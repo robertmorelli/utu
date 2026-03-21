@@ -1,16 +1,17 @@
 import process from 'node:process';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type {
-  UtuCompletionItem,
-  UtuDiagnostic,
-  UtuDocumentHighlight,
-  UtuDocumentSymbol,
-  UtuHover,
-  UtuLocation,
-  UtuRange,
-  UtuSemanticToken,
-  UtuWorkspaceSymbol,
+import {
+  copyRange,
+  type UtuCompletionItem,
+  type UtuDiagnostic,
+  type UtuDocumentHighlight,
+  type UtuDocumentSymbol,
+  type UtuHover,
+  type UtuLocation,
+  type UtuRange,
+  type UtuSemanticToken,
+  type UtuWorkspaceSymbol,
 } from '../core/types';
 import { UtuLanguageServer } from './index';
 
@@ -71,8 +72,24 @@ const DIAGNOSTIC_SEVERITIES: Record<UtuDiagnostic['severity'], number> = {
   error: 1,
 };
 
-const SEMANTIC_TOKEN_TYPES = ['type', 'enumMember', 'function', 'parameter', 'variable', 'property'] as const;
+const SEMANTIC_TOKEN_TYPES = [
+  'type',
+  'enumMember',
+  'function',
+  'parameter',
+  'variable',
+  'property',
+] as const;
+
 const SEMANTIC_TOKEN_MODIFIERS = ['declaration'] as const;
+
+const SEMANTIC_TOKEN_TYPE_INDEX = Object.fromEntries(
+  SEMANTIC_TOKEN_TYPES.map((type, index) => [type, index]),
+) as Record<string, number>;
+
+const SEMANTIC_TOKEN_MODIFIER_MASKS = Object.fromEntries(
+  SEMANTIC_TOKEN_MODIFIERS.map((modifier, index) => [modifier, 1 << index]),
+) as Record<string, number>;
 
 const JSON_RPC_ERRORS = {
   parseError: -32700,
@@ -85,6 +102,43 @@ const JSON_RPC_ERRORS = {
 const SERVER_NAME = 'utu-lsp';
 const SERVER_VERSION = '0.0.1';
 const HEADER_SEPARATOR = Buffer.from('\r\n\r\n', 'ascii');
+const INITIALIZE_RESULT = {
+  capabilities: {
+    textDocumentSync: {
+      openClose: true,
+      change: 2,
+      save: {
+        includeText: true,
+      },
+    },
+    hoverProvider: true,
+    definitionProvider: true,
+    referencesProvider: true,
+    documentHighlightProvider: true,
+    completionProvider: {
+      triggerCharacters: ['.'],
+    },
+    documentSymbolProvider: true,
+    workspaceSymbolProvider: true,
+    semanticTokensProvider: {
+      legend: {
+        tokenTypes: [...SEMANTIC_TOKEN_TYPES],
+        tokenModifiers: [...SEMANTIC_TOKEN_MODIFIERS],
+      },
+      full: true,
+    },
+    workspace: {
+      workspaceFolders: {
+        supported: true,
+        changeNotifications: true,
+      },
+    },
+  },
+  serverInfo: {
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
+  },
+};
 
 class JsonRpcConnection {
   private buffer = Buffer.alloc(0);
@@ -139,7 +193,12 @@ class JsonRpcConnection {
       try {
         message = JSON.parse(body);
       } catch (error) {
-        this.sendError(null, JSON_RPC_ERRORS.parseError, 'Invalid JSON payload.', errorToData(error));
+        this.sendError(
+          null,
+          JSON_RPC_ERRORS.parseError,
+          'Invalid JSON payload.',
+          errorToData(error),
+        );
         continue;
       }
 
@@ -148,24 +207,22 @@ class JsonRpcConnection {
   }
 
   private async dispatch(message: unknown): Promise<void> {
-    if (!isObject(message) || message.jsonrpc !== '2.0') {
+    if (!isJsonRpcMessage(message)) {
       this.sendError(null, JSON_RPC_ERRORS.invalidRequest, 'Expected a JSON-RPC 2.0 message.');
       return;
     }
 
-    if (typeof message.method === 'string' && 'id' in message) {
-      const request = message as JsonRpcRequest;
-
+    if (isJsonRpcRequest(message)) {
       try {
-        const result = await this.onRequest(request);
+        const result = await this.onRequest(message);
         this.send({
           jsonrpc: '2.0',
-          id: request.id,
+          id: message.id,
           result,
         });
       } catch (error) {
         this.sendError(
-          request.id,
+          message.id,
           getErrorCode(error),
           error instanceof Error ? error.message : 'Request failed.',
           errorToData(error),
@@ -175,9 +232,9 @@ class JsonRpcConnection {
       return;
     }
 
-    if (typeof message.method === 'string') {
+    if (isJsonRpcNotification(message)) {
       try {
-        await this.onNotification(message as JsonRpcNotification);
+        await this.onNotification(message);
       } catch (error) {
         console.error('[utu-lsp] notification failed:', error);
       }
@@ -196,9 +253,7 @@ class JsonRpcConnection {
     this.send({
       jsonrpc: '2.0',
       id,
-      error: data === undefined
-        ? { code, message }
-        : { code, message, data },
+      error: data === undefined ? { code, message } : { code, message, data },
     });
   }
 
@@ -227,183 +282,137 @@ class UtuLspSession {
       ),
     });
     this.connection = new JsonRpcConnection(
-      async (request) => this.handleRequest(request),
-      async (notification) => this.handleNotification(notification),
+      (request) => this.handleRequest(request),
+      (notification) => this.handleNotification(notification),
     );
   }
 
-  async handleRequest(request: JsonRpcRequest): Promise<unknown> {
-    switch (request.method) {
-      case 'initialize': {
-        const workspaceFolders = getWorkspaceFolderUris(request.params);
-        this.server.setWorkspaceFolders(workspaceFolders);
+  async handleRequest({ method, params }: JsonRpcRequest): Promise<unknown> {
+    switch (method) {
+      case 'initialize':
+        this.server.setWorkspaceFolders(getWorkspaceFolderUris(params));
         this.initialized = true;
-
-        return {
-          capabilities: {
-            textDocumentSync: {
-              openClose: true,
-              change: 2,
-              save: {
-                includeText: true,
-              },
-            },
-            hoverProvider: true,
-            definitionProvider: true,
-            referencesProvider: true,
-            documentHighlightProvider: true,
-            completionProvider: {
-              triggerCharacters: ['.'],
-            },
-            documentSymbolProvider: true,
-            workspaceSymbolProvider: true,
-            semanticTokensProvider: {
-              legend: {
-                tokenTypes: [...SEMANTIC_TOKEN_TYPES],
-                tokenModifiers: [...SEMANTIC_TOKEN_MODIFIERS],
-              },
-              full: true,
-            },
-            workspace: {
-              workspaceFolders: {
-                supported: true,
-                changeNotifications: true,
-              },
-            },
-          },
-          serverInfo: {
-            name: SERVER_NAME,
-            version: SERVER_VERSION,
-          },
-        };
-      }
+        return INITIALIZE_RESULT;
       case 'shutdown':
         this.shutdownRequested = true;
         return null;
       case 'textDocument/hover':
-        this.assertInitialized();
-        return toLspHover(
-          await this.server.getHover(
-            getRequiredTextDocumentUri(request.params),
-            getRequiredPosition(request.params),
+        return this.requireInitialized(async () =>
+          toLspHover(
+            await this.server.getHover(
+              getRequiredTextDocumentUri(params),
+              getRequiredPosition(params),
+            ),
           ),
         );
       case 'textDocument/definition':
-        this.assertInitialized();
-        return toLspLocation(
-          await this.server.getDefinition(
-            getRequiredTextDocumentUri(request.params),
-            getRequiredPosition(request.params),
+        return this.requireInitialized(async () =>
+          toLspLocation(
+            await this.server.getDefinition(
+              getRequiredTextDocumentUri(params),
+              getRequiredPosition(params),
+            ),
           ),
         );
       case 'textDocument/references':
-        this.assertInitialized();
-        return (
-          await this.server.getReferences(
-            getRequiredTextDocumentUri(request.params),
-            getRequiredPosition(request.params),
-            getIncludeDeclaration(request.params),
-          )
-        ).map(toLspLocation);
-      case 'textDocument/documentHighlight':
-        this.assertInitialized();
-        return (
-          await this.server.getDocumentHighlights(
-            getRequiredTextDocumentUri(request.params),
-            getRequiredPosition(request.params),
-          )
-        ).map(toLspDocumentHighlight);
-      case 'textDocument/completion':
-        this.assertInitialized();
-        return (
-          await this.server.getCompletionItems(
-            getRequiredTextDocumentUri(request.params),
-            getRequiredPosition(request.params),
-          )
-        ).map(toLspCompletionItem);
-      case 'textDocument/documentSymbol':
-        this.assertInitialized();
-        return (
-          await this.server.getDocumentSymbols(getRequiredTextDocumentUri(request.params))
-        ).map(toLspDocumentSymbol);
-      case 'workspace/symbol':
-        this.assertInitialized();
-        return (
-          await this.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(request.params))
-        ).map(toLspWorkspaceSymbol);
-      case 'textDocument/semanticTokens/full':
-        this.assertInitialized();
-        return {
-          data: encodeSemanticTokens(
-            await this.server.getDocumentSemanticTokens(getRequiredTextDocumentUri(request.params)),
-          ),
-        };
-      default:
-        throw new JsonRpcError(
-          JSON_RPC_ERRORS.methodNotFound,
-          `Unsupported request: ${request.method}`,
+        return this.requireInitialized(async () =>
+          (
+            await this.server.getReferences(
+              getRequiredTextDocumentUri(params),
+              getRequiredPosition(params),
+              getIncludeDeclaration(params),
+            )
+          ).map(toLspLocation),
         );
+      case 'textDocument/documentHighlight':
+        return this.requireInitialized(async () =>
+          (
+            await this.server.getDocumentHighlights(
+              getRequiredTextDocumentUri(params),
+              getRequiredPosition(params),
+            )
+          ).map(toLspDocumentHighlight),
+        );
+      case 'textDocument/completion':
+        return this.requireInitialized(async () =>
+          (
+            await this.server.getCompletionItems(
+              getRequiredTextDocumentUri(params),
+              getRequiredPosition(params),
+            )
+          ).map(toLspCompletionItem),
+        );
+      case 'textDocument/documentSymbol':
+        return this.requireInitialized(async () =>
+          (
+            await this.server.getDocumentSymbols(getRequiredTextDocumentUri(params))
+          ).map(toLspDocumentSymbol),
+        );
+      case 'workspace/symbol':
+        return this.requireInitialized(async () =>
+          (
+            await this.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(params))
+          ).map(toLspWorkspaceSymbol),
+        );
+      case 'textDocument/semanticTokens/full':
+        return this.requireInitialized(async () => ({
+          data: encodeSemanticTokens(
+            await this.server.getDocumentSemanticTokens(getRequiredTextDocumentUri(params)),
+          ),
+        }));
+      default:
+        throw new JsonRpcError(JSON_RPC_ERRORS.methodNotFound, `Unsupported request: ${method}`);
     }
   }
 
-  async handleNotification(notification: JsonRpcNotification): Promise<void> {
-    switch (notification.method) {
+  async handleNotification({ method, params }: JsonRpcNotification): Promise<void> {
+    switch (method) {
       case 'initialized':
       case '$/setTrace':
       case '$/cancelRequest':
-        return;
-      case 'textDocument/didOpen': {
-        this.assertInitialized();
-        const textDocument = getRequiredTextDocument(notification.params);
-        const diagnostics = await this.server.openDocument({
-          uri: textDocument.uri,
-          version: textDocument.version,
-          text: textDocument.text,
-        });
-        this.publishDiagnostics(textDocument.uri, diagnostics);
-        return;
-      }
-      case 'textDocument/didChange': {
-        this.assertInitialized();
-        const textDocument = getRequiredTextDocument(notification.params);
-        const contentChanges = getRequiredContentChanges(notification.params);
-        const diagnostics = await this.server.updateDocument({
-          uri: textDocument.uri,
-          version: textDocument.version,
-          changes: contentChanges.map((change) => ({
-            text: change.text,
-            range: change.range,
-          })),
-        });
-        this.publishDiagnostics(textDocument.uri, diagnostics);
-        return;
-      }
-      case 'textDocument/didSave': {
-        this.assertInitialized();
-        const uri = getRequiredTextDocumentUri(notification.params);
-        const diagnostics = await this.server.saveDocument({
-          uri,
-          text: getOptionalText(notification.params),
-        });
-        this.publishDiagnostics(uri, diagnostics);
-        return;
-      }
-      case 'textDocument/didClose': {
-        this.assertInitialized();
-        const uri = getRequiredTextDocumentUri(notification.params);
-        this.server.closeDocument(uri);
-        this.publishDiagnostics(uri, []);
-        return;
-      }
-      case 'workspace/didChangeWorkspaceFolders': {
-        this.assertInitialized();
-        const { added, removed } = getWorkspaceFolderChanges(notification.params);
-        this.server.addWorkspaceFolders(added);
-        this.server.removeWorkspaceFolders(removed);
-        return;
-      }
       case 'workspace/didChangeConfiguration':
         return;
+      case 'textDocument/didOpen':
+        return this.requireInitialized(async () => {
+          const textDocument = getRequiredTextDocument(params);
+          await this.publishDocumentDiagnostics(
+            textDocument.uri,
+            () => this.server.openDocument(textDocument),
+          );
+        });
+      case 'textDocument/didChange':
+        return this.requireInitialized(async () => {
+          const textDocument = getRequiredTextDocument(params);
+          await this.publishDocumentDiagnostics(textDocument.uri, () =>
+            this.server.updateDocument({
+              uri: textDocument.uri,
+              version: textDocument.version,
+              changes: getRequiredContentChanges(params),
+            }),
+          );
+        });
+      case 'textDocument/didSave':
+        return this.requireInitialized(async () => {
+          const uri = getRequiredTextDocumentUri(params);
+          await this.publishDocumentDiagnostics(uri, () =>
+            this.server.saveDocument({
+              uri,
+              text: getOptionalText(params),
+            }),
+          );
+        });
+      case 'textDocument/didClose':
+        return this.requireInitialized(async () => {
+          const uri = getRequiredTextDocumentUri(params);
+          this.server.closeDocument(uri);
+          this.publishDiagnostics(uri, []);
+        });
+      case 'workspace/didChangeWorkspaceFolders':
+        return this.requireInitialized(async () => {
+          const { added, removed } = getWorkspaceFolderChanges(params);
+          this.server.addWorkspaceFolders(added);
+          this.server.removeWorkspaceFolders(removed);
+        });
       case 'exit':
         this.exit();
         return;
@@ -432,6 +441,18 @@ class UtuLspSession {
     this.server.dispose();
     process.exit(this.shutdownRequested ? 0 : 1);
   }
+
+  private async requireInitialized<T>(callback: () => Promise<T>): Promise<T> {
+    this.assertInitialized();
+    return callback();
+  }
+
+  private async publishDocumentDiagnostics(
+    uri: string,
+    loadDiagnostics: () => Promise<readonly UtuDiagnostic[]>,
+  ): Promise<void> {
+    this.publishDiagnostics(uri, await loadDiagnostics());
+  }
 }
 
 class JsonRpcError extends Error {
@@ -449,43 +470,30 @@ function main(): void {
 }
 
 function resolveServerAssetPath(overridePath: string | undefined, assetName: string): string {
-  if (overridePath) {
-    return overridePath;
-  }
-
-  const currentFilePath = fileURLToPath(import.meta.url);
-  const currentDirectory = dirname(currentFilePath);
-  return resolvePath(currentDirectory, assetName);
+  return overridePath ?? resolvePath(dirname(fileURLToPath(import.meta.url)), assetName);
 }
 
 function getContentLength(headerText: string): number | undefined {
   const match = /Content-Length:\s*(\d+)/i.exec(headerText);
-  if (!match) {
-    return undefined;
-  }
-
-  return Number.parseInt(match[1], 10);
+  return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
 function getRequiredTextDocumentUri(params: unknown): string {
-  const textDocument = getRequiredTextDocument(params);
-  return textDocument.uri;
+  return getRequiredTextDocument(params).uri;
 }
 
-function getRequiredTextDocument(params: unknown): { uri: string; version: number; text: string } {
+function getRequiredTextDocument(
+  params: unknown,
+): { uri: string; version: number; text: string } {
   if (!isObject(params) || !isObject(params.textDocument)) {
     throw new JsonRpcError(JSON_RPC_ERRORS.invalidRequest, 'Missing textDocument payload.');
   }
 
-  const uri = requireString(params.textDocument.uri, 'textDocument.uri');
-  const version = typeof params.textDocument.version === 'number'
-    ? params.textDocument.version
-    : 0;
-  const text = typeof params.textDocument.text === 'string'
-    ? params.textDocument.text
-    : '';
-
-  return { uri, version, text };
+  return {
+    uri: requireString(params.textDocument.uri, 'textDocument.uri'),
+    version: typeof params.textDocument.version === 'number' ? params.textDocument.version : 0,
+    text: typeof params.textDocument.text === 'string' ? params.textDocument.text : '',
+  };
 }
 
 function getRequiredPosition(params: unknown): { line: number; character: number } {
@@ -500,11 +508,7 @@ function getRequiredPosition(params: unknown): { line: number; character: number
 }
 
 function getIncludeDeclaration(params: unknown): boolean {
-  if (!isObject(params) || !isObject(params.context)) {
-    return false;
-  }
-
-  return Boolean(params.context.includeDeclaration);
+  return Boolean(isObject(params) && isObject(params.context) && params.context.includeDeclaration);
 }
 
 function getRequiredContentChanges(
@@ -527,36 +531,24 @@ function getRequiredContentChanges(
 }
 
 function getWorkspaceSymbolQuery(params: unknown): string {
-  if (!isObject(params) || typeof params.query !== 'string') {
-    return '';
-  }
-
-  return params.query;
+  return isObject(params) && typeof params.query === 'string' ? params.query : '';
 }
 
 function getOptionalText(params: unknown): string | undefined {
-  if (!isObject(params) || typeof params.text !== 'string') {
-    return undefined;
-  }
-
-  return params.text;
+  return isObject(params) && typeof params.text === 'string' ? params.text : undefined;
 }
 
 function getWorkspaceFolderUris(params: unknown): string[] {
-  if (isObject(params) && Array.isArray(params.workspaceFolders)) {
-    return params.workspaceFolders
-      .map((folder) => (isObject(folder) && typeof folder.uri === 'string' ? folder.uri : undefined))
-      .filter((folder): folder is string => folder !== undefined);
+  if (!isObject(params)) {
+    return [];
   }
 
-  if (isObject(params) && typeof params.rootUri === 'string' && params.rootUri.length > 0) {
-    return [params.rootUri];
-  }
-
-  if (isObject(params) && typeof params.rootPath === 'string' && params.rootPath.length > 0) {
+  const folders = readFolderUris(params.workspaceFolders);
+  if (folders.length > 0) return folders;
+  if (typeof params.rootUri === 'string' && params.rootUri.length > 0) return [params.rootUri];
+  if (typeof params.rootPath === 'string' && params.rootPath.length > 0) {
     return [pathToFileURL(resolvePath(params.rootPath)).toString()];
   }
-
   return [];
 }
 
@@ -565,55 +557,34 @@ function getWorkspaceFolderChanges(params: unknown): { added: string[]; removed:
     return { added: [], removed: [] };
   }
 
-  const added = Array.isArray(params.event.added)
-    ? params.event.added
-        .map((folder) => (isObject(folder) && typeof folder.uri === 'string' ? folder.uri : undefined))
-        .filter((folder): folder is string => folder !== undefined)
-    : [];
-  const removed = Array.isArray(params.event.removed)
-    ? params.event.removed
-        .map((folder) => (isObject(folder) && typeof folder.uri === 'string' ? folder.uri : undefined))
-        .filter((folder): folder is string => folder !== undefined)
-    : [];
-
-  return { added, removed };
+  return {
+    added: readFolderUris(params.event.added),
+    removed: readFolderUris(params.event.removed),
+  };
 }
 
-function toLspRange(range: UtuRange): UtuRange {
-  return {
-    start: {
-      line: range.start.line,
-      character: range.start.character,
-    },
-    end: {
-      line: range.end.line,
-      character: range.end.character,
-    },
-  };
+function readFolderUris(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.flatMap((folder) =>
+        isObject(folder) && typeof folder.uri === 'string' ? [folder.uri] : [],
+      )
+    : [];
 }
 
 function toLspLocation(location: UtuLocation | undefined): { uri: string; range: UtuRange } | null {
-  if (!location) {
-    return null;
-  }
-
-  return {
-    uri: location.uri,
-    range: toLspRange(location.range),
-  };
+  return mapNullable(location, (value) => ({
+    uri: value.uri,
+    range: copyRange(value.range),
+  }));
 }
 
 function toLspHover(
   hover: UtuHover | undefined,
 ): { contents: UtuHover['contents']; range: UtuRange } | null {
-  if (!hover) {
-    return null;
-  }
-
-  return {
-    contents: hover.contents,
-    range: toLspRange(hover.range),
-  };
+  return mapNullable(hover, (value) => ({
+    contents: value.contents,
+    range: copyRange(value.range),
+  }));
 }
 
 function toLspDiagnostic(diagnostic: UtuDiagnostic): {
@@ -623,7 +594,7 @@ function toLspDiagnostic(diagnostic: UtuDiagnostic): {
   message: string;
 } {
   return {
-    range: toLspRange(diagnostic.range),
+    range: copyRange(diagnostic.range),
     severity: DIAGNOSTIC_SEVERITIES[diagnostic.severity],
     source: diagnostic.source,
     message: diagnostic.message,
@@ -635,7 +606,7 @@ function toLspDocumentHighlight(highlight: UtuDocumentHighlight): {
   kind: number;
 } {
   return {
-    range: toLspRange(highlight.range),
+    range: copyRange(highlight.range),
     kind: DOCUMENT_HIGHLIGHT_KINDS[highlight.kind],
   };
 }
@@ -663,8 +634,8 @@ function toLspDocumentSymbol(symbol: UtuDocumentSymbol): {
     name: symbol.name,
     detail: symbol.detail,
     kind: DOCUMENT_SYMBOL_KINDS[symbol.kind],
-    range: toLspRange(symbol.range),
-    selectionRange: toLspRange(symbol.selectionRange),
+    range: copyRange(symbol.range),
+    selectionRange: copyRange(symbol.selectionRange),
   };
 }
 
@@ -679,7 +650,7 @@ function toLspWorkspaceSymbol(symbol: UtuWorkspaceSymbol): {
     kind: DOCUMENT_SYMBOL_KINDS[symbol.kind],
     location: {
       uri: symbol.location.uri,
-      range: toLspRange(symbol.location.range),
+      range: copyRange(symbol.location.range),
     },
     containerName: symbol.detail,
   };
@@ -687,22 +658,16 @@ function toLspWorkspaceSymbol(symbol: UtuWorkspaceSymbol): {
 
 function encodeSemanticTokens(tokens: readonly UtuSemanticToken[]): number[] {
   const sortedTokens = [...tokens]
-    .filter((token) => token.range.start.line === token.range.end.line)
-    .filter((token) => token.range.end.character > token.range.start.character)
-    .sort((left, right) => {
-      if (left.range.start.line !== right.range.start.line) {
-        return left.range.start.line - right.range.start.line;
-      }
+    .filter(isEncodableSemanticToken)
+    .sort(compareSemanticTokens);
 
-      return left.range.start.character - right.range.start.character;
-    });
   const data: number[] = [];
   let previousLine = 0;
   let previousCharacter = 0;
 
   for (const token of sortedTokens) {
-    const typeIndex = SEMANTIC_TOKEN_TYPES.indexOf(token.type as typeof SEMANTIC_TOKEN_TYPES[number]);
-    if (typeIndex < 0) {
+    const typeIndex = SEMANTIC_TOKEN_TYPE_INDEX[token.type];
+    if (typeIndex === undefined) {
       continue;
     }
 
@@ -711,17 +676,7 @@ function encodeSemanticTokens(tokens: readonly UtuSemanticToken[]): number[] {
     const deltaLine = line - previousLine;
     const deltaCharacter = deltaLine === 0 ? character - previousCharacter : character;
     const length = token.range.end.character - token.range.start.character;
-    let modifierMask = 0;
-
-    for (const modifier of token.modifiers) {
-      const modifierIndex = SEMANTIC_TOKEN_MODIFIERS.indexOf(
-        modifier as typeof SEMANTIC_TOKEN_MODIFIERS[number],
-      );
-
-      if (modifierIndex >= 0) {
-        modifierMask |= 1 << modifierIndex;
-      }
-    }
+    const modifierMask = getModifierMask(token.modifiers);
 
     data.push(deltaLine, deltaCharacter, length, typeIndex, modifierMask);
     previousLine = line;
@@ -729,6 +684,23 @@ function encodeSemanticTokens(tokens: readonly UtuSemanticToken[]): number[] {
   }
 
   return data;
+}
+
+function isEncodableSemanticToken(token: UtuSemanticToken): boolean {
+  return token.range.start.line === token.range.end.line
+    && token.range.end.character > token.range.start.character;
+}
+
+function compareSemanticTokens(left: UtuSemanticToken, right: UtuSemanticToken): number {
+  return left.range.start.line - right.range.start.line
+    || left.range.start.character - right.range.start.character;
+}
+
+function getModifierMask(modifiers: readonly string[]): number {
+  return modifiers.reduce(
+    (mask, modifier) => mask | (SEMANTIC_TOKEN_MODIFIER_MASKS[modifier] ?? 0),
+    0,
+  );
 }
 
 function isRange(value: unknown): value is UtuRange {
@@ -741,8 +713,22 @@ function isRange(value: unknown): value is UtuRange {
     && typeof value.end.character === 'number';
 }
 
-function isObject(value: unknown): value is Record<string, any> {
+function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isJsonRpcMessage(
+  value: unknown,
+): value is Record<string, unknown> & { jsonrpc: '2.0' } {
+  return isObject(value) && value.jsonrpc === '2.0';
+}
+
+function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
+  return isObject(value) && typeof value.method === 'string' && 'id' in value;
+}
+
+function isJsonRpcNotification(value: unknown): value is JsonRpcNotification {
+  return isObject(value) && typeof value.method === 'string' && !('id' in value);
 }
 
 function requireString(value: unknown, fieldName: string): string {
@@ -762,9 +748,7 @@ function requireNumber(value: unknown, fieldName: string): number {
 }
 
 function getErrorCode(error: unknown): number {
-  return error instanceof JsonRpcError
-    ? error.code
-    : JSON_RPC_ERRORS.internalError;
+  return error instanceof JsonRpcError ? error.code : JSON_RPC_ERRORS.internalError;
 }
 
 function errorToData(error: unknown): unknown {
@@ -777,6 +761,10 @@ function errorToData(error: unknown): unknown {
   }
 
   return error;
+}
+
+function mapNullable<T, R>(value: T | undefined, map: (value: T) => R): R | null {
+  return value ? map(value) : null;
 }
 
 main();

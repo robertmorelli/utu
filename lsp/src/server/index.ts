@@ -1,23 +1,23 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { UtuLanguageService } from '../core/languageService';
+import { UtuLanguageService } from '../core/languageService';
 import { UtuParserService } from '../core/parser';
-import type {
-  UtuCompletionItem,
-  UtuDiagnostic,
-  UtuDocumentHighlight,
-  UtuDocumentSymbol,
-  UtuHover,
-  UtuLocation,
-  UtuPositionLike,
-  UtuRange,
-  UtuSemanticToken,
-  UtuTextDocument,
-  UtuWorkspaceSymbol,
+import {
+  clamp,
+  getDocumentUri,
+  type UtuCompletionItem,
+  type UtuDiagnostic,
+  type UtuDocumentHighlight,
+  type UtuDocumentSymbol,
+  type UtuHover,
+  type UtuLocation,
+  type UtuPositionLike,
+  type UtuRange,
+  type UtuSemanticToken,
+  type UtuTextDocument,
+  type UtuWorkspaceSymbol,
 } from '../core/types';
-import { getDocumentUri } from '../core/types';
-import { UtuLanguageService as UtuLanguageServiceImpl } from '../core/languageService';
 
 export interface UtuServerDocumentStore {
   all(): readonly UtuServerTextDocument[];
@@ -107,75 +107,51 @@ export class UtuServerTextDocument implements UtuTextDocument {
 
   lineAt(line: number): { text: string } {
     const offsets = this.getLineOffsets();
-    const safeLine = clamp(line, 0, Math.max(offsets.length - 1, 0));
-    const startOffset = offsets[safeLine] ?? 0;
-    const nextOffset = offsets[safeLine + 1] ?? this.text.length;
-    let endOffset = nextOffset;
-
-    if (endOffset > startOffset && this.text.charCodeAt(endOffset - 1) === 10) {
-      endOffset -= 1;
-    }
-
-    if (endOffset > startOffset && this.text.charCodeAt(endOffset - 1) === 13) {
-      endOffset -= 1;
-    }
-
-    return {
-      text: this.text.slice(startOffset, endOffset),
-    };
+    const [start, end] = this.getLineBounds(line, offsets);
+    return { text: this.text.slice(start, end) };
   }
 
   positionAt(offset: number): { line: number; character: number } {
-    const lineOffsets = this.getLineOffsets();
+    const offsets = this.getLineOffsets();
     const clampedOffset = clamp(offset, 0, this.text.length);
-    let low = 0;
-    let high = lineOffsets.length;
-
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      if ((lineOffsets[mid] ?? 0) > clampedOffset) {
-        high = mid;
-      } else {
-        low = mid + 1;
-      }
-    }
-
-    const line = Math.max(low - 1, 0);
+    const line = this.findLineForOffset(clampedOffset, offsets);
     return {
       line,
-      character: clampedOffset - (lineOffsets[line] ?? 0),
+      character: clampedOffset - (offsets[line] ?? 0),
     };
   }
 
   offsetAt(position: UtuPositionLike): number {
-    const lineOffsets = this.getLineOffsets();
-    const safeLine = clamp(position.line, 0, Math.max(lineOffsets.length - 1, 0));
-    const lineOffset = lineOffsets[safeLine] ?? 0;
-    const lineEndOffset = lineOffset + this.lineAt(safeLine).text.length;
-    return clamp(lineOffset + position.character, lineOffset, lineEndOffset);
+    const offsets = this.getLineOffsets();
+    const [lineStart, lineEnd] = this.getLineBounds(position.line, offsets);
+    return clamp(lineStart + position.character, lineStart, lineEnd);
   }
 
   setText(text: string, version: number): void {
-    this.text = text;
+    this.replaceText(text);
     this.version = version;
-    this.lineOffsets = undefined;
   }
 
   applyChanges(changes: readonly UtuTextChange[], version: number): void {
     for (const change of changes) {
       if (!change.range) {
-        this.text = change.text;
-        this.lineOffsets = undefined;
+        this.replaceText(change.text);
         continue;
       }
 
-      const startOffset = this.offsetAt(change.range.start);
-      const endOffset = this.offsetAt(change.range.end);
-      this.text = `${this.text.slice(0, startOffset)}${change.text}${this.text.slice(endOffset)}`;
-      this.lineOffsets = undefined;
+      const start = this.offsetAt(change.range.start);
+      const end = this.offsetAt(change.range.end);
+      this.replaceText(
+        `${this.text.slice(0, start)}${change.text}${this.text.slice(end)}`,
+      );
     }
 
     this.version = version;
+  }
+
+  private replaceText(text: string): void {
+    this.text = text;
+    this.lineOffsets = undefined;
   }
 
   private getLineOffsets(): number[] {
@@ -205,6 +181,33 @@ export class UtuServerTextDocument implements UtuTextDocument {
     this.lineOffsets = offsets;
     return offsets;
   }
+
+  private getSafeLine(line: number, offsets: readonly number[]): number {
+    return clamp(line, 0, Math.max(offsets.length - 1, 0));
+  }
+
+  private getLineBounds(line: number, offsets: readonly number[]): [number, number] {
+    const safeLine = this.getSafeLine(line, offsets);
+    const start = offsets[safeLine] ?? 0;
+    const nextOffset = offsets[safeLine + 1] ?? this.text.length;
+    return [start, trimLineEnding(this.text, start, nextOffset)];
+  }
+
+  private findLineForOffset(offset: number, offsets: readonly number[]): number {
+    let low = 0;
+    let high = offsets.length;
+
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if ((offsets[mid] ?? 0) > offset) {
+        high = mid;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    return Math.max(low - 1, 0);
+  }
 }
 
 export class UtuServerDocumentManager implements UtuServerDocumentStore {
@@ -216,7 +219,7 @@ export class UtuServerDocumentManager implements UtuServerDocumentStore {
   }
 
   all(): readonly UtuServerTextDocument[] {
-    return Array.from(this.openDocuments.values());
+    return [...this.openDocuments.values()];
   }
 
   get(uri: string): UtuServerTextDocument | undefined {
@@ -224,9 +227,7 @@ export class UtuServerDocumentManager implements UtuServerDocumentStore {
   }
 
   open(params: UtuOpenDocumentParams): UtuServerTextDocument {
-    const document = new UtuServerTextDocument(params.uri, params.version, params.text);
-    this.openDocuments.set(params.uri, document);
-    return document;
+    return this.store(new UtuServerTextDocument(params.uri, params.version, params.text));
   }
 
   update(params: UtuChangeDocumentParams): UtuServerTextDocument {
@@ -248,64 +249,34 @@ export class UtuServerDocumentManager implements UtuServerDocumentStore {
   }
 
   setWorkspaceFolders(folders: readonly string[]): void {
-    this.workspaceFolders = new Set(
-      folders
-        .map((folder) => folder.trim())
-        .filter((folder) => folder.length > 0),
-    );
+    this.workspaceFolders = new Set(normalizeFolders(folders));
   }
 
   addWorkspaceFolders(folders: readonly string[]): void {
-    for (const folder of folders) {
-      const normalized = folder.trim();
-      if (normalized) {
-        this.workspaceFolders.add(normalized);
-      }
+    for (const folder of normalizeFolders(folders)) {
+      this.workspaceFolders.add(folder);
     }
   }
 
   removeWorkspaceFolders(folders: readonly string[]): void {
-    for (const folder of folders) {
+    for (const folder of normalizeFolders(folders)) {
       this.workspaceFolders.delete(folder);
     }
   }
 
   async resolve(uri: string): Promise<UtuServerTextDocument | undefined> {
-    const openDocument = this.openDocuments.get(uri);
-    if (openDocument) {
-      return openDocument;
-    }
-
-    return loadFileDocument(uri);
+    return this.openDocuments.get(uri) ?? loadFileDocument(uri);
   }
 
   async listWorkspaceDocuments(): Promise<UtuServerTextDocument[]> {
-    const documents = new Map<string, UtuServerTextDocument>(
-      Array.from(this.openDocuments.entries()),
-    );
-
-    const filePaths = await Promise.all(
-      Array.from(this.workspaceFolders, async (folderUri) => {
-        const folderPath = tryFileUriToPath(folderUri);
-        if (!folderPath) {
-          return [];
-        }
-
-        return collectWorkspaceFiles(folderPath);
-      }),
-    );
-
-    const candidates = filePaths.flat();
-    const loadedDocuments = await Promise.all(
-      candidates.map(async (filePath) => {
-        const uri = pathToFileURL(filePath).toString();
-        if (documents.has(uri)) {
-          return undefined;
-        }
-
-        return loadFileDocument(uri);
-      }),
-    );
+    const documents = new Map(this.openDocuments);
+    const workspaceFiles = (
+      await Promise.all([...this.workspaceFolders].map(listWorkspaceFilesForFolder))
+    ).flat();
+    const missingUris = [
+      ...new Set(workspaceFiles.map((filePath) => pathToFileURL(filePath).toString())),
+    ].filter((uri) => !documents.has(uri));
+    const loadedDocuments = await Promise.all(missingUris.map(loadFileDocument));
 
     for (const document of loadedDocuments) {
       if (document) {
@@ -313,7 +284,12 @@ export class UtuServerDocumentManager implements UtuServerDocumentStore {
       }
     }
 
-    return Array.from(documents.values());
+    return [...documents.values()];
+  }
+
+  private store(document: UtuServerTextDocument): UtuServerTextDocument {
+    this.openDocuments.set(document.uri, document);
+    return document;
   }
 }
 
@@ -328,7 +304,7 @@ export class UtuLanguageServerCore {
       grammarWasmPath: options.grammarWasmPath,
       runtimeWasmPath: options.runtimeWasmPath,
     });
-    this.languageService = new UtuLanguageServiceImpl(this.parserService);
+    this.languageService = new UtuLanguageService(this.parserService);
   }
 
   dispose(): void {
@@ -359,15 +335,11 @@ export class UtuLanguageServerCore {
   }
 
   async openDocument(params: UtuOpenDocumentParams): Promise<UtuDiagnostic[]> {
-    const document = this.documents.open(params);
-    this.invalidateDocument(document.uri);
-    return this.languageService.getDiagnostics(document);
+    return this.getFreshDiagnostics(this.documents.open(params));
   }
 
   async updateDocument(params: UtuChangeDocumentParams): Promise<UtuDiagnostic[]> {
-    const document = this.documents.update(params);
-    this.invalidateDocument(document.uri);
-    return this.languageService.getDiagnostics(document);
+    return this.getFreshDiagnostics(this.documents.update(params));
   }
 
   closeDocument(uri: string): void {
@@ -376,47 +348,43 @@ export class UtuLanguageServerCore {
   }
 
   async saveDocument(params: UtuSaveDocumentParams): Promise<UtuDiagnostic[]> {
-    const openDocument = this.documents.get(params.uri);
-    if (openDocument && params.text !== undefined) {
-      openDocument.setText(params.text, params.version ?? openDocument.version);
-      this.invalidateDocument(params.uri);
-      return this.languageService.getDiagnostics(openDocument);
+    const document = this.documents.get(params.uri);
+    if (document && params.text !== undefined) {
+      document.setText(params.text, params.version ?? document.version);
+      return this.getFreshDiagnostics(document);
     }
 
     return this.getDiagnostics(params.uri);
   }
 
   async getDiagnostics(uri: string): Promise<UtuDiagnostic[]> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return [];
-    }
-
-    return this.languageService.getDiagnostics(document);
+    return this.withDocument<UtuDiagnostic[]>(
+      uri,
+      [],
+      (document) => this.languageService.getDiagnostics(document),
+    );
   }
 
   async getHover(
     uri: string,
     position: UtuPositionLike,
   ): Promise<UtuHover | undefined> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return undefined;
-    }
-
-    return this.languageService.getHover(document, position);
+    return this.withDocument<UtuHover | undefined>(
+      uri,
+      undefined,
+      (document) => this.languageService.getHover(document, position),
+    );
   }
 
   async getDefinition(
     uri: string,
     position: UtuPositionLike,
   ): Promise<UtuLocation | undefined> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return undefined;
-    }
-
-    return this.languageService.getDefinition(document, position);
+    return this.withDocument<UtuLocation | undefined>(
+      uri,
+      undefined,
+      (document) => this.languageService.getDefinition(document, position),
+    );
   }
 
   async getReferences(
@@ -424,59 +392,70 @@ export class UtuLanguageServerCore {
     position: UtuPositionLike,
     includeDeclaration: boolean,
   ): Promise<UtuLocation[]> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return [];
-    }
-
-    return this.languageService.getReferences(document, position, includeDeclaration);
+    return this.withDocument<UtuLocation[]>(
+      uri,
+      [],
+      (document) => this.languageService.getReferences(document, position, includeDeclaration),
+    );
   }
 
   async getDocumentHighlights(
     uri: string,
     position: UtuPositionLike,
   ): Promise<UtuDocumentHighlight[]> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return [];
-    }
-
-    return this.languageService.getDocumentHighlights(document, position);
+    return this.withDocument<UtuDocumentHighlight[]>(
+      uri,
+      [],
+      (document) => this.languageService.getDocumentHighlights(document, position),
+    );
   }
 
   async getCompletionItems(
     uri: string,
     position: UtuPositionLike,
   ): Promise<UtuCompletionItem[]> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return [];
-    }
-
-    return this.languageService.getCompletionItems(document, position);
+    return this.withDocument<UtuCompletionItem[]>(
+      uri,
+      [],
+      (document) => this.languageService.getCompletionItems(document, position),
+    );
   }
 
   async getDocumentSemanticTokens(uri: string): Promise<UtuSemanticToken[]> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return [];
-    }
-
-    return this.languageService.getDocumentSemanticTokens(document);
+    return this.withDocument<UtuSemanticToken[]>(
+      uri,
+      [],
+      (document) => this.languageService.getDocumentSemanticTokens(document),
+    );
   }
 
   async getDocumentSymbols(uri: string): Promise<UtuDocumentSymbol[]> {
-    const document = await this.documents.resolve(uri);
-    if (!document) {
-      return [];
-    }
-
-    return this.languageService.getDocumentSymbols(document);
+    return this.withDocument<UtuDocumentSymbol[]>(
+      uri,
+      [],
+      (document) => this.languageService.getDocumentSymbols(document),
+    );
   }
 
   async getWorkspaceSymbols(query: string): Promise<UtuWorkspaceSymbol[]> {
-    const documents = await this.documents.listWorkspaceDocuments();
-    return this.languageService.getWorkspaceSymbols(query, documents);
+    return this.languageService.getWorkspaceSymbols(
+      query,
+      await this.documents.listWorkspaceDocuments(),
+    );
+  }
+
+  private async getFreshDiagnostics(document: UtuServerTextDocument): Promise<UtuDiagnostic[]> {
+    this.invalidateDocument(document.uri);
+    return this.languageService.getDiagnostics(document);
+  }
+
+  private async withDocument<T>(
+    uri: string,
+    fallback: T,
+    action: (document: UtuServerTextDocument) => Promise<T>,
+  ): Promise<T> {
+    const document = await this.documents.resolve(uri);
+    return document ? action(document) : fallback;
   }
 }
 
@@ -489,15 +468,20 @@ async function loadFileDocument(uri: string): Promise<UtuServerTextDocument | un
   }
 
   try {
-    const [contents, metadata] = await Promise.all([
+    const [text, metadata] = await Promise.all([
       readFile(filePath, 'utf8'),
       stat(filePath),
     ]);
 
-    return new UtuServerTextDocument(uri, Math.trunc(metadata.mtimeMs), contents);
+    return new UtuServerTextDocument(uri, Math.trunc(metadata.mtimeMs), text);
   } catch {
     return undefined;
   }
+}
+
+async function listWorkspaceFilesForFolder(folderUri: string): Promise<string[]> {
+  const folderPath = tryFileUriToPath(folderUri);
+  return folderPath ? collectWorkspaceFiles(folderPath) : [];
 }
 
 async function collectWorkspaceFiles(directory: string): Promise<string[]> {
@@ -510,24 +494,35 @@ async function collectWorkspaceFiles(directory: string): Promise<string[]> {
       continue;
     }
 
-    const entries = await readdir(currentDirectory, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await readdir(currentDirectory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
 
     for (const entry of entries) {
+      const entryPath = resolvePath(currentDirectory, entry.name);
+
       if (entry.isDirectory()) {
         if (!SKIPPED_WORKSPACE_DIRECTORIES.has(entry.name)) {
-          pending.push(resolvePath(currentDirectory, entry.name));
+          pending.push(entryPath);
         }
 
         continue;
       }
 
       if (entry.isFile() && entry.name.endsWith('.utu')) {
-        files.push(resolvePath(currentDirectory, entry.name));
+        files.push(entryPath);
       }
     }
   }
 
   return files;
+}
+
+function normalizeFolders(folders: readonly string[]): string[] {
+  return folders.map((folder) => folder.trim()).filter(isNonEmptyString);
 }
 
 function tryFileUriToPath(uri: string): string | undefined {
@@ -542,6 +537,21 @@ function tryFileUriToPath(uri: string): string | undefined {
   }
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
+function trimLineEnding(text: string, start: number, end: number): number {
+  let trimmedEnd = end;
+
+  while (trimmedEnd > start) {
+    const code = text.charCodeAt(trimmedEnd - 1);
+    if (code !== 10 && code !== 13) {
+      break;
+    }
+
+    trimmedEnd -= 1;
+  }
+
+  return trimmedEnd;
+}
+
+function isNonEmptyString(value: string): value is string {
+  return value.length > 0;
 }

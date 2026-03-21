@@ -14,12 +14,37 @@ const treeSitterRuntimeSource = resolve(extensionRoot, '../node_modules/web-tree
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const watchMode = process.argv.includes('--watch');
 const webOnlyMode = process.argv.includes('--web-only');
+const watchStartMessage = webOnlyMode
+  ? 'Watching UTU web extension sources...'
+  : 'Watching UTU extension sources...';
+const watchReadyMessage = webOnlyMode
+  ? 'UTU_WEB_EXTENSION_READY'
+  : 'UTU_EXTENSION_READY';
 const sharedBuildOptions = {
   bundle: true,
   sourcemap: 'linked',
   sourcesContent: false,
   logLevel: 'info',
 };
+
+function createWatchReadyPlugin(label, tracker) {
+  return {
+    name: `watch-ready:${label}`,
+    setup(buildContext) {
+      buildContext.onEnd((result) => {
+        if (result.errors.length > 0 || tracker.readyLogged || tracker.completedLabels.has(label)) {
+          return;
+        }
+
+        tracker.completedLabels.add(label);
+        if (tracker.completedLabels.size === tracker.expectedCount) {
+          tracker.readyLogged = true;
+          console.log(tracker.readyMessage);
+        }
+      });
+    },
+  };
+}
 
 const extensionConfig = {
   ...sharedBuildOptions,
@@ -51,9 +76,38 @@ const compilerNodeConfig = {
   external: ['binaryen', 'web-tree-sitter'],
 };
 
-const configs = webOnlyMode
-  ? [extensionConfig, compilerWebConfig]
-  : [extensionConfig, compilerWebConfig, compilerNodeConfig];
+function createBuildConfigs() {
+  if (!watchMode) {
+    return webOnlyMode
+      ? [extensionConfig, compilerWebConfig]
+      : [extensionConfig, compilerWebConfig, compilerNodeConfig];
+  }
+
+  const watchTracker = {
+    completedLabels: new Set(),
+    expectedCount: webOnlyMode ? 2 : 3,
+    readyLogged: false,
+    readyMessage: watchReadyMessage,
+  };
+
+  const attachPlugin = (config, label) => ({
+    ...config,
+    plugins: [...(config.plugins ?? []), createWatchReadyPlugin(label, watchTracker)],
+  });
+
+  return webOnlyMode
+    ? [
+        attachPlugin(extensionConfig, 'extension'),
+        attachPlugin(compilerWebConfig, 'compiler-web'),
+      ]
+    : [
+        attachPlugin(extensionConfig, 'extension'),
+        attachPlugin(compilerWebConfig, 'compiler-web'),
+        attachPlugin(compilerNodeConfig, 'compiler-node'),
+      ];
+}
+
+const configs = createBuildConfigs();
 
 let compilerSyncTimer;
 
@@ -99,6 +153,7 @@ async function snapshotCompilerSources(root = compilerSourceRoot) {
 }
 
 if (watchMode) {
+  console.log(watchStartMessage);
   await prepareAssets();
   const contexts = await Promise.all(configs.map((config) => context(config)));
   await Promise.all(contexts.map((ctx) => ctx.watch()));
@@ -146,7 +201,6 @@ if (watchMode) {
   process.on('SIGINT', signalHandler);
   process.on('SIGTERM', signalHandler);
 
-  console.log(webOnlyMode ? 'Watching UTU web extension sources...' : 'Watching UTU extension sources...');
   await new Promise(() => {});
 } else {
   await prepareAssets();

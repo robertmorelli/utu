@@ -16,11 +16,14 @@
       "group": "build",
       "problemMatcher": [
         {
-          "base": "$tsc-watch",
+          "owner": "utu-web-watch",
+          "pattern": {
+            "regexp": "$a"
+          },
           "background": {
             "activeOnStart": true,
-            "beginsPattern": "Watching UTU web extension sources\\.\\.\\.",
-            "endsPattern": "\\[watch\\] build finished, watching for changes\\.\\.\\."
+            "beginsPattern": "^Watching UTU web extension sources\\.\\.\\.$",
+            "endsPattern": "^UTU_WEB_EXTENSION_READY$"
           }
         }
       ],

@@ -102,40 +102,39 @@ export interface UtuWorkspaceSymbol {
 }
 
 export function copyPosition(position: UtuPositionLike): UtuPosition {
-  return {
-    line: position.line,
-    character: position.character,
-  };
+  return { line: position.line, character: position.character };
 }
 
 export function copyRange(range: UtuRange): UtuRange {
-  return {
-    start: copyPosition(range.start),
-    end: copyPosition(range.end),
-  };
+  return { start: copyPosition(range.start), end: copyPosition(range.end) };
 }
 
 export function comparePositions(
   left: UtuPositionLike,
   right: UtuPositionLike,
 ): number {
-  if (left.line !== right.line) {
-    return left.line - right.line;
-  }
+  return left.line - right.line || left.character - right.character;
+}
 
-  return left.character - right.character;
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 export function rangeContains(
   range: UtuRange,
   position: UtuPositionLike,
 ): boolean {
-  return comparePositions(range.start, position) <= 0 && comparePositions(position, range.end) <= 0;
+  return comparePositions(range.start, position) <= 0
+    && comparePositions(position, range.end) <= 0;
 }
 
 export function rangeLength(range: UtuRange): number {
   const lineDelta = range.end.line - range.start.line;
   return lineDelta * 10_000 + (range.end.character - range.start.character);
+}
+
+export function rangeKey(range: UtuRange): string {
+  return `${range.start.line}:${range.start.character}:${range.end.line}:${range.end.character}`;
 }
 
 export function getDocumentUri(document: UtuTextDocument): string {

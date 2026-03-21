@@ -19,7 +19,6 @@ export interface CompileMetadata {
 
 export interface CompileOptions {
   wat?: boolean;
-  optimize?: boolean;
 }
 
 export interface CompilerModule {

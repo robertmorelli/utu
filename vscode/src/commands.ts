@@ -180,10 +180,7 @@ function compileDocument(
   document: vscode.TextDocument,
   options: CompileOptions = {},
 ) {
-  return compilerHost.compile(document.getText(), {
-    optimize: getOptimizeSetting(),
-    ...options,
-  });
+  return compilerHost.compile(document.getText(), options);
 }
 
 function getDocumentLabel(document: vscode.TextDocument): string {
@@ -238,10 +235,6 @@ function revealExecution(
   }
 
   output.show(true);
-}
-
-function getOptimizeSetting(): boolean {
-  return vscode.workspace.getConfiguration('utu').get<boolean>('compiler.optimize', true);
 }
 
 async function hasRunnableMain(

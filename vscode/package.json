@@ -98,11 +98,6 @@
           "default": "onType",
           "markdownDescription": "Controls when UTU syntax diagnostics run."
         },
-        "utu.compiler.optimize": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Enable Binaryen optimization when running UTU compile commands."
-        },
         "utu.bench.iterations": {
           "type": "number",
           "default": 1000,

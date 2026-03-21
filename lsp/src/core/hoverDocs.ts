@@ -5,7 +5,10 @@ interface HoverDoc {
   description: string;
 }
 
-const BUILTIN_DOCS: Record<string, HoverDoc> = {
+type HoverDocs = Record<string, HoverDoc>;
+type BuiltinReturnType = string | ((typeText?: string) => string | undefined);
+
+const BUILTIN_DOCS: HoverDocs = {
   'array.len': {
     signature: 'array.len(arr) i32',
     description: 'Returns the current length of a GC array value.',
@@ -52,7 +55,21 @@ const BUILTIN_DOCS: Record<string, HoverDoc> = {
   },
 };
 
-const BUILTIN_NAMESPACE_DOCS: Record<string, HoverDoc> = {
+const BUILTIN_RETURN_TYPES: Record<string, BuiltinReturnType> = {
+  'array.len': 'i32',
+  'array.new_default': (typeText) => typeText ? `array[${typeText}]` : 'array[T]',
+  'ref.null': (typeText) => typeText ? `${typeText} # null` : undefined,
+  'str.length': 'i32',
+  'str.char_code_at': 'i32',
+  'str.into_char_code_array': 'i32',
+  'str.concat': 'str',
+  'str.substring': 'str',
+  'str.from_char_code_array': 'str',
+  'str.from_char_code': 'str',
+  'str.equals': 'bool',
+};
+
+const BUILTIN_NAMESPACE_DOCS: HoverDocs = {
   array: {
     signature: 'array.*',
     description: 'Builtin namespace for GC array allocation and length queries.',
@@ -67,7 +84,7 @@ const BUILTIN_NAMESPACE_DOCS: Record<string, HoverDoc> = {
   },
 };
 
-const CORE_TYPE_DOCS: Record<string, HoverDoc> = {
+const CORE_TYPE_DOCS: HoverDocs = {
   anyref: {
     signature: 'anyref',
     description: 'Top-level Wasm GC reference type.',
@@ -126,7 +143,7 @@ const CORE_TYPE_DOCS: Record<string, HoverDoc> = {
   },
 };
 
-const LITERAL_DOCS: Record<string, HoverDoc> = {
+const LITERAL_DOCS: HoverDocs = {
   false: {
     signature: 'false',
     description: 'Boolean false literal.',
@@ -137,7 +154,7 @@ const LITERAL_DOCS: Record<string, HoverDoc> = {
   },
 };
 
-const KEYWORD_DOCS: Record<string, HoverDoc> = {
+const KEYWORD_DOCS: HoverDocs = {
   assert: {
     signature: 'assert condition',
     description: 'Traps when the condition is false. Common inside UTU tests.',
@@ -224,89 +241,19 @@ const KEYWORD_DOCS: Record<string, HoverDoc> = {
   },
 };
 
-export const KEYWORD_COMPLETIONS = [
-  'alt',
-  'assert',
-  'bench',
-  'break',
-  'else',
-  'export',
-  'extern',
-  'fatal',
-  'fn',
-  'for',
-  'if',
-  'import',
-  'let',
-  'match',
-  'measure',
-  'mut',
-  'not',
-  'setup',
-  'struct',
-  'test',
-  'type',
-] as const;
-
-export const CORE_TYPE_COMPLETIONS = [
-  'anyref',
-  'bool',
-  'eqref',
-  'externref',
-  'f32',
-  'f64',
-  'i31',
-  'i32',
-  'i64',
-  'str',
-  'u32',
-  'u64',
-  'v128',
-] as const;
-
-export const LITERAL_COMPLETIONS = ['false', 'true'] as const;
-
-export const BUILTIN_METHODS: Record<string, string[]> = {
-  array: ['len', 'new_default'],
-  ref: ['null'],
-  str: [
-    'length',
-    'char_code_at',
-    'concat',
-    'substring',
-    'equals',
-    'from_char_code_array',
-    'into_char_code_array',
-    'from_char_code',
-  ],
-};
+export const KEYWORD_COMPLETIONS = Object.keys(KEYWORD_DOCS);
+export const CORE_TYPE_COMPLETIONS = Object.keys(CORE_TYPE_DOCS)
+  .filter((word) => word !== 'null');
+export const LITERAL_COMPLETIONS = Object.keys(LITERAL_DOCS);
+export const BUILTIN_METHODS = groupBuiltinMethods(BUILTIN_DOCS);
 
 export function getBuiltinHover(key: string): UtuMarkupContent | undefined {
   return lookupHover(BUILTIN_DOCS, key);
 }
 
-export function getBuiltinReturnType(key: string, arrayElementType?: string): string | undefined {
-  switch (key) {
-    case 'array.len':
-      return 'i32';
-    case 'array.new_default':
-      return arrayElementType ? `array[${arrayElementType}]` : 'array[T]';
-    case 'ref.null':
-      return arrayElementType ? `${arrayElementType} # null` : undefined;
-    case 'str.length':
-    case 'str.char_code_at':
-    case 'str.into_char_code_array':
-      return 'i32';
-    case 'str.concat':
-    case 'str.substring':
-    case 'str.from_char_code_array':
-    case 'str.from_char_code':
-      return 'str';
-    case 'str.equals':
-      return 'bool';
-    default:
-      return undefined;
-  }
+export function getBuiltinReturnType(key: string, typeText?: string): string | undefined {
+  const value = BUILTIN_RETURN_TYPES[key];
+  return typeof value === 'function' ? value(typeText) : value;
 }
 
 export function getCoreTypeHover(word: string): UtuMarkupContent | undefined {
@@ -326,7 +273,7 @@ export function getBuiltinNamespaceHover(word: string): UtuMarkupContent | undef
 }
 
 export function isBuiltinNamespace(name: string): boolean {
-  return Object.prototype.hasOwnProperty.call(BUILTIN_METHODS, name);
+  return Object.hasOwn(BUILTIN_METHODS, name);
 }
 
 function toMarkdown(doc: HoverDoc): UtuMarkupContent {
@@ -336,7 +283,22 @@ function toMarkdown(doc: HoverDoc): UtuMarkupContent {
   };
 }
 
-function lookupHover<T extends Record<string, HoverDoc>>(docs: T, key: string): UtuMarkupContent | undefined {
+function lookupHover(docs: HoverDocs, key: string): UtuMarkupContent | undefined {
   const doc = docs[key];
   return doc ? toMarkdown(doc) : undefined;
+}
+
+function groupBuiltinMethods(docs: HoverDocs): Record<string, string[]> {
+  const methods: Record<string, string[]> = {};
+
+  for (const key of Object.keys(docs)) {
+    const [namespace, method] = key.split('.');
+    if (!namespace || !method) {
+      continue;
+    }
+
+    (methods[namespace] ??= []).push(method);
+  }
+
+  return methods;
 }

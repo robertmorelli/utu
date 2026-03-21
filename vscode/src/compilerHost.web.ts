@@ -12,6 +12,7 @@ import type {
   RuntimeHost,
   TestResult,
 } from './compilerHost';
+import { formatError } from './compilerHost';
 
 interface WebCompilerHostOptions {
   compilerModulePath: string;
@@ -99,7 +100,6 @@ export class WebCompilerHost implements CompilerHost, RuntimeHost {
   ): Promise<CompileArtifacts> {
     const compiler = await this.getCompiler();
     const result = await compiler.compile(source, {
-      optimize: false,
       ...options,
       mode,
       runtimeWasmUrl: this.options.runtimeWasmPath,
@@ -321,37 +321,4 @@ function base64EncodeBytes(bytes: Uint8Array): string {
   }
 
   return btoa(binary);
-}
-
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? error.message;
-  }
-
-  if (typeof error === 'object' && error !== null) {
-    try {
-      return JSON.stringify(error, createCircularReplacer(), 2);
-    } catch {
-      return String(error);
-    }
-  }
-
-  return String(error);
-}
-
-function createCircularReplacer() {
-  const seen = new WeakSet<object>();
-
-  return (_key: string, value: unknown) => {
-    if (typeof value !== 'object' || value === null) {
-      return value;
-    }
-
-    if (seen.has(value)) {
-      return '[Circular]';
-    }
-
-    seen.add(value);
-    return value;
-  };
 }
