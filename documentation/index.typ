@@ -13,6 +13,7 @@ The chapters are:
 - builtins and required Wasm instructions
 - grammar and compilation model
 - complete example walkthrough
+- codegen guide with side-by-side Utu and WAT
 
 #pagebreak()
 #include "01-overview-and-types.typ"
@@ -31,3 +32,6 @@ The chapters are:
 
 #pagebreak()
 #include "06-complete-example.typ"
+
+#pagebreak()
+#include "07-codegen-guide.typ"

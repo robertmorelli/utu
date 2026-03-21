@@ -6,7 +6,8 @@
     "grammar": "tree-sitter generate && tree-sitter build --wasm",
     "bundle": "esbuild compiler/index.js --bundle --format=esm --outfile=dist/index.mjs --external:web-tree-sitter --external:module",
     "distribute": "cp tree-sitter-utu.wasm vscode/ && cp tree-sitter-utu.wasm web_artifact/ && mv tree-sitter-utu.wasm cli_artifact/",
-    "build": "bun run grammar && bun run bundle && bun run distribute",
+    "docs": "bun scripts/build-docs.mjs",
+    "build": "bun run grammar && bun run bundle && bun run distribute && bun run docs",
     "test": "bun run test:examples",
     "test:examples": "bun scripts/test-examples.mjs --tag smoke",
     "test:examples:all": "bun scripts/test-examples.mjs"
