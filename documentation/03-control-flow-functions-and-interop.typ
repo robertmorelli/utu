@@ -107,6 +107,18 @@ Non-exhaustive matches trap through `unreachable`.
 instruction. The spec uses it for explicit traps, impossible control-flow
 paths, exhaustive match fallthrough, and force-unwrap failure.
 
+== Assert
+
+`assert` is a statement-like expression that traps when its condition is false:
+
+```utu
+assert value != null
+assert add(2, 2) == 4
+```
+
+The lowering is direct: evaluate the condition as `i32`, invert it, and emit a
+no-result Wasm `if` that executes `unreachable` on failure.
+
 == Function Definitions
 
 Function syntax keeps parameters in parentheses and places the return type
@@ -204,6 +216,30 @@ export fn main() {
     "hello world" -o console_log
 }
 ```
+
+== In-Source Tests And Benchmarks
+
+The language also supports top-level `test` and `bench` items:
+
+```utu
+test "adds two numbers" {
+    assert add(2, 2) == 4
+}
+
+bench "sum loop" |i| {
+    setup {
+        let total: i32 = 0
+        measure {
+            total = total + i
+        }
+    }
+}
+```
+
+Normal program compilation ignores these declarations. Test mode synthesizes
+zero-argument exports, while bench mode synthesizes one exported function per
+benchmark that takes an `i32` iteration count. The host runs those exports
+ephemerally and reports failures or timing.
 
 == Polymorphic Dispatch
 

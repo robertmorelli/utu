@@ -10,11 +10,11 @@ inside string literals, and comments are line comments only.
 ```ebnf
 program      ::= item*
 item         ::= import_decl | export_decl | fn_decl | type_decl
-               | struct_decl | global_decl
+               | struct_decl | global_decl | test_decl | bench_decl
 ```
 
 The top level therefore supports imports, exports, functions, named sum types,
-structs, and global `let` bindings.
+structs, global `let` bindings, and opt-in in-source tests and benchmarks.
 
 === Declarations
 
@@ -37,6 +37,10 @@ global_decl  ::= 'let' IDENT ':' type '=' expr
 import_decl  ::= 'import' 'extern' STRING IDENT '(' param_list ')'
                   return_type?
 export_decl  ::= 'export' fn_decl
+test_decl    ::= 'test' STRING block
+bench_decl   ::= 'bench' STRING '|' IDENT '|' '{' setup_decl '}'
+setup_decl   ::= 'setup' '{' expr* measure_decl '}'
+measure_decl ::= 'measure' block
 ```
 
 This section encodes a few core language choices:
@@ -77,8 +81,10 @@ expr         ::= literal | IDENT | unary_expr | binary_expr
              |   index_expr | if_expr | match_expr
              |   block_expr | for_expr | break_expr
              |   assign_expr | bind_expr | else_expr
-             |   struct_init | array_init
+             |   struct_init | array_init | assert_expr
              |   'unreachable' | '(' expr ')'
+
+assert_expr  ::= 'assert' expr
 
 bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
 
@@ -194,7 +200,7 @@ The identifier rules reinforce the style guide from the overview chapter:
 The compilation model is deliberately narrow:
 
 - parse source
-- typecheck it
+- validate parse errors
 - lower to WAT
 - run `wasm-opt`
 - emit the final `.wasm` binary
@@ -202,6 +208,15 @@ The compilation model is deliberately narrow:
 The spec explicitly avoids monomorphization, borrow checking, and large custom
 optimization passes. The compiler is supposed to do minimal semantic work and
 leave aggressive optimization to the Wasm engine.
+
+The shared compiler also exposes mode-based lowering:
+
+- `program` emits ordinary declarations only
+- `test` additionally synthesizes one exported Wasm function per `test`
+- `bench` additionally synthesizes one exported Wasm function per `bench`
+
+Test and benchmark metadata is returned alongside generated code so host tools
+can report source names while still executing ordinary Wasm exports.
 
 === Type Lowering
 
