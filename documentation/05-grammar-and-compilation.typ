@@ -224,7 +224,7 @@ The compilation model is deliberately narrow:
 - parse source
 - validate parse errors
 - lower to WAT
-- parse WAT with Binaryen and optionally optimize
+- parse WAT with Binaryen and optimize
 - emit the final `.wasm` binary
 
 The spec explicitly avoids monomorphization, borrow checking, and large custom

@@ -3,7 +3,7 @@
 == 12.1 Pipeline
 
 Source -> Parse -> parse-error validation -> Lower to WAT -> Binaryen parse
-and optional optimize -> `.wasm` binary. The compiler is intentionally simple:
+and optimize -> `.wasm` binary. The compiler is intentionally simple:
 no monomorphization, no borrow checking, no complex optimization passes. The
 philosophy is to do minimal work in the compiler and let the Wasm engine's
 optimizing tiers handle the rest.
