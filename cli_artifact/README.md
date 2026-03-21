@@ -16,6 +16,7 @@ Run all commands from this folder with Bun:
 bun ./src/cli.mjs help
 bun ./src/cli.mjs compile ../examples/float.utu --outdir ./dist/float
 bun ./src/cli.mjs compile ../examples/float.utu --outdir ./dist/float --bun
+bun ./src/cli.mjs compile ../examples/float.utu --outdir ./dist/float --node
 bun ./src/cli.mjs run ../examples/float.utu
 bun ./src/cli.mjs test ../examples/ci/tests_basic.utu
 bun ./src/cli.mjs bench ../examples/bench/bench_basic.utu --iterations 1000 --samples 5
@@ -27,6 +28,7 @@ bun ./src/cli.mjs bench ../examples/bench/bench_basic.utu --iterations 1000 --sa
 - `<name>.wasm` with the wasm bytes
 - `<name>.wat` when `--wat` is passed
 - `<name>` as a Bun standalone executable when `--bun` is passed
+- `<name>.js` as a self-contained Node script when `--node` is passed
 
 `run` ships with a built-in host for the current examples:
 

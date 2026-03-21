@@ -8,6 +8,7 @@
     "build": "bun build ./src/cli.mjs --target bun --outfile ./dist/utu.mjs",
     "smoke:compile": "bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/smoke",
     "smoke:bun": "bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/bun --bun",
+    "smoke:node": "bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/node --node",
     "smoke:run": "bun ./src/cli.mjs run ../examples/call_simple.utu",
     "smoke:test": "bun ./src/cli.mjs test ../examples/ci/tests_basic.utu",
     "smoke:bench": "bun ./src/cli.mjs bench ../examples/bench/bench_basic.utu --iterations 4 --samples 1 --warmup 0"

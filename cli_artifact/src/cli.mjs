@@ -11,20 +11,12 @@ import { compileUtuSource } from "./lib/compiler.mjs";
 const help = `utu Bun CLI
 
 Usage:
-  utu compile <input> [--outdir <dir>] [--wat] [--bun]
+  utu compile <input> [--outdir <dir>] [--wat] [--bun] [--node]
   utu run <input> [--imports <file>]
   utu test <input> [--imports <file>]
   utu bench <input> [--imports <file>] [--iterations <n>] [--samples <n>] [--warmup <n>]
 `;
 
-const imports = {
-  console_log: value => console.log(value),
-  i64_to_string: value => String(value),
-  f64_to_string: value => String(value),
-  math_sin: value => Math.sin(value),
-  math_cos: value => Math.cos(value),
-  math_sqrt: value => Math.sqrt(value),
-};
 const commands = { compile: compileCmd, run: runCmd, test: testCmd, bench: benchCmd };
 
 main().catch(error => {
@@ -40,11 +32,12 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 async function compileCmd(args) {
-  let input = "", outdir = "./dist", wat = false, bun = false;
+  let input = "", outdir = "./dist", wat = false, bun = false, node = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--wat") wat = true;
     else if (arg === "--bun") bun = true;
+    else if (arg === "--node") node = true;
     else if (arg === "--outdir") outdir = args[++i] ?? fail("Missing value for --outdir");
     else if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
     else if (!input) input = arg;
@@ -53,8 +46,9 @@ async function compileCmd(args) {
   if (!input) fail("compile needs an input file");
 
   const file = path.resolve(input);
+  const source = await readFile(file, "utf8");
   const name = path.basename(file, path.extname(file));
-  const { js, wasm, wat: watText } = await compileUtuSource(await readFile(file, "utf8"), { wat });
+  const { js, wasm, wat: watText } = await compileUtuSource(source, { wat });
   const dir = path.resolve(outdir);
   const base = path.join(dir, name);
 
@@ -67,6 +61,7 @@ async function compileCmd(args) {
   await Promise.all(outputs.map(([file, data, encoding]) => writeFile(file, data, encoding)));
   outputs.forEach(([file]) => console.log(`Wrote ${file}`));
   if (bun) console.log(`Wrote ${await buildBunExecutable(base, js)}`);
+  if (node) console.log(`Wrote ${await buildNodeScript(base, js, source)}`);
 }
 
 async function runCmd(args) {
@@ -150,7 +145,7 @@ async function loadExports(input, { importsFile = "", mode = "program" } = {}) {
   try {
     const mod = await import(pathToFileURL(file).href);
     return {
-      exports: await mod.instantiate(await loadImports(importsFile)),
+      exports: await mod.instantiate(await loadImports(importsFile, metadata.host?.modules ?? [])),
       metadata,
       cleanup,
     };
@@ -165,10 +160,11 @@ async function withExports(input, options, run) {
   try { return await run(loaded); } finally { await loaded.cleanup(); }
 }
 
-async function loadImports(file) {
-  if (!file) return imports;
+async function loadImports(file, moduleNames = []) {
+  const base = createDefaultImports();
+  if (!file) return base;
   const mod = await import(pathToFileURL(path.resolve(file)).href);
-  return { ...imports, ...(mod.default ?? mod.imports ?? mod) };
+  return mergeImportObjects(base, normalizeImportObject(mod.default ?? mod.imports ?? mod, moduleNames));
 }
 
 function fn(exports, name, message = `Missing export "${name}"`) {
@@ -196,6 +192,56 @@ function text(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function createDefaultImports() {
+  return {
+    es: {
+      console_log: value => console.log(value),
+      i64_to_string: value => String(value),
+      f64_to_string: value => String(value),
+      math_sin: value => Math.sin(value),
+      math_cos: value => Math.cos(value),
+      math_sqrt: value => Math.sqrt(value),
+    },
+  };
+}
+
+function normalizeImportObject(imports, moduleNames = []) {
+  if (!imports || typeof imports !== "object" || Array.isArray(imports)) return {};
+
+  const moduleKeys = new Set(moduleNames);
+  const normalized = {};
+  const flatEs = {};
+  for (const [key, value] of Object.entries(imports)) {
+    if (isModuleKey(key, moduleKeys)) normalized[key] = value;
+    else flatEs[key] = value;
+  }
+
+  if (Object.keys(flatEs).length) {
+    const existingEs = isPlainObject(normalized.es) ? normalized.es : {};
+    normalized.es = { ...existingEs, ...flatEs };
+  }
+
+  return normalized;
+}
+
+function mergeImportObjects(base, override) {
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    merged[key] = isPlainObject(merged[key]) && isPlainObject(value)
+      ? { ...merged[key], ...value }
+      : value;
+  }
+  return merged;
+}
+
+function isModuleKey(key, moduleKeys) {
+  return moduleKeys.has(key) || key === "es" || key === "__strings" || key === "wasm:js-string" || key.startsWith(".") || key.startsWith("/") || key.includes(":");
+}
+
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 async function buildBunExecutable(base, js) {
   const dir = await mkdtemp(path.join(tmpdir(), "utu-bun-"));
   const out = process.platform === "win32" ? `${base}.exe` : base;
@@ -208,12 +254,14 @@ async function buildBunExecutable(base, js) {
 import { instantiate } from "./program.mjs";
 
 const imports = {
-  console_log: value => console.log(value),
-  i64_to_string: value => String(value),
-  f64_to_string: value => String(value),
-  math_sin: value => Math.sin(value),
-  math_cos: value => Math.cos(value),
-  math_sqrt: value => Math.sqrt(value),
+  es: {
+    console_log: value => console.log(value),
+    i64_to_string: value => String(value),
+    f64_to_string: value => String(value),
+    math_sin: value => Math.sin(value),
+    math_cos: value => Math.cos(value),
+    math_sqrt: value => Math.sqrt(value),
+  },
 };
 
 const exports = await instantiate(imports);
@@ -236,4 +284,46 @@ function exec(command, args) {
     child.on("error", reject);
     child.on("exit", code => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code ?? 1}`)));
   });
+}
+
+async function buildNodeScript(base, js, source) {
+  const out = `${base}.js`;
+  const payload = Buffer.from(js, "utf8").toString("base64");
+  await writeFile(out, `#!/usr/bin/env node
+${sourceComment(source)}
+
+(async () => {
+  if (typeof globalThis.atob !== "function") {
+    globalThis.atob = s => Buffer.from(s, "base64").toString("binary");
+  }
+
+  const { instantiate } = await import("data:text/javascript;base64,${payload}");
+  const imports = {
+    es: {
+      console_log: value => console.log(value),
+      i64_to_string: value => String(value),
+      f64_to_string: value => String(value),
+      math_sin: value => Math.sin(value),
+      math_cos: value => Math.cos(value),
+      math_sqrt: value => Math.sqrt(value),
+    },
+  };
+
+  const exports = await instantiate(imports);
+  if (typeof exports.main !== "function") throw new Error("The program does not export a callable main function");
+  const result = await exports.main();
+  if (result !== undefined) console.log(result);
+})().catch(error => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});
+`, "utf8");
+  return out;
+}
+
+function sourceComment(source) {
+  return [
+    "// Original Utu source:",
+    ...source.split("\n").map(line => `// ${line}`),
+  ].join("\n");
 }
