@@ -1,84 +1,87 @@
-import extern "es" console_log(str)
-import extern "es" i64_to_string(i64) str
+let default_arg: i32 = 6
 
-let default_arg: i64 = 9
+fn swap(values: array[i32], left: i32, right: i32) {
+    let temp: i32 = values[left]
+    values[left] = values[right]
+    values[right] = temp
+}
 
-fn fannkuch(n: i64) i64 {
-    let count: array[i64] = array[i64].new(n, 0)
-    let perm1: array[i64] = array[i64].new(n, 0)
-    let perm: array[i64] = array[i64].new(n, 0)
-    let perm0: array[i64] = array[i64].new(n, 0)
+fn reverse_prefix(values: array[i32], last: i32) {
+    let left: i32 = 0
+    let right: i32 = last
+    for (0..array.len(values)) |step| {
+        if left >= right {
+            break
+        }
+        swap(values, left, right)
+        left = left + 1
+        right = right - 1
+    }
+}
 
+fn copy_array(values: array[i32]) array[i32] {
+    let out: array[i32] = array[i32].new(array.len(values), 0)
+    for (0..array.len(values)) |i| {
+        out[i] = values[i]
+    }
+    out
+}
+
+fn count_flips_work(work: array[i32], flips: i32) i32 {
+    if work[0] == 0 {
+        flips
+    } else {
+        reverse_prefix(work, work[0])
+        count_flips_work(work, flips + 1)
+    }
+}
+
+fn count_flips(values: array[i32]) i32 {
+    let work: array[i32] = copy_array(values)
+    count_flips_work(work, 0)
+}
+
+fn search(perm: array[i32], pos: i32) i32 {
+    if pos == array.len(perm) {
+        count_flips(perm)
+    } else {
+        let best: i32 = 0
+        for (pos..array.len(perm)) |i| {
+            swap(perm, pos, i)
+            let candidate: i32 = search(perm, pos + 1)
+            if candidate > best {
+                best = candidate
+            }
+            swap(perm, pos, i)
+        }
+        best
+    }
+}
+
+fn fannkuch(n: i32) i32 {
+    let perm: array[i32] = array[i32].new(n, 0)
     for (0..n) |i| {
-        count[i] = i + 1
-        perm1[i] = i
         perm[i] = i
     }
+    search(perm, 0)
+}
 
-    let max_flips: i64 = 0
-    let m: i64 = n - 1
-    let r: i64 = n
+test "fannkuch(4) = 4" {
+    assert fannkuch(4) == 4
+}
 
-    for () {
-        for (r != 1) {
-            count[r - 1] = r
-            r = r - 1
-        }
+test "fannkuch(5) = 7" {
+    assert fannkuch(5) == 7
+}
 
-        if perm1[0] != 0 and perm1[m] != m {
-            for (0..n) |i| {
-                perm[i] = perm1[i]
-            }
-
-            let flips_count: i64 = 0
-            let k: i64 = perm[0]
-
-            for (k != 0) {
-                let i: i64 = k
-                for (i >= 0) {
-                    perm0[i] = perm[k - i]
-                    i = i - 1
-                }
-
-                i = k
-                for (i >= 0) {
-                    perm[i] = perm0[i]
-                    i = i - 1
-                }
-
-                flips_count = flips_count + 1
-                k = perm[0]
-            }
-
-            if flips_count > max_flips {
-                max_flips = flips_count
-            }
-        }
-
-        if r == n {
-            break max_flips
-        }
-
-        for () {
-            let first: i64 = perm1[0]
-            let i: i64 = 1
-            for (i <= r) {
-                perm1[i - 1] = perm1[i]
-                i = i + 1
-            }
-            perm1[r] = first
-            count[r] = count[r] - 1
-            if count[r] > 0 {
-                break
-            }
-            r = r + 1
-            if r == n {
-                break
-            }
+bench "fannkuch" |i| {
+    setup {
+        measure {
+            fannkuch(5)
         }
     }
 }
 
-export fn main() {
-    fannkuch(default_arg) -o i64_to_string(_) -o console_log
+export fn main() i32 {
+    fannkuch(default_arg)
 }

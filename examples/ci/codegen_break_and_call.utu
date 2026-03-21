@@ -1,0 +1,16 @@
+fn add_one(value: i64) i64 {
+    value + 1
+}
+
+export fn main() i64 {
+    let answer: i64 = 0
+
+    done: {
+        for () {
+            answer = add_one(41)
+            break done answer
+        }
+
+        0
+    }
+}

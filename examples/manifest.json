@@ -144,6 +144,13 @@
       "tags": ["codegen"]
     },
     {
+      "name": "codegen-break-and-call",
+      "path": "examples/ci/codegen_break_and_call.utu",
+      "mode": "run",
+      "expectedReturn": "42",
+      "tags": ["smoke", "codegen"]
+    },
+    {
       "name": "codegen-refs-i31",
       "path": "examples/ci/codegen_refs_i31.utu",
       "mode": "test",

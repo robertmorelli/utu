@@ -1,5 +1,3 @@
-import extern "es" console_log(str)
-import extern "es" f64_to_string(f64) str
 import extern "es" math_sin(f64) f64
 import extern "es" math_cos(f64) f64
 import extern "es" math_sqrt(f64) f64
@@ -10,7 +8,7 @@ struct Point {
     mut z: f64,
 }
 
-let points: i64 = 200000
+let points: i32 = 200000
 
 fn new_point(i: f64) Point {
     let x: f64 = math_sin(i)
@@ -36,10 +34,13 @@ fn maximize_point(left: Point, right: Point) Point {
     left
 }
 
-fn benchmark(n: i64) Point {
-    let points: array[Point] = array[Point].new_default(n)
+fn benchmark(n: i32) Point {
+    let origin: Point = Point { x: 0.0, y: 0.0, z: 0.0 }
+    let points: array[Point] = array[Point].new(n, origin)
+    let ifloat: f64 = 0.0
     for (0..n) |i| {
-        points[i] = new_point(i)
+        points[i] = new_point(ifloat)
+        ifloat = ifloat + 1.0
     }
 
     for (0..n) |i| {
@@ -53,7 +54,15 @@ fn benchmark(n: i64) Point {
     best
 }
 
-export fn main() {
+bench "float normalize" |i| {
+    setup {
+        measure {
+            benchmark(256)
+        }
+    }
+}
+
+export fn main() f64 {
     let best: Point = benchmark(points)
-    best.x -o f64_to_string(_) -o console_log
+    best.x
 }

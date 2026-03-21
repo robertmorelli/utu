@@ -1,4 +1,5 @@
 import extern "es" console_log(str)
+import extern "es" i64_to_string(i64) str
 
 fn qux() i64 {
     0
@@ -106,29 +107,45 @@ fn foo(a: i64, b: i64, c: i64, d: i64) i64 {
 
 fn test_calls() i64 {
     let sink: i64 = 0
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
-    sink = sink + foo(1, 2, 3, 4)
+    let one: i64 = 1
+    let two: i64 = 2
+    let three: i64 = 3
+    let four: i64 = 4
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
+    sink = sink + foo(one, two, three, four)
     sink
 }
 
+bench "call-simple chain" |i| {
+    setup {
+        let one: i64 = 1
+        let two: i64 = 2
+        let three: i64 = 3
+        let four: i64 = 4
+        measure {
+            foo(one, two, three, four)
+        }
+    }
+}
+
 export fn main() {
-    test_calls() -o console_log
+    test_calls() -o i64_to_string(_) -o console_log
 }

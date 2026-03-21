@@ -2,13 +2,13 @@ import extern "es" console_log(str)
 import extern "es" i64_to_string(i64) str
 
 struct Strength {
-    rank: i64,
+    rank: i32,
     name: str,
 }
 
 struct Variable {
     name: str,
-    mut value: i64,
+    mut value: i32,
     strength: Strength,
 }
 
@@ -31,7 +31,7 @@ let preferred: Strength = Strength { rank: 2, name: "preferred" }
 let strong_default: Strength = Strength { rank: 3, name: "strong_default" }
 let normal: Strength = Strength { rank: 4, name: "normal" }
 
-fn new_variable(name: str, value: i64, strength: Strength) Variable {
+fn new_variable(name: str, value: i32, strength: Strength) Variable {
     Variable {
         name: name,
         value: value,
@@ -41,20 +41,20 @@ fn new_variable(name: str, value: i64, strength: Strength) Variable {
 
 fn apply_constraint(constraint: Constraint) {
     alt constraint {
-        c: EqualityConstraint => {
-            c.right.value = c.left.value
+        eq: EqualityConstraint => {
+            eq.right.value = eq.left.value
         },
-        c: ScaleConstraint => {
-            c.dest.value = c.src.value * c.scale.value + c.offset.value
+        scale: ScaleConstraint => {
+            scale.dest.value = scale.src.value * scale.scale.value + scale.offset.value
         },
     }
 }
 
 fn apply_inverse_scale(constraint: Constraint) {
     alt constraint {
-        _: EqualityConstraint => 0,
-        c: ScaleConstraint => {
-            c.src.value = (c.dest.value - c.offset.value) / c.scale.value
+        _: EqualityConstraint => {},
+        scale: ScaleConstraint => {
+            scale.src.value = (scale.dest.value - scale.offset.value) / scale.scale.value
         },
     }
 }
@@ -65,9 +65,14 @@ fn propagate_constraints(constraints: array[Constraint]) {
     }
 }
 
-fn chain_test(n: i64) i64 {
-    let vars: array[Variable] = array[Variable].new_default(n + 1)
-    let constraints: array[Constraint] = array[Constraint].new_default(n)
+fn chain_test(n: i32) i64 {
+    let dummy: Variable = new_variable("dummy", 0, strong_default)
+    let vars: array[Variable] = array[Variable].new(n + 1, dummy)
+    let constraints: array[Constraint] = array[Constraint].new(n, EqualityConstraint {
+        left: dummy,
+        right: dummy,
+        strength: required,
+    })
 
     for (0..n + 1) |i| {
         vars[i] = new_variable("v", 0, strong_default)
@@ -92,12 +97,17 @@ fn chain_test(n: i64) i64 {
     failures
 }
 
-fn projection_test(n: i64) i64 {
+fn projection_test(n: i32) i64 {
     let scale: Variable = new_variable("scale", 10, normal)
     let offset: Variable = new_variable("offset", 1000, normal)
-    let srcs: array[Variable] = array[Variable].new_default(n)
-    let dests: array[Variable] = array[Variable].new_default(n)
-    let constraints: array[Constraint] = array[Constraint].new_default(n)
+    let dummy: Variable = new_variable("dummy", 0, normal)
+    let srcs: array[Variable] = array[Variable].new(n, dummy)
+    let dests: array[Variable] = array[Variable].new(n, dummy)
+    let constraints: array[Constraint] = array[Constraint].new(n, EqualityConstraint {
+        left: dummy,
+        right: dummy,
+        strength: required,
+    })
 
     for (0..n) |i| {
         srcs[i] = new_variable("src", i, normal)
@@ -114,7 +124,7 @@ fn projection_test(n: i64) i64 {
     propagate_constraints(constraints)
 
     let failures: i64 = 0
-    let last: i64 = n - 1
+    let last: i32 = n - 1
 
     srcs[last].value = 17
     apply_constraint(constraints[last])
@@ -147,8 +157,16 @@ fn projection_test(n: i64) i64 {
     failures
 }
 
-fn delta_blue(n: i64) i64 {
+fn delta_blue(n: i32) i64 {
     chain_test(n) + projection_test(n)
+}
+
+bench "deltablue" |i| {
+    setup {
+        measure {
+            delta_blue(128)
+        }
+    }
 }
 
 export fn main() {
