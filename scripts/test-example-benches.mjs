@@ -1,10 +1,10 @@
 const cases = [
-    { name: 'call-simple', path: 'examples/call_simple.utu', label: 'call-simple chain:' },
-    { name: 'deltablue', path: 'examples/deltablue.utu', label: 'deltablue:' },
-    { name: 'fannkuch', path: 'examples/fannkuch.utu', label: 'fannkuch:' },
-    { name: 'float', path: 'examples/float.utu', label: 'float normalize:' },
-    { name: 'hello-name', path: 'examples/hello_name.utu', label: 'hello-name format:' },
-    { name: 'spectralnorm', path: 'examples/spectralnorm.utu', label: 'spectralnorm:' },
+    { name: 'call-simple', path: 'examples/call_simple.utu', labels: ['call-simple chain:'] },
+    { name: 'deltablue', path: 'examples/deltablue.utu', labels: ['deltablue_chain:', 'deltablue_projection:'] },
+    { name: 'fannkuch', path: 'examples/fannkuch.utu', labels: ['fannkuch:'] },
+    { name: 'float', path: 'examples/float.utu', labels: ['float normalize:'] },
+    { name: 'hello-name', path: 'examples/hello_name.utu', labels: ['hello-name format:'] },
+    { name: 'spectralnorm', path: 'examples/spectralnorm.utu', labels: ['spectralnorm:'] },
 ];
 
 let failed = false;
@@ -17,7 +17,7 @@ for (const testCase of cases) {
         proc.exited,
     ]);
     const output = `${stdout}${stderr}`;
-    const ok = exitCode === 0 && output.includes(testCase.label);
+    const ok = exitCode === 0 && testCase.labels.every(label => output.includes(label));
     console.log(`${ok ? 'PASS' : 'FAIL'} ${testCase.name}`);
     if (!ok) {
         failed = true;
