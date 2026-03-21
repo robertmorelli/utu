@@ -3,10 +3,13 @@ import {
   BUILTIN_METHODS,
   CORE_TYPE_COMPLETIONS,
   KEYWORD_COMPLETIONS,
+  LITERAL_COMPLETIONS,
+  getBuiltinNamespaceHover,
   getBuiltinHover,
   getBuiltinReturnType,
   getCoreTypeHover,
   getKeywordHover,
+  getLiteralHover,
   isBuiltinNamespace,
 } from './hoverDocs';
 import { rangeFromNode, rangeFromOffsets, UtuParserService } from './parser';
@@ -23,7 +26,7 @@ import {
   type UtuHover,
   type UtuLocation,
   type UtuMarkupContent,
-  type UtuPosition,
+  type UtuPositionLike,
   type UtuRange,
   type UtuSemanticToken,
   type UtuTextDocument,
@@ -35,6 +38,8 @@ export type UtuSymbolKind =
   | 'importFunction'
   | 'importValue'
   | 'global'
+  | 'test'
+  | 'bench'
   | 'parameter'
   | 'binding'
   | 'capture'
@@ -55,6 +60,7 @@ export interface UtuSymbol {
   typeText?: string;
   returnTypeText?: string;
   containerName?: string;
+  exported?: boolean;
   topLevel: boolean;
 }
 
@@ -82,6 +88,55 @@ interface CachedIndex {
   index: UtuDocumentIndex;
 }
 
+const SEMANTIC_TOKEN_TYPES: Partial<Record<UtuSymbolKind, string>> = {
+  struct: 'type',
+  sumType: 'type',
+  variant: 'enumMember',
+  function: 'function',
+  importFunction: 'function',
+  parameter: 'parameter',
+  field: 'property',
+  importValue: 'variable',
+  global: 'variable',
+  binding: 'variable',
+  capture: 'variable',
+  matchBinding: 'variable',
+};
+
+const COMPLETION_KINDS: Record<UtuSymbolKind, UtuCompletionItem['kind']> = {
+  function: 'function',
+  importFunction: 'function',
+  importValue: 'variable',
+  global: 'variable',
+  test: 'text',
+  bench: 'text',
+  parameter: 'text',
+  binding: 'text',
+  capture: 'text',
+  matchBinding: 'text',
+  struct: 'class',
+  sumType: 'class',
+  variant: 'enumMember',
+  field: 'text',
+};
+
+const DOCUMENT_SYMBOL_KINDS: Record<UtuSymbolKind, UtuDocumentSymbolKind> = {
+  function: 'function',
+  importFunction: 'function',
+  importValue: 'variable',
+  global: 'variable',
+  test: 'method',
+  bench: 'event',
+  parameter: 'object',
+  binding: 'object',
+  capture: 'object',
+  matchBinding: 'object',
+  struct: 'struct',
+  sumType: 'enum',
+  variant: 'enumMember',
+  field: 'object',
+};
+
 export class UtuLanguageService {
   private readonly cache = new Map<string, CachedIndex>();
 
@@ -101,10 +156,7 @@ export class UtuLanguageService {
 
   async getDiagnostics(document: UtuTextDocument): Promise<UtuDiagnostic[]> {
     const index = await this.getDocumentIndex(document);
-    return index.diagnostics.map((diagnostic) => ({
-      ...diagnostic,
-      range: copyRange(diagnostic.range),
-    }));
+    return index.diagnostics.map(cloneDiagnostic);
   }
 
   async getDocumentIndex(document: UtuTextDocument): Promise<UtuDocumentIndex> {
@@ -132,7 +184,7 @@ export class UtuLanguageService {
 
   async getHover(
     document: UtuTextDocument,
-    position: Pick<UtuPosition, 'line' | 'character'>,
+    position: UtuPositionLike,
   ): Promise<UtuHover | undefined> {
     const index = await this.getDocumentIndex(document);
     const occurrence = findOccurrenceAtPosition(index, position);
@@ -161,7 +213,10 @@ export class UtuLanguageService {
     const word = getWordAtPosition(document, position);
     if (!word) return undefined;
 
-    const fallbackHover = getCoreTypeHover(word.text) ?? getKeywordHover(word.text);
+    const fallbackHover = getCoreTypeHover(word.text)
+      ?? getLiteralHover(word.text)
+      ?? getKeywordHover(word.text)
+      ?? getBuiltinNamespaceHover(word.text);
     if (!fallbackHover) return undefined;
 
     return {
@@ -172,7 +227,7 @@ export class UtuLanguageService {
 
   async getDefinition(
     document: UtuTextDocument,
-    position: Pick<UtuPosition, 'line' | 'character'>,
+    position: UtuPositionLike,
   ): Promise<UtuLocation | undefined> {
     const index = await this.getDocumentIndex(document);
     const symbol = resolveSymbol(index, position);
@@ -186,7 +241,7 @@ export class UtuLanguageService {
 
   async getReferences(
     document: UtuTextDocument,
-    position: Pick<UtuPosition, 'line' | 'character'>,
+    position: UtuPositionLike,
     includeDeclaration: boolean,
   ): Promise<UtuLocation[]> {
     const index = await this.getDocumentIndex(document);
@@ -204,7 +259,7 @@ export class UtuLanguageService {
 
   async getDocumentHighlights(
     document: UtuTextDocument,
-    position: Pick<UtuPosition, 'line' | 'character'>,
+    position: UtuPositionLike,
   ): Promise<UtuDocumentHighlight[]> {
     const index = await this.getDocumentIndex(document);
     const symbol = resolveSymbol(index, position);
@@ -220,7 +275,7 @@ export class UtuLanguageService {
 
   async getCompletionItems(
     document: UtuTextDocument,
-    position: Pick<UtuPosition, 'line' | 'character'>,
+    position: UtuPositionLike,
   ): Promise<UtuCompletionItem[]> {
     const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
     const namespaceMatch = linePrefix.match(/\b([a-z0-9_]+)\.$/i);
@@ -257,10 +312,18 @@ export class UtuLanguageService {
       });
     }
 
+    for (const literal of LITERAL_COMPLETIONS) {
+      items.push({
+        label: literal,
+        kind: 'keyword',
+      });
+    }
+
     for (const symbol of index.topLevelSymbols) {
+      if (symbol.kind === 'test' || symbol.kind === 'bench') continue;
       items.push({
         label: symbol.name,
-        kind: completionKindForSymbol(symbol),
+        kind: COMPLETION_KINDS[symbol.kind],
         detail: symbol.signature,
       });
     }
@@ -302,7 +365,7 @@ export class UtuLanguageService {
     return index.topLevelSymbols.map((symbol) => ({
       name: symbol.name,
       detail: symbol.detail,
-      kind: symbolKindForDocument(symbol),
+      kind: DOCUMENT_SYMBOL_KINDS[symbol.kind],
       range: copyRange(symbol.range),
       selectionRange: copyRange(symbol.range),
     }));
@@ -321,7 +384,7 @@ export class UtuLanguageService {
         .map((symbol) => ({
           name: symbol.name,
           detail: symbol.detail,
-          kind: symbolKindForDocument(symbol),
+          kind: DOCUMENT_SYMBOL_KINDS[symbol.kind],
           location: {
             uri: symbol.uri,
             range: copyRange(symbol.range),
@@ -333,7 +396,7 @@ export class UtuLanguageService {
 
 export function findOccurrenceAtPosition(
   index: UtuDocumentIndex,
-  position: Pick<UtuPosition, 'line' | 'character'>,
+  position: UtuPositionLike,
 ): UtuOccurrence | undefined {
   let bestMatch: UtuOccurrence | undefined;
 
@@ -349,7 +412,7 @@ export function findOccurrenceAtPosition(
 
 export function findSymbolAtPosition(
   index: UtuDocumentIndex,
-  position: Pick<UtuPosition, 'line' | 'character'>,
+  position: UtuPositionLike,
 ): UtuSymbol | undefined {
   const occurrence = findOccurrenceAtPosition(index, position);
   if (occurrence?.symbolKey) {
@@ -360,28 +423,7 @@ export function findSymbolAtPosition(
 }
 
 export function getSemanticTokenType(symbol: UtuSymbol): string | undefined {
-  switch (symbol.kind) {
-    case 'struct':
-    case 'sumType':
-      return 'type';
-    case 'variant':
-      return 'enumMember';
-    case 'function':
-    case 'importFunction':
-      return 'function';
-    case 'parameter':
-      return 'parameter';
-    case 'field':
-      return 'property';
-    case 'importValue':
-    case 'global':
-    case 'binding':
-    case 'capture':
-    case 'matchBinding':
-      return 'variable';
-    default:
-      return undefined;
-  }
+  return SEMANTIC_TOKEN_TYPES[symbol.kind];
 }
 
 function buildDocumentIndex(
@@ -433,12 +475,14 @@ function buildDocumentIndex(
       typeText?: string;
       returnTypeText?: string;
       containerName?: string;
+      exported?: boolean;
+      name?: string;
       topLevel?: boolean;
     },
   ): UtuSymbol => {
     const symbol: UtuSymbol = {
       key: `${uri}#${symbolCounter}`,
-      name: nameNode.text,
+      name: options.name ?? nameNode.text,
       kind,
       uri,
       range: rangeFromNode(document, nameNode),
@@ -447,6 +491,7 @@ function buildDocumentIndex(
       typeText: options.typeText,
       returnTypeText: options.returnTypeText,
       containerName: options.containerName,
+      exported: options.exported,
       topLevel: options.topLevel ?? false,
     };
 
@@ -543,6 +588,12 @@ function buildDocumentIndex(
       case 'global_decl':
         collectGlobalDeclaration(item);
         break;
+      case 'test_decl':
+        collectTestDeclaration(item);
+        break;
+      case 'bench_decl':
+        collectBenchDeclaration(item);
+        break;
       case 'import_decl':
         collectImportDeclaration(item);
         break;
@@ -630,6 +681,7 @@ function buildDocumentIndex(
     const signature = `${exported ? 'export ' : ''}fn ${nameNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
     const functionSymbol = createSymbol(nameNode, 'function', {
       detail: exported ? 'exported function' : 'function',
+      exported,
       signature,
       returnTypeText: returnType?.text,
       topLevel: true,
@@ -651,6 +703,31 @@ function buildDocumentIndex(
     });
 
     registerTopLevelValue(globalSymbol);
+  }
+
+  function collectTestDeclaration(testDecl: Node): void {
+    const nameNode = findNamedChild(testDecl, 'string_lit');
+    if (!nameNode) return;
+
+    createSymbol(nameNode, 'test', {
+      detail: 'test case',
+      name: stringLiteralName(nameNode),
+      signature: `test ${nameNode.text}`,
+      topLevel: true,
+    });
+  }
+
+  function collectBenchDeclaration(benchDecl: Node): void {
+    const nameNode = findNamedChild(benchDecl, 'string_lit');
+    const captureNode = findNamedChild(findNamedChild(benchDecl, 'bench_capture'), 'identifier');
+    if (!nameNode) return;
+
+    createSymbol(nameNode, 'bench', {
+      detail: 'benchmark',
+      name: stringLiteralName(nameNode),
+      signature: `bench ${nameNode.text}${captureNode ? ` |${captureNode.text}|` : ''}`,
+      topLevel: true,
+    });
   }
 
   function collectImportDeclaration(importDecl: Node): void {
@@ -703,6 +780,12 @@ function buildDocumentIndex(
         break;
       case 'global_decl':
         walkGlobal(item);
+        break;
+      case 'test_decl':
+        walkTest(item);
+        break;
+      case 'bench_decl':
+        walkBench(item);
         break;
       case 'import_decl':
         walkImport(item);
@@ -779,6 +862,39 @@ function buildDocumentIndex(
     if (returnType) walkTypeAnnotation(returnType);
   }
 
+  function walkTest(testDecl: Node): void {
+    const block = findNamedChild(testDecl, 'block');
+    if (block) walkBlock(block);
+  }
+
+  function walkBench(benchDecl: Node): void {
+    const setupDecl = findNamedChild(benchDecl, 'setup_decl');
+    if (!setupDecl) return;
+
+    pushScope(localScopes);
+
+    const captureNode = findNamedChild(findNamedChild(benchDecl, 'bench_capture'), 'identifier');
+    if (captureNode) {
+      const symbol = createSymbol(captureNode, 'capture', {
+        detail: 'benchmark iteration capture',
+        signature: captureNode.text,
+      });
+      declareLocal(symbol);
+    }
+
+    for (const child of setupDecl.namedChildren) {
+      if (child.type === 'measure_decl') {
+        const block = findNamedChild(child, 'block');
+        if (block) walkBlock(block);
+        continue;
+      }
+
+      walkExpression(child);
+    }
+
+    popScope(localScopes);
+  }
+
   function walkBlock(block: Node): void {
     pushScope(localScopes);
 
@@ -840,6 +956,9 @@ function buildDocumentIndex(
         return;
       case 'match_expr':
         walkMatchExpression(node);
+        return;
+      case 'alt_expr':
+        walkAltExpression(node);
         return;
       case 'for_expr':
         walkForExpression(node);
@@ -1002,14 +1121,26 @@ function buildDocumentIndex(
     if (subjectNode) walkExpression(subjectNode);
 
     for (const armNode of arms) {
-      walkMatchArm(armNode);
+      const expressionNode = armNode.namedChildren.at(-1);
+      if (expressionNode) {
+        walkExpression(expressionNode);
+      }
     }
   }
 
-  function walkMatchArm(node: Node): void {
+  function walkAltExpression(node: Node): void {
+    const [subjectNode, ...arms] = node.namedChildren;
+    if (subjectNode) walkExpression(subjectNode);
+
+    for (const armNode of arms) {
+      walkAltArm(armNode);
+    }
+  }
+
+  function walkAltArm(node: Node): void {
     pushScope(localScopes);
 
-    const patternNode = findNamedChild(node, 'match_pattern');
+    const patternNode = node.namedChildren[0]?.type === 'identifier' ? node.namedChildren[0] : undefined;
     const typeNode = findNamedChild(node, 'type_ident');
     const expressionNode = node.namedChildren.at(-1);
 
@@ -1017,11 +1148,10 @@ function buildDocumentIndex(
       addResolvedOccurrence(typeNode, 'type', resolveTypeKey(typeNode.text));
     }
 
-    const patternIdentifier = patternNode ? findNamedChild(patternNode, 'identifier') : undefined;
-    if (patternIdentifier) {
-      const symbol = createSymbol(patternIdentifier, 'matchBinding', {
-        detail: 'match binding',
-        signature: typeNode ? `${patternIdentifier.text}: ${typeNode.text}` : patternIdentifier.text,
+    if (patternNode) {
+      const symbol = createSymbol(patternNode, 'matchBinding', {
+        detail: 'alt binding',
+        signature: typeNode ? `${patternNode.text}: ${typeNode.text}` : patternNode.text,
         typeText: typeNode?.text,
       });
       declareLocal(symbol);
@@ -1195,7 +1325,7 @@ function buildDocumentIndex(
 
 function resolveSymbol(
   index: UtuDocumentIndex,
-  position: Pick<UtuPosition, 'line' | 'character'>,
+  position: UtuPositionLike,
 ): UtuSymbol | undefined {
   const occurrence = findOccurrenceAtPosition(index, position);
   if (occurrence?.builtinKey) {
@@ -1212,7 +1342,7 @@ function resolveSymbol(
 function symbolToMarkup(symbol: UtuSymbol): UtuMarkupContent {
   const sections = [`\`\`\`utu\n${symbol.signature}\n\`\`\``, symbol.detail];
 
-  if (symbol.typeText && symbol.kind !== 'field') {
+  if (symbol.typeText) {
     sections.push(`Type: \`${symbol.typeText}\``);
   }
 
@@ -1230,46 +1360,15 @@ function symbolToMarkup(symbol: UtuSymbol): UtuMarkupContent {
   };
 }
 
-function completionKindForSymbol(symbol: UtuSymbol): UtuCompletionItem['kind'] {
-  switch (symbol.kind) {
-    case 'function':
-    case 'importFunction':
-      return 'function';
-    case 'struct':
-    case 'sumType':
-      return 'class';
-    case 'variant':
-      return 'enumMember';
-    case 'global':
-    case 'importValue':
-      return 'variable';
-    default:
-      return 'text';
-  }
-}
-
-function symbolKindForDocument(symbol: UtuSymbol): UtuDocumentSymbolKind {
-  switch (symbol.kind) {
-    case 'function':
-    case 'importFunction':
-      return 'function';
-    case 'struct':
-      return 'struct';
-    case 'sumType':
-      return 'enum';
-    case 'variant':
-      return 'enumMember';
-    case 'global':
-    case 'importValue':
-      return 'variable';
-    default:
-      return 'object';
-  }
+function stringLiteralName(node: Node): string {
+  return node.text.startsWith('"') && node.text.endsWith('"')
+    ? node.text.slice(1, -1)
+    : node.text;
 }
 
 function getWordAtPosition(
   document: UtuTextDocument,
-  position: Pick<UtuPosition, 'line' | 'character'>,
+  position: UtuPositionLike,
 ): { text: string; range: UtuRange } | undefined {
   if (position.line < 0 || position.line >= document.lineCount) {
     return undefined;
@@ -1409,4 +1508,11 @@ function popScope(scopes: Array<Map<string, string>>): void {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function cloneDiagnostic(diagnostic: UtuDiagnostic): UtuDiagnostic {
+  return {
+    ...diagnostic,
+    range: copyRange(diagnostic.range),
+  };
 }

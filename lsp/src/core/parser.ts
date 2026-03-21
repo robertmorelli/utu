@@ -1,5 +1,11 @@
 import type { Node, Parser, Tree } from 'web-tree-sitter';
-import { copyPosition, type UtuDiagnostic, type UtuRange, type UtuTextDocument } from './types';
+import {
+  copyPosition,
+  type UtuDiagnostic,
+  type UtuPositionLike,
+  type UtuRange,
+  type UtuTextDocument,
+} from './types';
 
 type TreeSitterModule = typeof import('web-tree-sitter');
 
@@ -9,8 +15,8 @@ export interface ParsedTree {
 }
 
 export interface ParserServiceOptions {
-  grammarWasmPath: string;
-  runtimeWasmPath: string;
+  grammarWasmPath: string | Uint8Array;
+  runtimeWasmPath: string | Uint8Array;
 }
 
 export class UtuParserService {
@@ -20,23 +26,11 @@ export class UtuParserService {
   constructor(private readonly options: ParserServiceOptions) {}
 
   async getDiagnostics(document: UtuTextDocument): Promise<UtuDiagnostic[]> {
-    const parsedTree = await this.parseSource(document.getText());
-
-    try {
-      return collectDiagnostics(parsedTree.tree.rootNode, document);
-    } finally {
-      parsedTree.dispose();
-    }
+    return this.withParsedTree(document.getText(), (tree) => collectDiagnostics(tree.rootNode, document));
   }
 
   async getTreeString(source: string): Promise<string> {
-    const parsedTree = await this.parseSource(source);
-
-    try {
-      return parsedTree.tree.rootNode.toString();
-    } finally {
-      parsedTree.dispose();
-    }
+    return this.withParsedTree(source, (tree) => tree.rootNode.toString());
   }
 
   async parseSource(source: string): Promise<ParsedTree> {
@@ -71,28 +65,42 @@ export class UtuParserService {
 
   private async loadParser(): Promise<Parser> {
     const treeSitter = (await import('web-tree-sitter')) as TreeSitterModule;
-    const runtimeWasmPath = normalizeWasmPath(this.options.runtimeWasmPath);
-    const grammarWasmPath = normalizeWasmPath(this.options.grammarWasmPath);
+    const runtimeWasm = normalizeWasmSource(this.options.runtimeWasmPath);
+    const grammarWasm = normalizeWasmSource(this.options.grammarWasmPath);
 
     try {
-      await treeSitter.Parser.init({
-        locateFile(scriptName) {
-          if (scriptName === 'web-tree-sitter.wasm') {
-            return runtimeWasmPath;
-          }
+      await treeSitter.Parser.init(
+        runtimeWasm instanceof Uint8Array
+          ? createTreeSitterModuleOptions(runtimeWasm) as unknown as Parameters<typeof treeSitter.Parser.init>[0]
+          : {
+              locateFile(scriptName: string) {
+                if (scriptName === 'web-tree-sitter.wasm') {
+                  return runtimeWasm;
+                }
 
-          return scriptName;
-        },
-      });
+                return scriptName;
+              },
+            },
+      );
 
       const parser = new treeSitter.Parser();
-      const language = await treeSitter.Language.load(grammarWasmPath);
+      const language = await treeSitter.Language.load(grammarWasm);
       parser.setLanguage(language);
       this.parserInstance = parser;
       return parser;
     } catch (error) {
       this.parserPromise = undefined;
       throw error;
+    }
+  }
+
+  private async withParsedTree<T>(source: string, callback: (tree: Tree) => T): Promise<T> {
+    const parsedTree = await this.parseSource(source);
+
+    try {
+      return callback(parsedTree.tree);
+    } finally {
+      parsedTree.dispose();
     }
   }
 }
@@ -168,7 +176,7 @@ function collectDiagnostics(rootNode: Node, document: UtuTextDocument): UtuDiagn
   }
 }
 
-function clampPosition(document: UtuTextDocument, position: ReturnType<typeof copyPosition>) {
+function clampPosition(document: UtuTextDocument, position: UtuPositionLike) {
   const lastLine = Math.max(document.lineCount - 1, 0);
   const line = clamp(position.line, 0, lastLine);
   const lineLength = getLineText(document, line).length;
@@ -189,6 +197,36 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function normalizeWasmPath(path: string): string {
-  return path.startsWith('file://') ? decodeURIComponent(path.slice('file://'.length)) : path;
+function normalizeWasmSource(source: string | Uint8Array): string | Uint8Array {
+  const binary = toWasmBinary(source);
+  if (binary) {
+    return binary;
+  }
+
+  return source.startsWith('file://') ? decodeURIComponent(source.slice('file://'.length)) : source;
+}
+
+function toWasmBinary(source: string | Uint8Array): Uint8Array | undefined {
+  if (ArrayBuffer.isView(source)) {
+    return source instanceof Uint8Array
+      ? source
+      : new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+  }
+
+  return source instanceof ArrayBuffer ? new Uint8Array(source) : undefined;
+}
+
+function createTreeSitterModuleOptions(runtimeWasm: Uint8Array) {
+  return {
+    wasmBinary: runtimeWasm,
+    instantiateWasm(
+      imports: WebAssembly.Imports,
+      successCallback: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+    ) {
+      void WebAssembly.instantiate(runtimeWasm, imports).then(({ instance, module }) => {
+        successCallback(instance, module);
+      });
+      return {};
+    },
+  };
 }

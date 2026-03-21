@@ -3,6 +3,8 @@ export interface UtuPosition {
   character: number;
 }
 
+export type UtuPositionLike = Pick<UtuPosition, 'line' | 'character'>;
+
 export interface UtuRange {
   start: UtuPosition;
   end: UtuPosition;
@@ -99,7 +101,7 @@ export interface UtuWorkspaceSymbol {
   location: UtuLocation;
 }
 
-export function copyPosition(position: Pick<UtuPosition, 'line' | 'character'>): UtuPosition {
+export function copyPosition(position: UtuPositionLike): UtuPosition {
   return {
     line: position.line,
     character: position.character,
@@ -114,8 +116,8 @@ export function copyRange(range: UtuRange): UtuRange {
 }
 
 export function comparePositions(
-  left: Pick<UtuPosition, 'line' | 'character'>,
-  right: Pick<UtuPosition, 'line' | 'character'>,
+  left: UtuPositionLike,
+  right: UtuPositionLike,
 ): number {
   if (left.line !== right.line) {
     return left.line - right.line;
@@ -126,7 +128,7 @@ export function comparePositions(
 
 export function rangeContains(
   range: UtuRange,
-  position: Pick<UtuPosition, 'line' | 'character'>,
+  position: UtuPositionLike,
 ): boolean {
   return comparePositions(range.start, position) <= 0 && comparePositions(position, range.end) <= 0;
 }

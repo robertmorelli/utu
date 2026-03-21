@@ -52,6 +52,21 @@ const BUILTIN_DOCS: Record<string, HoverDoc> = {
   },
 };
 
+const BUILTIN_NAMESPACE_DOCS: Record<string, HoverDoc> = {
+  array: {
+    signature: 'array.*',
+    description: 'Builtin namespace for GC array allocation and length queries.',
+  },
+  ref: {
+    signature: 'ref.*',
+    description: 'Builtin namespace for nullable and reference-oriented helpers.',
+  },
+  str: {
+    signature: 'str.*',
+    description: 'Builtin namespace for host-backed string operations.',
+  },
+};
+
 const CORE_TYPE_DOCS: Record<string, HoverDoc> = {
   anyref: {
     signature: 'anyref',
@@ -111,7 +126,26 @@ const CORE_TYPE_DOCS: Record<string, HoverDoc> = {
   },
 };
 
+const LITERAL_DOCS: Record<string, HoverDoc> = {
+  false: {
+    signature: 'false',
+    description: 'Boolean false literal.',
+  },
+  true: {
+    signature: 'true',
+    description: 'Boolean true literal.',
+  },
+};
+
 const KEYWORD_DOCS: Record<string, HoverDoc> = {
+  assert: {
+    signature: 'assert condition',
+    description: 'Traps when the condition is false. Common inside UTU tests.',
+  },
+  bench: {
+    signature: 'bench "name" |i| { setup { ... measure { ... } } }',
+    description: 'Declares a benchmark that is synthesized into a callable export in bench mode.',
+  },
   break: {
     signature: 'break',
     description: 'Exits the current block or loop expression, optionally yielding a value.',
@@ -149,8 +183,16 @@ const KEYWORD_DOCS: Record<string, HoverDoc> = {
     description: 'Promotes a value into a reusable binding.',
   },
   match: {
-    signature: 'match value { pattern => expr, ... }',
-    description: 'Pattern matches over variants and bindable values.',
+    signature: 'match value { literal => expr, _ => expr }',
+    description: 'Matches scalar values against literal arms.',
+  },
+  alt: {
+    signature: 'alt value { name: Type => expr, _ => expr }',
+    description: 'Dispatches over variants and refines the matched value by type.',
+  },
+  measure: {
+    signature: 'measure { ... }',
+    description: 'Defines the benchmark body that executes inside the generated timing loop.',
   },
   mut: {
     signature: 'mut field: Type',
@@ -160,36 +202,50 @@ const KEYWORD_DOCS: Record<string, HoverDoc> = {
     signature: 'not expr',
     description: 'Boolean negation operator.',
   },
+  setup: {
+    signature: 'setup { ... measure { ... } }',
+    description: 'Defines one-time benchmark setup that runs before the measured loop.',
+  },
   struct: {
     signature: 'struct Name { ... }',
     description: 'Declares a Wasm GC struct type.',
+  },
+  test: {
+    signature: 'test "name" { ... }',
+    description: 'Declares a test case that is synthesized into a zero-argument export in test mode.',
   },
   type: {
     signature: 'type Name = | Variant ...',
     description: 'Declares a sum type and its variants.',
   },
-  unreachable: {
-    signature: 'unreachable',
+  fatal: {
+    signature: 'fatal',
     description: 'Traps immediately and is commonly used as a force-unwrap fallback.',
   },
 };
 
 export const KEYWORD_COMPLETIONS = [
+  'alt',
+  'assert',
+  'bench',
   'break',
   'else',
   'export',
   'extern',
+  'fatal',
   'fn',
   'for',
   'if',
   'import',
   'let',
   'match',
+  'measure',
   'mut',
   'not',
+  'setup',
   'struct',
+  'test',
   'type',
-  'unreachable',
 ] as const;
 
 export const CORE_TYPE_COMPLETIONS = [
@@ -208,6 +264,8 @@ export const CORE_TYPE_COMPLETIONS = [
   'v128',
 ] as const;
 
+export const LITERAL_COMPLETIONS = ['false', 'true'] as const;
+
 export const BUILTIN_METHODS: Record<string, string[]> = {
   array: ['len', 'new_default'],
   ref: ['null'],
@@ -224,8 +282,7 @@ export const BUILTIN_METHODS: Record<string, string[]> = {
 };
 
 export function getBuiltinHover(key: string): UtuMarkupContent | undefined {
-  const doc = BUILTIN_DOCS[key];
-  return doc ? toMarkdown(doc) : undefined;
+  return lookupHover(BUILTIN_DOCS, key);
 }
 
 export function getBuiltinReturnType(key: string, arrayElementType?: string): string | undefined {
@@ -253,13 +310,19 @@ export function getBuiltinReturnType(key: string, arrayElementType?: string): st
 }
 
 export function getCoreTypeHover(word: string): UtuMarkupContent | undefined {
-  const doc = CORE_TYPE_DOCS[word];
-  return doc ? toMarkdown(doc) : undefined;
+  return lookupHover(CORE_TYPE_DOCS, word);
+}
+
+export function getLiteralHover(word: string): UtuMarkupContent | undefined {
+  return lookupHover(LITERAL_DOCS, word);
 }
 
 export function getKeywordHover(word: string): UtuMarkupContent | undefined {
-  const doc = KEYWORD_DOCS[word];
-  return doc ? toMarkdown(doc) : undefined;
+  return lookupHover(KEYWORD_DOCS, word);
+}
+
+export function getBuiltinNamespaceHover(word: string): UtuMarkupContent | undefined {
+  return lookupHover(BUILTIN_NAMESPACE_DOCS, word);
 }
 
 export function isBuiltinNamespace(name: string): boolean {
@@ -271,4 +334,9 @@ function toMarkdown(doc: HoverDoc): UtuMarkupContent {
     kind: 'markdown',
     value: `\`\`\`utu\n${doc.signature}\n\`\`\`\n${doc.description}`,
   };
+}
+
+function lookupHover<T extends Record<string, HoverDoc>>(docs: T, key: string): UtuMarkupContent | undefined {
+  const doc = docs[key];
+  return doc ? toMarkdown(doc) : undefined;
 }
