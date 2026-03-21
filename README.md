@@ -21,7 +21,7 @@ A high level language that compiles to highly efficient wasm.
 - `bun run test:examples` runs the smoke-tagged cases from `examples/manifest.json`
 - `bun run test:examples:codegen` runs the codegen-tagged cases from `examples/manifest.json`
 - `bun run test:language` runs focused `assert` / `test` / `bench` checks through the CLI
-- `bun run test:examples:all` runs the full manifest, including the legacy benchmark-tagged cases
+- `bun run test:examples:all` runs the full manifest, including the benchmark-tagged cases
 - `.github/workflows/example-tests.yml` runs the smoke suite on pull requests and supports a manual full-manifest run
 - `scripts/test-examples.mjs` writes a JSON report when passed `--report-file <path>`
 
