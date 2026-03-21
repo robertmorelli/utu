@@ -1,0 +1,19 @@
+{
+  "name": "@utu/cli-artifact",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "utu": "./src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run ./src/cli.ts",
+    "help": "bun run ./src/cli.ts help",
+    "build": "bun build ./src/cli.ts --target bun --outfile ./dist/utu.js",
+    "smoke:check": "bun run ./src/cli.ts check ../examples/call_simple.utu",
+    "smoke:compile": "bun run ./src/cli.ts compile ../examples/call_simple.utu --outdir ./dist/smoke",
+    "smoke:run": "bun run ./src/cli.ts run ../examples/call_simple.utu"
+  },
+  "engines": {
+    "bun": ">=1.2.17"
+  }
+}
