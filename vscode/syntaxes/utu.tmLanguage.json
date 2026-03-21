@@ -124,7 +124,7 @@
       "patterns": [
         {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|for|break|let|import|extern|export|fn|struct|type|mut|and|or|not|unreachable)\\b"
+          "match": "\\b(?:if|else|match|for|break|let|import|extern|export|fn|struct|type|test|bench|setup|measure|assert|mut|and|or|not|unreachable)\\b"
         },
         {
           "name": "constant.language.boolean.utu",

@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
-import { RepoCompilerHost, formatError } from './compilerHost';
+import { UtuParserService } from '../../lsp/src/core/parser';
+import { formatError, type CompilerHost } from './compilerHost';
 import { GeneratedDocumentStore, type GeneratedDocumentKind } from './generatedDocuments';
-import { UtuParserService } from './parserService';
 
 interface CommandDependencies {
   output: vscode.OutputChannel;
-  compilerHost: RepoCompilerHost;
+  compilerHost: CompilerHost;
   parserService: UtuParserService;
   generatedDocuments: GeneratedDocumentStore;
 }

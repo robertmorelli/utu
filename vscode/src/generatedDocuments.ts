@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 export type GeneratedDocumentKind = 'js' | 'wat' | 'tree';
@@ -12,7 +11,10 @@ export class GeneratedDocumentStore implements vscode.TextDocumentContentProvide
   readonly onDidChange = this.emitter.event;
 
   upsert(kind: GeneratedDocumentKind, sourceUri: vscode.Uri, content: string): vscode.Uri {
-    const baseName = path.posix.basename(sourceUri.path, path.posix.extname(sourceUri.path)) || 'utu';
+    const fileName = sourceUri.path.split('/').filter(Boolean).at(-1) ?? 'utu';
+    const extensionIndex = fileName.lastIndexOf('.');
+    const baseName =
+      extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
     const extension = kind === 'js' ? 'js' : kind === 'wat' ? 'wat' : 'txt';
     const query = new URLSearchParams({
       kind,

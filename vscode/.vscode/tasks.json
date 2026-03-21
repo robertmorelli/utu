@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "UTU: Watch Web Extension",
+      "type": "shell",
+      "command": "npm run watch:web",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "NO_COLOR": "1",
+          "FORCE_COLOR": "0"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "utu-web-watch",
+        "pattern": [
+          {
+            "regexp": "^(.*)$",
+            "message": 1
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "endsPattern": "\\[watch\\] build finished, watching for changes\\.\\.\\."
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

@@ -17,7 +17,7 @@
     "wasm",
     "tree-sitter"
   ],
-  "main": "./dist/extension.js",
+  "browser": "./dist/web/extension.js",
   "activationEvents": [
     "onLanguage:utu",
     "onCommand:utu.compileCurrentFile",
@@ -96,7 +96,9 @@
   },
   "scripts": {
     "build": "node ./scripts/build.mjs",
+    "build:web": "node ./scripts/build.mjs --web-only",
     "watch": "node ./scripts/build.mjs --watch",
+    "watch:web": "node ./scripts/build.mjs --watch --web-only",
     "check": "tsc -p . --noEmit",
     "vscode:prepublish": "npm run build"
   },
@@ -106,6 +108,7 @@
     "language-configuration.json",
     "README.md",
     "CHANGELOG.md",
+    "web-tree-sitter.wasm",
     "tree-sitter-utu.wasm"
   ],
   "dependencies": {

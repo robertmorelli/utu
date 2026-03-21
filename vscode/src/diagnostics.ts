@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { UtuParserService } from './parserService';
+import { UtuLanguageService } from '../../lsp/src/core/languageService';
+import { toVscodeDiagnostic } from './adapters/core';
 
 type ValidationMode = 'onType' | 'onSave' | 'off';
 
@@ -9,7 +10,7 @@ export class DiagnosticsController implements vscode.Disposable {
   private readonly pending = new Map<string, NodeJS.Timeout>();
 
   constructor(
-    private readonly parserService: UtuParserService,
+    private readonly languageService: UtuLanguageService,
     private readonly output: vscode.OutputChannel,
   ) {
     this.disposables.push(
@@ -79,13 +80,13 @@ export class DiagnosticsController implements vscode.Disposable {
     const version = document.version;
 
     try {
-      const diagnostics = await this.parserService.getDiagnostics(document);
+      const diagnostics = await this.languageService.getDiagnostics(document);
       const current = vscode.workspace.textDocuments.find(
         (candidate) => candidate.uri.toString() === document.uri.toString(),
       );
 
       if (!current || current.version !== version) return;
-      this.collection.set(document.uri, diagnostics);
+      this.collection.set(document.uri, diagnostics.map(toVscodeDiagnostic));
     } catch (error) {
       this.output.appendLine(`[utu] Validation failed for ${document.uri.fsPath || document.uri.toString()}`);
       this.output.appendLine(formatError(error));

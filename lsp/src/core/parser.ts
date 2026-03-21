@@ -1,20 +1,25 @@
-import * as path from 'node:path';
-import * as vscode from 'vscode';
 import type { Node, Parser, Tree } from 'web-tree-sitter';
+import { copyPosition, type UtuDiagnostic, type UtuRange, type UtuTextDocument } from './types';
 
 type TreeSitterModule = typeof import('web-tree-sitter');
+
 export interface ParsedTree {
   tree: Tree;
   dispose(): void;
 }
 
-export class UtuParserService implements vscode.Disposable {
+export interface ParserServiceOptions {
+  grammarWasmPath: string;
+  runtimeWasmPath: string;
+}
+
+export class UtuParserService {
   private parserPromise?: Promise<Parser>;
   private parserInstance?: Parser;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(private readonly options: ParserServiceOptions) {}
 
-  async getDiagnostics(document: vscode.TextDocument): Promise<vscode.Diagnostic[]> {
+  async getDiagnostics(document: UtuTextDocument): Promise<UtuDiagnostic[]> {
     const parsedTree = await this.parseSource(document.getText());
 
     try {
@@ -66,8 +71,8 @@ export class UtuParserService implements vscode.Disposable {
 
   private async loadParser(): Promise<Parser> {
     const treeSitter = (await import('web-tree-sitter')) as TreeSitterModule;
-    const runtimeWasmPath = require.resolve('web-tree-sitter/web-tree-sitter.wasm');
-    const grammarWasmPath = path.join(this.extensionUri.fsPath, 'tree-sitter-utu.wasm');
+    const runtimeWasmPath = normalizeWasmPath(this.options.runtimeWasmPath);
+    const grammarWasmPath = normalizeWasmPath(this.options.grammarWasmPath);
 
     try {
       await treeSitter.Parser.init({
@@ -92,8 +97,34 @@ export class UtuParserService implements vscode.Disposable {
   }
 }
 
-function collectDiagnostics(rootNode: Node, document: vscode.TextDocument): vscode.Diagnostic[] {
-  const diagnostics: vscode.Diagnostic[] = [];
+export function rangeFromNode(document: UtuTextDocument, node: Node): UtuRange {
+  return rangeFromOffsets(document, node.startIndex, node.endIndex);
+}
+
+export function rangeFromOffsets(
+  document: UtuTextDocument,
+  startOffset: number,
+  endOffset: number,
+): UtuRange {
+  const start = clampPosition(document, copyPosition(document.positionAt(startOffset)));
+  const end = clampPosition(document, copyPosition(document.positionAt(endOffset)));
+
+  if (start.line === end.line && end.character <= start.character) {
+    const lineLength = getLineText(document, end.line).length;
+    return {
+      start,
+      end: {
+        line: end.line,
+        character: Math.min(start.character + 1, lineLength),
+      },
+    };
+  }
+
+  return { start, end };
+}
+
+function collectDiagnostics(rootNode: Node, document: UtuTextDocument): UtuDiagnostic[] {
+  const diagnostics: UtuDiagnostic[] = [];
   const seen = new Set<string>();
 
   visit(rootNode);
@@ -123,36 +154,41 @@ function collectDiagnostics(rootNode: Node, document: vscode.TextDocument): vsco
   }
 
   function pushDiagnostic(message: string, node: Node): void {
-    const range = toRange(document, node);
+    const range = rangeFromNode(document, node);
     const key = `${message}:${range.start.line}:${range.start.character}:${range.end.line}:${range.end.character}`;
     if (seen.has(key)) return;
 
     seen.add(key);
-    const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Error);
-    diagnostic.source = 'utu';
-    diagnostics.push(diagnostic);
+    diagnostics.push({
+      message,
+      range,
+      severity: 'error',
+      source: 'utu',
+    });
   }
 }
 
-function toRange(document: vscode.TextDocument, node: Node): vscode.Range {
+function clampPosition(document: UtuTextDocument, position: ReturnType<typeof copyPosition>) {
   const lastLine = Math.max(document.lineCount - 1, 0);
-  const startLine = clamp(node.startPosition.row, 0, lastLine);
-  const endLine = clamp(node.endPosition.row, 0, lastLine);
-  const startLineLength = document.lineAt(startLine).text.length;
-  const endLineLength = document.lineAt(endLine).text.length;
+  const line = clamp(position.line, 0, lastLine);
+  const lineLength = getLineText(document, line).length;
 
-  const startCharacter = clamp(node.startPosition.column, 0, startLineLength);
-  let endCharacter = clamp(node.endPosition.column, 0, endLineLength);
+  return {
+    line,
+    character: clamp(position.character, 0, lineLength),
+  };
+}
 
-  if (startLine === endLine && endCharacter <= startCharacter) {
-    endCharacter = Math.min(startCharacter + 1, endLineLength);
-  }
-
-  const start = new vscode.Position(startLine, startCharacter);
-  const end = new vscode.Position(endLine, endCharacter);
-  return new vscode.Range(start, end);
+function getLineText(document: UtuTextDocument, line: number): string {
+  const lastLine = Math.max(document.lineCount - 1, 0);
+  const safeLine = clamp(line, 0, lastLine);
+  return document.lineAt(safeLine).text;
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function normalizeWasmPath(path: string): string {
+  return path.startsWith('file://') ? decodeURIComponent(path.slice('file://'.length)) : path;
 }
