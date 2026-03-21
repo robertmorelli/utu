@@ -49,7 +49,7 @@ const JSON_RPC_ERRORS = {
     serverNotInitialized: -32002,
 };
 const SERVER_NAME = 'utu-lsp';
-const SERVER_VERSION = '0.0.1';
+const SERVER_VERSION = '0.1.0';
 const HEADER_SEPARATOR = Buffer.from('\r\n\r\n', 'ascii');
 const INITIALIZE_RESULT = {
     capabilities: {
@@ -262,7 +262,7 @@ class UtuLspSession {
             case 'textDocument/didClose':
                 return this.requireInitialized(async () => {
                     const uri = getRequiredTextDocumentUri(params);
-                    this.server.closeDocument(uri);
+                    await this.server.closeDocument(uri);
                     this.publishDiagnostics(uri, []);
                 });
             case 'workspace/didChangeWorkspaceFolders':

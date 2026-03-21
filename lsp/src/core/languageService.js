@@ -254,24 +254,62 @@ export class UtuLanguageService {
         }));
     }
     async getWorkspaceSymbols(query, documents) {
-        const indices = await Promise.all(documents.map((document) => this.getDocumentIndex(document)));
-        const loweredQuery = query.trim().toLowerCase();
-        return indices.flatMap((index) => index.topLevelSymbols
-            .filter((symbol) => !loweredQuery || symbol.name.toLowerCase().includes(loweredQuery))
-            .map((symbol) => ({
-            name: symbol.name,
-            detail: symbol.detail,
-            kind: SYMBOL_METADATA[symbol.kind].documentSymbolKind,
-            location: {
-                uri: symbol.uri,
-                range: copyRange(symbol.range),
-            },
-        })));
+        const workspaceIndex = new UtuWorkspaceSymbolIndex(this);
+        await workspaceIndex.syncDocuments(documents, { replace: true });
+        return workspaceIndex.getWorkspaceSymbols(query);
     }
     async withResolvedSymbol(document, position, fallback, action) {
         const index = await this.getDocumentIndex(document);
         const symbol = resolveSymbol(index, position);
         return symbol ? action(index, symbol) : fallback;
+    }
+}
+export class UtuWorkspaceSymbolIndex {
+    languageService;
+    entries = new Map();
+    constructor(languageService) {
+        this.languageService = languageService;
+    }
+    clear() {
+        this.entries.clear();
+    }
+    deleteDocument(uri) {
+        this.entries.delete(uri);
+    }
+    async updateDocument(document) {
+        const uri = getDocumentUri(document);
+        const cached = this.entries.get(uri);
+        if (cached?.version === document.version) {
+            return cached.symbols;
+        }
+        const index = await this.languageService.getDocumentIndex(document);
+        const symbols = collectWorkspaceSymbols(index.topLevelSymbols);
+        this.entries.set(uri, {
+            version: document.version,
+            symbols,
+        });
+        return symbols;
+    }
+    async syncDocuments(documents, { replace = false } = {}) {
+        const seen = new Set();
+        for (const document of documents) {
+            const uri = getDocumentUri(document);
+            seen.add(uri);
+            await this.updateDocument(document);
+        }
+        if (!replace)
+            return;
+        for (const uri of this.entries.keys()) {
+            if (!seen.has(uri)) {
+                this.entries.delete(uri);
+            }
+        }
+    }
+    getWorkspaceSymbols(query = '') {
+        const loweredQuery = query.trim().toLowerCase();
+        return [...this.entries.values()].flatMap(({ symbols }) => symbols
+            .filter((symbol) => !loweredQuery || symbol.name.toLowerCase().includes(loweredQuery))
+            .map(cloneWorkspaceSymbol));
     }
 }
 export function findOccurrenceAtPosition(index, position) {
@@ -312,6 +350,26 @@ export function collectRunnableEntries(index) {
         ordinals.set(symbol.kind, ordinal + 1);
         return [{ kind: symbol.kind, ordinal, symbol }];
     });
+}
+function collectWorkspaceSymbols(symbols) {
+    return symbols.map((symbol) => ({
+        name: symbol.name,
+        detail: symbol.detail,
+        kind: SYMBOL_METADATA[symbol.kind].documentSymbolKind,
+        location: {
+            uri: symbol.uri,
+            range: copyRange(symbol.range),
+        },
+    }));
+}
+function cloneWorkspaceSymbol(symbol) {
+    return {
+        ...symbol,
+        location: {
+            uri: symbol.location.uri,
+            range: copyRange(symbol.location.range),
+        },
+    };
 }
 function buildDocumentIndex(document, rootNode, diagnostics) {
     const uri = getDocumentUri(document);

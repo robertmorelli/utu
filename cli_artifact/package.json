@@ -1,11 +1,39 @@
 {
-  "name": "@utu/cli-artifact",
-  "private": true,
-  "bin": {
-    "utu": "./src/cli.mjs"
+  "name": "@robertmorelli/utu-cli",
+  "description": "Bun CLI for compiling, running, testing, and benchmarking UTU programs.",
+  "version": "0.1.0",
+  "author": "Robert Morelli",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robertmorelli/utu.git",
+    "directory": "cli_artifact"
   },
+  "bugs": {
+    "url": "https://github.com/robertmorelli/utu/issues"
+  },
+  "homepage": "https://github.com/robertmorelli/utu#readme",
+  "keywords": [
+    "utu",
+    "wasm",
+    "bun",
+    "cli"
+  ],
+  "bin": {
+    "utu": "./dist/package/cli.js"
+  },
+  "files": [
+    "dist/package",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "bun build --compile --target=bun --outfile ./dist/utu ./src/cli.mjs",
+    "build": "node ./scripts/build.mjs",
+    "pack": "npm pack --pack-destination ./artifacts",
+    "prepack": "npm run build",
+    "publish:dry-run": "npm publish --dry-run --access public",
+    "publish:npm": "npm publish --access public",
     "smoke:compile": "bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/smoke",
     "smoke:run": "bun ./src/cli.mjs run ../examples/call_simple.utu",
     "smoke:test": "bun ./src/cli.mjs test ../examples/ci/tests_basic.utu",
@@ -13,5 +41,8 @@
   },
   "engines": {
     "bun": ">=1.2.17"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -2,8 +2,8 @@
 
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { compileUtuSource } from "./lib/compiler.mjs";
 import { executeRuntimeTest, getCallableExport, loadCompiledRuntime, withRuntime } from "../../shared/compiledRuntime.mjs";
@@ -223,17 +223,21 @@ function text(error) {
 }
 
 async function buildBunExecutable(base, js) {
-  const dir = await mkdtemp(path.join(tmpdir(), "utu-bun-"));
+  const packageRoot = getCliPackageRoot();
+  const buildRoot = path.join(packageRoot, ".tmp");
+  await mkdir(buildRoot, { recursive: true });
+  const dir = await mkdtemp(path.join(buildRoot, "utu-bun-"));
   const out = process.platform === "win32" ? `${base}.exe` : base;
   const program = path.join(dir, "program.mjs");
   const runner = path.join(dir, "run.mjs");
-  const helperUrl = new URL("./lib/bunMainRunner.mjs", import.meta.url).href;
+  const helperPath = path.join(packageRoot, "src/lib/bunMainRunner.mjs");
+  const helperImport = relativeImportSpecifier(dir, helperPath);
   const cleanup = () => rm(dir, { force: true, recursive: true });
 
   await writeFile(program, js, "utf8");
   await writeFile(runner, `
 import { instantiate } from "./program.mjs";
-import { runCompiledMain } from ${JSON.stringify(helperUrl)};
+import { runCompiledMain } from ${JSON.stringify(helperImport)};
 
 await runCompiledMain(instantiate);
 `, "utf8");
@@ -252,6 +256,17 @@ function exec(command, args) {
     child.on("error", reject);
     child.on("exit", code => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code ?? 1}`)));
   });
+}
+
+function relativeImportSpecifier(fromDir, targetFile) {
+  const specifier = path.relative(fromDir, targetFile).split(path.sep).join("/");
+  return specifier.startsWith(".") ? specifier : `./${specifier}`;
+}
+
+function getCliPackageRoot() {
+  const modulePath = fileURLToPath(import.meta.url);
+  if (!modulePath.startsWith("/$bunfs/")) return path.resolve(path.dirname(modulePath), "..");
+  return path.resolve(path.dirname(process.execPath), "..");
 }
 
 async function withProgramRuntime(input, { importsFile = "", mode = "program" } = {}, run) {

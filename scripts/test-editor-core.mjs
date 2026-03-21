@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { UtuLanguageService } from '../lsp/src/core/languageService.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp/src/core/languageService.js';
 import { UtuParserService } from '../lsp/src/core/parser.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -44,6 +44,46 @@ const cases = [
         );
         expectLabels(items, ['add_one', 'main']);
     }],
+    ['workspace symbol index caches unchanged versions', async () => {
+        let getDocumentIndexCalls = 0;
+        const workspaceSymbols = new UtuWorkspaceSymbolIndex({
+            async getDocumentIndex(document) {
+                getDocumentIndexCalls += 1;
+                return {
+                    uri: document.uri,
+                    topLevelSymbols: [
+                        {
+                            name: document.symbolName,
+                            detail: `${document.symbolName} detail`,
+                            kind: 'function',
+                            uri: document.uri,
+                            range: {
+                                start: { line: 0, character: 0 },
+                                end: { line: 0, character: document.symbolName.length },
+                            },
+                        },
+                    ],
+                };
+            },
+        });
+
+        const alphaV1 = { uri: 'file:///alpha.utu', version: 1, symbolName: 'alpha' };
+        const betaV1 = { uri: 'file:///beta.utu', version: 1, symbolName: 'beta' };
+
+        await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
+        expectEqual(getDocumentIndexCalls, 2);
+        expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('').map((symbol) => symbol.name).sort(), ['alpha', 'beta']);
+
+        await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
+        expectEqual(getDocumentIndexCalls, 2);
+
+        await workspaceSymbols.updateDocument({ ...alphaV1, version: 2, symbolName: 'alpha2' });
+        expectEqual(getDocumentIndexCalls, 3);
+        expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('alpha').map((symbol) => symbol.name), ['alpha2']);
+
+        await workspaceSymbols.syncDocuments([betaV1], { replace: true });
+        expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('').map((symbol) => symbol.name), ['beta']);
+    }],
 ];
 
 let failed = false;
@@ -73,6 +113,20 @@ function expectLabels(items, expectedLabels) {
         if (!labels.has(label)) {
             throw new Error(`Missing completion "${label}"`);
         }
+    }
+}
+
+function expectEqual(actual, expected) {
+    if (actual !== expected) {
+        throw new Error(`Expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`);
+    }
+}
+
+function expectDeepEqual(actual, expected) {
+    const actualJson = JSON.stringify(actual);
+    const expectedJson = JSON.stringify(expected);
+    if (actualJson !== expectedJson) {
+        throw new Error(`Expected ${expectedJson}, received ${actualJson}`);
     }
 }
 

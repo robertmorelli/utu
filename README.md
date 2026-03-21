@@ -22,7 +22,7 @@ A high level language that compiles to highly efficient wasm.
 - `bun run test:examples:codegen` runs the codegen-tagged cases from `examples/manifest.json`
 - `bun run test:language` runs focused `assert` / `test` / `bench` checks through the CLI
 - `bun run test:examples:all` runs the full manifest, including the benchmark-tagged cases
-- `.github/workflows/example-tests.yml` runs the smoke suite on pull requests and supports a manual full-manifest run
+- `.github/workflows/example-tests.yml` runs the full suite on pull requests, pushes to `main` / `master`, and manual dispatches
 - `scripts/test-examples.mjs` writes a JSON report when passed `--report-file <path>`
 
 ### CLI
@@ -31,3 +31,6 @@ A high level language that compiles to highly efficient wasm.
 - `bun ./cli_artifact/src/cli.mjs test <file> [--imports <file>]`
 - `bun ./cli_artifact/src/cli.mjs bench <file> [--imports <file>] [--seconds <n>] [--samples <n>] [--warmup <n>]`
 - `bun run build:cli` builds a standalone CLI executable at `cli_artifact/dist/utu`
+
+### License
+- MIT

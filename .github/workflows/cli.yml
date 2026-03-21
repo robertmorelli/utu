@@ -13,8 +13,17 @@ permissions:
 
 jobs:
   cli:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    name: CLI (${{ matrix.os }}, Bun ${{ matrix.bun-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        bun-version:
+          - 1.2.17
     defaults:
       run:
         shell: bash
@@ -27,7 +36,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.17
+          bun-version: ${{ matrix.bun-version }}
 
       - name: Install dependencies
         working-directory: .
@@ -75,7 +84,10 @@ jobs:
           test -f dist/ci-src/call_simple.wat
 
       - name: Build bundled CLI
-        run: bun run build
+        run: |
+          bun run build
+          test -f ./dist/package/cli.js
+          test -f ./dist/utu
 
       - name: Compile Bun executable
         run: |
@@ -86,7 +98,7 @@ jobs:
       - name: Compile with bundled CLI
         run: |
           rm -rf dist/ci-bundle
-          bun ./dist/utu.mjs compile ../examples/call_simple.utu --outdir ./dist/ci-bundle --wat
+          ./dist/utu compile ../examples/call_simple.utu --outdir ./dist/ci-bundle --wat
           test -f dist/ci-bundle/call_simple.mjs
           test -f dist/ci-bundle/call_simple.wasm
           test -f dist/ci-bundle/call_simple.wat
@@ -118,7 +130,7 @@ jobs:
       - name: Run with bundled CLI
         run: |
           set +e
-          output="$(bun ./dist/utu.mjs run ../examples/call_simple.utu 2>&1)"
+          output="$(./dist/utu run ../examples/call_simple.utu 2>&1)"
           exit_code=$?
           set -e
           echo "$output"

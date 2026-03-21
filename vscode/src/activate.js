@@ -8,6 +8,7 @@ import { GeneratedDocumentStore } from './generatedDocuments.js';
 import { UtuDocumentSymbolProvider } from './documentSymbols.js';
 import { registerLanguageProviders } from './languageProviders.js';
 import { registerTesting } from './testing.js';
+import { createWorkspaceSymbolController } from './workspaceSymbols.js';
 export function activateUtuExtension(context, options) {
     const output = vscode.window.createOutputChannel('UTU');
     const generatedDocuments = new GeneratedDocumentStore();
@@ -16,23 +17,31 @@ export function activateUtuExtension(context, options) {
         runtimeWasmPath: options.parserRuntimeWasmPath,
     });
     const languageService = new UtuLanguageService(parserService);
+    const workspaceSymbols = createWorkspaceSymbolController(languageService, output);
     const diagnostics = new DiagnosticsController(languageService, output);
     const statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem();
     const scheduleMainContextRefresh = createMainContextRefresher(languageService, options.runtimeHost);
+    const workspaceWatcher = vscode.workspace.createFileSystemWatcher('**/*.utu');
     const subscriptions = [
         output,
         generatedDocuments,
         parserService,
         diagnostics,
-        { dispose: () => languageService.dispose() },
+        workspaceWatcher,
+        { dispose: () => {
+                workspaceSymbols.clear();
+                languageService.dispose();
+            } },
         vscode.workspace.onDidChangeTextDocument((event) => {
             languageService.invalidate(event.document.uri.toString());
+            void workspaceSymbols.updateDocument(event.document);
             if (event.document === vscode.window.activeTextEditor?.document) {
                 void scheduleMainContextRefresh(event.document);
             }
         }),
         vscode.workspace.onDidCloseTextDocument((document) => {
             languageService.invalidate(document.uri.toString());
+            void workspaceSymbols.refreshUri(document.uri);
             if (document === vscode.window.activeTextEditor?.document) {
                 void vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false);
             }
@@ -43,22 +52,36 @@ export function activateUtuExtension(context, options) {
             updateStatusBarItem(statusBarItem, editor);
             void scheduleMainContextRefresh(editor?.document);
         }),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            void workspaceSymbols.syncWorkspace();
+        }),
+        workspaceWatcher.onDidCreate((uri) => {
+            void workspaceSymbols.refreshUri(uri);
+        }),
+        workspaceWatcher.onDidChange((uri) => {
+            void workspaceSymbols.refreshUri(uri);
+        }),
+        workspaceWatcher.onDidDelete((uri) => {
+            workspaceSymbols.deleteUri(uri);
+        }),
     ];
     if (statusBarItem !== undefined) {
         subscriptions.push(statusBarItem);
         updateStatusBarItem(statusBarItem, vscode.window.activeTextEditor);
     }
     subscriptions.push(vscode.workspace.onDidOpenTextDocument((document) => {
+        void workspaceSymbols.updateDocument(document);
         if (document === vscode.window.activeTextEditor?.document) {
             void scheduleMainContextRefresh(document);
         }
     }), vscode.workspace.onDidSaveTextDocument((document) => {
+        void workspaceSymbols.updateDocument(document);
         if (document === vscode.window.activeTextEditor?.document) {
             void scheduleMainContextRefresh(document);
         }
     }));
     context.subscriptions.push(...subscriptions);
-    registerLanguageProviders(context, languageService);
+    registerLanguageProviders(context, languageService, workspaceSymbols);
     registerRunCodeLensProvider(context, languageService);
     registerTesting(context, {
         languageService,
@@ -73,6 +96,7 @@ export function activateUtuExtension(context, options) {
         generatedDocuments,
         runtimeHost: options.runtimeHost,
     });
+    void workspaceSymbols.ensureInitialized();
     void scheduleMainContextRefresh(vscode.window.activeTextEditor?.document);
 }
 function createCompileStatusBarItem() {

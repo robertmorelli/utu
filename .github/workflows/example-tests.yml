@@ -2,23 +2,29 @@ name: Example Tests
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+      - master
   workflow_dispatch:
-    inputs:
-      suite:
-        description: Example suite to run
-        type: choice
-        options:
-          - smoke
-          - all
-        default: smoke
 
 permissions:
   contents: read
 
 jobs:
   examples:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: Example Suite (${{ matrix.os }}, Bun ${{ matrix.bun-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        bun-version:
+          - 1.2.17
+          - latest
 
     steps:
       - name: Check out repository
@@ -27,28 +33,10 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.17
+          bun-version: ${{ matrix.bun-version }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Select suite
-        id: suite
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.suite }}" == "all" ]]; then
-            echo "command=bun run test:examples:all --report-file .artifacts/example-report.json" >> "$GITHUB_OUTPUT"
-          else
-            echo "command=bun run test:examples --report-file .artifacts/example-report.json" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run example suite
-        run: ${{ steps.suite.outputs.command }}
-
-      - name: Upload example report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: example-test-report
-          path: .artifacts/example-report.json
-          if-no-files-found: warn
+      - name: Run full test suite
+        run: bun run test

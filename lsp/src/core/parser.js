@@ -1,5 +1,5 @@
 import { clamp, comparePositions, copyPosition, rangeKey, } from './types.js';
-import { createTreeSitterInitOptions, normalizeWasmSource } from '../../../shared/treeSitter.mjs';
+import { createTreeSitterInitOptions, normalizeWasmSource, parseTree, withParsedTree as withManagedParsedTree } from '../../../shared/treeSitter.mjs';
 export class UtuParserService {
     options;
     parserPromise;
@@ -12,16 +12,7 @@ export class UtuParserService {
     }
     async parseSource(source) {
         const parser = await this.getParser();
-        const tree = parser.parse(source);
-        if (!tree) {
-            throw new Error('Tree-sitter returned no syntax tree for the document.');
-        }
-        return {
-            tree,
-            dispose() {
-                tree.delete();
-            },
-        };
+        return parseTree(parser, source);
     }
     dispose() {
         this.parserInstance?.delete();
@@ -47,13 +38,8 @@ export class UtuParserService {
         }
     }
     async withParsedTree(source, callback) {
-        const parsedTree = await this.parseSource(source);
-        try {
-            return callback(parsedTree.tree);
-        }
-        finally {
-            parsedTree.dispose();
-        }
+        const parser = await this.getParser();
+        return withManagedParsedTree(parser, source, callback);
     }
 }
 export function rangeFromNode(document, node) {

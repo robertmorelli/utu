@@ -1,0 +1,71 @@
+name: Tooling Matrix
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    name: Tooling (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        node-version:
+          - 20
+          - 22
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.17
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build grammar artifact
+        run: |
+          bun run grammar
+          cp tree-sitter-utu.wasm vscode/
+
+      - name: Validate editor core
+        run: bun scripts/test-editor-core.mjs
+
+      - name: Validate web host behavior
+        run: bun scripts/test-editor-webhost.mjs
+
+      - name: Build LSP package
+        working-directory: lsp
+        run: |
+          npm run build
+          test -f ./dist/utu-lsp.js
+          test -f ./dist/tree-sitter-utu.wasm
+          test -f ./dist/web-tree-sitter.wasm
+
+      - name: Build VS Code extension
+        working-directory: vscode
+        run: |
+          npm run build
+          test -f ./dist/web/extension.js
+          test -f ./dist/compiler.mjs
+          test -f ./dist/compiler.web.mjs

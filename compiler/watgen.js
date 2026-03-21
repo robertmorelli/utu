@@ -338,7 +338,108 @@ class WatGen {
     }
 
     emitImportVal(imp) { return `  (import "${imp.module}" "${imp.name}" (global $${imp.name} ${this.wasmType(imp.type)}))`; }
-    emitGlobal(global) { return `  (global $${global.name} ${this.wasmType(global.type)} ${this.genExprInline(global.value, this.wasmType(global.type))})`; }
+    emitGlobal(global) {
+        const wasmType = this.wasmType(global.type);
+        const init = this.tryFoldGlobalInit(global.value, wasmType) ?? this.genExprInline(global.value, wasmType);
+        return `  (global $${global.name} ${wasmType} ${init})`;
+    }
+
+    tryFoldGlobalInit(node, wasmType) {
+        const value = this.evalConstExpr(node, wasmType);
+        if (value === null) return null;
+        if (wasmType === 'i64') return `i64.const ${value}`;
+        if (wasmType === 'f32') return `f32.const ${value}`;
+        if (wasmType === 'f64') return `f64.const ${value}`;
+        return `i32.const ${value}`;
+    }
+
+    evalConstExpr(node, wasmType) {
+        if (!node || !['i32', 'u32', 'i64', 'u64', 'f32', 'f64'].includes(wasmType)) return null;
+
+        switch (node.type) {
+            case 'literal':
+                return this.evalConstLiteral(node, wasmType);
+            case 'paren_expr':
+                return this.evalConstExpr(node.namedChildren[0], wasmType);
+            case 'unary_expr':
+                return this.evalConstUnary(node, wasmType);
+            case 'binary_expr':
+                return this.evalConstBinary(node, wasmType);
+            default:
+                return null;
+        }
+    }
+
+    evalConstLiteral(node, wasmType) {
+        const literal = literalInfo(node);
+        switch (literal.kind) {
+            case 'int':
+                return wasmType === 'i64' || wasmType === 'u64' ? BigInt(literal.value) : literal.value;
+            case 'float':
+                return literal.value;
+            case 'bool':
+                return literal.value ? 1 : 0;
+            default:
+                return null;
+        }
+    }
+
+    evalConstUnary(node, wasmType) {
+        const op = childOfType(node, 'unary_op').text;
+        const expr = node.namedChildren.find(child => child.type !== 'unary_op');
+        const value = this.evalConstExpr(expr, wasmType);
+        if (value === null) return null;
+
+        switch (op) {
+            case '-':
+                return -value;
+            case 'not':
+                return value ? 0 : 1;
+            case '~':
+                return typeof value === 'bigint' ? ~value : ~value;
+            default:
+                return null;
+        }
+    }
+
+    evalConstBinary(node, wasmType) {
+        const [leftNode, rightNode] = node.namedChildren;
+        const left = this.evalConstExpr(leftNode, wasmType);
+        const right = this.evalConstExpr(rightNode, wasmType);
+        if (left === null || right === null) return null;
+
+        const op = findAnonBetween(node, leftNode, rightNode);
+        const isBig = typeof left === 'bigint' || typeof right === 'bigint';
+        const normalize = (value) => {
+            if (isBig) return BigInt(value);
+            return value;
+        };
+        const l = normalize(left);
+        const r = normalize(right);
+
+        switch (op) {
+            case '+': return l + r;
+            case '-': return l - r;
+            case '*': return l * r;
+            case '/': return isBig ? l / r : (wasmType === 'f32' || wasmType === 'f64' ? l / r : Math.trunc(l / r));
+            case '%': return l % r;
+            case '&': return l & r;
+            case '|': return l | r;
+            case '^': return l ^ r;
+            case '<<': return l << r;
+            case '>>': return l >> r;
+            case '>>>': return isBig ? null : l >>> r;
+            case '==': return l === r ? 1 : 0;
+            case '!=': return l !== r ? 1 : 0;
+            case '<': return l < r ? 1 : 0;
+            case '>': return l > r ? 1 : 0;
+            case '<=': return l <= r ? 1 : 0;
+            case '>=': return l >= r ? 1 : 0;
+            case 'and': return l && r ? 1 : 0;
+            case 'or': return l || r ? 1 : 0;
+            default: return null;
+        }
+    }
 
     emitFunc(name, params, returnType, body, emitBody, extraLocals = []) {
         this.localTypes = new Map(params.map(param => [param.name, param.type]));

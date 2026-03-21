@@ -35,3 +35,26 @@ function toOptionalUint8Array(value) {
   }
   return undefined;
 }
+
+export function parseTree(parser, source, errorMessage = "Tree-sitter returned no syntax tree for the document.") {
+  const tree = parser.parse(source);
+  if (!tree) {
+    throw new Error(errorMessage);
+  }
+
+  return {
+    tree,
+    dispose() {
+      tree.delete();
+    },
+  };
+}
+
+export async function withParsedTree(parser, source, callback, errorMessage) {
+  const parsedTree = parseTree(parser, source, errorMessage);
+  try {
+    return await callback(parsedTree.tree);
+  } finally {
+    parsedTree.dispose();
+  }
+}

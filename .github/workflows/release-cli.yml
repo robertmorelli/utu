@@ -1,0 +1,75 @@
+name: Release CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the CLI package to npm
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'cli-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release-cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.17
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run full test suite
+        run: bun run test
+
+      - name: Run CLI smoke checks
+        working-directory: cli_artifact
+        run: |
+          bun run smoke:compile
+          bun run smoke:test
+          bun run smoke:bench
+
+      - name: Build release artifacts
+        working-directory: cli_artifact
+        run: |
+          bun run build
+          test -f ./dist/package/cli.js
+          test -f ./dist/utu
+
+      - name: Pack npm tarball
+        working-directory: cli_artifact
+        run: npm pack --pack-destination ./artifacts
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: utu-cli-release
+          path: |
+            cli_artifact/artifacts/*.tgz
+            cli_artifact/dist/utu
+
+      - name: Publish CLI package
+        if: github.event_name == 'push' || inputs.publish
+        working-directory: cli_artifact
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

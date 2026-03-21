@@ -1,0 +1,66 @@
+name: Release VS Code Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the VS Code extension to the Marketplace
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'vscode-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release-vscode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.17
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run full test suite
+        run: bun run test
+
+      - name: Build grammar artifact
+        run: |
+          bun run grammar
+          cp tree-sitter-utu.wasm vscode/
+
+      - name: Validate web host behavior
+        run: bun scripts/test-editor-webhost.mjs
+
+      - name: Package VSIX
+        working-directory: vscode
+        run: npm run package:vsix
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: utu-vscode-vsix
+          path: vscode/dist/*.vsix
+
+      - name: Publish to VS Code Marketplace
+        if: github.event_name == 'push' || inputs.publish
+        working-directory: vscode
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npm run publish:marketplace

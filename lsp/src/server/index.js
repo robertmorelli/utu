@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { UtuLanguageService } from '../core/languageService.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../core/languageService.js';
 import { UtuParserService } from '../core/parser.js';
 import { clamp, getDocumentUri, } from '../core/types.js';
 const DEFAULT_SERVER_CAPABILITIES = {
@@ -192,6 +192,9 @@ export class UtuLanguageServerCore {
     documents;
     parserService;
     languageService;
+    workspaceSymbols;
+    workspaceSymbolSyncPromise;
+    workspaceSymbolsReady = false;
     constructor(options) {
         this.documents = new UtuServerDocumentManager(options.workspaceFolders ?? []);
         this.parserService = new UtuParserService({
@@ -199,6 +202,7 @@ export class UtuLanguageServerCore {
             runtimeWasmPath: options.runtimeWasmPath,
         });
         this.languageService = new UtuLanguageService(this.parserService);
+        this.workspaceSymbols = new UtuWorkspaceSymbolIndex(this.languageService);
     }
     dispose() {
         this.clearDocuments();
@@ -207,19 +211,24 @@ export class UtuLanguageServerCore {
     }
     setWorkspaceFolders(folders) {
         this.documents.setWorkspaceFolders(folders);
+        this.resetWorkspaceSymbols();
     }
     addWorkspaceFolders(folders) {
         this.documents.addWorkspaceFolders(folders);
+        this.resetWorkspaceSymbols();
     }
     removeWorkspaceFolders(folders) {
         this.documents.removeWorkspaceFolders(folders);
+        this.resetWorkspaceSymbols();
     }
     invalidateDocument(uri) {
         this.languageService.invalidate(uri);
+        this.workspaceSymbols.deleteDocument(uri);
     }
     clearDocuments() {
         this.documents.clear();
         this.languageService.clear();
+        this.resetWorkspaceSymbols();
     }
     async openDocument(params) {
         return this.getFreshDiagnostics(this.documents.open(params));
@@ -227,9 +236,16 @@ export class UtuLanguageServerCore {
     async updateDocument(params) {
         return this.getFreshDiagnostics(this.documents.update(params));
     }
-    closeDocument(uri) {
+    async closeDocument(uri) {
         this.documents.close(uri);
         this.invalidateDocument(uri);
+        const document = await this.documents.resolve(uri);
+        if (document) {
+            await this.workspaceSymbols.updateDocument(document);
+            this.workspaceSymbolsReady = true;
+            return;
+        }
+        this.workspaceSymbols.deleteDocument(uri);
     }
     async saveDocument(params) {
         const document = this.documents.get(params.uri);
@@ -264,15 +280,41 @@ export class UtuLanguageServerCore {
         return this.withDocument(uri, [], (document) => this.languageService.getDocumentSymbols(document));
     }
     async getWorkspaceSymbols(query) {
-        return this.languageService.getWorkspaceSymbols(query, await this.documents.listWorkspaceDocuments());
+        await this.ensureWorkspaceSymbols();
+        return this.workspaceSymbols.getWorkspaceSymbols(query);
     }
     async getFreshDiagnostics(document) {
         this.invalidateDocument(document.uri);
-        return this.languageService.getDiagnostics(document);
+        const diagnostics = await this.languageService.getDiagnostics(document);
+        await this.workspaceSymbols.updateDocument(document);
+        this.workspaceSymbolsReady = true;
+        return diagnostics;
     }
     async withDocument(uri, fallback, action) {
         const document = await this.documents.resolve(uri);
         return document ? action(document) : fallback;
+    }
+    resetWorkspaceSymbols() {
+        this.workspaceSymbolSyncPromise = undefined;
+        this.workspaceSymbolsReady = false;
+        this.workspaceSymbols.clear();
+    }
+    async ensureWorkspaceSymbols() {
+        if (this.workspaceSymbolsReady) {
+            return;
+        }
+        this.workspaceSymbolSyncPromise ??= this.syncWorkspaceSymbols();
+        await this.workspaceSymbolSyncPromise;
+    }
+    async syncWorkspaceSymbols() {
+        try {
+            const documents = await this.documents.listWorkspaceDocuments();
+            await this.workspaceSymbols.syncDocuments(documents, { replace: true });
+            this.workspaceSymbolsReady = true;
+        }
+        finally {
+            this.workspaceSymbolSyncPromise = undefined;
+        }
     }
 }
 export class UtuLanguageServer extends UtuLanguageServerCore {

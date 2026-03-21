@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { toVscodeCompletionItem, toVscodeDocumentHighlight, toVscodeHover, toVscodeLocation, toVscodeWorkspaceSymbol, toVscodeRange, } from './adapters/core.js';
 const DOCUMENT_SELECTOR = [{ language: 'utu' }];
 const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(['type', 'enumMember', 'function', 'parameter', 'variable', 'property'], ['declaration']);
-export function registerLanguageProviders(context, languageService) {
+export function registerLanguageProviders(context, languageService, workspaceSymbols) {
     context.subscriptions.push(vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, {
         async provideHover(document, position) {
             const hover = await languageService.getHover(document, position);
@@ -38,13 +38,8 @@ export function registerLanguageProviders(context, languageService) {
         },
     }, SEMANTIC_TOKEN_LEGEND), vscode.languages.registerWorkspaceSymbolProvider({
         async provideWorkspaceSymbols(query) {
-            const documents = await listWorkspaceDocuments();
-            const symbols = await languageService.getWorkspaceSymbols(query, documents);
+            const symbols = await workspaceSymbols.getWorkspaceSymbols(query);
             return symbols.map(toVscodeWorkspaceSymbol);
         },
     }));
-}
-async function listWorkspaceDocuments() {
-    const workspaceUris = await vscode.workspace.findFiles('**/*.utu', '**/node_modules/**');
-    return Promise.all(workspaceUris.map((uri) => vscode.workspace.openTextDocument(uri)));
 }

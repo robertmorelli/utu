@@ -1,6 +1,8 @@
 {
   "name": "utu",
   "module": "compiler/index.js",
+  "author": "Robert Morelli",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "grammar": "tree-sitter generate && tree-sitter build --wasm",
@@ -9,7 +11,7 @@
     "build:cli": "cd cli_artifact && bun run build",
     "docs": "bun scripts/build-docs.mjs",
     "build": "bun run grammar && bun run bundle && bun run distribute && bun run build:cli && bun run docs",
-    "test": "bun run test:examples:all && bun run test:language && bun run test:editor:core && bun run test:editor:webhost && bun run test:examples:compile && bun run test:examples:bench && bun run test:docs:codegen",
+    "test": "bun run test:examples:all && bun run test:language && bun run test:editor:core && bun run test:editor:webhost && bun run test:examples:compile && bun run test:examples:bench && bun run test:stress && bun run test:docs:codegen",
     "test:examples": "bun scripts/test-examples.mjs --tag smoke",
     "test:examples:codegen": "bun scripts/test-examples.mjs --tag codegen",
     "test:examples:all": "bun scripts/test-examples.mjs",
@@ -18,6 +20,7 @@
     "test:language": "bun scripts/test-language.mjs",
     "test:editor:core": "bun scripts/test-editor-core.mjs",
     "test:editor:webhost": "bun scripts/test-editor-webhost.mjs",
+    "test:stress": "bun scripts/test-stress-runtime.mjs",
     "test:docs:codegen": "bun scripts/test-docs-codegen.mjs",
     "compare:deltablue:rust": "bun scripts/compare-deltablue-rust.mjs",
     "report:utu-v-rust": "bun scripts/generate-utu-v-rust-report.mjs"
