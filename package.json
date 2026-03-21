@@ -4,9 +4,7 @@
   "private": true,
   "scripts": {
     "grammar": "tree-sitter generate && tree-sitter build --wasm",
-    "bundle": "esbuild compiler/index.js --bundle --format=esm --outfile=dist/index.mjs --external:web-tree-sitter --external:module",
-    "build": "bun run grammar && bun run bundle",
-    "docs": "bun run bundle && cp tree-sitter-utu.wasm docs/"
+    "build": "esbuild compiler/index.js --bundle --format=esm --outfile=dist/index.mjs --external:web-tree-sitter --external:module && bun run grammar && mv tree-sitter-utu.wasm dist/"
   },
   "devDependencies": {
     "@types/bun": "latest"
