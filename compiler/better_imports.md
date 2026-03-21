@@ -1,4 +1,4 @@
-# Better Imports Sketch
+# Better Imports Notes
 
 ## Goal
 
@@ -11,14 +11,20 @@ import extern "node:fs" readFileSync(str) str
 
 without hardcoding all host behavior into `jsgen`, and without duplicating import analysis across the compiler.
 
-## Current Problem
+## Current State
 
-- The parser already accepts any string module specifier.
-- `watgen` already preserves the module string and emits it into Wasm imports.
-- `jsgen` rescans the tree separately and only recognizes `"es"`.
-- The CLI and example runner expect a flat import bag instead of a real Wasm import object.
+- The parser accepts arbitrary string module specifiers.
+- `watgen` preserves the declared module string and emits it into Wasm imports.
+- Shared host import analysis now lives in `compiler/host_analysis.js`.
+- `compiler/index.js` returns `metadata.host` and passes shared host analysis to
+  `jsgen`.
+- `jsgen` emits module-shaped import objects, auto-resolves `node:*` imports,
+  and keeps flat `es` compatibility as temporary sugar.
+- The CLI and example runner normalize nested import objects instead of
+  expecting a flat import bag.
 
-This means the language surface is already generic, but the generated JS and host runners are still specialized to one namespace.
+The first pass of the import refactor has already landed. The rest of this
+document is best read as follow-on cleanup and future design notes.
 
 ## Design Principle
 
@@ -33,29 +39,31 @@ That shared result should drive:
 
 The generated JS should only include the tiny amount of runtime logic needed for the imports that the current program actually uses.
 
-## Proposed Shared Analysis
+## Shared Analysis
 
-Add a small shared analyzer, for example:
-
-- `compiler/host_analysis.js`
-
-Export something like:
+The compiler now has a shared analyzer in `compiler/host_analysis.js`.
+Conceptually it exposes:
 
 ```js
 export function analyzeHostRequirements(rootNode) {
   return {
-    imports: [
-      { module: "es", name: "console_log", kind: "function", params: [...], returnType: null },
-      { module: "node:fs", name: "readFileSync", kind: "function", params: [...], returnType: {...} },
-      { module: "es", name: "document", kind: "value", type: {...} },
+    importFns: [
+      { module: "es", name: "console_log", kind: "function" },
+      { module: "node:fs", name: "readFileSync", kind: "function" },
     ],
-    modules: ["es", "node:fs"],
-    capabilities: ["node-builtins"],
-    platformHints: ["node", "bun"],
-    assumptions: {
-      needsNothing: false,
-      needsNodeBuiltins: true,
-      needsEsHost: true,
+    importVals: [
+      { module: "es", name: "document", kind: "value" },
+    ],
+    metadata: {
+      imports: [...],
+      modules: ["es", "node:fs"],
+      capabilities: ["node-builtins"],
+      platformHints: ["node", "bun"],
+      assumptions: {
+        needsNothing: false,
+        needsNodeBuiltins: true,
+        needsEsHost: true,
+      },
     },
   };
 }
@@ -99,7 +107,9 @@ This is better than only returning `["node"]` or `["bun"]`, because:
 
 ## Compiler Flow
 
-Refactor `compiler/index.js` so host analysis happens once and is passed through:
+The shared compiler already computes host analysis once and passes it through
+to generated JavaScript. A next pass could also make `watgen` consume that
+same shared analysis directly:
 
 ```js
 const tree = parser.parse(source);
@@ -132,11 +142,13 @@ This will remove drift between `watgen` and `jsgen`.
 
 ## `jsgen` Changes
 
-`jsgen` should consume `host`, not rescan the tree.
+Most of this section has landed: `jsgen` already consumes shared host
+analysis, emits module-shaped imports, and auto-resolves `node:*` modules.
+What remains is cleanup and sharper diagnostics.
 
 ### Generated API
 
-Change generated `instantiate` to accept a real Wasm import object shape:
+The generated `instantiate` API now accepts a real Wasm import object shape:
 
 ```js
 await instantiate({
@@ -149,7 +161,8 @@ await instantiate({
 })
 ```
 
-For convenience, `jsgen` can still accept the old flat `es` shape temporarily if desired, but that should be compatibility sugar, not the core model.
+Flat `es` input still works as compatibility sugar, but it is no longer the
+core model.
 
 ### Avoiding Code Bloat
 
@@ -183,23 +196,10 @@ That keeps the runtime code small and data-driven.
 
 ## CLI Changes
 
-Update the CLI to match the real Wasm import model.
+The CLI already matches the real Wasm import model while still normalizing flat
+`es` compatibility input.
 
-### Current State
-
-Today the CLI provides:
-
-```js
-{
-  console_log,
-  math_sqrt,
-  ...
-}
-```
-
-### Proposed State
-
-Provide:
+It now provides:
 
 ```js
 {
@@ -211,7 +211,8 @@ Provide:
 }
 ```
 
-Then add auto-resolution for `node:*` when required by metadata:
+Generated JavaScript handles `node:*` auto-resolution when required by
+metadata:
 
 ```js
 for (const specifier of metadata.host.modules) {
@@ -229,7 +230,7 @@ If a required module is still missing, throw a targeted error that names:
 
 ## Example Runner And Tests
 
-Update test helpers and fixtures to use the nested import object:
+The test helpers and fixtures now use the nested import object shape:
 
 ```js
 {
@@ -248,15 +249,17 @@ Add tests for:
 - browser-like environments fail with a clear diagnostic for `node:*`
 - metadata reports `platformHints: ["node", "bun"]` when `node:*` is used
 
-## Compatibility Plan
+## Remaining Cleanup
 
-To keep the change easy to land:
+The remaining follow-on work is roughly:
 
-1. Add shared host analysis.
-2. Make `watgen` and `jsgen` consume it.
-3. Keep temporary flat-`es` compatibility in generated JS if helpful.
-4. Migrate CLI and tests to nested import objects.
-5. Remove flat compatibility once all call sites are updated.
+1. Make `watgen` consume shared host analysis directly instead of reparsing
+   imports for itself.
+2. Tighten diagnostics for missing module bindings.
+3. Keep auto-resolution limited to `node:*` unless the project adopts a
+   broader module-resolution policy.
+4. Remove flat `es` compatibility once all callers are comfortably on the
+   nested import shape.
 
 ## Interaction With `T # E`
 
@@ -269,30 +272,12 @@ The only link is that host metadata can help produce better runtime errors:
 
 But the null-wrapping exception behavior should not be part of the core host analysis model.
 
-## Files Likely To Change
+## Files Likely To Change Next
 
 - `compiler/index.js`
 - `compiler/jsgen.js`
 - `compiler/watgen.js`
-- `compiler/host_analysis.js` or similar new file
+- `compiler/host_analysis.js`
 - `cli_artifact/src/cli.mjs`
 - `scripts/test-examples.mjs`
-- docs that currently describe imports as `"es"`-only
-
-## Recommended Minimal First Pass
-
-If we want the smallest safe landing:
-
-1. Add shared host analysis with `imports`, `modules`, `capabilities`, and `platformHints`.
-2. Switch `jsgen` to emit nested import objects.
-3. Auto-resolve only `"node:*"` modules in Node/Bun contexts.
-4. Return `metadata.host` from the compiler.
-
-That gets us:
-
-- generic module-aware imports
-- no npm requirement for Node builtins
-- small generated code
-- a single source of truth for host assumptions
-
-without committing yet to a broader module-resolution story for arbitrary ESM specifiers.
+- any docs that still imply host imports are `"es"`-only

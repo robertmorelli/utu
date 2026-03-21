@@ -11,16 +11,18 @@ A high level language that compiles to highly efficient wasm.
 - cli_artifact/ contains the bun cli for compilation
 
 ### About UTU
-- The spec lives in `spec.md`, with topic-oriented Typst docs under `documentation/`
+- The canonical spec lives under `documentation/`; `documentation/spec.typ` assembles the full spec and `documentation/index.typ` organizes the topic-oriented docs
 - Vaguely has algebraic types
 - Relies solely on js memory (no linear memory)
 - Lowers to nearly analogous wasm
 
 ### Testing
-- `bun run test` runs the smoke suite from `examples/manifest.json`
+- `bun run test` runs the full local suite: the full manifest plus language, editor-core, compile, benchmark, and docs/codegen checks
+- `bun run test:examples` runs the smoke-tagged cases from `examples/manifest.json`
+- `bun run test:examples:codegen` runs the codegen-tagged cases from `examples/manifest.json`
 - `bun run test:language` runs focused `assert` / `test` / `bench` checks through the CLI
-- `bun run test:examples:all` runs the smoke suite plus the current benchmark examples as non-blocking legacy coverage
-- `.github/workflows/example-tests.yml` runs the smoke suite on pull requests and supports a manual full-suite run
+- `bun run test:examples:all` runs the full manifest, including the legacy benchmark-tagged cases
+- `.github/workflows/example-tests.yml` runs the smoke suite on pull requests and supports a manual full-manifest run
 - `scripts/test-examples.mjs` writes a JSON report when passed `--report-file <path>`
 
 ### CLI

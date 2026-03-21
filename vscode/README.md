@@ -14,14 +14,17 @@ This folder now contains the starting point for the UTU VS Code extension.
 - local go-to-definition, find references, and document highlights
 - completions for UTU keywords, core types, builtin namespaces, and top-level symbols
 - workspace symbol search across `.utu` files
-- commands to compile the active file and inspect generated JavaScript, WAT, and the parser tree
+- commands to compile or run the active file and inspect generated JavaScript, WAT, and the parser tree
+- test and benchmark discovery through the VS Code Testing view and per-declaration code lenses
 - the reusable language core now lives in `../lsp/src/core`, with `vscode/src` acting as a thin adapter layer
-- a build step that copies `/compiler` into the hidden `vscode/.generated/compiler` snapshot before bundling `dist/compiler.mjs`
+- a standalone `utu-lsp` package now lives in `../lsp`
+- a build step that copies `/compiler` into the hidden `vscode/.generated/compiler` snapshot before bundling `dist/compiler.mjs` and `dist/compiler.web.mjs`
 - a web extension bundle for `vscode.dev` at `dist/web/extension.js`
 
 ## Commands
 
 - `UTU: Compile Current File`
+- `UTU: Run Main`
 - `UTU: Show Generated JavaScript`
 - `UTU: Show Generated WAT`
 - `UTU: Show Syntax Tree`
@@ -46,14 +49,15 @@ For VS Code desktop debugging of the web extension host:
 npm run watch:web
 ```
 
-The build emits the web extension plus the current compiler snapshot:
+The build emits the web extension plus the current compiler snapshots:
 
 - `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`
-- `dist/compiler.mjs`: a bundled snapshot of the current compiler sources from `../compiler`
+- `dist/compiler.web.mjs`: the browser-targeted compiler bundle used by the web extension host
+- `dist/compiler.mjs`: the Node-targeted compiler bundle used by desktop tooling and local inspection
 
 The source snapshot lives in `vscode/.generated/compiler`, which is hidden and gitignored so extension work stays isolated from ongoing compiler refactors while still letting the editor call the current compiler.
 
-The extension is now packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `../lsp` core so the same parser/index/query layer can back a future standalone UTU LSP server. Compiler commands are still reported as unsupported in the browser host for now, while hover, definitions, diagnostics, symbols, semantic tokens, and completions stay available.
+The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `../lsp` core, and the standalone stdio UTU LSP server now lives in `../lsp`. The browser host can compile files, run `export fn main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 
 ## Run It In VS Code
 

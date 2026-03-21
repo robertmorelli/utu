@@ -272,14 +272,8 @@ class UtuLspSession {
 
   constructor() {
     this.server = new UtuLanguageServer({
-      grammarWasmPath: resolveServerAssetPath(
-        process.env.UTU_LSP_GRAMMAR_WASM,
-        'tree-sitter-utu.wasm',
-      ),
-      runtimeWasmPath: resolveServerAssetPath(
-        process.env.UTU_LSP_RUNTIME_WASM,
-        'web-tree-sitter.wasm',
-      ),
+      grammarWasmPath: resolveServerAssetPath('tree-sitter-utu.wasm'),
+      runtimeWasmPath: resolveServerAssetPath('web-tree-sitter.wasm'),
     });
     this.connection = new JsonRpcConnection(
       (request) => this.handleRequest(request),
@@ -469,8 +463,8 @@ function main(): void {
   new UtuLspSession();
 }
 
-function resolveServerAssetPath(overridePath: string | undefined, assetName: string): string {
-  return overridePath ?? resolvePath(dirname(fileURLToPath(import.meta.url)), assetName);
+function resolveServerAssetPath(assetName: string): string {
+  return resolvePath(dirname(fileURLToPath(import.meta.url)), assetName);
 }
 
 function getContentLength(headerText: string): number | undefined {

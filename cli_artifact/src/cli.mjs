@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +12,7 @@ import { compileUtuSource } from "./lib/compiler.mjs";
 const help = `utu Bun CLI
 
 Usage:
-  utu compile <input> [--outdir <dir>] [--wat]
+  utu compile <input> [--outdir <dir>] [--wat] [--bun]
   utu run <input> [--imports <file>]
   utu test <input> [--imports <file>]
   utu bench <input> [--imports <file>] [--iterations <n>] [--samples <n>] [--warmup <n>]
@@ -32,11 +33,12 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 async function compileCmd(args) {
-  let input = "", outdir = "./dist", wat = false;
+  let input = "", outdir = "./dist", wat = false, bun = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--wat") wat = true;
-    else if (arg === "--bun" || arg === "--node" || arg === "--imports") fail("compile only emits artifacts; use `utu run`, `utu test`, or `utu bench` to execute code");
+    else if (arg === "--bun") bun = true;
+    else if (arg === "--node" || arg === "--imports") fail("compile only supports --wat and --bun");
     else if (arg === "--outdir") outdir = args[++i] ?? fail("Missing value for --outdir");
     else if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
     else if (!input) input = arg;
@@ -53,12 +55,20 @@ async function compileCmd(args) {
 
   await mkdir(dir, { recursive: true });
   const outputs = [
-    [`${base}.mjs`, js, "utf8"],
-    [`${base}.wasm`, wasm],
+    !bun && [`${base}.mjs`, js, "utf8"],
+    !bun && [`${base}.wasm`, wasm],
     watText && [`${base}.wat`, watText, "utf8"],
   ].filter(Boolean);
+  if (bun) {
+    await Promise.all([
+      rm(`${base}.mjs`, { force: true }),
+      rm(`${base}.wasm`, { force: true }),
+      wat ? Promise.resolve() : rm(`${base}.wat`, { force: true }),
+    ]);
+  }
   await Promise.all(outputs.map(([file, data, encoding]) => writeFile(file, data, encoding)));
   outputs.forEach(([file]) => console.log(`Wrote ${file}`));
+  if (bun) console.log(`Wrote ${await buildBunExecutable(base, js)}`);
 }
 
 async function runCmd(args) {
@@ -203,13 +213,6 @@ function readLine(fd, reader = fs) {
 }
 
 function promptSync(message) {
-  const scriptedName = process.env.UTU_NAME;
-  if (typeof scriptedName === "string" && scriptedName.length > 0) {
-    if (message) process.stdout.write(message);
-    process.stdout.write(`${scriptedName}\n`);
-    return scriptedName;
-  }
-
   if (typeof globalThis.prompt === "function") {
     return globalThis.prompt(message) ?? "";
   }
@@ -267,4 +270,67 @@ function isModuleKey(key, moduleKeys) {
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function buildBunExecutable(base, js) {
+  const dir = await mkdtemp(path.join(tmpdir(), "utu-bun-"));
+  const out = process.platform === "win32" ? `${base}.exe` : base;
+  const program = path.join(dir, "program.mjs");
+  const runner = path.join(dir, "run.mjs");
+  const cleanup = () => rm(dir, { force: true, recursive: true });
+
+  await writeFile(program, js, "utf8");
+  await writeFile(runner, `
+import fs from "node:fs";
+import { instantiate } from "./program.mjs";
+
+const readLine = fd => {
+  const buffer = Buffer.alloc(1);
+  let value = "";
+  while (true) {
+    const bytesRead = fs.readSync(fd, buffer, 0, 1, null);
+    if (bytesRead === 0) break;
+    const ch = buffer.toString("utf8", 0, bytesRead);
+    if (ch === "\\n") break;
+    if (ch !== "\\r") value += ch;
+  }
+  return value;
+};
+
+const imports = {
+  es: {
+    console_log: value => console.log(value),
+    prompt: message => {
+      if (typeof globalThis.prompt === "function") return globalThis.prompt(message) ?? "";
+      if (message) process.stdout.write(message);
+      return readLine(0);
+    },
+    i64_to_string: value => String(value),
+    f64_to_string: value => String(value),
+    math_sin: value => Math.sin(value),
+    math_cos: value => Math.cos(value),
+    math_sqrt: value => Math.sqrt(value),
+  },
+};
+
+const exports = await instantiate(imports);
+if (typeof exports.main !== "function") throw new Error("The program does not export a callable main function");
+const result = await exports.main();
+if (result !== undefined) console.log(result);
+`, "utf8");
+
+  try {
+    await exec("bun", ["build", "--compile", "--target=bun", "--outfile", out, runner]);
+    return out;
+  } finally {
+    await cleanup();
+  }
+}
+
+function exec(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: "inherit" });
+    child.on("error", reject);
+    child.on("exit", code => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code ?? 1}`)));
+  });
 }

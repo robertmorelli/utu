@@ -1,0 +1,11 @@
+import extern "es" console_log(str)
+import extern "es" prompt(str) str
+
+fn greeting(name: str) str {
+    "hello " -o str.concat(_, name)
+}
+
+export fn main() {
+    let name: str = prompt("What's your name? ")
+    greeting(name) -o console_log
+}

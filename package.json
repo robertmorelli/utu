@@ -9,7 +9,7 @@
     "build:cli": "cd cli_artifact && bun run build",
     "docs": "bun scripts/build-docs.mjs",
     "build": "bun run grammar && bun run bundle && bun run distribute && bun run build:cli && bun run docs",
-    "test": "bun run test:examples && bun run test:examples:codegen && bun run test:language && bun run test:editor:core && bun run test:examples:compile && bun run test:examples:bench && bun run test:docs:codegen",
+    "test": "bun run test:examples:all && bun run test:language && bun run test:editor:core && bun run test:examples:compile && bun run test:examples:bench && bun run test:docs:codegen",
     "test:examples": "bun scripts/test-examples.mjs --tag smoke",
     "test:examples:codegen": "bun scripts/test-examples.mjs --tag codegen",
     "test:examples:all": "bun scripts/test-examples.mjs",

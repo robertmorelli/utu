@@ -15,7 +15,7 @@ const cases = [
     ['run-call-simple', ['run', 'examples/call_simple.utu'], 0, '177280'],
     ['run-fannkuch', ['run', 'examples/fannkuch.utu'], 0, '10'],
     ['run-float', ['run', 'examples/float.utu'], 0, '0.8944271901453098'],
-    ['run-hello-name', ['run', 'examples/hello_name.utu', '--imports', 'examples/hello_name_host.mjs'], 0, 'hello utu', { UTU_NAME: 'utu' }],
+    ['run-hello-name', ['run', 'examples/hello_name.utu'], 0, 'hello utu', 'utu\n'],
     ['run-spectralnorm', ['run', 'examples/spectralnorm.utu'], 0, '1.2742222097429006'],
     ['run-deltablue', ['run', 'examples/deltablue.utu'], 0, '0'],
     ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--iterations', '4', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'],
@@ -23,12 +23,16 @@ const cases = [
 ];
 
 let failed = false;
-for (const [name, args, code, text, env] of cases) {
+for (const [name, args, code, text, stdin] of cases) {
     const proc = Bun.spawn(['bun', './cli_artifact/src/cli.mjs', ...args], {
+        stdin: stdin === undefined ? 'ignore' : 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',
-        env: { ...process.env, ...(env ?? {}) },
     });
+    if (stdin !== undefined) {
+        proc.stdin.write(stdin);
+        proc.stdin.end();
+    }
     const [stdout, stderr, exitCode] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
