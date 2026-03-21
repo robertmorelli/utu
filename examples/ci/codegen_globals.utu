@@ -1,0 +1,22 @@
+let seed: i32 = 41
+let banner: str = "ok"
+
+fn next() i32 {
+    seed + 1
+}
+
+fn loud() str {
+    str.concat(banner, "!")
+}
+
+test "top-level numeric globals lower to global.get" {
+    assert next() == 42
+}
+
+test "top-level string globals stay reusable" {
+    assert str.equals(loud(), "ok!")
+}
+
+test "globals compose across helpers" {
+    assert str.equals(str.concat(loud(), "?"), "ok!?")
+}

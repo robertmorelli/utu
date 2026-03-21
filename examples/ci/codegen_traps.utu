@@ -1,0 +1,11 @@
+fn fail_now() {
+    fatal
+}
+
+fn assert_even(x: i32) {
+    assert x % 2 == 0
+}
+
+export fn main() {
+    assert_even(4)
+}

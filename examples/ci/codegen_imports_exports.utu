@@ -1,0 +1,14 @@
+import extern "es" console_log(str)
+import extern "es" wrap(str) str
+
+fn greet(name: str) str {
+    name -o wrap
+}
+
+export fn main() {
+    "ok" -o console_log
+}
+
+test "imports can be called from test mode" {
+    assert str.equals(greet("utu"), "[utu]")
+}

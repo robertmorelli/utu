@@ -1,0 +1,38 @@
+struct Box {
+    value: i32,
+}
+
+fn maybe_box(flag: bool) Box # null {
+    if flag { Box { value: 41 } } else { ref.null Box }
+}
+
+fn or_zero(flag: bool) i32 {
+    let item: Box = maybe_box(flag) \ Box { value: 0 }
+    item.value
+}
+
+fn force_value(flag: bool) i32 {
+    let item: Box = maybe_box(flag) \ fatal
+    item.value
+}
+
+fn has_box(flag: bool) bool {
+    not ref.is_null(maybe_box(flag))
+}
+
+test "else fallback runs on null" {
+    assert or_zero(false) == 0
+}
+
+test "else fallback keeps non-null values" {
+    assert or_zero(true) == 41
+}
+
+test "force unwrap preserves non-null values" {
+    assert force_value(true) == 41
+}
+
+test "ref.is_null sees nullable results" {
+    assert has_box(true)
+    assert not has_box(false)
+}

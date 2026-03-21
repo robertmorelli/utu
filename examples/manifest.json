@@ -37,6 +37,140 @@
       "tags": ["smoke"]
     },
     {
+      "name": "codegen-arithmetic-locals",
+      "path": "examples/ci/codegen_arithmetic_locals.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-pipes",
+      "path": "examples/ci/codegen_pipes.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-structs",
+      "path": "examples/ci/codegen_structs.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-arrays",
+      "path": "examples/ci/codegen_arrays.utu",
+      "mode": "test",
+      "expectedTests": 5,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-control-flow",
+      "path": "examples/ci/codegen_control_flow.utu",
+      "mode": "test",
+      "expectedTests": 5,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-multi-value",
+      "path": "examples/ci/codegen_multi_value.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-nullable",
+      "path": "examples/ci/codegen_nullable.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-nullable-imports",
+      "path": "examples/ci/nullable_imports.utu",
+      "mode": "test",
+      "imports": "examples/ci/nullable_imports.mjs",
+      "expectedTests": 5,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-node-builtins",
+      "path": "examples/ci/node_builtin_imports.utu",
+      "mode": "test",
+      "expectedTests": 1,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-import-values",
+      "path": "examples/ci/codegen_import_values.utu",
+      "mode": "test",
+      "imports": "examples/ci/import_values_host.mjs",
+      "expectedTests": 3,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-globals",
+      "path": "examples/ci/codegen_globals.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-match",
+      "path": "examples/ci/codegen_match.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-scalar-match",
+      "path": "examples/ci/codegen_scalar_match.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-alt-fallback",
+      "path": "examples/ci/codegen_alt_fallback.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-imports-exports",
+      "path": "examples/ci/codegen_imports_exports.utu",
+      "mode": "test",
+      "expectedTests": 1,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-refs-i31",
+      "path": "examples/ci/codegen_refs_i31.utu",
+      "mode": "test",
+      "expectedTests": 5,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-composition",
+      "path": "examples/ci/codegen_composition.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-test-surface",
+      "path": "examples/ci/codegen_test_surface.utu",
+      "mode": "test",
+      "expectedTests": 2,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-traps",
+      "path": "examples/ci/codegen_traps.utu",
+      "mode": "compile",
+      "tags": ["codegen"]
+    },
+    {
       "name": "benchmark-call-simple",
       "path": "examples/call_simple.utu",
       "mode": "run",

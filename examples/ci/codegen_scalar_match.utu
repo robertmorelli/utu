@@ -1,0 +1,38 @@
+fn pick_bool(flag: bool) i32 {
+    match flag {
+        true => 1,
+        false => 2,
+    }
+}
+
+fn pick_float(x: f64) i32 {
+    match x {
+        1.5 => 15,
+        2.5 => 25,
+        _ => 99,
+    }
+}
+
+fn pick_int(x: i32) i32 {
+    match x {
+        0 => 10,
+        1 => 20,
+        _ => 30,
+    }
+}
+
+test "bool match can take the true arm" {
+    assert pick_bool(true) == 1
+}
+
+test "bool match can take the false arm" {
+    assert pick_bool(false) == 2
+}
+
+test "float match can take a specific arm" {
+    assert pick_float(2.5) == 25
+}
+
+test "scalar match preserves wildcard fallbacks" {
+    assert pick_int(7) == 30
+}

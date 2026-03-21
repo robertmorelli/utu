@@ -1,0 +1,75 @@
+struct Todo {
+    text: str,
+    mut done: bool,
+}
+
+type Filter =
+    | All
+    | Active
+    | Completed
+
+import extern "es" wrap(str) str
+
+fn new_todo(text: str) Todo {
+    Todo { text: text, done: false }
+}
+
+fn toggle(todo: Todo) {
+    todo.done = not todo.done
+}
+
+fn matches(todo: Todo, filter: Filter) bool {
+    alt filter {
+        _: All => true,
+        _: Active => not todo.done,
+        _: Completed => todo.done,
+    }
+}
+
+fn count(todos: array[Todo], filter: Filter) i32 {
+    let n: i32 = 0
+    for (0..array.len(todos)) |i| {
+        if matches(todos[i], filter) {
+            n = n + 1
+        }
+    }
+    n
+}
+
+fn status(flag: bool) str {
+    let maybe: str # null = if flag { "online" } else { null }
+    maybe \ "offline"
+}
+
+fn greet(name: str) str {
+    name -o wrap -o str.concat(_, "!")
+}
+
+fn build_todos() array[Todo] {
+    array[Todo].new_fixed(
+        new_todo("learn utu"),
+        new_todo("ship compiler"),
+        new_todo("write tests"),
+    )
+}
+
+test "composition keeps array mutations visible to matches" {
+    let todos: array[Todo] = build_todos()
+    toggle(todos[0])
+    assert count(todos, Active {}) == 2
+}
+
+test "composition can count completed variants" {
+    let todos: array[Todo] = build_todos()
+    toggle(todos[0])
+    assert count(todos, Completed {}) == 1
+}
+
+test "composition can use nullable strings with fallback" {
+    assert str.equals(status(false), "offline")
+    assert str.equals(status(true), "online")
+}
+
+test "composition can pipe host imports into string builtins" {
+    assert str.equals(greet("utu"), "[utu]!")
+}

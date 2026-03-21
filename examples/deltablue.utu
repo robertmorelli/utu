@@ -40,7 +40,7 @@ fn new_variable(name: str, value: i64, strength: Strength) Variable {
 }
 
 fn apply_constraint(constraint: Constraint) {
-    match constraint {
+    alt constraint {
         c: EqualityConstraint => {
             c.right.value = c.left.value
         },
@@ -51,7 +51,7 @@ fn apply_constraint(constraint: Constraint) {
 }
 
 fn apply_inverse_scale(constraint: Constraint) {
-    match constraint {
+    alt constraint {
         _: EqualityConstraint => 0,
         c: ScaleConstraint => {
             c.src.value = (c.dest.value - c.offset.value) / c.scale.value

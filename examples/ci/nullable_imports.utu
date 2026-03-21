@@ -1,0 +1,41 @@
+struct ApiError {}
+
+import extern "es" maybe_label(bool) str # null
+import extern "es" maybe_structured(bool) str # ApiError
+
+fn label_or_default(flag: bool) str {
+    maybe_label(flag) \ "offline"
+}
+
+fn label_or_force(flag: bool) str {
+    maybe_label(flag) \ fatal
+}
+
+fn structured_import_nulls(flag: bool) bool {
+    let value: str # null, err: ApiError # null = maybe_structured(flag)
+    if flag {
+        not ref.is_null(value) and ref.is_null(err)
+    } else {
+        ref.is_null(value) and ref.is_null(err)
+    }
+}
+
+test "thrown nullable imports fall back to defaults" {
+    assert str.equals(label_or_default(false), "offline")
+}
+
+test "non-null nullable imports skip defaults" {
+    assert str.equals(label_or_default(true), "online")
+}
+
+test "force unwrap still works after nullable import catches throws" {
+    assert str.equals(label_or_force(true), "online")
+}
+
+test "structured import placeholders stay null on throw" {
+    assert structured_import_nulls(false)
+}
+
+test "structured import placeholders preserve success values" {
+    assert structured_import_nulls(true)
+}
