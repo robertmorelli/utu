@@ -1,0 +1,14 @@
+import extern "es" console_log(str)
+import extern "es" wrap(str) str
+
+fn label() str {
+    "done"
+}
+
+fn decorate(value: str) str {
+    wrap(value)
+}
+
+export fn main() {
+    decorate(label()) -o console_log
+}

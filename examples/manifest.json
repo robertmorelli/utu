@@ -1,0 +1,68 @@
+{
+  "wasmPath": "cli_artifact/tree-sitter-utu.wasm",
+  "cases": [
+    {
+      "name": "ci-hello",
+      "path": "examples/ci/hello.utu",
+      "mode": "run",
+      "expectedLogs": ["ok"],
+      "tags": ["smoke"]
+    },
+    {
+      "name": "ci-global-string",
+      "path": "examples/ci/global_string.utu",
+      "mode": "run",
+      "expectedLogs": ["hello"],
+      "tags": ["smoke"]
+    },
+    {
+      "name": "ci-string-echo",
+      "path": "examples/ci/string_echo.utu",
+      "mode": "run",
+      "expectedLogs": ["value"],
+      "tags": ["smoke"]
+    },
+    {
+      "name": "ci-string-roundtrip",
+      "path": "examples/ci/string_roundtrip.utu",
+      "mode": "run",
+      "expectedLogs": ["[done]"],
+      "tags": ["smoke"]
+    },
+    {
+      "name": "benchmark-call-simple",
+      "path": "examples/call_simple.utu",
+      "mode": "run",
+      "allowFailure": true,
+      "tags": ["benchmark", "legacy"]
+    },
+    {
+      "name": "benchmark-deltablue",
+      "path": "examples/deltablue.utu",
+      "mode": "run",
+      "allowFailure": true,
+      "tags": ["benchmark", "legacy"]
+    },
+    {
+      "name": "benchmark-fannkuch",
+      "path": "examples/fannkuch.utu",
+      "mode": "run",
+      "allowFailure": true,
+      "tags": ["benchmark", "legacy"]
+    },
+    {
+      "name": "benchmark-float",
+      "path": "examples/float.utu",
+      "mode": "run",
+      "allowFailure": true,
+      "tags": ["benchmark", "legacy"]
+    },
+    {
+      "name": "benchmark-spectralnorm",
+      "path": "examples/spectralnorm.utu",
+      "mode": "run",
+      "allowFailure": true,
+      "tags": ["benchmark", "legacy"]
+    }
+  ]
+}

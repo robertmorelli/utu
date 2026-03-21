@@ -1,0 +1,9 @@
+import extern "es" console_log(str)
+
+fn echo(value: str) str {
+    value
+}
+
+export fn main() {
+    echo("value") -o console_log
+}

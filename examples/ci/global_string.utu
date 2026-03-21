@@ -1,0 +1,7 @@
+import extern "es" console_log(str)
+
+let greeting: str = "hello"
+
+export fn main() {
+    greeting -o console_log
+}
