@@ -152,7 +152,7 @@ async function loadExports(input, { importsFile = "", mode = "program" } = {}) {
   try {
     const mod = await import(pathToFileURL(file).href);
     return {
-      exports: await mod.instantiate(await loadImports(importsFile, metadata.host?.modules ?? [])),
+      exports: await mod.instantiate(await loadImports(importsFile)),
       metadata,
       cleanup,
     };
@@ -167,11 +167,11 @@ async function withExports(input, options, run) {
   try { return await run(loaded); } finally { await loaded.cleanup(); }
 }
 
-async function loadImports(file, moduleNames = []) {
+async function loadImports(file) {
   const base = createDefaultImports();
   if (!file) return base;
   const mod = await import(pathToFileURL(path.resolve(file)).href);
-  return mergeImportObjects(base, normalizeImportObject(mod.default ?? mod.imports ?? mod, moduleNames));
+  return mergeImportObjects(base, mod.default ?? mod);
 }
 
 function fn(exports, name, message = `Missing export "${name}"`) {
@@ -213,10 +213,6 @@ function readLine(fd, reader = fs) {
 }
 
 function promptSync(message) {
-  if (typeof globalThis.prompt === "function") {
-    return globalThis.prompt(message) ?? "";
-  }
-
   if (message) process.stdout.write(message);
   return readLine(0);
 }
@@ -235,25 +231,6 @@ function createDefaultImports() {
   };
 }
 
-function normalizeImportObject(imports, moduleNames = []) {
-  if (!imports || typeof imports !== "object" || Array.isArray(imports)) return {};
-
-  const moduleKeys = new Set(moduleNames);
-  const normalized = {};
-  const flatEs = {};
-  for (const [key, value] of Object.entries(imports)) {
-    if (isModuleKey(key, moduleKeys)) normalized[key] = value;
-    else flatEs[key] = value;
-  }
-
-  if (Object.keys(flatEs).length) {
-    const existingEs = isPlainObject(normalized.es) ? normalized.es : {};
-    normalized.es = { ...existingEs, ...flatEs };
-  }
-
-  return normalized;
-}
-
 function mergeImportObjects(base, override) {
   const merged = { ...base };
   for (const [key, value] of Object.entries(override)) {
@@ -262,10 +239,6 @@ function mergeImportObjects(base, override) {
       : value;
   }
   return merged;
-}
-
-function isModuleKey(key, moduleKeys) {
-  return moduleKeys.has(key) || key === "es" || key === "__strings" || key === "wasm:js-string" || key.startsWith(".") || key.startsWith("/") || key.includes(":");
 }
 
 function isPlainObject(value) {
@@ -301,7 +274,6 @@ const imports = {
   es: {
     console_log: value => console.log(value),
     prompt: message => {
-      if (typeof globalThis.prompt === "function") return globalThis.prompt(message) ?? "";
       if (message) process.stdout.write(message);
       return readLine(0);
     },

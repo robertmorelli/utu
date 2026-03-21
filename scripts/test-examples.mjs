@@ -94,7 +94,7 @@ async function runCase(testCase, wasmPath) {
         const modulePath = join(moduleDir, `${sanitizeName(testCase.name)}.mjs`);
         await writeFile(modulePath, js, 'utf8');
         const compiledModule = await import(pathToFileURL(modulePath).href);
-        const imports = await loadHostImports(testCase, result.logs, metadata.host?.modules ?? []);
+        const imports = await loadHostImports(testCase, result.logs);
         const exports = await compiledModule.instantiate(imports);
 
         if (mode === 'test') {
@@ -171,13 +171,13 @@ function makeFailureResult(testCase, error) {
     };
 }
 
-async function loadHostImports(testCase, logs, moduleNames) {
+async function loadHostImports(testCase, logs) {
     const baseImports = createHostImports(logs);
     if (!testCase.imports) return baseImports;
 
     const importPath = resolve(repoRoot, testCase.imports);
     const loaded = await import(pathToFileURL(importPath).href);
-    return mergeImportObjects(baseImports, normalizeImportObject(loaded.default ?? loaded.imports ?? loaded, moduleNames));
+    return mergeImportObjects(baseImports, loaded.default ?? loaded);
 }
 
 function createHostImports(logs) {
@@ -208,25 +208,6 @@ function createHostImports(logs) {
     };
 }
 
-function normalizeImportObject(imports, moduleNames = []) {
-    if (!imports || typeof imports !== 'object' || Array.isArray(imports)) return {};
-
-    const moduleKeys = new Set(moduleNames);
-    const normalized = {};
-    const flatEs = {};
-    for (const [key, value] of Object.entries(imports)) {
-        if (isModuleKey(key, moduleKeys)) normalized[key] = value;
-        else flatEs[key] = value;
-    }
-
-    if (Object.keys(flatEs).length) {
-        const existingEs = isPlainObject(normalized.es) ? normalized.es : {};
-        normalized.es = { ...existingEs, ...flatEs };
-    }
-
-    return normalized;
-}
-
 function mergeImportObjects(base, override) {
     const merged = { ...base };
     for (const [key, value] of Object.entries(override)) {
@@ -235,10 +216,6 @@ function mergeImportObjects(base, override) {
             : value;
     }
     return merged;
-}
-
-function isModuleKey(key, moduleKeys) {
-    return moduleKeys.has(key) || key === 'es' || key === '__strings' || key === 'wasm:js-string' || key.startsWith('.') || key.startsWith('/') || key.includes(':');
 }
 
 function isPlainObject(value) {

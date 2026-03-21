@@ -6,8 +6,7 @@ const wasmUrl = grammarWasmPath;
 const runtimeWasmUrl = runtimeWasmPath;
 
 export async function compileUtuSource(source, { wat = false, mode = "program" } = {}) {
-  if (typeof compiler.compile !== "function") throw new Error("Shared compiler module does not export compile().");
-  if (compiler.init) await compiler.init({ wasmUrl, runtimeWasmUrl });
+  await compiler.init({ wasmUrl, runtimeWasmUrl });
 
   const result = await compiler.compile(source, { wat, mode, wasmUrl, runtimeWasmUrl });
   return { js: result.js, metadata: result.metadata ?? { tests: [], benches: [] }, wasm: bytes(result.wasm), wat: result.wat };

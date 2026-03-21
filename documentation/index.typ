@@ -16,22 +16,22 @@ The chapters are:
 - codegen guide with side-by-side Utu and WAT
 
 #pagebreak()
-#include "01-overview-and-types.typ"
+#include "./01-overview-and-types.typ"
 
 #pagebreak()
-#include "02-strings-and-memory.typ"
+#include "./02-strings-and-memory.typ"
 
 #pagebreak()
-#include "03-control-flow-functions-and-interop.typ"
+#include "./03-control-flow-functions-and-interop.typ"
 
 #pagebreak()
-#include "04-builtins-and-wasm.typ"
+#include "./04-builtins-and-wasm.typ"
 
 #pagebreak()
-#include "05-grammar-and-compilation.typ"
+#include "./05-grammar-and-compilation.typ"
 
 #pagebreak()
-#include "06-complete-example.typ"
+#include "./06-complete-example.typ"
 
 #pagebreak()
-#include "07-codegen-guide.typ"
+#include "./07-codegen-guide.typ"
