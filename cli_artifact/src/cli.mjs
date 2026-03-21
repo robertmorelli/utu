@@ -15,7 +15,7 @@ Usage:
   utu compile <input> [--outdir <dir>] [--wat] [--bun]
   utu run <input> [--imports <file>]
   utu test <input> [--imports <file>]
-  utu bench <input> [--imports <file>] [--iterations <n>] [--samples <n>] [--warmup <n>]
+  utu bench <input> [--imports <file>] [--seconds <n>] [--samples <n>] [--warmup <n>]
 `;
 
 const commands = { compile: compileCmd, run: runCmd, test: testCmd, bench: benchCmd };
@@ -99,11 +99,11 @@ async function testCmd(args) {
 }
 
 async function benchCmd(args) {
-  let input = "", importsFile = "", iterations = 1000, samples = 10, warmup = 2;
+  let input = "", importsFile = "", seconds = 1, samples = 1, warmup = 1;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--imports") importsFile = args[++i] ?? fail("Missing value for --imports");
-    else if (arg === "--iterations") iterations = intArg(args[++i], "--iterations", 1);
+    else if (arg === "--seconds") seconds = floatArg(args[++i], "--seconds", 0);
     else if (arg === "--samples") samples = intArg(args[++i], "--samples", 1);
     else if (arg === "--warmup") warmup = intArg(args[++i], "--warmup");
     else if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
@@ -114,17 +114,28 @@ async function benchCmd(args) {
 
   await withExports(input, { importsFile, mode: "bench" }, async ({ exports, metadata }) => {
     if (!metadata.benches.length) fail("No benchmarks found");
+    const targetNs = Math.floor(seconds * 1e9);
     for (const { name, exportName } of metadata.benches) {
       const bench = fn(exports, exportName, `Missing benchmark export "${exportName}"`);
-      for (let i = 0; i < warmup; i++) await bench(iterations);
-      const times = [];
-      for (let i = 0; i < samples; i++) {
-        const start = process.hrtime.bigint();
-        await bench(iterations);
-        times.push(Number(process.hrtime.bigint() - start));
+      let estimate = 1;
+      for (let i = 0; i < warmup; i++) {
+        estimate = await calibrateIterations(bench, targetNs, estimate);
       }
-      const mean = times.reduce((sum, value) => sum + value, 0) / times.length;
-      console.log(`${name}: mean ${ns(mean)}, min ${ns(Math.min(...times))}, max ${ns(Math.max(...times))}, ${ns(mean / iterations)}/iter`);
+      const runs = [];
+      for (let i = 0; i < samples; i++) {
+        const iterations = clampIterations(estimate);
+        const elapsedNs = await timeInvocation(() => bench(iterations));
+        runs.push({ iterations, elapsedNs });
+        estimate = projectIterations(iterations, elapsedNs, targetNs);
+      }
+      const rates = runs.map(run => rate(run.iterations, run.elapsedNs));
+      const meanRate = rates.reduce((sum, value) => sum + value, 0) / rates.length;
+      const meanNsPerIter = runs.reduce((sum, run) => sum + run.elapsedNs, 0) / runs.reduce((sum, run) => sum + run.iterations, 0);
+      console.log(
+        `${name}: mean ${itersPerSecond(meanRate)}, min ${itersPerSecond(Math.min(...rates))}, `
+        + `max ${itersPerSecond(Math.max(...rates))}, ${ns(meanNsPerIter)}/iter, `
+        + `${seconds.toFixed(3)}s target`
+      );
     }
   });
 }
@@ -184,6 +195,60 @@ function intArg(value, flag, min = 0) {
   if (!Number.isFinite(n) || n < min) fail(`Invalid value for ${flag}`);
   return n;
 }
+
+function floatArg(value, flag, minExclusive = 0) {
+  const n = Number.parseFloat(value ?? "");
+  if (!Number.isFinite(n) || n <= minExclusive) fail(`Invalid value for ${flag}`);
+  return n;
+}
+
+async function timeInvocation(run) {
+  const start = process.hrtime.bigint();
+  await run();
+  return Number(process.hrtime.bigint() - start);
+}
+
+async function calibrateIterations(bench, targetNs, initialIterations) {
+  let iterations = clampIterations(initialIterations);
+  let elapsedNs = await timeInvocation(() => bench(iterations));
+
+  // Get the warmup call out of the sub-millisecond noise range before projecting.
+  while (elapsedNs < targetNs / 10 && iterations < MAX_BENCH_ITERATIONS) {
+    const scale = elapsedNs <= 0 ? 10 : Math.max(2, Math.ceil((targetNs / 10) / elapsedNs));
+    const next = clampIterations(iterations * scale);
+    if (next === iterations) break;
+    iterations = next;
+    elapsedNs = await timeInvocation(() => bench(iterations));
+  }
+
+  return projectIterations(iterations, elapsedNs, targetNs);
+}
+
+function projectIterations(iterations, elapsedNs, targetNs) {
+  if (elapsedNs <= 0) return clampIterations(iterations * 10);
+  const projected = Math.round(iterations * (targetNs / elapsedNs));
+  return clampIterations(projected);
+}
+
+function clampIterations(value) {
+  if (!Number.isFinite(value) || value < 1) return 1;
+  return Math.max(1, Math.min(MAX_BENCH_ITERATIONS, Math.round(value)));
+}
+
+function rate(iterations, elapsedNs) {
+  return elapsedNs <= 0 ? 0 : iterations / (elapsedNs / 1e9);
+}
+
+function itersPerSecond(value) {
+  if (value >= 1e9) return `${(value / 1e9).toFixed(3)}G iter/s`;
+  if (value >= 1e6) return `${(value / 1e6).toFixed(3)}M iter/s`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(3)}K iter/s`;
+  if (value >= 100) return `${value.toFixed(0)} iter/s`;
+  if (value >= 10) return `${value.toFixed(1)} iter/s`;
+  return `${value.toFixed(2)} iter/s`;
+}
+
+const MAX_BENCH_ITERATIONS = 0x7fffffff;
 
 function ns(value) {
   if (value >= 1e6) return `${(value / 1e6).toFixed(3)}ms`;

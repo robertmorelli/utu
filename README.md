@@ -29,5 +29,5 @@ A high level language that compiles to highly efficient wasm.
 - `bun ./cli_artifact/src/cli.mjs compile <file> [--outdir <dir>] [--wat]`
 - `bun ./cli_artifact/src/cli.mjs run <file> [--imports <file>]`
 - `bun ./cli_artifact/src/cli.mjs test <file> [--imports <file>]`
-- `bun ./cli_artifact/src/cli.mjs bench <file> [--imports <file>] [--iterations <n>] [--samples <n>] [--warmup <n>]`
+- `bun ./cli_artifact/src/cli.mjs bench <file> [--imports <file>] [--seconds <n>] [--samples <n>] [--warmup <n>]`
 - `bun run build:cli` builds a standalone CLI executable at `cli_artifact/dist/utu`

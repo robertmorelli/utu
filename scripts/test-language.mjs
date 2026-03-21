@@ -18,8 +18,8 @@ const cases = [
     ['run-hello-name', ['run', 'examples/hello_name.utu'], 0, 'hello utu', 'utu\n'],
     ['run-spectralnorm', ['run', 'examples/spectralnorm.utu'], 0, '1.2742222097429006'],
     ['run-deltablue', ['run', 'examples/deltablue.utu'], 0, '0'],
-    ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--iterations', '4', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'],
-    ['bench-codegen-surface', ['bench', 'examples/ci/codegen_test_surface.utu', '--iterations', '4', '--samples', '1', '--warmup', '0'], 0, 'increment loop:'],
+    ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'],
+    ['bench-codegen-surface', ['bench', 'examples/ci/codegen_test_surface.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'increment loop:'],
 ];
 
 let failed = false;

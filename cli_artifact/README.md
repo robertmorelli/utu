@@ -18,7 +18,8 @@ bun ./src/cli.mjs compile ../examples/float.utu --outdir ./dist/float
 bun ./src/cli.mjs run ../examples/float.utu
 bun ./src/cli.mjs run ../examples/hello_name.utu
 bun ./src/cli.mjs test ../examples/ci/tests_basic.utu
-bun ./src/cli.mjs bench ../examples/bench/bench_basic.utu --iterations 1000 --samples 5
+bun ./src/cli.mjs bench ../examples/bench/bench_basic.utu
+bun ./src/cli.mjs bench ../examples/bench/bench_basic.utu --seconds 0.25 --samples 3
 ```
 
 Build the standalone CLI executable:
@@ -47,8 +48,10 @@ bun run build
 `test` compiles in test mode, runs synthesized zero-arg exports, and reports
 source test names as `PASS` or `FAIL`.
 
-`bench` compiles in bench mode, runs synthesized benchmark exports with host
-timing, and reports mean/min/max plus time per iteration.
+`bench` compiles in bench mode, uses one warmup calibration pass by default to
+pick a batch size that should land near the requested duration, then reports
+throughput over time-bounded samples (default `1.0` second) plus time per
+iteration.
 
 All execution flows through the shared `run` / `test` / `bench` pipeline, and
 Binaryen optimization is always enabled.

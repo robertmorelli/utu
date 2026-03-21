@@ -18,7 +18,9 @@
     "test:language": "bun scripts/test-language.mjs",
     "test:editor:core": "bun scripts/test-editor-core.mjs",
     "test:editor:webhost": "bun scripts/test-editor-webhost.mjs",
-    "test:docs:codegen": "bun scripts/test-docs-codegen.mjs"
+    "test:docs:codegen": "bun scripts/test-docs-codegen.mjs",
+    "compare:deltablue:rust": "bun scripts/compare-deltablue-rust.mjs",
+    "report:utu-v-rust": "bun scripts/generate-utu-v-rust-report.mjs"
   },
   "devDependencies": {
     "tree-sitter-cli": "^0.26.7",

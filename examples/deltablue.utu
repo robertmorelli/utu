@@ -1,174 +1,940 @@
 import extern "es" console_log(str)
 import extern "es" i64_to_string(i64) str
 
-struct Strength {
-    rank: i32,
-    name: str,
+let required: i32 = 0
+let strong_preferred: i32 = 1
+let preferred: i32 = 2
+let strong_default: i32 = 3
+let normal: i32 = 4
+let weak_default: i32 = 5
+let weakest: i32 = 6
+
+let direction_none: i32 = 0
+let direction_forward: i32 = 1
+let direction_backward: i32 = 0 - 1
+
+struct ConstraintList {
+    items: array[Constraint],
+    mut count: i32,
 }
 
 struct Variable {
-    name: str,
     mut value: i32,
-    strength: Strength,
+    constraints: ConstraintList,
+    mut determined_by: Constraint # null,
+    mut mark: i32,
+    mut walk_strength: i32,
+    mut stay: bool,
+}
+
+struct VariableList {
+    items: array[Variable],
+    mut count: i32,
+}
+
+struct Planner {
+    mut current_mark: i32,
+    constraint_capacity: i32,
+    variable_capacity: i32,
 }
 
 type Constraint =
+    | EmptyConstraint {}
+    | StayConstraint {
+        output: Variable,
+        strength: i32,
+        mut satisfied: bool,
+    }
+    | EditConstraint {
+        output: Variable,
+        strength: i32,
+        mut satisfied: bool,
+    }
     | EqualityConstraint {
-        left: Variable,
-        right: Variable,
-        strength: Strength,
+        v1: Variable,
+        v2: Variable,
+        strength: i32,
+        mut direction: i32,
     }
     | ScaleConstraint {
         src: Variable,
         scale: Variable,
         offset: Variable,
         dest: Variable,
-        strength: Strength,
+        strength: i32,
+        mut direction: i32,
     }
 
-let required: Strength = Strength { rank: 0, name: "required" }
-let preferred: Strength = Strength { rank: 2, name: "preferred" }
-let strong_default: Strength = Strength { rank: 3, name: "strong_default" }
-let normal: Strength = Strength { rank: 4, name: "normal" }
+fn stronger(s1: i32, s2: i32) bool {
+    s1 < s2
+}
 
-fn new_variable(name: str, value: i32, strength: Strength) Variable {
-    Variable {
-        name: name,
-        value: value,
-        strength: strength,
+fn weaker(s1: i32, s2: i32) bool {
+    s1 > s2
+}
+
+fn weakest_of(s1: i32, s2: i32) i32 {
+    if s1 > s2 { s1 } else { s2 }
+}
+
+fn next_weaker(strength: i32) i32 {
+    match strength {
+        0 => weakest,
+        1 => weak_default,
+        2 => normal,
+        3 => strong_default,
+        4 => preferred,
+        5 => required,
+        _ => weakest,
     }
 }
 
-fn apply_constraint(constraint: Constraint) {
+fn new_constraint_list(capacity: i32) ConstraintList {
+    ConstraintList {
+        items: array[Constraint].new(capacity, EmptyConstraint {}),
+        count: 0,
+    }
+}
+
+fn new_variable(value: i32, constraint_capacity: i32) Variable {
+    Variable {
+        value: value,
+        constraints: new_constraint_list(constraint_capacity),
+        determined_by: ref.null Constraint,
+        mark: 0,
+        walk_strength: weakest,
+        stay: true,
+    }
+}
+
+fn new_variable_placeholder() Variable {
+    new_variable(0, 1)
+}
+
+fn new_variable_list(capacity: i32) VariableList {
+    let dummy: Variable = new_variable_placeholder()
+    VariableList {
+        items: array[Variable].new(capacity, dummy),
+        count: 0,
+    }
+}
+
+fn new_planner(variable_capacity: i32, constraint_capacity: i32) Planner {
+    Planner {
+        current_mark: 0,
+        variable_capacity: variable_capacity,
+        constraint_capacity: constraint_capacity,
+    }
+}
+
+fn constraint_list_append(list: ConstraintList, constraint: Constraint) {
+    if list.count >= array.len(list.items) {
+        fatal
+    }
+    list.items[list.count] = constraint
+    list.count = list.count + 1
+}
+
+fn constraint_list_pop_front(list: ConstraintList) Constraint {
+    let constraint: Constraint = list.items[0]
+    let i: i32 = 0
+    for (i + 1 < list.count) {
+        list.items[i] = list.items[i + 1]
+        i = i + 1
+    }
+    list.count = list.count - 1
+    constraint
+}
+
+fn constraint_list_copy(src: ConstraintList, capacity: i32) ConstraintList {
+    let out: ConstraintList = new_constraint_list(capacity)
+    for (0..src.count) |i| {
+        constraint_list_append(out, src.items[i])
+    }
+    out
+}
+
+fn variable_list_append(list: VariableList, value: Variable) {
+    if list.count >= array.len(list.items) {
+        fatal
+    }
+    list.items[list.count] = value
+    list.count = list.count + 1
+}
+
+fn variable_list_pop_front(list: VariableList) Variable {
+    let value: Variable = list.items[0]
+    let i: i32 = 0
+    for (i + 1 < list.count) {
+        list.items[i] = list.items[i + 1]
+        i = i + 1
+    }
+    list.count = list.count - 1
+    value
+}
+
+fn variable_add_constraint(variable: Variable, constraint: Constraint) {
+    constraint_list_append(variable.constraints, constraint)
+}
+
+fn variable_remove_constraint(variable: Variable, constraint: Constraint) {
+    let found: i32 = 0 - 1
+    let i: i32 = 0
+    for (i < variable.constraints.count) {
+        if found == 0 - 1 {
+            if ref.eq(variable.constraints.items[i], constraint) {
+                found = i
+            }
+        }
+        i = i + 1
+    }
+
+    if found != 0 - 1 {
+        i = found
+        for (i + 1 < variable.constraints.count) {
+            variable.constraints.items[i] = variable.constraints.items[i + 1]
+            i = i + 1
+        }
+        variable.constraints.count = variable.constraints.count - 1
+    }
+
+    if not ref.is_null(variable.determined_by) {
+        let determining: Constraint = variable.determined_by \ fatal
+        if ref.eq(determining, constraint) {
+            variable.determined_by = ref.null Constraint
+        }
+    }
+}
+
+fn constraint_strength(constraint: Constraint) i32 {
+    alt constraint {
+        _: EmptyConstraint => weakest,
+        stay: StayConstraint => stay.strength,
+        edit: EditConstraint => edit.strength,
+        eq: EqualityConstraint => eq.strength,
+        scale: ScaleConstraint => scale.strength,
+    }
+}
+
+fn constraint_is_input(constraint: Constraint) bool {
+    alt constraint {
+        _: EditConstraint => true,
+        _ => false,
+    }
+}
+
+fn constraint_is_satisfied(constraint: Constraint) bool {
+    alt constraint {
+        _: EmptyConstraint => false,
+        stay: StayConstraint => stay.satisfied,
+        edit: EditConstraint => edit.satisfied,
+        eq: EqualityConstraint => eq.direction != direction_none,
+        scale: ScaleConstraint => scale.direction != direction_none,
+    }
+}
+
+fn constraint_input(constraint: Constraint) Variable {
     alt constraint {
         eq: EqualityConstraint => {
-            eq.right.value = eq.left.value
+            if eq.direction == direction_forward { eq.v1 } else { eq.v2 }
         },
         scale: ScaleConstraint => {
-            scale.dest.value = scale.src.value * scale.scale.value + scale.offset.value
+            if scale.direction == direction_forward { scale.src } else { scale.dest }
         },
+        _ => fatal,
     }
 }
 
-fn apply_inverse_scale(constraint: Constraint) {
+fn constraint_output(constraint: Constraint) Variable {
     alt constraint {
-        _: EqualityConstraint => {},
+        stay: StayConstraint => stay.output,
+        edit: EditConstraint => edit.output,
+        eq: EqualityConstraint => {
+            if eq.direction == direction_forward { eq.v2 } else { eq.v1 }
+        },
         scale: ScaleConstraint => {
-            scale.src.value = (scale.dest.value - scale.offset.value) / scale.scale.value
+            if scale.direction == direction_forward { scale.dest } else { scale.src }
+        },
+        _ => fatal,
+    }
+}
+
+fn constraint_execute(constraint: Constraint) {
+    alt constraint {
+        _: EmptyConstraint => fatal,
+        _: StayConstraint => {},
+        _: EditConstraint => {},
+        eq: EqualityConstraint => {
+            constraint_output(eq).value = constraint_input(eq).value
+        },
+        scale: ScaleConstraint => {
+            if scale.direction == direction_forward {
+                scale.dest.value = scale.src.value * scale.scale.value + scale.offset.value
+            } else {
+                scale.src.value = (scale.dest.value - scale.offset.value) / scale.scale.value
+            }
         },
     }
 }
 
-fn propagate_constraints(constraints: array[Constraint]) {
-    for (0..array.len(constraints)) |i| {
-        apply_constraint(constraints[i])
+fn constraint_mark_unsatisfied(constraint: Constraint) {
+    alt constraint {
+        _: EmptyConstraint => {},
+        stay: StayConstraint => {
+            stay.satisfied = false
+        },
+        edit: EditConstraint => {
+            edit.satisfied = false
+        },
+        eq: EqualityConstraint => {
+            eq.direction = direction_none
+        },
+        scale: ScaleConstraint => {
+            scale.direction = direction_none
+        },
     }
+}
+
+fn constraint_add_to_graph(constraint: Constraint) {
+    alt constraint {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraint => {
+            variable_add_constraint(stay.output, stay)
+            stay.satisfied = false
+        },
+        edit: EditConstraint => {
+            variable_add_constraint(edit.output, edit)
+            edit.satisfied = false
+        },
+        eq: EqualityConstraint => {
+            variable_add_constraint(eq.v1, eq)
+            variable_add_constraint(eq.v2, eq)
+            eq.direction = direction_none
+        },
+        scale: ScaleConstraint => {
+            variable_add_constraint(scale.src, scale)
+            variable_add_constraint(scale.dest, scale)
+            variable_add_constraint(scale.scale, scale)
+            variable_add_constraint(scale.offset, scale)
+            scale.direction = direction_none
+        },
+    }
+}
+
+fn constraint_remove_from_graph(constraint: Constraint) {
+    alt constraint {
+        _: EmptyConstraint => {},
+        stay: StayConstraint => {
+            variable_remove_constraint(stay.output, stay)
+            stay.satisfied = false
+        },
+        edit: EditConstraint => {
+            variable_remove_constraint(edit.output, edit)
+            edit.satisfied = false
+        },
+        eq: EqualityConstraint => {
+            variable_remove_constraint(eq.v1, eq)
+            variable_remove_constraint(eq.v2, eq)
+            eq.direction = direction_none
+        },
+        scale: ScaleConstraint => {
+            variable_remove_constraint(scale.src, scale)
+            variable_remove_constraint(scale.dest, scale)
+            variable_remove_constraint(scale.scale, scale)
+            variable_remove_constraint(scale.offset, scale)
+            scale.direction = direction_none
+        },
+    }
+}
+
+fn constraint_mark_inputs(constraint: Constraint, mark: i32) {
+    alt constraint {
+        _: EmptyConstraint => fatal,
+        _: StayConstraint => {},
+        _: EditConstraint => {},
+        eq: EqualityConstraint => {
+            constraint_input(eq).mark = mark
+        },
+        scale: ScaleConstraint => {
+            constraint_input(scale).mark = mark
+            scale.scale.mark = mark
+            scale.offset.mark = mark
+        },
+    }
+}
+
+fn constraint_choose_method(constraint: Constraint, mark: i32) {
+    alt constraint {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraint => {
+            if stay.output.mark != mark {
+                if stronger(stay.strength, stay.output.walk_strength) {
+                    stay.satisfied = true
+                } else {
+                    stay.satisfied = false
+                }
+            } else {
+                stay.satisfied = false
+            }
+        },
+        edit: EditConstraint => {
+            if edit.output.mark != mark {
+                if stronger(edit.strength, edit.output.walk_strength) {
+                    edit.satisfied = true
+                } else {
+                    edit.satisfied = false
+                }
+            } else {
+                edit.satisfied = false
+            }
+        },
+        eq: EqualityConstraint => {
+            if eq.v1.mark == mark {
+                if eq.v2.mark != mark {
+                    if stronger(eq.strength, eq.v2.walk_strength) {
+                        eq.direction = direction_forward
+                    } else {
+                        eq.direction = direction_backward
+                    }
+                } else {
+                    eq.direction = direction_backward
+                }
+            }
+
+            if eq.v2.mark == mark {
+                if eq.v1.mark != mark {
+                    if stronger(eq.strength, eq.v1.walk_strength) {
+                        eq.direction = direction_backward
+                    } else {
+                        eq.direction = direction_none
+                    }
+                } else {
+                    eq.direction = direction_none
+                }
+            }
+
+            if weaker(eq.v1.walk_strength, eq.v2.walk_strength) {
+                if stronger(eq.strength, eq.v1.walk_strength) {
+                    eq.direction = direction_backward
+                } else {
+                    eq.direction = direction_none
+                }
+            } else {
+                if stronger(eq.strength, eq.v2.walk_strength) {
+                    eq.direction = direction_forward
+                } else {
+                    eq.direction = direction_backward
+                }
+            }
+        },
+        scale: ScaleConstraint => {
+            if scale.src.mark == mark {
+                if scale.dest.mark != mark {
+                    if stronger(scale.strength, scale.dest.walk_strength) {
+                        scale.direction = direction_forward
+                    } else {
+                        scale.direction = direction_backward
+                    }
+                } else {
+                    scale.direction = direction_backward
+                }
+            }
+
+            if scale.dest.mark == mark {
+                if scale.src.mark != mark {
+                    if stronger(scale.strength, scale.src.walk_strength) {
+                        scale.direction = direction_backward
+                    } else {
+                        scale.direction = direction_none
+                    }
+                } else {
+                    scale.direction = direction_none
+                }
+            }
+
+            if weaker(scale.src.walk_strength, scale.dest.walk_strength) {
+                if stronger(scale.strength, scale.src.walk_strength) {
+                    scale.direction = direction_backward
+                } else {
+                    scale.direction = direction_none
+                }
+            } else {
+                if stronger(scale.strength, scale.dest.walk_strength) {
+                    scale.direction = direction_forward
+                } else {
+                    scale.direction = direction_backward
+                }
+            }
+        },
+    }
+}
+
+fn constraint_inputs_known(constraint: Constraint, mark: i32) bool {
+    alt constraint {
+        _: EmptyConstraint => false,
+        _: StayConstraint => true,
+        _: EditConstraint => true,
+        _: EqualityConstraint => {
+            let input: Variable = constraint_input(constraint)
+            if input.mark == mark {
+                true
+            } else {
+                if input.stay {
+                    true
+                } else {
+                    ref.is_null(input.determined_by)
+                }
+            }
+        },
+        _: ScaleConstraint => {
+            let input: Variable = constraint_input(constraint)
+            if input.mark == mark {
+                true
+            } else {
+                if input.stay {
+                    true
+                } else {
+                    ref.is_null(input.determined_by)
+                }
+            }
+        },
+    }
+}
+
+fn constraint_recalculate(constraint: Constraint) {
+    alt constraint {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraint => {
+            stay.output.walk_strength = stay.strength
+            stay.output.stay = not constraint_is_input(stay)
+            if stay.output.stay {
+                constraint_execute(stay)
+            }
+        },
+        edit: EditConstraint => {
+            edit.output.walk_strength = edit.strength
+            edit.output.stay = not constraint_is_input(edit)
+            if edit.output.stay {
+                constraint_execute(edit)
+            }
+        },
+        eq: EqualityConstraint => {
+            let input: Variable = constraint_input(eq)
+            let out: Variable = constraint_output(eq)
+            out.walk_strength = weakest_of(eq.strength, input.walk_strength)
+            out.stay = input.stay
+            if out.stay {
+                constraint_execute(eq)
+            }
+        },
+        scale: ScaleConstraint => {
+            let input: Variable = constraint_input(scale)
+            let out: Variable = constraint_output(scale)
+            let all_stay: bool = false
+            out.walk_strength = weakest_of(scale.strength, input.walk_strength)
+            if input.stay {
+                if scale.scale.stay {
+                    all_stay = scale.offset.stay
+                }
+            }
+            out.stay = all_stay
+            if out.stay {
+                constraint_execute(scale)
+            }
+        },
+    }
+}
+
+fn planner_new_mark(planner: Planner) i32 {
+    planner.current_mark = planner.current_mark + 1
+    planner.current_mark
+}
+
+fn planner_add_constraints_consuming_to(variable: Variable, coll: ConstraintList) {
+    let determining: Constraint # null = variable.determined_by
+    let i: i32 = 0
+    for (i < variable.constraints.count) {
+        let constraint: Constraint = variable.constraints.items[i]
+        let same: bool = false
+        if not ref.is_null(determining) {
+            same = ref.eq(constraint, determining \ fatal)
+        }
+        if not same {
+            if constraint_is_satisfied(constraint) {
+                constraint_list_append(coll, constraint)
+            }
+        }
+        i = i + 1
+    }
+}
+
+fn planner_add_propagate(planner: Planner, constraint: Constraint, mark: i32) bool {
+    result: {
+        let todo: ConstraintList = new_constraint_list(planner.constraint_capacity)
+        constraint_list_append(todo, constraint)
+
+        for (todo.count > 0) {
+            let current: Constraint = constraint_list_pop_front(todo)
+            if constraint_output(current).mark == mark {
+                planner_incremental_remove(planner, constraint)
+                break result false
+            }
+
+            constraint_recalculate(current)
+            planner_add_constraints_consuming_to(constraint_output(current), todo)
+        }
+
+        true
+    }
+}
+
+fn planner_remove_propagate_from(planner: Planner, out: Variable) ConstraintList {
+    out.determined_by = ref.null Constraint
+    out.walk_strength = weakest
+    out.stay = true
+
+    let unsatisfied: ConstraintList = new_constraint_list(planner.constraint_capacity)
+    let todo: VariableList = new_variable_list(planner.variable_capacity)
+    variable_list_append(todo, out)
+
+    for (todo.count > 0) {
+        let variable: Variable = variable_list_pop_front(todo)
+        let determining: Constraint # null = variable.determined_by
+
+        let i: i32 = 0
+        for (i < variable.constraints.count) {
+            let constraint: Constraint = variable.constraints.items[i]
+            if not constraint_is_satisfied(constraint) {
+                constraint_list_append(unsatisfied, constraint)
+            }
+            i = i + 1
+        }
+
+        i = 0
+        for (i < variable.constraints.count) {
+            let constraint: Constraint = variable.constraints.items[i]
+            let same: bool = false
+            if not ref.is_null(determining) {
+                same = ref.eq(constraint, determining \ fatal)
+            }
+            if not same {
+                if constraint_is_satisfied(constraint) {
+                    constraint_recalculate(constraint)
+                    variable_list_append(todo, constraint_output(constraint))
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    unsatisfied
+}
+
+fn planner_incremental_add(planner: Planner, constraint: Constraint) {
+    let mark: i32 = planner_new_mark(planner)
+    let overridden: Constraint # null = constraint_satisfy(constraint, planner, mark)
+
+    for (not ref.is_null(overridden)) {
+        overridden = constraint_satisfy(overridden \ fatal, planner, mark)
+    }
+}
+
+fn planner_incremental_remove(planner: Planner, constraint: Constraint) {
+    let out: Variable = constraint_output(constraint)
+    constraint_mark_unsatisfied(constraint)
+    constraint_remove_from_graph(constraint)
+
+    let unsatisfied: ConstraintList = planner_remove_propagate_from(planner, out)
+    let strength: i32 = required
+    let repeat: bool = true
+
+    for (repeat) {
+        let i: i32 = 0
+        for (i < unsatisfied.count) {
+            let current: Constraint = unsatisfied.items[i]
+            if constraint_strength(current) == strength {
+                planner_incremental_add(planner, current)
+            }
+            strength = next_weaker(strength)
+            i = i + 1
+        }
+        repeat = strength != weakest
+    }
+}
+
+fn planner_make_plan(planner: Planner, sources: ConstraintList) ConstraintList {
+    let mark: i32 = planner_new_mark(planner)
+    let plan: ConstraintList = new_constraint_list(planner.constraint_capacity)
+    let todo: ConstraintList = constraint_list_copy(sources, planner.constraint_capacity)
+
+    for (todo.count > 0) {
+        let constraint: Constraint = constraint_list_pop_front(todo)
+        let out: Variable = constraint_output(constraint)
+        if out.mark != mark {
+            if constraint_inputs_known(constraint, mark) {
+                constraint_list_append(plan, constraint)
+                out.mark = mark
+                planner_add_constraints_consuming_to(out, todo)
+            }
+        }
+    }
+
+    plan
+}
+
+fn planner_extract_plan_from_constraints(planner: Planner, constraints: ConstraintList) ConstraintList {
+    let sources: ConstraintList = new_constraint_list(planner.constraint_capacity)
+
+    for (0..constraints.count) |i| {
+        let constraint: Constraint = constraints.items[i]
+        if constraint_is_input(constraint) {
+            if constraint_is_satisfied(constraint) {
+                constraint_list_append(sources, constraint)
+            }
+        }
+    }
+
+    planner_make_plan(planner, sources)
+}
+
+fn constraint_add_constraint(constraint: Constraint, planner: Planner) {
+    constraint_add_to_graph(constraint)
+    planner_incremental_add(planner, constraint)
+}
+
+fn constraint_satisfy(constraint: Constraint, planner: Planner, mark: i32) Constraint # null {
+    constraint_choose_method(constraint, mark)
+
+    if not constraint_is_satisfied(constraint) {
+        if constraint_strength(constraint) == required {
+            fatal
+        }
+        ref.null Constraint
+    } else {
+        constraint_mark_inputs(constraint, mark)
+        let out: Variable = constraint_output(constraint)
+        let overridden: Constraint # null = out.determined_by
+
+        if not ref.is_null(overridden) {
+            constraint_mark_unsatisfied(overridden \ fatal)
+        }
+
+        out.determined_by = constraint
+
+        if not planner_add_propagate(planner, constraint, mark) {
+            fatal
+        }
+
+        out.mark = mark
+        overridden
+    }
+}
+
+fn constraint_destroy(constraint: Constraint, planner: Planner) {
+    if constraint_is_satisfied(constraint) {
+        planner_incremental_remove(planner, constraint)
+    } else {
+        constraint_remove_from_graph(constraint)
+    }
+}
+
+fn plan_execute(plan: ConstraintList) {
+    for (0..plan.count) |i| {
+        constraint_execute(plan.items[i])
+    }
+}
+
+fn new_stay_constraint(variable: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = StayConstraint {
+        output: variable,
+        strength: strength,
+        satisfied: false,
+    }
+    constraint_add_constraint(constraint, planner)
+    constraint
+}
+
+fn new_edit_constraint(variable: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = EditConstraint {
+        output: variable,
+        strength: strength,
+        satisfied: false,
+    }
+    constraint_add_constraint(constraint, planner)
+    constraint
+}
+
+fn new_equality_constraint(v1: Variable, v2: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = EqualityConstraint {
+        v1: v1,
+        v2: v2,
+        strength: strength,
+        direction: direction_none,
+    }
+    constraint_add_constraint(constraint, planner)
+    constraint
+}
+
+fn new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = ScaleConstraint {
+        src: src,
+        scale: scale,
+        offset: offset,
+        dest: dest,
+        strength: strength,
+        direction: direction_none,
+    }
+    constraint_add_constraint(constraint, planner)
+    constraint
+}
+
+fn change(planner: Planner, variable: Variable, new_value: i32) {
+    let edit: Constraint = new_edit_constraint(variable, preferred, planner)
+    let edits: ConstraintList = new_constraint_list(1)
+    constraint_list_append(edits, edit)
+
+    let plan: ConstraintList = planner_extract_plan_from_constraints(planner, edits)
+    let i: i32 = 0
+    for (i < 10) {
+        variable.value = new_value
+        plan_execute(plan)
+        i = i + 1
+    }
+
+    constraint_destroy(edit, planner)
 }
 
 fn chain_test(n: i32) i64 {
-    let dummy: Variable = new_variable("dummy", 0, strong_default)
-    let vars: array[Variable] = array[Variable].new(n + 1, dummy)
-    let constraints: array[Constraint] = array[Constraint].new(n, EqualityConstraint {
-        left: dummy,
-        right: dummy,
-        strength: required,
-    })
+    let planner: Planner = new_planner(n + 4, n + 4)
+    let prev: Variable # null = ref.null Variable
+    let first: Variable # null = ref.null Variable
+    let last: Variable # null = ref.null Variable
+    let i: i32 = 0
 
-    for (0..n + 1) |i| {
-        vars[i] = new_variable("v", 0, strong_default)
-    }
+    for (i < n + 1) {
+        let variable: Variable = new_variable(0, 2)
 
-    for (0..n) |i| {
-        constraints[i] = EqualityConstraint {
-            left: vars[i],
-            right: vars[i + 1],
-            strength: required,
+        if not ref.is_null(prev) {
+            new_equality_constraint(prev \ fatal, variable, required, planner)
         }
+
+        if i == 0 {
+            first = variable
+        }
+
+        if i == n {
+            last = variable
+        }
+
+        prev = variable
+        i = i + 1
     }
+
+    let first_variable: Variable = first \ fatal
+    let last_variable: Variable = last \ fatal
+    new_stay_constraint(last_variable, strong_default, planner)
+
+    let edit: Constraint = new_edit_constraint(first_variable, preferred, planner)
+    let edits: ConstraintList = new_constraint_list(1)
+    constraint_list_append(edits, edit)
+    let plan: ConstraintList = planner_extract_plan_from_constraints(planner, edits)
 
     let failures: i64 = 0
-    for (0..100) |i| {
-        vars[0].value = i
-        propagate_constraints(constraints)
-        if vars[n].value != i {
+    i = 0
+    for (i < 100) {
+        first_variable.value = i
+        plan_execute(plan)
+        if last_variable.value != i {
             failures = failures + 1
         }
+        i = i + 1
     }
+
     failures
 }
 
 fn projection_test(n: i32) i64 {
-    let scale: Variable = new_variable("scale", 10, normal)
-    let offset: Variable = new_variable("offset", 1000, normal)
-    let dummy: Variable = new_variable("dummy", 0, normal)
-    let srcs: array[Variable] = array[Variable].new(n, dummy)
+    let planner: Planner = new_planner(n * 2 + 8, n * 2 + 8)
+    let scale: Variable = new_variable(10, n + 1)
+    let offset: Variable = new_variable(1000, n + 1)
+    let dummy: Variable = new_variable_placeholder()
+    let src: Variable = dummy
+    let dst: Variable = dummy
     let dests: array[Variable] = array[Variable].new(n, dummy)
-    let constraints: array[Constraint] = array[Constraint].new(n, EqualityConstraint {
-        left: dummy,
-        right: dummy,
-        strength: required,
-    })
+    let i: i32 = 0
 
-    for (0..n) |i| {
-        srcs[i] = new_variable("src", i, normal)
-        dests[i] = new_variable("dst", i, strong_default)
-        constraints[i] = ScaleConstraint {
-            src: srcs[i],
-            scale: scale,
-            offset: offset,
-            dest: dests[i],
-            strength: required,
-        }
+    for (i < n) {
+        src = new_variable(i, 3)
+        dst = new_variable(i, 2)
+        dests[i] = dst
+        new_stay_constraint(src, normal, planner)
+        new_scale_constraint(src, scale, offset, dst, required, planner)
+        i = i + 1
     }
-
-    propagate_constraints(constraints)
 
     let failures: i64 = 0
-    let last: i32 = n - 1
 
-    srcs[last].value = 17
-    apply_constraint(constraints[last])
-    if dests[last].value != 1170 {
+    change(planner, src, 17)
+    if dst.value != 1170 {
         failures = failures + 1
     }
 
-    dests[last].value = 1050
-    apply_inverse_scale(constraints[last])
-    if srcs[last].value != 5 {
+    change(planner, dst, 1050)
+    if src.value != 5 {
         failures = failures + 1
     }
 
-    scale.value = 5
-    propagate_constraints(constraints)
-    for (0..n - 1) |i| {
+    change(planner, scale, 5)
+    i = 0
+    for (i < n - 1) {
         if dests[i].value != i * 5 + 1000 {
             failures = failures + 1
         }
+        i = i + 1
     }
 
-    offset.value = 2000
-    propagate_constraints(constraints)
-    for (0..n - 1) |i| {
+    change(planner, offset, 2000)
+    i = 0
+    for (i < n - 1) {
         if dests[i].value != i * 5 + 2000 {
             failures = failures + 1
         }
+        i = i + 1
     }
 
     failures
 }
 
-fn delta_blue(n: i32) i64 {
+fn delta_blue_impl(n: i32) i64 {
     chain_test(n) + projection_test(n)
 }
 
-bench "deltablue" |i| {
+fn delta_blue(n: i32) i64 {
+    delta_blue_impl(n)
+}
+
+test "faithful deltablue stays consistent on a small graph" {
+    assert delta_blue(20) == 0
+}
+
+bench "deltablue_chain" |i| {
     setup {
+        let sink: i64 = 0
         measure {
-            delta_blue(128)
+            sink = sink + chain_test(1048)
+        }
+    }
+}
+
+bench "deltablue_projection" |i| {
+    setup {
+        let sink: i64 = 0
+        measure {
+            sink = sink + projection_test(1048)
         }
     }
 }
 
 export fn main() {
-    delta_blue(10000) -o i64_to_string(_) -o console_log
+    delta_blue_impl(200) -o i64_to_string(_) -o console_log
 }
