@@ -1294,25 +1294,17 @@ class WatGen {
 }
 
 function parseStructDecl(node) {
-    return {
-        kind: 'struct_decl',
-        name: childOfType(node, 'type_ident').text,
-        fields: parseFieldList(childOfType(node, 'field_list')),
-    };
+    return { kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) };
 }
 
 function parseTypeDecl(node) {
-    return {
-        kind: 'type_decl',
-        name: childOfType(node, 'type_ident').text,
-        variants: parseVariantList(childOfType(node, 'variant_list')),
-    };
+    return { kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')) };
 }
 
 function parseFnDecl(node) {
     return {
         kind: 'fn_decl',
-        name: childOfType(node, 'identifier').text,
+        name: textOf(node, 'identifier'),
         params: parseParamList(childOfType(node, 'param_list')),
         returnType: parseReturnType(childOfType(node, 'return_type')),
         body: childOfType(node, 'block'),
@@ -1333,62 +1325,40 @@ function parseImportDecl(node) {
     const named = node.namedChildren;
     const module = named[0].text.slice(1, -1);
     const name = named[1].text;
-
-    if (hasAnon(node, '(')) {
-        return {
+    return hasAnon(node, '(')
+        ? {
             kind: 'import_fn',
             module,
             name,
             params: parseImportParamList(childOfType(node, 'import_param_list')),
             returnType: parseReturnType(childOfType(node, 'return_type')),
-        };
-    }
-
-    return {
-        kind: 'import_val',
-        module,
-        name,
-        type: parseType(named[2]),
-    };
+        }
+        : { kind: 'import_val', module, name, type: parseType(named[2]) };
 }
 
-function parseFieldList(node) {
-    return node ? childrenOfType(node, 'field').map(parseField) : [];
-}
+const parseFieldList = (node) => mapType(node, 'field', parseField);
 
 function parseField(node) {
     const named = node.namedChildren;
     return {
         kind: 'field',
-        mut: node.children.some(child => child.type === 'mut'),
+        mut: hasAnon(node, 'mut'),
         name: named[0].text,
         type: parseType(named[1]),
     };
 }
 
-function parseVariantList(node) {
-    return node ? childrenOfType(node, 'variant').map(parseVariant) : [];
-}
+const parseVariantList = (node) => mapType(node, 'variant', parseVariant);
 
 function parseVariant(node) {
-    return {
-        kind: 'variant',
-        name: childOfType(node, 'type_ident').text,
-        fields: parseFieldList(childOfType(node, 'field_list')),
-    };
+    return { kind: 'variant', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) };
 }
 
-function parseParamList(node) {
-    return node ? childrenOfType(node, 'param').map(parseParam) : [];
-}
+const parseParamList = (node) => mapType(node, 'param', parseParam);
 
 function parseParam(node) {
     const named = node.namedChildren;
-    return {
-        kind: 'param',
-        name: named[0].text,
-        type: parseType(named[1]),
-    };
+    return { kind: 'param', name: named[0].text, type: parseType(named[1]) };
 }
 
 function parseImportParamList(node) {
@@ -1413,10 +1383,9 @@ function parseType(node) {
             return { kind: 'named', name: first.text };
         }
         case 'func_type': {
-            const typeList = childOfType(node, 'type_list');
             return {
                 kind: 'func_type',
-                params: typeList ? typeList.namedChildren.map(parseType) : [],
+                params: childOfType(node, 'type_list')?.namedChildren.map(parseType) ?? [],
                 returnType: parseReturnType(childOfType(node, 'return_type')),
             };
         }
@@ -1461,12 +1430,10 @@ function parseReturnType(node) {
 
 function parsePipeTarget(node) {
     const argsNode = childOfType(node, 'pipe_args');
-    const parts = [];
-    for (const child of node.namedChildren) {
-        if (child.type === 'pipe_args') break;
-        if (child.type === 'identifier') parts.push(child.text);
-    }
-    const callee = parts.join('.');
+    const callee = node.namedChildren
+        .filter(child => child.type === 'identifier')
+        .map(child => child.text)
+        .join('.');
     return argsNode
         ? { kind: 'pipe_call', callee, args: parsePipeArgs(argsNode) }
         : { kind: 'pipe_ident', name: callee };
@@ -1486,9 +1453,7 @@ function namespaceInfo(node) {
     };
 }
 
-function parseForSources(node) {
-    return node ? childrenOfType(node, 'for_source').map(parseForSource) : [];
-}
+const parseForSources = (node) => mapType(node, 'for_source', parseForSource);
 
 function parseForSource(node) {
     if (node.children.some(child => !child.isNamed && child.type === '..')) {
@@ -1497,9 +1462,7 @@ function parseForSource(node) {
     return { kind: 'cond', expr: node.namedChildren[0] };
 }
 
-function parseCapture(node) {
-    return node ? childrenOfType(node, 'identifier').map(child => child.text) : [];
-}
+const parseCapture = (node) => mapType(node, 'identifier', child => child.text);
 
 function parseMatchArm(node) {
     const named = node.namedChildren;
@@ -1528,20 +1491,10 @@ function parseBreak(node) {
 
 function literalInfo(node) {
     const child = node.namedChildren[0];
-    if (child) {
-        switch (child.type) {
-            case 'int_lit': return { kind: 'int', value: parseIntLit(child.text) };
-            case 'float_lit': return { kind: 'float', value: parseFloat(child.text) };
-            case 'string_lit': return { kind: 'string', value: child.text.slice(1, -1) };
-            case 'multiline_string_lit':
-                return {
-                    kind: 'string',
-                    value: childrenOfType(child, 'multiline_string_line')
-                        .map(line => line.text.slice(2))
-                        .join('\n'),
-                };
-        }
-    }
+    const string = stringLiteralValue(node);
+    if (string !== null) return { kind: 'string', value: string };
+    if (child?.type === 'int_lit') return { kind: 'int', value: parseIntLit(child.text) };
+    if (child?.type === 'float_lit') return { kind: 'float', value: parseFloat(child.text) };
 
     switch (node.text) {
         case 'true': return { kind: 'bool', value: true };
@@ -1570,3 +1523,6 @@ function flattenTuple(node, out = []) {
 function hasCallParens(node) {
     return hasAnon(node, '(');
 }
+
+const mapType = (node, type, parse) => childrenOfType(node, type).map(parse);
+const textOf = (node, type) => childOfType(node, type).text;

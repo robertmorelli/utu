@@ -44,3 +44,21 @@ export function findAnonBetween(node, leftChild, rightChild) {
     }
     return '?';
 }
+
+export function throwOnParseErrors(node) {
+    const errors = [];
+    collectParseErrors(node, errors);
+    if (!errors.length) return;
+    throw new Error(`Parse errors:\n${errors.map(({ message, row, col }) => `  ${message} at ${row + 1}:${col + 1}`).join('\n')}`);
+}
+
+function collectParseErrors(node, out) {
+    if (node.type === 'ERROR' || node.isMissing) {
+        out.push({
+            message: node.type === 'ERROR' ? 'Unexpected token' : `Missing ${node.type}`,
+            row: node.startPosition.row,
+            col: node.startPosition.column,
+        });
+    }
+    for (const child of node.children) collectParseErrors(child, out);
+}

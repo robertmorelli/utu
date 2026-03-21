@@ -2,6 +2,7 @@ import { Parser, Language } from 'web-tree-sitter';
 import binaryen from 'binaryen';
 import { watgen } from './watgen.js';
 import { jsgen } from './jsgen.js';
+import { throwOnParseErrors } from './tree.js';
 
 let parser = null;
 
@@ -37,31 +38,4 @@ export async function compile(source, options = {}) {
 
     const js = jsgen(tree, wasm);
     return emitWat ? { js, wat, wasm } : { js, wasm };
-}
-
-function throwOnParseErrors(node) {
-    const errors = [];
-    collectParseErrors(node, errors);
-    if (errors.length === 0) return;
-
-    const lines = errors.map(error => `  ${error.message} at ${error.row + 1}:${error.col + 1}`);
-    throw new Error(`Parse errors:\n${lines.join('\n')}`);
-}
-
-function collectParseErrors(node, out) {
-    if (node.type === 'ERROR') {
-        out.push({
-            message: 'Unexpected token',
-            row: node.startPosition.row,
-            col: node.startPosition.column,
-        });
-    } else if (node.isMissing) {
-        out.push({
-            message: `Missing ${node.type}`,
-            row: node.startPosition.row,
-            col: node.startPosition.column,
-        });
-    }
-
-    for (const child of node.children) collectParseErrors(child, out);
 }
