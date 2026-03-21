@@ -182,35 +182,35 @@
       "path": "examples/call_simple.utu",
       "mode": "run",
       "allowFailure": true,
-      "tags": ["benchmark", "legacy"]
+      "tags": ["benchmark"]
     },
     {
       "name": "benchmark-deltablue",
       "path": "examples/deltablue.utu",
       "mode": "run",
       "allowFailure": true,
-      "tags": ["benchmark", "legacy"]
+      "tags": ["benchmark"]
     },
     {
       "name": "benchmark-fannkuch",
       "path": "examples/fannkuch.utu",
       "mode": "run",
       "allowFailure": true,
-      "tags": ["benchmark", "legacy"]
+      "tags": ["benchmark"]
     },
     {
       "name": "benchmark-float",
       "path": "examples/float.utu",
       "mode": "run",
       "allowFailure": true,
-      "tags": ["benchmark", "legacy"]
+      "tags": ["benchmark"]
     },
     {
       "name": "benchmark-spectralnorm",
       "path": "examples/spectralnorm.utu",
       "mode": "run",
       "allowFailure": true,
-      "tags": ["benchmark", "legacy"]
+      "tags": ["benchmark"]
     }
   ]
 }

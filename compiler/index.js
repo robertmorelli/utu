@@ -40,8 +40,6 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
     throwOnParseErrors(tree.rootNode);
     const host = analyzeHostRequirements(tree);
     const { wat, metadata } = watgen(tree, { mode }), mod = binaryen.parseText(wat);
-    // Keep optimization mandatory without letting Binaryen upgrade modules to
-    // exact heap types that current runtimes reject.
     mod.setFeatures(SUPPORTED_WASM_FEATURES);
     binaryen.setOptimizeLevel(2);
     binaryen.setShrinkLevel(1);

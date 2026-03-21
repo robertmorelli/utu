@@ -32,22 +32,6 @@ export function jsgen(treeOrNode, binary, { mode = 'program', host = null } = {}
     lines.push('};');
 
     if (needsImports) {
-        lines.push('', `const __moduleKeys = new Set(${JSON.stringify(moduleImports.map(group => group.module))});`);
-        lines.push('', 'const __isModuleKey = key => __moduleKeys.has(key) || key === "__strings" || key === "wasm:js-string" || key.startsWith(".") || key.startsWith("/") || key.includes(":");');
-        lines.push('', 'const __normalizeImports = imports => {');
-        lines.push('  if (!imports || typeof imports !== "object" || Array.isArray(imports)) return {};');
-        lines.push('  const normalized = {};');
-        lines.push('  const flatEs = {};');
-        lines.push('  for (const [key, value] of Object.entries(imports)) {');
-        lines.push('    if (__isModuleKey(key)) normalized[key] = value;');
-        lines.push('    else flatEs[key] = value;');
-        lines.push('  }');
-        lines.push('  if (Object.keys(flatEs).length) {');
-        lines.push('    const existingEs = typeof normalized.es === "object" && normalized.es !== null ? normalized.es : {};');
-        lines.push('    normalized.es = { ...existingEs, ...flatEs };');
-        lines.push('  }');
-        lines.push('  return normalized;');
-        lines.push('};');
         lines.push('', 'const __requireHostBinding = (moduleObject, moduleName, importName) => {');
         lines.push('  if (!moduleObject || (typeof moduleObject !== "object" && typeof moduleObject !== "function") || !(importName in moduleObject)) {');
         lines.push('    throw new Error(`Missing host import "${importName}" from "${moduleName}"`);');
@@ -83,18 +67,17 @@ export function jsgen(treeOrNode, binary, { mode = 'program', host = null } = {}
 
     lines.push('', `export async function instantiate(${needsImports ? 'imports = {}' : ''}) {`);
     if (needsImports) {
-        lines.push('  const __imports = __normalizeImports(imports);');
         for (const group of moduleImports) {
             if (!group.autoResolve) continue;
-            lines.push(`  const ${group.ref} = __imports[${JSON.stringify(group.module)}] ?? await __importHostModule(${JSON.stringify(group.module)});`);
+            lines.push(`  const ${group.ref} = imports[${JSON.stringify(group.module)}] ?? await __importHostModule(${JSON.stringify(group.module)});`);
         }
     }
-    lines.push('  const module = await WebAssembly.compile(__decodeBase64(__b64), { builtins: ["js-string"] });');
+    lines.push('  const module = await WebAssembly.compile(__decodeBase64(__b64));');
     lines.push('  const instance = await WebAssembly.instantiate(module, {');
     if (strings.length) lines.push('    "__strings": Object.fromEntries(__strings.map((s, i) => [String(i), s])),');
     lines.push('    "wasm:js-string": __jsStringBuiltins,');
     for (const group of moduleImports) {
-        const moduleRef = group.autoResolve ? group.ref : `__imports[${JSON.stringify(group.module)}]`;
+        const moduleRef = group.autoResolve ? group.ref : `imports[${JSON.stringify(group.module)}]`;
         lines.push(`    ${JSON.stringify(group.module)}: {`);
         for (const entry of group.entries) {
             const binding = `__requireHostBinding(${moduleRef}, ${JSON.stringify(group.module)}, ${JSON.stringify(entry.name)})`;
@@ -168,7 +151,6 @@ function groupImportsByModule({ importFns, importVals }) {
 }
 
 function toBase64(bytes) {
-    if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
     let bin = '';
     for (const byte of bytes) bin += String.fromCharCode(byte);
     return btoa(bin);

@@ -1,5 +1,7 @@
 export default {
-  lucky: 41,
-  label: 'utu',
-  document: { title: 'utu' },
+  es: {
+    lucky: 41,
+    label: 'utu',
+    document: { title: 'utu' },
+  },
 };
