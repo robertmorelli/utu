@@ -75,8 +75,10 @@ The compiler's minimum instruction surface is grouped by category.
 - `br_if` for conditional exits
 - `br_on_cast` for type-based pattern matching
 - `call` for direct calls
-- `call_ref` for function reference dispatch
 - `unreachable` for lowered `fatal` traps and other impossible states
+
+Planned first-class function references would add `call_ref`, but that is not
+part of the current implemented instruction set.
 
 === GC Instructions
 

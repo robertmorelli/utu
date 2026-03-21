@@ -241,10 +241,8 @@ ephemerally and reports failures or timing.
 
 == Polymorphic Dispatch
 
-The language does not bake in a hidden vtable model. Dispatch stays explicit:
-
-- use `br_on_cast` chains for type-based dispatch
-- use `call_ref` for function reference dispatch
+The language does not bake in a hidden vtable model. Current compiler support
+keeps dispatch explicit through type-based `alt` lowering:
 
 ```utu
 fn describe(s: Shape) str {
@@ -254,11 +252,12 @@ fn describe(s: Shape) str {
         t: Triangle => "triangle",
     }
 }
-
-type Handler = fn(Event)
-let handlers: array[Handler] = array[Handler].new_fixed(on_click, on_hover, on_key)
-handlers[event.kind](event)
 ```
 
 This keeps the runtime behavior visible in the language surface and aligned
 with Wasm's own dispatch mechanisms.
+
+=== Future Work
+
+First-class function references and `call_ref`-based dispatch are still
+planned rather than implemented end to end today.

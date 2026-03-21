@@ -12,9 +12,11 @@ category.
 - `br_if`: conditional break
 - `br_on_cast`: type-based pattern matching
 - `call`: direct function call
-- `call_ref`: function reference call
 - `unreachable`: emitted for source-level `fatal`, exhaustive `alt`
   fallthrough, assert failure, and force unwrap
+
+Planned first-class function references would add `call_ref`, but the current
+compiler does not require it yet.
 
 == 10.2 GC Instructions
 

@@ -51,11 +51,14 @@ remainder, comparison, and conversion instructions.
 
 - `struct { ... }` maps to `(struct (field ...))`
 - `array[T]` maps to `(array (mut T))`
-- `fn(A) B` maps to `(func (param A) (result B))`
 - `externref` maps to `externref`, an opaque JS value
 - `anyref` maps to `anyref`, the top of the GC hierarchy
 - `i31` maps to `i31ref`, a 31-bit tagged integer
 - `eqref` maps to `eqref`, a structurally comparable reference
+
+The `fn(A) B` syntax is reserved for planned first-class function references.
+The grammar accepts it, but the current compiler does not yet support that
+surface as part of the stable implemented subset.
 
 All reference types are *non-nullable by default*. Nullable types are
 expressed using the exclusive disjunction operator: `T # null`. This maps to

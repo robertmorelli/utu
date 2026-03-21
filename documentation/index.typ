@@ -1,9 +1,9 @@
 = Utu Documentation
 
-This Typst document set migrates the language specification in `spec.md`
-into topic-oriented reference pages. The organization below keeps full
-coverage of the March 2026 draft while making it easier to evolve the docs
-chapter by chapter.
+This Typst document set organizes the language specification into
+topic-oriented reference pages. The organization below keeps full coverage of
+the March 2026 draft while making it easier to evolve the docs chapter by
+chapter.
 
 The chapters are:
 

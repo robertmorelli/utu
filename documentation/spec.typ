@@ -6,9 +6,9 @@ _Named after the Sumerian sun god of truth and justice._
 
 Language Specification — Draft — March 2026
 
-This Typst document is the canonical language specification extracted from
-`spec.md`. It preserves the section structure so grammar, semantics, lowering
-rules, and examples have a source of truth in Typst.
+This Typst document is the canonical language specification. It preserves the
+section structure so grammar, semantics, lowering rules, and examples have a
+single source of truth in Typst.
 
 #pagebreak()
 #include "spec-01-overview.typ"

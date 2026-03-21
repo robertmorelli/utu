@@ -68,11 +68,14 @@ Reference types map directly onto WasmGC heap references:
 
 - `struct { ... }` lowers to Wasm `struct`
 - `array[T]` lowers to Wasm `array`
-- `fn(A) B` lowers to a Wasm function type
 - `externref` is an opaque host reference
 - `anyref` is the top of the GC hierarchy
 - `i31` maps to `i31ref`
 - `eqref` is used for structurally comparable references
+
+The `fn(A) B` surface is reserved for planned first-class function references.
+The parser understands that syntax, but the current compiler does not yet
+support function references end to end as part of the stable subset.
 
 All reference types are non-nullable by default. Nullable references are
 spelled as `T # null`, which lowers to a nullable Wasm reference like
