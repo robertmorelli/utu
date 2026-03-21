@@ -4,12 +4,15 @@ import { RepoCompilerHost } from './compilerHost';
 import { DiagnosticsController } from './diagnostics';
 import { GeneratedDocumentStore } from './generatedDocuments';
 import { UtuDocumentSymbolProvider } from './documentSymbols';
+import { registerLanguageProviders } from './languageProviders';
+import { UtuLanguageModel } from './languageModel';
 import { UtuParserService } from './parserService';
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('UTU');
   const generatedDocuments = new GeneratedDocumentStore();
   const parserService = new UtuParserService(context.extensionUri);
+  const languageModel = new UtuLanguageModel(parserService);
   const compilerHost = new RepoCompilerHost(context.extensionUri);
   const diagnostics = new DiagnosticsController(parserService, output);
   const statusBarItem = createCompileStatusBarItem();
@@ -18,6 +21,7 @@ export function activate(context: vscode.ExtensionContext): void {
     output,
     generatedDocuments,
     parserService,
+    languageModel,
     diagnostics,
     statusBarItem,
     vscode.workspace.registerTextDocumentContentProvider('utu-generated', generatedDocuments),
@@ -26,6 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   updateStatusBarItem(statusBarItem, vscode.window.activeTextEditor);
+  registerLanguageProviders(context, languageModel);
   registerCommands(context, {
     output,
     compilerHost,

@@ -87,6 +87,11 @@
           "markdownDescription": "Enable Binaryen optimization when running UTU compile commands."
         }
       }
+    },
+    "configurationDefaults": {
+      "[utu]": {
+        "editor.semanticHighlighting.enabled": true
+      }
     }
   },
   "scripts": {

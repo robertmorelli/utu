@@ -7,10 +7,13 @@ This folder now contains the starting point for the UTU VS Code extension.
 - `.utu` language registration
 - line comments, bracket config, and editor indentation rules
 - basic TextMate syntax highlighting
+- semantic symbol coloring for UTU declarations and references
 - syntax diagnostics powered by the local `tree-sitter-utu.wasm`
 - document outline symbols for top-level declarations
+- hover details for UTU symbols, core types, and common builtins
+- local go-to-definition, find references, and document highlights
 - commands to compile the active file and inspect generated JavaScript, WAT, and the parser tree
-- a build step that snapshots the current repo compiler into `dist/compiler.mjs`
+- a build step that copies `/compiler` into the hidden `vscode/.generated/compiler` snapshot before bundling `dist/compiler.mjs`
 
 ## Commands
 
@@ -38,4 +41,4 @@ The build emits two artifacts:
 - `dist/extension.js`: the VS Code extension host entrypoint
 - `dist/compiler.mjs`: a bundled snapshot of the current compiler sources from `../compiler`
 
-That snapshot approach keeps the extension work isolated from ongoing compiler refactors while still letting the editor call the current compiler.
+The source snapshot lives in `vscode/.generated/compiler`, which is hidden and gitignored so extension work stays isolated from ongoing compiler refactors while still letting the editor call the current compiler.

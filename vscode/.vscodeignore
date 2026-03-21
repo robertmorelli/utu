@@ -1,5 +1,6 @@
 src/**
 scripts/**
+.generated/**
 tsconfig.json
 .gitignore
 .vscodeignore

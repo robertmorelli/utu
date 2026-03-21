@@ -1,9 +1,12 @@
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import * as vscode from 'vscode';
-import type { Node, Parser } from 'web-tree-sitter';
+import type { Node, Parser, Tree } from 'web-tree-sitter';
 
 type TreeSitterModule = typeof import('web-tree-sitter');
+export interface ParsedTree {
+  tree: Tree;
+  dispose(): void;
+}
 
 export class UtuParserService implements vscode.Disposable {
   private parserPromise?: Promise<Parser>;
@@ -12,19 +15,26 @@ export class UtuParserService implements vscode.Disposable {
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   async getDiagnostics(document: vscode.TextDocument): Promise<vscode.Diagnostic[]> {
-    const parser = await this.getParser();
-    const tree = parser.parse(document.getText());
+    const parsedTree = await this.parseSource(document.getText());
 
-    if (!tree) {
-      throw new Error('Tree-sitter returned no syntax tree for the document.');
+    try {
+      return collectDiagnostics(parsedTree.tree.rootNode, document);
+    } finally {
+      parsedTree.dispose();
     }
-
-    const diagnostics = collectDiagnostics(tree.rootNode, document);
-    tree.delete();
-    return diagnostics;
   }
 
   async getTreeString(source: string): Promise<string> {
+    const parsedTree = await this.parseSource(source);
+
+    try {
+      return parsedTree.tree.rootNode.toString();
+    } finally {
+      parsedTree.dispose();
+    }
+  }
+
+  async parseSource(source: string): Promise<ParsedTree> {
     const parser = await this.getParser();
     const tree = parser.parse(source);
 
@@ -32,9 +42,12 @@ export class UtuParserService implements vscode.Disposable {
       throw new Error('Tree-sitter returned no syntax tree for the document.');
     }
 
-    const treeString = tree.rootNode.toString();
-    tree.delete();
-    return treeString;
+    return {
+      tree,
+      dispose() {
+        tree.delete();
+      },
+    };
   }
 
   dispose(): void {
@@ -60,7 +73,7 @@ export class UtuParserService implements vscode.Disposable {
       await treeSitter.Parser.init({
         locateFile(scriptName) {
           if (scriptName === 'web-tree-sitter.wasm') {
-            return pathToFileURL(runtimeWasmPath).href;
+            return runtimeWasmPath;
           }
 
           return scriptName;
@@ -68,7 +81,7 @@ export class UtuParserService implements vscode.Disposable {
       });
 
       const parser = new treeSitter.Parser();
-      const language = await treeSitter.Language.load(pathToFileURL(grammarWasmPath).href);
+      const language = await treeSitter.Language.load(grammarWasmPath);
       parser.setLanguage(language);
       this.parserInstance = parser;
       return parser;
