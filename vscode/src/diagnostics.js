@@ -6,12 +6,14 @@ const UTU_LANGUAGE_ID = 'utu';
 export class DiagnosticsController {
     languageService;
     output;
+    compilerHost;
     collection = vscode.languages.createDiagnosticCollection('utu');
     disposables = [this.collection];
     pending = new Map();
-    constructor(languageService, output) {
+    constructor(languageService, output, compilerHost) {
         this.languageService = languageService;
         this.output = output;
+        this.compilerHost = compilerHost;
         this.disposables.push(vscode.workspace.onDidOpenTextDocument((document) => {
             if (this.isEnabledFor(document)) {
                 void this.validate(document);
@@ -67,6 +69,17 @@ export class DiagnosticsController {
         const { uri, version } = document;
         try {
             const diagnostics = await this.languageService.getDiagnostics(document);
+            if (!diagnostics.length && this.compilerHost) {
+                try { await this.compilerHost.compile(document.getText()); }
+                catch (error) {
+                    const symbols = (await this.languageService.getDocumentIndex(document)).topLevelSymbols;
+                    const functions = symbols.filter((symbol) => symbol.kind === 'importFunction' || symbol.kind === 'function');
+                    const range = functions[Number(/function at index (\d+)/.exec(String(error?.message ?? error))?.[1])]?.range
+                        ?? symbols.find((symbol) => symbol.kind === 'global')?.range
+                        ?? { start: document.positionAt(0), end: document.positionAt(Math.max(document.getText().length, 1)) };
+                    diagnostics.push({ range, severity: 'error', source: 'utu', message: error instanceof Error ? error.message : String(error) });
+                }
+            }
             const current = vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === uri.toString());
             if (!current || current.version !== version)
                 return;

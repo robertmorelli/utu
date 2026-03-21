@@ -1,16 +1,17 @@
-import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp/src/core/languageService.js';
 import { UtuParserService } from '../lsp/src/core/parser.js';
+import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
+const { grammarWasmPath, runtimeWasmPath } = await loadEditorTestAssets(repoRoot);
 
 const parserService = new UtuParserService({
-    grammarWasmPath: await readFile(resolve(repoRoot, 'vscode/tree-sitter-utu.wasm')),
-    runtimeWasmPath: await readFile(resolve(repoRoot, 'vscode/web-tree-sitter.wasm')),
+    grammarWasmPath,
+    runtimeWasmPath,
 });
 const languageService = new UtuLanguageService(parserService);
 

@@ -29,11 +29,16 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
         try {
             mod = binaryen.parseText(wat);
             mod.setFeatures(SUPPORTED_WASM_FEATURES);
-            if (!mod.validate()) throw new Error('Binaryen validation failed.');
+            const ensureValid = (message) => {
+                if (mod.validate()) return;
+                try { new WebAssembly.Module(mod.emitBinary()); } catch (error) { throw new Error(error?.message ?? message); }
+                throw new Error(message);
+            };
+            ensureValid('Binaryen validation failed.');
             binaryen.setOptimizeLevel(2);
             binaryen.setShrinkLevel(1);
             mod.optimize();
-            if (!mod.validate()) throw new Error('Binaryen validation failed after optimization.');
+            ensureValid('Binaryen validation failed after optimization.');
             wasm = mod.emitBinary();
             const module = new WebAssembly.Module(wasm);
             try {

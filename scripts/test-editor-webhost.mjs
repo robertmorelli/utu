@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,9 +9,11 @@ import {
 } from '../vscode/src/runMainSupport.js';
 import { createDefaultHostImports } from '../vscode/src/webHostImports.js';
 import { compile } from '../compiler/index.js';
+import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
+const { grammarWasmPath, runtimeWasmPath } = await loadEditorTestAssets(repoRoot);
 
 const cases = [
   ['allows plain exported mains', () => {
@@ -79,8 +81,8 @@ const cases = [
 
     const result = await compile(source, {
       mode: 'bench',
-      runtimeWasmUrl: await readFile(resolve(repoRoot, 'vscode/web-tree-sitter.wasm')),
-      wasmUrl: await readFile(resolve(repoRoot, 'vscode/tree-sitter-utu.wasm')),
+      runtimeWasmUrl: runtimeWasmPath,
+      wasmUrl: grammarWasmPath,
     });
     const module = await importGeneratedModule(result.js);
     const exports = await module.instantiate(createDefaultHostImports((line) => {

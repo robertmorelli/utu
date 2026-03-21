@@ -18,7 +18,7 @@ export function activateUtuExtension(context, options) {
     });
     const languageService = new UtuLanguageService(parserService);
     const workspaceSymbols = createWorkspaceSymbolController(languageService, output);
-    const diagnostics = new DiagnosticsController(languageService, output);
+    const diagnostics = new DiagnosticsController(languageService, output, options.compilerHost);
     const statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem();
     const scheduleMainContextRefresh = createMainContextRefresher(languageService, options.runtimeHost);
     const workspaceWatcher = vscode.workspace.createFileSystemWatcher('**/*.utu');

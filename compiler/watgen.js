@@ -396,7 +396,7 @@ class WatGen {
             case 'not':
                 return value ? 0 : 1;
             case '~':
-                return typeof value === 'bigint' ? ~value : ~value;
+                return ~value;
             default:
                 return null;
         }
@@ -622,7 +622,7 @@ class WatGen {
         switch (literal.kind) {
             case 'int': this.genInt(literal.value, hint, out); return;
             case 'float': this.genFloat(literal.value, hint, out); return;
-            case 'bool': out.push(`i32.const ${literal.value ? 1 : 0}`); return;
+            case 'bool': this.pushConst(literal.value ? 1 : 0, 'i32', out); return;
             case 'null': out.push(`ref.null ${this.nullLiteralTarget(hint)}`); return;
             case 'string': out.push(`global.get $__s${this.internString(literal.value)}`); return;
             default: throw new WatError(`Unknown literal kind: ${literal.kind}`);
@@ -630,15 +630,11 @@ class WatGen {
     }
 
     genInt(value, hint, out) {
-        if (hint === 'f32') return void out.push(`f32.const ${value}`);
-        if (hint === 'f64') return void out.push(`f64.const ${value}`);
-        if (hint === 'i64') return void out.push(`i64.const ${value}`);
-        out.push(`i32.const ${value}`);
+        this.pushConst(value, ['f32', 'f64', 'i64'].includes(hint) ? hint : 'i32', out);
     }
 
     genFloat(value, hint, out) {
-        if (hint === 'f32') return void out.push(`f32.const ${value}`);
-        out.push(`f64.const ${value}`);
+        this.pushConst(value, hint === 'f32' ? 'f32' : 'f64', out);
     }
 
     genIdent(node, out) {
@@ -1185,34 +1181,32 @@ class WatGen {
 
     wasmType(type) {
         if (!type) return 'i32';
-        if (type.kind === 'scalar') return SCALAR_WASM[type.name] || type.name;
+        if (type.kind === 'scalar') return this.scalarWasmType(type.name);
         if (type.kind === 'named') return this.namedWasmType(type.name);
         if (type.kind === 'nullable') return this.nullableWasmType(type.inner);
-        if (type.kind === 'array') {
-            const key = this.elemTypeKey(type.elem);
-            this.requireArrayType(key);
-            return `(ref ${this.arrayTypes.get(key)})`;
-        }
+        if (type.kind === 'array') return this.arrayWasmType(type.elem);
         if (type.kind === 'func_type') return `(ref $func_${this.funcTypeKey(type)})`;
         return ['exclusive', 'multi_return'].includes(type.kind) ? '' : 'i32';
     }
 
+    scalarWasmType(name) { return SCALAR_WASM[name] || name; }
     namedWasmType(name) { return REF_WASM[name] || `(ref $${name})`; }
     nullableWasmType(inner) { return !inner ? 'externref' : inner.kind === 'named' ? NULLABLE_REF_WASM[inner.name] || `(ref null $${inner.name})` : this.wasmType(inner); }
+    arrayWasmType(elemType) {
+        const key = this.elemTypeKey(elemType);
+        this.requireArrayType(key);
+        return `(ref ${this.arrayTypes.get(key)})`;
+    }
     elemKeyWasmType(key) { return SCALAR_WASM[key] || REF_WASM[key] || `(ref $${key})`; }
     watResultList(returnType) { return this.flattenResultTypes(returnType).map(type => `(result ${type})`).join(' '); }
 
     flattenResultTypes(type) {
         if (!type) return [];
 
-        if (type.kind === 'scalar') return [SCALAR_WASM[type.name] || type.name];
+        if (type.kind === 'scalar') return [this.scalarWasmType(type.name)];
         if (type.kind === 'named') return [this.namedWasmType(type.name)];
         if (type.kind === 'nullable') return [this.nullableWasmType(type.inner)];
-        if (type.kind === 'array') {
-            const key = this.elemTypeKey(type.elem);
-            this.requireArrayType(key);
-            return [`(ref ${this.arrayTypes.get(key)})`];
-        }
+        if (type.kind === 'array') return [this.arrayWasmType(type.elem)];
         if (type.kind === 'exclusive') return [this.nullableWasmTypeFor(type.ok), this.nullableWasmTypeFor(type.err)];
         if (type.kind === 'multi_return') return type.components.flatMap(component => this.flattenResultTypes(component));
         return [this.wasmType(type)];
@@ -1221,7 +1215,7 @@ class WatGen {
     nullableWasmTypeFor(type) { return !type ? 'i32' : type.kind === 'named' ? this.nullableWasmType(type) : type.kind === 'nullable' ? this.nullableWasmType(type.inner) : this.wasmType(type); }
     funcTypeKey(type) { return `${type.params.map(param => this.wasmType(param)).join('_')}_to_${this.watResultList(type.returnType).replace(/[() ]/g, '_')}`; }
     returnHint(returnType) { const results = this.flattenResultTypes(returnType); return results.length === 1 ? results[0] : null; }
-    wasmTypeStr(inferredType) { return !inferredType ? null : typeof inferredType === 'string' ? SCALAR_WASM[inferredType] || inferredType : this.wasmType(inferredType); }
+    wasmTypeStr(inferredType) { return !inferredType ? null : typeof inferredType === 'string' ? this.scalarWasmType(inferredType) : this.wasmType(inferredType); }
     valueHint(hint) { return hint === DISCARD_HINT ? null : hint; }
     needsDiscardHint(node) { return ['if_expr', 'match_expr', 'alt_expr', 'block_expr'].includes(node.type); }
     discardedExprLeavesValue(node) { return this.exprProducesValue(node) && !this.needsDiscardHint(node) && node.type !== 'fatal_expr'; }
@@ -1324,7 +1318,7 @@ class WatGen {
         if (patternNode.type === 'int_lit') return void this.genInt(parseIntLit(patternNode.text), hint, out);
         if (patternNode.type === 'float_lit') return void this.genFloat(parseFloat(patternNode.text), hint, out);
         if (node.text === 'true' || node.text === 'false') {
-            out.push(`i32.const ${node.text === 'true' ? 1 : 0}`);
+            this.pushConst(node.text === 'true' ? 1 : 0, 'i32', out);
             return;
         }
         throw new WatError(`Unsupported scalar match pattern: ${node.text}`);
@@ -1336,7 +1330,7 @@ class WatGen {
     refNullTarget(name) { return name === 'str' || name === 'externref' ? 'extern' : `$${name}`; }
     defaultValue(type) {
         if (!type) return 'i32.const 0';
-        if (type.kind === 'scalar') return `${SCALAR_WASM[type.name]}.const 0`;
+        if (type.kind === 'scalar') return this.constInstr(0, this.scalarWasmType(type.name));
         if (type.kind === 'named') return `ref.null ${this.refNullTarget(type.name)}`;
         if (type.kind === 'nullable') return `ref.null ${this.nullableNullTarget(type.inner)}`;
         return 'i32.const 0';
@@ -1349,6 +1343,8 @@ class WatGen {
     }
 
     nullableNullTarget(inner) { return inner?.kind === 'named' ? this.refNullTarget(inner.name) : 'none'; }
+    constInstr(value, wasmType) { return `${wasmType}.const ${value}`; }
+    pushConst(value, wasmType, out) { out.push(this.constInstr(value, wasmType)); }
     genExprInline(node, hint) { const out = []; this.genExpr(node, hint, out); return out.join(' '); }
     inferNsCallType({ ns, method }, args) {
         if (ns === 'str') {

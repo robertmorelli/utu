@@ -11,7 +11,7 @@ const cases = [
     ['tests-scalar-match', ['test', 'examples/ci/codegen_scalar_match.utu'], 0, 'PASS float match can take a specific arm'],
     ['tests-alt-fallback', ['test', 'examples/ci/codegen_alt_fallback.utu'], 0, 'PASS alt fallback can bind and forward the unmatched value'],
     ['tests-fail', ['test', 'examples/ci/tests_fail.utu'], 1, 'FAIL fails'],
-    ['compile-bad-return-type', ['compile', 'scripts/fixtures/compile_bad_return_type.utu'], 1, 'Binaryen validation failed'],
+    ['compile-bad-return-type', ['compile', 'scripts/fixtures/compile_bad_return_type.utu'], 1, 'function at index 0'],
     ['compile-bad-call-args', ['compile', 'scripts/fixtures/compile_bad_call_args.utu'], 1, 'call param types must match'],
     ['compile-nullability-mismatch', ['compile', 'scripts/fixtures/compile_nullability_mismatch.utu'], 1, 'function body type must match'],
     ['compile-illegal-global-init', ['compile', 'scripts/fixtures/compile_illegal_global_init.utu'], 1, 'global init must be constant'],
