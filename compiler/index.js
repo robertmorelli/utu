@@ -6,36 +6,22 @@ import { throwOnParseErrors } from './tree.js';
 
 let parser = null;
 
-export async function init(config = {}) {
+export async function init({ wasmUrl } = {}) {
     if (parser) return;
     await Parser.init();
-
-    const next = new Parser();
-    const url = config.wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url);
-    next.setLanguage(await Language.load(url));
-    parser = next;
+    parser = new Parser();
+    parser.setLanguage(await Language.load(wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url)));
 }
 
-export async function compile(source, options = {}) {
-    const { wat: emitWat = false, optimize = true, wasmUrl } = options;
+export async function compile(source, { wat: emitWat = false, optimize = true, wasmUrl } = {}) {
     if (!parser) await init({ wasmUrl });
-
     const tree = parser.parse(source);
     throwOnParseErrors(tree.rootNode);
-
-    const wat = watgen(tree);
-    const mod = binaryen.parseText(wat);
+    const wat = watgen(tree), mod = binaryen.parseText(wat);
     mod.setFeatures(binaryen.Features.All);
-
-    if (optimize) {
-        binaryen.setOptimizeLevel(2);
-        binaryen.setShrinkLevel(1);
-        mod.optimize();
-    }
-
+    if (optimize) { binaryen.setOptimizeLevel(2); binaryen.setShrinkLevel(1); mod.optimize(); }
     const wasm = mod.emitBinary();
     mod.dispose();
-
     const js = jsgen(tree, wasm);
     return emitWat ? { js, wat, wasm } : { js, wasm };
 }
