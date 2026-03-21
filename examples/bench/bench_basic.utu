@@ -1,0 +1,8 @@
+bench "sum loop" |i| {
+    setup {
+        let total: i32 = 0
+        measure {
+            total = total + i
+        }
+    }
+}

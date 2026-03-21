@@ -30,6 +30,13 @@
       "tags": ["smoke"]
     },
     {
+      "name": "ci-assert-pass",
+      "path": "examples/ci/assert_pass.utu",
+      "mode": "run",
+      "expectedLogs": ["ok"],
+      "tags": ["smoke"]
+    },
+    {
       "name": "benchmark-call-simple",
       "path": "examples/call_simple.utu",
       "mode": "run",
