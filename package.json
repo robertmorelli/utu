@@ -8,9 +8,10 @@
     "distribute": "cp tree-sitter-utu.wasm vscode/ && cp tree-sitter-utu.wasm web_artifact/ && mv tree-sitter-utu.wasm cli_artifact/",
     "docs": "bun scripts/build-docs.mjs",
     "build": "bun run grammar && bun run bundle && bun run distribute && bun run docs",
-    "test": "bun run test:examples",
+    "test": "bun run test:examples && bun run test:language",
     "test:examples": "bun scripts/test-examples.mjs --tag smoke",
-    "test:examples:all": "bun scripts/test-examples.mjs"
+    "test:examples:all": "bun scripts/test-examples.mjs",
+    "test:language": "bun scripts/test-language.mjs"
   },
   "devDependencies": {
     "tree-sitter-cli": "^0.26.7",
