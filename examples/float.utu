@@ -1,0 +1,59 @@
+import extern "es" console_log(str)
+import extern "es" f64_to_string(f64) str
+import extern "es" math_sin(f64) f64
+import extern "es" math_cos(f64) f64
+import extern "es" math_sqrt(f64) f64
+
+struct Point {
+    mut x: f64,
+    mut y: f64,
+    mut z: f64,
+}
+
+let points: i64 = 200000
+
+fn new_point(i: f64) Point {
+    let x: f64 = math_sin(i)
+    Point {
+        x: x,
+        y: math_cos(i) * 3.0,
+        z: (x * x) / 2.0,
+    }
+}
+
+fn normalize(point: Point) Point {
+    let norm: f64 = math_sqrt(point.x * point.x + point.y * point.y + point.z * point.z)
+    point.x = point.x / norm
+    point.y = point.y / norm
+    point.z = point.z / norm
+    point
+}
+
+fn maximize_point(left: Point, right: Point) Point {
+    left.x = if left.x > right.x { left.x } else { right.x }
+    left.y = if left.y > right.y { left.y } else { right.y }
+    left.z = if left.z > right.z { left.z } else { right.z }
+    left
+}
+
+fn benchmark(n: i64) Point {
+    let points: array[Point] = array[Point].new_default(n)
+    for (0..n) |i| {
+        points[i] = new_point(i)
+    }
+
+    for (0..n) |i| {
+        points[i] = normalize(points[i])
+    }
+
+    let best: Point = points[0]
+    for (1..n) |i| {
+        best = maximize_point(best, points[i])
+    }
+    best
+}
+
+export fn main() {
+    let best: Point = benchmark(points)
+    best.x -o f64_to_string(_) -o console_log
+}

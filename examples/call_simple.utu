@@ -1,0 +1,134 @@
+import extern "es" console_log(str)
+
+fn qux() i64 {
+    0
+}
+
+fn quux(a: i64) i64 {
+    let sink: i64 = 0
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink = sink + qux()
+    sink + a
+}
+
+fn baz(a: i64, b: i64) i64 {
+    let sink: i64 = 0
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink = sink + quux(a)
+    sink + b
+}
+
+fn bar(a: i64, b: i64, c: i64) i64 {
+    let sink: i64 = 0
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink = sink + baz(a, b)
+    sink + c
+}
+
+fn foo(a: i64, b: i64, c: i64, d: i64) i64 {
+    let sink: i64 = 0
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink = sink + bar(a, b, c)
+    sink + d
+}
+
+fn test_calls() i64 {
+    let sink: i64 = 0
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink = sink + foo(1, 2, 3, 4)
+    sink
+}
+
+export fn main() {
+    test_calls() -o console_log
+}

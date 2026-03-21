@@ -1,0 +1,68 @@
+import extern "es" console_log(str)
+import extern "es" f64_to_string(f64) str
+import extern "es" math_sqrt(f64) f64
+
+let default_n: i64 = 130
+
+fn eval_a(i: f64, j: f64) f64 {
+    1.0 / (((i + j) * (i + j + 1.0) / 2.0) + i + 1.0)
+}
+
+fn part_a_times_u(i: i64, u: array[f64]) f64 {
+    let partial_sum: f64 = 0.0
+    for (0..array.len(u)) |j| {
+        partial_sum = partial_sum + eval_a(i, j) * u[j]
+    }
+    partial_sum
+}
+
+fn part_at_times_u(i: i64, u: array[f64]) f64 {
+    let partial_sum: f64 = 0.0
+    for (0..array.len(u)) |j| {
+        partial_sum = partial_sum + eval_a(j, i) * u[j]
+    }
+    partial_sum
+}
+
+fn eval_a_times_u(u: array[f64]) array[f64] {
+    let out: array[f64] = array[f64].new(array.len(u), 0.0)
+    for (0..array.len(u)) |i| {
+        out[i] = part_a_times_u(i, u)
+    }
+    out
+}
+
+fn eval_at_times_u(u: array[f64]) array[f64] {
+    let out: array[f64] = array[f64].new(array.len(u), 0.0)
+    for (0..array.len(u)) |i| {
+        out[i] = part_at_times_u(i, u)
+    }
+    out
+}
+
+fn eval_ata_times_u(u: array[f64]) array[f64] {
+    let tmp: array[f64] = eval_a_times_u(u)
+    eval_at_times_u(tmp)
+}
+
+fn spectral_norm(n: i64) f64 {
+    let u: array[f64] = array[f64].new(n, 1.0)
+    let v: array[f64] = array[f64].new(n, 0.0)
+
+    for (0..10) |dummy| {
+        v = eval_ata_times_u(u)
+        u = eval_ata_times_u(v)
+    }
+
+    let vbv: f64 = 0.0
+    let vv: f64 = 0.0
+    for (0..n) |i| {
+        vbv = vbv + u[i] * v[i]
+        vv = vv + v[i] * v[i]
+    }
+    math_sqrt(vbv / vv)
+}
+
+export fn main() {
+    spectral_norm(default_n) -o f64_to_string(_) -o console_log
+}

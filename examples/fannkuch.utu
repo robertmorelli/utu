@@ -1,0 +1,84 @@
+import extern "es" console_log(str)
+import extern "es" i64_to_string(i64) str
+
+let default_arg: i64 = 9
+
+fn fannkuch(n: i64) i64 {
+    let count: array[i64] = array[i64].new(n, 0)
+    let perm1: array[i64] = array[i64].new(n, 0)
+    let perm: array[i64] = array[i64].new(n, 0)
+    let perm0: array[i64] = array[i64].new(n, 0)
+
+    for (0..n) |i| {
+        count[i] = i + 1
+        perm1[i] = i
+        perm[i] = i
+    }
+
+    let max_flips: i64 = 0
+    let m: i64 = n - 1
+    let r: i64 = n
+
+    for () {
+        for (r != 1) {
+            count[r - 1] = r
+            r = r - 1
+        }
+
+        if perm1[0] != 0 and perm1[m] != m {
+            for (0..n) |i| {
+                perm[i] = perm1[i]
+            }
+
+            let flips_count: i64 = 0
+            let k: i64 = perm[0]
+
+            for (k != 0) {
+                let i: i64 = k
+                for (i >= 0) {
+                    perm0[i] = perm[k - i]
+                    i = i - 1
+                }
+
+                i = k
+                for (i >= 0) {
+                    perm[i] = perm0[i]
+                    i = i - 1
+                }
+
+                flips_count = flips_count + 1
+                k = perm[0]
+            }
+
+            if flips_count > max_flips {
+                max_flips = flips_count
+            }
+        }
+
+        if r == n {
+            break max_flips
+        }
+
+        for () {
+            let first: i64 = perm1[0]
+            let i: i64 = 1
+            for (i <= r) {
+                perm1[i - 1] = perm1[i]
+                i = i + 1
+            }
+            perm1[r] = first
+            count[r] = count[r] - 1
+            if count[r] > 0 {
+                break
+            }
+            r = r + 1
+            if r == n {
+                break
+            }
+        }
+    }
+}
+
+export fn main() {
+    fannkuch(default_arg) -o i64_to_string(_) -o console_log
+}
