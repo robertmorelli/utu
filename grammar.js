@@ -260,6 +260,7 @@ module.exports = grammar({
       $.ref_null_expr,
       $.if_expr,
       $.match_expr,
+      $.alt_expr,
       $.block_expr,
       $.for_expr,
       $.break_expr,
@@ -267,7 +268,7 @@ module.exports = grammar({
       $.struct_init,
       $.array_init,
       $.assign_expr,
-      alias('unreachable', $.unreachable_expr),
+      alias('fatal', $.fatal_expr),
     ),
 
     paren_expr: $ => seq('(', $._expr, ')'),
@@ -393,7 +394,7 @@ module.exports = grammar({
       optional(seq('else', choice($.if_expr, $.block))),
     )),
 
-    // --- Match expression ---
+    // --- Scalar match expression ---
 
     match_expr: $ => seq(
       'match',
@@ -404,16 +405,35 @@ module.exports = grammar({
     ),
 
     // Arms:
+    //   0 => expr,
+    //   true => expr,
+    //   _ => expr,
+    match_arm: $ => seq(
+      choice('_', $.match_lit),
+      '=>',
+      $._expr,
+      ',',
+    ),
+
+    // --- Type / variant dispatch ---
+
+    alt_expr: $ => seq(
+      'alt',
+      $._expr,
+      '{',
+      repeat1($.alt_arm),
+      '}',
+    ),
+
+    // Arms:
     //   name: TypeName => expr,   (type cast binding)
     //   _: TypeName => expr,      (type test, discard)
     //   name => expr,             (catch-all with binding)
     //   _ => expr,                (wildcard)
-    match_arm: $ => choice(
-      seq($.match_pattern, ':', $.type_ident, '=>', $._expr, ','),
-      seq($.match_pattern, '=>', $._expr, ','),
+    alt_arm: $ => choice(
+      seq(choice('_', $.identifier), ':', $.type_ident, '=>', $._expr, ','),
+      seq(choice('_', $.identifier), '=>', $._expr, ','),
     ),
-
-    match_pattern: $ => choice('_', $.identifier),
 
     // --- For loop ---
 
@@ -513,6 +533,13 @@ module.exports = grammar({
       'true',
       'false',
       'null',
+    ),
+
+    match_lit: $ => choice(
+      $.int_lit,
+      $.float_lit,
+      alias('true', $.bool_lit),
+      alias('false', $.bool_lit),
     ),
 
     // Integer literals: decimal, hex, binary

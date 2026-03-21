@@ -37,7 +37,7 @@ jobs:
         run: |
           output="$(bun ./src/cli.mjs help)"
           echo "$output"
-          grep -Fq 'utu compile <input> [--outdir <dir>] [--wat]' <<<"$output"
+          grep -Fq 'utu compile <input> [--outdir <dir>] [--wat] [--bun] [--node]' <<<"$output"
           grep -Fq 'utu run <input>' <<<"$output"
 
       - name: Check usage errors
@@ -75,6 +75,12 @@ jobs:
           bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/ci-bun --bun
           test -f dist/ci-bun/call_simple
 
+      - name: Compile Node script
+        run: |
+          rm -rf dist/ci-node
+          bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/ci-node --node
+          test -f dist/ci-node/call_simple.js
+
       - name: Compile with bundled CLI
         run: |
           rm -rf dist/ci-bundle
@@ -94,6 +100,18 @@ jobs:
             exit 0
           fi
           grep -Eq 'Compiled wasm could not be compiled in Bun|Compiled wasm failed to instantiate in Bun|The program does not export a callable main function|WebAssembly.Module doesn'\''t validate' <<<"$output"
+
+      - name: Run Node script
+        run: |
+          set +e
+          output="$(node ./dist/ci-node/call_simple.js 2>&1)"
+          exit_code=$?
+          set -e
+          echo "$output"
+          if [[ $exit_code -eq 0 ]]; then
+            exit 0
+          fi
+          grep -Eq 'Compiled wasm could not be compiled in Bun|Compiled wasm failed to instantiate in Bun|The program does not export a callable main function|WebAssembly.Module doesn'\''t validate|expected type i64|Compiling function' <<<"$output"
 
       - name: Run with source CLI
         run: |

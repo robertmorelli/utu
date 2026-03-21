@@ -143,21 +143,31 @@ fn divide(a: i32, b: i32) i32 # DivError
 // Contract: exactly one result is non-null
 ```
 
-For imports from JS that may throw, the compiler wraps the call in `try`/`catch`. On success, returns `(value, null)`. On catch, attempts to cast the exception to the declared error type. If the cast fails, the exception is rethrown.
+The current compiler also accepts `A # B` on import signatures. The Wasm import
+surface is still a direct multi-value signature, but the generated JS wrapper
+now catches throws for nullable-compatible result shapes and substitutes null
+placeholders. `T # null` imports receive `null`; reference-shaped `T # E`
+imports currently receive `[null, null]`. That keeps nullable fallback working
+today, but it does not yet construct a typed error value. Structured JS-to-Utu
+error mapping is still a planned feature.
 
 ```
-// Catches any throw, returns null on error
+// Thrown JS exceptions become null in the generated JS wrapper
 import extern "es" fetch(str) Response # null
 
-// Catches and types the error
+// Thrown JS exceptions currently become [null, null] here
 import extern "es" fetch(str) Response # ApiError
 
-// Call site — same pattern for both:
+// Call site — nullable fallback and null checks work today:
 let resp: Response # null, err: ApiError # null = fetch(url)
-if err {
-    // handle error
+if not ref.is_null(err) {
+    // host-provided typed error path
 } else {
-    // resp is non-null here
+    if ref.is_null(resp) {
+        // temporary JS-throw placeholder path
+    } else {
+        // resp is non-null here
+    }
 }
 ```
 
@@ -171,35 +181,31 @@ T # null    // nullable T — maps to (ref null $T)
 
 This means nullable is not a special language feature — it falls out naturally from `#`.
 
-#### 2.6.2 Force Unwrap and Default Values
-
-The `\` (else) operator provides fallback handling for nullable values and `#` returns. It evaluates the left side; if the result is null, it evaluates the right side instead.
+#### 2.6.2 Force Unwrap And Default Fallback
 
 ```
 // Force unwrap — trap if null (\ unreachable)
 let val: Thing = get_thing() \ unreachable
 
-// Default value — use fallback if null
-let val: Thing = get_thing() \ default_value
+// Nullable fallback
+let cached: Response = fetch(url) \ default_response
 
-// Chained with function calls
-let name: str = lookup(id) \ "anonymous"
-
-// Works with # returns too — take the success or trap
+// Nullable import + force unwrap
 let resp: Response = fetch(url) \ unreachable
-
-// Take the success or use a default
-let resp: Response = fetch(url) \ cached_response
 ```
 
-The `\` operator lowers to a null check + branch:
+Both forms are implemented for nullable references:
+
+- `expr \ unreachable` -> evaluate `expr`, then apply `ref.as_non_null`
+- `expr \ fallback` -> evaluate `expr`, keep the non-null branch, otherwise
+  evaluate `fallback`
+
+The force-unwrap form lowers directly:
 
 ```wasm
-;; val = expr \ fallback
-(block $ok (result (ref $T))
-    (br_on_non_null $ok (call $expr))
-    ;; null path:
-    (local.get $fallback))  ;; or (unreachable)
+;; val = expr \ unreachable
+(call $expr)
+ref.as_non_null
 ```
 
 ### 2.7 Multi-Value Return (Tensor Product)
@@ -365,11 +371,6 @@ for (0..n) |i| {
     sum = sum + i
 }
 
-// Multiple ranges / counters
-for (0..width, 0..height) |x, y| {
-    draw_pixel(x, y)
-}
-
 // While-style loop (condition only, no capture)
 for (cond()) {
     body()
@@ -380,6 +381,10 @@ for () {
     if done() { break }
 }
 ```
+
+The parser accepts comma-separated sources and captures, but current lowering
+only uses the first source/capture pair. The documented loop surface therefore
+sticks to the single-range form that the compiler emits today.
 
 **Wasm lowering:** `for (0..n) |i| { ... }` lowers to:
 
@@ -412,19 +417,12 @@ let result: i32 = compute: {
 //     (call $expensive_calculation))
 ```
 
-### 5.4 Switch / Match
+### 5.4 Match
 
-Pattern matching on scalars uses `br_table`. Pattern matching on sum types uses `br_on_cast` chains with an `unreachable` trap for non-exhaustive matches.
+Current compiler support focuses on sum-type matches. They use `br_on_cast`
+chains with an `unreachable` trap for non-exhaustive matches.
 
 ```
-// Scalar switch -> br_table
-match opcode {
-    0 => handle_nop(),
-    1 => handle_add(),
-    2 => handle_sub(),
-    _ => unreachable,
-}
-
 // Type switch -> br_on_cast chain
 match shape {
     s: Circle => area_circle(s),
@@ -543,17 +541,17 @@ let q: i32, r: i32 = divmod(10, 3)
 // Simple import (void return — no return type)
 import extern "es" console_log(str)
 
-// Import with error handling (# null: catch-all)
+// Nullable return import
 import extern "es" fetch(str) Response # null
 
-// Import with typed error (# T: cast or rethrow)
+// Direct two-result import signature
 import extern "es" fetch(str) Response # ApiError
 
 // Import a value
 import extern "es" document: externref
 ```
 
-Note: String builtins (`str.length`, `str.concat`, etc.) are auto-imported from `"wasm:js-string"` and do not require import declarations.
+Note: String builtins (`str.length`, `str.concat`, etc.) are auto-imported from `"wasm:js-string"` and do not require import declarations. The generated JS wrapper currently catches throws from nullable-compatible imports and substitutes null placeholders. Structured typed error translation for `T # E` imports is still planned.
 
 ### 7.2 Wasm Exports
 
@@ -567,7 +565,7 @@ export fn main() {
 
 ## 8. Polymorphic Dispatch
 
-Dynamic dispatch uses `br_on_cast` for type-based dispatch and `call_indirect` / `call_ref` for function reference dispatch. There is no vtable built into the language — dispatch is explicit.
+Dynamic dispatch uses `br_on_cast` for type-based dispatch and `call_ref` for function reference dispatch. There is no vtable built into the language — dispatch is explicit.
 
 ```
 // Type-based dispatch (br_on_cast chain)
@@ -589,7 +587,9 @@ handlers[event.kind](event)  // call_ref with array.get
 
 ## 9. Builtin Operations
 
-All Wasm GC and numeric instructions are exposed as builtins. These are not library functions — the compiler emits the corresponding Wasm instruction directly.
+Builtin operations are not library functions — the compiler emits the
+corresponding Wasm instruction directly where the current implementation
+supports that source form.
 
 ### 9.1 Struct Operations
 
@@ -606,7 +606,6 @@ All Wasm GC and numeric instructions are exposed as builtins. These are not libr
 | `array[T].new(len, init)` | `array.new $T` |
 | `array[T].new_fixed(vals...)` | `array.new_fixed $T N` |
 | `array[T].new_default(len)` | `array.new_default $T` |
-| `array[T].new_data(data, off, len)` | `array.new_data $T $data` |
 | `arr[i]` | `array.get $T` |
 | `arr[i] = val` | `array.set $T` |
 | `array.len(arr)` | `array.len` |
@@ -620,8 +619,6 @@ All Wasm GC and numeric instructions are exposed as builtins. These are not libr
 | `ref.null T` | `ref.null $T` |
 | `ref.is_null(val)` | `ref.is_null` |
 | `ref.as_non_null(val)` | `ref.as_non_null` |
-| `ref.cast<T>(val)` | `ref.cast (ref $T)` |
-| `ref.test<T>(val)` | `ref.test (ref $T)` |
 | `ref.eq(a, b)` | `ref.eq` |
 | `i31.new(val)` | `ref.i31` |
 | `i31.get_s(val)` | `i31.get_s` |
@@ -631,7 +628,8 @@ All Wasm GC and numeric instructions are exposed as builtins. These are not libr
 
 ### 9.4 Numeric Operations
 
-Standard Wasm numeric instructions are available as infix operators and builtins:
+Standard Wasm numeric instructions are currently exposed through infix
+operators:
 
 | Category | Operations |
 |----------|-----------|
@@ -639,9 +637,7 @@ Standard Wasm numeric instructions are available as infix operators and builtins
 | Bitwise | `& (and)  \| (or)  ^ (xor)  << (shl)  >> (shr_s)  >>> (shr_u)` |
 | Unary | `- (negate)  not (logical not)  ~ (bitwise invert)` |
 | Comparison | `==  !=  <  >  <=  >=` |
-| Conversion | `i32.wrap(i64)`, `i64.extend(i32)`, `f32.convert(i32)`, etc. |
-| Math | `f32.sqrt`, `f64.ceil`, `f64.floor`, `f64.trunc`, `f64.nearest` |
-| SIMD | `v128.*` (all SIMD instructions as builtins) |
+| Helpers not yet implemented | `i32.wrap(i64)`, `f64.sqrt(...)`, `v128.*`, and similar numeric namespace builtins |
 
 **Operator clarity:** Each symbol has exactly one meaning. `#` is exclusive disjunction (type-level only). `%` is always remainder. `^` is always bitwise XOR. `~` is always bitwise NOT (unary only).
 
@@ -656,36 +652,26 @@ Complete list of Wasm instructions the compiler must emit. Organized by category
 | Instruction | Used For |
 |-------------|---------|
 | `block` | Labeled blocks, block-with-return |
-| `loop` | For loops, while loops |
+| `loop` | Counted, condition, and infinite `for` loops |
 | `if / else` | Conditionals |
 | `br` | Break from block/loop |
 | `br_if` | Conditional break |
-| `br_table` | Scalar switch/match |
-| `br_on_null` | Null check branching, `\` operator |
-| `br_on_non_null` | Non-null check branching, `\` operator |
 | `br_on_cast` | Type-based pattern matching |
-| `br_on_cast_fail` | Inverse type check |
 | `call` | Direct function call |
 | `call_ref` | Function reference call |
-| `call_indirect` | Table-based dispatch |
-| `return` | Early return |
 | `unreachable` | Trap / exhaustive match fallthrough / force unwrap |
-| `nop` | No operation |
-| `try / catch / catch_all` | JS import error wrapping (# operator) |
-| `throw_ref` | Rethrow on failed error cast |
 
 ### 10.2 GC Instructions
 
 | Instruction | Used For |
 |-------------|---------|
 | `struct.new` | Struct allocation |
-| `struct.get / struct.get_s / struct.get_u` | Field access |
+| `struct.get` | Field access |
 | `struct.set` | Field mutation (mut fields only) |
 | `array.new` | Array allocation (with default) |
 | `array.new_fixed` | Array allocation (from values) |
 | `array.new_default` | Array allocation (zero-init) |
-| `array.new_data` | Array from data segment |
-| `array.get / array.get_s / array.get_u` | Array element access |
+| `array.get` | Array element access |
 | `array.set` | Array element mutation |
 | `array.len` | Array length |
 | `array.copy` | Array bulk copy |
@@ -693,8 +679,6 @@ Complete list of Wasm instructions the compiler must emit. Organized by category
 | `ref.null` | Null reference literal |
 | `ref.is_null` | Null check |
 | `ref.as_non_null` | Assert non-null (trap on null) |
-| `ref.cast` | Downcast (trap on fail) |
-| `ref.test` | Type test (returns i32) |
 | `ref.eq` | Reference equality |
 | `ref.i31` | Box i32 to i31ref |
 | `i31.get_s / i31.get_u` | Unbox i31ref |
@@ -707,22 +691,12 @@ Complete list of Wasm instructions the compiler must emit. Organized by category
 |-------------|---------|
 | `local.get` | Read local variable |
 | `local.set` | Write local variable |
-| `local.tee` | Write and keep on stack |
 | `global.get` | Read global |
 | `global.set` | Write mutable global |
 
 ### 10.4 Numeric Instructions
 
-All standard Wasm numeric instructions for i32, i64, f32, f64 arithmetic, comparison, and conversion. Plus v128 SIMD instructions when targeting platforms with SIMD support.
-
-### 10.5 Table Instructions
-
-| Instruction | Used For |
-|-------------|---------|
-| `table.get` | Read function reference from table |
-| `table.set` | Write function reference to table |
-| `table.grow` | Grow function table |
-| `table.size` | Query table size |
+The current compiler uses the standard numeric instructions behind the source operators for i32, i64, f32, and f64.
 
 ---
 
@@ -735,7 +709,7 @@ EBNF-style grammar for Utu. Whitespace is insignificant except inside string lit
 ```ebnf
 program      ::= item*
 item         ::= import_decl | export_decl | fn_decl | type_decl
-               | struct_decl | global_decl
+               | struct_decl | global_decl | test_decl | bench_decl
 ```
 
 ### 11.2 Declarations
@@ -756,9 +730,14 @@ return_type  ::= type ('#' type)? (',' type ('#' type)?)*
 
 global_decl  ::= 'let' IDENT ':' type '=' expr
 
-import_decl  ::= 'import' 'extern' STRING IDENT '(' param_list ')'
-                  return_type?
+import_decl  ::= 'import' 'extern' STRING
+                  ( IDENT '(' import_param_list? ')' return_type?
+                  | IDENT ':' type )
+import_param_list ::= import_param (',' import_param)* ','?
+import_param ::= param | type
 export_decl  ::= 'export' fn_decl
+test_decl    ::= 'test' STRING block
+bench_decl   ::= 'bench' STRING '|' IDENT '|' '{' setup_decl '}'
 ```
 
 ### 11.3 Types
@@ -783,20 +762,24 @@ type_list    ::= (type (',' type)*)?
 
 ```ebnf
 expr         ::= literal | IDENT | unary_expr | binary_expr
-             |   call_expr | pipe_expr | field_expr
+             |   call_expr | tuple_expr | pipe_expr | field_expr
              |   index_expr | if_expr | match_expr
              |   block_expr | for_expr | break_expr
              |   assign_expr | bind_expr | else_expr
              |   struct_init | array_init
+             |   namespace_call_expr | ref_null_expr
              |   'unreachable' | '(' expr ')'
 
 bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
 
 else_expr    ::= expr '\' expr
 
+tuple_expr   ::= expr ',' expr
+
 pipe_expr    ::= expr '-o' pipe_target
-pipe_target  ::= IDENT
-             |   IDENT '(' pipe_args ')'
+pipe_target  ::= pipe_path
+             |   pipe_path '(' pipe_args ')'
+pipe_path    ::= IDENT | BUILTIN_NS | pipe_path '.' IDENT
 pipe_args    ::= pipe_arg (',' pipe_arg)*
 pipe_arg     ::= '_' | expr
 
@@ -806,12 +789,14 @@ arg_list     ::= (expr (',' expr)* ','?)?
 field_expr   ::= expr '.' IDENT
 index_expr   ::= expr '[' expr ']'
 
+namespace_call_expr ::= BUILTIN_NS '.' IDENT ('(' arg_list? ')')?
+ref_null_expr ::= 'ref' '.' 'null' TYPE_IDENT
+
 if_expr      ::= 'if' expr block ('else' (if_expr | block))?
 
 match_expr   ::= 'match' expr '{' match_arm+ '}'
-match_arm    ::= pattern '=>' expr ','
-             |   IDENT ':' TYPE_IDENT '=>' expr ','
-             |   '_' '=>' expr ','
+match_arm    ::= pattern ':' TYPE_IDENT '=>' expr ','
+             |   pattern '=>' expr ','
 pattern      ::= IDENT | '_'
 
 for_expr     ::= 'for' '(' for_sources ')' capture? block
@@ -819,14 +804,19 @@ for_sources  ::= for_source (',' for_source)*
 for_source   ::= expr '..' expr | expr
 capture      ::= '|' IDENT (',' IDENT)* '|'
 
-block_expr   ::= (IDENT ':')? '{' stmt* expr? '}'
+block_expr   ::= (IDENT ':')? block
+block        ::= '{' expr* '}'
 break_expr   ::= 'break' IDENT? expr?
 
 struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
 
-assign_expr  ::= (field_expr | index_expr) '=' expr
+assign_expr  ::= (IDENT | field_expr | index_expr) '=' expr
 ```
+
+The parser accepts comma-separated `for` sources and captures, but current
+lowering only uses the first source/capture pair. Literal scalar switch arms
+such as `0 => ...` are not part of the current `match_pattern` grammar.
 
 ### 11.5 Operators
 
@@ -884,6 +874,9 @@ LABEL        ::= IDENT
 
 ```ebnf
 COMMENT      ::= '//' <characters> NEWLINE
+BUILTIN_NS   ::= 'str' | 'array' | 'i31' | 'ref'
+              |   'extern' | 'any'
+              |   'i32' | 'i64' | 'f32' | 'f64'
 ```
 
 Line comments only. No block comments.
@@ -894,7 +887,7 @@ Line comments only. No block comments.
 
 ### 12.1 Pipeline
 
-Source → Parse → Typecheck → Lower to WAT → wasm-opt → .wasm binary. The compiler is intentionally simple: no monomorphization, no borrow checking, no complex optimization passes. The philosophy is to do minimal work in the compiler and let the Wasm engine's optimizing tiers (Turbofan, IonMonkey) handle the rest.
+Source -> Parse -> parse-error validation -> Lower to WAT -> Binaryen parse and optional optimize -> .wasm binary. The compiler is intentionally simple: no monomorphization, no borrow checking, no complex optimization passes. The philosophy is to do minimal work in the compiler and let the Wasm engine's optimizing tiers handle the rest.
 
 ### 12.2 Type Lowering
 
@@ -927,16 +920,14 @@ This applies to all multi-value returns including `,` (tensor product) and `#` (
 
 ### 12.5 Error Lowering
 
-A function with return type `A # B` is emitted with signature `(result (ref null $A) (ref null $B))`. For extern imports, the compiler wraps the import in a trampoline that uses `try`/`catch` from Wasm EH. On success: push value, push `ref.null`. On catch: attempt `ref.cast` to `$B`; if cast fails, `throw_ref` to rethrow. If `B` is `null`, the catch branch is `catch_all` and returns `(ref.null, i32.const 1)` or similar sentinel.
+A function with return type `A # B` is emitted with signature `(result (ref null $A) (ref null $B))`. Extern imports still use that same declared Wasm signature directly. In the generated JS wrapper, throws from nullable-compatible imports are currently coerced to null placeholders instead of a structured typed error branch.
 
 ### 12.6 Else Operator Lowering
 
-The `\` operator lowers to `br_on_non_null` / `br_on_null` patterns:
+The `\` operator now lowers for nullable references in two ways:
 
-- `expr \ fallback` → check if expr is null; if yes, evaluate fallback
-- `expr \ unreachable` → check if expr is null; if yes, trap
-
-For `#` returns, the compiler first extracts the success value (which is nullable), then applies the `\` logic.
+- `expr \ unreachable` -> evaluate `expr`, then apply `ref.as_non_null`
+- `expr \ fallback` -> evaluate `expr`, branch through `br_on_non_null` when a value is present, otherwise evaluate `fallback`
 
 ---
 
@@ -999,12 +990,9 @@ export fn main() {
 
     let active: i32 = count(todos, Active {})
 
-    // Error handling with \ (else)
-    let resp: str = fetch("/api/sync") \ "offline"
-    resp -o console_log
-
-    // Force unwrap — trap if null
+    // Nullable import + force unwrap
     let data: str = fetch("/api/data") \ unreachable
+    data -o console_log
 
     // Piped string concat
     "hello"
