@@ -1,0 +1,116 @@
+{
+  "name": "utu-vscode",
+  "displayName": "UTU",
+  "description": "VS Code language support and compiler tooling for UTU.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "local-dev",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "utu",
+    "wasm",
+    "tree-sitter"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:utu",
+    "onCommand:utu.compileCurrentFile",
+    "onCommand:utu.showGeneratedJavaScript",
+    "onCommand:utu.showGeneratedWat",
+    "onCommand:utu.showSyntaxTree"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "utu",
+        "aliases": [
+          "UTU",
+          "utu"
+        ],
+        "extensions": [
+          ".utu"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "utu",
+        "scopeName": "source.utu",
+        "path": "./syntaxes/utu.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "utu.compileCurrentFile",
+        "title": "UTU: Compile Current File",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.showGeneratedJavaScript",
+        "title": "UTU: Show Generated JavaScript",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.showGeneratedWat",
+        "title": "UTU: Show Generated WAT",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.showSyntaxTree",
+        "title": "UTU: Show Syntax Tree",
+        "category": "UTU"
+      }
+    ],
+    "configuration": {
+      "title": "UTU",
+      "properties": {
+        "utu.validation.mode": {
+          "type": "string",
+          "enum": [
+            "onType",
+            "onSave",
+            "off"
+          ],
+          "default": "onType",
+          "markdownDescription": "Controls when UTU syntax diagnostics run."
+        },
+        "utu.compiler.optimize": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable Binaryen optimization when running UTU compile commands."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "watch": "node ./scripts/build.mjs --watch",
+    "check": "tsc -p . --noEmit",
+    "vscode:prepublish": "npm run build"
+  },
+  "files": [
+    "dist",
+    "syntaxes",
+    "language-configuration.json",
+    "README.md",
+    "CHANGELOG.md",
+    "tree-sitter-utu.wasm"
+  ],
+  "dependencies": {
+    "binaryen": "^125.0.0",
+    "web-tree-sitter": "^0.26.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/vscode": "^1.96.0",
+    "esbuild": "^0.27.4",
+    "typescript": "^5.9.3"
+  }
+}

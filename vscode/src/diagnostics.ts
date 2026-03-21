@@ -1,0 +1,116 @@
+import * as vscode from 'vscode';
+import { UtuParserService } from './parserService';
+
+type ValidationMode = 'onType' | 'onSave' | 'off';
+
+export class DiagnosticsController implements vscode.Disposable {
+  private readonly collection = vscode.languages.createDiagnosticCollection('utu');
+  private readonly disposables: vscode.Disposable[] = [this.collection];
+  private readonly pending = new Map<string, NodeJS.Timeout>();
+
+  constructor(
+    private readonly parserService: UtuParserService,
+    private readonly output: vscode.OutputChannel,
+  ) {
+    this.disposables.push(
+      vscode.workspace.onDidOpenTextDocument((document) => {
+        if (this.isEnabledFor(document)) {
+          void this.validate(document);
+        }
+      }),
+      vscode.workspace.onDidChangeTextDocument((event) => {
+        if (!this.isEnabledFor(event.document)) return;
+        if (this.getValidationMode() !== 'onType') return;
+        this.schedule(event.document);
+      }),
+      vscode.workspace.onDidSaveTextDocument((document) => {
+        if (!this.isEnabledFor(document)) return;
+        if (this.getValidationMode() === 'off') return;
+        void this.validate(document);
+      }),
+      vscode.workspace.onDidCloseTextDocument((document) => {
+        this.pending.delete(document.uri.toString());
+        this.collection.delete(document.uri);
+      }),
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (!event.affectsConfiguration('utu')) return;
+        void this.refreshOpenDocuments();
+      }),
+    );
+
+    void this.refreshOpenDocuments();
+  }
+
+  dispose(): void {
+    for (const timeout of this.pending.values()) {
+      clearTimeout(timeout);
+    }
+
+    this.pending.clear();
+    vscode.Disposable.from(...this.disposables).dispose();
+  }
+
+  private schedule(document: vscode.TextDocument): void {
+    const key = document.uri.toString();
+    const existing = this.pending.get(key);
+    if (existing) clearTimeout(existing);
+
+    const timeout = setTimeout(() => {
+      this.pending.delete(key);
+      void this.validate(document);
+    }, 150);
+
+    this.pending.set(key, timeout);
+  }
+
+  private async refreshOpenDocuments(): Promise<void> {
+    const mode = this.getValidationMode();
+
+    if (mode === 'off') {
+      this.collection.clear();
+      return;
+    }
+
+    const documents = vscode.workspace.textDocuments.filter((document) => this.isUtuDocument(document));
+    await Promise.all(documents.map((document) => this.validate(document)));
+  }
+
+  private async validate(document: vscode.TextDocument): Promise<void> {
+    const version = document.version;
+
+    try {
+      const diagnostics = await this.parserService.getDiagnostics(document);
+      const current = vscode.workspace.textDocuments.find(
+        (candidate) => candidate.uri.toString() === document.uri.toString(),
+      );
+
+      if (!current || current.version !== version) return;
+      this.collection.set(document.uri, diagnostics);
+    } catch (error) {
+      this.output.appendLine(`[utu] Validation failed for ${document.uri.fsPath || document.uri.toString()}`);
+      this.output.appendLine(formatError(error));
+    }
+  }
+
+  private getValidationMode(): ValidationMode {
+    return vscode.workspace
+      .getConfiguration('utu')
+      .get<ValidationMode>('validation.mode', 'onType');
+  }
+
+  private isEnabledFor(document: vscode.TextDocument): boolean {
+    return this.isUtuDocument(document) && this.getValidationMode() !== 'off';
+  }
+
+  private isUtuDocument(document: vscode.TextDocument): boolean {
+    return document.languageId === 'utu';
+  }
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+
+  return String(error);
+}
