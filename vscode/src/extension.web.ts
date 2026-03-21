@@ -30,5 +30,5 @@ async function loadExtensionAssetBytes(
   uri: vscode.Uri,
 ): Promise<Uint8Array> {
   const bytes = await vscode.workspace.fs.readFile(uri);
-  return bytes instanceof Uint8Array ? new Uint8Array(bytes) : new Uint8Array(bytes.buffer);
+  return new Uint8Array(bytes);
 }

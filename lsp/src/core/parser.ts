@@ -11,6 +11,12 @@ import {
 } from './types';
 
 type TreeSitterModule = typeof import('web-tree-sitter');
+declare const WebAssembly: {
+  instantiate(
+    source: Uint8Array,
+    imports: object,
+  ): Promise<{ instance: unknown; module: unknown }>;
+};
 
 export interface ParsedTree {
   tree: Tree;
@@ -193,16 +199,7 @@ function createTreeSitterModuleOptions(runtimeWasm: Uint8Array) {
       imports: object,
       successCallback: (instance: unknown, module: unknown) => void,
     ) {
-      const webAssembly = globalThis as unknown as {
-        WebAssembly: {
-          instantiate(
-            source: Uint8Array,
-            imports: object,
-          ): Promise<{ instance: unknown; module: unknown }>;
-        };
-      };
-
-      void webAssembly.WebAssembly.instantiate(runtimeWasm, imports)
+      void WebAssembly.instantiate(runtimeWasm, imports)
         .then(({ instance, module }) => {
           successCallback(instance, module);
         });

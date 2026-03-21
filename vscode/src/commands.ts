@@ -96,6 +96,15 @@ export function registerCommands(
           return;
         }
 
+        const blocker = await dependencies.runtimeHost.getRunMainBlocker?.(document.getText());
+        if (blocker) {
+          dependencies.output.appendLine(`[utu] Run Main blocked for ${document.uri.fsPath || document.uri.toString()}`);
+          dependencies.output.appendLine(blocker);
+          dependencies.output.show(true);
+          await vscode.window.showWarningMessage(blocker);
+          return;
+        }
+
         const execution = await dependencies.runtimeHost.runMain(document.getText());
         revealExecution(dependencies.output, `Ran ${getDocumentLabel(document)}`, execution.logs, execution.result);
         vscode.window.setStatusBarMessage(`UTU ran ${getDocumentLabel(document)}`, 3000);

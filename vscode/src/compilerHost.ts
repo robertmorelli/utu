@@ -69,6 +69,7 @@ export interface BenchmarkResult {
 }
 
 export interface RuntimeHost {
+  getRunMainBlocker?(source: string): Promise<string | undefined>;
   runMain(source: string): Promise<ProgramRunResult>;
   runTest(source: string, ordinal: number): Promise<TestResult>;
   runTests(source: string): Promise<TestResult[]>;

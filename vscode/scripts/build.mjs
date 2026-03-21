@@ -49,7 +49,7 @@ function createWatchReadyPlugin(label, tracker) {
 const extensionConfig = {
   ...sharedBuildOptions,
   platform: 'browser',
-  target: 'es2022',
+  target: 'esnext',
   entryPoints: [resolve(extensionRoot, 'src/extension.ts')],
   outfile: resolve(extensionRoot, 'dist/web/extension.js'),
   format: 'cjs',
@@ -59,7 +59,7 @@ const extensionConfig = {
 const compilerWebConfig = {
   ...sharedBuildOptions,
   platform: 'browser',
-  target: 'es2022',
+  target: 'esnext',
   entryPoints: [resolve(generatedCompilerRoot, 'index.js')],
   outfile: resolve(extensionRoot, 'dist/compiler.web.mjs'),
   format: 'esm',
@@ -69,7 +69,7 @@ const compilerWebConfig = {
 const compilerNodeConfig = {
   ...sharedBuildOptions,
   platform: 'node',
-  target: 'node18',
+  target: 'esnext',
   entryPoints: [resolve(generatedCompilerRoot, 'index.js')],
   outfile: resolve(extensionRoot, 'dist/compiler.mjs'),
   format: 'esm',

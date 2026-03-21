@@ -23,7 +23,7 @@ await build({
   entryPoints: [resolve(lspRoot, 'src', 'server', 'node.ts')],
   outfile: serverOutputPath,
   platform: 'node',
-  target: 'node18',
+  target: 'esnext',
   format: 'esm',
   sourcemap: 'linked',
   sourcesContent: false,

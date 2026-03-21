@@ -13,6 +13,8 @@ import type {
   TestResult,
 } from './compilerHost';
 import { formatError } from './compilerHost';
+import { getRunMainBlockerMessage } from './runMainSupport';
+import { createDefaultHostImports } from './webHostImports';
 
 interface WebCompilerHostOptions {
   compilerModulePath: string;
@@ -43,7 +45,6 @@ const DEFAULT_BENCHMARK_OPTIONS: Required<BenchmarkOptions> = {
   samples: 10,
   warmup: 2,
 };
-
 export class WebCompilerHost implements CompilerHost, RuntimeHost {
   private compilerPromise?: Promise<CompilerRuntimeModule>;
 
@@ -51,6 +52,10 @@ export class WebCompilerHost implements CompilerHost, RuntimeHost {
 
   async compile(source: string, options: CompileOptions = {}): Promise<CompileArtifacts> {
     return this.compileWithMode(source, 'program', options);
+  }
+
+  async getRunMainBlocker(source: string): Promise<string | undefined> {
+    return getRunMainBlockerMessage(source);
   }
 
   async runMain(source: string): Promise<ProgramRunResult> {
@@ -118,7 +123,7 @@ export class WebCompilerHost implements CompilerHost, RuntimeHost {
     const artifact = await this.compileWithMode(source, mode);
     const module = await importGeneratedModule(artifact.js);
     let logSink: string[] = [];
-    const exports = await module.instantiate(createDefaultImports((line) => {
+    const exports = await module.instantiate(createDefaultHostImports((line) => {
       logSink.push(line);
     }));
 
@@ -158,29 +163,6 @@ export class WebCompilerHost implements CompilerHost, RuntimeHost {
   }
 }
 
-function createDefaultImports(writeLine: (line: string) => void): Record<string, unknown> {
-  return {
-    console_log(value: unknown) {
-      writeLine(String(value));
-    },
-    i64_to_string(value: unknown) {
-      return String(value);
-    },
-    f64_to_string(value: unknown) {
-      return String(value);
-    },
-    math_sin(value: number) {
-      return Math.sin(value);
-    },
-    math_cos(value: number) {
-      return Math.cos(value);
-    },
-    math_sqrt(value: number) {
-      return Math.sqrt(value);
-    },
-  };
-}
-
 async function importGeneratedModule(source: string): Promise<GeneratedModule> {
   return importModule<GeneratedModule>(source);
 }
@@ -213,7 +195,7 @@ function getExport(exports: Record<string, unknown>, exportName: string): (...ar
     throw new Error(`Missing export "${exportName}".`);
   }
 
-  return value;
+  return (...args: unknown[]) => value(...args);
 }
 
 async function executeTest(runtime: LoadedRuntime, ordinal: number): Promise<TestResult> {

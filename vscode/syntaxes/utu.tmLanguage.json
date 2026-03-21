@@ -100,18 +100,27 @@
       "patterns": [
         {
           "name": "meta.declaration.function.utu",
-          "match": "\\b(?:export\\s+)?fn\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "match": "\\b(?:(export)\\s+)?(fn)\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
           "captures": {
             "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "keyword.control.utu"
+            },
+            "3": {
               "name": "entity.name.function.utu"
             }
           }
         },
         {
           "name": "meta.declaration.type.utu",
-          "match": "\\b(?:struct|type)\\s+([A-Z][a-zA-Z0-9_]*)\\b",
+          "match": "\\b(struct|type)\\s+([A-Z][a-zA-Z0-9_]*)\\b",
           "captures": {
             "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
               "name": "entity.name.type.utu"
             }
           }
@@ -130,18 +139,30 @@
         },
         {
           "name": "meta.declaration.binding.utu",
-          "match": "\\blet\\s+([a-z_][a-zA-Z0-9_]*)\\b",
+          "match": "\\b(let)\\s+([a-z_][a-zA-Z0-9_]*)\\b",
           "captures": {
             "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
               "name": "variable.other.definition.utu"
             }
           }
         },
         {
           "name": "meta.import.utu",
-          "match": "\\bimport\\s+extern\\s+\"[^\"]*\"\\s+([a-z_][a-zA-Z0-9_]*)\\b",
+          "match": "\\b(import)\\s+(extern)\\s+(\"[^\"]*\")\\s+([a-z_][a-zA-Z0-9_]*)\\b",
           "captures": {
             "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "keyword.control.utu"
+            },
+            "3": {
+              "name": "string.quoted.double.utu"
+            },
+            "4": {
               "name": "entity.name.function.utu"
             }
           }

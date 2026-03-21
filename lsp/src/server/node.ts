@@ -1,6 +1,6 @@
 import process from 'node:process';
 import { dirname, resolve as resolvePath } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {
   copyRange,
   type UtuCompletionItem,
@@ -533,17 +533,7 @@ function getOptionalText(params: unknown): string | undefined {
 }
 
 function getWorkspaceFolderUris(params: unknown): string[] {
-  if (!isObject(params)) {
-    return [];
-  }
-
-  const folders = readFolderUris(params.workspaceFolders);
-  if (folders.length > 0) return folders;
-  if (typeof params.rootUri === 'string' && params.rootUri.length > 0) return [params.rootUri];
-  if (typeof params.rootPath === 'string' && params.rootPath.length > 0) {
-    return [pathToFileURL(resolvePath(params.rootPath)).toString()];
-  }
-  return [];
+  return isObject(params) ? readFolderUris(params.workspaceFolders) : [];
 }
 
 function getWorkspaceFolderChanges(params: unknown): { added: string[]; removed: string[] } {

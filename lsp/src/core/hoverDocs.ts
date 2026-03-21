@@ -23,7 +23,7 @@ const BUILTIN_DOCS: HoverDocs = {
   },
   'str.length': {
     signature: 'str.length(s) i32',
-    description: 'Returns the length of a host string via JS String Builtins.',
+    description: 'Returns the length of a host string via the runtime string host.',
   },
   'str.char_code_at': {
     signature: 'str.char_code_at(s, i) i32',
@@ -127,7 +127,7 @@ const CORE_TYPE_DOCS: HoverDocs = {
   },
   str: {
     signature: 'str',
-    description: 'Host-backed string reference built on JS String Builtins.',
+    description: 'Host-backed string reference provided by the runtime string host.',
   },
   u32: {
     signature: 'u32',

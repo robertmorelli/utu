@@ -104,7 +104,7 @@ export function registerTesting(
     request: vscode.TestRunRequest,
     kind: 'test' | 'bench',
   ): Promise<Map<string, vscode.TestItem[]>> => {
-    const queue = request.include ? [...request.include] : [...controller.items.values()];
+    const queue = request.include ? [...request.include] : collectRootItems(controller.items);
     const excluded = new Set(request.exclude?.map((item) => item.id) ?? []);
     const grouped = new Map<string, vscode.TestItem[]>();
 
@@ -120,7 +120,7 @@ export function registerTesting(
           await refreshFile(data.uri);
         }
 
-        queue.push(...item.children.values());
+        queue.push(...collectRootItems(item.children));
         continue;
       }
 
@@ -260,6 +260,14 @@ export function registerTesting(
   );
 
   void refreshWorkspace();
+}
+
+function collectRootItems(collection: vscode.TestItemCollection): vscode.TestItem[] {
+  const items: vscode.TestItem[] = [];
+  collection.forEach((item) => {
+    items.push(item);
+  });
+  return items;
 }
 
 function isRunnableSymbol(symbol: UtuSymbol): boolean {

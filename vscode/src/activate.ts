@@ -31,7 +31,7 @@ export function activateUtuExtension(
   const languageService = new UtuLanguageService(parserService);
   const diagnostics = new DiagnosticsController(languageService, output);
   const statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem();
-  const scheduleMainContextRefresh = createMainContextRefresher(languageService);
+  const scheduleMainContextRefresh = createMainContextRefresher(languageService, options.runtimeHost);
   const subscriptions: vscode.Disposable[] = [
     output,
     generatedDocuments,
@@ -117,7 +117,10 @@ function updateStatusBarItem(
   editor?.document.languageId === 'utu' ? item.show() : item.hide();
 }
 
-function createMainContextRefresher(languageService: UtuLanguageService) {
+function createMainContextRefresher(
+  languageService: UtuLanguageService,
+  runtimeHost: RuntimeHost,
+) {
   let refreshVersion = 0;
 
   return async (document: vscode.TextDocument | undefined) => {
@@ -135,7 +138,15 @@ function createMainContextRefresher(languageService: UtuLanguageService) {
       const hasRunnableMain = index.topLevelSymbols.some(
         (symbol) => symbol.kind === 'function' && symbol.exported && symbol.name === 'main',
       );
-      await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', hasRunnableMain);
+      if (!hasRunnableMain) {
+        await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false);
+        return;
+      }
+
+      const blocker = await runtimeHost.getRunMainBlocker?.(document.getText());
+      if (currentVersion !== refreshVersion) return;
+
+      await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', !blocker);
     } catch {
       if (currentVersion !== refreshVersion) return;
       await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false);
