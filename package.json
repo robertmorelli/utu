@@ -4,15 +4,15 @@
   "private": true,
   "scripts": {
     "grammar": "tree-sitter generate && tree-sitter build --wasm",
-    "build": "esbuild compiler/index.js --bundle --format=esm --outfile=dist/index.mjs --external:web-tree-sitter --external:module && bun run grammar && mv tree-sitter-utu.wasm dist/"
+    "build": "esbuild compiler/index.js --bundle --format=esm --outfile=dist/index.mjs --external:web-tree-sitter --external:module && bun run grammar && cp tree-sitter-utu.wasm web_artifact/ && mv tree-sitter-utu.wasm cli_artifact/"
   },
   "devDependencies": {
+    "tree-sitter-cli": "^0.26.7",
     "@types/bun": "latest"
   },
   "dependencies": {
     "binaryen": "^125.0.0",
     "esbuild": "^0.27.4",
-    "tree-sitter-cli": "^0.26.7",
     "web-tree-sitter": "^0.26.7"
   }
 }
