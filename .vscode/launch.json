@@ -7,6 +7,7 @@
       "debugWebWorkerHost": true,
       "request": "launch",
       "args": [
+        "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/vscode",
         "--extensionDevelopmentKind=web"
       ],

@@ -1,19 +1,15 @@
-import path from "node:path";
-import { pathToFileURL } from "node:url";
+import grammarWasmPath from "../../tree-sitter-utu.wasm" with { type: "file" };
+import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
+import * as compiler from "../../../compiler/index.js";
 
-const cliRoot = path.basename(import.meta.dir) === "dist"
-  ? path.resolve(import.meta.dir, "..")
-  : path.resolve(import.meta.dir, "../..");
-const wasmUrl = pathToFileURL(path.join(cliRoot, "tree-sitter-utu.wasm"));
-const compilerUrl = pathToFileURL(path.join(cliRoot, "..", "compiler", "index.js")).href;
-let compilerPromise;
+const wasmUrl = grammarWasmPath;
+const runtimeWasmUrl = runtimeWasmPath;
 
 export async function compileUtuSource(source, { wat = false, mode = "program" } = {}) {
-  const compiler = await (compilerPromise ??= import(compilerUrl));
   if (typeof compiler.compile !== "function") throw new Error("Shared compiler module does not export compile().");
-  if (compiler.init) await compiler.init({ wasmUrl });
+  if (compiler.init) await compiler.init({ wasmUrl, runtimeWasmUrl });
 
-  const result = await compiler.compile(source, { optimize: false, wat, mode, wasmUrl });
+  const result = await compiler.compile(source, { wat, mode, wasmUrl, runtimeWasmUrl });
   return { js: result.js, metadata: result.metadata ?? { tests: [], benches: [] }, wasm: bytes(result.wasm), wat: result.wat };
 }
 
