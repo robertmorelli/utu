@@ -29,7 +29,7 @@ fn toggle(todo: Todo) {
 }
 
 fn matches(todo: Todo, filter: Filter) bool {
-    match filter {
+    alt filter {
         _: All => true,
         _: Active => not todo.done,
         _: Completed => todo.done,
@@ -57,12 +57,9 @@ export fn main() {
 
     let active: i32 = count(todos, Active {})
 
-    // Error handling with \ (else)
-    let resp: str = fetch("/api/sync") \ "offline"
-    resp -o console_log
-
-    // Force unwrap — trap if null
-    let data: str = fetch("/api/data") \ unreachable
+    // Nullable import + force unwrap
+    let data: str = fetch("/api/data") \ fatal
+    data -o console_log
 
     // Piped string concat
     "hello"

@@ -155,43 +155,41 @@ The Wasm signature becomes a multi-value return with complementary nullability:
 The contract is semantic rather than structural: exactly one result must be
 non-null at runtime.
 
-This same mechanism covers JS imports that may throw:
+The current compiler also accepts `A # B` on import signatures:
 
 ```utu
 import extern "es" fetch(str) Response # null
 import extern "es" fetch(str) Response # ApiError
 ```
 
-On success the trampoline returns `(value, null)`. On failure it returns
-`(null, typed_error)` or rethrows when the caught exception cannot be cast to
-the declared error type.
+Today those imports still lower to direct Wasm multi-value signatures. In the
+generated JS wrapper, throws from nullable-compatible imports are temporarily
+converted into null placeholders instead. `T # null` receives `null`, while
+reference-shaped `T # E` currently receives `[null, null]`. Structured typed
+error mapping is still planned.
 
 Nullable references are just the same idea with `null` as the alternative:
 
 - `T # null` means a nullable `T`
 - there is no separate optional type syntax
 
-The fallback operator `\` handles nullable values and `#` returns:
+The current compiler supports both force unwrap and fallback on nullable
+references:
 
 ```utu
-let val: Thing = get_thing() \ unreachable
-let val: Thing = get_thing() \ default_value
-let name: str = lookup(id) \ "anonymous"
-let resp: Response = fetch(url) \ cached_response
+let val: Thing = get_thing() \ fatal
+let cached: Response = fetch(url) \ cached_response
+let data: Response = fetch(url) \ fatal
 ```
 
-Conceptually:
+- `expr \ fatal` force unwraps and traps on null
+- `expr \ fallback` evaluates `fallback` only when the left side is null
 
-- evaluate the left side
-- if the result is non-null, keep it
-- if the result is null, evaluate the right side instead
-
-The spec's Wasm lowering is a null check plus branch:
+The force-unwrap compiled form is direct:
 
 ```wasm
-(block $ok (result (ref $T))
-    (br_on_non_null $ok (call $expr))
-    (local.get $fallback))
+(call $expr)
+ref.as_non_null
 ```
 
 == Multi-Value Return

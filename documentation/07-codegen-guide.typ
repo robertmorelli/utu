@@ -6,8 +6,9 @@ lowering.
 
 The WAT snippets here are representative rather than byte-for-byte dumps. In
 real output, local names, recursive type-group placement, import names, and
-some stack cleanup details may differ, and `wasm-opt` may simplify the final
-result further. The important point is that the structure stays close.
+some stack cleanup details may differ, and Binaryen optimization may simplify
+the final result further. The important point is that the structure stays
+close.
 
 == How To Read This Guide
 
@@ -396,7 +397,7 @@ let q: i32, r: i32 = divmod(10, 3)
 Wasm pushes return values in declaration order, so the compiler must emit
 `local.set` in reverse order.
 
-== Nullable Values And `\`
+== Force Unwrap Uses `ref.as_non_null`
 
 #grid(
   columns: (1fr, 1fr),
@@ -405,43 +406,21 @@ Wasm pushes return values in declaration order, so the compiler must emit
   [*WAT*],
   [
 ```utu
-let resp: Response = fetch(url) \ cached_response
+let data: Response = fetch(url) \ fatal
 ```
   ],
   [
 ```wat
-(block $ok (result (ref $Response))
-  (call $fetch)
-  (br_on_non_null $ok)
-  (local.get $cached_response))
+(call $fetch)
+ref.as_non_null
 ```
   ],
 )
 
-The force-unwrap form is the same pattern with a trap in the null path:
-
-#grid(
-  columns: (1fr, 1fr),
-  gutter: 12pt,
-  [*Utu*],
-  [*WAT*],
-  [
-```utu
-let data: Response = fetch(url) \ unreachable
-```
-  ],
-  [
-```wat
-(block $ok (result (ref $Response))
-  (call $fetch)
-  (br_on_non_null $ok)
-  (unreachable))
-```
-  ],
-)
-
-For `A # B` returns, the compiler first works with the nullable success branch
-and then applies the same null-check lowering.
+Default fallback on nullable references now lowers too: the compiler evaluates
+the nullable expression, uses `br_on_non_null` to keep the present value, and
+only evaluates the fallback when the left side is null. Force unwrap remains
+the direct `ref.as_non_null` path.
 
 == Sum-Type Matches Become `br_on_cast` Chains
 
@@ -453,7 +432,7 @@ and then applies the same null-check lowering.
   [
 ```utu
 fn describe(shape: Shape) str {
-    match shape {
+    alt shape {
         c: Circle => "circle",
         r: Rect => "rect",
         t: Triangle => "triangle",

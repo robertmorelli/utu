@@ -26,11 +26,6 @@ for (0..n) |i| {
     sum = sum + i
 }
 
-// Multiple ranges / counters
-for (0..width, 0..height) |x, y| {
-    draw_pixel(x, y)
-}
-
 // While-style loop (condition only, no capture)
 for (cond()) {
     body()
@@ -41,6 +36,10 @@ for () {
     if done() { break }
 }
 ```
+
+Today the compiler lowers one source/capture pair. The parser accepts
+comma-separated sources and captures, but only the first pair currently has a
+defined lowering.
 
 *Wasm lowering:* `for (0..n) |i| { ... }` lowers to:
 
@@ -74,23 +73,15 @@ let result: i32 = compute: {
 //     (call $expensive_calculation))
 ```
 
-== 5.4 Switch / Match
+== 5.4 Match / Alt
 
-Pattern matching on scalars uses `br_table`. Pattern matching on sum types
-uses `br_on_cast` chains with an `unreachable` trap for non-exhaustive
-matches.
+Scalar `match` compares literal arms directly. Type-based `alt` uses
+`br_on_cast` chains with a final `fatal` path, lowered with Wasm
+`unreachable`.
 
 ```utu
-// Scalar switch -> br_table
-match opcode {
-    0 => handle_nop(),
-    1 => handle_add(),
-    2 => handle_sub(),
-    _ => unreachable,
-}
-
 // Type switch -> br_on_cast chain
-match shape {
+alt shape {
     s: Circle => area_circle(s),
     s: Rect => area_rect(s),
     s: Triangle => area_tri(s),
@@ -113,9 +104,9 @@ match shape {
 (call $area_tri)
 ```
 
-== 5.5 Unreachable
+== 5.5 Fatal
 
 ```utu
-// Traps the program. Maps directly to (unreachable)
-unreachable
+// Source-level trap keyword. Lowers directly to (unreachable)
+fatal
 ```

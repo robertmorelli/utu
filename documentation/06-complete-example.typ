@@ -32,7 +32,7 @@ fn toggle(todo: Todo) {
 }
 
 fn matches(todo: Todo, filter: Filter) bool {
-    match filter {
+    alt filter {
         _: All => true,
         _: Active => not todo.done,
         _: Completed => todo.done,
@@ -60,12 +60,9 @@ export fn main() {
 
     let active: i32 = count(todos, Active {})
 
-    // Error handling with \ (else)
-    let resp: str = fetch("/api/sync") \ "offline"
-    resp -o console_log
-
-    // Force unwrap — trap if null
-    let data: str = fetch("/api/data") \ unreachable
+    // Nullable import + force unwrap
+    let data: str = fetch("/api/data") \ fatal
+    data -o console_log
 
     // Piped string concat
     "hello"
@@ -78,16 +75,16 @@ export fn main() {
 
 - `Todo` shows a struct with one immutable field and one mutable field.
 - `Filter` shows a sum type with several variants.
-- `console_log` and `fetch` show host imports, including an exclusive
-  disjunction return with `str # null`.
+- `console_log` and `fetch` show host imports, including a nullable return
+  with `str # null`.
 - `new_todo` shows direct struct construction and implicit returns.
 - `toggle` shows mutable field assignment and the `not` operator.
 - `matches` shows pattern matching over a sum type.
 - `count` shows typed `let` bindings, array indexing, `array.len`, a counted
   `for` loop, and an expression return at the end of the function.
 - `main` shows `array.new_fixed`, export syntax, function calls on array
-  elements, fallback handling with `\`, a force unwrap with `unreachable`, and
-  a simple pipeline through `str.concat` and `console_log`.
+  elements, force unwrap with `fatal`, and a simple pipeline through
+  `str.concat` and `console_log`.
 
 == Why The Example Matters
 
@@ -96,7 +93,7 @@ Taken together, the example shows the central theme of the spec:
 - data types are expressed in WasmGC-native forms
 - control flow stays structured and explicit
 - interop relies on host references rather than a language runtime
-- error handling is value-based instead of exception-based in user code
+- nullability stays explicit in the type surface
 - the compiler mostly lowers source constructs into nearly identical Wasm
   constructs
 

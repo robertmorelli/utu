@@ -133,24 +133,31 @@ fn divide(a: i32, b: i32) i32 # DivError
 // Contract: exactly one result is non-null
 ```
 
-For imports from JS that may throw, the compiler wraps the call in
-`try` / `catch`. On success, returns `(value, null)`. On catch, attempts to
-cast the exception to the declared error type. If the cast fails, the
-exception is rethrown.
+The current compiler also accepts `A # B` on import signatures. The Wasm import
+surface is still a direct multi-value signature, but the generated JS wrapper
+now catches throws for nullable-compatible result shapes and substitutes null
+placeholders. `T # null` imports receive `null`; reference-shaped `T # E`
+imports currently receive `[null, null]`. That keeps nullable fallback working
+today, but it does not yet construct a typed error value. Structured JS-to-Utu
+error mapping is still a planned feature.
 
 ```utu
-// Catches any throw, returns null on error
+// Thrown JS exceptions become null in the generated JS wrapper
 import extern "es" fetch(str) Response # null
 
-// Catches and types the error
+// Thrown JS exceptions currently become [null, null] here
 import extern "es" fetch(str) Response # ApiError
 
-// Call site — same pattern for both:
+// Call site — nullable fallback and null checks work today:
 let resp: Response # null, err: ApiError # null = fetch(url)
-if err {
-    // handle error
+if not ref.is_null(err) {
+    // host-provided typed error path
 } else {
-    // resp is non-null here
+    if ref.is_null(resp) {
+        // temporary JS-throw placeholder path
+    } else {
+        // resp is non-null here
+    }
 }
 ```
 
@@ -167,35 +174,31 @@ from `#`.
 
 === 2.6.2 Force Unwrap and Default Values
 
-The `\` else operator provides fallback handling for nullable values and `#`
-returns. It evaluates the left side; if the result is null, it evaluates the
-right side instead.
+The current compiler supports both force unwrap and fallback on nullable
+references.
 
 ```utu
-// Force unwrap — trap if null (\ unreachable)
-let val: Thing = get_thing() \ unreachable
+// Force unwrap — trap if null (\ fatal)
+let val: Thing = get_thing() \ fatal
 
-// Default value — use fallback if null
-let val: Thing = get_thing() \ default_value
+// Nullable fallback
+let cached: Response = fetch(url) \ default_response
 
-// Chained with function calls
-let name: str = lookup(id) \ "anonymous"
-
-// Works with # returns too — take the success or trap
-let resp: Response = fetch(url) \ unreachable
-
-// Take the success or use a default
-let resp: Response = fetch(url) \ cached_response
+// Nullable import + force unwrap
+let resp: Response = fetch(url) \ fatal
 ```
 
-The `\` operator lowers to a null check plus branch:
+Both forms are implemented today:
+
+- `expr \ fatal` evaluates `expr` and applies `ref.as_non_null`
+- `expr \ fallback` evaluates `fallback` only when the left side is null
+
+The force-unwrap form lowers directly:
 
 ```wasm
-;; val = expr \ fallback
-(block $ok (result (ref $T))
-    (br_on_non_null $ok (call $expr))
-    ;; null path:
-    (local.get $fallback))  ;; or (unreachable)
+;; val = expr \ fatal
+(call $expr)
+ref.as_non_null
 ```
 
 == 2.7 Multi-Value Return (Tensor Product)
@@ -233,7 +236,8 @@ bench "sum loop" |i| {
 }
 ```
 
-- `assert` traps with `unreachable` when its condition is false
+- `assert` behaves like a source-level `fatal` on failure and lowers to Wasm
+  `unreachable`
 - `test` declarations are ignored by ordinary program compilation and become
   synthesized zero-argument exports in test mode
 - `bench` declarations are ignored by ordinary program compilation and become

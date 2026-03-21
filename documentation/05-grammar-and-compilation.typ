@@ -34,8 +34,11 @@ return_type  ::= type ('#' type)? (',' type ('#' type)?)*
 
 global_decl  ::= 'let' IDENT ':' type '=' expr
 
-import_decl  ::= 'import' 'extern' STRING IDENT '(' param_list ')'
-                  return_type?
+import_decl  ::= 'import' 'extern' STRING
+                  ( IDENT '(' import_param_list? ')' return_type?
+                  | IDENT ':' type )
+import_param_list ::= import_param (',' import_param)* ','?
+import_param ::= param | type
 export_decl  ::= 'export' fn_decl
 test_decl    ::= 'test' STRING block
 bench_decl   ::= 'bench' STRING '|' IDENT '|' '{' setup_decl '}'
@@ -77,12 +80,13 @@ kind of type constructor.
 
 ```ebnf
 expr         ::= literal | IDENT | unary_expr | binary_expr
-             |   call_expr | pipe_expr | field_expr
-             |   index_expr | if_expr | match_expr
+             |   call_expr | tuple_expr | pipe_expr | field_expr
+             |   index_expr | if_expr | match_expr | alt_expr
              |   block_expr | for_expr | break_expr
              |   assign_expr | bind_expr | else_expr
              |   struct_init | array_init | assert_expr
-             |   'unreachable' | '(' expr ')'
+             |   namespace_call_expr | ref_null_expr
+             |   'fatal' | '(' expr ')'
 
 assert_expr  ::= 'assert' expr
 
@@ -90,9 +94,12 @@ bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
 
 else_expr    ::= expr '\' expr
 
+tuple_expr   ::= expr ',' expr
+
 pipe_expr    ::= expr '-o' pipe_target
-pipe_target  ::= IDENT
-             |   IDENT '(' pipe_args ')'
+pipe_target  ::= pipe_path
+             |   pipe_path '(' pipe_args ')'
+pipe_path    ::= IDENT | BUILTIN_NS | pipe_path '.' IDENT
 pipe_args    ::= pipe_arg (',' pipe_arg)*
 pipe_arg     ::= '_' | expr
 
@@ -102,26 +109,35 @@ arg_list     ::= (expr (',' expr)* ','?)?
 field_expr   ::= expr '.' IDENT
 index_expr   ::= expr '[' expr ']'
 
+namespace_call_expr ::= BUILTIN_NS '.' IDENT ('(' arg_list? ')')?
+ref_null_expr ::= 'ref' '.' 'null' TYPE_IDENT
+
 if_expr      ::= 'if' expr block ('else' (if_expr | block))?
 
 match_expr   ::= 'match' expr '{' match_arm+ '}'
-match_arm    ::= pattern '=>' expr ','
-             |   IDENT ':' TYPE_IDENT '=>' expr ','
+match_arm    ::= match_lit '=>' expr ','
              |   '_' '=>' expr ','
-pattern      ::= IDENT | '_'
+match_lit    ::= INT_LIT | FLOAT_LIT | 'true' | 'false'
+
+alt_expr     ::= 'alt' expr '{' alt_arm+ '}'
+alt_arm      ::= IDENT ':' TYPE_IDENT '=>' expr ','
+             |   '_' ':' TYPE_IDENT '=>' expr ','
+             |   IDENT '=>' expr ','
+             |   '_' '=>' expr ','
 
 for_expr     ::= 'for' '(' for_sources ')' capture? block
 for_sources  ::= for_source (',' for_source)*
 for_source   ::= expr '..' expr | expr
 capture      ::= '|' IDENT (',' IDENT)* '|'
 
-block_expr   ::= (IDENT ':')? '{' stmt* expr? '}'
+block_expr   ::= (IDENT ':')? block
+block        ::= '{' expr* '}'
 break_expr   ::= 'break' IDENT? expr?
 
 struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
 
-assign_expr  ::= (field_expr | index_expr) '=' expr
+assign_expr  ::= (IDENT | field_expr | index_expr) '=' expr
 ```
 
 Several of the spec's most distinctive features appear here:
@@ -131,6 +147,9 @@ Several of the spec's most distinctive features appear here:
 - `-o` is parsed as a dedicated pipe form
 - `for` supports range sources, plain expressions, and optional captures
 - blocks can be labeled and can yield values
+
+The parser accepts comma-separated `for` sources and captures, but current
+lowering only uses the first source/capture pair.
 
 === Operators
 
@@ -187,6 +206,9 @@ LABEL        ::= IDENT
 
 ```ebnf
 COMMENT      ::= '//' <characters> NEWLINE
+BUILTIN_NS   ::= 'str' | 'array' | 'i31' | 'ref'
+              |   'extern' | 'any'
+              |   'i32' | 'i64' | 'f32' | 'f64'
 ```
 
 The identifier rules reinforce the style guide from the overview chapter:
@@ -202,7 +224,7 @@ The compilation model is deliberately narrow:
 - parse source
 - validate parse errors
 - lower to WAT
-- run `wasm-opt`
+- parse WAT with Binaryen and optionally optimize
 - emit the final `.wasm` binary
 
 The spec explicitly avoids monomorphization, borrow checking, and large custom
@@ -267,22 +289,15 @@ references:
 (result (ref null $A) (ref null $B))
 ```
 
-For imported extern functions, the compiler inserts a trampoline using Wasm
-exception handling:
-
-- success path pushes `(value, ref.null)`
-- catch path attempts `ref.cast` into the declared error type
-- failed typed catches are rethrown with `throw_ref`
-- catch-all nullable imports may use a sentinel representation for the error
-  branch
+For imported extern functions, the compiler still emits the declared
+multi-value signature directly. In the generated JS wrapper, throws from
+nullable-compatible imports are temporarily converted to null placeholders.
+Structured typed error translation is still planned.
 
 === Else Operator Lowering
 
-The `\` operator lowers to a null check and branch:
+The `\` operator lowers on nullable references in two ways:
 
-- `expr \ fallback` keeps the left side when non-null and evaluates the right
-  side only on null
-- `expr \ unreachable` traps on null
-
-For `#` results, the compiler first extracts the nullable success branch and
-then applies the same null-handling pattern.
+- `expr \ fatal` evaluates `expr` and applies `ref.as_non_null`
+- `expr \ fallback` evaluates `expr`, keeps the non-null branch, and otherwise
+  evaluates `fallback`

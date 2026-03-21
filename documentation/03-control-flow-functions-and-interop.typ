@@ -26,10 +26,6 @@ for (0..n) |i| {
     sum = sum + i
 }
 
-for (0..width, 0..height) |x, y| {
-    draw_pixel(x, y)
-}
-
 for (cond()) {
     body()
 }
@@ -41,10 +37,13 @@ for () {
 
 The loop forms cover:
 
-- counted loops over ranges
-- multi-counter loops over multiple ranges
+- counted loops over a single range
 - while-style loops where the source expression is the condition
 - infinite loops using empty parentheses
+
+The parser accepts comma-separated sources and captures, but current lowering
+only uses the first source/capture pair. The docs therefore describe the
+single-range form that the compiler emits today.
 
 The counted form lowers to the canonical Wasm `block` plus `loop` shape:
 
@@ -76,20 +75,13 @@ let result: i32 = compute: {
 This maps naturally to a Wasm `block` with a result type and `br` targeting the
 label.
 
-== Match, Switch, And Exhaustiveness
+== Match, Alt, And Exhaustiveness
 
-Scalar matches lower to `br_table`, while sum-type matches lower to a sequence
+Scalar `match` handles literal cases. Type-based `alt` lowers to a sequence
 of `br_on_cast` checks.
 
 ```utu
-match opcode {
-    0 => handle_nop(),
-    1 => handle_add(),
-    2 => handle_sub(),
-    _ => unreachable,
-}
-
-match shape {
+alt shape {
     s: Circle => area_circle(s),
     s: Rect => area_rect(s),
     s: Triangle => area_tri(s),
@@ -99,11 +91,11 @@ match shape {
 The type-based case is important because it shows how Utu leans on WasmGC's
 runtime type system instead of encoding a separate tag byte.
 
-Non-exhaustive matches trap through `unreachable`.
+Non-exhaustive `alt` expressions trap through `fatal`.
 
-== Unreachable
+== Fatal
 
-`unreachable` is a source-level spelling of the Wasm `unreachable`
+`fatal` is the source-level spelling that lowers to the Wasm `unreachable`
 instruction. The spec uses it for explicit traps, impossible control-flow
 paths, exhaustive match fallthrough, and force-unwrap failure.
 
@@ -207,6 +199,12 @@ import extern "es" document: externref
 The string builtins are special: they are auto-imported and do not need
 declarations in source files.
 
+`T # null` imports compile as nullable returns. `T # E` imports compile as
+direct two-result Wasm import signatures. In the generated JS wrapper, throws
+from nullable-compatible imports currently become null placeholders so fallback
+and null checks can handle them. Structured typed error lowering is still
+planned.
+
 == Exports
 
 Wasm exports are ordinary functions marked with `export`:
@@ -246,11 +244,11 @@ ephemerally and reports failures or timing.
 The language does not bake in a hidden vtable model. Dispatch stays explicit:
 
 - use `br_on_cast` chains for type-based dispatch
-- use `call_ref` or `call_indirect` for function reference dispatch
+- use `call_ref` for function reference dispatch
 
 ```utu
 fn describe(s: Shape) str {
-    match s {
+    alt s {
         c: Circle => "circle",
         r: Rect => "rect",
         t: Triangle => "triangle",

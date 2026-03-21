@@ -8,7 +8,7 @@ literals. Comments use `//`, line comments only, with no block comments.
 ```ebnf
 program      ::= item*
 item         ::= import_decl | export_decl | fn_decl | type_decl
-               | struct_decl | global_decl
+               | struct_decl | global_decl | test_decl | bench_decl
 ```
 
 == 11.2 Declarations
@@ -29,9 +29,14 @@ return_type  ::= type ('#' type)? (',' type ('#' type)?)*
 
 global_decl  ::= 'let' IDENT ':' type '=' expr
 
-import_decl  ::= 'import' 'extern' STRING IDENT '(' param_list ')'
-                  return_type?
+import_decl  ::= 'import' 'extern' STRING
+                  ( IDENT '(' import_param_list? ')' return_type?
+                  | IDENT ':' type )
+import_param_list ::= import_param (',' import_param)* ','?
+import_param ::= param | type
 export_decl  ::= 'export' fn_decl
+test_decl    ::= 'test' STRING block
+bench_decl   ::= 'bench' STRING '|' IDENT '|' '{' setup_decl '}'
 ```
 
 == 11.3 Types
@@ -56,20 +61,24 @@ type_list    ::= (type (',' type)*)?
 
 ```ebnf
 expr         ::= literal | IDENT | unary_expr | binary_expr
-             |   call_expr | pipe_expr | field_expr
-             |   index_expr | if_expr | match_expr
+             |   call_expr | tuple_expr | pipe_expr | field_expr
+             |   index_expr | if_expr | match_expr | alt_expr
              |   block_expr | for_expr | break_expr
              |   assign_expr | bind_expr | else_expr
              |   struct_init | array_init
-             |   'unreachable' | '(' expr ')'
+             |   namespace_call_expr | ref_null_expr
+             |   'fatal' | '(' expr ')'
 
 bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
 
 else_expr    ::= expr '\' expr
 
+tuple_expr   ::= expr ',' expr
+
 pipe_expr    ::= expr '-o' pipe_target
-pipe_target  ::= IDENT
-             |   IDENT '(' pipe_args ')'
+pipe_target  ::= pipe_path
+             |   pipe_path '(' pipe_args ')'
+pipe_path    ::= IDENT | BUILTIN_NS | pipe_path '.' IDENT
 pipe_args    ::= pipe_arg (',' pipe_arg)*
 pipe_arg     ::= '_' | expr
 
@@ -79,27 +88,40 @@ arg_list     ::= (expr (',' expr)* ','?)?
 field_expr   ::= expr '.' IDENT
 index_expr   ::= expr '[' expr ']'
 
+namespace_call_expr ::= BUILTIN_NS '.' IDENT ('(' arg_list? ')')?
+ref_null_expr ::= 'ref' '.' 'null' TYPE_IDENT
+
 if_expr      ::= 'if' expr block ('else' (if_expr | block))?
 
 match_expr   ::= 'match' expr '{' match_arm+ '}'
-match_arm    ::= pattern '=>' expr ','
-             |   IDENT ':' TYPE_IDENT '=>' expr ','
+match_arm    ::= match_lit '=>' expr ','
              |   '_' '=>' expr ','
-pattern      ::= IDENT | '_'
+match_lit    ::= INT_LIT | FLOAT_LIT | 'true' | 'false'
+
+alt_expr     ::= 'alt' expr '{' alt_arm+ '}'
+alt_arm      ::= IDENT ':' TYPE_IDENT '=>' expr ','
+             |   '_' ':' TYPE_IDENT '=>' expr ','
+             |   IDENT '=>' expr ','
+             |   '_' '=>' expr ','
 
 for_expr     ::= 'for' '(' for_sources ')' capture? block
 for_sources  ::= for_source (',' for_source)*
 for_source   ::= expr '..' expr | expr
 capture      ::= '|' IDENT (',' IDENT)* '|'
 
-block_expr   ::= (IDENT ':')? '{' stmt* expr? '}'
+block_expr   ::= (IDENT ':')? block
+block        ::= '{' expr* '}'
 break_expr   ::= 'break' IDENT? expr?
 
 struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
 
-assign_expr  ::= (field_expr | index_expr) '=' expr
+assign_expr  ::= (IDENT | field_expr | index_expr) '=' expr
 ```
+
+The parser accepts comma-separated `for` sources and captures, but current
+lowering only uses the first source/capture pair. Literal scalar switch arms
+such as `0 => ...` are not part of the current `match_pattern` grammar.
 
 == 11.5 Operators
 
@@ -158,6 +180,9 @@ LABEL        ::= IDENT
 
 ```ebnf
 COMMENT      ::= '//' <characters> NEWLINE
+BUILTIN_NS   ::= 'str' | 'array' | 'i31' | 'ref'
+              |   'extern' | 'any'
+              |   'i32' | 'i64' | 'f32' | 'f64'
 ```
 
 Line comments only. No block comments.

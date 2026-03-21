@@ -1,13 +1,13 @@
 = 8. Polymorphic Dispatch
 
-Dynamic dispatch uses `br_on_cast` for type-based dispatch and
-`call_indirect` / `call_ref` for function reference dispatch. There is no
-vtable built into the language; dispatch is explicit.
+Dynamic dispatch uses `br_on_cast` for type-based dispatch and `call_ref` for
+function reference dispatch. There is no vtable built into the language;
+dispatch is explicit.
 
 ```utu
 // Type-based dispatch (br_on_cast chain)
 fn describe(s: Shape) str {
-    match s {
+    alt s {
         c: Circle => "circle",
         r: Rect => "rect",
         t: Triangle => "triangle",

@@ -15,7 +15,6 @@ directly.
 - `array[T].new(len, init)` -> `array.new $T`
 - `array[T].new_fixed(vals...)` -> `array.new_fixed $T N`
 - `array[T].new_default(len)` -> `array.new_default $T`
-- `array[T].new_data(data, off, len)` -> `array.new_data $T $data`
 - `arr[i]` -> `array.get $T`
 - `arr[i] = val` -> `array.set $T`
 - `array.len(arr)` -> `array.len`
@@ -27,8 +26,6 @@ directly.
 - `ref.null T` -> `ref.null $T`
 - `ref.is_null(val)` -> `ref.is_null`
 - `ref.as_non_null(val)` -> `ref.as_non_null`
-- `ref.cast<T>(val)` -> `ref.cast (ref $T)`
-- `ref.test<T>(val)` -> `ref.test (ref $T)`
 - `ref.eq(a, b)` -> `ref.eq`
 - `i31.new(val)` -> `ref.i31`
 - `i31.get_s(val)` -> `i31.get_s`
@@ -38,8 +35,8 @@ directly.
 
 == 9.4 Numeric Operations
 
-Standard Wasm numeric instructions are available as infix operators and
-builtins:
+Standard Wasm numeric instructions are currently exposed through infix
+operators:
 
 - Arithmetic: `+  -  *  /  %`, mapping to instructions such as `i32.add`,
   `i32.rem_s`, and `f64.mul`
@@ -47,10 +44,8 @@ builtins:
   `>>>` as `shr_u`
 - Unary: `-` negate, `not` logical not, `~` bitwise invert
 - Comparison: `==  !=  <  >  <=  >=`
-- Conversion: `i32.wrap(i64)`, `i64.extend(i32)`, `f32.convert(i32)`, and so
-  on
-- Math: `f32.sqrt`, `f64.ceil`, `f64.floor`, `f64.trunc`, `f64.nearest`
-- SIMD: `v128.*`, all SIMD instructions as builtins
+- Numeric namespace helpers such as `i32.wrap(...)`, `f64.sqrt(...)`, and
+  `v128.*` are not implemented yet
 
 *Operator clarity:* Each symbol has exactly one meaning. `#` is exclusive
 disjunction at the type level only. `%` is always remainder. `^` is always
