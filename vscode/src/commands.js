@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import { formatError, } from './compilerHost.js';
+import { formatDurationMs, getBenchmarkOptionsFromConfig } from './benchmarking.js';
+import { displayNameForDocument } from './documentNames.js';
+import { hasRunnableMain as indexHasRunnableMain } from '../../lsp/src/core/languageService.js';
 export function registerCommands(context, dependencies) {
     registerCommand(context, 'utu.compileCurrentFile', () => withActiveUtuDocument(async (document) => {
-        const label = getDocumentLabel(document);
+        const label = displayNameForDocument(document);
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `Compiling ${label}`,
@@ -59,8 +62,8 @@ export function registerCommands(context, dependencies) {
                 return;
             }
             const execution = await dependencies.runtimeHost.runMain(document.getText());
-            revealExecution(dependencies.output, `Ran ${getDocumentLabel(document)}`, execution.logs, execution.result);
-            vscode.window.setStatusBarMessage(`UTU ran ${getDocumentLabel(document)}`, 3000);
+            revealExecution(dependencies.output, `Ran ${displayNameForDocument(document)}`, execution.logs, execution.result);
+            vscode.window.setStatusBarMessage(`UTU ran ${displayNameForDocument(document)}`, 3000);
         }
         catch (error) {
             await revealError(dependencies.output, 'Unable to run main', error);
@@ -84,8 +87,8 @@ export function registerCommands(context, dependencies) {
         const benchmarkOrdinal = typeof ordinal === 'number' ? ordinal : Number(ordinal);
         await withUtuDocument(uri, async (document) => {
             try {
-                const result = await dependencies.runtimeHost.runBenchmark(document.getText(), benchmarkOrdinal, getBenchmarkSettings());
-                revealExecution(dependencies.output, `Benchmarked "${result.name}"`, result.logs, `${formatMilliseconds(result.meanMs)} mean, ${formatMilliseconds(result.perIterationMs)}/iter`);
+                const result = await dependencies.runtimeHost.runBenchmark(document.getText(), benchmarkOrdinal, getBenchmarkOptionsFromConfig());
+                revealExecution(dependencies.output, `Benchmarked "${result.name}"`, result.logs, `${formatDurationMs(result.meanMs)} mean, ${formatDurationMs(result.perIterationMs)}/iter`);
                 vscode.window.setStatusBarMessage(`UTU benchmarked ${result.name}`, 3000);
             }
             catch (error) {
@@ -110,9 +113,6 @@ async function withUtuDocument(target, callback) {
 }
 function compileDocument(compilerHost, document, options = {}) {
     return compilerHost.compile(document.getText(), options);
-}
-function getDocumentLabel(document) {
-    return document.fileName.split(/[\\/]/).pop() ?? 'UTU file';
 }
 async function revealGeneratedDocument(generatedDocuments, kind, sourceUri, content) {
     const uri = generatedDocuments.upsert(kind, sourceUri, content);
@@ -144,7 +144,7 @@ function revealExecution(output, title, logs, result) {
 }
 async function hasRunnableMain(languageService, document) {
     const index = await languageService.getDocumentIndex(document);
-    return index.topLevelSymbols.some((symbol) => symbol.kind === 'function' && symbol.exported && symbol.name === 'main');
+    return indexHasRunnableMain(index);
 }
 async function resolveDocument(target) {
     if (target instanceof vscode.Uri) {
@@ -161,18 +161,4 @@ function hasTextDocumentShape(value) {
         && 'languageId' in value
         && 'getText' in value
         && 'uri' in value;
-}
-function formatMilliseconds(value) {
-    return value >= 1 ? `${value.toFixed(3)}ms` : `${(value * 1000).toFixed(3)}us`;
-}
-function getBenchmarkSettings() {
-    const config = vscode.workspace.getConfiguration('utu');
-    return {
-        iterations: clampCount(config.get('bench.iterations', 1000), 1),
-        samples: clampCount(config.get('bench.samples', 10), 1),
-        warmup: clampCount(config.get('bench.warmup', 2), 0),
-    };
-}
-function clampCount(value, minimum) {
-    return Number.isFinite(value) ? Math.max(minimum, Math.floor(value ?? minimum)) : minimum;
 }

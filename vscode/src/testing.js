@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import { toVscodeRange } from './adapters/core.js';
+import { formatDurationMs, getBenchmarkOptionsFromConfig } from './benchmarking.js';
 import { formatError } from './compilerHost.js';
+import { displayNameForUri } from './documentNames.js';
+import { collectRunnableEntries } from '../../lsp/src/core/languageService.js';
 const TEST_TAG = new vscode.TestTag('utu-test');
 const BENCH_TAG = new vscode.TestTag('utu-bench');
 export function registerTesting(context, dependencies) {
@@ -21,28 +24,22 @@ export function registerTesting(context, dependencies) {
     };
     const refreshFile = async (uri) => {
         const document = await vscode.workspace.openTextDocument(uri);
-        const symbols = (await dependencies.languageService.getDocumentIndex(document)).topLevelSymbols.filter(isRunnableSymbol);
-        if (!symbols.length) {
+        const entries = collectRunnableEntries(await dependencies.languageService.getDocumentIndex(document))
+            .filter((entry) => entry.kind !== 'main');
+        if (!entries.length) {
             controller.items.delete(uri.toString());
             return;
         }
         const fileItem = controller.items.get(uri.toString()) ?? createFileItem(uri);
-        const ordinalByKind = new Map([
-            ['test', 0],
-            ['bench', 0],
-        ]);
-        fileItem.children.replace(symbols.map((symbol) => {
-            const kind = symbol.kind;
-            const ordinal = ordinalByKind.get(kind) ?? 0;
-            ordinalByKind.set(kind, ordinal + 1);
-            const item = controller.createTestItem(`${uri.toString()}#${kind}:${symbol.range.start.line}:${symbol.range.start.character}`, symbol.name, uri);
-            item.description = symbol.kind;
-            item.range = toVscodeRange(symbol.range);
-            item.tags = [kind === 'bench' ? BENCH_TAG : TEST_TAG];
+        fileItem.children.replace(entries.map((entry) => {
+            const item = controller.createTestItem(`${uri.toString()}#${entry.kind}:${entry.symbol.range.start.line}:${entry.symbol.range.start.character}`, entry.symbol.name, uri);
+            item.description = entry.kind;
+            item.range = toVscodeRange(entry.symbol.range);
+            item.tags = [entry.kind === 'bench' ? BENCH_TAG : TEST_TAG];
             itemData.set(item, {
-                kind,
-                label: symbol.name,
-                ordinal,
+                kind: entry.kind,
+                label: entry.symbol.name,
+                ordinal: entry.ordinal,
                 uri,
             });
             return item;
@@ -52,7 +49,7 @@ export function registerTesting(context, dependencies) {
         }
     };
     const createFileItem = (uri) => {
-        const fileItem = controller.createTestItem(uri.toString(), fileNameFromUri(uri), uri);
+        const fileItem = controller.createTestItem(uri.toString(), displayNameForUri(uri), uri);
         itemData.set(fileItem, { kind: 'file', uri });
         return fileItem;
     };
@@ -114,7 +111,7 @@ export function registerTesting(context, dependencies) {
                         }
                     }
                     else {
-                        const results = await dependencies.runtimeHost.runBenchmarks(document.getText(), getBenchmarkOptions());
+                        const results = await dependencies.runtimeHost.runBenchmarks(document.getText(), getBenchmarkOptionsFromConfig());
                         for (const item of items) {
                             const data = itemData.get(item);
                             if (!data || data.kind !== 'bench')
@@ -125,7 +122,7 @@ export function registerTesting(context, dependencies) {
                                 run.errored(item, new vscode.TestMessage(`Missing benchmark result for "${data.label}".`));
                                 continue;
                             }
-                            appendLogs(run, item, result.logs, `${result.name}: mean ${formatMs(result.meanMs)}, min ${formatMs(result.minMs)}, max ${formatMs(result.maxMs)}, ${formatMs(result.perIterationMs)}/iter`);
+                            appendLogs(run, item, result.logs, `${result.name}: mean ${formatDurationMs(result.meanMs, { includeNs: true })}, min ${formatDurationMs(result.minMs, { includeNs: true })}, max ${formatDurationMs(result.maxMs, { includeNs: true })}, ${formatDurationMs(result.perIterationMs, { includeNs: true })}/iter`);
                             run.passed(item, result.durationMs);
                         }
                     }
@@ -185,9 +182,6 @@ function collectRootItems(collection) {
     });
     return items;
 }
-function isRunnableSymbol(symbol) {
-    return symbol.kind === 'test' || symbol.kind === 'bench';
-}
 function appendLogs(run, item, logs, summary) {
     const lines = [...logs];
     if (summary)
@@ -195,24 +189,6 @@ function appendLogs(run, item, logs, summary) {
     if (!lines.length)
         return;
     run.appendOutput(`${lines.join('\r\n')}\r\n`);
-}
-function fileNameFromUri(uri) {
-    return uri.path.split('/').filter(Boolean).at(-1) ?? uri.toString();
-}
-function getBenchmarkOptions() {
-    const config = vscode.workspace.getConfiguration('utu');
-    return {
-        iterations: clampCount(config.get('bench.iterations', 1000), 1),
-        samples: clampCount(config.get('bench.samples', 10), 1),
-        warmup: clampCount(config.get('bench.warmup', 2), 0),
-    };
-}
-function formatMs(value) {
-    if (value >= 1)
-        return `${value.toFixed(3)}ms`;
-    if (value >= 0.001)
-        return `${(value * 1000).toFixed(3)}us`;
-    return `${(value * 1_000_000).toFixed(0)}ns`;
 }
 function createRefreshScheduler(refreshFile) {
     const pending = new Map();
@@ -224,7 +200,4 @@ function createRefreshScheduler(refreshFile) {
             void refreshFile(uri);
         }, 150));
     };
-}
-function clampCount(value, minimum) {
-    return Number.isFinite(value) ? Math.max(minimum, Math.floor(value ?? minimum)) : minimum;
 }

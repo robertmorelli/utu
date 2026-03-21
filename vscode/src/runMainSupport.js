@@ -1,11 +1,6 @@
-const SUPPORTED_RUN_MAIN_ES_IMPORTS = new Set([
-    'console_log',
-    'i64_to_string',
-    'f64_to_string',
-    'math_sin',
-    'math_cos',
-    'math_sqrt',
-]);
+import { WEB_PROMPT_BLOCKER_MESSAGE, WEB_RUN_MAIN_ES_IMPORT_NAMES } from '../../shared/hostImports.mjs';
+
+const SUPPORTED_RUN_MAIN_ES_IMPORTS = new Set(WEB_RUN_MAIN_ES_IMPORT_NAMES);
 export function getRunMainBlockerMessage(source) {
     const unsupportedImports = collectUnsupportedRunMainImports(source);
     if (!unsupportedImports.length) {
@@ -13,7 +8,7 @@ export function getRunMainBlockerMessage(source) {
     }
     const promptImport = unsupportedImports.find((entry) => entry.module === 'es' && entry.name === 'prompt');
     if (promptImport) {
-        return 'UTU Run Main in the VS Code web host cannot provide synchronous `prompt()`. Use the CLI to run this file.';
+        return WEB_PROMPT_BLOCKER_MESSAGE;
     }
     const nodeImport = unsupportedImports.find((entry) => entry.module.startsWith('node:'));
     if (nodeImport) {

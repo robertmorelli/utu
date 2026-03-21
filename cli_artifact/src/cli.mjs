@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { compileUtuSource } from "./lib/compiler.mjs";
+import { executeRuntimeTest, getCallableExport, loadCompiledRuntime, withRuntime } from "../../shared/compiledRuntime.mjs";
+import { createCliImports, loadNodeModuleFromSource } from "./lib/nodeRuntime.mjs";
 
 const help = `utu Bun CLI
 
@@ -33,18 +33,18 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 async function compileCmd(args) {
-  let input = "", outdir = "./dist", wat = false, bun = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--wat") wat = true;
-    else if (arg === "--bun") bun = true;
-    else if (arg === "--node" || arg === "--imports") fail("compile only supports --wat and --bun");
-    else if (arg === "--outdir") outdir = args[++i] ?? fail("Missing value for --outdir");
-    else if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
-    else if (!input) input = arg;
-    else fail("Too many arguments for compile");
-  }
-  if (!input) fail("compile needs an input file");
+  const { input, outdir, wat, bun } = parseCommandArgs(args, {
+    command: "compile",
+    missingInput: "compile needs an input file",
+    defaults: { outdir: "./dist", wat: false, bun: false },
+    flags: {
+      "--wat": booleanFlag("wat"),
+      "--bun": booleanFlag("bun"),
+      "--outdir": valueFlag("outdir"),
+      "--node": unsupportedFlag("compile only supports --wat and --bun"),
+      "--imports": unsupportedFlag("compile only supports --wat and --bun"),
+    },
+  });
 
   const file = path.resolve(input);
   const source = await readFile(file, "utf8");
@@ -73,25 +73,23 @@ async function compileCmd(args) {
 
 async function runCmd(args) {
   const { input, importsFile } = parsePathArgs(args, "run");
-  await withExports(input, { importsFile }, async ({ exports }) => {
-    const result = await fn(exports, "main", "The program does not export a callable main function")();
+  await withProgramRuntime(input, { importsFile }, async runtime => {
+    const result = await getCallableExport(runtime.exports, "main", "The program does not export a callable main function")();
     if (result !== undefined) console.log(result);
   });
 }
 
 async function testCmd(args) {
   const { input, importsFile } = parsePathArgs(args, "test");
-  await withExports(input, { importsFile, mode: "test" }, async ({ exports, metadata }) => {
-    if (!metadata.tests.length) fail("No tests found");
+  await withProgramRuntime(input, { importsFile, mode: "test" }, async runtime => {
+    if (!runtime.metadata.tests.length) fail("No tests found");
     let failed = false;
-    for (const { name, exportName } of metadata.tests) {
-      try {
-        await fn(exports, exportName, `Missing test export "${exportName}"`)();
-        console.log(`PASS ${name}`);
-      } catch (error) {
+    for (let ordinal = 0; ordinal < runtime.metadata.tests.length; ordinal += 1) {
+      const result = await executeRuntimeTest(runtime, ordinal, { formatError: text });
+      console.log(`${result.passed ? "PASS" : "FAIL"} ${result.name}`);
+      if (!result.passed) {
         failed = true;
-        console.log(`FAIL ${name}`);
-        console.log(`  ${text(error)}`);
+        console.log(`  ${result.error}`);
       }
     }
     if (failed) process.exitCode = 1;
@@ -99,24 +97,23 @@ async function testCmd(args) {
 }
 
 async function benchCmd(args) {
-  let input = "", importsFile = "", seconds = 1, samples = 1, warmup = 1;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--imports") importsFile = args[++i] ?? fail("Missing value for --imports");
-    else if (arg === "--seconds") seconds = floatArg(args[++i], "--seconds", 0);
-    else if (arg === "--samples") samples = intArg(args[++i], "--samples", 1);
-    else if (arg === "--warmup") warmup = intArg(args[++i], "--warmup");
-    else if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
-    else if (!input) input = arg;
-    else fail("Too many arguments for bench");
-  }
-  if (!input) fail("bench needs an input file");
+  const { input, importsFile, seconds, samples, warmup } = parseCommandArgs(args, {
+    command: "bench",
+    missingInput: "bench needs an input file",
+    defaults: { importsFile: "", seconds: 1, samples: 1, warmup: 1 },
+    flags: {
+      "--imports": valueFlag("importsFile"),
+      "--seconds": valueFlag("seconds", value => floatArg(value, "--seconds", 0)),
+      "--samples": valueFlag("samples", value => intArg(value, "--samples", 1)),
+      "--warmup": valueFlag("warmup", value => intArg(value, "--warmup")),
+    },
+  });
 
-  await withExports(input, { importsFile, mode: "bench" }, async ({ exports, metadata }) => {
-    if (!metadata.benches.length) fail("No benchmarks found");
+  await withProgramRuntime(input, { importsFile, mode: "bench" }, async runtime => {
+    if (!runtime.metadata.benches.length) fail("No benchmarks found");
     const targetNs = Math.floor(seconds * 1e9);
-    for (const { name, exportName } of metadata.benches) {
-      const bench = fn(exports, exportName, `Missing benchmark export "${exportName}"`);
+    for (const { name, exportName } of runtime.metadata.benches) {
+      const bench = getCallableExport(runtime.exports, exportName, `Missing benchmark export "${exportName}"`);
       let estimate = 1;
       for (let i = 0; i < warmup; i++) {
         estimate = await calibrateIterations(bench, targetNs, estimate);
@@ -141,53 +138,14 @@ async function benchCmd(args) {
 }
 
 function parsePathArgs(args, command) {
-  let input = "", importsFile = "";
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--imports") importsFile = args[++i] ?? fail("Missing value for --imports");
-    else if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
-    else if (!input) input = arg;
-    else fail(`Too many arguments for ${command}`);
-  }
-  if (!input) fail(`${command} needs an input file`);
-  return { input, importsFile };
-}
-
-async function loadExports(input, { importsFile = "", mode = "program" } = {}) {
-  const { js, metadata } = await compileUtuSource(await readFile(path.resolve(input), "utf8"), { mode });
-  const dir = await mkdtemp(path.join(tmpdir(), "utu-cli-"));
-  const file = path.join(dir, "module.mjs");
-  const cleanup = () => rm(dir, { force: true, recursive: true });
-  await writeFile(file, js, "utf8");
-
-  try {
-    const mod = await import(pathToFileURL(file).href);
-    return {
-      exports: await mod.instantiate(await loadImports(importsFile)),
-      metadata,
-      cleanup,
-    };
-  } catch (error) {
-    await cleanup();
-    throw error;
-  }
-}
-
-async function withExports(input, options, run) {
-  const loaded = await loadExports(input, options);
-  try { return await run(loaded); } finally { await loaded.cleanup(); }
-}
-
-async function loadImports(file) {
-  const base = createDefaultImports();
-  if (!file) return base;
-  const mod = await import(pathToFileURL(path.resolve(file)).href);
-  return mergeImportObjects(base, mod.default ?? mod);
-}
-
-function fn(exports, name, message = `Missing export "${name}"`) {
-  if (typeof exports[name] !== "function") fail(message);
-  return exports[name];
+  return parseCommandArgs(args, {
+    command,
+    missingInput: `${command} needs an input file`,
+    defaults: { importsFile: "" },
+    flags: {
+      "--imports": valueFlag("importsFile"),
+    },
+  });
 }
 
 function intArg(value, flag, min = 0) {
@@ -264,96 +222,20 @@ function text(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function readLine(fd, reader = fs) {
-  const buffer = Buffer.alloc(1);
-  let value = "";
-  while (true) {
-    const bytesRead = reader.readSync(fd, buffer, 0, 1, null);
-    if (bytesRead === 0) break;
-    const ch = buffer.toString("utf8", 0, bytesRead);
-    if (ch === "\n") break;
-    if (ch !== "\r") value += ch;
-  }
-  return value;
-}
-
-function promptSync(message) {
-  if (message) process.stdout.write(message);
-  return readLine(0);
-}
-
-function createDefaultImports() {
-  return {
-    es: {
-      console_log: value => console.log(value),
-      prompt: promptSync,
-      i64_to_string: value => String(value),
-      f64_to_string: value => String(value),
-      math_sin: value => Math.sin(value),
-      math_cos: value => Math.cos(value),
-      math_sqrt: value => Math.sqrt(value),
-    },
-  };
-}
-
-function mergeImportObjects(base, override) {
-  const merged = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    merged[key] = isPlainObject(merged[key]) && isPlainObject(value)
-      ? { ...merged[key], ...value }
-      : value;
-  }
-  return merged;
-}
-
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 async function buildBunExecutable(base, js) {
   const dir = await mkdtemp(path.join(tmpdir(), "utu-bun-"));
   const out = process.platform === "win32" ? `${base}.exe` : base;
   const program = path.join(dir, "program.mjs");
   const runner = path.join(dir, "run.mjs");
+  const helperUrl = new URL("./lib/bunMainRunner.mjs", import.meta.url).href;
   const cleanup = () => rm(dir, { force: true, recursive: true });
 
   await writeFile(program, js, "utf8");
   await writeFile(runner, `
-import fs from "node:fs";
 import { instantiate } from "./program.mjs";
+import { runCompiledMain } from ${JSON.stringify(helperUrl)};
 
-const readLine = fd => {
-  const buffer = Buffer.alloc(1);
-  let value = "";
-  while (true) {
-    const bytesRead = fs.readSync(fd, buffer, 0, 1, null);
-    if (bytesRead === 0) break;
-    const ch = buffer.toString("utf8", 0, bytesRead);
-    if (ch === "\\n") break;
-    if (ch !== "\\r") value += ch;
-  }
-  return value;
-};
-
-const imports = {
-  es: {
-    console_log: value => console.log(value),
-    prompt: message => {
-      if (message) process.stdout.write(message);
-      return readLine(0);
-    },
-    i64_to_string: value => String(value),
-    f64_to_string: value => String(value),
-    math_sin: value => Math.sin(value),
-    math_cos: value => Math.cos(value),
-    math_sqrt: value => Math.sqrt(value),
-  },
-};
-
-const exports = await instantiate(imports);
-if (typeof exports.main !== "function") throw new Error("The program does not export a callable main function");
-const result = await exports.main();
-if (result !== undefined) console.log(result);
+await runCompiledMain(instantiate);
 `, "utf8");
 
   try {
@@ -370,4 +252,48 @@ function exec(command, args) {
     child.on("error", reject);
     child.on("exit", code => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code ?? 1}`)));
   });
+}
+
+async function withProgramRuntime(input, { importsFile = "", mode = "program" } = {}, run) {
+  const source = await readFile(path.resolve(input), "utf8");
+  return withRuntime(loadCompiledRuntime({
+    source,
+    mode,
+    compileSource: compileUtuSource,
+    loadModule: (js) => loadNodeModuleFromSource(js),
+    createImports: () => createCliImports(importsFile),
+  }), run);
+}
+
+function parseCommandArgs(args, { command, missingInput, defaults = {}, flags = {} }) {
+  let input = "";
+  const parsed = { ...defaults };
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const flag = flags[arg];
+    if (flag) {
+      if (flag.unsupported) fail(flag.unsupported);
+      const value = flag.arity === 0 ? undefined : args[++i];
+      if (flag.arity === 1 && value === undefined) fail(`Missing value for ${arg}`);
+      parsed[flag.key] = flag.read ? flag.read(value) : value;
+      continue;
+    }
+    if (arg.startsWith("-")) fail(`Unknown flag "${arg}"`);
+    if (!input) input = arg;
+    else fail(`Too many arguments for ${command}`);
+  }
+  if (!input) fail(missingInput);
+  return { input, ...parsed };
+}
+
+function booleanFlag(key) {
+  return { key, arity: 0, read: () => true };
+}
+
+function valueFlag(key, read) {
+  return { key, arity: 1, read };
+}
+
+function unsupportedFlag(message) {
+  return { unsupported: message };
 }

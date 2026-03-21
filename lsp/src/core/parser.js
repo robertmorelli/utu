@@ -1,13 +1,11 @@
 import { clamp, comparePositions, copyPosition, rangeKey, } from './types.js';
+import { createTreeSitterInitOptions, normalizeWasmSource } from '../../../shared/treeSitter.mjs';
 export class UtuParserService {
     options;
     parserPromise;
     parserInstance;
     constructor(options) {
         this.options = options;
-    }
-    async getDiagnostics(document) {
-        return this.withParsedTree(document.getText(), ({ rootNode }) => collectDiagnostics(rootNode, document));
     }
     async getTreeString(source) {
         return this.withParsedTree(source, ({ rootNode }) => rootNode.toString());
@@ -35,17 +33,9 @@ export class UtuParserService {
     }
     async loadParser() {
         const treeSitter = (await import('web-tree-sitter'));
-        const runtimeWasm = normalizeWasmSource(this.options.runtimeWasmPath);
         const grammarWasm = normalizeWasmSource(this.options.grammarWasmPath);
-        const initOptions = runtimeWasm instanceof Uint8Array
-            ? createTreeSitterModuleOptions(runtimeWasm)
-            : {
-                locateFile(scriptName) {
-                    return scriptName === 'web-tree-sitter.wasm' ? runtimeWasm : scriptName;
-                },
-            };
         try {
-            await treeSitter.Parser.init(initOptions);
+            await treeSitter.Parser.init(createTreeSitterInitOptions(this.options.runtimeWasmPath));
             const parser = new treeSitter.Parser();
             parser.setLanguage(await treeSitter.Language.load(grammarWasm));
             this.parserInstance = parser;
@@ -123,22 +113,5 @@ function widenEmptyRange(document, position) {
     return {
         line: position.line,
         character: Math.min(position.character + 1, getLineText(document, position.line).length),
-    };
-}
-function normalizeWasmSource(source) {
-    return typeof source === 'string' && source.startsWith('file://')
-        ? decodeURIComponent(source.slice('file://'.length))
-        : source;
-}
-function createTreeSitterModuleOptions(runtimeWasm) {
-    return {
-        wasmBinary: runtimeWasm,
-        instantiateWasm(imports, successCallback) {
-            void WebAssembly.instantiate(runtimeWasm, imports)
-                .then(({ instance, module }) => {
-                successCallback(instance, module);
-            });
-            return {};
-        },
     };
 }

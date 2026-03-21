@@ -8,8 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const extensionRoot = resolve(__dirname, '..');
 const compilerSourceRoot = resolve(extensionRoot, '../compiler');
+const sharedSourceRoot = resolve(extensionRoot, '../shared');
 const generatedRoot = resolve(extensionRoot, '.generated');
 const generatedCompilerRoot = resolve(generatedRoot, 'compiler');
+const generatedSharedRoot = resolve(generatedRoot, 'shared');
 const treeSitterRuntimeSource = resolve(extensionRoot, '../node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const watchMode = process.argv.includes('--watch');
@@ -114,7 +116,9 @@ let compilerSyncTimer;
 async function syncCompilerSources() {
   await mkdir(generatedRoot, { recursive: true });
   await rm(generatedCompilerRoot, { recursive: true, force: true });
+  await rm(generatedSharedRoot, { recursive: true, force: true });
   await cp(compilerSourceRoot, generatedCompilerRoot, { recursive: true });
+  await cp(sharedSourceRoot, generatedSharedRoot, { recursive: true });
 }
 
 async function syncParserRuntime() {
@@ -152,13 +156,21 @@ async function snapshotCompilerSources(root = compilerSourceRoot) {
   return snapshot;
 }
 
+async function snapshotCompilerSourceRoots() {
+  const snapshots = await Promise.all([
+    snapshotCompilerSources(compilerSourceRoot),
+    snapshotCompilerSources(sharedSourceRoot),
+  ]);
+  return snapshots.flat();
+}
+
 if (watchMode) {
   console.log(watchStartMessage);
   await prepareAssets();
   const contexts = await Promise.all(configs.map((config) => context(config)));
   await Promise.all(contexts.map((ctx) => ctx.watch()));
   const compilerContexts = webOnlyMode ? [contexts[1]] : [contexts[1], contexts[2]];
-  let compilerSourceState = (await snapshotCompilerSources()).join('|');
+  let compilerSourceState = (await snapshotCompilerSourceRoots()).join('|');
   let compilerPollInFlight = false;
   const compilerPoller = setInterval(() => {
     if (compilerPollInFlight) return;
@@ -166,7 +178,7 @@ if (watchMode) {
 
     void (async () => {
       try {
-        const nextState = (await snapshotCompilerSources()).join('|');
+        const nextState = (await snapshotCompilerSourceRoots()).join('|');
 
         if (nextState !== compilerSourceState) {
           compilerSourceState = nextState;

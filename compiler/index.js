@@ -4,6 +4,7 @@ import { watgen } from './watgen.js';
 import { jsgen } from './jsgen.js';
 import { analyzeHostRequirements } from './host_analysis.js';
 import { throwOnParseErrors } from './tree.js';
+import { createTreeSitterInitOptions } from '../shared/treeSitter.mjs';
 
 let parser = null;
 const SUPPORTED_WASM_FEATURES = binaryen.Features.GC
@@ -12,24 +13,7 @@ const SUPPORTED_WASM_FEATURES = binaryen.Features.GC
 
 export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     if (parser) return;
-    const runtimeWasmBinary = toWasmBinary(runtimeWasmUrl);
-    await Parser.init(
-        runtimeWasmBinary
-            ? {
-                wasmBinary: runtimeWasmBinary,
-                instantiateWasm(imports, successCallback) {
-                    void WebAssembly.instantiate(runtimeWasmBinary, imports).then(({ instance, module }) => {
-                        successCallback(instance, module);
-                    });
-                    return {};
-                },
-            }
-            : runtimeWasmUrl ? {
-                locateFile(scriptName) {
-                    return scriptName === 'web-tree-sitter.wasm' ? runtimeWasmUrl : scriptName;
-                },
-            } : void 0,
-    );
+    await Parser.init(createTreeSitterInitOptions(runtimeWasmUrl));
     parser = new Parser();
     parser.setLanguage(await Language.load(wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url)));
 }
@@ -48,14 +32,4 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
     mod.dispose();
     const result = { js: jsgen(tree, wasm, { mode, host }), wasm, metadata: { ...metadata, host: host.metadata } };
     return emitWat ? { ...result, wat } : result;
-}
-
-function toWasmBinary(value) {
-    if (ArrayBuffer.isView(value)) {
-        return value instanceof Uint8Array
-            ? value
-            : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    }
-
-    return value instanceof ArrayBuffer ? new Uint8Array(value) : undefined;
 }

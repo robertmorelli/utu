@@ -1,5 +1,7 @@
 # To Minimize
 
+Status: implemented in the working tree on 2026-03-21. The notes below are the original rationale/checklist that drove the refactor.
+
 Short answer: yes, the CLI and VS Code extension should share more code, but mostly at the runtime-adapter layer, not at the UI layer.
 
 The best opportunities are the places where both surfaces independently do some version of:

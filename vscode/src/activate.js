@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UtuLanguageService } from '../../lsp/src/core/languageService.js';
+import { UtuLanguageService, hasRunnableMain } from '../../lsp/src/core/languageService.js';
 import { UtuParserService } from '../../lsp/src/core/parser.js';
 import { registerRunCodeLensProvider } from './codeLens.js';
 import { registerCommands } from './commands.js';
@@ -100,8 +100,7 @@ function createMainContextRefresher(languageService, runtimeHost) {
             const index = await languageService.getDocumentIndex(document);
             if (currentVersion !== refreshVersion)
                 return;
-            const hasRunnableMain = index.topLevelSymbols.some((symbol) => symbol.kind === 'function' && symbol.exported && symbol.name === 'main');
-            if (!hasRunnableMain) {
+            if (!hasRunnableMain(index)) {
                 await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false);
                 return;
             }
