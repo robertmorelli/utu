@@ -71,30 +71,56 @@ process.exit(requiredFailures.length > 0 ? 1 : 0);
 async function runCase(testCase, wasmPath) {
     const sourcePath = resolve(repoRoot, testCase.path);
     const source = await readFile(sourcePath, 'utf8');
+    const mode = testCase.mode ?? 'run';
     const compileOptions = {
         wasmUrl: pathToFileURL(wasmPath),
+        mode: mode === 'test' ? 'test' : 'program',
     };
+    if (mode === 'test') compileOptions.optimize = false;
     if (typeof testCase.optimize === 'boolean') compileOptions.optimize = testCase.optimize;
 
-    const { js } = await compile(source, compileOptions);
+    const { js, metadata } = await compile(source, compileOptions);
     const result = {
         name: testCase.name,
         path: testCase.path,
-        mode: testCase.mode ?? 'run',
+        mode,
         allowFailure: Boolean(testCase.allowFailure),
         logs: [],
         status: 'passed',
     };
 
-    if ((testCase.mode ?? 'run') === 'compile') return result;
+    if (mode === 'compile') return result;
 
     const moduleDir = await mkdtemp(join(tmpdir(), 'utu-example-'));
     try {
         const modulePath = join(moduleDir, `${sanitizeName(testCase.name)}.mjs`);
         await writeFile(modulePath, js, 'utf8');
         const compiledModule = await import(pathToFileURL(modulePath).href);
-        const imports = createHostImports(result.logs);
+        const imports = await loadHostImports(testCase, result.logs, metadata.host?.modules ?? []);
         const exports = await compiledModule.instantiate(imports);
+
+        if (mode === 'test') {
+            if (!metadata.tests.length) throw new Error(`No tests found in ${testCase.path}`);
+            if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests) {
+                throw new Error(`Expected ${testCase.expectedTests} tests, found ${metadata.tests.length}`);
+            }
+
+            for (const { name, exportName } of metadata.tests) {
+                if (typeof exports[exportName] !== 'function') {
+                    throw new Error(`Missing test export "${exportName}" on ${testCase.path}`);
+                }
+                try {
+                    await exports[exportName]();
+                } catch (error) {
+                    throw new Error(`Test "${name}" failed: ${firstLine(error?.message ?? error)}`);
+                }
+            }
+
+            result.testsRun = metadata.tests.length;
+            result.testNames = metadata.tests.map((test) => test.name);
+            return result;
+        }
+
         const entry = testCase.entry ?? 'main';
 
         if (typeof exports[entry] !== 'function') {
@@ -147,30 +173,78 @@ function makeFailureResult(testCase, error) {
     };
 }
 
+async function loadHostImports(testCase, logs, moduleNames) {
+    const baseImports = createHostImports(logs);
+    if (!testCase.imports) return baseImports;
+
+    const importPath = resolve(repoRoot, testCase.imports);
+    const loaded = await import(pathToFileURL(importPath).href);
+    return mergeImportObjects(baseImports, normalizeImportObject(loaded.default ?? loaded.imports ?? loaded, moduleNames));
+}
+
 function createHostImports(logs) {
     return {
-        console_log(value) {
-            logs.push(String(value));
-        },
-        wrap(value) {
-            return `[${value}]`;
-        },
-        i64_to_string(value) {
-            return String(value);
-        },
-        f64_to_string(value) {
-            return String(value);
-        },
-        math_sin(value) {
-            return Math.sin(value);
-        },
-        math_cos(value) {
-            return Math.cos(value);
-        },
-        math_sqrt(value) {
-            return Math.sqrt(value);
+        es: {
+            console_log(value) {
+                logs.push(String(value));
+            },
+            wrap(value) {
+                return `[${value}]`;
+            },
+            i64_to_string(value) {
+                return String(value);
+            },
+            f64_to_string(value) {
+                return String(value);
+            },
+            math_sin(value) {
+                return Math.sin(value);
+            },
+            math_cos(value) {
+                return Math.cos(value);
+            },
+            math_sqrt(value) {
+                return Math.sqrt(value);
+            },
         },
     };
+}
+
+function normalizeImportObject(imports, moduleNames = []) {
+    if (!imports || typeof imports !== 'object' || Array.isArray(imports)) return {};
+
+    const moduleKeys = new Set(moduleNames);
+    const normalized = {};
+    const flatEs = {};
+    for (const [key, value] of Object.entries(imports)) {
+        if (isModuleKey(key, moduleKeys)) normalized[key] = value;
+        else flatEs[key] = value;
+    }
+
+    if (Object.keys(flatEs).length) {
+        const existingEs = isPlainObject(normalized.es) ? normalized.es : {};
+        normalized.es = { ...existingEs, ...flatEs };
+    }
+
+    return normalized;
+}
+
+function mergeImportObjects(base, override) {
+    const merged = { ...base };
+    for (const [key, value] of Object.entries(override)) {
+        merged[key] = isPlainObject(merged[key]) && isPlainObject(value)
+            ? { ...merged[key], ...value }
+            : value;
+    }
+    return merged;
+}
+
+function isModuleKey(key, moduleKeys) {
+    return moduleKeys.has(key) || key === 'es' || key === '__strings' || key === 'wasm:js-string' || key.startsWith('.') || key.startsWith('/') || key.includes(':');
+}
+
+function isPlainObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseArgs(argv) {
