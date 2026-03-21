@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { UtuLanguageService } from '../lsp/src/core/languageService.ts';
-import { UtuParserService } from '../lsp/src/core/parser.ts';
+import { UtuLanguageService } from '../lsp/src/core/languageService.js';
+import { UtuParserService } from '../lsp/src/core/parser.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');

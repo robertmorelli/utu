@@ -4,14 +4,12 @@
   "version": "0.0.1",
   "description": "Shared UTU language intelligence and a standalone UTU LSP server.",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./src/index.js",
   "bin": {
     "utu-lsp": "./dist/utu-lsp.js"
   },
   "scripts": {
     "build": "node ./scripts/build.mjs",
-    "check": "node ../node_modules/typescript/bin/tsc -p . --noEmit",
     "start": "node ./dist/utu-lsp.js"
   },
   "files": [

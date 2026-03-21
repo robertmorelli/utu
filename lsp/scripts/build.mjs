@@ -20,7 +20,7 @@ const grammarCandidates = [
 await mkdir(distRoot, { recursive: true });
 await build({
   bundle: true,
-  entryPoints: [resolve(lspRoot, 'src', 'server', 'node.ts')],
+  entryPoints: [resolve(lspRoot, 'src', 'server', 'node.js')],
   outfile: serverOutputPath,
   platform: 'node',
   target: 'esnext',

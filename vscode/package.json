@@ -126,7 +126,6 @@
     "build:web": "node ./scripts/build.mjs --web-only",
     "watch": "node ./scripts/build.mjs --watch",
     "watch:web": "node ./scripts/build.mjs --watch --web-only",
-    "check": "tsc -p . --noEmit",
     "vscode:prepublish": "npm run build"
   },
   "files": [
@@ -143,9 +142,6 @@
     "web-tree-sitter": "^0.26.7"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "@types/vscode": "^1.96.0",
-    "esbuild": "^0.27.4",
-    "typescript": "^5.9.3"
+    "esbuild": "^0.27.4"
   }
 }

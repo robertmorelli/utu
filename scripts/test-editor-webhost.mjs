@@ -6,8 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   collectUnsupportedRunMainImports,
   getRunMainBlockerMessage,
-} from '../vscode/src/runMainSupport.ts';
-import { createDefaultHostImports } from '../vscode/src/webHostImports.ts';
+} from '../vscode/src/runMainSupport.js';
+import { createDefaultHostImports } from '../vscode/src/webHostImports.js';
 import { compile } from '../compiler/index.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));

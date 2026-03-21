@@ -50,7 +50,7 @@ const extensionConfig = {
   ...sharedBuildOptions,
   platform: 'browser',
   target: 'esnext',
-  entryPoints: [resolve(extensionRoot, 'src/extension.ts')],
+  entryPoints: [resolve(extensionRoot, 'src/extension.js')],
   outfile: resolve(extensionRoot, 'dist/web/extension.js'),
   format: 'cjs',
   external: ['vscode', 'fs', 'fs/promises', 'module', 'path', 'url'],
