@@ -11,13 +11,24 @@ const cases = [
     ['tests-scalar-match', ['test', 'examples/ci/codegen_scalar_match.utu'], 0, 'PASS float match can take a specific arm'],
     ['tests-alt-fallback', ['test', 'examples/ci/codegen_alt_fallback.utu'], 0, 'PASS alt fallback can bind and forward the unmatched value'],
     ['tests-fail', ['test', 'examples/ci/tests_fail.utu'], 1, 'FAIL fails'],
+    ['run-break-and-call', ['run', 'examples/ci/codegen_break_and_call.utu'], 0, '42'],
+    ['run-call-simple', ['run', 'examples/call_simple.utu'], 0, '177280'],
+    ['run-fannkuch', ['run', 'examples/fannkuch.utu'], 0, '10'],
+    ['run-float', ['run', 'examples/float.utu'], 0, '0.8944271901453098'],
+    ['run-hello-name', ['run', 'examples/hello_name.utu', '--imports', 'examples/hello_name_host.mjs'], 0, 'hello utu', { UTU_NAME: 'utu' }],
+    ['run-spectralnorm', ['run', 'examples/spectralnorm.utu'], 0, '1.2742222097429006'],
+    ['run-deltablue', ['run', 'examples/deltablue.utu'], 0, '0'],
     ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--iterations', '4', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'],
     ['bench-codegen-surface', ['bench', 'examples/ci/codegen_test_surface.utu', '--iterations', '4', '--samples', '1', '--warmup', '0'], 0, 'increment loop:'],
 ];
 
 let failed = false;
-for (const [name, args, code, text] of cases) {
-    const proc = Bun.spawn(['bun', './cli_artifact/src/cli.mjs', ...args], { stdout: 'pipe', stderr: 'pipe' });
+for (const [name, args, code, text, env] of cases) {
+    const proc = Bun.spawn(['bun', './cli_artifact/src/cli.mjs', ...args], {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        env: { ...process.env, ...(env ?? {}) },
+    });
     const [stdout, stderr, exitCode] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),

@@ -76,8 +76,6 @@ async function runCase(testCase, wasmPath) {
         wasmUrl: pathToFileURL(wasmPath),
         mode: mode === 'test' ? 'test' : 'program',
     };
-    if (mode === 'test') compileOptions.optimize = false;
-    if (typeof testCase.optimize === 'boolean') compileOptions.optimize = testCase.optimize;
 
     const { js, metadata } = await compile(source, compileOptions);
     const result = {

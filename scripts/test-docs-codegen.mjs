@@ -100,6 +100,11 @@ const cases = [
         snippets: ['(import "es" "console_log"', '(import "es" "wrap"', '(func $main', 'call $console_log', '(export "main" (func $main))'],
     },
     {
+        name: 'break-and-call',
+        path: 'examples/ci/codegen_break_and_call.utu',
+        snippets: ['(func $add_one', 'i64.const 41', 'call $add_one', '(block $done (result i64)', 'br $done'],
+    },
+    {
         name: 'refs-and-i31',
         path: 'examples/ci/codegen_refs_i31.utu',
         snippets: ['ref.as_non_null', 'ref.eq', 'ref.is_null', 'ref.i31', 'i31.get_s', 'i31.get_u'],
@@ -135,7 +140,6 @@ for (const testCase of cases) {
     const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
     const { wat, metadata } = await compile(source, {
         wat: true,
-        optimize: false,
         wasmUrl,
         mode: testCase.mode ?? 'program',
     });
