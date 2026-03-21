@@ -39,6 +39,8 @@ module.exports = grammar({
       $.global_decl,
       $.import_decl,
       $.export_decl,
+      $.test_decl,
+      $.bench_decl,
     ),
 
     // ==================== Declarations ====================
@@ -150,6 +152,33 @@ module.exports = grammar({
       $.fn_decl,
     ),
 
+    test_decl: $ => seq(
+      'test',
+      $.string_lit,
+      $.block,
+    ),
+
+    bench_decl: $ => seq(
+      'bench',
+      $.string_lit,
+      $.bench_capture,
+      '{',
+      $.setup_decl,
+      '}',
+    ),
+
+    bench_capture: $ => seq('|', $.identifier, '|'),
+
+    setup_decl: $ => seq(
+      'setup',
+      '{',
+      repeat($._expr),
+      $.measure_decl,
+      '}',
+    ),
+
+    measure_decl: $ => seq('measure', $.block),
+
     // ==================== Types ====================
 
     _type: $ => choice(
@@ -218,6 +247,7 @@ module.exports = grammar({
       $.literal,
       $.identifier,
       $.paren_expr,
+      $.assert_expr,
       $.unary_expr,
       $.binary_expr,
       $.tuple_expr,
@@ -271,6 +301,8 @@ module.exports = grammar({
     ),
 
     // --- Prefix ---
+
+    assert_expr: $ => prec.right(-2, seq('assert', $._expr)),
 
     unary_expr: $ => prec(12, seq($.unary_op, $._expr)),
 

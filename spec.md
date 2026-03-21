@@ -214,6 +214,36 @@ fn divmod(a: i32, b: i32) i32, i32 {
 let q: i32, r: i32 = divmod(10, 3)
 ```
 
+### 2.8 Assertions, Tests, And Benchmarks
+
+Utu also supports a compact in-source testing surface:
+
+```
+assert cond
+
+test "adds two numbers" {
+    assert add(2, 2) == 4
+}
+
+bench "sum loop" |i| {
+    setup {
+        let total: i32 = 0
+        measure {
+            total = total + i
+        }
+    }
+}
+```
+
+- `assert` traps with `unreachable` when its condition is false
+- `test` declarations are ignored by ordinary program compilation and become
+  synthesized zero-argument exports in test mode
+- `bench` declarations are ignored by ordinary program compilation and become
+  synthesized benchmark exports in bench mode
+- benchmark setup runs once per sample and measure runs inside a generated Wasm
+  loop for the requested iteration count
+- benchmark timing is measured by the host, not inside Wasm
+
 
 ---
 
