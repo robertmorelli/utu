@@ -6,6 +6,9 @@
       "include": "#comments"
     },
     {
+      "include": "#testBench"
+    },
+    {
       "include": "#strings"
     },
     {
@@ -18,10 +21,19 @@
       "include": "#keywords"
     },
     {
+      "include": "#parameters"
+    },
+    {
       "include": "#types"
     },
     {
+      "include": "#members"
+    },
+    {
       "include": "#builtins"
+    },
+    {
+      "include": "#invocations"
     },
     {
       "include": "#operators"
@@ -33,6 +45,22 @@
         {
           "name": "comment.line.double-slash.utu",
           "match": "//.*$"
+        }
+      ]
+    },
+    "testBench": {
+      "patterns": [
+        {
+          "name": "meta.test-or-bench.utu",
+          "match": "\\b(test|bench)\\s+(\"(?:\\\\.|[^\"\\\\])*\")",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "entity.name.section.utu"
+            }
+          }
         }
       ]
     },
@@ -124,11 +152,27 @@
       "patterns": [
         {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|for|break|let|import|extern|export|fn|struct|type|test|bench|setup|measure|assert|mut|and|or|not|unreachable)\\b"
+          "match": "\\b(?:if|else|match|alt|for|break|let|import|extern|export|fn|struct|type|test|bench|setup|measure|assert|mut|and|or|not|fatal)\\b"
         },
         {
           "name": "constant.language.boolean.utu",
           "match": "\\b(?:true|false|null)\\b"
+        }
+      ]
+    },
+    "parameters": {
+      "patterns": [
+        {
+          "name": "meta.parameter.utu",
+          "match": "([,(])\\s*([a-z_][a-zA-Z0-9_]*)\\s*(?=:)",
+          "captures": {
+            "1": {
+              "name": "punctuation.separator.parameters.utu"
+            },
+            "2": {
+              "name": "variable.parameter.utu"
+            }
+          }
         }
       ]
     },
@@ -144,11 +188,46 @@
         }
       ]
     },
+    "members": {
+      "patterns": [
+        {
+          "name": "variable.other.member.utu",
+          "match": "\\.\\s*([a-z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.property.utu",
+          "match": "\\b([a-z_][a-zA-Z0-9_]*)\\s*(?=:)",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.utu"
+            }
+          }
+        }
+      ]
+    },
     "builtins": {
       "patterns": [
         {
           "name": "support.function.builtin.utu",
           "match": "\\b(?:str|array|i31|ref|extern|any|i32|i64|f32|f64)\\.[a-z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "invocations": {
+      "patterns": [
+        {
+          "name": "support.function.call.utu",
+          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|break\\b|let\\b|import\\b|extern\\b|export\\b|fn\\b|struct\\b|type\\b|test\\b|bench\\b|setup\\b|measure\\b|assert\\b|mut\\b|and\\b|or\\b|not\\b|fatal\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.utu"
+            }
+          }
         }
       ]
     },

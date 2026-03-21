@@ -1,5 +1,5 @@
 import { context, build } from 'esbuild';
-import { cp, mkdir, rm, watch } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
@@ -14,34 +14,46 @@ const treeSitterRuntimeSource = resolve(extensionRoot, '../node_modules/web-tree
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const watchMode = process.argv.includes('--watch');
 const webOnlyMode = process.argv.includes('--web-only');
-
-const extensionConfig = {
+const sharedBuildOptions = {
   bundle: true,
-  platform: 'browser',
-  target: 'es2022',
   sourcemap: 'linked',
   sourcesContent: false,
   logLevel: 'info',
+};
+
+const extensionConfig = {
+  ...sharedBuildOptions,
+  platform: 'browser',
+  target: 'es2022',
   entryPoints: [resolve(extensionRoot, 'src/extension.ts')],
   outfile: resolve(extensionRoot, 'dist/web/extension.js'),
   format: 'cjs',
   external: ['vscode', 'fs', 'fs/promises', 'module', 'path', 'url'],
 };
 
-const compilerConfig = {
-  bundle: true,
+const compilerWebConfig = {
+  ...sharedBuildOptions,
+  platform: 'browser',
+  target: 'es2022',
+  entryPoints: [resolve(generatedCompilerRoot, 'index.js')],
+  outfile: resolve(extensionRoot, 'dist/compiler.web.mjs'),
+  format: 'esm',
+  external: ['fs', 'fs/promises', 'module', 'path', 'url'],
+};
+
+const compilerNodeConfig = {
+  ...sharedBuildOptions,
   platform: 'node',
   target: 'node18',
-  sourcemap: 'linked',
-  sourcesContent: false,
-  logLevel: 'info',
   entryPoints: [resolve(generatedCompilerRoot, 'index.js')],
   outfile: resolve(extensionRoot, 'dist/compiler.mjs'),
   format: 'esm',
   external: ['binaryen', 'web-tree-sitter'],
 };
 
-const configs = webOnlyMode ? [extensionConfig] : [extensionConfig, compilerConfig];
+const configs = webOnlyMode
+  ? [extensionConfig, compilerWebConfig]
+  : [extensionConfig, compilerWebConfig, compilerNodeConfig];
 
 let compilerSyncTimer;
 
@@ -55,43 +67,72 @@ async function syncParserRuntime() {
   await cp(treeSitterRuntimeSource, treeSitterRuntimeDest);
 }
 
-async function rebuildCompilerSnapshot(compilerContext) {
+async function prepareAssets() {
+  await syncParserRuntime();
   await syncCompilerSources();
-  await compilerContext.rebuild();
+}
+
+async function rebuildCompilerSnapshot(compilerContexts) {
+  await syncCompilerSources();
+  await Promise.all(compilerContexts.map((compilerContext) => compilerContext.rebuild()));
+}
+
+async function snapshotCompilerSources(root = compilerSourceRoot) {
+  const entries = await readdir(root, { withFileTypes: true });
+  const snapshot = [];
+
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const entryPath = resolve(root, entry.name);
+
+    if (entry.isDirectory()) {
+      snapshot.push(...(await snapshotCompilerSources(entryPath)));
+      continue;
+    }
+
+    if (!entry.isFile()) continue;
+
+    const { mtimeMs, size } = await stat(entryPath);
+    snapshot.push(`${entryPath}:${size}:${mtimeMs}`);
+  }
+
+  return snapshot;
 }
 
 if (watchMode) {
-  await syncParserRuntime();
-  if (!webOnlyMode) {
-    await syncCompilerSources();
-  }
-
+  await prepareAssets();
   const contexts = await Promise.all(configs.map((config) => context(config)));
   await Promise.all(contexts.map((ctx) => ctx.watch()));
-  let compilerWatcher;
+  const compilerContexts = webOnlyMode ? [contexts[1]] : [contexts[1], contexts[2]];
+  let compilerSourceState = (await snapshotCompilerSources()).join('|');
+  let compilerPollInFlight = false;
+  const compilerPoller = setInterval(() => {
+    if (compilerPollInFlight) return;
+    compilerPollInFlight = true;
 
-  if (!webOnlyMode) {
-    try {
-      compilerWatcher = watch(compilerSourceRoot, { recursive: true });
-      const compilerContext = contexts[1];
+    void (async () => {
+      try {
+        const nextState = (await snapshotCompilerSources()).join('|');
 
-      (async () => {
-        for await (const _event of compilerWatcher) {
+        if (nextState !== compilerSourceState) {
+          compilerSourceState = nextState;
           if (compilerSyncTimer) clearTimeout(compilerSyncTimer);
           compilerSyncTimer = setTimeout(() => {
-            void rebuildCompilerSnapshot(compilerContext);
+            void rebuildCompilerSnapshot(compilerContexts).catch((error) => {
+              console.error('Compiler snapshot rebuild failed:', error);
+            });
           }, 75);
         }
-      })().catch((error) => {
-        console.error('Compiler snapshot watcher failed:', error);
-      });
-    } catch (error) {
-      console.warn('Compiler snapshot watch disabled:', error);
-    }
-  }
+      } catch (error) {
+        console.error('Compiler snapshot polling failed:', error);
+      } finally {
+        compilerPollInFlight = false;
+      }
+    })();
+  }, 250);
 
   const closeWatcher = async () => {
-    await compilerWatcher?.return?.();
+    clearInterval(compilerPoller);
+    if (compilerSyncTimer) clearTimeout(compilerSyncTimer);
     for (const ctx of contexts) {
       await ctx.dispose();
     }
@@ -108,9 +149,6 @@ if (watchMode) {
   console.log(webOnlyMode ? 'Watching UTU web extension sources...' : 'Watching UTU extension sources...');
   await new Promise(() => {});
 } else {
-  await syncParserRuntime();
-  if (!webOnlyMode) {
-    await syncCompilerSources();
-  }
+  await prepareAssets();
   await Promise.all(configs.map((config) => build(config)));
 }

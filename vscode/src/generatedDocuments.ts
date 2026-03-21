@@ -3,6 +3,16 @@ import * as vscode from 'vscode';
 export type GeneratedDocumentKind = 'js' | 'wat' | 'tree';
 
 const GENERATED_SCHEME = 'utu-generated';
+const GENERATED_FILE_EXTENSIONS: Record<GeneratedDocumentKind, string> = {
+  js: 'js',
+  wat: 'wat',
+  tree: 'txt',
+};
+const GENERATED_LANGUAGE_IDS: Record<GeneratedDocumentKind, string> = {
+  js: 'javascript',
+  wat: 'wat',
+  tree: 'plaintext',
+};
 
 export class GeneratedDocumentStore implements vscode.TextDocumentContentProvider, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<vscode.Uri>();
@@ -13,9 +23,7 @@ export class GeneratedDocumentStore implements vscode.TextDocumentContentProvide
   upsert(kind: GeneratedDocumentKind, sourceUri: vscode.Uri, content: string): vscode.Uri {
     const fileName = sourceUri.path.split('/').filter(Boolean).at(-1) ?? 'utu';
     const extensionIndex = fileName.lastIndexOf('.');
-    const baseName =
-      extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
-    const extension = kind === 'js' ? 'js' : kind === 'wat' ? 'wat' : 'txt';
+    const baseName = extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
     const query = new URLSearchParams({
       kind,
       source: sourceUri.toString(),
@@ -23,7 +31,7 @@ export class GeneratedDocumentStore implements vscode.TextDocumentContentProvide
 
     const uri = vscode.Uri.from({
       scheme: GENERATED_SCHEME,
-      path: `/${baseName}.${extension}`,
+      path: `/${baseName}.${GENERATED_FILE_EXTENSIONS[kind]}`,
       query,
     });
 
@@ -33,14 +41,7 @@ export class GeneratedDocumentStore implements vscode.TextDocumentContentProvide
   }
 
   languageIdFor(kind: GeneratedDocumentKind): string {
-    switch (kind) {
-      case 'js':
-        return 'javascript';
-      case 'wat':
-        return 'wat';
-      default:
-        return 'plaintext';
-    }
+    return GENERATED_LANGUAGE_IDS[kind];
   }
 
   provideTextDocumentContent(uri: vscode.Uri): string {

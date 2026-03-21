@@ -13,10 +13,36 @@ import type {
   UtuWorkspaceSymbol,
 } from '../../../lsp/src/core/types';
 
+const COMPLETION_KINDS: Record<UtuCompletionItemKind, vscode.CompletionItemKind> = {
+  class: vscode.CompletionItemKind.Class,
+  enumMember: vscode.CompletionItemKind.EnumMember,
+  function: vscode.CompletionItemKind.Function,
+  keyword: vscode.CompletionItemKind.Keyword,
+  method: vscode.CompletionItemKind.Method,
+  module: vscode.CompletionItemKind.Module,
+  text: vscode.CompletionItemKind.Text,
+  variable: vscode.CompletionItemKind.Variable,
+};
+
+const SYMBOL_KINDS: Record<UtuDocumentSymbolKind, vscode.SymbolKind> = {
+  enum: vscode.SymbolKind.Enum,
+  enumMember: vscode.SymbolKind.EnumMember,
+  event: vscode.SymbolKind.Event,
+  function: vscode.SymbolKind.Function,
+  method: vscode.SymbolKind.Method,
+  object: vscode.SymbolKind.Object,
+  struct: vscode.SymbolKind.Struct,
+  variable: vscode.SymbolKind.Variable,
+};
+
+const DIAGNOSTIC_SEVERITIES = {
+  error: vscode.DiagnosticSeverity.Error,
+} as const;
+
 export function toVscodeRange(range: UtuRange): vscode.Range {
   return new vscode.Range(
-    new vscode.Position(range.start.line, range.start.character),
-    new vscode.Position(range.end.line, range.end.character),
+    toVscodePosition(range.start),
+    toVscodePosition(range.end),
   );
 }
 
@@ -32,7 +58,7 @@ export function toVscodeDiagnostic(diagnostic: UtuDiagnostic): vscode.Diagnostic
   const vscodeDiagnostic = new vscode.Diagnostic(
     toVscodeRange(diagnostic.range),
     diagnostic.message,
-    diagnostic.severity === 'error' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning,
+    DIAGNOSTIC_SEVERITIES[diagnostic.severity],
   );
   vscodeDiagnostic.source = diagnostic.source;
   return vscodeDiagnostic;
@@ -50,7 +76,7 @@ export function toVscodeDocumentHighlight(
 }
 
 export function toVscodeCompletionItem(item: UtuCompletionItem): vscode.CompletionItem {
-  const vscodeItem = new vscode.CompletionItem(item.label, toVscodeCompletionKind(item.kind));
+  const vscodeItem = new vscode.CompletionItem(item.label, COMPLETION_KINDS[item.kind]);
   vscodeItem.detail = item.detail;
   return vscodeItem;
 }
@@ -59,7 +85,7 @@ export function toVscodeDocumentSymbol(symbol: UtuDocumentSymbol): vscode.Docume
   return new vscode.DocumentSymbol(
     symbol.name,
     symbol.detail,
-    toVscodeSymbolKind(symbol.kind),
+    SYMBOL_KINDS[symbol.kind],
     toVscodeRange(symbol.range),
     toVscodeRange(symbol.selectionRange),
   );
@@ -70,60 +96,22 @@ export function toVscodeWorkspaceSymbol(
 ): vscode.SymbolInformation {
   return new vscode.SymbolInformation(
     symbol.name,
-    toVscodeSymbolKind(symbol.kind),
+    SYMBOL_KINDS[symbol.kind],
     symbol.detail,
     toVscodeLocation(symbol.location),
   );
 }
 
 export function toMarkdownString(content: UtuMarkupContent): vscode.MarkdownString {
-  if (content.kind === 'plaintext') {
-    const markdown = new vscode.MarkdownString();
-    markdown.appendText(content.value);
-    return markdown;
+  if (content.kind === 'markdown') {
+    return new vscode.MarkdownString(content.value);
   }
 
-  return new vscode.MarkdownString(content.value);
+  const markdown = new vscode.MarkdownString();
+  markdown.appendText(content.value);
+  return markdown;
 }
 
-function toVscodeCompletionKind(kind: UtuCompletionItemKind): vscode.CompletionItemKind {
-  switch (kind) {
-    case 'class':
-      return vscode.CompletionItemKind.Class;
-    case 'enumMember':
-      return vscode.CompletionItemKind.EnumMember;
-    case 'function':
-      return vscode.CompletionItemKind.Function;
-    case 'keyword':
-      return vscode.CompletionItemKind.Keyword;
-    case 'method':
-      return vscode.CompletionItemKind.Method;
-    case 'module':
-      return vscode.CompletionItemKind.Module;
-    case 'variable':
-      return vscode.CompletionItemKind.Variable;
-    default:
-      return vscode.CompletionItemKind.Text;
-  }
-}
-
-function toVscodeSymbolKind(kind: UtuDocumentSymbolKind): vscode.SymbolKind {
-  switch (kind) {
-    case 'enum':
-      return vscode.SymbolKind.Enum;
-    case 'enumMember':
-      return vscode.SymbolKind.EnumMember;
-    case 'event':
-      return vscode.SymbolKind.Event;
-    case 'function':
-      return vscode.SymbolKind.Function;
-    case 'method':
-      return vscode.SymbolKind.Method;
-    case 'struct':
-      return vscode.SymbolKind.Struct;
-    case 'variable':
-      return vscode.SymbolKind.Variable;
-    default:
-      return vscode.SymbolKind.Object;
-  }
+function toVscodePosition(position: UtuRange['start']): vscode.Position {
+  return new vscode.Position(position.line, position.character);
 }

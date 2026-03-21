@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import { UtuLanguageService } from '../../lsp/src/core/languageService';
 import { toVscodeDiagnostic } from './adapters/core';
+import { formatError } from './compilerHost';
 
 type ValidationMode = 'onType' | 'onSave' | 'off';
+const VALIDATION_DELAY_MS = 150;
+const UTU_LANGUAGE_ID = 'utu';
 
 export class DiagnosticsController implements vscode.Disposable {
   private readonly collection = vscode.languages.createDiagnosticCollection('utu');
@@ -53,13 +56,12 @@ export class DiagnosticsController implements vscode.Disposable {
 
   private schedule(document: vscode.TextDocument): void {
     const key = document.uri.toString();
-    const existing = this.pending.get(key);
-    if (existing) clearTimeout(existing);
+    clearTimeout(this.pending.get(key));
 
     const timeout = setTimeout(() => {
       this.pending.delete(key);
       void this.validate(document);
-    }, 150);
+    }, VALIDATION_DELAY_MS);
 
     this.pending.set(key, timeout);
   }
@@ -77,18 +79,16 @@ export class DiagnosticsController implements vscode.Disposable {
   }
 
   private async validate(document: vscode.TextDocument): Promise<void> {
-    const version = document.version;
+    const { uri, version } = document;
 
     try {
       const diagnostics = await this.languageService.getDiagnostics(document);
-      const current = vscode.workspace.textDocuments.find(
-        (candidate) => candidate.uri.toString() === document.uri.toString(),
-      );
+      const current = vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === uri.toString());
 
       if (!current || current.version !== version) return;
-      this.collection.set(document.uri, diagnostics.map(toVscodeDiagnostic));
+      this.collection.set(uri, diagnostics.map(toVscodeDiagnostic));
     } catch (error) {
-      this.output.appendLine(`[utu] Validation failed for ${document.uri.fsPath || document.uri.toString()}`);
+      this.output.appendLine(`[utu] Validation failed for ${uri.fsPath || uri.toString()}`);
       this.output.appendLine(formatError(error));
     }
   }
@@ -104,14 +104,6 @@ export class DiagnosticsController implements vscode.Disposable {
   }
 
   private isUtuDocument(document: vscode.TextDocument): boolean {
-    return document.languageId === 'utu';
+    return document.languageId === UTU_LANGUAGE_ID;
   }
-}
-
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? error.message;
-  }
-
-  return String(error);
 }
