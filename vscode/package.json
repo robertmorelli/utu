@@ -19,13 +19,7 @@
   ],
   "browser": "./dist/web/extension.js",
   "activationEvents": [
-    "onLanguage:utu",
-    "workspaceContains:**/*.utu",
-    "onCommand:utu.compileCurrentFile",
-    "onCommand:utu.runMain",
-    "onCommand:utu.showGeneratedJavaScript",
-    "onCommand:utu.showGeneratedWat",
-    "onCommand:utu.showSyntaxTree"
+    "workspaceContains:**/*.utu"
   ],
   "contributes": {
     "languages": [
