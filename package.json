@@ -1,0 +1,19 @@
+{
+  "name": "utu",
+  "module": "compiler/index.js",
+  "private": true,
+  "scripts": {
+    "grammar": "tree-sitter generate && tree-sitter build --wasm",
+    "bundle": "esbuild compiler/index.js --bundle --format=esm --outfile=dist/index.mjs --external:web-tree-sitter --external:binaryen",
+    "build": "bun run grammar && bun run bundle"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "binaryen": "^125.0.0",
+    "esbuild": "^0.27.4",
+    "tree-sitter-cli": "^0.26.7",
+    "web-tree-sitter": "^0.26.7"
+  }
+}

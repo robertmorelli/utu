@@ -1,0 +1,984 @@
+# Utu
+
+**A WasmGC-Native Language with Linear-Logic Semantics**
+
+*Named after the Sumerian sun god of truth and justice.*
+
+Language Specification — Draft — March 2026
+
+---
+
+## 1. Overview
+
+Utu is a statically-typed, garbage-collected language that compiles directly to WebAssembly GC (WasmGC) instructions. It uses the browser's built-in garbage collector exclusively — no linear memory allocator, no bundled runtime. The result is near-native performance at a fraction of the bundle size of languages like Rust, Go, or Swift compiled to Wasm.
+
+**Design principles:**
+
+- Map directly to WasmGC primitives — every language construct has a 1:1 (or near 1:1) Wasm lowering
+- Linear-by-construction data flow via pipes; unrestricted bindings via explicit promotion
+- Control flow mirrors Wasm structured control flow exactly
+- Strings via JS String Builtins (externref), auto-imported — no custom string runtime
+- Errors as values using exclusive disjunction (`#`), no exceptions in user code
+- Null safety from WasmGC's non-nullable reference types
+- Struct fields const by default, explicitly `mut`
+
+**Naming conventions:**
+
+- Types: `CapitalCamel` — `Vec2`, `Shape`, `ApiError`, `Todo`
+- Functions and variables: `snake_case` — `new_todo`, `console_log`, `my_value`
+
+---
+
+## 2. Type System
+
+### 2.1 Linear Logic Foundation
+
+The type system draws from linear logic, where values are *resources* that are produced and consumed. The key insight is that linearity is enforced *structurally through syntax* rather than through a checker: unnamed intermediate values can only flow forward through pipes and cannot be referenced twice because they have no name. Named bindings are explicitly promoted to unrestricted use via `let`.
+
+#### 2.1.1 Connective Mapping
+
+| Symbol | Linear Logic | Meaning |
+|--------|-------------|---------|
+| (return type) | `!A ⊸ B` | Function (args unrestricted, named in params) |
+| `-o` | `A ⊸ B` | Pipe operator (consume left, produce right) |
+| `,` | `A ⊗ B` | Tensor product — have both simultaneously |
+| `\|` | `A ⊕ B` | Sum / union — one variant, tagged |
+| `#` | `A ⊕ B` (exclusive) | Exclusive disjunction — exactly one non-null |
+| `let` | `!A` | Exponential — promote to unrestricted (reusable binding) |
+
+#### 2.1.2 Resource Interpretation
+
+An unnamed value produced by an expression is a linear resource: it must be consumed exactly once by the next pipe stage or function argument. The `let` binding keyword promotes a value to unrestricted, allowing multiple uses. This makes linearity the invisible default — the common path is pipes and inline expressions, and `let` is the explicit escape hatch. The grammar itself prevents reuse of unnamed values, so no use-count analysis is required.
+
+### 2.2 Scalar Types
+
+| Type | Description |
+|------|-------------|
+| `i32` | 32-bit signed integer |
+| `u32` | 32-bit unsigned integer (i32 with unsigned operations) |
+| `i64` | 64-bit signed integer |
+| `u64` | 64-bit unsigned integer (i64 with unsigned operations) |
+| `f32` | 32-bit IEEE 754 float |
+| `f64` | 64-bit IEEE 754 float |
+| `v128` | 128-bit SIMD vector |
+| `bool` | Boolean (i32 with 0/1 semantics) |
+
+Note: Wasm does not distinguish signed/unsigned at the type level. `u32` and `u64` are syntactic sugar that select unsigned variants of division, remainder, comparison, and conversion instructions.
+
+### 2.3 Reference Types
+
+| Type | Wasm Mapping |
+|------|-------------|
+| `struct { ... }` | `(struct (field ...))` |
+| `array[T]` | `(array (mut T))` |
+| `fn(A) B` | `(func (param A) (result B))` |
+| `externref` | `externref` (opaque JS value) |
+| `anyref` | `anyref` (top of GC hierarchy) |
+| `i31` | `i31ref` (31-bit tagged integer) |
+| `eqref` | `eqref` (structurally comparable) |
+
+All reference types are **non-nullable by default**. Nullable types are expressed using the exclusive disjunction operator: `T # null`. This maps to `(ref null $T)` in Wasm. Null safety is enforced at the Wasm validator level — no runtime overhead.
+
+### 2.4 Product Types (Structs)
+
+Structs are GC heap-allocated reference types. Fields are **const by default**. Use the `mut` keyword to allow mutation. The tensor product `,` appears in both struct field lists and multi-value returns.
+
+```
+struct Vec2 {
+    x: f32,
+    y: f32,
+}
+
+struct Node {
+    value: i32,
+    mut left: Node # null,
+    mut right: Node # null,
+}
+```
+
+**Wasm lowering:**
+
+```wasm
+(type $Vec2 (struct (field $x f32) (field $y f32)))
+(type $Node (struct
+    (field $value i32)
+    (field $left (mut (ref null $Node)))
+    (field $right (mut (ref null $Node)))
+))
+```
+
+Note: const fields lower without the `(mut ...)` wrapper in Wasm, allowing the engine to optimize them as truly immutable.
+
+### 2.5 Sum Types (Enums)
+
+Sum types use `|` and map to WasmGC's type hierarchy. The compiler generates a common supertype and subtypes for each variant. Pattern matching lowers to `br_on_cast` chains.
+
+```
+type Shape =
+    | Circle { radius: f32 }
+    | Rect { w: f32, h: f32 }
+    | Triangle { a: f32, b: f32, c: f32 }
+```
+
+**Wasm lowering:**
+
+```wasm
+(type $Shape (struct))  ;; abstract supertype
+(type $Circle (sub $Shape (struct (field $radius f32))))
+(type $Rect (sub $Shape (struct (field $w f32) (field $h f32))))
+(type $Triangle (sub $Shape (struct
+    (field $a f32) (field $b f32) (field $c f32))))
+```
+
+### 2.6 Exclusive Disjunction (Error Returns)
+
+The `#` operator denotes an exclusive return: exactly one value is non-null. This is the error handling mechanism. It maps to Wasm multi-value return with complementary nullability.
+
+```
+fn divide(a: i32, b: i32) i32 # DivError
+
+// Wasm signature:
+// (func $divide (param i32 i32)
+//     (result (ref null $i32_box) (ref null $DivError)))
+// Contract: exactly one result is non-null
+```
+
+For imports from JS that may throw, the compiler wraps the call in `try`/`catch`. On success, returns `(value, null)`. On catch, attempts to cast the exception to the declared error type. If the cast fails, the exception is rethrown.
+
+```
+// Catches any throw, returns null on error
+import extern "es" fetch(str) Response # null
+
+// Catches and types the error
+import extern "es" fetch(str) Response # ApiError
+
+// Call site — same pattern for both:
+let resp: Response # null, err: ApiError # null = fetch(url)
+if err {
+    // handle error
+} else {
+    // resp is non-null here
+}
+```
+
+#### 2.6.1 Nullable Types
+
+Nullable types are expressed as exclusive disjunction with null:
+
+```
+T # null    // nullable T — maps to (ref null $T)
+```
+
+This means nullable is not a special language feature — it falls out naturally from `#`.
+
+#### 2.6.2 Force Unwrap and Default Values
+
+The `\` (else) operator provides fallback handling for nullable values and `#` returns. It evaluates the left side; if the result is null, it evaluates the right side instead.
+
+```
+// Force unwrap — trap if null (\ unreachable)
+let val: Thing = get_thing() \ unreachable
+
+// Default value — use fallback if null
+let val: Thing = get_thing() \ default_value
+
+// Chained with function calls
+let name: str = lookup(id) \ "anonymous"
+
+// Works with # returns too — take the success or trap
+let resp: Response = fetch(url) \ unreachable
+
+// Take the success or use a default
+let resp: Response = fetch(url) \ cached_response
+```
+
+The `\` operator lowers to a null check + branch:
+
+```wasm
+;; val = expr \ fallback
+(block $ok (result (ref $T))
+    (br_on_non_null $ok (call $expr))
+    ;; null path:
+    (local.get $fallback))  ;; or (unreachable)
+```
+
+### 2.7 Multi-Value Return (Tensor Product)
+
+Functions can return multiple values using `,` which maps directly to Wasm's multi-value return. Unlike `#`, all values are non-null (tensor — you have both).
+
+```
+fn divmod(a: i32, b: i32) i32, i32 {
+    a / b, a % b
+}
+
+let q: i32, r: i32 = divmod(10, 3)
+```
+
+
+---
+
+## 3. Strings
+
+Strings are opaque `externref` values backed by the host's native string representation via the **JS String Builtins** proposal. The compiler auto-imports all string builtins under the `"wasm:js-string"` namespace — no manual import declarations needed. The engine recognizes these imports and can inline them — they are not full JS interop calls.
+
+The `str` type is an alias for `externref` when used with string builtins.
+
+**Auto-imported builtins (always available):**
+
+| Function | Signature |
+|----------|-----------|
+| `str.length(s)` | `(str) i32` |
+| `str.char_code_at(s, i)` | `(str, i32) i32` |
+| `str.concat(a, b)` | `(str, str) str` |
+| `str.substring(s, start, end)` | `(str, i32, i32) str` |
+| `str.equals(a, b)` | `(str, str) bool` |
+| `str.from_char_code_array(arr, start, end)` | `(array[i16], i32, i32) str` |
+| `str.into_char_code_array(s, arr, start)` | `(str, array[i16], i32) i32` |
+| `str.from_char_code(code)` | `(i32) str` |
+
+### 3.1 String Literals
+
+Single-line strings use double quotes. Multi-line strings use `\\` at the start of each line (Zig-style):
+
+```
+let greeting: str = "hello world"
+
+let multiline: str =
+    \\this is a multi-line
+    \\string literal in utu
+    \\each line starts with \\
+```
+
+Multi-line strings are concatenated at compile time with newlines between each `\\` line.
+
+### 3.2 String Processing
+
+For most application code, the auto-imported builtins are sufficient and faster since they use the engine's optimized string representation. For heavy text processing (parsing, regex), convert to a GC `array[i16]` for direct indexing:
+
+```
+let msg: str = "hello" -o str.concat(_, ", ") -o str.concat(_, "world")
+
+// Heavy processing: convert to array
+let arr: array[i16] = array[i16].new(str.length(msg), 0)
+str.into_char_code_array(msg, arr, 0)
+// ... direct array[i16] access ...
+let result: str = str.from_char_code_array(arr, 0, array.len(arr))
+```
+
+---
+
+## 4. Memory Model
+
+### 4.1 GC-Only Allocation
+
+Utu uses WasmGC exclusively for all heap allocation. There is **no linear memory**, no malloc/free, no bundled allocator. All values are either Wasm value-stack scalars or GC-managed heap objects (structs, arrays, i31ref).
+
+**Consequences:**
+
+- The engine's generational/compacting GC manages all memory — typically better than what languages ship in linear memory
+- No use-after-free, no double-free, no memory leaks from forgotten deallocations
+- Bundle sizes are minimal: just compiled logic, no runtime overhead
+- The engine performs escape analysis and scalar replacement — small structs that don't escape may never be heap-allocated
+
+### 4.2 Struct Allocation
+
+```
+// Language level
+let pos: Vec2 = Vec2 { x: 1.0, y: 2.0 }
+
+// Wasm lowering
+(struct.new $Vec2 (f32.const 1.0) (f32.const 2.0))
+```
+
+### 4.3 Array Allocation
+
+```
+// Fixed-size, filled with default value
+let buf: array[i32] = array[i32].new(1024, 0)
+// -> (array.new $i32_array (i32.const 0) (i32.const 1024))
+
+// From existing data
+let data: array[f32] = array[f32].new_fixed(1.0, 2.0, 3.0)
+// -> (array.new_fixed $f32_array 3 (f32.const 1.0) ...)
+
+// Access
+let val: f32 = data[0]      // -> array.get
+data[0] = 42                 // -> array.set
+let len: i32 = array.len(data)  // -> array.len
+```
+
+---
+
+## 5. Control Flow
+
+Every control flow construct maps directly to a Wasm structured control flow instruction. There is no lowering gap — what you write is what gets emitted.
+
+### 5.1 Conditionals
+
+```
+// if-else expression (like Rust, evaluates to a value)
+let max: i32 = if a > b { a } else { b }
+
+// Wasm lowering:
+// (if (result i32) (i32.gt_s (local.get $a) (local.get $b))
+//     (then (local.get $a))
+//     (else (local.get $b)))
+```
+
+### 5.2 Loops
+
+Zig-style `for` loops. The loop header takes iterables/ranges in parentheses, and captures are bound in `|...|` after the closing paren.
+
+```
+// Counted loop — range + capture
+for (0..n) |i| {
+    sum = sum + i
+}
+
+// Multiple ranges / counters
+for (0..width, 0..height) |x, y| {
+    draw_pixel(x, y)
+}
+
+// While-style loop (condition only, no capture)
+for (cond()) {
+    body()
+}
+
+// Infinite loop (empty parens)
+for () {
+    if done() { break }
+}
+```
+
+**Wasm lowering:** `for (0..n) |i| { ... }` lowers to:
+
+```wasm
+(local $i i32)
+(local.set $i (i32.const 0))
+(block $break
+    (loop $continue
+        (br_if $break (i32.ge_s (local.get $i) (local.get $n)))
+        ;; body
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $continue)))
+```
+
+### 5.3 Blocks with Return
+
+Rust-style labeled blocks that evaluate to a value. Labels are bare identifiers (no tick prefix). Maps to Wasm `block` with `br`.
+
+```
+let result: i32 = compute: {
+    if shortcut() {
+        break compute 42
+    }
+    expensive_calculation()
+}
+
+// Wasm lowering:
+// (block $compute (result i32)
+//     (br_if $compute (i32.const 42) (call $shortcut))
+//     (call $expensive_calculation))
+```
+
+### 5.4 Switch / Match
+
+Pattern matching on scalars uses `br_table`. Pattern matching on sum types uses `br_on_cast` chains with an `unreachable` trap for non-exhaustive matches.
+
+```
+// Scalar switch -> br_table
+match opcode {
+    0 => handle_nop(),
+    1 => handle_add(),
+    2 => handle_sub(),
+    _ => unreachable,
+}
+
+// Type switch -> br_on_cast chain
+match shape {
+    s: Circle => area_circle(s),
+    s: Rect => area_rect(s),
+    s: Triangle => area_tri(s),
+}
+```
+
+**Wasm lowering for type match:**
+
+```wasm
+(block $tri (result (ref $Triangle))
+  (block $rect (result (ref $Rect))
+    (block $circle (result (ref $Circle))
+      (local.get $shape)
+      (br_on_cast $circle (ref $Shape) (ref $Circle))
+      (br_on_cast $rect (ref $Shape) (ref $Rect))
+      (br_on_cast $tri (ref $Shape) (ref $Triangle))
+      (unreachable))
+    (call $area_circle))
+  (call $area_rect))
+(call $area_tri)
+```
+
+### 5.5 Unreachable
+
+```
+// Traps the program. Maps directly to (unreachable)
+unreachable
+```
+
+---
+
+## 6. Functions and Pipes
+
+### 6.1 Function Definitions
+
+Functions list parameters in parentheses followed directly by the return type (no `->` arrow). Implicit return (last expression) follows Rust conventions. Parameters are unrestricted (implicitly reusable) since they are named. Void functions omit the return type.
+
+```
+fn add(a: i32, b: i32) i32 {
+    a + b    // implicit return
+}
+
+fn clamp(val: f32, lo: f32, hi: f32) f32 {
+    if val < lo { lo }
+    else if val > hi { hi }
+    else { val }
+}
+
+// Void functions omit the return type
+fn greet(name: str) {
+    name -o console_log
+}
+```
+
+### 6.2 Pipe Operator
+
+The `-o` operator (lollipop from linear logic) pipes a value into the next function. The left side is consumed by the right side.
+
+For **single-argument** functions, the pipe target is just the function name — no parentheses or underscore needed:
+
+```
+a -o f -o g
+
+// Equivalent to: g(f(a))
+```
+
+For **multi-argument** functions, use parentheses with `_` marking where the piped value goes:
+
+```
+a
+-o f
+-o z(_, c, d)
+
+// Equivalent to: z(f(a), c, d)
+
+// _ can appear in any argument position
+x -o clamp(0.0, _, 1.0)
+```
+
+**Chained example:**
+
+```
+"hello"
+-o str.concat(_, " world")
+-o console_log
+```
+
+**Wasm lowering:** The pipe is pure syntactic sugar. `a -o f` desugars to `f(a)`. `a -o f(_, b)` desugars to `f(a, b)`. The lowering is a direct function call.
+
+### 6.3 Bindings
+
+`let` is the binding keyword. It promotes a value to unrestricted (the linear logic exponential `!`). Every named binding is reusable. A type annotation is always required. If you only use a value once, prefer piping or inlining — no binding needed.
+
+```
+// Reusable binding (type always required)
+let config: Config = load_config()
+init(config)
+validate(config)   // used again — fine, it's let-bound
+
+// No binding needed for single use
+load_config() -o init
+
+// Destructuring multi-return
+let q: i32, r: i32 = divmod(10, 3)
+```
+
+---
+
+## 7. Imports and Exports
+
+### 7.1 JS Imports
+
+```
+// Simple import (void return — no return type)
+import extern "es" console_log(str)
+
+// Import with error handling (# null: catch-all)
+import extern "es" fetch(str) Response # null
+
+// Import with typed error (# T: cast or rethrow)
+import extern "es" fetch(str) Response # ApiError
+
+// Import a value
+import extern "es" document: externref
+```
+
+Note: String builtins (`str.length`, `str.concat`, etc.) are auto-imported from `"wasm:js-string"` and do not require import declarations.
+
+### 7.2 Wasm Exports
+
+```
+export fn main() {
+    "hello world" -o console_log
+}
+```
+
+---
+
+## 8. Polymorphic Dispatch
+
+Dynamic dispatch uses `br_on_cast` for type-based dispatch and `call_indirect` / `call_ref` for function reference dispatch. There is no vtable built into the language — dispatch is explicit.
+
+```
+// Type-based dispatch (br_on_cast chain)
+fn describe(s: Shape) str {
+    match s {
+        c: Circle => "circle",
+        r: Rect => "rect",
+        t: Triangle => "triangle",
+    }
+}
+
+// Function reference dispatch (call_ref)
+type Handler = fn(Event)
+let handlers: array[Handler] = array[Handler].new_fixed(on_click, on_hover, on_key)
+handlers[event.kind](event)  // call_ref with array.get
+```
+
+---
+
+## 9. Builtin Operations
+
+All Wasm GC and numeric instructions are exposed as builtins. These are not library functions — the compiler emits the corresponding Wasm instruction directly.
+
+### 9.1 Struct Operations
+
+| Operation | Wasm Instruction |
+|-----------|-----------------|
+| `StructName { fields... }` | `struct.new $T` |
+| `obj.field` | `struct.get $T $field` |
+| `obj.field = val` | `struct.set $T $field` (mut fields only) |
+
+### 9.2 Array Operations
+
+| Operation | Wasm Instruction |
+|-----------|-----------------|
+| `array[T].new(len, init)` | `array.new $T` |
+| `array[T].new_fixed(vals...)` | `array.new_fixed $T N` |
+| `array[T].new_default(len)` | `array.new_default $T` |
+| `array[T].new_data(data, off, len)` | `array.new_data $T $data` |
+| `arr[i]` | `array.get $T` |
+| `arr[i] = val` | `array.set $T` |
+| `array.len(arr)` | `array.len` |
+| `array.copy(dst, di, src, si, len)` | `array.copy $T $T` |
+| `array.fill(arr, off, val, len)` | `array.fill $T` |
+
+### 9.3 Reference Operations
+
+| Operation | Wasm Instruction |
+|-----------|-----------------|
+| `ref.null T` | `ref.null $T` |
+| `ref.is_null(val)` | `ref.is_null` |
+| `ref.as_non_null(val)` | `ref.as_non_null` |
+| `ref.cast<T>(val)` | `ref.cast (ref $T)` |
+| `ref.test<T>(val)` | `ref.test (ref $T)` |
+| `ref.eq(a, b)` | `ref.eq` |
+| `i31.new(val)` | `ref.i31` |
+| `i31.get_s(val)` | `i31.get_s` |
+| `i31.get_u(val)` | `i31.get_u` |
+| `extern.convert(val)` | `extern.convert_any` |
+| `any.convert(val)` | `any.convert_extern` |
+
+### 9.4 Numeric Operations
+
+Standard Wasm numeric instructions are available as infix operators and builtins:
+
+| Category | Operations |
+|----------|-----------|
+| Arithmetic | `+  -  *  /  %` (maps to i32.add, i32.rem_s, f64.mul, etc.) |
+| Bitwise | `& (and)  \| (or)  ^ (xor)  << (shl)  >> (shr_s)  >>> (shr_u)` |
+| Unary | `- (negate)  not (logical not)  ~ (bitwise invert)` |
+| Comparison | `==  !=  <  >  <=  >=` |
+| Conversion | `i32.wrap(i64)`, `i64.extend(i32)`, `f32.convert(i32)`, etc. |
+| Math | `f32.sqrt`, `f64.ceil`, `f64.floor`, `f64.trunc`, `f64.nearest` |
+| SIMD | `v128.*` (all SIMD instructions as builtins) |
+
+**Operator clarity:** Each symbol has exactly one meaning. `#` is exclusive disjunction (type-level only). `%` is always remainder. `^` is always bitwise XOR. `~` is always bitwise NOT (unary only).
+
+---
+
+## 10. Required Wasm Instructions
+
+Complete list of Wasm instructions the compiler must emit. Organized by category.
+
+### 10.1 Control Flow
+
+| Instruction | Used For |
+|-------------|---------|
+| `block` | Labeled blocks, block-with-return |
+| `loop` | For loops, while loops |
+| `if / else` | Conditionals |
+| `br` | Break from block/loop |
+| `br_if` | Conditional break |
+| `br_table` | Scalar switch/match |
+| `br_on_null` | Null check branching, `\` operator |
+| `br_on_non_null` | Non-null check branching, `\` operator |
+| `br_on_cast` | Type-based pattern matching |
+| `br_on_cast_fail` | Inverse type check |
+| `call` | Direct function call |
+| `call_ref` | Function reference call |
+| `call_indirect` | Table-based dispatch |
+| `return` | Early return |
+| `unreachable` | Trap / exhaustive match fallthrough / force unwrap |
+| `nop` | No operation |
+| `try / catch / catch_all` | JS import error wrapping (# operator) |
+| `throw_ref` | Rethrow on failed error cast |
+
+### 10.2 GC Instructions
+
+| Instruction | Used For |
+|-------------|---------|
+| `struct.new` | Struct allocation |
+| `struct.get / struct.get_s / struct.get_u` | Field access |
+| `struct.set` | Field mutation (mut fields only) |
+| `array.new` | Array allocation (with default) |
+| `array.new_fixed` | Array allocation (from values) |
+| `array.new_default` | Array allocation (zero-init) |
+| `array.new_data` | Array from data segment |
+| `array.get / array.get_s / array.get_u` | Array element access |
+| `array.set` | Array element mutation |
+| `array.len` | Array length |
+| `array.copy` | Array bulk copy |
+| `array.fill` | Array bulk fill |
+| `ref.null` | Null reference literal |
+| `ref.is_null` | Null check |
+| `ref.as_non_null` | Assert non-null (trap on null) |
+| `ref.cast` | Downcast (trap on fail) |
+| `ref.test` | Type test (returns i32) |
+| `ref.eq` | Reference equality |
+| `ref.i31` | Box i32 to i31ref |
+| `i31.get_s / i31.get_u` | Unbox i31ref |
+| `extern.convert_any` | anyref to externref |
+| `any.convert_extern` | externref to anyref |
+
+### 10.3 Variable Instructions
+
+| Instruction | Used For |
+|-------------|---------|
+| `local.get` | Read local variable |
+| `local.set` | Write local variable |
+| `local.tee` | Write and keep on stack |
+| `global.get` | Read global |
+| `global.set` | Write mutable global |
+
+### 10.4 Numeric Instructions
+
+All standard Wasm numeric instructions for i32, i64, f32, f64 arithmetic, comparison, and conversion. Plus v128 SIMD instructions when targeting platforms with SIMD support.
+
+### 10.5 Table Instructions
+
+| Instruction | Used For |
+|-------------|---------|
+| `table.get` | Read function reference from table |
+| `table.set` | Write function reference to table |
+| `table.grow` | Grow function table |
+| `table.size` | Query table size |
+
+---
+
+## 11. Grammar
+
+EBNF-style grammar for Utu. Whitespace is insignificant except inside string literals. Comments use `//` (line comments only — no block comments).
+
+### 11.1 Top-Level
+
+```ebnf
+program      ::= item*
+item         ::= import_decl | export_decl | fn_decl | type_decl
+               | struct_decl | global_decl
+```
+
+### 11.2 Declarations
+
+```ebnf
+struct_decl  ::= 'struct' TYPE_IDENT '{' field_list '}'
+field_list   ::= (field (',' field)* ','?)?
+field        ::= 'mut'? IDENT ':' type
+
+type_decl    ::= 'type' TYPE_IDENT '=' variant_list
+variant_list ::= '|'? variant ('|' variant)*
+variant      ::= TYPE_IDENT ('{' field_list '}')?
+
+fn_decl      ::= 'fn' IDENT '(' param_list ')' return_type? block
+param_list   ::= (param (',' param)* ','?)?
+param        ::= IDENT ':' type
+return_type  ::= type ('#' type)? (',' type ('#' type)?)*
+
+global_decl  ::= 'let' IDENT ':' type '=' expr
+
+import_decl  ::= 'import' 'extern' STRING IDENT '(' param_list ')'
+                  return_type?
+export_decl  ::= 'export' fn_decl
+```
+
+### 11.3 Types
+
+```ebnf
+type         ::= scalar_type | ref_type | func_type
+             |   type '#' 'null'
+             |   '(' type ')'
+
+scalar_type  ::= 'i32' | 'u32' | 'i64' | 'u64'
+             |   'f32' | 'f64' | 'v128' | 'bool'
+
+ref_type     ::= TYPE_IDENT | 'str'
+             |   'externref' | 'anyref' | 'eqref'
+             |   'i31' | 'array' '[' type ']'
+
+func_type    ::= 'fn' '(' type_list ')' return_type
+type_list    ::= (type (',' type)*)?
+```
+
+### 11.4 Expressions
+
+```ebnf
+expr         ::= literal | IDENT | unary_expr | binary_expr
+             |   call_expr | pipe_expr | field_expr
+             |   index_expr | if_expr | match_expr
+             |   block_expr | for_expr | break_expr
+             |   assign_expr | bind_expr | else_expr
+             |   struct_init | array_init
+             |   'unreachable' | '(' expr ')'
+
+bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
+
+else_expr    ::= expr '\' expr
+
+pipe_expr    ::= expr '-o' pipe_target
+pipe_target  ::= IDENT
+             |   IDENT '(' pipe_args ')'
+pipe_args    ::= pipe_arg (',' pipe_arg)*
+pipe_arg     ::= '_' | expr
+
+call_expr    ::= expr '(' arg_list ')'
+arg_list     ::= (expr (',' expr)* ','?)?
+
+field_expr   ::= expr '.' IDENT
+index_expr   ::= expr '[' expr ']'
+
+if_expr      ::= 'if' expr block ('else' (if_expr | block))?
+
+match_expr   ::= 'match' expr '{' match_arm+ '}'
+match_arm    ::= pattern '=>' expr ','
+             |   IDENT ':' TYPE_IDENT '=>' expr ','
+             |   '_' '=>' expr ','
+pattern      ::= IDENT | '_'
+
+for_expr     ::= 'for' '(' for_sources ')' capture? block
+for_sources  ::= for_source (',' for_source)*
+for_source   ::= expr '..' expr | expr
+capture      ::= '|' IDENT (',' IDENT)* '|'
+
+block_expr   ::= (IDENT ':')? '{' stmt* expr? '}'
+break_expr   ::= 'break' IDENT? expr?
+
+struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
+array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
+
+assign_expr  ::= (field_expr | index_expr) '=' expr
+```
+
+### 11.5 Operators
+
+**Precedence (high to low):**
+
+| Precedence | Operators | Associativity |
+|-----------|-----------|---------------|
+| 1 (highest) | `.` `[]` `()` | Left |
+| 2 | `~` (bitwise NOT) `-` (negate) `not` | Prefix |
+| 3 | `*` `/` `%` | Left |
+| 4 | `+` `-` | Left |
+| 5 | `<<` `>>` `>>>` | Left |
+| 6 | `&` (bitwise AND) | Left |
+| 7 | `^` (bitwise XOR) | Left |
+| 8 | `\|` (bitwise OR) | Left |
+| 9 | `==` `!=` `<` `>` `<=` `>=` | Left |
+| 10 | `and` | Left |
+| 11 | `or` | Left |
+| 12 | `\` (else/unwrap) | Left |
+| 13 (lowest) | `-o` (pipe) | Left |
+
+```ebnf
+binary_expr  ::= expr bin_op expr
+bin_op       ::= '+' | '-' | '*' | '/' | '%'
+             |   '==' | '!=' | '<' | '>' | '<=' | '>='
+             |   '&' | '|' | '^' | '<<' | '>>' | '>>>'
+             |   'and' | 'or'
+             |   '\' | '-o'
+
+unary_expr   ::= unary_op expr
+unary_op     ::= '-' | 'not' | '~'
+```
+
+**Symbol disambiguation:** Every symbol has exactly one role. `#` is always exclusive disjunction (types only, never in expressions). `%` is always remainder. `^` is always bitwise XOR. `~` is always bitwise NOT (unary only, never binary). No overloaded symbols.
+
+### 11.6 Literals and Identifiers
+
+```ebnf
+literal      ::= INT_LIT | FLOAT_LIT | STRING_LIT | 'true' | 'false'
+             |   'null'
+
+INT_LIT      ::= [0-9]+ | '0x' [0-9a-fA-F]+ | '0b' [01]+
+FLOAT_LIT    ::= [0-9]+ '.' [0-9]+ ([eE] [+-]? [0-9]+)?
+
+STRING_LIT   ::= '"' <characters> '"'
+             |   MULTILINE_STR
+MULTILINE_STR::= ('\\\\' <characters> NEWLINE)+
+
+IDENT        ::= [a-z_] [a-zA-Z0-9_]*
+TYPE_IDENT   ::= [A-Z] [a-zA-Z0-9]*
+LABEL        ::= IDENT
+```
+
+### 11.7 Comments
+
+```ebnf
+COMMENT      ::= '//' <characters> NEWLINE
+```
+
+Line comments only. No block comments.
+
+---
+
+## 12. Compilation Model
+
+### 12.1 Pipeline
+
+Source → Parse → Typecheck → Lower to WAT → wasm-opt → .wasm binary. The compiler is intentionally simple: no monomorphization, no borrow checking, no complex optimization passes. The philosophy is to do minimal work in the compiler and let the Wasm engine's optimizing tiers (Turbofan, IonMonkey) handle the rest.
+
+### 12.2 Type Lowering
+
+All language types lower to WasmGC types within a single recursive type group (`rec`). For modules with many types, the compiler may perform SCC decomposition to emit minimal `rec` groups, improving engine optimization. The ordering within groups is topological by reference graph.
+
+Const struct fields lower to non-mut Wasm fields. Mut struct fields lower to `(mut ...)` Wasm fields.
+
+### 12.3 Function Lowering
+
+Functions lower directly to Wasm functions. Parameters become locals. The implicit return (last expression) is left on the value stack. The pipe operator `-o` is desugared to nested function calls during lowering. `let` bindings become `local.set` / `local.get` pairs.
+
+### 12.4 Multi-Value Let Binding Lowering
+
+When a function returns multiple values, Wasm leaves them on the stack in declaration order. However, `local.set` pops from the top of the stack, so the compiler must set bindings in **reverse order**:
+
+```
+let q: i32, r: i32 = divmod(10, 3)
+```
+
+Wasm lowering:
+
+```wasm
+(call $divmod (i32.const 10) (i32.const 3))
+;; stack is now: [q_val, r_val] (r_val on top)
+(local.set $r)  ;; pops top of stack (second return value)
+(local.set $q)  ;; pops next value (first return value)
+```
+
+This applies to all multi-value returns including `,` (tensor product) and `#` (exclusive disjunction). The compiler reverses the binding list when emitting `local.set` instructions.
+
+### 12.5 Error Lowering
+
+A function with return type `A # B` is emitted with signature `(result (ref null $A) (ref null $B))`. For extern imports, the compiler wraps the import in a trampoline that uses `try`/`catch` from Wasm EH. On success: push value, push `ref.null`. On catch: attempt `ref.cast` to `$B`; if cast fails, `throw_ref` to rethrow. If `B` is `null`, the catch branch is `catch_all` and returns `(ref.null, i32.const 1)` or similar sentinel.
+
+### 12.6 Else Operator Lowering
+
+The `\` operator lowers to `br_on_non_null` / `br_on_null` patterns:
+
+- `expr \ fallback` → check if expr is null; if yes, evaluate fallback
+- `expr \ unreachable` → check if expr is null; if yes, trap
+
+For `#` returns, the compiler first extracts the success value (which is nullable), then applies the `\` logic.
+
+---
+
+## 13. Complete Example
+
+```
+// --- types ---
+
+struct Todo {
+    text: str,
+    mut done: bool,
+}
+
+type Filter =
+    | All
+    | Active
+    | Completed
+
+// --- imports ---
+
+import extern "es" console_log(str)
+import extern "es" fetch(str) str # null
+
+// --- functions ---
+
+fn new_todo(text: str) Todo {
+    Todo { text: text, done: false }
+}
+
+fn toggle(todo: Todo) {
+    todo.done = not todo.done
+}
+
+fn matches(todo: Todo, filter: Filter) bool {
+    match filter {
+        _: All => true,
+        _: Active => not todo.done,
+        _: Completed => todo.done,
+    }
+}
+
+fn count(todos: array[Todo], filter: Filter) i32 {
+    let n: i32 = 0
+    for (0..array.len(todos)) |i| {
+        if matches(todos[i], filter) {
+            n = n + 1
+        }
+    }
+    n
+}
+
+export fn main() {
+    let todos: array[Todo] = array[Todo].new_fixed(
+        new_todo("learn utu"),
+        new_todo("build compiler"),
+        new_todo("ship it"),
+    )
+
+    toggle(todos[0])
+
+    let active: i32 = count(todos, Active {})
+
+    // Error handling with \ (else)
+    let resp: str = fetch("/api/sync") \ "offline"
+    resp -o console_log
+
+    // Force unwrap — trap if null
+    let data: str = fetch("/api/data") \ unreachable
+
+    // Piped string concat
+    "hello"
+    -o str.concat(_, " world")
+    -o console_log
+}
+```
