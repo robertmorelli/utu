@@ -11,8 +11,8 @@ import {
 
 export class WatError extends Error {}
 
-export function watgen(treeOrNode) {
-    return new WatGen(rootNode(treeOrNode)).generate();
+export function watgen(treeOrNode, { mode = 'program' } = {}) {
+    return new WatGen(rootNode(treeOrNode), mode).generate();
 }
 
 const SCALAR_WASM = {
@@ -24,6 +24,7 @@ const SCALAR_WASM = {
 const REF_WASM = { str: 'externref', externref: 'externref', anyref: 'anyref', eqref: 'eqref', i31: 'i31ref' };
 const NULLABLE_REF_WASM = { str: 'externref', externref: 'externref', anyref: 'anyref' };
 const SCALAR_NAMES = new Set(['i32', 'u32', 'i64', 'u64', 'f32', 'f64', 'v128', 'bool']);
+const I32 = { kind: 'scalar', name: 'i32' };
 
 const STR_BUILTINS = {
     length: { importName: 'length', sig: '(param externref) (result i32)' },
@@ -37,8 +38,9 @@ const STR_BUILTINS = {
 };
 
 class WatGen {
-    constructor(root) {
+    constructor(root, mode) {
         this.root = root;
+        this.mode = mode;
 
         this.structDecls = [];
         this.typeDecls = [];
@@ -47,6 +49,8 @@ class WatGen {
         this.globalDecls = [];
         this.importFns = [];
         this.importVals = [];
+        this.testDecls = [];
+        this.benchDecls = [];
 
         this.typeDeclMap = new Map();
         this.globalTypeMap = new Map();
@@ -60,10 +64,11 @@ class WatGen {
         this.labelStack = [];
         this.currentReturnType = null;
         this.uid = 0;
+        this.metadata = { tests: [], benches: [] };
     }
 
     nextUid() { return this.uid++; }
-    generate() { this.collect(); this.scanAll(); return this.emit(); }
+    generate() { this.collect(); this.scanAll(); return { wat: this.emit(), metadata: this.metadata }; }
 
     collect() {
         for (const item of this.root.namedChildren) {
@@ -105,6 +110,12 @@ class WatGen {
                     this.fnItems.push({ ...fn, exported: true, exportName: fn.name });
                     break;
                 }
+                case 'test_decl':
+                    this.testDecls.push(parseTestDecl(item));
+                    break;
+                case 'bench_decl':
+                    this.benchDecls.push(parseBenchDecl(item));
+                    break;
                 default:
                     throw new WatError(`Unknown top-level item: ${item.type}`);
             }
@@ -114,6 +125,11 @@ class WatGen {
     scanAll() {
         for (const { body } of this.fnItems) this.scanNode(body);
         for (const global of this.globalDecls) this.scanNode(global.value);
+        if (this.mode === 'test') for (const test of this.testDecls) this.scanNode(test.body);
+        if (this.mode === 'bench') for (const bench of this.benchDecls) {
+            for (const stmt of bench.setupPrelude) this.scanNode(stmt);
+            this.scanNode(bench.measureBody);
+        }
     }
 
     scanNode(node) {
@@ -178,6 +194,24 @@ class WatGen {
             }
         }
 
+        if (this.mode === 'test') {
+            this.testDecls.forEach((test, i) => {
+                const exportName = `__utu_test_${i}`;
+                this.metadata.tests.push({ name: test.name, exportName });
+                lines.push(this.emitTest(test, exportName));
+                lines.push(`  (export "${exportName}" (func $${exportName}))`);
+            });
+        }
+
+        if (this.mode === 'bench') {
+            this.benchDecls.forEach((bench, i) => {
+                const exportName = `__utu_bench_${i}`;
+                this.metadata.benches.push({ name: bench.name, exportName });
+                lines.push(this.emitBench(bench, exportName));
+                lines.push(`  (export "${exportName}" (func $${exportName}))`);
+            });
+        }
+
         lines.push(')');
         return lines.join('\n');
     }
@@ -221,10 +255,8 @@ class WatGen {
             }
         }
 
-        for (const fn of this.fnItems) {
-            for (const param of fn.params) visitType(param.type);
-            visitType(fn.returnType);
-            walkBlock(fn.body, node => {
+        const visitBody = (body) => {
+            for (const stmt of Array.isArray(body) ? body : body?.namedChildren ?? []) walk(stmt, node => {
                 if (node.type === 'bind_expr') {
                     for (const target of parseBindTargets(node)) visitType(target.type);
                 }
@@ -232,7 +264,16 @@ class WatGen {
                     visitType(parseType(node.namedChildren[0]));
                 }
             });
+        };
+
+        for (const fn of this.fnItems) {
+            for (const param of fn.params) visitType(param.type);
+            visitType(fn.returnType);
+            visitBody(fn.body);
         }
+
+        if (this.mode === 'test') for (const test of this.testDecls) visitBody(test.body);
+        if (this.mode === 'bench') for (const bench of this.benchDecls) visitBody([...bench.setupPrelude, ...bench.measureBody.namedChildren]);
 
         for (const imp of this.importFns) {
             for (const param of imp.params) visitType(param.type);
@@ -291,20 +332,20 @@ class WatGen {
     emitImportVal(imp) { return `  (import "${imp.module}" "${imp.name}" (global $${imp.name} ${this.wasmType(imp.type)}))`; }
     emitGlobal(global) { return `  (global $${global.name} ${this.wasmType(global.type)} ${this.genExprInline(global.value, this.wasmType(global.type))})`; }
 
-    emitFn(fn) {
-        this.localTypes = new Map(fn.params.map(param => [param.name, param.type]));
-        this.currentReturnType = fn.returnType;
+    emitFunc(name, params, returnType, body, emitBody, extraLocals = []) {
+        this.localTypes = new Map(params.map(param => [param.name, param.type]));
+        this.currentReturnType = returnType;
         this.labelStack = [];
-        const locals = this.collectLocals(fn.body);
+        const locals = this.collectLocals(body, extraLocals);
 
-        const params = fn.params
+        const paramList = params
             .map(param => `(param $${param.name} ${this.wasmType(param.type)})`)
             .join(' ');
-        const results = fn.returnType ? ` ${this.watResultList(fn.returnType)}` : '';
-        const sig = [params, results].filter(Boolean).join(' ');
+        const results = returnType ? ` ${this.watResultList(returnType)}` : '';
+        const sig = [paramList, results].filter(Boolean).join(' ');
 
-        const lines = [`  (func $${fn.name}${sig ? ` ${sig}` : ''}`];
-        const declared = new Set(fn.params.map(param => param.name));
+        const lines = [`  (func $${name}${sig ? ` ${sig}` : ''}`];
+        const declared = new Set(params.map(param => param.name));
 
         for (const local of locals) {
             if (declared.has(local.name)) continue;
@@ -313,16 +354,37 @@ class WatGen {
         }
 
         const bodyLines = [];
-        this.genBlock(fn.body, bodyLines, true);
+        emitBody(bodyLines);
         this.pushLines(lines, bodyLines);
         lines.push('  )');
         return lines.join('\n');
     }
 
-    collectLocals(block) {
+    emitFn(fn) {
+        return this.emitFunc(fn.name, fn.params, fn.returnType, fn.body, out => this.genBlock(fn.body, out, true));
+    }
+
+    emitTest(test, exportName) { return this.emitFunc(exportName, [], null, test.body, out => this.genBlock(test.body, out)); }
+
+    emitBench(bench, exportName) {
+        return this.emitFunc(
+            exportName,
+            [{ name: 'iterations', type: I32 }],
+            null,
+            [...bench.setupPrelude, ...bench.measureBody.namedChildren],
+            out => {
+                this.genBody(bench.setupPrelude, out);
+                this.genBenchLoop(bench, out);
+            },
+            [[bench.capture, I32]],
+        );
+    }
+
+    collectLocals(body, extraLocals = []) {
         const locals = [];
         const seen = new Set();
-        walkBlock(block, node => {
+        for (const [name, type] of extraLocals) this.addLocal(locals, seen, name, type);
+        for (const stmt of Array.isArray(body) ? body : body.namedChildren) walk(stmt, node => {
             if (node.type === 'bind_expr') {
                 for (const target of parseBindTargets(node)) this.addLocal(locals, seen, target.name, target.type);
                 return;
@@ -331,14 +393,14 @@ class WatGen {
                 parseForSources(childOfType(node, 'for_sources')).forEach((source, i) => {
                     if (source.kind === 'range') {
                         const name = parseCapture(childOfType(node, 'capture'))[i];
-                        if (name) this.addLocal(locals, seen, name, { kind: 'scalar', name: 'i32' });
+                        if (name) this.addLocal(locals, seen, name, I32);
                     }
                 });
                 return;
             }
             if (node.type !== 'match_expr') return;
 
-            const subjectType = this.inferredToType(this.inferType(node.namedChildren[0])) ?? { kind: 'scalar', name: 'i32' };
+            const subjectType = this.inferredToType(this.inferType(node.namedChildren[0])) ?? I32;
             const arms = childrenOfType(node, 'match_arm').map(parseMatchArm);
             if (!arms.some(arm => arm.guard !== null)) {
                 this.addLocal(locals, seen, this.scalarMatchTempName(node), subjectType);
@@ -363,21 +425,17 @@ class WatGen {
     pushArgs(args, out, hint = null) { for (const arg of args) this.genExpr(arg, hint, out); }
     pushLines(out, lines, prefix = '    ') { for (const line of lines) out.push(`${prefix}${line}`); }
 
-    genBlock(block, out, isFnBody = false) {
-        const stmts = block.namedChildren;
+    genBody(stmts, out, isFnBody = false) {
         for (let i = 0; i < stmts.length; i++) {
             const stmt = stmts[i];
-            const isLast = i === stmts.length - 1;
-            const hint = isLast && isFnBody && this.currentReturnType
-                ? this.returnHint(this.currentReturnType)
-                : null;
-
+            const hint = i === stmts.length - 1 && isFnBody && this.currentReturnType ? this.returnHint(this.currentReturnType) : null;
             this.genExpr(stmt, hint, out);
-
-            if (!isLast && this.exprProducesValue(stmt)) {
-                out.push('drop');
-            }
+            if (i !== stmts.length - 1 && this.exprProducesValue(stmt)) out.push('drop');
         }
+    }
+
+    genBlock(block, out, isFnBody = false) {
+        this.genBody(block.namedChildren, out, isFnBody);
     }
 
     genExpr(node, hint, out) {
@@ -385,6 +443,7 @@ class WatGen {
             case 'literal': this.genLiteral(node, hint, out); return;
             case 'identifier': this.genIdent(node, out); return;
             case 'paren_expr': this.genExpr(node.namedChildren[0], hint, out); return;
+            case 'assert_expr': this.genAssert(node, out); return;
             case 'unary_expr': this.genUnary(node, hint, out); return;
             case 'binary_expr': this.genBinary(node, hint, out); return;
             case 'tuple_expr': this.genTuple(node, out); return;
@@ -444,6 +503,16 @@ class WatGen {
     genIdent(node, out) {
         const name = node.text;
         out.push(`${this.globalTypeMap.has(name) && !this.localTypes?.has(name) ? 'global' : 'local'}.get $${name}`);
+    }
+
+    genAssert(node, out) {
+        this.genExpr(node.namedChildren[0], 'i32', out);
+        out.push('i32.eqz');
+        out.push('(if');
+        out.push('  (then');
+        out.push('    unreachable');
+        out.push('  )');
+        out.push(')');
     }
 
     genUnary(node, hint, out) {
@@ -905,6 +974,32 @@ class WatGen {
         out.push(`br ${label}`);
     }
 
+    genBenchLoop(bench, out) {
+        const uid = this.nextUid();
+        const breakLabel = `$__break_${uid}`;
+        const continueLabel = `$__continue_${uid}`;
+        this.labelStack.push({ kind: 'loop', breakLbl: breakLabel });
+        out.push('i32.const 0');
+        out.push(`local.set $${bench.capture}`);
+        out.push(`(block ${breakLabel}`);
+        out.push(`  (loop ${continueLabel}`);
+        out.push(`    local.get $${bench.capture}`);
+        out.push('    local.get $iterations');
+        out.push('    i32.ge_s');
+        out.push(`    br_if ${breakLabel}`);
+        const bodyLines = [];
+        this.genBody(bench.measureBody.namedChildren, bodyLines);
+        this.pushLines(out, bodyLines);
+        out.push(`    local.get $${bench.capture}`);
+        out.push('    i32.const 1');
+        out.push('    i32.add');
+        out.push(`    local.set $${bench.capture}`);
+        out.push(`    (br ${continueLabel})`);
+        out.push('  )');
+        out.push(')');
+        this.labelStack.pop();
+    }
+
     genLet(node, out) {
         const targets = parseBindTargets(node);
         const value = node.namedChildren[node.namedChildren.length - 1];
@@ -978,7 +1073,7 @@ class WatGen {
 
         if (lhs.type === 'identifier') {
             const name = lhs.text;
-            const type = this.localTypes.get(name) ?? this.globalTypeMap.get(name) ?? { kind: 'scalar', name: 'i32' };
+            const type = this.localTypes.get(name) ?? this.globalTypeMap.get(name) ?? I32;
             this.genExpr(rhs, this.wasmType(type), out);
             out.push(`${this.localTypes.has(name) ? 'local' : 'global'}.set $${name}`);
             return;
@@ -1097,6 +1192,8 @@ class WatGen {
                 return this.inferType(node.namedChildren[1]);
             case 'block':
                 return this.inferType(node.namedChildren.at(-1));
+            case 'assert_expr':
+                return null;
             default:
                 return null;
         }
@@ -1130,7 +1227,7 @@ class WatGen {
 
     nullableNullTarget(inner) { return !inner ? 'none' : inner.kind === 'named' ? (inner.name === 'str' || inner.name === 'externref' ? 'extern' : `$${inner.name}`) : 'none'; }
     genExprInline(node, hint) { const out = []; this.genExpr(node, hint, out); return out.join(' '); }
-    exprProducesValue(node) { return !['assign_expr', 'for_expr', 'bind_expr'].includes(node.type); }
+    exprProducesValue(node) { return !['assert_expr', 'assign_expr', 'for_expr', 'bind_expr'].includes(node.type); }
 }
 
 const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) });
@@ -1151,6 +1248,22 @@ const parseImportDecl = (node) => {
     return hasAnon(node, '(')
         ? { kind: 'import_fn', module, name, params: parseImportParamList(childOfType(node, 'import_param_list')), returnType: parseReturnType(childOfType(node, 'return_type')) }
         : { kind: 'import_val', module, name, type: parseType(typeNode) };
+};
+const parseTestDecl = (node) => ({ kind: 'test_decl', name: node.namedChildren[0].text.slice(1, -1), body: childOfType(node, 'block') });
+const parseSetupDecl = (node) => {
+    const named = node.namedChildren, measure = named.at(-1);
+    if (measure?.type !== 'measure_decl') throw new WatError('bench setup must end with a measure block');
+    return { setupPrelude: named.slice(0, -1), measureBody: childOfType(measure, 'block') };
+};
+const parseBenchDecl = (node) => {
+    const setup = childOfType(node, 'setup_decl');
+    if (!setup) throw new WatError('bench must contain exactly one setup block');
+    return {
+        kind: 'bench_decl',
+        name: node.namedChildren[0].text.slice(1, -1),
+        capture: childOfType(node, 'bench_capture').namedChildren[0].text,
+        ...parseSetupDecl(setup),
+    };
 };
 
 const parseFieldList = (node) => mapType(node, 'field', parseField);

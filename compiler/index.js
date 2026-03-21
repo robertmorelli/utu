@@ -13,15 +13,15 @@ export async function init({ wasmUrl } = {}) {
     parser.setLanguage(await Language.load(wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url)));
 }
 
-export async function compile(source, { wat: emitWat = false, optimize = true, wasmUrl } = {}) {
+export async function compile(source, { wat: emitWat = false, optimize = true, wasmUrl, mode = 'program' } = {}) {
     if (!parser) await init({ wasmUrl });
     const tree = parser.parse(source);
     throwOnParseErrors(tree.rootNode);
-    const wat = watgen(tree), mod = binaryen.parseText(wat);
+    const { wat, metadata } = watgen(tree, { mode }), mod = binaryen.parseText(wat);
     mod.setFeatures(binaryen.Features.All);
     if (optimize) { binaryen.setOptimizeLevel(2); binaryen.setShrinkLevel(1); mod.optimize(); }
     const wasm = mod.emitBinary();
     mod.dispose();
-    const js = jsgen(tree, wasm);
-    return emitWat ? { js, wat, wasm } : { js, wasm };
+    const result = { js: jsgen(tree, wasm, { mode }), wasm, metadata };
+    return emitWat ? { ...result, wat } : result;
 }
