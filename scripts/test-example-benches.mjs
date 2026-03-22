@@ -9,7 +9,7 @@ const cases = [
 
 let failed = false;
 for (const testCase of cases) {
-    const args = ['bun', './cli_artifact/src/cli.mjs', 'bench', testCase.path, '--seconds', '0.01', '--samples', '1', '--warmup', '0'];
+    const args = ['bun', './compiler/cli.mjs', 'bench', testCase.path, '--seconds', '0.01', '--samples', '1', '--warmup', '0'];
     const proc = Bun.spawn(args, { stdout: 'pipe', stderr: 'pipe' });
     const [stdout, stderr, exitCode] = await Promise.all([
         new Response(proc.stdout).text(),

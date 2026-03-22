@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { UtuParserService, createSourceDocument, spanFromOffsets } from '../compiler/parser.js';
-import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp/src/core/languageService.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../compiler/lsp_core/languageService.js';
 import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));

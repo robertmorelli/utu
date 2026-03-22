@@ -89,7 +89,6 @@
       "name": "codegen-nullable-imports",
       "path": "examples/ci/nullable_imports.utu",
       "mode": "test",
-      "imports": "examples/ci/nullable_imports.mjs",
       "expectedTests": 5,
       "tags": ["codegen"]
     },
@@ -104,7 +103,6 @@
       "name": "codegen-import-values",
       "path": "examples/ci/codegen_import_values.utu",
       "mode": "test",
-      "imports": "examples/ci/import_values_host.mjs",
       "expectedTests": 3,
       "tags": ["codegen"]
     },

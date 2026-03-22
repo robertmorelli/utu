@@ -1,10 +1,13 @@
 import { chmod, copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import grammarWasmPath from "../tree-sitter-utu.wasm" with { type: "file" };
+import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
 
-import { compileUtuSource } from "../cli_artifact/src/lib/compiler.mjs";
+import * as compiler from "../compiler/index.js";
 
 const repoRoot = process.cwd();
+const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
 const cacheDir = path.join(tmpdir(), "utu-deltablue-bench-cache");
 const utuDir = path.join(cacheDir, "utu");
 const rustWasmDir = path.join(cacheDir, "rust_wasm");
@@ -53,7 +56,8 @@ console.log(cacheDir);
 
 async function prepareUtu() {
     const source = await readFile(path.join(repoRoot, "examples/deltablue.utu"), "utf8");
-    const { js, metadata, wasm } = await compileUtuSource(source, { mode: "bench" });
+    await compiler.init(compilerAssetOptions);
+    const { js, metadata, wasm } = await compiler.compile(source, { mode: "bench", ...compilerAssetOptions });
     const moduleBytes = Buffer.byteLength(js, "utf8");
     await writeFile(path.join(utuDir, "module.mjs"), js, "utf8");
     await writeFile(

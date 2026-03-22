@@ -66,7 +66,7 @@ jobs:
         run: |
           npm run build
           test -f ./dist/utu-lsp.js
-          test -f ./dist/tree-sitter-utu.wasm
+          test -f ./tree-sitter-utu.wasm
           test -f ./dist/web-tree-sitter.wasm
 
       - name: Build VS Code extension

@@ -27,7 +27,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: cli_artifact
 
     steps:
       - name: Check out repository
@@ -44,7 +43,7 @@ jobs:
 
       - name: Check help text
         run: |
-          output="$(bun ./src/cli.mjs help)"
+          output="$(bun ./compiler/cli.mjs help)"
           echo "$output"
           grep -Fq 'utu compile <input> [--outdir <dir>] [--wat] [--bun]' <<<"$output"
           grep -Fq 'utu run <input>' <<<"$output"
@@ -52,7 +51,7 @@ jobs:
       - name: Check usage errors
         run: |
           set +e
-          output="$(bun ./src/cli.mjs compile 2>&1)"
+          output="$(bun ./compiler/cli.mjs compile 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -60,7 +59,7 @@ jobs:
           grep -Fq 'compile needs an input file' <<<"$output"
 
           set +e
-          output="$(bun ./src/cli.mjs nope 2>&1)"
+          output="$(bun ./compiler/cli.mjs nope 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -68,7 +67,7 @@ jobs:
           grep -Fq 'Unknown command "nope"' <<<"$output"
 
           set +e
-          output="$(bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
+          output="$(bun ./compiler/cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -78,7 +77,7 @@ jobs:
       - name: Compile with source CLI
         run: |
           rm -rf dist/ci-src
-          bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/ci-src --wat
+          bun ./compiler/cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --wat
           test -f dist/ci-src/call_simple.mjs
           test -f dist/ci-src/call_simple.wasm
           test -f dist/ci-src/call_simple.wat
@@ -92,13 +91,13 @@ jobs:
       - name: Compile Bun executable
         run: |
           rm -rf dist/ci-bun
-          bun ./src/cli.mjs compile ../examples/call_simple.utu --outdir ./dist/ci-bun --bun
+          bun ./compiler/cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-bun --bun
           test -f dist/ci-bun/call_simple
 
       - name: Compile with bundled CLI
         run: |
           rm -rf dist/ci-bundle
-          ./dist/utu compile ../examples/call_simple.utu --outdir ./dist/ci-bundle --wat
+          ./dist/utu compile ./examples/call_simple.utu --outdir ./dist/ci-bundle --wat
           test -f dist/ci-bundle/call_simple.mjs
           test -f dist/ci-bundle/call_simple.wasm
           test -f dist/ci-bundle/call_simple.wat
@@ -118,7 +117,7 @@ jobs:
       - name: Run with source CLI
         run: |
           set +e
-          output="$(bun ./src/cli.mjs run ../examples/call_simple.utu 2>&1)"
+          output="$(bun ./compiler/cli.mjs run ./examples/call_simple.utu 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -130,7 +129,7 @@ jobs:
       - name: Run with bundled CLI
         run: |
           set +e
-          output="$(./dist/utu run ../examples/call_simple.utu 2>&1)"
+          output="$(./dist/utu run ./examples/call_simple.utu 2>&1)"
           exit_code=$?
           set -e
           echo "$output"

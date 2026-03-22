@@ -1,21 +1,21 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import grammarWasmPath from '../tree-sitter-utu.wasm' with { type: 'file' };
+import runtimeWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' };
 
-import { compileUtuSource } from '../cli_artifact/src/lib/compiler.mjs';
-import { executeFixedRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../shared/compiledRuntime.mjs';
-import { createCliImportProvider } from '../shared/hostImports.mjs';
-import { loadNodeModuleFromSource } from '../shared/moduleLoaders.node.mjs';
+import * as compiler from '../compiler/index.js';
+import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../compiler/loadCompiledRuntime.mjs';
+import { loadNodeModuleFromSource } from '../compiler/loadNodeModuleFromSource.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
+const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
 const sources = {
     run: await readFile(resolve(repoRoot, 'examples/ci/hello.utu'), 'utf8'),
     test: await readFile(resolve(repoRoot, 'examples/ci/tests_basic.utu'), 'utf8'),
     bench: await readFile(resolve(repoRoot, 'examples/bench/bench_basic.utu'), 'utf8'),
 };
-const emptyImports = () => createCliImportProvider({ prompt: () => '', writeLine: () => {} });
-
 const cases = [
     ['compile-run cycle', 25, async () => {
         await withCliRuntime(sources.run, { mode: 'program' }, async (runtime) => {
@@ -40,8 +40,8 @@ const cases = [
     ['compile-bench cycle', 15, async () => {
         await withCliRuntime(sources.bench, { mode: 'bench' }, async (runtime) => {
             expectEqual(runtime.metadata.benches.length, 1);
-            const result = await executeFixedRuntimeBenchmark(runtime, 0, {
-                iterations: 16,
+            const result = await executeRuntimeBenchmark(runtime, 0, {
+                seconds: 0.001,
                 samples: 1,
                 warmup: 0,
             });
@@ -76,10 +76,28 @@ async function withCliRuntime(source, { mode }, run) {
   return withRuntime(loadCompiledRuntime({
     source,
     mode,
-    compileSource: compileUtuSource,
+    compileSource,
     loadModule: (shim) => loadNodeModuleFromSource(shim, { prefix: `utu-stress-${mode}-` }),
-    createImports: emptyImports,
   }), run);
+}
+
+async function compileSource(source, { wat = false, mode = 'program', where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {
+    await compiler.init(compilerAssetOptions);
+    const value = await compiler.compile(source, {
+        wat,
+        mode,
+        where,
+        moduleFormat,
+        targetName,
+        ...compilerAssetOptions,
+    });
+    return {
+        ...value,
+        js: value.js ?? value.shim,
+        shim: value.shim ?? value.js,
+        wasm: value.wasm instanceof Uint8Array ? value.wasm : new Uint8Array(value.wasm),
+        metadata: value.metadata ?? {},
+    };
 }
 
 function expectEqual(actual, expected) {

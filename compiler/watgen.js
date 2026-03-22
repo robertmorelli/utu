@@ -11,8 +11,8 @@ import {
 
 export class WatError extends Error {}
 
-export function watgen(treeOrNode, { mode = 'program', profile = null } = {}) {
-    return new WatGen(rootNode(treeOrNode), mode, profile).generate();
+export function watgen(treeOrNode, { mode = 'program', profile = null, targetName = null } = {}) {
+    return new WatGen(rootNode(treeOrNode), mode, profile, targetName).generate();
 }
 
 const SCALAR_WASM = {
@@ -322,10 +322,11 @@ const PARSE_TYPE_HANDLERS = {
 };
 
 class WatGen {
-    constructor(root, mode, profile = null) {
+    constructor(root, mode, profile = null, targetName = null) {
         this.root = root;
         this.mode = mode;
         this.profile = profile;
+        this.targetName = targetName;
 
         this.structDecls = [];
         this.typeDecls = [];
@@ -362,6 +363,10 @@ class WatGen {
             if (collect) collect(this, item);
             else throw new WatError(`Unknown top-level item: ${item.type}`);
         }
+        if (this.mode === 'test' && this.targetName !== null)
+            this.testDecls = this.testDecls.filter((test) => test.name === this.targetName);
+        if (this.mode === 'bench' && this.targetName !== null)
+            this.benchDecls = this.benchDecls.filter((bench) => bench.name === this.targetName);
     }
 
     scanAll() {

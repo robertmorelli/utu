@@ -3,31 +3,32 @@ import { resolve } from 'node:path';
 
 const grammarCandidates = [
   'tree-sitter-utu.wasm',
-  'vscode/tree-sitter-utu.wasm',
+  'tree-sitter-utu.wasm',
 ];
 
 const runtimeCandidates = [
   'web-tree-sitter.wasm',
-  'vscode/web-tree-sitter.wasm',
+  'web-tree-sitter.wasm',
   'node_modules/web-tree-sitter/web-tree-sitter.wasm',
 ];
 
 const packagedEditorGrammarCandidates = [
-  'vscode/tree-sitter-utu.wasm',
+  'tree-sitter-utu.wasm',
 ];
 
 const packagedEditorRuntimeCandidates = [
-  'vscode/web-tree-sitter.wasm',
+  'web-tree-sitter.wasm',
   'node_modules/web-tree-sitter/web-tree-sitter.wasm',
 ];
 
 const cliGrammarCandidates = [
   'tree-sitter-utu.wasm',
+  'tree-sitter-utu.wasm',
 ];
 
 const cliRuntimeCandidates = [
+  'web-tree-sitter.wasm',
   'node_modules/web-tree-sitter/web-tree-sitter.wasm',
-  'vscode/web-tree-sitter.wasm',
 ];
 
 export async function loadEditorTestAssets(repoRoot) {

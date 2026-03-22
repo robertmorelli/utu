@@ -61,7 +61,7 @@
         "UTU: Prepare Web Extension"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/vscode",
+        "cwd": "${workspaceFolder}",
         "env": {
           "NO_COLOR": "1",
           "FORCE_COLOR": "0"

@@ -2,11 +2,14 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import grammarWasmPath from "../tree-sitter-utu.wasm" with { type: "file" };
+import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
 
-import { compileUtuSource } from "../cli_artifact/src/lib/compiler.mjs";
+import * as compiler from "../compiler/index.js";
 
 const repoRoot = process.cwd();
 const targetSeconds = Number.parseFloat(process.argv[2] ?? "1");
+const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
 const MAX_BENCH_ITERATIONS = 0x7fffffff;
 if (!Number.isFinite(targetSeconds) || targetSeconds <= 0) {
     throw new Error("Usage: bun scripts/compare-deltablue-rust.mjs [seconds]");
@@ -54,7 +57,8 @@ async function loadUtu() {
     const source = await readFile(path.join(repoRoot, "examples/deltablue.utu"), "utf8");
     const dir = await mkdtemp(path.join(tmpdir(), "utu-rust-compare-utu-"));
     const file = path.join(dir, "module.mjs");
-    const { js, metadata, wasm } = await compileUtuSource(source, { mode: "bench" });
+    await compiler.init(compilerAssetOptions);
+    const { js, metadata, wasm } = await compiler.compile(source, { mode: "bench", ...compilerAssetOptions });
     await writeFile(file, js, "utf8");
     const mod = await import(pathToFileURL(file).href);
     const exports = await mod.instantiate();

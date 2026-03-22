@@ -1,5 +1,12 @@
-import { createUtuTreeSitterParser } from './treeSitterParser.js';
-import { parseTree, withParsedTree as withManagedParsedTree } from '../shared/treeSitter.mjs';
+import { Parser, Language } from 'web-tree-sitter';
+
+export async function createUtuTreeSitterParser({ wasmUrl, runtimeWasmUrl, grammarWasmPath = wasmUrl, runtimeWasmPath = runtimeWasmUrl } = {}) {
+    const grammarWasm = normalizeWasmSource(grammarWasmPath);
+    await Parser.init(createTreeSitterInitOptions(runtimeWasmPath));
+    const parser = new Parser();
+    parser.setLanguage(await Language.load(grammarWasm));
+    return parser;
+}
 
 export class UtuParserService {
     options;
@@ -36,7 +43,58 @@ export class UtuParserService {
     }
     async withParsedTree(source, callback) {
         const parser = await this.getParser();
-        return withManagedParsedTree(parser, source, callback);
+        return withParsedTree(parser, source, callback);
+    }
+}
+
+export function normalizeWasmSource(source) {
+    if (typeof source === 'string' || source instanceof URL) {
+        return source;
+    }
+    if (source instanceof ArrayBuffer) {
+        return new Uint8Array(source);
+    }
+    if (ArrayBuffer.isView(source)) {
+        return new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+    }
+    return source?.href ?? source ?? null;
+}
+
+export function createTreeSitterInitOptions(runtimeWasmSource) {
+    const runtimeWasm = normalizeWasmSource(runtimeWasmSource);
+    if (runtimeWasm instanceof Uint8Array) {
+        return {
+            wasmBinary: runtimeWasm,
+            instantiateWasm(imports, successCallback) {
+                void WebAssembly.instantiate(runtimeWasm, imports).then(({ instance, module }) => {
+                    successCallback(instance, module);
+                });
+                return {};
+            },
+        };
+    }
+    return runtimeWasm ? { locateFile: () => String(runtimeWasm) } : {};
+}
+
+export function parseTree(parser, source, errorMessage = 'Tree-sitter returned no syntax tree for the document.') {
+    const tree = parser.parse(source);
+    if (!tree) {
+        throw new Error(errorMessage);
+    }
+    return {
+        tree,
+        dispose() {
+            tree.delete();
+        },
+    };
+}
+
+export async function withParsedTree(parser, source, callback, errorMessage) {
+    const parsedTree = parseTree(parser, source, errorMessage);
+    try {
+        return await callback(parsedTree.tree);
+    } finally {
+        parsedTree.dispose();
     }
 }
 

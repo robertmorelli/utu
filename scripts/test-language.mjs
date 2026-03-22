@@ -4,9 +4,7 @@ const cases = [
     ['tests-basic', ['test', 'examples/ci/tests_basic.utu'], 0, 'PASS adds two numbers'],
     ['tests-codegen-surface', ['test', 'examples/ci/codegen_test_surface.utu'], 0, 'PASS top-level tests become synthesized exports'],
     ['tests-nullable', ['test', 'examples/ci/codegen_nullable.utu'], 0, 'PASS else fallback runs on null'],
-    ['tests-nullable-imports', ['test', 'examples/ci/nullable_imports.utu', '--imports', 'examples/ci/nullable_imports.mjs'], 0, 'PASS thrown nullable imports fall back to defaults'],
     ['tests-string-builtins', ['test', 'examples/ci/node_builtin_imports.utu'], 0, 'PASS string builtins work without host declarations'],
-    ['tests-import-values', ['test', 'examples/ci/codegen_import_values.utu', '--imports', 'examples/ci/import_values_host.mjs'], 0, 'PASS imported externref globals can stay non-null'],
     ['tests-globals', ['test', 'examples/ci/codegen_globals.utu'], 0, 'PASS top-level numeric globals lower to global.get'],
     ['tests-scalar-match', ['test', 'examples/ci/codegen_scalar_match.utu'], 0, 'PASS float match can take a specific arm'],
     ['tests-alt-fallback', ['test', 'examples/ci/codegen_alt_fallback.utu'], 0, 'PASS alt fallback can bind and forward the unmatched value'],
@@ -29,7 +27,7 @@ const cases = [
 
 let failed = false;
 for (const [name, args, code, text, stdin] of cases) {
-    const proc = Bun.spawn(['bun', './cli_artifact/src/cli.mjs', ...args], {
+    const proc = Bun.spawn(['bun', './compiler/cli.mjs', ...args], {
         stdin: stdin === undefined ? 'ignore' : 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',

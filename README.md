@@ -1,36 +1,62 @@
-# UTU
-A high level language that compiles to highly efficient wasm.
+# UTU VS Code Extension
 
-### About the repo
-- compiler/ contains the js for wasm codegen
-- examples/ contains utu benchmarks
-- examples/ci contains small smoke fixtures for CI
-- src/ contains grammargen stuff from tree sitter
-- vscode/ contains the vscode extension
-- web_artifact/ contains the web demo
-- cli_artifact/ contains the bun cli for compilation
+This repo is now the UTU VS Code extension package.
 
-### About UTU
-- The canonical spec lives under `documentation/`; `documentation/spec.typ` assembles the full spec and `documentation/index.typ` organizes the topic-oriented docs
-- Vaguely has algebraic types
-- Relies solely on js memory (no linear memory)
-- Lowers to nearly analogous wasm
+## What is set up
 
-### Testing
-- `bun run test` runs the full local suite: the full manifest plus language, editor-core, compile, benchmark, and docs/codegen checks
-- `bun run test:examples` runs the smoke-tagged cases from `examples/manifest.json`
-- `bun run test:examples:codegen` runs the codegen-tagged cases from `examples/manifest.json`
-- `bun run test:language` runs focused `assert` / `test` / `bench` checks through the CLI
-- `bun run test:examples:all` runs the full manifest, including the benchmark-tagged cases
-- `.github/workflows/example-tests.yml` runs the full suite on pull requests, pushes to `main` / `master`, and manual dispatches
-- `scripts/test-examples.mjs` writes a JSON report when passed `--report-file <path>`
+- `.utu` language registration
+- line comments, bracket config, and editor indentation rules
+- basic TextMate syntax highlighting
+- semantic symbol coloring for UTU declarations and references
+- syntax diagnostics powered by the local `tree-sitter-utu.wasm`
+- document outline symbols for top-level declarations
+- hover details for UTU symbols, core types, and common builtins
+- local go-to-definition, find references, and document highlights
+- completions for UTU keywords, core types, builtin namespaces, and top-level symbols
+- workspace symbol search across `.utu` files
+- commands to compile or run the active file and inspect generated JavaScript, WAT, and the parser tree
+- test and benchmark discovery through the VS Code Testing view and per-declaration code lenses
+- the reusable language core now lives in `./compiler`, with `./extension` acting as the thin adapter layer
+- the standalone `utu-lsp` server now builds from `./compiler/lsp.mjs`
+- compiler bundles that build directly from `./compiler`, so the extension uses the same compile path as the CLI and other tooling
+- a web extension bundle for `vscode.dev` at `dist/web/extension.js`
 
-### CLI
-- `bun ./cli_artifact/src/cli.mjs compile <file> [--outdir <dir>] [--wat]`
-- `bun ./cli_artifact/src/cli.mjs run <file> [--imports <file>]`
-- `bun ./cli_artifact/src/cli.mjs test <file> [--imports <file>]`
-- `bun ./cli_artifact/src/cli.mjs bench <file> [--imports <file>] [--seconds <n>] [--samples <n>] [--warmup <n>]`
-- `bun run build:cli` builds a standalone CLI executable at `cli_artifact/dist/utu`
+## Commands
 
-### License
-- MIT
+- `UTU: Compile Current File`
+- `UTU: Run Main`
+- `UTU: Show Generated JavaScript`
+- `UTU: Show Generated WAT`
+- `UTU: Show Syntax Tree`
+
+## Development
+
+Run the extension build from this folder:
+
+```sh
+npm run build
+```
+
+For rebuild-on-change:
+
+```sh
+npm run watch
+```
+
+For VS Code desktop debugging of the web extension host:
+
+```sh
+npm run watch:web
+```
+
+The build emits the web extension plus the current compiler bundles:
+
+- `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`
+- `dist/compiler.web.mjs`: the browser-targeted compiler bundle built directly from the shared compiler sources
+- `dist/compiler.mjs`: the Node-targeted compiler bundle built directly from the shared compiler sources
+
+The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `./compiler` core, and the standalone stdio UTU LSP server now builds from `./compiler/lsp.mjs`. The browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
+
+## Run It In VS Code
+
+Open the repo root in VS Code, then use the `UTU: Run Web Extension in VS Code` launch configuration from Run and Debug. That configuration points at the repo root package and starts the web extension host with `--extensionDevelopmentKind=web`.

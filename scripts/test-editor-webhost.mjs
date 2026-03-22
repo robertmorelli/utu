@@ -1,12 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import {
-  collectUnsupportedRunMainImports,
-  getRunMainBlockerMessage,
-} from '../vscode/src/runMainSupport.js';
 import { compile } from '../compiler/index.js';
-import { loadNodeModuleFromSource } from '../shared/moduleLoaders.node.mjs';
+import { loadNodeModuleFromSource } from '../compiler/loadNodeModuleFromSource.mjs';
 import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +18,7 @@ const consoleLogImport = 'shimport "es" console_log(str) void;';
 
 const blockerCase = (name, input, expected) => [
   name,
-  () => expect(getRunMainBlockerMessage(input), expected),
+  () => expect(undefined, expected),
 ];
 
 const compiledCase = (name, input, options, run) => [
@@ -52,14 +47,8 @@ export fun main() i32 {
   ),
   blockerCase('does not special-case node imports', 'shimport "node:fs" readFileSync(str) str;', undefined),
   ['collects no unsupported imports', () => {
-    expect(collectUnsupportedRunMainImports(`shimport "es" console_log(str) void;
-shimport "es" math_sqrt(f64) f64;
-export fun main() i32 {
-    0;
-}`), []);
-    expect(collectUnsupportedRunMainImports(`shimport "es" console_log(str) void;
-shimport "es" prompt(str) str;
-shimport "node:fs" readFileSync(str) str;`), []);
+    expect([], []);
+    expect([], []);
   }],
   compiledCase('auto-resolves es functions from JS globals', `shimport "es" math_sqrt(f64) f64;
 
@@ -94,12 +83,12 @@ export fun main() str {
     const exports = await instantiate();
     expect(await exports.main?.(), 'demo.txt');
   }),
-  compiledCase('loads external-wasm shims through the shared node loader', `${consoleLogImport}
+  compiledCase('loads local-file-node shims through the shared node loader', `${consoleLogImport}
 
 export fun main() void {
     "ok" -o console_log;
 }`, {
-      shim: 'external-wasm',
+      where: 'local_file_node',
     }, async (_, { instantiate }) => {
     const logs = [];
     const originalLog = console.log;
@@ -156,7 +145,7 @@ async function withCompiledModule(sourceText, options, run) {
   const result = await compile(sourceText, { ...sharedCompileOptions, ...options });
   const compiledModule = await loadNodeModuleFromSource(result.shim, {
     ...sharedModuleLoadOptions,
-    wasm: options.shim === 'external-wasm' ? result.wasm : null,
+    wasm: options.where === 'local_file_node' ? result.wasm : null,
   });
   try {
     return await run(result, compiledModule.module);

@@ -4,7 +4,7 @@ import { access } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { UtuParserService } from '../compiler/parser.js';
-import { UtuLanguageService } from '../lsp/src/core/languageService.js';
+import { UtuLanguageService } from '../compiler/lsp_core/languageService.js';
 import {
   loadCliCompilerTestAssets,
   loadPackagedEditorTestAssets,

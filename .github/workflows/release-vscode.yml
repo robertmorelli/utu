@@ -41,9 +41,7 @@ jobs:
         run: bun run test
 
       - name: Build grammar artifact
-        run: |
-          bun run grammar
-          cp tree-sitter-utu.wasm vscode/
+        run: bun run grammar
 
       - name: Validate web host behavior
         run: bun scripts/test-editor-webhost.mjs
@@ -56,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: utu-vscode-vsix
-          path: vscode/dist/*.vsix
+          path: dist/*.vsix
 
       - name: Publish to VS Code Marketplace
         if: github.event_name == 'push' || inputs.publish

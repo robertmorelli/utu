@@ -2,8 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compile } from '../compiler/index.js';
-import { createCliImportProvider, mergeImportObjects } from '../shared/hostImports.mjs';
-import { loadNodeModuleFromSource } from '../shared/moduleLoaders.node.mjs';
+import { loadNodeModuleFromSource } from '../compiler/loadNodeModuleFromSource.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -92,7 +91,6 @@ async function runCase(testCase, wasmPath) {
 
     const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-example-' });
     try {
-        await loadHostImports(testCase, result.logs);
         const exports = await compiledModule.module.instantiate();
 
         if (mode === 'test') {
@@ -167,27 +165,6 @@ function makeFailureResult(testCase, error) {
         status: 'failed',
         error: String(error?.message ?? error),
     };
-}
-
-async function loadHostImports(testCase, logs) {
-    const provider = createCliImportProvider({
-        prompt: () => '',
-        writeLine(line) {
-            logs.push(String(line));
-        },
-    });
-    const baseImports = mergeImportObjects(provider.imports, {
-        es: {
-            wrap(value) {
-                return `[${value}]`;
-            },
-        },
-    });
-    if (!testCase.imports) return baseImports;
-
-    const importPath = resolve(repoRoot, testCase.imports);
-    const loaded = await import(pathToFileURL(importPath).href);
-    return mergeImportObjects(baseImports, loaded.default ?? loaded);
 }
 
 function parseArgs(argv) {

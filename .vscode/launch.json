@@ -8,11 +8,11 @@
       "request": "launch",
       "args": [
         "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/vscode",
+        "--extensionDevelopmentPath=${workspaceFolder}",
         "--extensionDevelopmentKind=web"
       ],
       "outFiles": [
-        "${workspaceFolder}/vscode/dist/web/**/*.js"
+        "${workspaceFolder}/dist/web/**/*.js"
       ],
       "preLaunchTask": "UTU: Watch Web Extension"
     }

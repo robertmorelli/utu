@@ -36,12 +36,19 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 .build
 .claude
+.generated
 examples/Benchmark
+*.vsix
 
 spec.md
-vscode/.npm-cache
+.npm-cache
 lsp/.npm-cache
 cli_artifact/.npm-cache
 benchmarks/rust_deltablue/target
 benchmarks/rust_deltablue_arena/target
 .emscripten-cache
+web-tree-sitter.wasm
+codex.json
+codex.yml
+bun.lock
+tree-sitter-utu.wasm

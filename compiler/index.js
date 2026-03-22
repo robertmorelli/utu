@@ -1,11 +1,8 @@
 import binaryen from 'binaryen';
 import { watgen } from './watgen.js';
 import { jsgen } from './jsgen.js';
-import { analyzeHostRequirements } from './host_analysis.js';
-import { throwOnParseErrors } from './tree.js';
-import { withParsedTree } from '../shared/treeSitter.mjs';
-import { createUtuTreeSitterParser } from './treeSitterParser.js';
-export { loadWebModuleFromSource } from '../shared/moduleLoaders.web.mjs';
+import { createUtuTreeSitterParser, withParsedTree } from './parser.js';
+import { childOfType, throwOnParseErrors } from './tree.js';
 
 let parser = null;
 const SUPPORTED_WASM_FEATURES = binaryen.Features.GC
@@ -15,17 +12,16 @@ const SUPPORTED_WASM_FEATURES = binaryen.Features.GC
 export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     if (parser) return;
     parser = await createUtuTreeSitterParser({
-        wasmUrl: wasmUrl ?? new URL('../cli_artifact/tree-sitter-utu.wasm', import.meta.url),
+        wasmUrl: wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url),
         runtimeWasmUrl,
     });
 }
 
-export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, shim = 'inline-wasm', moduleFormat = 'esm' } = {}) {
+export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
     return withParsedTree(parser, source, async (tree) => {
         throwOnParseErrors(tree.rootNode);
-        const host = analyzeHostRequirements(tree);
-        const { wat, metadata } = watgen(tree, { mode, profile });
+        const { wat, metadata } = watgen(tree, { mode, profile, targetName });
         let mod;
         let wasm;
         try {
@@ -46,18 +42,51 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
         } finally {
             mod?.dispose();
         }
-        const generatedShim = jsgen(tree, wasm, { mode, host, profile, shim, moduleFormat });
+        const generatedShim = jsgen(tree, wasm, { mode, profile, where, moduleFormat, metadata });
         const result = {
             shim: generatedShim,
             js: generatedShim,
             wasm,
             metadata: {
                 ...metadata,
-                host: host.metadata,
-                artifact: { shim, moduleFormat },
+                targetName,
+                artifact: { where, moduleFormat },
             },
         };
         return emitWat ? { ...result, wat } : result;
+    });
+}
+
+export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {
+    if (!parser) await init({ wasmUrl, runtimeWasmUrl });
+    return withParsedTree(parser, source, async (tree) => {
+        throwOnParseErrors(tree.rootNode);
+        const tests = [];
+        const benches = [];
+        const exports = [];
+        for (const item of tree.rootNode.namedChildren) {
+            if (item.type === 'export_decl') {
+                const fn = childOfType(item, 'fn_decl');
+                const name = childOfType(fn, 'identifier')?.text;
+                if (name) exports.push({ name });
+                continue;
+            }
+            if (item.type === 'test_decl') {
+                const name = item.namedChildren[0]?.text.slice(1, -1);
+                if (name) tests.push({ name });
+                continue;
+            }
+            if (item.type === 'bench_decl') {
+                const name = item.namedChildren[0]?.text.slice(1, -1);
+                if (name) benches.push({ name });
+            }
+        }
+        return {
+            exports,
+            tests,
+            benches,
+            hasMain: exports.some((entry) => entry.name === 'main'),
+        };
     });
 }
 
