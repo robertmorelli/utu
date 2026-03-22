@@ -1,11 +1,15 @@
+import { spawn } from 'node:child_process';
 import { build, context } from 'esbuild';
-import { cp, readdir, stat } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { getRepoRoot } from './test-helpers.mjs';
 
 const extensionRoot = getRepoRoot(import.meta.url);
 const compilerSourceRoot = extensionRoot;
+const cliEntry = resolve(extensionRoot, 'cli.mjs');
+const cliPackageRoot = resolve(extensionRoot, 'dist/cli-package');
+const cliBinaryPath = resolve(extensionRoot, 'dist/utu');
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
@@ -19,8 +23,9 @@ const ignoredWatchEntries = new Set([
   'tree-sitter-utu.wasm',
   'web-tree-sitter.wasm',
 ]);
+const cliOnlyMode = process.argv.includes('--cli-only');
 const watchMode = process.argv.includes('--watch');
-const webOnlyMode = process.argv.includes('--web-only');
+const webOnlyMode = process.argv.includes('--web-only') || cliOnlyMode;
 const watchMessages = webOnlyMode
   ? { start: 'Watching UTU web extension sources...', ready: 'UTU_WEB_EXTENSION_READY' }
   : { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
@@ -31,11 +36,11 @@ const sharedBuildOptions = {
   sourcesContent: false,
   logLevel: 'info',
 };
-const activeTargets = [
+const activeTargets = cliOnlyMode ? [] : [
   createTarget('extension', {
     platform: 'browser',
     target: 'esnext',
-    entryPoints: [resolve(extensionRoot, 'extension/extension.js')],
+    entryPoints: [resolve(extensionRoot, 'extension/extension.web.js')],
     outfile: resolve(extensionRoot, 'dist/web/extension.js'),
     format: 'cjs',
     external: ['vscode', 'fs', 'fs/promises', 'module', 'path', 'url'],
@@ -66,6 +71,7 @@ await syncAssets();
 
 if (!watchMode) {
   await Promise.all(activeTargets.map(({ config }) => build(config)));
+  if (!webOnlyMode) await buildCli();
 } else {
   const tracker = createWatchTracker(activeTargets.length, watchMessages.ready);
   const contexts = await Promise.all(activeTargets.map(({ label, config }) => context(withWatchReadyPlugin(config, label, tracker))));
@@ -131,6 +137,13 @@ async function syncAssets() {
     cp(treeSitterRuntimeSource, treeSitterRuntimeDest),
     syncGrammarArtifact(),
   ]);
+}
+
+async function buildCli() {
+  await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
+  await rm(cliPackageRoot, { recursive: true, force: true });
+  await exec('bun', ['build', '--target=bun', '--outdir', cliPackageRoot, cliEntry]);
+  await exec('bun', ['build', '--compile', '--target=bun', '--outfile', cliBinaryPath, cliEntry]);
 }
 
 async function syncGrammarArtifact() {
@@ -225,4 +238,12 @@ async function snapshotPath(path, recursive) {
   } catch {
     return [];
   }
+}
+
+function exec(command, args) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(command, args, { stdio: 'inherit' });
+    child.on('error', rejectPromise);
+    child.on('exit', (code) => code === 0 ? resolvePromise() : rejectPromise(new Error(`${command} exited with code ${code ?? 1}`)));
+  });
 }

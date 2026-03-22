@@ -6,7 +6,6 @@ import { compile } from '../index.js';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { UtuParserService, createSourceDocument, spanFromOffsets } from '../parser.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
-import { loadCliCompilerTestAssets, loadEditorTestAssets, loadPackagedEditorTestAssets } from './editor-test-assets.mjs';
 import {
   collectCompileJobs,
   collectUtuFiles,
@@ -20,6 +19,11 @@ import {
 } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
+const grammarCandidates = ['tree-sitter-utu.wasm'];
+const runtimeCandidates = ['web-tree-sitter.wasm', 'node_modules/web-tree-sitter/web-tree-sitter.wasm'];
+const loadEditorTestAssets = (root) => loadAssetSet(root, 'UTU grammar wasm');
+const loadPackagedEditorTestAssets = (root) => loadAssetSet(root, 'packaged VS Code grammar wasm');
+const loadCliCompilerTestAssets = (root) => loadAssetSet(root, 'CLI grammar wasm');
 const subcommand = process.argv[2] ?? 'all';
 let failed = false;
 if (subcommand !== 'examples' && subcommand !== 'webhost') failed ||= await runCoreSuite();
@@ -392,4 +396,24 @@ function formatDiagnostic(diagnostic) {
 
 function getBenchExport(result) {
   return result.metadata.benches[0].exportName;
+}
+
+async function loadAssetSet(root, grammarLabel) {
+  const [grammarPath, runtimePath] = await Promise.all([
+    findExistingAsset(root, grammarCandidates, grammarLabel),
+    findExistingAsset(root, runtimeCandidates, 'Tree-sitter runtime wasm'),
+  ]);
+  const [grammarWasmPath, runtimeWasmPath] = await Promise.all([readFile(grammarPath), readFile(runtimePath)]);
+  return { grammarPath, runtimePath, grammarWasmPath, runtimeWasmPath };
+}
+
+async function findExistingAsset(root, candidates, label) {
+  for (const candidate of candidates) {
+    const resolvedPath = resolve(root, candidate);
+    try {
+      await access(resolvedPath);
+      return resolvedPath;
+    } catch {}
+  }
+  throw new Error(`Could not find ${label}. Checked: ${candidates.join(', ')}`);
 }

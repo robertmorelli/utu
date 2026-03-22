@@ -72,3 +72,13 @@ export async function runNamedCases(cases) {
   }
   return failed;
 }
+
+export async function runCli(args, stdin) {
+  const proc = Bun.spawn(['bun', './cli.mjs', ...args], { stdin: stdin === undefined ? 'ignore' : 'pipe', stdout: 'pipe', stderr: 'pipe' });
+  if (stdin !== undefined) {
+    proc.stdin.write(stdin);
+    proc.stdin.end();
+  }
+  const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  return { output: `${stdout}${stderr}`, exitCode };
+}
