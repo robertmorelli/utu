@@ -128,35 +128,15 @@
     }
   },
   "scripts": {
-    "grammar": "tree-sitter generate && tree-sitter build --wasm",
     "distribute": "test -f ./tree-sitter-utu.wasm",
-    "build:cli": "node ./scripts/build.mjs --cli-only",
-    "build:lsp": "bun build --compile --target=bun --outfile ./dist/utu-lsp ./lsp.mjs",
-    "build": "node ./scripts/build.mjs && bun run build:cli",
-    "build:web": "node ./scripts/build.mjs --web-only && npm run test:editor:activation-selfcheck",
-    "rebuild:web": "node ./scripts/rebuild-web.mjs && npm run test:editor:activation-selfcheck",
-    "package:vsix": "npx @vscode/vsce package --no-dependencies --out ./dist/utu-vscode-${npm_package_version}.vsix",
+    "build": "node ./scripts/build.mjs",
     "publish:marketplace": "npx @vscode/vsce publish --no-dependencies",
-    "test": "bun run test:examples:all && bun run test:language && npm run test:editor:activation-selfcheck && bun run test:editor:core && bun run test:editor:examples && bun run test:editor:webhost && bun run test:examples:compile && bun run test:examples:bench && bun run test:stress && bun run test:docs:codegen",
-    "test:examples": "bun ./scripts/test-examples.mjs",
-    "test:examples:codegen": "bun ./scripts/test-examples.mjs --tag codegen",
-    "test:examples:all": "bun ./scripts/test-examples.mjs",
-    "test:examples:compile": "bun ./scripts/test-examples.mjs --compile-all",
-    "test:examples:bench": "bun ./scripts/test-examples.mjs --cli --cli-bench-examples",
-    "test:language": "bun ./scripts/test-examples.mjs --cli",
-    "test:editor:activation-selfcheck": "node ./scripts/test-vscode-activation-selfcheck.mjs",
-    "test:editor:activation-repro": "node ./scripts/test-vscode-activation-language-version-repro.mjs",
-    "test:editor:core": "bun ./scripts/test-editor.mjs core",
-    "test:editor:examples": "bun ./scripts/test-editor.mjs examples",
-    "test:editor:webhost": "bun ./scripts/test-editor.mjs webhost",
-    "test:textmate:escape": "node ./scripts/test-textmate-escape.mjs",
-    "test:stress": "bun ./scripts/test-stress-runtime.mjs",
-    "test:docs:codegen": "bun ./scripts/test-docs-codegen.mjs",
+    "test": "bun ./scripts/test-all.mjs",
     "compare:deltablue:rust": "bun ./scripts/deltablue-rust.mjs compare",
     "report:utu-v-rust": "bun ./scripts/deltablue-rust.mjs report",
-    "watch": "node ./scripts/build.mjs --watch",
-    "watch:web": "node ./scripts/build.mjs --watch --web-only",
-    "vscode:prepublish": "npm run build"
+    "watch": "bun run build --watch",
+    "watch:web": "bun run build --watch --web-only",
+    "vscode:prepublish": "true"
   },
   "files": [
     "dist",
@@ -169,6 +149,7 @@
     "tree-sitter-utu.wasm"
   ],
   "dependencies": {
+    "@vscode/vsce": "^3.7.1",
     "binaryen": "^125.0.0",
     "web-tree-sitter": "^0.26.7"
   },

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "examples:all",
+    "label": "Examples (all)",
+    "command": ["bun", "./scripts/test-examples.mjs"]
+  },
+  {
+    "id": "language",
+    "label": "Language CLI",
+    "command": ["bun", "./scripts/test-examples.mjs", "--cli"]
+  },
+  {
+    "id": "editor:web-compiler-source-load",
+    "label": "Editor web compiler source load",
+    "command": ["node", "./scripts/test-vscode-web-compiler-source-load.mjs"]
+  },
+  {
+    "id": "editor:activation-selfcheck",
+    "label": "Editor activation self-check",
+    "command": ["node", "./scripts/test-vscode-activation-selfcheck.mjs"]
+  },
+  {
+    "id": "editor:core",
+    "label": "Editor core",
+    "command": ["bun", "./scripts/test-editor.mjs", "core"]
+  },
+  {
+    "id": "editor:examples",
+    "label": "Editor examples",
+    "command": ["bun", "./scripts/test-editor.mjs", "examples"]
+  },
+  {
+    "id": "editor:webhost",
+    "label": "Editor webhost",
+    "command": ["bun", "./scripts/test-editor.mjs", "webhost"]
+  },
+  {
+    "id": "examples:compile",
+    "label": "Examples compile",
+    "command": ["bun", "./scripts/test-examples.mjs", "--compile-all"]
+  },
+  {
+    "id": "examples:bench",
+    "label": "Examples bench",
+    "command": ["bun", "./scripts/test-examples.mjs", "--cli", "--cli-bench-examples"]
+  },
+  {
+    "id": "stress",
+    "label": "Stress runtime",
+    "command": ["bun", "./scripts/test-stress-runtime.mjs"]
+  },
+  {
+    "id": "docs:codegen",
+    "label": "Docs codegen",
+    "command": ["bun", "./scripts/test-docs-codegen.mjs"]
+  },
+  {
+    "id": "no-globalthis",
+    "label": "No global object access",
+    "command": ["node", "./scripts/test-no-global-this.mjs"]
+  }
+]

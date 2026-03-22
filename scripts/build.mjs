@@ -10,6 +10,9 @@ const compilerSourceRoot = extensionRoot;
 const cliEntry = resolve(extensionRoot, 'cli.mjs');
 const cliPackageRoot = resolve(extensionRoot, 'dist/cli-package');
 const cliBinaryPath = resolve(extensionRoot, 'dist/utu');
+const lspEntry = resolve(extensionRoot, 'lsp.mjs');
+const lspBinaryPath = resolve(extensionRoot, 'dist/utu-lsp');
+const vsceBinaryPath = resolve(extensionRoot, 'node_modules/.bin/vsce');
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
@@ -54,6 +57,9 @@ const activeTargets = cliOnlyMode ? [] : [
     outfile: resolve(extensionRoot, 'dist/compiler.web.mjs'),
     format: 'esm',
     external: ['fs', 'fs/promises', 'module', 'path', 'url'],
+    define: {
+      'globalThis.process': 'undefined',
+    },
     loader: {
       '.wasm': 'binary',
     },
@@ -72,11 +78,16 @@ const activeTargets = cliOnlyMode ? [] : [
 ].filter(Boolean);
 
 if (watchMode) console.log(watchMessages.start);
+if (!watchMode) await resetBuildArtifacts();
 await syncAssets();
 
 if (!watchMode) {
   await Promise.all(activeTargets.map(({ config }) => build(config)));
-  if (!webOnlyMode) await buildCli();
+  if (!webOnlyMode) {
+    await buildCli();
+    await buildLsp();
+    await packageVsix();
+  }
 } else {
   const tracker = createWatchTracker(activeTargets.length, watchMessages.ready);
   const contexts = await Promise.all(activeTargets.map(({ label, config }) => context(withWatchReadyPlugin(config, label, tracker))));
@@ -142,11 +153,35 @@ async function syncAssets() {
   await Promise.all([cp(treeSitterRuntimeSource, treeSitterRuntimeDest), syncGrammarArtifact()]);
 }
 
+async function resetBuildArtifacts() {
+  await Promise.all([
+    rm(resolve(extensionRoot, 'dist'), { recursive: true, force: true }),
+    rm(treeSitterRuntimeDest, { force: true }),
+    rm(grammarDest, { force: true }),
+  ]);
+}
+
 async function buildCli() {
   await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
   await rm(cliPackageRoot, { recursive: true, force: true });
   await exec('bun', ['build', '--target=bun', '--outdir', cliPackageRoot, cliEntry]);
   await exec('bun', ['build', '--compile', '--target=bun', '--outfile', cliBinaryPath, cliEntry]);
+}
+
+async function buildLsp() {
+  await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
+  await exec('bun', ['build', '--compile', '--target=bun', '--outfile', lspBinaryPath, lspEntry]);
+}
+
+async function packageVsix() {
+  try {
+    const stats = await stat(vsceBinaryPath);
+    if (!stats.isFile()) throw new Error('not a file');
+  } catch {
+    throw new Error('VSIX packaging is part of `bun run build`, but local `node_modules/.bin/vsce` is missing. Install `@vscode/vsce` locally so build can package without hanging on `npx`.');
+  }
+
+  await exec(vsceBinaryPath, ['package', '--no-dependencies', '--out', resolve(extensionRoot, `dist/utu-vscode-${process.env.npm_package_version ?? '0.0.0'}.vsix`)]);
 }
 
 async function syncGrammarArtifact() {
@@ -162,8 +197,13 @@ async function ensureGrammarArtifact({ force = false } = {}) {
   const sourceStats = await stat(freshestSource);
   const artifactStats = freshestArtifact ? await stat(freshestArtifact) : null;
   if (force || !artifactStats || artifactStats.mtimeMs < sourceStats.mtimeMs) {
-    await runPackageScript('grammar');
+    await buildGrammar();
   }
+}
+
+async function buildGrammar() {
+  await exec('tree-sitter', ['generate']);
+  await exec('tree-sitter', ['build', '--wasm']);
 }
 
 async function findFreshestFile(paths) {
@@ -269,11 +309,4 @@ function exec(command, args) {
     child.on('error', rejectPromise);
     child.on('exit', (code) => code === 0 ? resolvePromise() : rejectPromise(new Error(`${command} exited with code ${code ?? 1}`)));
   });
-}
-
-function runPackageScript(name) {
-  if (process.env.npm_execpath) {
-    return exec(process.execPath, [process.env.npm_execpath, 'run', name]);
-  }
-  return exec('npm', ['run', name]);
 }
