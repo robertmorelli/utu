@@ -54,6 +54,9 @@ const activeTargets = cliOnlyMode ? [] : [
     outfile: resolve(extensionRoot, 'dist/compiler.web.mjs'),
     format: 'esm',
     external: ['fs', 'fs/promises', 'module', 'path', 'url'],
+    loader: {
+      '.wasm': 'binary',
+    },
   }),
   !webOnlyMode && createTarget('compiler-node', {
     platform: 'node',
@@ -62,6 +65,9 @@ const activeTargets = cliOnlyMode ? [] : [
     outfile: resolve(extensionRoot, 'dist/compiler.mjs'),
     format: 'esm',
     external: ['binaryen', 'web-tree-sitter'],
+    loader: {
+      '.wasm': 'binary',
+    },
   }),
 ].filter(Boolean);
 
@@ -98,6 +104,7 @@ function createTarget(label, config) {
     },
   };
 }
+
 
 function createWatchTracker(expectedCount, readyMessage) {
   return {
@@ -155,7 +162,7 @@ async function ensureGrammarArtifact({ force = false } = {}) {
   const sourceStats = await stat(freshestSource);
   const artifactStats = freshestArtifact ? await stat(freshestArtifact) : null;
   if (force || !artifactStats || artifactStats.mtimeMs < sourceStats.mtimeMs) {
-    await exec('bun', ['run', 'grammar']);
+    await runPackageScript('grammar');
   }
 }
 
@@ -262,4 +269,11 @@ function exec(command, args) {
     child.on('error', rejectPromise);
     child.on('exit', (code) => code === 0 ? resolvePromise() : rejectPromise(new Error(`${command} exited with code ${code ?? 1}`)));
   });
+}
+
+function runPackageScript(name) {
+  if (process.env.npm_execpath) {
+    return exec(process.execPath, [process.env.npm_execpath, 'run', name]);
+  }
+  return exec('npm', ['run', name]);
 }

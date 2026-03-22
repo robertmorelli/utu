@@ -3,8 +3,8 @@ import { activateUtuExtension } from './activate.js';
 import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from '../loadCompiledRuntime.mjs';
 
 export async function activate(context) {
-    const grammarWasmPath = await readExtensionFile(context, 'tree-sitter-utu.wasm');
-    const parserRuntimeWasmPath = await readExtensionFile(context, 'web-tree-sitter.wasm');
+    const grammarWasmPath = await readExtensionBytes(context, 'tree-sitter-utu.wasm');
+    const parserRuntimeWasmPath = await readExtensionBytes(context, 'web-tree-sitter.wasm');
     const runtimeHost = new WebCompilerHost({
         compilerModulePath: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs').toString(true),
         grammarWasmPath,
@@ -24,6 +24,17 @@ async function readExtensionFile(context, ...segments) {
     return vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, ...segments));
 }
 
+async function readExtensionBytes(context, ...segments) {
+    const uri = vscode.Uri.joinPath(context.extensionUri, ...segments);
+    try {
+        const response = await fetch(uri.toString(true));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return new Uint8Array(await response.arrayBuffer());
+    } catch {
+        return readExtensionFile(context, ...segments);
+    }
+}
+
 class WebCompilerHost {
     options;
     compilerPromise;
@@ -41,10 +52,10 @@ class WebCompilerHost {
     }
     async compileSource(source, { mode = 'program', ...options } = {}) {
         const compiler = await this.getCompiler();
-        return normalizeCompileArtifact(await compiler.compile(source, { ...options, mode, wasmUrl: this.options.grammarWasmPath, runtimeWasmUrl: this.options.runtimeWasmPath }));
+        return normalizeCompileArtifact(await compiler.compile(source, { ...options, mode }));
     }
     loadRuntime(source, mode, compileOptions = {}, prepareRuntime) { return loadCompiledRuntime({ source, mode, compileSource: (input, options = {}) => this.compileSource(input, options), loadModule: loadModuleFromSource, prepareRuntime, compileOptions }); }
-    async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, { wasmUrl: this.options.grammarWasmPath, runtimeWasmUrl: this.options.runtimeWasmPath }); }
+    async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, {}); }
     async getCompiler() { return (this.compilerPromise ??= this.loadCompiler()); }
     async loadCompiler() { return loadModuleFromSource(new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true))), { preferBlobUrl: true }); }
 }

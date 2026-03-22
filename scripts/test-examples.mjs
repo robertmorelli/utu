@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { compile } from '../index.js';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { collectCompileJobs, collectUtuFiles, firstLine, getRepoRoot, runCli, runNamedCases } from './test-helpers.mjs';
@@ -25,10 +24,10 @@ const CLI_BENCH_EXAMPLE_CASES = [['call-simple', 'examples/call_simple.utu', ['c
 const options = parseArgs(process.argv.slice(2));
 await (options.cliSmoke ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));
 
-async function runCase(testCase, wasmPath) {
+async function runCase(testCase) {
     const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
     const mode = testCase.mode ?? 'run';
-    const { shim, metadata } = await compile(source, { wasmUrl: pathToFileURL(wasmPath), mode: mode === 'test' ? 'test' : 'program' });
+    const { shim, metadata } = await compile(source, { mode: mode === 'test' ? 'test' : 'program' });
     const result = { name: testCase.name, path: testCase.path, mode, allowFailure: Boolean(testCase.allowFailure), logs: [], status: 'passed' };
     if (mode === 'compile') return result;
     const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-example-' });
@@ -100,14 +99,13 @@ function valuesEqual(left, right) { return JSON.stringify(left) === JSON.stringi
 async function runManifestCases(options) {
     const manifestPath = resolve(process.cwd(), options.manifest ?? 'jsondata/examples.manifest.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    const wasmPath = resolve(repoRoot, manifest.wasmPath ?? 'tree-sitter-utu.wasm');
     const selectedTags = new Set(options.tags);
     const cases = manifest.cases.filter((testCase) => selectedTags.size === 0 || testCase.tags?.some((tag) => selectedTags.has(tag)));
     if (cases.length === 0) return void (console.error(`No example cases matched for manifest ${manifestPath}`), process.exit(1));
     const results = [];
     for (const testCase of cases) {
         const startedAt = Date.now();
-        const result = await runCase(testCase, wasmPath).catch((error) => makeFailureResult(testCase, error));
+        const result = await runCase(testCase).catch((error) => makeFailureResult(testCase, error));
         result.durationMs = Date.now() - startedAt;
         results.push(result);
         const prefix = result.status === 'passed' ? 'PASS' : result.status === 'allowed-failure' ? 'WARN' : 'FAIL';
@@ -131,7 +129,6 @@ async function runManifestCases(options) {
 
 async function runCompileAll(options) {
     const exampleRoot = resolve(repoRoot, options.exampleRoot ?? 'examples');
-    const wasmUrl = pathToFileURL(resolve(repoRoot, 'tree-sitter-utu.wasm'));
     const files = (await collectUtuFiles(exampleRoot)).sort();
     let failed = false;
 
@@ -141,7 +138,7 @@ async function runCompileAll(options) {
 
         for (const { mode } of collectCompileJobs(source)) {
             try {
-                const { metadata } = await compile(source, { wasmUrl, mode });
+                const { metadata } = await compile(source, { mode });
                 const details = mode === 'test' ? ` ${metadata.tests.length} tests` : mode === 'bench' ? ` ${metadata.benches.length} benches` : '';
                 console.log(`PASS ${rel} [${mode}]${details}`);
             } catch (error) {

@@ -211,11 +211,6 @@ async function runExamplesSuite() {
 }
 
 async function runWebhostSuite() {
-  const { grammarWasmPath, runtimeWasmPath } = await loadEditorTestAssets(repoRoot);
-  const sharedCompileOptions = {
-    runtimeWasmUrl: runtimeWasmPath,
-    wasmUrl: grammarWasmPath,
-  };
   const sharedModuleLoadOptions = {
     prefix: 'utu-webhost-test-',
   };
@@ -332,7 +327,7 @@ bench "smoke" |i| {
   ];
 
   async function withCompiledModule(sourceText, options, run) {
-    const result = await compile(sourceText, { ...sharedCompileOptions, ...options });
+    const result = await compile(sourceText, options);
     const compiledModule = await loadNodeModuleFromSource(result.shim, {
       ...sharedModuleLoadOptions,
       wasm: options.where === 'local_file_node' ? result.wasm : null,
@@ -354,11 +349,7 @@ function expectLabels(items, expectedLabels) {
 
 async function attemptCompile(compilerModule, source, mode, assets) {
   try {
-    await compilerModule.compile(source, {
-      mode,
-      wasmUrl: assets.grammarWasmPath,
-      runtimeWasmUrl: assets.runtimeWasmPath,
-    });
+    await compilerModule.compile(source, { mode });
     return { ok: true };
   } catch (error) {
     return {

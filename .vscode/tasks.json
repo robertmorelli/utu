@@ -44,12 +44,12 @@
       }
     },
     {
-      "label": "UTU: Prepare Web Extension",
+      "label": "UTU: Rebuild Web Extension",
       "type": "shell",
       "command": "npm",
       "args": [
         "run",
-        "build:web"
+        "rebuild:web"
       ],
       "options": {
         "cwd": "${workspaceFolder}",

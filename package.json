@@ -134,6 +134,7 @@
     "build:lsp": "bun build --compile --target=bun --outfile ./dist/utu-lsp ./lsp.mjs",
     "build": "node ./scripts/build.mjs && bun run build:cli",
     "build:web": "node ./scripts/build.mjs --web-only",
+    "rebuild:web": "node ./scripts/rebuild-web.mjs",
     "package:vsix": "npx @vscode/vsce package --no-dependencies --out ./dist/utu-vscode-${npm_package_version}.vsix",
     "publish:marketplace": "npx @vscode/vsce publish --no-dependencies",
     "test": "bun run test:examples:all && bun run test:language && bun run test:editor:core && bun run test:editor:examples && bun run test:editor:webhost && bun run test:examples:compile && bun run test:examples:bench && bun run test:stress && bun run test:docs:codegen",

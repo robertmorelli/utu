@@ -2,15 +2,12 @@ import { chmod, copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:f
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import grammarWasmPath from '../tree-sitter-utu.wasm' with { type: 'file' };
-import runtimeWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' };
 
 import * as compiler from '../index.js';
 import { getRepoRoot } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
 const cacheDir = path.join(tmpdir(), 'utu-deltablue-bench-cache');
-const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
 const MAX_BENCH_ITERATIONS = 0x7fffffff;
 const CASE_TO_EXPORT = { chain: 'bench_chain', projection: 'bench_projection' };
 const IMPLS = {
@@ -77,8 +74,8 @@ async function prepareCache() {
 
 async function prepareUtuBundle() {
   const source = await readFile(path.join(repoRoot, 'examples/deltablue.utu'), 'utf8');
-  await compiler.init(compilerAssetOptions);
-  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench', ...compilerAssetOptions });
+  await compiler.init();
+  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench' });
   const metadataText = JSON.stringify({ benches: metadata.benches }, null, 2);
   const moduleBytes = Buffer.byteLength(js, 'utf8');
   await Promise.all([
@@ -142,8 +139,8 @@ function runNativeCase(dirName, benchCase, iterations) {
 async function loadUtuBenchmarkCases() {
   const dir = await mkdtemp(path.join(tmpdir(), 'utu-rust-compare-utu-'));
   const source = await readFile(path.join(repoRoot, 'examples/deltablue.utu'), 'utf8');
-  await compiler.init(compilerAssetOptions);
-  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench', ...compilerAssetOptions });
+  await compiler.init();
+  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench' });
   await writeFile(path.join(dir, 'module.mjs'), js, 'utf8');
   const mod = await import(pathToFileURL(path.join(dir, 'module.mjs')).href);
   const exports = await mod.instantiate();

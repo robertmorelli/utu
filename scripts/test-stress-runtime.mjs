@@ -1,7 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import grammarWasmPath from '../tree-sitter-utu.wasm' with { type: 'file' };
-import runtimeWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' };
 
 import * as compiler from '../index.js';
 import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from '../loadCompiledRuntime.mjs';
@@ -9,7 +7,6 @@ import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { expectDeepEqual, expectEqual, getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
-const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
 const sources = {
     run: await readFile(resolve(repoRoot, 'examples/ci/hello.utu'), 'utf8'),
     test: await readFile(resolve(repoRoot, 'examples/ci/tests_basic.utu'), 'utf8'),
@@ -67,13 +64,12 @@ async function withCliRuntime(source, { mode }, run) {
 }
 
 async function compileSource(source, { wat = false, mode = 'program', where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {
-    await compiler.init(compilerAssetOptions);
+    await compiler.init();
     return normalizeCompileArtifact(await compiler.compile(source, {
         wat,
         mode,
         where,
         moduleFormat,
         targetName,
-        ...compilerAssetOptions,
     }));
 }

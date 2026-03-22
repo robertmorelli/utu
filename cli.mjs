@@ -3,16 +3,12 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import grammarWasmPath from "./tree-sitter-utu.wasm" with { type: "file" };
-import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
 import data from "./jsondata/cli.data.json" with { type: "json" };
 import * as compiler from "./index.js";
 import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from "./loadCompiledRuntime.mjs";
 import { loadNodeModuleFromSource } from "./loadNodeModuleFromSource.mjs";
 
 const help = data.help;
-const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
-
 main().catch(error => (console.error(text(error)), process.exitCode = 1));
 
 async function main(argv = process.argv.slice(2)) {
@@ -133,8 +129,8 @@ function loadRuntime(source, { mode = "program", targetName = null } = {}) {
 }
 
 async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null } = {}) {
-  await compiler.init(compilerAssetOptions);
-  return normalizeCompileArtifact(await compiler.compile(source, { wat, mode, where, moduleFormat, targetName, ...compilerAssetOptions }));
+  await compiler.init();
+  return normalizeCompileArtifact(await compiler.compile(source, { wat, mode, where, moduleFormat, targetName }));
 }
 
-async function getMetadata(source) { await compiler.init(compilerAssetOptions); return compiler.get_metadata(source, compilerAssetOptions); }
+async function getMetadata(source) { await compiler.init(); return compiler.get_metadata(source); }

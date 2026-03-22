@@ -1,4 +1,6 @@
 import binaryen from 'binaryen';
+import bundledGrammarWasm from './tree-sitter-utu.wasm';
+import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
 import { watgen } from './watgen.js';
 import { jsgen } from './jsgen.js';
 import { createUtuTreeSitterParser, withParsedTree } from './parser.js';
@@ -9,7 +11,10 @@ const SUPPORTED_WASM_FEATURES = binaryen.Features.GC | binaryen.Features.Referen
 
 export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     if (parser) return;
-    parser = await createUtuTreeSitterParser({ wasmUrl: wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url), runtimeWasmUrl });
+    parser = await createUtuTreeSitterParser({
+        wasmUrl: wasmUrl ?? bundledGrammarWasm,
+        runtimeWasmUrl: runtimeWasmUrl ?? bundledRuntimeWasm,
+    });
 }
 
 export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {

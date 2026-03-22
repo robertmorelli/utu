@@ -1,12 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { compile } from '../index.js';
 import { getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
-const wasmUrl = pathToFileURL(resolve(repoRoot, 'tree-sitter-utu.wasm'));
 
 const cases = [
     {
@@ -137,7 +135,7 @@ const cases = [
 
 if (await runNamedCases(cases.map((testCase) => [testCase.name, async () => {
     const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
-    const { wat, metadata } = await compile(source, { wat: true, wasmUrl, mode: testCase.mode ?? 'program' });
+    const { wat, metadata } = await compile(source, { wat: true, mode: testCase.mode ?? 'program' });
     const missing = testCase.snippets.filter((snippet) => !wat.includes(snippet));
     const metadataErrors = [];
     if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests)
