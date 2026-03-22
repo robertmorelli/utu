@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { build, context } from 'esbuild';
-import { cp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { getRepoRoot } from './test-helpers.mjs';
@@ -84,11 +84,13 @@ await syncAssets();
 
 if (!watchMode) {
   await Promise.all(activeTargets.map(({ config }) => build(config)));
+  await Promise.all(activeTargets.map(postprocessBundle));
   await buildAllArtifacts();
 } else {
   const tracker = createWatchTracker(activeTargets.length, watchMessages.ready);
   const contexts = await Promise.all(activeTargets.map(({ label, config }) => context(withWatchReadyPlugin(config, label, tracker))));
   await Promise.all(contexts.map((ctx) => ctx.watch()));
+  await Promise.all(activeTargets.map(postprocessBundle));
   await buildAllArtifacts();
   const stopWatching = await watchCompilerInputs(contexts.slice(1));
   const close = async () => {
@@ -107,11 +109,31 @@ if (!watchMode) {
 function createTarget(label, config) {
   return {
     label,
+    outfile: config.outfile,
     config: {
       ...sharedBuildOptions,
       ...config,
     },
   };
+}
+
+async function postprocessBundle(target) {
+  if (!target.outfile) return;
+  const source = await readFile(target.outfile, 'utf8');
+  if (!source.includes('Uint8Array.fromBase64(')) return;
+  const helper = `const __utuFromBase64 = (input) => {
+  if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(input);
+  const decode = typeof atob === "function"
+    ? atob
+    : (value) => Buffer.from(value, "base64").toString("binary");
+  const binary = decode(input);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+};
+
+`;
+  await writeFile(target.outfile, helper + source.replaceAll('Uint8Array.fromBase64(', '__utuFromBase64('), 'utf8');
 }
 
 
