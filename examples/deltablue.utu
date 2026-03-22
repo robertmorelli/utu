@@ -932,6 +932,15 @@ bench "deltablue_projection" |i| {
     }
 }
 
+bench "deltablue_both" |i| {
+    setup {
+        let sink: i64 = 0;
+        measure {
+            sink = chain_test(1048) + projection_test(1048);
+        }
+    }
+}
+
 export fun main() i64 {
     delta_blue_impl(200);
 }

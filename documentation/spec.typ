@@ -236,11 +236,6 @@ Builtins proposal. In user-facing terms, `str` behaves like a first-class
 string type. In implementation terms, it is an alias for `externref` in the
 string builtin surface.
 
-The compiler auto-imports the string builtins from `"wasm:js-string"`. That
-means string operations do not need explicit import declarations, and the spec
-expects engines to optimize these builtins as native string operations rather
-than full JS interop calls.
-
 The always-available builtins are:
 
 - `str.length(s) -> i32`
@@ -550,9 +545,6 @@ shimport "es" fetch(str) Response # ApiError;
 shimport "es" document: externref;
 shimport "node:path" basename(str) str;
 ```
-
-The string builtins are special: they are auto-provided and do not need
-declarations in source files.
 
 == Exports
 

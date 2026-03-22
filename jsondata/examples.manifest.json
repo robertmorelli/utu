@@ -142,6 +142,13 @@
       "tags": ["codegen"]
     },
     {
+      "name": "codegen-jsgen",
+      "path": "examples/ci/codegen_jsgen.utu",
+      "mode": "run",
+      "expectedReturn": "codex",
+      "tags": ["codegen"]
+    },
+    {
       "name": "codegen-break-and-call",
       "path": "examples/ci/codegen_break_and_call.utu",
       "mode": "run",

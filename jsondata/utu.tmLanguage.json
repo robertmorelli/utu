@@ -9,6 +9,9 @@
       "include": "#testBench"
     },
     {
+      "include": "#jsgen"
+    },
+    {
       "include": "#strings"
     },
     {
@@ -64,11 +67,43 @@
         }
       ]
     },
+    "jsgen": {
+      "patterns": [
+        {
+          "name": "meta.declaration.jsgen.utu",
+          "begin": "\\b(escape)\\s+(`)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.utu"
+            }
+          },
+          "end": "(`)",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.utu"
+            }
+          },
+          "contentName": "meta.embedded.inline.javascript",
+          "patterns": [
+            {
+              "include": "source.js"
+            }
+          ]
+        }
+      ]
+    },
     "strings": {
       "patterns": [
         {
           "name": "string.quoted.other.multiline.utu",
           "match": "\\\\\\\\[^\\n]*$"
+        },
+        {
+          "name": "string.quoted.other.jsgen.utu",
+          "match": "`(?:\\\\.|[^`\\\\])*`"
         },
         {
           "name": "string.quoted.double.utu",
@@ -144,6 +179,21 @@
           }
         },
         {
+          "name": "meta.declaration.jsgen-function.utu",
+          "match": "\\b(escape)\\s+(`[^`]+`)\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "string.quoted.other.jsgen.utu"
+            },
+            "3": {
+              "name": "entity.name.function.utu"
+            }
+          }
+        },
+        {
           "name": "meta.declaration.type.utu",
           "match": "\\b(struct|type)\\s+([A-Z][a-zA-Z0-9_]*)\\b",
           "captures": {
@@ -185,7 +235,7 @@
       "patterns": [
         {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|alt|for|while|break|emit|let|export|shimport|fun|struct|type|test|bench|setup|measure|assert|mut|and|or|not|fatal|void)\\b"
+          "match": "\\b(?:if|else|match|alt|for|while|break|emit|let|export|shimport|escape|fun|struct|type|test|bench|setup|measure|assert|mut|and|or|not|fatal|void)\\b"
         },
         {
           "name": "constant.language.boolean.utu",

@@ -1,5 +1,7 @@
+escape `(a,b) => a + b` str_add(str,str) str;
+
 fun greeting(name: str) str {
-    "hello " -o str.concat(_, name);
+    "hello " -o str_add(_, name);
 }
 
 export fun main() str {

@@ -48,7 +48,10 @@
       {
         "language": "utu",
         "scopeName": "source.utu",
-        "path": "./jsondata/utu.tmLanguage.json"
+        "path": "./jsondata/utu.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.inline.javascript": "javascript"
+        }
       }
     ],
     "commands": [

@@ -1,7 +1,10 @@
-shimport "es" concat(str,str) str;
+// shimport "es" _String_prototype_concat(str,str) str;
+shimport "es" _console_log(str) void;
+
 
 fun greeting(name: str) str {
-    "hello " -o str.concat(_, name);
+    _console_log("hello ");
+    "hi";
 }
 
 bench "hello-name format" |i| {

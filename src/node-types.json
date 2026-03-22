@@ -2445,6 +2445,33 @@
     }
   },
   {
+    "type": "jsgen_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "import_param_list",
+          "named": true
+        },
+        {
+          "type": "jsgen_lit",
+          "named": true
+        },
+        {
+          "type": "return_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "literal",
     "named": true,
     "fields": {},
@@ -3573,6 +3600,10 @@
           "named": true
         },
         {
+          "type": "jsgen_decl",
+          "named": true
+        },
+        {
           "type": "struct_decl",
           "named": true
         },
@@ -4280,6 +4311,10 @@
     "named": false
   },
   {
+    "type": "escape",
+    "named": false
+  },
+  {
     "type": "export",
     "named": false
   },
@@ -4337,6 +4372,10 @@
   },
   {
     "type": "int_lit",
+    "named": true
+  },
+  {
+    "type": "jsgen_lit",
     "named": true
   },
   {

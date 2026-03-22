@@ -15,9 +15,12 @@ export async function loadCompiledRuntime({
   const module = loaded?.module ?? loaded;
   const cleanup = loaded?.cleanup ?? NOOP_CLEANUP;
   const prepared = await prepareRuntime?.();
-  const runtimeCleanup = prepared?.cleanup ?? prepared ?? NOOP_CLEANUP;
+  const hostImports = typeof prepared === "object" && prepared !== null ? prepared.hostImports ?? {} : {};
+  const runtimeCleanup = typeof prepared === "function"
+    ? prepared
+    : prepared?.cleanup ?? NOOP_CLEANUP;
   try {
-    const exports = await module.instantiate(artifact.wasm);
+    const exports = await module.instantiate(artifact.wasm, hostImports);
     return createRuntime({
       metadata: module.metadata ?? artifact.metadata,
       module,

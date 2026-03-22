@@ -95,6 +95,16 @@ export function stringLiteralName(node) {
     return node.text.startsWith('"') && node.text.endsWith('"') ? node.text.slice(1, -1) : node.text;
 }
 
+export function parseHostImportName(name) {
+    if (!name.startsWith('_')) return { hostName: name, hostPath: [name] };
+    const hostPath = name
+        .slice(1)
+        .replace(/__/g, '\0')
+        .split('_')
+        .map((segment) => segment.replace(/\0/g, '_'));
+    return { hostName: hostPath.join('.'), hostPath };
+}
+
 export function collectParseDiagnostics(rootNode, documentOrSource) {
     const document = toSourceDocument(documentOrSource), diagnostics = [], seen = new Set(); visit(rootNode); diagnostics.sort((left, right) => left.range.start.line - right.range.start.line || left.range.start.character - right.range.start.character); return diagnostics;
     function visit(node) { if (node.isError) pushDiagnostic('Unexpected token', node); if (node.isMissing) pushDiagnostic(`Missing ${node.type}`, node); for (const child of node.children) visit(child); }

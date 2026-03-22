@@ -7,32 +7,6 @@
   "supportedModuleFormats": [
     "esm"
   ],
-  "jsStringBuiltins": [
-    {
-      "name": "length",
-      "expression": "value => value.length"
-    },
-    {
-      "name": "charCodeAt",
-      "expression": "(value, index) => value.charCodeAt(index)"
-    },
-    {
-      "name": "concat",
-      "expression": "(left, right) => left + right"
-    },
-    {
-      "name": "substring",
-      "expression": "(value, start, end) => value.substring(start, end)"
-    },
-    {
-      "name": "equals",
-      "expression": "(left, right) => +(left === right)"
-    },
-    {
-      "name": "fromCharCode",
-      "expression": "value => String.fromCharCode(value)"
-    }
-  ],
   "defaultBenchmarkOptions": {
     "seconds": 1,
     "samples": 10,
@@ -151,11 +125,12 @@
     "  const bench = __selectEntry(metadata.benches, ordinal);",
     "  const settings = __normalizeBenchmarkOptions(options);",
     "  const targetNs = Math.floor(settings.seconds * 1e9);",
+    "  const sampleTargetNs = Math.max(1, Math.floor(targetNs / Math.max(1, settings.samples)));",
     "  const profile = measureOptions.profile ?? null;",
     "  const clock = measureOptions.clock ?? __defaultClock();",
     "  const benchFn = exports[bench.exportName];",
     "  let estimate = 1;",
-    "  for (let warmupIndex = 0; warmupIndex < settings.warmup; warmupIndex += 1) estimate = await __calibrateIterations(benchFn, targetNs, estimate, clock);",
+    "  for (let warmupIndex = 0; warmupIndex < settings.warmup; warmupIndex += 1) estimate = await __calibrateIterations(benchFn, sampleTargetNs, estimate, clock);",
     "  const runs = [];",
     "  const profileCounts = [];",
     "  let logs = [];",
@@ -165,7 +140,7 @@
     "    const startNs = clock.nowNs();",
     "    const execution = await __invokeExport(exports, bench.exportName, [iterations]);",
     "    const elapsedNs = Math.max(0, clock.nowNs() - startNs);",
-    "    estimate = __projectIterations(iterations, elapsedNs, targetNs);",
+    "    estimate = __projectIterations(iterations, elapsedNs, sampleTargetNs);",
     "    logs = execution.logs;",
     "    runs.push({ durationMs: elapsedNs / 1e6, elapsedNs, iterations });",
     "    if (profile?.snapshot) __mergeCounts(profileCounts, profile.snapshot());",
@@ -177,7 +152,7 @@
     "  const iterationTotal = runs.reduce((sum, run) => sum + run.iterations, 0);",
     "  const rates = runs.map(run => __benchmarkRate(run.iterations, run.elapsedNs));",
     "  const meanRate = durationMs <= 0 ? 0 : iterationTotal / (durationMs / 1000);",
-    "  const summary = `${bench.name}: mean ${__formatIterationsPerSecond(meanRate)}, min ${__formatIterationsPerSecond(Math.min(...rates))}, max ${__formatIterationsPerSecond(Math.max(...rates))}, ${__formatDurationNs(iterationTotal > 0 ? (durationMs / iterationTotal) * 1e6 : 0)}/iter, ${settings.seconds.toFixed(3)}s target, ${runs.map(run => run.iterations).join(\", \")} iterations`;",
+    "  const summary = `${bench.name}: mean ${__formatIterationsPerSecond(meanRate)}, min ${__formatIterationsPerSecond(Math.min(...rates))}, max ${__formatIterationsPerSecond(Math.max(...rates))}, ${__formatDurationNs(iterationTotal > 0 ? (durationMs / iterationTotal) * 1e6 : 0)}/iter, ${settings.seconds.toFixed(3)}s total target, ${runs.map(run => run.iterations).join(\", \")} iterations`;",
     "  return {",
     "    name: bench.name,",
     "    exportName: bench.exportName,",
@@ -195,18 +170,6 @@
     "    summary,",
     "  };",
     "}"
-  ],
-  "resolveHostImportLines": [
-    "const __resolveHostImport = (root, moduleName, importName) => {",
-    "  let value = root;",
-    "  for (const segment of importName.split(\"_\")) {",
-    "    if (!segment || !value || (typeof value !== \"object\" && typeof value !== \"function\") || !(segment in value)) {",
-    "      throw new Error(`Missing host import \"${importName}\" from \"${moduleName}\"`);",
-    "    }",
-    "    value = value[segment];",
-    "  }",
-    "  return value;",
-    "};"
   ],
   "importHostModuleLines": [
     "const __importHostModule = async specifier => {",

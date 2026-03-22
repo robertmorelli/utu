@@ -9,6 +9,7 @@ import {
     stringLiteralValue,
     findAnonBetween,
 } from './tree.js';
+import { parseHostImportName } from './parser.js';
 import data from './jsondata/watgen.data.json' with { type: 'json' };
 
 export class WatError extends Error {}
@@ -73,7 +74,6 @@ const SCALAR_NAMES = new Set(data.scalarNames);
 const I32 = data.i32Type;
 const DISCARD_HINT = data.discardHint;
 
-const STR_BUILTINS = data.strBuiltins;
 const TOP_LEVEL_COLLECT_HANDLERS = {
     struct_decl: (ctx, item) => {
         const decl = parseStructDecl(item);
@@ -99,6 +99,9 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
             ctx.importVals.push(decl);
             ctx.globalTypeMap.set(decl.name, decl.type);
         }
+    },
+    jsgen_decl: (ctx, item) => {
+        ctx.importFns.push(parseJsgenDecl(item));
     },
     export_decl: (ctx, item) => {
         const fn = parseFnDecl(childOfType(item, 'fn_decl'));
@@ -386,7 +389,6 @@ class WatGen {
         this.strings = new Map();
         this.stringList = [];
         this.arrayTypes = new Map();
-        this.usedStrBuiltins = new Set();
 
         this.localTypes = null;
         this.labelStack = [];
@@ -426,21 +428,10 @@ class WatGen {
             const value = stringLiteralValue(child);
             if (value !== null) this.internString(value);
 
-            if (child.type === 'namespace_call_expr') {
-                const { ns, method } = namespaceInfo(child);
-                if (ns === 'str' && STR_BUILTINS[method]) this.usedStrBuiltins.add(method);
-            }
-
             if (child.type === 'pipe_expr') {
-                this.noteBuiltin(pipeCallee(parsePipeTarget(childOfType(child, 'pipe_target'))));
+                void pipeCallee(parsePipeTarget(childOfType(child, 'pipe_target')));
             }
         });
-    }
-
-    noteBuiltin(callee = '') {
-        if (!callee.startsWith('str.')) return;
-        const method = callee.slice(4);
-        if (STR_BUILTINS[method]) this.usedStrBuiltins.add(method);
     }
     bodyItems(body) { return Array.isArray(body) ? body : kids(body); }
 
@@ -468,10 +459,6 @@ class WatGen {
             lines.push(`  (import "__strings" "${i}" (global $__s${i} externref))`);
         }
 
-        for (const method of this.usedStrBuiltins) {
-            const builtin = STR_BUILTINS[method];
-            lines.push(`  (import "wasm:js-string" "${builtin.importName}" (func $str.${method} ${builtin.sig}))`);
-        }
         if (this.profile === 'ticks') lines.push('  (import "__utu_profile" "tick" (func $__utu_profile_tick (param i32)))');
 
         for (const imp of this.importFns) lines.push(this.emitImportFn(imp));
@@ -582,10 +569,10 @@ class WatGen {
             imp.params.map(param => `(param ${this.wasmType(param.type)})`).join(' '),
             imp.returnType && this.watResultList(imp.returnType),
         ].filter(Boolean).join(' ');
-        return `  (import "${imp.module}" "${imp.name}" (func $${imp.name}${sig ? ` ${sig}` : ''}))`;
+        return `  (import "${imp.module}" "${imp.hostName}" (func $${imp.name}${sig ? ` ${sig}` : ''}))`;
     }
 
-    emitImportVal(imp) { return `  (import "${imp.module}" "${imp.name}" (global $${imp.name} ${this.wasmType(imp.type)}))`; }
+    emitImportVal(imp) { return `  (import "${imp.module}" "${imp.hostName}" (global $${imp.name} ${this.wasmType(imp.type)}))`; }
     emitGlobal(global) {
         const wasmType = this.wasmType(global.type);
         const init = this.tryFoldGlobalInit(global.value, wasmType) ?? this.genExprInline(global.value, wasmType);
@@ -1319,10 +1306,20 @@ const parseGlobalDecl = (node) => {
 };
 const parseImportDecl = (node) => {
     const [moduleNode, nameNode, typeNode] = kids(node), module = moduleNode.text.slice(1, -1), name = nameNode.text;
+    const { hostName } = parseHostImportName(name);
     return hasAnon(node, '(')
-        ? { kind: 'import_fn', module, name, params: parseImportParamList(childOfType(node, 'import_param_list')), returnType: parseReturnType(childOfType(node, 'return_type')) }
-        : { kind: 'import_val', module, name, type: parseType(typeNode) };
+        ? { kind: 'import_fn', module, name, hostName, params: parseImportParamList(childOfType(node, 'import_param_list')), returnType: parseReturnType(childOfType(node, 'return_type')) }
+        : { kind: 'import_val', module, name, hostName, type: parseType(typeNode) };
 };
+const parseJsgenDecl = (node) => ({
+    kind: 'import_fn',
+    module: '__utu_jsgen',
+    name: textOf(node, 'identifier'),
+    hostName: textOf(node, 'identifier'),
+    jsSource: childOfType(node, 'jsgen_lit')?.text.slice(1, -1) ?? '',
+    params: parseImportParamList(childOfType(node, 'import_param_list')),
+    returnType: parseReturnType(childOfType(node, 'return_type')),
+});
 const parseTestDecl = (node) => ({ kind: 'test_decl', name: kids(node)[0].text.slice(1, -1), body: childOfType(node, 'block') });
 const parseSetupDecl = (node) => {
     const named = kids(node), measure = named.at(-1);

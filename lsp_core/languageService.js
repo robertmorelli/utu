@@ -241,6 +241,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         fn_decl: { collect: (item) => collectFunctionDeclaration(item, false), walk: walkFunction },
         global_decl: { collect: collectGlobalDeclaration, walk: walkGlobal },
         import_decl: { collect: collectImportDeclaration, walk: walkImport },
+        jsgen_decl: { collect: collectJsgenDeclaration, walk: walkJsgen },
         test_decl: { collect: collectTestDeclaration, walk: walkTest },
         bench_decl: { collect: collectBenchDeclaration, walk: walkBench },
     };
@@ -366,6 +367,18 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         const importSymbol = createSymbol(nameNode, 'importValue', { detail: 'host import value', signature: `shimport ${moduleText} ${nameNode.text}: ${typeNode.text}`, typeText: typeNode.text, topLevel: true });
         rememberSymbolKey(topLevelValueKeys, importSymbol);
     }
+    function collectJsgenDeclaration(jsgenDecl) {
+        const sourceNode = findNamedChild(jsgenDecl, 'jsgen_lit');
+        const nameNode = findNamedChild(jsgenDecl, 'identifier');
+        if (!sourceNode || !nameNode)
+            return;
+        const paramList = findNamedChild(jsgenDecl, 'import_param_list');
+        const returnTypeNode = findNamedChild(jsgenDecl, 'return_type');
+        if (!returnTypeNode)
+            return;
+        const importSymbol = createSymbol(nameNode, 'importFunction', { detail: 'inline js import', signature: `escape ${sourceNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`, returnTypeText: returnTypeNode.text, topLevel: true });
+        rememberSymbolKey(topLevelValueKeys, importSymbol);
+    }
     function collectTestDeclaration(testDecl) {
         const nameNode = findNamedChild(testDecl, 'string_lit');
         if (!nameNode)
@@ -429,6 +442,16 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         const typeNode = importDecl.namedChildren.at(-1);
         if (typeNode && typeNode.type !== 'identifier')
             walkTypeAnnotation(typeNode);
+    }
+    function walkJsgen(jsgenDecl) {
+        const returnTypeNode = findNamedChild(jsgenDecl, 'return_type');
+        if (!returnTypeNode)
+            return;
+        for (const paramNode of findNamedChildren(findNamedChild(jsgenDecl, 'import_param_list'), 'param')) {
+            const typeNode = paramNode.namedChildren.at(-1);
+            if (typeNode) walkTypeAnnotation(typeNode);
+        }
+        walkTypeAnnotation(returnTypeNode);
     }
     function walkTest(testDecl) { walkBlock(findNamedChild(testDecl, 'block')); }
     function walkBench(benchDecl) {
