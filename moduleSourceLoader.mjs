@@ -1,12 +1,26 @@
 const IS_NODE_LIKE = typeof process === 'object' && process?.versions?.node && process?.type !== 'renderer';
 
 export async function loadModuleFromSource(source, { preferBlobUrl = false, identifier = 'module' } = {}) {
+    if (typeof source === 'string' && arguments[1]?.where === 'packed_base64') source = IS_NODE_LIKE ? Buffer.from(source, 'base64').toString('utf8') : atob(source);
     if (IS_NODE_LIKE) return loadNodeModuleFromSource(source, { identifier });
-    if (preferBlobUrl && typeof URL.createObjectURL === 'function') {
-        const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-        return import(url).finally(() => URL.revokeObjectURL(url));
+    const shouldTryBlobUrl = preferBlobUrl || typeof URL.createObjectURL === 'function';
+    if (shouldTryBlobUrl) {
+        try {
+            return await loadBlobModuleFromSource(source);
+        } catch (error) {
+            if (!shouldFallbackToDataUrl(error)) throw error;
+        }
     }
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+}
+
+function loadBlobModuleFromSource(source) {
+    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    return import(url).finally(() => URL.revokeObjectURL(url));
+}
+
+function shouldFallbackToDataUrl(error) {
+    return error instanceof TypeError;
 }
 
 async function loadNodeModuleFromSource(source, { identifier }) {

@@ -46,10 +46,11 @@
     {
       "label": "UTU: Rebuild Web Extension",
       "type": "shell",
-      "command": "npm",
+      "command": "bun",
       "args": [
         "run",
-        "rebuild:web"
+        "build",
+        "--web-only"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
@@ -63,7 +64,11 @@
     {
       "label": "UTU: Watch Web Extension",
       "type": "shell",
-      "command": "npm run watch:web",
+      "command": "bun",
+      "args": [
+        "run",
+        "watch:web"
+      ],
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {

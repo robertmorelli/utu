@@ -249,6 +249,19 @@ export fun main() f64 {
       const exports = await instantiate(undefined, { es: { math_sqrt: Math.sqrt } });
       expectValue(await exports.main?.(), 9);
     }),
+    compiledCase('throws clearly for missing es value imports', `shimport "es" label: str;
+
+export fun main() str {
+    label;
+}`, {}, async (_, { instantiate }) => {
+      let message = '';
+      try {
+        await instantiate();
+      } catch (error) {
+        message = firstLine(error?.message ?? error);
+      }
+      expectValue(message, 'Missing host import "es.label"');
+    }),
     compiledCase('treats comments as compiler trivia', `// top-level comment
 export fun main() i32 {
     // block comment

@@ -1,6 +1,7 @@
 {
   "supportedWasmLocations": [
     "base64",
+    "packed_base64",
     "relative_url",
     "local_file_node"
   ],

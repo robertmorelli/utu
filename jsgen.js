@@ -206,6 +206,10 @@ function renderImportBinding(group, entry, moduleRef) {
         ? renderHostImportAccess(moduleRef, entry.hostPath)
         : renderHostImportExpression(group.module === '__utu_profile' ? ['__utu_profile', ...entry.hostPath] : entry.hostPath);
     const resolvedRef = `(${hostImportRef} ?? ${fallbackRef})`;
+    if (entry.kind === 'value') {
+        const valueRef = moduleRef ? resolvedRef : hostImportRef;
+        return `(() => { const __value = ${valueRef}; if (__value === undefined) throw new Error(${JSON.stringify(`Missing host import "${group.module}.${entry.hostName}"`)}); return __value; })()`;
+    }
     const caughtFallback = renderCaughtFallback(entry.returnType);
     return caughtFallback === null
         ? resolvedRef
