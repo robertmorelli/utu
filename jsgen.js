@@ -191,8 +191,9 @@ function renderHostImportAccess(rootExpression, path) {
 }
 
 function renderHostImportExpression(path) {
+    const globalRoot = `(typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : global))`;
     return path.map((segment, index) => index === 0
-        ? `globalThis[${JSON.stringify(segment)}]`
+        ? `${globalRoot}[${JSON.stringify(segment)}]`
         : /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)
             ? `.${segment}`
             : `[${JSON.stringify(segment)}]`).join('');

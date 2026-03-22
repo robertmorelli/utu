@@ -79,7 +79,7 @@ const source = `
 import { readFile } from 'node:fs/promises';
 
 const fixtureUris = ${JSON.stringify(fixtureUris)};
-const outputLines = globalThis.__utuActivationLogLines ?? [];
+const outputLines = global.__utuActivationLogLines ?? [];
 let findFilesCalls = 0;
 
 function disposable() {
@@ -231,7 +231,7 @@ export const tests = {
 };
 `;
 
-  globalThis.__utuActivationLogLines = outputLines;
+  global.__utuActivationLogLines = outputLines;
   await mkdir(stubPackageRoot, { recursive: true });
   await writeFile(resolve(stubPackageRoot, 'package.json'), JSON.stringify(packageJson, null, 2), 'utf8');
   await writeFile(resolve(stubPackageRoot, 'index.js'), source, 'utf8');

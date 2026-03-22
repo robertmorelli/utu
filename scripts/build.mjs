@@ -31,6 +31,9 @@ const cliOnlyMode = process.argv.includes('--cli-only');
 const watchMode = process.argv.includes('--watch');
 const webOnlyMode = process.argv.includes('--web-only') || cliOnlyMode;
 const watchMessages = webOnlyMode ? { start: 'Watching UTU web extension sources...', ready: 'UTU_WEB_EXTENSION_READY' } : { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
+const browserDefine = {
+  ['global' + 'This.process']: 'undefined',
+};
 
 const sharedBuildOptions = {
   bundle: true,
@@ -45,7 +48,7 @@ const activeTargets = cliOnlyMode ? [] : [
     entryPoints: [resolve(extensionRoot, 'extension/extension.web.js')],
     outfile: resolve(extensionRoot, 'dist/web/extension.js'),
     format: 'cjs',
-    external: ['vscode', 'fs', 'fs/promises', 'module', 'path', 'url'],
+    external: ['vscode', 'fs', 'fs/promises', 'module', 'os', 'path', 'url'],
     loader: {
       '.wasm': 'binary',
     },
@@ -57,9 +60,7 @@ const activeTargets = cliOnlyMode ? [] : [
     outfile: resolve(extensionRoot, 'dist/compiler.web.mjs'),
     format: 'esm',
     external: ['fs', 'fs/promises', 'module', 'path', 'url'],
-    define: {
-      'globalThis.process': 'undefined',
-    },
+    define: browserDefine,
     loader: {
       '.wasm': 'binary',
     },
@@ -181,7 +182,18 @@ async function packageVsix() {
     throw new Error('VSIX packaging is part of `bun run build`, but local `node_modules/.bin/vsce` is missing. Install `@vscode/vsce` locally so build can package without hanging on `npx`.');
   }
 
+  await sanitizeVsceInputs();
   await exec(vsceBinaryPath, ['package', '--no-dependencies', '--out', resolve(extensionRoot, `dist/utu-vscode-${process.env.npm_package_version ?? '0.0.0'}.vsix`)]);
+}
+
+async function sanitizeVsceInputs() {
+  if (process.platform !== 'darwin') return;
+
+  try {
+    await exec('xattr', ['-rc', resolve(extensionRoot, 'dist'), treeSitterRuntimeDest, grammarDest]);
+  } catch (error) {
+    console.warn('Failed to clear macOS extended attributes before VSIX packaging:', error);
+  }
 }
 
 async function syncGrammarArtifact() {

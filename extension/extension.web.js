@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { activateUtuExtension } from './activate.js';
 import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from '../loadCompiledRuntime.mjs';
+import { loadModuleFromSource } from '../moduleSourceLoader.mjs';
 
 export async function activate(context) {
     const grammarWasmPath = await readExtensionBytes(context, 'tree-sitter-utu.wasm');
@@ -57,14 +58,12 @@ class WebCompilerHost {
     loadRuntime(source, mode, compileOptions = {}, prepareRuntime) { return loadCompiledRuntime({ source, mode, compileSource: (input, options = {}) => this.compileSource(input, options), loadModule: loadModuleFromSource, prepareRuntime, compileOptions }); }
     async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, {}); }
     async getCompiler() { return (this.compilerPromise ??= this.loadCompiler()); }
-    async loadCompiler() { return loadModuleFromSource(new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true))), { preferBlobUrl: true }); }
-}
-function loadModuleFromSource(source, { preferBlobUrl = false } = {}) {
-    if (typeof URL.createObjectURL === 'function') {
-        const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-        return import(url).finally(() => URL.revokeObjectURL(url));
+    async loadCompiler() {
+        return loadModuleFromSource(new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true))), {
+            preferBlobUrl: true,
+            identifier: 'compiler.web',
+        });
     }
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 async function getNamedTarget(source, getMetadata, kind, ordinal) {
     const metadata = await getMetadata(source);

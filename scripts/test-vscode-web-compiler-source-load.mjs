@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
+import { loadModuleFromSource } from '../moduleSourceLoader.mjs';
 
 const source = await readFile(new URL('../dist/compiler.web.mjs', import.meta.url), 'utf8');
-const compiler = await import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+const compiler = await loadModuleFromSource(source, { identifier: 'compiler.web-test' });
 
 const metadata = await compiler.get_metadata('export fun main() i32 { 0; }');
 if (!metadata.hasMain) {
