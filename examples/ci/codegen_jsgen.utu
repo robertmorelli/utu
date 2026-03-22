@@ -1,4 +1,4 @@
-escape `(a, b) => a + b` str_add(str, str) str;
+escape |(a, b) => a + b| str_add(str, str) str;
 
 export fun main() str {
     let prefix: str = "co";

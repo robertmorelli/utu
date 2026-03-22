@@ -9,8 +9,8 @@ type Filter =
     | Completed;
 
 shimport "es" wrap(str) str;
-escape `(a, b) => a + b` str_concat(str, str) str;
-escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+escape |(a, b) => a + b| str_concat(str, str) str;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun new_todo(text: str) Todo {
     Todo { text: text, done: false };

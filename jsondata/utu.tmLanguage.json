@@ -71,25 +71,17 @@
       "patterns": [
         {
           "name": "meta.declaration.jsgen.utu",
-          "begin": "\\b(escape)\\b\\s+(`)",
+          "begin": "\\b(escape)\\b\\s+\\|",
           "beginCaptures": {
             "1": {
               "name": "keyword.control.utu"
-            },
-            "2": {
-              "name": "punctuation.definition.string.begin.utu"
             }
           },
-          "end": "(`)(?=\\s+[a-z_][a-zA-Z0-9_]*\\s*\\()",
-          "endCaptures": {
-            "1": {
-              "name": "punctuation.definition.string.end.utu"
-            }
-          },
+          "end": "\\|(?=\\s+[a-z_][a-zA-Z0-9_]*\\s*\\()",
           "patterns": [
             {
-              "begin": "(?<=`)",
-              "end": "(?=`)",
+              "begin": "(?=[^|])",
+              "end": "(?=\\|)",
               "contentName": "meta.embedded.inline.javascript",
               "patterns": [
                 {
@@ -177,21 +169,6 @@
             },
             "3": {
               "name": "variable.other.definition.utu"
-            }
-          }
-        },
-        {
-          "name": "meta.declaration.jsgen-function.utu",
-          "match": "\\b(escape)\\s+(`[^`]+`)\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
-          "captures": {
-            "1": {
-              "name": "keyword.control.utu"
-            },
-            "2": {
-              "name": "string.quoted.other.jsgen.utu"
-            },
-            "3": {
-              "name": "entity.name.function.utu"
             }
           }
         },

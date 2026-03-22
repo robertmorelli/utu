@@ -146,6 +146,7 @@
     "test:editor:core": "bun ./scripts/test-editor.mjs core",
     "test:editor:examples": "bun ./scripts/test-editor.mjs examples",
     "test:editor:webhost": "bun ./scripts/test-editor.mjs webhost",
+    "test:textmate:escape": "node ./scripts/test-textmate-escape.mjs",
     "test:stress": "bun ./scripts/test-stress-runtime.mjs",
     "test:docs:codegen": "bun ./scripts/test-docs-codegen.mjs",
     "compare:deltablue:rust": "bun ./scripts/deltablue-rust.mjs compare",
@@ -169,7 +170,9 @@
     "web-tree-sitter": "^0.26.7"
   },
   "devDependencies": {
+    "esbuild": "^0.27.4",
     "tree-sitter-cli": "^0.26.7",
-    "esbuild": "^0.27.4"
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
   }
 }

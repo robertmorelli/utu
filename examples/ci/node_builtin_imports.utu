@@ -1,5 +1,5 @@
-escape `(s, start, end) => s.substring(start, end)` substring(str, i32, i32) str;
-escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+escape |(s, start, end) => s.substring(start, end)| substring(str, i32, i32) str;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun readme_prefix() str {
     substring("# UTU README", 0, 5);

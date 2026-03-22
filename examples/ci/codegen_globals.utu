@@ -1,5 +1,5 @@
-escape `(a, b) => a + b` str_concat(str, str) str;
-escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+escape |(a, b) => a + b| str_concat(str, str) str;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 let seed: i32 = 41;
 let banner: str = "ok";

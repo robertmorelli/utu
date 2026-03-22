@@ -1,4 +1,4 @@
-escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 type Shape =
     | Circle { radius: i32 }

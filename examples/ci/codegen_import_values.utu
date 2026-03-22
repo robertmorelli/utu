@@ -1,7 +1,7 @@
 shimport "es" lucky: i32;
 shimport "es" label: str;
 shimport "es" document: externref;
-escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun score() i32 {
     lucky + 1;

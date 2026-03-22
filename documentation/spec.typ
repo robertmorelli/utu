@@ -262,7 +262,7 @@ The spec recommends making string behavior explicit at the boundary where you
 need it. For lightweight helpers, define them inline with `escape`:
 
 ```utu
-escape `(a, b) => a + b` str_concat(str, str) str;
+escape |(a, b) => a + b| str_concat(str, str) str;
 
 let msg: str = "hello" -o str_concat(_, ", ") -o str_concat(_, "world");
 ```
@@ -1070,7 +1070,7 @@ fun count(todos: array[Todo], filter: Filter) i32 {
 }
 
 export fun main() void {
-    escape `(a, b) => a + b` str_concat(str, str) str;
+    escape |(a, b) => a + b| str_concat(str, str) str;
     let todos: array[Todo] = array[Todo].new_fixed(
         new_todo("learn utu"),
         new_todo("build compiler"),

@@ -591,7 +591,7 @@ module.exports = grammar({
     float_lit: $ => token(/[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/),
 
     string_lit: $ => token(seq('"', /[^"\n]*/, '"')),
-    jsgen_lit: $ => token(seq('`', /[^`\n]*/, '`')),
+    jsgen_lit: $ => token(seq('|', /[^|\n]*/, '|')),
 
     // Multi-line string: one or more lines each starting with \\
     multiline_string_lit: $ => prec.right(repeat1($.multiline_string_line)),

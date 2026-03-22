@@ -1799,7 +1799,6 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
         '\\', 51,
         ']', 30,
         '^', 43,
-        '`', 9,
         '{', 18,
         '|', 25,
         '}', 19,
@@ -1809,7 +1808,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
           lookahead == ' ') SKIP(0);
       if (('1' <= lookahead && lookahead <= '9')) ADVANCE(56);
       if (('A' <= lookahead && lookahead <= 'Z')) ADVANCE(65);
-      if (('_' <= lookahead && lookahead <= 'z')) ADVANCE(64);
+      if (lookahead == '_' ||
+          ('a' <= lookahead && lookahead <= 'z')) ADVANCE(64);
       END_STATE();
     case 1:
       ADVANCE_MAP(
@@ -1857,6 +1857,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
         '\\', 8,
         ']', 30,
         '{', 18,
+        '|', 9,
         '}', 19,
         '~', 34,
       );
@@ -1892,7 +1893,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == '\\') ADVANCE(63);
       END_STATE();
     case 9:
-      if (lookahead == '`') ADVANCE(62);
+      if (lookahead == '|') ADVANCE(62);
       if (lookahead != 0 &&
           lookahead != '\n') ADVANCE(9);
       END_STATE();
@@ -3008,7 +3009,7 @@ static const TSLexerMode ts_lex_modes[STATE_COUNT] = {
   [371] = {.lex_state = 0},
   [372] = {.lex_state = 0},
   [373] = {.lex_state = 0},
-  [374] = {.lex_state = 0},
+  [374] = {.lex_state = 2},
   [375] = {.lex_state = 0},
   [376] = {.lex_state = 0},
   [377] = {.lex_state = 0},
@@ -3115,7 +3116,6 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [sym_int_lit] = ACTIONS(1),
     [sym_float_lit] = ACTIONS(1),
     [sym_string_lit] = ACTIONS(1),
-    [sym_jsgen_lit] = ACTIONS(1),
     [sym_multiline_string_line] = ACTIONS(1),
     [sym_type_ident] = ACTIONS(1),
   },
