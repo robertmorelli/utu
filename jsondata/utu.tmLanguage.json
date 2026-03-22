@@ -71,27 +71,25 @@
       "patterns": [
         {
           "name": "meta.declaration.jsgen.utu",
-          "begin": "\\b(escape)\\b",
+          "begin": "\\b(escape)\\b\\s+(`)",
           "beginCaptures": {
             "1": {
               "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.utu"
             }
           },
-          "end": "(?=\\s+[a-z_][a-zA-Z0-9_]*\\s*\\()",
+          "end": "(`)(?=\\s+[a-z_][a-zA-Z0-9_]*\\s*\\()",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.utu"
+            }
+          },
           "patterns": [
             {
-              "begin": "(`)",
-              "beginCaptures": {
-                "1": {
-                  "name": "punctuation.definition.string.begin.utu"
-                }
-              },
-              "end": "(`)",
-              "endCaptures": {
-                "1": {
-                  "name": "punctuation.definition.string.end.utu"
-                }
-              },
+              "begin": "(?<=`)",
+              "end": "(?=`)",
               "contentName": "meta.embedded.inline.javascript",
               "patterns": [
                 {
