@@ -64,7 +64,7 @@ jobs:
           set -e
           echo "$output"
           test $exit_code -ne 0
-          grep -Fq 'Unknown command "nope"' <<<"$output"
+          grep -Fq "ENOENT: no such file or directory" <<<"$output"
 
           set +e
           output="$(bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
