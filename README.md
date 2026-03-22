@@ -1,5 +1,7 @@
 # UTU
 
+UTU is a web-first, portable, zero-dep compiler distribution for making tiny, high-performance Wasm bundles.
+
 This repo builds the full UTU toolchain from the repo root: the VS Code extension, the bundled CLI, and the standalone LSP binary.
 
 ## What is set up

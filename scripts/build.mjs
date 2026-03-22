@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { build, context } from 'esbuild';
-import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { getRepoRoot } from './test-helpers.mjs';
@@ -17,7 +17,9 @@ const treeSitterBinaryPath = resolve(extensionRoot, 'node_modules/.bin/tree-sitt
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
-const grammarSourceInputs = [resolve(extensionRoot, 'grammar.js')];
+const grammarSourcePath = resolve(extensionRoot, 'grammar.cjs');
+const grammarCompatPath = resolve(extensionRoot, 'grammar.js');
+const grammarSourceInputs = [grammarSourcePath];
 const compilerInputRoots = [compilerSourceRoot];
 const staticAssetInputs = [treeSitterRuntimeSource, grammarDest];
 const ignoredWatchEntries = new Set([
@@ -217,8 +219,13 @@ async function ensureGrammarArtifact({ force = false } = {}) {
 }
 
 async function buildGrammar() {
-  await exec(treeSitterBinaryPath, ['generate']);
-  await exec(treeSitterBinaryPath, ['build', '--wasm']);
+  await writeFile(grammarCompatPath, "import grammarDefinition from './grammar.cjs';\nexport default grammarDefinition;\n", 'utf8');
+  try {
+    await exec(treeSitterBinaryPath, ['generate']);
+    await exec(treeSitterBinaryPath, ['build', '--wasm']);
+  } finally {
+    await rm(grammarCompatPath, { force: true });
+  }
 }
 
 async function findFreshestFile(paths) {

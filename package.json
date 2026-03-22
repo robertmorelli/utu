@@ -1,11 +1,12 @@
 {
   "name": "utu-vscode",
   "displayName": "UTU",
-  "description": "VS Code language support and compiler tooling for UTU.",
+  "description": "Web-first, portable, zero-dep compiler distribution for making tiny, high-performance Wasm bundles.",
   "author": "Robert Morelli",
   "version": "0.1.0",
   "publisher": "robertmorelli",
   "license": "MIT",
+  "type": "module",
   "module": "index.js",
   "repository": {
     "type": "git",
