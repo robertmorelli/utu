@@ -1,46 +1,46 @@
 type Shape =
     | Circle { radius: i32 }
     | Rect { width: i32, height: i32 }
-    | Triangle { base: i32, height: i32 }
+    | Triangle { base: i32, height: i32 };
 
-fn area(shape: Shape) i32 {
+fun area(shape: Shape) i32 {
     alt shape {
         c: Circle => c.radius * c.radius,
         r: Rect => r.width * r.height,
         t: Triangle => t.base * t.height / 2,
-    }
+    };
 }
 
-fn describe(shape: Shape) str {
+fun describe(shape: Shape) str {
     alt shape {
         _: Circle => "circle",
         _: Rect => "rect",
         _: Triangle => "triangle",
-    }
+    };
 }
 
-fn tag(kind: i32) str {
+fun tag(kind: i32) str {
     match kind {
         0 => "zero",
         1 => "one",
         _ => "many",
-    }
+    };
 }
 
 test "alt dispatches circle arms" {
-    assert area(Circle { radius: 4 }) == 16
+    assert area(Circle { radius: 4 }) == 16;
 }
 
 test "alt dispatches rect arms" {
-    assert area(Rect { width: 3, height: 4 }) == 12
+    assert area(Rect { width: 3, height: 4 }) == 12;
 }
 
 test "alt dispatches triangle arms" {
-    assert area(Triangle { base: 5, height: 4 }) == 10
+    assert area(Triangle { base: 5, height: 4 }) == 10;
 }
 
 test "alt and match can return strings" {
-    assert str.equals(describe(Rect { width: 2, height: 6 }), "rect")
-    assert str.equals(tag(0), "zero")
-    assert str.equals(tag(3), "many")
+    assert str.equals(describe(Rect { width: 2, height: 6 }), "rect");
+    assert str.equals(tag(0), "zero");
+    assert str.equals(tag(3), "many");
 }

@@ -1,29 +1,29 @@
-fn add(a: i32, b: i32) i32 {
-    a + b
+fun add(a: i32, b: i32) i32 {
+    a + b;
 }
 
-fn scaled_sum(a: i32, b: i32) i32 {
-    let sum: i32 = add(a, b)
-    let diff: i32 = a - b
-    sum * 2 + diff
+fun scaled_sum(a: i32, b: i32) i32 {
+    let sum: i32 = add(a, b);
+    let diff: i32 = a - b;
+    sum * 2 + diff;
 }
 
-fn bit_mix(a: i32, b: i32) i32 {
-    ((a << 2) ^ b) & 31
+fun bit_mix(a: i32, b: i32) i32 {
+    ((a << 2) ^ b) & 31;
 }
 
 test "implicit return keeps arithmetic on the stack" {
-    assert add(4, 5) == 9
+    assert add(4, 5) == 9;
 }
 
 test "let bindings become reusable locals" {
-    assert scaled_sum(10, 4) == 34
+    assert scaled_sum(10, 4) == 34;
 }
 
 test "bitwise operators lower directly" {
-    assert bit_mix(3, 5) == 9
+    assert bit_mix(3, 5) == 9;
 }
 
 test "unary not stays boolean" {
-    assert not false
+    assert not false;
 }

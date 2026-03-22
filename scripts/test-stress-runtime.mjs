@@ -3,9 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compileUtuSource } from '../cli_artifact/src/lib/compiler.mjs';
-import { loadNodeModuleFromSource } from '../cli_artifact/src/lib/nodeRuntime.mjs';
 import { executeFixedRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../shared/compiledRuntime.mjs';
 import { createCliImportProvider } from '../shared/hostImports.mjs';
+import { loadNodeModuleFromSource } from '../shared/moduleLoaders.node.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -14,6 +14,7 @@ const sources = {
     test: await readFile(resolve(repoRoot, 'examples/ci/tests_basic.utu'), 'utf8'),
     bench: await readFile(resolve(repoRoot, 'examples/bench/bench_basic.utu'), 'utf8'),
 };
+const emptyImports = () => createCliImportProvider({ prompt: () => '', writeLine: () => {} });
 
 const cases = [
     ['compile-run cycle', 25, async () => {
@@ -72,13 +73,13 @@ if (failed) {
 }
 
 async function withCliRuntime(source, { mode }, run) {
-    return withRuntime(loadCompiledRuntime({
-        source,
-        mode,
-        compileSource: (input, options = {}) => compileUtuSource(input, options),
-        loadModule: (js) => loadNodeModuleFromSource(js, `utu-stress-${mode}-`),
-        createImports: () => createCliImportProvider({ prompt: () => '', writeLine: () => {} }),
-    }), run);
+  return withRuntime(loadCompiledRuntime({
+    source,
+    mode,
+    compileSource: compileUtuSource,
+    loadModule: (shim) => loadNodeModuleFromSource(shim, { prefix: `utu-stress-${mode}-` }),
+    createImports: emptyImports,
+  }), run);
 }
 
 function expectEqual(actual, expected) {

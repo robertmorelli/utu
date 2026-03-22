@@ -1,8 +1,8 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { UtuParserService, createSourceDocument, spanFromOffsets } from '../compiler/parser.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp/src/core/languageService.js';
-import { UtuParserService } from '../lsp/src/core/parser.js';
 import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -21,29 +21,47 @@ const cases = [
             createDocument('file:///static.utu', ''),
             { line: 0, character: 0 },
         );
-        expectLabels(items, ['fn', 'array', 'i64', 'true']);
+        expectLabels(items, ['fun', 'while', 'array', 'i64', 'true']);
     }],
     ['namespace completions', async () => {
         const items = await languageService.getCompletionItems(
-            createDocument('file:///namespace.utu', 'fn main() i32 { array. }'),
-            { line: 0, character: 'fn main() i32 { array.'.length },
+            createDocument('file:///namespace.utu', 'fun main() i32 { array. }'),
+            { line: 0, character: 'fun main() i32 { array.'.length },
         );
         expectLabels(items, ['len', 'new_default']);
     }],
     ['top level completions', async () => {
         const items = await languageService.getCompletionItems(
             createDocument('file:///top-level.utu', [
-                'fn add_one(value: i64) i64 {',
+                'fun add_one(value: i64) i64 {',
                 '    value + 1',
                 '}',
                 '',
-                'export fn main() i64 {',
+                'export fun main() i64 {',
                 '    add_one(41)',
                 '}',
             ].join('\n')),
             { line: 5, character: 8 },
         );
         expectLabels(items, ['add_one', 'main']);
+    }],
+    ['compiler source documents expose offset and line ranges', async () => {
+        const document = createSourceDocument('alpha\nbeta', {
+            uri: 'file:///ranges.utu',
+            version: 7,
+        });
+        const span = spanFromOffsets(document, 2, 7);
+        expectEqual(document.offsetAt({ line: 1, character: 2 }), 8);
+        expectDeepEqual(span, {
+            range: {
+                start: { line: 0, character: 2 },
+                end: { line: 1, character: 1 },
+            },
+            offsetRange: {
+                start: 2,
+                end: 7,
+            },
+        });
     }],
     ['workspace symbol index caches unchanged versions', async () => {
         let getDocumentIndexCalls = 0;

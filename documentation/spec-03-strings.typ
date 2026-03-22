@@ -25,12 +25,12 @@ Single-line strings use double quotes. Multi-line strings use `\\` at the
 start of each line in Zig style:
 
 ```utu
-let greeting: str = "hello world"
+let greeting: str = "hello world";
 
 let multiline: str =
     \\this is a multi-line
     \\string literal in utu
-    \\each line starts with \\
+    \\each line starts with \\;
 ```
 
 Multi-line strings are concatenated at compile time with newlines between each
@@ -44,11 +44,11 @@ text processing such as parsing or regex, convert to a GC `array[i16]` for
 direct indexing:
 
 ```utu
-let msg: str = "hello" -o str.concat(_, ", ") -o str.concat(_, "world")
+let msg: str = "hello" -o str.concat(_, ", ") -o str.concat(_, "world");
 
 // Heavy processing: convert to array
-let arr: array[i16] = array[i16].new(str.length(msg), 0)
-str.into_char_code_array(msg, arr, 0)
+let arr: array[i16] = array[i16].new(str.length(msg), 0);
+str.into_char_code_array(msg, arr, 0);
 // ... direct array[i16] access ...
-let result: str = str.from_char_code_array(arr, 0, array.len(arr))
+let result: str = str.from_char_code_array(arr, 0, array.len(arr));
 ```

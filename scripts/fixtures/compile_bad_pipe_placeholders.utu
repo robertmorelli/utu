@@ -1,0 +1,7 @@
+fun add(a: i32, b: i32, c: i32) i32 {
+    a + b + c;
+}
+
+fun bad() i32 {
+    1 -o add(_, 2, _);
+}

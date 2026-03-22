@@ -1,11 +1,11 @@
-fn add(a: i32, b: i32) i32 {
-    a + b
+fun add(a: i32, b: i32) i32 {
+    a + b;
 }
 
 test "adds two numbers" {
-    assert add(2, 2) == 4
+    assert add(2, 2) == 4;
 }
 
 test "adds negatives" {
-    assert add(3, -5) == -2
+    assert add(3, -5) == -2;
 }

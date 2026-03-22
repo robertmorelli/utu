@@ -1,9 +1,9 @@
-fn one() i32 {
-    1
+fun one() i32 {
+    1;
 }
 
-let bad: i32 = one()
+let bad: i32 = one();
 
-export fn main() i32 {
-    bad
+export fun main() i32 {
+    bad;
 }

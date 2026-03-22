@@ -57,30 +57,13 @@ async function loadUtu() {
     const { js, metadata, wasm } = await compileUtuSource(source, { mode: "bench" });
     await writeFile(file, js, "utf8");
     const mod = await import(pathToFileURL(file).href);
-    let lastLog = null;
-    const exports = await mod.instantiate({
-        es: {
-            console_log(value) {
-                lastLog = String(value);
-            },
-            i64_to_string(value) {
-                return String(value);
-            },
-        },
-    });
+    const exports = await mod.instantiate();
     const cleanup = () => rm(dir, { recursive: true, force: true });
     return metadata.benches.map(bench => ({
         name: `utu_${bench.name.replace(/^deltablue_/, "")}`,
         wasmBytes: wasm.length,
         bench: (iterations) => exports[bench.exportName](iterations),
-        check: () => {
-            lastLog = null;
-            exports.main();
-            if (lastLog === null) {
-                throw new Error("Utu main() did not log a result.");
-            }
-            return Number(lastLog);
-        },
+        check: () => Number(exports.main()),
         cleanup,
     }));
 }

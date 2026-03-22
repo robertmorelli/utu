@@ -1,14 +1,15 @@
-import extern "es" console_log(str)
-import extern "es" wrap(str) str
-
-fn label() str {
-    "done"
+fun label() str {
+    "done";
 }
 
-fn decorate(value: str) str {
-    wrap(value)
+fun wrap(value: str) str {
+    "[" -o str.concat(_, value) -o str.concat(_, "]");
 }
 
-export fn main() {
-    decorate(label()) -o console_log
+fun decorate(value: str) str {
+    wrap(value);
+}
+
+export fun main() str {
+    decorate(label());
 }

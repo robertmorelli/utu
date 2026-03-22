@@ -1,39 +1,39 @@
 {
-  "wasmPath": "cli_artifact/tree-sitter-utu.wasm",
+  "wasmPath": "tree-sitter-utu.wasm",
   "cases": [
     {
       "name": "ci-hello",
       "path": "examples/ci/hello.utu",
       "mode": "run",
-      "expectedLogs": ["ok"],
+      "expectedReturn": "ok",
       "tags": ["smoke"]
     },
     {
       "name": "ci-global-string",
       "path": "examples/ci/global_string.utu",
       "mode": "run",
-      "expectedLogs": ["hello"],
+      "expectedReturn": "hello",
       "tags": ["smoke"]
     },
     {
       "name": "ci-string-echo",
       "path": "examples/ci/string_echo.utu",
       "mode": "run",
-      "expectedLogs": ["value"],
+      "expectedReturn": "value",
       "tags": ["smoke"]
     },
     {
       "name": "ci-string-roundtrip",
       "path": "examples/ci/string_roundtrip.utu",
       "mode": "run",
-      "expectedLogs": ["[done]"],
+      "expectedReturn": "[done]",
       "tags": ["smoke"]
     },
     {
       "name": "ci-assert-pass",
       "path": "examples/ci/assert_pass.utu",
       "mode": "run",
-      "expectedLogs": ["ok"],
+      "expectedReturn": "ok",
       "tags": ["smoke"]
     },
     {

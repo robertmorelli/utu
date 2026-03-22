@@ -28,7 +28,7 @@ The always-available builtins are:
 Single-line string literals use double quotes:
 
 ```utu
-let greeting: str = "hello world"
+let greeting: str = "hello world";
 ```
 
 Multi-line strings use Zig-style `\\` prefixes on each line:
@@ -37,7 +37,7 @@ Multi-line strings use Zig-style `\\` prefixes on each line:
 let multiline: str =
     \\this is a multi-line
     \\string literal in utu
-    \\each line starts with \\
+    \\each line starts with \\;
 ```
 
 The compiler concatenates those lines at compile time and inserts newline
@@ -53,12 +53,12 @@ The spec recommends two tiers of string work:
   more important than host string specialization
 
 ```utu
-let msg: str = "hello" -o str.concat(_, ", ") -o str.concat(_, "world")
+let msg: str = "hello" -o str.concat(_, ", ") -o str.concat(_, "world");
 
-let arr: array[i16] = array[i16].new(str.length(msg), 0)
-str.into_char_code_array(msg, arr, 0)
+let arr: array[i16] = array[i16].new(str.length(msg), 0);
+str.into_char_code_array(msg, arr, 0);
 // ... direct array[i16] access ...
-let result: str = str.from_char_code_array(arr, 0, array.len(arr))
+let result: str = str.from_char_code_array(arr, 0, array.len(arr));
 ```
 
 This keeps common string operations lightweight without preventing low-level
@@ -88,7 +88,7 @@ The consequences called out in the spec are:
 Constructing a struct lowers directly to `struct.new`:
 
 ```utu
-let pos: Vec2 = Vec2 { x: 1.0, y: 2.0 }
+let pos: Vec2 = Vec2 { x: 1.0, y: 2.0 };
 ```
 
 ```wasm
@@ -101,12 +101,12 @@ Arrays are first-class GC objects with mutable elements. The spec exposes the
 core allocation patterns directly:
 
 ```utu
-let buf: array[i32] = array[i32].new(1024, 0)
-let data: array[f32] = array[f32].new_fixed(1.0, 2.0, 3.0)
+let buf: array[i32] = array[i32].new(1024, 0);
+let data: array[f32] = array[f32].new_fixed(1.0, 2.0, 3.0);
 
-let val: f32 = data[0]
-data[0] = 42
-let len: i32 = array.len(data)
+let val: f32 = data[0];
+data[0] = 42;
+let len: i32 = array.len(data);
 ```
 
 The corresponding Wasm operations are:

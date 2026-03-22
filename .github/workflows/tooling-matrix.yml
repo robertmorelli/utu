@@ -46,10 +46,17 @@ jobs:
       - name: Build grammar artifact
         run: |
           bun run grammar
-          cp tree-sitter-utu.wasm vscode/
+          bun run distribute
+
+      - name: Build VS Code web bundle
+        working-directory: vscode
+        run: npm run build:web
 
       - name: Validate editor core
         run: bun scripts/test-editor-core.mjs
+
+      - name: Validate editor/example compile parity
+        run: bun scripts/test-editor-example-parity.mjs
 
       - name: Validate web host behavior
         run: bun scripts/test-editor-webhost.mjs

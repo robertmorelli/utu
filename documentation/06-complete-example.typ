@@ -14,60 +14,50 @@ struct Todo {
 type Filter =
     | All
     | Active
-    | Completed
-
-// --- imports ---
-
-import extern "es" console_log(str)
-import extern "es" fetch(str) str # null
+    | Completed;
 
 // --- functions ---
 
-fn new_todo(text: str) Todo {
-    Todo { text: text, done: false }
+fun new_todo(text: str) Todo {
+    Todo { text: text, done: false };
 }
 
-fn toggle(todo: Todo) {
-    todo.done = not todo.done
+fun toggle(todo: Todo) void {
+    todo.done = not todo.done;
 }
 
-fn matches(todo: Todo, filter: Filter) bool {
+fun matches(todo: Todo, filter: Filter) bool {
     alt filter {
         _: All => true,
         _: Active => not todo.done,
         _: Completed => todo.done,
-    }
+    };
 }
 
-fn count(todos: array[Todo], filter: Filter) i32 {
-    let n: i32 = 0
+fun count(todos: array[Todo], filter: Filter) i32 {
+    let n: i32 = 0;
     for (0..array.len(todos)) |i| {
         if matches(todos[i], filter) {
-            n = n + 1
-        }
-    }
-    n
+            n = n + 1;
+        };
+    };
+    n;
 }
 
-export fn main() {
+export fun main() void {
     let todos: array[Todo] = array[Todo].new_fixed(
         new_todo("learn utu"),
         new_todo("build compiler"),
         new_todo("ship it"),
-    )
+    );
 
-    toggle(todos[0])
+    toggle(todos[0]);
 
-    let active: i32 = count(todos, Active {})
+    let active: i32 = count(todos, Active {});
+    let label: str # null = if active > 0 { "active"; } else { null; };
+    let text: str = label \ "idle";
 
-    // Nullable import + force unwrap
-    let data: str = fetch("/api/data") \ fatal
-    data -o console_log
-
-    // Piped string concat
-    "hello"
-    -o str.concat(_, " world")
-    -o console_log
+    text -o str.concat(_, " todos");
 }
 ```
 
@@ -75,16 +65,14 @@ export fn main() {
 
 - `Todo` shows a struct with one immutable field and one mutable field.
 - `Filter` shows a sum type with several variants.
-- `console_log` and `fetch` show host imports, including a nullable return
-  with `str # null`.
 - `new_todo` shows direct struct construction and implicit returns.
 - `toggle` shows mutable field assignment and the `not` operator.
 - `matches` shows pattern matching over a sum type.
 - `count` shows typed `let` bindings, array indexing, `array.len`, a counted
   `for` loop, and an expression return at the end of the function.
 - `main` shows `array.new_fixed`, export syntax, function calls on array
-  elements, force unwrap with `fatal`, and a simple pipeline through
-  `str.concat` and `console_log`.
+  elements, nullable fallback with `\`, and a simple pipeline through
+  `str.concat`.
 
 == Why The Example Matters
 
@@ -92,7 +80,7 @@ Taken together, the example shows the central theme of the spec:
 
 - data types are expressed in WasmGC-native forms
 - control flow stays structured and explicit
-- interop relies on host references rather than a language runtime
+- builtins stay minimal and explicit
 - nullability stays explicit in the type surface
 - the compiler mostly lowers source constructs into nearly identical Wasm
   constructs

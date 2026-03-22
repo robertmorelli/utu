@@ -8,36 +8,36 @@ struct Todo {
     mut done: bool,
 }
 
-fn make_vec() Vec2 {
-    Vec2 { x: 1.0, y: 2.0 }
+fun make_vec() Vec2 {
+    Vec2 { x: 1.0, y: 2.0 };
 }
 
-fn get_x(v: Vec2) f32 {
-    v.x
+fun get_x(v: Vec2) f32 {
+    v.x;
 }
 
-fn new_todo(text: str) Todo {
-    Todo { text: text, done: false }
+fun new_todo(text: str) Todo {
+    Todo { text: text, done: false };
 }
 
-fn toggle(todo: Todo) {
-    todo.done = not todo.done
+fun toggle(todo: Todo) void {
+    todo.done = not todo.done;
 }
 
-fn done_text(todo: Todo) str {
-    if todo.done { "done" } else { todo.text }
+fun done_text(todo: Todo) str {
+    if todo.done { "done"; } else { todo.text; };
 }
 
 test "struct construction feeds field access" {
-    assert get_x(make_vec()) == 1.0
+    assert get_x(make_vec()) == 1.0;
 }
 
 test "mutable fields can be toggled in place" {
-    let todo: Todo = new_todo("ship")
-    toggle(todo)
-    assert str.equals(done_text(todo), "done")
+    let todo: Todo = new_todo("ship");
+    toggle(todo);
+    assert str.equals(done_text(todo), "done");
 }
 
 test "immutable fields stay readable after allocation" {
-    assert str.equals(done_text(new_todo("write tests")), "write tests")
+    assert str.equals(done_text(new_todo("write tests")), "write tests");
 }

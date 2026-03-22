@@ -18,7 +18,7 @@ This folder now contains the starting point for the UTU VS Code extension.
 - test and benchmark discovery through the VS Code Testing view and per-declaration code lenses
 - the reusable language core now lives in `../lsp/src/core`, with `vscode/src` acting as a thin adapter layer
 - a standalone `utu-lsp` package now lives in `../lsp`
-- a build step that copies `/compiler` into the hidden `vscode/.generated/compiler` snapshot before bundling `dist/compiler.mjs` and `dist/compiler.web.mjs`
+- compiler bundles that build directly from `../compiler` and `../shared`, so the extension uses the same compile path as the CLI and other tooling
 - a web extension bundle for `vscode.dev` at `dist/web/extension.js`
 
 ## Commands
@@ -49,15 +49,13 @@ For VS Code desktop debugging of the web extension host:
 npm run watch:web
 ```
 
-The build emits the web extension plus the current compiler snapshots:
+The build emits the web extension plus the current compiler bundles:
 
 - `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`
-- `dist/compiler.web.mjs`: the browser-targeted compiler bundle used by the web extension host
-- `dist/compiler.mjs`: the Node-targeted compiler bundle used by desktop tooling and local inspection
+- `dist/compiler.web.mjs`: the browser-targeted compiler bundle built directly from the shared compiler sources
+- `dist/compiler.mjs`: the Node-targeted compiler bundle built directly from the shared compiler sources
 
-The source snapshot lives in `vscode/.generated/compiler`, which is hidden and gitignored so extension work stays isolated from ongoing compiler refactors while still letting the editor call the current compiler.
-
-The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `../lsp` core, and the standalone stdio UTU LSP server now lives in `../lsp`. The browser host can compile files, run `export fn main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
+The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `../lsp` core, and the standalone stdio UTU LSP server now lives in `../lsp`. The browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 
 ## Run It In VS Code
 

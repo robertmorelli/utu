@@ -3,10 +3,18 @@ import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: 
 import * as compiler from "../../../compiler/index.js";
 import { normalizeCompileArtifact } from "../../../shared/compilerArtifacts.mjs";
 
-const wasmUrl = grammarWasmPath;
-const runtimeWasmUrl = runtimeWasmPath;
+const compilerAssetOptions = {
+  wasmUrl: grammarWasmPath,
+  runtimeWasmUrl: runtimeWasmPath,
+};
 
-export async function compileUtuSource(source, { wat = false, mode = "program" } = {}) {
-  await compiler.init({ wasmUrl, runtimeWasmUrl });
-  return normalizeCompileArtifact(await compiler.compile(source, { wat, mode, wasmUrl, runtimeWasmUrl }));
+export async function compileUtuSource(source, { wat = false, mode = "program", shim = "inline-wasm", moduleFormat = "esm" } = {}) {
+  await compiler.init(compilerAssetOptions);
+  return normalizeCompileArtifact(await compiler.compile(source, {
+    wat,
+    mode,
+    shim,
+    moduleFormat,
+    ...compilerAssetOptions,
+  }));
 }

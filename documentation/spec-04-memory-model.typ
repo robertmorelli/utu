@@ -21,7 +21,7 @@ and `i31ref`.
 
 ```utu
 // Language level
-let pos: Vec2 = Vec2 { x: 1.0, y: 2.0 }
+let pos: Vec2 = Vec2 { x: 1.0, y: 2.0 };
 
 // Wasm lowering
 (struct.new $Vec2 (f32.const 1.0) (f32.const 2.0))
@@ -31,15 +31,15 @@ let pos: Vec2 = Vec2 { x: 1.0, y: 2.0 }
 
 ```utu
 // Fixed-size, filled with default value
-let buf: array[i32] = array[i32].new(1024, 0)
+let buf: array[i32] = array[i32].new(1024, 0);
 // -> (array.new $i32_array (i32.const 0) (i32.const 1024))
 
 // From existing data
-let data: array[f32] = array[f32].new_fixed(1.0, 2.0, 3.0)
+let data: array[f32] = array[f32].new_fixed(1.0, 2.0, 3.0);
 // -> (array.new_fixed $f32_array 3 (f32.const 1.0) ...)
 
 // Access
-let val: f32 = data[0]      // -> array.get
-data[0] = 42                 // -> array.set
-let len: i32 = array.len(data)  // -> array.len
+let val: f32 = data[0];      // -> array.get
+data[0] = 42;                // -> array.set
+let len: i32 = array.len(data);  // -> array.len
 ```

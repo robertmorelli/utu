@@ -23,5 +23,5 @@ languages like Rust, Go, or Swift compiled to Wasm.
 *Naming conventions:*
 
 - Types: `CapitalCamel` such as `Vec2`, `Shape`, `ApiError`, `Todo`
-- Functions and variables: `snake_case` such as `new_todo`, `console_log`,
+- Functions and variables: `snake_case` such as `new_todo`, `format_label`,
   `my_value`

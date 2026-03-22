@@ -35,15 +35,17 @@ bun run build
 - `<name>.wasm` with the wasm bytes
 - `<name>.wat` when `--wat` is passed
 
-`run` ships with a built-in host for the current examples:
+`run` wires in a tiny ES host adapter for:
 
 - `console_log`
 - `prompt`
-- `i64_to_string`
-- `f64_to_string`
-- `math_sin`
-- `math_cos`
-- `math_sqrt`
+
+Other `shimport "es"` names resolve from the generated JS shim against the
+provided imports object first and `globalThis` second.
+
+`shimport "node:*"` imports auto-resolve from Node/Bun built-in modules. Names
+still come from the UTU identifier, so `posix_basename` can resolve to
+`path.posix.basename`.
 
 `test` compiles in test mode, runs synthesized zero-arg exports, and reports
 source test names as `PASS` or `FAIL`.

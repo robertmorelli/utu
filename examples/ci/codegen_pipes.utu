@@ -1,43 +1,43 @@
-fn inc(x: i32) i32 {
-    x + 1
+fun inc(x: i32) i32 {
+    x + 1;
 }
 
-fn double(x: i32) i32 {
-    x * 2
+fun double(x: i32) i32 {
+    x * 2;
 }
 
-fn clamp(val: i32, lo: i32, hi: i32) i32 {
-    if val < lo { lo } else if val > hi { hi } else { val }
+fun clamp(val: i32, lo: i32, hi: i32) i32 {
+    if val < lo { lo; } else if val > hi { hi; } else { val; };
 }
 
-fn affine(scale: i32, value: i32, offset: i32) i32 {
-    value * scale + offset
+fun affine(scale: i32, value: i32, offset: i32) i32 {
+    value * scale + offset;
 }
 
-fn use_pipe(x: i32) i32 {
-    x -o inc -o double
+fun use_pipe(x: i32) i32 {
+    x -o inc -o double;
 }
 
-fn clamp_unit(x: i32) i32 {
-    x -o clamp(_, 0, 10)
+fun clamp_unit(x: i32) i32 {
+    x -o clamp(_, 0, 10);
 }
 
-fn scale_then_offset(x: i32) i32 {
-    x -o affine(3, _, 1)
+fun scale_then_offset(x: i32) i32 {
+    x -o affine(3, _, 1);
 }
 
 test "simple pipes become nested calls" {
-    assert use_pipe(3) == 8
+    assert use_pipe(3) == 8;
 }
 
 test "placeholder pipes can clamp low values" {
-    assert clamp_unit(-2) == 0
+    assert clamp_unit(-2) == 0;
 }
 
 test "placeholder pipes can clamp high values" {
-    assert clamp_unit(18) == 10
+    assert clamp_unit(18) == 10;
 }
 
 test "placeholder position composes with other arguments" {
-    assert scale_then_offset(4) == 13
+    assert scale_then_offset(4) == 13;
 }

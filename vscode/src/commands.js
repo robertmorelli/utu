@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import { formatError, } from './compilerHost.js';
 import { formatDurationMs, getBenchmarkOptionsFromConfig } from './benchmarking.js';
+import { recordBenchmarkProfile } from './codeLens.js';
 import { displayNameForDocument } from './documentNames.js';
 import { hasRunnableMain as indexHasRunnableMain } from '../../lsp/src/core/languageService.js';
 export function registerCommands(context, dependencies) {
+    registerCommand(context, 'utu.noop', () => {});
     registerCommand(context, 'utu.compileCurrentFile', () => withActiveUtuDocument(async (document) => {
         const label = displayNameForDocument(document);
         await vscode.window.withProgress({
@@ -12,7 +14,7 @@ export function registerCommands(context, dependencies) {
         }, async () => {
             try {
                 const result = await compileDocument(dependencies.compilerHost, document);
-                dependencies.output.appendLine(`[utu] Compiled ${document.uri.fsPath || document.uri.toString()} (${result.js.length} JS chars, ${result.wasm.byteLength} wasm bytes)`);
+                dependencies.output.appendLine(`[utu] Compiled ${document.uri.fsPath || document.uri.toString()} (${result.shim.length} JS chars, ${result.wasm.byteLength} wasm bytes)`);
                 vscode.window.setStatusBarMessage(`UTU compiled ${label}`, 3000);
             }
             catch (error) {
@@ -23,7 +25,7 @@ export function registerCommands(context, dependencies) {
     registerCommand(context, 'utu.showGeneratedJavaScript', () => withActiveUtuDocument(async (document) => {
         try {
             const result = await compileDocument(dependencies.compilerHost, document);
-            await revealGeneratedDocument(dependencies.generatedDocuments, 'js', document.uri, result.js);
+            await revealGeneratedDocument(dependencies.generatedDocuments, 'js', document.uri, result.shim);
         }
         catch (error) {
             await revealError(dependencies.output, 'Unable to generate JavaScript output', error);
@@ -50,7 +52,7 @@ export function registerCommands(context, dependencies) {
     registerCommand(context, 'utu.runMain', (uri) => withUtuDocument(uri, async (document) => {
         try {
             if (!(await hasRunnableMain(dependencies.languageService, document))) {
-                await vscode.window.showWarningMessage('UTU Run Main requires `export fn main()` in the active file.');
+                await vscode.window.showWarningMessage('UTU Run Main requires `export fun main()` in the active file.');
                 return;
             }
             const blocker = await dependencies.runtimeHost.getRunMainBlocker?.(document.getText());
@@ -88,6 +90,7 @@ export function registerCommands(context, dependencies) {
         await withUtuDocument(uri, async (document) => {
             try {
                 const result = await dependencies.runtimeHost.runBenchmark(document.getText(), benchmarkOrdinal, getBenchmarkOptionsFromConfig());
+                recordBenchmarkProfile(document, result.name, result.profileCounts ?? []);
                 revealExecution(dependencies.output, `Benchmarked "${result.name}"`, result.logs, `${formatDurationMs(result.meanMs)} mean, ${formatDurationMs(result.perIterationMs)}/iter`);
                 vscode.window.setStatusBarMessage(`UTU benchmarked ${result.name}`, 3000);
             }

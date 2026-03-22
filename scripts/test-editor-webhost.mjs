@@ -1,103 +1,138 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import {
   collectUnsupportedRunMainImports,
   getRunMainBlockerMessage,
 } from '../vscode/src/runMainSupport.js';
-import { createDefaultHostImports } from '../vscode/src/webHostImports.js';
 import { compile } from '../compiler/index.js';
+import { loadNodeModuleFromSource } from '../shared/moduleLoaders.node.mjs';
 import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 const { grammarWasmPath, runtimeWasmPath } = await loadEditorTestAssets(repoRoot);
+const sharedCompileOptions = {
+  runtimeWasmUrl: runtimeWasmPath,
+  wasmUrl: grammarWasmPath,
+};
+const sharedModuleLoadOptions = {
+  prefix: 'utu-webhost-test-',
+};
+const consoleLogImport = 'shimport "es" console_log(str) void;';
+
+const blockerCase = (name, input, expected) => [
+  name,
+  () => expect(getRunMainBlockerMessage(input), expected),
+];
+
+const compiledCase = (name, input, options, run) => [
+  name,
+  () => withCompiledModule(input, options, run),
+];
 
 const cases = [
-  ['allows plain exported mains', () => {
-    expectUndefined(getRunMainBlockerMessage([
-      'export fn main() i32 {',
-      '    0',
-      '}',
-    ].join('\n')));
+  blockerCase('allows plain exported mains', `export fun main() i32 {
+    0;
+}`, undefined),
+  blockerCase('allows exported mains with explicit void returns', `export fun main() void {
+    assert true;
+}`, undefined),
+  blockerCase('allows es imports that can be resolved from the JS host', `shimport "es" console_log(str) void;
+shimport "es" math_sqrt(f64) f64;
+export fun main() i32 {
+    console_log("ok");
+    0;
+}`, undefined),
+  blockerCase('does not special-case prompt imports', 'shimport "es" prompt(str) str;', undefined),
+  blockerCase(
+    'allows browser globals such as fetch',
+    'shimport "es" fetch(str) str;',
+    undefined,
+  ),
+  blockerCase('does not special-case node imports', 'shimport "node:fs" readFileSync(str) str;', undefined),
+  ['collects no unsupported imports', () => {
+    expect(collectUnsupportedRunMainImports(`shimport "es" console_log(str) void;
+shimport "es" math_sqrt(f64) f64;
+export fun main() i32 {
+    0;
+}`), []);
+    expect(collectUnsupportedRunMainImports(`shimport "es" console_log(str) void;
+shimport "es" prompt(str) str;
+shimport "node:fs" readFileSync(str) str;`), []);
   }],
-  ['allows supported built-in es imports', () => {
-    expectUndefined(getRunMainBlockerMessage([
-      'import extern "es" console_log(str)',
-      'import extern "es" math_sqrt(value) f64',
-      'export fn main() i32 {',
-      '    console_log("ok")',
-      '    0',
-      '}',
-    ].join('\n')));
-  }],
-  ['blocks synchronous prompt', () => {
-    expectEqual(
-      getRunMainBlockerMessage('import extern "es" prompt(str) str'),
-      'UTU Run Main in the VS Code web host cannot provide synchronous `prompt()`. Use the CLI to run this file.',
-    );
-  }],
-  ['blocks node imports', () => {
-    expectEqual(
-      getRunMainBlockerMessage('import extern "node:fs" read_file(path) str'),
-      'UTU Run Main in the VS Code web host cannot auto-load `node:fs`. Use the CLI to run this file.',
-    );
-  }],
-  ['reports other unsupported imports', () => {
-    expectEqual(
-      getRunMainBlockerMessage('import extern "es" fetch(url) str'),
-      'UTU Run Main in the VS Code web host only supports built-in host imports. This file needs `es:fetch`. Use the CLI to run this file.',
-    );
-  }],
-  ['collects unsupported imports precisely', () => {
-    expectDeepEqual(
-      collectUnsupportedRunMainImports([
-        'import extern "es" console_log(str)',
-        'import extern "es" prompt(str) str',
-        'import extern "node:fs" read_file(path) str',
-      ].join('\n')),
-      [
-        { module: 'es', name: 'prompt' },
-        { module: 'node:fs', name: 'read_file' },
-      ],
-    );
-  }],
-  ['instantiates benchmark modules with module-shaped es imports', async () => {
+  compiledCase('auto-resolves es functions from JS globals', `shimport "es" math_sqrt(f64) f64;
+
+export fun main() f64 {
+    math_sqrt(81.0);
+}`, {}, async (_, { instantiate }) => {
+    const exports = await instantiate();
+    expect(await exports.main?.(), 9);
+  }),
+  compiledCase('treats comments as compiler trivia', `// top-level comment
+export fun main() i32 {
+    // block comment
+    1 // inline comment
+    + 2;
+}`, {}, async (_, { instantiate }) => {
+    const exports = await instantiate();
+    expect(await exports.main?.(), 3);
+  }),
+  compiledCase('auto-resolves node builtin imports', `shimport "node:fs" existsSync(str) bool;
+
+export fun main() bool {
+    existsSync("./package.json");
+}`, {}, async (_, { instantiate }) => {
+    const exports = await instantiate();
+    expect(await exports.main?.(), 1);
+  }),
+  compiledCase('resolves namespace paths from node module exports', `shimport "node:path" posix_basename(str) str;
+
+export fun main() str {
+    posix_basename("/tmp/demo.txt");
+}`, {}, async (_, { instantiate }) => {
+    const exports = await instantiate();
+    expect(await exports.main?.(), 'demo.txt');
+  }),
+  compiledCase('loads external-wasm shims through the shared node loader', `${consoleLogImport}
+
+export fun main() void {
+    "ok" -o console_log;
+}`, {
+      shim: 'external-wasm',
+    }, async (_, { instantiate }) => {
     const logs = [];
-    const source = [
-      'import extern "es" console_log(str)',
-      '',
-      'bench "smoke" |i| {',
-      '    setup {',
-      '        measure {',
-      '            "ok" -o console_log',
-      '            i',
-      '        }',
-      '    }',
-      '}',
-    ].join('\n');
+    const originalLog = console.log;
+    console.log = (line) => {
+      logs.push(String(line));
+    };
+    const exports = await instantiate();
+    expect(await exports.main?.(), undefined);
+    expect(logs, ['ok']);
+    console.log = originalLog;
+  }),
+  compiledCase('instantiates benchmark modules with es host imports', `${consoleLogImport}
 
-    const result = await compile(source, {
-      mode: 'bench',
-      runtimeWasmUrl: runtimeWasmPath,
-      wasmUrl: grammarWasmPath,
-    });
-    const module = await importGeneratedModule(result.js);
-    const exports = await module.instantiate(createDefaultHostImports((line) => {
-      logs.push(line);
-    }));
-    const benchExport = result.metadata.benches[0]?.exportName;
-
-    if (!benchExport) {
-      throw new Error('Expected benchmark export metadata.');
+bench "smoke" |i| {
+    setup {
+        measure {
+            "ok" -o console_log;
+            i;
+        }
     }
-
-    const value = await exports[benchExport](3);
-    expectUndefined(value);
-    expectDeepEqual(logs, ['ok', 'ok', 'ok']);
-  }],
+}`, {
+      mode: 'bench',
+    }, async (result, { instantiate }) => {
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (line) => {
+      logs.push(String(line));
+    };
+    const exports = await instantiate();
+    expect(await exports[getBenchExport(result)](3), undefined);
+    expect(logs, ['ok', 'ok', 'ok']);
+    console.log = originalLog;
+  }),
 ];
 
 let failed = false;
@@ -117,35 +152,32 @@ if (failed) {
   process.exit(1);
 }
 
-function expectUndefined(value) {
-  if (value !== undefined) {
-    throw new Error(`Expected undefined, received ${JSON.stringify(value)}`);
-  }
-}
-
-function expectEqual(actual, expected) {
-  if (actual !== expected) {
-    throw new Error(`Expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`);
-  }
-}
-
-function expectDeepEqual(actual, expected) {
-  const actualJson = JSON.stringify(actual);
-  const expectedJson = JSON.stringify(expected);
-
-  if (actualJson !== expectedJson) {
-    throw new Error(`Expected ${expectedJson}, received ${actualJson}`);
-  }
-}
-
-async function importGeneratedModule(source) {
-  const dir = await mkdtemp(resolve(tmpdir(), 'utu-webhost-test-'));
-  const file = resolve(dir, 'module.mjs');
-
+async function withCompiledModule(sourceText, options, run) {
+  const result = await compile(sourceText, { ...sharedCompileOptions, ...options });
+  const compiledModule = await loadNodeModuleFromSource(result.shim, {
+    ...sharedModuleLoadOptions,
+    wasm: options.shim === 'external-wasm' ? result.wasm : null,
+  });
   try {
-    await writeFile(file, source, 'utf8');
-    return await import(pathToFileURL(file).href);
+    return await run(result, compiledModule.module);
   } finally {
-    await rm(dir, { force: true, recursive: true });
+    await compiledModule.cleanup?.();
   }
+}
+
+function getBenchExport(result) {
+  const exportName = result.metadata.benches[0]?.exportName;
+  if (exportName) return exportName;
+  throw new Error('Expected benchmark export metadata.');
+}
+
+function expect(actual, expected) {
+    const actualText = describe(actual);
+    const expectedText = describe(expected);
+    if (Object.is(actual, expected) || actualText === expectedText) return;
+    throw new Error(`Expected ${expectedText}, received ${actualText}`);
+}
+
+function describe(value) {
+    return value === undefined ? 'undefined' : JSON.stringify(value);
 }

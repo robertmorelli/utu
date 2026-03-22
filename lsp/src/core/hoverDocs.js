@@ -124,6 +124,10 @@ const CORE_TYPE_DOCS = {
         signature: 'u64',
         description: '64-bit integer using unsigned operations where applicable.',
     },
+    void: {
+        signature: 'void',
+        description: 'Explicitly marks a function or function type as returning no value.',
+    },
     v128: {
         signature: 'v128',
         description: '128-bit SIMD vector value.',
@@ -150,38 +154,38 @@ const KEYWORD_DOCS = {
     },
     break: {
         signature: 'break',
-        description: 'Exits the current block or loop expression, optionally yielding a value.',
+        description: 'Exits the current loop immediately.',
+    },
+    emit: {
+        signature: 'emit expr',
+        description: 'Exits the current block expression early and yields the given value.',
     },
     else: {
         signature: 'else',
         description: 'Provides the fallback branch of an `if` expression or the unwrap fallback operator.',
     },
     export: {
-        signature: 'export fn ...',
+        signature: 'export fun ...',
         description: 'Marks a UTU function as exported from the compiled Wasm module.',
     },
-    extern: {
-        signature: 'import extern "..."',
-        description: 'Declares a host-provided import, typically from the `es` namespace.',
+    shimport: {
+        signature: 'shimport "module" name(params) return_type',
+        description: 'Declares a host import available to the compiled Wasm module.',
     },
-    fn: {
-        signature: 'fn name(params) return_type',
+    fun: {
+        signature: 'fun name(params) return_type',
         description: 'Declares a UTU function.',
     },
     for: {
-        signature: 'for (source) |binding| { ... }',
-        description: 'Iterates over a source expression or range and binds loop captures inside the body.',
+        signature: 'for (start..end) |binding| { ... };',
+        description: 'Iterates over a range and binds the loop capture inside the body.',
     },
     if: {
-        signature: 'if condition { ... } else { ... }',
+        signature: 'if condition { ... } else { ... };',
         description: 'Expression-oriented conditional branch.',
     },
-    import: {
-        signature: 'import extern "..." name(...)',
-        description: 'Declares a host function or value import.',
-    },
     let: {
-        signature: 'let name: Type = expr',
+        signature: 'let name: Type = expr;',
         description: 'Promotes a value into a reusable binding.',
     },
     match: {
@@ -203,6 +207,10 @@ const KEYWORD_DOCS = {
     not: {
         signature: 'not expr',
         description: 'Boolean negation operator.',
+    },
+    while: {
+        signature: 'while (condition) { ... };',
+        description: 'Repeats while the condition stays truthy, or forever with empty parentheses.',
     },
     setup: {
         signature: 'setup { ... measure { ... } }',

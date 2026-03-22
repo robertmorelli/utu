@@ -5,12 +5,12 @@ no vtable built into the language; dispatch stays explicit.
 
 ```utu
 // Type-based dispatch (br_on_cast chain)
-fn describe(s: Shape) str {
+fun describe(s: Shape) str {
     alt s {
         c: Circle => "circle",
         r: Rect => "rect",
         t: Triangle => "triangle",
-    }
+    };
 }
 
 ```

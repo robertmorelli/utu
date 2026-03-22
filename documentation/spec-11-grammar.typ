@@ -1,7 +1,8 @@
 = 11. Grammar
 
 EBNF-style grammar for Utu. Whitespace is insignificant except inside string
-literals. Comments use `//`, line comments only, with no block comments.
+literals. Semicolons terminate expressions in blocks and simple top-level
+declarations. Comments use `//`, line comments only, with no block comments.
 
 == 11.1 Top-Level
 
@@ -18,20 +19,21 @@ struct_decl  ::= 'struct' TYPE_IDENT '{' field_list '}'
 field_list   ::= (field (',' field)* ','?)?
 field        ::= 'mut'? IDENT ':' type
 
-type_decl    ::= 'type' TYPE_IDENT '=' variant_list
+type_decl    ::= 'type' TYPE_IDENT '=' variant_list ';'
 variant_list ::= '|'? variant ('|' variant)*
 variant      ::= TYPE_IDENT ('{' field_list '}')?
 
-fn_decl      ::= 'fn' IDENT '(' param_list ')' return_type? block
+fn_decl      ::= 'fun' IDENT '(' param_list ')' return_type block
 param_list   ::= (param (',' param)* ','?)?
 param        ::= IDENT ':' type
-return_type  ::= type ('#' type)? (',' type ('#' type)?)*
+return_type  ::= 'void'
+               | type ('#' type)? (',' type ('#' type)?)*
 
-global_decl  ::= 'let' IDENT ':' type '=' expr
-
-import_decl  ::= 'import' 'extern' STRING
-                  ( IDENT '(' import_param_list? ')' return_type?
+global_decl  ::= 'let' IDENT ':' type '=' expr ';'
+import_decl  ::= 'shimport' STRING
+                  ( IDENT '(' import_param_list? ')' return_type
                   | IDENT ':' type )
+                  ';'
 import_param_list ::= import_param (',' import_param)* ','?
 import_param ::= param | type
 export_decl  ::= 'export' fn_decl
@@ -53,7 +55,7 @@ ref_type     ::= TYPE_IDENT | 'str'
              |   'externref' | 'anyref' | 'eqref'
              |   'i31' | 'array' '[' type ']'
 
-func_type    ::= 'fn' '(' type_list ')' return_type
+func_type    ::= 'fun' '(' type_list ')' return_type
 type_list    ::= (type (',' type)*)?
 ```
 
@@ -63,24 +65,26 @@ type_list    ::= (type (',' type)*)?
 expr         ::= literal | IDENT | unary_expr | binary_expr
              |   call_expr | tuple_expr | pipe_expr | field_expr
              |   index_expr | if_expr | match_expr | alt_expr
-             |   block_expr | for_expr | break_expr
+             |   block_expr | for_expr | while_expr | break_expr
              |   assign_expr | bind_expr | else_expr
              |   struct_init | array_init
              |   namespace_call_expr | ref_null_expr
-             |   'fatal' | '(' expr ')'
+             |   emit_expr | 'fatal' | '(' expr ')'
 
 bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
 
 else_expr    ::= expr '\' expr
 
-tuple_expr   ::= expr ',' expr
+tuple_expr   ::= '(' expr ',' expr (',' expr)* ','? ')'
 
 pipe_expr    ::= expr '-o' pipe_target
 pipe_target  ::= pipe_path
              |   pipe_path '(' pipe_args ')'
 pipe_path    ::= IDENT | BUILTIN_NS | pipe_path '.' IDENT
-pipe_args    ::= pipe_arg (',' pipe_arg)*
-pipe_arg     ::= '_' | expr
+pipe_args    ::= expr (',' expr)*
+             |   pipe_prefix? '_' pipe_suffix?
+pipe_prefix  ::= expr (',' expr)* ','
+pipe_suffix  ::= ',' expr (',' expr)*
 
 call_expr    ::= expr '(' arg_list ')'
 arg_list     ::= (expr (',' expr)* ','?)?
@@ -105,13 +109,15 @@ alt_arm      ::= IDENT ':' TYPE_IDENT '=>' expr ','
              |   '_' '=>' expr ','
 
 for_expr     ::= 'for' '(' for_sources ')' capture? block
+while_expr   ::= 'while' '(' expr? ')' block
 for_sources  ::= for_source (',' for_source)*
-for_source   ::= expr '..' expr | expr
+for_source   ::= expr '..' expr
 capture      ::= '|' IDENT (',' IDENT)* '|'
 
 block_expr   ::= (IDENT ':')? block
-block        ::= '{' expr* '}'
-break_expr   ::= 'break' IDENT? expr?
+block        ::= '{' (expr ';')* '}'
+break_expr   ::= 'break'
+emit_expr    ::= 'emit' expr
 
 struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
@@ -120,8 +126,9 @@ assign_expr  ::= (IDENT | field_expr | index_expr) '=' expr
 ```
 
 The parser accepts comma-separated `for` sources and captures, but current
-lowering only uses the first source/capture pair. Literal scalar switch arms
-such as `0 => ...` are not part of the current `match_pattern` grammar.
+lowering only uses the first source/capture pair. Pipe targets may contain at
+most one `_` placeholder. Literal scalar switch arms such as `0 => ...` are
+not part of the current `match_pattern` grammar.
 
 == 11.5 Operators
 

@@ -1,27 +1,27 @@
-import extern "es" lucky: i32
-import extern "es" label: str
-import extern "es" document: externref
+shimport "es" lucky: i32;
+shimport "es" label: str;
+shimport "es" document: externref;
 
-fn score() i32 {
-    lucky + 1
+fun score() i32 {
+    lucky + 1;
 }
 
-fn named() bool {
-    str.equals(label, "utu")
+fun named() bool {
+    str.equals(label, "utu");
 }
 
-fn doc_present() bool {
-    not ref.is_null(document)
+fun doc_present() bool {
+    not ref.is_null(document);
 }
 
 test "imported numeric globals contribute to arithmetic" {
-    assert score() == 42
+    assert score() == 42;
 }
 
 test "imported string globals flow into string builtins" {
-    assert named()
+    assert named();
 }
 
 test "imported externref globals can stay non-null" {
-    assert doc_present()
+    assert doc_present();
 }

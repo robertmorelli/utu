@@ -1,33 +1,26 @@
 = 7. Imports and Exports
 
-== 7.1 JS Imports
+== 7.1 Host Imports
 
 ```utu
-// Simple import (void return — no return type)
-import extern "es" console_log(str)
-
-// Nullable return import
-import extern "es" fetch(str) Response # null
-
-// Direct two-result import signature
-import extern "es" fetch(str) Response # ApiError
-
-// Import a value
-import extern "es" document: externref
+shimport "es" console_log(str) void;
+shimport "es" fetch(str) Response # null;
+shimport "es" fetch(str) Response # ApiError;
+shimport "es" document: externref;
+shimport "node:path" basename(str) str;
 ```
 
-Note: String builtins such as `str.length` and `str.concat` are auto-imported
-from `"wasm:js-string"` and do not require import declarations.
+String builtins such as `str.length` and `str.concat` are auto-provided from
+`"wasm:js-string"` and do not require any user-written declaration syntax.
 
-The Wasm import surface stays direct, but the generated JS wrapper currently
-catches throws from nullable-compatible imports and substitutes null
-placeholders. Structured typed error translation for `T # E` imports is still
-planned.
+`shimport` takes an explicit host module string. The `"es"` module resolves
+against host-provided bindings first and then the ambient JS host object, while
+`"node:*"` modules auto-resolve in Node and Bun runtimes.
 
 == 7.2 Wasm Exports
 
 ```utu
-export fn main() {
-    "hello world" -o console_log
+export fun main() void {
+    "hello world" -o console_log;
 }
 ```

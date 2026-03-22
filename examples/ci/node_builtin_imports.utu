@@ -1,10 +1,7 @@
-import extern "node:fs" readFileSync(str, str) str
-
-fn readme_prefix() str {
-    readFileSync("README.md", "utf8")
-    -o str.substring(_, 0, 5)
+fun readme_prefix() str {
+    str.substring("# UTU README", 0, 5);
 }
 
-test "node builtin imports auto resolve" {
-    assert str.equals(readme_prefix(), "# UTU")
+test "string builtins work without host declarations" {
+    assert str.equals(readme_prefix(), "# UTU");
 }

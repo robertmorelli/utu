@@ -1,5 +1,3 @@
-import extern "es" console_log(str)
-
-export fn main() {
-    "ok" -o console_log
+export fun main() str {
+    "ok";
 }

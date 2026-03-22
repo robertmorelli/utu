@@ -1,151 +1,148 @@
-import extern "es" console_log(str)
-import extern "es" i64_to_string(i64) str
-
-fn qux() i64 {
-    0
+fun qux() i64 {
+    0;
 }
 
-fn quux(a: i64) i64 {
-    let sink: i64 = 0
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink = sink + qux()
-    sink + a
+fun quux(a: i64) i64 {
+    let sink: i64 = 0;
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink = sink + qux();
+    sink + a;
 }
 
-fn baz(a: i64, b: i64) i64 {
-    let sink: i64 = 0
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink = sink + quux(a)
-    sink + b
+fun baz(a: i64, b: i64) i64 {
+    let sink: i64 = 0;
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink = sink + quux(a);
+    sink + b;
 }
 
-fn bar(a: i64, b: i64, c: i64) i64 {
-    let sink: i64 = 0
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink = sink + baz(a, b)
-    sink + c
+fun bar(a: i64, b: i64, c: i64) i64 {
+    let sink: i64 = 0;
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink = sink + baz(a, b);
+    sink + c;
 }
 
-fn foo(a: i64, b: i64, c: i64, d: i64) i64 {
-    let sink: i64 = 0
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink = sink + bar(a, b, c)
-    sink + d
+fun foo(a: i64, b: i64, c: i64, d: i64) i64 {
+    let sink: i64 = 0;
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink = sink + bar(a, b, c);
+    sink + d;
 }
 
-fn test_calls() i64 {
-    let sink: i64 = 0
-    let one: i64 = 1
-    let two: i64 = 2
-    let three: i64 = 3
-    let four: i64 = 4
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink = sink + foo(one, two, three, four)
-    sink
+fun test_calls() i64 {
+    let sink: i64 = 0;
+    let one: i64 = 1;
+    let two: i64 = 2;
+    let three: i64 = 3;
+    let four: i64 = 4;
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink = sink + foo(one, two, three, four);
+    sink;
 }
 
 bench "call-simple chain" |i| {
     setup {
-        let one: i64 = 1
-        let two: i64 = 2
-        let three: i64 = 3
-        let four: i64 = 4
+        let one: i64 = 1;
+        let two: i64 = 2;
+        let three: i64 = 3;
+        let four: i64 = 4;
         measure {
-            foo(one, two, three, four)
+            foo(one, two, three, four);
         }
     }
 }
 
-export fn main() {
-    test_calls() -o i64_to_string(_) -o console_log
+export fun main() i64 {
+    test_calls();
 }

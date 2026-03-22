@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compile } from '../compiler/index.js';
+import { createCliImportProvider, mergeImportObjects } from '../shared/hostImports.mjs';
+import { loadNodeModuleFromSource } from '../shared/moduleLoaders.node.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -10,7 +11,7 @@ const repoRoot = resolve(scriptDir, '..');
 const options = parseArgs(process.argv.slice(2));
 const manifestPath = resolve(process.cwd(), options.manifest ?? 'examples/manifest.json');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-const wasmPath = resolve(repoRoot, manifest.wasmPath ?? 'cli_artifact/tree-sitter-utu.wasm');
+const wasmPath = resolve(repoRoot, manifest.wasmPath ?? 'tree-sitter-utu.wasm');
 const selectedTags = new Set(options.tags);
 
 const cases = manifest.cases.filter((testCase) => {
@@ -77,7 +78,7 @@ async function runCase(testCase, wasmPath) {
         mode: mode === 'test' ? 'test' : 'program',
     };
 
-    const { js, metadata } = await compile(source, compileOptions);
+    const { shim, metadata } = await compile(source, compileOptions);
     const result = {
         name: testCase.name,
         path: testCase.path,
@@ -89,13 +90,10 @@ async function runCase(testCase, wasmPath) {
 
     if (mode === 'compile') return result;
 
-    const moduleDir = await mkdtemp(join(tmpdir(), 'utu-example-'));
+    const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-example-' });
     try {
-        const modulePath = join(moduleDir, `${sanitizeName(testCase.name)}.mjs`);
-        await writeFile(modulePath, js, 'utf8');
-        const compiledModule = await import(pathToFileURL(modulePath).href);
-        const imports = await loadHostImports(testCase, result.logs);
-        const exports = await compiledModule.instantiate(imports);
+        await loadHostImports(testCase, result.logs);
+        const exports = await compiledModule.module.instantiate();
 
         if (mode === 'test') {
             if (!metadata.tests.length) throw new Error(`No tests found in ${testCase.path}`);
@@ -143,7 +141,7 @@ async function runCase(testCase, wasmPath) {
 
         return result;
     } finally {
-        await rm(moduleDir, { force: true, recursive: true });
+        await compiledModule.cleanup?.();
     }
 }
 
@@ -172,54 +170,24 @@ function makeFailureResult(testCase, error) {
 }
 
 async function loadHostImports(testCase, logs) {
-    const baseImports = createHostImports(logs);
+    const provider = createCliImportProvider({
+        prompt: () => '',
+        writeLine(line) {
+            logs.push(String(line));
+        },
+    });
+    const baseImports = mergeImportObjects(provider.imports, {
+        es: {
+            wrap(value) {
+                return `[${value}]`;
+            },
+        },
+    });
     if (!testCase.imports) return baseImports;
 
     const importPath = resolve(repoRoot, testCase.imports);
     const loaded = await import(pathToFileURL(importPath).href);
     return mergeImportObjects(baseImports, loaded.default ?? loaded);
-}
-
-function createHostImports(logs) {
-    return {
-        es: {
-            console_log(value) {
-                logs.push(String(value));
-            },
-            wrap(value) {
-                return `[${value}]`;
-            },
-            i64_to_string(value) {
-                return String(value);
-            },
-            f64_to_string(value) {
-                return String(value);
-            },
-            math_sin(value) {
-                return Math.sin(value);
-            },
-            math_cos(value) {
-                return Math.cos(value);
-            },
-            math_sqrt(value) {
-                return Math.sqrt(value);
-            },
-        },
-    };
-}
-
-function mergeImportObjects(base, override) {
-    const merged = { ...base };
-    for (const [key, value] of Object.entries(override)) {
-        merged[key] = isPlainObject(merged[key]) && isPlainObject(value)
-            ? { ...merged[key], ...value }
-            : value;
-    }
-    return merged;
-}
-
-function isPlainObject(value) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseArgs(argv) {
@@ -255,10 +223,6 @@ function normalizeValue(value) {
 
 function valuesEqual(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function sanitizeName(name) {
-    return name.replace(/[^a-z0-9_-]/gi, '_');
 }
 
 function firstLine(message) {

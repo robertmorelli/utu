@@ -1,19 +1,17 @@
-import extern "es" console_log(str)
-import extern "es" prompt(str) str
+shimport "es" concat(str,str) str;
 
-fn greeting(name: str) str {
-    "hello " -o str.concat(_, name)
+fun greeting(name: str) str {
+    "hello " -o str.concat(_, name);
 }
 
 bench "hello-name format" |i| {
     setup {
         measure {
-            greeting("utu")
+            greeting("utu");
         }
     }
 }
 
-export fn main() {
-    let name: str = prompt("What's your name? ")
-    greeting(name) -o console_log
+export fun main() str {
+    greeting("utu");
 }

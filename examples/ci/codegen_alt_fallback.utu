@@ -1,31 +1,31 @@
 type Shape =
     | Circle { radius: i32 }
     | Rect { width: i32, height: i32 }
-    | Triangle { base: i32, height: i32 }
+    | Triangle { base: i32, height: i32 };
 
-fn classify(shape: Shape) i32 {
+fun classify(shape: Shape) i32 {
     alt shape {
         c: Circle => c.radius,
         other => fallback_score(other),
-    }
+    };
 }
 
-fn fallback_score(shape: Shape) i32 {
+fun fallback_score(shape: Shape) i32 {
     alt shape {
         _: Rect => 20,
         _: Triangle => 30,
         _ => 0,
-    }
+    };
 }
 
 test "alt fallback can bind and forward the unmatched value" {
-    assert classify(Rect { width: 1, height: 2 }) == 20
+    assert classify(Rect { width: 1, height: 2 }) == 20;
 }
 
 test "alt fallback can route a different variant" {
-    assert classify(Triangle { base: 3, height: 4 }) == 30
+    assert classify(Triangle { base: 3, height: 4 }) == 30;
 }
 
 test "typed alt arms still win before fallback" {
-    assert classify(Circle { radius: 7 }) == 7
+    assert classify(Circle { radius: 7 }) == 7;
 }

@@ -38,11 +38,21 @@ console.log(reportPath);
 async function runHyperfine(caseName, options, cacheDir) {
     const jsonDir = await mkdtemp(path.join(tmpdir(), `utu-v-rust-${caseName}-`));
     const jsonPath = path.join(jsonDir, `${caseName}.json`);
-    const nativePath = path.join(cacheDir, "rust_native", "rust_deltablue");
+    const nativePath = path.join(cacheDir, "rust_native", "runner");
+    const arenaNativePath = path.join(cacheDir, "rust_arena_native", "runner");
+    const variantNames = [
+        "utu_wasm",
+        "rc_rust_wasm",
+        "rc_rust_native",
+        "unsafe_rust_wasm",
+        "unsafe_rust_native",
+    ];
     const commands = [
         `bun scripts/run-deltablue-bench-case.mjs utu ${caseName} ${options.iterations}`,
         `bun scripts/run-deltablue-bench-case.mjs rust ${caseName} ${options.iterations}`,
         `${nativePath} ${caseName} ${options.iterations}`,
+        `bun scripts/run-deltablue-bench-case.mjs rust_arena ${caseName} ${options.iterations}`,
+        `${arenaNativePath} ${caseName} ${options.iterations}`,
     ];
     const args = [
         "hyperfine",
@@ -52,12 +62,7 @@ async function runHyperfine(caseName, options, cacheDir) {
         String(options.minRuns),
         "--export-json",
         jsonPath,
-        "--command-name",
-        "utu_wasm",
-        "--command-name",
-        "rust_wasm",
-        "--command-name",
-        "rust_native",
+        ...variantNames.flatMap(name => ["--command-name", name]),
         ...commands,
     ];
     const run = Bun.spawnSync(args, {
@@ -71,7 +76,7 @@ async function runHyperfine(caseName, options, cacheDir) {
     const data = JSON.parse(await readFile(jsonPath, "utf8"));
     await rm(jsonDir, { recursive: true, force: true });
     return data.results.map((result, index) => ({
-        name: ["utu_wasm", "rust_wasm", "rust_native"][index],
+        name: variantNames[index],
         command: result.command,
         mean: result.mean,
         stddev: result.stddev,
@@ -114,6 +119,33 @@ function parsePositiveInt(value, flag) {
 }
 
 function renderMarkdown({ generatedAt, options, sizes, chain, projection, cacheDir }) {
+    const sizeRows = [
+        {
+            name: "Utu bundle",
+            sourceBytes: sizes.utu.source_bytes,
+            bundleBytes: sizes.utu.bundle_bytes,
+        },
+        {
+            name: "Rust wasm",
+            sourceBytes: sizes.rust_wasm.source_bytes,
+            bundleBytes: sizes.rust_wasm.bundle_bytes,
+        },
+        {
+            name: "Rust native",
+            sourceBytes: sizes.rust_native.source_bytes,
+            bundleBytes: sizes.rust_native.bundle_bytes,
+        },
+        {
+            name: "Unsafe Rust wasm",
+            sourceBytes: sizes.rust_arena_wasm.source_bytes,
+            bundleBytes: sizes.rust_arena_wasm.bundle_bytes,
+        },
+        {
+            name: "Unsafe Rust native",
+            sourceBytes: sizes.rust_arena_native.source_bytes,
+            bundleBytes: sizes.rust_arena_native.bundle_bytes,
+        },
+    ];
     return [
         "# Utu vs Rust DeltaBlue",
         "",
@@ -126,14 +158,11 @@ function renderMarkdown({ generatedAt, options, sizes, chain, projection, cacheD
         `- Iterations per command: ${options.iterations}`,
         `- Prepared cache: \`${cacheDir}\``,
         "",
-        "## Binary Sizes",
+        "## Source vs Bundle Sizes",
         "",
-        "| Variant | Artifact | Size (bytes) | Size (KiB) |",
-        "| --- | --- | ---: | ---: |",
-        sizeRow("Utu wasm", "Compiled wasm payload", sizes.utu.wasm_bytes),
-        sizeRow("Utu wrapper", "Generated module.mjs", sizes.utu.module_bytes),
-        sizeRow("Rust wasm", "rust_deltablue.wasm", sizes.rust_wasm.wasm_bytes),
-        sizeRow("Rust native", "release/rust_deltablue", sizes.rust_native.binary_bytes),
+        sourceBundleTable(sizeRows),
+        "",
+        "Source size counts only the benchmark language files. Utu bundle size combines the generated `module.mjs` and `utu.wasm` outputs.",
         "",
         "## Chain Benchmark",
         "",
@@ -147,12 +176,13 @@ function renderMarkdown({ generatedAt, options, sizes, chain, projection, cacheD
 }
 
 function benchmarkTable(results) {
-    const fastest = Math.min(...results.map(result => result.mean));
+    const sortedResults = [...results].sort((left, right) => left.mean - right.mean);
+    const fastest = Math.min(...sortedResults.map(result => result.mean));
     const lines = [
         "| Variant | Mean (ms) | Stddev (ms) | Min (ms) | Max (ms) | Relative | Runs |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ];
-    for (const result of results) {
+    for (const result of sortedResults) {
         lines.push([
             "|",
             result.name,
@@ -174,14 +204,36 @@ function benchmarkTable(results) {
     return lines.join("\n");
 }
 
-function sizeRow(name, artifact, bytes) {
-    return `| ${name} | ${artifact} | ${bytes} | ${round(bytes / 1024)} |`;
-}
-
 function formatMs(seconds) {
     return round(seconds * 1000);
 }
 
 function round(value) {
     return Math.round(value * 1000) / 1000;
+}
+
+function sourceBundleTable(rows) {
+    const smallestSource = Math.min(...rows.map(row => row.sourceBytes));
+    const lines = [
+        "| Variant | Source (bytes) | Source rel. smallest | Bundle (bytes) | Bundle / Source |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ];
+
+    for (const row of rows) {
+        lines.push([
+            "|",
+            row.name,
+            "|",
+            row.sourceBytes,
+            "|",
+            `${round(row.sourceBytes / smallestSource)}x`,
+            "|",
+            row.bundleBytes,
+            "|",
+            `${round(row.bundleBytes / row.sourceBytes)}x`,
+            "|",
+        ].join(" "));
+    }
+
+    return lines.join("\n");
 }

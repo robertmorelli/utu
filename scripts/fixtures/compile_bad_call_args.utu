@@ -1,7 +1,7 @@
-fn add(a: i32, b: i32) i32 {
-    a + b
+fun add(a: i32, b: i32) i32 {
+    a + b;
 }
 
-fn bad() i32 {
-    add("hi", 1)
+fun bad() i32 {
+    add("hi", 1);
 }

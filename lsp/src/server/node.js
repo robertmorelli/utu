@@ -88,6 +88,68 @@ const INITIALIZE_RESULT = {
         version: SERVER_VERSION,
     },
 };
+const REQUEST_HANDLERS = {
+    initialize: async (session, params) => {
+        session.server.setWorkspaceFolders(getWorkspaceFolderUris(params));
+        session.initialized = true;
+        return INITIALIZE_RESULT;
+    },
+    shutdown: async (session) => {
+        session.shutdownRequested = true;
+        return null;
+    },
+    'textDocument/hover': async (session, params) => session.requireInitialized(async () => toLspHover(await session.server.getHover(getRequiredTextDocumentUri(params), getRequiredPosition(params)))),
+    'textDocument/definition': async (session, params) => session.requireInitialized(async () => toLspLocation(await session.server.getDefinition(getRequiredTextDocumentUri(params), getRequiredPosition(params)))),
+    'textDocument/references': async (session, params) => session.requireInitialized(async () => (await session.server.getReferences(getRequiredTextDocumentUri(params), getRequiredPosition(params), getIncludeDeclaration(params))).map(toLspLocation)),
+    'textDocument/documentHighlight': async (session, params) => session.requireInitialized(async () => (await session.server.getDocumentHighlights(getRequiredTextDocumentUri(params), getRequiredPosition(params))).map(toLspDocumentHighlight)),
+    'textDocument/completion': async (session, params) => session.requireInitialized(async () => (await session.server.getCompletionItems(getRequiredTextDocumentUri(params), getRequiredPosition(params))).map(toLspCompletionItem)),
+    'textDocument/documentSymbol': async (session, params) => session.requireInitialized(async () => (await session.server.getDocumentSymbols(getRequiredTextDocumentUri(params))).map(toLspDocumentSymbol)),
+    'workspace/symbol': async (session, params) => session.requireInitialized(async () => (await session.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(params))).map(toLspWorkspaceSymbol)),
+    'textDocument/semanticTokens/full': async (session, params) => session.requireInitialized(async () => ({
+        data: encodeSemanticTokens(await session.server.getDocumentSemanticTokens(getRequiredTextDocumentUri(params))),
+    })),
+};
+const IGNORED_NOTIFICATION_HANDLERS = Object.fromEntries([
+    'initialized',
+    '$/setTrace',
+    '$/cancelRequest',
+    'workspace/didChangeConfiguration',
+].map((method) => [method, async () => { }]));
+const NOTIFICATION_HANDLERS = {
+    ...IGNORED_NOTIFICATION_HANDLERS,
+    'textDocument/didOpen': async (session, params) => session.requireInitialized(async () => {
+        const textDocument = getRequiredTextDocument(params);
+        await session.publishDocumentDiagnostics(textDocument.uri, () => session.server.openDocument(textDocument));
+    }),
+    'textDocument/didChange': async (session, params) => session.requireInitialized(async () => {
+        const textDocument = getRequiredTextDocument(params);
+        await session.publishDocumentDiagnostics(textDocument.uri, () => session.server.updateDocument({
+            uri: textDocument.uri,
+            version: textDocument.version,
+            changes: getRequiredContentChanges(params),
+        }));
+    }),
+    'textDocument/didSave': async (session, params) => session.requireInitialized(async () => {
+        const uri = getRequiredTextDocumentUri(params);
+        await session.publishDocumentDiagnostics(uri, () => session.server.saveDocument({
+            uri,
+            text: getOptionalText(params),
+        }));
+    }),
+    'textDocument/didClose': async (session, params) => session.requireInitialized(async () => {
+        const uri = getRequiredTextDocumentUri(params);
+        await session.server.closeDocument(uri);
+        session.publishDiagnostics(uri, []);
+    }),
+    'workspace/didChangeWorkspaceFolders': async (session, params) => session.requireInitialized(async () => {
+        const { added, removed } = getWorkspaceFolderChanges(params);
+        session.server.addWorkspaceFolders(added);
+        session.server.removeWorkspaceFolders(removed);
+    }),
+    exit: async (session) => {
+        session.exit();
+    },
+};
 class JsonRpcConnection {
     onRequest;
     onNotification;
@@ -200,83 +262,15 @@ class UtuLspSession {
         this.connection = new JsonRpcConnection((request) => this.handleRequest(request), (notification) => this.handleNotification(notification));
     }
     async handleRequest({ method, params }) {
-        switch (method) {
-            case 'initialize':
-                this.server.setWorkspaceFolders(getWorkspaceFolderUris(params));
-                this.initialized = true;
-                return INITIALIZE_RESULT;
-            case 'shutdown':
-                this.shutdownRequested = true;
-                return null;
-            case 'textDocument/hover':
-                return this.requireInitialized(async () => toLspHover(await this.server.getHover(getRequiredTextDocumentUri(params), getRequiredPosition(params))));
-            case 'textDocument/definition':
-                return this.requireInitialized(async () => toLspLocation(await this.server.getDefinition(getRequiredTextDocumentUri(params), getRequiredPosition(params))));
-            case 'textDocument/references':
-                return this.requireInitialized(async () => (await this.server.getReferences(getRequiredTextDocumentUri(params), getRequiredPosition(params), getIncludeDeclaration(params))).map(toLspLocation));
-            case 'textDocument/documentHighlight':
-                return this.requireInitialized(async () => (await this.server.getDocumentHighlights(getRequiredTextDocumentUri(params), getRequiredPosition(params))).map(toLspDocumentHighlight));
-            case 'textDocument/completion':
-                return this.requireInitialized(async () => (await this.server.getCompletionItems(getRequiredTextDocumentUri(params), getRequiredPosition(params))).map(toLspCompletionItem));
-            case 'textDocument/documentSymbol':
-                return this.requireInitialized(async () => (await this.server.getDocumentSymbols(getRequiredTextDocumentUri(params))).map(toLspDocumentSymbol));
-            case 'workspace/symbol':
-                return this.requireInitialized(async () => (await this.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(params))).map(toLspWorkspaceSymbol));
-            case 'textDocument/semanticTokens/full':
-                return this.requireInitialized(async () => ({
-                    data: encodeSemanticTokens(await this.server.getDocumentSemanticTokens(getRequiredTextDocumentUri(params))),
-                }));
-            default:
-                throw new JsonRpcError(JSON_RPC_ERRORS.methodNotFound, `Unsupported request: ${method}`);
-        }
+        const handle = REQUEST_HANDLERS[method];
+        if (handle)
+            return handle(this, params);
+        throw new JsonRpcError(JSON_RPC_ERRORS.methodNotFound, `Unsupported request: ${method}`);
     }
     async handleNotification({ method, params }) {
-        switch (method) {
-            case 'initialized':
-            case '$/setTrace':
-            case '$/cancelRequest':
-            case 'workspace/didChangeConfiguration':
-                return;
-            case 'textDocument/didOpen':
-                return this.requireInitialized(async () => {
-                    const textDocument = getRequiredTextDocument(params);
-                    await this.publishDocumentDiagnostics(textDocument.uri, () => this.server.openDocument(textDocument));
-                });
-            case 'textDocument/didChange':
-                return this.requireInitialized(async () => {
-                    const textDocument = getRequiredTextDocument(params);
-                    await this.publishDocumentDiagnostics(textDocument.uri, () => this.server.updateDocument({
-                        uri: textDocument.uri,
-                        version: textDocument.version,
-                        changes: getRequiredContentChanges(params),
-                    }));
-                });
-            case 'textDocument/didSave':
-                return this.requireInitialized(async () => {
-                    const uri = getRequiredTextDocumentUri(params);
-                    await this.publishDocumentDiagnostics(uri, () => this.server.saveDocument({
-                        uri,
-                        text: getOptionalText(params),
-                    }));
-                });
-            case 'textDocument/didClose':
-                return this.requireInitialized(async () => {
-                    const uri = getRequiredTextDocumentUri(params);
-                    await this.server.closeDocument(uri);
-                    this.publishDiagnostics(uri, []);
-                });
-            case 'workspace/didChangeWorkspaceFolders':
-                return this.requireInitialized(async () => {
-                    const { added, removed } = getWorkspaceFolderChanges(params);
-                    this.server.addWorkspaceFolders(added);
-                    this.server.removeWorkspaceFolders(removed);
-                });
-            case 'exit':
-                this.exit();
-                return;
-            default:
-                return;
-        }
+        const handle = NOTIFICATION_HANDLERS[method];
+        if (handle)
+            return handle(this, params);
     }
     publishDiagnostics(uri, diagnostics) {
         this.connection.sendNotification('textDocument/publishDiagnostics', {

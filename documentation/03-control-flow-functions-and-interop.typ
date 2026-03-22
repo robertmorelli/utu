@@ -12,33 +12,33 @@ between source and emitted code.
 selection:
 
 ```utu
-let max: i32 = if a > b { a } else { b }
+let max: i32 = if a > b { a; } else { b; };
 ```
 
 At the Wasm level this is a plain `if` with a result type.
 
 == Loops
 
-Utu uses Zig-style `for` syntax:
+Utu uses range `for` loops and condition-style `while` loops:
 
 ```utu
 for (0..n) |i| {
-    sum = sum + i
-}
+    sum = sum + i;
+};
 
-for (cond()) {
-    body()
-}
+while (cond()) {
+    body();
+};
 
-for () {
-    if done() { break }
-}
+while () {
+    if done() { break; };
+};
 ```
 
 The loop forms cover:
 
 - counted loops over a single range
-- while-style loops where the source expression is the condition
+- while-style loops where the header expression is the condition
 - infinite loops using empty parentheses
 
 The parser accepts comma-separated sources and captures, but current lowering
@@ -60,16 +60,16 @@ The counted form lowers to the canonical Wasm `block` plus `loop` shape:
 
 == Blocks With Return
 
-Labeled blocks evaluate to values. A `break` targeting the label exits the
-block early and supplies the resulting value.
+Labeled blocks evaluate to values. `emit expr` exits the current labeled block
+early and supplies the resulting value, while plain `break` exits loops.
 
 ```utu
 let result: i32 = compute: {
     if shortcut() {
-        break compute 42
-    }
-    expensive_calculation()
-}
+        emit 42;
+    };
+    expensive_calculation();
+};
 ```
 
 This maps naturally to a Wasm `block` with a result type and `br` targeting the
@@ -85,7 +85,7 @@ alt shape {
     s: Circle => area_circle(s),
     s: Rect => area_rect(s),
     s: Triangle => area_tri(s),
-}
+};
 ```
 
 The type-based case is important because it shows how Utu leans on WasmGC's
@@ -104,8 +104,8 @@ paths, exhaustive match fallthrough, and force-unwrap failure.
 `assert` is a statement-like expression that traps when its condition is false:
 
 ```utu
-assert value != null
-assert add(2, 2) == 4
+assert value != null;
+assert add(2, 2) == 4;
 ```
 
 The lowering is direct: evaluate the condition as `i32`, invert it, and emit a
@@ -117,25 +117,25 @@ Function syntax keeps parameters in parentheses and places the return type
 immediately after the parameter list:
 
 ```utu
-fn add(a: i32, b: i32) i32 {
-    a + b
+fun add(a: i32, b: i32) i32 {
+    a + b;
 }
 
-fn clamp(val: f32, lo: f32, hi: f32) f32 {
-    if val < lo { lo }
-    else if val > hi { hi }
-    else { val }
+fun clamp(val: f32, lo: f32, hi: f32) f32 {
+    if val < lo { lo; }
+    else if val > hi { hi; }
+    else { val; };
 }
 
-fn greet(name: str) {
-    name -o console_log
+fun check(value: bool) void {
+    assert value;
 }
 ```
 
 Important conventions:
 
 - the last expression is the implicit return value
-- void functions simply omit the return type
+- void functions write `void` explicitly
 - parameters are unrestricted because they are already named bindings
 
 == Pipe Operator
@@ -146,19 +146,20 @@ left into the function on the right.
 Single-argument pipelines stay minimal:
 
 ```utu
-a -o f -o g
+a -o f -o g;
 ```
 
 That means the same thing as `g(f(a))`.
 
-Multi-argument pipelines use `_` to mark the slot receiving the piped value:
+Multi-argument pipelines use `_` to mark the slot receiving the piped value.
+A pipe target may contain at most one `_`:
 
 ```utu
 a
 -o f
--o z(_, c, d)
+-o z(_, c, d);
 
-x -o clamp(0.0, _, 1.0)
+x -o clamp(0.0, _, 1.0);
 ```
 
 This is syntactic sugar only. Lowering turns pipes into ordinary function
@@ -170,13 +171,13 @@ calls, which keeps the compiler simple and the runtime model transparent.
 annotation.
 
 ```utu
-let config: Config = load_config()
-init(config)
-validate(config)
+let config: Config = load_config();
+init(config);
+validate(config);
 
-load_config() -o init
+load_config() -o init;
 
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```
 
 The discipline is:
@@ -187,31 +188,26 @@ The discipline is:
 
 == Imports
 
-JS imports use `import extern "es" ...`:
+Host imports use `shimport "<module>" ...`:
 
 ```utu
-import extern "es" console_log(str)
-import extern "es" fetch(str) Response # null
-import extern "es" fetch(str) Response # ApiError
-import extern "es" document: externref
+shimport "es" console_log(str) void;
+shimport "es" fetch(str) Response # null;
+shimport "es" fetch(str) Response # ApiError;
+shimport "es" document: externref;
+shimport "node:path" basename(str) str;
 ```
 
-The string builtins are special: they are auto-imported and do not need
+The string builtins are special: they are auto-provided and do not need
 declarations in source files.
-
-`T # null` imports compile as nullable returns. `T # E` imports compile as
-direct two-result Wasm import signatures. In the generated JS wrapper, throws
-from nullable-compatible imports currently become null placeholders so fallback
-and null checks can handle them. Structured typed error lowering is still
-planned.
 
 == Exports
 
 Wasm exports are ordinary functions marked with `export`:
 
 ```utu
-export fn main() {
-    "hello world" -o console_log
+export fun main() void {
+    "hello world" -o console_log;
 }
 ```
 
@@ -221,14 +217,14 @@ The language also supports top-level `test` and `bench` items:
 
 ```utu
 test "adds two numbers" {
-    assert add(2, 2) == 4
+    assert add(2, 2) == 4;
 }
 
 bench "sum loop" |i| {
     setup {
-        let total: i32 = 0
+        let total: i32 = 0;
         measure {
-            total = total + i
+            total = total + i;
         }
     }
 }
@@ -245,12 +241,12 @@ The language does not bake in a hidden vtable model. Current compiler support
 keeps dispatch explicit through type-based `alt` lowering:
 
 ```utu
-fn describe(s: Shape) str {
+fun describe(s: Shape) str {
     alt s {
         c: Circle => "circle",
         r: Rect => "rect",
         t: Triangle => "triangle",
-    }
+    };
 }
 ```
 

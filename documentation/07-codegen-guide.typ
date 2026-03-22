@@ -26,8 +26,8 @@ close.
   [*WAT*],
   [
 ```utu
-fn add(a: i32, b: i32) i32 {
-    a + b
+fun add(a: i32, b: i32) i32 {
+    a + b;
 }
 ```
   ],
@@ -41,8 +41,8 @@ fn add(a: i32, b: i32) i32 {
   ],
 )
 
-The last expression in the function body becomes the value left on the Wasm
-stack at the end of the function.
+Semicolons terminate expressions, but the last expression in the function body
+still becomes the value left on the Wasm stack at the end of the function.
 
 == Pipes Desugar To Nested Calls
 
@@ -53,11 +53,11 @@ stack at the end of the function.
   [*WAT*],
   [
 ```utu
-fn inc(x: i32) i32 { x + 1 }
-fn double(x: i32) i32 { x * 2 }
+fun inc(x: i32) i32 { x + 1; }
+fun double(x: i32) i32 { x * 2; }
 
-fn use_pipe(x: i32) i32 {
-    x -o inc -o double
+fun use_pipe(x: i32) i32 {
+    x -o inc -o double;
 }
 ```
   ],
@@ -81,10 +81,10 @@ that receives the piped value.
   [*WAT*],
   [
 ```utu
-fn clamp(val: f32, lo: f32, hi: f32) f32 { ... }
+fun clamp(val: f32, lo: f32, hi: f32) f32 { ... }
 
-fn clamp_unit(x: f32) f32 {
-    x -o clamp(_, 0.0, 1.0)
+fun clamp_unit(x: f32) f32 {
+    x -o clamp(_, 0.0, 1.0);
 }
 ```
   ],
@@ -108,9 +108,9 @@ fn clamp_unit(x: f32) f32 {
   [*WAT*],
   [
 ```utu
-fn scaled_sum(a: i32, b: i32) i32 {
-    let sum: i32 = add(a, b)
-    sum * 2
+fun scaled_sum(a: i32, b: i32) i32 {
+    let sum: i32 = add(a, b);
+    sum * 2;
 }
 ```
   ],
@@ -146,12 +146,12 @@ struct Vec2 {
     y: f32,
 }
 
-fn make_vec() Vec2 {
-    Vec2 { x: 1.0, y: 2.0 }
+fun make_vec() Vec2 {
+    Vec2 { x: 1.0, y: 2.0 };
 }
 
-fn get_x(v: Vec2) f32 {
-    v.x
+fun get_x(v: Vec2) f32 {
+    v.x;
 }
 ```
   ],
@@ -190,8 +190,8 @@ struct Todo {
     mut done: bool,
 }
 
-fn toggle(todo: Todo) {
-    todo.done = not todo.done
+fun toggle(todo: Todo) void {
+    todo.done = not todo.done;
 }
 ```
   ],
@@ -219,9 +219,9 @@ code usually reloads the reference before computing the updated field value.
   [*WAT*],
   [
 ```utu
-fn first_plus_len(xs: array[i32]) i32 {
-    let first: i32 = xs[0]
-    first + array.len(xs)
+fun first_plus_len(xs: array[i32]) i32 {
+    let first: i32 = xs[0];
+    first + array.len(xs);
 }
 ```
   ],
@@ -250,7 +250,7 @@ Allocation is just as direct:
   [*WAT*],
   [
 ```utu
-let buf: array[i32] = array[i32].new(1024, 0)
+let buf: array[i32] = array[i32].new(1024, 0);
 ```
   ],
   [
@@ -271,8 +271,8 @@ let buf: array[i32] = array[i32].new(1024, 0)
   [*WAT*],
   [
 ```utu
-fn max(a: i32, b: i32) i32 {
-    if a > b { a } else { b }
+fun max(a: i32, b: i32) i32 {
+    if a > b { a; } else { b; };
 }
 ```
   ],
@@ -303,12 +303,12 @@ This is the same structured shape Wasm already uses, which is why Utu can make
   [*WAT*],
   [
 ```utu
-fn sum_to(n: i32) i32 {
-    let sum: i32 = 0
+fun sum_to(n: i32) i32 {
+    let sum: i32 = 0;
     for (0..n) |i| {
-        sum = sum + i
-    }
-    sum
+        sum = sum + i;
+    };
+    sum;
 }
 ```
   ],
@@ -352,8 +352,8 @@ The loop structure is intentionally unsurprising if you already know Wasm.
   [*WAT*],
   [
 ```utu
-fn divmod(a: i32, b: i32) i32, i32 {
-    a / b, a % b
+fun divmod(a: i32, b: i32) i32, i32 {
+    a / b, a % b;
 }
 ```
   ],
@@ -379,7 +379,7 @@ Binding those results shows one of the few non-obvious lowering rules:
   [*WAT*],
   [
 ```utu
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```
   ],
   [
@@ -406,7 +406,7 @@ Wasm pushes return values in declaration order, so the compiler must emit
   [*WAT*],
   [
 ```utu
-let data: Response = fetch(url) \ fatal
+let data: Response = fetch(url) \ fatal;
 ```
   ],
   [
@@ -431,12 +431,12 @@ the direct `ref.as_non_null` path.
   [*WAT*],
   [
 ```utu
-fn describe(shape: Shape) str {
+fun describe(shape: Shape) str {
     alt shape {
         c: Circle => "circle",
         r: Rect => "rect",
         t: Triangle => "triangle",
-    }
+    };
 }
 ```
   ],
@@ -466,7 +466,7 @@ fn describe(shape: Shape) str {
 The exact string constant strategy may vary, but the dispatch structure is the
 key point: sum-type matching is really type refinement through WasmGC casts.
 
-== Imports And Exports Are Also Thin
+== Exports Are Also Thin
 
 #grid(
   columns: (1fr, 1fr),
@@ -475,10 +475,10 @@ key point: sum-type matching is really type refinement through WasmGC casts.
   [*WAT*],
   [
 ```utu
-import extern "es" console_log(str)
+shimport "es" console_log(str) void;
 
-export fn main() {
-    "hello world" -o console_log
+export fun main() void {
+    "hello world" -o console_log;
 }
 ```
   ],

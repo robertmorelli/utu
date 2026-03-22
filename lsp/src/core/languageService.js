@@ -1,5 +1,5 @@
 import { BUILTIN_METHODS, CORE_TYPE_COMPLETIONS, KEYWORD_COMPLETIONS, LITERAL_COMPLETIONS, getBuiltinNamespaceHover, getBuiltinHover, getBuiltinReturnType, getCoreTypeHover, getKeywordHover, getLiteralHover, isBuiltinNamespace, } from './hoverDocs.js';
-import { collectDiagnostics, rangeFromNode, rangeFromOffsets, } from './parser.js';
+import { collectParseDiagnostics, spanFromNode, spanFromOffsets, } from '../../../compiler/parser.js';
 import { clamp, comparePositions, copyRange, getDocumentUri, rangeContains, rangeKey, rangeLength, } from './types.js';
 const SYMBOL_METADATA = {
     function: {
@@ -104,6 +104,12 @@ const RECURSIVE_EXPRESSION_TYPES = new Set([
     'paren_expr',
     'assign_expr',
 ]);
+const LITERAL_TYPE_BY_NODE_TYPE = {
+    int_lit: 'i64',
+    float_lit: 'f64',
+    string_lit: 'str',
+    multiline_string_lit: 'str',
+};
 export class UtuLanguageService {
     parserService;
     cache = new Map();
@@ -131,7 +137,7 @@ export class UtuLanguageService {
         }
         const parsedTree = await this.parserService.parseSource(document.getText());
         try {
-            const diagnostics = collectDiagnostics(parsedTree.tree.rootNode, document);
+            const diagnostics = collectParseDiagnostics(parsedTree.tree.rootNode, document);
             const index = buildDocumentIndex(document, parsedTree.tree.rootNode, diagnostics);
             this.cache.set(cacheKey, {
                 version: document.version,
@@ -404,12 +410,14 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         }
     };
     const createSymbol = (nameNode, kind, options) => {
+        const span = spanFromNode(document, nameNode);
         const symbol = {
             key: `${uri}#${symbolCounter}`,
             name: options.name ?? nameNode.text,
             kind,
             uri,
-            range: rangeFromNode(document, nameNode),
+            range: span.range,
+            offsetRange: span.offsetRange,
             detail: options.detail,
             signature: options.signature,
             typeText: options.typeText,
@@ -437,18 +445,21 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         occurrences.push(occurrence);
     };
     const addResolvedOccurrence = (nameNode, role, symbolKey) => {
+        const span = spanFromNode(document, nameNode);
         addOccurrence({
             name: nameNode.text,
-            range: rangeFromNode(document, nameNode),
+            range: span.range,
+            offsetRange: span.offsetRange,
             role,
             symbolKey,
             isDefinition: false,
         });
     };
-    const addBuiltinOccurrence = (range, key, label) => {
+    const addBuiltinOccurrence = (span, key, label) => {
         addOccurrence({
             name: label ?? key,
-            range,
+            range: span.range,
+            offsetRange: span.offsetRange,
             role: 'builtin',
             builtinKey: key,
             isDefinition: false,
@@ -477,9 +488,49 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             walk: walkFunction,
         },
         global_decl: { collect: collectGlobalDeclaration, walk: walkGlobal },
+        import_decl: { collect: collectImportDeclaration, walk: walkImport },
         test_decl: { collect: collectTestDeclaration, walk: walkTest },
         bench_decl: { collect: collectBenchDeclaration, walk: walkBench },
-        import_decl: { collect: collectImportDeclaration, walk: walkImport },
+    };
+    const WALK_EXPRESSION_HANDLERS = {
+        identifier: (node) => addResolvedOccurrence(node, 'value', resolveValueKey(node.text)),
+        struct_init: walkStructInit,
+        field_expr: walkFieldExpression,
+        call_expr: walkCallExpression,
+        namespace_call_expr: (node) => addBuiltinOccurrence(rangeForBuiltinNode(document, node), builtinKeyFromNamespaceCall(node), node.text),
+        array_init: walkArrayInit,
+        ref_null_expr: walkRefNullExpression,
+        pipe_expr: walkPipeExpression,
+        bind_expr: walkBindExpression,
+        block_expr: walkBlockExpression,
+        block: walkBlock,
+        match_expr: walkMatchExpression,
+        alt_expr: walkAltExpression,
+        for_expr: walkForExpression,
+        while_expr: walkWhileExpression,
+        break_expr: walkBreakExpression,
+        emit_expr: (node) => walkNamedChildren(node, walkExpression),
+        literal: () => { },
+    };
+    const EXPRESSION_TYPE_INFERERS = {
+        identifier: inferIdentifierType,
+        field_expr: inferFieldExpressionType,
+        call_expr: inferCallExpressionType,
+        namespace_call_expr: (node) => getBuiltinReturnType(builtinKeyFromNamespaceCall(node)),
+        pipe_expr: inferPipeExpressionType,
+        pipe_target: inferPipeTargetType,
+        struct_init: inferStructInitType,
+        array_init: inferArrayInitType,
+        ref_null_expr: inferRefNullType,
+        paren_expr: inferFirstChildType,
+        block_expr: inferFirstChildType,
+        literal: inferLiteralType,
+        binary_expr: inferFirstChildType,
+        else_expr: inferFirstChildType,
+        tuple_expr: inferFirstChildType,
+        index_expr: inferFirstChildType,
+        assign_expr: inferFirstChildType,
+        unary_expr: inferFirstChildType,
     };
     for (const item of rootNode.namedChildren) {
         collectTopLevelDeclarations(item);
@@ -563,7 +614,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const paramList = findNamedChild(fnDecl, 'param_list');
         const returnType = findNamedChild(fnDecl, 'return_type');
-        const signature = `${exported ? 'export ' : ''}fn ${nameNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
+        const signature = `${exported ? 'export ' : ''}fun ${nameNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
         const functionSymbol = createSymbol(nameNode, 'function', {
             detail: exported ? 'exported function' : 'function',
             exported,
@@ -585,6 +636,35 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             topLevel: true,
         });
         registerTopLevelValue(globalSymbol);
+    }
+    function collectImportDeclaration(importDecl) {
+        const moduleNode = findNamedChild(importDecl, 'string_lit');
+        const nameNode = findNamedChild(importDecl, 'identifier');
+        if (!moduleNode || !nameNode)
+            return;
+        const moduleText = moduleNode.text;
+        const returnTypeNode = findNamedChild(importDecl, 'return_type');
+        if (returnTypeNode) {
+            const paramList = findNamedChild(importDecl, 'import_param_list');
+            const importSymbol = createSymbol(nameNode, 'importFunction', {
+                detail: 'host import',
+                signature: `shimport ${moduleText} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
+                returnTypeText: returnTypeNode.text,
+                topLevel: true,
+            });
+            registerTopLevelValue(importSymbol);
+            return;
+        }
+        const typeNode = importDecl.namedChildren.at(-1);
+        if (!typeNode || typeNode.type === 'identifier')
+            return;
+        const importSymbol = createSymbol(nameNode, 'importValue', {
+            detail: 'host import value',
+            signature: `shimport ${moduleText} ${nameNode.text}: ${typeNode.text}`,
+            typeText: typeNode.text,
+            topLevel: true,
+        });
+        registerTopLevelValue(importSymbol);
     }
     function collectTestDeclaration(testDecl) {
         const nameNode = findNamedChild(testDecl, 'string_lit');
@@ -608,32 +688,6 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             signature: `bench ${nameNode.text}${captureNode ? ` |${captureNode.text}|` : ''}`,
             topLevel: true,
         });
-    }
-    function collectImportDeclaration(importDecl) {
-        const moduleNode = findNamedChild(importDecl, 'string_lit');
-        const nameNode = findNamedChild(importDecl, 'identifier');
-        if (!moduleNode || !nameNode)
-            return;
-        const importParamList = findNamedChild(importDecl, 'import_param_list');
-        const returnType = findNamedChild(importDecl, 'return_type');
-        if (importParamList) {
-            const importSymbol = createSymbol(nameNode, 'importFunction', {
-                detail: `import from ${moduleNode.text}`,
-                signature: `import extern ${moduleNode.text} ${nameNode.text}(${importParamList.text})${returnType ? ` ${returnType.text}` : ''}`,
-                returnTypeText: returnType?.text,
-                topLevel: true,
-            });
-            registerTopLevelValue(importSymbol);
-            return;
-        }
-        const typeNode = importDecl.namedChildren.at(-1);
-        const importSymbol = createSymbol(nameNode, 'importValue', {
-            detail: `import from ${moduleNode.text}`,
-            signature: `import extern ${moduleNode.text} ${nameNode.text}: ${typeNode?.text ?? 'unknown'}`,
-            typeText: typeNode?.text,
-            topLevel: true,
-        });
-        registerTopLevelValue(importSymbol);
     }
     function walkTopLevelItem(item) {
         if (item.type === 'export_decl') {
@@ -686,22 +740,20 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             walkExpression(valueNode);
     }
     function walkImport(importDecl) {
-        const importParamList = findNamedChild(importDecl, 'import_param_list');
-        if (importParamList) {
-            for (const param of importParamList.namedChildren) {
-                if (param.type === 'param') {
-                    const typeNode = param.namedChildren.at(-1);
-                    if (typeNode)
-                        walkTypeAnnotation(typeNode);
-                }
-                else {
-                    walkTypeAnnotation(param);
-                }
+        const returnTypeNode = findNamedChild(importDecl, 'return_type');
+        if (returnTypeNode) {
+            for (const paramNode of findNamedChildren(findNamedChild(importDecl, 'import_param_list'), 'param')) {
+                const typeNode = paramNode.namedChildren.at(-1);
+                if (typeNode)
+                    walkTypeAnnotation(typeNode);
             }
+            walkTypeAnnotation(returnTypeNode);
+            return;
         }
-        const returnType = findNamedChild(importDecl, 'return_type');
-        if (returnType)
-            walkTypeAnnotation(returnType);
+        const typeNode = importDecl.namedChildren.at(-1);
+        if (typeNode && typeNode.type !== 'identifier') {
+            walkTypeAnnotation(typeNode);
+        }
     }
     function walkTest(testDecl) {
         const block = findNamedChild(testDecl, 'block');
@@ -735,72 +787,23 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             }
         });
     }
+    function walkBlockExpression(node) {
+        const block = findNamedChild(node, 'block');
+        if (block)
+            walkBlock(block);
+    }
+    function walkBreakExpression(node) {
+        return;
+    }
     function walkExpression(node) {
         if (RECURSIVE_EXPRESSION_TYPES.has(node.type)) {
             walkNamedChildren(node, walkExpression);
             return;
         }
-        switch (node.type) {
-            case 'identifier':
-                addResolvedOccurrence(node, 'value', resolveValueKey(node.text));
-                return;
-            case 'struct_init':
-                walkStructInit(node);
-                return;
-            case 'field_expr':
-                walkFieldExpression(node);
-                return;
-            case 'call_expr':
-                walkCallExpression(node);
-                return;
-            case 'namespace_call_expr':
-                addBuiltinOccurrence(rangeForBuiltinNode(document, node), builtinKeyFromNamespaceCall(node), node.text);
-                return;
-            case 'array_init':
-                walkArrayInit(node);
-                return;
-            case 'ref_null_expr':
-                walkRefNullExpression(node);
-                return;
-            case 'pipe_expr':
-                walkPipeExpression(node);
-                return;
-            case 'bind_expr':
-                walkBindExpression(node);
-                return;
-            case 'block_expr': {
-                const block = findNamedChild(node, 'block');
-                if (block)
-                    walkBlock(block);
-                return;
-            }
-            case 'block':
-                walkBlock(node);
-                return;
-            case 'match_expr':
-                walkMatchExpression(node);
-                return;
-            case 'alt_expr':
-                walkAltExpression(node);
-                return;
-            case 'for_expr':
-                walkForExpression(node);
-                return;
-            case 'break_expr':
-                for (const child of node.namedChildren) {
-                    if (child.type === 'identifier') {
-                        addResolvedOccurrence(child, 'value', resolveValueKey(child.text));
-                    }
-                    else {
-                        walkExpression(child);
-                    }
-                }
-                return;
-            case 'literal':
-                return;
-            default:
-                walkNamedChildren(node, walkExpression);
-        }
+        const walkNode = WALK_EXPRESSION_HANDLERS[node.type];
+        if (walkNode)
+            return walkNode(node);
+        walkNamedChildren(node, walkExpression);
     }
     function walkStructInit(node) {
         const typeNode = findNamedChild(node, 'type_ident');
@@ -845,7 +848,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         if (typeNode)
             walkTypeAnnotation(typeNode);
         if (methodNode) {
-            addBuiltinOccurrence(rangeFromOffsets(document, node.startIndex, methodNode.endIndex), `array.${methodNode.text}`, `array.${methodNode.text}`);
+            addBuiltinOccurrence(spanFromOffsets(document, node.startIndex, methodNode.endIndex), `array.${methodNode.text}`, `array.${methodNode.text}`);
         }
         if (argListNode) {
             for (const arg of argListNode.namedChildren) {
@@ -855,7 +858,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     }
     function walkRefNullExpression(node) {
         const typeNode = findNamedChild(node, 'type_ident');
-        addBuiltinOccurrence(rangeFromOffsets(document, node.startIndex, node.startIndex + 'ref.null'.length), 'ref.null');
+        addBuiltinOccurrence(spanFromOffsets(document, node.startIndex, node.startIndex + 'ref.null'.length), 'ref.null');
         if (typeNode) {
             addResolvedOccurrence(typeNode, 'type', resolveTypeKey(typeNode.text));
         }
@@ -875,7 +878,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         const second = namedChildren[1];
         if (first.type === 'identifier' && second?.type === 'identifier' && isBuiltinNamespace(first.text)) {
             const builtinKey = `${first.text}.${second.text}`;
-            addBuiltinOccurrence(rangeFromOffsets(document, node.startIndex, second.endIndex), builtinKey, builtinKey);
+            addBuiltinOccurrence(spanFromOffsets(document, node.startIndex, second.endIndex), builtinKey, builtinKey);
         }
         else if (first.type === 'identifier') {
             addResolvedOccurrence(first, 'value', resolveValueKey(first.text));
@@ -964,6 +967,17 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             }
         });
     }
+    function walkWhileExpression(node) {
+        for (const child of node.namedChildren) {
+            if (child.type !== 'block') {
+                walkExpression(child);
+            }
+        }
+        const blockNode = findNamedChild(node, 'block');
+        if (blockNode) {
+            walkBlock(blockNode);
+        }
+    }
     function walkTypeAnnotation(node) {
         if (node.type === 'type_ident') {
             addResolvedOccurrence(node, 'type', resolveTypeKey(node.text));
@@ -1001,70 +1015,42 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     function inferFirstChildType(node) {
         return node.namedChildren[0] ? inferExpressionType(node.namedChildren[0]) : undefined;
     }
+    function inferIdentifierType(node) {
+        const symbol = lookupSymbol(resolveValueKey(node.text));
+        return symbol?.typeText ?? symbol?.returnTypeText;
+    }
+    function inferFieldExpressionType(node) {
+        const [baseNode, fieldNode] = node.namedChildren;
+        if (!baseNode || !fieldNode)
+            return undefined;
+        const baseType = inferExpressionType(baseNode);
+        if (!baseType)
+            return undefined;
+        const fieldSymbol = lookupSymbol(resolveFieldKey(baseType, fieldNode.text));
+        return fieldSymbol?.typeText;
+    }
+    function inferCallExpressionType(node) {
+        const calleeNode = node.namedChildren[0];
+        if (!calleeNode)
+            return undefined;
+        if (calleeNode.type === 'identifier')
+            return inferIdentifierType(calleeNode);
+        return calleeNode.type === 'namespace_call_expr'
+            ? getBuiltinReturnType(builtinKeyFromNamespaceCall(calleeNode))
+            : undefined;
+    }
+    function inferStructInitType(node) { return findNamedChild(node, 'type_ident')?.text; }
+    function inferArrayInitType(node) { return node.namedChildren[0] ? `array[${node.namedChildren[0].text}]` : 'array[T]'; }
+    function inferRefNullType(node) {
+        const typeNode = findNamedChild(node, 'type_ident');
+        return typeNode ? `${typeNode.text} # null` : undefined;
+    }
+    function inferPipeExpressionType(node) {
+        const targetNode = node.namedChildren.at(-1);
+        return targetNode ? inferPipeTargetType(targetNode) : undefined;
+    }
     function inferExpressionType(node) {
-        switch (node.type) {
-            case 'identifier': {
-                const symbol = lookupSymbol(resolveValueKey(node.text));
-                return symbol?.typeText ?? symbol?.returnTypeText;
-            }
-            case 'field_expr': {
-                const [baseNode, fieldNode] = node.namedChildren;
-                if (!baseNode || !fieldNode)
-                    return undefined;
-                const baseType = inferExpressionType(baseNode);
-                if (!baseType)
-                    return undefined;
-                const fieldSymbol = lookupSymbol(resolveFieldKey(baseType, fieldNode.text));
-                return fieldSymbol?.typeText;
-            }
-            case 'call_expr': {
-                const calleeNode = node.namedChildren[0];
-                if (!calleeNode)
-                    return undefined;
-                if (calleeNode.type === 'identifier') {
-                    const symbol = lookupSymbol(resolveValueKey(calleeNode.text));
-                    return symbol?.returnTypeText ?? symbol?.typeText;
-                }
-                if (calleeNode.type === 'namespace_call_expr') {
-                    return getBuiltinReturnType(builtinKeyFromNamespaceCall(calleeNode));
-                }
-                return undefined;
-            }
-            case 'namespace_call_expr':
-                return getBuiltinReturnType(builtinKeyFromNamespaceCall(node));
-            case 'pipe_expr': {
-                const targetNode = node.namedChildren.at(-1);
-                return targetNode ? inferPipeTargetType(targetNode) : undefined;
-            }
-            case 'pipe_target':
-                return inferPipeTargetType(node);
-            case 'struct_init': {
-                const typeNode = findNamedChild(node, 'type_ident');
-                return typeNode?.text;
-            }
-            case 'array_init': {
-                const elementTypeNode = node.namedChildren[0];
-                return elementTypeNode ? `array[${elementTypeNode.text}]` : 'array[T]';
-            }
-            case 'ref_null_expr': {
-                const typeNode = findNamedChild(node, 'type_ident');
-                return typeNode ? `${typeNode.text} # null` : undefined;
-            }
-            case 'paren_expr':
-            case 'block_expr':
-                return inferFirstChildType(node);
-            case 'literal':
-                return inferLiteralType(node);
-            case 'binary_expr':
-            case 'else_expr':
-            case 'tuple_expr':
-            case 'index_expr':
-            case 'assign_expr':
-            case 'unary_expr':
-                return inferFirstChildType(node);
-            default:
-                return undefined;
-        }
+        return EXPRESSION_TYPE_INFERERS[node.type]?.(node);
     }
     function inferPipeTargetType(node) {
         const namedChildren = node.namedChildren;
@@ -1207,9 +1193,9 @@ function builtinKeyFromNamespaceCall(node) {
 function rangeForBuiltinNode(document, node) {
     const methodNode = findNamedChild(node, 'identifier');
     if (!methodNode) {
-        return rangeFromNode(document, node);
+        return spanFromNode(document, node);
     }
-    return rangeFromOffsets(document, node.startIndex, methodNode.endIndex);
+    return spanFromOffsets(document, node.startIndex, methodNode.endIndex);
 }
 function inferLiteralType(node) {
     if (node.text === 'true' || node.text === 'false') {
@@ -1221,17 +1207,7 @@ function inferLiteralType(node) {
     const literalChild = node.namedChildren[0];
     if (!literalChild)
         return undefined;
-    switch (literalChild.type) {
-        case 'int_lit':
-            return 'i64';
-        case 'float_lit':
-            return 'f64';
-        case 'string_lit':
-        case 'multiline_string_lit':
-            return 'str';
-        default:
-            return undefined;
-    }
+    return LITERAL_TYPE_BY_NODE_TYPE[literalChild.type];
 }
 function withScope(scopes, action) {
     scopes.push(new Map());

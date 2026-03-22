@@ -1,6 +1,4 @@
 import fs from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -35,26 +33,9 @@ export async function createCliImports(importsFile = "") {
   };
 }
 
-export async function loadNodeModuleFromSource(source, prefix = "utu-cli-") {
-  const dir = await mkdtemp(path.join(tmpdir(), prefix));
-  const file = path.join(dir, "module.mjs");
-  const cleanup = () => rm(dir, { force: true, recursive: true });
-  await writeFile(file, source, "utf8");
-
-  try {
-    return {
-      module: await import(pathToFileURL(file).href),
-      cleanup,
-    };
-  } catch (error) {
-    await cleanup();
-    throw error;
-  }
-}
-
 export async function runCompiledProgram(instantiate, { prompt = promptSync } = {}) {
-  const provider = createCliImportProvider({ prompt });
-  const exports = await instantiate(provider.imports);
+  void prompt;
+  const exports = await instantiate();
   const result = await getCallableExport(exports, "main", "The program does not export a callable main function")();
   if (result !== undefined) console.log(result);
 }

@@ -1,7 +1,5 @@
-import extern "es" console_log(str)
+let greeting: str = "hello";
 
-let greeting: str = "hello"
-
-export fn main() {
-    greeting -o console_log
+export fun main() str {
+    greeting;
 }

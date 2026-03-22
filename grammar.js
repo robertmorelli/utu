@@ -11,10 +11,6 @@ module.exports = grammar({
   conflicts: $ => [
     // nullable_type ambiguity: T # could be nullable_type or _return_component with exclusive
     [$._type, $.nullable_type],
-    // import_decl: 'fn' after () could start a func_type return or the next fn_decl item
-    [$.import_decl],
-    // break_expr optional label/expr: 'break' identifier ambiguous with 'break' followed by expr
-    [$._expr, $.break_expr],
     // _return_component: optional '#' is ambiguous at reduce time
     [$._return_component],
     // pipe_target: path optionally followed by (pipe_args)
@@ -34,10 +30,10 @@ module.exports = grammar({
 
     _item: $ => choice(
       $.struct_decl,
-      $.type_decl,
+      seq($.type_decl, ';'),
       $.fn_decl,
-      $.global_decl,
-      $.import_decl,
+      seq($.global_decl, ';'),
+      seq($.import_decl, ';'),
       $.export_decl,
       $.test_decl,
       $.bench_decl,
@@ -85,12 +81,12 @@ module.exports = grammar({
     ),
 
     fn_decl: $ => seq(
-      'fn',
+      'fun',
       $.identifier,
       '(',
       optional($.param_list),
       ')',
-      optional($.return_type),
+      $.return_type,
       $.block,
     ),
 
@@ -102,16 +98,22 @@ module.exports = grammar({
 
     param: $ => seq($.identifier, ':', $._type),
 
-    // return_type: one or more comma-separated components, each optionally with # error type
-    return_type: $ => seq(
-      $._return_component,
-      repeat(seq(',', $._return_component)),
+    // return_type: either void or one or more comma-separated components,
+    // each optionally with # error type
+    return_type: $ => choice(
+      $.void_type,
+      seq(
+        $._return_component,
+        repeat(seq(',', $._return_component)),
+      ),
     ),
 
     _return_component: $ => seq(
       $._type,
       optional(seq('#', $._type)),
     ),
+
+    void_type: _ => 'void',
 
     global_decl: $ => seq(
       'let',
@@ -123,14 +125,10 @@ module.exports = grammar({
     ),
 
     import_decl: $ => seq(
-      'import',
-      'extern',
+      'shimport',
       $.string_lit,
       choice(
-        // function import: name(params) return_type?
-        // params may be unnamed (just types) as in: import extern "es" console_log(str)
-        seq($.identifier, '(', optional($.import_param_list), ')', optional($.return_type)),
-        // value import: name: type
+        seq($.identifier, '(', optional($.import_param_list), ')', $.return_type),
         seq($.identifier, ':', $._type),
       ),
     ),
@@ -141,10 +139,9 @@ module.exports = grammar({
       optional(','),
     ),
 
-    // Import params may be unnamed (type only) or named (ident: type)
     _import_param: $ => choice(
-      $.param,   // named: ident: type
-      $._type,   // unnamed: type
+      $.param,
+      $._type,
     ),
 
     export_decl: $ => seq(
@@ -172,7 +169,7 @@ module.exports = grammar({
     setup_decl: $ => seq(
       'setup',
       '{',
-      repeat($._expr),
+      repeat(seq($._expr, ';')),
       $.measure_decl,
       '}',
     ),
@@ -212,7 +209,7 @@ module.exports = grammar({
     ),
 
     func_type: $ => seq(
-      'fn',
+      'fun',
       '(',
       optional($.type_list),
       ')',
@@ -246,11 +243,11 @@ module.exports = grammar({
     _expr: $ => choice(
       $.literal,
       $.identifier,
+      $.tuple_expr,
       $.paren_expr,
       $.assert_expr,
       $.unary_expr,
       $.binary_expr,
-      $.tuple_expr,
       $.pipe_expr,
       $.else_expr,
       $.call_expr,
@@ -263,7 +260,9 @@ module.exports = grammar({
       $.alt_expr,
       $.block_expr,
       $.for_expr,
+      $.while_expr,
       $.break_expr,
+      $.emit_expr,
       $.bind_expr,
       $.struct_init,
       $.array_init,
@@ -352,17 +351,43 @@ module.exports = grammar({
       'i32', 'i64', 'f32', 'f64',
     ),
 
-    pipe_args: $ => seq(
-      $.pipe_arg,
-      repeat(seq(',', $.pipe_arg)),
+    pipe_args: $ => choice(
+      $.pipe_args_no_placeholder,
+      $.pipe_args_with_placeholder,
     ),
 
-    pipe_arg: $ => choice('_', $._expr),
+    pipe_args_no_placeholder: $ => seq(
+      alias($._expr, $.pipe_arg),
+      repeat(seq(',', alias($._expr, $.pipe_arg))),
+      optional(','),
+    ),
+
+    pipe_args_with_placeholder: $ => seq(
+      optional(seq(
+        alias($._expr, $.pipe_arg),
+        repeat(seq(',', alias($._expr, $.pipe_arg))),
+        ',',
+      )),
+      alias('_', $.pipe_arg_placeholder),
+      optional(seq(
+        ',',
+        alias($._expr, $.pipe_arg),
+        repeat(seq(',', alias($._expr, $.pipe_arg))),
+      )),
+      optional(','),
+    ),
 
     // --- Multi-value comma expression (tensor product / tuple return) ---
-    // Lower precedence than any binary op so it only wins at statement top level.
-    // Use prec.right so  a, b, c  parses right-to-left (doesn't matter for flat lists).
-    tuple_expr: $ => prec.right(-1, seq($._expr, ',', $._expr)),
+    // Tuples are explicit and must be parenthesized.
+    tuple_expr: $ => seq(
+      '(',
+      $._expr,
+      ',',
+      $._expr,
+      repeat(seq(',', $._expr)),
+      optional(','),
+      ')',
+    ),
 
     // --- Namespace-qualified call: str.method(args), array.len(arr), ref.is_null(v), etc. ---
     // Handles builtin keyword namespaces that can't appear as plain identifiers.
@@ -440,9 +465,17 @@ module.exports = grammar({
     for_expr: $ => seq(
       'for',
       '(',
-      optional($.for_sources),
+      $.for_sources,
       ')',
       optional($.capture),
+      $.block,
+    ),
+
+    while_expr: $ => seq(
+      'while',
+      '(',
+      optional($._expr),
+      ')',
       $.block,
     ),
 
@@ -451,11 +484,7 @@ module.exports = grammar({
       repeat(seq(',', $.for_source)),
     ),
 
-    // range  expr..expr  preferred over plain expr
-    for_source: $ => choice(
-      prec(1, seq($._expr, '..', $._expr)),
-      $._expr,
-    ),
+    for_source: $ => prec(1, seq($._expr, '..', $._expr)),
 
     capture: $ => seq(
       '|',
@@ -472,15 +501,13 @@ module.exports = grammar({
     )),
 
     // Plain block used inside if/for/fn/etc.
-    block: $ => seq('{', repeat($._expr), '}'),
+    block: $ => seq('{', repeat(seq($._expr, ';')), '}'),
 
-    // --- Break ---
+    // --- Break / Emit ---
 
-    break_expr: $ => prec.right(seq(
-      'break',
-      optional($.identifier),
-      optional($._expr),
-    )),
+    break_expr: _ => 'break',
+
+    emit_expr: $ => prec.right(seq('emit', $._expr)),
 
     // --- Let binding ---
 

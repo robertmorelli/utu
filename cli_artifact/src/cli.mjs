@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import { compileUtuSource } from "./lib/compiler.mjs";
 import { executeRuntimeTest, getCallableExport, loadCompiledRuntime, withRuntime } from "../../shared/compiledRuntime.mjs";
-import { createCliImports, loadNodeModuleFromSource } from "./lib/nodeRuntime.mjs";
+import { loadNodeModuleFromSource } from "../../shared/moduleLoaders.node.mjs";
+import { createCliImports } from "./lib/nodeRuntime.mjs";
 
 const help = `utu Bun CLI
 
@@ -49,13 +50,17 @@ async function compileCmd(args) {
   const file = path.resolve(input);
   const source = await readFile(file, "utf8");
   const name = path.basename(file, path.extname(file));
-  const { js, wasm, wat: watText } = await compileUtuSource(source, { wat });
+  const { shim, wasm, wat: watText } = await compileUtuSource(source, {
+    wat,
+    shim: bun ? "inline-wasm" : "external-wasm",
+    moduleFormat: "esm",
+  });
   const dir = path.resolve(outdir);
   const base = path.join(dir, name);
 
   await mkdir(dir, { recursive: true });
   const outputs = [
-    !bun && [`${base}.mjs`, js, "utf8"],
+    !bun && [`${base}.mjs`, shim, "utf8"],
     !bun && [`${base}.wasm`, wasm],
     watText && [`${base}.wat`, watText, "utf8"],
   ].filter(Boolean);
@@ -68,7 +73,7 @@ async function compileCmd(args) {
   }
   await Promise.all(outputs.map(([file, data, encoding]) => writeFile(file, data, encoding)));
   outputs.forEach(([file]) => console.log(`Wrote ${file}`));
-  if (bun) console.log(`Wrote ${await buildBunExecutable(base, js)}`);
+  if (bun) console.log(`Wrote ${await buildBunExecutable(base, shim)}`);
 }
 
 async function runCmd(args) {
@@ -275,7 +280,7 @@ async function withProgramRuntime(input, { importsFile = "", mode = "program" } 
     source,
     mode,
     compileSource: compileUtuSource,
-    loadModule: (js) => loadNodeModuleFromSource(js),
+    loadModule: (shim) => loadNodeModuleFromSource(shim),
     createImports: () => createCliImports(importsFile),
   }), run);
 }

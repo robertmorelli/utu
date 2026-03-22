@@ -3,8 +3,10 @@ import { formatError } from './compilerHost.js';
 import { DEFAULT_BENCHMARK_OPTIONS } from './benchmarking.js';
 import { getRunMainBlockerMessage } from './runMainSupport.js';
 import { normalizeCompileArtifact } from '../../shared/compilerArtifacts.mjs';
-import { executeFixedRuntimeBenchmark, executeFixedRuntimeBenchmarks, executeRuntimeTest, executeRuntimeTests, loadCompiledRuntime, withRuntime, } from '../../shared/compiledRuntime.mjs';
+import { executeFixedRuntimeBenchmarks, executeRuntimeTest, executeRuntimeTests, loadCompiledRuntime, selectMetadataEntry, withRuntime, } from '../../shared/compiledRuntime.mjs';
 import { createWebImportProvider } from '../../shared/hostImports.mjs';
+import { loadWebModuleFromSource } from '../../shared/moduleLoaders.web.mjs';
+
 export class WebCompilerHost {
     options;
     compilerPromise;
@@ -12,7 +14,7 @@ export class WebCompilerHost {
         this.options = options;
     }
     async compile(source, options = {}) {
-        return this.compileWithMode(source, 'program', options);
+        return this.compileSource(source, options);
     }
     async getRunMainBlocker(source) {
         return getRunMainBlockerMessage(source);
@@ -20,13 +22,8 @@ export class WebCompilerHost {
     async runMain(source) {
         return withRuntime(this.loadRuntime(source, 'program'), async (runtime) => {
             const execution = await runtime.invoke('main', [], 'The program does not export a callable main function');
-            if (execution.error) {
-                throw execution.error;
-            }
-            return {
-                logs: execution.logs,
-                result: execution.result,
-            };
+            if (execution.error) throw execution.error;
+            return execution;
         });
     }
     async runTest(source, ordinal) {
@@ -36,30 +33,58 @@ export class WebCompilerHost {
         return withRuntime(this.loadRuntime(source, 'test'), (runtime) => executeRuntimeTests(runtime, { formatError }));
     }
     async runBenchmark(source, ordinal, options = {}) {
-        return withRuntime(this.loadRuntime(source, 'bench'), (runtime) => executeFixedRuntimeBenchmark(runtime, ordinal, { ...DEFAULT_BENCHMARK_OPTIONS, ...options }));
+        const profile = createProfileImportProvider();
+        const settings = { ...DEFAULT_BENCHMARK_OPTIONS, ...options };
+        return withRuntime(this.loadRuntime(source, 'bench', { profile: 'ticks' }, () => profile), async (runtime) => {
+            const bench = selectMetadataEntry(runtime.metadata.benches, ordinal, 'benchmarks');
+            const profileCounts = [];
+            const runs = [];
+            for (let i = 0; i < settings.warmup + settings.samples; i += 1) {
+                profile.resetProfile();
+                const start = performance.now();
+                const sample = await runtime.invoke(bench.exportName, [settings.iterations], `Missing benchmark export "${bench.exportName}"`);
+                if (sample.error) throw sample.error;
+                if (i >= settings.warmup) {
+                    runs.push({ durationMs: performance.now() - start, logs: sample.logs });
+                    mergeCounts(profileCounts, profile.getProfile());
+                }
+            }
+            const durations = runs.map(({ durationMs }) => durationMs);
+            const durationMs = durations.reduce((sum, value) => sum + value, 0);
+            const meanMs = durationMs / durations.length;
+            return {
+                name: bench.name,
+                exportName: bench.exportName,
+                durationMs,
+                logs: runs.at(-1)?.logs ?? [],
+                maxMs: Math.max(...durations),
+                meanMs,
+                minMs: Math.min(...durations),
+                perIterationMs: meanMs / settings.iterations,
+                profileCounts,
+            };
+        });
     }
     async runBenchmarks(source, options = {}) {
         return withRuntime(this.loadRuntime(source, 'bench'), (runtime) => executeFixedRuntimeBenchmarks(runtime, { ...DEFAULT_BENCHMARK_OPTIONS, ...options }));
-    }
-    async compileWithMode(source, mode, options = {}) {
-        return this.compileSource(source, { ...options, mode });
     }
     async compileSource(source, { mode = 'program', ...options } = {}) {
         const compiler = await this.getCompiler();
         return normalizeCompileArtifact(await compiler.compile(source, {
             ...options,
             mode,
-            runtimeWasmUrl: this.options.runtimeWasmPath,
             wasmUrl: this.options.grammarWasmPath,
+            runtimeWasmUrl: this.options.runtimeWasmPath,
         }));
     }
-    async loadRuntime(source, mode) {
+    loadRuntime(source, mode, compileOptions = {}, createImports = () => createWebImportProvider()) {
         return loadCompiledRuntime({
             source,
             mode,
             compileSource: (input, options = {}) => this.compileSource(input, options),
-            loadModule: (js) => importModule(js),
-            createImports: () => createWebImportProvider(),
+            loadModule: (shim) => loadWebModuleFromSource(shim, { formatError }),
+            createImports,
+            compileOptions,
         });
     }
     async getCompiler() {
@@ -68,48 +93,29 @@ export class WebCompilerHost {
     }
     async loadCompiler() {
         const source = await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true));
-        return importModule(new TextDecoder().decode(source));
+        return loadWebModuleFromSource(new TextDecoder().decode(source), { formatError });
     }
 }
-async function importModule(source) {
-    const errors = [];
-    const strategies = source.length > 1_000_000
-        ? [() => importBlobModule(source), () => importDataModule(source)]
-        : [() => importDataModule(source), () => importBlobModule(source)];
-    try {
-        for (const strategy of strategies) {
-            try {
-                return await strategy();
-            }
-            catch (error) {
-                errors.push(formatError(error));
-            }
-        }
-    }
-    catch {
-        // Unreachable, kept so TS preserves the structured control flow.
-    }
-    throw new Error(`Failed to import generated module.\n${errors.map((error, index) => `Attempt ${index + 1}: ${error}`).join('\n')}`);
+
+function createProfileImportProvider() {
+    const provider = createWebImportProvider();
+    const counts = [];
+    provider.imports.__utu_profile = {
+        tick(fid) {
+            counts[fid] = (counts[fid] ?? 0) + 1;
+        },
+    };
+    return {
+        ...provider,
+        resetProfile() {
+            counts.length = 0;
+        },
+        getProfile() {
+            return [...counts];
+        },
+    };
 }
-async function importBlobModule(source) {
-    const moduleUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-    try {
-        return (await import(moduleUrl));
-    }
-    finally {
-        URL.revokeObjectURL(moduleUrl);
-    }
-}
-async function importDataModule(source) {
-    return (await import(`data:text/javascript;base64,${base64Encode(source)}`));
-}
-function base64Encode(source) {
-    return base64EncodeBytes(new TextEncoder().encode(source));
-}
-function base64EncodeBytes(bytes) {
-    let binary = '';
-    for (let index = 0; index < bytes.length; index += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-    }
-    return btoa(binary);
+
+function mergeCounts(target, values) {
+    for (let i = 0; i < values.length; i += 1) target[i] = (target[i] ?? 0) + (values[i] ?? 0);
 }

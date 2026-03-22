@@ -20,8 +20,9 @@ Const struct fields lower to non-mut Wasm fields. Mut struct fields lower to
 
 == 12.3 Function Lowering
 
-Functions lower directly to Wasm functions. Parameters become locals. The
-implicit return, the last expression, is left on the value stack. The pipe
+Functions lower directly to Wasm functions. Parameters become locals.
+Semicolons terminate expressions, but the last expression in a typed function
+or block is still left on the value stack as the implicit return. The pipe
 operator `-o` is desugared to nested function calls during lowering. `let`
 bindings become `local.set` / `local.get` pairs.
 
@@ -32,7 +33,7 @@ declaration order. However, `local.set` pops from the top of the stack, so the
 compiler must set bindings in *reverse order*:
 
 ```utu
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```
 
 Wasm lowering:

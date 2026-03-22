@@ -1,6 +1,4 @@
-import extern "es" console_log(str)
-
-export fn main() {
-    assert true
-    "ok" -o console_log
+export fun main() str {
+    assert true;
+    "ok";
 }

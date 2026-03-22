@@ -2,6 +2,6 @@ struct Box {
     value: i32,
 }
 
-fn bad() Box {
-    ref.null Box
+fun bad() Box {
+    ref.null Box;
 }

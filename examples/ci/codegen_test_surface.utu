@@ -1,20 +1,20 @@
-fn add(a: i32, b: i32) i32 {
-    a + b
+fun add(a: i32, b: i32) i32 {
+    a + b;
 }
 
 test "top-level tests become synthesized exports" {
-    assert add(4, 5) == 9
+    assert add(4, 5) == 9;
 }
 
 test "tests share helpers inside one file" {
-    assert add(-1, 1) == 0
+    assert add(-1, 1) == 0;
 }
 
 bench "increment loop" |i| {
     setup {
-        let total: i32 = 0
+        let total: i32 = 0;
         measure {
-            total = total + i
+            total = total + i;
         }
     }
 }

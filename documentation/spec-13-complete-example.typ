@@ -11,59 +11,49 @@ struct Todo {
 type Filter =
     | All
     | Active
-    | Completed
-
-// --- imports ---
-
-import extern "es" console_log(str)
-import extern "es" fetch(str) str # null
+    | Completed;
 
 // --- functions ---
 
-fn new_todo(text: str) Todo {
-    Todo { text: text, done: false }
+fun new_todo(text: str) Todo {
+    Todo { text: text, done: false };
 }
 
-fn toggle(todo: Todo) {
-    todo.done = not todo.done
+fun toggle(todo: Todo) void {
+    todo.done = not todo.done;
 }
 
-fn matches(todo: Todo, filter: Filter) bool {
+fun matches(todo: Todo, filter: Filter) bool {
     alt filter {
         _: All => true,
         _: Active => not todo.done,
         _: Completed => todo.done,
-    }
+    };
 }
 
-fn count(todos: array[Todo], filter: Filter) i32 {
-    let n: i32 = 0
+fun count(todos: array[Todo], filter: Filter) i32 {
+    let n: i32 = 0;
     for (0..array.len(todos)) |i| {
         if matches(todos[i], filter) {
-            n = n + 1
-        }
-    }
-    n
+            n = n + 1;
+        };
+    };
+    n;
 }
 
-export fn main() {
+export fun main() str {
     let todos: array[Todo] = array[Todo].new_fixed(
         new_todo("learn utu"),
         new_todo("build compiler"),
         new_todo("ship it"),
-    )
+    );
 
-    toggle(todos[0])
+    toggle(todos[0]);
 
-    let active: i32 = count(todos, Active {})
+    let active: i32 = count(todos, Active {});
+    let label: str # null = if active > 0 { "active"; } else { null; };
+    let text: str = label \ "idle";
 
-    // Nullable import + force unwrap
-    let data: str = fetch("/api/data") \ fatal
-    data -o console_log
-
-    // Piped string concat
-    "hello"
-    -o str.concat(_, " world")
-    -o console_log
+    text -o str.concat(_, " todos");
 }
 ```

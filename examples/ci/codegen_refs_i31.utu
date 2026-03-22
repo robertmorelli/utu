@@ -2,46 +2,46 @@ struct Box {
     value: i32,
 }
 
-fn checked_value() i32 {
-    let box: Box = Box { value: 7 }
-    let checked: Box = ref.as_non_null(box)
-    if ref.eq(box, checked) { checked.value } else { 0 }
+fun checked_value() i32 {
+    let box: Box = Box { value: 7 };
+    let checked: Box = ref.as_non_null(box);
+    if ref.eq(box, checked) { checked.value; } else { 0; };
 }
 
-fn nullable_box(flag: bool) Box # null {
-    if flag { Box { value: 9 } } else { ref.null Box }
+fun nullable_box(flag: bool) Box # null {
+    if flag { Box { value: 9 }; } else { ref.null Box; };
 }
 
-fn null_status(flag: bool) bool {
-    ref.is_null(nullable_box(flag))
+fun null_status(flag: bool) bool {
+    ref.is_null(nullable_box(flag));
 }
 
-fn signed_box() i32 {
-    let boxed: i31 = i31.new(-7)
-    i31.get_s(boxed)
+fun signed_box() i32 {
+    let boxed: i31 = i31.new(-7);
+    i31.get_s(boxed);
 }
 
-fn unsigned_box() i32 {
-    let boxed: i31 = i31.new(255)
-    i31.get_u(boxed)
+fun unsigned_box() i32 {
+    let boxed: i31 = i31.new(255);
+    i31.get_u(boxed);
 }
 
 test "ref.as_non_null keeps non-null references" {
-    assert checked_value() == 7
+    assert checked_value() == 7;
 }
 
 test "ref.is_null can see nullable references" {
-    assert null_status(false)
+    assert null_status(false);
 }
 
 test "ref.is_null distinguishes non-null references" {
-    assert not null_status(true)
+    assert not null_status(true);
 }
 
 test "i31 signed unboxing preserves sign" {
-    assert signed_box() == -7
+    assert signed_box() == -7;
 }
 
 test "i31 unsigned unboxing preserves payload" {
-    assert unsigned_box() == 255
+    assert unsigned_box() == 255;
 }

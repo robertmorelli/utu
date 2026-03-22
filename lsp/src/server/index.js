@@ -1,8 +1,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { UtuParserService } from '../../../compiler/parser.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../core/languageService.js';
-import { UtuParserService } from '../core/parser.js';
 import { clamp, getDocumentUri, } from '../core/types.js';
 const DEFAULT_SERVER_CAPABILITIES = {
     hover: true,

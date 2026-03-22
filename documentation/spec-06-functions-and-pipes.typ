@@ -3,24 +3,24 @@
 == 6.1 Function Definitions
 
 Functions list parameters in parentheses followed directly by the return type,
-with no `->` arrow. Implicit return of the last expression follows Rust
-conventions. Parameters are unrestricted and implicitly reusable because they
-are named. Void functions omit the return type.
+with no `->` arrow. Semicolons terminate expressions, but the last expression
+in a non-void block still supplies the implicit return value. Parameters are
+unrestricted and implicitly reusable because they are named. Void functions
+spell that explicitly with `void`.
 
 ```utu
-fn add(a: i32, b: i32) i32 {
-    a + b    // implicit return
+fun add(a: i32, b: i32) i32 {
+    a + b;    // implicit return
 }
 
-fn clamp(val: f32, lo: f32, hi: f32) f32 {
-    if val < lo { lo }
-    else if val > hi { hi }
-    else { val }
+fun clamp(val: f32, lo: f32, hi: f32) f32 {
+    if val < lo { lo; }
+    else if val > hi { hi; }
+    else { val; };
 }
 
-// Void functions omit the return type
-fn greet(name: str) {
-    name -o console_log
+fun check(value: bool) void {
+    assert value;
 }
 ```
 
@@ -33,31 +33,30 @@ For *single-argument* functions, the pipe target is just the function name:
 there are no parentheses and no underscore.
 
 ```utu
-a -o f -o g
+a -o f -o g;
 
 // Equivalent to: g(f(a))
 ```
 
 For *multi-argument* functions, use parentheses with `_` marking where the
-piped value goes:
+piped value goes. A pipe target may contain at most one `_` placeholder:
 
 ```utu
 a
 -o f
--o z(_, c, d)
+-o z(_, c, d);
 
 // Equivalent to: z(f(a), c, d)
 
 // _ can appear in any argument position
-x -o clamp(0.0, _, 1.0)
+x -o clamp(0.0, _, 1.0);
 ```
 
 *Chained example:*
 
 ```utu
 "hello"
--o str.concat(_, " world")
--o console_log
+-o str.concat(_, " world");
 ```
 
 *Wasm lowering:* The pipe is pure syntactic sugar. `a -o f` desugars to `f(a)`.
@@ -72,13 +71,13 @@ inlining and skip the binding.
 
 ```utu
 // Reusable binding (type always required)
-let config: Config = load_config()
-init(config)
-validate(config)   // used again — fine, it's let-bound
+let config: Config = load_config();
+init(config);
+validate(config);   // used again — fine, it's let-bound
 
 // No binding needed for single use
-load_config() -o init
+load_config() -o init;
 
 // Destructuring multi-return
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```

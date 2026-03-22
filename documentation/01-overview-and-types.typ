@@ -73,7 +73,7 @@ Reference types map directly onto WasmGC heap references:
 - `i31` maps to `i31ref`
 - `eqref` is used for structurally comparable references
 
-The `fn(A) B` surface is reserved for planned first-class function references.
+The `fun(A) B` surface is reserved for planned first-class function references.
 The parser understands that syntax, but the current compiler does not yet
 support function references end to end as part of the stable subset.
 
@@ -124,7 +124,7 @@ subtype per variant, and pattern matching becomes a `br_on_cast` chain.
 type Shape =
     | Circle { radius: f32 }
     | Rect { w: f32, h: f32 }
-    | Triangle { a: f32, b: f32, c: f32 }
+    | Triangle { a: f32, b: f32, c: f32 };
 ```
 
 ```wasm
@@ -145,7 +145,9 @@ The `#` operator expresses an exclusive result: exactly one branch is present.
 In practice, this is Utu's error return mechanism.
 
 ```utu
-fn divide(a: i32, b: i32) i32 # DivError
+fun divide(a: i32, b: i32) i32 # DivError {
+    fatal;
+}
 ```
 
 The Wasm signature becomes a multi-value return with complementary nullability:
@@ -158,18 +160,16 @@ The Wasm signature becomes a multi-value return with complementary nullability:
 The contract is semantic rather than structural: exactly one result must be
 non-null at runtime.
 
-The current compiler also accepts `A # B` on import signatures:
+The same `A # B` spelling is used on ES host imports:
 
 ```utu
-import extern "es" fetch(str) Response # null
-import extern "es" fetch(str) Response # ApiError
+shimport "es" fetch(str) Response # null;
+shimport "es" fetch(str) Response # ApiError;
 ```
 
-Today those imports still lower to direct Wasm multi-value signatures. In the
-generated JS wrapper, throws from nullable-compatible imports are temporarily
-converted into null placeholders instead. `T # null` receives `null`, while
-reference-shaped `T # E` currently receives `[null, null]`. Structured typed
-error mapping is still planned.
+Those imports still lower to direct Wasm multi-value signatures. The source
+language keeps the error and nullable cases explicit instead of introducing
+hidden exceptions.
 
 Nullable references are just the same idea with `null` as the alternative:
 
@@ -180,9 +180,9 @@ The current compiler supports both force unwrap and fallback on nullable
 references:
 
 ```utu
-let val: Thing = get_thing() \ fatal
-let cached: Response = fetch(url) \ cached_response
-let data: Response = fetch(url) \ fatal
+let val: Thing = get_thing() \ fatal;
+let cached: Response = fetch(url) \ cached_response;
+let data: Response = fetch(url) \ fatal;
 ```
 
 - `expr \ fatal` force unwraps and traps on null
@@ -201,11 +201,11 @@ The tensor operator `,` means "have both values at once". Functions can return
 multiple values directly, which maps naturally onto Wasm multi-value returns.
 
 ```utu
-fn divmod(a: i32, b: i32) i32, i32 {
-    a / b, a % b
+fun divmod(a: i32, b: i32) i32, i32 {
+    (a / b, a % b);
 }
 
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```
 
 Unlike `#`, a tensor return does not represent alternatives. Every component is

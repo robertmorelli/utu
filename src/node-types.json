@@ -48,6 +48,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -110,6 +114,10 @@
         {
           "type": "unary_expr",
           "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
         }
       ]
     }
@@ -167,6 +175,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -224,6 +236,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -278,6 +294,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -335,6 +355,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -428,6 +452,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -485,6 +513,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -539,6 +571,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -596,6 +632,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -688,6 +728,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -745,6 +789,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -803,6 +851,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -860,6 +912,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -949,6 +1005,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1006,6 +1066,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -1025,117 +1089,6 @@
         },
         {
           "type": "identifier",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "break_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
-          "named": true
-        },
-        {
-          "type": "assert_expr",
-          "named": true
-        },
-        {
-          "type": "assign_expr",
-          "named": true
-        },
-        {
-          "type": "binary_expr",
-          "named": true
-        },
-        {
-          "type": "bind_expr",
-          "named": true
-        },
-        {
-          "type": "block_expr",
-          "named": true
-        },
-        {
-          "type": "break_expr",
-          "named": true
-        },
-        {
-          "type": "call_expr",
-          "named": true
-        },
-        {
-          "type": "else_expr",
-          "named": true
-        },
-        {
-          "type": "fatal_expr",
-          "named": true
-        },
-        {
-          "type": "field_expr",
-          "named": true
-        },
-        {
-          "type": "for_expr",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "if_expr",
-          "named": true
-        },
-        {
-          "type": "index_expr",
-          "named": true
-        },
-        {
-          "type": "literal",
-          "named": true
-        },
-        {
-          "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
-          "named": true
-        },
-        {
-          "type": "paren_expr",
-          "named": true
-        },
-        {
-          "type": "pipe_expr",
-          "named": true
-        },
-        {
-          "type": "ref_null_expr",
-          "named": true
-        },
-        {
-          "type": "struct_init",
-          "named": true
-        },
-        {
-          "type": "tuple_expr",
-          "named": true
-        },
-        {
-          "type": "unary_expr",
           "named": true
         }
       ]
@@ -1194,6 +1147,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1251,6 +1208,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -1320,6 +1281,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1377,6 +1342,129 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "emit_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_expr",
+          "named": true
+        },
+        {
+          "type": "array_init",
+          "named": true
+        },
+        {
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
+          "named": true
+        },
+        {
+          "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "ref_null_expr",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -1481,6 +1569,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1538,6 +1630,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -1592,6 +1688,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1649,6 +1749,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -1768,6 +1872,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1825,6 +1933,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -1913,6 +2025,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -1991,6 +2107,10 @@
         {
           "type": "unary_expr",
           "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
         }
       ]
     }
@@ -2053,6 +2173,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -2110,6 +2234,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -2246,6 +2374,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -2303,6 +2435,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -2384,6 +2520,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -2446,6 +2586,10 @@
         {
           "type": "unary_expr",
           "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
         }
       ]
     }
@@ -2496,6 +2640,10 @@
         },
         {
           "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "emit_expr",
           "named": true
         },
         {
@@ -2560,6 +2708,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -2763,6 +2915,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -2820,6 +2976,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -2862,7 +3022,7 @@
     "fields": {},
     "children": {
       "multiple": false,
-      "required": false,
+      "required": true,
       "types": [
         {
           "type": "alt_expr",
@@ -2902,6 +3062,10 @@
         },
         {
           "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "emit_expr",
           "named": true
         },
         {
@@ -2963,6 +3127,10 @@
         {
           "type": "unary_expr",
           "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
         }
       ]
     }
@@ -2972,11 +3140,49 @@
     "named": true,
     "fields": {},
     "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "pipe_args_no_placeholder",
+          "named": true
+        },
+        {
+          "type": "pipe_args_with_placeholder",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "pipe_args_no_placeholder",
+    "named": true,
+    "fields": {},
+    "children": {
       "multiple": true,
       "required": true,
       "types": [
         {
           "type": "pipe_arg",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "pipe_args_with_placeholder",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "pipe_arg",
+          "named": true
+        },
+        {
+          "type": "pipe_arg_placeholder",
           "named": true
         }
       ]
@@ -3028,6 +3234,10 @@
         },
         {
           "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "emit_expr",
           "named": true
         },
         {
@@ -3092,6 +3302,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -3193,6 +3407,10 @@
         {
           "type": "scalar_type",
           "named": true
+        },
+        {
+          "type": "void_type",
+          "named": true
         }
       ]
     }
@@ -3248,6 +3466,10 @@
         },
         {
           "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "emit_expr",
           "named": true
         },
         {
@@ -3312,6 +3534,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -3467,6 +3693,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -3524,6 +3754,10 @@
         },
         {
           "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -3628,6 +3862,10 @@
           "named": true
         },
         {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
           "type": "fatal_expr",
           "named": true
         },
@@ -3690,6 +3928,10 @@
         {
           "type": "unary_op",
           "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
         }
       ]
     }
@@ -3728,6 +3970,129 @@
       "types": [
         {
           "type": "variant",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "while_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_expr",
+          "named": true
+        },
+        {
+          "type": "array_init",
+          "named": true
+        },
+        {
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "emit_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
+          "named": true
+        },
+        {
+          "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "ref_null_expr",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
           "named": true
         }
       ]
@@ -3791,6 +4156,10 @@
   },
   {
     "type": ":",
+    "named": false
+  },
+  {
+    "type": ";",
     "named": false
   },
   {
@@ -3890,8 +4259,8 @@
     "named": true
   },
   {
-    "type": "break",
-    "named": false
+    "type": "break_expr",
+    "named": true
   },
   {
     "type": "comment",
@@ -3900,6 +4269,10 @@
   },
   {
     "type": "else",
+    "named": false
+  },
+  {
+    "type": "emit",
     "named": false
   },
   {
@@ -3939,11 +4312,11 @@
     "named": true
   },
   {
-    "type": "fn",
+    "type": "for",
     "named": false
   },
   {
-    "type": "for",
+    "type": "fun",
     "named": false
   },
   {
@@ -3960,10 +4333,6 @@
   },
   {
     "type": "if",
-    "named": false
-  },
-  {
-    "type": "import",
     "named": false
   },
   {
@@ -4003,11 +4372,19 @@
     "named": false
   },
   {
+    "type": "pipe_arg_placeholder",
+    "named": true
+  },
+  {
     "type": "ref",
     "named": false
   },
   {
     "type": "setup",
+    "named": false
+  },
+  {
+    "type": "shimport",
     "named": false
   },
   {
@@ -4048,6 +4425,14 @@
   },
   {
     "type": "v128",
+    "named": false
+  },
+  {
+    "type": "void_type",
+    "named": true
+  },
+  {
+    "type": "while",
     "named": false
   },
   {

@@ -56,7 +56,7 @@ remainder, comparison, and conversion instructions.
 - `i31` maps to `i31ref`, a 31-bit tagged integer
 - `eqref` maps to `eqref`, a structurally comparable reference
 
-The `fn(A) B` syntax is reserved for planned first-class function references.
+The `fun(A) B` syntax is reserved for planned first-class function references.
 The grammar accepts it, but the current compiler does not yet support that
 surface as part of the stable implemented subset.
 
@@ -108,7 +108,7 @@ common supertype and subtypes for each variant. Pattern matching lowers to
 type Shape =
     | Circle { radius: f32 }
     | Rect { w: f32, h: f32 }
-    | Triangle { a: f32, b: f32, c: f32 }
+    | Triangle { a: f32, b: f32, c: f32 };
 ```
 
 *Wasm lowering:*
@@ -128,7 +128,9 @@ This is the error handling mechanism. It maps to Wasm multi-value return with
 complementary nullability.
 
 ```utu
-fn divide(a: i32, b: i32) i32 # DivError
+fun divide(a: i32, b: i32) i32 # DivError {
+    fatal;
+}
 
 // Wasm signature:
 // (func $divide (param i32 i32)
@@ -136,32 +138,26 @@ fn divide(a: i32, b: i32) i32 # DivError
 // Contract: exactly one result is non-null
 ```
 
-The current compiler also accepts `A # B` on import signatures. The Wasm import
-surface is still a direct multi-value signature, but the generated JS wrapper
-now catches throws for nullable-compatible result shapes and substitutes null
-placeholders. `T # null` imports receive `null`; reference-shaped `T # E`
-imports currently receive `[null, null]`. That keeps nullable fallback working
-today, but it does not yet construct a typed error value. Structured JS-to-Utu
-error mapping is still a planned feature.
+The same `A # B` spelling is used for ordinary function returns. At runtime the
+compiler lowers it to a direct multi-value Wasm signature with complementary
+nullability. That keeps nullable fallback and explicit branching in the source
+surface without introducing a separate exception system.
 
 ```utu
-// Thrown JS exceptions become null in the generated JS wrapper
-import extern "es" fetch(str) Response # null
-
-// Thrown JS exceptions currently become [null, null] here
-import extern "es" fetch(str) Response # ApiError
+shimport "es" fetch(str) Response # null;
+shimport "es" fetch(str) Response # ApiError;
 
 // Call site — nullable fallback and null checks work today:
-let resp: Response # null, err: ApiError # null = fetch(url)
+let resp: Response # null, err: ApiError # null = fetch(url);
 if not ref.is_null(err) {
-    // host-provided typed error path
+    // typed error path
 } else {
     if ref.is_null(resp) {
-        // temporary JS-throw placeholder path
+        // empty result path
     } else {
         // resp is non-null here
-    }
-}
+    };
+};
 ```
 
 === 2.6.1 Nullable Types
@@ -182,13 +178,13 @@ references.
 
 ```utu
 // Force unwrap — trap if null (\ fatal)
-let val: Thing = get_thing() \ fatal
+let val: Thing = get_thing() \ fatal;
 
 // Nullable fallback
-let cached: Response = fetch(url) \ default_response
+let cached: Response = fetch(url) \ default_response;
 
 // Nullable import + force unwrap
-let resp: Response = fetch(url) \ fatal
+let resp: Response = fetch(url) \ fatal;
 ```
 
 Both forms are implemented today:
@@ -211,11 +207,11 @@ multi-value return. Unlike `#`, all values are non-null; tensor means you have
 both.
 
 ```utu
-fn divmod(a: i32, b: i32) i32, i32 {
-    a / b, a % b
+fun divmod(a: i32, b: i32) i32, i32 {
+    (a / b, a % b);
 }
 
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```
 
 == 2.8 Assertions, Tests, And Benchmarks
@@ -223,17 +219,17 @@ let q: i32, r: i32 = divmod(10, 3)
 Utu also supports a compact in-source testing surface:
 
 ```utu
-assert cond
+assert cond;
 
 test "adds two numbers" {
-    assert add(2, 2) == 4
+    assert add(2, 2) == 4;
 }
 
 bench "sum loop" |i| {
     setup {
-        let total: i32 = 0
+        let total: i32 = 0;
         measure {
-            total = total + i
+            total = total + i;
         }
     }
 }

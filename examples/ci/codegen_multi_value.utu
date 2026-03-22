@@ -1,31 +1,31 @@
-fn divmod(a: i32, b: i32) i32, i32 {
-    a / b, a % b
+fun divmod(a: i32, b: i32) i32, i32 {
+    (a / b, a % b);
 }
 
-fn pack_divmod(a: i32, b: i32) i32 {
-    let q: i32, r: i32 = divmod(a, b)
-    q * 10 + r
+fun pack_divmod(a: i32, b: i32) i32 {
+    let q: i32, r: i32 = divmod(a, b);
+    q * 10 + r;
 }
 
-fn reorder(a: i32, b: i32) i32, i32, i32 {
-    a + b, a - b, a * b
+fun reorder(a: i32, b: i32) i32, i32, i32 {
+    (a + b, a - b, a * b);
 }
 
-fn pack_reorder(a: i32, b: i32) i32 {
-    let sum: i32, diff: i32, prod: i32 = reorder(a, b)
-    sum + diff + prod
+fun pack_reorder(a: i32, b: i32) i32 {
+    let sum: i32, diff: i32, prod: i32 = reorder(a, b);
+    sum + diff + prod;
 }
 
 test "two-value returns bind in source order" {
-    assert pack_divmod(17, 5) == 32
+    assert pack_divmod(17, 5) == 32;
 }
 
 test "direct bindings can inspect both return values" {
-    let q: i32, r: i32 = divmod(20, 5)
-    assert q == 4
-    assert r == 0
+    let q: i32, r: i32 = divmod(20, 5);
+    assert q == 4;
+    assert r == 0;
 }
 
 test "three-value returns also bind in reverse stack order" {
-    assert pack_reorder(3, 2) == 12
+    assert pack_reorder(3, 2) == 12;
 }

@@ -13,8 +13,6 @@ const grammarDest = resolve(distRoot, 'tree-sitter-utu.wasm');
 const grammarCandidates = [
   '',
   'vscode',
-  'cli_artifact',
-  'web_artifact',
 ].map((path) => resolve(repoRoot, path, 'tree-sitter-utu.wasm'));
 
 await mkdir(distRoot, { recursive: true });

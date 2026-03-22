@@ -42,3 +42,6 @@ spec.md
 vscode/.npm-cache
 lsp/.npm-cache
 cli_artifact/.npm-cache
+benchmarks/rust_deltablue/target
+benchmarks/rust_deltablue_arena/target
+.emscripten-cache

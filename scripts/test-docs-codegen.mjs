@@ -6,7 +6,7 @@ import { compile } from '../compiler/index.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
-const wasmUrl = pathToFileURL(resolve(repoRoot, 'cli_artifact/tree-sitter-utu.wasm'));
+const wasmUrl = pathToFileURL(resolve(repoRoot, 'tree-sitter-utu.wasm'));
 
 const cases = [
     {

@@ -1,68 +1,79 @@
-import extern "es" math_sin(f64) f64
-import extern "es" math_cos(f64) f64
-import extern "es" math_sqrt(f64) f64
-
 struct Point {
     mut x: f64,
     mut y: f64,
     mut z: f64,
 }
 
-let points: i32 = 200000
+let points: i32 = 200000;
 
-fn new_point(i: f64) Point {
-    let x: f64 = math_sin(i)
+fun sqrt_newton(value: f64) f64 {
+    if value <= 0.0 {
+        0.0;
+    } else {
+        let guess: f64 = if value > 1.0 { value; } else { 1.0; };
+        let i: i32 = 0;
+        while (i < 16) {
+            guess = 0.5 * (guess + value / guess);
+            i = i + 1;
+        };
+        guess;
+    };
+}
+
+fun new_point(i: f64) Point {
+    let base: f64 = i + 1.0;
+    let x: f64 = base / 3.0;
     Point {
         x: x,
-        y: math_cos(i) * 3.0,
-        z: (x * x) / 2.0,
-    }
+        y: (base + 2.0) / 5.0,
+        z: (base + 4.0) / 7.0,
+    };
 }
 
-fn normalize(point: Point) Point {
-    let norm: f64 = math_sqrt(point.x * point.x + point.y * point.y + point.z * point.z)
-    point.x = point.x / norm
-    point.y = point.y / norm
-    point.z = point.z / norm
-    point
+fun normalize(point: Point) Point {
+    let norm: f64 = sqrt_newton(point.x * point.x + point.y * point.y + point.z * point.z);
+    point.x = point.x / norm;
+    point.y = point.y / norm;
+    point.z = point.z / norm;
+    point;
 }
 
-fn maximize_point(left: Point, right: Point) Point {
-    left.x = if left.x > right.x { left.x } else { right.x }
-    left.y = if left.y > right.y { left.y } else { right.y }
-    left.z = if left.z > right.z { left.z } else { right.z }
-    left
+fun maximize_point(left: Point, right: Point) Point {
+    left.x = if left.x > right.x { left.x; } else { right.x; };
+    left.y = if left.y > right.y { left.y; } else { right.y; };
+    left.z = if left.z > right.z { left.z; } else { right.z; };
+    left;
 }
 
-fn benchmark(n: i32) Point {
-    let origin: Point = Point { x: 0.0, y: 0.0, z: 0.0 }
-    let points: array[Point] = array[Point].new(n, origin)
-    let ifloat: f64 = 0.0
+fun benchmark(n: i32) Point {
+    let origin: Point = Point { x: 0.0, y: 0.0, z: 0.0 };
+    let points: array[Point] = array[Point].new(n, origin);
+    let ifloat: f64 = 0.0;
     for (0..n) |i| {
-        points[i] = new_point(ifloat)
-        ifloat = ifloat + 1.0
-    }
+        points[i] = new_point(ifloat);
+        ifloat = ifloat + 1.0;
+    };
 
     for (0..n) |i| {
-        points[i] = normalize(points[i])
-    }
+        points[i] = normalize(points[i]);
+    };
 
-    let best: Point = points[0]
+    let best: Point = points[0];
     for (1..n) |i| {
-        best = maximize_point(best, points[i])
-    }
-    best
+        best = maximize_point(best, points[i]);
+    };
+    best;
 }
 
 bench "float normalize" |i| {
     setup {
         measure {
-            benchmark(256)
+            benchmark(256);
         }
     }
 }
 
-export fn main() f64 {
-    let best: Point = benchmark(points)
-    best.x
+export fun main() f64 {
+    let best: Point = benchmark(points);
+    best.x;
 }

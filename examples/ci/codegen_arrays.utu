@@ -1,49 +1,49 @@
-fn first_plus_len(xs: array[i32]) i32 {
-    let first: i32 = xs[0]
-    first + array.len(xs)
+fun first_plus_len(xs: array[i32]) i32 {
+    let first: i32 = xs[0];
+    first + array.len(xs);
 }
 
-fn filled_sum() i32 {
-    let xs: array[i32] = array[i32].new(4, 3)
-    xs[0] + xs[3] + array.len(xs)
+fun filled_sum() i32 {
+    let xs: array[i32] = array[i32].new(4, 3);
+    xs[0] + xs[3] + array.len(xs);
 }
 
-fn fixed_sum() i32 {
-    let xs: array[i32] = array[i32].new_fixed(4, 5, 6)
-    xs[0] + xs[1] + xs[2]
+fun fixed_sum() i32 {
+    let xs: array[i32] = array[i32].new_fixed(4, 5, 6);
+    xs[0] + xs[1] + xs[2];
 }
 
-fn default_write() i32 {
-    let xs: array[i32] = array[i32].new_default(3)
-    xs[1] = 9
-    xs[1]
+fun default_write() i32 {
+    let xs: array[i32] = array[i32].new_default(3);
+    xs[1] = 9;
+    xs[1];
 }
 
-fn copy_and_fill_total() i32 {
-    let src: array[i32] = array[i32].new_fixed(1, 2, 3, 4)
-    let dst: array[i32] = array[i32].new_default(4)
-    array.copy(dst, 0, src, 0, 4)
-    array.fill(dst, 1, 7, 2)
-    dst[0] + dst[1] + dst[2] + dst[3]
+fun copy_and_fill_total() i32 {
+    let src: array[i32] = array[i32].new_fixed(1, 2, 3, 4);
+    let dst: array[i32] = array[i32].new_default(4);
+    array.copy(dst, 0, src, 0, 4);
+    array.fill(dst, 1, 7, 2);
+    dst[0] + dst[1] + dst[2] + dst[3];
 }
 
 test "array get and len compose" {
-    let xs: array[i32] = array[i32].new_fixed(4, 5, 6)
-    assert first_plus_len(xs) == 7
+    let xs: array[i32] = array[i32].new_fixed(4, 5, 6);
+    assert first_plus_len(xs) == 7;
 }
 
 test "array.new fills every slot from one value" {
-    assert filled_sum() == 10
+    assert filled_sum() == 10;
 }
 
 test "array.new_fixed keeps literal values in order" {
-    assert fixed_sum() == 15
+    assert fixed_sum() == 15;
 }
 
 test "array.new_default pairs with indexed writes" {
-    assert default_write() == 9
+    assert default_write() == 9;
 }
 
 test "array.copy and array.fill update ranges" {
-    assert copy_and_fill_total() == 19
+    assert copy_and_fill_total() == 19;
 }

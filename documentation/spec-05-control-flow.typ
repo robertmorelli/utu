@@ -7,7 +7,7 @@ instruction. There is no lowering gap: what you write is what gets emitted.
 
 ```utu
 // if-else expression (like Rust, evaluates to a value)
-let max: i32 = if a > b { a } else { b }
+let max: i32 = if a > b { a; } else { b; };
 
 // Wasm lowering:
 // (if (result i32) (i32.gt_s (local.get $a) (local.get $b))
@@ -17,24 +17,24 @@ let max: i32 = if a > b { a } else { b }
 
 == 5.2 Loops
 
-Zig-style `for` loops. The loop header takes iterables or ranges in
-parentheses, and captures are bound in `|...|` after the closing paren.
+Range `for` loops pair with condition-style `while` loops. `for` takes a
+range in parentheses and binds captures in `|...|` after the closing paren.
 
 ```utu
 // Counted loop — range + capture
 for (0..n) |i| {
-    sum = sum + i
-}
+    sum = sum + i;
+};
 
-// While-style loop (condition only, no capture)
-for (cond()) {
-    body()
-}
+// While-style loop (condition only)
+while (cond()) {
+    body();
+};
 
 // Infinite loop (empty parens)
-for () {
-    if done() { break }
-}
+while () {
+    if done() { break; };
+};
 ```
 
 Today the compiler lowers one source/capture pair. The parser accepts
@@ -57,15 +57,16 @@ defined lowering.
 == 5.3 Blocks with Return
 
 Rust-style labeled blocks that evaluate to a value. Labels are bare
-identifiers, with no tick prefix. This maps to Wasm `block` with `br`.
+identifiers, with no tick prefix. `emit expr` exits the current labeled block
+with a value, while plain `break` remains loop-only.
 
 ```utu
 let result: i32 = compute: {
     if shortcut() {
-        break compute 42
-    }
-    expensive_calculation()
-}
+        emit 42;
+    };
+    expensive_calculation();
+};
 
 // Wasm lowering:
 // (block $compute (result i32)
@@ -85,7 +86,7 @@ alt shape {
     s: Circle => area_circle(s),
     s: Rect => area_rect(s),
     s: Triangle => area_tri(s),
-}
+};
 ```
 
 *Wasm lowering for type match:*
@@ -108,5 +109,5 @@ alt shape {
 
 ```utu
 // Source-level trap keyword. Lowers directly to (unreachable)
-fatal
+fatal;
 ```

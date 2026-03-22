@@ -1,11 +1,11 @@
-fn fail_now() {
-    fatal
+fun fail_now() void {
+    fatal;
 }
 
-fn assert_even(x: i32) {
-    assert x % 2 == 0
+fun assert_even(x: i32) void {
+    assert x % 2 == 0;
 }
 
-export fn main() {
-    assert_even(4)
+export fun main() void {
+    assert_even(4);
 }

@@ -1,65 +1,65 @@
-fn max(a: i32, b: i32) i32 {
-    if a > b { a } else { b }
+fun max(a: i32, b: i32) i32 {
+    if a > b { a; } else { b; };
 }
 
-fn sum_to(n: i32) i32 {
-    let sum: i32 = 0
+fun sum_to(n: i32) i32 {
+    let sum: i32 = 0;
     for (0..n) |i| {
-        sum = sum + i
-    }
-    sum
+        sum = sum + i;
+    };
+    sum;
 }
 
-fn countdown_total(n: i32) i32 {
-    let cur: i32 = n
-    let total: i32 = 0
-    for (cur > 0) {
-        total = total + cur
-        cur = cur - 1
-    }
-    total
+fun countdown_total(n: i32) i32 {
+    let cur: i32 = n;
+    let total: i32 = 0;
+    while (cur > 0) {
+        total = total + cur;
+        cur = cur - 1;
+    };
+    total;
 }
 
-fn first_over(limit: i32, threshold: i32) i32 {
+fun first_over(limit: i32, threshold: i32) i32 {
     search: {
         for (0..limit) |i| {
             if i > threshold {
-                break search i
-            }
-        }
-        0 - 1
-    }
+                emit i;
+            };
+        };
+        0 - 1;
+    };
 }
 
-fn spin_until(limit: i32) i32 {
-    let i: i32 = 0
+fun spin_until(limit: i32) i32 {
+    let i: i32 = 0;
     done: {
-        for () {
-            i = i + 1
+        while () {
+            i = i + 1;
             if i == limit {
-                break done i
-            }
-        }
-        0
-    }
+                emit i;
+            };
+        };
+        0;
+    };
 }
 
 test "if expressions return values" {
-    assert max(9, 4) == 9
+    assert max(9, 4) == 9;
 }
 
 test "counted loops sum ranges" {
-    assert sum_to(5) == 10
+    assert sum_to(5) == 10;
 }
 
-test "condition loops re-check mutable locals" {
-    assert countdown_total(4) == 10
+test "while loops re-check mutable locals" {
+    assert countdown_total(4) == 10;
 }
 
 test "labeled blocks can return early from nested loops" {
-    assert first_over(8, 4) == 5
+    assert first_over(8, 4) == 5;
 }
 
-test "infinite loops can break with a value" {
-    assert spin_until(6) == 6
+test "infinite while loops can emit a value" {
+    assert spin_until(6) == 6;
 }

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UTU Playground</title>
+  <script type="importmap">{"imports": {"web-tree-sitter": "./web-tree-sitter.js"}}</script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: "Iosevka Web", "IBM Plex Mono", monospace;
+      background:
+        radial-gradient(circle at top left, rgba(93, 203, 255, 0.18), transparent 32%),
+        linear-gradient(180deg, #09111c, #0d1726 42%, #0b1320);
+      color: #eaf2ff;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: #c0d2ef;
+      max-width: 720px;
+    }
+
+    textarea,
+    pre {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid rgba(175, 212, 255, 0.18);
+      border-radius: 14px;
+      background: rgba(8, 14, 24, 0.78);
+      color: #f5f8ff;
+      padding: 14px 16px;
+      font: 15px/1.5 "Iosevka Web", "IBM Plex Mono", monospace;
+      box-shadow: 0 14px 48px rgba(0, 0, 0, 0.28);
+    }
+
+    textarea {
+      min-height: 320px;
+      resize: vertical;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin: 12px 0;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font: inherit;
+      color: #08111c;
+      background: linear-gradient(135deg, #96f0ff, #7ad7ff);
+      cursor: pointer;
+    }
+
+    .hint {
+      color: #9db5d4;
+      font-size: 14px;
+    }
+
+    pre {
+      min-height: 84px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <nav>
+      <a href="./web_artifact/docs.html">guide docs</a>
+      <a href="./web_artifact/spec.html">canonical spec</a>
+    </nav>
+
+    <h1>UTU Playground</h1>
+    <p>Serve the repo root and this page will use the root Tree-sitter browser assets plus the shared browser compiler bundle from <code>dist/index.mjs</code>.</p>
+
+    <textarea id="src">shimport "es" console_log(str) void;
+
+export fun main() void {
+    "hello from utu" -o console_log;
+}</textarea>
+
+    <div class="actions">
+      <button id="run" type="button">Run</button>
+      <span class="hint">Uses <code>./tree-sitter-utu.wasm</code>, <code>./web-tree-sitter.js</code>, and <code>./web-tree-sitter.wasm</code>.</span>
+    </div>
+
+    <pre id="out"></pre>
+  </main>
+
+  <script type="module">
+    import { compile, loadWebModuleFromSource } from './dist/index.mjs';
+
+    const out = document.getElementById('out');
+    const src = document.getElementById('src');
+    const runButton = document.getElementById('run');
+
+    runButton.addEventListener('click', async () => {
+      out.textContent = '';
+      try {
+        const { shim, wasm } = await compile(src.value, {
+          wasmUrl: new URL('./tree-sitter-utu.wasm', import.meta.url),
+        });
+        const { instantiate } = await loadWebModuleFromSource(shim);
+        const exports = await instantiate({
+          console_log(value) {
+            out.textContent += `${value}\n`;
+          },
+        }, wasm);
+        exports.main?.();
+      } catch (error) {
+        out.textContent = `Error: ${error?.message ?? String(error)}`;
+      }
+    });
+  </script>
+</body>
+
+</html>

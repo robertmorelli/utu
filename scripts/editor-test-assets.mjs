@@ -4,30 +4,42 @@ import { resolve } from 'node:path';
 const grammarCandidates = [
   'tree-sitter-utu.wasm',
   'vscode/tree-sitter-utu.wasm',
-  'cli_artifact/tree-sitter-utu.wasm',
-  'web_artifact/tree-sitter-utu.wasm',
 ];
 
 const runtimeCandidates = [
+  'web-tree-sitter.wasm',
   'vscode/web-tree-sitter.wasm',
   'node_modules/web-tree-sitter/web-tree-sitter.wasm',
-  'web_artifact/web-tree-sitter.wasm',
+];
+
+const packagedEditorGrammarCandidates = [
+  'vscode/tree-sitter-utu.wasm',
+];
+
+const packagedEditorRuntimeCandidates = [
+  'vscode/web-tree-sitter.wasm',
+  'node_modules/web-tree-sitter/web-tree-sitter.wasm',
+];
+
+const cliGrammarCandidates = [
+  'tree-sitter-utu.wasm',
+];
+
+const cliRuntimeCandidates = [
+  'node_modules/web-tree-sitter/web-tree-sitter.wasm',
+  'vscode/web-tree-sitter.wasm',
 ];
 
 export async function loadEditorTestAssets(repoRoot) {
-  const [grammarPath, runtimePath] = await Promise.all([
-    findExistingAsset(repoRoot, grammarCandidates, 'UTU grammar wasm'),
-    findExistingAsset(repoRoot, runtimeCandidates, 'Tree-sitter runtime wasm'),
-  ]);
-  const [grammarWasmPath, runtimeWasmPath] = await Promise.all([
-    readFile(grammarPath),
-    readFile(runtimePath),
-  ]);
+  return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'UTU grammar wasm');
+}
 
-  return {
-    grammarWasmPath,
-    runtimeWasmPath,
-  };
+export async function loadPackagedEditorTestAssets(repoRoot) {
+  return loadAssetSet(repoRoot, packagedEditorGrammarCandidates, packagedEditorRuntimeCandidates, 'packaged VS Code grammar wasm');
+}
+
+export async function loadCliCompilerTestAssets(repoRoot) {
+  return loadAssetSet(repoRoot, cliGrammarCandidates, cliRuntimeCandidates, 'CLI grammar wasm');
 }
 
 async function findExistingAsset(repoRoot, candidates, label) {
@@ -41,4 +53,22 @@ async function findExistingAsset(repoRoot, candidates, label) {
   }
 
   throw new Error(`Could not find ${label}. Checked: ${candidates.join(', ')}`);
+}
+
+async function loadAssetSet(repoRoot, grammarAssetCandidates, runtimeAssetCandidates, grammarLabel) {
+  const [grammarPath, runtimePath] = await Promise.all([
+    findExistingAsset(repoRoot, grammarAssetCandidates, grammarLabel),
+    findExistingAsset(repoRoot, runtimeAssetCandidates, 'Tree-sitter runtime wasm'),
+  ]);
+  const [grammarWasmPath, runtimeWasmPath] = await Promise.all([
+    readFile(grammarPath),
+    readFile(runtimePath),
+  ]);
+
+  return {
+    grammarPath,
+    runtimePath,
+    grammarWasmPath,
+    runtimeWasmPath,
+  };
 }

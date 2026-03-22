@@ -3,7 +3,8 @@
 == Grammar Overview
 
 The grammar is presented in EBNF style. Whitespace is insignificant except
-inside string literals, and comments are line comments only.
+inside string literals, semicolons terminate expressions in blocks and simple
+top-level declarations, and comments are line comments only.
 
 === Top-Level Items
 
@@ -23,26 +24,27 @@ struct_decl  ::= 'struct' TYPE_IDENT '{' field_list '}'
 field_list   ::= (field (',' field)* ','?)?
 field        ::= 'mut'? IDENT ':' type
 
-type_decl    ::= 'type' TYPE_IDENT '=' variant_list
+type_decl    ::= 'type' TYPE_IDENT '=' variant_list ';'
 variant_list ::= '|'? variant ('|' variant)*
 variant      ::= TYPE_IDENT ('{' field_list '}')?
 
-fn_decl      ::= 'fn' IDENT '(' param_list ')' return_type? block
+fn_decl      ::= 'fun' IDENT '(' param_list ')' return_type block
 param_list   ::= (param (',' param)* ','?)?
 param        ::= IDENT ':' type
-return_type  ::= type ('#' type)? (',' type ('#' type)?)*
+return_type  ::= 'void'
+               | type ('#' type)? (',' type ('#' type)?)*
 
-global_decl  ::= 'let' IDENT ':' type '=' expr
-
-import_decl  ::= 'import' 'extern' STRING
-                  ( IDENT '(' import_param_list? ')' return_type?
+global_decl  ::= 'let' IDENT ':' type '=' expr ';'
+import_decl  ::= 'shimport' STRING
+                  ( IDENT '(' import_param_list? ')' return_type
                   | IDENT ':' type )
+                  ';'
 import_param_list ::= import_param (',' import_param)* ','?
 import_param ::= param | type
 export_decl  ::= 'export' fn_decl
 test_decl    ::= 'test' STRING block
 bench_decl   ::= 'bench' STRING '|' IDENT '|' '{' setup_decl '}'
-setup_decl   ::= 'setup' '{' expr* measure_decl '}'
+setup_decl   ::= 'setup' '{' (expr ';')* measure_decl '}'
 measure_decl ::= 'measure' block
 ```
 
@@ -50,6 +52,8 @@ This section encodes a few core language choices:
 
 - struct fields are declared inline with optional `mut`
 - function return types are written directly after the parameter list
+- `void` is written explicitly for functions with no result
+- Host imports use `shimport "<module>" ...`
 - `#` can appear inside the return-type grammar
 - `export` wraps an ordinary function declaration rather than introducing a
   second export-only syntax
@@ -68,7 +72,7 @@ ref_type     ::= TYPE_IDENT | 'str'
              |   'externref' | 'anyref' | 'eqref'
              |   'i31' | 'array' '[' type ']'
 
-func_type    ::= 'fn' '(' type_list ')' return_type
+func_type    ::= 'fun' '(' type_list ')' return_type
 type_list    ::= (type (',' type)*)?
 ```
 
@@ -82,10 +86,10 @@ kind of type constructor.
 expr         ::= literal | IDENT | unary_expr | binary_expr
              |   call_expr | tuple_expr | pipe_expr | field_expr
              |   index_expr | if_expr | match_expr | alt_expr
-             |   block_expr | for_expr | break_expr
+             |   block_expr | for_expr | while_expr | break_expr
              |   assign_expr | bind_expr | else_expr
              |   struct_init | array_init | assert_expr
-             |   namespace_call_expr | ref_null_expr
+             |   namespace_call_expr | ref_null_expr | emit_expr
              |   'fatal' | '(' expr ')'
 
 assert_expr  ::= 'assert' expr
@@ -94,14 +98,16 @@ bind_expr    ::= 'let' IDENT ':' type (',' IDENT ':' type)* '=' expr
 
 else_expr    ::= expr '\' expr
 
-tuple_expr   ::= expr ',' expr
+tuple_expr   ::= '(' expr ',' expr (',' expr)* ','? ')'
 
 pipe_expr    ::= expr '-o' pipe_target
 pipe_target  ::= pipe_path
              |   pipe_path '(' pipe_args ')'
 pipe_path    ::= IDENT | BUILTIN_NS | pipe_path '.' IDENT
-pipe_args    ::= pipe_arg (',' pipe_arg)*
-pipe_arg     ::= '_' | expr
+pipe_args    ::= expr (',' expr)*
+             |   pipe_prefix? '_' pipe_suffix?
+pipe_prefix  ::= expr (',' expr)* ','
+pipe_suffix  ::= ',' expr (',' expr)*
 
 call_expr    ::= expr '(' arg_list ')'
 arg_list     ::= (expr (',' expr)* ','?)?
@@ -126,13 +132,15 @@ alt_arm      ::= IDENT ':' TYPE_IDENT '=>' expr ','
              |   '_' '=>' expr ','
 
 for_expr     ::= 'for' '(' for_sources ')' capture? block
+while_expr   ::= 'while' '(' expr? ')' block
 for_sources  ::= for_source (',' for_source)*
-for_source   ::= expr '..' expr | expr
+for_source   ::= expr '..' expr
 capture      ::= '|' IDENT (',' IDENT)* '|'
 
 block_expr   ::= (IDENT ':')? block
-block        ::= '{' expr* '}'
-break_expr   ::= 'break' IDENT? expr?
+block        ::= '{' (expr ';')* '}'
+break_expr   ::= 'break'
+emit_expr    ::= 'emit' expr
 
 struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
@@ -145,8 +153,10 @@ Several of the spec's most distinctive features appear here:
 - binding is an expression form
 - `\` is part of the expression grammar
 - `-o` is parsed as a dedicated pipe form
-- `for` supports range sources, plain expressions, and optional captures
-- blocks can be labeled and can yield values
+- pipe targets allow at most one `_` placeholder
+- `for` supports range sources and optional captures
+- `while` handles condition and infinite loops
+- blocks can be labeled and can yield values through `emit`
 
 The parser accepts comma-separated `for` sources and captures, but current
 lowering only uses the first source/capture pair.
@@ -267,7 +277,7 @@ returned, Wasm leaves them on the stack in declaration order, but `local.set`
 consumes from the top. That means the compiler must bind them in reverse order.
 
 ```utu
-let q: i32, r: i32 = divmod(10, 3)
+let q: i32, r: i32 = divmod(10, 3);
 ```
 
 ```wasm
