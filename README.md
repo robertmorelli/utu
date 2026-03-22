@@ -1,6 +1,6 @@
 # UTU
 
-UTU is a web-first, portable, zero-dep compiler distribution for making tiny, high-performance Wasm bundles.
+UTU is a web-first, zero-dep compiler distribution for making tiny, high-performance Wasm bundles for modern ES runtimes like Node, Bun, and browsers aligned with the 2026 web platform.
 
 This repo builds the full UTU toolchain from the repo root: the VS Code extension, the bundled CLI, and the standalone LSP binary.
 
@@ -45,6 +45,8 @@ Run the full verification suite from the repo root:
 bun run test
 ```
 
+`bun run test` verifies that the test manifest covers every checked-in `scripts/test-*.mjs` regression and then runs the full suite.
+
 For rebuild-on-change:
 
 ```sh
@@ -59,7 +61,7 @@ The build emits the web extension plus the current compiler bundles and Bun exec
 - `./utu`: bundled Bun CLI executable
 - `./utu-lsp`: bundled Bun LSP executable
 
-The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `.` core, and the standalone stdio UTU LSP server builds from `./lsp.mjs`. The browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
+The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `.` core, and the standalone stdio UTU LSP server builds from `./lsp.mjs`. UTU targets modern ES runtimes, so the browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 
 Design note: do not add VS Code-specific behavior to the compiler or generated shim just to make the extension UI work. The compiler should stay shared and host-agnostic. If the editor needs better run output, prefer surfacing `main()` return values and wiring explicit host/runtime imports rather than teaching codegen about VS Code.
 

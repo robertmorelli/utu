@@ -20,6 +20,16 @@
     "command": ["node", "./scripts/test-vscode-activation-selfcheck.mjs"]
   },
   {
+    "id": "editor:activation-language-version-repro",
+    "label": "Editor activation language-version repro",
+    "command": ["node", "./scripts/test-vscode-activation-language-version-repro.mjs"]
+  },
+  {
+    "id": "editor:activation-log-repro",
+    "label": "Editor activation log repro",
+    "command": ["node", "./scripts/test-vscode-web-extension-activation-log-repro.mjs"]
+  },
+  {
     "id": "editor:core",
     "label": "Editor core",
     "command": ["bun", "./scripts/test-editor.mjs", "core"]
@@ -53,6 +63,11 @@
     "id": "docs:codegen",
     "label": "Docs codegen",
     "command": ["bun", "./scripts/test-docs-codegen.mjs"]
+  },
+  {
+    "id": "grammar:textmate-escape",
+    "label": "Grammar TextMate escape",
+    "command": ["node", "./scripts/test-textmate-escape.mjs"]
   },
   {
     "id": "no-globalthis",
