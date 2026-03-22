@@ -45,7 +45,7 @@ jobs:
         run: |
           output="$(bun ./cli.mjs help)"
           echo "$output"
-          grep -Fq 'utu compile <input> [--outdir <dir>] [--wat] [--bun]' <<<"$output"
+          grep -Fq 'utu compile <input> [--outdir <dir>] [--wat] [--bun|--node]' <<<"$output"
           grep -Fq 'utu run <input>' <<<"$output"
 
       - name: Check usage errors
