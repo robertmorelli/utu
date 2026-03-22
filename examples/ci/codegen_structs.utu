@@ -1,3 +1,5 @@
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+
 struct Vec2 {
     x: f32,
     y: f32,
@@ -35,9 +37,9 @@ test "struct construction feeds field access" {
 test "mutable fields can be toggled in place" {
     let todo: Todo = new_todo("ship");
     toggle(todo);
-    assert str.equals(done_text(todo), "done");
+    assert str_eq(done_text(todo), "done");
 }
 
 test "immutable fields stay readable after allocation" {
-    assert str.equals(done_text(new_todo("write tests")), "write tests");
+    assert str_eq(done_text(new_todo("write tests")), "write tests");
 }

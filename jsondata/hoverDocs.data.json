@@ -23,38 +23,6 @@
     "ref.eq": {
       "signature": "ref.eq(a, b) bool",
       "description": "Compares two reference values for identity equality."
-    },
-    "str.length": {
-      "signature": "str.length(s) i32",
-      "description": "Returns the length of a host string via the runtime string host."
-    },
-    "str.char_code_at": {
-      "signature": "str.char_code_at(s, i) i32",
-      "description": "Reads the UTF-16 code unit at a string index."
-    },
-    "str.concat": {
-      "signature": "str.concat(a, b) str",
-      "description": "Concatenates two strings using the host string implementation."
-    },
-    "str.substring": {
-      "signature": "str.substring(s, start, end) str",
-      "description": "Returns a substring backed by the host string implementation."
-    },
-    "str.equals": {
-      "signature": "str.equals(a, b) bool",
-      "description": "Compares two strings for equality."
-    },
-    "str.from_char_code_array": {
-      "signature": "str.from_char_code_array(arr, start, end) str",
-      "description": "Builds a string from a range of UTF-16 code units."
-    },
-    "str.into_char_code_array": {
-      "signature": "str.into_char_code_array(s, arr, start) i32",
-      "description": "Copies a string into a UTF-16 code unit array."
-    },
-    "str.from_char_code": {
-      "signature": "str.from_char_code(code) str",
-      "description": "Creates a one-code-unit string from an integer code point."
     }
   },
   "builtinReturnTypes": {
@@ -62,15 +30,7 @@
     "array.new_default": { "kind": "array_new_default" },
     "ref.null": { "kind": "ref_null" },
     "ref.is_null": "bool",
-    "ref.eq": "bool",
-    "str.length": "i32",
-    "str.char_code_at": "i32",
-    "str.into_char_code_array": "i32",
-    "str.concat": "str",
-    "str.substring": "str",
-    "str.from_char_code_array": "str",
-    "str.from_char_code": "str",
-    "str.equals": "bool"
+    "ref.eq": "bool"
   },
   "builtinNamespaceDocs": {
     "array": {
@@ -80,10 +40,6 @@
     "ref": {
       "signature": "ref.*",
       "description": "Builtin namespace for nullable and reference-oriented helpers."
-    },
-    "str": {
-      "signature": "str.*",
-      "description": "Builtin namespace for host-backed string operations."
     }
   },
   "coreTypeDocs": {
@@ -129,7 +85,7 @@
     },
     "str": {
       "signature": "str",
-      "description": "Host-backed string reference provided by the runtime string host."
+      "description": "Host-backed string reference. Use `escape` or explicit host imports for string-specific behavior."
     },
     "u32": {
       "signature": "u32",

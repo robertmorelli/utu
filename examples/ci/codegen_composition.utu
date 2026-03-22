@@ -9,6 +9,8 @@ type Filter =
     | Completed;
 
 shimport "es" wrap(str) str;
+escape `(a, b) => a + b` str_concat(str, str) str;
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
 
 fun new_todo(text: str) Todo {
     Todo { text: text, done: false };
@@ -42,7 +44,7 @@ fun status(flag: bool) str {
 }
 
 fun greet(name: str) str {
-    name -o wrap -o str.concat(_, "!");
+    name -o wrap -o str_concat(_, "!");
 }
 
 fun build_todos() array[Todo] {
@@ -66,10 +68,10 @@ test "composition can count completed variants" {
 }
 
 test "composition can use nullable strings with fallback" {
-    assert str.equals(status(false), "offline");
-    assert str.equals(status(true), "online");
+    assert str_eq(status(false), "offline");
+    assert str_eq(status(true), "online");
 }
 
-test "composition can pipe host imports into string builtins" {
-    assert str.equals(greet("utu"), "[utu]!");
+test "composition can pipe host imports into string helpers" {
+    assert str_eq(greet("utu"), "[utu]!");
 }

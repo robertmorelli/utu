@@ -42,8 +42,12 @@ export class DiagnosticsController {
                 try { await this.compilerHost.compile(document.getText()); }
                 catch (error) {
                     const index = await this.languageService.getDocumentIndex(document);
-                    const compileError = describeCompileError(document, error, index);
-                    diagnostics.push({ range: compileError.range, severity: 'error', source: 'utu', message: compileError.message });
+                    if (isSourceDiagnosticError(error)) {
+                        const compileError = describeCompileError(document, error, index);
+                        diagnostics.push({ range: compileError.range, severity: 'error', source: 'utu', message: compileError.message });
+                    } else {
+                        logOutputError(this.output, `[utu] Skipping non-source validation error for ${uri.fsPath || uri.toString()}`, error);
+                    }
                 }
             if (vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === uri.toString())?.version !== version)
                 return;
@@ -90,6 +94,17 @@ function describeCompileError(document, error, index) {
             ?? fullDocumentRange(document),
         message: firstUsefulErrorLine(text),
     };
+}
+
+function isSourceDiagnosticError(error) {
+    const text = String(error instanceof Error ? error.message : error);
+    return /(?:^|\n)Fatal:\s+\d+:\d+:\s+error:/m.test(text)
+        || /Parse errors:/u.test(text)
+        || /function at index \d+/u.test(text)
+        || /global init must be constant/u.test(text)
+        || /call param types must match/u.test(text)
+        || /function body type must match/u.test(text)
+        || /does not exist/u.test(text);
 }
 
 function firstUsefulErrorLine(text) {

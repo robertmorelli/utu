@@ -546,22 +546,22 @@ class WatGen {
     }
 
     emitStructType(decl) {
-        return this.emitStructLikeType(`    (type $${decl.name} (struct`, decl.fields);
+        return this.emitStructLikeType(`    (type $${decl.name} (struct`, decl.fields, '    ))');
     }
 
     emitSumType(decl) {
         const lines = [`    (type $${decl.name} (sub (struct)))`];
         for (const variant of decl.variants)
-            lines.push(this.emitStructLikeType(`    (type $${variant.name} (sub $${decl.name} (struct`, variant.fields));
+            lines.push(this.emitStructLikeType(`    (type $${variant.name} (sub $${decl.name} (struct`, variant.fields, '    )))'));
         return lines;
     }
 
-    emitStructLikeType(prefix, fields) {
-        if (!fields.length) return `${prefix}))`;
+    emitStructLikeType(prefix, fields, closing) {
+        if (!fields.length) return `${prefix}${closing.trimStart()}`;
         return [
             prefix,
             ...fields.map(field => `      ${this.watField(field)}`),
-            '    ))',
+            closing,
         ].join('\n');
     }
 

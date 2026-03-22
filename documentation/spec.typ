@@ -26,7 +26,7 @@ The key design principles from the spec are:
 - direct lowering to WasmGC primitives
 - linear-by-construction data flow through pipes
 - structured control flow that mirrors Wasm blocks and loops
-- strings backed by host string builtins instead of a custom runtime
+- host-backed strings with explicit helper imports instead of implicit string builtins
 - error handling as values with exclusive disjunction via `#`
 - null safety derived from non-nullable Wasm reference types
 - immutable struct fields by default, with `mut` opt-in
@@ -231,21 +231,10 @@ present, non-null when it is a reference, and available simultaneously.
 
 == Strings
 
-Strings are host-backed `externref` values exposed through the JS String
-Builtins proposal. In user-facing terms, `str` behaves like a first-class
-string type. In implementation terms, it is an alias for `externref` in the
-string builtin surface.
-
-The always-available builtins are:
-
-- `str.length(s) -> i32`
-- `str.char_code_at(s, i) -> i32`
-- `str.concat(a, b) -> str`
-- `str.substring(s, start, end) -> str`
-- `str.equals(a, b) -> bool`
-- `str.from_char_code_array(arr, start, end) -> str`
-- `str.into_char_code_array(s, arr, start) -> i32`
-- `str.from_char_code(code) -> str`
+Strings are host-backed `externref` values. In user-facing terms, `str`
+behaves like a first-class string type. UTU does not assume a built-in string
+method surface; string operations should be provided explicitly through
+`escape` declarations or regular host imports.
 
 == String Literals
 
@@ -269,24 +258,17 @@ characters between them.
 
 == String Processing Strategy
 
-The spec recommends two tiers of string work:
-
-- use the builtins directly for ordinary application code, because the engine
-  keeps strings in its optimized native representation
-- convert into `array[i16]` for heavy text processing where indexed access is
-  more important than host string specialization
+The spec recommends making string behavior explicit at the boundary where you
+need it. For lightweight helpers, define them inline with `escape`:
 
 ```utu
-let msg: str = "hello" -o str.concat(_, ", ") -o str.concat(_, "world");
+escape `(a, b) => a + b` str_concat(str, str) str;
 
-let arr: array[i16] = array[i16].new(str.length(msg), 0);
-str.into_char_code_array(msg, arr, 0);
-// ... direct array[i16] access ...
-let result: str = str.from_char_code_array(arr, 0, array.len(arr));
+let msg: str = "hello" -o str_concat(_, ", ") -o str_concat(_, "world");
 ```
 
-This keeps common string operations lightweight without preventing low-level
-text algorithms when needed.
+For heavier text processing, prefer explicit host imports or array-oriented
+data structures rather than assuming a built-in string runtime surface.
 
 == GC-Only Memory Model
 
@@ -1088,6 +1070,7 @@ fun count(todos: array[Todo], filter: Filter) i32 {
 }
 
 export fun main() void {
+    escape `(a, b) => a + b` str_concat(str, str) str;
     let todos: array[Todo] = array[Todo].new_fixed(
         new_todo("learn utu"),
         new_todo("build compiler"),
@@ -1100,7 +1083,7 @@ export fun main() void {
     let label: str # null = if active > 0 { "active"; } else { null; };
     let text: str = label \ "idle";
 
-    text -o str.concat(_, " todos");
+    text -o str_concat(_, " todos");
 }
 ```
 
@@ -1114,8 +1097,8 @@ export fun main() void {
 - `count` shows typed `let` bindings, array indexing, `array.len`, a counted
   `for` loop, and an expression return at the end of the function.
 - `main` shows `array.new_fixed`, export syntax, function calls on array
-  elements, nullable fallback with `\`, and a simple pipeline through
-  `str.concat`.
+  elements, nullable fallback with `\`, and a simple pipeline through an
+  explicit `escape` helper.
 
 == Why The Example Matters
 

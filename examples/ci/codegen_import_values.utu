@@ -1,13 +1,14 @@
 shimport "es" lucky: i32;
 shimport "es" label: str;
 shimport "es" document: externref;
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
 
 fun score() i32 {
     lucky + 1;
 }
 
 fun named() bool {
-    str.equals(label, "utu");
+    str_eq(label, "utu");
 }
 
 fun doc_present() bool {
@@ -18,7 +19,7 @@ test "imported numeric globals contribute to arithmetic" {
     assert score() == 42;
 }
 
-test "imported string globals flow into string builtins" {
+test "imported string globals flow into string helpers" {
     assert named();
 }
 

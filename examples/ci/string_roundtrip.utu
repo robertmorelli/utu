@@ -1,9 +1,11 @@
+escape `(a, b) => a + b` str_concat(str, str) str;
+
 fun label() str {
     "done";
 }
 
 fun wrap(value: str) str {
-    "[" -o str.concat(_, value) -o str.concat(_, "]");
+    "[" -o str_concat(_, value) -o str_concat(_, "]");
 }
 
 fun decorate(value: str) str {

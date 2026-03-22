@@ -9,7 +9,7 @@ const repoRoot = getRepoRoot(import.meta.url);
 const CLI_CASES = [
     ['assert-pass', ['run', 'examples/ci/assert_pass.utu'], 0, 'ok'], ['assert-fail', ['run', 'examples/ci/assert_fail.utu'], 1, 'Unreachable code'],
     ['tests-basic', ['test', 'examples/ci/tests_basic.utu'], 0, 'PASS adds two numbers'], ['tests-codegen-surface', ['test', 'examples/ci/codegen_test_surface.utu'], 0, 'PASS top-level tests become synthesized exports'],
-    ['tests-nullable', ['test', 'examples/ci/codegen_nullable.utu'], 0, 'PASS else fallback runs on null'], ['tests-string-builtins', ['test', 'examples/ci/node_builtin_imports.utu'], 0, 'PASS string builtins work without host declarations'],
+    ['tests-nullable', ['test', 'examples/ci/codegen_nullable.utu'], 0, 'PASS else fallback runs on null'], ['tests-string-builtins', ['test', 'examples/ci/node_builtin_imports.utu'], 0, 'PASS string helpers work without legacy builtins'],
     ['tests-globals', ['test', 'examples/ci/codegen_globals.utu'], 0, 'PASS top-level numeric globals lower to global.get'], ['tests-scalar-match', ['test', 'examples/ci/codegen_scalar_match.utu'], 0, 'PASS float match can take a specific arm'],
     ['tests-alt-fallback', ['test', 'examples/ci/codegen_alt_fallback.utu'], 0, 'PASS alt fallback can bind and forward the unmatched value'], ['tests-fail', ['test', 'examples/ci/tests_fail.utu'], 1, 'FAIL fails'],
     ['compile-bad-return-type', ['compile', 'scripts/fixtures/compile_bad_return_type.utu'], 1, 'function at index 0'], ['compile-bad-call-args', ['compile', 'scripts/fixtures/compile_bad_call_args.utu'], 1, 'call param types must match'],

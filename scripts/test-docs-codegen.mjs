@@ -112,7 +112,7 @@ const cases = [
     {
         name: 'composition',
         path: 'examples/ci/codegen_composition.utu',
-        snippets: ['array.new_fixed $Todo_array 3', 'struct.set $Todo $done', 'br_on_cast', 'br_on_non_null', 'call $str.concat'],
+        snippets: ['array.new_fixed $Todo_array 3', 'struct.set $Todo $done', 'br_on_cast', 'br_on_non_null', 'call $str_concat'],
     },
     {
         name: 'test-surface',

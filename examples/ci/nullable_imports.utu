@@ -2,6 +2,7 @@ struct ApiError {}
 
 shimport "es" maybe_label(bool) str # null;
 shimport "es" maybe_structured(bool) str # ApiError;
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
 
 fun label_or_default(flag: bool) str {
     maybe_label(flag) \ "offline";
@@ -21,15 +22,15 @@ fun structured_import_nulls(flag: bool) bool {
 }
 
 test "thrown nullable imports fall back to defaults" {
-    assert str.equals(label_or_default(false), "offline");
+    assert str_eq(label_or_default(false), "offline");
 }
 
 test "non-null nullable imports skip defaults" {
-    assert str.equals(label_or_default(true), "online");
+    assert str_eq(label_or_default(true), "online");
 }
 
 test "force unwrap still works after nullable import catches throws" {
-    assert str.equals(label_or_force(true), "online");
+    assert str_eq(label_or_force(true), "online");
 }
 
 test "structured import placeholders stay null on throw" {

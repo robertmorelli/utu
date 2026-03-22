@@ -1,7 +1,10 @@
+escape `(s, start, end) => s.substring(start, end)` substring(str, i32, i32) str;
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+
 fun readme_prefix() str {
-    str.substring("# UTU README", 0, 5);
+    substring("# UTU README", 0, 5);
 }
 
-test "string builtins work without host declarations" {
-    assert str.equals(readme_prefix(), "# UTU");
+test "string helpers work without legacy builtins" {
+    assert str_eq(readme_prefix(), "# UTU");
 }

@@ -1,3 +1,5 @@
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+
 type Shape =
     | Circle { radius: i32 }
     | Rect { width: i32, height: i32 }
@@ -40,7 +42,7 @@ test "alt dispatches triangle arms" {
 }
 
 test "alt and match can return strings" {
-    assert str.equals(describe(Rect { width: 2, height: 6 }), "rect");
-    assert str.equals(tag(0), "zero");
-    assert str.equals(tag(3), "many");
+    assert str_eq(describe(Rect { width: 2, height: 6 }), "rect");
+    assert str_eq(tag(0), "zero");
+    assert str_eq(tag(3), "many");
 }

@@ -1,3 +1,6 @@
+escape `(a, b) => a + b` str_concat(str, str) str;
+escape `(a, b) => a === b ? 1 : 0` str_eq(str, str) bool;
+
 let seed: i32 = 41;
 let banner: str = "ok";
 
@@ -6,7 +9,7 @@ fun next() i32 {
 }
 
 fun loud() str {
-    str.concat(banner, "!");
+    str_concat(banner, "!");
 }
 
 test "top-level numeric globals lower to global.get" {
@@ -14,9 +17,9 @@ test "top-level numeric globals lower to global.get" {
 }
 
 test "top-level string globals stay reusable" {
-    assert str.equals(loud(), "ok!");
+    assert str_eq(loud(), "ok!");
 }
 
 test "globals compose across helpers" {
-    assert str.equals(str.concat(loud(), "?"), "ok!?");
+    assert str_eq(str_concat(loud(), "?"), "ok!?");
 }
