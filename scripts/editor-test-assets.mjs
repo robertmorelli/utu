@@ -2,22 +2,11 @@ import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const grammarCandidates = ['tree-sitter-utu.wasm'];
-const runtimeCandidates = [
-  'web-tree-sitter.wasm',
-  'node_modules/web-tree-sitter/web-tree-sitter.wasm',
-];
+const runtimeCandidates = ['web-tree-sitter.wasm', 'node_modules/web-tree-sitter/web-tree-sitter.wasm'];
 
-export async function loadEditorTestAssets(repoRoot) {
-  return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'UTU grammar wasm');
-}
-
-export async function loadPackagedEditorTestAssets(repoRoot) {
-  return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'packaged VS Code grammar wasm');
-}
-
-export async function loadCliCompilerTestAssets(repoRoot) {
-  return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'CLI grammar wasm');
-}
+export const loadEditorTestAssets = (repoRoot) => loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'UTU grammar wasm');
+export const loadPackagedEditorTestAssets = (repoRoot) => loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'packaged VS Code grammar wasm');
+export const loadCliCompilerTestAssets = (repoRoot) => loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'CLI grammar wasm');
 
 async function findExistingAsset(repoRoot, candidates, label) {
   for (const candidate of candidates) {
