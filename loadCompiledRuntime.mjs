@@ -1,3 +1,5 @@
+import data from './jsondata/runtime.data.json' with { type: 'json' };
+
 const NOOP_CLEANUP = async () => { };
 
 export async function loadCompiledRuntime({
@@ -63,11 +65,7 @@ export async function executeRuntimeTest(runtime, ordinal, { now = defaultNow } 
   return runtime.module.runTest(runtime.exports, ordinal, { formatError: (e) => JSON.stringify(e), now });
 }
 
-export const DEFAULT_BENCHMARK_OPTIONS = Object.freeze({
-  seconds: 1,
-  samples: 10,
-  warmup: 2,
-});
+export const DEFAULT_BENCHMARK_OPTIONS = Object.freeze(data.defaultBenchmarkOptions);
 
 export async function executeRuntimeBenchmark(runtime, ordinal, options = {}, measureOptions = {}) {
   return runtime.module.runBenchmark(runtime.exports, ordinal, options, measureOptions);

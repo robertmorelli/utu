@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const compilerRoot = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(compilerRoot, '..');
+const repoRoot = compilerRoot;
 const distRoot = resolve(repoRoot, 'dist');
 const packageRoot = resolve(distRoot, 'cli-package');
 const entry = resolve(compilerRoot, 'cli.mjs');

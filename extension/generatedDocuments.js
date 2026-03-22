@@ -1,16 +1,9 @@
 import * as vscode from 'vscode';
 import { baseNameForGeneratedDocument } from './documentNames.js';
+import data from '../jsondata/extension.data.json' with { type: 'json' };
 const GENERATED_SCHEME = 'utu-generated';
-const GENERATED_FILE_EXTENSIONS = {
-    js: 'js',
-    wat: 'wat',
-    tree: 'txt',
-};
-const GENERATED_LANGUAGE_IDS = {
-    js: 'javascript',
-    wat: 'wat',
-    tree: 'plaintext',
-};
+const GENERATED_FILE_EXTENSIONS = data.generatedFileExtensions;
+const GENERATED_LANGUAGE_IDS = data.generatedLanguageIds;
 export class GeneratedDocumentStore {
     emitter = new vscode.EventEmitter();
     contents = new Map();

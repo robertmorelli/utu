@@ -1,27 +1,8 @@
 import * as vscode from 'vscode';
-const COMPLETION_KINDS = {
-    class: vscode.CompletionItemKind.Class,
-    enumMember: vscode.CompletionItemKind.EnumMember,
-    function: vscode.CompletionItemKind.Function,
-    keyword: vscode.CompletionItemKind.Keyword,
-    method: vscode.CompletionItemKind.Method,
-    module: vscode.CompletionItemKind.Module,
-    text: vscode.CompletionItemKind.Text,
-    variable: vscode.CompletionItemKind.Variable,
-};
-const SYMBOL_KINDS = {
-    enum: vscode.SymbolKind.Enum,
-    enumMember: vscode.SymbolKind.EnumMember,
-    event: vscode.SymbolKind.Event,
-    function: vscode.SymbolKind.Function,
-    method: vscode.SymbolKind.Method,
-    object: vscode.SymbolKind.Object,
-    struct: vscode.SymbolKind.Struct,
-    variable: vscode.SymbolKind.Variable,
-};
-const DIAGNOSTIC_SEVERITIES = {
-    error: vscode.DiagnosticSeverity.Error,
-};
+import data from '../../jsondata/extension.data.json' with { type: 'json' };
+const COMPLETION_KINDS = Object.fromEntries(Object.entries(data.completionKinds).map(([key, value]) => [key, vscode.CompletionItemKind[value]]));
+const SYMBOL_KINDS = Object.fromEntries(Object.entries(data.symbolKinds).map(([key, value]) => [key, vscode.SymbolKind[value]]));
+const DIAGNOSTIC_SEVERITIES = Object.fromEntries(Object.entries(data.diagnosticSeverities).map(([key, value]) => [key, vscode.DiagnosticSeverity[value]]));
 export function toVscodeRange(range) {
     return new vscode.Range(toVscodePosition(range.start), toVscodePosition(range.end));
 }

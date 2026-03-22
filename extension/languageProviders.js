@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { toVscodeCompletionItem, toVscodeDocumentHighlight, toVscodeHover, toVscodeLocation, toVscodeWorkspaceSymbol, toVscodeRange, } from './adapters/core.js';
-const DOCUMENT_SELECTOR = [{ language: 'utu' }];
-const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(['type', 'enumMember', 'function', 'parameter', 'variable', 'property'], ['declaration']);
+import data from '../jsondata/extension.data.json' with { type: 'json' };
+const DOCUMENT_SELECTOR = data.documentSelector;
+const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(data.semanticTokenLegend.types, data.semanticTokenLegend.modifiers);
 export function registerLanguageProviders(context, languageService, workspaceSymbols) {
     context.subscriptions.push(vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, {
         async provideHover(document, position) {

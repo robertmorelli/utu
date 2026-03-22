@@ -1,0 +1,7 @@
+{
+  "defaultBenchmarkOptions": {
+    "seconds": 1,
+    "samples": 10,
+    "warmup": 2
+  }
+}

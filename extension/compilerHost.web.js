@@ -65,21 +65,16 @@ export class WebCompilerHost {
     }
     async loadCompiler() {
         const source = await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true));
-        return loadModuleFromSource(new TextDecoder().decode(source));
+        return loadModuleFromSource(new TextDecoder().decode(source), { preferBlobUrl: true });
     }
 }
 
-const textEncoder = new TextEncoder();
-
-function loadModuleFromSource(source) {
-    return import(`data:text/javascript;base64,${base64EncodeBytes(textEncoder.encode(source))}`);
-}
-
-function base64EncodeBytes(bytes) {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i += 0x8000)
-        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return btoa(binary);
+function loadModuleFromSource(source, { preferBlobUrl = false } = {}) {
+    if (preferBlobUrl && typeof URL.createObjectURL === 'function') {
+        const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+        return import(url).finally(() => URL.revokeObjectURL(url));
+    }
+    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
 async function getNamedTarget(source, getMetadata, kind, ordinal) {

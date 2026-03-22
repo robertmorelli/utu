@@ -1,0 +1,106 @@
+{
+  "completionItemKinds": {
+    "text": 1,
+    "method": 2,
+    "function": 3,
+    "variable": 6,
+    "class": 7,
+    "module": 9,
+    "keyword": 14,
+    "enumMember": 20
+  },
+  "documentSymbolKinds": {
+    "method": 6,
+    "function": 12,
+    "enum": 10,
+    "variable": 13,
+    "object": 19,
+    "enumMember": 22,
+    "struct": 23,
+    "event": 24
+  },
+  "documentHighlightKinds": {
+    "read": 2,
+    "write": 3
+  },
+  "diagnosticSeverities": {
+    "error": 1
+  },
+  "semanticTokenTypes": [
+    "type",
+    "enumMember",
+    "function",
+    "parameter",
+    "variable",
+    "property"
+  ],
+  "semanticTokenModifiers": [
+    "declaration"
+  ],
+  "jsonRpcErrors": {
+    "parseError": -32700,
+    "invalidRequest": -32600,
+    "methodNotFound": -32601,
+    "internalError": -32603,
+    "serverNotInitialized": -32002
+  },
+  "serverInfo": {
+    "name": "utu-lsp",
+    "version": "0.1.0"
+  },
+  "headerSeparator": "\r\n\r\n",
+  "ignoredNotifications": [
+    "initialized",
+    "$/setTrace",
+    "$/cancelRequest",
+    "workspace/didChangeConfiguration"
+  ],
+  "initializeResult": {
+    "capabilities": {
+      "textDocumentSync": {
+        "openClose": true,
+        "change": 2,
+        "save": {
+          "includeText": true
+        }
+      },
+      "hoverProvider": true,
+      "definitionProvider": true,
+      "referencesProvider": true,
+      "documentHighlightProvider": true,
+      "completionProvider": {
+        "triggerCharacters": [
+          "."
+        ]
+      },
+      "documentSymbolProvider": true,
+      "workspaceSymbolProvider": true,
+      "semanticTokensProvider": {
+        "legend": {
+          "tokenTypes": [
+            "type",
+            "enumMember",
+            "function",
+            "parameter",
+            "variable",
+            "property"
+          ],
+          "tokenModifiers": [
+            "declaration"
+          ]
+        },
+        "full": true
+      },
+      "workspace": {
+        "workspaceFolders": {
+          "supported": true,
+          "changeNotifications": true
+        }
+      }
+    },
+    "serverInfo": {
+      "name": "utu-lsp",
+      "version": "0.1.0"
+    }
+  }
+}

@@ -3,91 +3,18 @@ import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copyRange, } from './lsp_core/types.js';
 import { UtuLanguageServer } from './lsp_server/index.js';
-const COMPLETION_ITEM_KINDS = {
-    text: 1,
-    method: 2,
-    function: 3,
-    variable: 6,
-    class: 7,
-    module: 9,
-    keyword: 14,
-    enumMember: 20,
-};
-const DOCUMENT_SYMBOL_KINDS = {
-    method: 6,
-    function: 12,
-    enum: 10,
-    variable: 13,
-    object: 19,
-    enumMember: 22,
-    struct: 23,
-    event: 24,
-};
-const DOCUMENT_HIGHLIGHT_KINDS = {
-    read: 2,
-    write: 3,
-};
-const DIAGNOSTIC_SEVERITIES = {
-    error: 1,
-};
-const SEMANTIC_TOKEN_TYPES = [
-    'type',
-    'enumMember',
-    'function',
-    'parameter',
-    'variable',
-    'property',
-];
-const SEMANTIC_TOKEN_MODIFIERS = ['declaration'];
+import data from './jsondata/lsp.data.json' with { type: 'json' };
+const COMPLETION_ITEM_KINDS = data.completionItemKinds;
+const DOCUMENT_SYMBOL_KINDS = data.documentSymbolKinds;
+const DOCUMENT_HIGHLIGHT_KINDS = data.documentHighlightKinds;
+const DIAGNOSTIC_SEVERITIES = data.diagnosticSeverities;
+const SEMANTIC_TOKEN_TYPES = data.semanticTokenTypes;
+const SEMANTIC_TOKEN_MODIFIERS = data.semanticTokenModifiers;
 const SEMANTIC_TOKEN_TYPE_INDEX = Object.fromEntries(SEMANTIC_TOKEN_TYPES.map((type, index) => [type, index]));
 const SEMANTIC_TOKEN_MODIFIER_MASKS = Object.fromEntries(SEMANTIC_TOKEN_MODIFIERS.map((modifier, index) => [modifier, 1 << index]));
-const JSON_RPC_ERRORS = {
-    parseError: -32700,
-    invalidRequest: -32600,
-    methodNotFound: -32601,
-    internalError: -32603,
-    serverNotInitialized: -32002,
-};
-const SERVER_NAME = 'utu-lsp';
-const SERVER_VERSION = '0.1.0';
-const HEADER_SEPARATOR = Buffer.from('\r\n\r\n', 'ascii');
-const INITIALIZE_RESULT = {
-    capabilities: {
-        textDocumentSync: {
-            openClose: true,
-            change: 2,
-            save: {
-                includeText: true,
-            },
-        },
-        hoverProvider: true,
-        definitionProvider: true,
-        referencesProvider: true,
-        documentHighlightProvider: true,
-        completionProvider: {
-            triggerCharacters: ['.'],
-        },
-        documentSymbolProvider: true,
-        workspaceSymbolProvider: true,
-        semanticTokensProvider: {
-            legend: {
-                tokenTypes: [...SEMANTIC_TOKEN_TYPES],
-                tokenModifiers: [...SEMANTIC_TOKEN_MODIFIERS],
-            },
-            full: true,
-        },
-        workspace: {
-            workspaceFolders: {
-                supported: true,
-                changeNotifications: true,
-            },
-        },
-    },
-    serverInfo: {
-        name: SERVER_NAME,
-        version: SERVER_VERSION,
-    },
-};
+const JSON_RPC_ERRORS = data.jsonRpcErrors;
+const HEADER_SEPARATOR = Buffer.from(data.headerSeparator, 'ascii');
+const INITIALIZE_RESULT = data.initializeResult;
 const REQUEST_HANDLERS = {
     initialize: async (session, params) => {
         session.server.setWorkspaceFolders(getWorkspaceFolderUris(params));
@@ -109,12 +36,7 @@ const REQUEST_HANDLERS = {
         data: encodeSemanticTokens(await session.server.getDocumentSemanticTokens(getRequiredTextDocumentUri(params))),
     })),
 };
-const IGNORED_NOTIFICATION_HANDLERS = Object.fromEntries([
-    'initialized',
-    '$/setTrace',
-    '$/cancelRequest',
-    'workspace/didChangeConfiguration',
-].map((method) => [method, async () => { }]));
+const IGNORED_NOTIFICATION_HANDLERS = Object.fromEntries(data.ignoredNotifications.map((method) => [method, async () => { }]));
 const NOTIFICATION_HANDLERS = {
     ...IGNORED_NOTIFICATION_HANDLERS,
     'textDocument/didOpen': async (session, params) => session.requireInitialized(async () => {

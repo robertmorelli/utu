@@ -1,0 +1,13 @@
+{
+  "help": "utu Bun CLI\n\nUsage:\n  utu compile <input> [--outdir <dir>] [--wat] [--bun]\n  utu run <input>\n  utu test <input>\n  utu bench <input> [--seconds <n>] [--samples <n>] [--warmup <n>]\n",
+  "compileDefaults": {
+    "outdir": "./dist",
+    "wat": false,
+    "bun": false
+  },
+  "benchDefaults": {
+    "seconds": 1,
+    "samples": 1,
+    "warmup": 1
+  }
+}

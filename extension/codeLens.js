@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { collectRunnableEntries } from '../lsp_core/languageService.js';
 import { toVscodeRange } from './adapters/core.js';
-const DOCUMENT_SELECTOR = [{ language: 'utu' }];
+import data from '../jsondata/extension.data.json' with { type: 'json' };
+const DOCUMENT_SELECTOR = data.documentSelector;
 const profileLensData = new Map();
 const lensEmitter = new vscode.EventEmitter();
 

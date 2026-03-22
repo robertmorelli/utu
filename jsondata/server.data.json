@@ -1,0 +1,19 @@
+{
+  "defaultServerCapabilities": {
+    "hover": true,
+    "definition": true,
+    "references": true,
+    "completion": true,
+    "documentHighlights": true,
+    "documentSymbols": true,
+    "workspaceSymbols": true,
+    "semanticTokens": true,
+    "diagnostics": true
+  },
+  "skippedWorkspaceDirectories": [
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules"
+  ]
+}

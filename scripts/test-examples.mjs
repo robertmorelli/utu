@@ -8,7 +8,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 
 const options = parseArgs(process.argv.slice(2));
-const manifestPath = resolve(process.cwd(), options.manifest ?? 'examples/manifest.json');
+const manifestPath = resolve(process.cwd(), options.manifest ?? 'jsondata/examples.manifest.json');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const wasmPath = resolve(repoRoot, manifest.wasmPath ?? 'tree-sitter-utu.wasm');
 const selectedTags = new Set(options.tags);

@@ -4,21 +4,15 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import grammarWasmPath from "../tree-sitter-utu.wasm" with { type: "file" };
+import grammarWasmPath from "./tree-sitter-utu.wasm" with { type: "file" };
 import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
+import data from "./jsondata/cli.data.json" with { type: "json" };
 
 import * as compiler from "./index.js";
 import { executeRuntimeBenchmark, executeRuntimeTest, getCallableExport, loadCompiledRuntime, withRuntime } from "./loadCompiledRuntime.mjs";
 import { loadNodeModuleFromSource } from "./loadNodeModuleFromSource.mjs";
 
-const help = `utu Bun CLI
-
-Usage:
-  utu compile <input> [--outdir <dir>] [--wat] [--bun]
-  utu run <input>
-  utu test <input>
-  utu bench <input> [--seconds <n>] [--samples <n>] [--warmup <n>]
-`;
+const help = data.help;
 
 const commands = { compile: compileCmd, run: runCmd, test: testCmd, bench: benchCmd };
 const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
@@ -39,7 +33,7 @@ async function compileCmd(args) {
   const { input, outdir, wat, bun } = parseCommandArgs(args, {
     command: "compile",
     missingInput: "compile needs an input file",
-    defaults: { outdir: "./dist", wat: false, bun: false },
+    defaults: data.compileDefaults,
     flags: {
       "--wat": booleanFlag("wat"),
       "--bun": booleanFlag("bun"),
@@ -111,7 +105,7 @@ async function benchCmd(args) {
   const { input, seconds, samples, warmup } = parseCommandArgs(args, {
     command: "bench",
     missingInput: "bench needs an input file",
-    defaults: { seconds: 1, samples: 1, warmup: 1 },
+    defaults: data.benchDefaults,
     flags: {
       "--seconds": valueFlag("seconds", value => floatArg(value, "--seconds", 0)),
       "--samples": valueFlag("samples", value => intArg(value, "--samples", 1)),

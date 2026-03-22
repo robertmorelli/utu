@@ -4,23 +4,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { UtuParserService } from '../parser.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
 import { clamp, getDocumentUri, } from '../lsp_core/types.js';
-const DEFAULT_SERVER_CAPABILITIES = {
-    hover: true,
-    definition: true,
-    references: true,
-    completion: true,
-    documentHighlights: true,
-    documentSymbols: true,
-    workspaceSymbols: true,
-    semanticTokens: true,
-    diagnostics: true,
-};
-const SKIPPED_WORKSPACE_DIRECTORIES = new Set([
-    '.git',
-    '.hg',
-    '.svn',
-    'node_modules',
-]);
+import data from '../jsondata/server.data.json' with { type: 'json' };
+const DEFAULT_SERVER_CAPABILITIES = data.defaultServerCapabilities;
+const SKIPPED_WORKSPACE_DIRECTORIES = new Set(data.skippedWorkspaceDirectories);
 export function getDefaultServerCapabilities() {
     return { ...DEFAULT_SERVER_CAPABILITIES };
 }
