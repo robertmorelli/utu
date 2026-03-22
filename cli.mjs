@@ -47,13 +47,13 @@ async function testCmd(args) {
   const { tests } = await getMetadata(source);
   if (!tests.length) fail("No tests found");
   let failed = false;
-  for (const { name } of tests) {
-    await withRuntime(loadRuntime(source, { mode: "test", targetName: name }), async runtime => {
-      const result = await executeRuntimeTest(runtime, 0, { formatError: text });
+  await withRuntime(loadRuntime(source, { mode: "test" }), async runtime => {
+    for (const [ordinal, { name }] of tests.entries()) {
+      const result = await executeRuntimeTest(runtime, ordinal, { formatError: text });
       console.log(`${result.passed ? "PASS" : "FAIL"} ${result.name}`);
       if (!result.passed) failed = console.log(`  ${result.error}`) ?? true;
-    });
-  }
+    }
+  });
   if (failed) process.exitCode = 1;
 }
 
@@ -62,10 +62,11 @@ async function benchCmd(args) {
   const source = await readFile(path.resolve(input), "utf8");
   const { benches } = await getMetadata(source);
   if (!benches.length) fail("No benchmarks found");
-  for (const { name } of benches) {
-    await withRuntime(loadRuntime(source, { mode: "bench", targetName: name }), async runtime =>
-      console.log((await executeRuntimeBenchmark(runtime, 0, { seconds, samples, warmup })).summary));
-  }
+  await withRuntime(loadRuntime(source, { mode: "bench" }), async runtime => {
+    for (const [ordinal] of benches.entries()) {
+      console.log((await executeRuntimeBenchmark(runtime, ordinal, { seconds, samples, warmup })).summary);
+    }
+  });
 }
 
 function parseArgs(args, command, missingInput, defaults = {}, flags = {}) {

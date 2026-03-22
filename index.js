@@ -33,7 +33,11 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
             ensureValid(mod, 'Binaryen validation failed after optimization.');
             wasm = mod.emitBinary();
             const module = new WebAssembly.Module(wasm);
-            if (!WebAssembly.Module.imports(module).length) await WebAssembly.instantiate(module).catch(() => {});
+            let importDescriptors = null;
+            try {
+                importDescriptors = WebAssembly.Module.imports(module);
+            } catch { }
+            if (importDescriptors?.length === 0) await WebAssembly.instantiate(module).catch(() => {});
         } catch (error) {
             throw new Error(error?.message ?? String(error));
         } finally {

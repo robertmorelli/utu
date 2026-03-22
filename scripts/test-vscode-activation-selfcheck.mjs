@@ -1,0 +1,38 @@
+import { readFile } from 'node:fs/promises';
+
+import { createSourceDocument, UtuParserService } from '../parser.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
+
+const source = 'export fun main() i32 { 0; }';
+
+async function main() {
+  const compiler = await import('../dist/compiler.web.mjs');
+  const metadata = await compiler.get_metadata(source);
+  if (!metadata.hasMain) {
+    throw new Error('Web compiler self-check failed: expected built compiler bundle to report a runnable main.');
+  }
+
+  const [grammarWasmPath, runtimeWasmPath] = await Promise.all([
+    readFile(new URL('../tree-sitter-utu.wasm', import.meta.url)),
+    readFile(new URL('../web-tree-sitter.wasm', import.meta.url)),
+  ]);
+  const parserService = new UtuParserService({ grammarWasmPath, runtimeWasmPath });
+  const languageService = new UtuLanguageService(parserService);
+  const workspaceSymbols = new UtuWorkspaceSymbolIndex(languageService);
+
+  try {
+    await workspaceSymbols.syncDocuments([
+      Object.assign(
+        createSourceDocument(source, { uri: 'file:///activation-selfcheck.utu', version: 1 }),
+        { languageId: 'utu' },
+      ),
+    ], { replace: true });
+  } finally {
+    languageService.dispose();
+    parserService.dispose();
+  }
+
+  console.log('PASS vscode activation selfcheck');
+}
+
+await main();

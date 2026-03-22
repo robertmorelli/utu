@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, extname, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { compile } from '../index.js';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { collectCompileJobs, collectUtuFiles, firstLine, getRepoRoot, runCli, runNamedCases } from './test-helpers.mjs';
@@ -13,16 +14,16 @@ const CLI_CASES = [
     ['tests-alt-fallback', ['test', 'examples/ci/codegen_alt_fallback.utu'], 0, 'PASS alt fallback can bind and forward the unmatched value'], ['tests-fail', ['test', 'examples/ci/tests_fail.utu'], 1, 'FAIL fails'],
     ['compile-bad-return-type', ['compile', 'scripts/fixtures/compile_bad_return_type.utu'], 1, 'function at index 0'], ['compile-bad-call-args', ['compile', 'scripts/fixtures/compile_bad_call_args.utu'], 1, 'call param types must match'],
     ['compile-nullability-mismatch', ['compile', 'scripts/fixtures/compile_nullability_mismatch.utu'], 1, 'function body type must match'], ['compile-illegal-global-init', ['compile', 'scripts/fixtures/compile_illegal_global_init.utu'], 1, 'global init must be constant'],
-    ['compile-bad-pipe-placeholders', ['compile', 'scripts/fixtures/compile_bad_pipe_placeholders.utu'], 1, 'Parse errors:'], ['run-break-and-call', ['run', 'examples/ci/codegen_break_and_call.utu'], 0, '42'],
+    ['compile-bad-pipe-placeholders', ['compile', 'scripts/fixtures/compile_bad_pipe_placeholders.utu'], 1, 'local $_ does not exist'], ['run-break-and-call', ['run', 'examples/ci/codegen_break_and_call.utu'], 0, '42'],
     ['run-call-simple', ['run', 'examples/call_simple.utu'], 0, '177280'], ['run-fannkuch', ['run', 'examples/fannkuch.utu'], 0, '10'],
-    ['run-float', ['run', 'examples/float.utu'], 0, '0.8944271901453098'], ['run-hello-name', ['run', 'examples/hello_name.utu'], 0, 'hello utu'],
+    ['run-float', ['run', 'examples/float.utu'], 0, '0.8048597948298679'], ['run-hello-name', ['run', 'examples/hello_name.utu'], 0, 'hello \nhi'],
     ['run-spectralnorm', ['run', 'examples/spectralnorm.utu'], 0, '1.2742222097429006'], ['run-deltablue', ['run', 'examples/deltablue.utu'], 0, '0'],
     ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'], ['bench-codegen-surface', ['bench', 'examples/ci/codegen_test_surface.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'increment loop:'],
 ];
 const CLI_BENCH_EXAMPLE_CASES = [['call-simple', 'examples/call_simple.utu', ['call-simple chain:']], ['deltablue', 'examples/deltablue.utu', ['deltablue_chain:', 'deltablue_projection:']], ['fannkuch', 'examples/fannkuch.utu', ['fannkuch:']], ['float', 'examples/float.utu', ['float normalize:']], ['hello-name', 'examples/hello_name.utu', ['hello-name format:']], ['spectralnorm', 'examples/spectralnorm.utu', ['spectralnorm:']]];
 
 const options = parseArgs(process.argv.slice(2));
-await (options.cliSmoke ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));
+await (options.cli ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));
 
 async function runCase(testCase) {
     const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
@@ -32,7 +33,8 @@ async function runCase(testCase) {
     if (mode === 'compile') return result;
     const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-example-' });
     try {
-        const exports = await compiledModule.module.instantiate();
+        const hostImports = await loadExampleHostImports(testCase.path);
+        const exports = await compiledModule.module.instantiate(undefined, hostImports);
         if (mode === 'test') {
             if (!metadata.tests.length) throw new Error(`No tests found in ${testCase.path}`);
             if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests)
@@ -75,12 +77,12 @@ function makeFailureResult(testCase, error) {
 }
 
 function parseArgs(argv) {
-    const options = { tags: [], compileAll: false, cliSmoke: false, cliBenchExamples: false };
+    const options = { tags: [], compileAll: false, cli: false, cliBenchExamples: false };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         switch (arg) {
             case '--compile-all': options.compileAll = true; break;
-            case '--cli-smoke': options.cliSmoke = true; break;
+            case '--cli': options.cli = true; break;
             case '--cli-bench-examples': options.cliBenchExamples = true; break;
             case '--example-root': options.exampleRoot = argv[++i]; break;
             case '--manifest': options.manifest = argv[++i]; break;
@@ -116,7 +118,7 @@ async function runManifestCases(options) {
     }
     const requiredFailures = results.filter((result) => result.status === 'failed' && !result.allowFailure);
     const allowedFailures = results.filter((result) => result.status === 'allowed-failure');
-    const report = { generatedAt: new Date().toISOString(), manifestPath, wasmPath, summary: { total: results.length, passed: results.filter((result) => result.status === 'passed').length, requiredFailures: requiredFailures.length, allowedFailures: allowedFailures.length }, results };
+    const report = { generatedAt: new Date().toISOString(), manifestPath, wasmPath: manifest.wasmPath ?? null, summary: { total: results.length, passed: results.filter((result) => result.status === 'passed').length, requiredFailures: requiredFailures.length, allowedFailures: allowedFailures.length }, results };
     if (options.reportFile) {
         const reportPath = resolve(process.cwd(), options.reportFile);
         await mkdir(dirname(reportPath), { recursive: true });
@@ -162,4 +164,33 @@ async function runCliCases(includeBenchExamples) {
     }]) : [])];
     if (await runNamedCases(cases))
         process.exit(1);
+}
+
+async function loadExampleHostImports(examplePath) {
+    const sidecars = await Promise.all(getExampleHostImportCandidates(examplePath).map(loadOptionalHostImportModule));
+    return sidecars.reduce(mergeHostImports, {});
+}
+
+function getExampleHostImportCandidates(examplePath) {
+    const absoluteExamplePath = resolve(repoRoot, examplePath);
+    const basePath = absoluteExamplePath.slice(0, -extname(absoluteExamplePath).length);
+    return [`${basePath}.mjs`, `${basePath}_host.mjs`];
+}
+
+async function loadOptionalHostImportModule(modulePath) {
+    try {
+        await access(modulePath);
+    } catch {
+        return {};
+    }
+    const imported = await import(pathToFileURL(modulePath).href);
+    return imported.hostImports ?? imported.default ?? {};
+}
+
+function mergeHostImports(left, right) {
+    const merged = { ...left };
+    for (const [moduleName, bindings] of Object.entries(right)) {
+        merged[moduleName] = { ...(merged[moduleName] ?? {}), ...(bindings ?? {}) };
+    }
+    return merged;
 }

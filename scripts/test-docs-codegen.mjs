@@ -95,7 +95,7 @@ const cases = [
     {
         name: 'imports-and-exports',
         path: 'examples/ci/codegen_imports_exports.utu',
-        snippets: ['(import "es" "console_log"', '(import "es" "wrap"', '(func $main', 'call $console_log', '(export "main" (func $main))'],
+        snippets: ['(import "es" "console_log"', '(import "es" "wrap"', '(func $greet', 'call $wrap', '(export "main" (func $main))'],
     },
     {
         name: 'break-and-call',

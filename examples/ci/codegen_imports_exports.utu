@@ -1,14 +1,15 @@
 shimport "es" console_log(str) void;
-// shimport "es" wrap(str) str;
+shimport "es" wrap(str) str;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
-// fun greet(name: str) str {
-//     name -o wrap;
-// }
+fun greet(name: str) str {
+    name -o wrap;
+}
 
 export fun main() i64 {
     3;
 }
 
-// test "imports can be called from test mode" {
-//     assert wrap("utu") == "[utu]";
-// }
+test "imports can be called from test mode" {
+    assert str_eq(greet("utu"), "[utu]");
+}

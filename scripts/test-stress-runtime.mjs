@@ -19,7 +19,8 @@ const cases = [
             if (execution.error) {
                 throw execution.error;
             }
-            expectDeepEqual(execution.logs, ['ok']);
+            expectDeepEqual(execution.logs, []);
+            expectEqual(execution.result, 'ok');
         });
     }],
     ['compile-test cycle', 25, async () => {

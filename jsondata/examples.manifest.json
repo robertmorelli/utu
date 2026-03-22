@@ -6,35 +6,35 @@
       "path": "examples/ci/hello.utu",
       "mode": "run",
       "expectedReturn": "ok",
-      "tags": ["smoke"]
+      "tags": []
     },
     {
       "name": "ci-global-string",
       "path": "examples/ci/global_string.utu",
       "mode": "run",
       "expectedReturn": "hello",
-      "tags": ["smoke"]
+      "tags": []
     },
     {
       "name": "ci-string-echo",
       "path": "examples/ci/string_echo.utu",
       "mode": "run",
       "expectedReturn": "value",
-      "tags": ["smoke"]
+      "tags": []
     },
     {
       "name": "ci-string-roundtrip",
       "path": "examples/ci/string_roundtrip.utu",
       "mode": "run",
       "expectedReturn": "[done]",
-      "tags": ["smoke"]
+      "tags": []
     },
     {
       "name": "ci-assert-pass",
       "path": "examples/ci/assert_pass.utu",
       "mode": "run",
       "expectedReturn": "ok",
-      "tags": ["smoke"]
+      "tags": []
     },
     {
       "name": "codegen-arithmetic-locals",
@@ -153,7 +153,7 @@
       "path": "examples/ci/codegen_break_and_call.utu",
       "mode": "run",
       "expectedReturn": "42",
-      "tags": ["smoke", "codegen"]
+      "tags": ["codegen"]
     },
     {
       "name": "codegen-refs-i31",

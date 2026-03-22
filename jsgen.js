@@ -43,31 +43,27 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
 
     if (needsNodeImports) lines.push('', renderSnippetLines(data.importHostModuleLines));
 
-    lines.push('', 'export async function instantiate(__wasmOverride) {');
+    lines.push('', 'export async function instantiate(__wasmOverride, __hostImports = {}) {');
     for (const group of moduleImports)
         if (group.autoResolve)
             lines.push(`  const ${group.ref} = await __importHostModule(${JSON.stringify(group.module)});`);
     if (where === 'base64') lines.push('  const __wasm = __wasmOverride ?? __wasmBytes;');
     if (where === 'relative_url') lines.push('  const __wasm = __wasmOverride ?? await (await fetch(__wasmUrl)).arrayBuffer();');
     if (where === 'local_file_node') lines.push('  const __wasm = __wasmOverride ?? await (await import("node:fs/promises")).readFile(__wasmPath);');
-    lines.push('  const __result = await WebAssembly.instantiate(__wasm, {');
+    lines.push('  const __imports = {');
     if (strings.length) lines.push('    "__strings": Object.fromEntries(__strings.map((s, i) => [i, s])),');
     for (const group of moduleImports) {
-            const moduleRef = group.autoResolve
-                ? group.ref
-                : null;
+        const moduleRef = group.autoResolve
+            ? group.ref
+            : null;
         lines.push(`    ${JSON.stringify(group.module)}: {`);
         for (const entry of group.entries) {
-            const binding = entry.kind === 'inline_js'
-                ? entry.ref
-                : moduleRef
-                ? renderHostImportAccess(moduleRef, entry.hostPath)
-                : renderHostImportExpression(group.module === '__utu_profile' ? ['__utu_profile', ...entry.hostPath] : entry.hostPath);
+            const binding = renderImportBinding(group, entry, moduleRef);
             lines.push(`      ${JSON.stringify(entry.hostName)}: ${binding},`);
         }
         lines.push('    },');
     }
-    lines.push('  });', '  return (__result.instance ?? __result).exports;', '}');
+    lines.push('  };', '  const __result = await WebAssembly.instantiate(__wasm, __imports);', '  return (__result.instance ?? __result).exports;', '}');
     if (exportNames.length) lines.push('', `// Exported functions: ${exportNames.join(', ')}`);
     return lines.join('\n');
 }
@@ -146,6 +142,7 @@ function parseImportDecl(node) {
             hostName,
             hostPath,
             paramCount: namedChildren(childOfType(node, 'import_param_list')).length,
+            returnType: parseReturnTypeNode(childOfType(node, 'return_type')),
         };
     }
     return { kind: 'value', module, name, hostName, hostPath };
@@ -195,8 +192,48 @@ function renderHostImportAccess(rootExpression, path) {
 
 function renderHostImportExpression(path) {
     return path.map((segment, index) => index === 0
-        ? segment
+        ? `globalThis[${JSON.stringify(segment)}]`
         : /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)
             ? `.${segment}`
             : `[${JSON.stringify(segment)}]`).join('');
+}
+
+function renderImportBinding(group, entry, moduleRef) {
+    if (entry.kind === 'inline_js') return entry.ref;
+    const hostImportRef = `__hostImports[${JSON.stringify(group.module)}]?.[${JSON.stringify(entry.hostName)}]`;
+    const fallbackRef = moduleRef
+        ? renderHostImportAccess(moduleRef, entry.hostPath)
+        : renderHostImportExpression(group.module === '__utu_profile' ? ['__utu_profile', ...entry.hostPath] : entry.hostPath);
+    const resolvedRef = `(${hostImportRef} ?? ${fallbackRef})`;
+    const caughtFallback = renderCaughtFallback(entry.returnType);
+    return caughtFallback === null
+        ? resolvedRef
+        : `(...__args) => { try { return ${resolvedRef}(...__args); } catch { return ${caughtFallback}; } }`;
+}
+
+function parseReturnTypeNode(node) {
+    if (!node) return null;
+    if (childOfType(node, 'void_type')) return null;
+    const components = [];
+    for (let index = 0; index < node.children.length; index += 1) {
+        const child = node.children[index];
+        if (!child.isNamed || child.type === 'void_type') continue;
+        const hash = node.children[index + 1]?.type === '#';
+        const err = hash && node.children[index + 2]?.isNamed ? node.children[index + 2] : null;
+        components.push(hash && err ? { kind: 'exclusive' } : { kind: child.type === 'nullable_type' ? 'nullable' : 'plain' });
+        if (hash) index += err ? 2 : 1;
+    }
+    return components;
+}
+
+function renderCaughtFallback(returnType) {
+    if (!returnType?.length) return null;
+    if (returnType.length === 1) {
+        return returnType[0].kind === 'nullable'
+            ? 'null'
+            : returnType[0].kind === 'exclusive'
+                ? '[null, null]'
+                : null;
+    }
+    return `[${returnType.map(component => component.kind === 'exclusive' ? 'null, null' : 'null').join(', ')}]`;
 }

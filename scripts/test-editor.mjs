@@ -241,18 +241,13 @@ export fun main() i32 {
     ),
     blockerCase('does not special-case node imports', 'shimport "node:fs" readFileSync(str) str;', undefined),
     ['collects no unsupported imports', () => expectDeepEqual([], [])],
-    compiledCase('resolves es functions from explicit JS globals', `shimport "es" math_sqrt(f64) f64;
+    compiledCase('resolves es functions from explicit host imports', `shimport "es" math_sqrt(f64) f64;
 
 export fun main() f64 {
     math_sqrt(81.0);
 }`, {}, async (_, { instantiate }) => {
-      globalThis.math = Math;
-      try {
-        const exports = await instantiate();
-        expectValue(await exports.main?.(), 9);
-      } finally {
-        delete globalThis.math;
-      }
+      const exports = await instantiate(undefined, { es: { math_sqrt: Math.sqrt } });
+      expectValue(await exports.main?.(), 9);
     }),
     compiledCase('treats comments as compiler trivia', `// top-level comment
 export fun main() i32 {
@@ -271,10 +266,10 @@ export fun main() bool {
       const exports = await instantiate();
       expectValue(await exports.main?.(), 1);
     }),
-    compiledCase('resolves namespace paths from node module exports', `shimport "node:path" posix_basename(str) str;
+    compiledCase('resolves namespace paths from node module exports', `shimport "node:path" _posix_basename(str) str;
 
 export fun main() str {
-    posix_basename("/tmp/demo.txt");
+    _posix_basename("/tmp/demo.txt");
 }`, {}, async (_, { instantiate }) => {
       const exports = await instantiate();
       expectValue(await exports.main?.(), 'demo.txt');
@@ -287,21 +282,16 @@ export fun main() void {
       where: 'local_file_node',
     }, async (_, { instantiate }) => {
       const logs = [];
-      const originalLog = console.log;
-      console.log = (line) => {
+      const console_log = (line) => {
         logs.push(String(line));
       };
-      try {
-        const exports = await instantiate();
-        expectValue(await exports.main?.(), undefined);
-        expectDeepEqual(logs, ['ok']);
-      } finally {
-        console.log = originalLog;
-      }
+      const exports = await instantiate(undefined, { es: { console_log } });
+      expectValue(await exports.main?.(), undefined);
+      expectDeepEqual(logs, ['ok']);
     }),
     compiledCase('instantiates benchmark modules with es host imports', `${consoleLogImport}
 
-bench "smoke" |i| {
+bench "sample" |i| {
     setup {
         measure {
             "ok" -o console_log;
@@ -312,17 +302,12 @@ bench "smoke" |i| {
       mode: 'bench',
     }, async (result, { instantiate }) => {
       const logs = [];
-      const originalLog = console.log;
-      console.log = (line) => {
+      const console_log = (line) => {
         logs.push(String(line));
       };
-      try {
-        const exports = await instantiate();
-        expectValue(await exports[getBenchExport(result)](3), undefined);
-        expectDeepEqual(logs, ['ok', 'ok', 'ok']);
-      } finally {
-        console.log = originalLog;
-      }
+      const exports = await instantiate(undefined, { es: { console_log } });
+      expectValue(await exports[getBenchExport(result)](3), undefined);
+      expectDeepEqual(logs, ['ok', 'ok', 'ok']);
     }),
   ];
 
