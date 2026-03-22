@@ -2,12 +2,6 @@ name: Release LSP
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the LSP package to npm
-        required: false
-        default: false
-        type: boolean
   push:
     tags:
       - 'lsp-v*'
@@ -38,36 +32,23 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build everything
+        run: bun run build
+
       - name: Run full test suite
         run: bun run test
 
-      - name: Build grammar artifact
-        run: bun run grammar
-
-      - name: Validate LSP/editor core
-        run: bun scripts/test-editor-core.mjs
-
-      - name: Build LSP package
-        working-directory: lsp
+      - name: Verify LSP artifacts
         run: |
-          npm run build
-          test -f ./dist/utu-lsp.js
+          test -f ./utu-lsp
           test -f ./tree-sitter-utu.wasm
-          test -f ./dist/web-tree-sitter.wasm
-
-      - name: Pack npm tarball
-        working-directory: lsp
-        run: npm pack --pack-destination ./artifacts
+          test -f ./web-tree-sitter.wasm
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: utu-lsp-release
-          path: lsp/artifacts/*.tgz
-
-      - name: Publish LSP package
-        if: github.event_name == 'push' || inputs.publish
-        working-directory: lsp
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+          path: |
+            utu-lsp
+            tree-sitter-utu.wasm
+            web-tree-sitter.wasm

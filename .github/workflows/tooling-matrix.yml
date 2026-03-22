@@ -43,36 +43,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build grammar artifact
-        run: |
-          bun run grammar
-          bun run distribute
+      - name: Build everything
+        run: bun run build
 
-      - name: Build VS Code web bundle
-        working-directory: vscode
-        run: npm run build:web
-
-      - name: Validate editor core
-        run: bun scripts/test-editor-core.mjs
-
-      - name: Validate editor/example compile parity
-        run: bun scripts/test-editor-example-parity.mjs
-
-      - name: Validate web host behavior
-        run: bun scripts/test-editor-webhost.mjs
-
-      - name: Build LSP package
-        working-directory: lsp
-        run: |
-          npm run build
-          test -f ./dist/utu-lsp.js
-          test -f ./tree-sitter-utu.wasm
-          test -f ./dist/web-tree-sitter.wasm
-
-      - name: Build VS Code extension
-        working-directory: vscode
-        run: |
-          npm run build
-          test -f ./dist/web/extension.js
-          test -f ./dist/compiler.mjs
-          test -f ./dist/compiler.web.mjs
+      - name: Run full test suite
+        run: bun run test

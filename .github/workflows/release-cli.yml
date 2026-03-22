@@ -2,12 +2,6 @@ name: Release CLI
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the CLI package to npm
-        required: false
-        default: false
-        type: boolean
   push:
     tags:
       - 'cli-v*'
@@ -38,38 +32,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build everything
+        run: bun run build
+
       - name: Run full test suite
         run: bun run test
 
-      - name: Run CLI smoke checks
-        working-directory: cli_artifact
+      - name: Verify CLI artifacts
         run: |
-          bun run smoke:compile
-          bun run smoke:test
-          bun run smoke:bench
-
-      - name: Build release artifacts
-        working-directory: cli_artifact
-        run: |
-          bun run build
-          test -f ./dist/package/cli.js
-          test -f ./dist/utu
-
-      - name: Pack npm tarball
-        working-directory: cli_artifact
-        run: npm pack --pack-destination ./artifacts
+          test -f ./dist/cli-package/cli.js
+          test -f ./utu
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: utu-cli-release
           path: |
-            cli_artifact/artifacts/*.tgz
-            cli_artifact/dist/utu
-
-      - name: Publish CLI package
-        if: github.event_name == 'push' || inputs.publish
-        working-directory: cli_artifact
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+            dist/cli-package/**
+            utu

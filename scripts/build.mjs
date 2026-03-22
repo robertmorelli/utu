@@ -24,7 +24,6 @@ const ignoredWatchEntries = new Set([
   '.git',
   'node_modules',
   'dist',
-  'cli_artifact',
   'tree-sitter-utu.wasm',
   'web-tree-sitter.wasm',
 ]);
@@ -231,7 +230,7 @@ async function findFreshestFile(paths) {
       return null;
     }
   }))).filter(Boolean);
-  if (!candidates.length) throw new Error('Could not find tree-sitter-utu.wasm. Run `bun run grammar` from the repo root.');
+  if (!candidates.length) throw new Error('Could not find tree-sitter-utu.wasm. Run `bun run build` from the repo root.');
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
   return candidates[0].path;
 }

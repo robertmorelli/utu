@@ -37,18 +37,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build everything
+        run: bun run build
+
       - name: Run full test suite
         run: bun run test
-
-      - name: Build grammar artifact
-        run: bun run grammar
-
-      - name: Validate web host behavior
-        run: bun scripts/test-editor-webhost.mjs
-
-      - name: Package VSIX
-        working-directory: vscode
-        run: npm run package:vsix
 
       - name: Upload VSIX
         uses: actions/upload-artifact@v4
@@ -58,7 +51,6 @@ jobs:
 
       - name: Publish to VS Code Marketplace
         if: github.event_name == 'push' || inputs.publish
-        working-directory: vscode
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npm run publish:marketplace
+        run: ./node_modules/.bin/vsce publish --no-dependencies
