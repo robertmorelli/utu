@@ -1,4 +1,4 @@
-import docs from './hoverDocs.data.json' with { type: 'json' };
+import docs from '../jsondata/hoverDocs.data.json' with { type: 'json' };
 
 const BUILTIN_DOCS = docs.builtinDocs;
 const BUILTIN_RETURN_TYPES = docs.builtinReturnTypes;

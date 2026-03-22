@@ -1,4 +1,4 @@
-import data from './languageService.data.json' with { type: 'json' };
+import data from '../jsondata/languageService.data.json' with { type: 'json' };
 import { BUILTIN_METHODS, CORE_TYPE_COMPLETIONS, KEYWORD_COMPLETIONS, LITERAL_COMPLETIONS, getBuiltinNamespaceHover, getBuiltinHover, getBuiltinReturnType, getCoreTypeHover, getKeywordHover, getLiteralHover, isBuiltinNamespace, } from './hoverDocs.js';
 import { collectParseDiagnostics, spanFromNode, spanFromOffsets, } from '../parser.js';
 import { clamp, comparePositions, copyRange, getDocumentUri, rangeContains, rangeKey, rangeLength, } from './types.js';

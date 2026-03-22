@@ -1,18 +1,14 @@
 import { rootNode, childOfType, walk, stringLiteralValue } from './tree.js';
+import data from './jsondata/jsgen.data.json' with { type: 'json' };
 
-const JS_STRING_BUILTINS = [
-    ['length', 'value => value.length'],
-    ['charCodeAt', '(value, index) => value.charCodeAt(index)'],
-    ['concat', '(left, right) => left + right'],
-    ['substring', '(value, start, end) => value.substring(start, end)'],
-    ['equals', '(left, right) => +(left === right)'],
-    ['fromCharCode', 'value => String.fromCharCode(value)'],
-];
+const JS_STRING_BUILTINS = data.jsStringBuiltins;
+const SUPPORTED_WASM_LOCATIONS = data.supportedWasmLocations;
+const SUPPORTED_MODULE_FORMATS = data.supportedModuleFormats;
 
 export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', metadata = {} } = {}) {
-    if (!['base64', 'relative_url', 'local_file_node'].includes(where))
+    if (!SUPPORTED_WASM_LOCATIONS.includes(where))
         throw new Error(`Unsupported wasm location "${where}". Expected base64, relative_url, or local_file_node.`);
-    if (moduleFormat !== 'esm')
+    if (!SUPPORTED_MODULE_FORMATS.includes(moduleFormat))
         throw new Error(`Unsupported module format "${moduleFormat}". Expected esm.`);
 
     const root = rootNode(treeOrNode);
@@ -33,30 +29,31 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
     if (where === 'local_file_node') lines.push('', 'const __wasmPath = new URL(import.meta.url.replace(/\\.(?:[cm]?js|mjs)$/u, ".wasm"));');
 
     if (strings.length) lines.push('', `const __strings = [${strings.map(value => JSON.stringify(value)).join(', ')}];`);
-    lines.push('', `const __jsStringBuiltins = {\n${JS_STRING_BUILTINS.map(([name, value]) => `  ${name}: ${value},`).join('\n')}\n};`);
+    lines.push('', `const __jsStringBuiltins = {\n${JS_STRING_BUILTINS.map(({ name, expression }) => `  ${name}: ${expression},`).join('\n')}\n};`);
     lines.push('', `export const metadata = ${JSON.stringify({
         tests: metadata.tests ?? [],
         benches: metadata.benches ?? [],
     })};`);
     lines.push('', [
-        'export const DEFAULT_BENCHMARK_OPTIONS = Object.freeze({ seconds: 1, samples: 10, warmup: 2 });',
+        `export const DEFAULT_BENCHMARK_OPTIONS = Object.freeze(${JSON.stringify(data.defaultBenchmarkOptions)});`,
         'const __defaultFormatError = error => error instanceof Error ? error.message : String(error);',
         'const __defaultNow = () => performance.now();',
         'const __defaultClock = () => typeof process !== "undefined" && process?.hrtime?.bigint',
         '  ? { nowNs: () => Number(process.hrtime.bigint()) }',
         '  : { nowNs: () => Math.round(performance.now() * 1e6) };',
         'const __benchmarkRate = (iterations, elapsedNs) => elapsedNs <= 0 ? 0 : iterations / (elapsedNs / 1e9);',
+        `const __iterationsPerSecondFormatThresholds = ${JSON.stringify(data.iterationsPerSecondFormatThresholds)};`,
         'const __formatIterationsPerSecond = value => {',
-        '  if (value >= 1e9) return `${(value / 1e9).toFixed(3)}G iter/s`;',
-        '  if (value >= 1e6) return `${(value / 1e6).toFixed(3)}M iter/s`;',
-        '  if (value >= 1e3) return `${(value / 1e3).toFixed(3)}K iter/s`;',
-        '  if (value >= 100) return `${value.toFixed(0)} iter/s`;',
-        '  if (value >= 10) return `${value.toFixed(1)} iter/s`;',
+        '  for (const entry of __iterationsPerSecondFormatThresholds) {',
+        '    if (value >= entry.min) return `${(value / entry.divisor).toFixed(entry.digits)}${entry.suffix}`;',
+        '  }',
         '  return `${value.toFixed(2)} iter/s`;',
         '};',
+        `const __durationNsFormatThresholds = ${JSON.stringify(data.durationNsFormatThresholds)};`,
         'const __formatDurationNs = value => {',
-        '  if (value >= 1e6) return `${(value / 1e6).toFixed(3)}ms`;',
-        '  if (value >= 1e3) return `${(value / 1e3).toFixed(3)}us`;',
+        '  for (const entry of __durationNsFormatThresholds) {',
+        '    if (value >= entry.min) return `${(value / entry.divisor).toFixed(entry.digits)}${entry.suffix}`;',
+        '  }',
         '  return `${value.toFixed(0)}ns`;',
         '};',
         'const __normalizeBenchmarkOptions = options => ({',

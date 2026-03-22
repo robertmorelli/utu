@@ -8,6 +8,7 @@ import {
     stringLiteralValue,
     findAnonBetween,
 } from './tree.js';
+import data from './jsondata/watgen.data.json' with { type: 'json' };
 
 export class WatError extends Error {}
 
@@ -15,23 +16,18 @@ export function watgen(treeOrNode, { mode = 'program', profile = null, targetNam
     return new WatGen(rootNode(treeOrNode), mode, profile, targetName).generate();
 }
 
-const SCALAR_WASM = {
-    i32: 'i32', u32: 'i32',
-    i64: 'i64', u64: 'i64',
-    f32: 'f32', f64: 'f64',
-    bool: 'i32', v128: 'v128',
-};
-const REF_WASM = { str: 'externref', externref: 'externref', anyref: 'anyref', eqref: 'eqref', i31: 'i31ref' };
-const NULLABLE_REF_WASM = { str: 'externref', externref: 'externref', anyref: 'anyref' };
-const REF_NULL_TARGETS = { externref: 'extern', anyref: 'any', eqref: 'eq', i31ref: 'i31' };
-const I31_NS_OPS = { new: 'ref.i31', get_s: 'i31.get_s', get_u: 'i31.get_u' };
-const I31_NS_RETURN_TYPES = { new: 'i31', get_s: 'i32', get_u: 'i32' };
-const SIMPLE_NS_OPS = { extern: 'extern.convert_any', any: 'any.convert_extern' };
-const SIMPLE_NS_RETURN_TYPES = { extern: 'externref', any: 'anyref' };
-const REF_NS_OPS = { is_null: 'ref.is_null', as_non_null: 'ref.as_non_null', eq: 'ref.eq' };
-const REF_NS_RETURN_TYPES = { is_null: 'i32', eq: 'i32', test: 'i32' };
-const DIRECT_BINARY_INSTRS = { '+': 'add', '-': 'sub', '*': 'mul', '&': 'and', '|': 'or', '^': 'xor', '<<': 'shl', '>>>': 'shr_u', '==': 'eq', '!=': 'ne', and: 'and', or: 'or' };
-const COMPARE_BINARY_INSTRS = { '<': 'lt', '>': 'gt', '<=': 'le', '>=': 'ge' };
+const SCALAR_WASM = data.scalarWasm;
+const REF_WASM = data.refWasm;
+const NULLABLE_REF_WASM = data.nullableRefWasm;
+const REF_NULL_TARGETS = data.refNullTargets;
+const I31_NS_OPS = data.i31NsOps;
+const I31_NS_RETURN_TYPES = data.i31NsReturnTypes;
+const SIMPLE_NS_OPS = data.simpleNsOps;
+const SIMPLE_NS_RETURN_TYPES = data.simpleNsReturnTypes;
+const REF_NS_OPS = data.refNsOps;
+const REF_NS_RETURN_TYPES = data.refNsReturnTypes;
+const DIRECT_BINARY_INSTRS = data.directBinaryInstrs;
+const COMPARE_BINARY_INSTRS = data.compareBinaryInstrs;
 const BINARY_INSTR_BUILDERS = {
     ...Object.fromEntries(Object.entries(DIRECT_BINARY_INSTRS).map(([op, suffix]) => [op, ({ base }) => `${base}.${suffix}`])),
     ...Object.fromEntries(Object.entries(COMPARE_BINARY_INSTRS).map(([op, suffix]) => [op, ({ base, isFloat, isUnsigned }) => isFloat ? `${base}.${suffix}` : `${base}.${suffix}_${isUnsigned ? 'u' : 's'}`])),
@@ -39,7 +35,7 @@ const BINARY_INSTR_BUILDERS = {
     '%': ({ base, isFloat, isUnsigned }) => isFloat ? `${base}.rem` : `${base}.rem_${isUnsigned ? 'u' : 's'}`,
     '>>': ({ base, isUnsigned }) => `${base}.shr_${isUnsigned ? 'u' : 's'}`,
 };
-const VALID_CONST_WASM_TYPES = new Set(['i32', 'u32', 'i64', 'u64', 'f32', 'f64']);
+const VALID_CONST_WASM_TYPES = new Set(data.validConstWasmTypes);
 const CONST_UNARY_OPS = { '-': value => -value, not: value => value ? 0 : 1, '~': value => ~value };
 const CONST_BINARY_OPS = {
     '+': (left, right) => left + right,
@@ -62,28 +58,19 @@ const CONST_BINARY_OPS = {
     and: (left, right) => left && right ? 1 : 0,
     or: (left, right) => left || right ? 1 : 0,
 };
-const LITERAL_INFERRED_TYPES = { int: 'i32', float: 'f64', bool: 'i32', string: 'str' };
-const LITERAL_TEXT_INFO = { true: { kind: 'bool', value: true }, false: { kind: 'bool', value: false }, null: { kind: 'null', value: null } };
-const FLOAT_NEG_INSTRS = { f32: 'f32.neg', f64: 'f64.neg' };
-const SCALAR_MATCH_COMPARE_TYPES = { i64: 'i64', u64: 'i64', f32: 'f32', f64: 'f64' };
-const BINARY_BOOL_OPS = new Set(['==', '!=', '<', '>', '<=', '>=', 'and', 'or']);
-const DISCARD_HINT_NODES = new Set(['if_expr', 'match_expr', 'alt_expr', 'block_expr']);
-const VALUELESS_EXPR_TYPES = new Set(['assert_expr', 'assign_expr', 'break_expr', 'emit_expr', 'for_expr', 'while_expr', 'bind_expr', 'fatal_expr']);
-const INFERRED_VALUE_EXPR_TYPES = new Set(['call_expr', 'namespace_call_expr', 'pipe_expr', 'if_expr', 'match_expr', 'alt_expr', 'block_expr']);
-const SCALAR_NAMES = new Set(['i32', 'u32', 'i64', 'u64', 'f32', 'f64', 'v128', 'bool']);
-const I32 = { kind: 'scalar', name: 'i32' };
-const DISCARD_HINT = '__discard__';
+const LITERAL_INFERRED_TYPES = data.literalInferredTypes;
+const LITERAL_TEXT_INFO = data.literalTextInfo;
+const FLOAT_NEG_INSTRS = data.floatNegInstrs;
+const SCALAR_MATCH_COMPARE_TYPES = data.scalarMatchCompareTypes;
+const BINARY_BOOL_OPS = new Set(data.binaryBoolOps);
+const DISCARD_HINT_NODES = new Set(data.discardHintNodes);
+const VALUELESS_EXPR_TYPES = new Set(data.valuelessExprTypes);
+const INFERRED_VALUE_EXPR_TYPES = new Set(data.inferredValueExprTypes);
+const SCALAR_NAMES = new Set(data.scalarNames);
+const I32 = data.i32Type;
+const DISCARD_HINT = data.discardHint;
 
-const STR_BUILTINS = {
-    length: { importName: 'length', sig: '(param externref) (result i32)' },
-    char_code_at: { importName: 'charCodeAt', sig: '(param externref i32) (result i32)' },
-    concat: { importName: 'concat', sig: '(param externref externref) (result externref)' },
-    substring: { importName: 'substring', sig: '(param externref i32 i32) (result externref)' },
-    equals: { importName: 'equals', sig: '(param externref externref) (result i32)' },
-    from_char_code_array: { importName: 'fromCharCodeArray', sig: '(param (ref $i16_array) i32 i32) (result externref)' },
-    into_char_code_array: { importName: 'intoCharCodeArray', sig: '(param externref (ref $i16_array) i32) (result i32)' },
-    from_char_code: { importName: 'fromCharCode', sig: '(param i32) (result externref)' },
-};
+const STR_BUILTINS = data.strBuiltins;
 const TOP_LEVEL_COLLECT_HANDLERS = {
     struct_decl: (ctx, item) => {
         const decl = parseStructDecl(item);

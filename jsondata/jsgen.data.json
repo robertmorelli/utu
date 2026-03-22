@@ -1,0 +1,87 @@
+{
+  "supportedWasmLocations": [
+    "base64",
+    "relative_url",
+    "local_file_node"
+  ],
+  "supportedModuleFormats": [
+    "esm"
+  ],
+  "jsStringBuiltins": [
+    {
+      "name": "length",
+      "expression": "value => value.length"
+    },
+    {
+      "name": "charCodeAt",
+      "expression": "(value, index) => value.charCodeAt(index)"
+    },
+    {
+      "name": "concat",
+      "expression": "(left, right) => left + right"
+    },
+    {
+      "name": "substring",
+      "expression": "(value, start, end) => value.substring(start, end)"
+    },
+    {
+      "name": "equals",
+      "expression": "(left, right) => +(left === right)"
+    },
+    {
+      "name": "fromCharCode",
+      "expression": "value => String.fromCharCode(value)"
+    }
+  ],
+  "defaultBenchmarkOptions": {
+    "seconds": 1,
+    "samples": 10,
+    "warmup": 2
+  },
+  "iterationsPerSecondFormatThresholds": [
+    {
+      "min": 1000000000,
+      "divisor": 1000000000,
+      "suffix": "G iter/s",
+      "digits": 3
+    },
+    {
+      "min": 1000000,
+      "divisor": 1000000,
+      "suffix": "M iter/s",
+      "digits": 3
+    },
+    {
+      "min": 1000,
+      "divisor": 1000,
+      "suffix": "K iter/s",
+      "digits": 3
+    },
+    {
+      "min": 100,
+      "divisor": 1,
+      "suffix": " iter/s",
+      "digits": 0
+    },
+    {
+      "min": 10,
+      "divisor": 1,
+      "suffix": " iter/s",
+      "digits": 1
+    }
+  ],
+  "durationNsFormatThresholds": [
+    {
+      "min": 1000000,
+      "divisor": 1000000,
+      "suffix": "ms",
+      "digits": 3
+    },
+    {
+      "min": 1000,
+      "divisor": 1000,
+      "suffix": "us",
+      "digits": 3
+    }
+  ]
+}

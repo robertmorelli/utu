@@ -1,0 +1,200 @@
+{
+  "scalarWasm": {
+    "i32": "i32",
+    "u32": "i32",
+    "i64": "i64",
+    "u64": "i64",
+    "f32": "f32",
+    "f64": "f64",
+    "bool": "i32",
+    "v128": "v128"
+  },
+  "refWasm": {
+    "str": "externref",
+    "externref": "externref",
+    "anyref": "anyref",
+    "eqref": "eqref",
+    "i31": "i31ref"
+  },
+  "nullableRefWasm": {
+    "str": "externref",
+    "externref": "externref",
+    "anyref": "anyref"
+  },
+  "refNullTargets": {
+    "externref": "extern",
+    "anyref": "any",
+    "eqref": "eq",
+    "i31ref": "i31"
+  },
+  "i31NsOps": {
+    "new": "ref.i31",
+    "get_s": "i31.get_s",
+    "get_u": "i31.get_u"
+  },
+  "i31NsReturnTypes": {
+    "new": "i31",
+    "get_s": "i32",
+    "get_u": "i32"
+  },
+  "simpleNsOps": {
+    "extern": "extern.convert_any",
+    "any": "any.convert_extern"
+  },
+  "simpleNsReturnTypes": {
+    "extern": "externref",
+    "any": "anyref"
+  },
+  "refNsOps": {
+    "is_null": "ref.is_null",
+    "as_non_null": "ref.as_non_null",
+    "eq": "ref.eq"
+  },
+  "refNsReturnTypes": {
+    "is_null": "i32",
+    "eq": "i32",
+    "test": "i32"
+  },
+  "directBinaryInstrs": {
+    "+": "add",
+    "-": "sub",
+    "*": "mul",
+    "&": "and",
+    "|": "or",
+    "^": "xor",
+    "<<": "shl",
+    ">>>": "shr_u",
+    "==": "eq",
+    "!=": "ne",
+    "and": "and",
+    "or": "or"
+  },
+  "compareBinaryInstrs": {
+    "<": "lt",
+    ">": "gt",
+    "<=": "le",
+    ">=": "ge"
+  },
+  "validConstWasmTypes": [
+    "i32",
+    "u32",
+    "i64",
+    "u64",
+    "f32",
+    "f64"
+  ],
+  "literalInferredTypes": {
+    "int": "i32",
+    "float": "f64",
+    "bool": "i32",
+    "string": "str"
+  },
+  "literalTextInfo": {
+    "true": {
+      "kind": "bool",
+      "value": true
+    },
+    "false": {
+      "kind": "bool",
+      "value": false
+    },
+    "null": {
+      "kind": "null",
+      "value": null
+    }
+  },
+  "floatNegInstrs": {
+    "f32": "f32.neg",
+    "f64": "f64.neg"
+  },
+  "scalarMatchCompareTypes": {
+    "i64": "i64",
+    "u64": "i64",
+    "f32": "f32",
+    "f64": "f64"
+  },
+  "binaryBoolOps": [
+    "==",
+    "!=",
+    "<",
+    ">",
+    "<=",
+    ">=",
+    "and",
+    "or"
+  ],
+  "discardHintNodes": [
+    "if_expr",
+    "match_expr",
+    "alt_expr",
+    "block_expr"
+  ],
+  "valuelessExprTypes": [
+    "assert_expr",
+    "assign_expr",
+    "break_expr",
+    "emit_expr",
+    "for_expr",
+    "while_expr",
+    "bind_expr",
+    "fatal_expr"
+  ],
+  "inferredValueExprTypes": [
+    "call_expr",
+    "namespace_call_expr",
+    "pipe_expr",
+    "if_expr",
+    "match_expr",
+    "alt_expr",
+    "block_expr"
+  ],
+  "scalarNames": [
+    "i32",
+    "u32",
+    "i64",
+    "u64",
+    "f32",
+    "f64",
+    "v128",
+    "bool"
+  ],
+  "discardHint": "__discard__",
+  "i32Type": {
+    "kind": "scalar",
+    "name": "i32"
+  },
+  "strBuiltins": {
+    "length": {
+      "importName": "length",
+      "sig": "(param externref) (result i32)"
+    },
+    "char_code_at": {
+      "importName": "charCodeAt",
+      "sig": "(param externref i32) (result i32)"
+    },
+    "concat": {
+      "importName": "concat",
+      "sig": "(param externref externref) (result externref)"
+    },
+    "substring": {
+      "importName": "substring",
+      "sig": "(param externref i32 i32) (result externref)"
+    },
+    "equals": {
+      "importName": "equals",
+      "sig": "(param externref externref) (result i32)"
+    },
+    "from_char_code_array": {
+      "importName": "fromCharCodeArray",
+      "sig": "(param (ref $i16_array) i32 i32) (result externref)"
+    },
+    "into_char_code_array": {
+      "importName": "intoCharCodeArray",
+      "sig": "(param externref (ref $i16_array) i32) (result i32)"
+    },
+    "from_char_code": {
+      "importName": "fromCharCode",
+      "sig": "(param i32) (result externref)"
+    }
+  }
+}
