@@ -1,7 +1,7 @@
 {
   "name": "utu-vscode",
   "displayName": "UTU",
-  "description": "Web-first, zero-dep compiler distribution for making tiny, high-performance Wasm bundles for modern ES runtimes.",
+  "description": "Web-first language and compiler for building tiny, high-performance Wasm bundles.",
   "author": "Robert Morelli",
   "version": "0.1.0",
   "publisher": "robertmorelli",

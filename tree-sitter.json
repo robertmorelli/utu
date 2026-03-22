@@ -13,7 +13,7 @@
   "metadata": {
     "version": "0.1.0",
     "license": "MIT",
-    "description": "Web-first, portable, zero-dep compiler tooling for making tiny, high-performance Wasm bundles.",
+    "description": "Web-first language and compiler tooling for building tiny, high-performance Wasm bundles.",
     "authors": [
       {
         "name": "Robert Morelli",
