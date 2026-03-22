@@ -2,48 +2,6 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "UTU: Build Grammar",
-      "type": "shell",
-      "command": "bun",
-      "args": [
-        "run",
-        "grammar"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "NO_COLOR": "1",
-          "FORCE_COLOR": "0"
-        }
-      },
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      }
-    },
-    {
-      "label": "UTU: Distribute Grammar",
-      "type": "shell",
-      "command": "bun",
-      "args": [
-        "run",
-        "distribute"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "NO_COLOR": "1",
-          "FORCE_COLOR": "0"
-        }
-      },
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      }
-    },
-    {
       "label": "UTU: Rebuild",
       "type": "shell",
       "command": "bun",
