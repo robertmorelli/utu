@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex, hasRunnableMain } from '../lsp_core/languageService.js'; import { UtuParserService } from '../parser.js';
 import { registerCommands } from './commands.js'; import { DiagnosticsController } from './diagnostics.js';
 import { GeneratedDocumentStore } from './generatedDocuments.js'; import { registerLanguageProviders } from './languageProviders.js';
+import { UTU_EXCLUDE, UTU_GLOB } from './shared.js';
 import { registerTesting } from './testing.js';
 export function activateUtuExtension(context, options) {
-    const output = vscode.window.createOutputChannel('UTU'), generatedDocuments = new GeneratedDocumentStore(), parserService = new UtuParserService({ grammarWasmPath: options.grammarWasmPath, runtimeWasmPath: options.parserRuntimeWasmPath }), languageService = new UtuLanguageService(parserService), workspaceSymbols = createWorkspaceSymbolController(languageService, output), diagnostics = new DiagnosticsController(languageService, output, options.compilerHost), statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem(), refreshMainContext = createMainContextRefresher(languageService, options.runtimeHost), workspaceWatcher = vscode.workspace.createFileSystemWatcher('**/*.utu');
+    const output = vscode.window.createOutputChannel('UTU'), generatedDocuments = new GeneratedDocumentStore(), parserService = new UtuParserService({ grammarWasmPath: options.grammarWasmPath, runtimeWasmPath: options.parserRuntimeWasmPath }), languageService = new UtuLanguageService(parserService), workspaceSymbols = createWorkspaceSymbolController(languageService, output), diagnostics = new DiagnosticsController(languageService, output, options.compilerHost), statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem(), refreshMainContext = createMainContextRefresher(languageService, options.runtimeHost), workspaceWatcher = vscode.workspace.createFileSystemWatcher(UTU_GLOB);
     const syncDocument = (document) => { void workspaceSymbols.updateDocument(document); if (document === vscode.window.activeTextEditor?.document) void refreshMainContext(document); };
     const subscriptions = [
         output, generatedDocuments, parserService, diagnostics, workspaceWatcher, { dispose: () => { workspaceSymbols.clear(); languageService.dispose(); } },
@@ -41,7 +42,7 @@ function createWorkspaceSymbolController(languageService, output) {
     let queue = Promise.resolve(), initialSyncPromise;
     const schedule = (label, task) => (queue = queue.then(task, task).catch((error) => { output?.appendLine(`[workspace symbols] ${label}: ${error instanceof Error ? error.message : String(error)}`); }));
     const syncWorkspace = () => schedule('sync workspace', async () => {
-        const uris = await vscode.workspace.findFiles('**/*.utu', '**/node_modules/**');
+        const uris = await vscode.workspace.findFiles(UTU_GLOB, UTU_EXCLUDE);
         const documents = await Promise.all(uris.map((uri) => vscode.workspace.openTextDocument(uri)));
         await index.syncDocuments(documents.filter((document) => document.languageId === 'utu'), { replace: true });
     });

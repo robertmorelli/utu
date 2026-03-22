@@ -3,6 +3,7 @@ import { toVscodeRange } from './adapters/core.js';
 import { DEFAULT_BENCHMARK_OPTIONS } from '../loadCompiledRuntime.mjs';
 import { displayNameForUri } from './generatedDocuments.js';
 import { collectRunnableEntries } from '../lsp_core/languageService.js';
+import { createDebouncedUriScheduler, logOutputError, UTU_EXCLUDE, UTU_GLOB, UTU_LANGUAGE_ID } from './shared.js';
 const TEST_TAG = new vscode.TestTag('utu-test'), BENCH_TAG = new vscode.TestTag('utu-bench');
 const RUNNERS = { test: { label: 'UTU Tests', tag: TEST_TAG, run: (dependencies, source, ordinal) => dependencies.runtimeHost.runTest(source, ordinal) }, bench: { label: 'UTU Benchmarks', tag: BENCH_TAG, run: (dependencies, source, ordinal) => dependencies.runtimeHost.runBenchmark(source, ordinal, getBenchmarkOptionsFromConfig()) } };
 export function registerTesting(context, dependencies) {
@@ -23,7 +24,7 @@ export function registerTesting(context, dependencies) {
         }));
         if (!controller.items.get(fileItem.id)) controller.items.add(fileItem);
     };
-    const refreshWorkspace = async () => { const liveIds = new Set(); await Promise.all((await vscode.workspace.findFiles('**/*.utu', '**/node_modules/**')).map(async (uri) => { liveIds.add(uri.toString()); await refreshFile(uri); })); controller.items.forEach((item) => !liveIds.has(item.id) && controller.items.delete(item.id)); };
+    const refreshWorkspace = async () => { const liveIds = new Set(); await Promise.all((await vscode.workspace.findFiles(UTU_GLOB, UTU_EXCLUDE)).map(async (uri) => { liveIds.add(uri.toString()); await refreshFile(uri); })); controller.items.forEach((item) => !liveIds.has(item.id) && controller.items.delete(item.id)); };
     const collectRunnableItems = async (request, kind) => {
         const queue = request.include ? [...request.include] : Array.from(controller.items);
         const excluded = new Set(request.exclude?.map((item) => item.id));
@@ -61,23 +62,21 @@ export function registerTesting(context, dependencies) {
                     }
                 }
                 catch (error) {
-                    const message = JSON.stringify(error);
-                    dependencies.output.appendLine(`[utu] ${uri.fsPath || uri.toString()}`);
-                    dependencies.output.appendLine(message);
+                    const message = error instanceof Error ? error.message : JSON.stringify(error);
+                    logOutputError(dependencies.output, `[utu] ${uri.fsPath || uri.toString()}`, error);
                     for (const item of items) run.errored(item, new vscode.TestMessage(message));
                 }
             }
         }
         finally { run.end(); }
     };
-    const pending = new Map();
-    const scheduleRefresh = (uri) => { const key = uri.toString(); clearTimeout(pending.get(key)); pending.set(key, setTimeout(() => { pending.delete(key); void refreshFile(uri); }, 150)); };
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*.utu');
+    const refreshScheduler = createDebouncedUriScheduler(150, refreshFile);
+    const watcher = vscode.workspace.createFileSystemWatcher(UTU_GLOB);
     controller.resolveHandler = async (item) => !item ? refreshWorkspace() : itemData.get(item)?.kind === 'file' && refreshFile(itemData.get(item).uri);
     const testProfile = controller.createRunProfile('Run Tests', vscode.TestRunProfileKind.Run, (request, token) => runItems(request, token, 'test'));
     const benchProfile = controller.createRunProfile('Run Benchmarks', vscode.TestRunProfileKind.Run, (request, token) => runItems(request, token, 'bench'));
     testProfile.tag = TEST_TAG; benchProfile.tag = BENCH_TAG;
-    context.subscriptions.push(controller, testProfile, benchProfile, watcher, vscode.workspace.onDidOpenTextDocument((document) => document.languageId === 'utu' && void refreshFile(document.uri)), vscode.workspace.onDidChangeTextDocument((event) => event.document.languageId === 'utu' && scheduleRefresh(event.document.uri)), vscode.workspace.onDidSaveTextDocument((document) => document.languageId === 'utu' && void refreshFile(document.uri)), watcher.onDidCreate((uri) => { void refreshFile(uri); }), watcher.onDidChange(scheduleRefresh), watcher.onDidDelete((uri) => { controller.items.delete(uri.toString()); }));
+    context.subscriptions.push(controller, testProfile, benchProfile, watcher, { dispose: () => refreshScheduler.clear() }, vscode.workspace.onDidOpenTextDocument((document) => document.languageId === UTU_LANGUAGE_ID && void refreshFile(document.uri)), vscode.workspace.onDidChangeTextDocument((event) => event.document.languageId === UTU_LANGUAGE_ID && refreshScheduler.schedule(event.document.uri)), vscode.workspace.onDidSaveTextDocument((document) => document.languageId === UTU_LANGUAGE_ID && void refreshFile(document.uri)), watcher.onDidCreate((uri) => { void refreshFile(uri); }), watcher.onDidChange((uri) => refreshScheduler.schedule(uri)), watcher.onDidDelete((uri) => { refreshScheduler.delete(uri); controller.items.delete(uri.toString()); }));
     void refreshWorkspace();
 }
 

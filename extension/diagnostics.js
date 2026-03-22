@@ -1,32 +1,31 @@
 import * as vscode from 'vscode';
 import { toVscodeDiagnostic } from './adapters/core.js';
+import { createDebouncedUriScheduler, logOutputError, UTU_LANGUAGE_ID } from './shared.js';
 const VALIDATION_DELAY_MS = 150;
-const UTU_LANGUAGE_ID = 'utu';
 export class DiagnosticsController {
     languageService;
     output;
     compilerHost;
     collection = vscode.languages.createDiagnosticCollection('utu');
     disposables = [this.collection];
-    pending = new Map();
+    pending = createDebouncedUriScheduler(VALIDATION_DELAY_MS, async (uri) => {
+        const document = vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === uri.toString());
+        if (document)
+            await this.validate(document);
+    });
     constructor(languageService, output, compilerHost) {
         this.languageService = languageService;
         this.output = output;
         this.compilerHost = compilerHost;
-        this.disposables.push(vscode.workspace.onDidOpenTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)), vscode.workspace.onDidChangeTextDocument(({ document }) => this.getValidationMode() === 'onType' && this.isEnabledFor(document) && this.schedule(document)), vscode.workspace.onDidSaveTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)), vscode.workspace.onDidCloseTextDocument((document) => (this.pending.delete(document.uri.toString()), this.collection.delete(document.uri))), vscode.workspace.onDidChangeConfiguration((event) => event.affectsConfiguration('utu') && void this.refreshOpenDocuments()));
+        this.disposables.push(vscode.workspace.onDidOpenTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)), vscode.workspace.onDidChangeTextDocument(({ document }) => this.getValidationMode() === 'onType' && this.isEnabledFor(document) && this.schedule(document)), vscode.workspace.onDidSaveTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)), vscode.workspace.onDidCloseTextDocument((document) => (this.pending.delete(document.uri), this.collection.delete(document.uri))), vscode.workspace.onDidChangeConfiguration((event) => event.affectsConfiguration('utu') && void this.refreshOpenDocuments()));
         void this.refreshOpenDocuments();
     }
     dispose() {
-        for (const timeout of this.pending.values())
-            clearTimeout(timeout);
         this.pending.clear();
         vscode.Disposable.from(...this.disposables).dispose();
     }
     schedule(document) {
-        const key = document.uri.toString();
-        clearTimeout(this.pending.get(key));
-        const timeout = setTimeout(() => (this.pending.delete(key), void this.validate(document)), VALIDATION_DELAY_MS);
-        this.pending.set(key, timeout);
+        this.pending.schedule(document.uri);
     }
     async refreshOpenDocuments() {
         if (this.getValidationMode() === 'off') {
@@ -53,8 +52,7 @@ export class DiagnosticsController {
             this.collection.set(uri, diagnostics.map(toVscodeDiagnostic));
         }
         catch (error) {
-            this.output.appendLine(`[utu] Validation failed for ${uri.fsPath || uri.toString()}`);
-            this.output.appendLine(JSON.stringify(error));
+            logOutputError(this.output, `[utu] Validation failed for ${uri.fsPath || uri.toString()}`, error);
         }
     }
     getValidationMode() { return vscode.workspace.getConfiguration('utu').get('validation.mode', 'onType'); }

@@ -10,7 +10,7 @@ export async function loadCompiledRuntime({
   prepareRuntime,
   compileOptions = {},
 }) {
-  const artifact = toCompileArtifact(await compileSource(source, { ...compileOptions, mode }));
+  const artifact = normalizeCompileArtifact(await compileSource(source, { ...compileOptions, mode }));
   const loaded = await loadModule(artifact.shim, artifact);
   const module = loaded?.module ?? loaded;
   const cleanup = loaded?.cleanup ?? NOOP_CLEANUP;
@@ -73,7 +73,7 @@ export async function executeRuntimeBenchmark(runtime, ordinal, options = {}, me
 
 function defaultNow() { return performance.now(); }
 
-function toCompileArtifact(value) {
+export function normalizeCompileArtifact(value) {
   return {
     ...value,
     js: value.js ?? value.shim,

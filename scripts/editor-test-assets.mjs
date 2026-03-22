@@ -6,21 +6,17 @@ const runtimeCandidates = [
   'web-tree-sitter.wasm',
   'node_modules/web-tree-sitter/web-tree-sitter.wasm',
 ];
-const packagedEditorGrammarCandidates = grammarCandidates;
-const packagedEditorRuntimeCandidates = runtimeCandidates;
-const cliGrammarCandidates = grammarCandidates;
-const cliRuntimeCandidates = runtimeCandidates;
 
 export async function loadEditorTestAssets(repoRoot) {
   return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'UTU grammar wasm');
 }
 
 export async function loadPackagedEditorTestAssets(repoRoot) {
-  return loadAssetSet(repoRoot, packagedEditorGrammarCandidates, packagedEditorRuntimeCandidates, 'packaged VS Code grammar wasm');
+  return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'packaged VS Code grammar wasm');
 }
 
 export async function loadCliCompilerTestAssets(repoRoot) {
-  return loadAssetSet(repoRoot, cliGrammarCandidates, cliRuntimeCandidates, 'CLI grammar wasm');
+  return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'CLI grammar wasm');
 }
 
 async function findExistingAsset(repoRoot, candidates, label) {

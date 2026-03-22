@@ -4,7 +4,7 @@ import grammarWasmPath from '../tree-sitter-utu.wasm' with { type: 'file' };
 import runtimeWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' };
 
 import * as compiler from '../index.js';
-import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../loadCompiledRuntime.mjs';
+import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from '../loadCompiledRuntime.mjs';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { expectDeepEqual, expectEqual, getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
@@ -68,19 +68,12 @@ async function withCliRuntime(source, { mode }, run) {
 
 async function compileSource(source, { wat = false, mode = 'program', where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {
     await compiler.init(compilerAssetOptions);
-    const value = await compiler.compile(source, {
+    return normalizeCompileArtifact(await compiler.compile(source, {
         wat,
         mode,
         where,
         moduleFormat,
         targetName,
         ...compilerAssetOptions,
-    });
-    return {
-        ...value,
-        js: value.js ?? value.shim,
-        shim: value.shim ?? value.js,
-        wasm: value.wasm instanceof Uint8Array ? value.wasm : new Uint8Array(value.wasm),
-        metadata: value.metadata ?? {},
-    };
+    }));
 }
