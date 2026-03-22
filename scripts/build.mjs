@@ -13,6 +13,7 @@ const cliBinaryPath = resolve(extensionRoot, 'dist/utu');
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
+const grammarSourceInputs = [resolve(extensionRoot, 'grammar.js')];
 const compilerInputRoots = [compilerSourceRoot];
 const staticAssetInputs = [treeSitterRuntimeSource, grammarDest];
 const ignoredWatchEntries = new Set([
@@ -142,7 +143,20 @@ async function buildCli() {
 }
 
 async function syncGrammarArtifact() {
+  await ensureGrammarArtifact({ force: true });
   await findFreshestFile([grammarDest]);
+}
+
+async function ensureGrammarArtifact({ force = false } = {}) {
+  const [freshestSource, freshestArtifact] = await Promise.all([
+    findFreshestFile(grammarSourceInputs),
+    findFreshestFile([grammarDest]).catch(() => null),
+  ]);
+  const sourceStats = await stat(freshestSource);
+  const artifactStats = freshestArtifact ? await stat(freshestArtifact) : null;
+  if (force || !artifactStats || artifactStats.mtimeMs < sourceStats.mtimeMs) {
+    await exec('bun', ['run', 'grammar']);
+  }
 }
 
 async function findFreshestFile(paths) {
@@ -162,8 +176,10 @@ async function findFreshestFile(paths) {
 async function watchCompilerInputs(compilerContexts) {
   let compilerState = await snapshotState(compilerInputRoots, { recursive: true });
   let assetState = await snapshotState(staticAssetInputs);
+  let grammarSourceState = await snapshotState(grammarSourceInputs);
   let syncTimer;
   let polling = false;
+  let grammarBuild = Promise.resolve();
 
   const poller = setInterval(() => {
     if (polling) return;
@@ -171,7 +187,21 @@ async function watchCompilerInputs(compilerContexts) {
 
     void (async () => {
       try {
-        const [nextCompilerState, nextAssetState] = await Promise.all([snapshotState(compilerInputRoots, { recursive: true }), snapshotState(staticAssetInputs)]);
+        const [nextCompilerState, nextAssetState, nextGrammarSourceState] = await Promise.all([
+          snapshotState(compilerInputRoots, { recursive: true }),
+          snapshotState(staticAssetInputs),
+          snapshotState(grammarSourceInputs),
+        ]);
+
+        if (nextGrammarSourceState !== grammarSourceState) {
+          grammarSourceState = nextGrammarSourceState;
+          grammarBuild = grammarBuild.then(async () => {
+            await ensureGrammarArtifact();
+          }).catch((error) => {
+            console.error('Grammar rebuild failed:', error);
+          });
+          await grammarBuild;
+        }
 
         if (nextCompilerState !== compilerState) {
           compilerState = nextCompilerState;

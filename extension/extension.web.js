@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { activateUtuExtension } from './activate.js';
 import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from '../loadCompiledRuntime.mjs';
-import grammarWasmPath from '../tree-sitter-utu.wasm';
-import parserRuntimeWasmPath from '../web-tree-sitter.wasm';
 
 export async function activate(context) {
+    const grammarWasmPath = await readExtensionFile(context, 'tree-sitter-utu.wasm');
+    const parserRuntimeWasmPath = await readExtensionFile(context, 'web-tree-sitter.wasm');
     const runtimeHost = new WebCompilerHost({
         compilerModulePath: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs').toString(true),
         grammarWasmPath,
@@ -19,6 +19,11 @@ export async function activate(context) {
     });
 }
 export function deactivate() { }
+
+async function readExtensionFile(context, ...segments) {
+    return vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, ...segments));
+}
+
 class WebCompilerHost {
     options;
     compilerPromise;

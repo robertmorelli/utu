@@ -8,6 +8,26 @@
       "signature": "array[T].new_default(len) array[T]",
       "description": "Allocates a GC array and fills it with the type default for `T`."
     },
+    "array.copy": {
+      "signature": "array.copy(dst, dst_index, src, src_index, len) void",
+      "description": "Copies a contiguous range from one GC array into another."
+    },
+    "array.fill": {
+      "signature": "array.fill(arr, index, value, len) void",
+      "description": "Writes the same value into a contiguous GC array range."
+    },
+    "i31.new": {
+      "signature": "i31.new(value) i31",
+      "description": "Boxes a 31-bit integer payload into a Wasm GC i31 reference."
+    },
+    "i31.get_s": {
+      "signature": "i31.get_s(value) i32",
+      "description": "Reads an i31 payload back as a signed 32-bit integer."
+    },
+    "i31.get_u": {
+      "signature": "i31.get_u(value) i32",
+      "description": "Reads an i31 payload back as an unsigned 32-bit integer."
+    },
     "ref.null": {
       "signature": "ref.null Type",
       "description": "Constructs a null reference literal for a nullable UTU reference type."
@@ -28,6 +48,9 @@
   "builtinReturnTypes": {
     "array.len": "i32",
     "array.new_default": { "kind": "array_new_default" },
+    "i31.new": "i31",
+    "i31.get_s": "i32",
+    "i31.get_u": "i32",
     "ref.null": { "kind": "ref_null" },
     "ref.is_null": "bool",
     "ref.eq": "bool"
@@ -35,7 +58,11 @@
   "builtinNamespaceDocs": {
     "array": {
       "signature": "array.*",
-      "description": "Builtin namespace for GC array allocation and length queries."
+      "description": "Builtin namespace for GC array allocation, bulk updates, and length queries."
+    },
+    "i31": {
+      "signature": "i31.*",
+      "description": "Builtin namespace for boxing and unboxing Wasm GC i31 references."
     },
     "ref": {
       "signature": "ref.*",
@@ -138,6 +165,10 @@
     "export": {
       "signature": "export fun ...",
       "description": "Marks a UTU function as exported from the compiled Wasm module."
+    },
+    "escape": {
+      "signature": "escape |js_expr| name(params) return_type",
+      "description": "Declares an inline host-backed helper implemented by embedded JavaScript."
     },
     "shimport": {
       "signature": "shimport \"module\" name(params) return_type",

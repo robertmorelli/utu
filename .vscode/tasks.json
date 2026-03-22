@@ -45,21 +45,25 @@
     },
     {
       "label": "UTU: Prepare Web Extension",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "UTU: Build Grammar",
-        "UTU: Distribute Grammar"
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "build:web"
       ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "NO_COLOR": "1",
+          "FORCE_COLOR": "0"
+        }
+      },
       "group": "build"
     },
     {
       "label": "UTU: Watch Web Extension",
       "type": "shell",
       "command": "npm run watch:web",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "UTU: Prepare Web Extension"
-      ],
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {

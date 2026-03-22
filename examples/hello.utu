@@ -1,4 +1,4 @@
-escape `(a,b) => a + b` str_add(str,str) str;
+escape |(a,b) => a + b| str_add(str,str) str;
 
 fun greeting(name: str) str {
     "hello " -o str_add(_, name);
