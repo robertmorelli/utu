@@ -80,7 +80,7 @@ jobs:
       - name: Compile with source CLI
         run: |
           rm -rf dist/ci-src
-          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --wat
+          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --node --wat
           test -f dist/ci-src/call_simple.mjs
           test -f dist/ci-src/call_simple.wasm
           test -f dist/ci-src/call_simple.wat
@@ -100,7 +100,7 @@ jobs:
       - name: Compile with bundled CLI
         run: |
           rm -rf dist/ci-bundle
-          ./utu compile ./examples/call_simple.utu --outdir ./dist/ci-bundle --wat
+          ./utu compile ./examples/call_simple.utu --outdir ./dist/ci-bundle --node --wat
           test -f dist/ci-bundle/call_simple.mjs
           test -f dist/ci-bundle/call_simple.wasm
           test -f dist/ci-bundle/call_simple.wat
@@ -207,7 +207,7 @@ jobs:
       - name: Compile with source CLI
         run: |
           rm -rf dist/ci-src
-          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --wat
+          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --node --wat
           test -f dist/ci-src/call_simple.mjs
           test -f dist/ci-src/call_simple.wasm
           test -f dist/ci-src/call_simple.wat
@@ -227,7 +227,7 @@ jobs:
       - name: Compile with bundled CLI
         run: |
           rm -rf dist/ci-bundle
-          ./utu compile ./examples/call_simple.utu --outdir ./dist/ci-bundle --wat
+          ./utu compile ./examples/call_simple.utu --outdir ./dist/ci-bundle --node --wat
           test -f dist/ci-bundle/call_simple.mjs
           test -f dist/ci-bundle/call_simple.wasm
           test -f dist/ci-bundle/call_simple.wat
