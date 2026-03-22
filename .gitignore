@@ -44,8 +44,8 @@ spec.md
 .npm-cache
 lsp/.npm-cache
 cli_artifact/.npm-cache
-benchmarks/rust_deltablue/target
-benchmarks/rust_deltablue_arena/target
+examples/rust_benchmarks/rust_deltablue/target
+examples/rust_benchmarks/rust_deltablue_arena/target
 .emscripten-cache
 web-tree-sitter.wasm
 codex.json
