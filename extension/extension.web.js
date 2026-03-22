@@ -44,7 +44,7 @@ class WebCompilerHost {
     async loadCompiler() { return loadModuleFromSource(new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true))), { preferBlobUrl: true }); }
 }
 function loadModuleFromSource(source, { preferBlobUrl = false } = {}) {
-    if (preferBlobUrl && typeof URL.createObjectURL === 'function') {
+    if (typeof URL.createObjectURL === 'function') {
         const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
         return import(url).finally(() => URL.revokeObjectURL(url));
     }
