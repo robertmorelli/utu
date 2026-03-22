@@ -34,6 +34,7 @@ module.exports = grammar({
       $.fn_decl,
       seq($.global_decl, ';'),
       seq($.import_decl, ';'),
+      seq($.jsgen_decl, ';'),
       $.export_decl,
       $.test_decl,
       $.bench_decl,
@@ -131,6 +132,16 @@ module.exports = grammar({
         seq($.identifier, '(', optional($.import_param_list), ')', $.return_type),
         seq($.identifier, ':', $._type),
       ),
+    ),
+
+    jsgen_decl: $ => seq(
+      'escape',
+      $.jsgen_lit,
+      $.identifier,
+      '(',
+      optional($.import_param_list),
+      ')',
+      $.return_type,
     ),
 
     import_param_list: $ => seq(
@@ -580,6 +591,7 @@ module.exports = grammar({
     float_lit: $ => token(/[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/),
 
     string_lit: $ => token(seq('"', /[^"\n]*/, '"')),
+    jsgen_lit: $ => token(seq('`', /[^`\n]*/, '`')),
 
     // Multi-line string: one or more lines each starting with \\
     multiline_string_lit: $ => prec.right(repeat1($.multiline_string_line)),
