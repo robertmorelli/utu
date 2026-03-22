@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
 const extensionRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const compilerSourceRoot = resolve(extensionRoot, 'compiler');
+const compilerSourceRoot = extensionRoot;
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');

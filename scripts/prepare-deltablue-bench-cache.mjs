@@ -4,7 +4,7 @@ import path from "node:path";
 import grammarWasmPath from "../tree-sitter-utu.wasm" with { type: "file" };
 import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
 
-import * as compiler from "../compiler/index.js";
+import * as compiler from "../index.js";
 
 const repoRoot = process.cwd();
 const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
@@ -26,14 +26,14 @@ await Promise.all([
 
 const utu = await prepareUtu();
 const rust = await prepareRustVariant({
-    manifestPath: path.join(repoRoot, "benchmarks/rust_deltablue/Cargo.toml"),
+    manifestPath: path.join(repoRoot, "examples/rust_benchmarks/rust_deltablue/Cargo.toml"),
     artifactName: "rust_deltablue",
     wasmDir: rustWasmDir,
     nativeDir: rustNativeDir,
     nativeRustFlags: "-C target-cpu=native",
 });
 const rustArena = await prepareRustVariant({
-    manifestPath: path.join(repoRoot, "benchmarks/rust_deltablue_arena/Cargo.toml"),
+    manifestPath: path.join(repoRoot, "examples/rust_benchmarks/rust_deltablue_arena/Cargo.toml"),
     artifactName: "rust_deltablue_arena",
     wasmDir: rustArenaWasmDir,
     nativeDir: rustArenaNativeDir,

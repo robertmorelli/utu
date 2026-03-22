@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { compile } from '../compiler/index.js';
-import { loadNodeModuleFromSource } from '../compiler/loadNodeModuleFromSource.mjs';
+import { compile } from '../index.js';
+import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');

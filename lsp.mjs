@@ -1,8 +1,8 @@
 import process from 'node:process';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { copyRange, } from '../lsp_core/types.js';
-import { UtuLanguageServer } from './index.js';
+import { copyRange, } from './lsp_core/types.js';
+import { UtuLanguageServer } from './lsp_server/index.js';
 const COMPLETION_ITEM_KINDS = {
     text: 1,
     method: 2,

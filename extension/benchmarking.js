@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { DEFAULT_BENCHMARK_OPTIONS } from '../compiler/loadCompiledRuntime.mjs';
+import { DEFAULT_BENCHMARK_OPTIONS } from '../loadCompiledRuntime.mjs';
 
 function clampCount(value, minimum) {
     return Number.isFinite(value) ? Math.max(minimum, Math.floor(value ?? minimum)) : minimum;

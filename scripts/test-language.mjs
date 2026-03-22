@@ -27,7 +27,7 @@ const cases = [
 
 let failed = false;
 for (const [name, args, code, text, stdin] of cases) {
-    const proc = Bun.spawn(['bun', './compiler/cli.mjs', ...args], {
+    const proc = Bun.spawn(['bun', './cli.mjs', ...args], {
         stdin: stdin === undefined ? 'ignore' : 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',

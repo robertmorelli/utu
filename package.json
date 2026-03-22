@@ -6,7 +6,7 @@
   "version": "0.1.0",
   "publisher": "robertmorelli",
   "license": "MIT",
-  "module": "compiler/index.js",
+  "module": "index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/robertmorelli/utu.git"
@@ -127,8 +127,8 @@
   "scripts": {
     "grammar": "tree-sitter generate && tree-sitter build --wasm",
     "distribute": "test -f ./tree-sitter-utu.wasm",
-    "build:cli": "node ./compiler/build-cli.mjs",
-    "build:lsp": "bun build --compile --target=bun --outfile ./dist/utu-lsp ./compiler/lsp.mjs",
+    "build:cli": "node ./build-cli.mjs",
+    "build:lsp": "bun build --compile --target=bun --outfile ./dist/utu-lsp ./lsp.mjs",
     "build": "bun run grammar && node ./scripts/build.mjs && bun run build:cli",
     "build:web": "node ./scripts/build.mjs --web-only",
     "package:vsix": "npx @vscode/vsce package --no-dependencies --out ./dist/utu-vscode-${npm_package_version}.vsix",

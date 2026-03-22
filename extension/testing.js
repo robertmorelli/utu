@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { toVscodeRange } from './adapters/core.js';
 import { getBenchmarkOptionsFromConfig } from './benchmarking.js';
 import { displayNameForUri } from './documentNames.js';
-import { collectRunnableEntries } from '../compiler/lsp_core/languageService.js';
+import { collectRunnableEntries } from '../lsp_core/languageService.js';
 const TEST_TAG = new vscode.TestTag('utu-test');
 const BENCH_TAG = new vscode.TestTag('utu-bench');
 export function registerTesting(context, dependencies) {

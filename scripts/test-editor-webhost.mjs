@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compile } from '../compiler/index.js';
-import { loadNodeModuleFromSource } from '../compiler/loadNodeModuleFromSource.mjs';
+import { compile } from '../index.js';
+import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { loadEditorTestAssets } from './editor-test-assets.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));

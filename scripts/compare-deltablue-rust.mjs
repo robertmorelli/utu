@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import grammarWasmPath from "../tree-sitter-utu.wasm" with { type: "file" };
 import runtimeWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" };
 
-import * as compiler from "../compiler/index.js";
+import * as compiler from "../index.js";
 
 const repoRoot = process.cwd();
 const targetSeconds = Number.parseFloat(process.argv[2] ?? "1");
@@ -74,7 +74,7 @@ async function loadUtu() {
 
 async function loadRustVariants() {
     const dir = await mkdtemp(path.join(tmpdir(), "utu-rust-compare-rust-"));
-    const manifestPath = path.join(repoRoot, "benchmarks/rust_deltablue/Cargo.toml");
+    const manifestPath = path.join(repoRoot, "examples/rust_benchmarks/rust_deltablue/Cargo.toml");
     const rustcPath = resolveRustcPath();
     const cargoPath = path.join(path.dirname(rustcPath), "cargo");
     const build = Bun.spawnSync([

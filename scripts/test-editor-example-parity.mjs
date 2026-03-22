@@ -3,8 +3,8 @@ import { dirname, relative, resolve } from 'node:path';
 import { access } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { UtuParserService } from '../compiler/parser.js';
-import { UtuLanguageService } from '../compiler/lsp_core/languageService.js';
+import { UtuParserService } from '../parser.js';
+import { UtuLanguageService } from '../lsp_core/languageService.js';
 import {
   loadCliCompilerTestAssets,
   loadPackagedEditorTestAssets,
@@ -116,7 +116,7 @@ async function attemptCompile(compiler, source, mode, assets) {
 }
 
 async function loadIsolatedCompiler(label) {
-  return import(new URL(`../compiler/index.js?instance=${label}`, import.meta.url).href);
+  return import(new URL(`../index.js?instance=${label}`, import.meta.url).href);
 }
 
 async function loadWebCompiler(repoRoot) {

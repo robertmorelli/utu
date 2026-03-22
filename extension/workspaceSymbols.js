@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UtuWorkspaceSymbolIndex } from '../compiler/lsp_core/languageService.js';
+import { UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
 
 const WORKSPACE_GLOB = '**/*.utu';
 const WORKSPACE_EXCLUDE = '**/node_modules/**';

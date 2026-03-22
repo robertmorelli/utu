@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 import grammarWasmPath from '../tree-sitter-utu.wasm' with { type: 'file' };
 import runtimeWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' };
 
-import * as compiler from '../compiler/index.js';
-import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../compiler/loadCompiledRuntime.mjs';
-import { loadNodeModuleFromSource } from '../compiler/loadNodeModuleFromSource.mjs';
+import * as compiler from '../index.js';
+import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../loadCompiledRuntime.mjs';
+import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');

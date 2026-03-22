@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { UtuLanguageService, hasRunnableMain } from '../compiler/lsp_core/languageService.js';
-import { UtuParserService } from '../compiler/parser.js';
+import { UtuLanguageService, hasRunnableMain } from '../lsp_core/languageService.js';
+import { UtuParserService } from '../parser.js';
 import { registerRunCodeLensProvider } from './codeLens.js';
 import { registerCommands } from './commands.js';
 import { DiagnosticsController } from './diagnostics.js';

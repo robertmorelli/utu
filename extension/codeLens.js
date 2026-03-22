@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { collectRunnableEntries } from '../compiler/lsp_core/languageService.js';
+import { collectRunnableEntries } from '../lsp_core/languageService.js';
 import { toVscodeRange } from './adapters/core.js';
 const DOCUMENT_SELECTOR = [{ language: 'utu' }];
 const profileLensData = new Map();

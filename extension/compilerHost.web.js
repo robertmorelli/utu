@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime, } from '../compiler/loadCompiledRuntime.mjs';
+import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime, } from '../loadCompiledRuntime.mjs';
 
 export class WebCompilerHost {
     options;

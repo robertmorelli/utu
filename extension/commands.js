@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { getBenchmarkOptionsFromConfig } from './benchmarking.js';
 import { displayNameForDocument } from './documentNames.js';
-import { hasRunnableMain as indexHasRunnableMain } from '../compiler/lsp_core/languageService.js';
+import { hasRunnableMain as indexHasRunnableMain } from '../lsp_core/languageService.js';
 
 export function registerCommands(context, dependencies) {
     const generated = {

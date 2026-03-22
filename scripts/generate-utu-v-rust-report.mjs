@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 const repoRoot = process.cwd();
-const reportPath = path.join(repoRoot, "utu_v_rust.md");
+const reportPath = path.join(repoRoot, "examples/rust_benchmarks/utu_v_rust.md");
 
 const options = parseArgs(process.argv.slice(2));
 const prep = Bun.spawnSync(["bun", "scripts/prepare-deltablue-bench-cache.mjs"], {
