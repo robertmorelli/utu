@@ -1,15 +1,14 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import grammarWasmPath from '../tree-sitter-utu.wasm' with { type: 'file' };
 import runtimeWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' };
 
 import * as compiler from '../index.js';
 import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, withRuntime } from '../loadCompiledRuntime.mjs';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
+import { expectDeepEqual, expectEqual, getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(scriptDir, '..');
+const repoRoot = getRepoRoot(import.meta.url);
 const compilerAssetOptions = { wasmUrl: grammarWasmPath, runtimeWasmUrl: runtimeWasmPath };
 const sources = {
     run: await readFile(resolve(repoRoot, 'examples/ci/hello.utu'), 'utf8'),
@@ -50,27 +49,13 @@ const cases = [
             }
         });
     }],
-];
+].map(([name, iterations, run]) => [`${name} (${iterations} iterations)`, async () => {
+    for (let iteration = 0; iteration < iterations; iteration += 1)
+        await run();
+}]);
 
-let failed = false;
-
-for (const [name, iterations, run] of cases) {
-    try {
-        for (let iteration = 0; iteration < iterations; iteration += 1) {
-            await run();
-        }
-        console.log(`PASS ${name} (${iterations} iterations)`);
-    }
-    catch (error) {
-        failed = true;
-        console.log(`FAIL ${name}`);
-        console.log(`  ${String(error instanceof Error ? error.message : error)}`);
-    }
-}
-
-if (failed) {
+if (await runNamedCases(cases))
     process.exit(1);
-}
 
 async function withCliRuntime(source, { mode }, run) {
   return withRuntime(loadCompiledRuntime({
@@ -98,18 +83,4 @@ async function compileSource(source, { wat = false, mode = 'program', where = 'b
         wasm: value.wasm instanceof Uint8Array ? value.wasm : new Uint8Array(value.wasm),
         metadata: value.metadata ?? {},
     };
-}
-
-function expectEqual(actual, expected) {
-    if (actual !== expected) {
-        throw new Error(`Expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`);
-    }
-}
-
-function expectDeepEqual(actual, expected) {
-    const actualJson = JSON.stringify(actual);
-    const expectedJson = JSON.stringify(expected);
-    if (actualJson !== expectedJson) {
-        throw new Error(`Expected ${expectedJson}, received ${actualJson}`);
-    }
 }

@@ -1,5 +1,6 @@
 import {
     rootNode,
+    namedChildren,
     childOfType,
     childrenOfType,
     hasAnon,
@@ -15,6 +16,8 @@ export class WatError extends Error {}
 export function watgen(treeOrNode, { mode = 'program', profile = null, targetName = null } = {}) {
     return new WatGen(rootNode(treeOrNode), mode, profile, targetName).generate();
 }
+
+const kids = namedChildren;
 
 const SCALAR_WASM = data.scalarWasm;
 const REF_WASM = data.refWasm;
@@ -106,7 +109,7 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
 };
 const CONST_EXPR_HANDLERS = {
     literal: (ctx, node, wasmType) => ctx.evalConstLiteral(node, wasmType),
-    paren_expr: (ctx, node, wasmType) => ctx.evalConstExpr(node.namedChildren[0], wasmType),
+    paren_expr: (ctx, node, wasmType) => ctx.evalConstExpr(kids(node)[0], wasmType),
     unary_expr: (ctx, node, wasmType) => ctx.evalConstUnary(node, wasmType),
     binary_expr: (ctx, node, wasmType) => ctx.evalConstBinary(node, wasmType),
 };
@@ -167,21 +170,21 @@ const NS_CALL_HANDLERS = {
 const INFER_TYPE_HANDLERS = {
     literal: (_ctx, node) => LITERAL_INFERRED_TYPES[literalInfo(node).kind] ?? null,
     identifier: (ctx, node) => ctx.typeName(ctx.localTypes?.get(node.text) ?? ctx.globalTypeMap.get(node.text)),
-    paren_expr: (ctx, node) => ctx.inferType(node.namedChildren.at(-1)),
-    unary_expr: (ctx, node) => ctx.inferType(node.namedChildren.at(-1)),
+    paren_expr: (ctx, node) => ctx.inferType(kids(node).at(-1)),
+    unary_expr: (ctx, node) => ctx.inferType(kids(node).at(-1)),
     binary_expr: (ctx, node) => {
-        const [left, right] = node.namedChildren;
+        const [left, right] = kids(node);
         return BINARY_BOOL_OPS.has(findAnonBetween(node, left, right))
             ? 'i32'
             : ctx.dominantType(ctx.inferType(left), ctx.inferType(right));
     },
     field_expr: (ctx, node) => {
-        const [object, field] = node.namedChildren;
+        const [object, field] = kids(node);
         return ctx.typeName(ctx.lookupFieldType(ctx.inferType(object), field.text));
     },
-    index_expr: (ctx, node) => ctx.arrayElemKeyFromInferred(ctx.inferType(node.namedChildren[0])),
+    index_expr: (ctx, node) => ctx.arrayElemKeyFromInferred(ctx.inferType(kids(node)[0])),
     call_expr: (ctx, node) => {
-        const callee = node.namedChildren[0];
+        const callee = kids(node)[0];
         return callee.type === 'identifier'
             ? ctx.typeName(ctx.lookupCallableReturnType(callee.text))
             : callee.type === 'namespace_call_expr'
@@ -199,9 +202,9 @@ const INFER_TYPE_HANDLERS = {
     },
     namespace_call_expr: (ctx, node) => ctx.inferNsCallType(namespaceInfo(node), ctx.args(node)),
     struct_init: (_ctx, node) => childOfType(node, 'type_ident').text,
-    array_init: (ctx, node) => `${ctx.elemTypeKey(parseType(node.namedChildren[0]))}_array`,
-    if_expr: (ctx, node) => ctx.inferType(node.namedChildren[1]),
-    block: (ctx, node) => ctx.inferType(node.namedChildren.at(-1)),
+    array_init: (ctx, node) => `${ctx.elemTypeKey(parseType(kids(node)[0]))}_array`,
+    if_expr: (ctx, node) => ctx.inferType(kids(node)[1]),
+    block: (ctx, node) => ctx.inferType(kids(node).at(-1)),
     assert_expr: () => null,
 };
 const INFER_NS_CALL_HANDLERS = {
@@ -229,11 +232,11 @@ const LOCAL_COLLECT_HANDLERS = {
         });
     },
     match_expr: (ctx, locals, seen, node) => {
-        const subjectType = ctx.inferredToType(ctx.inferType(node.namedChildren[0])) ?? I32;
+        const subjectType = ctx.inferredToType(ctx.inferType(kids(node)[0])) ?? I32;
         ctx.addLocal(locals, seen, ctx.scalarMatchTempName(node), subjectType);
     },
     alt_expr: (ctx, locals, seen, node) => {
-        const subjectType = ctx.inferredToType(ctx.inferType(node.namedChildren[0])) ?? I32;
+        const subjectType = ctx.inferredToType(ctx.inferType(kids(node)[0])) ?? I32;
         for (const arm of childrenOfType(node, 'alt_arm').map(parseAltArm)) {
             if (arm.pattern !== '_') ctx.addLocal(locals, seen, arm.pattern, arm.guard ? { kind: 'named', name: arm.guard } : subjectType);
         }
@@ -260,7 +263,7 @@ const BODY_TYPE_VISIT_HANDLERS = {
     bind_expr: (_ctx, node, visitType) => {
         for (const target of parseBindTargets(node)) visitType(target.type);
     },
-    array_init: (_ctx, node, visitType) => visitType(parseType(node.namedChildren[0])),
+    array_init: (_ctx, node, visitType) => visitType(parseType(kids(node)[0])),
 };
 const ELEM_TYPE_KEY_HANDLERS = {
     scalar: (_ctx, type) => type.name,
@@ -271,10 +274,62 @@ const SCALAR_PATTERN_GENERATORS = {
     int_lit: (ctx, node, hint, out) => ctx.genInt(parseIntLit(node.text), hint, out),
     float_lit: (ctx, node, hint, out) => ctx.genFloat(parseFloat(node.text), hint, out),
 };
+const CALL_CALLEE_HANDLERS = {
+    pipe_expr: (ctx, callee, args, out) => ctx.genPipeCall(callee, args, out),
+    namespace_call_expr: (ctx, callee, args, out) => ctx.genNsCall(callee, out, args),
+    identifier: (ctx, callee, args, out) => {
+        ctx.pushArgs(args, out, ctx.lookupCallable(callee.text)?.params?.map(param => param.type));
+        out.push(`call $${callee.text}`);
+    },
+    index_expr: (ctx, callee, args, out) => {
+        const [object, index] = kids(callee);
+        ctx.pushArgs(args, out);
+        ctx.genExpr(object, null, out);
+        ctx.genExpr(index, 'i32', out);
+        out.push(`array.get ${ctx.arrayTypeNameFromInferred(ctx.inferType(object))}`);
+        out.push('call_ref');
+    },
+};
+const ARRAY_INIT_HANDLERS = {
+    new: (ctx, args, elemWasm, _arrayTypeName, out) => {
+        ctx.genExpr(args[1], elemWasm, out);
+        ctx.genExpr(args[0], 'i32', out);
+        out.push(`array.new ${_arrayTypeName}`);
+    },
+    new_fixed: (ctx, args, elemWasm, _arrayTypeName, out) => {
+        for (const arg of args) ctx.genExpr(arg, elemWasm, out);
+        out.push(`array.new_fixed ${_arrayTypeName} ${args.length}`);
+    },
+    new_default: (ctx, args, _elemWasm, _arrayTypeName, out) => {
+        ctx.genExpr(args[0], 'i32', out);
+        out.push(`array.new_default ${_arrayTypeName}`);
+    },
+};
+const ASSIGN_TARGET_HANDLERS = {
+    identifier: (ctx, lhs, rhs, out) => {
+        const name = lhs.text;
+        const type = ctx.localTypes.get(name) ?? ctx.globalTypeMap.get(name) ?? I32;
+        ctx.genExpr(rhs, ctx.wasmType(type), out);
+        out.push(`${ctx.localTypes.has(name) ? 'local' : 'global'}.set $${name}`);
+    },
+    field_expr: (ctx, lhs, rhs, out) => {
+        const [object, field] = kids(lhs);
+        ctx.genExpr(object, null, out);
+        ctx.genExpr(rhs, null, out);
+        out.push(`struct.set $${ctx.inferType(object) || '__unknown'} $${field.text}`);
+    },
+    index_expr: (ctx, lhs, rhs, out) => {
+        const [object, index] = kids(lhs);
+        ctx.genExpr(object, null, out);
+        ctx.genExpr(index, 'i32', out);
+        ctx.genExpr(rhs, null, out);
+        out.push(`array.set ${ctx.arrayTypeNameFromInferred(ctx.inferType(object))}`);
+    },
+};
 const EXPR_GENERATORS = {
     literal: (ctx, node, hint, out) => ctx.genLiteral(node, hint, out),
     identifier: (ctx, node, _hint, out) => ctx.genIdent(node, out),
-    paren_expr: (ctx, node, hint, out) => ctx.genExpr(node.namedChildren[0], hint, out),
+    paren_expr: (ctx, node, hint, out) => ctx.genExpr(kids(node)[0], hint, out),
     assert_expr: (ctx, node, _hint, out) => ctx.genAssert(node, out),
     unary_expr: (ctx, node, hint, out) => ctx.genUnary(node, hint, out),
     binary_expr: (ctx, node, hint, out) => ctx.genBinary(node, hint, out),
@@ -301,11 +356,11 @@ const EXPR_GENERATORS = {
     fatal_expr: (_ctx, _node, _hint, out) => out.push('unreachable'),
 };
 const PARSE_TYPE_HANDLERS = {
-    nullable_type: node => ({ kind: 'nullable', inner: parseType(node.namedChildren[0]) }),
+    nullable_type: node => ({ kind: 'nullable', inner: parseType(kids(node)[0]) }),
     scalar_type: node => ({ kind: 'scalar', name: node.text }),
-    ref_type: node => node.children[0].type === 'array' ? { kind: 'array', elem: parseType(node.namedChildren[0]) } : { kind: 'named', name: node.children[0].text },
-    func_type: node => ({ kind: 'func_type', params: childOfType(node, 'type_list')?.namedChildren.map(parseType) ?? [], returnType: parseReturnType(childOfType(node, 'return_type')) }),
-    paren_type: node => parseType(node.namedChildren[0]),
+    ref_type: node => node.children[0].type === 'array' ? { kind: 'array', elem: parseType(kids(node)[0]) } : { kind: 'named', name: node.children[0].text },
+    func_type: node => ({ kind: 'func_type', params: kids(childOfType(node, 'type_list')).map(parseType), returnType: parseReturnType(childOfType(node, 'return_type')) }),
+    paren_type: node => parseType(kids(node)[0]),
 };
 
 class WatGen {
@@ -345,7 +400,7 @@ class WatGen {
     generate() { this.collect(); this.scanAll(); return { wat: this.emit(), metadata: this.metadata }; }
 
     collect() {
-        for (const item of this.root.namedChildren) {
+        for (const item of kids(this.root)) {
             const collect = TOP_LEVEL_COLLECT_HANDLERS[item.type];
             if (collect) collect(this, item);
             else throw new WatError(`Unknown top-level item: ${item.type}`);
@@ -387,7 +442,7 @@ class WatGen {
         const method = callee.slice(4);
         if (STR_BUILTINS[method]) this.usedStrBuiltins.add(method);
     }
-    bodyItems(body) { return Array.isArray(body) ? body : body?.namedChildren ?? []; }
+    bodyItems(body) { return Array.isArray(body) ? body : kids(body); }
 
     internString(value) {
         if (!this.strings.has(value)) {
@@ -479,7 +534,7 @@ class WatGen {
         }
 
         if (this.mode === 'test') for (const test of this.testDecls) visitBody(test.body);
-        if (this.mode === 'bench') for (const bench of this.benchDecls) visitBody([...bench.setupPrelude, ...bench.measureBody.namedChildren]);
+        if (this.mode === 'bench') for (const bench of this.benchDecls) visitBody([...bench.setupPrelude, ...kids(bench.measureBody)]);
 
         for (const imp of this.importFns) {
             for (const param of imp.params) visitType(param.type);
@@ -556,14 +611,14 @@ class WatGen {
 
     evalConstUnary(node, wasmType) {
         const op = childOfType(node, 'unary_op').text;
-        const expr = node.namedChildren.find(child => child.type !== 'unary_op');
+        const expr = kids(node).find(child => child.type !== 'unary_op');
         const value = this.evalConstExpr(expr, wasmType);
         if (value === null) return null;
         return CONST_UNARY_OPS[op]?.(value) ?? null;
     }
 
     evalConstBinary(node, wasmType) {
-        const [leftNode, rightNode] = node.namedChildren;
+        const [leftNode, rightNode] = kids(node);
         const left = this.evalConstExpr(leftNode, wasmType);
         const right = this.evalConstExpr(rightNode, wasmType);
         if (left === null || right === null) return null;
@@ -622,7 +677,7 @@ class WatGen {
             exportName,
             [{ name: 'iterations', type: I32 }],
             null,
-            [...bench.setupPrelude, ...bench.measureBody.namedChildren],
+            [...bench.setupPrelude, ...kids(bench.measureBody)],
             out => {
                 this.genBody(bench.setupPrelude, out);
                 this.genBenchLoop(bench, out);
@@ -655,7 +710,7 @@ class WatGen {
         this.localTypes.set(name, type);
     }
 
-    args(node) { return childOfType(node, 'arg_list')?.namedChildren ?? []; }
+    args(node) { return kids(childOfType(node, 'arg_list')); }
     pushArgs(args, out, types = []) {
         args.forEach((arg, i) => this.genExpr(arg, types[i] ? this.wasmType(types[i]) : null, out));
     }
@@ -700,7 +755,7 @@ class WatGen {
     }
 
     genBlock(block, out, isFnBody = false, tailHint = null) {
-        this.genBody(block.namedChildren, out, isFnBody, tailHint);
+        this.genBody(kids(block), out, isFnBody, tailHint);
     }
 
     genExpr(node, hint, out) {
@@ -730,14 +785,14 @@ class WatGen {
     }
 
     genAssert(node, out) {
-        this.genExpr(node.namedChildren[0], 'i32', out);
+        this.genExpr(kids(node)[0], 'i32', out);
         out.push('i32.eqz', '(if', '  (then', '    unreachable', '  )', ')');
     }
 
     genUnary(node, hint, out) {
         hint = this.valueHint(hint);
         const op = childOfType(node, 'unary_op').text;
-        const expr = node.namedChildren.find(child => child.type !== 'unary_op');
+        const expr = kids(node).find(child => child.type !== 'unary_op');
         const wasmType = hint || this.inferType(expr) || 'i32';
 
         this.genExpr(expr, wasmType, out);
@@ -748,7 +803,7 @@ class WatGen {
 
     genBinary(node, hint, out) {
         hint = this.valueHint(hint);
-        const [left, right] = node.namedChildren;
+        const [left, right] = kids(node);
         const op = findAnonBetween(node, left, right);
         const leftType = this.inferType(left) || hint || 'i32';
         const rightType = this.inferType(right) || hint || 'i32';
@@ -773,7 +828,7 @@ class WatGen {
     }
 
     genPipe(node, out) {
-        const value = node.namedChildren[0];
+        const value = kids(node)[0];
         const target = parsePipeTarget(childOfType(node, 'pipe_target'));
 
         if (target.kind === 'pipe_ident') {
@@ -788,7 +843,7 @@ class WatGen {
 
     genElse(node, hint, out) {
         hint = this.valueHint(hint);
-        const [expr, fallback] = node.namedChildren;
+        const [expr, fallback] = kids(node);
         if (fallback.type === 'fatal_expr') {
             this.genExpr(expr, null, out);
             out.push('ref.as_non_null');
@@ -805,27 +860,16 @@ class WatGen {
     }
 
     genCall(node, out) {
-        const callee = node.namedChildren[0], args = this.args(node);
-        if (callee.type === 'pipe_expr') return void this.genPipeCall(callee, args, out);
-        if (callee.type === 'namespace_call_expr') return void this.genNsCall(callee, out, args);
-        if (callee.type === 'identifier') {
-            this.pushArgs(args, out, this.lookupCallable(node.namedChildren[0].text)?.params?.map(param => param.type));
-            return void out.push(`call $${callee.text}`);
-        }
+        const callee = kids(node)[0], args = this.args(node);
+        const emit = CALL_CALLEE_HANDLERS[callee.type];
+        if (emit) return void emit(this, callee, args, out);
         this.pushArgs(args, out);
-        if (callee.type === 'index_expr') {
-            const [object, index] = callee.namedChildren;
-            this.genExpr(object, null, out);
-            this.genExpr(index, 'i32', out);
-            out.push(`array.get ${this.arrayTypeNameFromInferred(this.inferType(object))}`);
-            return void out.push('call_ref');
-        }
         this.genExpr(callee, null, out);
         out.push('call_ref');
     }
 
     genPipeCall(pipeNode, args, out) {
-        const value = pipeNode.namedChildren[0];
+        const value = kids(pipeNode)[0];
         const target = parsePipeTarget(childOfType(pipeNode, 'pipe_target'));
         const callee = target.kind === 'pipe_ident' ? target.name : target.callee;
         this.pushPipedArgs(value, args, out, arg => arg.type === 'identifier' && arg.text === '_');
@@ -833,13 +877,13 @@ class WatGen {
     }
 
     genField(node, out) {
-        const [object, field] = node.namedChildren;
+        const [object, field] = kids(node);
         this.genExpr(object, null, out);
         out.push(`struct.get $${this.inferType(object) || '__unknown'} $${field.text}`);
     }
 
     genIndex(node, out) {
-        const [object, index] = node.namedChildren;
+        const [object, index] = kids(node);
         this.genExpr(object, null, out);
         this.genExpr(index, 'i32', out);
         out.push(`array.get ${this.arrayTypeNameFromInferred(this.inferType(object))}`);
@@ -885,9 +929,9 @@ class WatGen {
     genIf(node, hint, out) {
         const branchHint = hint === DISCARD_HINT ? DISCARD_HINT : null;
         hint = this.valueHint(hint);
-        const cond = node.namedChildren[0];
-        const thenBlock = node.namedChildren[1];
-        const elseBranch = node.namedChildren[2] ?? null;
+        const cond = kids(node)[0];
+        const thenBlock = kids(node)[1];
+        const elseBranch = kids(node)[2] ?? null;
         const resultType = hint || (elseBranch ? this.inferType(thenBlock) : null);
         const branchType = resultType ?? branchHint;
         const resultClause = resultType ? ` (result ${resultType})` : '';
@@ -914,7 +958,7 @@ class WatGen {
     genTypeMatch(node, arms, hint, out) {
         const discard = hint === DISCARD_HINT;
         hint = this.valueHint(hint);
-        const subject = node.namedChildren[0];
+        const subject = kids(node)[0];
         const subjectType = this.inferType(subject) || '__unknown';
         const resultType = discard ? null : (hint || this.inferType(arms[arms.length - 1]?.expr) || null);
         const typedArms = arms.filter(arm => arm.guard !== null);
@@ -964,7 +1008,7 @@ class WatGen {
     genScalarMatch(node, arms, hint, out) {
         const discard = hint === DISCARD_HINT;
         hint = this.valueHint(hint);
-        const subject = node.namedChildren[0];
+        const subject = kids(node)[0];
         const tempName = this.scalarMatchTempName(node);
         const resultType = discard ? null : (hint || this.inferType(arms[arms.length - 1].expr) || null);
         const compareType = this.scalarMatchCompareType(this.inferType(subject));
@@ -1028,7 +1072,7 @@ class WatGen {
 
     genWhile(node, out) {
         const loop = this.loopInfo();
-        const condition = node.namedChildren.find(child => child.type !== 'block') ?? null;
+        const condition = kids(node).find(child => child.type !== 'block') ?? null;
         const body = childOfType(node, 'block');
         const emitBody = lines => this.genBlock(body, lines, false);
 
@@ -1065,7 +1109,7 @@ class WatGen {
     }
 
     genEmit(node, out) {
-        const value = node.namedChildren[0];
+        const value = kids(node)[0];
         const frame = [...this.labelStack].reverse().find(item => item.kind === 'block');
         if (!frame) throw new WatError('emit can only exit block expressions');
         this.genExpr(value, null, out);
@@ -1081,7 +1125,7 @@ class WatGen {
             out.push('    local.get $iterations');
             out.push('    i32.ge_s');
             out.push(`    br_if ${loop.breakLabel}`);
-            this.pushGenerated(out, lines => this.genBody(bench.measureBody.namedChildren, lines));
+            this.pushGenerated(out, lines => this.genBody(kids(bench.measureBody), lines));
             this.bumpI32Local(bench.capture, out, '    ');
             out.push(`    (br ${loop.continueLabel})`);
         });
@@ -1089,7 +1133,7 @@ class WatGen {
 
     genLet(node, out) {
         const targets = parseBindTargets(node);
-        const value = node.namedChildren[node.namedChildren.length - 1];
+        const value = kids(node).at(-1);
 
         if (targets.length === 1) {
             this.genExpr(value, this.wasmType(targets[0].type), out);
@@ -1108,7 +1152,7 @@ class WatGen {
         const fields = this.typeFields(typeName);
         if (!fields) throw new WatError(`Unknown type: ${typeName}`);
         const fieldMap = new Map(
-            childrenOfType(node, 'field_init').map(field => [field.namedChildren[0].text, field.namedChildren[1]])
+            childrenOfType(node, 'field_init').map(field => [kids(field)[0].text, kids(field)[1]])
         );
         for (const field of fields) {
             const value = fieldMap.get(field.name);
@@ -1119,57 +1163,21 @@ class WatGen {
     }
 
     genArrayInit(node, out) {
-        const elemType = parseType(node.namedChildren[0]), method = node.namedChildren[1].text, args = this.args(node);
+        const elemType = parseType(kids(node)[0]), method = kids(node)[1].text, args = this.args(node);
         const elemWasm = this.wasmType(elemType), key = this.elemTypeKey(elemType);
         this.requireArrayType(key);
         const arrayTypeName = this.arrayTypes.get(key);
-        switch (method) {
-            case 'new':
-                this.genExpr(args[1], elemWasm, out);
-                this.genExpr(args[0], 'i32', out);
-                out.push(`array.new ${arrayTypeName}`);
-                return;
-            case 'new_fixed':
-                for (const arg of args) this.genExpr(arg, elemWasm, out);
-                out.push(`array.new_fixed ${arrayTypeName} ${args.length}`);
-                return;
-            case 'new_default':
-                this.genExpr(args[0], 'i32', out);
-                out.push(`array.new_default ${arrayTypeName}`);
-                return;
-            default:
-                throw new WatError(`Unknown array init method: ${method}`);
-        }
+        const emit = ARRAY_INIT_HANDLERS[method];
+        if (emit) return void emit(this, args, elemWasm, arrayTypeName, out);
+        throw new WatError(`Unknown array init method: ${method}`);
     }
 
     requireArrayType(key) { if (!this.arrayTypes.has(key)) this.arrayTypes.set(key, `$${key}_array`); }
 
     genAssign(node, out) {
-        const [lhs, rhs] = node.namedChildren;
-
-        if (lhs.type === 'identifier') {
-            const name = lhs.text;
-            const type = this.localTypes.get(name) ?? this.globalTypeMap.get(name) ?? I32;
-            this.genExpr(rhs, this.wasmType(type), out);
-            out.push(`${this.localTypes.has(name) ? 'local' : 'global'}.set $${name}`);
-            return;
-        }
-
-        if (lhs.type === 'field_expr') {
-            const [object, field] = lhs.namedChildren;
-            this.genExpr(object, null, out);
-            this.genExpr(rhs, null, out);
-            out.push(`struct.set $${this.inferType(object) || '__unknown'} $${field.text}`);
-            return;
-        }
-
-        if (lhs.type === 'index_expr') {
-            const [object, index] = lhs.namedChildren;
-            this.genExpr(object, null, out);
-            this.genExpr(index, 'i32', out);
-            this.genExpr(rhs, null, out);
-            out.push(`array.set ${this.arrayTypeNameFromInferred(this.inferType(object))}`);
-        }
+        const [lhs, rhs] = kids(node);
+        const emit = ASSIGN_TARGET_HANDLERS[lhs.type];
+        if (emit) return void emit(this, lhs, rhs, out);
     }
 
     wasmType(type) {
@@ -1242,7 +1250,7 @@ class WatGen {
     lookupCallable(name) { return this.fnItems.find(item => item.name === name) ?? this.importFns.find(item => item.name === name) ?? null; }
     lookupCallableReturnType(name) { return this.lookupCallable(name)?.returnType ?? null; }
     genScalarPattern(node, hint, out) {
-        const patternNode = node.type === 'match_lit' ? node.namedChildren[0] ?? node : node;
+        const patternNode = node.type === 'match_lit' ? kids(node)[0] ?? node : node;
         const emit = SCALAR_PATTERN_GENERATORS[patternNode.type];
         if (emit) return emit(this, patternNode, hint, out);
         if (node.text === 'true' || node.text === 'false') {
@@ -1295,18 +1303,18 @@ const parseFnDecl = (node) => ({
     body: childOfType(node, 'block'),
 });
 const parseGlobalDecl = (node) => {
-    const [name, type, value] = node.namedChildren;
+    const [name, type, value] = kids(node);
     return { kind: 'global_decl', name: name.text, type: parseType(type), value };
 };
 const parseImportDecl = (node) => {
-    const [moduleNode, nameNode, typeNode] = node.namedChildren, module = moduleNode.text.slice(1, -1), name = nameNode.text;
+    const [moduleNode, nameNode, typeNode] = kids(node), module = moduleNode.text.slice(1, -1), name = nameNode.text;
     return hasAnon(node, '(')
         ? { kind: 'import_fn', module, name, params: parseImportParamList(childOfType(node, 'import_param_list')), returnType: parseReturnType(childOfType(node, 'return_type')) }
         : { kind: 'import_val', module, name, type: parseType(typeNode) };
 };
-const parseTestDecl = (node) => ({ kind: 'test_decl', name: node.namedChildren[0].text.slice(1, -1), body: childOfType(node, 'block') });
+const parseTestDecl = (node) => ({ kind: 'test_decl', name: kids(node)[0].text.slice(1, -1), body: childOfType(node, 'block') });
 const parseSetupDecl = (node) => {
-    const named = node.namedChildren, measure = named.at(-1);
+    const named = kids(node), measure = named.at(-1);
     if (measure?.type !== 'measure_decl') throw new WatError('bench setup must end with a measure block');
     return { setupPrelude: named.slice(0, -1), measureBody: childOfType(measure, 'block') };
 };
@@ -1315,25 +1323,25 @@ const parseBenchDecl = (node) => {
     if (!setup) throw new WatError('bench must contain exactly one setup block');
     return {
         kind: 'bench_decl',
-        name: node.namedChildren[0].text.slice(1, -1),
-        capture: childOfType(node, 'bench_capture').namedChildren[0].text,
+        name: kids(node)[0].text.slice(1, -1),
+        capture: kids(childOfType(node, 'bench_capture'))[0].text,
         ...parseSetupDecl(setup),
     };
 };
 
 const parseFieldList = (node) => mapType(node, 'field', parseField);
 const parseField = (node) => {
-    const [name, type] = node.namedChildren;
+    const [name, type] = kids(node);
     return { kind: 'field', mut: hasAnon(node, 'mut'), name: name.text, type: parseType(type) };
 };
 const parseVariantList = (node) => mapType(node, 'variant', parseVariant);
 const parseVariant = (node) => ({ kind: 'variant', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) });
 const parseParamList = (node) => mapType(node, 'param', parseParam);
 const parseParam = (node) => {
-    const [name, type] = node.namedChildren;
+    const [name, type] = kids(node);
     return { kind: 'param', name: name.text, type: parseType(type) };
 };
-const parseImportParamList = (node) => node?.namedChildren.map(child => child.type === 'param' ? parseParam(child) : { kind: 'anon_param', type: parseType(child) }) ?? [];
+const parseImportParamList = (node) => kids(node).map(child => child.type === 'param' ? parseParam(child) : { kind: 'anon_param', type: parseType(child) });
 
 function parseType(node) {
     if (!node) return null;
@@ -1360,31 +1368,32 @@ function parseReturnType(node) {
 
 const parsePipeTarget = (node) => {
     const argsNode = childOfType(node, 'pipe_args');
-    const callee = node.namedChildren.filter(child => child.type === 'identifier').map(child => child.text).join('.');
+    const callee = kids(node).filter(child => child.type === 'identifier').map(child => child.text).join('.');
     return argsNode ? { kind: 'pipe_call', callee, args: parsePipeArgs(argsNode) } : { kind: 'pipe_ident', name: callee };
 };
 const pipeCallee = (target) => target.kind === 'pipe_ident' ? target.name : target.callee;
-const parsePipeArgs = (node) => node.namedChildren
+const parsePipeArgs = (node) => kids(node)
     .filter(child => child.type === 'pipe_arg' || child.type === 'pipe_arg_placeholder')
     .map(arg => arg.type === 'pipe_arg_placeholder' ? { kind: 'placeholder' } : { kind: 'arg', value: arg });
 const pipeArgValues = (target) => target.args.filter(arg => arg.kind === 'arg').map(arg => arg.value);
 const namespaceInfo = (node) => ({ ns: node.children[0].text, method: childOfType(node, 'identifier').text });
 const parseForSources = (node) => mapType(node, 'for_source', parseForSource);
-const parseForSource = (node) => ({ kind: 'range', start: node.namedChildren[0], end: node.namedChildren[1] });
+const parseForSource = (node) => ({ kind: 'range', start: kids(node)[0], end: kids(node)[1] });
 const parseCapture = (node) => mapType(node, 'identifier', child => child.text);
 const parseMatchArm = (node) => {
-    const [first] = node.namedChildren;
-    return { pattern: node.namedChildren.length === 2 ? first : null, expr: node.namedChildren.at(-1) };
+    const named = kids(node), [first] = named;
+    return { pattern: named.length === 2 ? first : null, expr: named.at(-1) };
 };
 const parseAltArm = (node) => {
-    const typeNode = node.namedChildren.find(child => child.type === 'type_ident') ?? null;
-    const identNode = node.namedChildren[0]?.type === 'identifier' ? node.namedChildren[0] : null;
-    return { pattern: identNode?.text ?? '_', guard: typeNode?.text ?? null, expr: node.namedChildren.at(-1) };
+    const named = kids(node);
+    const typeNode = named.find(child => child.type === 'type_ident') ?? null;
+    const identNode = named[0]?.type === 'identifier' ? named[0] : null;
+    return { pattern: identNode?.text ?? '_', guard: typeNode?.text ?? null, expr: named.at(-1) };
 };
-const parseBindTargets = (node) => childrenOfType(node, 'bind_target').map(target => ({ name: target.namedChildren[0].text, type: parseType(target.namedChildren[1]) }));
+const parseBindTargets = (node) => childrenOfType(node, 'bind_target').map(target => ({ name: kids(target)[0].text, type: parseType(kids(target)[1]) }));
 
 function literalInfo(node) {
-    const child = node.namedChildren[0];
+    const child = kids(node)[0];
     const string = stringLiteralValue(node);
     if (string !== null) return { kind: 'string', value: string };
     if (child?.type === 'int_lit') return { kind: 'int', value: parseIntLit(child.text) };
@@ -1396,7 +1405,7 @@ function literalInfo(node) {
 const parseIntLit = (text) => text.startsWith('0x') ? parseInt(text.slice(2), 16) : text.startsWith('0b') ? parseInt(text.slice(2), 2) : parseInt(text, 10);
 const flattenTuple = (node, out = []) => {
     if (node.type === 'tuple_expr') {
-        for (const child of node.namedChildren) flattenTuple(child, out);
+        for (const child of kids(node)) flattenTuple(child, out);
         return out;
     }
     out.push(node);

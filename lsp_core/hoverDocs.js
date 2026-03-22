@@ -24,18 +24,11 @@ export function getBuiltinReturnType(key, typeText) {
         return typeText ? `${typeText} # null` : undefined;
     return undefined;
 }
-export function getCoreTypeHover(word) {
-    return lookupHover(CORE_TYPE_DOCS, word);
-}
-export function getLiteralHover(word) {
-    return lookupHover(LITERAL_DOCS, word);
-}
-export function getKeywordHover(word) {
-    return lookupHover(KEYWORD_DOCS, word);
-}
-export function getBuiltinNamespaceHover(word) {
-    return lookupHover(BUILTIN_NAMESPACE_DOCS, word);
-}
+export const getCoreTypeHover = (word) => lookupHover(CORE_TYPE_DOCS, word);
+export const getLiteralHover = (word) => lookupHover(LITERAL_DOCS, word);
+export const getKeywordHover = (word) => lookupHover(KEYWORD_DOCS, word);
+export const getBuiltinNamespaceHover = (word) =>
+    lookupHover(BUILTIN_NAMESPACE_DOCS, word);
 export function isBuiltinNamespace(name) {
     return Object.hasOwn(BUILTIN_METHODS, name);
 }
@@ -53,9 +46,6 @@ function groupBuiltinMethods(docs) {
     const methods = {};
     for (const key of Object.keys(docs)) {
         const [namespace, method] = key.split('.');
-        if (!namespace || !method) {
-            continue;
-        }
         (methods[namespace] ??= []).push(method);
     }
     return methods;

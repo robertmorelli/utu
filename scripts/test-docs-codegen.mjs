@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { compile } from '../index.js';
+import { getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(scriptDir, '..');
+const repoRoot = getRepoRoot(import.meta.url);
 const wasmUrl = pathToFileURL(resolve(repoRoot, 'tree-sitter-utu.wasm'));
 
 const cases = [
@@ -135,31 +135,16 @@ const cases = [
     },
 ];
 
-let failed = false;
-for (const testCase of cases) {
+if (await runNamedCases(cases.map((testCase) => [testCase.name, async () => {
     const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
-    const { wat, metadata } = await compile(source, {
-        wat: true,
-        wasmUrl,
-        mode: testCase.mode ?? 'program',
-    });
-
+    const { wat, metadata } = await compile(source, { wat: true, wasmUrl, mode: testCase.mode ?? 'program' });
     const missing = testCase.snippets.filter((snippet) => !wat.includes(snippet));
     const metadataErrors = [];
-    if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests) {
+    if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests)
         metadataErrors.push(`expected ${testCase.expectedTests} tests, found ${metadata.tests.length}`);
-    }
-    if ('expectedBenches' in testCase && metadata.benches.length !== testCase.expectedBenches) {
+    if ('expectedBenches' in testCase && metadata.benches.length !== testCase.expectedBenches)
         metadataErrors.push(`expected ${testCase.expectedBenches} benches, found ${metadata.benches.length}`);
-    }
-
-    const ok = missing.length === 0 && metadataErrors.length === 0;
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${testCase.name}`);
-    if (!ok) {
-        failed = true;
-        if (missing.length) console.log(`  missing snippets: ${missing.join(' | ')}`);
-        for (const error of metadataErrors) console.log(`  ${error}`);
-    }
-}
-
-if (failed) process.exit(1);
+    if (missing.length || metadataErrors.length)
+        throw new Error([missing.length ? `missing snippets: ${missing.join(' | ')}` : '', ...metadataErrors].filter(Boolean).join('\n  '));
+}])))
+    process.exit(1);

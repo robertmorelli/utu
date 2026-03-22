@@ -1,35 +1,15 @@
 import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const grammarCandidates = [
-  'tree-sitter-utu.wasm',
-  'tree-sitter-utu.wasm',
-];
-
+const grammarCandidates = ['tree-sitter-utu.wasm'];
 const runtimeCandidates = [
   'web-tree-sitter.wasm',
-  'web-tree-sitter.wasm',
   'node_modules/web-tree-sitter/web-tree-sitter.wasm',
 ];
-
-const packagedEditorGrammarCandidates = [
-  'tree-sitter-utu.wasm',
-];
-
-const packagedEditorRuntimeCandidates = [
-  'web-tree-sitter.wasm',
-  'node_modules/web-tree-sitter/web-tree-sitter.wasm',
-];
-
-const cliGrammarCandidates = [
-  'tree-sitter-utu.wasm',
-  'tree-sitter-utu.wasm',
-];
-
-const cliRuntimeCandidates = [
-  'web-tree-sitter.wasm',
-  'node_modules/web-tree-sitter/web-tree-sitter.wasm',
-];
+const packagedEditorGrammarCandidates = grammarCandidates;
+const packagedEditorRuntimeCandidates = runtimeCandidates;
+const cliGrammarCandidates = grammarCandidates;
+const cliRuntimeCandidates = runtimeCandidates;
 
 export async function loadEditorTestAssets(repoRoot) {
   return loadAssetSet(repoRoot, grammarCandidates, runtimeCandidates, 'UTU grammar wasm');
@@ -46,13 +26,11 @@ export async function loadCliCompilerTestAssets(repoRoot) {
 async function findExistingAsset(repoRoot, candidates, label) {
   for (const candidate of candidates) {
     const resolvedPath = resolve(repoRoot, candidate);
-
     try {
       await access(resolvedPath);
       return resolvedPath;
     } catch {}
   }
-
   throw new Error(`Could not find ${label}. Checked: ${candidates.join(', ')}`);
 }
 
@@ -65,11 +43,5 @@ async function loadAssetSet(repoRoot, grammarAssetCandidates, runtimeAssetCandid
     readFile(grammarPath),
     readFile(runtimePath),
   ]);
-
-  return {
-    grammarPath,
-    runtimePath,
-    grammarWasmPath,
-    runtimeWasmPath,
-  };
+  return { grammarPath, runtimePath, grammarWasmPath, runtimeWasmPath };
 }

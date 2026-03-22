@@ -1,4 +1,4 @@
-import { rootNode, childOfType, walk, stringLiteralValue } from './tree.js';
+import { rootNode, namedChildren, childOfType, walk, stringLiteralValue } from './tree.js';
 import data from './jsondata/jsgen.data.json' with { type: 'json' };
 
 const JS_STRING_BUILTINS = data.jsStringBuiltins;
@@ -34,163 +34,15 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
         tests: metadata.tests ?? [],
         benches: metadata.benches ?? [],
     })};`);
-    lines.push('', [
-        `export const DEFAULT_BENCHMARK_OPTIONS = Object.freeze(${JSON.stringify(data.defaultBenchmarkOptions)});`,
-        'const __defaultFormatError = error => error instanceof Error ? error.message : String(error);',
-        'const __defaultNow = () => performance.now();',
-        'const __defaultClock = () => typeof process !== "undefined" && process?.hrtime?.bigint',
-        '  ? { nowNs: () => Number(process.hrtime.bigint()) }',
-        '  : { nowNs: () => Math.round(performance.now() * 1e6) };',
-        'const __benchmarkRate = (iterations, elapsedNs) => elapsedNs <= 0 ? 0 : iterations / (elapsedNs / 1e9);',
-        `const __iterationsPerSecondFormatThresholds = ${JSON.stringify(data.iterationsPerSecondFormatThresholds)};`,
-        'const __formatIterationsPerSecond = value => {',
-        '  for (const entry of __iterationsPerSecondFormatThresholds) {',
-        '    if (value >= entry.min) return `${(value / entry.divisor).toFixed(entry.digits)}${entry.suffix}`;',
-        '  }',
-        '  return `${value.toFixed(2)} iter/s`;',
-        '};',
-        `const __durationNsFormatThresholds = ${JSON.stringify(data.durationNsFormatThresholds)};`,
-        'const __formatDurationNs = value => {',
-        '  for (const entry of __durationNsFormatThresholds) {',
-        '    if (value >= entry.min) return `${(value / entry.divisor).toFixed(entry.digits)}${entry.suffix}`;',
-        '  }',
-        '  return `${value.toFixed(0)}ns`;',
-        '};',
-        'const __normalizeBenchmarkOptions = options => ({',
-        '  seconds: Number.isFinite(options?.seconds) && options.seconds > 0 ? options.seconds : DEFAULT_BENCHMARK_OPTIONS.seconds,',
-        '  samples: Number.isFinite(options?.samples) ? Math.max(1, Math.floor(options.samples)) : DEFAULT_BENCHMARK_OPTIONS.samples,',
-        '  warmup: Number.isFinite(options?.warmup) ? Math.max(0, Math.floor(options.warmup)) : DEFAULT_BENCHMARK_OPTIONS.warmup,',
-        '});',
-        'const __selectEntry = (entries, ordinal) => entries[ordinal];',
-        'const __invokeExport = async (exports, exportName, args = []) => ({ logs: [], result: await exports[exportName](...args) });',
-        'const __timeInvocation = async (run, clock) => {',
-        '  const startNs = clock.nowNs();',
-        '  await run();',
-        '  return Math.max(0, clock.nowNs() - startNs);',
-        '};',
-        'const __clampIterations = value => !Number.isFinite(value) || value < 1 ? 1 : Math.max(1, Math.min(0x7fffffff, Math.round(value)));',
-        'const __projectIterations = (iterations, elapsedNs, targetNs) => elapsedNs <= 0',
-        '  ? __clampIterations(iterations * 10)',
-        '  : __clampIterations(Math.round(iterations * (targetNs / elapsedNs)));',
-        'const __calibrateIterations = async (bench, targetNs, initialIterations, clock) => {',
-        '  let iterations = __clampIterations(initialIterations);',
-        '  let elapsedNs = await __timeInvocation(() => bench(iterations), clock);',
-        '  while (elapsedNs < targetNs / 10 && iterations < 0x7fffffff) {',
-        '    const scale = elapsedNs <= 0 ? 10 : Math.max(2, Math.ceil((targetNs / 10) / elapsedNs));',
-        '    const next = __clampIterations(iterations * scale);',
-        '    if (next === iterations) break;',
-        '    iterations = next;',
-        '    elapsedNs = await __timeInvocation(() => bench(iterations), clock);',
-        '  }',
-        '  return __projectIterations(iterations, elapsedNs, targetNs);',
-        '};',
-        'const __mergeCounts = (target, values) => {',
-        '  for (let i = 0; i < values.length; i += 1) target[i] = (target[i] ?? 0) + (values[i] ?? 0);',
-        '};',
-        'export async function runTest(exports, ordinal, { formatError = __defaultFormatError, now = __defaultNow } = {}) {',
-        '  const test = __selectEntry(metadata.tests, ordinal);',
-        '  const start = now();',
-        '  try {',
-        '    const execution = await __invokeExport(exports, test.exportName, []);',
-        '    return { name: test.name, exportName: test.exportName, durationMs: now() - start, error: undefined, logs: execution.logs, passed: true };',
-        '  } catch (error) {',
-        '    return { name: test.name, exportName: test.exportName, durationMs: now() - start, error: formatError(error), logs: [], passed: false };',
-        '  }',
-        '}',
-        'export async function runBenchmark(exports, ordinal, options = {}, measureOptions = {}) {',
-        '  const bench = __selectEntry(metadata.benches, ordinal);',
-        '  const settings = __normalizeBenchmarkOptions(options);',
-        '  const targetNs = Math.floor(settings.seconds * 1e9);',
-        '  const profile = measureOptions.profile ?? null;',
-        '  const clock = measureOptions.clock ?? __defaultClock();',
-        '  const benchFn = exports[bench.exportName];',
-        '  let estimate = 1;',
-        '  for (let warmupIndex = 0; warmupIndex < settings.warmup; warmupIndex += 1) estimate = await __calibrateIterations(benchFn, targetNs, estimate, clock);',
-        '  const runs = [];',
-        '  const profileCounts = [];',
-        '  let logs = [];',
-        '  for (let sampleIndex = 0; sampleIndex < settings.samples; sampleIndex += 1) {',
-        '    const iterations = __clampIterations(estimate);',
-        '    profile?.reset?.();',
-        '    const startNs = clock.nowNs();',
-        '    const execution = await __invokeExport(exports, bench.exportName, [iterations]);',
-        '    const elapsedNs = Math.max(0, clock.nowNs() - startNs);',
-        '    estimate = __projectIterations(iterations, elapsedNs, targetNs);',
-        '    logs = execution.logs;',
-        '    runs.push({ durationMs: elapsedNs / 1e6, elapsedNs, iterations });',
-        '    if (profile?.snapshot) __mergeCounts(profileCounts, profile.snapshot());',
-        '  }',
-        '  const durations = runs.map(run => run.durationMs);',
-        '  const elapsedNs = runs.map(run => run.elapsedNs);',
-        '  const durationMs = durations.reduce((sum, value) => sum + value, 0);',
-        '  const meanMs = durationMs / durations.length;',
-        '  const iterationTotal = runs.reduce((sum, run) => sum + run.iterations, 0);',
-        '  const rates = runs.map(run => __benchmarkRate(run.iterations, run.elapsedNs));',
-        '  const meanRate = durationMs <= 0 ? 0 : iterationTotal / (durationMs / 1000);',
-        '  const summary = `${bench.name}: mean ${__formatIterationsPerSecond(meanRate)}, min ${__formatIterationsPerSecond(Math.min(...rates))}, max ${__formatIterationsPerSecond(Math.max(...rates))}, ${__formatDurationNs(iterationTotal > 0 ? (durationMs / iterationTotal) * 1e6 : 0)}/iter, ${settings.seconds.toFixed(3)}s target, ${runs.map(run => run.iterations).join(", ")} iterations`;',
-        '  return {',
-        '    name: bench.name,',
-        '    exportName: bench.exportName,',
-        '    durationMs,',
-        '    logs,',
-        '    maxMs: Math.max(...durations),',
-        '    meanMs,',
-        '    minMs: Math.min(...durations),',
-        '    perIterationMs: iterationTotal > 0 ? durationMs / iterationTotal : 0,',
-        '    sampleDurationsMs: durations,',
-        '    sampleElapsedNs: elapsedNs,',
-        '    iterations: runs.map(run => run.iterations),',
-        '    iterationTotal,',
-        '    profileCounts,',
-        '    summary,',
-        '  };',
-        '}',
-    ].join('\n'));
+    lines.push('', renderSnippetLines(data.runtimePreludeLines, {
+        __DEFAULT_BENCHMARK_OPTIONS__: JSON.stringify(data.defaultBenchmarkOptions),
+        __ITERATIONS_PER_SECOND_FORMAT_THRESHOLDS__: JSON.stringify(data.iterationsPerSecondFormatThresholds),
+        __DURATION_NS_FORMAT_THRESHOLDS__: JSON.stringify(data.durationNsFormatThresholds),
+    }));
 
-    if (needsImports) lines.push('', [
-        'const __globalObject = typeof globalThis !== "undefined" ? globalThis : undefined;',
-        'const __importPaths = (moduleName, importName) => {',
-        '  const paths = [[importName]];',
-        '  const parts = importName.split("_").filter(Boolean);',
-        '  if (parts.length > 1) paths.push(parts);',
-        '  if (moduleName === "es" && parts.length > 1) {',
-        '    const [head, ...tail] = parts;',
-        '    const headVariants = [head];',
-        '    const capitalized = head ? head[0].toUpperCase() + head.slice(1) : head;',
-        '    if (capitalized && !headVariants.includes(capitalized)) headVariants.push(capitalized);',
-        '    const upper = head.toUpperCase();',
-        '    if (upper && !headVariants.includes(upper)) headVariants.push(upper);',
-        '    for (const variant of headVariants.slice(1)) paths.push([variant, ...tail]);',
-        '  }',
-        '  return paths;',
-        '};',
-        'const __resolveBindingPath = (root, path) => {',
-        '  if (!root || (typeof root !== "object" && typeof root !== "function")) return null;',
-        '  let value = root;',
-        '  for (const segment of path) {',
-        '    if (!value || (typeof value !== "object" && typeof value !== "function") || !(segment in value)) return null;',
-        '    value = value[segment];',
-        '  }',
-        '  return value;',
-        '};',
-        'const __resolveHostImport = (moduleObject, moduleName, importName) => {',
-        '  for (const source of [moduleObject, moduleName === "es" ? __globalObject : undefined]) {',
-        '    if (source === undefined) continue;',
-        '    for (const path of __importPaths(moduleName, importName)) {',
-        '      const resolved = __resolveBindingPath(source, path);',
-        '      if (resolved) return resolved;',
-        '    }',
-        '  }',
-        '  throw new Error(`Missing host import "${importName}" from "${moduleName}"`);',
-        '};',
-    ].join('\n'));
+    if (needsImports) lines.push('', renderSnippetLines(data.resolveHostImportLines));
 
-    if (needsNodeImports) lines.push('', [
-        'const __importHostModule = async specifier => {',
-        '  try { return await import(specifier); }',
-        '  catch (error) { throw new Error(`Failed to auto-resolve host module "${specifier}": ${error instanceof Error ? error.message : String(error)}`); }',
-        '};',
-    ].join('\n'));
+    if (needsNodeImports) lines.push('', renderSnippetLines(data.importHostModuleLines));
 
     lines.push('', 'export async function instantiate() {');
     for (const group of moduleImports)
@@ -206,9 +58,9 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
             const moduleRef = group.autoResolve
                 ? group.ref
                 : group.module === 'es'
-                    ? '__globalObject'
+                    ? 'globalThis'
                     : group.module === '__utu_profile'
-                        ? '__globalObject?.__utu_profile'
+                        ? 'globalThis.__utu_profile'
                         : 'undefined';
         lines.push(`    ${JSON.stringify(group.module)}: {`);
         for (const entry of group.entries) {
@@ -227,7 +79,7 @@ function analyze(root, mode) {
     const fnBodies = [], globalBodies = [], testBodies = [], benchBodies = [];
     const addBody = (bucket, node) => node && bucket.push(node);
 
-    for (const item of root.namedChildren) {
+    for (const item of namedChildren(root)) {
         switch (item.type) {
             case 'fn_decl':
                 addBody(fnBodies, childOfType(item, 'block'));
@@ -239,14 +91,14 @@ function analyze(root, mode) {
                 break;
             }
             case 'global_decl':
-                addBody(globalBodies, item.namedChildren.at(-1));
+                addBody(globalBodies, namedChildren(item).at(-1));
                 break;
             case 'test_decl':
                 if (mode === 'test') addBody(testBodies, childOfType(item, 'block'));
                 break;
             case 'bench_decl':
                 if (mode !== 'bench') break;
-                const named = childOfType(item, 'setup_decl')?.namedChildren ?? [];
+                const named = namedChildren(childOfType(item, 'setup_decl'));
                 benchBodies.push(...named.slice(0, -1));
                 addBody(benchBodies, childOfType(named.at(-1), 'block'));
                 break;
@@ -272,7 +124,7 @@ function groupImportsByModule(root, profile = null) {
         return groups.get(module);
     };
 
-    for (const item of root.namedChildren) {
+    for (const item of namedChildren(root)) {
         if (item.type !== 'import_decl') continue;
         const entry = parseImportDecl(item);
         groupFor(entry.module).entries.push(entry);
@@ -282,7 +134,7 @@ function groupImportsByModule(root, profile = null) {
 }
 
 function parseImportDecl(node) {
-    const [moduleNode, nameNode] = node.namedChildren;
+    const [moduleNode, nameNode] = namedChildren(node);
     const module = moduleNode.text.slice(1, -1);
     const name = nameNode.text;
     if (node.text.includes('(')) {
@@ -290,7 +142,7 @@ function parseImportDecl(node) {
             kind: 'function',
             module,
             name,
-            paramCount: childOfType(node, 'import_param_list')?.namedChildren.length ?? 0,
+            paramCount: namedChildren(childOfType(node, 'import_param_list')).length,
         };
     }
     return { kind: 'value', module, name };
@@ -300,4 +152,11 @@ function toBase64(bytes) {
     let bin = '';
     for (const byte of bytes) bin += String.fromCharCode(byte);
     return btoa(bin);
+}
+
+function renderSnippetLines(lines, replacements = {}) {
+    return lines.map(line => Object.entries(replacements).reduce(
+        (rendered, [key, value]) => rendered.replaceAll(key, value),
+        line,
+    )).join('\n');
 }

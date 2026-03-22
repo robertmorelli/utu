@@ -2,19 +2,14 @@ import binaryen from 'binaryen';
 import { watgen } from './watgen.js';
 import { jsgen } from './jsgen.js';
 import { createUtuTreeSitterParser, withParsedTree } from './parser.js';
-import { childOfType, throwOnParseErrors } from './tree.js';
+import { childOfType, namedChildren, throwOnParseErrors } from './tree.js';
 
 let parser = null;
-const SUPPORTED_WASM_FEATURES = binaryen.Features.GC
-    | binaryen.Features.ReferenceTypes
-    | binaryen.Features.Multivalue;
+const SUPPORTED_WASM_FEATURES = binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue;
 
 export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     if (parser) return;
-    parser = await createUtuTreeSitterParser({
-        wasmUrl: wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url),
-        runtimeWasmUrl,
-    });
+    parser = await createUtuTreeSitterParser({ wasmUrl: wasmUrl ?? new URL('../tree-sitter-utu.wasm', import.meta.url), runtimeWasmUrl });
 }
 
 export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {
@@ -22,8 +17,7 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
     return withParsedTree(parser, source, async (tree) => {
         throwOnParseErrors(tree.rootNode);
         const { wat, metadata } = watgen(tree, { mode, profile, targetName });
-        let mod;
-        let wasm;
+        let mod, wasm;
         try {
             mod = binaryen.parseText(wat);
             mod.setFeatures(SUPPORTED_WASM_FEATURES);
@@ -34,9 +28,7 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
             ensureValid(mod, 'Binaryen validation failed after optimization.');
             wasm = mod.emitBinary();
             const module = new WebAssembly.Module(wasm);
-            try {
-                if (!WebAssembly.Module.imports(module).length) await WebAssembly.instantiate(module);
-            } catch {}
+            if (!WebAssembly.Module.imports(module).length) await WebAssembly.instantiate(module).catch(() => {});
         } catch (error) {
             throw new Error(error?.message ?? String(error));
         } finally {
@@ -53,7 +45,8 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
                 artifact: { where, moduleFormat },
             },
         };
-        return emitWat ? { ...result, wat } : result;
+        if (emitWat) result.wat = wat;
+        return result;
     });
 }
 
@@ -61,10 +54,8 @@ export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
     return withParsedTree(parser, source, async (tree) => {
         throwOnParseErrors(tree.rootNode);
-        const tests = [];
-        const benches = [];
-        const exports = [];
-        for (const item of tree.rootNode.namedChildren) {
+        const tests = [], benches = [], exports = [];
+        for (const item of namedChildren(tree.rootNode)) {
             if (item.type === 'export_decl') {
                 const fn = childOfType(item, 'fn_decl');
                 const name = childOfType(fn, 'identifier')?.text;
@@ -72,12 +63,12 @@ export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {
                 continue;
             }
             if (item.type === 'test_decl') {
-                const name = item.namedChildren[0]?.text.slice(1, -1);
+                const name = namedChildren(item)[0]?.text.slice(1, -1);
                 if (name) tests.push({ name });
                 continue;
             }
             if (item.type === 'bench_decl') {
-                const name = item.namedChildren[0]?.text.slice(1, -1);
+                const name = namedChildren(item)[0]?.text.slice(1, -1);
                 if (name) benches.push({ name });
             }
         }

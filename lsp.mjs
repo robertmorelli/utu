@@ -15,62 +15,54 @@ const SEMANTIC_TOKEN_MODIFIER_MASKS = Object.fromEntries(SEMANTIC_TOKEN_MODIFIER
 const JSON_RPC_ERRORS = data.jsonRpcErrors;
 const HEADER_SEPARATOR = Buffer.from(data.headerSeparator, 'ascii');
 const INITIALIZE_RESULT = data.initializeResult;
+const identity = (value) => value;
+const mapArray = (map) => (values) => values.map(map);
+const INVALID_REQUEST = JSON_RPC_ERRORS.invalidRequest;
+const withInitialization = (run) => (session, params) => session.requireInitialized(() => run(session, params));
+const textDocumentRequest = (method, map = identity) => withInitialization(async (session, params) => map(await session.server[method](getRequiredTextDocumentUri(params))));
+const textDocumentPositionRequest = (method, map = identity, getExtraArgs = () => []) => withInitialization(async (session, params) => map(await session.server[method](getRequiredTextDocumentUri(params), getRequiredPosition(params), ...getExtraArgs(params))));
+const withDocumentDiagnostics = (session, textDocument, loadDiagnostics) => session.publishDocumentDiagnostics(textDocument.uri, () => loadDiagnostics(textDocument));
+const textDocumentNotification = (run) => withInitialization(async (session, params) => run(session, getRequiredTextDocument(params), params));
+const jsonRpc = (message) => ({ jsonrpc: '2.0', ...message });
+const ensure = (condition, message) => {
+    if (!condition)
+        throw new JsonRpcError(INVALID_REQUEST, message);
+};
 const REQUEST_HANDLERS = {
-    initialize: async (session, params) => {
-        session.server.setWorkspaceFolders(getWorkspaceFolderUris(params));
-        session.initialized = true;
-        return INITIALIZE_RESULT;
-    },
-    shutdown: async (session) => {
-        session.shutdownRequested = true;
-        return null;
-    },
-    'textDocument/hover': async (session, params) => session.requireInitialized(async () => toLspHover(await session.server.getHover(getRequiredTextDocumentUri(params), getRequiredPosition(params)))),
-    'textDocument/definition': async (session, params) => session.requireInitialized(async () => toLspLocation(await session.server.getDefinition(getRequiredTextDocumentUri(params), getRequiredPosition(params)))),
-    'textDocument/references': async (session, params) => session.requireInitialized(async () => (await session.server.getReferences(getRequiredTextDocumentUri(params), getRequiredPosition(params), getIncludeDeclaration(params))).map(toLspLocation)),
-    'textDocument/documentHighlight': async (session, params) => session.requireInitialized(async () => (await session.server.getDocumentHighlights(getRequiredTextDocumentUri(params), getRequiredPosition(params))).map(toLspDocumentHighlight)),
-    'textDocument/completion': async (session, params) => session.requireInitialized(async () => (await session.server.getCompletionItems(getRequiredTextDocumentUri(params), getRequiredPosition(params))).map(toLspCompletionItem)),
-    'textDocument/documentSymbol': async (session, params) => session.requireInitialized(async () => (await session.server.getDocumentSymbols(getRequiredTextDocumentUri(params))).map(toLspDocumentSymbol)),
-    'workspace/symbol': async (session, params) => session.requireInitialized(async () => (await session.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(params))).map(toLspWorkspaceSymbol)),
-    'textDocument/semanticTokens/full': async (session, params) => session.requireInitialized(async () => ({
-        data: encodeSemanticTokens(await session.server.getDocumentSemanticTokens(getRequiredTextDocumentUri(params))),
-    })),
+    initialize: async (session, params) => ((session.server.setWorkspaceFolders(getWorkspaceFolderUris(params))), (session.initialized = true), INITIALIZE_RESULT),
+    shutdown: async (session) => ((session.shutdownRequested = true), null),
+    'textDocument/hover': textDocumentPositionRequest('getHover', toLspHover),
+    'textDocument/definition': textDocumentPositionRequest('getDefinition', toLspLocation),
+    'textDocument/references': textDocumentPositionRequest('getReferences', mapArray(toLspLocation), (params) => [getIncludeDeclaration(params)]),
+    'textDocument/documentHighlight': textDocumentPositionRequest('getDocumentHighlights', mapArray(toLspDocumentHighlight)),
+    'textDocument/completion': textDocumentPositionRequest('getCompletionItems', mapArray(toLspCompletionItem)),
+    'textDocument/documentSymbol': textDocumentRequest('getDocumentSymbols', mapArray(toLspDocumentSymbol)),
+    'workspace/symbol': withInitialization(async (session, params) => (await session.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(params))).map(toLspWorkspaceSymbol)),
+    'textDocument/semanticTokens/full': textDocumentRequest('getDocumentSemanticTokens', (tokens) => ({ data: encodeSemanticTokens(tokens) })),
 };
 const IGNORED_NOTIFICATION_HANDLERS = Object.fromEntries(data.ignoredNotifications.map((method) => [method, async () => { }]));
 const NOTIFICATION_HANDLERS = {
     ...IGNORED_NOTIFICATION_HANDLERS,
-    'textDocument/didOpen': async (session, params) => session.requireInitialized(async () => {
-        const textDocument = getRequiredTextDocument(params);
-        await session.publishDocumentDiagnostics(textDocument.uri, () => session.server.openDocument(textDocument));
+    'textDocument/didOpen': textDocumentNotification((session, textDocument) => withDocumentDiagnostics(session, textDocument, () => session.server.openDocument(textDocument))),
+    'textDocument/didChange': textDocumentNotification((session, textDocument, params) => withDocumentDiagnostics(session, textDocument, () => session.server.updateDocument({
+        uri: textDocument.uri,
+        version: textDocument.version,
+        changes: getRequiredContentChanges(params),
+    }))),
+    'textDocument/didSave': textDocumentNotification((session, textDocument, params) => withDocumentDiagnostics(session, textDocument, () => session.server.saveDocument({
+        uri: textDocument.uri,
+        text: getOptionalText(params),
+    }))),
+    'textDocument/didClose': textDocumentNotification(async (session, textDocument) => {
+        await session.server.closeDocument(textDocument.uri);
+        session.publishDiagnostics(textDocument.uri, []);
     }),
-    'textDocument/didChange': async (session, params) => session.requireInitialized(async () => {
-        const textDocument = getRequiredTextDocument(params);
-        await session.publishDocumentDiagnostics(textDocument.uri, () => session.server.updateDocument({
-            uri: textDocument.uri,
-            version: textDocument.version,
-            changes: getRequiredContentChanges(params),
-        }));
-    }),
-    'textDocument/didSave': async (session, params) => session.requireInitialized(async () => {
-        const uri = getRequiredTextDocumentUri(params);
-        await session.publishDocumentDiagnostics(uri, () => session.server.saveDocument({
-            uri,
-            text: getOptionalText(params),
-        }));
-    }),
-    'textDocument/didClose': async (session, params) => session.requireInitialized(async () => {
-        const uri = getRequiredTextDocumentUri(params);
-        await session.server.closeDocument(uri);
-        session.publishDiagnostics(uri, []);
-    }),
-    'workspace/didChangeWorkspaceFolders': async (session, params) => session.requireInitialized(async () => {
+    'workspace/didChangeWorkspaceFolders': withInitialization(async (session, params) => {
         const { added, removed } = getWorkspaceFolderChanges(params);
         session.server.addWorkspaceFolders(added);
         session.server.removeWorkspaceFolders(removed);
     }),
-    exit: async (session) => {
-        session.exit();
-    },
+    exit: async (session) => session.exit(),
 };
 class JsonRpcConnection {
     onRequest;
@@ -79,39 +71,27 @@ class JsonRpcConnection {
     constructor(onRequest, onNotification) {
         this.onRequest = onRequest;
         this.onNotification = onNotification;
-        process.stdin.on('data', (chunk) => {
-            this.handleData(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-        process.stdin.on('error', (error) => {
-            console.error('[utu-lsp] stdin error:', error);
-        });
+        process.stdin.on('data', (chunk) => this.handleData(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        process.stdin.on('error', (error) => console.error('[utu-lsp] stdin error:', error));
     }
-    sendNotification(method, params) {
-        this.send({
-            jsonrpc: '2.0',
-            method,
-            params,
-        });
-    }
+    sendNotification(method, params) { this.send(jsonRpc({ method, params })); }
     handleData(chunk) {
         this.buffer = Buffer.concat([this.buffer, chunk]);
         while (true) {
             const headerEnd = this.buffer.indexOf(HEADER_SEPARATOR);
-            if (headerEnd < 0) {
+            if (headerEnd < 0)
                 return;
-            }
             const headerText = this.buffer.slice(0, headerEnd).toString('utf8');
             const contentLength = getContentLength(headerText);
             if (contentLength === undefined) {
                 this.buffer = this.buffer.slice(headerEnd + HEADER_SEPARATOR.length);
-                this.sendError(null, JSON_RPC_ERRORS.invalidRequest, 'Missing Content-Length header.');
+                this.sendError(null, INVALID_REQUEST, 'Missing Content-Length header.');
                 continue;
             }
             const bodyStart = headerEnd + HEADER_SEPARATOR.length;
             const bodyEnd = bodyStart + contentLength;
-            if (this.buffer.length < bodyEnd) {
+            if (this.buffer.length < bodyEnd)
                 return;
-            }
             const body = this.buffer.slice(bodyStart, bodyEnd).toString('utf8');
             this.buffer = this.buffer.slice(bodyEnd);
             let message;
@@ -127,17 +107,13 @@ class JsonRpcConnection {
     }
     async dispatch(message) {
         if (!isJsonRpcMessage(message)) {
-            this.sendError(null, JSON_RPC_ERRORS.invalidRequest, 'Expected a JSON-RPC 2.0 message.');
+            this.sendError(null, INVALID_REQUEST, 'Expected a JSON-RPC 2.0 message.');
             return;
         }
         if (isJsonRpcRequest(message)) {
             try {
                 const result = await this.onRequest(message);
-                this.send({
-                    jsonrpc: '2.0',
-                    id: message.id,
-                    result,
-                });
+                this.send(jsonRpc({ id: message.id, result }));
             }
             catch (error) {
                 this.sendError(message.id, getErrorCode(error), error instanceof Error ? error.message : 'Request failed.', errorToData(error));
@@ -153,18 +129,10 @@ class JsonRpcConnection {
             }
             return;
         }
-        if ('id' in message) {
-            return;
-        }
-        this.sendError(null, JSON_RPC_ERRORS.invalidRequest, 'Invalid JSON-RPC message.');
+        if (!('id' in message))
+            this.sendError(null, INVALID_REQUEST, 'Invalid JSON-RPC message.');
     }
-    sendError(id, code, message, data) {
-        this.send({
-            jsonrpc: '2.0',
-            id,
-            error: data === undefined ? { code, message } : { code, message, data },
-        });
-    }
+    sendError(id, code, message, data) { this.send(jsonRpc({ id, error: data === undefined ? { code, message } : { code, message, data } })); }
     send(message) {
         const payload = Buffer.from(JSON.stringify(message), 'utf8');
         process.stdout.write(`Content-Length: ${payload.length}\r\n\r\n`, 'utf8');
@@ -177,10 +145,7 @@ class UtuLspSession {
     initialized = false;
     shutdownRequested = false;
     constructor({ grammarWasmPath = resolveServerAssetPath('tree-sitter-utu.wasm'), runtimeWasmPath = resolveServerAssetPath('web-tree-sitter.wasm'), } = {}) {
-        this.server = new UtuLanguageServer({
-            grammarWasmPath,
-            runtimeWasmPath,
-        });
+        this.server = new UtuLanguageServer({ grammarWasmPath, runtimeWasmPath });
         this.connection = new JsonRpcConnection((request) => this.handleRequest(request), (notification) => this.handleNotification(notification));
     }
     async handleRequest({ method, params }) {
@@ -194,54 +159,25 @@ class UtuLspSession {
         if (handle)
             return handle(this, params);
     }
-    publishDiagnostics(uri, diagnostics) {
-        this.connection.sendNotification('textDocument/publishDiagnostics', {
-            uri,
-            diagnostics: diagnostics.map(toLspDiagnostic),
-        });
-    }
+    publishDiagnostics(uri, diagnostics) { this.connection.sendNotification('textDocument/publishDiagnostics', { uri, diagnostics: diagnostics.map(toLspDiagnostic) }); }
     assertInitialized() {
-        if (!this.initialized) {
+        if (!this.initialized)
             throw new JsonRpcError(JSON_RPC_ERRORS.serverNotInitialized, 'The UTU language server has not been initialized yet.');
-        }
     }
-    exit() {
-        this.server.dispose();
-        process.exit(this.shutdownRequested ? 0 : 1);
-    }
-    async requireInitialized(callback) {
-        this.assertInitialized();
-        return callback();
-    }
-    async publishDocumentDiagnostics(uri, loadDiagnostics) {
-        this.publishDiagnostics(uri, await loadDiagnostics());
-    }
+    exit() { this.server.dispose(); process.exit(this.shutdownRequested ? 0 : 1); }
+    async requireInitialized(callback) { this.assertInitialized(); return callback(); }
+    async publishDocumentDiagnostics(uri, loadDiagnostics) { this.publishDiagnostics(uri, await loadDiagnostics()); }
 }
 class JsonRpcError extends Error {
     code;
-    constructor(code, message) {
-        super(message);
-        this.code = code;
-    }
+    constructor(code, message) { super(message); this.code = code; }
 }
-export function startLspServer(options = {}) {
-    process.stdin.resume();
-    new UtuLspSession(options);
-}
-function resolveServerAssetPath(assetName) {
-    return resolvePath(dirname(fileURLToPath(import.meta.url)), assetName);
-}
-function getContentLength(headerText) {
-    const match = /Content-Length:\s*(\d+)/i.exec(headerText);
-    return match ? Number.parseInt(match[1], 10) : undefined;
-}
-function getRequiredTextDocumentUri(params) {
-    return getRequiredTextDocument(params).uri;
-}
+export function startLspServer(options = {}) { process.stdin.resume(); new UtuLspSession(options); }
+function resolveServerAssetPath(assetName) { return resolvePath(dirname(fileURLToPath(import.meta.url)), assetName); }
+function getContentLength(headerText) { return mapNullable(/Content-Length:\s*(\d+)/i.exec(headerText), (match) => Number.parseInt(match[1], 10)); }
+function getRequiredTextDocumentUri(params) { return getRequiredTextDocument(params).uri; }
 function getRequiredTextDocument(params) {
-    if (!isObject(params) || !isObject(params.textDocument)) {
-        throw new JsonRpcError(JSON_RPC_ERRORS.invalidRequest, 'Missing textDocument payload.');
-    }
+    ensure(isObject(params) && isObject(params.textDocument), 'Missing textDocument payload.');
     return {
         uri: requireString(params.textDocument.uri, 'textDocument.uri'),
         version: typeof params.textDocument.version === 'number' ? params.textDocument.version : 0,
@@ -249,9 +185,7 @@ function getRequiredTextDocument(params) {
     };
 }
 function getRequiredPosition(params) {
-    if (!isObject(params) || !isObject(params.position)) {
-        throw new JsonRpcError(JSON_RPC_ERRORS.invalidRequest, 'Missing position payload.');
-    }
+    ensure(isObject(params) && isObject(params.position), 'Missing position payload.');
     return {
         line: requireNumber(params.position.line, 'position.line'),
         character: requireNumber(params.position.character, 'position.character'),
@@ -261,103 +195,34 @@ function getIncludeDeclaration(params) {
     return Boolean(isObject(params) && isObject(params.context) && params.context.includeDeclaration);
 }
 function getRequiredContentChanges(params) {
-    if (!isObject(params) || !Array.isArray(params.contentChanges)) {
-        throw new JsonRpcError(JSON_RPC_ERRORS.invalidRequest, 'Missing contentChanges payload.');
-    }
+    ensure(isObject(params) && Array.isArray(params.contentChanges), 'Missing contentChanges payload.');
     return params.contentChanges.map((change) => {
-        if (!isObject(change) || typeof change.text !== 'string') {
-            throw new JsonRpcError(JSON_RPC_ERRORS.invalidRequest, 'Invalid content change payload.');
-        }
-        return {
-            text: change.text,
-            range: isRange(change.range) ? change.range : undefined,
-        };
+        ensure(isObject(change) && typeof change.text === 'string', 'Invalid content change payload.');
+        return { text: change.text, range: isRange(change.range) ? change.range : undefined };
     });
 }
-function getWorkspaceSymbolQuery(params) {
-    return isObject(params) && typeof params.query === 'string' ? params.query : '';
-}
-function getOptionalText(params) {
-    return isObject(params) && typeof params.text === 'string' ? params.text : undefined;
-}
-function getWorkspaceFolderUris(params) {
-    return isObject(params) ? readFolderUris(params.workspaceFolders) : [];
-}
+function getWorkspaceSymbolQuery(params) { return isObject(params) && typeof params.query === 'string' ? params.query : ''; }
+function getOptionalText(params) { return isObject(params) && typeof params.text === 'string' ? params.text : undefined; }
+function getWorkspaceFolderUris(params) { return isObject(params) ? readFolderUris(params.workspaceFolders) : []; }
 function getWorkspaceFolderChanges(params) {
-    if (!isObject(params) || !isObject(params.event)) {
-        return { added: [], removed: [] };
-    }
-    return {
-        added: readFolderUris(params.event.added),
-        removed: readFolderUris(params.event.removed),
-    };
+    return isObject(params) && isObject(params.event)
+        ? { added: readFolderUris(params.event.added), removed: readFolderUris(params.event.removed) }
+        : { added: [], removed: [] };
 }
-function readFolderUris(value) {
-    return Array.isArray(value)
-        ? value.flatMap((folder) => isObject(folder) && typeof folder.uri === 'string' ? [folder.uri] : [])
-        : [];
-}
-function toLspLocation(location) {
-    return mapNullable(location, (value) => ({
-        uri: value.uri,
-        range: copyRange(value.range),
-    }));
-}
-function toLspHover(hover) {
-    return mapNullable(hover, (value) => ({
-        contents: value.contents,
-        range: copyRange(value.range),
-    }));
-}
-function toLspDiagnostic(diagnostic) {
-    return {
-        range: copyRange(diagnostic.range),
-        severity: DIAGNOSTIC_SEVERITIES[diagnostic.severity],
-        source: diagnostic.source,
-        message: diagnostic.message,
-    };
-}
-function toLspDocumentHighlight(highlight) {
-    return {
-        range: copyRange(highlight.range),
-        kind: DOCUMENT_HIGHLIGHT_KINDS[highlight.kind],
-    };
-}
-function toLspCompletionItem(item) {
-    return {
-        label: item.label,
-        kind: COMPLETION_ITEM_KINDS[item.kind],
-        detail: item.detail,
-    };
-}
-function toLspDocumentSymbol(symbol) {
-    return {
-        name: symbol.name,
-        detail: symbol.detail,
-        kind: DOCUMENT_SYMBOL_KINDS[symbol.kind],
-        range: copyRange(symbol.range),
-        selectionRange: copyRange(symbol.selectionRange),
-    };
-}
-function toLspWorkspaceSymbol(symbol) {
-    return {
-        name: symbol.name,
-        kind: DOCUMENT_SYMBOL_KINDS[symbol.kind],
-        location: {
-            uri: symbol.location.uri,
-            range: copyRange(symbol.location.range),
-        },
-        containerName: symbol.detail,
-    };
-}
+function readFolderUris(value) { return Array.isArray(value) ? value.flatMap((folder) => isObject(folder) && typeof folder.uri === 'string' ? [folder.uri] : []) : []; }
+function copyUriRange(value) { return { uri: value.uri, range: copyRange(value.range) }; }
+function toLspLocation(location) { return mapNullable(location, copyUriRange); }
+function toLspHover(hover) { return mapNullable(hover, (value) => ({ contents: value.contents, range: copyRange(value.range) })); }
+function toLspDiagnostic(diagnostic) { return { range: copyRange(diagnostic.range), severity: DIAGNOSTIC_SEVERITIES[diagnostic.severity], source: diagnostic.source, message: diagnostic.message }; }
+function toLspDocumentHighlight(highlight) { return { range: copyRange(highlight.range), kind: DOCUMENT_HIGHLIGHT_KINDS[highlight.kind] }; }
+function toLspCompletionItem(item) { return { label: item.label, kind: COMPLETION_ITEM_KINDS[item.kind], detail: item.detail }; }
+function toLspDocumentSymbol(symbol) { return { name: symbol.name, detail: symbol.detail, kind: DOCUMENT_SYMBOL_KINDS[symbol.kind], range: copyRange(symbol.range), selectionRange: copyRange(symbol.selectionRange) }; }
+function toLspWorkspaceSymbol(symbol) { return { name: symbol.name, kind: DOCUMENT_SYMBOL_KINDS[symbol.kind], location: copyUriRange(symbol.location), containerName: symbol.detail }; }
 function encodeSemanticTokens(tokens) {
-    const sortedTokens = [...tokens]
-        .filter(isEncodableSemanticToken)
-        .sort(compareSemanticTokens);
     const data = [];
     let previousLine = 0;
     let previousCharacter = 0;
-    for (const token of sortedTokens) {
+    for (const token of [...tokens].filter(isEncodableSemanticToken).sort(compareSemanticTokens)) {
         const typeIndex = SEMANTIC_TOKEN_TYPE_INDEX[token.type];
         if (typeIndex === undefined) {
             continue;
@@ -422,14 +287,9 @@ function getErrorCode(error) {
     return error instanceof JsonRpcError ? error.code : JSON_RPC_ERRORS.internalError;
 }
 function errorToData(error) {
-    if (error instanceof Error) {
-        return {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-        };
-    }
-    return error;
+    return error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : error;
 }
 function mapNullable(value, map) {
     return value ? map(value) : null;

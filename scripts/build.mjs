@@ -1,10 +1,10 @@
 import { build, context } from 'esbuild';
 import { cp, readdir, stat } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import process from 'node:process';
+import { getRepoRoot } from './test-helpers.mjs';
 
-const extensionRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const extensionRoot = getRepoRoot(import.meta.url);
 const compilerSourceRoot = extensionRoot;
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
