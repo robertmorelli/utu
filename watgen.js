@@ -726,6 +726,13 @@ class WatGen {
         if (!args.some(isPlaceholder)) this.genExpr(value, null, out);
         for (const arg of args) this.genExpr(isPlaceholder(arg) ? value : readArg(arg), null, out);
     }
+    pipedArgs(value, args, isPlaceholder, readArg = arg => arg) {
+        const placeholderCount = args.filter(isPlaceholder).length;
+        if (placeholderCount > 1) throw new WatError('pipe targets can contain at most one underscore placeholder');
+        return args.some(isPlaceholder)
+            ? args.map(arg => isPlaceholder(arg) ? value : readArg(arg))
+            : [value, ...args.map(readArg)];
+    }
     loopInfo() {
         const uid = this.nextUid();
         return { uid, breakLabel: `$__break_${uid}`, continueLabel: `$__continue_${uid}` };
@@ -830,15 +837,14 @@ class WatGen {
     genPipe(node, out) {
         const value = kids(node)[0];
         const target = parsePipeTarget(childOfType(node, 'pipe_target'));
-
-        if (target.kind === 'pipe_ident') {
-            this.genExpr(value, null, out);
-            out.push(`call $${target.name}`);
-            return;
+        if (target.kind === 'pipe_call' && target.callee.includes('.')) {
+            const [ns, method] = target.callee.split('.');
+            const emit = NS_CALL_HANDLERS[ns];
+            if (!emit) throw new WatError(`Unknown namespace: ${ns}`);
+            return void emit(this, method, this.pipedArgs(value, target.args, arg => arg.kind === 'placeholder', arg => arg.value), out);
         }
-
-        this.pushPipedArgs(value, target.args, out, arg => arg.kind === 'placeholder', arg => arg.value);
-        out.push(`call $${target.callee}`);
+        this.pushPipedArgs(value, target.kind === 'pipe_ident' ? [] : target.args, out, arg => arg.kind === 'placeholder', arg => arg.value);
+        out.push(`call $${target.kind === 'pipe_ident' ? target.name : target.callee}`);
     }
 
     genElse(node, hint, out) {
@@ -871,9 +877,14 @@ class WatGen {
     genPipeCall(pipeNode, args, out) {
         const value = kids(pipeNode)[0];
         const target = parsePipeTarget(childOfType(pipeNode, 'pipe_target'));
-        const callee = target.kind === 'pipe_ident' ? target.name : target.callee;
+        if (target.kind === 'pipe_call' && target.callee.includes('.')) {
+            const [ns, method] = target.callee.split('.');
+            const emit = NS_CALL_HANDLERS[ns];
+            if (!emit) throw new WatError(`Unknown namespace: ${ns}`);
+            return void emit(this, method, this.pipedArgs(value, args, arg => arg.type === 'identifier' && arg.text === '_'), out);
+        }
         this.pushPipedArgs(value, args, out, arg => arg.type === 'identifier' && arg.text === '_');
-        out.push(`call $${callee}`);
+        out.push(`call $${target.kind === 'pipe_ident' ? target.name : target.callee}`);
     }
 
     genField(node, out) {
@@ -1372,9 +1383,10 @@ const parsePipeTarget = (node) => {
     return argsNode ? { kind: 'pipe_call', callee, args: parsePipeArgs(argsNode) } : { kind: 'pipe_ident', name: callee };
 };
 const pipeCallee = (target) => target.kind === 'pipe_ident' ? target.name : target.callee;
-const parsePipeArgs = (node) => kids(node)
+const parsePipeArgs = (node) => namedChildren(node)
+    .flatMap(child => child.type === 'pipe_args_with_placeholder' || child.type === 'pipe_args_no_placeholder' ? namedChildren(child) : [child])
     .filter(child => child.type === 'pipe_arg' || child.type === 'pipe_arg_placeholder')
-    .map(arg => arg.type === 'pipe_arg_placeholder' ? { kind: 'placeholder' } : { kind: 'arg', value: arg });
+    .map(arg => arg.type === 'pipe_arg_placeholder' ? { kind: 'placeholder' } : { kind: 'arg', value: kids(arg)[0] });
 const pipeArgValues = (target) => target.args.filter(arg => arg.kind === 'arg').map(arg => arg.value);
 const namespaceInfo = (node) => ({ ns: node.children[0].text, method: childOfType(node, 'identifier').text });
 const parseForSources = (node) => mapType(node, 'for_source', parseForSource);

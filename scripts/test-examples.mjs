@@ -26,74 +26,45 @@ const options = parseArgs(process.argv.slice(2));
 await (options.cliSmoke ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));
 
 async function runCase(testCase, wasmPath) {
-    const sourcePath = resolve(repoRoot, testCase.path);
-    const source = await readFile(sourcePath, 'utf8');
+    const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
     const mode = testCase.mode ?? 'run';
-    const compileOptions = {
-        wasmUrl: pathToFileURL(wasmPath),
-        mode: mode === 'test' ? 'test' : 'program',
-    };
-
-    const { shim, metadata } = await compile(source, compileOptions);
-    const result = {
-        name: testCase.name,
-        path: testCase.path,
-        mode,
-        allowFailure: Boolean(testCase.allowFailure),
-        logs: [],
-        status: 'passed',
-    };
-
+    const { shim, metadata } = await compile(source, { wasmUrl: pathToFileURL(wasmPath), mode: mode === 'test' ? 'test' : 'program' });
+    const result = { name: testCase.name, path: testCase.path, mode, allowFailure: Boolean(testCase.allowFailure), logs: [], status: 'passed' };
     if (mode === 'compile') return result;
-
     const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-example-' });
     try {
         const exports = await compiledModule.module.instantiate();
-
         if (mode === 'test') {
             if (!metadata.tests.length) throw new Error(`No tests found in ${testCase.path}`);
-            if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests) {
+            if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests)
                 throw new Error(`Expected ${testCase.expectedTests} tests, found ${metadata.tests.length}`);
-            }
-
             for (const { name, exportName } of metadata.tests) {
-                if (typeof exports[exportName] !== 'function') {
+                if (typeof exports[exportName] !== 'function')
                     throw new Error(`Missing test export "${exportName}" on ${testCase.path}`);
-                }
                 try {
                     await exports[exportName]();
                 } catch (error) {
                     throw new Error(`Test "${name}" failed: ${firstLine(error?.message ?? error)}`);
                 }
             }
-
             result.testsRun = metadata.tests.length;
             result.testNames = metadata.tests.map((test) => test.name);
             return result;
         }
-
         const entry = testCase.entry ?? 'main';
-
-        if (typeof exports[entry] !== 'function') {
+        if (typeof exports[entry] !== 'function')
             throw new Error(`Export "${entry}" was not found on ${testCase.path}`);
-        }
-
         const args = Array.isArray(testCase.args) ? testCase.args : [];
         const returnValue = exports[entry](...args);
         if ('expectedReturn' in testCase) {
             const actual = normalizeValue(returnValue);
-            if (!valuesEqual(actual, testCase.expectedReturn)) {
+            if (!valuesEqual(actual, testCase.expectedReturn))
                 throw new Error(`Expected return ${JSON.stringify(testCase.expectedReturn)}, got ${JSON.stringify(actual)}`);
-            }
             result.returnValue = actual;
-        } else if (returnValue !== undefined) {
+        } else if (returnValue !== undefined)
             result.returnValue = normalizeValue(returnValue);
-        }
-
-        if (Array.isArray(testCase.expectedLogs) && !valuesEqual(result.logs, testCase.expectedLogs)) {
+        if (Array.isArray(testCase.expectedLogs) && !valuesEqual(result.logs, testCase.expectedLogs))
             throw new Error(`Expected logs ${JSON.stringify(testCase.expectedLogs)}, got ${JSON.stringify(result.logs)}`);
-        }
-
         return result;
     } finally {
         await compiledModule.cleanup?.();
@@ -109,27 +80,13 @@ function parseArgs(argv) {
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         switch (arg) {
-            case '--compile-all':
-                options.compileAll = true;
-                break;
-            case '--cli-smoke':
-                options.cliSmoke = true;
-                break;
-            case '--cli-bench-examples':
-                options.cliBenchExamples = true;
-                break;
-            case '--example-root':
-                options.exampleRoot = argv[++i];
-                break;
-            case '--manifest':
-                options.manifest = argv[++i];
-                break;
-            case '--report-file':
-                options.reportFile = argv[++i];
-                break;
-            case '--tag':
-                options.tags.push(argv[++i]);
-                break;
+            case '--compile-all': options.compileAll = true; break;
+            case '--cli-smoke': options.cliSmoke = true; break;
+            case '--cli-bench-examples': options.cliBenchExamples = true; break;
+            case '--example-root': options.exampleRoot = argv[++i]; break;
+            case '--manifest': options.manifest = argv[++i]; break;
+            case '--report-file': options.reportFile = argv[++i]; break;
+            case '--tag': options.tags.push(argv[++i]); break;
             default:
                 throw new Error(`Unknown argument: ${arg}`);
         }
@@ -146,22 +103,14 @@ async function runManifestCases(options) {
     const wasmPath = resolve(repoRoot, manifest.wasmPath ?? 'tree-sitter-utu.wasm');
     const selectedTags = new Set(options.tags);
     const cases = manifest.cases.filter((testCase) => selectedTags.size === 0 || testCase.tags?.some((tag) => selectedTags.has(tag)));
-    if (cases.length === 0) {
-        console.error(`No example cases matched for manifest ${manifestPath}`);
-        process.exit(1);
-    }
+    if (cases.length === 0) return void (console.error(`No example cases matched for manifest ${manifestPath}`), process.exit(1));
     const results = [];
     for (const testCase of cases) {
         const startedAt = Date.now();
         const result = await runCase(testCase, wasmPath).catch((error) => makeFailureResult(testCase, error));
         result.durationMs = Date.now() - startedAt;
         results.push(result);
-
-        const prefix = result.status === 'passed'
-            ? 'PASS'
-            : result.status === 'allowed-failure'
-                ? 'WARN'
-                : 'FAIL';
+        const prefix = result.status === 'passed' ? 'PASS' : result.status === 'allowed-failure' ? 'WARN' : 'FAIL';
         const note = result.allowFailure && result.status !== 'failed' ? ' (allowed)' : '';
         console.log(`${prefix} ${result.name}${note} [${result.mode}] ${result.durationMs}ms`);
         if (result.error) console.log(`  ${firstLine(result.error)}`);
@@ -176,9 +125,8 @@ async function runManifestCases(options) {
         await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
         console.log(`Report written to ${reportPath}`);
     }
-    console.log('');
-    console.log(`Summary: ${report.summary.passed}/${report.summary.total} passed, ${report.summary.allowedFailures} allowed failures, ${report.summary.requiredFailures} required failures`);
-    process.exit(requiredFailures.length > 0 ? 1 : 0);
+    console.log(`\nSummary: ${report.summary.passed}/${report.summary.total} passed, ${report.summary.allowedFailures} allowed failures, ${report.summary.requiredFailures} required failures`);
+    process.exit(requiredFailures.length ? 1 : 0);
 }
 
 async function runCompileAll(options) {
@@ -194,11 +142,7 @@ async function runCompileAll(options) {
         for (const { mode } of collectCompileJobs(source)) {
             try {
                 const { metadata } = await compile(source, { wasmUrl, mode });
-                const details = mode === 'test'
-                    ? ` ${metadata.tests.length} tests`
-                    : mode === 'bench'
-                        ? ` ${metadata.benches.length} benches`
-                        : '';
+                const details = mode === 'test' ? ` ${metadata.tests.length} tests` : mode === 'bench' ? ` ${metadata.benches.length} benches` : '';
                 console.log(`PASS ${rel} [${mode}]${details}`);
             } catch (error) {
                 failed = true;
@@ -212,18 +156,13 @@ async function runCompileAll(options) {
 }
 
 async function runCliCases(includeBenchExamples) {
-    const cases = [
-        ...CLI_CASES.map(([name, args, code, text, stdin]) => [name, async () => {
-            const { output, exitCode } = await runCli(args, stdin);
-            if (exitCode !== code || !output.includes(text))
-                throw new Error(output.trim());
-        }]),
-        ...(includeBenchExamples ? CLI_BENCH_EXAMPLE_CASES.map(([name, path, labels]) => [name, async () => {
-            const { output, exitCode } = await runCli(['bench', path, '--seconds', '0.01', '--samples', '1', '--warmup', '0']);
-            if (exitCode !== 0 || !labels.every((label) => output.includes(label)))
-                throw new Error(output.trim());
-        }]) : []),
-    ];
+    const cases = [...CLI_CASES.map(([name, args, code, text, stdin]) => [name, async () => {
+        const { output, exitCode } = await runCli(args, stdin);
+        if (exitCode !== code || !output.includes(text)) throw new Error(output.trim());
+    }]), ...(includeBenchExamples ? CLI_BENCH_EXAMPLE_CASES.map(([name, path, labels]) => [name, async () => {
+        const { output, exitCode } = await runCli(['bench', path, '--seconds', '0.01', '--samples', '1', '--warmup', '0']);
+        if (exitCode !== 0 || !labels.every((label) => output.includes(label))) throw new Error(output.trim());
+    }]) : [])];
     if (await runNamedCases(cases))
         process.exit(1);
 }

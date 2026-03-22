@@ -21,9 +21,7 @@ import {
 const repoRoot = getRepoRoot(import.meta.url);
 const grammarCandidates = ['tree-sitter-utu.wasm'];
 const runtimeCandidates = ['web-tree-sitter.wasm', 'node_modules/web-tree-sitter/web-tree-sitter.wasm'];
-const loadEditorTestAssets = (root) => loadAssetSet(root, 'UTU grammar wasm');
-const loadPackagedEditorTestAssets = (root) => loadAssetSet(root, 'packaged VS Code grammar wasm');
-const loadCliCompilerTestAssets = (root) => loadAssetSet(root, 'CLI grammar wasm');
+const loadEditorTestAssets = (root) => loadAssetSet(root, 'UTU grammar wasm'), loadPackagedEditorTestAssets = (root) => loadAssetSet(root, 'packaged VS Code grammar wasm'), loadCliCompilerTestAssets = (root) => loadAssetSet(root, 'CLI grammar wasm');
 const subcommand = process.argv[2] ?? 'all';
 let failed = false;
 if (subcommand !== 'examples' && subcommand !== 'webhost') failed ||= await runCoreSuite();
@@ -399,10 +397,7 @@ function getBenchExport(result) {
 }
 
 async function loadAssetSet(root, grammarLabel) {
-  const [grammarPath, runtimePath] = await Promise.all([
-    findExistingAsset(root, grammarCandidates, grammarLabel),
-    findExistingAsset(root, runtimeCandidates, 'Tree-sitter runtime wasm'),
-  ]);
+  const [grammarPath, runtimePath] = await Promise.all([findExistingAsset(root, grammarCandidates, grammarLabel), findExistingAsset(root, runtimeCandidates, 'Tree-sitter runtime wasm')]);
   const [grammarWasmPath, runtimeWasmPath] = await Promise.all([readFile(grammarPath), readFile(runtimePath)]);
   return { grammarPath, runtimePath, grammarWasmPath, runtimeWasmPath };
 }

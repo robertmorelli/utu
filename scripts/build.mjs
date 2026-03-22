@@ -26,9 +26,7 @@ const ignoredWatchEntries = new Set([
 const cliOnlyMode = process.argv.includes('--cli-only');
 const watchMode = process.argv.includes('--watch');
 const webOnlyMode = process.argv.includes('--web-only') || cliOnlyMode;
-const watchMessages = webOnlyMode
-  ? { start: 'Watching UTU web extension sources...', ready: 'UTU_WEB_EXTENSION_READY' }
-  : { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
+const watchMessages = webOnlyMode ? { start: 'Watching UTU web extension sources...', ready: 'UTU_WEB_EXTENSION_READY' } : { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
 
 const sharedBuildOptions = {
   bundle: true,
@@ -133,10 +131,7 @@ function createWatchReadyPlugin(label, tracker) {
 }
 
 async function syncAssets() {
-  await Promise.all([
-    cp(treeSitterRuntimeSource, treeSitterRuntimeDest),
-    syncGrammarArtifact(),
-  ]);
+  await Promise.all([cp(treeSitterRuntimeSource, treeSitterRuntimeDest), syncGrammarArtifact()]);
 }
 
 async function buildCli() {
@@ -159,13 +154,7 @@ async function findFreshestFile(paths) {
       return null;
     }
   }))).filter(Boolean);
-
-  if (!candidates.length) {
-    throw new Error(
-      'Could not find tree-sitter-utu.wasm. Run `bun run grammar` from the repo root.',
-    );
-  }
-
+  if (!candidates.length) throw new Error('Could not find tree-sitter-utu.wasm. Run `bun run grammar` from the repo root.');
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
   return candidates[0].path;
 }
@@ -182,10 +171,7 @@ async function watchCompilerInputs(compilerContexts) {
 
     void (async () => {
       try {
-        const [nextCompilerState, nextAssetState] = await Promise.all([
-          snapshotState(compilerInputRoots, { recursive: true }),
-          snapshotState(staticAssetInputs),
-        ]);
+        const [nextCompilerState, nextAssetState] = await Promise.all([snapshotState(compilerInputRoots, { recursive: true }), snapshotState(staticAssetInputs)]);
 
         if (nextCompilerState !== compilerState) {
           compilerState = nextCompilerState;
