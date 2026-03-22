@@ -12,6 +12,18 @@
       "signature": "ref.null Type",
       "description": "Constructs a null reference literal for a nullable UTU reference type."
     },
+    "ref.is_null": {
+      "signature": "ref.is_null(value) bool",
+      "description": "Returns whether a reference value is null."
+    },
+    "ref.as_non_null": {
+      "signature": "ref.as_non_null(value) Type",
+      "description": "Reinterprets a nullable reference as non-null when the program guarantees it."
+    },
+    "ref.eq": {
+      "signature": "ref.eq(a, b) bool",
+      "description": "Compares two reference values for identity equality."
+    },
     "str.length": {
       "signature": "str.length(s) i32",
       "description": "Returns the length of a host string via the runtime string host."
@@ -49,6 +61,8 @@
     "array.len": "i32",
     "array.new_default": { "kind": "array_new_default" },
     "ref.null": { "kind": "ref_null" },
+    "ref.is_null": "bool",
+    "ref.eq": "bool",
     "str.length": "i32",
     "str.char_code_at": "i32",
     "str.into_char_code_array": "i32",
