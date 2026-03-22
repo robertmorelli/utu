@@ -13,6 +13,7 @@ const cliBinaryPath = resolve(extensionRoot, 'dist/utu');
 const lspEntry = resolve(extensionRoot, 'lsp.mjs');
 const lspBinaryPath = resolve(extensionRoot, 'dist/utu-lsp');
 const vsceBinaryPath = resolve(extensionRoot, 'node_modules/.bin/vsce');
+const treeSitterBinaryPath = resolve(extensionRoot, 'node_modules/.bin/tree-sitter');
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
@@ -27,10 +28,8 @@ const ignoredWatchEntries = new Set([
   'tree-sitter-utu.wasm',
   'web-tree-sitter.wasm',
 ]);
-const cliOnlyMode = process.argv.includes('--cli-only');
 const watchMode = process.argv.includes('--watch');
-const webOnlyMode = process.argv.includes('--web-only') || cliOnlyMode;
-const watchMessages = webOnlyMode ? { start: 'Watching UTU web extension sources...', ready: 'UTU_WEB_EXTENSION_READY' } : { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
+const watchMessages = { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
 const browserDefine = {
   ['global' + 'This.process']: 'undefined',
 };
@@ -41,7 +40,7 @@ const sharedBuildOptions = {
   sourcesContent: false,
   logLevel: 'info',
 };
-const activeTargets = cliOnlyMode ? [] : [
+const activeTargets = [
   createTarget('extension', {
     platform: 'browser',
     target: 'esnext',
@@ -65,7 +64,7 @@ const activeTargets = cliOnlyMode ? [] : [
       '.wasm': 'binary',
     },
   }),
-  !webOnlyMode && createTarget('compiler-node', {
+  createTarget('compiler-node', {
     platform: 'node',
     target: 'esnext',
     entryPoints: [resolve(compilerSourceRoot, 'index.js')],
@@ -76,7 +75,7 @@ const activeTargets = cliOnlyMode ? [] : [
       '.wasm': 'binary',
     },
   }),
-].filter(Boolean);
+];
 
 if (watchMode) console.log(watchMessages.start);
 if (!watchMode) await resetBuildArtifacts();
@@ -84,15 +83,12 @@ await syncAssets();
 
 if (!watchMode) {
   await Promise.all(activeTargets.map(({ config }) => build(config)));
-  if (!webOnlyMode) {
-    await buildCli();
-    await buildLsp();
-    await packageVsix();
-  }
+  await buildAllArtifacts();
 } else {
   const tracker = createWatchTracker(activeTargets.length, watchMessages.ready);
   const contexts = await Promise.all(activeTargets.map(({ label, config }) => context(withWatchReadyPlugin(config, label, tracker))));
   await Promise.all(contexts.map((ctx) => ctx.watch()));
+  await buildAllArtifacts();
   const stopWatching = await watchCompilerInputs(contexts.slice(1));
   const close = async () => {
     await stopWatching();
@@ -174,6 +170,12 @@ async function buildLsp() {
   await exec('bun', ['build', '--compile', '--target=bun', '--outfile', lspBinaryPath, lspEntry]);
 }
 
+async function buildAllArtifacts() {
+  await buildCli();
+  await buildLsp();
+  await packageVsix();
+}
+
 async function packageVsix() {
   try {
     const stats = await stat(vsceBinaryPath);
@@ -214,8 +216,8 @@ async function ensureGrammarArtifact({ force = false } = {}) {
 }
 
 async function buildGrammar() {
-  await exec('tree-sitter', ['generate']);
-  await exec('tree-sitter', ['build', '--wasm']);
+  await exec(treeSitterBinaryPath, ['generate']);
+  await exec(treeSitterBinaryPath, ['build', '--wasm']);
 }
 
 async function findFreshestFile(paths) {
@@ -266,7 +268,7 @@ async function watchCompilerInputs(compilerContexts) {
           compilerState = nextCompilerState;
           if (syncTimer) clearTimeout(syncTimer);
           syncTimer = setTimeout(() => {
-            void Promise.all(compilerContexts.map((ctx) => ctx.rebuild())).catch((error) => {
+            void Promise.all([...compilerContexts.map((ctx) => ctx.rebuild()), buildAllArtifacts()]).catch((error) => {
               console.error('Compiler bundle rebuild failed:', error);
             });
           }, 75);
@@ -275,6 +277,7 @@ async function watchCompilerInputs(compilerContexts) {
         if (nextAssetState !== assetState) {
           assetState = nextAssetState;
           await syncAssets();
+          await buildAllArtifacts();
         }
       } catch (error) {
         console.error('Compiler input polling failed:', error);

@@ -43,12 +43,6 @@ For rebuild-on-change:
 npm run watch
 ```
 
-For VS Code desktop debugging of the web extension host:
-
-```sh
-npm run watch:web
-```
-
 The build emits the web extension plus the current compiler bundles:
 
 - `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`

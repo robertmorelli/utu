@@ -44,13 +44,12 @@
       }
     },
     {
-      "label": "UTU: Rebuild Web Extension",
+      "label": "UTU: Rebuild",
       "type": "shell",
       "command": "bun",
       "args": [
         "run",
-        "build",
-        "--web-only"
+        "build"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
@@ -62,12 +61,12 @@
       "group": "build"
     },
     {
-      "label": "UTU: Watch Web Extension",
+      "label": "UTU: Watch",
       "type": "shell",
       "command": "bun",
       "args": [
         "run",
-        "watch:web"
+        "watch"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
@@ -80,14 +79,14 @@
       "group": "build",
       "problemMatcher": [
         {
-          "owner": "utu-web-watch",
+          "owner": "utu-watch",
           "pattern": {
             "regexp": "$a"
           },
           "background": {
             "activeOnStart": true,
-            "beginsPattern": "^Watching UTU web extension sources\\.\\.\\.$",
-            "endsPattern": "^UTU_WEB_EXTENSION_READY$"
+            "beginsPattern": "^Watching UTU extension sources\\.\\.\\.$",
+            "endsPattern": "^UTU_EXTENSION_READY$"
           }
         }
       ],

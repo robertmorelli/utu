@@ -14,7 +14,7 @@
       "outFiles": [
         "${workspaceFolder}/dist/web/**/*.js"
       ],
-      "preLaunchTask": "UTU: Rebuild Web Extension"
+      "preLaunchTask": "UTU: Rebuild"
     }
   ]
 }
