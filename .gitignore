@@ -6,6 +6,8 @@ out
 dist
 .artifacts
 *.tgz
+/utu
+/utu-lsp
 
 # code coverage
 coverage

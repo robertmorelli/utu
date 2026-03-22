@@ -9,9 +9,9 @@ const extensionRoot = getRepoRoot(import.meta.url);
 const compilerSourceRoot = extensionRoot;
 const cliEntry = resolve(extensionRoot, 'cli.mjs');
 const cliPackageRoot = resolve(extensionRoot, 'dist/cli-package');
-const cliBinaryPath = resolve(extensionRoot, 'dist/utu');
+const cliBinaryPath = resolve(extensionRoot, 'utu');
 const lspEntry = resolve(extensionRoot, 'lsp.mjs');
-const lspBinaryPath = resolve(extensionRoot, 'dist/utu-lsp');
+const lspBinaryPath = resolve(extensionRoot, 'utu-lsp');
 const vsceBinaryPath = resolve(extensionRoot, 'node_modules/.bin/vsce');
 const treeSitterBinaryPath = resolve(extensionRoot, 'node_modules/.bin/tree-sitter');
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
@@ -153,6 +153,8 @@ async function syncAssets() {
 async function resetBuildArtifacts() {
   await Promise.all([
     rm(resolve(extensionRoot, 'dist'), { recursive: true, force: true }),
+    rm(cliBinaryPath, { force: true }),
+    rm(lspBinaryPath, { force: true }),
     rm(treeSitterRuntimeDest, { force: true }),
     rm(grammarDest, { force: true }),
   ]);

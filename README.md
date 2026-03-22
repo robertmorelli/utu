@@ -34,20 +34,22 @@ This repo is now the UTU VS Code extension package.
 Run the extension build from this folder:
 
 ```sh
-npm run build
+bun run build
 ```
 
 For rebuild-on-change:
 
 ```sh
-npm run watch
+bun run watch
 ```
 
-The build emits the web extension plus the current compiler bundles:
+The build emits the web extension plus the current compiler bundles and Bun executables:
 
 - `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`
 - `dist/compiler.web.mjs`: the browser-targeted compiler bundle built directly from the shared compiler sources
 - `dist/compiler.mjs`: the Node-targeted compiler bundle built directly from the shared compiler sources
+- `./utu`: bundled Bun CLI executable
+- `./utu-lsp`: bundled Bun LSP executable
 
 The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `.` core, and the standalone stdio UTU LSP server now builds from `./lsp.mjs`. The browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 

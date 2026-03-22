@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import data from "./jsondata/cli.data.json" with { type: "json" };
@@ -16,14 +17,15 @@ async function main(argv = process.argv.slice(2)) {
   if (!command || command === "help" || args.includes("--help")) return void console.log(help);
   const run = { compile: compileCmd, run: runCmd, test: testCmd, bench: benchCmd }[command];
   if (run) return run(args);
-  fail(`Unknown command "${command}".\n\n${help}`);
+  return compileCmd(argv);
 }
 
 async function compileCmd(args) {
-  const { input, outdir, wat, bun } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun"], "--outdir": ["outdir", value => value], "--node": "compile only supports --wat and --bun" });
+  const { input, outdir, wat, bun } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun", () => true], "--node": ["bun", () => false], "--outdir": ["outdir", value => value] });
   const file = path.resolve(input);
   const source = await readFile(file, "utf8");
-  const base = path.join(path.resolve(outdir), path.basename(file, path.extname(file)));
+  const outputDir = outdir ? path.resolve(outdir) : bun ? path.dirname(file) : path.resolve(data.compileNodeDefaults.outdir);
+  const base = path.join(outputDir, path.basename(file, path.extname(file)));
   const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "base64" : "local_file_node", moduleFormat: "esm" });
   await mkdir(path.dirname(base), { recursive: true });
   const outputs = [!bun && [`${base}.mjs`, shim, "utf8"], !bun && [`${base}.wasm`, wasm], watText && [`${base}.wat`, watText, "utf8"]].filter(Boolean);
@@ -82,8 +84,9 @@ function parseArgs(args, command, missingInput, defaults = {}, flags = {}) {
     }
     if (typeof flag === "string") fail(flag);
     const [key, read = () => true] = flag;
-    const value = read === undefined || flag.length === 1 ? undefined : args[++i];
-    if (flag.length > 1 && value === undefined) fail(`Missing value for ${arg}`);
+    const expectsValue = flag.length > 1 && read.length > 0;
+    const value = expectsValue ? args[++i] : undefined;
+    if (expectsValue && value === undefined) fail(`Missing value for ${arg}`);
     parsed[key] = read(value);
   }
   if (!input) fail(missingInput);
@@ -99,8 +102,7 @@ function fail(message) { throw new Error(message); }
 function text(error) { return error instanceof Error ? error.message : String(error); }
 
 async function buildBunExecutable(base, shim) {
-  const modulePath = fileURLToPath(import.meta.url);
-  const buildRoot = path.join(path.resolve(path.dirname(modulePath.startsWith("/$bunfs/") ? process.execPath : modulePath), ".."), ".tmp");
+  const buildRoot = path.join(tmpdir(), "utu-bun-build");
   await mkdir(buildRoot, { recursive: true });
   const dir = await mkdtemp(path.join(buildRoot, "utu-bun-"));
   const out = process.platform === "win32" ? `${base}.exe` : base;
