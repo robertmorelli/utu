@@ -11,6 +11,14 @@ const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
 const compilerInputRoots = [compilerSourceRoot];
 const staticAssetInputs = [treeSitterRuntimeSource, grammarDest];
+const ignoredWatchEntries = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'cli_artifact',
+  'tree-sitter-utu.wasm',
+  'web-tree-sitter.wasm',
+]);
 const watchMode = process.argv.includes('--watch');
 const webOnlyMode = process.argv.includes('--web-only');
 const watchMessages = webOnlyMode
@@ -210,6 +218,7 @@ async function snapshotPath(path, recursive) {
       const entries = await readdir(path, { withFileTypes: true });
       return (await Promise.all(entries
         .sort((left, right) => left.name.localeCompare(right.name))
+        .filter((entry) => !ignoredWatchEntries.has(entry.name))
         .map((entry) => snapshotPath(resolve(path, entry.name), true)))).flat();
     }
     return details.isFile() ? [`${path}:${details.size}:${details.mtimeMs}`] : [];

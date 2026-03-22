@@ -166,15 +166,14 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
         '};',
         'const __resolveBindingPath = (root, path) => {',
         '  if (!root || (typeof root !== "object" && typeof root !== "function")) return null;',
-        '  let owner = null, value = root;',
+        '  let value = root;',
         '  for (const segment of path) {',
         '    if (!value || (typeof value !== "object" && typeof value !== "function") || !(segment in value)) return null;',
-        '    owner = value;',
         '    value = value[segment];',
         '  }',
-        '  return { owner, value };',
+        '  return value;',
         '};',
-        'const __resolveHostBinding = (moduleObject, moduleName, importName) => {',
+        'const __resolveHostImport = (moduleObject, moduleName, importName) => {',
         '  for (const source of [moduleObject, moduleName === "es" ? __globalObject : undefined]) {',
         '    if (source === undefined) continue;',
         '    for (const path of __importPaths(moduleName, importName)) {',
@@ -184,11 +183,6 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
         '  }',
         '  throw new Error(`Missing host import "${importName}" from "${moduleName}"`);',
         '};',
-        'const __bindHostFunction = (moduleObject, moduleName, importName) => {',
-        '  const { owner, value } = __resolveHostBinding(moduleObject, moduleName, importName);',
-        '  return (...args) => value.apply(owner, args);',
-        '};',
-        'const __readHostValue = (moduleObject, moduleName, importName) => __resolveHostBinding(moduleObject, moduleName, importName).value;',
     ].join('\n'));
 
     if (needsNodeImports) lines.push('', [
@@ -218,9 +212,7 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
                         : 'undefined';
         lines.push(`    ${JSON.stringify(group.module)}: {`);
         for (const entry of group.entries) {
-            const binding = entry.kind === 'function'
-                ? `__bindHostFunction(${moduleRef}, ${JSON.stringify(group.module)}, ${JSON.stringify(entry.name)})`
-                : `__readHostValue(${moduleRef}, ${JSON.stringify(group.module)}, ${JSON.stringify(entry.name)})`;
+            const binding = `__resolveHostImport(${moduleRef}, ${JSON.stringify(group.module)}, ${JSON.stringify(entry.name)})`;
             lines.push(`      ${JSON.stringify(entry.name)}: ${binding},`);
         }
         lines.push('    },');

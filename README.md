@@ -57,6 +57,8 @@ The build emits the web extension plus the current compiler bundles:
 
 The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `.` core, and the standalone stdio UTU LSP server now builds from `./lsp.mjs`. The browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 
+Design note: do not add VS Code-specific behavior to the compiler or generated shim just to make the extension UI work. The compiler should stay shared and host-agnostic. If the editor needs better run output, prefer surfacing `main()` return values and wiring explicit host/runtime imports rather than teaching codegen about VS Code.
+
 ## Run It In VS Code
 
 Open the repo root in VS Code, then use the `UTU: Run Web Extension in VS Code` launch configuration from Run and Debug. That configuration points at the repo root package and starts the web extension host with `--extensionDevelopmentKind=web`.
