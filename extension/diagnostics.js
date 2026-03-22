@@ -41,8 +41,8 @@ export class DiagnosticsController {
             if (!diagnostics.length && this.compilerHost)
                 try { await this.compilerHost.compile(document.getText()); }
                 catch (error) {
-                    const symbols = (await this.languageService.getDocumentIndex(document)).topLevelSymbols;
-                    const compileError = describeCompileError(document, error, symbols);
+                    const index = await this.languageService.getDocumentIndex(document);
+                    const compileError = describeCompileError(document, error, index);
                     diagnostics.push({ range: compileError.range, severity: 'error', source: 'utu', message: compileError.message });
                 }
             if (vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === uri.toString())?.version !== version)
@@ -57,13 +57,18 @@ export class DiagnosticsController {
     isEnabledFor(document) { return document.languageId === UTU_LANGUAGE_ID && this.getValidationMode() !== 'off'; }
 }
 
-function describeCompileError(document, error, symbols) {
+function describeCompileError(document, error, index) {
     const text = String(error instanceof Error ? error.message : error);
     const fatalMatch = /(?:^|\n)Fatal:\s+(\d+):(\d+):\s+error:\s+([^\n]+)/m.exec(text);
+    const missingFunctionMatch = /function \$([A-Za-z0-9_.]+) does not exist/u.exec(text);
+    const missingFunctionName = missingFunctionMatch?.[1] ?? null;
+    const sourceRange = missingFunctionName
+        ? findSourceRangeForMissingFunction(index, missingFunctionName)
+        : undefined;
     if (fatalMatch) {
         const [, lineText, columnText, message] = fatalMatch;
         return {
-            range: pointRange(document, Number(lineText) - 1, Number(columnText) - 1),
+            range: sourceRange ?? pointRange(document, Number(lineText) - 1, Number(columnText) - 1),
             message,
         };
     }
@@ -77,7 +82,8 @@ function describeCompileError(document, error, symbols) {
         };
     }
 
-    const indexedRange = symbols.filter(({ kind }) => kind === 'importFunction' || kind === 'function')[Number(/function at index (\d+)/.exec(text)?.[1])]?.range;
+    const symbols = index.topLevelSymbols;
+    const indexedRange = sourceRange ?? symbols.filter(({ kind }) => kind === 'importFunction' || kind === 'function')[Number(/function at index (\d+)/.exec(text)?.[1])]?.range;
     return {
         range: indexedRange
             ?? symbols.find((symbol) => symbol.kind === 'global')?.range
@@ -106,6 +112,19 @@ function pointRange(document, line, character) {
 
 function fullDocumentRange(document) {
     return { start: document.positionAt(0), end: document.positionAt(Math.max(document.getText().length, 1)) };
+}
+
+function findSourceRangeForMissingFunction(index, name) {
+    if (!name)
+        return undefined;
+    const normalized = name.startsWith('str.') || name.startsWith('array.') || name.startsWith('ref.') || name.startsWith('i31.')
+        ? name
+        : name.replace(/\$/g, '');
+    const builtinOccurrence = index.occurrences.find((occurrence) => occurrence.builtinKey === normalized);
+    if (builtinOccurrence)
+        return builtinOccurrence.range;
+    const valueName = normalized.split('.').pop();
+    return index.occurrences.find((occurrence) => occurrence.name === valueName && occurrence.role === 'value' && !occurrence.isDefinition)?.range;
 }
 
 function clamp(value, min, max) {

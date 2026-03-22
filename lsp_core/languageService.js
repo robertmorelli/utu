@@ -181,6 +181,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     const topLevelTypeKeys = new Map();
     const fieldsByOwner = new Map();
     const localScopes = [];
+    const semanticDiagnosticKeys = new Set();
     let symbolCounter = 0;
     const rememberSymbolKey = (symbolsByName, { name, key }) => void (!symbolsByName.has(name) && symbolsByName.set(name, key));
     const registerField = (ownerName, fieldSymbol) => {
@@ -227,6 +228,16 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         addOccurrence({ name: nameNode.text, range: span.range, offsetRange: span.offsetRange, role, symbolKey, isDefinition: false });
     };
     const addBuiltinOccurrence = (span, key, label) => addOccurrence({ name: label ?? key, range: span.range, offsetRange: span.offsetRange, role: 'builtin', builtinKey: key, isDefinition: false });
+    const addSemanticDiagnostic = (node, message) => {
+        if (!node)
+            return;
+        const span = spanFromNode(document, node);
+        const key = `${message}:${rangeKey(span.range)}`;
+        if (semanticDiagnosticKeys.has(key))
+            return;
+        semanticDiagnosticKeys.add(key);
+        diagnostics.push({ message, range: span.range, offsetRange: span.offsetRange, severity: 'error', source: 'utu' });
+    };
     const lookupSymbol = (key) => (key ? symbolByKey.get(key) : undefined);
     const declareLocalSymbol = (nameNode, kind, detail, typeNode, signature = typeNode ? `${nameNode.text}: ${typeNode.text}` : nameNode.text) => {
         if (typeNode)
@@ -250,7 +261,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         struct_init: walkStructInit,
         field_expr: walkFieldExpression,
         call_expr: walkCallExpression,
-        namespace_call_expr: (node) => addBuiltinOccurrence(rangeForBuiltinNode(document, node), builtinKeyFromNamespaceCall(node), node.text),
+        namespace_call_expr: walkNamespaceCallExpression,
         array_init: walkArrayInit,
         ref_null_expr: walkRefNullExpression,
         pipe_expr: walkPipeExpression,
@@ -517,8 +528,24 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     }
     function walkCallExpression(node) {
         const [calleeNode, argListNode] = node.namedChildren;
+        if (calleeNode?.type === 'identifier') {
+            const symbol = lookupSymbol(resolveValueKey(calleeNode.text));
+            if (!symbol)
+                addSemanticDiagnostic(calleeNode, `Undefined function or import "${calleeNode.text}".`);
+        }
         walkExpression(calleeNode);
         walkExpressions(argListNode?.type === 'arg_list' ? argListNode.namedChildren : []);
+    }
+    function walkNamespaceCallExpression(node) {
+        const methodNode = findNamedChild(node, 'identifier');
+        const namespace = node.children[0]?.text ?? 'builtin';
+        if (!methodNode)
+            return;
+        if (!(BUILTIN_METHODS[namespace] ?? []).includes(methodNode.text))
+            addSemanticDiagnostic(methodNode, `Unknown builtin method "${namespace}.${methodNode.text}".`);
+        else
+            addBuiltinOccurrence(rangeForBuiltinNode(document, node), `${namespace}.${methodNode.text}`, node.text);
+        walkExpressions(findNamedChild(node, 'arg_list')?.namedChildren ?? []);
     }
     function walkArrayInit(node) {
         const typeNode = node.namedChildren[0];
@@ -548,10 +575,18 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const first = namedChildren[0];
         const second = namedChildren[1];
-        if (first.type === 'identifier' && second?.type === 'identifier' && isBuiltinNamespace(first.text))
-            addBuiltinOccurrence(spanFromOffsets(document, node.startIndex, second.endIndex), `${first.text}.${second.text}`, `${first.text}.${second.text}`);
-        else if (first.type === 'identifier')
-            addResolvedOccurrence(first, 'value', resolveValueKey(first.text));
+        if (first.type === 'identifier' && second?.type === 'identifier' && isBuiltinNamespace(first.text)) {
+            if (!(BUILTIN_METHODS[first.text] ?? []).includes(second.text))
+                addSemanticDiagnostic(second, `Unknown builtin method "${first.text}.${second.text}".`);
+            else
+                addBuiltinOccurrence(spanFromOffsets(document, node.startIndex, second.endIndex), `${first.text}.${second.text}`, `${first.text}.${second.text}`);
+        }
+        else if (first.type === 'identifier') {
+            const symbolKey = resolveValueKey(first.text);
+            if (!symbolKey)
+                addSemanticDiagnostic(first, `Undefined function or import "${first.text}".`);
+            addResolvedOccurrence(first, 'value', symbolKey);
+        }
         walkExpressions(findNamedChildren(findNamedChild(node, 'pipe_args'), 'pipe_arg').map((pipeArg) => pipeArg.namedChildren[0]));
     }
     function walkBindExpression(node) {

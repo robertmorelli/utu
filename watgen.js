@@ -546,17 +546,23 @@ class WatGen {
     }
 
     emitStructType(decl) {
-        const fields = decl.fields.map(field => this.watField(field)).join(' ');
-        return `    (type $${decl.name} (struct${fields ? ` ${fields}` : ''}))`;
+        return this.emitStructLikeType(`    (type $${decl.name} (struct`, decl.fields);
     }
 
     emitSumType(decl) {
         const lines = [`    (type $${decl.name} (sub (struct)))`];
-        for (const variant of decl.variants) {
-            const fields = variant.fields.map(field => this.watField(field)).join(' ');
-            lines.push(`    (type $${variant.name} (sub $${decl.name} (struct${fields ? ` ${fields}` : ''})))`);
-        }
+        for (const variant of decl.variants)
+            lines.push(this.emitStructLikeType(`    (type $${variant.name} (sub $${decl.name} (struct`, variant.fields));
         return lines;
+    }
+
+    emitStructLikeType(prefix, fields) {
+        if (!fields.length) return `${prefix}))`;
+        return [
+            prefix,
+            ...fields.map(field => `      ${this.watField(field)}`),
+            '    ))',
+        ].join('\n');
     }
 
     watField(field) {
