@@ -1,9 +1,15 @@
 escape |(a,b) => a + b| str_add(str,str) str;
+escape |(a) => a| tostr(i32) str;
 
 fun greeting(name: str) str {
     str_add("hello ", name);
 }
 
+fun five() str {
+    str_add(tostr(2), tostr(3));
+}
+
 export fun main() str {
-    greeting("utu");
+    // greeting("utu");
+    five();
 }
