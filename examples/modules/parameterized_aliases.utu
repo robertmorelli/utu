@@ -19,12 +19,12 @@ mod boxy[T] {
 construct box_i32 = boxy[i32];
 
 fun read_inline(value: boxy[i32].Box) i32 {
-    boxy[i32].Box.get(value);
+    value.get();
 }
 
 test "construct aliases expose qualified types" {
     let box: box_i32.Box = box_i32.Box.new(7);
-    assert box_i32.Box.get(box) == 7;
+    assert box.get() == 7;
 }
 
 test "alias and inline paths share one instantiation" {
@@ -36,7 +36,7 @@ test "construct aliases qualify free functions" {
     assert box_i32.id(11) == 11;
 }
 
-test "alias qualified methods still pipe" {
+test "alias qualified associated calls work from values" {
     let box: box_i32.Box = box_i32.Box.new(9);
-    assert box -o box_i32.Box.get(_) == 9;
+    assert box.get() == 9;
 }

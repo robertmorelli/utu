@@ -218,6 +218,20 @@
       "tags": ["modules"]
     },
     {
+      "name": "modules-top-level-promotion",
+      "path": "examples/modules/top_level.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-method-promotion",
+      "path": "examples/modules/method_promotion.utu",
+      "mode": "test",
+      "expectedTests": 6,
+      "tags": ["modules"]
+    },
+    {
       "name": "modules-main-and-bench",
       "path": "examples/modules/main_and_bench.utu",
       "mode": "run",

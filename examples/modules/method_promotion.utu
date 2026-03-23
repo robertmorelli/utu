@@ -1,0 +1,88 @@
+struct Vec {
+    left: i32,
+    right: i32,
+}
+
+fun Vec.new(left: i32, right: i32) Vec {
+    Vec { left: left, right: right };
+}
+
+fun Vec.total(self: Vec) i32 {
+    self.left + self.right;
+}
+
+mod boxy[T] {
+    struct Box {
+        value: T,
+    }
+
+    fun Box.new(value: T) Box {
+        Box { value: value };
+    }
+
+    fun Box.get(self: Box) T {
+        self.value;
+    }
+}
+
+mod Pair[L, R] {
+    struct Pair {
+        left: L,
+        right: R,
+    }
+
+    fun Pair.new(left: L, right: R) Pair {
+        Pair { left: left, right: right };
+    }
+
+    fun Pair.left(self: Pair) L {
+        self.left;
+    }
+
+    fun Pair.right(self: Pair) R {
+        self.right;
+    }
+}
+
+construct ints = boxy[i32];
+
+fun make_box(value: i32) ints.Box {
+    ints.Box.new(value);
+}
+
+fun make_pair() Pair[i32, i32] {
+    Pair[i32, i32].new(5, 6);
+}
+
+fun maybe_pair(flag: bool) Pair[i32, i32] # null {
+    if flag { Pair[i32, i32].new(2, 9); } else { null; };
+}
+
+test "top level method sugar works on locals and direct call results" {
+    let vec: Vec = Vec.new(3, 4);
+    assert vec.total() == 7;
+    assert Vec.new(1, 2).total() == 3;
+}
+
+test "construct aliases expose method sugar" {
+    let box: ints.Box = ints.Box.new(7);
+    assert box.get() == 7;
+}
+
+test "free function return values can use methods" {
+    assert make_box(8).get() == 8;
+    assert make_pair().left() == 5;
+}
+
+test "promoted module types support method sugar" {
+    let pair: Pair[i32, i32] = Pair[i32, i32].new(3, 4);
+    assert pair.left() + pair.right() == 7;
+}
+
+test "promoted module call results can chain methods" {
+    assert Pair[i32, i32].new(5, 6).right() == 6;
+}
+
+test "else results can flow into methods" {
+    assert (maybe_pair(true) \ Pair[i32, i32].new(0, 0)).right() == 9;
+}

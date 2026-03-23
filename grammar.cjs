@@ -19,8 +19,8 @@ module.exports = grammar({
     [$.return_type],
     // ref.null T vs ref.<method>(args): both start with 'ref' '.'
     [$._builtin_ns, $.ref_null_expr],
-    [$.module_ref, $._expr],
-    [$.instantiated_module_ref, $.inline_module_type_path, $._expr],
+    [$.module_name, $._expr],
+    [$.module_name, $.ref_null_expr],
   ],
 
   rules: {
@@ -62,12 +62,14 @@ module.exports = grammar({
 
     module_decl: $ => seq(
       'mod',
-      $.identifier,
+      $.module_name,
       optional($.module_type_param_list),
       '{',
       repeat($._module_item),
       '}',
     ),
+
+    module_name: $ => choice($.identifier, $.type_ident),
 
     module_type_param_list: $ => seq(
       '[',
@@ -85,10 +87,10 @@ module.exports = grammar({
       ),
     ),
 
-    module_ref: $ => $.identifier,
+    module_ref: $ => $.module_name,
 
-    instantiated_module_ref: $ => prec(-1, seq(
-      $.identifier,
+    instantiated_module_ref: $ => prec(2, seq(
+      $.module_name,
       $.module_type_arg_list,
     )),
 
@@ -100,16 +102,11 @@ module.exports = grammar({
       ']',
     ),
 
-    inline_module_type_path: $ => prec(2, seq(
-      $.identifier,
+    inline_module_type_path: $ => prec(3, seq(
+      $.module_name,
       $.module_type_arg_list,
       '.',
       $.type_ident,
-    )),
-
-    inline_module_pipe_path: $ => prec(2, seq(
-      $.identifier,
-      $.module_type_arg_list,
     )),
 
     struct_decl: $ => seq(
@@ -291,6 +288,7 @@ module.exports = grammar({
     ref_type: $ => choice(
       $.type_ident,
       $.qualified_type_ref,
+      $.instantiated_module_ref,
       'str',
       'externref',
       'anyref',
@@ -346,10 +344,11 @@ module.exports = grammar({
       $.binary_expr,
       $.pipe_expr,
       $.else_expr,
-      $.call_expr,
+      $.promoted_module_call_expr,
       $.type_member_expr,
       $.field_expr,
       $.index_expr,
+      $.call_expr,
       $.namespace_call_expr,
       $.ref_null_expr,
       $.if_expr,
@@ -380,12 +379,23 @@ module.exports = grammar({
 
     type_member_expr: $ => prec.left(13, seq(
       choice(
-        $.type_ident,
+        $.instantiated_module_ref,
         $.inline_module_type_path,
         $.qualified_type_ref,
+        $.type_ident,
       ),
       '.',
       $.identifier,
+    )),
+
+    promoted_module_call_expr: $ => prec.left(14, seq(
+      $.module_name,
+      $.module_type_arg_list,
+      '.',
+      $.identifier,
+      '(',
+      optional($.arg_list),
+      ')',
     )),
 
     field_expr: $ => prec.left(13, seq(
@@ -445,12 +455,14 @@ module.exports = grammar({
     ),
 
     // dotted path that may start with a type-namespace keyword
-    _pipe_path: $ => prec.left(1, choice(
-      alias($._builtin_ns, $.identifier),
-      $.inline_module_pipe_path,
-      $.identifier,
-      $.type_ident,
-      seq($._pipe_path, '.', choice($.identifier, $.type_ident)),
+    _pipe_path: $ => prec.left(1, seq(
+      choice(
+        alias($._builtin_ns, $.identifier),
+        $.instantiated_module_ref,
+        $.identifier,
+        $.type_ident,
+      ),
+      repeat(seq('.', choice($.identifier, $.type_ident))),
     )),
 
     // keywords used as namespace prefixes in builtin calls

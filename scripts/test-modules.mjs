@@ -1,3 +1,4 @@
+import binaryen from 'binaryen';
 import { compile } from '../index.js';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { firstLine, runNamedCases } from './test-helpers.mjs';
@@ -55,7 +56,7 @@ export fun main() i32 {
     let alias_box: box_i32.Box = box_i32.Box.new(7);
     let inline_box: boxy[i32].Box = alias_box;
     let opened_box: Box = Box.new(3);
-    let from_pipe: i32 = inline_box -o boxy[i32].Box.get(_);
+    let from_pipe: i32 = box_i32.Box.get(inline_box);
     double_inline(alias_box) + from_pipe + Box.get(opened_box);
 }`,
     },
@@ -104,6 +105,147 @@ construct calc_i32 = calc[i32];
 
 export fun main() i32 {
     calc_i32.id(calc_i32.twice(5));
+}`,
+    },
+    {
+        name: 'same-name-module-types-promote-to-top-level-paths',
+        expectedReturn: 14,
+        source: `mod Pair[L, R] {
+    struct Pair {
+        left: L,
+        right: R,
+    }
+
+    struct NotPair {
+        one: L,
+    }
+
+    fun Pair.new(left: L, right: R) Pair {
+        Pair { left: left, right: right };
+    }
+
+    fun Pair.left(self: Pair) L {
+        self.left;
+    }
+
+    fun Pair.right(self: Pair) R {
+        self.right;
+    }
+
+    fun NotPair.only(self: NotPair) L {
+        self.one;
+    }
+}
+
+construct pair_i32 = Pair[i32, i32];
+
+export fun main() i32 {
+    let pair: Pair[i32, i32] = Pair[i32, i32].new(5, 6);
+    let other: pair_i32.NotPair = pair_i32.NotPair { one: 3 };
+    Pair[i32, i32].left(pair) + Pair[i32, i32].right(pair) + pair_i32.NotPair.only(other);
+}`,
+    },
+    {
+        name: 'method-promotion-covers-top-level-constructs-and-promoted-types',
+        expectedReturn: 22,
+        source: `struct Vec {
+    left: i32,
+    right: i32,
+}
+
+fun Vec.new(left: i32, right: i32) Vec {
+    Vec { left: left, right: right };
+}
+
+fun Vec.total(self: Vec) i32 {
+    self.left + self.right;
+}
+
+mod boxy[T] {
+    struct Box {
+        value: T,
+    }
+
+    fun Box.new(value: T) Box {
+        Box { value: value };
+    }
+
+    fun Box.get(self: Box) T {
+        self.value;
+    }
+}
+
+mod Pair[L, R] {
+    struct Pair {
+        left: L,
+        right: R,
+    }
+
+    fun Pair.new(left: L, right: R) Pair {
+        Pair { left: left, right: right };
+    }
+
+    fun Pair.left(self: Pair) L {
+        self.left;
+    }
+
+    fun Pair.right(self: Pair) R {
+        self.right;
+    }
+}
+
+construct ints = boxy[i32];
+
+fun maybe_pair(flag: bool) Pair[i32, i32] # null {
+    if flag { Pair[i32, i32].new(2, 9); } else { null; };
+}
+
+export fun main() i32 {
+    let vec: Vec = Vec.new(3, 4);
+    let box: ints.Box = ints.Box.new(7);
+    vec.total() + box.get() + Pair[i32, i32].new(5, 6).right() + (maybe_pair(true) \\ Pair[i32, i32].new(0, 0)).left();
+}`,
+    },
+    {
+        name: 'method-promotion-works-on-free-function-returns',
+        expectedReturn: 11,
+        source: `mod boxy[T] {
+    struct Box {
+        value: T,
+    }
+
+    fun Box.new(value: T) Box {
+        Box { value: value };
+    }
+
+    fun Box.get(self: Box) T {
+        self.value;
+    }
+}
+
+construct ints = boxy[i32];
+
+fun make_box(value: i32) ints.Box {
+    ints.Box.new(value);
+}
+
+export fun main() i32 {
+    make_box(11).get();
+}`,
+    },
+    {
+        name: 'module-escapes-preserve-leading-underscore-names',
+        expectedReturn: 3,
+        source: `mod Console[T] {
+    escape |(a) => a| _log(T) T;
+
+    fun log(t: T) T {
+        _log(t);
+    }
+}
+
+export fun main() i32 {
+    Console[i32].log(3);
 }`,
     },
 ];
@@ -181,6 +323,12 @@ const cases = [
         if (actual !== testCase.expectedReturn)
             throw new Error(`Expected return ${testCase.expectedReturn}, got ${actual}`);
     }]),
+    ['binaryen-strips-unused-instantiated-functions', async () => {
+        const single = await inspectOptimizedModule(makeBinaryenDceSource(1));
+        const many = await inspectOptimizedModule(makeBinaryenDceSource(50));
+        if (many.functionCount !== single.functionCount)
+            throw new Error(`Expected 50 instantiations to keep ${single.functionCount} optimized function(s), got ${many.functionCount}`);
+    }],
     ...failureCases.map((testCase) => [testCase.name, async () => {
         try {
             await compile(testCase.source, { mode: 'program' });
@@ -207,4 +355,34 @@ async function compileAndRun(source) {
     } finally {
         await compiledModule.cleanup?.();
     }
+}
+
+async function inspectOptimizedModule(source) {
+    const { wasm } = await compile(source, { mode: 'program' });
+    const mod = binaryen.readBinary(wasm);
+    try {
+        return { functionCount: mod.getNumFunctions() };
+    } finally {
+        mod.dispose();
+    }
+}
+
+function makeBinaryenDceSource(count) {
+    const types = Array.from({ length: count }, (_, index) => `struct T${index} {\n    value: i32,\n}`).join('\n\n');
+    const constructs = Array.from({ length: count }, (_, index) => `construct foo_${index} = foo[T${index}];`).join('\n');
+    return `shimport "es" input: i32;
+
+mod foo[T] {
+    fun bar(value: T) T {
+        value;
+    }
+}
+
+${types}
+
+${constructs}
+
+export fun main() i32 {
+    foo_0.bar(T0 { value: input }).value;
+}`;
 }

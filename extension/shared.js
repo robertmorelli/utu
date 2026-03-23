@@ -8,4 +8,12 @@ export function appendOutputBlock(output, title, lines = [], result) { output.ap
     output.appendLine(line); if (result !== undefined)
     output.appendLine(String(result)); output.show(true); }
 export function formatError(error) { return error instanceof Error ? error.message : JSON.stringify(error); }
+export function firstUsefulErrorLine(text) {
+    return text
+        .split('\n')
+        .map((line) => line.trim())
+        .find((line) => line && !/^at\s/u.test(line) && !/^error:\s*Program terminated with exit\(\d+\)$/u.test(line))
+        ?? text.trim()
+        ?? 'UTU command failed.';
+}
 export function logOutputError(output, label, error) { appendOutputBlock(output, label, [formatError(error)]); }

@@ -15,7 +15,7 @@ mod boxy[T] {
 construct box_i32 = boxy[i32];
 
 fun double_inline(value: boxy[i32].Box) i32 {
-    boxy[i32].Box.get(value) * 2;
+    value.get() * 2;
 }
 
 test "inline qualified types work in signatures" {
@@ -25,15 +25,15 @@ test "inline qualified types work in signatures" {
 
 test "inline qualified associated calls work" {
     let box: boxy[i32].Box = boxy[i32].Box.new(10);
-    assert boxy[i32].Box.get(box) == 10;
+    assert box.get() == 10;
 }
 
-test "inline qualified methods pipe" {
+test "inline qualified associated calls work from values" {
     let box: boxy[i32].Box = boxy[i32].Box.new(4);
-    assert box -o boxy[i32].Box.get(_) == 4;
+    assert box.get() == 4;
 }
 
 test "inline and alias paths stay interchangeable" {
     let box: box_i32.Box = box_i32.Box.new(13);
-    assert boxy[i32].Box.get(box) == 13;
+    assert box.get() == 13;
 }

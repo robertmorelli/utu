@@ -1,0 +1,12 @@
+
+mod Console[T] {
+    escape |(a) => console.log(a)| logger(T) void;
+    fun log(t: T) void {
+        logger(t);
+    }
+
+}
+
+export fun main() void {
+    Console[i32].log(3);
+}

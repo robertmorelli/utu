@@ -18,7 +18,7 @@ mod math {
 }
 
 fun pair_total(pair: math.Pair) i32 {
-    math.Pair.sum(pair);
+    pair.sum();
 }
 
 test "plain modules qualify types" {
@@ -30,11 +30,11 @@ test "plain modules qualify free functions" {
     assert math.inc(8) == 9;
 }
 
-test "plain module methods pipe from qualified types" {
+test "plain module associated calls work from values" {
     let pair: math.Pair = math.Pair.new(4, 6);
-    assert pair -o math.Pair.sum(_) == 10;
+    assert pair.sum() == 10;
 }
 
 test "plain module constructors stay type qualified" {
-    assert math.Pair.sum(math.Pair.new(1, 7)) == 8;
+    assert math.Pair.new(1, 7).sum() == 8;
 }

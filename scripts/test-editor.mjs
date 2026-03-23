@@ -322,6 +322,20 @@ bench "sample" |i| {
       expectValue(await exports[getBenchExport(result)](3), undefined);
       expectDeepEqual(logs, ['ok', 'ok', 'ok']);
     }),
+    compiledCase('wires module-local escape imports through the webhost shim', `mod Console[T] {
+    escape |(a) => a| _log(T) T;
+
+    fun log(t: T) T {
+        _log(t);
+    }
+}
+
+export fun main() i32 {
+    Console[i32].log(3);
+}`, {}, async (_, { instantiate }) => {
+      const exports = await instantiate();
+      expectValue(await exports.main?.(), 3);
+    }),
   ];
 
   async function withCompiledModule(sourceText, options, run) {

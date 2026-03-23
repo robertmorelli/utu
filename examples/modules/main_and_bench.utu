@@ -22,7 +22,7 @@ bench "module counter get" |i| {
     setup {
         let box: ints.Box = step(i);
         measure {
-            ints.Box.get(box);
+            box.get();
         }
     }
 }
@@ -30,5 +30,5 @@ bench "module counter get" |i| {
 export fun main() i32 {
     let alias_box: ints.Box = step(9);
     let inline_box: counter[i32].Box = counter[i32].Box.new(12);
-    ints.Box.get(alias_box) + (inline_box -o counter[i32].Box.get(_));
+    alias_box.get() + inline_box.get();
 }

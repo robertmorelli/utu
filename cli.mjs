@@ -37,7 +37,9 @@ async function compileCmd(args) {
 
 async function runCmd(args) {
   const { input } = parseArgs(args, "run", "run needs an input file");
-  return withRuntime(loadRuntime(await readFile(path.resolve(input), "utf8")), async ({ exports }) => {
+  const source = await readFile(path.resolve(input), "utf8");
+  if (!(await getMetadata(source)).hasMain) fail('UTU run requires `export fun main()` in the input file.');
+  return withRuntime(loadRuntime(source), async ({ exports }) => {
     const result = await exports.main();
     if (result !== undefined) console.log(result);
   });

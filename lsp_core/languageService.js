@@ -269,6 +269,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         identifier: (node) => addResolvedOccurrence(node, 'value', resolveValueKey(node.text)),
         qualified_type_ref: walkQualifiedTypeReference,
         type_member_expr: walkTypeMemberExpression,
+        promoted_module_call_expr: walkPromotedModuleCallExpression,
         struct_init: walkStructInit,
         field_expr: walkFieldExpression,
         call_expr: walkCallExpression,
@@ -291,6 +292,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         field_expr: inferFieldExpressionType,
         call_expr: inferCallExpressionType,
         type_member_expr: inferTypeMemberExpressionType,
+        promoted_module_call_expr: inferPromotedModuleCallType,
         namespace_call_expr: (node) => getBuiltinReturnType(builtinKeyFromNamespaceCall(node)),
         pipe_expr: inferPipeExpressionType,
         pipe_target: inferPipeTargetType,
@@ -301,7 +303,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         block_expr: inferFirstChildType,
         literal: inferLiteralType,
         binary_expr: inferFirstChildType,
-        else_expr: inferFirstChildType,
+        else_expr: inferElseExpressionType,
         tuple_expr: inferFirstChildType,
         index_expr: inferFirstChildType,
         assign_expr: inferFirstChildType,
@@ -353,8 +355,24 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             collectFieldSymbols(variantSymbol, findNamedChild(variantNode, 'field_list'));
         }
     }
+    function findModuleNameNode(node) {
+        return findNamedChild(findNamedChild(node, 'module_name'), 'identifier')
+            ?? findNamedChild(findNamedChild(node, 'module_name'), 'type_ident')
+            ?? findNamedChild(findNamedChild(node, 'module_ref'), 'identifier')
+            ?? findNamedChild(findNamedChild(node, 'module_ref'), 'type_ident')
+            ?? findNamedChild(node, 'identifier')
+            ?? findNamedChild(node, 'type_ident');
+    }
+    function resolvePromotedTypeKeyByName(name) {
+        const namespace = resolveNamespaceByName(name);
+        return namespace?.promotedTypeName ? namespace.typeKeys.get(namespace.promotedTypeName) : undefined;
+    }
+    function resolveNamespaceValueOrPromotedAssocKey(namespace, name) {
+        return namespace?.valueKeys.get(name)
+            ?? (namespace?.promotedTypeName ? namespace.assocKeys.get(`${namespace.promotedTypeName}.${name}`) : undefined);
+    }
     function collectModuleDeclaration(moduleDecl) {
-        const moduleNameNode = findNamedChild(moduleDecl, 'identifier');
+        const moduleNameNode = findModuleNameNode(moduleDecl);
         if (!moduleNameNode)
             return;
         const namespace = {
@@ -362,6 +380,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             typeKeys: new Map(),
             valueKeys: new Map(),
             assocKeys: new Map(),
+            promotedTypeName: undefined,
         };
         moduleNamespaces.set(namespace.name, namespace);
         for (const item of moduleDecl.namedChildren) {
@@ -393,6 +412,8 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const structSymbol = createSymbol(nameNode, 'struct', { detail: `struct in ${namespace.name}`, signature: `struct ${nameNode.text}`, containerName: namespace.name });
         namespace.typeKeys.set(nameNode.text, structSymbol.key);
+        if (nameNode.text === namespace.name)
+            namespace.promotedTypeName = nameNode.text;
         collectFieldSymbols(structSymbol, findNamedChild(structDecl, 'field_list'));
     }
     function collectModuleType(typeDecl, namespace) {
@@ -401,6 +422,8 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const typeSymbol = createSymbol(nameNode, 'sumType', { detail: `sum type in ${namespace.name}`, signature: `type ${nameNode.text}`, containerName: namespace.name });
         namespace.typeKeys.set(nameNode.text, typeSymbol.key);
+        if (nameNode.text === namespace.name)
+            namespace.promotedTypeName = nameNode.text;
         for (const variantNode of findNamedChildren(findNamedChild(typeDecl, 'variant_list'), 'variant')) {
             const variantNameNode = findNamedChild(variantNode, 'type_ident');
             if (!variantNameNode)
@@ -726,9 +749,9 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         const [baseNode, fieldNameNode] = node.namedChildren;
         if (!baseNode || !fieldNameNode)
             return;
-        const moduleNamespace = baseNode.type === 'identifier' ? resolveNamespaceByName(baseNode.text) : undefined;
+        const moduleNamespace = ['identifier', 'instantiated_module_ref'].includes(baseNode.type) ? resolveNamespaceNode(baseNode) : undefined;
         if (moduleNamespace) {
-            addResolvedOccurrence(fieldNameNode, 'value', moduleNamespace.valueKeys.get(fieldNameNode.text));
+            addResolvedOccurrence(fieldNameNode, 'value', resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNameNode.text));
             return;
         }
         walkExpression(baseNode);
@@ -742,8 +765,25 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             if (!symbol)
                 addSemanticDiagnostic(calleeNode, `Undefined function or import "${calleeNode.text}".`);
         }
+        if (calleeNode?.type === 'field_expr') {
+            const [baseNode, memberNode] = calleeNode.namedChildren;
+            const methodKey = resolveMethodCallKey(calleeNode);
+            if (methodKey) {
+                walkExpression(baseNode);
+                addResolvedOccurrence(memberNode, 'value', methodKey);
+                walkExpressions(argListNode?.type === 'arg_list' ? argListNode.namedChildren : []);
+                return;
+            }
+        }
         walkExpression(calleeNode);
         walkExpressions(argListNode?.type === 'arg_list' ? argListNode.namedChildren : []);
+    }
+    function walkPromotedModuleCallExpression(node) {
+        const namespace = resolveNamespaceByName(findModuleNameNode(node)?.text ?? '');
+        const memberNode = findNamedChild(node, 'identifier');
+        if (memberNode)
+            addResolvedOccurrence(memberNode, 'value', resolveNamespaceValueOrPromotedAssocKey(namespace, memberNode.text));
+        walkExpressions(findNamedChild(node, 'arg_list')?.namedChildren ?? []);
     }
     function walkNamespaceCallExpression(node) {
         const methodNode = findNamedChild(node, 'identifier');
@@ -793,7 +833,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         else {
             const namespace = resolveNamespaceNode(first);
             if (namespace && second?.type === 'identifier' && pathParts.length === 2) {
-                addResolvedOccurrence(second, 'value', namespace.valueKeys.get(second.text));
+                addResolvedOccurrence(second, 'value', resolveNamespaceValueOrPromotedAssocKey(namespace, second.text));
             }
             else if (namespace && second?.type === 'type_ident' && pathParts[2]?.type === 'identifier') {
                 addResolvedOccurrence(second, 'type', namespace.typeKeys.get(second.text));
@@ -878,6 +918,12 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             addResolvedOccurrence(node, 'type', resolveTypeKey(node.text));
             return;
         }
+        if (node.type === 'instantiated_module_ref') {
+            const nameNode = findModuleNameNode(node);
+            if (nameNode)
+                addResolvedOccurrence(nameNode, 'type', resolveQualifiedTypeKey(node));
+            return;
+        }
         if (node.type === 'qualified_type_ref') {
             walkQualifiedTypeReference(node);
             return;
@@ -893,37 +939,91 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         if (!node)
             return undefined;
         if (node.type === 'module_ref')
-            return resolveNamespaceNode(findNamedChild(node, 'identifier'));
+            return resolveNamespaceNode(findModuleNameNode(node));
         if (node.type === 'qualified_type_ref')
             return resolveNamespaceNode(node.namedChildren[0]);
         if (node.type === 'identifier')
             return resolveNamespaceByName(node.text);
-        if (['instantiated_module_ref', 'inline_module_pipe_path', 'inline_module_type_path'].includes(node.type))
-            return resolveNamespaceByName(findNamedChild(node, 'identifier')?.text ?? '');
+        if (node.type === 'type_ident')
+            return resolveNamespaceByName(node.text);
+        if (['instantiated_module_ref', 'inline_module_type_path'].includes(node.type))
+            return resolveNamespaceByName(findModuleNameNode(node)?.text ?? '');
         return undefined;
     }
     function resolveQualifiedTypeKey(node) {
         const namespace = resolveNamespaceNode(node);
         const typeNode = findNamedChild(node, 'type_ident');
-        return typeNode ? namespace?.typeKeys.get(typeNode.text) : undefined;
+        return typeNode
+            ? namespace?.typeKeys.get(typeNode.text)
+            : namespace?.promotedTypeName
+                ? namespace.typeKeys.get(namespace.promotedTypeName)
+                : undefined;
+    }
+    function resolveAssociatedKeyByOwnerName(ownerName, memberName) {
+        const promoted = resolveNamespaceByName(ownerName);
+        return moduleScopes.at(-1)?.assocKeys.get(`${ownerName}.${memberName}`)
+            ?? openTypeNamespaces.get(ownerName)?.assocKeys.get(`${ownerName}.${memberName}`)
+            ?? promoted?.assocKeys.get(`${promoted.promotedTypeName ?? ''}.${memberName}`)
+            ?? topLevelAssocKeys.get(`${ownerName}.${memberName}`);
     }
     function resolveAssociatedKey(ownerNode, memberName) {
         if (!ownerNode)
             return undefined;
-        if (ownerNode.type === 'qualified_type_ref' || ownerNode.type === 'inline_module_type_path') {
+        if (['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type)) {
             const namespace = resolveNamespaceNode(ownerNode);
             const typeNode = findNamedChild(ownerNode, 'type_ident');
-            return typeNode ? namespace?.assocKeys.get(`${typeNode.text}.${memberName}`) : undefined;
+            const ownerName = typeNode?.text ?? namespace?.promotedTypeName;
+            return ownerName ? namespace?.assocKeys.get(`${ownerName}.${memberName}`) : undefined;
         }
         const ownerName = ownerNode.type === 'type_ident' ? ownerNode.text : findNamedChild(ownerNode, 'type_ident')?.text;
-        if (!ownerName)
+        return ownerName ? resolveAssociatedKeyByOwnerName(ownerName, memberName) : undefined;
+    }
+    function resolveNamespaceText(text) {
+        const normalized = normalizeTypeText(text);
+        if (!normalized)
             return undefined;
-        return moduleScopes.at(-1)?.assocKeys.get(`${ownerName}.${memberName}`)
-            ?? openTypeNamespaces.get(ownerName)?.assocKeys.get(`${ownerName}.${memberName}`)
-            ?? topLevelAssocKeys.get(`${ownerName}.${memberName}`);
+        const head = normalized.split('.')[0];
+        const bracketIndex = head.indexOf('[');
+        return resolveNamespaceByName(bracketIndex >= 0 ? head.slice(0, bracketIndex) : head);
+    }
+    function resolveOwnerInfoFromTypeText(typeText) {
+        const normalized = normalizeTypeText(typeText);
+        if (!normalized)
+            return undefined;
+        const lastDot = normalized.lastIndexOf('.');
+        if (lastDot >= 0) {
+            const namespace = resolveNamespaceText(normalized.slice(0, lastDot));
+            const owner = normalized.slice(lastDot + 1);
+            return owner ? { owner, namespace } : undefined;
+        }
+        if (normalized.includes('[')) {
+            const namespace = resolveNamespaceText(normalized);
+            return namespace?.promotedTypeName ? { owner: namespace.promotedTypeName, namespace } : undefined;
+        }
+        if (openTypeNamespaces.has(normalized))
+            return { owner: normalized, namespace: openTypeNamespaces.get(normalized) };
+        if (moduleScopes.at(-1)?.typeKeys.has(normalized))
+            return { owner: normalized, namespace: moduleScopes.at(-1) };
+        return { owner: normalized, namespace: undefined };
+    }
+    function resolveAssociatedKeyFromTypeText(typeText, memberName) {
+        const ownerInfo = resolveOwnerInfoFromTypeText(typeText);
+        if (!ownerInfo?.owner)
+            return undefined;
+        if (ownerInfo.namespace) {
+            const direct = ownerInfo.namespace.assocKeys.get(`${ownerInfo.owner}.${memberName}`);
+            if (direct)
+                return direct;
+        }
+        return resolveAssociatedKeyByOwnerName(ownerInfo.owner, memberName);
+    }
+    function resolveMethodCallKey(node) {
+        const [baseNode, memberNode] = node.namedChildren;
+        const baseType = inferExpressionType(baseNode);
+        return memberNode && baseType ? resolveAssociatedKeyFromTypeText(baseType, memberNode.text) : undefined;
     }
     function inferTypeNodeText(node) {
-        return node?.text;
+        return node?.type === 'instantiated_module_ref' ? findModuleNameNode(node)?.text : node?.text;
     }
     function declareLocal(symbol) { localScopes.at(-1)?.set(symbol.name, symbol.key); }
     function resolveValueKey(name) {
@@ -939,6 +1039,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     function resolveTypeKey(name) {
         return moduleScopes.at(-1)?.typeKeys.get(name)
             ?? openTypeKeys.get(name)
+            ?? resolvePromotedTypeKeyByName(name)
             ?? topLevelTypeKeys.get(name);
     }
     function resolveFieldKey(ownerTypeText, fieldName) {
@@ -957,9 +1058,9 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         const [baseNode, fieldNode] = node.namedChildren;
         if (!baseNode || !fieldNode)
             return undefined;
-        const moduleNamespace = baseNode.type === 'identifier' ? resolveNamespaceByName(baseNode.text) : undefined;
+        const moduleNamespace = ['identifier', 'instantiated_module_ref'].includes(baseNode.type) ? resolveNamespaceNode(baseNode) : undefined;
         if (moduleNamespace) {
-            const symbol = lookupSymbol(moduleNamespace.valueKeys.get(fieldNode.text));
+            const symbol = lookupSymbol(resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNode.text));
             return symbol?.returnTypeText ?? symbol?.typeText;
         }
         const baseType = inferExpressionType(baseNode);
@@ -974,11 +1075,19 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return undefined;
         if (calleeNode.type === 'identifier')
             return inferIdentifierType(calleeNode);
-        if (calleeNode.type === 'field_expr')
-            return inferFieldExpressionType(calleeNode);
+        if (calleeNode.type === 'field_expr') {
+            const methodSymbol = lookupSymbol(resolveMethodCallKey(calleeNode));
+            return methodSymbol?.returnTypeText ?? methodSymbol?.typeText ?? inferFieldExpressionType(calleeNode);
+        }
         if (calleeNode.type === 'type_member_expr')
             return inferTypeMemberExpressionType(calleeNode);
         return calleeNode.type === 'namespace_call_expr' ? getBuiltinReturnType(builtinKeyFromNamespaceCall(calleeNode)) : undefined;
+    }
+    function inferPromotedModuleCallType(node) {
+        const namespace = resolveNamespaceByName(findModuleNameNode(node)?.text ?? '');
+        const memberNode = findNamedChild(node, 'identifier');
+        const symbol = lookupSymbol(memberNode ? resolveNamespaceValueOrPromotedAssocKey(namespace, memberNode.text) : undefined);
+        return symbol?.returnTypeText ?? symbol?.typeText;
     }
     function inferTypeMemberExpressionType(node) {
         const memberNode = node.namedChildren.at(-1);
@@ -993,6 +1102,9 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         const typeNode = node.namedChildren.at(-1);
         const typeText = inferTypeNodeText(typeNode);
         return typeText ? `${typeText} # null` : undefined;
+    }
+    function inferElseExpressionType(node) {
+        return inferExpressionType(node.namedChildren[1]) ?? stripNullableTypeText(inferExpressionType(node.namedChildren[0]));
     }
     function inferPipeExpressionType(node) {
         const targetNode = node.namedChildren.at(-1);
@@ -1014,7 +1126,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         }
         const namespace = resolveNamespaceNode(first);
         if (namespace && second?.type === 'identifier') {
-            const symbol = lookupSymbol(namespace.valueKeys.get(second.text));
+            const symbol = lookupSymbol(resolveNamespaceValueOrPromotedAssocKey(namespace, second.text));
             return symbol?.returnTypeText ?? symbol?.typeText;
         }
         if (namespace && second?.type === 'type_ident' && pathParts[2]?.type === 'identifier') {
@@ -1080,6 +1192,9 @@ function expandTypeCandidates(typeText) {
     if (!normalized)
         return [];
     const candidates = new Set([normalized]);
+    const typeArgsIndex = normalized.indexOf('[');
+    if (typeArgsIndex > 0)
+        candidates.add(normalized.slice(0, typeArgsIndex));
     const lastDot = normalized.lastIndexOf('.');
     if (lastDot >= 0 && lastDot < normalized.length - 1)
         candidates.add(normalized.slice(lastDot + 1));
@@ -1091,6 +1206,9 @@ function normalizeTypeText(typeText) {
         value = value.slice(1, -1).trim();
     value = value.replace(/\s*#\s*null\s*$/, '').trim();
     return value;
+}
+function stripNullableTypeText(typeText) {
+    return typeText?.replace(/\s*#\s*null\s*$/, '').trim();
 }
 function builtinKeyFromNamespaceCall(node) {
     const methodNode = findNamedChild(node, 'identifier');

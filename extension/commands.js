@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { displayNameForDocument } from './generatedDocuments.js';
 import { hasRunnableMain as indexHasRunnableMain } from '../lsp_core/languageService.js';
 import { getBenchmarkOptionsFromConfig } from './testing.js';
-import { appendOutputBlock, logOutputError } from './shared.js';
+import { appendOutputBlock, firstUsefulErrorLine, formatError, logOutputError } from './shared.js';
 
 export function registerCommands(context, d) {
     const withUtuDocument = async (target) => (target = target instanceof vscode.Uri ? await vscode.workspace.openTextDocument(target) : target ?? vscode.window.activeTextEditor?.document, target?.languageId === 'utu' ? target : (await vscode.window.showWarningMessage('Open a .utu file to use UTU commands.'), undefined));
@@ -39,6 +39,13 @@ export function registerCommands(context, d) {
     });
 }
 
-async function fail(output, run) { try { return await run(); } catch (error) { logOutputError(output, '[utu] Command failed', error); await vscode.window.showErrorMessage('UTU command failed. Check the UTU output channel for details.'); } }
+async function fail(output, run) {
+    try {
+        return await run();
+    } catch (error) {
+        logOutputError(output, '[utu] Command failed', error);
+        await vscode.window.showErrorMessage(`UTU command failed: ${firstUsefulErrorLine(formatError(error))}`);
+    }
+}
 
 function show(output, title, logs, result) { appendOutputBlock(output, `[utu] ${title}`, logs, result); }

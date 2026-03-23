@@ -31,6 +31,16 @@ function containsModuleFeature(node) {
     return (node.children ?? []).some(containsModuleFeature);
 }
 
+function moduleNameNode(node) {
+    const wrapper = childOfType(node, 'module_name');
+    if (wrapper) return moduleNameNode(wrapper);
+    const moduleRef = childOfType(node, 'module_ref');
+    if (moduleRef) return moduleNameNode(moduleRef);
+    return node?.type === 'identifier' || node?.type === 'type_ident'
+        ? node
+        : childOfType(node, 'identifier') ?? childOfType(node, 'type_ident');
+}
+
 class ModuleExpander {
     constructor(root, source) {
         this.root = root;
@@ -44,10 +54,13 @@ class ModuleExpander {
         this.topLevelValueNames = new Set();
         this.topLevelTypeNames = new Set();
         this.topLevelAssocNames = new Map();
+        this.topLevelValueTypes = new Map();
+        this.topLevelFnReturns = new Map();
+        this.topLevelAssocReturns = new Map();
     }
 
     expand() {
-        this.collectTopLevelSymbols();
+        this.collectTopLevelSymbols(this.createRootContext());
         this.validateModuleNameCollisions();
 
         const ctx = this.createRootContext();
@@ -85,20 +98,20 @@ class ModuleExpander {
             aliases: ctx.aliases,
             openTypes: ctx.openTypes,
             openValues: ctx.openValues,
-            localValueScopes: ctx.localValueScopes.map((scope) => new Set(scope)),
+            localValueScopes: ctx.localValueScopes.map((scope) => new Map(scope)),
             ...overrides,
         };
     }
 
     pushScope(ctx) {
         return this.cloneContext(ctx, {
-            localValueScopes: [...ctx.localValueScopes, new Set()],
+            localValueScopes: [...ctx.localValueScopes, new Map()],
         });
     }
 
-    declareLocal(ctx, name) {
+    declareLocal(ctx, name, info = null) {
         const scope = ctx.localValueScopes.at(-1);
-        if (scope) scope.add(name);
+        if (scope) scope.set(name, info);
     }
 
     isLocalValue(ctx, name) {
@@ -108,15 +121,27 @@ class ModuleExpander {
         return false;
     }
 
+    lookupLocal(ctx, name) {
+        for (let index = ctx.localValueScopes.length - 1; index >= 0; index -= 1) {
+            if (ctx.localValueScopes[index].has(name)) return ctx.localValueScopes[index].get(name);
+        }
+        return undefined;
+    }
+
     sourceOf(node) {
         return this.source.slice(node.startIndex, node.endIndex);
     }
 
-    collectTopLevelSymbols() {
+    collectTopLevelSymbols(ctx) {
+        for (const item of kids(this.root)) {
+            if (item.type === 'module_decl') this.collectModuleTemplate(item);
+        }
         for (const item of kids(this.root)) {
             switch (item.type) {
                 case 'module_decl':
-                    this.collectModuleTemplate(item);
+                    break;
+                case 'construct_decl':
+                    this.applyConstruct(item, ctx);
                     break;
                 case 'struct_decl':
                     this.topLevelTypeNames.add(childOfType(item, 'type_ident').text);
@@ -129,24 +154,39 @@ class ModuleExpander {
                     break;
                 }
                 case 'fn_decl':
-                    this.collectTopLevelFunction(item, false);
+                    this.collectTopLevelFunction(item, ctx);
                     break;
                 case 'export_decl':
-                    this.collectTopLevelFunction(childOfType(item, 'fn_decl'), true);
+                    this.collectTopLevelFunction(childOfType(item, 'fn_decl'), ctx);
                     break;
-                case 'global_decl':
+                case 'global_decl': {
+                    const nameNode = childOfType(item, 'identifier');
+                    if (nameNode) {
+                        this.topLevelValueNames.add(nameNode.text);
+                        this.topLevelValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
+                    }
+                    break;
+                }
                 case 'import_decl':
                 case 'jsgen_decl': {
                     const nameNode = childOfType(item, 'identifier');
-                    if (nameNode) this.topLevelValueNames.add(nameNode.text);
+                    if (!nameNode) break;
+                    this.topLevelValueNames.add(nameNode.text);
+                    const returnTypeNode = childOfType(item, 'return_type');
+                    if (returnTypeNode) {
+                        this.topLevelFnReturns.set(nameNode.text, this.describeReturn(returnTypeNode, ctx));
+                        break;
+                    }
+                    this.topLevelValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
                     break;
                 }
             }
         }
     }
 
-    collectTopLevelFunction(node) {
+    collectTopLevelFunction(node, ctx) {
         const assocNode = childOfType(node, 'associated_fn_name');
+        const returnInfo = this.describeReturn(childOfType(node, 'return_type'), ctx);
         if (assocNode) {
             const [ownerNode, nameNode] = kids(assocNode);
             const key = `${ownerNode.text}.${nameNode.text}`;
@@ -154,18 +194,22 @@ class ModuleExpander {
                 throw new Error(`Duplicate associated function "${key}".`);
             }
             this.topLevelAssocNames.set(key, this.mangleTopLevelAssoc(ownerNode.text, nameNode.text));
+            this.topLevelAssocReturns.set(key, returnInfo);
             return;
         }
         const nameNode = childOfType(node, 'identifier');
-        if (nameNode) this.topLevelValueNames.add(nameNode.text);
+        if (nameNode) {
+            this.topLevelValueNames.add(nameNode.text);
+            this.topLevelFnReturns.set(nameNode.text, returnInfo);
+        }
     }
 
     collectModuleTemplate(node) {
-        const name = childOfType(node, 'identifier').text;
+        const name = moduleNameNode(node).text;
         if (this.moduleTemplates.has(name)) {
             throw new Error(`Duplicate module "${name}".`);
         }
-        const items = kids(node).filter((child) => !['identifier', 'module_type_param_list'].includes(child.type));
+        const items = kids(node).filter((child) => !['identifier', 'type_ident', 'module_name', 'module_type_param_list'].includes(child.type));
         for (const item of items) this.validateModuleItem(item);
         this.moduleNames.add(name);
         this.moduleTemplates.set(name, {
@@ -278,20 +322,25 @@ class ModuleExpander {
             typeNames: new Map(),
             freeValueNames: new Map(),
             assocNames: new Map(),
+            freeValueTypes: new Map(),
+            freeFnReturns: new Map(),
+            assocReturns: new Map(),
             exportedTypes: [],
             exportedValues: [],
+            promotedTypeName: null,
+            promotedType: null,
             source: '',
         };
 
         this.namespaceCache.set(key, namespace);
         this.namespaceOrder.push(namespace);
-        this.collectNamespaceNames(namespace);
 
         const moduleCtx = this.cloneContext(ctx, {
             namespace,
             typeParams: new Map([...ctx.typeParams, ...namespace.typeParams]),
             localValueScopes: [],
         });
+        this.collectNamespaceNames(namespace, moduleCtx);
         namespace.source = namespace.template.items
             .map((item) => this.emitItem(item, moduleCtx, true))
             .filter(Boolean)
@@ -300,7 +349,7 @@ class ModuleExpander {
         return namespace;
     }
 
-    collectNamespaceNames(namespace) {
+    collectNamespaceNames(namespace, ctx) {
         for (const item of namespace.template.items) {
             switch (item.type) {
                 case 'struct_decl': {
@@ -325,17 +374,30 @@ class ModuleExpander {
                             throw new Error(`Duplicate associated function "${key}" in module "${namespace.displayText}".`);
                         }
                         namespace.assocNames.set(key, this.mangleNamespaceAssoc(namespace, ownerNode.text, nameNode.text));
+                        namespace.assocReturns.set(key, this.describeReturn(childOfType(item, 'return_type'), ctx));
                         break;
                     }
                     const nameNode = childOfType(item, 'identifier');
                     this.registerNamespaceValue(namespace, nameNode.text);
+                    namespace.freeFnReturns.set(nameNode.text, this.describeReturn(childOfType(item, 'return_type'), ctx));
                     break;
                 }
-                case 'global_decl':
+                case 'global_decl': {
+                    const nameNode = childOfType(item, 'identifier');
+                    this.registerNamespaceValue(namespace, nameNode.text);
+                    namespace.freeValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
+                    break;
+                }
                 case 'import_decl':
                 case 'jsgen_decl': {
                     const nameNode = childOfType(item, 'identifier');
                     this.registerNamespaceValue(namespace, nameNode.text);
+                    const returnTypeNode = childOfType(item, 'return_type');
+                    if (returnTypeNode) {
+                        namespace.freeFnReturns.set(nameNode.text, this.describeReturn(returnTypeNode, ctx));
+                        break;
+                    }
+                    namespace.freeValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
                     break;
                 }
             }
@@ -344,7 +406,12 @@ class ModuleExpander {
 
     registerNamespaceType(namespace, name) {
         if (namespace.typeNames.has(name)) throw new Error(`Duplicate type "${name}" in module "${namespace.displayText}".`);
-        namespace.typeNames.set(name, this.mangleNamespaceType(namespace, name));
+        const value = this.mangleNamespaceType(namespace, name);
+        namespace.typeNames.set(name, value);
+        if (name === namespace.template.name) {
+            namespace.promotedTypeName = name;
+            namespace.promotedType = value;
+        }
         namespace.exportedTypes.push(name);
     }
 
@@ -374,14 +441,14 @@ class ModuleExpander {
         const instNode = node?.type === 'instantiated_module_ref' ? node : childOfType(node, 'instantiated_module_ref');
         const directArgsNode = childOfType(node, 'module_type_arg_list');
         if (!instNode) {
-            const nameNode = node?.type === 'identifier' ? node : childOfType(node, 'identifier');
+            const nameNode = moduleNameNode(node);
             return {
                 name: nameNode.text,
                 argNodes: directArgsNode ? kids(directArgsNode) : [],
             };
         }
         return {
-            name: childOfType(instNode, 'identifier').text,
+            name: moduleNameNode(instNode).text,
             argNodes: this.moduleArgNodes(node),
         };
     }
@@ -464,7 +531,7 @@ class ModuleExpander {
         const params = childrenOfType(childOfType(node, 'param_list'), 'param');
         const fnCtx = this.pushScope(ctx);
         for (const param of params) {
-            this.declareLocal(fnCtx, childOfType(param, 'identifier').text);
+            this.declareLocal(fnCtx, childOfType(param, 'identifier').text, this.describeType(kids(param)[1], ctx));
         }
         return `fun ${name}(${params.map((param) => this.emitParam(param, ctx)).join(', ')}) ${this.emitReturnType(childOfType(node, 'return_type'), ctx)} ${this.emitBlock(childOfType(node, 'block'), fnCtx, true)}`;
     }
@@ -540,7 +607,7 @@ class ModuleExpander {
     emitBenchDecl(node, ctx) {
         const captureNode = childOfType(childOfType(node, 'bench_capture'), 'identifier');
         const benchCtx = this.pushScope(ctx);
-        if (captureNode) this.declareLocal(benchCtx, captureNode.text);
+        if (captureNode) this.declareLocal(benchCtx, captureNode.text, null);
         return `bench ${childOfType(node, 'string_lit').text} |${captureNode.text}| { ${this.emitSetupDecl(childOfType(node, 'setup_decl'), benchCtx)} }`;
     }
 
@@ -556,6 +623,70 @@ class ModuleExpander {
         return `setup { ${parts.join(' ')} }`;
     }
 
+    describeBareType(name, ctx) {
+        if (ctx.typeParams.has(name)) return { text: ctx.typeParams.get(name), owner: name, namespace: ctx.namespace };
+        if (ctx.namespace?.typeNames.has(name)) return { text: ctx.namespace.typeNames.get(name), owner: name, namespace: ctx.namespace };
+        if (this.topLevelTypeNames.has(name)) return { text: name, owner: name, namespace: null };
+        if (ctx.openTypes.has(name)) {
+            const namespace = ctx.openTypes.get(name);
+            return { text: namespace.typeNames.get(name), owner: name, namespace };
+        }
+        const namespace = this.resolveMaybeNamespaceName(name, ctx);
+        return namespace?.promotedType
+            ? { text: namespace.promotedType, owner: namespace.promotedTypeName, namespace }
+            : { text: name, owner: null, namespace: null };
+    }
+
+    describeType(node, ctx) {
+        if (!node) return null;
+        switch (node.type) {
+            case 'scalar_type':
+                return { text: node.text, owner: null, namespace: null };
+            case 'type_ident':
+                return this.describeBareType(node.text, ctx);
+            case 'instantiated_module_ref': {
+                const namespace = this.resolveNamespaceFromModuleRef(node, ctx);
+                return { text: this.resolvePromotedType(namespace), owner: namespace.promotedTypeName, namespace };
+            }
+            case 'qualified_type_ref': {
+                const moduleRef = childOfType(node, 'module_ref') ?? childOfType(node, 'instantiated_module_ref');
+                const typeNode = childOfType(node, 'type_ident');
+                const namespace = this.resolveNamespaceFromModuleRef(moduleRef, ctx);
+                return { text: namespace.typeNames.get(typeNode.text), owner: typeNode.text, namespace };
+            }
+            case 'nullable_type': {
+                const info = this.describeType(kids(node)[0], ctx);
+                return info ? { ...info, text: `${info.text} # null` } : { text: this.emitType(node, ctx), owner: null, namespace: null };
+            }
+            case 'ref_type': {
+                if (node.children[0]?.type === 'array') return { text: this.emitType(node, ctx), owner: null, namespace: null };
+                const child = kids(node)[0];
+                return child ? this.describeType(child, ctx) : { text: node.text, owner: null, namespace: null };
+            }
+            case 'paren_type': {
+                const info = this.describeType(kids(node)[0], ctx);
+                return info ? { ...info, text: `(${info.text})` } : { text: this.emitType(node, ctx), owner: null, namespace: null };
+            }
+            default:
+                return { text: this.emitType(node, ctx), owner: null, namespace: null };
+        }
+    }
+
+    describeReturn(node, ctx) {
+        if (!node || childOfType(node, 'void_type')) return null;
+        const info = this.describeType(namedChildren(node)[0], ctx);
+        if (!info) return null;
+        return node.children.some((child) => child.type === ',')
+            ? { text: this.emitReturnType(node, ctx), owner: null, namespace: null }
+            : { ...info, text: this.emitReturnType(node, ctx) };
+    }
+
+    stripNullable(info) {
+        return info?.text.endsWith('# null')
+            ? { ...info, text: info.text.replace(/\s*#\s*null$/, '') }
+            : info;
+    }
+
     emitType(node, ctx) {
         if (!node) return 'void';
         switch (node.type) {
@@ -563,6 +694,8 @@ class ModuleExpander {
                 return node.text;
             case 'type_ident':
                 return this.resolveBareType(node.text, ctx);
+            case 'instantiated_module_ref':
+                return this.resolvePromotedType(this.resolveNamespaceFromModuleRef(node, ctx));
             case 'qualified_type_ref':
                 return this.resolveQualifiedType(node, ctx);
             case 'nullable_type':
@@ -582,20 +715,16 @@ class ModuleExpander {
     }
 
     resolveBareType(name, ctx) {
-        if (ctx.typeParams.has(name)) return ctx.typeParams.get(name);
-        if (ctx.namespace?.typeNames.has(name)) return ctx.namespace.typeNames.get(name);
-        if (this.topLevelTypeNames.has(name)) return name;
-        if (ctx.openTypes.has(name)) return ctx.openTypes.get(name).typeNames.get(name);
-        return name;
+        return this.describeBareType(name, ctx).text;
+    }
+
+    resolvePromotedType(namespace) {
+        if (namespace.promotedType) return namespace.promotedType;
+        throw new Error(`Module "${namespace.displayText}" does not expose a promoted type.`);
     }
 
     resolveQualifiedType(node, ctx) {
-        const moduleRef = childOfType(node, 'module_ref') ?? childOfType(node, 'instantiated_module_ref');
-        const typeNode = childOfType(node, 'type_ident');
-        const namespace = this.resolveNamespaceFromModuleRef(moduleRef, ctx);
-        const resolved = namespace.typeNames.get(typeNode.text);
-        if (!resolved) throw new Error(`Unknown type "${typeNode.text}" in module "${namespace.displayText}".`);
-        return resolved;
+        return this.describeType(node, ctx).text;
     }
 
     emitExpr(node, ctx) {
@@ -604,6 +733,10 @@ class ModuleExpander {
                 return node.text;
             case 'identifier':
                 return this.resolveBareValue(node.text, ctx);
+            case 'instantiated_module_ref':
+                throw new Error(`Module path "${this.sourceOf(node)}" is not a value.`);
+            case 'promoted_module_call_expr':
+                return this.emitPromotedModuleCall(node, ctx);
             case 'paren_expr':
                 return `(${this.emitExpr(kids(node)[0], ctx)})`;
             case 'assert_expr':
@@ -678,6 +811,28 @@ class ModuleExpander {
         return name;
     }
 
+    resolveValueType(name, ctx) {
+        const local = this.lookupLocal(ctx, name);
+        if (local !== undefined) return local;
+        if (ctx.namespace?.freeValueTypes.has(name)) return ctx.namespace.freeValueTypes.get(name);
+        if (this.topLevelValueTypes.has(name)) return this.topLevelValueTypes.get(name);
+        if (ctx.openValues.has(name)) return ctx.openValues.get(name).freeValueTypes.get(name) ?? null;
+        return null;
+    }
+
+    resolveFunctionReturn(name, ctx) {
+        if (ctx.namespace?.freeFnReturns.has(name)) return ctx.namespace.freeFnReturns.get(name);
+        if (this.topLevelFnReturns.has(name)) return this.topLevelFnReturns.get(name);
+        if (ctx.openValues.has(name)) return ctx.openValues.get(name).freeFnReturns.get(name) ?? null;
+        return null;
+    }
+
+    resolveNamespaceValueReturn(namespace, memberName) {
+        return namespace?.freeFnReturns.get(memberName)
+            ?? (namespace?.promotedTypeName ? namespace.assocReturns.get(`${namespace.promotedTypeName}.${memberName}`) : null)
+            ?? null;
+    }
+
     emitCallExpr(node, ctx) {
         const callee = kids(node)[0];
         const args = kids(childOfType(node, 'arg_list')).map((arg) => this.emitExpr(arg, ctx));
@@ -685,6 +840,8 @@ class ModuleExpander {
         if (callee?.type === 'field_expr') {
             const moduleValue = this.resolveModuleField(callee, ctx);
             if (moduleValue) return `${moduleValue}(${args.join(', ')})`;
+            const method = this.resolveMethodCall(callee, ctx);
+            if (method) return `${method.callee}(${[this.emitExpr(kids(callee)[0], ctx), ...args].join(', ')})`;
         }
 
         if (callee?.type === 'type_member_expr') {
@@ -700,25 +857,29 @@ class ModuleExpander {
         return `${this.emitExpr(kids(node)[0], ctx)}.${kids(node)[1].text}`;
     }
 
+    resolveMethodCall(node, ctx) {
+        const [baseNode, memberNode] = kids(node);
+        const info = this.inferExprInfo(baseNode, ctx);
+        if (!info?.owner || !memberNode) return null;
+        return this.resolveAssociatedEntryFromInfo(info, memberNode.text, ctx);
+    }
+
     resolveModuleField(node, ctx) {
         const [baseNode, memberNode] = kids(node);
-        if (baseNode?.type !== 'identifier' || this.isLocalValue(ctx, baseNode.text)) return null;
+        if (baseNode?.type !== 'identifier' || !memberNode || this.isLocalValue(ctx, baseNode.text)) return null;
         const namespace = this.resolveMaybeNamespaceName(baseNode.text, ctx);
-        return namespace?.freeValueNames.get(memberNode.text) ?? null;
+        return this.resolveNamespaceValue(namespace, memberNode.text);
     }
 
     resolveTypeMemberExpr(node, ctx) {
         const memberNode = childOfType(node, 'identifier');
         const ownerNode = kids(node).find((child) => child !== memberNode);
-        if (['qualified_type_ref', 'inline_module_type_path'].includes(ownerNode.type)) {
-            const namespace = this.resolveNamespaceFromModuleRef(
-                childOfType(ownerNode, 'module_ref') ?? childOfType(ownerNode, 'instantiated_module_ref') ?? ownerNode,
-                ctx,
-            );
-            const ownerName = childOfType(ownerNode, 'type_ident').text;
+        if (['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type)) {
+            const namespace = this.resolveNamespaceFromModuleRef(ownerNode, ctx);
+            const ownerName = childOfType(ownerNode, 'type_ident')?.text ?? namespace.promotedTypeName;
             const resolved = namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
-            if (!resolved) throw new Error(`Unknown associated function "${ownerName}.${memberNode.text}" in module "${namespace.displayText}".`);
-            return resolved;
+            if (resolved) return resolved;
+            throw new Error(`Unknown associated function "${ownerName}.${memberNode.text}" in module "${namespace.displayText}".`);
         }
 
         const ownerName = ownerNode.text;
@@ -733,6 +894,11 @@ class ModuleExpander {
             const resolved = namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
             if (resolved) return resolved;
         }
+        const promoted = this.resolveMaybeNamespaceName(ownerName, ctx);
+        if (promoted?.promotedTypeName) {
+            const resolved = promoted.assocNames.get(`${promoted.promotedTypeName}.${memberNode.text}`);
+            if (resolved) return resolved;
+        }
         throw new Error(`Unknown associated function "${ownerName}.${memberNode.text}".`);
     }
 
@@ -741,6 +907,15 @@ class ModuleExpander {
         const methodNode = childOfType(node, 'identifier');
         const argsNode = childOfType(node, 'arg_list');
         return `${namespace}.${methodNode.text}${hasAnon(node, '(') ? `(${kids(argsNode).map((arg) => this.emitExpr(arg, ctx)).join(', ')})` : ''}`;
+    }
+
+    emitPromotedModuleCall(node, ctx) {
+        const memberNode = childOfType(node, 'identifier');
+        const argsNode = childOfType(node, 'arg_list');
+        const namespace = this.resolveNamespaceFromModuleRef(node, ctx);
+        const callee = this.resolveNamespaceValue(namespace, memberNode.text);
+        if (!callee) throw new Error(`Unknown value "${memberNode.text}" in module "${namespace.displayText}".`);
+        return `${callee}(${kids(argsNode).map((arg) => this.emitExpr(arg, ctx)).join(', ')})`;
     }
 
     emitPipeExpr(node, ctx) {
@@ -764,7 +939,7 @@ class ModuleExpander {
         if (pathParts.length === 1) {
             const child = pathParts[0];
             if (child.type === 'identifier') return { callee: this.resolveBareValue(child.text, ctx), args };
-            if (['module_ref', 'instantiated_module_ref', 'inline_module_pipe_path'].includes(child.type)) {
+            if (['module_ref', 'instantiated_module_ref'].includes(child.type)) {
                 const { name, argNodes } = this.parseModuleRefWithFallback(child);
                 if (argNodes.length === 0 && !ctx.aliases.has(name) && !this.moduleTemplates.has(name)) {
                     return { callee: this.resolveBareValue(name, ctx), args };
@@ -780,14 +955,14 @@ class ModuleExpander {
             if (first.type === 'identifier') {
                 const namespace = this.resolveMaybeNamespaceName(first.text, ctx);
                 if (namespace) {
-                    const value = namespace.freeValueNames.get(second.text);
+                    const value = this.resolveNamespaceValue(namespace, second.text);
                     if (!value) throw new Error(`Unknown value "${second.text}" in module "${namespace.displayText}".`);
                     return { callee: value, args };
                 }
             }
-            if (['module_ref', 'instantiated_module_ref', 'inline_module_pipe_path'].includes(first.type)) {
+            if (['module_ref', 'instantiated_module_ref'].includes(first.type)) {
                 const namespace = this.resolveNamespaceFromModuleRef(first, ctx);
-                const value = namespace.freeValueNames.get(second.text);
+                const value = this.resolveNamespaceValue(namespace, second.text);
                 if (!value) throw new Error(`Unknown value "${second.text}" in module "${namespace.displayText}".`);
                 return { callee: value, args };
             }
@@ -803,7 +978,7 @@ class ModuleExpander {
             return { callee: value, args };
         }
 
-        if (pathParts.length === 3 && ['module_ref', 'instantiated_module_ref', 'inline_module_pipe_path'].includes(pathParts[0].type)) {
+        if (pathParts.length === 3 && ['module_ref', 'instantiated_module_ref'].includes(pathParts[0].type)) {
             const namespace = this.resolveNamespaceFromModuleRef(pathParts[0], ctx);
             const ownerName = pathParts[1].text;
             const memberName = pathParts[2].text;
@@ -819,11 +994,11 @@ class ModuleExpander {
         const instNode = node?.type === 'instantiated_module_ref' ? node : childOfType(node, 'instantiated_module_ref');
         if (instNode) {
             return {
-                name: childOfType(instNode, 'identifier').text,
+                name: moduleNameNode(instNode).text,
                 argNodes: this.moduleArgNodes(node),
             };
         }
-        const nameNode = node?.type === 'identifier' ? node : childOfType(node, 'identifier');
+        const nameNode = moduleNameNode(node);
         return {
             name: nameNode.text,
             argNodes: this.moduleArgNodes(node),
@@ -841,18 +1016,99 @@ class ModuleExpander {
     }
 
     resolveAssociatedByOwner(ownerName, memberName, ctx) {
-        if (ctx.namespace?.assocNames.has(`${ownerName}.${memberName}`)) {
-            return ctx.namespace.assocNames.get(`${ownerName}.${memberName}`);
-        }
+        const entry = this.resolveAssociatedEntry(ownerName, memberName, ctx);
+        if (entry) return entry.callee;
+        throw new Error(`Unknown associated function "${ownerName}.${memberName}".`);
+    }
+
+    resolveNamespaceValue(namespace, memberName) {
+        return namespace?.freeValueNames.get(memberName)
+            ?? (namespace?.promotedTypeName ? namespace.assocNames.get(`${namespace.promotedTypeName}.${memberName}`) : null)
+            ?? null;
+    }
+
+    resolveNamespaceAssoc(namespace, ownerName, memberName) {
+        const key = `${ownerName}.${memberName}`;
+        const callee = namespace?.assocNames.get(key);
+        return callee ? { callee, returnInfo: namespace.assocReturns.get(key) ?? null } : null;
+    }
+
+    resolveAssociatedEntry(ownerName, memberName, ctx) {
+        const local = this.resolveNamespaceAssoc(ctx.namespace, ownerName, memberName);
+        if (local) return local;
         if (this.topLevelAssocNames.has(`${ownerName}.${memberName}`)) {
-            return this.topLevelAssocNames.get(`${ownerName}.${memberName}`);
+            return {
+                callee: this.topLevelAssocNames.get(`${ownerName}.${memberName}`),
+                returnInfo: this.topLevelAssocReturns.get(`${ownerName}.${memberName}`) ?? null,
+            };
         }
         if (ctx.openTypes.has(ownerName)) {
-            const namespace = ctx.openTypes.get(ownerName);
-            const value = namespace.assocNames.get(`${ownerName}.${memberName}`);
-            if (value) return value;
+            const opened = this.resolveNamespaceAssoc(ctx.openTypes.get(ownerName), ownerName, memberName);
+            if (opened) return opened;
         }
-        throw new Error(`Unknown associated function "${ownerName}.${memberName}".`);
+        const promoted = this.resolveMaybeNamespaceName(ownerName, ctx);
+        return promoted?.promotedTypeName ? this.resolveNamespaceAssoc(promoted, promoted.promotedTypeName, memberName) : null;
+    }
+
+    resolveAssociatedEntryFromInfo(info, memberName, ctx) {
+        if (!info?.owner) return null;
+        if (info.namespace) {
+            const resolved = this.resolveNamespaceAssoc(info.namespace, info.owner, memberName);
+            if (resolved) return resolved;
+        }
+        return this.resolveAssociatedEntry(info.owner, memberName, ctx);
+    }
+
+    inferExprInfo(node, ctx) {
+        if (!node) return null;
+        switch (node.type) {
+            case 'identifier':
+                return this.resolveValueType(node.text, ctx);
+            case 'paren_expr':
+                return this.inferExprInfo(kids(node)[0], ctx);
+            case 'struct_init':
+                return this.describeType(kids(node)[0], ctx);
+            case 'call_expr':
+                return this.inferCallExprInfo(node, ctx);
+            case 'promoted_module_call_expr':
+                return this.resolveNamespaceValueReturn(this.resolveNamespaceFromModuleRef(node, ctx), childOfType(node, 'identifier')?.text);
+            case 'else_expr':
+                return this.inferExprInfo(kids(node)[1], ctx) ?? this.stripNullable(this.inferExprInfo(kids(node)[0], ctx));
+            default:
+                return null;
+        }
+    }
+
+    inferCallExprInfo(node, ctx) {
+        const callee = kids(node)[0];
+        if (!callee) return null;
+        if (callee.type === 'identifier') return this.resolveFunctionReturn(callee.text, ctx);
+        if (callee.type === 'type_member_expr') {
+            const memberNode = childOfType(callee, 'identifier');
+            const ownerNode = kids(callee).find((child) => child !== memberNode);
+            return memberNode ? this.resolveAssociatedReturn(ownerNode, memberNode.text, ctx) : null;
+        }
+        if (callee.type === 'field_expr') {
+            const [baseNode, memberNode] = kids(callee);
+            if (baseNode?.type === 'identifier' && memberNode && !this.isLocalValue(ctx, baseNode.text)) {
+                return this.resolveNamespaceValueReturn(this.resolveMaybeNamespaceName(baseNode.text, ctx), memberNode.text);
+            }
+            return this.resolveMethodCall(callee, ctx)?.returnInfo ?? null;
+        }
+        if (callee.type === 'promoted_module_call_expr') {
+            return this.resolveNamespaceValueReturn(this.resolveNamespaceFromModuleRef(callee, ctx), childOfType(callee, 'identifier')?.text);
+        }
+        return null;
+    }
+
+    resolveAssociatedReturn(ownerNode, memberName, ctx) {
+        if (!ownerNode) return null;
+        if (['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type)) {
+            const namespace = this.resolveNamespaceFromModuleRef(ownerNode, ctx);
+            const ownerName = childOfType(ownerNode, 'type_ident')?.text ?? namespace.promotedTypeName;
+            return this.resolveNamespaceAssoc(namespace, ownerName, memberName)?.returnInfo ?? null;
+        }
+        return this.resolveAssociatedEntry(ownerNode.text, memberName, ctx)?.returnInfo ?? null;
     }
 
     emitIfExpr(node, ctx) {
@@ -916,7 +1172,7 @@ class ModuleExpander {
         const targets = childrenOfType(node, 'bind_target');
         const valueNode = kids(node).at(-1);
         const rendered = `let ${targets.map((target) => `${childOfType(target, 'identifier').text}: ${this.emitType(kids(target).at(-1), ctx)}`).join(', ')} = ${this.emitExpr(valueNode, ctx)}`;
-        for (const target of targets) this.declareLocal(ctx, childOfType(target, 'identifier').text);
+        for (const target of targets) this.declareLocal(ctx, childOfType(target, 'identifier').text, this.describeType(kids(target).at(-1), ctx));
         return rendered;
     }
 
@@ -948,8 +1204,12 @@ function pascalCase(value) {
 }
 
 function snakeCase(value) {
-    const parts = String(value).match(/[A-Za-z0-9]+/g) ?? ['x'];
-    return parts.map((part) => part.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()).join('_');
+    const normalized = String(value)
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .replace(/[^A-Za-z0-9_]+/g, '_')
+        .replace(/_+/g, '_')
+        .toLowerCase();
+    return normalized || 'x';
 }
 
 function hashText(value) {

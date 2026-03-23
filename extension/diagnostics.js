@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { toVscodeDiagnostic } from './adapters/core.js';
-import { createDebouncedUriScheduler, logOutputError, UTU_LANGUAGE_ID } from './shared.js';
+import { createDebouncedUriScheduler, firstUsefulErrorLine, logOutputError, UTU_LANGUAGE_ID } from './shared.js';
 const VALIDATION_DELAY_MS = 150;
 export class DiagnosticsController {
     languageService;
@@ -105,15 +105,6 @@ function isSourceDiagnosticError(error) {
         || /call param types must match/u.test(text)
         || /function body type must match/u.test(text)
         || /does not exist/u.test(text);
-}
-
-function firstUsefulErrorLine(text) {
-    return text
-        .split('\n')
-        .map((line) => line.trim())
-        .find((line) => line && !/^at\s/u.test(line) && !/^error:\s*Program terminated with exit\(\d+\)$/u.test(line))
-        ?? text.trim()
-        ?? 'Compilation failed.';
 }
 
 function pointRange(document, line, character) {

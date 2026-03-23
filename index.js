@@ -46,7 +46,7 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
         } finally {
             mod?.dispose();
         }
-        const generatedShim = jsgen(tree, wasm, { mode, profile, where, moduleFormat, metadata });
+        const generatedShim = jsgen(activeTree, wasm, { mode, profile, where, moduleFormat, metadata });
         const result = {
             shim: where === 'packed_base64' ? btoa(generatedShim) : generatedShim,
             js: generatedShim,
