@@ -1,6 +1,7 @@
 import binaryen from 'binaryen';
 import bundledGrammarWasm from './tree-sitter-utu.wasm';
 import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
+import { expandSource } from './expand.js';
 import { watgen } from './watgen.js';
 import { jsgen } from './jsgen.js';
 import { createUtuTreeSitterParser, withParsedTree } from './parser.js';
@@ -21,7 +22,9 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
     return withParsedTree(parser, source, async (tree) => {
         throwOnParseErrors(tree.rootNode);
-        const { wat, metadata } = watgen(tree, { mode, profile, targetName });
+        const expandedSource = expandSource(tree, source);
+        const runCompile = async (activeTree) => {
+            const { wat, metadata } = watgen(activeTree, { mode, profile, targetName });
         let mod, wasm;
         try {
             mod = binaryen.parseText(wat);
@@ -56,6 +59,12 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
         };
         if (emitWat) result.wat = wat;
         return result;
+        };
+        if (expandedSource === source) return runCompile(tree);
+        return withParsedTree(parser, expandedSource, async (expandedTree) => {
+            throwOnParseErrors(expandedTree.rootNode);
+            return runCompile(expandedTree);
+        });
     });
 }
 
@@ -63,30 +72,38 @@ export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
     return withParsedTree(parser, source, async (tree) => {
         throwOnParseErrors(tree.rootNode);
-        const tests = [], benches = [], exports = [];
-        for (const item of namedChildren(tree.rootNode)) {
-            if (item.type === 'export_decl') {
-                const fn = childOfType(item, 'fn_decl');
-                const name = childOfType(fn, 'identifier')?.text;
-                if (name) exports.push({ name });
-                continue;
+        const expandedSource = expandSource(tree, source);
+        const readMetadata = (activeTree) => {
+            const tests = [], benches = [], exports = [];
+            for (const item of namedChildren(activeTree.rootNode)) {
+                if (item.type === 'export_decl') {
+                    const fn = childOfType(item, 'fn_decl');
+                    const name = childOfType(fn, 'identifier')?.text;
+                    if (name) exports.push({ name });
+                    continue;
+                }
+                if (item.type === 'test_decl') {
+                    const name = namedChildren(item)[0]?.text.slice(1, -1);
+                    if (name) tests.push({ name });
+                    continue;
+                }
+                if (item.type === 'bench_decl') {
+                    const name = namedChildren(item)[0]?.text.slice(1, -1);
+                    if (name) benches.push({ name });
+                }
             }
-            if (item.type === 'test_decl') {
-                const name = namedChildren(item)[0]?.text.slice(1, -1);
-                if (name) tests.push({ name });
-                continue;
-            }
-            if (item.type === 'bench_decl') {
-                const name = namedChildren(item)[0]?.text.slice(1, -1);
-                if (name) benches.push({ name });
-            }
-        }
-        return {
-            exports,
-            tests,
-            benches,
-            hasMain: exports.some((entry) => entry.name === 'main'),
+            return {
+                exports,
+                tests,
+                benches,
+                hasMain: exports.some((entry) => entry.name === 'main'),
+            };
         };
+        if (expandedSource === source) return readMetadata(tree);
+        return withParsedTree(parser, expandedSource, async (expandedTree) => {
+            throwOnParseErrors(expandedTree.rootNode);
+            return readMetadata(expandedTree);
+        });
     });
 }
 

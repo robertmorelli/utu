@@ -65,6 +65,11 @@
     "command": ["bun", "./scripts/test-docs-codegen.mjs"]
   },
   {
+    "id": "language:modules",
+    "label": "Language modules",
+    "command": ["bun", "./scripts/test-modules.mjs"]
+  },
+  {
     "id": "grammar:textmate-escape",
     "label": "Grammar TextMate escape",
     "command": ["node", "./scripts/test-textmate-escape.mjs"]

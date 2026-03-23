@@ -21,7 +21,7 @@ This repo builds the full UTU toolchain from the repo root: the VS Code extensio
 - the reusable language core now lives in `.`, with `./extension` acting as the thin adapter layer
 - the standalone `utu-lsp` server now builds from `./lsp.mjs`
 - compiler bundles that build directly from `.`, so the extension uses the same compile path as the CLI and other tooling
-- a web extension bundle for `vscode.dev` at `dist/web/extension.js`
+- a web extension bundle for `vscode.dev` at `dist/web/extension.cjs`
 
 ## Commands
 
@@ -55,7 +55,7 @@ bun run watch
 
 The build emits the web extension plus the current compiler bundles and Bun executables:
 
-- `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`
+- `dist/web/extension.cjs`: the browser/webworker extension host entrypoint for `vscode.dev`
 - `dist/compiler.web.mjs`: the browser-targeted compiler bundle built directly from the shared compiler sources
 - `dist/compiler.mjs`: the Node-targeted compiler bundle built directly from the shared compiler sources
 - `./utu`: bundled Bun CLI executable

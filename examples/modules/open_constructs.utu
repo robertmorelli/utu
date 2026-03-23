@@ -1,0 +1,41 @@
+mod cell[T] {
+    struct Cell {
+        value: T,
+    }
+
+    fun Cell.new(value: T) Cell {
+        Cell { value: value };
+    }
+
+    fun Cell.get(self: Cell) T {
+        self.value;
+    }
+
+    fun wrap(value: T) Cell {
+        Cell.new(value);
+    }
+}
+
+construct cell[i32];
+
+fun opened_sum(left: Cell, right: Cell) i32 {
+    Cell.get(left) + Cell.get(right);
+}
+
+test "open construct imports types" {
+    let cell: Cell = Cell.new(3);
+    assert Cell.get(cell) == 3;
+}
+
+test "open construct imports free functions" {
+    assert Cell.get(wrap(4)) == 4;
+}
+
+test "open names work in later helper functions" {
+    assert opened_sum(Cell.new(2), Cell.new(5)) == 7;
+}
+
+test "opened methods pipe like top level methods" {
+    let cell: Cell = Cell.new(8);
+    assert cell -o Cell.get(_) == 8;
+}

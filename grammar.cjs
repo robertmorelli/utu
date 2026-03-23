@@ -19,6 +19,8 @@ module.exports = grammar({
     [$.return_type],
     // ref.null T vs ref.<method>(args): both start with 'ref' '.'
     [$._builtin_ns, $.ref_null_expr],
+    [$.module_ref, $._expr],
+    [$.instantiated_module_ref, $.inline_module_type_path, $._expr],
   ],
 
   rules: {
@@ -29,6 +31,22 @@ module.exports = grammar({
     // ==================== Top Level ====================
 
     _item: $ => choice(
+      $.module_decl,
+      seq($.construct_decl, ';'),
+      $.struct_decl,
+      seq($.type_decl, ';'),
+      $.fn_decl,
+      seq($.global_decl, ';'),
+      seq($.import_decl, ';'),
+      seq($.jsgen_decl, ';'),
+      $.export_decl,
+      $.test_decl,
+      $.bench_decl,
+    ),
+
+    _module_item: $ => choice(
+      $.module_decl,
+      seq($.construct_decl, ';'),
       $.struct_decl,
       seq($.type_decl, ';'),
       $.fn_decl,
@@ -41,6 +59,58 @@ module.exports = grammar({
     ),
 
     // ==================== Declarations ====================
+
+    module_decl: $ => seq(
+      'mod',
+      $.identifier,
+      optional($.module_type_param_list),
+      '{',
+      repeat($._module_item),
+      '}',
+    ),
+
+    module_type_param_list: $ => seq(
+      '[',
+      $.type_ident,
+      repeat(seq(',', $.type_ident)),
+      optional(','),
+      ']',
+    ),
+
+    construct_decl: $ => seq(
+      'construct',
+      choice(
+        seq($.identifier, '=', choice($.instantiated_module_ref, $.module_ref)),
+        choice($.instantiated_module_ref, $.module_ref),
+      ),
+    ),
+
+    module_ref: $ => $.identifier,
+
+    instantiated_module_ref: $ => prec(-1, seq(
+      $.identifier,
+      $.module_type_arg_list,
+    )),
+
+    module_type_arg_list: $ => seq(
+      '[',
+      $._type,
+      repeat(seq(',', $._type)),
+      optional(','),
+      ']',
+    ),
+
+    inline_module_type_path: $ => prec(2, seq(
+      $.identifier,
+      $.module_type_arg_list,
+      '.',
+      $.type_ident,
+    )),
+
+    inline_module_pipe_path: $ => prec(2, seq(
+      $.identifier,
+      $.module_type_arg_list,
+    )),
 
     struct_decl: $ => seq(
       'struct',
@@ -83,12 +153,21 @@ module.exports = grammar({
 
     fn_decl: $ => seq(
       'fun',
-      $.identifier,
+      choice(
+        $.identifier,
+        $.associated_fn_name,
+      ),
       '(',
       optional($.param_list),
       ')',
       $.return_type,
       $.block,
+    ),
+
+    associated_fn_name: $ => seq(
+      $.type_ident,
+      '.',
+      $.identifier,
     ),
 
     param_list: $ => seq(
@@ -211,12 +290,18 @@ module.exports = grammar({
 
     ref_type: $ => choice(
       $.type_ident,
+      $.qualified_type_ref,
       'str',
       'externref',
       'anyref',
       'eqref',
       'i31',
       seq('array', '[', $._type, ']'),
+    ),
+
+    qualified_type_ref: $ => choice(
+      seq($.module_ref, '.', $.type_ident),
+      seq($.instantiated_module_ref, '.', $.type_ident),
     ),
 
     func_type: $ => seq(
@@ -262,6 +347,7 @@ module.exports = grammar({
       $.pipe_expr,
       $.else_expr,
       $.call_expr,
+      $.type_member_expr,
       $.field_expr,
       $.index_expr,
       $.namespace_call_expr,
@@ -290,6 +376,16 @@ module.exports = grammar({
       '(',
       optional($.arg_list),
       ')',
+    )),
+
+    type_member_expr: $ => prec.left(13, seq(
+      choice(
+        $.type_ident,
+        $.inline_module_type_path,
+        $.qualified_type_ref,
+      ),
+      '.',
+      $.identifier,
     )),
 
     field_expr: $ => prec.left(13, seq(
@@ -350,9 +446,11 @@ module.exports = grammar({
 
     // dotted path that may start with a type-namespace keyword
     _pipe_path: $ => prec.left(1, choice(
-      $.identifier,
       alias($._builtin_ns, $.identifier),
-      seq($._pipe_path, '.', $.identifier),
+      $.inline_module_pipe_path,
+      $.identifier,
+      $.type_ident,
+      seq($._pipe_path, '.', choice($.identifier, $.type_ident)),
     )),
 
     // keywords used as namespace prefixes in builtin calls
@@ -411,7 +509,15 @@ module.exports = grammar({
 
     // --- ref.null T — null reference literal of a given type ---
     // Special form: T is a type_ident, not an expression argument.
-    ref_null_expr: $ => seq('ref', '.', 'null', $.type_ident),
+    ref_null_expr: $ => seq(
+      'ref',
+      '.',
+      'null',
+      choice(
+        $.type_ident,
+        $.qualified_type_ref,
+      ),
+    ),
 
     // --- Assignment: lhs = rhs ---
     // lhs may be identifier (local), field_expr, or index_expr
@@ -535,7 +641,10 @@ module.exports = grammar({
     // --- Struct initializer: TypeName { field: expr, ... } ---
 
     struct_init: $ => seq(
-      $.type_ident,
+      choice(
+        $.type_ident,
+        $.qualified_type_ref,
+      ),
       '{',
       optional(seq(
         $.field_init,

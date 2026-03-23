@@ -1,0 +1,40 @@
+mod math {
+    struct Pair {
+        left: i32,
+        right: i32,
+    }
+
+    fun Pair.new(left: i32, right: i32) Pair {
+        Pair { left: left, right: right };
+    }
+
+    fun Pair.sum(self: Pair) i32 {
+        self.left + self.right;
+    }
+
+    fun inc(value: i32) i32 {
+        value + 1;
+    }
+}
+
+fun pair_total(pair: math.Pair) i32 {
+    math.Pair.sum(pair);
+}
+
+test "plain modules qualify types" {
+    let pair: math.Pair = math.Pair.new(2, 3);
+    assert pair_total(pair) == 5;
+}
+
+test "plain modules qualify free functions" {
+    assert math.inc(8) == 9;
+}
+
+test "plain module methods pipe from qualified types" {
+    let pair: math.Pair = math.Pair.new(4, 6);
+    assert pair -o math.Pair.sum(_) == 10;
+}
+
+test "plain module constructors stay type qualified" {
+    assert math.Pair.sum(math.Pair.new(1, 7)) == 8;
+}

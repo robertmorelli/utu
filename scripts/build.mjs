@@ -46,7 +46,7 @@ const activeTargets = [
     platform: 'browser',
     target: 'esnext',
     entryPoints: [resolve(extensionRoot, 'extension/extension.web.js')],
-    outfile: resolve(extensionRoot, 'dist/web/extension.js'),
+    outfile: resolve(extensionRoot, 'dist/web/extension.cjs'),
     format: 'cjs',
     external: ['vscode', 'fs', 'fs/promises', 'module', 'os', 'path', 'url'],
     loader: {

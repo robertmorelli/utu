@@ -20,7 +20,7 @@ const CLI_CASES = [
     ['run-spectralnorm', ['run', 'examples/spectralnorm.utu'], 0, '1.2742222097429006'], ['run-deltablue', ['run', 'examples/deltablue.utu'], 0, '0'],
     ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'], ['bench-codegen-surface', ['bench', 'examples/ci/codegen_test_surface.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'increment loop:'],
 ];
-const CLI_BENCH_EXAMPLE_CASES = [['call-simple', 'examples/call_simple.utu', ['call-simple chain:']], ['deltablue', 'examples/deltablue.utu', ['deltablue_chain:', 'deltablue_projection:']], ['fannkuch', 'examples/fannkuch.utu', ['fannkuch:']], ['float', 'examples/float.utu', ['float normalize:']], ['hello-name', 'examples/hello_name.utu', ['hello-name format:']], ['spectralnorm', 'examples/spectralnorm.utu', ['spectralnorm:']]];
+const CLI_BENCH_EXAMPLE_CASES = [['call-simple', 'examples/call_simple.utu', ['call-simple chain:']], ['deltablue', 'examples/deltablue.utu', ['deltablue_chain:', 'deltablue_projection:']], ['fannkuch', 'examples/fannkuch.utu', ['fannkuch:']], ['float', 'examples/float.utu', ['float normalize:']], ['hello-name', 'examples/hello_name.utu', ['hello-name format:']], ['spectralnorm', 'examples/spectralnorm.utu', ['spectralnorm:']], ['modules-main-and-bench', 'examples/modules/main_and_bench.utu', ['module counter get:']]];
 
 const options = parseArgs(process.argv.slice(2));
 await (options.cli ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));

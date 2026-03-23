@@ -183,6 +183,55 @@
       "tags": ["codegen"]
     },
     {
+      "name": "modules-plain-modules",
+      "path": "examples/modules/plain_modules.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-parameterized-aliases",
+      "path": "examples/modules/parameterized_aliases.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-open-constructs",
+      "path": "examples/modules/open_constructs.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-inline-paths",
+      "path": "examples/modules/inline_paths.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-two-params-and-nullable",
+      "path": "examples/modules/two_params_and_nullable.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-main-and-bench",
+      "path": "examples/modules/main_and_bench.utu",
+      "mode": "run",
+      "expectedReturn": 22,
+      "tags": ["modules"]
+    },
+    {
+      "name": "modules-multiple-instantiations",
+      "path": "examples/modules/multiple_instantiations.utu",
+      "mode": "test",
+      "expectedTests": 4,
+      "tags": ["modules"]
+    },
+    {
       "name": "benchmark-call-simple",
       "path": "examples/call_simple.utu",
       "mode": "run",
