@@ -1,4 +1,14 @@
-import binaryen from 'binaryen';
+// Set up binaryen stderr capture before the module loads so its bound console.error
+// points at our wrapper, not the original. This must run before ensureBinaryen().
+const _binaryenCapture = { active: false, lines: [] };
+{
+    const _origErr = console.error;
+    console.error = function (...args) {
+        if (_binaryenCapture.active) _binaryenCapture.lines.push(args.map(String).join(' '));
+        else _origErr.apply(console, args);
+    };
+}
+
 import bundledGrammarWasm from './tree-sitter-utu.wasm';
 import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
 import { expandSource } from './expand.js';
@@ -7,8 +17,12 @@ import { jsgen } from './jsgen.js';
 import { createUtuTreeSitterParser, withParsedTree } from './parser.js';
 import { childOfType, namedChildren, throwOnParseErrors } from './tree.js';
 
+let _binaryenModule = null;
+async function ensureBinaryen() {
+    return _binaryenModule ??= (await import('binaryen')).default;
+}
+
 let parser = null;
-const SUPPORTED_WASM_FEATURES = binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue;
 
 export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     if (parser) return;
@@ -25,40 +39,46 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
         const expandedSource = expandSource(tree, source);
         const runCompile = async (activeTree) => {
             const { wat, metadata } = watgen(activeTree, { mode, profile, targetName });
-        let mod, wasm;
-        try {
-            mod = binaryen.parseText(wat);
-            mod.setFeatures(SUPPORTED_WASM_FEATURES);
-            ensureValid(mod, 'Binaryen validation failed.');
-            binaryen.setOptimizeLevel(3);
-            binaryen.setShrinkLevel(2);
-            mod.optimize();
-            ensureValid(mod, 'Binaryen validation failed after optimization.');
-            wasm = mod.emitBinary();
-            const module = new WebAssembly.Module(wasm);
-            let importDescriptors = null;
+            const binaryen = await ensureBinaryen();
+            let mod, wasm;
+            _binaryenCapture.active = true;
+            _binaryenCapture.lines = [];
             try {
-                importDescriptors = WebAssembly.Module.imports(module);
-            } catch { }
-            if (importDescriptors?.length === 0) await WebAssembly.instantiate(module).catch(() => {});
-        } catch (error) {
-            throw new Error(error?.message ?? String(error));
-        } finally {
-            mod?.dispose();
-        }
-        const generatedShim = jsgen(activeTree, wasm, { mode, profile, where, moduleFormat, metadata });
-        const result = {
-            shim: where === 'packed_base64' ? btoa(generatedShim) : generatedShim,
-            js: generatedShim,
-            wasm,
-            metadata: {
-                ...metadata,
-                targetName,
-                artifact: { where, moduleFormat },
-            },
-        };
-        if (emitWat) result.wat = wat;
-        return result;
+                mod = binaryen.parseText(wat);
+                mod.setFeatures(binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue);
+                ensureValid(mod, 'Binaryen validation failed.');
+                binaryen.setOptimizeLevel(3);
+                binaryen.setShrinkLevel(2);
+                mod.optimize();
+                ensureValid(mod, 'Binaryen validation failed after optimization.');
+                wasm = mod.emitBinary();
+                const module = new WebAssembly.Module(wasm);
+                let importDescriptors = null;
+                try {
+                    importDescriptors = WebAssembly.Module.imports(module);
+                } catch { }
+                if (importDescriptors?.length === 0) await WebAssembly.instantiate(module).catch(() => {});
+            } catch (error) {
+                const msg = error?.message || String(error);
+                const binaryenDetail = _binaryenCapture.lines.join('\n').trim();
+                throw new Error(binaryenDetail ? `${msg}\n${binaryenDetail}` : msg);
+            } finally {
+                _binaryenCapture.active = false;
+                mod?.dispose();
+            }
+            const generatedShim = jsgen(activeTree, wasm, { mode, profile, where, moduleFormat, metadata });
+            const result = {
+                shim: where === 'packed_base64' ? btoa(generatedShim) : generatedShim,
+                js: generatedShim,
+                wasm,
+                metadata: {
+                    ...metadata,
+                    targetName,
+                    artifact: { where, moduleFormat },
+                },
+            };
+            if (emitWat) result.wat = wat;
+            return result;
         };
         if (expandedSource === source) return runCompile(tree);
         return withParsedTree(parser, expandedSource, async (expandedTree) => {
@@ -66,6 +86,37 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
             return runCompile(expandedTree);
         });
     });
+}
+
+// Validates WAT text using binaryen (no optimization). Returns null on success,
+// or { message, binaryenOutput } on failure. Never throws and never writes to stderr.
+export async function validateWat(wat) {
+    const binaryen = await ensureBinaryen();
+    let mod;
+    _binaryenCapture.active = true;
+    _binaryenCapture.lines = [];
+    try {
+        mod = binaryen.parseText(wat);
+        mod.setFeatures(binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue);
+        if (mod.validate()) return null;
+        let message;
+        try {
+            new WebAssembly.Module(mod.emitBinary());
+            message = 'Binaryen validation failed.';
+        } catch (error) {
+            message = error?.message || 'Binaryen validation failed.';
+        }
+        return { message, binaryenOutput: [..._binaryenCapture.lines] };
+    } catch (error) {
+        process.exitCode = 0;
+        return {
+            message: error?.message || String(error),
+            binaryenOutput: [..._binaryenCapture.lines],
+        };
+    } finally {
+        _binaryenCapture.active = false;
+        mod?.dispose();
+    }
 }
 
 export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {

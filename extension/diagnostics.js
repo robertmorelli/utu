@@ -104,7 +104,8 @@ function isSourceDiagnosticError(error) {
         || /global init must be constant/u.test(text)
         || /call param types must match/u.test(text)
         || /function body type must match/u.test(text)
-        || /does not exist/u.test(text);
+        || /does not exist/u.test(text)
+        || /Program terminated with exit\(\d+\)/u.test(text);
 }
 
 function pointRange(document, line, character) {

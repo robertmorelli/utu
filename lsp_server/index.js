@@ -3,6 +3,7 @@ import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { UtuParserService, UtuSourceDocument } from '../parser.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
+import { validateWat } from '../index.js';
 import { getDocumentUri } from '../lsp_core/types.js';
 import data from '../jsondata/server.data.json' with { type: 'json' };
 const DEFAULT_SERVER_CAPABILITIES = data.defaultServerCapabilities;
@@ -90,7 +91,7 @@ export class UtuLanguageServerCore {
             grammarWasmPath: options.grammarWasmPath,
             runtimeWasmPath: options.runtimeWasmPath,
         });
-        this.languageService = new UtuLanguageService(this.parserService);
+        this.languageService = new UtuLanguageService(this.parserService, { validateWat });
         this.workspaceSymbols = new UtuWorkspaceSymbolIndex(this.languageService);
         this.workspaceSymbolsReady = false;
     }

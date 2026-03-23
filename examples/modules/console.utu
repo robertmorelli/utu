@@ -1,12 +1,13 @@
 
-mod Console[T] {
-    escape |(a) => console.log(a)| logger(T) void;
-    fun log(t: T) void {
-        logger(t);
+mod Adder[T] {
+    escape |(a,b) => a + b| add_(T, T) T;
+    fun add(t: T, c: T) T {
+        add_(t, c);
     }
 
 }
 
-export fun main() void {
-    Console[i32].log(3);
+export fun main() i32 {
+    let y: f32 = Adder[f32].add(2.0,3.0);
+    // Adder[i32].add(2,3);
 }

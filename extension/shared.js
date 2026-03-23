@@ -12,8 +12,7 @@ export function firstUsefulErrorLine(text) {
     return text
         .split('\n')
         .map((line) => line.trim())
-        .find((line) => line && !/^at\s/u.test(line) && !/^error:\s*Program terminated with exit\(\d+\)$/u.test(line))
-        ?? text.trim()
-        ?? 'UTU command failed.';
+        .find((line) => line && !/^at\s/u.test(line) && !/^(?:error:\s*)?Program terminated with exit\(\d+\)$/u.test(line))
+        ?? 'Compilation failed.';
 }
 export function logOutputError(output, label, error) { appendOutputBlock(output, label, [formatError(error)]); }

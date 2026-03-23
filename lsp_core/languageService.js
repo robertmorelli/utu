@@ -2,6 +2,11 @@ import data from '../jsondata/languageService.data.json' with { type: 'json' };
 import { BUILTIN_METHODS, CORE_TYPE_COMPLETIONS, KEYWORD_COMPLETIONS, LITERAL_COMPLETIONS, getBuiltinNamespaceHover, getBuiltinHover, getBuiltinReturnType, getCoreTypeHover, getKeywordHover, getLiteralHover, isBuiltinNamespace, } from './hoverDocs.js';
 import { collectParseDiagnostics, findNamedChild, findNamedChildren, getWordAtPosition, spanFromNode, spanFromOffsets, stringLiteralName, walkNamedChildren, } from '../parser.js';
 import { comparePositions, copyRange, getDocumentUri, rangeContains, rangeKey, rangeLength, } from './types.js';
+import { expandSource } from '../expand.js';
+import { watgen } from '../watgen.js';
+
+const FILE_START_RANGE = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+const FILE_START_OFFSET_RANGE = { start: 0, end: 0 };
 const SYMBOL_METADATA = data.symbolMetadata;
 const STATIC_COMPLETION_ITEMS = [
     ...createCompletionItems(KEYWORD_COMPLETIONS, 'keyword'),
@@ -14,8 +19,9 @@ const RECURSIVE_EXPRESSION_TYPES = new Set(data.recursiveExpressionTypes);
 const LITERAL_TYPE_BY_NODE_TYPE = data.literalTypeByNodeType;
 export class UtuLanguageService {
     parserService;
+    validateWat;
     cache = new Map();
-    constructor(parserService) { this.parserService = parserService; }
+    constructor(parserService, { validateWat = null } = {}) { this.parserService = parserService; this.validateWat = validateWat; }
     dispose() { this.clear(); }
     invalidate(uri) { this.cache.delete(uri); }
     clear() { this.cache.clear(); }
@@ -28,6 +34,10 @@ export class UtuLanguageService {
         const parsedTree = await this.parserService.parseSource(document.getText());
         try {
             const diagnostics = collectParseDiagnostics(parsedTree.tree.rootNode, document);
+            if (diagnostics.length === 0) {
+                const compileDiagnostic = await this.tryGetCompileDiagnostic(parsedTree.tree, document.getText(), document);
+                if (compileDiagnostic) diagnostics.push(compileDiagnostic);
+            }
             const index = buildDocumentIndex(document, parsedTree.tree.rootNode, diagnostics);
             this.cache.set(cacheKey, { version: document.version, index });
             return index;
@@ -35,6 +45,31 @@ export class UtuLanguageService {
         finally {
             parsedTree.dispose();
         }
+    }
+    async tryGetCompileDiagnostic(tree, source, document) {
+        let wat;
+        try {
+            const expandedSource = expandSource(tree, source);
+            if (expandedSource === source) {
+                ({ wat } = watgen(tree));
+            } else {
+                const expandedParsed = await this.parserService.parseSource(expandedSource);
+                try {
+                    ({ wat } = watgen(expandedParsed.tree));
+                } finally {
+                    expandedParsed.dispose();
+                }
+            }
+        } catch (error) {
+            const message = error?.message || String(error);
+            if (!message) return null;
+            return { message, range: FILE_START_RANGE, offsetRange: FILE_START_OFFSET_RANGE, severity: 'error', source: 'utu' };
+        }
+        if (!this.validateWat) return null;
+        const result = await this.validateWat(wat);
+        if (!result) return null;
+        const span = findCompileErrorSpan(tree.rootNode, result.message, result.binaryenOutput, document);
+        return { message: result.message, ...span, severity: 'error', source: 'utu' };
     }
     async getHover(document, position) {
         const index = await this.getDocumentIndex(document);
@@ -1237,4 +1272,48 @@ function withScope(scopes, action) {
 }
 function cloneDiagnostic(diagnostic) {
     return { ...diagnostic, range: copyRange(diagnostic.range) };
+}
+
+// Try to find the source span most relevant to a compile error.
+// Checks binaryenOutput for "[wasm-validator error in function X]" to extract X,
+// then maps X to the matching export/test/bench node.
+function findCompileErrorSpan(rootNode, message, binaryenOutput, document) {
+    const functionName = extractBinaryenFunctionName(binaryenOutput);
+    if (functionName) {
+        const node = findNodeForWatFunction(rootNode, functionName);
+        if (node) return spanFromNode(document, node);
+    }
+    return { range: FILE_START_RANGE, offsetRange: FILE_START_OFFSET_RANGE };
+}
+
+function extractBinaryenFunctionName(binaryenOutput) {
+    for (const line of (binaryenOutput ?? [])) {
+        const match = line.match(/\[wasm-validator error in function (\S+)\]/);
+        if (match) return match[1];
+    }
+    return null;
+}
+
+function findNodeForWatFunction(rootNode, watName) {
+    // __utu_test_N → Nth test_decl
+    const testMatch = watName.match(/^__utu_test_(\d+)$/);
+    if (testMatch) {
+        const tests = rootNode.namedChildren.filter(n => n.type === 'test_decl');
+        return tests[parseInt(testMatch[1])] ?? null;
+    }
+    // __utu_bench_N → Nth bench_decl
+    const benchMatch = watName.match(/^__utu_bench_(\d+)$/);
+    if (benchMatch) {
+        const benches = rootNode.namedChildren.filter(n => n.type === 'bench_decl');
+        return benches[parseInt(benchMatch[1])] ?? null;
+    }
+    // top-level exported function
+    for (const node of rootNode.namedChildren) {
+        if (node.type === 'export_decl') {
+            const fn = findNamedChild(node, 'fn_decl');
+            const name = findNamedChild(fn, 'identifier')?.text;
+            if (name === watName) return node;
+        }
+    }
+    return null;
 }
