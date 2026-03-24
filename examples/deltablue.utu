@@ -86,17 +86,17 @@ fun next_weaker(strength: i32) i32 {
     };
 }
 
-fun new_constraint_list(capacity: i32) ConstraintList {
+fun ConstraintList.new(capacity: i32) ConstraintList {
     ConstraintList {
         items: array[Constraint].new(capacity, EmptyConstraint {}),
         count: 0,
     };
 }
 
-fun new_variable(value: i32, constraint_capacity: i32) Variable {
+fun Variable.new(value: i32, constraint_capacity: i32) Variable {
     Variable {
         value: value,
-        constraints: new_constraint_list(constraint_capacity),
+        constraints: ConstraintList.new(constraint_capacity),
         determined_by: ref.null Constraint,
         mark: 0,
         walk_strength: weakest,
@@ -104,19 +104,19 @@ fun new_variable(value: i32, constraint_capacity: i32) Variable {
     };
 }
 
-fun new_variable_placeholder() Variable {
-    new_variable(0, 1);
+fun Variable.placeholder() Variable {
+    Variable.new(0, 1);
 }
 
-fun new_variable_list(capacity: i32) VariableList {
-    let dummy: Variable = new_variable_placeholder();
+fun VariableList.new(capacity: i32) VariableList {
+    let dummy: Variable = Variable.placeholder();
     VariableList {
         items: array[Variable].new(capacity, dummy),
         count: 0,
     };
 }
 
-fun new_planner(variable_capacity: i32, constraint_capacity: i32) Planner {
+fun Planner.new(variable_capacity: i32, constraint_capacity: i32) Planner {
     Planner {
         current_mark: 0,
         variable_capacity: variable_capacity,
@@ -124,79 +124,79 @@ fun new_planner(variable_capacity: i32, constraint_capacity: i32) Planner {
     };
 }
 
-fun constraint_list_append(list: ConstraintList, constraint: Constraint) void {
-    if list.count >= array.len(list.items) {
+fun ConstraintList.append(self: ConstraintList, constraint: Constraint) void {
+    if self.count >= array.len(self.items) {
         fatal;
     };
-    list.items[list.count] = constraint;
-    list.count = list.count + 1;
+    self.items[self.count] = constraint;
+    self.count = self.count + 1;
 }
 
-fun constraint_list_pop_front(list: ConstraintList) Constraint {
-    let constraint: Constraint = list.items[0];
-    for (0..list.count - 1) |i| {
-        list.items[i] = list.items[i + 1];
+fun ConstraintList.pop_front(self: ConstraintList) Constraint {
+    let constraint: Constraint = self.items[0];
+    for (0..self.count - 1) |i| {
+        self.items[i] = self.items[i + 1];
     };
-    list.count = list.count - 1;
+    self.count = self.count - 1;
     constraint;
 }
 
-fun constraint_list_copy(src: ConstraintList, capacity: i32) ConstraintList {
-    let out: ConstraintList = new_constraint_list(capacity);
-    for (0..src.count) |i| {
-        constraint_list_append(out, src.items[i]);
+fun ConstraintList.copy(self: ConstraintList, capacity: i32) ConstraintList {
+    let out: ConstraintList = ConstraintList.new(capacity);
+    for (0..self.count) |i| {
+        out.append(self.items[i]);
     };
     out;
 }
 
-fun variable_list_append(list: VariableList, value: Variable) void {
-    if list.count >= array.len(list.items) {
+fun VariableList.append(self: VariableList, value: Variable) void {
+    if self.count >= array.len(self.items) {
         fatal;
     };
-    list.items[list.count] = value;
-    list.count = list.count + 1;
+    self.items[self.count] = value;
+    self.count = self.count + 1;
 }
 
-fun variable_list_pop_front(list: VariableList) Variable {
-    let value: Variable = list.items[0];
-    for (0..list.count - 1) |i| {
-        list.items[i] = list.items[i + 1];
+fun VariableList.pop_front(self: VariableList) Variable {
+    let value: Variable = self.items[0];
+    for (0..self.count - 1) |i| {
+        self.items[i] = self.items[i + 1];
     };
-    list.count = list.count - 1;
+    self.count = self.count - 1;
     value;
 }
 
-fun variable_add_constraint(variable: Variable, constraint: Constraint) void {
-    constraint_list_append(variable.constraints, constraint);
+fun Variable.add_constraint(self: Variable, constraint: Constraint) void {
+    let constraints: ConstraintList = self.constraints;
+    constraints.append(constraint);
 }
 
-fun variable_remove_constraint(variable: Variable, constraint: Constraint) void {
+fun Variable.remove_constraint(self: Variable, constraint: Constraint) void {
     let found: i32 = 0 - 1;
-    for (0..variable.constraints.count) |i| {
+    for (0..self.constraints.count) |i| {
         if found == 0 - 1 {
-            if ref.eq(variable.constraints.items[i], constraint) {
+            if ref.eq(self.constraints.items[i], constraint) {
                 found = i;
             };
         };
     };
 
     if found != 0 - 1 {
-        for (found..variable.constraints.count - 1) |i| {
-            variable.constraints.items[i] = variable.constraints.items[i + 1];
+        for (found..self.constraints.count - 1) |i| {
+            self.constraints.items[i] = self.constraints.items[i + 1];
         };
-        variable.constraints.count = variable.constraints.count - 1;
+        self.constraints.count = self.constraints.count - 1;
     };
 
-    if not ref.is_null(variable.determined_by) {
-        let determining: Constraint = variable.determined_by \ fatal;
+    promote self.determined_by |determining| {
         if ref.eq(determining, constraint) {
-            variable.determined_by = ref.null Constraint;
+            self.determined_by = ref.null Constraint;
         };
     };
 }
 
-fun constraint_strength(constraint: Constraint) i32 {
-    alt constraint {
+fun Constraint.strength(self: Constraint) i32 {
+    alt self {
         _: EmptyConstraint => weakest,
         stay: StayConstraint => stay.strength,
         edit: EditConstraint => edit.strength,
@@ -205,15 +205,15 @@ fun constraint_strength(constraint: Constraint) i32 {
     };
 }
 
-fun constraint_is_input(constraint: Constraint) bool {
-    alt constraint {
+fun Constraint.is_input(self: Constraint) bool {
+    alt self {
         _: EditConstraint => true,
         _ => false,
     };
 }
 
-fun constraint_is_satisfied(constraint: Constraint) bool {
-    alt constraint {
+fun Constraint.is_satisfied(self: Constraint) bool {
+    alt self {
         _: EmptyConstraint => false,
         stay: StayConstraint => stay.satisfied,
         edit: EditConstraint => edit.satisfied,
@@ -222,8 +222,8 @@ fun constraint_is_satisfied(constraint: Constraint) bool {
     };
 }
 
-fun constraint_input(constraint: Constraint) Variable {
-    alt constraint {
+fun Constraint.input(self: Constraint) Variable {
+    alt self {
         eq: EqualityConstraint => {
             if eq.direction == direction_forward { eq.v1; } else { eq.v2; };
         },
@@ -234,8 +234,8 @@ fun constraint_input(constraint: Constraint) Variable {
     };
 }
 
-fun constraint_output(constraint: Constraint) Variable {
-    alt constraint {
+fun Constraint.output(self: Constraint) Variable {
+    alt self {
         stay: StayConstraint => stay.output,
         edit: EditConstraint => edit.output,
         eq: EqualityConstraint => {
@@ -248,13 +248,13 @@ fun constraint_output(constraint: Constraint) Variable {
     };
 }
 
-fun constraint_execute(constraint: Constraint) void {
-    alt constraint {
+fun Constraint.execute(self: Constraint) void {
+    alt self {
         _: EmptyConstraint => fatal,
         _: StayConstraint => {},
         _: EditConstraint => {},
         eq: EqualityConstraint => {
-            constraint_output(eq).value = constraint_input(eq).value;
+            Constraint.output(eq).value = Constraint.input(eq).value;
         },
         scale: ScaleConstraint => {
             if scale.direction == direction_forward {
@@ -266,8 +266,8 @@ fun constraint_execute(constraint: Constraint) void {
     };
 }
 
-fun constraint_mark_unsatisfied(constraint: Constraint) void {
-    alt constraint {
+fun Constraint.mark_unsatisfied(self: Constraint) void {
+    alt self {
         _: EmptyConstraint => {},
         stay: StayConstraint => {
             stay.satisfied = false;
@@ -284,76 +284,76 @@ fun constraint_mark_unsatisfied(constraint: Constraint) void {
     };
 }
 
-fun constraint_add_to_graph(constraint: Constraint) void {
-    alt constraint {
+fun Constraint.add_to_graph(self: Constraint) void {
+    alt self {
         _: EmptyConstraint => fatal,
         stay: StayConstraint => {
-            variable_add_constraint(stay.output, stay);
+            Variable.add_constraint(stay.output, stay);
             stay.satisfied = false;
         },
         edit: EditConstraint => {
-            variable_add_constraint(edit.output, edit);
+            Variable.add_constraint(edit.output, edit);
             edit.satisfied = false;
         },
         eq: EqualityConstraint => {
-            variable_add_constraint(eq.v1, eq);
-            variable_add_constraint(eq.v2, eq);
+            Variable.add_constraint(eq.v1, eq);
+            Variable.add_constraint(eq.v2, eq);
             eq.direction = direction_none;
         },
         scale: ScaleConstraint => {
-            variable_add_constraint(scale.src, scale);
-            variable_add_constraint(scale.dest, scale);
-            variable_add_constraint(scale.scale, scale);
-            variable_add_constraint(scale.offset, scale);
+            Variable.add_constraint(scale.src, scale);
+            Variable.add_constraint(scale.dest, scale);
+            Variable.add_constraint(scale.scale, scale);
+            Variable.add_constraint(scale.offset, scale);
             scale.direction = direction_none;
         },
     };
 }
 
-fun constraint_remove_from_graph(constraint: Constraint) void {
-    alt constraint {
+fun Constraint.remove_from_graph(self: Constraint) void {
+    alt self {
         _: EmptyConstraint => {},
         stay: StayConstraint => {
-            variable_remove_constraint(stay.output, stay);
+            Variable.remove_constraint(stay.output, stay);
             stay.satisfied = false;
         },
         edit: EditConstraint => {
-            variable_remove_constraint(edit.output, edit);
+            Variable.remove_constraint(edit.output, edit);
             edit.satisfied = false;
         },
         eq: EqualityConstraint => {
-            variable_remove_constraint(eq.v1, eq);
-            variable_remove_constraint(eq.v2, eq);
+            Variable.remove_constraint(eq.v1, eq);
+            Variable.remove_constraint(eq.v2, eq);
             eq.direction = direction_none;
         },
         scale: ScaleConstraint => {
-            variable_remove_constraint(scale.src, scale);
-            variable_remove_constraint(scale.dest, scale);
-            variable_remove_constraint(scale.scale, scale);
-            variable_remove_constraint(scale.offset, scale);
+            Variable.remove_constraint(scale.src, scale);
+            Variable.remove_constraint(scale.dest, scale);
+            Variable.remove_constraint(scale.scale, scale);
+            Variable.remove_constraint(scale.offset, scale);
             scale.direction = direction_none;
         },
     };
 }
 
-fun constraint_mark_inputs(constraint: Constraint, mark: i32) void {
-    alt constraint {
+fun Constraint.mark_inputs(self: Constraint, mark: i32) void {
+    alt self {
         _: EmptyConstraint => fatal,
         _: StayConstraint => {},
         _: EditConstraint => {},
         eq: EqualityConstraint => {
-            constraint_input(eq).mark = mark;
+            Constraint.input(eq).mark = mark;
         },
         scale: ScaleConstraint => {
-            constraint_input(scale).mark = mark;
+            Constraint.input(scale).mark = mark;
             scale.scale.mark = mark;
             scale.offset.mark = mark;
         },
     };
 }
 
-fun constraint_choose_method(constraint: Constraint, mark: i32) void {
-    alt constraint {
+fun Constraint.choose_method(self: Constraint, mark: i32) void {
+    alt self {
         _: EmptyConstraint => fatal,
         stay: StayConstraint => {
             if stay.output.mark != mark {
@@ -458,13 +458,13 @@ fun constraint_choose_method(constraint: Constraint, mark: i32) void {
     };
 }
 
-fun constraint_inputs_known(constraint: Constraint, mark: i32) bool {
-    alt constraint {
+fun Constraint.inputs_known(self: Constraint, mark: i32) bool {
+    alt self {
         _: EmptyConstraint => false,
         _: StayConstraint => true,
         _: EditConstraint => true,
         _: EqualityConstraint => {
-            let input: Variable = constraint_input(constraint);
+            let input: Variable = self.input();
             if input.mark == mark {
                 true;
             } else {
@@ -476,7 +476,7 @@ fun constraint_inputs_known(constraint: Constraint, mark: i32) bool {
             };
         },
         _: ScaleConstraint => {
-            let input: Variable = constraint_input(constraint);
+            let input: Variable = self.input();
             if input.mark == mark {
                 true;
             } else {
@@ -490,35 +490,35 @@ fun constraint_inputs_known(constraint: Constraint, mark: i32) bool {
     };
 }
 
-fun constraint_recalculate(constraint: Constraint) void {
-    alt constraint {
+fun Constraint.recalculate(self: Constraint) void {
+    alt self {
         _: EmptyConstraint => fatal,
         stay: StayConstraint => {
             stay.output.walk_strength = stay.strength;
-            stay.output.stay = not constraint_is_input(stay);
+            stay.output.stay = not Constraint.is_input(stay);
             if stay.output.stay {
-                constraint_execute(stay);
+                Constraint.execute(stay);
             };
         },
         edit: EditConstraint => {
             edit.output.walk_strength = edit.strength;
-            edit.output.stay = not constraint_is_input(edit);
+            edit.output.stay = not Constraint.is_input(edit);
             if edit.output.stay {
-                constraint_execute(edit);
+                Constraint.execute(edit);
             };
         },
         eq: EqualityConstraint => {
-            let input: Variable = constraint_input(eq);
-            let out: Variable = constraint_output(eq);
+            let input: Variable = Constraint.input(eq);
+            let out: Variable = Constraint.output(eq);
             out.walk_strength = weakest_of(eq.strength, input.walk_strength);
             out.stay = input.stay;
             if out.stay {
-                constraint_execute(eq);
+                Constraint.execute(eq);
             };
         },
         scale: ScaleConstraint => {
-            let input: Variable = constraint_input(scale);
-            let out: Variable = constraint_output(scale);
+            let input: Variable = Constraint.input(scale);
+            let out: Variable = Constraint.output(scale);
             let all_stay: bool = false;
             out.walk_strength = weakest_of(scale.strength, input.walk_strength);
             if input.stay {
@@ -528,83 +528,83 @@ fun constraint_recalculate(constraint: Constraint) void {
             };
             out.stay = all_stay;
             if out.stay {
-                constraint_execute(scale);
+                Constraint.execute(scale);
             };
         },
     };
 }
 
-fun planner_new_mark(planner: Planner) i32 {
-    planner.current_mark = planner.current_mark + 1;
-    planner.current_mark;
+fun Planner.new_mark(self: Planner) i32 {
+    self.current_mark = self.current_mark + 1;
+    self.current_mark;
 }
 
-fun planner_add_constraints_consuming_to(variable: Variable, coll: ConstraintList) void {
-    let determining: ?Constraint = variable.determined_by;
-    for (0..variable.constraints.count) |i| {
-        let constraint: Constraint = variable.constraints.items[i];
+fun Variable.add_constraints_consuming_to(self: Variable, coll: ConstraintList) void {
+    let determining: ?Constraint = self.determined_by;
+    for (0..self.constraints.count) |i| {
+        let constraint: Constraint = self.constraints.items[i];
         let same: bool = false;
-        if not ref.is_null(determining) {
-            same = ref.eq(constraint, determining \ fatal);
+        promote determining |active| {
+            same = ref.eq(constraint, active);
         };
         if not same {
-            if constraint_is_satisfied(constraint) {
-                constraint_list_append(coll, constraint);
+            if constraint.is_satisfied() {
+                coll.append(constraint);
             };
         };
     };
 }
 
-fun planner_add_propagate(planner: Planner, constraint: Constraint, mark: i32) bool {
+fun Planner.add_propagate(self: Planner, constraint: Constraint, mark: i32) bool {
     result: {
-        let todo: ConstraintList = new_constraint_list(planner.constraint_capacity);
-        constraint_list_append(todo, constraint);
+        let todo: ConstraintList = ConstraintList.new(self.constraint_capacity);
+        todo.append(constraint);
 
         while (todo.count > 0) {
-            let current: Constraint = constraint_list_pop_front(todo);
-            if constraint_output(current).mark == mark {
-                planner_incremental_remove(planner, constraint);
+            let current: Constraint = todo.pop_front();
+            if current.output().mark == mark {
+                self.incremental_remove(constraint);
                 emit false;
             };
 
-            constraint_recalculate(current);
-            planner_add_constraints_consuming_to(constraint_output(current), todo);
+            current.recalculate();
+            current.output().add_constraints_consuming_to(todo);
         };
 
         true;
     };
 }
 
-fun planner_remove_propagate_from(planner: Planner, out: Variable) ConstraintList {
+fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
     out.determined_by = ref.null Constraint;
     out.walk_strength = weakest;
     out.stay = true;
 
-    let unsatisfied: ConstraintList = new_constraint_list(planner.constraint_capacity);
-    let todo: VariableList = new_variable_list(planner.variable_capacity);
-    variable_list_append(todo, out);
+    let unsatisfied: ConstraintList = ConstraintList.new(self.constraint_capacity);
+    let todo: VariableList = VariableList.new(self.variable_capacity);
+    todo.append(out);
 
     while (todo.count > 0) {
-        let variable: Variable = variable_list_pop_front(todo);
+        let variable: Variable = todo.pop_front();
         let determining: ?Constraint = variable.determined_by;
 
         for (0..variable.constraints.count) |i| {
             let constraint: Constraint = variable.constraints.items[i];
-            if not constraint_is_satisfied(constraint) {
-                constraint_list_append(unsatisfied, constraint);
+            if not constraint.is_satisfied() {
+                unsatisfied.append(constraint);
             };
         };
 
         for (0..variable.constraints.count) |i| {
             let constraint: Constraint = variable.constraints.items[i];
             let same: bool = false;
-            if not ref.is_null(determining) {
-                same = ref.eq(constraint, determining \ fatal);
+            promote determining |active| {
+                same = ref.eq(constraint, active);
             };
             if not same {
-                if constraint_is_satisfied(constraint) {
-                    constraint_recalculate(constraint);
-                    variable_list_append(todo, constraint_output(constraint));
+                if constraint.is_satisfied() {
+                    constraint.recalculate();
+                    todo.append(constraint.output());
                 };
             };
         };
@@ -613,29 +613,29 @@ fun planner_remove_propagate_from(planner: Planner, out: Variable) ConstraintLis
     unsatisfied;
 }
 
-fun planner_incremental_add(planner: Planner, constraint: Constraint) void {
-    let mark: i32 = planner_new_mark(planner);
-    let overridden: ?Constraint = constraint_satisfy(constraint, planner, mark);
+fun Planner.incremental_add(self: Planner, constraint: Constraint) void {
+    let mark: i32 = self.new_mark();
+    let overridden: ?Constraint = constraint.satisfy(self, mark);
 
     while (not ref.is_null(overridden)) {
-        overridden = constraint_satisfy(overridden \ fatal, planner, mark);
+        overridden = (overridden \ fatal).satisfy(self, mark);
     };
 }
 
-fun planner_incremental_remove(planner: Planner, constraint: Constraint) void {
-    let out: Variable = constraint_output(constraint);
-    constraint_mark_unsatisfied(constraint);
-    constraint_remove_from_graph(constraint);
+fun Planner.incremental_remove(self: Planner, constraint: Constraint) void {
+    let out: Variable = constraint.output();
+    constraint.mark_unsatisfied();
+    constraint.remove_from_graph();
 
-    let unsatisfied: ConstraintList = planner_remove_propagate_from(planner, out);
+    let unsatisfied: ConstraintList = self.remove_propagate_from(out);
     let strength: i32 = required;
     let repeat: bool = true;
 
     while (repeat) {
         for (0..unsatisfied.count) |i| {
             let current: Constraint = unsatisfied.items[i];
-            if constraint_strength(current) == strength {
-                planner_incremental_add(planner, current);
+            if current.strength() == strength {
+                self.incremental_add(current);
             };
             strength = next_weaker(strength);
         };
@@ -643,19 +643,19 @@ fun planner_incremental_remove(planner: Planner, constraint: Constraint) void {
     };
 }
 
-fun planner_make_plan(planner: Planner, sources: ConstraintList) ConstraintList {
-    let mark: i32 = planner_new_mark(planner);
-    let plan: ConstraintList = new_constraint_list(planner.constraint_capacity);
-    let todo: ConstraintList = constraint_list_copy(sources, planner.constraint_capacity);
+fun Planner.make_plan(self: Planner, sources: ConstraintList) ConstraintList {
+    let mark: i32 = self.new_mark();
+    let plan: ConstraintList = ConstraintList.new(self.constraint_capacity);
+    let todo: ConstraintList = sources.copy(self.constraint_capacity);
 
     while (todo.count > 0) {
-        let constraint: Constraint = constraint_list_pop_front(todo);
-        let out: Variable = constraint_output(constraint);
+        let constraint: Constraint = todo.pop_front();
+        let out: Variable = constraint.output();
         if out.mark != mark {
-            if constraint_inputs_known(constraint, mark) {
-                constraint_list_append(plan, constraint);
+            if constraint.inputs_known(mark) {
+                plan.append(constraint);
                 out.mark = mark;
-                planner_add_constraints_consuming_to(out, todo);
+                out.add_constraints_consuming_to(todo);
             };
         };
     };
@@ -663,46 +663,46 @@ fun planner_make_plan(planner: Planner, sources: ConstraintList) ConstraintList 
     plan;
 }
 
-fun planner_extract_plan_from_constraints(planner: Planner, constraints: ConstraintList) ConstraintList {
-    let sources: ConstraintList = new_constraint_list(planner.constraint_capacity);
+fun Planner.extract_plan_from_constraints(self: Planner, constraints: ConstraintList) ConstraintList {
+    let sources: ConstraintList = ConstraintList.new(self.constraint_capacity);
 
     for (0..constraints.count) |i| {
         let constraint: Constraint = constraints.items[i];
-        if constraint_is_input(constraint) {
-            if constraint_is_satisfied(constraint) {
-                constraint_list_append(sources, constraint);
+        if constraint.is_input() {
+            if constraint.is_satisfied() {
+                sources.append(constraint);
             };
         };
     };
 
-    planner_make_plan(planner, sources);
+    self.make_plan(sources);
 }
 
-fun constraint_add_constraint(constraint: Constraint, planner: Planner) void {
-    constraint_add_to_graph(constraint);
-    planner_incremental_add(planner, constraint);
+fun Constraint.add_constraint(self: Constraint, planner: Planner) void {
+    self.add_to_graph();
+    planner.incremental_add(self);
 }
 
-fun constraint_satisfy(constraint: Constraint, planner: Planner, mark: i32) ?Constraint {
-    constraint_choose_method(constraint, mark);
+fun Constraint.satisfy(self: Constraint, planner: Planner, mark: i32) ?Constraint {
+    self.choose_method(mark);
 
-    if not constraint_is_satisfied(constraint) {
-        if constraint_strength(constraint) == required {
+    if not self.is_satisfied() {
+        if self.strength() == required {
             fatal;
         };
         ref.null Constraint;
     } else {
-        constraint_mark_inputs(constraint, mark);
-        let out: Variable = constraint_output(constraint);
+        self.mark_inputs(mark);
+        let out: Variable = self.output();
         let overridden: ?Constraint = out.determined_by;
 
-        if not ref.is_null(overridden) {
-            constraint_mark_unsatisfied(overridden \ fatal);
+        promote overridden |active| {
+            Constraint.mark_unsatisfied(active);
         };
 
-        out.determined_by = constraint;
+        out.determined_by = self;
 
-        if not planner_add_propagate(planner, constraint, mark) {
+        if not planner.add_propagate(self, mark) {
             fatal;
         };
 
@@ -711,17 +711,18 @@ fun constraint_satisfy(constraint: Constraint, planner: Planner, mark: i32) ?Con
     };
 }
 
-fun constraint_destroy(constraint: Constraint, planner: Planner) void {
-    if constraint_is_satisfied(constraint) {
-        planner_incremental_remove(planner, constraint);
+fun Constraint.destroy(self: Constraint, planner: Planner) void {
+    if self.is_satisfied() {
+        planner.incremental_remove(self);
     } else {
-        constraint_remove_from_graph(constraint);
+        self.remove_from_graph();
     };
 }
 
 fun plan_execute(plan: ConstraintList) void {
     for (0..plan.count) |i| {
-        constraint_execute(plan.items[i]);
+        let constraint: Constraint = plan.items[i];
+        constraint.execute();
     };
 }
 
@@ -731,7 +732,7 @@ fun new_stay_constraint(variable: Variable, strength: i32, planner: Planner) Con
         strength: strength,
         satisfied: false,
     };
-    constraint_add_constraint(constraint, planner);
+    constraint.add_constraint(planner);
     constraint;
 }
 
@@ -741,7 +742,7 @@ fun new_edit_constraint(variable: Variable, strength: i32, planner: Planner) Con
         strength: strength,
         satisfied: false,
     };
-    constraint_add_constraint(constraint, planner);
+    constraint.add_constraint(planner);
     constraint;
 }
 
@@ -752,7 +753,7 @@ fun new_equality_constraint(v1: Variable, v2: Variable, strength: i32, planner: 
         strength: strength,
         direction: direction_none,
     };
-    constraint_add_constraint(constraint, planner);
+    constraint.add_constraint(planner);
     constraint;
 }
 
@@ -765,34 +766,34 @@ fun new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest:
         strength: strength,
         direction: direction_none,
     };
-    constraint_add_constraint(constraint, planner);
+    constraint.add_constraint(planner);
     constraint;
 }
 
 fun change(planner: Planner, variable: Variable, new_value: i32) void {
     let edit: Constraint = new_edit_constraint(variable, preferred, planner);
-    let edits: ConstraintList = new_constraint_list(1);
-    constraint_list_append(edits, edit);
+    let edits: ConstraintList = ConstraintList.new(1);
+    edits.append(edit);
 
-    let plan: ConstraintList = planner_extract_plan_from_constraints(planner, edits);
+    let plan: ConstraintList = planner.extract_plan_from_constraints(edits);
     for (0..10) |i| {
         variable.value = new_value;
         plan_execute(plan);
     };
 
-    constraint_destroy(edit, planner);
+    edit.destroy(planner);
 }
 
 fun chain_test(n: i32) i64 {
-    let planner: Planner = new_planner(n + 4, n + 4);
+    let planner: Planner = Planner.new(n + 4, n + 4);
     let prev: ?Variable = ref.null Variable;
     let first: ?Variable = ref.null Variable;
     let last: ?Variable = ref.null Variable;
     for (0..n + 1) |i| {
-        let variable: Variable = new_variable(0, 2);
+        let variable: Variable = Variable.new(0, 2);
 
-        if not ref.is_null(prev) {
-            new_equality_constraint(prev \ fatal, variable, required, planner);
+        promote prev |previous| {
+            new_equality_constraint(previous, variable, required, planner);
         };
 
         if i == 0 {
@@ -811,9 +812,9 @@ fun chain_test(n: i32) i64 {
     new_stay_constraint(last_variable, strong_default, planner);
 
     let edit: Constraint = new_edit_constraint(first_variable, preferred, planner);
-    let edits: ConstraintList = new_constraint_list(1);
-    constraint_list_append(edits, edit);
-    let plan: ConstraintList = planner_extract_plan_from_constraints(planner, edits);
+    let edits: ConstraintList = ConstraintList.new(1);
+    edits.append(edit);
+    let plan: ConstraintList = planner.extract_plan_from_constraints(edits);
 
     let failures: i64 = 0;
     for (0..100) |i| {
@@ -828,16 +829,16 @@ fun chain_test(n: i32) i64 {
 }
 
 fun projection_test(n: i32) i64 {
-    let planner: Planner = new_planner(n * 2 + 8, n * 2 + 8);
-    let scale: Variable = new_variable(10, n + 1);
-    let offset: Variable = new_variable(1000, n + 1);
-    let dummy: Variable = new_variable_placeholder();
+    let planner: Planner = Planner.new(n * 2 + 8, n * 2 + 8);
+    let scale: Variable = Variable.new(10, n + 1);
+    let offset: Variable = Variable.new(1000, n + 1);
+    let dummy: Variable = Variable.placeholder();
     let src: Variable = dummy;
     let dst: Variable = dummy;
     let dests: array[Variable] = array[Variable].new(n, dummy);
     for (0..n) |i| {
-        src = new_variable(i, 3);
-        dst = new_variable(i, 2);
+        src = Variable.new(i, 3);
+        dst = Variable.new(i, 2);
         dests[i] = dst;
         new_stay_constraint(src, normal, planner);
         new_scale_constraint(src, scale, offset, dst, required, planner);

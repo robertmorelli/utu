@@ -785,7 +785,9 @@ class WatGen {
     }
 
     genExpr(node, hint, out) {
-        EXPR_GENERATORS[node.type](this, node, hint, out);
+        const emit = EXPR_GENERATORS[node.type];
+        if (!emit) throw new Error(`Unsupported expr node in watgen: ${node.type}`);
+        emit(this, node, hint, out);
     }
 
     genLiteral(node, hint, out) {
@@ -940,12 +942,14 @@ class WatGen {
     }
 
     genIf(node, hint, out) {
-        const branchHint = hint === DISCARD_HINT ? DISCARD_HINT : null;
+        const discard = hint === DISCARD_HINT;
+        const branchHint = discard ? DISCARD_HINT : null;
         hint = this.valueHint(hint);
         const cond = kids(node)[0];
         const thenBlock = kids(node)[1];
         const elseBranch = kids(node)[2] ?? null;
-        const resultType = hint || (elseBranch ? this.inferType(thenBlock) : null);
+        const inferredResultType = discard || hint ? null : (elseBranch ? this.exprType(thenBlock) : null);
+        const resultType = discard ? null : (hint || this.wasmTypeStr(inferredResultType) || null);
         const branchType = resultType ?? branchHint;
         const resultClause = resultType ? ` (result ${resultType})` : '';
 
@@ -965,13 +969,15 @@ class WatGen {
     }
 
     genPromote(node, hint, out) {
-        const branchHint = hint === DISCARD_HINT ? DISCARD_HINT : null;
+        const discard = hint === DISCARD_HINT;
+        const branchHint = discard ? DISCARD_HINT : null;
         hint = this.valueHint(hint);
         const expr = kids(node)[0];
         const ident = kids(node)[1].text;
         const thenBlock = kids(node)[2];
         const elseBlock = kids(node)[3] ?? null;
-        const resultType = hint || this.inferType(thenBlock);
+        const inferredResultType = discard || hint ? null : this.exprType(thenBlock);
+        const resultType = discard ? null : (hint || this.wasmTypeStr(inferredResultType) || null);
         const branchType = resultType ?? branchHint;
         const resultClause = resultType ? ` (result ${resultType})` : '';
 
@@ -990,7 +996,7 @@ class WatGen {
             if (elseBlock) {
                 this.pushGenerated(lines, ls => this.genBody(kids(elseBlock), ls, false, branchType), '    ');
             } else if (resultType) {
-                lines.push('    ' + this.defaultValue(resultType));
+                lines.push('    ' + this.defaultValue(inferredResultType));
             }
             lines.push('  )');
 
@@ -1017,7 +1023,8 @@ class WatGen {
         hint = this.valueHint(hint);
         const subject = kids(node)[0];
         const subjectType = this.inferType(subject);
-        const resultType = discard ? null : (hint || this.inferType(arms[arms.length - 1]?.expr) || null);
+        const inferredResultType = hint || discard ? null : this.exprType(arms[arms.length - 1]?.expr);
+        const resultType = discard ? null : (hint || this.wasmTypeStr(inferredResultType) || null);
         const typedArms = arms.filter(arm => arm.guard !== null);
         const fallback = arms.find(arm => arm.guard === null) ?? null;
 
@@ -1067,11 +1074,17 @@ class WatGen {
         hint = this.valueHint(hint);
         const subject = kids(node)[0];
         const tempName = this.scalarMatchTempName(node);
-        const resultType = discard ? null : (hint || this.inferType(arms[arms.length - 1].expr) || null);
+        const inferredResultType = hint || discard ? null : this.exprType(arms[arms.length - 1].expr);
+        const resultType = discard ? null : (hint || this.wasmTypeStr(inferredResultType) || null);
         const compareType = this.scalarMatchCompareType(this.inferType(subject));
 
         this.genExpr(subject, compareType, out);
         out.push(`local.set $${tempName}`);
+        const branchTablePlan = this.scalarMatchBranchTablePlan(node, arms, compareType);
+        if (branchTablePlan) {
+            this.genScalarMatchBranchTable(node, branchTablePlan, tempName, resultType, out);
+            return;
+        }
         this.genScalarMatchCases(arms, 0, tempName, compareType, resultType, out);
     }
 
@@ -1097,6 +1110,34 @@ class WatGen {
         out.push('  (else');
         this.pushGenerated(out, lines => this.genScalarMatchCases(arms, index + 1, tempName, compareType, resultType, lines), '    ');
         out.push('  )');
+        out.push(')');
+    }
+
+    genScalarMatchBranchTable(node, plan, tempName, resultType, out) {
+        const exitLabel = `$__match_exit_${node.id}`;
+        const defaultLabel = `$__match_default_${node.id}`;
+
+        out.push(`(block ${exitLabel}${resultType ? ` (result ${resultType})` : ''}`);
+        out.push(`  (block ${defaultLabel}`);
+        for (let index = plan.cases.length - 1; index >= 0; index -= 1)
+            out.push(`    (block ${plan.cases[index].label}`);
+
+        out.push(`      local.get $${tempName}`);
+        if (plan.minValue !== 0) {
+            out.push(`      i32.const ${plan.minValue}`);
+            out.push('      i32.sub');
+        }
+        out.push(`      br_table ${plan.tableLabels.join(' ')} ${defaultLabel}`);
+
+        for (const matchCase of plan.cases) {
+            out.push('    )');
+            this.pushGenerated(out, lines => this.genBranchExpr(matchCase.arm.expr, resultType, lines), '    ');
+            out.push(`    br ${exitLabel}`);
+        }
+
+        out.push('  )');
+        if (plan.fallback) this.genBranchExpr(plan.fallback.expr, resultType, out);
+        else out.push('  unreachable');
         out.push(')');
     }
 
@@ -1294,7 +1335,7 @@ class WatGen {
     returnHint(returnType) { const results = this.flattenResultTypes(returnType); return results.length === 1 ? results[0] : null; }
     wasmTypeStr(inferredType) { return !inferredType ? null : typeof inferredType === 'string' ? this.scalarWasmType(inferredType) : this.wasmType(inferredType); }
     valueHint(hint) { return hint === DISCARD_HINT ? null : hint; }
-    needsDiscardHint(node) { return DISCARD_HINT_NODES.has(node.type); }
+    needsDiscardHint(node) { return DISCARD_HINT_NODES.has(node.type) || node.type === 'promote_expr'; }
     genBranchExpr(node, hint, out) {
         if (node.type === 'block') return void this.genBody(kids(node), out, false, hint);
         this.genExpr(node, hint ?? DISCARD_HINT, out);
@@ -1376,6 +1417,49 @@ class WatGen {
     arrayTypeNameFromInferred(inferred) { return `$${inferred.endsWith('_array') ? inferred : `${inferred}_array`}`; }
     arrayElemKeyFromInferred(inferred) { return inferred?.endsWith('_array') ? inferred.slice(0, -6) : null; }
     scalarMatchTempName(node) { return `__match_subj_${node.id}`; }
+    scalarMatchBranchTablePlan(node, arms, compareType) {
+        if (compareType !== 'i32') return null;
+
+        const fallbackIndex = arms.findIndex(arm => !arm.pattern);
+        if (fallbackIndex !== -1 && fallbackIndex !== arms.length - 1) return null;
+
+        const explicitArms = (fallbackIndex === -1 ? arms : arms.slice(0, fallbackIndex))
+            .map((arm) => ({ arm, value: this.scalarMatchPatternValue(arm.pattern) }));
+        if (!explicitArms.length || explicitArms.some(({ value }) => value === null)) return null;
+
+        const caseMap = new Map();
+        for (const { arm, value } of explicitArms) {
+            if (caseMap.has(value)) return null;
+            caseMap.set(value, arm);
+        }
+
+        const values = [...caseMap.keys()].sort((left, right) => left - right);
+        const minValue = values[0];
+        const maxValue = values[values.length - 1];
+        const span = maxValue - minValue + 1;
+        if (span > Math.max(8, values.length * 4)) return null;
+
+        const cases = values.map((value, index) => ({
+            value,
+            arm: caseMap.get(value),
+            label: `$__match_${node.id}_${index}`,
+        }));
+        const labelsByValue = new Map(cases.map((matchCase) => [matchCase.value, matchCase.label]));
+        return {
+            minValue,
+            fallback: fallbackIndex === -1 ? null : arms[fallbackIndex],
+            cases,
+            tableLabels: Array.from({ length: span }, (_, offset) => labelsByValue.get(minValue + offset) ?? `$__match_default_${node.id}`),
+        };
+    }
+    scalarMatchPatternValue(node) {
+        if (!node) return null;
+        const patternNode = node.type === 'match_lit' ? kids(node)[0] ?? node : node;
+        if (patternNode.type === 'int_lit') return parseIntLit(patternNode.text);
+        if (patternNode.text === 'true') return 1;
+        if (patternNode.text === 'false') return 0;
+        return null;
+    }
     lookupCallable(name) {
         const fn = this.fnItems.find(item => this.fnName(item) === name);
         return fn ? { params: this.fnParams(fn), returnType: this.fnReturnType(fn) } : this.importFns.find(item => item.name === name) ?? null;

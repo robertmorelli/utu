@@ -75,14 +75,14 @@ const cases = [
             'struct.get $Triangle $base',
             '(func $tag',
             'local.set $__match_subj_',
-            'i32.eq',
+            'br_table',
         ],
     },
     {
         name: 'scalar-match',
         path: 'examples/ci/codegen_scalar_match.utu',
         mode: 'test',
-        snippets: ['(func $pick_bool', '(func $pick_float', '(func $pick_int', 'local.set $__match_subj_', 'f64.eq', 'i32.eq'],
+        snippets: ['(func $pick_bool', '(func $pick_float', '(func $pick_int', 'local.set $__match_subj_', 'f64.eq', 'br_table'],
         expectedTests: 4,
     },
     {

@@ -200,6 +200,8 @@ class ModuleExpander {
     collectModuleTemplate(node) {
         const name = moduleNameNode(node).text;
         const items = kids(node).filter((child) => !['identifier', 'type_ident', 'module_name', 'module_type_param_list'].includes(child.type));
+        if (items.some((item) => item.type === 'export_decl'))
+            throw new Error('export declarations are not supported inside modules in v1');
         this.moduleNames.add(name);
         this.moduleTemplates.set(name, {
             name,
@@ -224,10 +226,14 @@ class ModuleExpander {
 
     openNamespace(namespace, ctx) {
         for (const name of namespace.exportedValues) {
+            if (this.topLevelValueNames.has(name) || ctx.openValues.has(name))
+                throw new Error(`open construct ${namespace.displayText} would collide on value "${name}"`);
             ctx.openValues.set(name, namespace);
         }
 
         for (const name of namespace.exportedTypes) {
+            if (this.topLevelTypeNames.has(name) || ctx.openTypes.has(name))
+                throw new Error(`open construct ${namespace.displayText} would collide on type "${name}"`);
             ctx.openTypes.set(name, namespace);
         }
     }
@@ -252,6 +258,9 @@ class ModuleExpander {
     }
 
     ensureNamespace(template, argTexts, ctx) {
+        if (!template) throw new Error('Unknown module reference');
+        if (argTexts.length !== template.typeParams.length)
+            throw new Error(`module ${template.name} expects ${template.typeParams.length} type argument(s), received ${argTexts.length}`);
         const displayText = template.typeParams.length
             ? `${template.name}[${argTexts.join(', ')}]`
             : template.name;
@@ -684,6 +693,8 @@ class ModuleExpander {
                 return `ref.null ${this.emitType(kids(node)[0], ctx)}`;
             case 'if_expr':
                 return this.emitIfExpr(node, ctx);
+            case 'promote_expr':
+                return this.emitPromoteExpr(node, ctx);
             case 'match_expr':
                 return this.emitMatchExpr(node, ctx);
             case 'alt_expr':
@@ -958,6 +969,8 @@ class ModuleExpander {
                 return this.resolveNamespaceValueReturn(this.resolveNamespaceFromModuleRef(node, ctx), childOfType(node, 'identifier')?.text);
             case 'else_expr':
                 return this.inferExprInfo(kids(node)[1], ctx) ?? this.stripNullable(this.inferExprInfo(kids(node)[0], ctx));
+            case 'promote_expr':
+                return this.inferExprInfo(kids(node)[2], ctx) ?? this.inferExprInfo(kids(node)[3], ctx) ?? null;
             default:
                 return null;
         }
@@ -1003,9 +1016,24 @@ class ModuleExpander {
         return `if ${this.emitExpr(cond, ctx)} ${this.emitBlock(thenBlock, this.pushScope(ctx), true)}${elseBranch ? ` else ${elseBranch.type === 'if_expr' ? this.emitExpr(elseBranch, ctx) : this.emitBlock(elseBranch, this.pushScope(ctx), true)}` : ''}`;
     }
 
+    emitPromoteExpr(node, ctx) {
+        const parts = kids(node);
+        const expr = parts[0];
+        const ident = parts[1];
+        const thenBlock = parts[2];
+        const elseBlock = parts[3] ?? null;
+        const inner = this.pushScope(ctx);
+        if (ident?.text && ident.text !== '_') this.declareLocal(inner, ident.text, this.stripNullable(this.inferExprInfo(expr, ctx)));
+        return `promote ${this.emitExpr(expr, ctx)} |${ident.text}| ${this.emitBlock(thenBlock, inner, true)}${elseBlock ? ` else ${this.emitBlock(elseBlock, this.pushScope(ctx), true)}` : ''}`;
+    }
+
     emitMatchExpr(node, ctx) {
         const [subject, ...arms] = kids(node);
-        const renderedArms = arms.map((arm) => `${arm.namedChildren[0].text} => ${this.emitExpr(arm.namedChildren.at(-1), ctx)},`);
+        const renderedArms = arms.map((arm) => {
+            const named = kids(arm);
+            const pattern = named.length === 1 ? '_' : named[0].text;
+            return `${pattern} => ${this.emitExpr(named.at(-1), ctx)},`;
+        });
         return `match ${this.emitExpr(subject, ctx)} { ${renderedArms.join(' ')} }`;
     }
 
@@ -1018,13 +1046,15 @@ class ModuleExpander {
     emitAltArm(node, ctx) {
         const inner = this.pushScope(ctx);
         const named = kids(node);
-        const patternNode = named[0];
+        const patternNode = named[0] ?? null;
+        const identNode = patternNode?.type === 'identifier' ? patternNode : null;
         const typeNode = named.find((child) => child.type === 'type_ident' || child.type === 'qualified_type_ref') ?? null;
         const exprNode = named.at(-1);
-        if (patternNode.type === 'identifier' && patternNode.text !== '_') this.declareLocal(inner, patternNode.text);
+        if (identNode && identNode.text !== '_') this.declareLocal(inner, identNode.text, typeNode ? this.describeType(typeNode, ctx) : null);
+        const patternText = identNode?.text ?? (hasAnon(node, '_') ? '_' : typeNode ? '_' : patternNode?.text ?? '_');
         const head = typeNode
-            ? `${patternNode.text}: ${this.emitType(typeNode, ctx)}`
-            : patternNode.text;
+            ? `${patternText}: ${this.emitType(typeNode, ctx)}`
+            : patternText;
         return `${head} => ${this.emitExpr(exprNode, inner)},`;
     }
 

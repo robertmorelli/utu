@@ -1,6 +1,6 @@
 = Utu Language Specification
 
-*A WasmGC-Native Language with Linear-Logic Semantics*
+*A WasmGC-Native Language Specification*
 
 _Named after the Sumerian sun god of truth and justice._
 
@@ -24,12 +24,26 @@ structured control flow, GC heap types, and multi-value returns.
 The key design principles from the spec are:
 
 - direct lowering to WasmGC primitives
-- linear-by-construction data flow through pipes
+- explicit data flow through pipes and local bindings
 - structured control flow that mirrors Wasm blocks and loops
 - host-backed strings with explicit helper imports instead of implicit string builtins
-- error handling as values with exclusive disjunction via `#`
+- structured error and nullable results without hidden exceptions
 - null safety derived from non-nullable Wasm reference types
 - immutable struct fields by default, with `mut` opt-in
+
+The implemented surface covered by the compiler, examples, and tests includes:
+
+- structs, sum types, arrays, globals, nullable references, and multi-value returns
+- `if`, `while`, `for`, `match`, `alt`, `promote`, `break`, and pipe expressions
+- top-level `test` and `bench` declarations
+- host imports via `shimport` and inline JS helpers via `escape`
+- parameterized modules, `construct` aliases, open constructs, associated functions, and method-call sugar
+- WasmGC reference builtins such as `ref.null`, `ref.is_null`, `ref.as_non_null`, `ref.cast`, `ref.test`, and `i31`
+
+Notable current limits:
+
+- module bodies do not support nested `export` declarations in v1
+- `fun(A) B` function-reference syntax is parsed, but not yet supported as a stable end-to-end compiler feature
 
 The naming convention is intentionally simple:
 
@@ -37,27 +51,18 @@ The naming convention is intentionally simple:
 - functions and variables use `snake_case`, such as `new_todo` and
   `console_log`
 
-== Linear Logic Foundation
+== Data Flow And Binding
 
-The type system borrows from linear logic, but the important practical idea is
-syntactic discipline rather than a separate borrow checker. Unnamed
-intermediate values flow forward through `-o` pipelines and cannot be reused
-accidentally because they are never bound. A `let` binding explicitly promotes
-the value into a reusable, unrestricted name.
+Utu keeps data flow explicit without a separate ownership system. Inline
+expressions can feed directly into `-o` pipelines, while `let` introduces a
+stable local name when a value needs to be reused or inspected later.
 
-The connective mapping in the spec is:
+That produces a straightforward style:
 
-- function return position: `!A ⊸ B`
-- pipe operator `-o`: `A ⊸ B`
-- tensor product `,`: `A ⊗ B`
-- sum type `|`: `A ⊕ B`
-- exclusive disjunction `#`: exactly one branch is present
-- `let`: promotion to unrestricted use
-
-This gives the language a useful default:
-
-- inline expressions and pipelines are single-use by construction
-- named bindings are the explicit opt-out when reuse is needed
+- pipelines keep one-off transformations compact
+- `let` makes reuse and mutation explicit
+- multi-value returns stay close to Wasm's stack machine instead of forcing
+  tuple boxing
 
 == Scalar Types
 
@@ -93,8 +98,7 @@ support function references end to end as part of the stable subset.
 
 All reference types are non-nullable by default. Nullable references are
 spelled as `?T`, which lowers to a nullable Wasm reference like
-`(ref null $T)`. The spec treats nullability as a special case of exclusive
-disjunction rather than a separate language feature.
+`(ref null $T)`.
 
 == Product Types: Structs
 
@@ -153,10 +157,11 @@ type Shape =
 This model keeps variant dispatch inside WasmGC's native type system instead of
 building a hand-rolled tag format in linear memory.
 
-== Exclusive Disjunction, Nullability, And `\`
+== Structured Error Results, Nullability, And `\`
 
-The `#` operator expresses an exclusive result: exactly one branch is present.
-In practice, this is Utu's error return mechanism.
+The `#` operator expresses a structured two-result convention: one position is
+for success and one is for the alternate result. In practice, this is Utu's
+typed error-return surface.
 
 ```utu
 fun divide(a: i32, b: i32) i32 # DivError {
@@ -171,7 +176,7 @@ The Wasm signature becomes a multi-value return with complementary nullability:
     (result (ref null $i32_box) (ref null $DivError)))
 ```
 
-The contract is semantic rather than structural: exactly one result must be
+The contract is semantic rather than structural: exactly one result should be
 non-null at runtime.
 
 The same `A # B` spelling is used on ES host imports:
@@ -211,8 +216,8 @@ ref.as_non_null
 
 == Multi-Value Return
 
-The tensor operator `,` means "have both values at once". Functions can return
-multiple values directly, which maps naturally onto Wasm multi-value returns.
+Comma-separated returns let functions produce multiple values directly, which
+maps naturally onto Wasm multi-value returns.
 
 ```utu
 fun divmod(a: i32, b: i32) i32, i32 {
@@ -222,7 +227,7 @@ fun divmod(a: i32, b: i32) i32, i32 {
 let q: i32, r: i32 = divmod(10, 3);
 ```
 
-Unlike `#`, a tensor return does not represent alternatives. Every component is
+Unlike `#`, a multi-value return does not represent alternatives. Every component is
 present, non-null when it is a reference, and available simultaneously.
 
 #pagebreak()
@@ -470,8 +475,8 @@ Important conventions:
 
 == Pipe Operator
 
-The `-o` operator is Utu's core linear-flow surface. It feeds the value on the
-left into the function on the right.
+The `-o` operator is Utu's core pipe surface. It feeds the value on the left
+into the function on the right.
 
 Single-argument pipelines stay minimal:
 
@@ -646,7 +651,7 @@ Numeric namespace helpers such as `f64.sqrt(...)`, `i32.wrap(...)`, and
 
 The spec also insists on symbol clarity:
 
-- `#` is only exclusive disjunction at the type level
+- `#` is only the structured alternate-result marker at the type level
 - `%` is always remainder
 - `^` is always bitwise XOR
 - `~` is always unary bitwise NOT
@@ -994,8 +999,7 @@ let q: i32, r: i32 = divmod(10, 3);
 (local.set $q)
 ```
 
-This reversal rule applies to both tensor returns and exclusive disjunction
-returns.
+This reversal rule applies to both multi-value returns and `#` returns.
 
 === Error Lowering
 
@@ -1622,7 +1626,7 @@ If you are comfortable reading WAT, Utu should feel mostly transparent. The
 language adds:
 
 - a friendlier syntax for types, expressions, and control flow
-- pipelines for linear-looking data flow
+- pipelines for direct data flow
 - a value-based error model using `#` and `\`
 - direct names for WasmGC allocation and reference operations
 

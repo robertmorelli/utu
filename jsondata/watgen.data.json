@@ -127,7 +127,8 @@
     "if_expr",
     "match_expr",
     "alt_expr",
-    "block_expr"
+    "block_expr",
+    "promote_expr"
   ],
   "valuelessExprTypes": [
     "assert_expr",
