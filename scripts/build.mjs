@@ -190,6 +190,18 @@ async function writeWebBundlePackageMetadata() {
   await writeFile(resolve(webDistRoot, 'package.json'), `${JSON.stringify({ type: 'commonjs' }, null, 2)}\n`, 'utf8');
 }
 
+async function writeRepoWebEntrypointAlias() {
+  const webDistRoot = resolve(extensionRoot, 'dist/web');
+  await mkdir(webDistRoot, { recursive: true });
+  const extensionEntry = await readFile(resolve(webDistRoot, 'extension.cjs'), 'utf8');
+  const extensionEntryForWebHost = extensionEntry.replace(/sourceMappingURL=extension\.cjs\.map\b/u, 'sourceMappingURL=extension.js.map');
+
+  await Promise.all([
+    writeFile(resolve(webDistRoot, 'extension.js'), extensionEntryForWebHost, 'utf8'),
+    cp(resolve(webDistRoot, 'extension.cjs.map'), resolve(webDistRoot, 'extension.js.map')),
+  ]);
+}
+
 async function buildCli() {
   await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
   await rm(cliPackageRoot, { recursive: true, force: true });
@@ -203,6 +215,8 @@ async function buildLsp() {
 }
 
 async function buildAllArtifacts() {
+  await writeWebBundlePackageMetadata();
+  await writeRepoWebEntrypointAlias();
   await stageWebDevExtension();
   await buildCli();
   await buildLsp();
@@ -213,11 +227,14 @@ async function stageWebDevExtension() {
   const rootPackage = JSON.parse(await readFile(resolve(extensionRoot, 'package.json'), 'utf8'));
   const stagedPackage = {
     ...rootPackage,
+    main: './dist/web/extension.js',
     browser: './dist/web/extension.js',
   };
 
   delete stagedPackage.type;
+  delete stagedPackage.module;
   delete stagedPackage.scripts;
+  delete stagedPackage.dependencies;
   delete stagedPackage.devDependencies;
   delete stagedPackage.files;
 
@@ -226,13 +243,10 @@ async function stageWebDevExtension() {
   await mkdir(resolve(webDevExtensionRoot, 'dist'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'jsondata'), { recursive: true });
 
-  const extensionEntry = await readFile(resolve(extensionRoot, 'dist/web/extension.cjs'), 'utf8');
-  const extensionEntryForWebHost = extensionEntry.replace(/sourceMappingURL=extension\.cjs\.map\b/u, 'sourceMappingURL=extension.js.map');
-
   await Promise.all([
     writeFile(resolve(webDevExtensionRoot, 'package.json'), `${JSON.stringify(stagedPackage, null, 2)}\n`, 'utf8'),
-    writeFile(resolve(webDevExtensionRoot, 'dist/web/extension.js'), extensionEntryForWebHost, 'utf8'),
-    cp(resolve(extensionRoot, 'dist/web/extension.cjs.map'), resolve(webDevExtensionRoot, 'dist/web/extension.js.map')),
+    cp(resolve(extensionRoot, 'dist/web/extension.js'), resolve(webDevExtensionRoot, 'dist/web/extension.js')),
+    cp(resolve(extensionRoot, 'dist/web/extension.js.map'), resolve(webDevExtensionRoot, 'dist/web/extension.js.map')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs.map'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs.map')),
     cp(resolve(extensionRoot, 'language-configuration.json'), resolve(webDevExtensionRoot, 'language-configuration.json')),
@@ -254,7 +268,8 @@ async function packageVsix() {
   }
 
   await sanitizeVsceInputs();
-  await exec(vsceBinaryPath, ['package', '--no-dependencies', '--out', resolve(extensionRoot, `dist/utu-vscode-${process.env.npm_package_version ?? '0.0.0'}.vsix`)]);
+  const stagedPackage = JSON.parse(await readFile(resolve(webDevExtensionRoot, 'package.json'), 'utf8'));
+  await exec(vsceBinaryPath, ['package', '--no-dependencies', '--out', resolve(extensionRoot, `dist/utu-vscode-${stagedPackage.version ?? '0.0.0'}.vsix`)], { cwd: webDevExtensionRoot });
 }
 
 async function sanitizeVsceInputs() {
@@ -392,9 +407,9 @@ async function snapshotPath(path, recursive) {
   }
 }
 
-function exec(command, args) {
+function exec(command, args, options = {}) {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, { stdio: 'inherit' });
+    const child = spawn(command, args, { stdio: 'inherit', ...options });
     child.on('error', rejectPromise);
     child.on('exit', (code) => code === 0 ? resolvePromise() : rejectPromise(new Error(`${command} exited with code ${code ?? 1}`)));
   });

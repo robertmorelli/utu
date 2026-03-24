@@ -26,6 +26,14 @@ async function readExtensionFile(context, ...segments) {
     return vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, ...segments));
 }
 
+function decodeUtf8(bytes) {
+    return new TextDecoder('utf-8').decode(bytes);
+}
+
+function stripSourceMapComment(source) {
+    return source.replace(/\n\/\/# sourceMappingURL=.*$/u, '');
+}
+
 async function readExtensionBytes(context, ...segments) {
     const uri = vscode.Uri.joinPath(context.extensionUri, ...segments);
     try {
@@ -60,7 +68,8 @@ class WebCompilerHost {
     async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, {}); }
     async getCompiler() { return (this.compilerPromise ??= this.loadCompiler()); }
     async loadCompiler() {
-        return import(this.options.compilerModuleUri.toString(true));
+        const source = stripSourceMapComment(decodeUtf8(await vscode.workspace.fs.readFile(this.options.compilerModuleUri)));
+        return loadModuleFromSource(source, { identifier: 'utu-compiler-web' });
     }
 }
 async function getNamedTarget(source, getMetadata, kind, ordinal) {

@@ -12,8 +12,6 @@ import {
 import { parseHostImportName } from './parser.js';
 import data from './jsondata/watgen.data.json' with { type: 'json' };
 
-export class WatError extends Error {}
-
 export function watgen(treeOrNode, { mode = 'program', profile = null, targetName = null } = {}) {
     return new WatGen(rootNode(treeOrNode), mode, profile, targetName).generate();
 }
@@ -88,7 +86,8 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
     },
     fn_decl: (ctx, item) => ctx.fnItems.push({ node: item, exported: false }),
     global_decl: (ctx, item) => {
-        const decl = parseGlobalDecl(item);
+        const [name, type, value] = kids(item);
+        const decl = { kind: 'global_decl', name: name.text, type: parseType(type), value };
         ctx.globalDecls.push(decl);
         ctx.globalTypeMap.set(decl.name, decl.type);
     },
@@ -107,8 +106,20 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         const node = childOfType(item, 'fn_decl');
         ctx.fnItems.push({ node, exported: true, exportName: textOf(node, 'identifier') });
     },
-    test_decl: (ctx, item) => ctx.testDecls.push(parseTestDecl(item)),
-    bench_decl: (ctx, item) => ctx.benchDecls.push(parseBenchDecl(item)),
+    test_decl: (ctx, item) => {
+        ctx.testDecls.push({ kind: 'test_decl', name: kids(item)[0].text.slice(1, -1), body: childOfType(item, 'block') });
+    },
+    bench_decl: (ctx, item) => {
+        const setup = childOfType(item, 'setup_decl');
+        const named = kids(setup);
+        ctx.benchDecls.push({
+            kind: 'bench_decl',
+            name: kids(item)[0].text.slice(1, -1),
+            capture: kids(childOfType(item, 'bench_capture'))[0].text,
+            setupPrelude: named.slice(0, -1),
+            measureBody: childOfType(named.at(-1), 'block'),
+        });
+    },
 };
 const CONST_EXPR_HANDLERS = {
     literal: (ctx, node, wasmType) => ctx.evalConstLiteral(node, wasmType),
@@ -164,10 +175,8 @@ const NS_CALL_HANDLERS = {
     array: (ctx, method, args, out) => ctx.genArrayNsCall(method, args, out),
     ref: (ctx, method, args, out) => ctx.genRefNsCall(method, args, out),
     i31: (ctx, method, args, out) => {
-        const op = I31_NS_OPS[method];
-        if (!op) throw new WatError(`Unknown i31 method: ${method}`);
         ctx.pushArgs(args, out);
-        out.push(op);
+        out.push(I31_NS_OPS[method]);
     },
 };
 const INFER_TYPE_HANDLERS = {
@@ -300,7 +309,7 @@ const CALL_CALLEE_HANDLERS = {
         out.push('call_ref');
     },
     field_expr: (_ctx, callee) => {
-        throw new WatError(`Unresolved method call '.${kids(callee)[1]?.text ?? '?'}()': desugar p.method() in expand.js before watgen`);
+        throw new Error(`Unresolved method call '.${kids(callee)[1]?.text ?? '?'}()': desugar p.method() in expand.js before watgen`);
     },
 };
 const ARRAY_INIT_HANDLERS = {
@@ -411,13 +420,18 @@ class WatGen {
     }
 
     nextUid() { return this.uid++; }
-    generate() { this.collect(); this.scanAll(); return { wat: this.emit(), metadata: this.metadata }; }
+    generate() {
+        this.collect();
+        this.scanAll();
+        this.metadata.strings = [...this.stringList];
+        return { wat: this.emit(), metadata: this.metadata };
+    }
 
     collect() {
         for (const item of kids(this.root)) {
             const collect = TOP_LEVEL_COLLECT_HANDLERS[item.type];
             if (collect) collect(this, item);
-            else throw new WatError(`Unknown top-level item: ${item.type}`);
+            else throw new Error(`Unknown top-level item: ${item.type}`);
         }
         if (this.mode === 'test' && this.targetName !== null)
             this.testDecls = this.testDecls.filter((test) => test.name === this.targetName);
@@ -605,7 +619,7 @@ class WatGen {
 
     tryFoldGlobalInit(node, wasmType) {
         const value = this.evalConstExpr(node, wasmType);
-        return value === null ? null : this.constInstr(value, wasmType);
+        return value === null ? null : `${wasmType}.const ${value}`;
     }
 
     evalConstExpr(node, wasmType) {
@@ -679,10 +693,10 @@ class WatGen {
 
     emitFn(fn, profileId = null) {
         const body = this.fnBody(fn);
-        return this.emitFunc(this.fnName(fn), this.fnParams(fn), this.fnReturnType(fn), body, out => this.genBlock(body, out, true), [], profileId);
+        return this.emitFunc(this.fnName(fn), this.fnParams(fn), this.fnReturnType(fn), body, out => this.genBody(kids(body), out, true), [], profileId);
     }
 
-    emitTest(test, exportName) { return this.emitFunc(exportName, [], null, test.body, out => this.genBlock(test.body, out)); }
+    emitTest(test, exportName) { return this.emitFunc(exportName, [], null, test.body, out => this.genBody(kids(test.body), out)); }
 
     emitBench(bench, exportName) {
         return this.emitFunc(
@@ -734,25 +748,22 @@ class WatGen {
     }
     pushPipedArgs(value, args, out, isPlaceholder, readArg = arg => arg) {
         const placeholderCount = args.filter(isPlaceholder).length;
-        if (placeholderCount > 1) throw new WatError('pipe targets can contain at most one underscore placeholder');
+        if (placeholderCount > 1) throw new Error('pipe targets can contain at most one underscore placeholder');
         if (!args.some(isPlaceholder)) this.genExpr(value, null, out);
         for (const arg of args) this.genExpr(isPlaceholder(arg) ? value : readArg(arg), null, out);
     }
     pipedArgs(value, args, isPlaceholder, readArg = arg => arg) {
         const placeholderCount = args.filter(isPlaceholder).length;
-        if (placeholderCount > 1) throw new WatError('pipe targets can contain at most one underscore placeholder');
+        if (placeholderCount > 1) throw new Error('pipe targets can contain at most one underscore placeholder');
         return args.some(isPlaceholder)
             ? args.map(arg => isPlaceholder(arg) ? value : readArg(arg))
             : [value, ...args.map(readArg)];
     }
-    loopInfo() {
-        const uid = this.nextUid();
-        return { uid, breakLabel: `$__break_${uid}`, continueLabel: `$__continue_${uid}` };
-    }
-    withLoop(out, { breakLabel, continueLabel }, emitBody) {
+    withLoop(out, emitBody) {
+        const uid = this.uid++, breakLabel = `$__break_${uid}`, continueLabel = `$__continue_${uid}`;
         this.labelStack.push({ kind: 'loop', breakLbl: breakLabel });
         out.push(`(block ${breakLabel}`, `  (loop ${continueLabel}`);
-        emitBody();
+        emitBody(breakLabel, continueLabel, uid);
         out.push('  )', ')');
         this.labelStack.pop();
     }
@@ -773,27 +784,20 @@ class WatGen {
         }
     }
 
-    genBlock(block, out, isFnBody = false, tailHint = null) {
-        this.genBody(kids(block), out, isFnBody, tailHint);
-    }
-
     genExpr(node, hint, out) {
         EXPR_GENERATORS[node.type](this, node, hint, out);
     }
 
     genLiteral(node, hint, out) {
-        const literal = literalInfo(node);
-        const emit = LITERAL_GENERATORS[literal.kind];
-        if (emit) return emit(this, literal, this.valueHint(hint), out);
-        throw new WatError(`Unknown literal kind: ${literal.kind}`);
+        LITERAL_GENERATORS[literalInfo(node).kind](this, literalInfo(node), this.valueHint(hint), out);
     }
 
     genInt(value, hint, out) {
-        this.pushConst(value, ['f32', 'f64', 'i64'].includes(hint) ? hint : 'i32', out);
+        out.push(`${['f32', 'f64', 'i64'].includes(hint) ? hint : 'i32'}.const ${value}`);
     }
 
     genFloat(value, hint, out) {
-        this.pushConst(value, hint === 'f32' ? 'f32' : 'f64', out);
+        out.push(`${hint === 'f32' ? 'f32' : 'f64'}.const ${value}`);
     }
 
     genIdent(node, out) {
@@ -813,9 +817,7 @@ class WatGen {
         const wasmType = hint || this.inferType(expr) || 'i32';
 
         this.genExpr(expr, wasmType, out);
-        const emit = UNARY_GENERATORS[op];
-        if (emit) return emit(this, wasmType, out);
-        throw new WatError(`Unknown unary op: ${op}`);
+        UNARY_GENERATORS[op](this, wasmType, out);
     }
 
     genBinary(node, hint, out) {
@@ -826,18 +828,21 @@ class WatGen {
         const rightType = this.inferType(right) || hint || 'i32';
         const wasmType = this.dominantType(leftType, rightType);
 
-        this.genExpr(left, wasmType, out);
-        this.genExpr(right, wasmType, out);
+        this.genExprForBinaryOperand(left, leftType, wasmType, out);
+        this.genExprForBinaryOperand(right, rightType, wasmType, out);
         out.push(this.binaryInstr(op, wasmType));
+    }
+
+    genExprForBinaryOperand(node, sourceType, targetType, out) {
+        const sourceWasm = this.wasmTypeStr(sourceType) || targetType;
+        this.genExpr(node, sourceWasm, out);
+        this.coerceNumeric(sourceWasm, targetType, out);
     }
 
     binaryInstr(op, wasmType) {
         const isFloat = wasmType === 'f32' || wasmType === 'f64';
         const isUnsigned = wasmType === 'u32' || wasmType === 'u64';
-        const base = isUnsigned ? wasmType.replace('u', 'i') : wasmType;
-        const build = BINARY_INSTR_BUILDERS[op];
-        if (build) return build({ base, isFloat, isUnsigned });
-        throw new WatError(`Unknown binary op: ${op}`);
+        return BINARY_INSTR_BUILDERS[op]({ base: isUnsigned ? wasmType.replace('u', 'i') : wasmType, isFloat, isUnsigned });
     }
 
     genTuple(node, out) {
@@ -918,18 +923,10 @@ class WatGen {
     }
 
     genArrayNsCall(method, args, out) {
-        const emit = ARRAY_NS_CALL_HANDLERS[method];
-        if (emit) return emit(this, args, out);
-        throw new WatError(`Unknown array namespace method: ${method}`);
+        ARRAY_NS_CALL_HANDLERS[method](this, args, out);
     }
 
     genRefNsCall(method, args, out) {
-        const op = REF_NS_OPS[method];
-        if (op) {
-            this.pushArgs(args.slice(0, method === 'eq' ? 2 : 1), out);
-            out.push(op);
-            return;
-        }
         if (method === 'cast' || method === 'test') {
             this.genExpr(args[0], null, out);
             const typeName = args[1].text;
@@ -938,7 +935,8 @@ class WatGen {
                 : `ref.test (ref $${typeName})`);
             return;
         }
-        throw new WatError(`Unknown ref namespace method: ${method}`);
+        this.pushArgs(args.slice(0, method === 'eq' ? 2 : 1), out);
+        out.push(REF_NS_OPS[method]);
     }
 
     genIf(node, hint, out) {
@@ -954,7 +952,7 @@ class WatGen {
         this.genExpr(cond, 'i32', out);
         out.push(`(if${resultClause}`);
         out.push('  (then');
-        this.pushGenerated(out, lines => this.genBlock(thenBlock, lines, false, branchType));
+        this.pushGenerated(out, lines => this.genBody(kids(thenBlock), lines, false, branchType));
         out.push('  )');
 
         if (elseBranch) {
@@ -990,7 +988,7 @@ class WatGen {
             // Then branch (null case)
             lines.push('  (then');
             if (elseBlock) {
-                this.pushGenerated(lines, ls => this.genBlock(elseBlock, ls, false, branchType), '    ');
+                this.pushGenerated(lines, ls => this.genBody(kids(elseBlock), ls, false, branchType), '    ');
             } else if (resultType) {
                 lines.push('    ' + this.defaultValue(resultType));
             }
@@ -1003,7 +1001,7 @@ class WatGen {
                 ls.push('ref.as_non_null');
                 ls.push(`local.set $${ident}`);
             }, '    ');
-            this.pushGenerated(lines, ls => this.genBlock(thenBlock, ls, false, branchType), '    ');
+            this.pushGenerated(lines, ls => this.genBody(kids(thenBlock), ls, false, branchType), '    ');
             lines.push('  )');
 
             lines.push(')');
@@ -1024,7 +1022,7 @@ class WatGen {
         const fallback = arms.find(arm => arm.guard === null) ?? null;
 
         if (typedArms.length === 0) {
-            if (!fallback) throw new WatError('alt requires at least one typed arm or fallback arm');
+            if (!fallback) throw new Error('alt requires at least one typed arm or fallback arm');
             this.genExpr(subject, null, out);
             if (fallback.pattern !== '_') out.push(`local.set $${fallback.pattern}`);
             else out.push('drop');
@@ -1103,47 +1101,45 @@ class WatGen {
     }
 
     genFor(node, out) {
-        const loop = this.loopInfo();
         const sources = parseForSources(childOfType(node, 'for_sources'));
         const captures = parseCapture(childOfType(node, 'capture'));
         const body = childOfType(node, 'block');
-        const emitBody = lines => this.genBlock(body, lines, false);
+        const emitBody = lines => this.genBody(kids(body), lines, false);
 
         const source = sources[0];
         if (source.kind === 'range') {
-            const capture = captures[0] || `__i_${loop.uid}`;
+            const capture = captures[0] || `__i_${this.uid}`;
             this.genExpr(source.start, 'i32', out);
             out.push(`local.set $${capture}`);
-            this.withLoop(out, loop, () => {
+            this.withLoop(out, (breakLabel, continueLabel, uid) => {
                 out.push(`    local.get $${capture}`);
                 this.pushGenerated(out, lines => this.genExpr(source.end, 'i32', lines));
                 out.push('    i32.ge_s');
-                out.push(`    br_if ${loop.breakLabel}`);
+                out.push(`    br_if ${breakLabel}`);
                 this.pushGenerated(out, emitBody);
                 this.bumpI32Local(capture, out, '    ');
                 this.genProfileTick(out, '    ');
-                out.push(`    (br ${loop.continueLabel})`);
+                out.push(`    (br ${continueLabel})`);
             });
             return;
         }
-        throw new WatError('for loops require a range source');
+        throw new Error('for loops require a range source');
     }
 
     genWhile(node, out) {
-        const loop = this.loopInfo();
         const condition = kids(node).find(child => child.type !== 'block') ?? null;
         const body = childOfType(node, 'block');
-        const emitBody = lines => this.genBlock(body, lines, false);
+        const emitBody = lines => this.genBody(kids(body), lines, false);
 
-        this.withLoop(out, loop, () => {
+        this.withLoop(out, (breakLabel, continueLabel) => {
             if (condition) {
                 this.pushGenerated(out, lines => this.genExpr(condition, 'i32', lines));
                 out.push('    i32.eqz');
-                out.push(`    br_if ${loop.breakLabel}`);
+                out.push(`    br_if ${breakLabel}`);
             }
             this.pushGenerated(out, emitBody);
             this.genProfileTick(out, '    ');
-            out.push(`    (br ${loop.continueLabel})`);
+            out.push(`    (br ${continueLabel})`);
         });
     }
 
@@ -1156,37 +1152,36 @@ class WatGen {
 
         out.push(`(block ${label}${resultClause}`);
         this.labelStack.push({ kind: 'block', wasmLabel: label });
-        this.pushGenerated(out, lines => this.genBlock(block, lines, false, hint), '  ');
+        this.pushGenerated(out, lines => this.genBody(kids(block), lines, false, hint), '  ');
         this.labelStack.pop();
         out.push(')');
     }
 
     genBreak(node, out) {
         const frame = [...this.labelStack].reverse().find(item => item.kind === 'loop');
-        if (!frame) throw new WatError('break can only exit loops');
+        if (!frame) throw new Error('break can only exit loops');
         out.push(`br ${frame.breakLbl}`);
     }
 
     genEmit(node, out) {
         const value = kids(node)[0];
         const frame = [...this.labelStack].reverse().find(item => item.kind === 'block');
-        if (!frame) throw new WatError('emit can only exit block expressions');
+        if (!frame) throw new Error('emit can only exit block expressions');
         this.genExpr(value, null, out);
         out.push(`br ${frame.wasmLabel}`);
     }
 
     genBenchLoop(bench, out) {
-        const loop = this.loopInfo();
-        this.pushConst(0, 'i32', out);
+        out.push('i32.const 0');
         out.push(`local.set $${bench.capture}`);
-        this.withLoop(out, loop, () => {
+        this.withLoop(out, (breakLabel, continueLabel) => {
             out.push(`    local.get $${bench.capture}`);
             out.push('    local.get $iterations');
             out.push('    i32.ge_s');
-            out.push(`    br_if ${loop.breakLabel}`);
+            out.push(`    br_if ${breakLabel}`);
             this.pushGenerated(out, lines => this.genBody(kids(bench.measureBody), lines));
             this.bumpI32Local(bench.capture, out, '    ');
-            out.push(`    (br ${loop.continueLabel})`);
+            out.push(`    (br ${continueLabel})`);
         });
     }
 
@@ -1209,7 +1204,7 @@ class WatGen {
     genStructInit(node, out) {
         const typeName = childOfType(node, 'type_ident').text;
         const fields = this.typeFields(typeName);
-        if (!fields) throw new WatError(`Unknown type: ${typeName}`);
+        if (!fields) throw new Error(`Unknown type: ${typeName}`);
         const fieldMap = new Map(
             childrenOfType(node, 'field_init').map(field => [kids(field)[0].text, kids(field)[1]])
         );
@@ -1235,6 +1230,36 @@ class WatGen {
         const [lhs, rhs] = kids(node);
         const emit = ASSIGN_TARGET_HANDLERS[lhs.type];
         if (emit) return void emit(this, lhs, rhs, out);
+    }
+
+    coerceNumeric(from, to, out) {
+        if (!from || !to || from === to || !this.isNumericWasmType(from) || !this.isNumericWasmType(to)) return;
+        const instr = {
+            'f32->f64': 'f64.promote_f32',
+            'f64->f32': 'f32.demote_f64',
+            'i32->i64': 'i64.extend_i32_s',
+            'i32->u64': 'i64.extend_i32_s',
+            'u32->i64': 'i64.extend_i32_u',
+            'u32->u64': 'i64.extend_i32_u',
+            'i32->f32': 'f32.convert_i32_s',
+            'i32->f64': 'f64.convert_i32_s',
+            'u32->f32': 'f32.convert_i32_u',
+            'u32->f64': 'f64.convert_i32_u',
+            'i64->f32': 'f32.convert_i64_s',
+            'i64->f64': 'f64.convert_i64_s',
+            'u64->f32': 'f32.convert_i64_u',
+            'u64->f64': 'f64.convert_i64_u',
+            'i64->i32': 'i32.wrap_i64',
+            'i64->u32': 'i32.wrap_i64',
+            'u64->i32': 'i32.wrap_i64',
+            'u64->u32': 'i32.wrap_i64',
+        }[`${from}->${to}`];
+        if (!instr) throw new Error(`Unsupported numeric coercion from ${from} to ${to}`);
+        out.push(instr);
+    }
+
+    isNumericWasmType(type) {
+        return type === 'i32' || type === 'u32' || type === 'i64' || type === 'u64' || type === 'f32' || type === 'f64';
     }
 
     wasmType(type) {
@@ -1271,16 +1296,15 @@ class WatGen {
     valueHint(hint) { return hint === DISCARD_HINT ? null : hint; }
     needsDiscardHint(node) { return DISCARD_HINT_NODES.has(node.type); }
     genBranchExpr(node, hint, out) {
-        if (node.type === 'block') return void this.genBlock(node, out, false, hint);
+        if (node.type === 'block') return void this.genBody(kids(node), out, false, hint);
         this.genExpr(node, hint ?? DISCARD_HINT, out);
         if (!hint && this.discardedExprLeavesValue(node)) out.push('drop');
     }
     discardedExprLeavesValue(node) { return this.exprProducesValue(node) && !this.needsDiscardHint(node) && node.type !== 'fatal_expr'; }
 
     dominantType(left, right) {
-        const floats = ['f32', 'f64'];
-        if (floats.includes(left)) return left;
-        if (floats.includes(right)) return right;
+        if (left === 'f64' || right === 'f64') return 'f64';
+        if (left === 'f32' || right === 'f32') return 'f32';
         if (left === 'i64' || right === 'i64') return 'i64';
         if (left === 'u64' || right === 'u64') return 'u64';
         if (left === 'u32' || right === 'u32') return 'u32';
@@ -1292,7 +1316,7 @@ class WatGen {
     fnParams(fn) { return parseParamList(childOfType(fn.node, 'param_list')); }
     fnReturnType(fn) { return parseReturnType(childOfType(fn.node, 'return_type')); }
     fnBody(fn) { return childOfType(fn.node, 'block'); }
-    inferredToType(inferred) { return !inferred ? null : SCALAR_NAMES.has(inferred) ? { kind: 'scalar', name: inferred } : { kind: 'named', name: inferred }; }
+    inferredToType(inferred) { return inferred ? { kind: SCALAR_NAMES.has(inferred) ? 'scalar' : 'named', name: inferred } : null; }
     exprType(node) {
         if (!node) return null;
         switch (node.type) {
@@ -1362,10 +1386,10 @@ class WatGen {
         const emit = SCALAR_PATTERN_GENERATORS[patternNode.type];
         if (emit) return emit(this, patternNode, hint, out);
         if (node.text === 'true' || node.text === 'false') {
-            this.pushConst(node.text === 'true' ? 1 : 0, 'i32', out);
+            out.push(`i32.const ${node.text === 'true' ? 1 : 0}`);
             return;
         }
-        throw new WatError(`Unsupported scalar match pattern: ${node.text}`);
+        throw new Error(`Unsupported scalar match pattern: ${node.text}`);
     }
     scalarMatchCompareType(inferred) { return SCALAR_MATCH_COMPARE_TYPES[inferred] || 'i32'; }
 
@@ -1373,7 +1397,7 @@ class WatGen {
     defaultValue(type) {
         const emit = DEFAULT_VALUE_GENERATORS[type?.kind];
         if (emit) return emit(this, type);
-        return this.constInstr(0, this.scalarWasmType(type?.name || 'i32'));
+        return `${this.scalarWasmType(type?.name || 'i32')}.const 0`;
     }
 
     nullLiteralTarget(hint) {
@@ -1383,8 +1407,6 @@ class WatGen {
     }
 
     nullableNullTarget(inner) { return inner?.kind === 'named' ? this.refNullTarget(inner.name) : 'none'; }
-    constInstr(value, wasmType) { return `${wasmType}.const ${value}`; }
-    pushConst(value, wasmType, out) { out.push(this.constInstr(value, wasmType)); }
     genExprInline(node, hint) { const out = []; this.genExpr(node, hint, out); return out.join(' '); }
     inferNsCallType({ ns, method }, args) {
         const infer = INFER_NS_CALL_HANDLERS[ns];
@@ -1403,10 +1425,6 @@ class WatGen {
 
 const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec') });
 const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: true });
-const parseGlobalDecl = (node) => {
-    const [name, type, value] = kids(node);
-    return { kind: 'global_decl', name: name.text, type: parseType(type), value };
-};
 const parseImportDecl = (node) => {
     const [moduleNode, nameNode, typeNode] = kids(node), module = moduleNode.text.slice(1, -1), name = nameNode.text;
     const { hostName } = parseHostImportName(name);
@@ -1423,22 +1441,6 @@ const parseJsgenDecl = (node, index) => ({
     params: parseImportParamList(childOfType(node, 'import_param_list')),
     returnType: parseReturnType(childOfType(node, 'return_type')),
 });
-const parseTestDecl = (node) => ({ kind: 'test_decl', name: kids(node)[0].text.slice(1, -1), body: childOfType(node, 'block') });
-const parseSetupDecl = (node) => {
-    const named = kids(node), measure = named.at(-1);
-    if (measure?.type !== 'measure_decl') throw new WatError('bench setup must end with a measure block');
-    return { setupPrelude: named.slice(0, -1), measureBody: childOfType(measure, 'block') };
-};
-const parseBenchDecl = (node) => {
-    const setup = childOfType(node, 'setup_decl');
-    if (!setup) throw new WatError('bench must contain exactly one setup block');
-    return {
-        kind: 'bench_decl',
-        name: kids(node)[0].text.slice(1, -1),
-        capture: kids(childOfType(node, 'bench_capture'))[0].text,
-        ...parseSetupDecl(setup),
-    };
-};
 
 const parseFieldList = (node) => mapType(node, 'field', parseField);
 const parseField = (node) => {
@@ -1455,10 +1457,7 @@ const parseParam = (node) => {
 const parseImportParamList = (node) => kids(node).map(child => child.type === 'param' ? parseParam(child) : { kind: 'anon_param', type: parseType(child) });
 
 function parseType(node) {
-    if (!node) return null;
-    const parse = PARSE_TYPE_HANDLERS[node.type];
-    if (parse) return parse(node);
-    throw new WatError(`Unknown type node: ${node.type}`);
+    return node ? PARSE_TYPE_HANDLERS[node.type](node) : null;
 }
 
 function parseReturnType(node) {
@@ -1510,8 +1509,7 @@ function literalInfo(node) {
     if (string !== null) return { kind: 'string', value: string };
     if (child?.type === 'int_lit') return { kind: 'int', value: parseIntLit(child.text) };
     if (child?.type === 'float_lit') return { kind: 'float', value: parseFloat(child.text) };
-    if (LITERAL_TEXT_INFO[node.text]) return LITERAL_TEXT_INFO[node.text];
-    throw new WatError(`Unknown literal: ${node.text}`);
+    return LITERAL_TEXT_INFO[node.text];
 }
 
 const parseIntLit = (text) => text.startsWith('0x') ? parseInt(text.slice(2), 16) : text.startsWith('0b') ? parseInt(text.slice(2), 2) : parseInt(text, 10);

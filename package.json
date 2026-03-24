@@ -27,7 +27,8 @@
     "wasm",
     "tree-sitter"
   ],
-  "browser": "./dist/web/extension.cjs",
+  "main": "./dist/web/extension.js",
+  "browser": "./dist/web/extension.js",
   "activationEvents": [
     "workspaceContains:**/*.utu"
   ],

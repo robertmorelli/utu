@@ -58,9 +58,9 @@ export async function executeRuntimeTest(runtime, ordinal, { now = () => perform
   const start = now();
   try {
     await runtime.exports[t.exportName]();
-    return { name: t.name, exportName: t.exportName, durationMs: now() - start, passed: true };
+    return { name: t.name, exportName: t.exportName, durationMs: now() - start, logs: [], passed: true };
   } catch (e) {
-    return { name: t.name, exportName: t.exportName, durationMs: now() - start, error: JSON.stringify(e), passed: false };
+    return { name: t.name, exportName: t.exportName, durationMs: now() - start, logs: [], error: JSON.stringify(e), passed: false };
   }
 }
 
@@ -101,6 +101,7 @@ export async function executeRuntimeBenchmark(runtime, ordinal, options = {}, me
   const summary = `${bench.name}: mean ${fmtIps(meanRate)}, min ${fmtIps(Math.min(...rates))}, max ${fmtIps(Math.max(...rates))}, ${fmtNs(iterTotal > 0 ? durationMs / iterTotal * 1e6 : 0)}/iter, ${seconds.toFixed(3)}s total target, ${runs.map(r => r.iterations).join(', ')} iterations`;
   return {
     name: bench.name, exportName: bench.exportName,
+    logs: [],
     durationMs, maxMs: Math.max(...durMs), meanMs: durationMs / runs.length, minMs: Math.min(...durMs),
     perIterationMs: iterTotal > 0 ? durationMs / iterTotal : 0,
     sampleDurationsMs: durMs, sampleElapsedNs: runs.map(r => r.elapsedNs),

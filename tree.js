@@ -1,46 +1,36 @@
-const COMMENT_NODE_TYPE = 'comment';
+export const rootNode = n => n?.rootNode ?? n;
+export const namedChildren = n => (n?.namedChildren ?? []).filter(c => c.type !== 'comment');
+export const childOfType = (n, t) => namedChildren(n).find(c => c.type === t) ?? null;
+export const childrenOfType = (n, t) => namedChildren(n).filter(c => c.type === t);
+export const hasAnon = (n, t) => (n?.children ?? []).some(c => !c.isNamed && c.type === t);
+export const walk = (n, v) => n && (v(n), namedChildren(n).forEach(c => walk(c, v)));
+export const walkBlock = (b, v) => namedChildren(b).forEach(s => walk(s, v));
 
-export const rootNode = (treeOrNode) => treeOrNode?.rootNode ?? treeOrNode;
-export const namedChildren = (node) => (node?.namedChildren ?? []).filter(child => child.type !== COMMENT_NODE_TYPE);
-export const childOfType = (node, type) => namedChildren(node).find(child => child.type === type) ?? null;
-export const childrenOfType = (node, type) => namedChildren(node).filter(child => child.type === type);
-export const hasAnon = (node, type) => (node?.children ?? []).some(child => !child.isNamed && child.type === type);
-export const walk = (node, visit) => node && (visit(node), namedChildren(node).forEach(child => walk(child, visit)));
-export const walkBlock = (block, visit) => namedChildren(block).forEach(stmt => walk(stmt, visit));
+export const stringLiteralValue = n => {
+    const c = n?.type === 'literal' ? namedChildren(n)[0] : null;
+    return c?.type === 'string_lit' ? c.text.slice(1, -1)
+        : c?.type === 'multiline_string_lit' ? childrenOfType(c, 'multiline_string_line').map(l => l.text.slice(2)).join('\n')
+        : null;
+};
 
-export function stringLiteralValue(node) {
-    if (node?.type !== 'literal') return null;
-    const child = namedChildren(node)[0];
-    if (!child) return null;
-    return child.type === 'string_lit'
-        ? child.text.slice(1, -1)
-        : child.type === 'multiline_string_lit'
-            ? childrenOfType(child, 'multiline_string_line').map(line => line.text.slice(2)).join('\n')
-            : null;
-}
-
-export function findAnonBetween(node, leftChild, rightChild) {
-    let inGap = false;
-    for (const child of node?.children ?? []) {
-        if (child.id === leftChild.id) { inGap = true; continue; }
-        if (child.id === rightChild.id) break;
-        if (inGap && !child.isNamed) return child.type;
+export function findAnonBetween(n, l, r) {
+    let gap = 0;
+    for (const c of n?.children ?? []) {
+        if (c.id === l.id) gap = 1;
+        else if (c.id === r.id) break;
+        else if (gap && !c.isNamed) return c.type;
     }
     return '?';
 }
 
-export function throwOnParseErrors(node) {
-    const errors = [];
-    collectParseErrors(node, errors);
-    if (errors.length) throw new Error(`Parse errors:\n${errors.map(({ message, row, col }) => `  ${message} at ${row + 1}:${col + 1}`).join('\n')}`);
+export function throwOnParseErrors(n) {
+    const errs = [];
+    const collect = c => {
+        if (c?.type === 'ERROR' || c?.isMissing) {
+            errs.push(`  ${c.type === 'ERROR' ? 'Unexpected token' : `Missing ${c.type}`} at ${c.startPosition.row + 1}:${c.startPosition.column + 1}`);
+        }
+        c?.children?.forEach(collect);
+    };
+    collect(n);
+    if (errs.length) throw new Error(`Parse errors:\n${errs.join('\n')}`);
 }
-
-const collectParseErrors = (node, out) => {
-    if (!node) return;
-    if (node.type === 'ERROR' || node.isMissing) out.push({
-        message: node.type === 'ERROR' ? 'Unexpected token' : `Missing ${node.type}`,
-        row: node.startPosition.row,
-        col: node.startPosition.column,
-    });
-    for (const child of node.children ?? []) collectParseErrors(child, out);
-};

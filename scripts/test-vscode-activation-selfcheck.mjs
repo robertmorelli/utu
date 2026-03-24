@@ -7,10 +7,10 @@ const source = 'export fun main() i32 { 0; }';
 
 async function main() {
   const packageMetadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  if (packageMetadata.browser !== './dist/web/extension.cjs') {
-    throw new Error(`Expected package.json browser entry to target ./dist/web/extension.cjs, received ${JSON.stringify(packageMetadata.browser)}`);
+  if (packageMetadata.browser !== './dist/web/extension.js') {
+    throw new Error(`Expected package.json browser entry to target ./dist/web/extension.js, received ${JSON.stringify(packageMetadata.browser)}`);
   }
-  await access(new URL('../dist/web/extension.cjs', import.meta.url));
+  await access(new URL('../dist/web/extension.js', import.meta.url));
 
   const compiler = await import('../dist/compiler.web.mjs');
   const metadata = await compiler.get_metadata(source);

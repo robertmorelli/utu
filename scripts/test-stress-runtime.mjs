@@ -28,6 +28,7 @@ const cases = [
             expectEqual(runtime.metadata.tests.length, 2);
             for (let ordinal = 0; ordinal < runtime.metadata.tests.length; ordinal += 1) {
                 const result = await executeRuntimeTest(runtime, ordinal);
+                expectDeepEqual(result.logs, []);
                 if (!result.passed) {
                     throw new Error(`Expected ${result.name} to pass, received ${result.error}`);
                 }
@@ -42,6 +43,7 @@ const cases = [
                 samples: 1,
                 warmup: 0,
             });
+            expectDeepEqual(result.logs, []);
             if (!Number.isFinite(result.meanMs) || result.meanMs < 0) {
                 throw new Error(`Expected a finite benchmark mean, received ${result.meanMs}`);
             }

@@ -62,7 +62,6 @@ class ModuleExpander {
 
     expand() {
         this.collectTopLevelSymbols(this.createRootContext());
-        this.validateModuleNameCollisions();
 
         const ctx = this.createRootContext();
         const topLevelOutputs = [];
@@ -129,10 +128,6 @@ class ModuleExpander {
         return undefined;
     }
 
-    sourceOf(node) {
-        return this.source.slice(node.startIndex, node.endIndex);
-    }
-
     collectTopLevelSymbols(ctx) {
         for (const item of kids(this.root)) {
             if (item.type === 'module_decl') this.collectModuleTemplate(item);
@@ -191,9 +186,6 @@ class ModuleExpander {
         if (assocNode) {
             const [ownerNode, nameNode] = kids(assocNode);
             const key = `${ownerNode.text}.${nameNode.text}`;
-            if (this.topLevelAssocNames.has(key)) {
-                throw new Error(`Duplicate associated function "${key}".`);
-            }
             this.topLevelAssocNames.set(key, this.mangleTopLevelAssoc(ownerNode.text, nameNode.text));
             this.topLevelAssocReturns.set(key, returnInfo);
             return;
@@ -207,38 +199,13 @@ class ModuleExpander {
 
     collectModuleTemplate(node) {
         const name = moduleNameNode(node).text;
-        if (this.moduleTemplates.has(name)) {
-            throw new Error(`Duplicate module "${name}".`);
-        }
         const items = kids(node).filter((child) => !['identifier', 'type_ident', 'module_name', 'module_type_param_list'].includes(child.type));
-        for (const item of items) this.validateModuleItem(item);
         this.moduleNames.add(name);
         this.moduleTemplates.set(name, {
             name,
             typeParams: childrenOfType(childOfType(node, 'module_type_param_list'), 'type_ident').map((child) => child.text),
             items,
         });
-    }
-
-    static #MODULE_ITEM_ERRORS = {
-        module_decl: 'nested modules are not supported in v1.',
-        construct_decl: 'construct declarations are top-level only in v1.',
-        export_decl: 'export declarations are not supported inside modules in v1.',
-        test_decl: 'test declarations are not supported inside modules in v1.',
-        bench_decl: 'bench declarations are not supported inside modules in v1.',
-    };
-
-    validateModuleItem(node) {
-        const err = ModuleExpander.#MODULE_ITEM_ERRORS[node.type];
-        if (err) throw new Error(err);
-    }
-
-    validateModuleNameCollisions() {
-        for (const name of this.moduleNames) {
-            if (this.topLevelValueNames.has(name)) {
-                throw new Error(`Module "${name}" conflicts with a top-level value name.`);
-            }
-        }
     }
 
     applyConstruct(node, ctx) {
@@ -248,11 +215,7 @@ class ModuleExpander {
         const namespace = this.resolveNamespaceFromModuleRef(moduleRef, ctx);
 
         if (aliasNode) {
-            const aliasName = aliasNode.text;
-            if (ctx.aliases.has(aliasName) || this.moduleNames.has(aliasName) || this.topLevelValueNames.has(aliasName)) {
-                throw new Error(`construct alias "${aliasName}" collides with an existing top-level name.`);
-            }
-            ctx.aliases.set(aliasName, namespace);
+            ctx.aliases.set(aliasNode.text, namespace);
             return;
         }
 
@@ -261,18 +224,10 @@ class ModuleExpander {
 
     openNamespace(namespace, ctx) {
         for (const name of namespace.exportedValues) {
-            const existing = ctx.openValues.get(name);
-            if (this.topLevelValueNames.has(name) || (existing && existing !== namespace)) {
-                throw new Error(`construct ${namespace.displayText}; would collide on value "${name}".`);
-            }
             ctx.openValues.set(name, namespace);
         }
 
         for (const name of namespace.exportedTypes) {
-            const existing = ctx.openTypes.get(name);
-            if (this.topLevelTypeNames.has(name) || (existing && existing !== namespace)) {
-                throw new Error(`construct ${namespace.displayText}; would collide on type "${name}".`);
-            }
             ctx.openTypes.set(name, namespace);
         }
     }
@@ -286,13 +241,7 @@ class ModuleExpander {
         if (argNodes.length === 0 && ctx.aliases.has(name)) return ctx.aliases.get(name);
 
         const template = this.moduleTemplates.get(name);
-        if (!template) throw new Error(`Unknown module "${name}".`);
-
         const argTexts = argNodes.map((typeNode) => this.emitType(typeNode, ctx));
-        if (argTexts.length !== template.typeParams.length) {
-            throw new Error(`Module "${name}" expects ${template.typeParams.length} type argument(s), received ${argTexts.length}.`);
-        }
-
         return this.ensureNamespace(template, argTexts, ctx);
     }
 
@@ -367,9 +316,6 @@ class ModuleExpander {
                     if (assocNode) {
                         const [ownerNode, nameNode] = kids(assocNode);
                         const key = `${ownerNode.text}.${nameNode.text}`;
-                        if (namespace.assocNames.has(key)) {
-                            throw new Error(`Duplicate associated function "${key}" in module "${namespace.displayText}".`);
-                        }
                         namespace.assocNames.set(key, this.mangleNamespaceAssoc(namespace, ownerNode.text, nameNode.text));
                         namespace.assocReturns.set(key, this.describeReturn(childOfType(item, 'return_type'), ctx));
                         break;
@@ -402,7 +348,6 @@ class ModuleExpander {
     }
 
     registerNamespaceType(namespace, name) {
-        if (namespace.typeNames.has(name)) throw new Error(`Duplicate type "${name}" in module "${namespace.displayText}".`);
         const value = this.mangleNamespaceType(namespace, name);
         namespace.typeNames.set(name, value);
         if (name === namespace.template.name) {
@@ -413,7 +358,6 @@ class ModuleExpander {
     }
 
     registerNamespaceValue(namespace, name) {
-        if (namespace.freeValueNames.has(name)) throw new Error(`Duplicate value "${name}" in module "${namespace.displayText}".`);
         namespace.freeValueNames.set(name, this.mangleNamespaceValue(namespace, name));
         namespace.exportedValues.push(name);
     }
@@ -444,9 +388,9 @@ class ModuleExpander {
     emitItem(node, ctx, inModule) {
         switch (node.type) {
             case 'module_decl':
-                throw new Error('nested modules are not supported in v1.');
+                return '';
             case 'construct_decl':
-                throw new Error('construct declarations are top-level only in v1.');
+                return '';
             case 'struct_decl':
                 return this.emitStructDecl(node, ctx, inModule);
             case 'type_decl':
@@ -460,16 +404,13 @@ class ModuleExpander {
             case 'jsgen_decl':
                 return `${this.emitJsgenDecl(node, ctx, inModule)};`;
             case 'export_decl':
-                if (inModule) throw new Error('export declarations are not supported inside modules in v1.');
-                return `export ${this.emitFnDecl(childOfType(node, 'fn_decl'), ctx, false)}`;
+                return inModule ? '' : `export ${this.emitFnDecl(childOfType(node, 'fn_decl'), ctx, false)}`;
             case 'test_decl':
-                if (inModule) throw new Error('test declarations are not supported inside modules in v1.');
-                return this.emitTestDecl(node, ctx);
+                return inModule ? '' : this.emitTestDecl(node, ctx);
             case 'bench_decl':
-                if (inModule) throw new Error('bench declarations are not supported inside modules in v1.');
-                return this.emitBenchDecl(node, ctx);
+                return inModule ? '' : this.emitBenchDecl(node, ctx);
             default:
-                throw new Error(`Unsupported item during module expansion: ${node.type}`);
+                return '';
         }
     }
 
@@ -519,14 +460,10 @@ class ModuleExpander {
     emitAssociatedFnName(node, ctx, inModule) {
         const [ownerNode, nameNode] = kids(node);
         if (inModule) {
-            const value = ctx.namespace.assocNames.get(`${ownerNode.text}.${nameNode.text}`);
-            if (!value) throw new Error(`Unknown associated function "${ownerNode.text}.${nameNode.text}" in module "${ctx.namespace.displayText}".`);
-            return value;
+            return ctx.namespace.assocNames.get(`${ownerNode.text}.${nameNode.text}`);
         }
         const key = `${ownerNode.text}.${nameNode.text}`;
-        const value = this.topLevelAssocNames.get(key);
-        if (!value) throw new Error(`Unknown associated function "${key}".`);
-        return value;
+        return this.topLevelAssocNames.get(key);
     }
 
     emitParam(node, ctx) {
@@ -699,8 +636,7 @@ class ModuleExpander {
     }
 
     resolvePromotedType(namespace) {
-        if (namespace.promotedType) return namespace.promotedType;
-        throw new Error(`Module "${namespace.displayText}" does not expose a promoted type.`);
+        return namespace.promotedType;
     }
 
     emitExpr(node, ctx) {
@@ -710,7 +646,7 @@ class ModuleExpander {
             case 'identifier':
                 return this.resolveBareValue(node.text, ctx);
             case 'instantiated_module_ref':
-                throw new Error(`Module path "${this.sourceOf(node)}" is not a value.`);
+                return node.text;
             case 'promoted_module_call_expr':
                 return this.emitPromotedModuleCall(node, ctx);
             case 'paren_expr':
@@ -775,7 +711,7 @@ class ModuleExpander {
             case 'block':
                 return this.emitBlock(node, this.pushScope(ctx), true);
             default:
-                throw new Error(`Unsupported expression during module expansion: ${node.type}`);
+                return node.text;
         }
     }
 
@@ -853,9 +789,7 @@ class ModuleExpander {
         if (['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type)) {
             const namespace = this.resolveNamespaceFromModuleRef(ownerNode, ctx);
             const ownerName = childOfType(ownerNode, 'type_ident')?.text ?? namespace.promotedTypeName;
-            const resolved = namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
-            if (resolved) return resolved;
-            throw new Error(`Unknown associated function "${ownerName}.${memberNode.text}" in module "${namespace.displayText}".`);
+            return namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
         }
 
         const ownerName = ownerNode.text;
@@ -875,7 +809,7 @@ class ModuleExpander {
             const resolved = promoted.assocNames.get(`${promoted.promotedTypeName}.${memberNode.text}`);
             if (resolved) return resolved;
         }
-        throw new Error(`Unknown associated function "${ownerName}.${memberNode.text}".`);
+        return undefined;
     }
 
     emitNamespaceCallExpr(node, ctx) {
@@ -890,7 +824,6 @@ class ModuleExpander {
         const argsNode = childOfType(node, 'arg_list');
         const namespace = this.resolveNamespaceFromModuleRef(node, ctx);
         const callee = this.resolveNamespaceValue(namespace, memberNode.text);
-        if (!callee) throw new Error(`Unknown value "${memberNode.text}" in module "${namespace.displayText}".`);
         return `${callee}(${kids(argsNode).map((arg) => this.emitExpr(arg, ctx)).join(', ')})`;
     }
 
@@ -900,7 +833,6 @@ class ModuleExpander {
         const { callee, args } = this.parsePipeTarget(targetNode, ctx);
         const value = this.emitExpr(valueNode, ctx);
         const placeholderCount = args.filter((arg) => arg.kind === 'placeholder').length;
-        if (placeholderCount > 1) throw new Error('pipe targets can contain at most one underscore placeholder');
         const finalArgs = placeholderCount === 0
             ? [value, ...args.map((arg) => this.emitExpr(arg.node, ctx))]
             : args.map((arg) => arg.kind === 'placeholder' ? value : this.emitExpr(arg.node, ctx));
@@ -931,39 +863,30 @@ class ModuleExpander {
             if (first.type === 'identifier') {
                 const namespace = this.resolveMaybeNamespaceName(first.text, ctx);
                 if (namespace) {
-                    const value = this.resolveNamespaceValue(namespace, second.text);
-                    if (!value) throw new Error(`Unknown value "${second.text}" in module "${namespace.displayText}".`);
-                    return { callee: value, args };
+                    return { callee: this.resolveNamespaceValue(namespace, second.text), args };
                 }
             }
             if (['module_ref', 'instantiated_module_ref'].includes(first.type)) {
                 const namespace = this.resolveNamespaceFromModuleRef(first, ctx);
-                const value = this.resolveNamespaceValue(namespace, second.text);
-                if (!value) throw new Error(`Unknown value "${second.text}" in module "${namespace.displayText}".`);
-                return { callee: value, args };
+                return { callee: this.resolveNamespaceValue(namespace, second.text), args };
             }
         }
 
         if (pathParts.length === 3 && pathParts[0].type === 'identifier' && pathParts[1].type === 'type_ident') {
             const namespace = this.resolveMaybeNamespaceName(pathParts[0].text, ctx);
-            if (!namespace) throw new Error(`Unknown module or construct alias "${pathParts[0].text}".`);
             const ownerName = pathParts[1].text;
             const memberName = pathParts[2].text;
-            const value = namespace.assocNames.get(`${ownerName}.${memberName}`);
-            if (!value) throw new Error(`Unknown associated function "${ownerName}.${memberName}" in module "${namespace.displayText}".`);
-            return { callee: value, args };
+            return { callee: namespace?.assocNames.get(`${ownerName}.${memberName}`), args };
         }
 
         if (pathParts.length === 3 && ['module_ref', 'instantiated_module_ref'].includes(pathParts[0].type)) {
             const namespace = this.resolveNamespaceFromModuleRef(pathParts[0], ctx);
             const ownerName = pathParts[1].text;
             const memberName = pathParts[2].text;
-            const value = namespace.assocNames.get(`${ownerName}.${memberName}`);
-            if (!value) throw new Error(`Unknown associated function "${ownerName}.${memberName}" in module "${namespace.displayText}".`);
-            return { callee: value, args };
+            return { callee: namespace.assocNames.get(`${ownerName}.${memberName}`), args };
         }
 
-        throw new Error(`Unsupported pipe target "${this.sourceOf(node)}".`);
+        return { callee: undefined, args };
     }
 
 
@@ -979,8 +902,7 @@ class ModuleExpander {
 
     resolveAssociatedByOwner(ownerName, memberName, ctx) {
         const entry = this.resolveAssociatedEntry(ownerName, memberName, ctx);
-        if (entry) return entry.callee;
-        throw new Error(`Unknown associated function "${ownerName}.${memberName}".`);
+        return entry?.callee;
     }
 
     resolveNamespaceValue(namespace, memberName) {
@@ -1159,4 +1081,3 @@ class ModuleExpander {
         return `{\n${statements.map((stmt) => `    ${stmt}`).join('\n')}\n}`;
     }
 }
-

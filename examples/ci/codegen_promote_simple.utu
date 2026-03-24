@@ -1,6 +1,14 @@
+struct Box {
+    value: i32,
+}
+
+fun maybe_box() ?Box {
+    ref.null Box;
+}
+
 fun test_promote() i32 {
-    promote (ref.null i32) |x| {
-        42;
+    promote maybe_box() |box| {
+        box.value;
     } else {
         0;
     };
