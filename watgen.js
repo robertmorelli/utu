@@ -292,6 +292,9 @@ const CALL_CALLEE_HANDLERS = {
         out.push(`array.get ${ctx.arrayTypeNameFromInferred(ctx.inferType(object))}`);
         out.push('call_ref');
     },
+    field_expr: (_ctx, callee) => {
+        throw new WatError(`Unresolved method call '.${kids(callee)[1]?.text ?? '?'}()': desugar p.method() in expand.js before watgen`);
+    },
 };
 const ARRAY_INIT_HANDLERS = {
     new: (ctx, args, elemWasm, _arrayTypeName, out) => {
@@ -448,10 +451,11 @@ class WatGen {
 
         this.collectArrayTypes();
 
-        const typeDefs = this.emitTypeDefs();
-        if (typeDefs.length > 0) {
+        for (const def of this.emitPlainTypeDefs()) lines.push(def);
+        const recDefs = this.emitRecTypeDefs();
+        if (recDefs.length > 0) {
             lines.push('  (rec');
-            for (const def of typeDefs) lines.push(def);
+            for (const def of recDefs) lines.push(def);
             lines.push('  )');
         }
 
@@ -537,22 +541,29 @@ class WatGen {
         return key ? key(this, type) : 'unknown';
     }
 
-    emitTypeDefs() {
+    emitPlainTypeDefs() {
         return [
-            ...this.structDecls.map(decl => this.emitStructType(decl)),
-            ...this.typeDecls.flatMap(decl => this.emitSumType(decl)),
-            ...[...this.arrayTypes].map(([key, name]) => `    (type ${name} (array (mut ${this.elemKeyWasmType(key)})))`),
+            ...this.structDecls.filter(d => !d.rec).map(decl => this.emitStructType(decl, '  ')),
+            ...this.typeDecls.filter(d => !d.rec).flatMap(decl => this.emitSumType(decl, '  ')),
         ];
     }
 
-    emitStructType(decl) {
-        return this.emitStructLikeType(`    (type $${decl.name} (struct`, decl.fields, '    ))');
+    emitRecTypeDefs() {
+        return [
+            ...[...this.arrayTypes].map(([key, name]) => `    (type ${name} (array (mut ${this.elemKeyWasmType(key)})))`),
+            ...this.structDecls.filter(d => d.rec).map(decl => this.emitStructType(decl)),
+            ...this.typeDecls.filter(d => d.rec).flatMap(decl => this.emitSumType(decl)),
+        ];
     }
 
-    emitSumType(decl) {
-        const lines = [`    (type $${decl.name} (sub (struct)))`];
+    emitStructType(decl, indent = '    ') {
+        return this.emitStructLikeType(`${indent}(type $${decl.name} (struct`, decl.fields, `${indent}))`);
+    }
+
+    emitSumType(decl, indent = '    ') {
+        const lines = [`${indent}(type $${decl.name} (sub (struct)))`];
         for (const variant of decl.variants)
-            lines.push(this.emitStructLikeType(`    (type $${variant.name} (sub $${decl.name} (struct`, variant.fields, '    )))'));
+            lines.push(this.emitStructLikeType(`${indent}(type $${variant.name} (sub $${decl.name} (struct`, variant.fields, `${indent})))`));
         return lines;
     }
 
@@ -1297,8 +1308,8 @@ class WatGen {
     }
 }
 
-const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) });
-const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')) });
+const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec') });
+const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: hasAnon(node, 'rec') });
 const parseFnDecl = (node) => ({
     kind: 'fn_decl',
     name: textOf(node, 'identifier'),

@@ -499,7 +499,8 @@ class ModuleExpander {
         const nameNode = childOfType(node, 'type_ident');
         const typeName = inModule ? ctx.namespace.typeNames.get(nameNode.text) : nameNode.text;
         const fields = childrenOfType(childOfType(node, 'field_list'), 'field').map((field) => this.emitField(field, ctx));
-        return `struct ${typeName} {\n${fields.map((field) => `    ${field},`).join('\n')}\n}`;
+        const rec = hasAnon(node, 'rec') ? 'rec ' : '';
+        return `${rec}struct ${typeName} {\n${fields.map((field) => `    ${field},`).join('\n')}\n}`;
     }
 
     emitField(node, ctx) {
@@ -511,7 +512,8 @@ class ModuleExpander {
         const typeNameNode = childOfType(node, 'type_ident');
         const typeName = inModule ? ctx.namespace.typeNames.get(typeNameNode.text) : typeNameNode.text;
         const variants = childrenOfType(childOfType(node, 'variant_list'), 'variant').map((variant) => this.emitVariant(variant, ctx, inModule));
-        return `type ${typeName} = ${variants.map((variant) => `| ${variant}`).join(' ')}`;
+        const rec = hasAnon(node, 'rec') ? 'rec ' : '';
+        return `${rec}type ${typeName} = ${variants.map((variant) => `| ${variant}`).join(' ')}`;
     }
 
     emitVariant(node, ctx, inModule) {

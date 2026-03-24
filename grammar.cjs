@@ -110,6 +110,7 @@ module.exports = grammar({
     )),
 
     struct_decl: $ => seq(
+      optional('rec'),
       'struct',
       $.type_ident,
       '{',
@@ -131,6 +132,7 @@ module.exports = grammar({
     ),
 
     type_decl: $ => seq(
+      optional('rec'),
       'type',
       $.type_ident,
       '=',

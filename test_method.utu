@@ -1,0 +1,8 @@
+mod Pair[L, R] {
+    struct Pair { left: L, right: R }
+    fun Pair.left(self: Pair) L { self.left; }
+}
+fun main() void {
+    let p: Pair[i32, i32] = Pair[i32, i32] { left: 1, right: 2 };
+    let a: i32 = p.left();
+}

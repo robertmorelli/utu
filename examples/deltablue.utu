@@ -12,12 +12,12 @@ let direction_backward: i32 = 0 - 1;
 
 escape |(a) => console.log("hello " + a)| greet(str) void;
 
-struct ConstraintList {
+rec struct ConstraintList {
     items: array[Constraint],
     mut count: i32,
 }
 
-struct Variable {
+rec struct Variable {
     mut value: i32,
     constraints: ConstraintList,
     mut determined_by: Constraint # null,
@@ -26,7 +26,7 @@ struct Variable {
     mut stay: bool,
 }
 
-struct VariableList {
+rec struct VariableList {
     items: array[Variable],
     mut count: i32,
 }
@@ -37,7 +37,7 @@ struct Planner {
     variable_capacity: i32,
 }
 
-type Constraint =
+rec type Constraint =
     | EmptyConstraint {}
     | StayConstraint {
         output: Variable,

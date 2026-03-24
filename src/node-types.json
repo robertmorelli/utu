@@ -4975,6 +4975,10 @@
     "named": true
   },
   {
+    "type": "rec",
+    "named": false
+  },
+  {
     "type": "ref",
     "named": false
   },

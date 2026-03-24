@@ -323,6 +323,39 @@ const cases = [
         if (actual !== testCase.expectedReturn)
             throw new Error(`Expected return ${testCase.expectedReturn}, got ${actual}`);
     }]),
+    ['method-sugar-does-not-add-struct-fields', async () => {
+        const source = `struct Vec {
+    x: i32,
+    y: i32,
+}
+
+fun Vec.new(x: i32, y: i32) Vec {
+    Vec { x: x, y: y };
+}
+
+fun Vec.sum(self: Vec) i32 {
+    self.x + self.y;
+}
+
+export fun main() i32 {
+    let v: Vec = Vec.new(3, 4);
+    v.sum();
+}`;
+        const { wat } = await compile(source, { mode: 'program', wat: true });
+        const structBody = wat.match(/\(type \$Vec \(struct([\s\S]*?)\)\s*\)/)?.[1] ?? '';
+        const fieldCount = (structBody.match(/\(field /g) ?? []).length;
+        if (fieldCount !== 2)
+            throw new Error(`Vec struct has ${fieldCount} WAT field(s), expected exactly 2. Method sugar must not add implicit fields to the struct.`);
+    }],
+    ['unresolved-field-call-throws-instead-of-emitting-call-ref', async () => {
+        try {
+            await compile(`export fun main() i32 { let x: i32 = 0; x.ghost(); }`, { mode: 'program' });
+        } catch (error) {
+            if (String(error?.message ?? error).includes('ghost')) return;
+            throw new Error(`Expected error mentioning 'ghost', got: ${error?.message}`);
+        }
+        throw new Error('Expected compile to fail for unresolved method call');
+    }],
     ['binaryen-strips-unused-instantiated-functions', async () => {
         const single = await inspectOptimizedModule(makeBinaryenDceSource(1));
         const many = await inspectOptimizedModule(makeBinaryenDceSource(50));
