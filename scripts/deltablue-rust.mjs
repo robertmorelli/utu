@@ -75,7 +75,7 @@ async function prepareCache() {
 async function prepareUtuBundle() {
   const source = await readFile(path.join(repoRoot, 'examples/deltablue.utu'), 'utf8');
   await compiler.init();
-  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench' });
+  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench', where: 'external' });
   const metadataText = JSON.stringify({ benches: metadata.benches }, null, 2);
   const moduleBytes = Buffer.byteLength(js, 'utf8');
   await Promise.all([
@@ -121,9 +121,12 @@ async function prepareRustVariant(manifestRelPath, artifactName, wasmKey, native
 }
 
 async function runUtuCase(_, benchCase, iterations) {
-  const metadata = JSON.parse(await readFile(path.join(cacheDir, 'utu', 'metadata.json'), 'utf8'));
+  const [metadata, wasm] = await Promise.all([
+    readFile(path.join(cacheDir, 'utu', 'metadata.json'), 'utf8').then(JSON.parse),
+    readFile(path.join(cacheDir, 'utu', 'utu.wasm')),
+  ]);
   const mod = await import(pathToFileURL(path.join(cacheDir, 'utu', 'module.mjs')).href);
-  const exports = await mod.instantiate();
+  const exports = await mod.instantiate(wasm);
   exports[metadata.benches.find((bench) => bench.name === `deltablue_${benchCase}`).exportName](iterations);
 }
 
@@ -140,10 +143,10 @@ async function loadUtuBenchmarkCases() {
   const dir = await mkdtemp(path.join(tmpdir(), 'utu-rust-compare-utu-'));
   const source = await readFile(path.join(repoRoot, 'examples/deltablue.utu'), 'utf8');
   await compiler.init();
-  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench' });
+  const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench', where: 'external' });
   await writeFile(path.join(dir, 'module.mjs'), js, 'utf8');
   const mod = await import(pathToFileURL(path.join(dir, 'module.mjs')).href);
-  const exports = await mod.instantiate();
+  const exports = await mod.instantiate(wasm);
   return metadata.benches.map((bench) => ({
     name: `utu_${bench.name.replace(/^deltablue_/, '')}`,
     wasmBytes: wasm.length,

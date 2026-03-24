@@ -26,13 +26,14 @@ async function compileCmd(args) {
   const source = await readFile(file, "utf8");
   const outputDir = outdir ? path.resolve(outdir) : bun ? path.dirname(file) : path.resolve(data.compileNodeDefaults.outdir);
   const base = path.join(outputDir, path.basename(file, path.extname(file)));
-  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "base64" : "local_file_node", moduleFormat: "esm" });
+  const targetName = path.basename(file, path.extname(file));
+  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null });
   await mkdir(path.dirname(base), { recursive: true });
   const outputs = [!bun && [`${base}.mjs`, shim, "utf8"], !bun && [`${base}.wasm`, wasm], watText && [`${base}.wat`, watText, "utf8"]].filter(Boolean);
   if (bun) await Promise.all([rm(`${base}.mjs`, { force: true }), rm(`${base}.wasm`, { force: true }), wat ? undefined : rm(`${base}.wat`, { force: true })]);
   await Promise.all(outputs.map(([filePath, value, encoding]) => writeFile(filePath, value, encoding)));
   outputs.forEach(([filePath]) => console.log(`Wrote ${filePath}`));
-  if (bun) console.log(`Wrote ${await buildBunExecutable(base, shim)}`);
+  if (bun) console.log(`Wrote ${await buildBunExecutable(base, shim, wasm, targetName)}`);
 }
 
 async function runCmd(args) {
@@ -103,7 +104,7 @@ function parseNumber(value, flag, parse, valid) {
 function fail(message) { throw new Error(message); }
 function text(error) { return error instanceof Error ? error.message : String(error); }
 
-async function buildBunExecutable(base, shim) {
+async function buildBunExecutable(base, shim, wasm, targetName) {
   const buildRoot = path.join(tmpdir(), "utu-bun-build");
   await mkdir(buildRoot, { recursive: true });
   const dir = await mkdtemp(path.join(buildRoot, "utu-bun-"));
@@ -111,6 +112,7 @@ async function buildBunExecutable(base, shim) {
   const runner = path.join(dir, "run.mjs");
   await Promise.all([
     writeFile(path.join(dir, "program.mjs"), shim, "utf8"),
+    writeFile(path.join(dir, `${targetName}.wasm`), wasm),
     writeFile(runner, 'import { instantiate } from "./program.mjs";\nconst exports = await instantiate();\nconst result = await exports.main();\nif (result !== undefined) console.log(result);\n', "utf8"),
   ]);
   try {
@@ -130,7 +132,7 @@ function exec(command, args) {
 }
 
 function loadRuntime(source, { mode = "program", targetName = null } = {}) {
-  return loadCompiledRuntime({ source, mode, compileSource, loadModule: shim => loadNodeModuleFromSource(shim), compileOptions: { targetName } });
+  return loadCompiledRuntime({ source, mode, compileSource, loadModule: shim => loadNodeModuleFromSource(shim), compileOptions: { targetName, where: "external" } });
 }
 
 async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null } = {}) {

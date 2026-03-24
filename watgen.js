@@ -101,7 +101,7 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         }
     },
     jsgen_decl: (ctx, item) => {
-        ctx.importFns.push(parseJsgenDecl(item));
+        ctx.importFns.push(parseJsgenDecl(item, ctx.jsgenImportCount++));
     },
     export_decl: (ctx, item) => {
         const fn = parseFnDecl(childOfType(item, 'fn_decl'));
@@ -398,6 +398,7 @@ class WatGen {
         this.currentReturnType = null;
         this.currentProfileId = null;
         this.uid = 0;
+        this.jsgenImportCount = 0;
         this.metadata = { tests: [], benches: [] };
     }
 
@@ -1328,11 +1329,11 @@ const parseImportDecl = (node) => {
         ? { kind: 'import_fn', module, name, hostName, params: parseImportParamList(childOfType(node, 'import_param_list')), returnType: parseReturnType(childOfType(node, 'return_type')) }
         : { kind: 'import_val', module, name, hostName, type: parseType(typeNode) };
 };
-const parseJsgenDecl = (node) => ({
+const parseJsgenDecl = (node, index) => ({
     kind: 'import_fn',
-    module: '__utu_jsgen',
+    module: '',
     name: textOf(node, 'identifier'),
-    hostName: textOf(node, 'identifier'),
+    hostName: String(index),
     jsSource: childOfType(node, 'jsgen_lit')?.text.slice(1, -1) ?? '',
     params: parseImportParamList(childOfType(node, 'import_param_list')),
     returnType: parseReturnType(childOfType(node, 'return_type')),

@@ -32,13 +32,14 @@ export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     });
 }
 
-export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null } = {}) {
+export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false } = {}) {
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
     return withParsedTree(parser, source, async (tree) => {
         throwOnParseErrors(tree.rootNode);
         const expandedSource = expandSource(tree, source);
         const runCompile = async (activeTree) => {
             const { wat, metadata } = watgen(activeTree, { mode, profile, targetName });
+            metadata.targetName = targetName;
             const binaryen = await ensureBinaryen();
             let mod, wasm;
             _binaryenCapture.active = true;
@@ -66,7 +67,7 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
                 _binaryenCapture.active = false;
                 mod?.dispose();
             }
-            const generatedShim = jsgen(activeTree, wasm, { mode, profile, where, moduleFormat, metadata });
+            const generatedShim = jsgen(activeTree, wasm, { mode, profile, where, moduleFormat, metadata, source: includeSource ? source : null });
             const result = {
                 shim: where === 'packed_base64' ? btoa(generatedShim) : generatedShim,
                 js: generatedShim,

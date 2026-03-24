@@ -10,8 +10,6 @@ let direction_none: i32 = 0;
 let direction_forward: i32 = 1;
 let direction_backward: i32 = 0 - 1;
 
-escape |(a) => console.log("hello " + a)| greet(str) void;
-
 rec struct ConstraintList {
     items: array[Constraint],
     mut count: i32,
