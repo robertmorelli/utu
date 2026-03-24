@@ -1,6 +1,6 @@
 struct ApiError {}
 
-shimport "es" maybe_label(bool) str # null;
+shimport "es" maybe_label(bool) ?str;
 shimport "es" maybe_structured(bool) str # ApiError;
 escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
@@ -13,7 +13,7 @@ fun label_or_force(flag: bool) str {
 }
 
 fun structured_import_nulls(flag: bool) bool {
-    let value: str # null, err: ApiError # null = maybe_structured(flag);
+    let value: ?str, err: ?ApiError = maybe_structured(flag);
     if flag {
         not ref.is_null(value) and ref.is_null(err);
     } else {

@@ -571,18 +571,6 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "STRING",
-              "value": "rec"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
           "type": "STRING",
           "value": "type"
         },
@@ -1199,16 +1187,12 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "STRING",
+          "value": "?"
+        },
+        {
           "type": "SYMBOL",
           "name": "_base_type"
-        },
-        {
-          "type": "STRING",
-          "value": "#"
-        },
-        {
-          "type": "STRING",
-          "value": "null"
         }
       ]
     },
@@ -1512,6 +1496,10 @@
         {
           "type": "SYMBOL",
           "name": "if_expr"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "promote_expr"
         },
         {
           "type": "SYMBOL",
@@ -2668,6 +2656,56 @@
         ]
       }
     },
+    "promote_expr": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "promote"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_expr"
+        },
+        {
+          "type": "STRING",
+          "value": "|"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "STRING",
+          "value": "|"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "block"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "else"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "block"
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
     "match_expr": {
       "type": "SEQ",
       "members": [
@@ -3421,11 +3459,11 @@
   ],
   "conflicts": [
     [
-      "_type",
-      "nullable_type"
+      "_return_component"
     ],
     [
-      "_return_component"
+      "type_ident",
+      "module_name"
     ],
     [
       "pipe_target"
@@ -3444,6 +3482,10 @@
     [
       "module_name",
       "ref_null_expr"
+    ],
+    [
+      "_expr",
+      "promote_expr"
     ]
   ],
   "precedences": [],

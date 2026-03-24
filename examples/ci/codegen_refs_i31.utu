@@ -8,7 +8,7 @@ fun checked_value() i32 {
     if ref.eq(box, checked) { checked.value; } else { 0; };
 }
 
-fun nullable_box(flag: bool) Box # null {
+fun nullable_box(flag: bool) ?Box {
     if flag { Box { value: 9 }; } else { ref.null Box; };
 }
 

@@ -18,7 +18,7 @@ rec struct ConstraintList {
 rec struct Variable {
     mut value: i32,
     constraints: ConstraintList,
-    mut determined_by: Constraint # null,
+    mut determined_by: ?Constraint,
     mut mark: i32,
     mut walk_strength: i32,
     mut stay: bool,
@@ -35,7 +35,7 @@ struct Planner {
     variable_capacity: i32,
 }
 
-rec type Constraint =
+type Constraint =
     | EmptyConstraint {}
     | StayConstraint {
         output: Variable,
@@ -134,10 +134,8 @@ fun constraint_list_append(list: ConstraintList, constraint: Constraint) void {
 
 fun constraint_list_pop_front(list: ConstraintList) Constraint {
     let constraint: Constraint = list.items[0];
-    let i: i32 = 0;
-    while (i + 1 < list.count) {
+    for (0..list.count - 1) |i| {
         list.items[i] = list.items[i + 1];
-        i = i + 1;
     };
     list.count = list.count - 1;
     constraint;
@@ -161,10 +159,8 @@ fun variable_list_append(list: VariableList, value: Variable) void {
 
 fun variable_list_pop_front(list: VariableList) Variable {
     let value: Variable = list.items[0];
-    let i: i32 = 0;
-    while (i + 1 < list.count) {
+    for (0..list.count - 1) |i| {
         list.items[i] = list.items[i + 1];
-        i = i + 1;
     };
     list.count = list.count - 1;
     value;
@@ -176,21 +172,17 @@ fun variable_add_constraint(variable: Variable, constraint: Constraint) void {
 
 fun variable_remove_constraint(variable: Variable, constraint: Constraint) void {
     let found: i32 = 0 - 1;
-    let i: i32 = 0;
-    while (i < variable.constraints.count) {
+    for (0..variable.constraints.count) |i| {
         if found == 0 - 1 {
             if ref.eq(variable.constraints.items[i], constraint) {
                 found = i;
             };
         };
-        i = i + 1;
     };
 
     if found != 0 - 1 {
-        i = found;
-        while (i + 1 < variable.constraints.count) {
+        for (found..variable.constraints.count - 1) |i| {
             variable.constraints.items[i] = variable.constraints.items[i + 1];
-            i = i + 1;
         };
         variable.constraints.count = variable.constraints.count - 1;
     };
@@ -548,9 +540,8 @@ fun planner_new_mark(planner: Planner) i32 {
 }
 
 fun planner_add_constraints_consuming_to(variable: Variable, coll: ConstraintList) void {
-    let determining: Constraint # null = variable.determined_by;
-    let i: i32 = 0;
-    while (i < variable.constraints.count) {
+    let determining: ?Constraint = variable.determined_by;
+    for (0..variable.constraints.count) |i| {
         let constraint: Constraint = variable.constraints.items[i];
         let same: bool = false;
         if not ref.is_null(determining) {
@@ -561,7 +552,6 @@ fun planner_add_constraints_consuming_to(variable: Variable, coll: ConstraintLis
                 constraint_list_append(coll, constraint);
             };
         };
-        i = i + 1;
     };
 }
 
@@ -596,19 +586,16 @@ fun planner_remove_propagate_from(planner: Planner, out: Variable) ConstraintLis
 
     while (todo.count > 0) {
         let variable: Variable = variable_list_pop_front(todo);
-        let determining: Constraint # null = variable.determined_by;
+        let determining: ?Constraint = variable.determined_by;
 
-        let i: i32 = 0;
-        while (i < variable.constraints.count) {
+        for (0..variable.constraints.count) |i| {
             let constraint: Constraint = variable.constraints.items[i];
             if not constraint_is_satisfied(constraint) {
                 constraint_list_append(unsatisfied, constraint);
             };
-            i = i + 1;
         };
 
-        i = 0;
-        while (i < variable.constraints.count) {
+        for (0..variable.constraints.count) |i| {
             let constraint: Constraint = variable.constraints.items[i];
             let same: bool = false;
             if not ref.is_null(determining) {
@@ -620,7 +607,6 @@ fun planner_remove_propagate_from(planner: Planner, out: Variable) ConstraintLis
                     variable_list_append(todo, constraint_output(constraint));
                 };
             };
-            i = i + 1;
         };
     };
 
@@ -629,7 +615,7 @@ fun planner_remove_propagate_from(planner: Planner, out: Variable) ConstraintLis
 
 fun planner_incremental_add(planner: Planner, constraint: Constraint) void {
     let mark: i32 = planner_new_mark(planner);
-    let overridden: Constraint # null = constraint_satisfy(constraint, planner, mark);
+    let overridden: ?Constraint = constraint_satisfy(constraint, planner, mark);
 
     while (not ref.is_null(overridden)) {
         overridden = constraint_satisfy(overridden \ fatal, planner, mark);
@@ -646,14 +632,12 @@ fun planner_incremental_remove(planner: Planner, constraint: Constraint) void {
     let repeat: bool = true;
 
     while (repeat) {
-        let i: i32 = 0;
-        while (i < unsatisfied.count) {
+        for (0..unsatisfied.count) |i| {
             let current: Constraint = unsatisfied.items[i];
             if constraint_strength(current) == strength {
                 planner_incremental_add(planner, current);
             };
             strength = next_weaker(strength);
-            i = i + 1;
         };
         repeat = strength != weakest;
     };
@@ -699,7 +683,7 @@ fun constraint_add_constraint(constraint: Constraint, planner: Planner) void {
     planner_incremental_add(planner, constraint);
 }
 
-fun constraint_satisfy(constraint: Constraint, planner: Planner, mark: i32) Constraint # null {
+fun constraint_satisfy(constraint: Constraint, planner: Planner, mark: i32) ?Constraint {
     constraint_choose_method(constraint, mark);
 
     if not constraint_is_satisfied(constraint) {
@@ -710,7 +694,7 @@ fun constraint_satisfy(constraint: Constraint, planner: Planner, mark: i32) Cons
     } else {
         constraint_mark_inputs(constraint, mark);
         let out: Variable = constraint_output(constraint);
-        let overridden: Constraint # null = out.determined_by;
+        let overridden: ?Constraint = out.determined_by;
 
         if not ref.is_null(overridden) {
             constraint_mark_unsatisfied(overridden \ fatal);
@@ -791,11 +775,9 @@ fun change(planner: Planner, variable: Variable, new_value: i32) void {
     constraint_list_append(edits, edit);
 
     let plan: ConstraintList = planner_extract_plan_from_constraints(planner, edits);
-    let i: i32 = 0;
-    while (i < 10) {
+    for (0..10) |i| {
         variable.value = new_value;
         plan_execute(plan);
-        i = i + 1;
     };
 
     constraint_destroy(edit, planner);
@@ -803,12 +785,10 @@ fun change(planner: Planner, variable: Variable, new_value: i32) void {
 
 fun chain_test(n: i32) i64 {
     let planner: Planner = new_planner(n + 4, n + 4);
-    let prev: Variable # null = ref.null Variable;
-    let first: Variable # null = ref.null Variable;
-    let last: Variable # null = ref.null Variable;
-    let i: i32 = 0;
-
-    while (i < n + 1) {
+    let prev: ?Variable = ref.null Variable;
+    let first: ?Variable = ref.null Variable;
+    let last: ?Variable = ref.null Variable;
+    for (0..n + 1) |i| {
         let variable: Variable = new_variable(0, 2);
 
         if not ref.is_null(prev) {
@@ -824,7 +804,6 @@ fun chain_test(n: i32) i64 {
         };
 
         prev = variable;
-        i = i + 1;
     };
 
     let first_variable: Variable = first \ fatal;
@@ -837,14 +816,12 @@ fun chain_test(n: i32) i64 {
     let plan: ConstraintList = planner_extract_plan_from_constraints(planner, edits);
 
     let failures: i64 = 0;
-    i = 0;
-    while (i < 100) {
+    for (0..100) |i| {
         first_variable.value = i;
         plan_execute(plan);
         if last_variable.value != i {
             failures = failures + 1;
         };
-        i = i + 1;
     };
 
     failures;
@@ -858,15 +835,12 @@ fun projection_test(n: i32) i64 {
     let src: Variable = dummy;
     let dst: Variable = dummy;
     let dests: array[Variable] = array[Variable].new(n, dummy);
-    let i: i32 = 0;
-
-    while (i < n) {
+    for (0..n) |i| {
         src = new_variable(i, 3);
         dst = new_variable(i, 2);
         dests[i] = dst;
         new_stay_constraint(src, normal, planner);
         new_scale_constraint(src, scale, offset, dst, required, planner);
-        i = i + 1;
     };
 
     let failures: i64 = 0;
@@ -882,21 +856,17 @@ fun projection_test(n: i32) i64 {
     };
 
     change(planner, scale, 5);
-    i = 0;
-    while (i < n - 1) {
+    for (0..n - 1) |i| {
         if dests[i].value != i * 5 + 1000 {
             failures = failures + 1;
         };
-        i = i + 1;
     };
 
     change(planner, offset, 2000);
-    i = 0;
-    while (i < n - 1) {
+    for (0..n - 1) |i| {
         if dests[i].value != i * 5 + 2000 {
             failures = failures + 1;
         };
-        i = i + 1;
     };
 
     failures;

@@ -1,0 +1,7 @@
+fun test_promote() i32 {
+    promote (ref.null i32) |x| {
+        42;
+    } else {
+        0;
+    };
+}

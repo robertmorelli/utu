@@ -26,7 +26,7 @@ mod Pair[L, R] {
 }
 
 
-fun maybe_pair(flag: bool) Pair[i32, i32] # null {
+fun maybe_pair(flag: bool) ?Pair[i32, i32] {
     if flag { Pair[i32, i32].new(2, 9); } else { null; };
 }
 
@@ -43,6 +43,6 @@ test "same-name module types promote into top-level type paths" {
 }
 
 test "promoted module types work in nullable positions" {
-    let maybe: Pair[i32, i32] # null = maybe_pair(true);
+    let maybe: ?Pair[i32, i32] = maybe_pair(true);
     assert (maybe \ Pair[i32, i32].new(0, 0)).right() == 9;
 }

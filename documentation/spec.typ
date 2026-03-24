@@ -92,7 +92,7 @@ The parser understands that syntax, but the current compiler does not yet
 support function references end to end as part of the stable subset.
 
 All reference types are non-nullable by default. Nullable references are
-spelled as `T # null`, which lowers to a nullable Wasm reference like
+spelled as `?T`, which lowers to a nullable Wasm reference like
 `(ref null $T)`. The spec treats nullability as a special case of exclusive
 disjunction rather than a separate language feature.
 
@@ -109,8 +109,8 @@ struct Vec2 {
 
 struct Node {
     value: i32,
-    mut left: Node # null,
-    mut right: Node # null,
+    mut left: ?Node,
+    mut right: ?Node,
 }
 ```
 
@@ -177,7 +177,7 @@ non-null at runtime.
 The same `A # B` spelling is used on ES host imports:
 
 ```utu
-shimport "es" fetch(str) Response # null;
+shimport "es" fetch(str) ?Response;
 shimport "es" fetch(str) Response # ApiError;
 ```
 
@@ -185,9 +185,9 @@ Those imports still lower to direct Wasm multi-value signatures. The source
 language keeps the error and nullable cases explicit instead of introducing
 hidden exceptions.
 
-Nullable references are just the same idea with `null` as the alternative:
+Nullable references use a prefix `?`:
 
-- `T # null` means a nullable `T`
+- `?T` means a nullable `T`
 - there is no separate optional type syntax
 
 The current compiler supports both force unwrap and fallback on nullable
@@ -522,7 +522,7 @@ Host imports use `shimport "<module>" ...`:
 
 ```utu
 shimport "es" console_log(str) void;
-shimport "es" fetch(str) Response # null;
+shimport "es" fetch(str) ?Response;
 shimport "es" fetch(str) Response # ApiError;
 shimport "es" document: externref;
 shimport "node:path" basename(str) str;
@@ -770,8 +770,7 @@ This section encodes a few core language choices:
 === Types
 
 ```ebnf
-type         ::= scalar_type | ref_type | func_type
-             |   type '#' 'null'
+type         ::= '?' type | scalar_type | ref_type | func_type
              |   '(' type ')'
 
 scalar_type  ::= 'i32' | 'u32' | 'i64' | 'u64'
@@ -785,9 +784,8 @@ func_type    ::= 'fun' '(' type_list ')' return_type
 type_list    ::= (type (',' type)*)?
 ```
 
-The type grammar keeps nullable references as `type '#' 'null'`, preserving the
-idea that nullability is a form of exclusive disjunction rather than a separate
-kind of type constructor.
+Nullable references are written as a prefix `?`: `?T` means a nullable `T`,
+lowering to `(ref null $T)`. The `?` binds tightly as a prefix type constructor.
 
 === Expressions
 
@@ -1080,7 +1078,7 @@ export fun main() void {
     toggle(todos[0]);
 
     let active: i32 = count(todos, Active {});
-    let label: str # null = if active > 0 { "active"; } else { null; };
+    let label: ?str = if active > 0 { "active"; } else { null; };
     let text: str = label \ "idle";
 
     text -o str_concat(_, " todos");

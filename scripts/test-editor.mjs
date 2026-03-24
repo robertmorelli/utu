@@ -151,6 +151,12 @@ async function runExamplesSuite() {
     loadIsolatedCompiler('cli'),
   ]);
 
+  // Pre-warm binaryen sequentially to avoid a Bun bug where concurrent
+  // top-level-await module imports race and one importer gets an uninitialized module.
+  const warmupSource = 'export fun main() i32 { 0; }';
+  await webCompiler.compile(warmupSource).catch(() => {});
+  await cliCompiler.compile(warmupSource).catch(() => {});
+
   let failed = false;
   try {
     const files = (await collectUtuFiles(exampleRoot)).sort();

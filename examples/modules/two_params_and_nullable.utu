@@ -19,7 +19,7 @@ mod duo[L, R] {
 
 construct ints = duo[i32, i32];
 
-fun maybe_pair(flag: bool) ints.Pair # null {
+fun maybe_pair(flag: bool) ?ints.Pair {
     if flag { ints.Pair.new(2, 9); } else { null; };
 }
 
@@ -29,7 +29,7 @@ test "two type parameters fill struct fields" {
 }
 
 test "module types work in nullable positions" {
-    let maybe: ints.Pair # null = maybe_pair(true);
+    let maybe: ?ints.Pair = maybe_pair(true);
     assert (maybe \ ints.Pair.new(0, 0)).right() == 9;
 }
 

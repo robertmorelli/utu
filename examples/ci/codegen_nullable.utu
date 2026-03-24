@@ -2,7 +2,7 @@ struct Box {
     value: i32,
 }
 
-fun maybe_box(flag: bool) Box # null {
+fun maybe_box(flag: bool) ?Box {
     if flag { Box { value: 41 }; } else { ref.null Box; };
 }
 

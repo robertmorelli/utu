@@ -54,7 +54,7 @@ fun make_pair() Pair[i32, i32] {
     Pair[i32, i32].new(5, 6);
 }
 
-fun maybe_pair(flag: bool) Pair[i32, i32] # null {
+fun maybe_pair(flag: bool) ?Pair[i32, i32] {
     if flag { Pair[i32, i32].new(2, 9); } else { null; };
 }
 

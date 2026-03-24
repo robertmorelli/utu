@@ -9,10 +9,10 @@ module.exports = grammar({
   ],
 
   conflicts: $ => [
-    // nullable_type ambiguity: T # could be nullable_type or _return_component with exclusive
-    [$._type, $.nullable_type],
-    // _return_component: optional '#' is ambiguous at reduce time
     [$._return_component],
+    // nullable_type: after '?', an uppercase ident could be type_ident (ref_type done)
+    // or module_name (continuing to instantiated_module_ref/qualified_type_ref)
+    [$.type_ident, $.module_name],
     // pipe_target: path optionally followed by (pipe_args)
     [$.pipe_target],
     // return_type: comma separator ambiguous with multi-value vs end of return list
@@ -21,6 +21,8 @@ module.exports = grammar({
     [$._builtin_ns, $.ref_null_expr],
     [$.module_name, $._expr],
     [$.module_name, $.ref_null_expr],
+    // promote_expr: | after identifier could be binary_expr (bitwise OR) or promote syntax
+    [$._expr, $.promote_expr],
   ],
 
   rules: {
@@ -132,7 +134,6 @@ module.exports = grammar({
     ),
 
     type_decl: $ => seq(
-      optional('rec'),
       'type',
       $.type_ident,
       '=',
@@ -272,8 +273,8 @@ module.exports = grammar({
       $._base_type,
     ),
 
-    // T # null  — nullable reference
-    nullable_type: $ => seq($._base_type, '#', 'null'),
+    // ?T — nullable reference
+    nullable_type: $ => seq('?', $._base_type),
 
     _base_type: $ => choice(
       $.scalar_type,
@@ -354,6 +355,7 @@ module.exports = grammar({
       $.namespace_call_expr,
       $.ref_null_expr,
       $.if_expr,
+      $.promote_expr,
       $.match_expr,
       $.alt_expr,
       $.block_expr,
@@ -432,13 +434,13 @@ module.exports = grammar({
     binary_expr: $ => choice(
       prec.left(11, seq($._expr, choice('*', '/', '%'), $._expr)),
       prec.left(10, seq($._expr, choice('+', '-'), $._expr)),
-      prec.left(9,  seq($._expr, choice('<<', '>>', '>>>'), $._expr)),
-      prec.left(8,  seq($._expr, '&', $._expr)),
-      prec.left(7,  seq($._expr, '^', $._expr)),
-      prec.left(6,  seq($._expr, '|', $._expr)),
-      prec.left(5,  seq($._expr, choice('==', '!=', '<', '>', '<=', '>='), $._expr)),
-      prec.left(4,  seq($._expr, 'and', $._expr)),
-      prec.left(3,  seq($._expr, 'or', $._expr)),
+      prec.left(9, seq($._expr, choice('<<', '>>', '>>>'), $._expr)),
+      prec.left(8, seq($._expr, '&', $._expr)),
+      prec.left(7, seq($._expr, '^', $._expr)),
+      prec.left(6, seq($._expr, '|', $._expr)),
+      prec.left(5, seq($._expr, choice('==', '!=', '<', '>', '<=', '>='), $._expr)),
+      prec.left(4, seq($._expr, 'and', $._expr)),
+      prec.left(3, seq($._expr, 'or', $._expr)),
     ),
 
     // --- Else / unwrap: expr \ fallback ---
@@ -549,6 +551,18 @@ module.exports = grammar({
       $.block,
       optional(seq('else', choice($.if_expr, $.block))),
     )),
+
+    // --- Nullable reference promotion with binding ---
+
+    promote_expr: $ => seq(
+      'promote',
+      $._expr,
+      '|',
+      $.identifier,
+      '|',
+      $.block,
+      optional(seq('else', $.block)),
+    ),
 
     // --- Scalar match expression ---
 

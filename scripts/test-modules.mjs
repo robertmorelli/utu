@@ -196,7 +196,7 @@ mod Pair[L, R] {
 
 construct ints = boxy[i32];
 
-fun maybe_pair(flag: bool) Pair[i32, i32] # null {
+fun maybe_pair(flag: bool) ?Pair[i32, i32] {
     if flag { Pair[i32, i32].new(2, 9); } else { null; };
 }
 

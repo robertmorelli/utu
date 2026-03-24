@@ -39,7 +39,7 @@ fun count(todos: array[Todo], filter: Filter) i32 {
 }
 
 fun status(flag: bool) str {
-    let maybe: str # null = if flag { "online"; } else { null; };
+    let maybe: ?str = if flag { "online"; } else { null; };
     maybe \ "offline";
 }
 

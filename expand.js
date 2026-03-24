@@ -6,6 +6,7 @@ import {
     hasAnon,
     findAnonBetween,
 } from './tree.js';
+import { pascalCase, snakeCase, hashText } from './expand-utils.js';
 
 const kids = namedChildren;
 const MODULE_FEATURE_NODES = new Set([
@@ -219,21 +220,17 @@ class ModuleExpander {
         });
     }
 
+    static #MODULE_ITEM_ERRORS = {
+        module_decl: 'nested modules are not supported in v1.',
+        construct_decl: 'construct declarations are top-level only in v1.',
+        export_decl: 'export declarations are not supported inside modules in v1.',
+        test_decl: 'test declarations are not supported inside modules in v1.',
+        bench_decl: 'bench declarations are not supported inside modules in v1.',
+    };
+
     validateModuleItem(node) {
-        switch (node.type) {
-            case 'module_decl':
-                throw new Error('nested modules are not supported in v1.');
-            case 'construct_decl':
-                throw new Error('construct declarations are top-level only in v1.');
-            case 'export_decl':
-                throw new Error('export declarations are not supported inside modules in v1.');
-            case 'test_decl':
-                throw new Error('test declarations are not supported inside modules in v1.');
-            case 'bench_decl':
-                throw new Error('bench declarations are not supported inside modules in v1.');
-            default:
-                return;
-        }
+        const err = ModuleExpander.#MODULE_ITEM_ERRORS[node.type];
+        if (err) throw new Error(err);
     }
 
     validateModuleNameCollisions() {
@@ -281,7 +278,7 @@ class ModuleExpander {
     }
 
     resolveNamespaceFromModuleRef(node, ctx) {
-        const { name, argNodes } = this.parseModuleRef(node);
+        const { name, argNodes } = this.getModuleRef(node);
         return this.resolveNamespaceByNameAndArgs(name, argNodes, ctx);
     }
 
@@ -437,30 +434,11 @@ class ModuleExpander {
         return `__utu_${snakeCase(namespace.template.name)}_${namespace.hash}_${snakeCase(owner)}_${snakeCase(member)}`;
     }
 
-    parseModuleRef(node) {
+    getModuleRef(node) {
         const instNode = node?.type === 'instantiated_module_ref' ? node : childOfType(node, 'instantiated_module_ref');
-        const directArgsNode = childOfType(node, 'module_type_arg_list');
-        if (!instNode) {
-            const nameNode = moduleNameNode(node);
-            return {
-                name: nameNode.text,
-                argNodes: directArgsNode ? kids(directArgsNode) : [],
-            };
-        }
-        return {
-            name: moduleNameNode(instNode).text,
-            argNodes: this.moduleArgNodes(node),
-        };
-    }
-
-    moduleArgNodes(node) {
-        const instNode = node?.type === 'instantiated_module_ref' ? node : childOfType(node, 'instantiated_module_ref');
-        if (!instNode) {
-            const argsNode = childOfType(node, 'module_type_arg_list');
-            return argsNode ? kids(argsNode) : [];
-        }
-        const argsNode = childOfType(instNode, 'module_type_arg_list');
-        return argsNode ? kids(argsNode) : [];
+        const target = instNode ?? node;
+        const argsNode = childOfType(target, 'module_type_arg_list');
+        return { name: moduleNameNode(target).text, argNodes: argsNode ? kids(argsNode) : [] };
     }
 
     emitItem(node, ctx, inModule) {
@@ -658,7 +636,7 @@ class ModuleExpander {
             }
             case 'nullable_type': {
                 const info = this.describeType(kids(node)[0], ctx);
-                return info ? { ...info, text: `${info.text} # null` } : { text: this.emitType(node, ctx), owner: null, namespace: null };
+                return info ? { ...info, text: `?${info.text}` } : { text: this.emitType(node, ctx), owner: null, namespace: null };
             }
             case 'ref_type': {
                 if (node.children[0]?.type === 'array') return { text: this.emitType(node, ctx), owner: null, namespace: null };
@@ -699,9 +677,9 @@ class ModuleExpander {
             case 'instantiated_module_ref':
                 return this.resolvePromotedType(this.resolveNamespaceFromModuleRef(node, ctx));
             case 'qualified_type_ref':
-                return this.resolveQualifiedType(node, ctx);
+                return this.describeType(node, ctx).text;
             case 'nullable_type':
-                return `${this.emitType(kids(node)[0], ctx)} # null`;
+                return `?${this.emitType(kids(node)[0], ctx)}`;
             case 'ref_type': {
                 if (node.children[0]?.type === 'array') return `array[${this.emitType(kids(node)[0], ctx)}]`;
                 const child = kids(node)[0];
@@ -723,10 +701,6 @@ class ModuleExpander {
     resolvePromotedType(namespace) {
         if (namespace.promotedType) return namespace.promotedType;
         throw new Error(`Module "${namespace.displayText}" does not expose a promoted type.`);
-    }
-
-    resolveQualifiedType(node, ctx) {
-        return this.describeType(node, ctx).text;
     }
 
     emitExpr(node, ctx) {
@@ -942,7 +916,7 @@ class ModuleExpander {
             const child = pathParts[0];
             if (child.type === 'identifier') return { callee: this.resolveBareValue(child.text, ctx), args };
             if (['module_ref', 'instantiated_module_ref'].includes(child.type)) {
-                const { name, argNodes } = this.parseModuleRefWithFallback(child);
+                const { name, argNodes } = this.getModuleRef(child);
                 if (argNodes.length === 0 && !ctx.aliases.has(name) && !this.moduleTemplates.has(name)) {
                     return { callee: this.resolveBareValue(name, ctx), args };
                 }
@@ -992,20 +966,6 @@ class ModuleExpander {
         throw new Error(`Unsupported pipe target "${this.sourceOf(node)}".`);
     }
 
-    parseModuleRefWithFallback(node) {
-        const instNode = node?.type === 'instantiated_module_ref' ? node : childOfType(node, 'instantiated_module_ref');
-        if (instNode) {
-            return {
-                name: moduleNameNode(instNode).text,
-                argNodes: this.moduleArgNodes(node),
-            };
-        }
-        const nameNode = moduleNameNode(node);
-        return {
-            name: nameNode.text,
-            argNodes: this.moduleArgNodes(node),
-        };
-    }
 
     parsePipeArgs(node) {
         if (!node) return [];
@@ -1200,25 +1160,3 @@ class ModuleExpander {
     }
 }
 
-function pascalCase(value) {
-    const parts = String(value).match(/[A-Za-z0-9]+/g) ?? ['X'];
-    return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('');
-}
-
-function snakeCase(value) {
-    const normalized = String(value)
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-        .replace(/[^A-Za-z0-9_]+/g, '_')
-        .replace(/_+/g, '_')
-        .toLowerCase();
-    return normalized || 'x';
-}
-
-function hashText(value) {
-    let hash = 2166136261;
-    for (let index = 0; index < value.length; index += 1) {
-        hash ^= value.charCodeAt(index);
-        hash = Math.imul(hash, 16777619);
-    }
-    return Math.abs(hash >>> 0).toString(36);
-}

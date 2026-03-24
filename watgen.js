@@ -207,6 +207,7 @@ const INFER_TYPE_HANDLERS = {
     struct_init: (_ctx, node) => childOfType(node, 'type_ident').text,
     array_init: (ctx, node) => `${ctx.elemTypeKey(parseType(kids(node)[0]))}_array`,
     if_expr: (ctx, node) => ctx.inferType(kids(node)[1]),
+    promote_expr: (ctx, node) => ctx.inferType(kids(node)[2]),
     block: (ctx, node) => ctx.inferType(kids(node).at(-1)),
     assert_expr: () => null,
 };
@@ -243,6 +244,14 @@ const LOCAL_COLLECT_HANDLERS = {
         for (const arm of childrenOfType(node, 'alt_arm').map(parseAltArm)) {
             if (arm.pattern !== '_') ctx.addLocal(locals, seen, arm.pattern, arm.guard ? { kind: 'named', name: arm.guard } : subjectType);
         }
+    },
+    promote_expr: (ctx, locals, seen, node) => {
+        const exprType = ctx.inferredToType(ctx.inferType(kids(node)[0])) ?? I32;
+        const ident = kids(node)[1].text;
+        // Declare the temporary local to hold the nullable value
+        ctx.addLocal(locals, seen, `__promote_${node.id}`, exprType);
+        // Declare the identifier local with the non-nullable type
+        ctx.addLocal(locals, seen, ident, exprType);
     },
 };
 const TYPE_VISIT_HANDLERS = {
@@ -348,6 +357,7 @@ const EXPR_GENERATORS = {
     namespace_call_expr: (ctx, node, _hint, out) => ctx.genNsCall(node, out),
     ref_null_expr: (_ctx, node, _hint, out) => out.push(`ref.null $${childOfType(node, 'type_ident').text}`),
     if_expr: (ctx, node, hint, out) => ctx.genIf(node, hint, out),
+    promote_expr: (ctx, node, hint, out) => ctx.genPromote(node, hint, out),
     match_expr: (ctx, node, hint, out) => ctx.genMatch(node, hint, out),
     alt_expr: (ctx, node, hint, out) => ctx.genAlt(node, hint, out),
     for_expr: (ctx, node, _hint, out) => ctx.genFor(node, out),
@@ -967,6 +977,49 @@ class WatGen {
         out.push(')');
     }
 
+    genPromote(node, hint, out) {
+        const branchHint = hint === DISCARD_HINT ? DISCARD_HINT : null;
+        hint = this.valueHint(hint);
+        const expr = kids(node)[0];
+        const ident = kids(node)[1].text;
+        const thenBlock = kids(node)[2];
+        const elseBlock = kids(node)[3] ?? null;
+        const resultType = hint || this.inferType(thenBlock);
+        const branchType = resultType ?? branchHint;
+        const resultClause = resultType ? ` (result ${resultType})` : '';
+
+        // Store the nullable value in a temporary local
+        const tempName = `__promote_${node.id}`;
+        this.genExpr(expr, null, out);
+        out.push(`local.set $${tempName}`);
+
+        // Generate if statement based on null check
+        this.pushGenerated(out, lines => {
+            lines.push(`(ref.is_null (local.get $${tempName}))`);
+            lines.push(`(if${resultClause}`);
+
+            // Then branch (null case)
+            lines.push('  (then');
+            if (elseBlock) {
+                this.pushGenerated(lines, ls => this.genBlock(elseBlock, ls, false, branchType), '    ');
+            } else if (resultType) {
+                lines.push('    ' + this.defaultValue(resultType));
+            }
+            lines.push('  )');
+
+            // Else branch (non-null case)
+            lines.push('  (else');
+            this.pushGenerated(lines, ls => {
+                ls.push(`local.get $${tempName}`);
+                ls.push(`local.set $${ident}`);
+            }, '    ');
+            this.pushGenerated(lines, ls => this.genBlock(thenBlock, ls, false, branchType), '    ');
+            lines.push('  )');
+
+            lines.push(')');
+        });
+    }
+
     genMatch(node, hint, out) { this.genScalarMatch(node, childrenOfType(node, 'match_arm').map(parseMatchArm), hint, out); }
 
     genAlt(node, hint, out) { this.genTypeMatch(node, childrenOfType(node, 'alt_arm').map(parseAltArm), hint, out); }
@@ -1310,7 +1363,7 @@ class WatGen {
 }
 
 const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec') });
-const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: hasAnon(node, 'rec') });
+const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: true });
 const parseFnDecl = (node) => ({
     kind: 'fn_decl',
     name: textOf(node, 'identifier'),
