@@ -7,12 +7,13 @@ export async function activate(context) {
     const grammarWasmPath = await readExtensionBytes(context, 'tree-sitter-utu.wasm');
     const parserRuntimeWasmPath = await readExtensionBytes(context, 'web-tree-sitter.wasm');
     const runtimeHost = new WebCompilerHost({
-        compilerModulePath: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs').toString(true),
+        compilerModuleUri: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs'),
         grammarWasmPath,
         runtimeWasmPath: parserRuntimeWasmPath,
     });
     activateUtuExtension(context, {
         compilerHost: runtimeHost,
+        diagnosticsCompilerHost: undefined,
         runtimeHost,
         grammarWasmPath,
         parserRuntimeWasmPath,
@@ -59,10 +60,7 @@ class WebCompilerHost {
     async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, {}); }
     async getCompiler() { return (this.compilerPromise ??= this.loadCompiler()); }
     async loadCompiler() {
-        return loadModuleFromSource(new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.parse(this.options.compilerModulePath, true))), {
-            preferBlobUrl: true,
-            identifier: 'compiler.web',
-        });
+        return import(this.options.compilerModuleUri.toString(true));
     }
 }
 async function getNamedTarget(source, getMetadata, kind, ordinal) {

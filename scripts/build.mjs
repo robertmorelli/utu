@@ -9,6 +9,7 @@ const extensionRoot = getRepoRoot(import.meta.url);
 const compilerSourceRoot = extensionRoot;
 const cliEntry = resolve(extensionRoot, 'cli.mjs');
 const cliPackageRoot = resolve(extensionRoot, 'dist/cli-package');
+const webDevExtensionRoot = resolve(extensionRoot, 'dist/web-dev-extension');
 const cliBinaryPath = resolve(extensionRoot, 'utu');
 const lspEntry = resolve(extensionRoot, 'lsp.mjs');
 const lspBinaryPath = resolve(extensionRoot, 'utu-lsp');
@@ -183,6 +184,12 @@ async function resetBuildArtifacts() {
   ]);
 }
 
+async function writeWebBundlePackageMetadata() {
+  const webDistRoot = resolve(extensionRoot, 'dist/web');
+  await mkdir(webDistRoot, { recursive: true });
+  await writeFile(resolve(webDistRoot, 'package.json'), `${JSON.stringify({ type: 'commonjs' }, null, 2)}\n`, 'utf8');
+}
+
 async function buildCli() {
   await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
   await rm(cliPackageRoot, { recursive: true, force: true });
@@ -196,9 +203,46 @@ async function buildLsp() {
 }
 
 async function buildAllArtifacts() {
+  await stageWebDevExtension();
   await buildCli();
   await buildLsp();
   await packageVsix();
+}
+
+async function stageWebDevExtension() {
+  const rootPackage = JSON.parse(await readFile(resolve(extensionRoot, 'package.json'), 'utf8'));
+  const stagedPackage = {
+    ...rootPackage,
+    browser: './dist/web/extension.js',
+  };
+
+  delete stagedPackage.type;
+  delete stagedPackage.scripts;
+  delete stagedPackage.devDependencies;
+  delete stagedPackage.files;
+
+  await rm(webDevExtensionRoot, { recursive: true, force: true });
+  await mkdir(resolve(webDevExtensionRoot, 'dist/web'), { recursive: true });
+  await mkdir(resolve(webDevExtensionRoot, 'dist'), { recursive: true });
+  await mkdir(resolve(webDevExtensionRoot, 'jsondata'), { recursive: true });
+
+  const extensionEntry = await readFile(resolve(extensionRoot, 'dist/web/extension.cjs'), 'utf8');
+  const extensionEntryForWebHost = extensionEntry.replace(/sourceMappingURL=extension\.cjs\.map\b/u, 'sourceMappingURL=extension.js.map');
+
+  await Promise.all([
+    writeFile(resolve(webDevExtensionRoot, 'package.json'), `${JSON.stringify(stagedPackage, null, 2)}\n`, 'utf8'),
+    writeFile(resolve(webDevExtensionRoot, 'dist/web/extension.js'), extensionEntryForWebHost, 'utf8'),
+    cp(resolve(extensionRoot, 'dist/web/extension.cjs.map'), resolve(webDevExtensionRoot, 'dist/web/extension.js.map')),
+    cp(resolve(extensionRoot, 'dist/compiler.web.mjs'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs')),
+    cp(resolve(extensionRoot, 'dist/compiler.web.mjs.map'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs.map')),
+    cp(resolve(extensionRoot, 'language-configuration.json'), resolve(webDevExtensionRoot, 'language-configuration.json')),
+    cp(resolve(extensionRoot, 'README.md'), resolve(webDevExtensionRoot, 'README.md')),
+    cp(resolve(extensionRoot, 'CHANGELOG.md'), resolve(webDevExtensionRoot, 'CHANGELOG.md')),
+    cp(resolve(extensionRoot, 'LICENSE'), resolve(webDevExtensionRoot, 'LICENSE')),
+    cp(resolve(extensionRoot, 'jsondata/utu.tmLanguage.json'), resolve(webDevExtensionRoot, 'jsondata/utu.tmLanguage.json')),
+    cp(resolve(extensionRoot, 'tree-sitter-utu.wasm'), resolve(webDevExtensionRoot, 'tree-sitter-utu.wasm')),
+    cp(resolve(extensionRoot, 'web-tree-sitter.wasm'), resolve(webDevExtensionRoot, 'web-tree-sitter.wasm')),
+  ]);
 }
 
 async function packageVsix() {

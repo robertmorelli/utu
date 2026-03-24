@@ -6,8 +6,9 @@
       "type": "extensionHost",
       "debugWebWorkerHost": true,
       "request": "launch",
+      "preLaunchTask": "UTU: Rebuild",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionDevelopmentPath=${workspaceFolder}/dist/web-dev-extension",
         "--extensionDevelopmentKind=web"
       ],
       "outFiles": [

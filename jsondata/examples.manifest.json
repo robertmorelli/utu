@@ -86,6 +86,13 @@
       "tags": ["codegen"]
     },
     {
+      "name": "codegen-promote",
+      "path": "examples/ci/codegen_promote.utu",
+      "mode": "test",
+      "expectedTests": 3,
+      "tags": ["codegen"]
+    },
+    {
       "name": "codegen-nullable-imports",
       "path": "examples/ci/nullable_imports.utu",
       "mode": "test",
