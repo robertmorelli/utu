@@ -1,13 +1,39 @@
+const EMPTY = [];
+
 export const rootNode = n => n?.rootNode ?? n;
-export const namedChildren = n => (n?.namedChildren ?? []).filter(c => c.type !== 'comment');
-export const childOfType = (n, t) => namedChildren(n).find(c => c.type === t) ?? null;
-export const childrenOfType = (n, t) => namedChildren(n).filter(c => c.type === t);
+export const namedChildren = n => {
+    const children = n?.namedChildren ?? EMPTY;
+    return children.some(c => c.type === 'comment') ? children.filter(c => c.type !== 'comment') : children;
+};
+export const childOfType = (n, t) => {
+    for (const child of n?.namedChildren ?? EMPTY) {
+        if (child.type === t) return child;
+    }
+    return null;
+};
+export const childrenOfType = (n, t) => {
+    const matches = [];
+    for (const child of n?.namedChildren ?? EMPTY) {
+        if (child.type === t) matches.push(child);
+    }
+    return matches;
+};
 export const hasAnon = (n, t) => (n?.children ?? []).some(c => !c.isNamed && c.type === t);
-export const walk = (n, v) => n && (v(n), namedChildren(n).forEach(c => walk(c, v)));
-export const walkBlock = (b, v) => namedChildren(b).forEach(s => walk(s, v));
+export const walk = (n, v) => {
+    if (!n) return;
+    v(n);
+    for (const child of n.namedChildren ?? EMPTY) {
+        if (child.type !== 'comment') walk(child, v);
+    }
+};
+export const walkBlock = (b, v) => {
+    for (const stmt of b?.namedChildren ?? EMPTY) {
+        if (stmt.type !== 'comment') walk(stmt, v);
+    }
+};
 
 export const stringLiteralValue = n => {
-    const c = n?.type === 'literal' ? namedChildren(n)[0] : null;
+    const c = n?.type === 'literal' ? (n.namedChildren ?? EMPTY)[0] ?? null : null;
     return c?.type === 'string_lit' ? c.text.slice(1, -1)
         : c?.type === 'multiline_string_lit' ? childrenOfType(c, 'multiline_string_line').map(l => l.text.slice(2)).join('\n')
         : null;
@@ -24,6 +50,7 @@ export function findAnonBetween(n, l, r) {
 }
 
 export function throwOnParseErrors(n) {
+    if (!n?.hasError) return;
     const errs = [];
     const collect = c => {
         if (c?.type === 'ERROR' || c?.isMissing) {

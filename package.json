@@ -5,6 +5,7 @@
   "author": "Robert Morelli",
   "version": "0.1.0",
   "publisher": "robertmorelli",
+  "icon": "utu.png",
   "license": "MIT",
   "type": "module",
   "module": "index.js",
@@ -54,6 +55,13 @@
         "embeddedLanguages": {
           "meta.embedded.inline.javascript": "javascript"
         }
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "utu-file-icons",
+        "label": "UTU File Icons",
+        "path": "./icons/utu-icon-theme.json"
       }
     ],
     "commands": [
@@ -137,11 +145,13 @@
   },
   "files": [
     "dist",
+    "icons",
     "jsondata/utu.tmLanguage.json",
     "language-configuration.json",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
+    "utu.png",
     "web-tree-sitter.wasm",
     "tree-sitter-utu.wasm"
   ],

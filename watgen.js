@@ -84,7 +84,11 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         ctx.typeDeclMap.set(decl.name, decl);
         for (const variant of decl.variants) ctx.variantDecls.set(variant.name, variant);
     },
-    fn_decl: (ctx, item) => ctx.fnItems.push({ node: item, exported: false }),
+    fn_decl: (ctx, item) => {
+        const fn = parseFnItem(item);
+        ctx.fnItems.push(fn);
+        ctx.callables.set(fn.name, fn);
+    },
     global_decl: (ctx, item) => {
         const [name, type, value] = kids(item);
         const decl = { kind: 'global_decl', name: name.text, type: parseType(type), value };
@@ -93,18 +97,25 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
     },
     import_decl: (ctx, item) => {
         const decl = parseImportDecl(item);
-        if (decl.kind === 'import_fn') ctx.importFns.push(decl);
+        if (decl.kind === 'import_fn') {
+            ctx.importFns.push(decl);
+            ctx.callables.set(decl.name, decl);
+        }
         else {
             ctx.importVals.push(decl);
             ctx.globalTypeMap.set(decl.name, decl.type);
         }
     },
     jsgen_decl: (ctx, item) => {
-        ctx.importFns.push(parseJsgenDecl(item, ctx.jsgenImportCount++));
+        const decl = parseJsgenDecl(item, ctx.jsgenImportCount++);
+        ctx.importFns.push(decl);
+        ctx.callables.set(decl.name, decl);
     },
     export_decl: (ctx, item) => {
         const node = childOfType(item, 'fn_decl');
-        ctx.fnItems.push({ node, exported: true, exportName: textOf(node, 'identifier') });
+        const fn = parseFnItem(node, true);
+        ctx.fnItems.push(fn);
+        ctx.callables.set(fn.name, fn);
     },
     test_decl: (ctx, item) => {
         ctx.testDecls.push({ kind: 'test_decl', name: kids(item)[0].text.slice(1, -1), body: childOfType(item, 'block') });
@@ -405,6 +416,7 @@ class WatGen {
 
         this.typeDeclMap = new Map();
         this.globalTypeMap = new Map();
+        this.callables = new Map();
 
         this.strings = new Map();
         this.stringList = [];
@@ -1353,10 +1365,10 @@ class WatGen {
     }
 
     inferType(node) { return INFER_TYPE_HANDLERS[node.type]?.(this, node) ?? null; }
-    fnName(fn) { return textOf(fn.node, 'identifier'); }
-    fnParams(fn) { return parseParamList(childOfType(fn.node, 'param_list')); }
-    fnReturnType(fn) { return parseReturnType(childOfType(fn.node, 'return_type')); }
-    fnBody(fn) { return childOfType(fn.node, 'block'); }
+    fnName(fn) { return fn.name; }
+    fnParams(fn) { return fn.params; }
+    fnReturnType(fn) { return fn.returnType; }
+    fnBody(fn) { return fn.body; }
     inferredToType(inferred) { return inferred ? { kind: SCALAR_NAMES.has(inferred) ? 'scalar' : 'named', name: inferred } : null; }
     exprType(node) {
         if (!node) return null;
@@ -1460,10 +1472,7 @@ class WatGen {
         if (patternNode.text === 'false') return 0;
         return null;
     }
-    lookupCallable(name) {
-        const fn = this.fnItems.find(item => this.fnName(item) === name);
-        return fn ? { params: this.fnParams(fn), returnType: this.fnReturnType(fn) } : this.importFns.find(item => item.name === name) ?? null;
-    }
+    lookupCallable(name) { return this.callables.get(name) ?? null; }
     lookupCallableReturnType(name) { return this.lookupCallable(name)?.returnType ?? null; }
     genScalarPattern(node, hint, out) {
         const patternNode = node.type === 'match_lit' ? kids(node)[0] ?? node : node;
@@ -1509,6 +1518,15 @@ class WatGen {
 
 const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec') });
 const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: true });
+const parseFnItem = (node, exported = false) => ({
+    node,
+    name: textOf(node, 'identifier'),
+    params: parseParamList(childOfType(node, 'param_list')),
+    returnType: parseReturnType(childOfType(node, 'return_type')),
+    body: childOfType(node, 'block'),
+    exported,
+    exportName: exported ? textOf(node, 'identifier') : null,
+});
 const parseImportDecl = (node) => {
     const [moduleNode, nameNode, typeNode] = kids(node), module = moduleNode.text.slice(1, -1), name = nameNode.text;
     const { hostName } = parseHostImportName(name);

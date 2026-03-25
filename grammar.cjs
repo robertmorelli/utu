@@ -10,9 +10,6 @@ module.exports = grammar({
 
   conflicts: $ => [
     [$._return_component],
-    // nullable_type: after '?', an uppercase ident could be type_ident (ref_type done)
-    // or module_name (continuing to instantiated_module_ref/qualified_type_ref)
-    [$.type_ident, $.module_name],
     // pipe_target: path optionally followed by (pipe_args)
     [$.pipe_target],
     // return_type: comma separator ambiguous with multi-value vs end of return list

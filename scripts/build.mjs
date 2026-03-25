@@ -243,6 +243,8 @@ async function stageWebDevExtension() {
   await mkdir(resolve(webDevExtensionRoot, 'dist'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'jsondata'), { recursive: true });
 
+  const stagedAssetCopies = await collectStagedPackageAssetCopies(rootPackage);
+
   await Promise.all([
     writeFile(resolve(webDevExtensionRoot, 'package.json'), `${JSON.stringify(stagedPackage, null, 2)}\n`, 'utf8'),
     cp(resolve(extensionRoot, 'dist/web/extension.js'), resolve(webDevExtensionRoot, 'dist/web/extension.js')),
@@ -256,7 +258,31 @@ async function stageWebDevExtension() {
     cp(resolve(extensionRoot, 'jsondata/utu.tmLanguage.json'), resolve(webDevExtensionRoot, 'jsondata/utu.tmLanguage.json')),
     cp(resolve(extensionRoot, 'tree-sitter-utu.wasm'), resolve(webDevExtensionRoot, 'tree-sitter-utu.wasm')),
     cp(resolve(extensionRoot, 'web-tree-sitter.wasm'), resolve(webDevExtensionRoot, 'web-tree-sitter.wasm')),
+    ...stagedAssetCopies,
   ]);
+}
+
+async function collectStagedPackageAssetCopies(rootPackage) {
+  const assetPaths = new Set();
+  if (typeof rootPackage.icon === 'string' && rootPackage.icon) assetPaths.add(rootPackage.icon);
+  for (const theme of rootPackage.contributes?.iconThemes ?? []) {
+    if (typeof theme?.path === 'string' && theme.path) assetPaths.add(theme.path);
+  }
+
+  const copies = [];
+  for (const relativePath of assetPaths) {
+    const sourcePath = resolve(extensionRoot, relativePath);
+    const details = await stat(sourcePath).catch(() => null);
+    if (!details) continue;
+    const targetPath = resolve(webDevExtensionRoot, relativePath);
+    copies.push(copyIntoStage(sourcePath, targetPath, details.isDirectory()));
+  }
+  return copies;
+}
+
+async function copyIntoStage(sourcePath, targetPath, recursive = false) {
+  await mkdir(resolve(targetPath, '..'), { recursive: true });
+  await cp(sourcePath, targetPath, recursive ? { recursive: true } : undefined);
 }
 
 async function packageVsix() {
