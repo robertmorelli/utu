@@ -3,7 +3,7 @@
   "displayName": "UTU",
   "description": "Web-first language and compiler for building tiny, high-performance Wasm bundles.",
   "author": "Robert Morelli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "robertmorelli",
   "icon": "utu.png",
   "license": "MIT",
@@ -139,6 +139,7 @@
   },
   "scripts": {
     "build": "node ./scripts/build.mjs",
+    "bump": "node ./scripts/bump.mjs",
     "test": "bun run build && bun ./scripts/test-all.mjs",
     "vrust": "bun ./scripts/deltablue-rust.mjs compare && bun ./scripts/deltablue-rust.mjs report",
     "watch": "bun run build --watch"

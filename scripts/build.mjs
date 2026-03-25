@@ -236,7 +236,6 @@ async function stageWebDevExtension() {
   delete stagedPackage.scripts;
   delete stagedPackage.dependencies;
   delete stagedPackage.devDependencies;
-  delete stagedPackage.files;
 
   await rm(webDevExtensionRoot, { recursive: true, force: true });
   await mkdir(resolve(webDevExtensionRoot, 'dist/web'), { recursive: true });

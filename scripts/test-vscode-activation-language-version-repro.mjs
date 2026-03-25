@@ -55,8 +55,7 @@ async function main() {
       }
     }
 
-    console.log('PASS vscode activation language-version repro');
-    console.log(stack.split('\n').slice(0, 8).join('\n'));
+    console.log(`PASS vscode activation language-version repro (verified expected error: ${expectedMessage})`);
   } finally {
     treeSitter.Language.load = originalLoad;
     languageService.dispose();

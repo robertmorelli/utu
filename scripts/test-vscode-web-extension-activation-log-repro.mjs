@@ -48,8 +48,7 @@ async function main() {
       throw new Error(`Expected activation log to include "${expectedMessage}", received:\n${joined || '(no output)'}`);
     }
 
-    console.log('PASS vscode activation log repro');
-    console.log(joined.split('\n').slice(0, 4).join('\n'));
+    console.log(`PASS vscode activation log repro (verified workspace log contains expected error: ${expectedMessage})`);
   } finally {
     treeSitter.Language.load = originalLoad;
     await rm(stubPackageRoot, { recursive: true, force: true });
