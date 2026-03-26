@@ -37,7 +37,7 @@ The implemented surface covered by the compiler, examples, and tests includes:
 - `if`, `while`, single-range `for`, labeled blocks with `emit`, `match`, `alt`, `promote`, `assert`, `fatal`, and pipe expressions
 - host imports via `shimport` and inline JS helpers via `escape`
 - compile-time modules via `mod`, `construct` aliases, open constructs, qualified type paths, associated functions, and method-call sugar
-- top-level `proto` declarations over `tag struct` implementers, including explicit protocol calls and synthesized getter members
+- top-level `proto` declarations as syntax for table-backed `call_indirect` over tagged receivers, including methods, getters, setters, and explicit protocol calls
 - top-level `test` and `bench` declarations with `setup { ... measure { ... } }`
 - WasmGC reference builtins such as `ref.null`, `ref.is_null`, `ref.as_non_null`, `ref.eq`, `ref.cast`, `ref.test`, and `i31`
 
@@ -139,9 +139,9 @@ immutable.
 == Tagged Structs
 
 `tag struct` is the current opt-in surface for structs that participate in
-protocol dispatch. Tagged structs behave like ordinary structs in source code,
-but the compiler prepends a hidden `__tag: i32` field that user code cannot
-declare directly.
+table-backed protocol dispatch. Tagged structs behave like ordinary structs in
+source code, but the compiler prepends a hidden `__tag: i32` field that user
+code cannot declare directly. That hidden tag is what indexes protocol tables.
 
 ```utu
 tag struct Box {
@@ -213,7 +213,11 @@ sugar works for values whose associated member can be resolved unambiguously.
 
 == Protocols
 
-Protocols are Utu's current virtual-dispatch surface for tagged structs.
+Protocols are Utu's table-backed `call_indirect` surface for tagged receivers.
+They do not introduce a second hidden object model. A protocol member is the
+source-language name for a Wasm table entry plus an indirect call through that
+member's dedicated table. This syntax must produce this structure and only this
+structure in Wasm.
 
 ```utu
 proto Measure[T] {
@@ -222,6 +226,11 @@ proto Measure[T] {
 
 proto Area[T] {
     get area: i32,
+};
+
+proto CounterOps[T] {
+    get value: i32,
+    set value: i32,
 };
 
 tag struct Box {
@@ -243,14 +252,20 @@ Key v1 rules:
 - protocols are declared at top level
 - a protocol currently declares exactly one type parameter, and method members
   may use it only as the first parameter
-- implementers must be `tag struct`
-- `get` members are field-backed and synthesized automatically rather than
-  implemented with `fun`
+- concrete protocol implementations live on tagged receiver types
+- `get` and `set` members are still protocol entries: they get their own tables
+  and are invoked through `call_indirect`
+- current field-backed synthesis only supplies the thunk body automatically;
+  it does not change what a protocol member is
 - `box.measure()` works when unambiguous, while `Measure.measure(box)` is always
   available as the explicit form
 
-Lowering uses one dispatch table per protocol member plus tag-indexed
-`call_indirect` helpers, so dynamic dispatch stays explicit in the emitted Wasm.
+Lowering uses one dispatch table per protocol member, getter, and setter. A
+protocol use means tag-indexed `call_indirect` through that member's table.
+This contract is absolute: this syntax must produce this structure and only
+this structure in Wasm. If the compiler lowers a protocol path to something
+else, that is a bug in the lowering rather than an alternate protocol
+semantics.
 
 == Structured Error Results, Nullability, And `\`
 
@@ -669,7 +684,7 @@ The language does not bake in a hidden object model. Current compiler support
 keeps dispatch explicit in two different ways:
 
 - `alt` lowers sum-type and subtype dispatch through `br_on_cast`
-- `proto` lowers tagged-struct virtual members through tables and `call_indirect`
+- `proto` lowers protocol members through tables and `call_indirect`; a protocol member is literally a table-backed indirect call surface
 
 `alt` is the right surface when a value already has a shared sum type.
 Protocols are the right surface when separate tagged structs should share one
@@ -802,9 +817,9 @@ These cover named values, temporaries, and mutable globals.
 
 === Dispatch Support
 
-- `table` definitions for protocol member dispatch tables
+- `table` definitions for protocol method, getter, and setter dispatch tables
 - `elem` segments that populate those tables
-- `call_indirect` for protocol dispatch helpers
+- `call_indirect` for every protocol member invocation
 
 These only appear when `proto` declarations are present.
 
@@ -859,9 +874,10 @@ field        ::= 'mut'? IDENT ':' type
 
 proto_decl   ::= 'proto' TYPE_IDENT module_type_param_list? '{' proto_member_list? '}'
 proto_member_list ::= proto_member (',' proto_member)* ','?
-proto_member ::= proto_method | proto_getter
+proto_member ::= proto_method | proto_getter | proto_setter
 proto_method ::= IDENT '(' type_list? ')' return_type
 proto_getter ::= 'get' IDENT ':' type
+proto_setter ::= 'set' IDENT ':' type
 
 type_decl    ::= 'type' TYPE_IDENT '=' variant_list ';'
 variant_list ::= '|'? variant ('|' variant)*
@@ -1778,4 +1794,6 @@ language adds:
 - direct names for WasmGC allocation and reference operations
 
 But the generated shape remains close enough that you can usually predict the
-WAT by inspection.
+WAT by inspection. The goal is not to invent a second runtime model; it is to
+surface Wasm constructs, including tables and `call_indirect`, with a usable
+syntax. In Utu, syntax is a contract over emitted Wasm structure.

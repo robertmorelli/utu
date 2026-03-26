@@ -1,6 +1,6 @@
 # Utu vs Rust DeltaBlue
 
-Generated: 2026-03-26T09:13:25.651Z
+Generated: 2026-03-26T09:20:02.427Z
 
 ## Benchmark Setup
 
@@ -26,20 +26,20 @@ Source size counts only the benchmark language files. Utu bundle size combines t
 
 | Variant | Mean (ms) | Stddev (ms) | Min (ms) | Max (ms) | Relative | Runs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| unsafe_rust_native | 44.239 | 7.119 | 38.079 | 73.343 | 1x | 70 |
-| unsafe_rust_wasm | 78.627 | 1.26 | 76.823 | 81.932 | 1.777x | 34 |
-| utu_wasm | 127.187 | 1.882 | 125.296 | 133.357 | 2.875x | 23 |
-| utu_protocols_wasm | 148.688 | 32.388 | 128.352 | 243.43 | 3.361x | 15 |
-| rc_rust_native | 189.76 | 14.283 | 178.762 | 219.608 | 4.289x | 16 |
-| rc_rust_wasm | 225.401 | 1.721 | 223.492 | 229.164 | 5.095x | 12 |
+| unsafe_rust_native | 42.783 | 3.04 | 38.372 | 56.553 | 1x | 63 |
+| unsafe_rust_wasm | 87.282 | 6.773 | 77.462 | 99.906 | 2.04x | 34 |
+| utu_wasm | 133.212 | 4.209 | 126.078 | 142.747 | 3.114x | 22 |
+| utu_protocols_wasm | 133.831 | 1.634 | 131.881 | 137.692 | 3.128x | 21 |
+| rc_rust_native | 180.985 | 1.286 | 179.539 | 184.494 | 4.23x | 16 |
+| rc_rust_wasm | 232.112 | 9.145 | 224.078 | 245.31 | 5.425x | 12 |
 
 ## Projection Benchmark
 
 | Variant | Mean (ms) | Stddev (ms) | Min (ms) | Max (ms) | Relative | Runs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| unsafe_rust_native | 52.752 | 9.899 | 46.693 | 97.354 | 1x | 52 |
-| unsafe_rust_wasm | 118.271 | 2.358 | 114.061 | 123.404 | 2.242x | 23 |
-| utu_wasm | 191.611 | 2.703 | 188.598 | 197.349 | 3.632x | 14 |
-| utu_protocols_wasm | 207.429 | 25.851 | 191.272 | 258.39 | 3.932x | 14 |
-| rc_rust_native | 291.583 | 3.405 | 285.394 | 295.647 | 5.527x | 10 |
-| rc_rust_wasm | 329.013 | 6.453 | 320.063 | 339.692 | 6.237x | 10 |
+| unsafe_rust_native | 53.98 | 4.931 | 51.75 | 87.87 | 1x | 51 |
+| unsafe_rust_wasm | 123.999 | 1.966 | 122.109 | 131.634 | 2.297x | 23 |
+| utu_wasm | 197.737 | 2.232 | 193.842 | 202.744 | 3.663x | 14 |
+| utu_protocols_wasm | 201.631 | 1.344 | 199.14 | 204.736 | 3.735x | 14 |
+| rc_rust_native | 315.58 | 44.27 | 292.845 | 440.039 | 5.846x | 10 |
+| rc_rust_wasm | 340.54 | 13.393 | 329.916 | 363.561 | 6.309x | 10 |

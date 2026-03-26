@@ -184,11 +184,15 @@
     },
     "get": {
       "signature": "get field: Type",
-      "description": "Inside a protocol body, declares a zero-argument virtual getter member. It is sugar over the same per-member table and `call_indirect` dispatch path as other protocol members."
+      "description": "Inside a protocol body, declares a getter member. A protocol getter is still a dedicated table-backed `call_indirect` entry. The contract is absolute: this syntax must produce that Wasm structure and only that structure."
+    },
+    "set": {
+      "signature": "set field: Type",
+      "description": "Inside a protocol body, declares a setter member. A protocol setter gets its own dispatch table and is invoked with `call_indirect`, just like any other protocol member. The contract is absolute: this syntax must produce that Wasm structure and only that structure."
     },
     "proto": {
-      "signature": "proto Name[T] { method(T, ...) return_type, get field: Type, ... };",
-      "description": "Declares a top-level protocol surface that tagged structs can implement. It lowers to one dispatch table per member plus tag-indexed `call_indirect` helpers. In v1, the type parameter may only appear as the first method parameter."
+      "signature": "proto Name[T] { method(T, ...) return_type, get field: Type, set field: Type, ... };",
+      "description": "Declares a top-level protocol surface for table-backed dispatch on tagged receivers. A protocol member is the source-language name for a dedicated Wasm table plus tag-indexed `call_indirect`; methods, getters, and setters all follow that rule. The contract is absolute: this syntax must produce that structure and only that structure in Wasm. In v1, the type parameter may only appear as the first method parameter."
     },
     "for": {
       "signature": "for (start..end) |binding| { ... };",
@@ -236,7 +240,7 @@
     },
     "tag": {
       "signature": "tag struct Name { ... }",
-      "description": "Marks a struct as tagged so protocol dispatch can read its hidden runtime tag. Lowers by prepending a hidden first `__tag` field used to index protocol tables."
+      "description": "Marks a struct as tagged so protocol dispatch can read its hidden runtime tag. Lowers by prepending a hidden first `__tag` field used to index protocol tables for `call_indirect`."
     },
     "while": {
       "signature": "while (condition) { ... };",

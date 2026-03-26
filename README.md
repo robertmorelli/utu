@@ -32,7 +32,7 @@ The checked-in compiler, examples, and tests currently cover:
 - `if`, `while`, single-range `for`, labeled blocks with `emit`, `match`, `alt`, `promote`, `assert`, `fatal`, and pipe expressions with `_` placeholders
 - host imports through `shimport` and inline JS helpers through `escape`
 - compile-time modules through `mod`, `construct` aliases, open constructs, qualified type paths, associated functions, and method-call sugar
-- top-level `proto` declarations over `tag struct` implementers, including explicit protocol calls and synthesized getter members
+- top-level `proto` declarations as syntax for table-backed `call_indirect` over tagged receivers, with an absolute lowering contract: this syntax must produce this structure and only this structure in Wasm
 - top-level `test` and `bench` declarations with `setup { ... measure { ... } }`
 
 Notable current limits:
