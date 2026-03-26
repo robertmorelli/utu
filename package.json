@@ -57,13 +57,6 @@
         }
       }
     ],
-    "iconThemes": [
-      {
-        "id": "utu-file-icons",
-        "label": "UTU File Icons",
-        "path": "./icons/utu-icon-theme.json"
-      }
-    ],
     "commands": [
       {
         "command": "utu.compileCurrentFile",
@@ -146,7 +139,6 @@
   },
   "files": [
     "dist",
-    "icons",
     "jsondata/utu.tmLanguage.json",
     "language-configuration.json",
     "README.md",

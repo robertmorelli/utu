@@ -132,69 +132,23 @@ class ModuleExpander {
         for (const item of kids(this.root)) {
             if (item.type === 'module_decl') this.collectModuleTemplate(item);
         }
-        for (const item of kids(this.root)) {
-            switch (item.type) {
-                case 'module_decl':
-                    break;
-                case 'construct_decl':
-                    this.applyConstruct(item, ctx);
-                    break;
-                case 'struct_decl':
-                    this.topLevelTypeNames.add(childOfType(item, 'type_ident').text);
-                    break;
-                case 'type_decl': {
-                    this.topLevelTypeNames.add(childOfType(item, 'type_ident').text);
-                    for (const variant of childrenOfType(childOfType(item, 'variant_list'), 'variant')) {
-                        this.topLevelTypeNames.add(childOfType(variant, 'type_ident').text);
-                    }
-                    break;
-                }
-                case 'fn_decl':
-                    this.collectTopLevelFunction(item, ctx);
-                    break;
-                case 'export_decl':
-                    this.collectTopLevelFunction(childOfType(item, 'fn_decl'), ctx);
-                    break;
-                case 'global_decl': {
-                    const nameNode = childOfType(item, 'identifier');
-                    if (nameNode) {
-                        this.topLevelValueNames.add(nameNode.text);
-                        this.topLevelValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
-                    }
-                    break;
-                }
-                case 'import_decl':
-                case 'jsgen_decl': {
-                    const nameNode = childOfType(item, 'identifier');
-                    if (!nameNode) break;
-                    this.topLevelValueNames.add(nameNode.text);
-                    const returnTypeNode = childOfType(item, 'return_type');
-                    if (returnTypeNode) {
-                        this.topLevelFnReturns.set(nameNode.text, this.describeReturn(returnTypeNode, ctx));
-                        break;
-                    }
-                    this.topLevelValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
-                    break;
-                }
-            }
-        }
-    }
-
-    collectTopLevelFunction(node, ctx) {
-        const assocNode = childOfType(node, 'associated_fn_name');
-        const returnInfo = this.describeReturn(childOfType(node, 'return_type'), ctx);
-        if (assocNode) {
-            const [ownerNode, nameNode] = kids(assocNode);
-            const key = `${ownerNode.text}.${nameNode.text}`;
-            this.topLevelAssocNames.set(key, this.mangleTopLevelAssoc(ownerNode.text, nameNode.text));
-            this.topLevelAssocReturns.set(key, returnInfo);
-            return;
-        }
-        const nameNode = childOfType(node, 'identifier');
-        if (nameNode) {
-            this.topLevelValueNames.add(nameNode.text);
-            this.topLevelFnReturns.set(nameNode.text, returnInfo);
-        }
+        this.collectSymbols(kids(this.root), ctx, {
+            onConstruct: (item) => this.applyConstruct(item, ctx),
+            onType: (name) => this.topLevelTypeNames.add(name),
+            onValue: (name, type) => {
+                this.topLevelValueNames.add(name);
+                this.topLevelValueTypes.set(name, type);
+            },
+            onFunction: (name, returnInfo) => {
+                this.topLevelValueNames.add(name);
+                this.topLevelFnReturns.set(name, returnInfo);
+            },
+            onAssoc: (owner, member, returnInfo) => {
+                const key = `${owner}.${member}`;
+                this.topLevelAssocNames.set(key, this.mangleTopLevelAssoc(owner, member));
+                this.topLevelAssocReturns.set(key, returnInfo);
+            },
+        });
     }
 
     collectModuleTemplate(node) {
@@ -305,55 +259,76 @@ class ModuleExpander {
     }
 
     collectNamespaceNames(namespace, ctx) {
-        for (const item of namespace.template.items) {
+        this.collectSymbols(namespace.template.items, ctx, {
+            onType: (name) => this.registerNamespaceType(namespace, name),
+            onValue: (name, type) => {
+                this.registerNamespaceValue(namespace, name);
+                namespace.freeValueTypes.set(name, type);
+            },
+            onFunction: (name, returnInfo) => {
+                this.registerNamespaceValue(namespace, name);
+                namespace.freeFnReturns.set(name, returnInfo);
+            },
+            onAssoc: (owner, member, returnInfo) => {
+                const key = `${owner}.${member}`;
+                namespace.assocNames.set(key, this.mangleNamespaceAssoc(namespace, owner, member));
+                namespace.assocReturns.set(key, returnInfo);
+            },
+        });
+    }
+
+    collectSymbols(items, ctx, handlers) {
+        for (const item of items) {
             switch (item.type) {
-                case 'struct_decl': {
-                    const name = childOfType(item, 'type_ident').text;
-                    this.registerNamespaceType(namespace, name);
+                case 'module_decl':
                     break;
-                }
-                case 'type_decl': {
-                    const name = childOfType(item, 'type_ident').text;
-                    this.registerNamespaceType(namespace, name);
+                case 'construct_decl':
+                    handlers.onConstruct?.(item);
+                    break;
+                case 'struct_decl':
+                    handlers.onType(childOfType(item, 'type_ident').text);
+                    break;
+                case 'type_decl':
+                    handlers.onType(childOfType(item, 'type_ident').text);
                     for (const variant of childrenOfType(childOfType(item, 'variant_list'), 'variant')) {
-                        this.registerNamespaceType(namespace, childOfType(variant, 'type_ident').text);
+                        handlers.onType(childOfType(variant, 'type_ident').text);
                     }
                     break;
-                }
-                case 'fn_decl': {
-                    const assocNode = childOfType(item, 'associated_fn_name');
-                    if (assocNode) {
-                        const [ownerNode, nameNode] = kids(assocNode);
-                        const key = `${ownerNode.text}.${nameNode.text}`;
-                        namespace.assocNames.set(key, this.mangleNamespaceAssoc(namespace, ownerNode.text, nameNode.text));
-                        namespace.assocReturns.set(key, this.describeReturn(childOfType(item, 'return_type'), ctx));
-                        break;
-                    }
-                    const nameNode = childOfType(item, 'identifier');
-                    this.registerNamespaceValue(namespace, nameNode.text);
-                    namespace.freeFnReturns.set(nameNode.text, this.describeReturn(childOfType(item, 'return_type'), ctx));
+                case 'fn_decl':
+                    this.collectFunctionSymbol(item, ctx, handlers);
                     break;
-                }
-                case 'global_decl': {
-                    const nameNode = childOfType(item, 'identifier');
-                    this.registerNamespaceValue(namespace, nameNode.text);
-                    namespace.freeValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
+                case 'export_decl':
+                    this.collectFunctionSymbol(childOfType(item, 'fn_decl'), ctx, handlers);
                     break;
-                }
+                case 'global_decl':
+                    this.collectValueSymbol(item, kids(item).at(-1), ctx, handlers.onValue);
+                    break;
                 case 'import_decl':
                 case 'jsgen_decl': {
-                    const nameNode = childOfType(item, 'identifier');
-                    this.registerNamespaceValue(namespace, nameNode.text);
                     const returnTypeNode = childOfType(item, 'return_type');
-                    if (returnTypeNode) {
-                        namespace.freeFnReturns.set(nameNode.text, this.describeReturn(returnTypeNode, ctx));
-                        break;
-                    }
-                    namespace.freeValueTypes.set(nameNode.text, this.describeType(kids(item).at(-1), ctx));
+                    this.collectValueSymbol(item, returnTypeNode ?? kids(item).at(-1), ctx, returnTypeNode ? handlers.onFunction : handlers.onValue, returnTypeNode);
                     break;
                 }
             }
         }
+    }
+
+    collectFunctionSymbol(node, ctx, handlers) {
+        const assocNode = childOfType(node, 'associated_fn_name');
+        const returnInfo = this.describeReturn(childOfType(node, 'return_type'), ctx);
+        if (assocNode) {
+            const [ownerNode, nameNode] = kids(assocNode);
+            handlers.onAssoc(ownerNode.text, nameNode.text, returnInfo);
+            return;
+        }
+        const nameNode = childOfType(node, 'identifier');
+        if (nameNode) handlers.onFunction(nameNode.text, returnInfo);
+    }
+
+    collectValueSymbol(node, valueTypeNode, ctx, register, returnTypeNode = null) {
+        const nameNode = childOfType(node, 'identifier');
+        if (!nameNode) return;
+        register(nameNode.text, returnTypeNode ? this.describeReturn(returnTypeNode, ctx) : this.describeType(valueTypeNode, ctx));
     }
 
     registerNamespaceType(namespace, name) {
@@ -504,15 +479,7 @@ class ModuleExpander {
     }
 
     emitImportDecl(node, ctx, inModule) {
-        const moduleNode = childOfType(node, 'string_lit');
-        const nameNode = childOfType(node, 'identifier');
-        const name = inModule ? ctx.namespace.freeValueNames.get(nameNode.text) : nameNode.text;
-        const returnTypeNode = childOfType(node, 'return_type');
-        if (returnTypeNode) {
-            return `shimport ${moduleNode.text} ${name}(${this.emitImportParamList(childOfType(node, 'import_param_list'), ctx)}) ${this.emitReturnType(returnTypeNode, ctx)}`;
-        }
-        const typeNode = kids(node).at(-1);
-        return `shimport ${moduleNode.text} ${name}: ${this.emitType(typeNode, ctx)}`;
+        return this.emitExternDecl('shimport', childOfType(node, 'string_lit').text, node, ctx, inModule);
     }
 
     emitImportParamList(node, ctx) {
@@ -520,10 +487,16 @@ class ModuleExpander {
     }
 
     emitJsgenDecl(node, ctx, inModule) {
-        const sourceNode = childOfType(node, 'jsgen_lit');
+        return this.emitExternDecl('escape', childOfType(node, 'jsgen_lit').text, node, ctx, inModule);
+    }
+
+    emitExternDecl(keyword, sourceText, node, ctx, inModule) {
         const nameNode = childOfType(node, 'identifier');
         const name = inModule ? ctx.namespace.freeValueNames.get(nameNode.text) : nameNode.text;
-        return `escape ${sourceNode.text} ${name}(${this.emitImportParamList(childOfType(node, 'import_param_list'), ctx)}) ${this.emitReturnType(childOfType(node, 'return_type'), ctx)}`;
+        const returnTypeNode = childOfType(node, 'return_type');
+        return returnTypeNode
+            ? `${keyword} ${sourceText} ${name}(${this.emitImportParamList(childOfType(node, 'import_param_list'), ctx)}) ${this.emitReturnType(returnTypeNode, ctx)}`
+            : `${keyword} ${sourceText} ${name}: ${this.emitType(kids(node).at(-1), ctx)}`;
     }
 
     emitTestDecl(node, ctx) {
@@ -797,30 +770,13 @@ class ModuleExpander {
     resolveTypeMemberExpr(node, ctx) {
         const memberNode = childOfType(node, 'identifier');
         const ownerNode = kids(node).find((child) => child !== memberNode);
+        if (!memberNode || !ownerNode) return undefined;
         if (['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type)) {
             const namespace = this.resolveNamespaceFromModuleRef(ownerNode, ctx);
             const ownerName = childOfType(ownerNode, 'type_ident')?.text ?? namespace.promotedTypeName;
-            return namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
+            return this.resolveNamespaceAssoc(namespace, ownerName, memberNode.text)?.callee;
         }
-
-        const ownerName = ownerNode.text;
-        if (ctx.namespace?.assocNames.has(`${ownerName}.${memberNode.text}`)) {
-            return ctx.namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
-        }
-        if (this.topLevelAssocNames.has(`${ownerName}.${memberNode.text}`)) {
-            return this.topLevelAssocNames.get(`${ownerName}.${memberNode.text}`);
-        }
-        if (ctx.openTypes.has(ownerName)) {
-            const namespace = ctx.openTypes.get(ownerName);
-            const resolved = namespace.assocNames.get(`${ownerName}.${memberNode.text}`);
-            if (resolved) return resolved;
-        }
-        const promoted = this.resolveMaybeNamespaceName(ownerName, ctx);
-        if (promoted?.promotedTypeName) {
-            const resolved = promoted.assocNames.get(`${promoted.promotedTypeName}.${memberNode.text}`);
-            if (resolved) return resolved;
-        }
-        return undefined;
+        return this.resolveAssociatedEntry(ownerNode.text, memberNode.text, ctx)?.callee;
     }
 
     emitNamespaceCallExpr(node, ctx) {

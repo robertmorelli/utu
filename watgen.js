@@ -308,7 +308,7 @@ const CALL_CALLEE_HANDLERS = {
     pipe_expr: (ctx, callee, args, out) => ctx.genPipeCall(callee, args, out),
     namespace_call_expr: (ctx, callee, args, out) => ctx.genNsCall(callee, out, args),
     identifier: (ctx, callee, args, out) => {
-        ctx.pushArgs(args, out, ctx.lookupCallable(callee.text)?.params?.map(param => param.type));
+        ctx.pushArgs(args, out, ctx.callables.get(callee.text)?.params?.map(param => param.type));
         out.push(`call $${callee.text}`);
     },
     index_expr: (ctx, callee, args, out) => {
@@ -452,7 +452,7 @@ class WatGen {
     }
 
     scanAll() {
-        for (const fn of this.fnItems) this.scanNode(this.fnBody(fn));
+        for (const fn of this.fnItems) this.scanNode(fn.body);
         for (const global of this.globalDecls) this.scanNode(global.value);
         if (this.mode === 'test') for (const test of this.testDecls) this.scanNode(test.body);
         if (this.mode === 'bench') for (const bench of this.benchDecls) {
@@ -506,7 +506,7 @@ class WatGen {
 
         for (const [i, fn] of this.fnItems.entries()) {
             lines.push(this.emitFn(fn, this.profile === 'ticks' ? i : null));
-            if (fn.exported) lines.push(`  (export "${fn.exportName}" (func $${this.fnName(fn)}))`);
+            if (fn.exported) lines.push(`  (export "${fn.exportName}" (func $${fn.name}))`);
         }
 
         if (this.mode === 'test') {
@@ -552,9 +552,9 @@ class WatGen {
         };
 
         for (const fn of this.fnItems) {
-            for (const param of this.fnParams(fn)) visitType(param.type);
-            visitType(this.fnReturnType(fn));
-            visitBody(this.fnBody(fn));
+            for (const param of fn.params) visitType(param.type);
+            visitType(fn.returnType);
+            visitBody(fn.body);
         }
 
         if (this.mode === 'test') for (const test of this.testDecls) visitBody(test.body);
@@ -704,8 +704,8 @@ class WatGen {
     }
 
     emitFn(fn, profileId = null) {
-        const body = this.fnBody(fn);
-        return this.emitFunc(this.fnName(fn), this.fnParams(fn), this.fnReturnType(fn), body, out => this.genBody(kids(body), out, true), [], profileId);
+        const body = fn.body;
+        return this.emitFunc(fn.name, fn.params, fn.returnType, body, out => this.genBody(kids(body), out, true), [], profileId);
     }
 
     emitTest(test, exportName) { return this.emitFunc(exportName, [], null, test.body, out => this.genBody(kids(test.body), out)); }
@@ -757,12 +757,6 @@ class WatGen {
         const lines = [];
         emit(lines);
         this.pushLines(out, lines, prefix);
-    }
-    pushPipedArgs(value, args, out, isPlaceholder, readArg = arg => arg) {
-        const placeholderCount = args.filter(isPlaceholder).length;
-        if (placeholderCount > 1) throw new Error('pipe targets can contain at most one underscore placeholder');
-        if (!args.some(isPlaceholder)) this.genExpr(value, null, out);
-        for (const arg of args) this.genExpr(isPlaceholder(arg) ? value : readArg(arg), null, out);
     }
     pipedArgs(value, args, isPlaceholder, readArg = arg => arg) {
         const placeholderCount = args.filter(isPlaceholder).length;
@@ -870,7 +864,8 @@ class WatGen {
             const [ns, method] = target.callee.split('.');
             return void NS_CALL_HANDLERS[ns](this, method, this.pipedArgs(value, target.args, arg => arg.kind === 'placeholder', arg => arg.value), out);
         }
-        this.pushPipedArgs(value, target.kind === 'pipe_ident' ? [] : target.args, out, arg => arg.kind === 'placeholder', arg => arg.value);
+        for (const arg of this.pipedArgs(value, target.kind === 'pipe_ident' ? [] : target.args, arg => arg.kind === 'placeholder', arg => arg.value))
+            this.genExpr(arg, null, out);
         out.push(`call $${target.kind === 'pipe_ident' ? target.name : target.callee}`);
     }
 
@@ -908,7 +903,8 @@ class WatGen {
             const [ns, method] = target.callee.split('.');
             return void NS_CALL_HANDLERS[ns](this, method, this.pipedArgs(value, args, arg => arg.type === 'identifier' && arg.text === '_'), out);
         }
-        this.pushPipedArgs(value, args, out, arg => arg.type === 'identifier' && arg.text === '_');
+        for (const arg of this.pipedArgs(value, args, arg => arg.type === 'identifier' && arg.text === '_'))
+            this.genExpr(arg, null, out);
         out.push(`call $${target.kind === 'pipe_ident' ? target.name : target.callee}`);
     }
 
@@ -1365,10 +1361,6 @@ class WatGen {
     }
 
     inferType(node) { return INFER_TYPE_HANDLERS[node.type]?.(this, node) ?? null; }
-    fnName(fn) { return fn.name; }
-    fnParams(fn) { return fn.params; }
-    fnReturnType(fn) { return fn.returnType; }
-    fnBody(fn) { return fn.body; }
     inferredToType(inferred) { return inferred ? { kind: SCALAR_NAMES.has(inferred) ? 'scalar' : 'named', name: inferred } : null; }
     exprType(node) {
         if (!node) return null;
@@ -1472,8 +1464,7 @@ class WatGen {
         if (patternNode.text === 'false') return 0;
         return null;
     }
-    lookupCallable(name) { return this.callables.get(name) ?? null; }
-    lookupCallableReturnType(name) { return this.lookupCallable(name)?.returnType ?? null; }
+    lookupCallableReturnType(name) { return this.callables.get(name)?.returnType ?? null; }
     genScalarPattern(node, hint, out) {
         const patternNode = node.type === 'match_lit' ? kids(node)[0] ?? node : node;
         const emit = SCALAR_PATTERN_GENERATORS[patternNode.type];

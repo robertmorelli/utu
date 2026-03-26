@@ -1,5 +1,5 @@
+import { compile, validateWat } from '../index.js';
 import binaryen from 'binaryen';
-import { compile } from '../index.js';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
 import { firstLine, runNamedCases } from './test-helpers.mjs';
 
@@ -317,6 +317,24 @@ export fun main() i32 {
     },
 ];
 
+const binaryenValidationCases = [
+    {
+        name: 'binaryen-return-type-validation',
+        message: 'function body type must match',
+        wat: `(module (func $bad (result i32) (ref.null extern)))`,
+    },
+    {
+        name: 'binaryen-call-arg-validation',
+        message: 'call param types must match',
+        wat: `(module (func $add (param i32 i32) (result i32) (i32.const 0)) (func $bad (result i32) (call $add (ref.null extern) (i32.const 1))))`,
+    },
+    {
+        name: 'binaryen-global-init-validation',
+        message: 'global init must be constant',
+        wat: `(module (func $one (result i32) (i32.const 1)) (global $bad i32 (call $one)))`,
+    },
+];
+
 const cases = [
     ...successCases.map((testCase) => [testCase.name, async () => {
         const actual = await compileAndRun(testCase.source);
@@ -362,6 +380,16 @@ export fun main() i32 {
         if (many.functionCount !== single.functionCount)
             throw new Error(`Expected 50 instantiations to keep ${single.functionCount} optimized function(s), got ${many.functionCount}`);
     }],
+    ...binaryenValidationCases.map((testCase) => [testCase.name, async () => {
+        const result = await validateWat(testCase.wat);
+        if (!result) throw new Error('Expected WAT validation to fail');
+        if (result.message.includes('WebAssembly.Module'))
+            throw new Error(`Expected Binaryen diagnostic, got: ${JSON.stringify(firstLine(result.message))}`);
+        if (!result.message.includes(testCase.message))
+            throw new Error(`Expected message to include ${JSON.stringify(testCase.message)}, got ${JSON.stringify(firstLine(result.message))}`);
+        if (!result.binaryenOutput.join('\n').includes(testCase.message))
+            throw new Error(`Expected binaryen output to include ${JSON.stringify(testCase.message)}, got ${JSON.stringify(result.binaryenOutput)}`);
+    }]),
     ...failureCases.map((testCase) => [testCase.name, async () => {
         try {
             await compile(testCase.source, { mode: 'program' });
