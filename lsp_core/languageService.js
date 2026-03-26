@@ -34,11 +34,12 @@ export class UtuLanguageService {
         const parsedTree = await this.parserService.parseSource(document.getText());
         try {
             const diagnostics = collectParseDiagnostics(parsedTree.tree.rootNode, document);
+            const index = buildDocumentIndex(document, parsedTree.tree.rootNode, diagnostics);
             if (diagnostics.length === 0) {
                 const compileDiagnostic = await this.tryGetCompileDiagnostic(parsedTree.tree, document.getText(), document);
-                if (compileDiagnostic) diagnostics.push(compileDiagnostic);
+                if (compileDiagnostic)
+                    diagnostics.push(compileDiagnostic);
             }
-            const index = buildDocumentIndex(document, parsedTree.tree.rootNode, diagnostics);
             this.cache.set(cacheKey, { version: document.version, index });
             return index;
         }
@@ -301,7 +302,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         bench_decl: { collect: collectBenchDeclaration, walk: walkBench },
     };
     const WALK_EXPRESSION_HANDLERS = {
-        identifier: (node) => addResolvedOccurrence(node, 'value', resolveValueKey(node.text)),
+        identifier: walkIdentifierExpression,
         qualified_type_ref: walkQualifiedTypeReference,
         type_member_expr: walkTypeMemberExpression,
         promoted_module_call_expr: walkPromotedModuleCallExpression,
@@ -393,10 +394,57 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     function findModuleNameNode(node) {
         return findNamedChild(findNamedChild(node, 'module_name'), 'identifier')
             ?? findNamedChild(findNamedChild(node, 'module_name'), 'type_ident')
+            ?? findNamedChild(findNamedChild(findNamedChild(node, 'module_ref'), 'module_name'), 'identifier')
+            ?? findNamedChild(findNamedChild(findNamedChild(node, 'module_ref'), 'module_name'), 'type_ident')
             ?? findNamedChild(findNamedChild(node, 'module_ref'), 'identifier')
             ?? findNamedChild(findNamedChild(node, 'module_ref'), 'type_ident')
             ?? findNamedChild(node, 'identifier')
             ?? findNamedChild(node, 'type_ident');
+    }
+    function formatTypeName(typeText) {
+        return normalizeTypeText(typeText) ?? typeText?.trim() ?? 'unknown';
+    }
+    function getTypeResolution(node) {
+        if (!node)
+            return { key: undefined };
+        if (node.type === 'type_ident')
+            return { key: resolveTypeKey(node.text), typeNode: node, typeName: node.text };
+        if (node.type === 'qualified_type_ref' || node.type === 'instantiated_module_ref') {
+            const namespaceNode = findModuleNameNode(node);
+            const namespace = resolveNamespaceNode(node);
+            const typeNode = findNamedChild(node, 'type_ident');
+            const typeName = formatTypeName(node.text);
+            const key = typeNode
+                ? namespace?.typeKeys.get(typeNode.text)
+                : namespace?.promotedTypeName
+                    ? namespace.typeKeys.get(namespace.promotedTypeName)
+                    : undefined;
+            return { key, namespace, namespaceNode, typeNode, typeName };
+        }
+        return { key: undefined };
+    }
+    function walkIdentifierExpression(node) {
+        const symbolKey = resolveValueKey(node.text);
+        if (!symbolKey)
+            addSemanticDiagnostic(node, `Undefined value "${node.text}".`);
+        addResolvedOccurrence(node, 'value', symbolKey);
+    }
+    function walkQualifiedTypeLike(node) {
+        const { key, namespace, namespaceNode, typeNode } = getTypeResolution(node);
+        if (!namespace) {
+            if (namespaceNode)
+                addSemanticDiagnostic(namespaceNode, `Unknown module or construct alias "${namespaceNode.text}".`);
+        }
+        else if (typeNode && !key) {
+            addSemanticDiagnostic(typeNode, `Unknown type "${typeNode.text}" in namespace "${namespace.name}".`);
+        }
+        if (typeNode)
+            addResolvedOccurrence(typeNode, 'type', key);
+        else if (namespaceNode)
+            addResolvedOccurrence(namespaceNode, 'type', key);
+    }
+    function isCallableValueSymbol(symbol) {
+        return symbol?.kind === 'function' || symbol?.kind === 'importFunction';
     }
     function resolvePromotedTypeKeyByName(name) {
         const namespace = resolveNamespaceByName(name);
@@ -757,20 +805,22 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         if (!typeNode)
             return;
         walkTypeAnnotation(typeNode);
-        const ownerType = inferTypeNodeText(typeNode);
+        const ownerType = formatTypeName(inferTypeNodeText(typeNode));
         for (const fieldInit of findNamedChildren(node, 'field_init')) {
             const fieldNameNode = findNamedChild(fieldInit, 'identifier');
             const valueNode = fieldInit.namedChildren.at(-1);
-            if (fieldNameNode)
-                addResolvedOccurrence(fieldNameNode, 'field', resolveFieldKey(ownerType, fieldNameNode.text));
+            if (fieldNameNode) {
+                const fieldKey = resolveFieldKey(ownerType, fieldNameNode.text);
+                if (!fieldKey)
+                    addSemanticDiagnostic(fieldNameNode, `Unknown field "${fieldNameNode.text}" in struct initializer for "${ownerType}".`);
+                addResolvedOccurrence(fieldNameNode, 'field', fieldKey);
+            }
             if (valueNode)
                 walkExpression(valueNode);
         }
     }
     function walkQualifiedTypeReference(node) {
-        const typeNode = findNamedChild(node, 'type_ident');
-        if (typeNode)
-            addResolvedOccurrence(typeNode, 'type', resolveQualifiedTypeKey(node));
+        walkQualifiedTypeLike(node);
     }
     function walkTypeMemberExpression(node) {
         const ownerNode = node.namedChildren[0];
@@ -786,32 +836,79 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const moduleNamespace = ['identifier', 'instantiated_module_ref'].includes(baseNode.type) ? resolveNamespaceNode(baseNode) : undefined;
         if (moduleNamespace) {
-            addResolvedOccurrence(fieldNameNode, 'value', resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNameNode.text));
+            const symbolKey = resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNameNode.text);
+            if (!symbolKey)
+                addSemanticDiagnostic(fieldNameNode, `Unknown member "${fieldNameNode.text}" in namespace "${moduleNamespace.name}".`);
+            addResolvedOccurrence(fieldNameNode, 'value', symbolKey);
             return;
         }
         walkExpression(baseNode);
         const baseType = inferExpressionType(baseNode);
-        addResolvedOccurrence(fieldNameNode, 'field', baseType ? resolveFieldKey(baseType, fieldNameNode.text) : undefined);
+        const fieldKey = baseType ? resolveFieldKey(baseType, fieldNameNode.text) : undefined;
+        if (baseType && !fieldKey)
+            addSemanticDiagnostic(fieldNameNode, `Unknown field "${fieldNameNode.text}" on type "${formatTypeName(baseType)}".`);
+        addResolvedOccurrence(fieldNameNode, 'field', fieldKey);
     }
     function walkCallExpression(node) {
         const [calleeNode, argListNode] = node.namedChildren;
+        const args = argListNode?.type === 'arg_list' ? argListNode.namedChildren : [];
         if (calleeNode?.type === 'identifier') {
-            const symbol = lookupSymbol(resolveValueKey(calleeNode.text));
+            const symbolKey = resolveValueKey(calleeNode.text);
+            const symbol = lookupSymbol(symbolKey);
             if (!symbol)
                 addSemanticDiagnostic(calleeNode, `Undefined function or import "${calleeNode.text}".`);
+            else if (!isCallableValueSymbol(symbol))
+                addSemanticDiagnostic(calleeNode, `Cannot call "${calleeNode.text}" because it is not a function.`);
+            addResolvedOccurrence(calleeNode, 'value', symbolKey);
+            walkExpressions(args);
+            return;
         }
         if (calleeNode?.type === 'field_expr') {
             const [baseNode, memberNode] = calleeNode.namedChildren;
+            const moduleNamespace = ['identifier', 'instantiated_module_ref'].includes(baseNode?.type) ? resolveNamespaceNode(baseNode) : undefined;
+            if (moduleNamespace && memberNode) {
+                const symbolKey = resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, memberNode.text);
+                if (!symbolKey)
+                    addSemanticDiagnostic(memberNode, `Unknown member "${memberNode.text}" in namespace "${moduleNamespace.name}".`);
+                addResolvedOccurrence(memberNode, 'value', symbolKey);
+                walkExpressions(args);
+                return;
+            }
             const methodKey = resolveMethodCallKey(calleeNode);
-            if (methodKey) {
+            if (memberNode && methodKey) {
                 walkExpression(baseNode);
                 addResolvedOccurrence(memberNode, 'value', methodKey);
-                walkExpressions(argListNode?.type === 'arg_list' ? argListNode.namedChildren : []);
+                walkExpressions(args);
+                return;
+            }
+            if (memberNode) {
+                walkExpression(baseNode);
+                const baseType = inferExpressionType(baseNode);
+                const fieldKey = baseType ? resolveFieldKey(baseType, memberNode.text) : undefined;
+                if (baseType && fieldKey)
+                    addSemanticDiagnostic(memberNode, `Cannot call field "${memberNode.text}" on type "${formatTypeName(baseType)}".`);
+                else if (baseType)
+                    addSemanticDiagnostic(memberNode, `Unknown method "${memberNode.text}" on type "${formatTypeName(baseType)}".`);
+                addResolvedOccurrence(memberNode, 'value', methodKey);
+                walkExpressions(args);
+                return;
+            }
+        }
+        if (calleeNode?.type === 'type_member_expr') {
+            const [ownerNode, memberNode] = calleeNode.namedChildren;
+            if (ownerNode && memberNode) {
+                const ownerResolution = getTypeResolution(ownerNode);
+                walkTypeAnnotation(ownerNode);
+                const symbolKey = resolveAssociatedKey(ownerNode, memberNode.text);
+                if (ownerResolution.key && !symbolKey)
+                    addSemanticDiagnostic(memberNode, `Unknown associated function "${memberNode.text}" on type "${ownerResolution.typeName}".`);
+                addResolvedOccurrence(memberNode, 'value', symbolKey);
+                walkExpressions(args);
                 return;
             }
         }
         walkExpression(calleeNode);
-        walkExpressions(argListNode?.type === 'arg_list' ? argListNode.namedChildren : []);
+        walkExpressions(args);
     }
     function walkPromotedModuleCallExpression(node) {
         const namespace = resolveNamespaceByName(findModuleNameNode(node)?.text ?? '');
@@ -868,15 +965,30 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         else {
             const namespace = resolveNamespaceNode(first);
             if (namespace && second?.type === 'identifier' && pathParts.length === 2) {
-                addResolvedOccurrence(second, 'value', resolveNamespaceValueOrPromotedAssocKey(namespace, second.text));
+                const symbolKey = resolveNamespaceValueOrPromotedAssocKey(namespace, second.text);
+                if (!symbolKey)
+                    addSemanticDiagnostic(second, `Unknown member "${second.text}" in namespace "${namespace.name}".`);
+                addResolvedOccurrence(second, 'value', symbolKey);
             }
             else if (namespace && second?.type === 'type_ident' && pathParts[2]?.type === 'identifier') {
-                addResolvedOccurrence(second, 'type', namespace.typeKeys.get(second.text));
-                addResolvedOccurrence(pathParts[2], 'value', namespace.assocKeys.get(`${second.text}.${pathParts[2].text}`));
+                const typeKey = namespace.typeKeys.get(second.text);
+                if (!typeKey)
+                    addSemanticDiagnostic(second, `Unknown type "${second.text}" in namespace "${namespace.name}".`);
+                addResolvedOccurrence(second, 'type', typeKey);
+                const assocKey = namespace.assocKeys.get(`${second.text}.${pathParts[2].text}`);
+                if (typeKey && !assocKey)
+                    addSemanticDiagnostic(pathParts[2], `Unknown associated function "${pathParts[2].text}" on type "${second.text}".`);
+                addResolvedOccurrence(pathParts[2], 'value', assocKey);
             }
             else if (first.type === 'type_ident' && second?.type === 'identifier') {
-                addResolvedOccurrence(first, 'type', resolveTypeKey(first.text));
-                addResolvedOccurrence(second, 'value', resolveAssociatedKey(first, second.text));
+                const typeKey = resolveTypeKey(first.text);
+                if (!typeKey)
+                    addSemanticDiagnostic(first, `Undefined type "${first.text}".`);
+                addResolvedOccurrence(first, 'type', typeKey);
+                const assocKey = resolveAssociatedKey(first, second.text);
+                if (typeKey && !assocKey)
+                    addSemanticDiagnostic(second, `Unknown associated function "${second.text}" on type "${first.text}".`);
+                addResolvedOccurrence(second, 'value', assocKey);
             }
             else if (first.type === 'identifier') {
                 const symbolKey = resolveValueKey(first.text);
@@ -950,17 +1062,18 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         if (!node)
             return;
         if (node.type === 'type_ident') {
-            addResolvedOccurrence(node, 'type', resolveTypeKey(node.text));
+            const typeKey = resolveTypeKey(node.text);
+            if (!typeKey)
+                addSemanticDiagnostic(node, `Undefined type "${node.text}".`);
+            addResolvedOccurrence(node, 'type', typeKey);
             return;
         }
         if (node.type === 'instantiated_module_ref') {
-            const nameNode = findModuleNameNode(node);
-            if (nameNode)
-                addResolvedOccurrence(nameNode, 'type', resolveQualifiedTypeKey(node));
+            walkQualifiedTypeLike(node);
             return;
         }
         if (node.type === 'qualified_type_ref') {
-            walkQualifiedTypeReference(node);
+            walkQualifiedTypeLike(node);
             return;
         }
         walkExpressions(node.namedChildren, walkTypeAnnotation);

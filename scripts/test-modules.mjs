@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { compile, validateWat } from '../index.js';
 import binaryen from 'binaryen';
 import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
@@ -333,6 +334,34 @@ const binaryenValidationCases = [
         message: 'global init must be constant',
         wat: `(module (func $one (result i32) (i32.const 1)) (global $bad i32 (call $one)))`,
     },
+    {
+        name: 'binaryen-nullability-validation',
+        message: 'function body type must match',
+        wat: `(module (type $Box (struct (field i32))) (func $bad (result (ref $Box)) (ref.null $Box)))`,
+    },
+];
+
+const binaryenCompileFailureCases = [
+    {
+        name: 'binaryen-compile-return-type-validation',
+        path: 'scripts/fixtures/compile_bad_return_type.utu',
+        message: 'function body type must match',
+    },
+    {
+        name: 'binaryen-compile-call-arg-validation',
+        path: 'scripts/fixtures/compile_bad_call_args.utu',
+        message: 'call param types must match',
+    },
+    {
+        name: 'binaryen-compile-nullability-validation',
+        path: 'scripts/fixtures/compile_nullability_mismatch.utu',
+        message: 'function body type must match',
+    },
+    {
+        name: 'binaryen-compile-global-init-validation',
+        path: 'scripts/fixtures/compile_illegal_global_init.utu',
+        message: 'global init must be constant',
+    },
 ];
 
 const cases = [
@@ -389,6 +418,19 @@ export fun main() i32 {
             throw new Error(`Expected message to include ${JSON.stringify(testCase.message)}, got ${JSON.stringify(firstLine(result.message))}`);
         if (!result.binaryenOutput.join('\n').includes(testCase.message))
             throw new Error(`Expected binaryen output to include ${JSON.stringify(testCase.message)}, got ${JSON.stringify(result.binaryenOutput)}`);
+    }]),
+    ...binaryenCompileFailureCases.map((testCase) => [testCase.name, async () => {
+        const source = await readFile(new URL(`../${testCase.path}`, import.meta.url), 'utf8');
+        try {
+            await compile(source, { mode: 'program' });
+        } catch (error) {
+            const message = String(error?.message ?? error);
+            if (message.includes('WebAssembly.Module'))
+                throw new Error(`Expected Binaryen diagnostic, got: ${JSON.stringify(firstLine(message))}`);
+            if (message.includes(testCase.message)) return;
+            throw new Error(`Expected ${JSON.stringify(testCase.message)}, got ${JSON.stringify(firstLine(message))}`);
+        }
+        throw new Error('Expected compile to fail');
     }]),
     ...failureCases.map((testCase) => [testCase.name, async () => {
         try {

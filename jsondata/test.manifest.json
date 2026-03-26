@@ -35,6 +35,11 @@
     "command": ["bun", "./scripts/test-editor.mjs", "core"]
   },
   {
+    "id": "editor:diagnostics",
+    "label": "Editor diagnostics",
+    "command": ["bun", "./scripts/test-diagnostics.mjs"]
+  },
+  {
     "id": "editor:examples",
     "label": "Editor examples",
     "command": ["bun", "./scripts/test-editor.mjs", "examples"]

@@ -759,8 +759,6 @@ class WatGen {
         this.pushLines(out, lines, prefix);
     }
     pipedArgs(value, args, isPlaceholder, readArg = arg => arg) {
-        const placeholderCount = args.filter(isPlaceholder).length;
-        if (placeholderCount > 1) throw new Error('pipe targets can contain at most one underscore placeholder');
         return args.some(isPlaceholder)
             ? args.map(arg => isPlaceholder(arg) ? value : readArg(arg))
             : [value, ...args.map(readArg)];

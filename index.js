@@ -52,7 +52,7 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
 // or { message, binaryenOutput } on failure. Never throws and never writes to stderr.
 export async function validateWat(wat) {
     return withParsedWat(wat, (mod) => {
-        const message = mod.validate() ? null : _binaryenCapture.lines.join('\n').trim() || 'Binaryen validation failed.';
+        const message = binaryenValidationMessage(mod);
         return message ? { message, binaryenOutput: [..._binaryenCapture.lines] } : null;
     }, (error) => ({
         message: formatBinaryenError(error),
@@ -64,9 +64,8 @@ export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {
     return withActiveTree(source, { wasmUrl, runtimeWasmUrl }, (tree) => collectMetadata(tree.rootNode));
 }
 
-function ensureBinaryenValid(mod, fallbackMessage = 'Binaryen validation failed.') {
-    if (mod.validate()) return;
-    throw new Error(_binaryenCapture.lines.join('\n').trim() || fallbackMessage);
+function binaryenValidationMessage(mod) {
+    return mod.validate() ? null : _binaryenCapture.lines.join('\n').trim() || 'Binaryen validation failed.';
 }
 
 function formatBinaryenError(error) {
@@ -91,11 +90,11 @@ async function withActiveTree(source, initOptions, callback) {
 
 async function compileWat(wat) {
     return withParsedWat(wat, (mod, binaryen) => {
-        ensureBinaryenValid(mod);
+        const message = binaryenValidationMessage(mod);
+        if (message) throw new Error(message);
         binaryen.setOptimizeLevel(3);
         binaryen.setShrinkLevel(2);
         mod.optimize();
-        ensureBinaryenValid(mod, 'Binaryen validation failed after optimization.');
         return mod.emitBinary();
     });
 }
