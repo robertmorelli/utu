@@ -377,7 +377,10 @@ const EXPR_GENERATORS = {
     field_expr: (ctx, node, _hint, out) => ctx.genField(node, out),
     index_expr: (ctx, node, _hint, out) => ctx.genIndex(node, out),
     namespace_call_expr: (ctx, node, _hint, out) => ctx.genNsCall(node, out),
-    ref_null_expr: (_ctx, node, _hint, out) => out.push(`ref.null $${childOfType(node, 'type_ident').text}`),
+    ref_null_expr: (_ctx, node, _hint, out) => {
+        const typeNode = childOfType(node, 'type_ident') ?? childOfType(node, 'qualified_type_ref');
+        out.push(`ref.null $${typeNode.text}`);
+    },
     if_expr: (ctx, node, hint, out) => ctx.genIf(node, hint, out),
     promote_expr: (ctx, node, hint, out) => ctx.genPromote(node, hint, out),
     match_expr: (ctx, node, hint, out) => ctx.genMatch(node, hint, out),
@@ -423,6 +426,8 @@ class WatGen {
         this.globalTypeMap = new Map();
         this.callables = new Map();
         this.taggedStructTags = new Map();
+        this.taggedTypeProtocols = new Map();
+        this.variantParents = new Map();
         this.protocolMethodMap = new Map();
         this.protocolImplMap = new Map();
         this.protocolImplementersByProtocol = new Map();
@@ -532,6 +537,7 @@ class WatGen {
             const helper = {
                 name: protoDispatchName(impl.protocol, impl.member, impl.selfTypeName),
                 selfTypeName: impl.selfTypeName,
+                tagTypeName: impl.selfTypeName,
                 params: helperParams,
                 returnType: helperReturnType,
                 funcTypeName: slice.funcTypeName,
@@ -539,6 +545,36 @@ class WatGen {
             };
             this.protocolHelpers.push(helper);
             this.callables.set(helper.name, helper);
+        }
+
+        for (const typeDecl of this.typeDecls) {
+            if (!typeDecl.tagged) continue;
+            for (const protocol of typeDecl.protocols) {
+                const protoDecl = this.protoDecls.find((decl) => decl.name === protocol);
+                if (!protoDecl) continue;
+                for (const method of protoDecl.methods) {
+                    const helperName = protoDispatchName(protocol, method.name, typeDecl.name);
+                    if (this.callables.has(helperName)) continue;
+                    const helper = {
+                        name: helperName,
+                        selfTypeName: typeDecl.name,
+                        params: method.params.map((type, index) => ({
+                            kind: 'param',
+                            name: index === 0 ? 'self' : `arg${index}`,
+                            type: substituteProtocolType(type, protoDecl.typeParam, typeDecl.name),
+                        })),
+                        returnType: substituteProtocolType(method.returnType, protoDecl.typeParam, typeDecl.name),
+                        funcTypeName: protoFuncTypeName(protocol, method.name),
+                        tableName: protoTableName(protocol, method.name),
+                        variantDispatch: typeDecl.variants.map((variant) => ({
+                            variantName: variant.name,
+                            callee: protoDispatchName(protocol, method.name, variant.name),
+                        })),
+                    };
+                    this.protocolHelpers.push(helper);
+                    this.callables.set(helper.name, helper);
+                }
+            }
         }
     }
 
@@ -549,6 +585,21 @@ class WatGen {
             if (decl.fields.some((field) => field.name === HIDDEN_TAG_FIELD.name))
                 throw new Error(`Tagged struct "${decl.name}" cannot declare a field named "${HIDDEN_TAG_FIELD.name}"`);
             this.taggedStructTags.set(decl.name, nextTag++);
+        }
+        for (const decl of this.typeDecls) {
+            if (decl.protocols.length > 0 && !decl.tagged)
+                throw new Error(`Type "${decl.name}" must be declared with "tag type" to implement protocols`);
+            if (!decl.tagged) continue;
+            for (const protocol of decl.protocols) {
+                if (!this.taggedTypeProtocols.has(decl.name)) this.taggedTypeProtocols.set(decl.name, new Set());
+                this.taggedTypeProtocols.get(decl.name).add(protocol);
+            }
+            if (decl.variants.some((variant) => variant.fields.some((field) => field.name === HIDDEN_TAG_FIELD.name)))
+                throw new Error(`Tagged type "${decl.name}" cannot declare a field named "${HIDDEN_TAG_FIELD.name}" on its variants`);
+            for (const variant of decl.variants) {
+                this.variantParents.set(variant.name, decl.name);
+                this.taggedStructTags.set(variant.name, nextTag++);
+            }
         }
     }
 
@@ -574,7 +625,10 @@ class WatGen {
             throw new Error(`Protocol getter "${fn.protocolOwner}.${fn.protocolMember}" is field-backed and must not be implemented with "fun"`);
         if (!fn.selfTypeName) throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" must use a concrete named self type`);
         if (!this.taggedStructTags.has(fn.selfTypeName))
-            throw new Error(`Type "${fn.selfTypeName}" must be declared with "tag struct" to implement protocol "${fn.protocolOwner}"`);
+            throw new Error(`Type "${fn.selfTypeName}" must be declared with "tag struct" or belong to a "tag type" that implements protocol "${fn.protocolOwner}"`);
+        const parentTypeName = this.variantParents.get(fn.selfTypeName) ?? null;
+        if (parentTypeName && !this.taggedTypeProtocols.get(parentTypeName)?.has(fn.protocolOwner))
+            throw new Error(`Variant "${fn.selfTypeName}" cannot implement protocol "${fn.protocolOwner}" because parent type "${parentTypeName}" does not declare it`);
         if (fn.exported) throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" cannot be exported directly`);
         const expectedParams = method.params.map((type) => substituteProtocolType(type, method.typeParam, fn.selfTypeName));
         const expectedReturn = substituteProtocolType(method.returnType, method.typeParam, fn.selfTypeName);
@@ -642,8 +696,7 @@ class WatGen {
     }
 
     requireProtocolGetterField(protocol, method, selfTypeName) {
-        const decl = this.typeDeclMap.get(selfTypeName);
-        const field = decl?.fields.find((candidate) => candidate.name === method.name) ?? null;
+        const field = this.typeFields(selfTypeName)?.find((candidate) => candidate.name === method.name) ?? null;
         if (!field)
             throw new Error(`Type "${selfTypeName}" must declare field "${method.name}" to satisfy protocol getter "${protocol}.${method.name}"`);
         if (!typesEqual(field.type, method.returnType))
@@ -659,6 +712,18 @@ class WatGen {
                 for (const method of decl.methods) {
                     if (!this.protocolImplMap.has(protocolImplKey(decl.name, method.name, selfTypeName)))
                         throw new Error(`Type "${selfTypeName}" does not fully implement protocol "${decl.name}"; missing "${method.name}"`);
+                }
+            }
+        }
+        for (const typeDecl of this.typeDecls) {
+            for (const protocol of typeDecl.protocols) {
+                const protoDecl = this.protoDecls.find((decl) => decl.name === protocol);
+                if (!protoDecl) throw new Error(`Unknown protocol "${protocol}" on type "${typeDecl.name}"`);
+                for (const variant of typeDecl.variants) {
+                    for (const method of protoDecl.methods) {
+                        if (!this.protocolImplMap.has(protocolImplKey(protocol, method.name, variant.name)))
+                            throw new Error(`Variant "${variant.name}" does not fully implement protocol "${protocol}" required by type "${typeDecl.name}"; missing "${method.name}"`);
+                    }
                 }
             }
         }
@@ -703,6 +768,16 @@ class WatGen {
 
     runtimeStructFields(decl) {
         return decl.tagged ? [HIDDEN_TAG_FIELD, ...decl.fields] : decl.fields;
+    }
+
+    runtimeTypeFields(typeName) {
+        const decl = this.typeDeclMap.get(typeName);
+        if (decl?.kind === 'struct_decl') return this.runtimeStructFields(decl);
+        if (decl?.kind === 'type_decl') return [];
+        const variant = this.variantDecls.get(typeName);
+        if (!variant) return null;
+        const parentTypeName = this.variantParents.get(typeName) ?? null;
+        return this.typeDeclMap.get(parentTypeName)?.tagged ? [HIDDEN_TAG_FIELD, ...variant.fields] : variant.fields;
     }
 
     emit() {
@@ -835,7 +910,11 @@ class WatGen {
     emitSumType(decl, indent = '    ') {
         const lines = [`${indent}(type $${decl.name} (sub (struct)))`];
         for (const variant of decl.variants)
-            lines.push(this.emitStructLikeType(`${indent}(type $${variant.name} (sub $${decl.name} (struct`, variant.fields, `${indent})))`));
+            lines.push(this.emitStructLikeType(
+                `${indent}(type $${variant.name} (sub $${decl.name} (struct`,
+                decl.tagged ? [HIDDEN_TAG_FIELD, ...variant.fields] : variant.fields,
+                `${indent})))`,
+            ));
         return lines;
     }
 
@@ -880,11 +959,43 @@ class WatGen {
 
     emitProtocolHelper(helper) {
         return this.emitFunc(helper.name, helper.params, helper.returnType, [], out => {
+            if (helper.variantDispatch) {
+                this.emitProtocolVariantHelper(helper, helper.variantDispatch, out, 0);
+                return;
+            }
             for (const param of helper.params) out.push(`local.get $${param.name}`);
             out.push('local.get $self');
-            out.push(`struct.get $${helper.selfTypeName} $${HIDDEN_TAG_FIELD.name}`);
+            out.push(`struct.get $${helper.tagTypeName} $${HIDDEN_TAG_FIELD.name}`);
             out.push(`call_indirect $${helper.tableName}${this.callIndirectSig(helper.funcTypeName, null, null)}`);
         });
+    }
+
+    emitProtocolVariantHelper(helper, variants, out, index) {
+        const variant = variants[index];
+        if (!variant) {
+            out.push('unreachable');
+            return;
+        }
+        out.push('local.get $self');
+        out.push(`ref.test (ref $${variant.variantName})`);
+        out.push(`(if${helper.returnType ? ` ${this.watResultList(helper.returnType)}` : ''}`);
+        out.push('  (then');
+        this.pushGenerated(out, lines => {
+            for (const param of helper.params) {
+                if (param.name === 'self') {
+                    lines.push('local.get $self');
+                    lines.push(`ref.cast (ref $${variant.variantName})`);
+                    continue;
+                }
+                lines.push(`local.get $${param.name}`);
+            }
+            lines.push(`call $${variant.callee}`);
+        });
+        out.push('  )');
+        out.push('  (else');
+        this.pushGenerated(out, lines => this.emitProtocolVariantHelper(helper, variants, lines, index + 1));
+        out.push('  )');
+        out.push(')');
     }
 
     emitProtocolElem(slice) {
@@ -1116,6 +1227,17 @@ class WatGen {
         hint = this.valueHint(hint);
         const [left, right] = kids(node);
         const op = findAnonBetween(node, left, right);
+        if (['==', '!='].includes(op)) {
+            const leftExprType = this.exprType(left) ?? this.inferredToType(this.inferType(left));
+            const rightExprType = this.exprType(right) ?? this.inferredToType(this.inferType(right));
+            if (this.isRefComparableType(leftExprType) || this.isRefComparableType(rightExprType)) {
+                this.genExpr(left, this.wasmTypeStr(leftExprType) ?? null, out);
+                this.genExpr(right, this.wasmTypeStr(rightExprType) ?? null, out);
+                out.push('ref.eq');
+                if (op === '!=') out.push('i32.eqz');
+                return;
+            }
+        }
         const leftType = this.inferType(left) || hint || 'i32';
         const rightType = this.inferType(right) || hint || 'i32';
         const wasmType = this.dominantType(leftType, rightType);
@@ -1536,13 +1658,14 @@ class WatGen {
 
     genStructInit(node, out) {
         const typeName = childOfType(node, 'type_ident').text;
-        const fields = this.typeFields(typeName);
+        const fields = this.runtimeTypeFields(typeName);
         if (!fields) throw new Error(`Unknown type: ${typeName}`);
         const fieldMap = new Map(
             childrenOfType(node, 'field_init').map(field => [kids(field)[0].text, kids(field)[1]])
         );
         if (this.taggedStructTags.has(typeName)) out.push(`i32.const ${this.taggedStructTags.get(typeName)}`);
         for (const field of fields) {
+            if (field.name === HIDDEN_TAG_FIELD.name) continue;
             const value = fieldMap.get(field.name);
             if (value) this.genExpr(value, this.wasmType(field.type), out);
             else out.push(this.defaultValue(field.type));
@@ -1649,6 +1772,12 @@ class WatGen {
         if (left === 'u64' || right === 'u64') return 'u64';
         if (left === 'u32' || right === 'u32') return 'u32';
         return left || right || 'i32';
+    }
+
+    isRefComparableType(type) {
+        if (!type) return false;
+        if (typeof type === 'string') return !SCALAR_NAMES.has(type);
+        return ['named', 'nullable', 'array', 'func_type'].includes(type.kind);
     }
 
     inferType(node) { return INFER_TYPE_HANDLERS[node.type]?.(this, node) ?? null; }
@@ -1838,7 +1967,19 @@ const parseProtoDecl = (node) => {
             : [],
     };
 };
-const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: true });
+const parseTypeDecl = (node) => {
+    const name = textOf(node, 'type_ident');
+    const tagged = hasAnon(node, 'tag');
+    const protocols = childrenOfType(childOfType(node, 'protocol_list'), 'type_ident').map((child) => child.text);
+    return {
+        kind: 'type_decl',
+        name,
+        tagged,
+        protocols,
+        variants: parseVariantList(childOfType(node, 'variant_list')).map((variant) => ({ ...variant, parentTypeName: name })),
+        rec: true,
+    };
+};
 const parseFnItem = (node, exported = false) => {
     const assocNode = childOfType(node, 'associated_fn_name');
     const params = parseParamList(childOfType(node, 'param_list'));

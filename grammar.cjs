@@ -166,9 +166,16 @@ module.exports = grammar({
       $._type,
     ),
 
+    protocol_list: $ => seq(
+      $.type_ident,
+      repeat(seq(',', $.type_ident)),
+    ),
+
     type_decl: $ => seq(
+      optional('tag'),
       'type',
       $.type_ident,
+      optional(seq(':', $.protocol_list)),
       '=',
       $.variant_list,
     ),

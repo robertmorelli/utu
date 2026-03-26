@@ -4138,6 +4138,21 @@
     }
   },
   {
+    "type": "protocol_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type_ident",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "qualified_type_ref",
     "named": true,
     "fields": {},
@@ -4657,6 +4672,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "protocol_list",
+          "named": true
+        },
         {
           "type": "type_ident",
           "named": true

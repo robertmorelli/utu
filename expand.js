@@ -60,6 +60,7 @@ class ModuleExpander {
         this.topLevelProtocolMembers = new Map();
         this.topLevelGetterOnlyProtocols = new Set();
         this.topLevelProtocolImplementers = new Map();
+        this.topLevelTaggedTypeProtocols = new Map();
         this.topLevelStructFieldTypes = new Map();
         this.topLevelProtocolImplsByKey = new Map();
         this.topLevelProtocolImplsByTypeMember = new Map();
@@ -140,6 +141,7 @@ class ModuleExpander {
         for (const item of kids(this.root)) {
             if (item.type === 'module_decl') this.collectModuleTemplate(item);
             if (item.type === 'struct_decl') this.collectTopLevelStructFields(item, ctx);
+            if (item.type === 'type_decl') this.collectTopLevelTypeFields(item, ctx);
             if (item.type === 'proto_decl') this.collectTopLevelProtocol(item, ctx);
         }
         this.collectSymbols(kids(this.root), ctx, {
@@ -186,6 +188,26 @@ class ModuleExpander {
             fields.set(fieldName.text, this.describeType(typeNode, ctx));
         }
         this.topLevelStructFieldTypes.set(nameNode.text, fields);
+    }
+
+    collectTopLevelTypeFields(node, ctx) {
+        const nameNode = childOfType(node, 'type_ident');
+        if (!nameNode) return;
+        const protocolNames = childrenOfType(childOfType(node, 'protocol_list'), 'type_ident').map((child) => child.text);
+        if (hasAnon(node, 'tag') && protocolNames.length > 0)
+            this.topLevelTaggedTypeProtocols.set(nameNode.text, new Set(protocolNames));
+        for (const variant of childrenOfType(childOfType(node, 'variant_list'), 'variant')) {
+            const variantName = childOfType(variant, 'type_ident');
+            if (!variantName) continue;
+            const fields = new Map();
+            for (const field of childrenOfType(childOfType(variant, 'field_list'), 'field')) {
+                const fieldName = childOfType(field, 'identifier');
+                const typeNode = kids(field).at(-1);
+                if (!fieldName || !typeNode) continue;
+                fields.set(fieldName.text, this.describeType(typeNode, ctx));
+            }
+            this.topLevelStructFieldTypes.set(variantName.text, fields);
+        }
     }
 
     collectTopLevelProtocol(node, ctx) {
@@ -523,7 +545,10 @@ class ModuleExpander {
         const typeName = inModule ? ctx.namespace.typeNames.get(typeNameNode.text) : typeNameNode.text;
         const variants = childrenOfType(childOfType(node, 'variant_list'), 'variant').map((variant) => this.emitVariant(variant, ctx, inModule));
         const rec = hasAnon(node, 'rec') ? 'rec ' : '';
-        return `${rec}type ${typeName} = ${variants.map((variant) => `| ${variant}`).join(' ')}`;
+        const tagged = hasAnon(node, 'tag') ? 'tag ' : '';
+        const protocols = childrenOfType(childOfType(node, 'protocol_list'), 'type_ident').map((child) => inModule ? ctx.namespace.typeNames.get(child.text) ?? child.text : child.text);
+        const protocolClause = protocols.length ? `: ${protocols.join(', ')}` : '';
+        return `${rec}${tagged}type ${typeName}${protocolClause} = ${variants.map((variant) => `| ${variant}`).join(' ')}`;
     }
 
     emitVariant(node, ctx, inModule) {
@@ -889,6 +914,11 @@ class ModuleExpander {
         const memberNode = childOfType(node, 'identifier');
         const ownerNode = kids(node).find((child) => child !== memberNode);
         if (!memberNode || !ownerNode) return undefined;
+        if (memberNode.text === 'null') {
+            if (['type_ident', 'qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type))
+                return `ref.null ${this.emitType(ownerNode, ctx)}`;
+            return undefined;
+        }
         if (['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(ownerNode.type)) {
             const namespace = this.resolveNamespaceFromModuleRef(ownerNode, ctx);
             const ownerName = childOfType(ownerNode, 'type_ident')?.text ?? namespace.promotedTypeName;
@@ -1031,7 +1061,18 @@ class ModuleExpander {
     resolveProtocolDispatchFromInfo(info, memberName) {
         if (!info?.text) return null;
         const entries = this.topLevelProtocolImplsByTypeMember.get(this.protocolTypeMemberKey(info.text, memberName)) ?? [];
-        if (entries.length === 0) return null;
+        if (entries.length === 0) {
+            const protocols = [...(this.topLevelTaggedTypeProtocols.get(info.text) ?? new Set())]
+                .filter((protocol) => this.topLevelProtocolMembers.has(this.protocolMemberKey(protocol, memberName)));
+            if (protocols.length === 0) return null;
+            if (protocols.length > 1)
+                throw new Error(`Ambiguous protocol method ".${memberName}()" on type "${info.text}" across protocols: ${protocols.sort().join(', ')}`);
+            const protocol = protocols[0];
+            return {
+                callee: this.mangleProtocolDispatch(protocol, memberName, info.text),
+                returnInfo: this.topLevelProtocolMembers.get(this.protocolMemberKey(protocol, memberName))?.returnInfo ?? null,
+            };
+        }
         if (entries.length > 1) {
             const protocols = entries.map((entry) => entry.protocol).sort().join(', ');
             throw new Error(`Ambiguous protocol method ".${memberName}()" on type "${info.text}" across protocols: ${protocols}`);
@@ -1162,8 +1203,10 @@ class ModuleExpander {
         const selfInfo = this.inferExprInfo(argNodes[0], ctx);
         if (!selfInfo?.text) throw new Error(`Could not resolve the receiver type for protocol call "${ownerNode.text}.${memberNode.text}"`);
         const impl = this.topLevelProtocolImplsByKey.get(this.protocolImplKey(ownerNode.text, memberNode.text, selfInfo.text));
+        const method = this.topLevelProtocolMembers.get(this.protocolMemberKey(ownerNode.text, memberNode.text));
         if (!impl) {
-            const method = this.topLevelProtocolMembers.get(this.protocolMemberKey(ownerNode.text, memberNode.text));
+            if (this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(ownerNode.text))
+                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: method?.returnInfo ?? null };
             const field = this.topLevelStructFieldTypes.get(selfInfo.text)?.get(memberNode.text) ?? null;
             const getterBacked = method?.getter
                 && field

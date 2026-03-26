@@ -97,7 +97,7 @@ fun Variable.new(value: i32, constraint_capacity: i32) Variable {
     Variable {
         value: value,
         constraints: ConstraintList.new(constraint_capacity),
-        determined_by: ref.null Constraint,
+        determined_by: Constraint.null,
         mark: 0,
         walk_strength: weakest,
         stay: true,
@@ -125,9 +125,7 @@ fun Planner.new(variable_capacity: i32, constraint_capacity: i32) Planner {
 }
 
 fun ConstraintList.append(self: ConstraintList, constraint: Constraint) void {
-    if self.count >= array.len(self.items) {
-        fatal;
-    };
+    assert self.count < array.len(self.items);
     self.items[self.count] = constraint;
     self.count = self.count + 1;
 }
@@ -150,9 +148,7 @@ fun ConstraintList.copy(self: ConstraintList, capacity: i32) ConstraintList {
 }
 
 fun VariableList.append(self: VariableList, value: Variable) void {
-    if self.count >= array.len(self.items) {
-        fatal;
-    };
+    assert self.count < array.len(self.items);
     self.items[self.count] = value;
     self.count = self.count + 1;
 }
@@ -175,7 +171,7 @@ fun Variable.remove_constraint(self: Variable, constraint: Constraint) void {
     let found: i32 = 0 - 1;
     for (0..self.constraints.count) |i| {
         if found == 0 - 1 {
-            if ref.eq(self.constraints.items[i], constraint) {
+            if self.constraints.items[i] == constraint {
                 found = i;
             };
         };
@@ -189,8 +185,8 @@ fun Variable.remove_constraint(self: Variable, constraint: Constraint) void {
     };
 
     promote self.determined_by |determining| {
-        if ref.eq(determining, constraint) {
-            self.determined_by = ref.null Constraint;
+        if determining == constraint {
+            self.determined_by = Constraint.null;
         };
     };
 }
@@ -545,7 +541,7 @@ fun Variable.add_constraints_consuming_to(self: Variable, coll: ConstraintList) 
         let constraint: Constraint = self.constraints.items[i];
         let same: bool = false;
         promote determining |active| {
-            same = ref.eq(constraint, active);
+            same = constraint == active;
         };
         if not same {
             if constraint.is_satisfied() {
@@ -576,7 +572,7 @@ fun Planner.add_propagate(self: Planner, constraint: Constraint, mark: i32) bool
 }
 
 fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
-    out.determined_by = ref.null Constraint;
+    out.determined_by = Constraint.null;
     out.walk_strength = weakest;
     out.stay = true;
 
@@ -599,7 +595,7 @@ fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
             let constraint: Constraint = variable.constraints.items[i];
             let same: bool = false;
             promote determining |active| {
-                same = ref.eq(constraint, active);
+                same = constraint == active;
             };
             if not same {
                 if constraint.is_satisfied() {
@@ -687,10 +683,8 @@ fun Constraint.satisfy(self: Constraint, planner: Planner, mark: i32) ?Constrain
     self.choose_method(mark);
 
     if not self.is_satisfied() {
-        if self.strength() == required {
-            fatal;
-        };
-        ref.null Constraint;
+        assert self.strength() != required;
+        Constraint.null;
     } else {
         self.mark_inputs(mark);
         let out: Variable = self.output();
@@ -702,9 +696,7 @@ fun Constraint.satisfy(self: Constraint, planner: Planner, mark: i32) ?Constrain
 
         out.determined_by = self;
 
-        if not planner.add_propagate(self, mark) {
-            fatal;
-        };
+        assert planner.add_propagate(self, mark);
 
         out.mark = mark;
         overridden;
@@ -786,9 +778,9 @@ fun change(planner: Planner, variable: Variable, new_value: i32) void {
 
 fun chain_test(n: i32) i64 {
     let planner: Planner = Planner.new(n + 4, n + 4);
-    let prev: ?Variable = ref.null Variable;
-    let first: ?Variable = ref.null Variable;
-    let last: ?Variable = ref.null Variable;
+    let prev: ?Variable = Variable.null;
+    let first: ?Variable = Variable.null;
+    let last: ?Variable = Variable.null;
     for (0..n + 1) |i| {
         let variable: Variable = Variable.new(0, 2);
 

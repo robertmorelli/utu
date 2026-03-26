@@ -221,6 +221,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     const constructAliases = new Map();
     const protocolTypeNames = new Set();
     const protocolAssocKeysBySelf = new Map();
+    const taggedTypeProtocols = new Map();
     const openValueKeys = new Map();
     const openTypeKeys = new Map();
     const openTypeNamespaces = new Map();
@@ -369,6 +370,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     };
     for (const item of rootNode.namedChildren)
         collectTopLevelDeclarations(item);
+    registerTaggedTypeProtocolAssocKeys();
     for (const item of rootNode.namedChildren)
         walkTopLevelItem(item);
     occurrences.sort((left, right) => comparePositions(left.range.start, right.range.start));
@@ -404,6 +406,10 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const typeSymbol = createSymbol(nameNode, 'sumType', { detail: 'sum type', signature: `type ${nameNode.text}`, topLevel: true });
         rememberSymbolKey(topLevelTypeKeys, typeSymbol);
+        const protocolListNode = findNamedChild(typeDecl, 'protocol_list');
+        if (typeDecl.text.includes('tag type') && protocolListNode) {
+            taggedTypeProtocols.set(nameNode.text, findNamedChildren(protocolListNode, 'type_ident').map((node) => node.text));
+        }
         for (const variantNode of findNamedChildren(findNamedChild(typeDecl, 'variant_list'), 'variant')) {
             const variantNameNode = findNamedChild(variantNode, 'type_ident');
             if (!variantNameNode)
@@ -456,6 +462,17 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
                 topLevel: false,
             });
             topLevelAssocKeys.set(`${nameNode.text}.${memberNameNode.text}`, methodSymbol.key);
+        }
+    }
+    function registerTaggedTypeProtocolAssocKeys() {
+        for (const [typeName, protocolNames] of taggedTypeProtocols.entries()) {
+            for (const protocolName of protocolNames) {
+                for (const [assocKey, symbolKey] of topLevelAssocKeys.entries()) {
+                    if (!assocKey.startsWith(`${protocolName}.`))
+                        continue;
+                    registerProtocolAssocForSelfType(typeName, assocKey.slice(protocolName.length + 1), symbolKey);
+                }
+            }
         }
     }
     function findModuleNameNode(node) {
@@ -913,6 +930,13 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         walkExpression(baseNode);
         const baseType = inferExpressionType(baseNode);
         const fieldKey = baseType ? resolveFieldKey(baseType, fieldNameNode.text) : undefined;
+        const getterKey = resolveMethodCallKey(node);
+        const getterSymbol = lookupSymbol(getterKey);
+        const protocolGetter = getterSymbol?.detail?.includes('protocol getter');
+        if (protocolGetter) {
+            addResolvedOccurrence(fieldNameNode, 'value', getterKey);
+            return;
+        }
         if (baseType && !fieldKey)
             addSemanticDiagnostic(fieldNameNode, `Unknown field "${fieldNameNode.text}" on type "${formatTypeName(baseType)}".`);
         addResolvedOccurrence(fieldNameNode, 'field', fieldKey);
@@ -1335,7 +1359,10 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         if (!baseType)
             return undefined;
         const fieldSymbol = lookupSymbol(resolveFieldKey(baseType, fieldNode.text));
-        return fieldSymbol?.typeText;
+        if (fieldSymbol?.typeText)
+            return fieldSymbol.typeText;
+        const getterSymbol = lookupSymbol(resolveMethodCallKey(node));
+        return getterSymbol?.returnTypeText ?? getterSymbol?.typeText;
     }
     function inferCallExpressionType(node) {
         const calleeNode = node.namedChildren[0];

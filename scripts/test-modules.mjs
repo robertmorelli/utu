@@ -373,6 +373,97 @@ export fun main() i32 {
     CounterOps.value(counter) + counter.bump();
 }`,
     },
+    {
+        name: 'ref-equality-operators-use-reference-equality',
+        expectedReturn: 3,
+        source: `tag struct Box {
+    value: i32,
+}
+
+export fun main() i32 {
+    let a: Box = Box { value: 1 };
+    let b: Box = a;
+    let c: Box = Box { value: 1 };
+    let total: i32 = 0;
+    if a == b {
+        total = total + 1;
+    };
+    if a != c {
+        total = total + 2;
+    };
+    total;
+}`,
+    },
+    {
+        name: 'type-null-sugars-to-ref-null',
+        expectedReturn: 1,
+        source: `tag struct Box {
+    value: i32,
+}
+
+export fun main() i32 {
+    let maybe: ?Box = Box.null;
+    if maybe == Box.null {
+        1;
+    } else {
+        0;
+    };
+}`,
+    },
+    {
+        name: 'tagged-sum-protocol-getters-synthesize-for-variants',
+        expectedReturn: 19,
+        source: `proto ValueOps[T] {
+    get value: i32,
+    bump(T) i32,
+};
+
+tag type Counter: ValueOps =
+    | EmptyCounter {
+        value: i32,
+    }
+    | RealCounter {
+        value: i32,
+    };
+
+fun ValueOps.bump(self: EmptyCounter) i32 {
+    self.value;
+}
+
+fun ValueOps.bump(self: RealCounter) i32 {
+    self.value + 5;
+}
+
+export fun main() i32 {
+    let counter: Counter = RealCounter { value: 7 };
+    ValueOps.value(counter) + counter.bump();
+}`,
+    },
+    {
+        name: 'tagged-sum-types-dispatch-protocols-through-the-parent-type',
+        expectedReturn: 15,
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag type Shape: Measure =
+    | Box { width: i32, height: i32 }
+    | Square { side: i32 };
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: Square) i32 {
+    self.side * self.side;
+}
+
+export fun main() i32 {
+    let a: Shape = Box { width: 2, height: 3 };
+    let b: Shape = Square { side: 3 };
+    Measure.measure(a) + b.measure();
+}`,
+    },
 ];
 
 const failureCases = [
@@ -396,6 +487,29 @@ export fun main() i32 {
 }`,
     },
     {
+        name: 'plain-types-cannot-declare-protocol-conformance',
+        message: 'must be declared with "tag type"',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+type Shape: Measure =
+    | Box { width: i32, height: i32 }
+    | Square { side: i32 };
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: Square) i32 {
+    self.side * self.side;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
         name: 'protocol-decls-restrict-type-params-to-the-self-position',
         message: 'may only use "T" as the first parameter',
         source: `proto Clone[T] {
@@ -408,6 +522,43 @@ tag struct Box {
 
 fun Clone.clone(self: Box) i32 {
     self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'tagged-sum-protocols-require-every-variant-to-implement',
+        message: 'Variant "Square" does not fully implement protocol "Measure" required by type "Shape"; missing "measure"',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag type Shape: Measure =
+    | Box { width: i32, height: i32 }
+    | Square { side: i32 };
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'variants-cannot-implement-protocols-the-parent-type-did-not-declare',
+        message: 'parent type "Shape" does not declare it',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag type Shape =
+    | Box { width: i32, height: i32 };
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
 }
 
 export fun main() i32 {
