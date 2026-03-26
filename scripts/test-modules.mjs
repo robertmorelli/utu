@@ -249,9 +249,394 @@ export fun main() i32 {
     Console[i32].log(3);
 }`,
     },
+    {
+        name: 'protocol-method-sugar-dispatches-through-tagged-structs',
+        expectedReturn: 22,
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+tag struct Square {
+    side: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: Square) i32 {
+    self.side * self.side;
+}
+
+export fun main() i32 {
+    let box: Box = Box { width: 2, height: 3 };
+    let square: Square = Square { side: 4 };
+    box.measure() + square.measure();
+}`,
+    },
+    {
+        name: 'explicit-protocol-calls-disambiguate-shared-member-names',
+        expectedReturn: 26,
+        source: `proto Area[T] {
+    measure(T) i32,
+};
+
+proto Perimeter[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+fun Area.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Perimeter.measure(self: Box) i32 {
+    (self.width + self.height) * 2;
+}
+
+export fun main() i32 {
+    let box: Box = Box { width: 3, height: 4 };
+    Area.measure(box) + Perimeter.measure(box);
+}`,
+    },
+    {
+        name: 'protocol-methods-work-inside-typed-promote-captures',
+        expectedReturn: 10,
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+fun maybe_box(flag: bool) ?Box {
+    if flag { Box { width: 2, height: 5 }; } else { ref.null Box; };
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+export fun main() i32 {
+    promote maybe_box(true) |box: Box| {
+        box.measure();
+    } else {
+        0;
+    };
+}`,
+    },
+    {
+        name: 'getter-only-protocols-synthesize-field-backed-dispatch',
+        expectedReturn: 12,
+        source: `proto Area[T] {
+    get area: i32,
+};
+
+tag struct Rect {
+    area: i32,
+}
+
+export fun main() i32 {
+    let rect: Rect = Rect { area: 12 };
+    Area.area(rect);
+}`,
+    },
+    {
+        name: 'getter-protocol-members-synthesize-for-explicit-implementers',
+        expectedReturn: 22,
+        source: `proto CounterOps[T] {
+    get value: i32,
+    bump(T) i32,
+};
+
+tag struct Counter {
+    value: i32,
+}
+
+fun CounterOps.bump(self: Counter) i32 {
+    self.value + 8;
+}
+
+export fun main() i32 {
+    let counter: Counter = Counter { value: 7 };
+    CounterOps.value(counter) + counter.bump();
+}`,
+    },
 ];
 
 const failureCases = [
+    {
+        name: 'protocol-impl-requires-tagged-structs',
+        message: 'must be declared with "tag struct"',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+struct Box {
+    width: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-decls-restrict-type-params-to-the-self-position',
+        message: 'may only use "T" as the first parameter',
+        source: `proto Clone[T] {
+    clone(T) T,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Clone.clone(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-decls-require-exactly-one-type-parameter',
+        message: 'must declare exactly one type parameter',
+        source: `proto Measure[T, U] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-impl-return-types-must-match',
+        message: 'does not match the protocol return type',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Measure.measure(self: Box) bool {
+    true;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-impl-params-must-match',
+        message: 'does not match parameter 2',
+        source: `proto Measure[T] {
+    measure(T, i32) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Measure.measure(self: Box, scale: bool) i32 {
+    if scale { self.width; } else { 0; };
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'duplicate-protocol-impls-are-rejected',
+        message: 'Duplicate protocol implementation',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width;
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width + 1;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-getters-cannot-be-implemented-manually',
+        message: 'must not be implemented with "fun"',
+        source: `proto Value[T] {
+    get value: i32,
+};
+
+tag struct Box {
+    value: i32,
+}
+
+fun Value.value(self: Box) i32 {
+    self.value;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-getters-require-matching-fields-on-implementers',
+        message: 'must declare field "value"',
+        source: `proto ValueOps[T] {
+    get value: i32,
+    score(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun ValueOps.score(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-implementers-must-cover-all-members',
+        message: 'does not fully implement protocol "Measure"; missing "perimeter"',
+        source: `proto Measure[T] {
+    area(T) i32,
+    perimeter(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Measure.area(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-method-sugar-rejects-ambiguous-members',
+        message: 'Ambiguous protocol method ".measure()"',
+        source: `proto Area[T] {
+    measure(T) i32,
+};
+
+proto Perimeter[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+fun Area.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Perimeter.measure(self: Box) i32 {
+    (self.width + self.height) * 2;
+}
+
+export fun main() i32 {
+    let box: Box = Box { width: 3, height: 4 };
+    box.measure();
+}`,
+    },
+    {
+        name: 'explicit-protocol-calls-reject-missing-impls',
+        message: 'does not implement protocol "Measure" method "measure"',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+tag struct Square {
+    side: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    let square: Square = Square { side: 4 };
+    Measure.measure(square);
+}`,
+    },
+    {
+        name: 'tagged-structs-cannot-shadow-the-hidden-tag-field',
+        message: 'cannot declare a field named "__tag"',
+        source: `tag struct Box {
+    __tag: i32,
+    width: i32,
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'typed-promote-captures-still-need-a-compatible-type',
+        message: "local.set's value type must be correct",
+        source: `struct Box {
+    value: i32,
+}
+
+fun maybe_box(flag: bool) ?Box {
+    if flag { Box { value: 41 }; } else { ref.null Box; };
+}
+
+export fun main() i32 {
+    promote maybe_box(true) |n: i32| {
+        n;
+    } else {
+        0;
+    };
+}`,
+    },
     {
         name: 'open-construct-rejects-type-collisions',
         message: 'would collide on type "Box"',
@@ -393,6 +778,42 @@ export fun main() i32 {
         const fieldCount = (structBody.match(/\(field /g) ?? []).length;
         if (fieldCount !== 2)
             throw new Error(`Vec struct has ${fieldCount} WAT field(s), expected exactly 2. Method sugar must not add implicit fields to the struct.`);
+    }],
+    ['tagged-structs-add-hidden-tags-and-emit-call-indirect-dispatch', async () => {
+        const source = `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+tag struct Square {
+    side: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: Square) i32 {
+    self.side * self.side;
+}
+
+export fun main() i32 {
+    let box: Box = Box { width: 2, height: 3 };
+    box.measure();
+}`;
+        const { wat } = await compile(source, { mode: 'program', wat: true });
+        if (!wat.includes('(field $__tag i32)'))
+            throw new Error('Expected tagged structs to lower a hidden $__tag field');
+        if (!wat.includes('(table $__utu_proto_table_measure_measure 2 funcref)'))
+            throw new Error('Expected a dedicated protocol dispatch table for Measure.measure');
+        if (!wat.includes('(elem $__utu_proto_elem_measure_measure (table $__utu_proto_table_measure_measure)'))
+            throw new Error('Expected Measure.measure elements to be attached to its own table');
+        if (!wat.includes('call_indirect $__utu_proto_table_measure_measure'))
+            throw new Error('Expected protocol dispatch to use call_indirect');
     }],
     ['unresolved-field-call-throws-instead-of-emitting-call-ref', async () => {
         try {

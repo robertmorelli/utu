@@ -20,6 +20,14 @@ fun promote_no_else(flag: bool) i32 {
     };
 }
 
+fun typed_promote_test(flag: bool) i32 {
+    promote maybe_box(flag) |box: Box| {
+        box.value + 1;
+    } else {
+        0;
+    };
+}
+
 test "promote binds non-null value" {
     assert promote_test(true) == 41;
 }
@@ -30,4 +38,12 @@ test "promote runs else block on null" {
 
 test "promote without else on non-null" {
     assert promote_no_else(true) == 41;
+}
+
+test "typed promote capture keeps the declared type in the then branch" {
+    assert typed_promote_test(true) == 42;
+}
+
+test "typed promote capture still runs the else branch on null" {
+    assert typed_promote_test(false) == 0;
 }

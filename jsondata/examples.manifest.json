@@ -89,7 +89,14 @@
       "name": "codegen-promote",
       "path": "examples/ci/codegen_promote.utu",
       "mode": "test",
-      "expectedTests": 3,
+      "expectedTests": 5,
+      "tags": ["codegen"]
+    },
+    {
+      "name": "codegen-protocols",
+      "path": "examples/ci/codegen_protocols.utu",
+      "mode": "test",
+      "expectedTests": 5,
       "tags": ["codegen"]
     },
     {

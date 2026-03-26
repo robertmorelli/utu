@@ -18,8 +18,7 @@ module.exports = grammar({
     [$._builtin_ns, $.ref_null_expr],
     [$.module_name, $._expr],
     [$.module_name, $.ref_null_expr],
-    // promote_expr: | after identifier could be binary_expr (bitwise OR) or promote syntax
-    [$._expr, $.promote_expr],
+    [$._expr, $.promote_capture],
   ],
 
   rules: {
@@ -33,6 +32,7 @@ module.exports = grammar({
       $.module_decl,
       seq($.construct_decl, ';'),
       $.struct_decl,
+      seq($.proto_decl, ';'),
       seq($.type_decl, ';'),
       $.fn_decl,
       seq($.global_decl, ';'),
@@ -110,11 +110,47 @@ module.exports = grammar({
 
     struct_decl: $ => seq(
       optional('rec'),
+      optional('tag'),
       'struct',
       $.type_ident,
       '{',
       optional($.field_list),
       '}',
+    ),
+
+    proto_decl: $ => seq(
+      'proto',
+      $.type_ident,
+      optional($.module_type_param_list),
+      '{',
+      optional($.proto_member_list),
+      '}',
+    ),
+
+    proto_member_list: $ => seq(
+      $.proto_member,
+      repeat(seq(',', $.proto_member)),
+      optional(','),
+    ),
+
+    proto_member: $ => choice(
+      $.proto_method,
+      $.proto_getter,
+    ),
+
+    proto_method: $ => seq(
+      $.identifier,
+      '(',
+      optional($.type_list),
+      ')',
+      $.return_type,
+    ),
+
+    proto_getter: $ => seq(
+      'get',
+      $.identifier,
+      ':',
+      $._type,
     ),
 
     field_list: $ => seq(
@@ -554,11 +590,16 @@ module.exports = grammar({
     promote_expr: $ => seq(
       'promote',
       $._expr,
-      '|',
-      $.identifier,
-      '|',
+      $.promote_capture,
       $.block,
       optional(seq('else', $.block)),
+    ),
+
+    promote_capture: $ => seq(
+      '|',
+      $.identifier,
+      optional(seq(':', $._type)),
+      '|',
     ),
 
     // --- Scalar match expression ---

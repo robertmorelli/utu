@@ -176,7 +176,15 @@
     },
     "fun": {
       "signature": "fun name(params) return_type",
-      "description": "Declares a UTU function."
+      "description": "Declares a UTU function. Lowers directly to a Wasm `(func ...)`."
+    },
+    "get": {
+      "signature": "get field: Type",
+      "description": "Inside a protocol body, declares a zero-argument virtual getter member. It is sugar over the same per-member table and `call_indirect` dispatch path as other protocol members."
+    },
+    "proto": {
+      "signature": "proto Name[T] { method(T, ...) return_type, get field: Type, ... };",
+      "description": "Declares a protocol surface that tagged structs can implement. It is sugar over one dispatch table per virtual member plus tag-indexed `call_indirect` helpers. In v1, the type parameter may only appear as the first method parameter."
     },
     "for": {
       "signature": "for (start..end) |binding| { ... };",
@@ -192,11 +200,15 @@
     },
     "match": {
       "signature": "match value { literal => expr, _ => expr }",
-      "description": "Matches scalar values against literal arms."
+      "description": "Matches scalar values against literal arms. Dense scalar matches lower to a Wasm `br_table`; sparse matches fall back to comparisons."
     },
     "alt": {
       "signature": "alt value { name: Type => expr, _ => expr }",
-      "description": "Dispatches over variants and refines the matched value by type."
+      "description": "Dispatches over variants and refines the matched value by type. Lowers to Wasm GC type tests with `br_on_cast`-style branching."
+    },
+    "mod": {
+      "signature": "mod name[T] { ... }",
+      "description": "Declares a compile-time namespace/template. It is expanded away before codegen rather than lowering to a separate Wasm module."
     },
     "measure": {
       "signature": "measure { ... }",
@@ -206,9 +218,21 @@
       "signature": "mut field: Type",
       "description": "Marks a struct field as mutable."
     },
+    "promote": {
+      "signature": "promote value |binding: Type| { ... } else { ... }",
+      "description": "Promotes a nullable value into a non-null binding for the then branch. Lowers to a Wasm GC null check using `br_on_non_null`-style control flow."
+    },
+    "rec": {
+      "signature": "rec struct Name { ... } / rec type Name = ...",
+      "description": "Wraps recursive GC type declarations in a Wasm `(rec ...)` group so they can reference themselves."
+    },
     "not": {
       "signature": "not expr",
       "description": "Boolean negation operator."
+    },
+    "tag": {
+      "signature": "tag struct Name { ... }",
+      "description": "Marks a struct as tagged so protocol dispatch can read its hidden runtime tag. Lowers by prepending a hidden first `__tag` field used to index protocol tables."
     },
     "while": {
       "signature": "while (condition) { ... };",
@@ -220,7 +244,7 @@
     },
     "struct": {
       "signature": "struct Name { ... }",
-      "description": "Declares a Wasm GC struct type."
+      "description": "Declares a Wasm GC struct type. Lowers to a Wasm `(type $Name (struct ...))`."
     },
     "test": {
       "signature": "test \"name\" { ... }",
@@ -228,7 +252,7 @@
     },
     "type": {
       "signature": "type Name = | Variant ...",
-      "description": "Declares a sum type and its variants."
+      "description": "Declares a sum type and its variants. Lowers to a root Wasm GC struct subtype plus one struct subtype per variant."
     },
     "fatal": {
       "signature": "fatal",

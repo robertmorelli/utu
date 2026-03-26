@@ -12,6 +12,7 @@ const MAX_BENCH_ITERATIONS = 0x7fffffff;
 const CASE_TO_EXPORT = { chain: 'bench_chain', projection: 'bench_projection' };
 const IMPLS = {
   utu: ['utu', runUtuCase],
+  utu2: ['utu2', runUtuCase],
   rust: ['rust_wasm', runRustWasmCase],
   native: ['rust_native', runNativeCase],
   rust_arena: ['rust_arena_wasm', runRustWasmCase],
@@ -56,14 +57,19 @@ async function compareBenchmarks(targetSeconds) {
 
 async function prepareCache() {
   await rm(cacheDir, { recursive: true, force: true });
-  await Promise.all(['utu', 'rust_wasm', 'rust_native', 'rust_arena_wasm', 'rust_arena_native'].map((dir) => mkdir(path.join(cacheDir, dir), { recursive: true })));
-  const [utu, rust, rustArena] = await Promise.all([
-    prepareUtuBundle(),
+  await Promise.all(['utu', 'utu2', 'rust_wasm', 'rust_native', 'rust_arena_wasm', 'rust_arena_native'].map((dir) => mkdir(path.join(cacheDir, dir), { recursive: true })));
+  // Compile Utu variants sequentially to avoid a Bun/Binaryen import race.
+  const [utu, utu2] = [
+    await prepareUtuBundle('examples/deltablue.utu', 'utu'),
+    await prepareUtuBundle('examples/deltablue2.utu', 'utu2'),
+  ];
+  const [rust, rustArena] = await Promise.all([
     prepareRustVariant('examples/rust_benchmarks/rust_deltablue/Cargo.toml', 'rust_deltablue', 'rust_wasm', 'rust_native'),
     prepareRustVariant('examples/rust_benchmarks/rust_deltablue_arena/Cargo.toml', 'rust_deltablue_arena', 'rust_arena_wasm', 'rust_arena_native'),
   ]);
   await writeFile(path.join(cacheDir, 'sizes.json'), JSON.stringify({
     utu,
+    utu2,
     rust_wasm: rust.wasm,
     rust_native: rust.native,
     rust_arena_wasm: rustArena.wasm,
@@ -72,19 +78,19 @@ async function prepareCache() {
   return cacheDir;
 }
 
-async function prepareUtuBundle() {
-  const source = await readFile(path.join(repoRoot, 'examples/deltablue.utu'), 'utf8');
+async function prepareUtuBundle(sourceArtifact, dirName) {
+  const source = await readFile(path.join(repoRoot, sourceArtifact), 'utf8');
   await compiler.init();
   const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench', where: 'external' });
   const metadataText = JSON.stringify({ benches: metadata.benches }, null, 2);
   const moduleBytes = Buffer.byteLength(js, 'utf8');
   await Promise.all([
-    writeFile(path.join(cacheDir, 'utu', 'module.mjs'), js, 'utf8'),
-    writeFile(path.join(cacheDir, 'utu', 'metadata.json'), metadataText, 'utf8'),
-    writeFile(path.join(cacheDir, 'utu', 'utu.wasm'), wasm),
+    writeFile(path.join(cacheDir, dirName, 'module.mjs'), js, 'utf8'),
+    writeFile(path.join(cacheDir, dirName, 'metadata.json'), metadataText, 'utf8'),
+    writeFile(path.join(cacheDir, dirName, 'utu.wasm'), wasm),
   ]);
   return {
-    source_artifact: 'examples/deltablue.utu',
+    source_artifact: sourceArtifact,
     source_bytes: Buffer.byteLength(source, 'utf8'),
     bundle_artifact: 'module.mjs + utu.wasm',
     bundle_bytes: moduleBytes + wasm.length,
@@ -120,12 +126,12 @@ async function prepareRustVariant(manifestRelPath, artifactName, wasmKey, native
   };
 }
 
-async function runUtuCase(_, benchCase, iterations) {
+async function runUtuCase(dirName, benchCase, iterations) {
   const [metadata, wasm] = await Promise.all([
-    readFile(path.join(cacheDir, 'utu', 'metadata.json'), 'utf8').then(JSON.parse),
-    readFile(path.join(cacheDir, 'utu', 'utu.wasm')),
+    readFile(path.join(cacheDir, dirName, 'metadata.json'), 'utf8').then(JSON.parse),
+    readFile(path.join(cacheDir, dirName, 'utu.wasm')),
   ]);
-  const mod = await import(pathToFileURL(path.join(cacheDir, 'utu', 'module.mjs')).href);
+  const mod = await import(pathToFileURL(path.join(cacheDir, dirName, 'module.mjs')).href);
   const exports = await mod.instantiate(wasm);
   exports[metadata.benches.find((bench) => bench.name === `deltablue_${benchCase}`).exportName](iterations);
 }
@@ -140,15 +146,22 @@ function runNativeCase(dirName, benchCase, iterations) {
 }
 
 async function loadUtuBenchmarkCases() {
-  const dir = await mkdtemp(path.join(tmpdir(), 'utu-rust-compare-utu-'));
-  const source = await readFile(path.join(repoRoot, 'examples/deltablue.utu'), 'utf8');
+  return [
+    ...(await loadUtuBenchmarkVariant('utu', 'examples/deltablue.utu')),
+    ...(await loadUtuBenchmarkVariant('utu2', 'examples/deltablue2.utu')),
+  ];
+}
+
+async function loadUtuBenchmarkVariant(prefix, sourceArtifact) {
+  const dir = await mkdtemp(path.join(tmpdir(), `utu-rust-compare-${prefix}-`));
+  const source = await readFile(path.join(repoRoot, sourceArtifact), 'utf8');
   await compiler.init();
   const { js, metadata, wasm } = await compiler.compile(source, { mode: 'bench', where: 'external' });
   await writeFile(path.join(dir, 'module.mjs'), js, 'utf8');
   const mod = await import(pathToFileURL(path.join(dir, 'module.mjs')).href);
   const exports = await mod.instantiate(wasm);
   return metadata.benches.map((bench) => ({
-    name: `utu_${bench.name.replace(/^deltablue_/, '')}`,
+    name: `${prefix}_${bench.name.replace(/^deltablue_/, '')}`,
     wasmBytes: wasm.length,
     bench: (iterations) => exports[bench.exportName](iterations),
     check: () => Number(exports.main()),
@@ -183,7 +196,7 @@ async function instantiateRustCase(name, exportName, wasmPath, dir) {
 async function runHyperfine(caseName, options, preparedCacheDir) {
   const jsonDir = await mkdtemp(path.join(tmpdir(), `utu-v-rust-${caseName}-`));
   const jsonPath = path.join(jsonDir, `${caseName}.json`);
-  const names = ['utu_wasm', 'rc_rust_wasm', 'rc_rust_native', 'unsafe_rust_wasm', 'unsafe_rust_native'];
+  const names = ['utu_wasm', 'utu_protocols_wasm', 'rc_rust_wasm', 'rc_rust_native', 'unsafe_rust_wasm', 'unsafe_rust_native'];
   run([
     'hyperfine',
     '--warmup', String(options.warmup),
@@ -191,6 +204,7 @@ async function runHyperfine(caseName, options, preparedCacheDir) {
     '--export-json', jsonPath,
     ...names.flatMap((name) => ['--command-name', name]),
     `bun scripts/deltablue-rust.mjs run utu ${caseName} ${options.iterations}`,
+    `bun scripts/deltablue-rust.mjs run utu2 ${caseName} ${options.iterations}`,
     `bun scripts/deltablue-rust.mjs run rust ${caseName} ${options.iterations}`,
     `${path.join(preparedCacheDir, 'rust_native', 'runner')} ${caseName} ${options.iterations}`,
     `bun scripts/deltablue-rust.mjs run rust_arena ${caseName} ${options.iterations}`,
@@ -265,6 +279,7 @@ function summarizeMetrics(metrics) {
 function renderMarkdown({ generatedAt, options, sizes, chain, projection, cacheDir }) {
   const rows = [
     ['Utu bundle', sizes.utu.source_bytes, sizes.utu.bundle_bytes],
+    ['Utu protocols bundle', sizes.utu2.source_bytes, sizes.utu2.bundle_bytes],
     ['Rust wasm', sizes.rust_wasm.source_bytes, sizes.rust_wasm.bundle_bytes],
     ['Rust native', sizes.rust_native.source_bytes, sizes.rust_native.bundle_bytes],
     ['Unsafe Rust wasm', sizes.rust_arena_wasm.source_bytes, sizes.rust_arena_wasm.bundle_bytes],

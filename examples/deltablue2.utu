@@ -1,0 +1,1118 @@
+let required: i32 = 0;
+let strong_preferred: i32 = 1;
+let preferred: i32 = 2;
+let strong_default: i32 = 3;
+let normal: i32 = 4;
+let weak_default: i32 = 5;
+let weakest: i32 = 6;
+
+let direction_none: i32 = 0;
+let direction_forward: i32 = 1;
+let direction_backward: i32 = 0 - 1;
+
+rec struct ConstraintList {
+    items: array[Constraint],
+    mut count: i32,
+}
+
+rec struct Variable {
+    mut value: i32,
+    constraints: ConstraintList,
+    mut determined_by: ?Constraint,
+    mut mark: i32,
+    mut walk_strength: i32,
+    mut stay: bool,
+}
+
+rec struct VariableList {
+    items: array[Variable],
+    mut count: i32,
+}
+
+struct Planner {
+    mut current_mark: i32,
+    constraint_capacity: i32,
+    variable_capacity: i32,
+}
+
+proto ConstraintOps[T] {
+    strength(T) i32,
+    is_input(T) bool,
+    is_satisfied(T) bool,
+    input(T) Variable,
+    output(T) Variable,
+    execute(T) void,
+    mark_unsatisfied(T) void,
+    add_to_graph(T, Constraint) void,
+    remove_from_graph(T, Constraint) void,
+    mark_inputs(T, i32) void,
+    choose_method(T, i32) void,
+    inputs_known(T, i32) bool,
+    recalculate(T) void,
+};
+
+rec tag struct StayConstraint {
+    output: Variable,
+    strength: i32,
+    mut satisfied: bool,
+}
+
+rec tag struct EditConstraint {
+    output: Variable,
+    strength: i32,
+    mut satisfied: bool,
+}
+
+rec tag struct EqualityConstraint {
+    v1: Variable,
+    v2: Variable,
+    strength: i32,
+    mut direction: i32,
+}
+
+rec tag struct ScaleConstraint {
+    src: Variable,
+    scale: Variable,
+    offset: Variable,
+    dest: Variable,
+    strength: i32,
+    mut direction: i32,
+}
+
+type Constraint =
+    | EmptyConstraint {}
+    | StayConstraintBox {
+        value: StayConstraint,
+    }
+    | EditConstraintBox {
+        value: EditConstraint,
+    }
+    | EqualityConstraintBox {
+        value: EqualityConstraint,
+    }
+    | ScaleConstraintBox {
+        value: ScaleConstraint,
+    };
+
+fun stronger(s1: i32, s2: i32) bool {
+    s1 < s2;
+}
+
+fun weaker(s1: i32, s2: i32) bool {
+    s1 > s2;
+}
+
+fun weakest_of(s1: i32, s2: i32) i32 {
+    if s1 > s2 { s1; } else { s2; };
+}
+
+fun next_weaker(strength: i32) i32 {
+    match strength {
+        0 => weakest,
+        1 => weak_default,
+        2 => normal,
+        3 => strong_default,
+        4 => preferred,
+        5 => required,
+        _ => weakest,
+    };
+}
+
+fun ConstraintList.new(capacity: i32) ConstraintList {
+    ConstraintList {
+        items: array[Constraint].new(capacity, EmptyConstraint {}),
+        count: 0,
+    };
+}
+
+fun Variable.new(value: i32, constraint_capacity: i32) Variable {
+    Variable {
+        value: value,
+        constraints: ConstraintList.new(constraint_capacity),
+        determined_by: ref.null Constraint,
+        mark: 0,
+        walk_strength: weakest,
+        stay: true,
+    };
+}
+
+fun Variable.placeholder() Variable {
+    Variable.new(0, 1);
+}
+
+fun VariableList.new(capacity: i32) VariableList {
+    let dummy: Variable = Variable.placeholder();
+    VariableList {
+        items: array[Variable].new(capacity, dummy),
+        count: 0,
+    };
+}
+
+fun Planner.new(variable_capacity: i32, constraint_capacity: i32) Planner {
+    Planner {
+        current_mark: 0,
+        variable_capacity: variable_capacity,
+        constraint_capacity: constraint_capacity,
+    };
+}
+
+fun ConstraintList.append(self: ConstraintList, constraint: Constraint) void {
+    if self.count >= array.len(self.items) {
+        fatal;
+    };
+    self.items[self.count] = constraint;
+    self.count = self.count + 1;
+}
+
+fun ConstraintList.pop_front(self: ConstraintList) Constraint {
+    let constraint: Constraint = self.items[0];
+    for (0..self.count - 1) |i| {
+        self.items[i] = self.items[i + 1];
+    };
+    self.count = self.count - 1;
+    constraint;
+}
+
+fun ConstraintList.copy(self: ConstraintList, capacity: i32) ConstraintList {
+    let out: ConstraintList = ConstraintList.new(capacity);
+    for (0..self.count) |i| {
+        out.append(self.items[i]);
+    };
+    out;
+}
+
+fun VariableList.append(self: VariableList, value: Variable) void {
+    if self.count >= array.len(self.items) {
+        fatal;
+    };
+    self.items[self.count] = value;
+    self.count = self.count + 1;
+}
+
+fun VariableList.pop_front(self: VariableList) Variable {
+    let value: Variable = self.items[0];
+    for (0..self.count - 1) |i| {
+        self.items[i] = self.items[i + 1];
+    };
+    self.count = self.count - 1;
+    value;
+}
+
+fun Variable.add_constraint(self: Variable, constraint: Constraint) void {
+    let constraints: ConstraintList = self.constraints;
+    constraints.append(constraint);
+}
+
+fun Variable.remove_constraint(self: Variable, constraint: Constraint) void {
+    let found: i32 = 0 - 1;
+    for (0..self.constraints.count) |i| {
+        if found == 0 - 1 {
+            if ref.eq(self.constraints.items[i], constraint) {
+                found = i;
+            };
+        };
+    };
+
+    if found != 0 - 1 {
+        for (found..self.constraints.count - 1) |i| {
+            self.constraints.items[i] = self.constraints.items[i + 1];
+        };
+        self.constraints.count = self.constraints.count - 1;
+    };
+
+    promote self.determined_by |determining| {
+        if ref.eq(determining, constraint) {
+            self.determined_by = ref.null Constraint;
+        };
+    };
+}
+
+fun stay_constraint_value(self: StayConstraintBox) StayConstraint {
+    self.value;
+}
+
+fun edit_constraint_value(self: EditConstraintBox) EditConstraint {
+    self.value;
+}
+
+fun equality_constraint_value(self: EqualityConstraintBox) EqualityConstraint {
+    self.value;
+}
+
+fun scale_constraint_value(self: ScaleConstraintBox) ScaleConstraint {
+    self.value;
+}
+
+fun ConstraintOps.strength(self: StayConstraint) i32 {
+    self.strength;
+}
+
+fun ConstraintOps.strength(self: EditConstraint) i32 {
+    self.strength;
+}
+
+fun ConstraintOps.strength(self: EqualityConstraint) i32 {
+    self.strength;
+}
+
+fun ConstraintOps.strength(self: ScaleConstraint) i32 {
+    self.strength;
+}
+
+fun ConstraintOps.is_input(self: StayConstraint) bool {
+    false;
+}
+
+fun ConstraintOps.is_input(self: EditConstraint) bool {
+    true;
+}
+
+fun ConstraintOps.is_input(self: EqualityConstraint) bool {
+    false;
+}
+
+fun ConstraintOps.is_input(self: ScaleConstraint) bool {
+    false;
+}
+
+fun ConstraintOps.is_satisfied(self: StayConstraint) bool {
+    self.satisfied;
+}
+
+fun ConstraintOps.is_satisfied(self: EditConstraint) bool {
+    self.satisfied;
+}
+
+fun ConstraintOps.is_satisfied(self: EqualityConstraint) bool {
+    self.direction != direction_none;
+}
+
+fun ConstraintOps.is_satisfied(self: ScaleConstraint) bool {
+    self.direction != direction_none;
+}
+
+fun ConstraintOps.input(self: StayConstraint) Variable {
+    fatal;
+}
+
+fun ConstraintOps.input(self: EditConstraint) Variable {
+    fatal;
+}
+
+fun ConstraintOps.input(self: EqualityConstraint) Variable {
+    if self.direction == direction_forward { self.v1; } else { self.v2; };
+}
+
+fun ConstraintOps.input(self: ScaleConstraint) Variable {
+    if self.direction == direction_forward { self.src; } else { self.dest; };
+}
+
+fun ConstraintOps.output(self: StayConstraint) Variable {
+    self.output;
+}
+
+fun ConstraintOps.output(self: EditConstraint) Variable {
+    self.output;
+}
+
+fun ConstraintOps.output(self: EqualityConstraint) Variable {
+    if self.direction == direction_forward { self.v2; } else { self.v1; };
+}
+
+fun ConstraintOps.output(self: ScaleConstraint) Variable {
+    if self.direction == direction_forward { self.dest; } else { self.src; };
+}
+
+fun ConstraintOps.execute(self: StayConstraint) void {}
+
+fun ConstraintOps.execute(self: EditConstraint) void {}
+
+fun ConstraintOps.execute(self: EqualityConstraint) void {
+    ConstraintOps.output(self).value = ConstraintOps.input(self).value;
+}
+
+fun ConstraintOps.execute(self: ScaleConstraint) void {
+    if self.direction == direction_forward {
+        self.dest.value = self.src.value * self.scale.value + self.offset.value;
+    } else {
+        self.src.value = (self.dest.value - self.offset.value) / self.scale.value;
+    };
+}
+
+fun ConstraintOps.mark_unsatisfied(self: StayConstraint) void {
+    self.satisfied = false;
+}
+
+fun ConstraintOps.mark_unsatisfied(self: EditConstraint) void {
+    self.satisfied = false;
+}
+
+fun ConstraintOps.mark_unsatisfied(self: EqualityConstraint) void {
+    self.direction = direction_none;
+}
+
+fun ConstraintOps.mark_unsatisfied(self: ScaleConstraint) void {
+    self.direction = direction_none;
+}
+
+fun ConstraintOps.add_to_graph(self: StayConstraint, owner: Constraint) void {
+    Variable.add_constraint(self.output, owner);
+    self.satisfied = false;
+}
+
+fun ConstraintOps.add_to_graph(self: EditConstraint, owner: Constraint) void {
+    Variable.add_constraint(self.output, owner);
+    self.satisfied = false;
+}
+
+fun ConstraintOps.add_to_graph(self: EqualityConstraint, owner: Constraint) void {
+    Variable.add_constraint(self.v1, owner);
+    Variable.add_constraint(self.v2, owner);
+    self.direction = direction_none;
+}
+
+fun ConstraintOps.add_to_graph(self: ScaleConstraint, owner: Constraint) void {
+    Variable.add_constraint(self.src, owner);
+    Variable.add_constraint(self.dest, owner);
+    Variable.add_constraint(self.scale, owner);
+    Variable.add_constraint(self.offset, owner);
+    self.direction = direction_none;
+}
+
+fun ConstraintOps.remove_from_graph(self: StayConstraint, owner: Constraint) void {
+    Variable.remove_constraint(self.output, owner);
+    self.satisfied = false;
+}
+
+fun ConstraintOps.remove_from_graph(self: EditConstraint, owner: Constraint) void {
+    Variable.remove_constraint(self.output, owner);
+    self.satisfied = false;
+}
+
+fun ConstraintOps.remove_from_graph(self: EqualityConstraint, owner: Constraint) void {
+    Variable.remove_constraint(self.v1, owner);
+    Variable.remove_constraint(self.v2, owner);
+    self.direction = direction_none;
+}
+
+fun ConstraintOps.remove_from_graph(self: ScaleConstraint, owner: Constraint) void {
+    Variable.remove_constraint(self.src, owner);
+    Variable.remove_constraint(self.dest, owner);
+    Variable.remove_constraint(self.scale, owner);
+    Variable.remove_constraint(self.offset, owner);
+    self.direction = direction_none;
+}
+
+fun ConstraintOps.mark_inputs(self: StayConstraint, mark: i32) void {}
+
+fun ConstraintOps.mark_inputs(self: EditConstraint, mark: i32) void {}
+
+fun ConstraintOps.mark_inputs(self: EqualityConstraint, mark: i32) void {
+    ConstraintOps.input(self).mark = mark;
+}
+
+fun ConstraintOps.mark_inputs(self: ScaleConstraint, mark: i32) void {
+    ConstraintOps.input(self).mark = mark;
+    self.scale.mark = mark;
+    self.offset.mark = mark;
+}
+
+fun ConstraintOps.choose_method(self: StayConstraint, mark: i32) void {
+    if self.output.mark != mark {
+        if stronger(self.strength, self.output.walk_strength) {
+            self.satisfied = true;
+        } else {
+            self.satisfied = false;
+        };
+    } else {
+        self.satisfied = false;
+    };
+}
+
+fun ConstraintOps.choose_method(self: EditConstraint, mark: i32) void {
+    if self.output.mark != mark {
+        if stronger(self.strength, self.output.walk_strength) {
+            self.satisfied = true;
+        } else {
+            self.satisfied = false;
+        };
+    } else {
+        self.satisfied = false;
+    };
+}
+
+fun ConstraintOps.choose_method(self: EqualityConstraint, mark: i32) void {
+    if self.v1.mark == mark {
+        if self.v2.mark != mark {
+            if stronger(self.strength, self.v2.walk_strength) {
+                self.direction = direction_forward;
+            } else {
+                self.direction = direction_backward;
+            };
+        } else {
+            self.direction = direction_backward;
+        };
+    };
+
+    if self.v2.mark == mark {
+        if self.v1.mark != mark {
+            if stronger(self.strength, self.v1.walk_strength) {
+                self.direction = direction_backward;
+            } else {
+                self.direction = direction_none;
+            };
+        } else {
+            self.direction = direction_none;
+        };
+    };
+
+    if weaker(self.v1.walk_strength, self.v2.walk_strength) {
+        if stronger(self.strength, self.v1.walk_strength) {
+            self.direction = direction_backward;
+        } else {
+            self.direction = direction_none;
+        };
+    } else {
+        if stronger(self.strength, self.v2.walk_strength) {
+            self.direction = direction_forward;
+        } else {
+            self.direction = direction_backward;
+        };
+    };
+}
+
+fun ConstraintOps.choose_method(self: ScaleConstraint, mark: i32) void {
+    if self.src.mark == mark {
+        if self.dest.mark != mark {
+            if stronger(self.strength, self.dest.walk_strength) {
+                self.direction = direction_forward;
+            } else {
+                self.direction = direction_backward;
+            };
+        } else {
+            self.direction = direction_backward;
+        };
+    };
+
+    if self.dest.mark == mark {
+        if self.src.mark != mark {
+            if stronger(self.strength, self.src.walk_strength) {
+                self.direction = direction_backward;
+            } else {
+                self.direction = direction_none;
+            };
+        } else {
+            self.direction = direction_none;
+        };
+    };
+
+    if weaker(self.src.walk_strength, self.dest.walk_strength) {
+        if stronger(self.strength, self.src.walk_strength) {
+            self.direction = direction_backward;
+        } else {
+            self.direction = direction_none;
+        };
+    } else {
+        if stronger(self.strength, self.dest.walk_strength) {
+            self.direction = direction_forward;
+        } else {
+            self.direction = direction_backward;
+        };
+    };
+}
+
+fun ConstraintOps.inputs_known(self: StayConstraint, mark: i32) bool {
+    true;
+}
+
+fun ConstraintOps.inputs_known(self: EditConstraint, mark: i32) bool {
+    true;
+}
+
+fun ConstraintOps.inputs_known(self: EqualityConstraint, mark: i32) bool {
+    let input: Variable = ConstraintOps.input(self);
+    if input.mark == mark {
+        true;
+    } else {
+        if input.stay {
+            true;
+        } else {
+            ref.is_null(input.determined_by);
+        };
+    };
+}
+
+fun ConstraintOps.inputs_known(self: ScaleConstraint, mark: i32) bool {
+    let input: Variable = ConstraintOps.input(self);
+    if input.mark == mark {
+        true;
+    } else {
+        if input.stay {
+            true;
+        } else {
+            ref.is_null(input.determined_by);
+        };
+    };
+}
+
+fun ConstraintOps.recalculate(self: StayConstraint) void {
+    self.output.walk_strength = self.strength;
+    self.output.stay = not ConstraintOps.is_input(self);
+    if self.output.stay {
+        ConstraintOps.execute(self);
+    };
+}
+
+fun ConstraintOps.recalculate(self: EditConstraint) void {
+    self.output.walk_strength = self.strength;
+    self.output.stay = not ConstraintOps.is_input(self);
+    if self.output.stay {
+        ConstraintOps.execute(self);
+    };
+}
+
+fun ConstraintOps.recalculate(self: EqualityConstraint) void {
+    let input: Variable = ConstraintOps.input(self);
+    let out: Variable = ConstraintOps.output(self);
+    out.walk_strength = weakest_of(self.strength, input.walk_strength);
+    out.stay = input.stay;
+    if out.stay {
+        ConstraintOps.execute(self);
+    };
+}
+
+fun ConstraintOps.recalculate(self: ScaleConstraint) void {
+    let input: Variable = ConstraintOps.input(self);
+    let out: Variable = ConstraintOps.output(self);
+    let all_stay: bool = false;
+    out.walk_strength = weakest_of(self.strength, input.walk_strength);
+    if input.stay {
+        if self.scale.stay {
+            all_stay = self.offset.stay;
+        };
+    };
+    out.stay = all_stay;
+    if out.stay {
+        ConstraintOps.execute(self);
+    };
+}
+
+fun Constraint.strength(self: Constraint) i32 {
+    alt self {
+        _: EmptyConstraint => weakest,
+        stay: StayConstraintBox => ConstraintOps.strength(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.strength(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.strength(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.strength(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.is_input(self: Constraint) bool {
+    alt self {
+        _: EmptyConstraint => false,
+        stay: StayConstraintBox => ConstraintOps.is_input(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.is_input(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.is_input(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.is_input(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.is_satisfied(self: Constraint) bool {
+    alt self {
+        _: EmptyConstraint => false,
+        stay: StayConstraintBox => ConstraintOps.is_satisfied(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.is_satisfied(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.is_satisfied(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.is_satisfied(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.input(self: Constraint) Variable {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.input(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.input(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.input(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.input(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.output(self: Constraint) Variable {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.output(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.output(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.output(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.output(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.execute(self: Constraint) void {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.execute(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.execute(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.execute(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.execute(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.mark_unsatisfied(self: Constraint) void {
+    alt self {
+        _: EmptyConstraint => {},
+        stay: StayConstraintBox => ConstraintOps.mark_unsatisfied(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.mark_unsatisfied(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.mark_unsatisfied(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.mark_unsatisfied(scale_constraint_value(scale)),
+    };
+}
+
+fun Constraint.add_to_graph(self: Constraint) void {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.add_to_graph(stay_constraint_value(stay), self),
+        edit: EditConstraintBox => ConstraintOps.add_to_graph(edit_constraint_value(edit), self),
+        eq: EqualityConstraintBox => ConstraintOps.add_to_graph(equality_constraint_value(eq), self),
+        scale: ScaleConstraintBox => ConstraintOps.add_to_graph(scale_constraint_value(scale), self),
+    };
+}
+
+fun Constraint.remove_from_graph(self: Constraint) void {
+    alt self {
+        _: EmptyConstraint => {},
+        stay: StayConstraintBox => ConstraintOps.remove_from_graph(stay_constraint_value(stay), self),
+        edit: EditConstraintBox => ConstraintOps.remove_from_graph(edit_constraint_value(edit), self),
+        eq: EqualityConstraintBox => ConstraintOps.remove_from_graph(equality_constraint_value(eq), self),
+        scale: ScaleConstraintBox => ConstraintOps.remove_from_graph(scale_constraint_value(scale), self),
+    };
+}
+
+fun Constraint.mark_inputs(self: Constraint, mark: i32) void {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.mark_inputs(stay_constraint_value(stay), mark),
+        edit: EditConstraintBox => ConstraintOps.mark_inputs(edit_constraint_value(edit), mark),
+        eq: EqualityConstraintBox => ConstraintOps.mark_inputs(equality_constraint_value(eq), mark),
+        scale: ScaleConstraintBox => ConstraintOps.mark_inputs(scale_constraint_value(scale), mark),
+    };
+}
+
+fun Constraint.choose_method(self: Constraint, mark: i32) void {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.choose_method(stay_constraint_value(stay), mark),
+        edit: EditConstraintBox => ConstraintOps.choose_method(edit_constraint_value(edit), mark),
+        eq: EqualityConstraintBox => ConstraintOps.choose_method(equality_constraint_value(eq), mark),
+        scale: ScaleConstraintBox => ConstraintOps.choose_method(scale_constraint_value(scale), mark),
+    };
+}
+
+fun Constraint.inputs_known(self: Constraint, mark: i32) bool {
+    alt self {
+        _: EmptyConstraint => false,
+        stay: StayConstraintBox => ConstraintOps.inputs_known(stay_constraint_value(stay), mark),
+        edit: EditConstraintBox => ConstraintOps.inputs_known(edit_constraint_value(edit), mark),
+        eq: EqualityConstraintBox => ConstraintOps.inputs_known(equality_constraint_value(eq), mark),
+        scale: ScaleConstraintBox => ConstraintOps.inputs_known(scale_constraint_value(scale), mark),
+    };
+}
+
+fun Constraint.recalculate(self: Constraint) void {
+    alt self {
+        _: EmptyConstraint => fatal,
+        stay: StayConstraintBox => ConstraintOps.recalculate(stay_constraint_value(stay)),
+        edit: EditConstraintBox => ConstraintOps.recalculate(edit_constraint_value(edit)),
+        eq: EqualityConstraintBox => ConstraintOps.recalculate(equality_constraint_value(eq)),
+        scale: ScaleConstraintBox => ConstraintOps.recalculate(scale_constraint_value(scale)),
+    };
+}
+
+fun Planner.new_mark(self: Planner) i32 {
+    self.current_mark = self.current_mark + 1;
+    self.current_mark;
+}
+
+fun Variable.add_constraints_consuming_to(self: Variable, coll: ConstraintList) void {
+    let determining: ?Constraint = self.determined_by;
+    for (0..self.constraints.count) |i| {
+        let constraint: Constraint = self.constraints.items[i];
+        let same: bool = false;
+        promote determining |active| {
+            same = ref.eq(constraint, active);
+        };
+        if not same {
+            if constraint.is_satisfied() {
+                coll.append(constraint);
+            };
+        };
+    };
+}
+
+fun Planner.add_propagate(self: Planner, constraint: Constraint, mark: i32) bool {
+    result: {
+        let todo: ConstraintList = ConstraintList.new(self.constraint_capacity);
+        todo.append(constraint);
+
+        while (todo.count > 0) {
+            let current: Constraint = todo.pop_front();
+            if current.output().mark == mark {
+                self.incremental_remove(constraint);
+                emit false;
+            };
+
+            current.recalculate();
+            current.output().add_constraints_consuming_to(todo);
+        };
+
+        true;
+    };
+}
+
+fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
+    out.determined_by = ref.null Constraint;
+    out.walk_strength = weakest;
+    out.stay = true;
+
+    let unsatisfied: ConstraintList = ConstraintList.new(self.constraint_capacity);
+    let todo: VariableList = VariableList.new(self.variable_capacity);
+    todo.append(out);
+
+    while (todo.count > 0) {
+        let variable: Variable = todo.pop_front();
+        let determining: ?Constraint = variable.determined_by;
+
+        for (0..variable.constraints.count) |i| {
+            let constraint: Constraint = variable.constraints.items[i];
+            if not constraint.is_satisfied() {
+                unsatisfied.append(constraint);
+            };
+        };
+
+        for (0..variable.constraints.count) |i| {
+            let constraint: Constraint = variable.constraints.items[i];
+            let same: bool = false;
+            promote determining |active| {
+                same = ref.eq(constraint, active);
+            };
+            if not same {
+                if constraint.is_satisfied() {
+                    constraint.recalculate();
+                    todo.append(constraint.output());
+                };
+            };
+        };
+    };
+
+    unsatisfied;
+}
+
+fun Planner.incremental_add(self: Planner, constraint: Constraint) void {
+    let mark: i32 = self.new_mark();
+    let overridden: ?Constraint = constraint.satisfy(self, mark);
+
+    while (not ref.is_null(overridden)) {
+        overridden = (overridden \ fatal).satisfy(self, mark);
+    };
+}
+
+fun Planner.incremental_remove(self: Planner, constraint: Constraint) void {
+    let out: Variable = constraint.output();
+    constraint.mark_unsatisfied();
+    constraint.remove_from_graph();
+
+    let unsatisfied: ConstraintList = self.remove_propagate_from(out);
+    let strength: i32 = required;
+    let repeat: bool = true;
+
+    while (repeat) {
+        for (0..unsatisfied.count) |i| {
+            let current: Constraint = unsatisfied.items[i];
+            if current.strength() == strength {
+                self.incremental_add(current);
+            };
+            strength = next_weaker(strength);
+        };
+        repeat = strength != weakest;
+    };
+}
+
+fun Planner.make_plan(self: Planner, sources: ConstraintList) ConstraintList {
+    let mark: i32 = self.new_mark();
+    let plan: ConstraintList = ConstraintList.new(self.constraint_capacity);
+    let todo: ConstraintList = sources.copy(self.constraint_capacity);
+
+    while (todo.count > 0) {
+        let constraint: Constraint = todo.pop_front();
+        let out: Variable = constraint.output();
+        if out.mark != mark {
+            if constraint.inputs_known(mark) {
+                plan.append(constraint);
+                out.mark = mark;
+                out.add_constraints_consuming_to(todo);
+            };
+        };
+    };
+
+    plan;
+}
+
+fun Planner.extract_plan_from_constraints(self: Planner, constraints: ConstraintList) ConstraintList {
+    let sources: ConstraintList = ConstraintList.new(self.constraint_capacity);
+
+    for (0..constraints.count) |i| {
+        let constraint: Constraint = constraints.items[i];
+        if constraint.is_input() {
+            if constraint.is_satisfied() {
+                sources.append(constraint);
+            };
+        };
+    };
+
+    self.make_plan(sources);
+}
+
+fun Constraint.add_constraint(self: Constraint, planner: Planner) void {
+    self.add_to_graph();
+    planner.incremental_add(self);
+}
+
+fun Constraint.satisfy(self: Constraint, planner: Planner, mark: i32) ?Constraint {
+    self.choose_method(mark);
+
+    if not self.is_satisfied() {
+        if self.strength() == required {
+            fatal;
+        };
+        ref.null Constraint;
+    } else {
+        self.mark_inputs(mark);
+        let out: Variable = self.output();
+        let overridden: ?Constraint = out.determined_by;
+
+        promote overridden |active| {
+            Constraint.mark_unsatisfied(active);
+        };
+
+        out.determined_by = self;
+
+        if not planner.add_propagate(self, mark) {
+            fatal;
+        };
+
+        out.mark = mark;
+        overridden;
+    };
+}
+
+fun Constraint.destroy(self: Constraint, planner: Planner) void {
+    if self.is_satisfied() {
+        planner.incremental_remove(self);
+    } else {
+        self.remove_from_graph();
+    };
+}
+
+fun plan_execute(plan: ConstraintList) void {
+    for (0..plan.count) |i| {
+        let constraint: Constraint = plan.items[i];
+        constraint.execute();
+    };
+}
+
+fun new_stay_constraint(variable: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = StayConstraintBox {
+        value: StayConstraint {
+            output: variable,
+            strength: strength,
+            satisfied: false,
+        },
+    };
+    constraint.add_constraint(planner);
+    constraint;
+}
+
+fun new_edit_constraint(variable: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = EditConstraintBox {
+        value: EditConstraint {
+            output: variable,
+            strength: strength,
+            satisfied: false,
+        },
+    };
+    constraint.add_constraint(planner);
+    constraint;
+}
+
+fun new_equality_constraint(v1: Variable, v2: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = EqualityConstraintBox {
+        value: EqualityConstraint {
+            v1: v1,
+            v2: v2,
+            strength: strength,
+            direction: direction_none,
+        },
+    };
+    constraint.add_constraint(planner);
+    constraint;
+}
+
+fun new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest: Variable, strength: i32, planner: Planner) Constraint {
+    let constraint: Constraint = ScaleConstraintBox {
+        value: ScaleConstraint {
+            src: src,
+            scale: scale,
+            offset: offset,
+            dest: dest,
+            strength: strength,
+            direction: direction_none,
+        },
+    };
+    constraint.add_constraint(planner);
+    constraint;
+}
+
+fun change(planner: Planner, variable: Variable, new_value: i32) void {
+    let edit: Constraint = new_edit_constraint(variable, preferred, planner);
+    let edits: ConstraintList = ConstraintList.new(1);
+    edits.append(edit);
+
+    let plan: ConstraintList = planner.extract_plan_from_constraints(edits);
+    for (0..10) |i| {
+        variable.value = new_value;
+        plan_execute(plan);
+    };
+
+    edit.destroy(planner);
+}
+
+fun chain_test(n: i32) i64 {
+    let planner: Planner = Planner.new(n + 4, n + 4);
+    let prev: ?Variable = ref.null Variable;
+    let first: ?Variable = ref.null Variable;
+    let last: ?Variable = ref.null Variable;
+    for (0..n + 1) |i| {
+        let variable: Variable = Variable.new(0, 2);
+
+        promote prev |previous| {
+            new_equality_constraint(previous, variable, required, planner);
+        };
+
+        if i == 0 {
+            first = variable;
+        };
+
+        if i == n {
+            last = variable;
+        };
+
+        prev = variable;
+    };
+
+    let first_variable: Variable = first \ fatal;
+    let last_variable: Variable = last \ fatal;
+    new_stay_constraint(last_variable, strong_default, planner);
+
+    let edit: Constraint = new_edit_constraint(first_variable, preferred, planner);
+    let edits: ConstraintList = ConstraintList.new(1);
+    edits.append(edit);
+    let plan: ConstraintList = planner.extract_plan_from_constraints(edits);
+
+    let failures: i64 = 0;
+    for (0..100) |i| {
+        first_variable.value = i;
+        plan_execute(plan);
+        if last_variable.value != i {
+            failures = failures + 1;
+        };
+    };
+
+    failures;
+}
+
+fun projection_test(n: i32) i64 {
+    let planner: Planner = Planner.new(n * 2 + 8, n * 2 + 8);
+    let scale: Variable = Variable.new(10, n + 1);
+    let offset: Variable = Variable.new(1000, n + 1);
+    let dummy: Variable = Variable.placeholder();
+    let src: Variable = dummy;
+    let dst: Variable = dummy;
+    let dests: array[Variable] = array[Variable].new(n, dummy);
+    for (0..n) |i| {
+        src = Variable.new(i, 3);
+        dst = Variable.new(i, 2);
+        dests[i] = dst;
+        new_stay_constraint(src, normal, planner);
+        new_scale_constraint(src, scale, offset, dst, required, planner);
+    };
+
+    let failures: i64 = 0;
+
+    change(planner, src, 17);
+    if dst.value != 1170 {
+        failures = failures + 1;
+    };
+
+    change(planner, dst, 1050);
+    if src.value != 5 {
+        failures = failures + 1;
+    };
+
+    change(planner, scale, 5);
+    for (0..n - 1) |i| {
+        if dests[i].value != i * 5 + 1000 {
+            failures = failures + 1;
+        };
+    };
+
+    change(planner, offset, 2000);
+    for (0..n - 1) |i| {
+        if dests[i].value != i * 5 + 2000 {
+            failures = failures + 1;
+        };
+    };
+
+    failures;
+}
+
+fun delta_blue_impl(n: i32) i64 {
+    chain_test(n) + projection_test(n);
+}
+
+fun delta_blue(n: i32) i64 {
+    delta_blue_impl(n);
+}
+
+test "faithful deltablue stays consistent on a small graph" {
+    assert delta_blue(20) == 0;
+}
+
+bench "deltablue_chain" |i| {
+    setup {
+        let sink: i64 = 0;
+        measure {
+            sink = sink + chain_test(1048);
+        }
+    }
+}
+
+bench "deltablue_projection" |i| {
+    setup {
+        let sink: i64 = 0;
+        measure {
+            sink = sink + projection_test(1048);
+        }
+    }
+}
+
+bench "deltablue_both" |i| {
+    setup {
+        let sink: i64 = 0;
+        measure {
+            sink = chain_test(1048) + projection_test(1048);
+        }
+    }
+}
+
+export fun main() i64 {
+    delta_blue_impl(200);
+}

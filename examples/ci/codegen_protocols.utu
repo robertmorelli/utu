@@ -1,0 +1,76 @@
+proto Measure[T] {
+    measure(T) i32,
+};
+
+proto Area[T] {
+    get area: i32,
+};
+
+proto CounterOps[T] {
+    get value: i32,
+    bump(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+tag struct Rect {
+    area: i32,
+}
+
+tag struct Square {
+    side: i32,
+}
+
+tag struct Counter {
+    value: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: Square) i32 {
+    self.side * self.side;
+}
+
+fun CounterOps.bump(self: Counter) i32 {
+    self.value + 1;
+}
+
+fun maybe_box(flag: bool) ?Box {
+    if flag { Box { width: 2, height: 5 }; } else { ref.null Box; };
+}
+
+test "protocol method sugar dispatches on tagged structs" {
+    let box: Box = Box { width: 2, height: 3 };
+    let square: Square = Square { side: 4 };
+    assert box.measure() == 6;
+    assert square.measure() == 16;
+}
+
+test "explicit protocol calls use the first argument as the receiver" {
+    let box: Box = Box { width: 3, height: 4 };
+    assert Measure.measure(box) == 12;
+}
+
+test "getter-only protocols synthesize field-backed dispatch" {
+    let rect: Rect = Rect { area: 12 };
+    assert Area.area(rect) == 12;
+}
+
+test "protocol getters synthesize for explicit implementers too" {
+    let counter: Counter = Counter { value: 7 };
+    assert CounterOps.value(counter) == 7;
+    assert counter.bump() == 8;
+}
+
+test "protocol methods work with typed promote captures" {
+    promote maybe_box(true) |box: Box| {
+        assert box.measure() == 10;
+    } else {
+        fatal;
+    };
+}

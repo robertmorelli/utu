@@ -10,6 +10,7 @@ import {
     findAnonBetween,
 } from './tree.js';
 import { parseHostImportName } from './parser.js';
+import { hashText, snakeCase } from './expand-utils.js';
 import data from './jsondata/watgen.data.json' with { type: 'json' };
 
 export function watgen(treeOrNode, { mode = 'program', profile = null, targetName = null } = {}) {
@@ -77,6 +78,9 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         const decl = parseStructDecl(item);
         ctx.structDecls.push(decl);
         ctx.typeDeclMap.set(decl.name, decl);
+    },
+    proto_decl: (ctx, item) => {
+        ctx.protoDecls.push(parseProtoDecl(item));
     },
     type_decl: (ctx, item) => {
         const decl = parseTypeDecl(item);
@@ -267,9 +271,10 @@ const LOCAL_COLLECT_HANDLERS = {
     },
     promote_expr: (ctx, locals, seen, node) => {
         const exprType = ctx.exprType(kids(node)[0]) ?? ctx.inferredToType(ctx.inferType(kids(node)[0])) ?? I32;
-        const ident = kids(node)[1].text;
+        const capture = parsePromoteCapture(kids(node)[1]);
+        const ident = capture.name;
         ctx.addLocal(locals, seen, `__promote_${node.id}`, exprType);
-        ctx.addLocal(locals, seen, ident, exprType.kind === 'nullable' ? exprType.inner : exprType);
+        ctx.addLocal(locals, seen, ident, capture.type ?? (exprType.kind === 'nullable' ? exprType.inner : exprType));
     },
 };
 const TYPE_VISIT_HANDLERS = {
@@ -405,6 +410,7 @@ class WatGen {
         this.targetName = targetName;
 
         this.structDecls = [];
+        this.protoDecls = [];
         this.typeDecls = [];
         this.variantDecls = new Map();
         this.fnItems = [];
@@ -417,6 +423,13 @@ class WatGen {
         this.typeDeclMap = new Map();
         this.globalTypeMap = new Map();
         this.callables = new Map();
+        this.taggedStructTags = new Map();
+        this.protocolMethodMap = new Map();
+        this.protocolImplMap = new Map();
+        this.protocolImplementersByProtocol = new Map();
+        this.protocolSlices = [];
+        this.protocolHelpers = [];
+        this.protocolThunks = [];
 
         this.strings = new Map();
         this.stringList = [];
@@ -434,6 +447,7 @@ class WatGen {
     nextUid() { return this.uid++; }
     generate() {
         this.collect();
+        this.analyzeProtocols();
         this.scanAll();
         this.metadata.strings = [...this.stringList];
         return { wat: this.emit(), metadata: this.metadata };
@@ -449,6 +463,213 @@ class WatGen {
             this.testDecls = this.testDecls.filter((test) => test.name === this.targetName);
         if (this.mode === 'bench' && this.targetName !== null)
             this.benchDecls = this.benchDecls.filter((bench) => bench.name === this.targetName);
+    }
+
+    analyzeProtocols() {
+        this.assignTagIds();
+
+        for (const decl of this.protoDecls) {
+            this.validateProtocolDecl(decl);
+            for (const method of decl.methods) {
+                this.protocolMethodMap.set(protocolMethodKey(decl.name, method.name), {
+                    ...method,
+                    protocol: decl.name,
+                    typeParam: decl.typeParam,
+                });
+            }
+        }
+
+        for (const fn of this.fnItems) {
+            if (!fn.protocolOwner) continue;
+            this.registerProtocolImpl(fn);
+        }
+
+        this.synthesizeProtocolGetterImpls();
+        this.validateProtocolImplementers();
+
+        const maxTag = Math.max(-1, ...this.taggedStructTags.values());
+        if (maxTag < 0) return;
+        const sliceSize = maxTag + 1;
+        const slicesByKey = new Map();
+
+        for (const impl of this.protocolImplMap.values()) {
+            const key = protocolMethodKey(impl.protocol, impl.member);
+            const method = this.protocolMethodMap.get(key);
+            const helperParams = method.params.map((type, index) => ({
+                kind: 'param',
+                name: index === 0 ? 'self' : `arg${index}`,
+                type: substituteProtocolType(type, method.typeParam, impl.selfTypeName),
+            }));
+            const helperReturnType = substituteProtocolType(method.returnType, method.typeParam, impl.selfTypeName);
+            let slice = slicesByKey.get(key);
+            if (!slice) {
+                slice = {
+                    protocol: impl.protocol,
+                    member: impl.member,
+                    funcTypeName: protoFuncTypeName(impl.protocol, impl.member),
+                    trapName: protoTrapName(impl.protocol, impl.member),
+                    tableName: protoTableName(impl.protocol, impl.member),
+                    elemName: protoElemName(impl.protocol, impl.member),
+                    dispatchParams: this.protocolDispatchParams(method),
+                    returnType: method.returnType,
+                    size: sliceSize,
+                    entries: Array.from({ length: sliceSize }, () => protoTrapName(impl.protocol, impl.member)),
+                };
+                slicesByKey.set(key, slice);
+                this.protocolSlices.push(slice);
+            }
+
+            const thunk = {
+                name: protoThunkName(impl.protocol, impl.member, impl.selfTypeName),
+                funcTypeName: slice.funcTypeName,
+                params: slice.dispatchParams,
+                returnType: slice.returnType,
+                selfTypeName: impl.selfTypeName,
+                impl,
+            };
+            this.protocolThunks.push(thunk);
+            slice.entries[impl.tag] = thunk.name;
+
+            const helper = {
+                name: protoDispatchName(impl.protocol, impl.member, impl.selfTypeName),
+                selfTypeName: impl.selfTypeName,
+                params: helperParams,
+                returnType: helperReturnType,
+                funcTypeName: slice.funcTypeName,
+                tableName: slice.tableName,
+            };
+            this.protocolHelpers.push(helper);
+            this.callables.set(helper.name, helper);
+        }
+    }
+
+    assignTagIds() {
+        let nextTag = 0;
+        for (const decl of this.structDecls) {
+            if (!decl.tagged) continue;
+            if (decl.fields.some((field) => field.name === HIDDEN_TAG_FIELD.name))
+                throw new Error(`Tagged struct "${decl.name}" cannot declare a field named "${HIDDEN_TAG_FIELD.name}"`);
+            this.taggedStructTags.set(decl.name, nextTag++);
+        }
+    }
+
+    validateProtocolDecl(decl) {
+        if (decl.typeParams.length !== 1) throw new Error(`Protocol "${decl.name}" must declare exactly one type parameter in v1`);
+        const seen = new Set();
+        for (const method of decl.methods) {
+            if (seen.has(method.name)) throw new Error(`Protocol "${decl.name}" declares "${method.name}" more than once`);
+            seen.add(method.name);
+            if (method.params.length === 0) throw new Error(`Protocol method "${decl.name}.${method.name}" must take the protocol type as its first parameter`);
+            if (method.params[0]?.kind !== 'named' || method.params[0].name !== decl.typeParam)
+                throw new Error(`Protocol method "${decl.name}.${method.name}" must use "${decl.typeParam}" as its first parameter`);
+            const laterParams = method.params.slice(1);
+            if (laterParams.some((type) => typeUsesNamed(type, decl.typeParam)) || typeUsesNamed(method.returnType, decl.typeParam))
+                throw new Error(`Protocol method "${decl.name}.${method.name}" may only use "${decl.typeParam}" as the first parameter in v1`);
+        }
+    }
+
+    registerProtocolImpl(fn) {
+        const method = this.protocolMethodMap.get(protocolMethodKey(fn.protocolOwner, fn.protocolMember));
+        if (!method) throw new Error(`Unknown protocol method "${fn.protocolOwner}.${fn.protocolMember}"`);
+        if (method.getter)
+            throw new Error(`Protocol getter "${fn.protocolOwner}.${fn.protocolMember}" is field-backed and must not be implemented with "fun"`);
+        if (!fn.selfTypeName) throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" must use a concrete named self type`);
+        if (!this.taggedStructTags.has(fn.selfTypeName))
+            throw new Error(`Type "${fn.selfTypeName}" must be declared with "tag struct" to implement protocol "${fn.protocolOwner}"`);
+        if (fn.exported) throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" cannot be exported directly`);
+        const expectedParams = method.params.map((type) => substituteProtocolType(type, method.typeParam, fn.selfTypeName));
+        const expectedReturn = substituteProtocolType(method.returnType, method.typeParam, fn.selfTypeName);
+        if (fn.params.length !== expectedParams.length)
+            throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" on "${fn.selfTypeName}" must have ${expectedParams.length} parameter(s)`);
+        for (let index = 0; index < expectedParams.length; index += 1) {
+            if (!typesEqual(fn.params[index]?.type, expectedParams[index]))
+                throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" on "${fn.selfTypeName}" does not match parameter ${index + 1}`);
+        }
+        if (!typesEqual(fn.returnType, expectedReturn))
+            throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" on "${fn.selfTypeName}" does not match the protocol return type`);
+
+        const key = protocolImplKey(fn.protocolOwner, fn.protocolMember, fn.selfTypeName);
+        if (this.protocolImplMap.has(key))
+            throw new Error(`Duplicate protocol implementation for "${fn.protocolOwner}.${fn.protocolMember}" on "${fn.selfTypeName}"`);
+        this.protocolImplMap.set(key, {
+            protocol: fn.protocolOwner,
+            member: fn.protocolMember,
+            selfTypeName: fn.selfTypeName,
+            fn,
+            tag: this.taggedStructTags.get(fn.selfTypeName),
+        });
+        if (!this.protocolImplementersByProtocol.has(fn.protocolOwner)) this.protocolImplementersByProtocol.set(fn.protocolOwner, new Set());
+        this.protocolImplementersByProtocol.get(fn.protocolOwner).add(fn.selfTypeName);
+    }
+
+    synthesizeProtocolGetterImpls() {
+        for (const decl of this.protoDecls) {
+            const implementers = this.protocolImplementersByProtocol.get(decl.name) ?? new Set();
+            if (decl.methods.length > 0 && decl.methods.every((method) => method.getter)) {
+                for (const selfTypeName of this.taggedStructTags.keys()) {
+                    if (this.protocolGetterFieldsMatch(decl, selfTypeName)) implementers.add(selfTypeName);
+                }
+                if (implementers.size > 0) this.protocolImplementersByProtocol.set(decl.name, implementers);
+            }
+
+            for (const selfTypeName of implementers) {
+                for (const method of decl.methods) {
+                    if (!method.getter) continue;
+                    const key = protocolImplKey(decl.name, method.name, selfTypeName);
+                    if (this.protocolImplMap.has(key)) continue;
+                    const field = this.requireProtocolGetterField(decl.name, method, selfTypeName);
+                    this.protocolImplMap.set(key, {
+                        protocol: decl.name,
+                        member: method.name,
+                        selfTypeName,
+                        tag: this.taggedStructTags.get(selfTypeName),
+                        syntheticGetterField: field.name,
+                    });
+                }
+            }
+        }
+    }
+
+    protocolGetterFieldsMatch(decl, selfTypeName) {
+        try {
+            for (const method of decl.methods) {
+                if (!method.getter) return false;
+                this.requireProtocolGetterField(decl.name, method, selfTypeName);
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    requireProtocolGetterField(protocol, method, selfTypeName) {
+        const decl = this.typeDeclMap.get(selfTypeName);
+        const field = decl?.fields.find((candidate) => candidate.name === method.name) ?? null;
+        if (!field)
+            throw new Error(`Type "${selfTypeName}" must declare field "${method.name}" to satisfy protocol getter "${protocol}.${method.name}"`);
+        if (!typesEqual(field.type, method.returnType))
+            throw new Error(`Protocol getter "${protocol}.${method.name}" requires field "${method.name}" on "${selfTypeName}" to have type "${this.typeText(method.returnType)}"`);
+        return field;
+    }
+
+    validateProtocolImplementers() {
+        for (const decl of this.protoDecls) {
+            const implementers = this.protocolImplementersByProtocol.get(decl.name);
+            if (!implementers) continue;
+            for (const selfTypeName of implementers) {
+                for (const method of decl.methods) {
+                    if (!this.protocolImplMap.has(protocolImplKey(decl.name, method.name, selfTypeName)))
+                        throw new Error(`Type "${selfTypeName}" does not fully implement protocol "${decl.name}"; missing "${method.name}"`);
+                }
+            }
+        }
+    }
+
+    protocolDispatchParams(method) {
+        return [
+            { kind: 'param', name: 'self', type: EQREF_TYPE },
+            ...method.params.slice(1).map((type, index) => ({ kind: 'param', name: `arg${index + 1}`, type })),
+        ];
     }
 
     scanAll() {
@@ -481,6 +702,10 @@ class WatGen {
         return this.strings.get(value);
     }
 
+    runtimeStructFields(decl) {
+        return decl.tagged ? [HIDDEN_TAG_FIELD, ...decl.fields] : decl.fields;
+    }
+
     emit() {
         const lines = ['(module'];
 
@@ -503,11 +728,17 @@ class WatGen {
         for (const imp of this.importFns) lines.push(this.emitImportFn(imp));
         for (const imp of this.importVals) lines.push(this.emitImportVal(imp));
         for (const global of this.globalDecls) lines.push(this.emitGlobal(global));
+        for (const slice of this.protocolSlices) lines.push(this.emitProtocolFuncType(slice));
+        for (const slice of this.protocolSlices) lines.push(this.emitProtocolTable(slice));
 
         for (const [i, fn] of this.fnItems.entries()) {
             lines.push(this.emitFn(fn, this.profile === 'ticks' ? i : null));
             if (fn.exported) lines.push(`  (export "${fn.exportName}" (func $${fn.name}))`);
         }
+
+        for (const slice of this.protocolSlices) lines.push(this.emitProtocolTrapThunk(slice));
+        for (const thunk of this.protocolThunks) lines.push(this.emitProtocolThunk(thunk));
+        for (const helper of this.protocolHelpers) lines.push(this.emitProtocolHelper(helper));
 
         if (this.mode === 'test') {
             this.testDecls.forEach((test, i) => {
@@ -527,6 +758,8 @@ class WatGen {
             });
         }
 
+        for (const slice of this.protocolSlices) lines.push(this.emitProtocolElem(slice));
+
         lines.push(')');
         return lines.join('\n');
     }
@@ -539,6 +772,13 @@ class WatGen {
 
         for (const decl of this.structDecls) {
             for (const field of decl.fields) visitType(field.type);
+        }
+
+        for (const decl of this.protoDecls) {
+            for (const method of decl.methods) {
+                for (const param of method.params) visitType(param);
+                visitType(method.returnType);
+            }
         }
 
         for (const decl of this.typeDecls) {
@@ -590,7 +830,7 @@ class WatGen {
     }
 
     emitStructType(decl, indent = '    ') {
-        return this.emitStructLikeType(`${indent}(type $${decl.name} (struct`, decl.fields, `${indent}))`);
+        return this.emitStructLikeType(`${indent}(type $${decl.name} (struct`, this.runtimeStructFields(decl), `${indent}))`);
     }
 
     emitSumType(decl, indent = '    ') {
@@ -612,6 +852,53 @@ class WatGen {
     watField(field) {
         const wasmType = this.wasmType(field.type);
         return field.mut ? `(field $${field.name} (mut ${wasmType}))` : `(field $${field.name} ${wasmType})`;
+    }
+
+    emitProtocolTable(table) {
+        return `  (table $${table.tableName} ${table.size} funcref)`;
+    }
+
+    emitProtocolFuncType(slice) {
+        return `  (type $${slice.funcTypeName} (func${this.funcTypeClause(slice.dispatchParams, slice.returnType)}))`;
+    }
+
+    emitProtocolTrapThunk(slice) {
+        return this.emitFunc(slice.trapName, slice.dispatchParams, slice.returnType, [], out => out.push('unreachable'), [], null, slice.funcTypeName);
+    }
+
+    emitProtocolThunk(thunk) {
+        return this.emitFunc(thunk.name, thunk.params, thunk.returnType, [], out => {
+            out.push('local.get $self');
+            out.push(`ref.cast (ref $${thunk.selfTypeName})`);
+            if (thunk.impl.syntheticGetterField) {
+                out.push(`struct.get $${thunk.selfTypeName} $${thunk.impl.syntheticGetterField}`);
+                return;
+            }
+            for (const param of thunk.params.slice(1)) out.push(`local.get $${param.name}`);
+            out.push(`call $${thunk.impl.fn.name}`);
+        }, [], null, thunk.funcTypeName);
+    }
+
+    emitProtocolHelper(helper) {
+        return this.emitFunc(helper.name, helper.params, helper.returnType, [], out => {
+            for (const param of helper.params) out.push(`local.get $${param.name}`);
+            out.push('local.get $self');
+            out.push(`struct.get $${helper.selfTypeName} $${HIDDEN_TAG_FIELD.name}`);
+            out.push(`call_indirect $${helper.tableName}${this.callIndirectSig(helper.funcTypeName, null, null)}`);
+        });
+    }
+
+    emitProtocolElem(slice) {
+        return `  (elem $${slice.elemName} (table $${slice.tableName}) (i32.const 0) func ${slice.entries.map((name) => `$${name}`).join(' ')})`;
+    }
+
+    callIndirectSig(funcTypeName, params, returnType) {
+        if (funcTypeName) return ` (type $${funcTypeName})`;
+        const parts = [
+            ...params.map((param) => `(param ${this.wasmType(param.type)})`),
+            ...this.flattenResultTypes(returnType).map((type) => `(result ${type})`),
+        ];
+        return parts.length ? ` ${parts.join(' ')}` : '';
     }
 
     emitImportFn(imp) {
@@ -672,7 +959,7 @@ class WatGen {
         return evalOp ? evalOp(l, r, { isBig, isFloat: wasmType === 'f32' || wasmType === 'f64' }) : null;
     }
 
-    emitFunc(name, params, returnType, body, emitBody, extraLocals = [], profileId = null) {
+    emitFunc(name, params, returnType, body, emitBody, extraLocals = [], profileId = null, funcTypeName = null) {
         this.localTypes = new Map(params.map(param => [param.name, param.type]));
         this.currentReturnType = returnType;
         this.labelStack = [];
@@ -683,7 +970,7 @@ class WatGen {
             .map(param => `(param $${param.name} ${this.wasmType(param.type)})`)
             .join(' ');
         const results = returnType ? ` ${this.watResultList(returnType)}` : '';
-        const sig = [paramList, results].filter(Boolean).join(' ');
+        const sig = [funcTypeName ? `(type $${funcTypeName})` : null, paramList, results].filter(Boolean).join(' ');
 
         const lines = [`  (func $${name}${sig ? ` ${sig}` : ''}`];
         const declared = new Set(params.map(param => param.name));
@@ -705,7 +992,7 @@ class WatGen {
 
     emitFn(fn, profileId = null) {
         const body = fn.body;
-        return this.emitFunc(fn.name, fn.params, fn.returnType, body, out => this.genBody(kids(body), out, true), [], profileId);
+        return this.emitFunc(fn.name, fn.params, fn.returnType, body, out => this.genBody(kids(body), out, true), [], profileId, fn.protocolFuncTypeName ?? null);
     }
 
     emitTest(test, exportName) { return this.emitFunc(exportName, [], null, test.body, out => this.genBody(kids(test.body), out)); }
@@ -979,7 +1266,7 @@ class WatGen {
         const branchHint = discard ? DISCARD_HINT : null;
         hint = this.valueHint(hint);
         const expr = kids(node)[0];
-        const ident = kids(node)[1].text;
+        const { name: ident } = parsePromoteCapture(kids(node)[1]);
         const thenBlock = kids(node)[2];
         const elseBlock = kids(node)[3] ?? null;
         const inferredResultType = discard || hint ? null : this.exprType(thenBlock);
@@ -1255,6 +1542,7 @@ class WatGen {
         const fieldMap = new Map(
             childrenOfType(node, 'field_init').map(field => [kids(field)[0].text, kids(field)[1]])
         );
+        if (this.taggedStructTags.has(typeName)) out.push(`i32.const ${this.taggedStructTags.get(typeName)}`);
         for (const field of fields) {
             const value = fieldMap.get(field.name);
             if (value) this.genExpr(value, this.wasmType(field.type), out);
@@ -1328,6 +1616,12 @@ class WatGen {
     }
     elemKeyWasmType(key) { return SCALAR_WASM[key] || REF_WASM[key] || `(ref $${key})`; }
     watResultList(returnType) { return this.flattenResultTypes(returnType).map(type => `(result ${type})`).join(' '); }
+    funcTypeClause(params, returnType) {
+        return [
+            ...params.map((param) => ` (param ${this.wasmType(param.type)})`),
+            ...this.flattenResultTypes(returnType).map((type) => ` (result ${type})`),
+        ].join('');
+    }
 
     flattenResultTypes(type) {
         if (!type) return [];
@@ -1410,6 +1704,26 @@ class WatGen {
         }
     }
     typeName(type) { return !type ? null : type.kind === 'array' ? `${this.elemTypeKey(type.elem)}_array` : ['scalar', 'named'].includes(type.kind) ? type.name : null; }
+    typeText(type) {
+        if (!type) return 'void';
+        switch (type.kind) {
+            case 'scalar':
+            case 'named':
+                return type.name;
+            case 'nullable':
+                return `?${this.typeText(type.inner)}`;
+            case 'array':
+                return `array[${this.typeText(type.elem)}]`;
+            case 'exclusive':
+                return `${this.typeText(type.ok)} # ${this.typeText(type.err)}`;
+            case 'multi_return':
+                return type.components.map((component) => this.typeText(component)).join(', ');
+            case 'func_type':
+                return `fun(${type.params.map((param) => this.typeText(param)).join(', ')}) ${this.typeText(type.returnType)}`;
+            default:
+                return 'unknown';
+        }
+    }
     typeFields(typeName) { return this.typeDeclMap.get(typeName)?.fields ?? this.variantDecls.get(typeName)?.fields ?? null; }
 
     lookupFieldType(typeName, fieldName) {
@@ -1505,17 +1819,50 @@ class WatGen {
     }
 }
 
-const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec') });
+const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec'), tagged: hasAnon(node, 'tag') });
+const parseProtoDecl = (node) => {
+    const typeParams = childrenOfType(childOfType(node, 'module_type_param_list'), 'type_ident').map((child) => child.text);
+    const typeParam = typeParams[0] ?? null;
+    const memberList = childOfType(node, 'proto_member_list');
+    return {
+        kind: 'proto_decl',
+        name: textOf(node, 'type_ident'),
+        typeParam,
+        typeParams,
+        methods: memberList
+            ? childrenOfType(memberList, 'proto_member')
+                .map((member) => kids(member)[0])
+                .filter((child) => ['proto_method', 'proto_getter'].includes(child?.type))
+                .map((child) => child.type === 'proto_getter'
+                    ? parseProtoGetter(child, typeParam)
+                    : parseProtoMethod(child))
+            : [],
+    };
+};
 const parseTypeDecl = (node) => ({ kind: 'type_decl', name: textOf(node, 'type_ident'), variants: parseVariantList(childOfType(node, 'variant_list')), rec: true });
-const parseFnItem = (node, exported = false) => ({
-    node,
-    name: textOf(node, 'identifier'),
-    params: parseParamList(childOfType(node, 'param_list')),
-    returnType: parseReturnType(childOfType(node, 'return_type')),
-    body: childOfType(node, 'block'),
-    exported,
-    exportName: exported ? textOf(node, 'identifier') : null,
-});
+const parseFnItem = (node, exported = false) => {
+    const assocNode = childOfType(node, 'associated_fn_name');
+    const params = parseParamList(childOfType(node, 'param_list'));
+    const ownerNode = assocNode ? kids(assocNode)[0] : null;
+    const memberNode = assocNode ? kids(assocNode)[1] : null;
+    const selfType = params[0]?.type ?? null;
+    const selfTypeName = selfType?.kind === 'named' ? selfType.name : null;
+    const name = assocNode
+        ? protoImplName(ownerNode.text, memberNode.text, selfTypeName ?? ownerNode.text)
+        : textOf(node, 'identifier');
+    return {
+        node,
+        name,
+        params,
+        returnType: parseReturnType(childOfType(node, 'return_type')),
+        body: childOfType(node, 'block'),
+        exported,
+        exportName: exported && !assocNode ? textOf(node, 'identifier') : null,
+        protocolOwner: ownerNode?.text ?? null,
+        protocolMember: memberNode?.text ?? null,
+        selfTypeName,
+    };
+};
 const parseImportDecl = (node) => {
     const [moduleNode, nameNode, typeNode] = kids(node), module = moduleNode.text.slice(1, -1), name = nameNode.text;
     const { hostName } = parseHostImportName(name);
@@ -1538,6 +1885,20 @@ const parseField = (node) => {
     const [name, type] = kids(node);
     return { kind: 'field', mut: hasAnon(node, 'mut'), name: name.text, type: parseType(type) };
 };
+const parseProtoMethod = (node) => ({
+    kind: 'proto_method',
+    name: textOf(node, 'identifier'),
+    params: kids(childOfType(node, 'type_list')).map(parseType),
+    returnType: parseReturnType(childOfType(node, 'return_type')),
+    getter: false,
+});
+const parseProtoGetter = (node, typeParam) => ({
+    kind: 'proto_method',
+    name: textOf(node, 'identifier'),
+    params: typeParam ? [{ kind: 'named', name: typeParam }] : [],
+    returnType: parseType(kids(node).at(-1)),
+    getter: true,
+});
 const parseVariantList = (node) => mapType(node, 'variant', parseVariant);
 const parseVariant = (node) => ({ kind: 'variant', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) });
 const parseParamList = (node) => mapType(node, 'param', parseParam);
@@ -1582,6 +1943,11 @@ const namespaceInfo = (node) => ({ ns: node.children[0].text, method: childOfTyp
 const parseForSources = (node) => mapType(node, 'for_source', parseForSource);
 const parseForSource = (node) => ({ kind: 'range', start: kids(node)[0], end: kids(node)[1] });
 const parseCapture = (node) => mapType(node, 'identifier', child => child.text);
+const parsePromoteCapture = (node) => {
+    const ident = childOfType(node, 'identifier');
+    const typeNode = kids(node).find((child) => child !== ident) ?? null;
+    return { name: ident.text, type: parseType(typeNode) };
+};
 const parseMatchArm = (node) => {
     const named = kids(node), [first] = named;
     return { pattern: named.length === 2 ? first : null, expr: named.at(-1) };
@@ -1615,3 +1981,66 @@ const flattenTuple = (node, out = []) => {
 
 const mapType = (node, type, parse) => childrenOfType(node, type).map(parse);
 const textOf = (node, type) => childOfType(node, type).text;
+const HIDDEN_TAG_FIELD = Object.freeze({ kind: 'field', mut: false, name: '__tag', type: I32 });
+const EQREF_TYPE = Object.freeze({ kind: 'named', name: 'eqref' });
+const protocolMethodKey = (protocol, member) => `${protocol}.${member}`;
+const protocolImplKey = (protocol, member, selfType) => `${protocol}.${member}:${selfType}`;
+const protoFuncTypeName = (protocol, member) => `__utu_proto_sig_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protoDispatchName = (protocol, member, selfType) => `__utu_proto_dispatch_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+const protoImplName = (protocol, member, selfType) => `__utu_proto_impl_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+const protoThunkName = (protocol, member, selfType) => `__utu_proto_thunk_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+const protoTrapName = (protocol, member) => `__utu_proto_trap_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protoTableName = (protocol, member) => `__utu_proto_table_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protoElemName = (protocol, member) => `__utu_proto_elem_${snakeCase(protocol)}_${snakeCase(member)}`;
+function typeUsesNamed(type, name) {
+    if (!type) return false;
+    switch (type.kind) {
+        case 'named':
+            return type.name === name;
+        case 'nullable':
+            return typeUsesNamed(type.inner, name);
+        case 'array':
+            return typeUsesNamed(type.elem, name);
+        case 'exclusive':
+            return typeUsesNamed(type.ok, name) || typeUsesNamed(type.err, name);
+        case 'multi_return':
+            return type.components.some((component) => typeUsesNamed(component, name));
+        case 'func_type':
+            return type.params.some((param) => typeUsesNamed(param, name)) || typeUsesNamed(type.returnType, name);
+        default:
+            return false;
+    }
+}
+function typesEqual(left, right) {
+    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+function substituteProtocolType(type, typeParamName, selfTypeName) {
+    if (!type) return null;
+    switch (type.kind) {
+        case 'named':
+            return type.name === typeParamName ? { kind: 'named', name: selfTypeName } : type;
+        case 'nullable':
+            return { ...type, inner: substituteProtocolType(type.inner, typeParamName, selfTypeName) };
+        case 'array':
+            return { ...type, elem: substituteProtocolType(type.elem, typeParamName, selfTypeName) };
+        case 'exclusive':
+            return {
+                ...type,
+                ok: substituteProtocolType(type.ok, typeParamName, selfTypeName),
+                err: substituteProtocolType(type.err, typeParamName, selfTypeName),
+            };
+        case 'multi_return':
+            return {
+                ...type,
+                components: type.components.map((component) => substituteProtocolType(component, typeParamName, selfTypeName)),
+            };
+        case 'func_type':
+            return {
+                ...type,
+                params: type.params.map((param) => substituteProtocolType(param, typeParamName, selfTypeName)),
+                returnType: substituteProtocolType(type.returnType, typeParamName, selfTypeName),
+            };
+        default:
+            return type;
+    }
+}
