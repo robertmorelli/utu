@@ -27,17 +27,20 @@ This repo builds the full UTU toolchain from the repo root: the VS Code extensio
 
 The checked-in compiler, examples, and tests currently cover:
 
-- scalar types, structs, nullable references, arrays, sum types, globals, and multi-value returns
-- direct WasmGC reference operations such as `ref.null`, `ref.is_null`, `ref.as_non_null`, `ref.cast`, `ref.test`, and `i31`
-- `if`, `while`, `for`, `match`, `alt`, `promote`, `break`, and pipe expressions with `_` placeholders
-- top-level `test` and `bench` declarations
+- scalar types, strings, globals, structs, `tag struct`, nullable references, arrays, sum types, and multi-value returns
+- direct WasmGC reference operations such as `ref.null`, `ref.is_null`, `ref.as_non_null`, `ref.eq`, `ref.cast`, `ref.test`, and `i31`
+- `if`, `while`, single-range `for`, labeled blocks with `emit`, `match`, `alt`, `promote`, `assert`, `fatal`, and pipe expressions with `_` placeholders
 - host imports through `shimport` and inline JS helpers through `escape`
-- parameterized modules, `construct` aliases, open constructs, associated functions, and method-call sugar
+- compile-time modules through `mod`, `construct` aliases, open constructs, qualified type paths, associated functions, and method-call sugar
+- top-level `proto` declarations over `tag struct` implementers, including explicit protocol calls and synthesized getter members
+- top-level `test` and `bench` declarations with `setup { ... measure { ... } }`
 
 Notable current limits:
 
 - first-class function references are parsed but not supported as a stable compiler feature yet
 - module bodies do not support nested `export` declarations in v1
+- `proto` declarations and protocol implementations stay top-level only in v1
+- the parser accepts multiple `for` sources/captures, but current lowering only uses the first pair
 
 ## Commands
 

@@ -36,11 +36,11 @@ struct Planner {
 }
 
 proto ConstraintOps[T] {
-    strength(T) i32,
-    is_input(T) bool,
-    is_satisfied(T) bool,
-    input(T) Variable,
-    output(T) Variable,
+    get strength: i32,
+    get is_input: bool,
+    get is_satisfied: bool,
+    get input: Variable,
+    get output: Variable,
     execute(T) void,
     mark_unsatisfied(T) void,
     add_to_graph(T, Constraint) void,
@@ -53,20 +53,28 @@ proto ConstraintOps[T] {
 
 rec tag struct StayConstraint {
     output: Variable,
+    input: Variable,
     strength: i32,
-    mut satisfied: bool,
+    is_input: bool,
+    mut is_satisfied: bool,
 }
 
 rec tag struct EditConstraint {
     output: Variable,
+    input: Variable,
     strength: i32,
-    mut satisfied: bool,
+    is_input: bool,
+    mut is_satisfied: bool,
 }
 
 rec tag struct EqualityConstraint {
     v1: Variable,
     v2: Variable,
     strength: i32,
+    is_input: bool,
+    mut is_satisfied: bool,
+    mut input: Variable,
+    mut output: Variable,
     mut direction: i32,
 }
 
@@ -76,6 +84,10 @@ rec tag struct ScaleConstraint {
     offset: Variable,
     dest: Variable,
     strength: i32,
+    is_input: bool,
+    mut is_satisfied: bool,
+    mut input: Variable,
+    mut output: Variable,
     mut direction: i32,
 }
 
@@ -243,84 +255,26 @@ fun scale_constraint_value(self: ScaleConstraintBox) ScaleConstraint {
     self.value;
 }
 
-fun ConstraintOps.strength(self: StayConstraint) i32 {
-    self.strength;
+fun sync_equality_state(self: EqualityConstraint) void {
+    self.is_satisfied = self.direction != direction_none;
+    if self.direction == direction_forward {
+        self.input = self.v1;
+        self.output = self.v2;
+    } else {
+        self.input = self.v2;
+        self.output = self.v1;
+    };
 }
 
-fun ConstraintOps.strength(self: EditConstraint) i32 {
-    self.strength;
-}
-
-fun ConstraintOps.strength(self: EqualityConstraint) i32 {
-    self.strength;
-}
-
-fun ConstraintOps.strength(self: ScaleConstraint) i32 {
-    self.strength;
-}
-
-fun ConstraintOps.is_input(self: StayConstraint) bool {
-    false;
-}
-
-fun ConstraintOps.is_input(self: EditConstraint) bool {
-    true;
-}
-
-fun ConstraintOps.is_input(self: EqualityConstraint) bool {
-    false;
-}
-
-fun ConstraintOps.is_input(self: ScaleConstraint) bool {
-    false;
-}
-
-fun ConstraintOps.is_satisfied(self: StayConstraint) bool {
-    self.satisfied;
-}
-
-fun ConstraintOps.is_satisfied(self: EditConstraint) bool {
-    self.satisfied;
-}
-
-fun ConstraintOps.is_satisfied(self: EqualityConstraint) bool {
-    self.direction != direction_none;
-}
-
-fun ConstraintOps.is_satisfied(self: ScaleConstraint) bool {
-    self.direction != direction_none;
-}
-
-fun ConstraintOps.input(self: StayConstraint) Variable {
-    fatal;
-}
-
-fun ConstraintOps.input(self: EditConstraint) Variable {
-    fatal;
-}
-
-fun ConstraintOps.input(self: EqualityConstraint) Variable {
-    if self.direction == direction_forward { self.v1; } else { self.v2; };
-}
-
-fun ConstraintOps.input(self: ScaleConstraint) Variable {
-    if self.direction == direction_forward { self.src; } else { self.dest; };
-}
-
-fun ConstraintOps.output(self: StayConstraint) Variable {
-    self.output;
-}
-
-fun ConstraintOps.output(self: EditConstraint) Variable {
-    self.output;
-}
-
-fun ConstraintOps.output(self: EqualityConstraint) Variable {
-    if self.direction == direction_forward { self.v2; } else { self.v1; };
-}
-
-fun ConstraintOps.output(self: ScaleConstraint) Variable {
-    if self.direction == direction_forward { self.dest; } else { self.src; };
+fun sync_scale_state(self: ScaleConstraint) void {
+    self.is_satisfied = self.direction != direction_none;
+    if self.direction == direction_forward {
+        self.input = self.src;
+        self.output = self.dest;
+    } else {
+        self.input = self.dest;
+        self.output = self.src;
+    };
 }
 
 fun ConstraintOps.execute(self: StayConstraint) void {}
@@ -328,7 +282,7 @@ fun ConstraintOps.execute(self: StayConstraint) void {}
 fun ConstraintOps.execute(self: EditConstraint) void {}
 
 fun ConstraintOps.execute(self: EqualityConstraint) void {
-    ConstraintOps.output(self).value = ConstraintOps.input(self).value;
+    self.output.value = self.input.value;
 }
 
 fun ConstraintOps.execute(self: ScaleConstraint) void {
@@ -340,35 +294,38 @@ fun ConstraintOps.execute(self: ScaleConstraint) void {
 }
 
 fun ConstraintOps.mark_unsatisfied(self: StayConstraint) void {
-    self.satisfied = false;
+    self.is_satisfied = false;
 }
 
 fun ConstraintOps.mark_unsatisfied(self: EditConstraint) void {
-    self.satisfied = false;
+    self.is_satisfied = false;
 }
 
 fun ConstraintOps.mark_unsatisfied(self: EqualityConstraint) void {
     self.direction = direction_none;
+    sync_equality_state(self);
 }
 
 fun ConstraintOps.mark_unsatisfied(self: ScaleConstraint) void {
     self.direction = direction_none;
+    sync_scale_state(self);
 }
 
 fun ConstraintOps.add_to_graph(self: StayConstraint, owner: Constraint) void {
     Variable.add_constraint(self.output, owner);
-    self.satisfied = false;
+    self.is_satisfied = false;
 }
 
 fun ConstraintOps.add_to_graph(self: EditConstraint, owner: Constraint) void {
     Variable.add_constraint(self.output, owner);
-    self.satisfied = false;
+    self.is_satisfied = false;
 }
 
 fun ConstraintOps.add_to_graph(self: EqualityConstraint, owner: Constraint) void {
     Variable.add_constraint(self.v1, owner);
     Variable.add_constraint(self.v2, owner);
     self.direction = direction_none;
+    sync_equality_state(self);
 }
 
 fun ConstraintOps.add_to_graph(self: ScaleConstraint, owner: Constraint) void {
@@ -377,22 +334,24 @@ fun ConstraintOps.add_to_graph(self: ScaleConstraint, owner: Constraint) void {
     Variable.add_constraint(self.scale, owner);
     Variable.add_constraint(self.offset, owner);
     self.direction = direction_none;
+    sync_scale_state(self);
 }
 
 fun ConstraintOps.remove_from_graph(self: StayConstraint, owner: Constraint) void {
     Variable.remove_constraint(self.output, owner);
-    self.satisfied = false;
+    self.is_satisfied = false;
 }
 
 fun ConstraintOps.remove_from_graph(self: EditConstraint, owner: Constraint) void {
     Variable.remove_constraint(self.output, owner);
-    self.satisfied = false;
+    self.is_satisfied = false;
 }
 
 fun ConstraintOps.remove_from_graph(self: EqualityConstraint, owner: Constraint) void {
     Variable.remove_constraint(self.v1, owner);
     Variable.remove_constraint(self.v2, owner);
     self.direction = direction_none;
+    sync_equality_state(self);
 }
 
 fun ConstraintOps.remove_from_graph(self: ScaleConstraint, owner: Constraint) void {
@@ -401,6 +360,7 @@ fun ConstraintOps.remove_from_graph(self: ScaleConstraint, owner: Constraint) vo
     Variable.remove_constraint(self.scale, owner);
     Variable.remove_constraint(self.offset, owner);
     self.direction = direction_none;
+    sync_scale_state(self);
 }
 
 fun ConstraintOps.mark_inputs(self: StayConstraint, mark: i32) void {}
@@ -408,11 +368,11 @@ fun ConstraintOps.mark_inputs(self: StayConstraint, mark: i32) void {}
 fun ConstraintOps.mark_inputs(self: EditConstraint, mark: i32) void {}
 
 fun ConstraintOps.mark_inputs(self: EqualityConstraint, mark: i32) void {
-    ConstraintOps.input(self).mark = mark;
+    self.input.mark = mark;
 }
 
 fun ConstraintOps.mark_inputs(self: ScaleConstraint, mark: i32) void {
-    ConstraintOps.input(self).mark = mark;
+    self.input.mark = mark;
     self.scale.mark = mark;
     self.offset.mark = mark;
 }
@@ -420,24 +380,24 @@ fun ConstraintOps.mark_inputs(self: ScaleConstraint, mark: i32) void {
 fun ConstraintOps.choose_method(self: StayConstraint, mark: i32) void {
     if self.output.mark != mark {
         if stronger(self.strength, self.output.walk_strength) {
-            self.satisfied = true;
+            self.is_satisfied = true;
         } else {
-            self.satisfied = false;
+            self.is_satisfied = false;
         };
     } else {
-        self.satisfied = false;
+        self.is_satisfied = false;
     };
 }
 
 fun ConstraintOps.choose_method(self: EditConstraint, mark: i32) void {
     if self.output.mark != mark {
         if stronger(self.strength, self.output.walk_strength) {
-            self.satisfied = true;
+            self.is_satisfied = true;
         } else {
-            self.satisfied = false;
+            self.is_satisfied = false;
         };
     } else {
-        self.satisfied = false;
+        self.is_satisfied = false;
     };
 }
 
@@ -479,6 +439,8 @@ fun ConstraintOps.choose_method(self: EqualityConstraint, mark: i32) void {
             self.direction = direction_backward;
         };
     };
+
+    sync_equality_state(self);
 }
 
 fun ConstraintOps.choose_method(self: ScaleConstraint, mark: i32) void {
@@ -519,6 +481,8 @@ fun ConstraintOps.choose_method(self: ScaleConstraint, mark: i32) void {
             self.direction = direction_backward;
         };
     };
+
+    sync_scale_state(self);
 }
 
 fun ConstraintOps.inputs_known(self: StayConstraint, mark: i32) bool {
@@ -530,7 +494,7 @@ fun ConstraintOps.inputs_known(self: EditConstraint, mark: i32) bool {
 }
 
 fun ConstraintOps.inputs_known(self: EqualityConstraint, mark: i32) bool {
-    let input: Variable = ConstraintOps.input(self);
+    let input: Variable = self.input;
     if input.mark == mark {
         true;
     } else {
@@ -543,7 +507,7 @@ fun ConstraintOps.inputs_known(self: EqualityConstraint, mark: i32) bool {
 }
 
 fun ConstraintOps.inputs_known(self: ScaleConstraint, mark: i32) bool {
-    let input: Variable = ConstraintOps.input(self);
+    let input: Variable = self.input;
     if input.mark == mark {
         true;
     } else {
@@ -557,7 +521,7 @@ fun ConstraintOps.inputs_known(self: ScaleConstraint, mark: i32) bool {
 
 fun ConstraintOps.recalculate(self: StayConstraint) void {
     self.output.walk_strength = self.strength;
-    self.output.stay = not ConstraintOps.is_input(self);
+    self.output.stay = not self.is_input;
     if self.output.stay {
         ConstraintOps.execute(self);
     };
@@ -565,15 +529,15 @@ fun ConstraintOps.recalculate(self: StayConstraint) void {
 
 fun ConstraintOps.recalculate(self: EditConstraint) void {
     self.output.walk_strength = self.strength;
-    self.output.stay = not ConstraintOps.is_input(self);
+    self.output.stay = not self.is_input;
     if self.output.stay {
         ConstraintOps.execute(self);
     };
 }
 
 fun ConstraintOps.recalculate(self: EqualityConstraint) void {
-    let input: Variable = ConstraintOps.input(self);
-    let out: Variable = ConstraintOps.output(self);
+    let input: Variable = self.input;
+    let out: Variable = self.output;
     out.walk_strength = weakest_of(self.strength, input.walk_strength);
     out.stay = input.stay;
     if out.stay {
@@ -582,8 +546,8 @@ fun ConstraintOps.recalculate(self: EqualityConstraint) void {
 }
 
 fun ConstraintOps.recalculate(self: ScaleConstraint) void {
-    let input: Variable = ConstraintOps.input(self);
-    let out: Variable = ConstraintOps.output(self);
+    let input: Variable = self.input;
+    let out: Variable = self.output;
     let all_stay: bool = false;
     out.walk_strength = weakest_of(self.strength, input.walk_strength);
     if input.stay {
@@ -600,50 +564,50 @@ fun ConstraintOps.recalculate(self: ScaleConstraint) void {
 fun Constraint.strength(self: Constraint) i32 {
     alt self {
         _: EmptyConstraint => weakest,
-        stay: StayConstraintBox => ConstraintOps.strength(stay_constraint_value(stay)),
-        edit: EditConstraintBox => ConstraintOps.strength(edit_constraint_value(edit)),
-        eq: EqualityConstraintBox => ConstraintOps.strength(equality_constraint_value(eq)),
-        scale: ScaleConstraintBox => ConstraintOps.strength(scale_constraint_value(scale)),
+        stay: StayConstraintBox => stay.value.strength,
+        edit: EditConstraintBox => edit.value.strength,
+        eq: EqualityConstraintBox => eq.value.strength,
+        scale: ScaleConstraintBox => scale.value.strength,
     };
 }
 
 fun Constraint.is_input(self: Constraint) bool {
     alt self {
         _: EmptyConstraint => false,
-        stay: StayConstraintBox => ConstraintOps.is_input(stay_constraint_value(stay)),
-        edit: EditConstraintBox => ConstraintOps.is_input(edit_constraint_value(edit)),
-        eq: EqualityConstraintBox => ConstraintOps.is_input(equality_constraint_value(eq)),
-        scale: ScaleConstraintBox => ConstraintOps.is_input(scale_constraint_value(scale)),
+        stay: StayConstraintBox => stay.value.is_input,
+        edit: EditConstraintBox => edit.value.is_input,
+        eq: EqualityConstraintBox => eq.value.is_input,
+        scale: ScaleConstraintBox => scale.value.is_input,
     };
 }
 
 fun Constraint.is_satisfied(self: Constraint) bool {
     alt self {
         _: EmptyConstraint => false,
-        stay: StayConstraintBox => ConstraintOps.is_satisfied(stay_constraint_value(stay)),
-        edit: EditConstraintBox => ConstraintOps.is_satisfied(edit_constraint_value(edit)),
-        eq: EqualityConstraintBox => ConstraintOps.is_satisfied(equality_constraint_value(eq)),
-        scale: ScaleConstraintBox => ConstraintOps.is_satisfied(scale_constraint_value(scale)),
+        stay: StayConstraintBox => stay.value.is_satisfied,
+        edit: EditConstraintBox => edit.value.is_satisfied,
+        eq: EqualityConstraintBox => eq.value.is_satisfied,
+        scale: ScaleConstraintBox => scale.value.is_satisfied,
     };
 }
 
 fun Constraint.input(self: Constraint) Variable {
     alt self {
         _: EmptyConstraint => fatal,
-        stay: StayConstraintBox => ConstraintOps.input(stay_constraint_value(stay)),
-        edit: EditConstraintBox => ConstraintOps.input(edit_constraint_value(edit)),
-        eq: EqualityConstraintBox => ConstraintOps.input(equality_constraint_value(eq)),
-        scale: ScaleConstraintBox => ConstraintOps.input(scale_constraint_value(scale)),
+        stay: StayConstraintBox => stay.value.input,
+        edit: EditConstraintBox => edit.value.input,
+        eq: EqualityConstraintBox => eq.value.input,
+        scale: ScaleConstraintBox => scale.value.input,
     };
 }
 
 fun Constraint.output(self: Constraint) Variable {
     alt self {
         _: EmptyConstraint => fatal,
-        stay: StayConstraintBox => ConstraintOps.output(stay_constraint_value(stay)),
-        edit: EditConstraintBox => ConstraintOps.output(edit_constraint_value(edit)),
-        eq: EqualityConstraintBox => ConstraintOps.output(equality_constraint_value(eq)),
-        scale: ScaleConstraintBox => ConstraintOps.output(scale_constraint_value(scale)),
+        stay: StayConstraintBox => stay.value.output,
+        edit: EditConstraintBox => edit.value.output,
+        eq: EqualityConstraintBox => eq.value.output,
+        scale: ScaleConstraintBox => scale.value.output,
     };
 }
 
@@ -923,8 +887,10 @@ fun new_stay_constraint(variable: Variable, strength: i32, planner: Planner) Con
     let constraint: Constraint = StayConstraintBox {
         value: StayConstraint {
             output: variable,
+            input: variable,
             strength: strength,
-            satisfied: false,
+            is_input: false,
+            is_satisfied: false,
         },
     };
     constraint.add_constraint(planner);
@@ -935,8 +901,10 @@ fun new_edit_constraint(variable: Variable, strength: i32, planner: Planner) Con
     let constraint: Constraint = EditConstraintBox {
         value: EditConstraint {
             output: variable,
+            input: variable,
             strength: strength,
-            satisfied: false,
+            is_input: true,
+            is_satisfied: false,
         },
     };
     constraint.add_constraint(planner);
@@ -949,6 +917,10 @@ fun new_equality_constraint(v1: Variable, v2: Variable, strength: i32, planner: 
             v1: v1,
             v2: v2,
             strength: strength,
+            is_input: false,
+            is_satisfied: false,
+            input: v2,
+            output: v1,
             direction: direction_none,
         },
     };
@@ -964,6 +936,10 @@ fun new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest:
             offset: offset,
             dest: dest,
             strength: strength,
+            is_input: false,
+            is_satisfied: false,
+            input: dest,
+            output: src,
             direction: direction_none,
         },
     };
@@ -1086,7 +1062,7 @@ test "faithful deltablue stays consistent on a small graph" {
     assert delta_blue(20) == 0;
 }
 
-bench "deltablue_chain" |i| {
+bench "deltablue_chain" {
     setup {
         let sink: i64 = 0;
         measure {
@@ -1095,7 +1071,7 @@ bench "deltablue_chain" |i| {
     }
 }
 
-bench "deltablue_projection" |i| {
+bench "deltablue_projection" {
     setup {
         let sink: i64 = 0;
         measure {
@@ -1104,7 +1080,7 @@ bench "deltablue_projection" |i| {
     }
 }
 
-bench "deltablue_both" |i| {
+bench "deltablue_both" {
     setup {
         let sink: i64 = 0;
         measure {

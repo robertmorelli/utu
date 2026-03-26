@@ -309,7 +309,7 @@ export fun main() i32 {
 }`,
     },
     {
-        name: 'protocol-methods-work-inside-typed-promote-captures',
+        name: 'protocol-methods-work-inside-promote-captures',
         expectedReturn: 10,
         source: `proto Measure[T] {
     measure(T) i32,
@@ -329,7 +329,7 @@ fun Measure.measure(self: Box) i32 {
 }
 
 export fun main() i32 {
-    promote maybe_box(true) |box: Box| {
+    promote maybe_box(true) |box| {
         box.measure();
     } else {
         0;
@@ -616,25 +616,6 @@ export fun main() i32 {
 
 export fun main() i32 {
     0;
-}`,
-    },
-    {
-        name: 'typed-promote-captures-still-need-a-compatible-type',
-        message: "local.set's value type must be correct",
-        source: `struct Box {
-    value: i32,
-}
-
-fun maybe_box(flag: bool) ?Box {
-    if flag { Box { value: 41 }; } else { ref.null Box; };
-}
-
-export fun main() i32 {
-    promote maybe_box(true) |n: i32| {
-        n;
-    } else {
-        0;
-    };
 }`,
     },
     {

@@ -281,13 +281,10 @@ module.exports = grammar({
     bench_decl: $ => seq(
       'bench',
       $.string_lit,
-      $.bench_capture,
       '{',
       $.setup_decl,
       '}',
     ),
-
-    bench_capture: $ => seq('|', $.identifier, '|'),
 
     setup_decl: $ => seq(
       'setup',
@@ -598,7 +595,6 @@ module.exports = grammar({
     promote_capture: $ => seq(
       '|',
       $.identifier,
-      optional(seq(':', $._type)),
       '|',
     ),
 

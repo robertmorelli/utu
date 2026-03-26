@@ -10,11 +10,11 @@ test "tests share helpers inside one file" {
     assert add(-1, 1) == 0;
 }
 
-bench "increment loop" |i| {
+bench "increment loop" {
     setup {
         let total: i32 = 0;
         measure {
-            total = total + i;
+            total = total + 1;
         }
     }
 }

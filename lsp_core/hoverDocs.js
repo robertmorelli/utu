@@ -21,7 +21,7 @@ export function getBuiltinReturnType(key, typeText) {
     if (value.kind === 'array_new_default')
         return typeText ? `array[${typeText}]` : 'array[T]';
     if (value.kind === 'ref_null')
-        return typeText ? `${typeText} # null` : undefined;
+        return typeText ? `?${typeText}` : undefined;
     return undefined;
 }
 export const getCoreTypeHover = (word) => lookupHover(CORE_TYPE_DOCS, word);

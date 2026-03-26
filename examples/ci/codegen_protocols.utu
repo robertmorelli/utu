@@ -67,8 +67,8 @@ test "protocol getters synthesize for explicit implementers too" {
     assert counter.bump() == 8;
 }
 
-test "protocol methods work with typed promote captures" {
-    promote maybe_box(true) |box: Box| {
+test "protocol methods work with promote captures" {
+    promote maybe_box(true) |box| {
         assert box.measure() == 10;
     } else {
         fatal;

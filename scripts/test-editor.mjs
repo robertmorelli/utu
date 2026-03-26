@@ -67,6 +67,57 @@ async function runCoreSuite() {
       );
       expectLabels(items, ['add_one', 'main']);
     }],
+    ['promote captures are indexed with narrowed local types', async () => {
+      const source = [
+        'struct Box {',
+        '    value: i32,',
+        '}',
+        '',
+        'fun maybe_box(flag: bool) ?Box {',
+        '    if flag { Box { value: 41 }; } else { ref.null Box; };',
+        '}',
+        '',
+        'fun inferred(flag: bool) i32 {',
+        '    promote maybe_box(flag) |box| {',
+        '        box.value;',
+        '    } else {',
+        '        0;',
+        '    };',
+        '}',
+        '',
+        'fun inferred_again(flag: bool) i32 {',
+        '    promote maybe_box(flag) |other| {',
+        '        other.value;',
+        '    } else {',
+        '        0;',
+        '    };',
+        '}',
+      ].join('\n');
+      const document = createDocument('file:///promote-hover.utu', source);
+      const diagnostics = await languageService.getDiagnostics(document);
+      expectDeepEqual(diagnostics.map((diagnostic) => diagnostic.message), []);
+      await expectHoverContains(languageService, document, source, 'box.value', 1, 'box: Box');
+      await expectHoverContains(languageService, document, source, 'other.value', 1, 'other: Box');
+    }],
+    ['nullable fatal unwrap narrows field access', async () => {
+      const source = [
+        'struct Box {',
+        '    value: i32,',
+        '}',
+        '',
+        'fun maybe_box(flag: bool) ?Box {',
+        '    if flag { Box { value: 41 }; } else { ref.null Box; };',
+        '}',
+        '',
+        'fun use(flag: bool) i32 {',
+        '    (maybe_box(flag) \\ fatal).value;',
+        '}',
+      ].join('\n');
+      const document = createDocument('file:///fatal-narrow.utu', source);
+      const diagnostics = await languageService.getDiagnostics(document);
+      expectDeepEqual(diagnostics.map((diagnostic) => diagnostic.message), []);
+      await expectHoverContains(languageService, document, source, 'fatal).value', 'fatal).'.length + 1, 'value: i32');
+    }],
     ['compiler source documents expose offset and line ranges', async () => {
       const document = createSourceDocument('alpha\nbeta', {
         uri: 'file:///ranges.utu',
@@ -310,11 +361,10 @@ export fun main() void {
     }),
     compiledCase('instantiates benchmark modules with es host imports', `${consoleLogImport}
 
-bench "sample" |i| {
+bench "sample" {
     setup {
         measure {
             "ok" -o console_log;
-            i;
         }
     }
 }`, {
@@ -363,6 +413,16 @@ export fun main() i32 {
 function expectLabels(items, expectedLabels) {
   const labels = new Set(items.map((item) => item.label));
   for (const label of expectedLabels) if (!labels.has(label)) throw new Error(`Missing completion "${label}"`);
+}
+
+async function expectHoverContains(languageService, document, source, marker, characterOffset, fragment) {
+  const markerOffset = source.indexOf(marker);
+  if (markerOffset < 0)
+    throw new Error(`Could not find marker ${JSON.stringify(marker)}`);
+  const hover = await languageService.getHover(document, document.positionAt(markerOffset + characterOffset));
+  const value = hover?.contents?.value;
+  if (!value?.includes(fragment))
+    throw new Error(`Expected hover for ${JSON.stringify(marker)} to include ${JSON.stringify(fragment)}, received ${JSON.stringify(value)}`);
 }
 
 async function attemptCompile(compilerModule, source, mode, assets) {

@@ -17,6 +17,7 @@ const failed = await runNamedCases([
   ['language service surfaces targeted diagnostics with tight ranges', testLanguageServiceDiagnostics],
   ['lsp publishes the same targeted diagnostics', testLspDiagnostics],
   ['vs code diagnostics controller surfaces the same targeted diagnostics', testExtensionDiagnostics],
+  ['vs code diagnostics controller logs non-source compiler failures once', testExtensionValidationLogSuppression],
 ]);
 if (failed)
   process.exit(1);
@@ -68,7 +69,7 @@ async function testLspDiagnostics() {
 
 async function testExtensionDiagnostics() {
   const stubPackageRoot = resolve(repoRoot, 'node_modules/vscode');
-  globalThis.__utuVscodeTestState = { textDocuments: [], diagnosticsByUri: new Map() };
+  const testState = resetVscodeTestState();
   await writeFakeVscodePackage(stubPackageRoot);
   const parserService = createParserService();
   const languageService = new UtuLanguageService(parserService);
@@ -76,18 +77,56 @@ async function testExtensionDiagnostics() {
   try {
     const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'extension/diagnostics.js')).href);
     const document = Object.assign(createDocument(fixture.source), { languageId: 'utu' });
-    globalThis.__utuVscodeTestState.textDocuments.push(document);
+    testState.textDocuments.push(document);
     controller = new DiagnosticsController(languageService, { appendLine() {}, show() {} }, undefined);
-    await waitFor(() => globalThis.__utuVscodeTestState.diagnosticsByUri.has(fixture.uri));
+    await waitFor(() => testState.diagnosticsByUri.has(fixture.uri));
     expectDeepEqual(
-      toComparableDiagnostics(globalThis.__utuVscodeTestState.diagnosticsByUri.get(fixture.uri) ?? []),
+      toComparableDiagnostics(testState.diagnosticsByUri.get(fixture.uri) ?? []),
       fixture.expectedDiagnostics,
     );
   } finally {
     controller?.dispose?.();
     languageService.dispose();
     parserService.dispose();
-    delete globalThis.__utuVscodeTestState;
+    await rm(stubPackageRoot, { recursive: true, force: true });
+  }
+}
+
+async function testExtensionValidationLogSuppression() {
+  const stubPackageRoot = resolve(repoRoot, 'node_modules/vscode');
+  const expectedMessage = 'Incompatible language version 0. Compatibility range 13 through 15.';
+  const outputLines = [];
+  const testState = resetVscodeTestState();
+  await writeFakeVscodePackage(stubPackageRoot);
+  const parserService = createParserService();
+  const languageService = new UtuLanguageService(parserService);
+  let controller;
+  try {
+    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'extension/diagnostics.js')).href);
+    const documents = [
+      Object.assign(createSourceDocument('export fun main() i32 { 0; }', { uri: 'file:///validation-a.utu', version: 1 }), { languageId: 'utu' }),
+      Object.assign(createSourceDocument('export fun main() i32 { 1; }', { uri: 'file:///validation-b.utu', version: 1 }), { languageId: 'utu' }),
+    ];
+    testState.textDocuments.push(...documents);
+    controller = new DiagnosticsController(
+      languageService,
+      { appendLine(line) { outputLines.push(line); }, show() {} },
+      { async compile() { throw new Error(expectedMessage); } },
+    );
+    await waitFor(() => testState.diagnosticsByUri.size === documents.length && outputLines.length >= 2);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+    expectDeepEqual(
+      outputLines.filter((line) => line.includes('[utu] Compiler-backed validation disabled for this session; using syntax and semantic diagnostics only')),
+      ['[utu] Compiler-backed validation disabled for this session; using syntax and semantic diagnostics only'],
+    );
+    expectDeepEqual(
+      outputLines.filter((line) => line.includes(expectedMessage)),
+      [expectedMessage],
+    );
+  } finally {
+    controller?.dispose?.();
+    languageService.dispose();
+    parserService.dispose();
     await rm(stubPackageRoot, { recursive: true, force: true });
   }
 }
@@ -97,6 +136,13 @@ function createParserService() {
     grammarWasmPath: resolve(repoRoot, 'tree-sitter-utu.wasm'),
     runtimeWasmPath: resolve(repoRoot, 'web-tree-sitter.wasm'),
   });
+}
+
+function resetVscodeTestState() {
+  const state = globalThis.__utuVscodeTestState ??= { textDocuments: [], diagnosticsByUri: new Map() };
+  state.textDocuments.length = 0;
+  state.diagnosticsByUri = new Map();
+  return state;
 }
 
 function createDocument(text) {

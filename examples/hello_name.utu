@@ -7,7 +7,7 @@ fun greeting(name: str) str {
     "hi";
 }
 
-bench "hello-name format" |i| {
+bench "hello-name format" {
     setup {
         measure {
             greeting("utu");

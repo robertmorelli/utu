@@ -131,7 +131,7 @@ fun test_calls() i64 {
     sink;
 }
 
-bench "call-simple chain" |i| {
+bench "call-simple chain" {
     setup {
         let one: i64 = 1;
         let two: i64 = 2;

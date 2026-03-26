@@ -130,7 +130,6 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         ctx.benchDecls.push({
             kind: 'bench_decl',
             name: kids(item)[0].text.slice(1, -1),
-            capture: kids(childOfType(item, 'bench_capture'))[0].text,
             setupPrelude: named.slice(0, -1),
             measureBody: childOfType(named.at(-1), 'block'),
         });
@@ -274,7 +273,7 @@ const LOCAL_COLLECT_HANDLERS = {
         const capture = parsePromoteCapture(kids(node)[1]);
         const ident = capture.name;
         ctx.addLocal(locals, seen, `__promote_${node.id}`, exprType);
-        ctx.addLocal(locals, seen, ident, capture.type ?? (exprType.kind === 'nullable' ? exprType.inner : exprType));
+        ctx.addLocal(locals, seen, ident, exprType.kind === 'nullable' ? exprType.inner : exprType);
     },
 };
 const TYPE_VISIT_HANDLERS = {
@@ -1007,7 +1006,7 @@ class WatGen {
                 this.genBody(bench.setupPrelude, out);
                 this.genBenchLoop(bench, out);
             },
-            [[bench.capture, I32]],
+            [],
         );
     }
 
@@ -1506,15 +1505,15 @@ class WatGen {
     }
 
     genBenchLoop(bench, out) {
-        out.push('i32.const 0');
-        out.push(`local.set $${bench.capture}`);
         this.withLoop(out, (breakLabel, continueLabel) => {
-            out.push(`    local.get $${bench.capture}`);
             out.push('    local.get $iterations');
-            out.push('    i32.ge_s');
+            out.push('    i32.eqz');
             out.push(`    br_if ${breakLabel}`);
             this.pushGenerated(out, lines => this.genBody(kids(bench.measureBody), lines));
-            this.bumpI32Local(bench.capture, out, '    ');
+            out.push('    local.get $iterations');
+            out.push('    i32.const 1');
+            out.push('    i32.sub');
+            out.push('    local.set $iterations');
             out.push(`    (br ${continueLabel})`);
         });
     }
@@ -1945,8 +1944,7 @@ const parseForSource = (node) => ({ kind: 'range', start: kids(node)[0], end: ki
 const parseCapture = (node) => mapType(node, 'identifier', child => child.text);
 const parsePromoteCapture = (node) => {
     const ident = childOfType(node, 'identifier');
-    const typeNode = kids(node).find((child) => child !== ident) ?? null;
-    return { name: ident.text, type: parseType(typeNode) };
+    return { name: ident.text };
 };
 const parseMatchArm = (node) => {
     const named = kids(node), [first] = named;

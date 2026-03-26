@@ -147,8 +147,12 @@
       "description": "Traps when the condition is false. Common inside UTU tests."
     },
     "bench": {
-      "signature": "bench \"name\" |i| { setup { ... measure { ... } } }",
-      "description": "Declares a benchmark that is synthesized into a callable export in bench mode."
+      "signature": "bench \"name\" { setup { ... measure { ... } } }",
+      "description": "Declares a benchmark that is synthesized into a callable export in bench mode. The generated export receives an iteration count; `setup` runs once and `measure` runs inside the timing loop."
+    },
+    "construct": {
+      "signature": "construct alias = mod_name[T]; / construct mod_name[T];",
+      "description": "Instantiates a compile-time module. The aliased form creates a qualified namespace; the bare form opens that namespace into the current scope."
     },
     "break": {
       "signature": "break",
@@ -184,7 +188,7 @@
     },
     "proto": {
       "signature": "proto Name[T] { method(T, ...) return_type, get field: Type, ... };",
-      "description": "Declares a protocol surface that tagged structs can implement. It is sugar over one dispatch table per virtual member plus tag-indexed `call_indirect` helpers. In v1, the type parameter may only appear as the first method parameter."
+      "description": "Declares a top-level protocol surface that tagged structs can implement. It lowers to one dispatch table per member plus tag-indexed `call_indirect` helpers. In v1, the type parameter may only appear as the first method parameter."
     },
     "for": {
       "signature": "for (start..end) |binding| { ... };",
@@ -219,8 +223,8 @@
       "description": "Marks a struct field as mutable."
     },
     "promote": {
-      "signature": "promote value |binding: Type| { ... } else { ... }",
-      "description": "Promotes a nullable value into a non-null binding for the then branch. Lowers to a Wasm GC null check using `br_on_non_null`-style control flow."
+      "signature": "promote value |binding| { ... } else { ... }",
+      "description": "Promotes a nullable value into a non-null binding for the then branch. Lowers to an explicit null check plus `ref.as_non_null` before entering the then branch."
     },
     "rec": {
       "signature": "rec struct Name { ... } / rec type Name = ...",

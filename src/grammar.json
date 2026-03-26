@@ -1260,10 +1260,6 @@
           "name": "string_lit"
         },
         {
-          "type": "SYMBOL",
-          "name": "bench_capture"
-        },
-        {
           "type": "STRING",
           "value": "{"
         },
@@ -1274,23 +1270,6 @@
         {
           "type": "STRING",
           "value": "}"
-        }
-      ]
-    },
-    "bench_capture": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "|"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "identifier"
-        },
-        {
-          "type": "STRING",
-          "value": "|"
         }
       ]
     },
@@ -2882,27 +2861,6 @@
         {
           "type": "SYMBOL",
           "name": "identifier"
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "STRING",
-                  "value": ":"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_type"
-                }
-              ]
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
         },
         {
           "type": "STRING",

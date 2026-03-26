@@ -885,7 +885,7 @@ test "faithful deltablue stays consistent on a small graph" {
     assert delta_blue(20) == 0;
 }
 
-bench "deltablue_chain" |i| {
+bench "deltablue_chain" {
     setup {
         let sink: i64 = 0;
         measure {
@@ -894,7 +894,7 @@ bench "deltablue_chain" |i| {
     }
 }
 
-bench "deltablue_projection" |i| {
+bench "deltablue_projection" {
     setup {
         let sink: i64 = 0;
         measure {
@@ -903,7 +903,7 @@ bench "deltablue_projection" |i| {
     }
 }
 
-bench "deltablue_both" |i| {
+bench "deltablue_both" {
     setup {
         let sink: i64 = 0;
         measure {

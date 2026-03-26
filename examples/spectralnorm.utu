@@ -82,7 +82,7 @@ fun spectral_norm(n: i32) f64 {
     _Math_sqrt(vbv / vv);
 }
 
-bench "spectralnorm" |i| {
+bench "spectralnorm" {
     setup {
         measure {
             spectral_norm(64);

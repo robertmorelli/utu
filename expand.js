@@ -621,10 +621,7 @@ class ModuleExpander {
     }
 
     emitBenchDecl(node, ctx) {
-        const captureNode = childOfType(childOfType(node, 'bench_capture'), 'identifier');
-        const benchCtx = this.pushScope(ctx);
-        if (captureNode) this.declareLocal(benchCtx, captureNode.text, null);
-        return `bench ${childOfType(node, 'string_lit').text} |${captureNode.text}| { ${this.emitSetupDecl(childOfType(node, 'setup_decl'), benchCtx)} }`;
+        return `bench ${childOfType(node, 'string_lit').text} { ${this.emitSetupDecl(childOfType(node, 'setup_decl'), this.pushScope(ctx))} }`;
     }
 
     emitSetupDecl(node, ctx) {
@@ -698,8 +695,8 @@ class ModuleExpander {
     }
 
     stripNullable(info) {
-        return info?.text.endsWith('# null')
-            ? { ...info, text: info.text.replace(/\s*#\s*null$/, '') }
+        return info?.text.startsWith('?')
+            ? { ...info, text: info.text.slice(1) }
             : info;
     }
 
@@ -1113,12 +1110,11 @@ class ModuleExpander {
         const expr = parts[0];
         const capture = parts[1];
         const ident = childOfType(capture, 'identifier');
-        const captureType = kids(capture).find((child) => child !== ident) ?? null;
         const thenBlock = parts[2];
         const elseBlock = parts[3] ?? null;
         const inner = this.pushScope(ctx);
-        if (ident?.text && ident.text !== '_') this.declareLocal(inner, ident.text, captureType ? this.describeType(captureType, ctx) : this.stripNullable(this.inferExprInfo(expr, ctx)));
-        return `promote ${this.emitExpr(expr, ctx)} |${ident.text}${captureType ? `: ${this.emitType(captureType, ctx)}` : ''}| ${this.emitBlock(thenBlock, inner, true)}${elseBlock ? ` else ${this.emitBlock(elseBlock, this.pushScope(ctx), true)}` : ''}`;
+        if (ident?.text && ident.text !== '_') this.declareLocal(inner, ident.text, this.stripNullable(this.inferExprInfo(expr, ctx)));
+        return `promote ${this.emitExpr(expr, ctx)} |${ident.text}| ${this.emitBlock(thenBlock, inner, true)}${elseBlock ? ` else ${this.emitBlock(elseBlock, this.pushScope(ctx), true)}` : ''}`;
     }
 
     emitMatchExpr(node, ctx) {

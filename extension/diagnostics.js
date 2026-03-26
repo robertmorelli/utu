@@ -6,6 +6,7 @@ export class DiagnosticsController {
     languageService;
     output;
     compilerHost;
+    compilerValidationUnavailableMessage;
     collection = vscode.languages.createDiagnosticCollection('utu');
     disposables = [this.collection];
     pending = createDebouncedUriScheduler(VALIDATION_DELAY_MS, async (uri) => {
@@ -38,15 +39,15 @@ export class DiagnosticsController {
         const { uri, version } = document;
         try {
             const diagnostics = await this.languageService.getDiagnostics(document);
-            if (!diagnostics.length && this.compilerHost)
+            if (!diagnostics.length && this.compilerHost && !this.compilerValidationUnavailableMessage)
                 try { await this.compilerHost.compile(document.getText()); }
                 catch (error) {
-                    const index = await this.languageService.getDocumentIndex(document);
                     if (isSourceDiagnosticError(error)) {
+                        const index = await this.languageService.getDocumentIndex(document);
                         const compileError = describeCompileError(document, error, index);
                         diagnostics.push({ range: compileError.range, severity: 'error', source: 'utu', message: compileError.message });
                     } else {
-                        logOutputError(this.output, `[utu] Skipping non-source validation error for ${uri.fsPath || uri.toString()}`, error);
+                        this.disableCompilerValidation(error);
                     }
                 }
             if (vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === uri.toString())?.version !== version)
@@ -59,6 +60,13 @@ export class DiagnosticsController {
     }
     getValidationMode() { return vscode.workspace.getConfiguration('utu').get('validation.mode', 'onType'); }
     isEnabledFor(document) { return document.languageId === UTU_LANGUAGE_ID && this.getValidationMode() !== 'off'; }
+    disableCompilerValidation(error) {
+        const message = String(error instanceof Error ? error.message : error);
+        if (!this.compilerValidationUnavailableMessage) {
+            this.compilerValidationUnavailableMessage = message;
+            logOutputError(this.output, '[utu] Compiler-backed validation disabled for this session; using syntax and semantic diagnostics only', error);
+        }
+    }
 }
 
 function describeCompileError(document, error, index) {

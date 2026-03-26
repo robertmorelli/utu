@@ -33,16 +33,19 @@ The key design principles from the spec are:
 
 The implemented surface covered by the compiler, examples, and tests includes:
 
-- structs, sum types, arrays, globals, nullable references, and multi-value returns
-- `if`, `while`, `for`, `match`, `alt`, `promote`, `break`, and pipe expressions
-- top-level `test` and `bench` declarations
+- strings, globals, structs, tagged structs, arrays, sum types, nullable references, and multi-value returns
+- `if`, `while`, single-range `for`, labeled blocks with `emit`, `match`, `alt`, `promote`, `assert`, `fatal`, and pipe expressions
 - host imports via `shimport` and inline JS helpers via `escape`
-- parameterized modules, `construct` aliases, open constructs, associated functions, and method-call sugar
-- WasmGC reference builtins such as `ref.null`, `ref.is_null`, `ref.as_non_null`, `ref.cast`, `ref.test`, and `i31`
+- compile-time modules via `mod`, `construct` aliases, open constructs, qualified type paths, associated functions, and method-call sugar
+- top-level `proto` declarations over `tag struct` implementers, including explicit protocol calls and synthesized getter members
+- top-level `test` and `bench` declarations with `setup { ... measure { ... } }`
+- WasmGC reference builtins such as `ref.null`, `ref.is_null`, `ref.as_non_null`, `ref.eq`, `ref.cast`, `ref.test`, and `i31`
 
 Notable current limits:
 
 - module bodies do not support nested `export` declarations in v1
+- `proto` declarations and protocol implementations remain top-level only in v1
+- the parser accepts comma-separated `for` sources and captures, but current lowering only uses the first pair
 - `fun(A) B` function-reference syntax is parsed, but not yet supported as a stable end-to-end compiler feature
 
 The naming convention is intentionally simple:
@@ -133,6 +136,23 @@ The spec calls out an optimization-friendly detail: non-`mut` fields lower to
 non-mutable Wasm fields, which allows the engine to treat them as truly
 immutable.
 
+== Tagged Structs
+
+`tag struct` is the current opt-in surface for structs that participate in
+protocol dispatch. Tagged structs behave like ordinary structs in source code,
+but the compiler prepends a hidden `__tag: i32` field that user code cannot
+declare directly.
+
+```utu
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+```
+
+Use `tag struct` when a type needs to satisfy a `proto`. Ordinary structs stay
+leaner and do not carry the hidden dispatch tag.
+
 == Sum Types: Enums
 
 Sum types use `|`. The compiler models them as a common supertype plus one
@@ -156,6 +176,81 @@ type Shape =
 
 This model keeps variant dispatch inside WasmGC's native type system instead of
 building a hand-rolled tag format in linear memory.
+
+== Modules And Constructs
+
+`mod` declares a compile-time namespace/template rather than a runtime Wasm
+module. Parameterized modules instantiate concrete namespaces before lowering,
+so names like `math.Pair` and `boxy[i32].Box` are part of the stable surface
+today.
+
+```utu
+mod cell[T] {
+    struct Cell {
+        value: T,
+    }
+
+    fun Cell.new(value: T) Cell {
+        Cell { value: value };
+    }
+
+    fun Cell.get(self: Cell) T {
+        self.value;
+    }
+}
+
+construct ints = cell[i32];
+construct cell[i32];
+```
+
+The two `construct` forms serve different purposes:
+
+- `construct name = module[args];` creates a qualified alias such as `ints.Cell`
+- `construct module[args];` opens the instantiated module into the current scope
+
+Associated functions continue to use `Owner.member(...)` syntax, and method-call
+sugar works for values whose associated member can be resolved unambiguously.
+
+== Protocols
+
+Protocols are Utu's current virtual-dispatch surface for tagged structs.
+
+```utu
+proto Measure[T] {
+    measure(T) i32,
+};
+
+proto Area[T] {
+    get area: i32,
+};
+
+tag struct Box {
+    width: i32,
+    height: i32,
+}
+
+tag struct Rect {
+    area: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+```
+
+Key v1 rules:
+
+- protocols are declared at top level
+- a protocol currently declares exactly one type parameter, and method members
+  may use it only as the first parameter
+- implementers must be `tag struct`
+- `get` members are field-backed and synthesized automatically rather than
+  implemented with `fun`
+- `box.measure()` works when unambiguous, while `Measure.measure(box)` is always
+  available as the explicit form
+
+Lowering uses one dispatch table per protocol member plus tag-indexed
+`call_indirect` helpers, so dynamic dispatch stays explicit in the emitted Wasm.
 
 == Structured Error Results, Nullability, And `\`
 
@@ -552,11 +647,11 @@ test "adds two numbers" {
     assert add(2, 2) == 4;
 }
 
-bench "sum loop" |i| {
+bench "sum loop" {
     setup {
         let total: i32 = 0;
         measure {
-            total = total + i;
+            total = total + 1;
         }
     }
 }
@@ -564,26 +659,21 @@ bench "sum loop" |i| {
 
 Normal program compilation ignores these declarations. Test mode synthesizes
 zero-argument exports, while bench mode synthesizes one exported function per
-benchmark that takes an `i32` iteration count. The host runs those exports
-ephemerally and reports failures or timing.
+benchmark that takes an `i32` iteration count. `setup` runs once per exported
+invocation, and `measure` runs inside the generated timing loop. The host runs
+those exports ephemerally and reports failures or timing.
 
 == Polymorphic Dispatch
 
-The language does not bake in a hidden vtable model. Current compiler support
-keeps dispatch explicit through type-based `alt` lowering:
+The language does not bake in a hidden object model. Current compiler support
+keeps dispatch explicit in two different ways:
 
-```utu
-fun describe(s: Shape) str {
-    alt s {
-        c: Circle => "circle",
-        r: Rect => "rect",
-        t: Triangle => "triangle",
-    };
-}
-```
+- `alt` lowers sum-type and subtype dispatch through `br_on_cast`
+- `proto` lowers tagged-struct virtual members through tables and `call_indirect`
 
-This keeps the runtime behavior visible in the language surface and aligned
-with Wasm's own dispatch mechanisms.
+`alt` is the right surface when a value already has a shared sum type.
+Protocols are the right surface when separate tagged structs should share one
+member contract without first being wrapped in a single sum type.
 
 === Future Work
 
@@ -630,6 +720,8 @@ Reference builtins expose WasmGC's reference toolset:
 - `ref.is_null(val)` -> `ref.is_null`
 - `ref.as_non_null(val)` -> `ref.as_non_null`
 - `ref.eq(a, b)` -> `ref.eq`
+- `ref.cast(val, T)` -> `ref.cast (ref $T)`
+- `ref.test(val, T)` -> `ref.test (ref $T)`
 - `i31.new(val)` -> `ref.i31`
 - `i31.get_s(val)` -> `i31.get_s`
 - `i31.get_u(val)` -> `i31.get_u`
@@ -668,6 +760,7 @@ The compiler's minimum instruction surface is grouped by category.
 - `br` for breaking out of a block or loop
 - `br_if` for conditional exits
 - `br_on_cast` for type-based pattern matching
+- `br_on_non_null` for nullable fallback paths
 - `call` for direct calls
 - `unreachable` for lowered `fatal` traps and other impossible states
 
@@ -691,6 +784,8 @@ part of the current implemented instruction set.
 - `ref.is_null` for null checks
 - `ref.as_non_null` for assertions that trap on null
 - `ref.eq` for reference equality
+- `ref.cast` for checked downcasts
+- `ref.test` for runtime type tests
 - `ref.i31` for boxing an integer into `i31ref`
 - `i31.get_s` and `i31.get_u` for unboxing
 - `extern.convert_any` for anyref-to-externref conversion
@@ -704,6 +799,14 @@ part of the current implemented instruction set.
 - `global.set`
 
 These cover named values, temporaries, and mutable globals.
+
+=== Dispatch Support
+
+- `table` definitions for protocol member dispatch tables
+- `elem` segments that populate those tables
+- `call_indirect` for protocol dispatch helpers
+
+These only appear when `proto` declarations are present.
 
 === Numeric Instructions
 
@@ -724,26 +827,48 @@ top-level declarations, and comments are line comments only.
 
 ```ebnf
 program      ::= item*
-item         ::= import_decl | export_decl | fn_decl | type_decl
-               | struct_decl | global_decl | test_decl | bench_decl
+item         ::= module_decl | construct_decl ';' | import_decl | export_decl
+               | fn_decl | proto_decl ';' | type_decl ';' | struct_decl
+               | global_decl ';' | jsgen_decl ';' | test_decl | bench_decl
 ```
 
-The top level therefore supports imports, exports, functions, named sum types,
-structs, global `let` bindings, and opt-in in-source tests and benchmarks.
+The top level therefore supports modules, constructs, imports, exports,
+functions, protocols, named sum types, structs, global `let` bindings, inline
+JS helpers, and opt-in in-source tests and benchmarks.
 
 === Declarations
 
 ```ebnf
-struct_decl  ::= 'struct' TYPE_IDENT '{' field_list '}'
-field_list   ::= (field (',' field)* ','?)?
+module_decl  ::= 'mod' module_name module_type_param_list? '{' module_item* '}'
+module_item  ::= module_decl | construct_decl ';' | struct_decl | type_decl ';'
+               | fn_decl | global_decl ';' | import_decl ';' | jsgen_decl ';'
+               | test_decl | bench_decl
+module_name  ::= IDENT | TYPE_IDENT
+module_type_param_list ::= '[' TYPE_IDENT (',' TYPE_IDENT)* ','? ']'
+module_type_arg_list   ::= '[' type (',' type)* ','? ']'
+
+construct_decl ::= 'construct'
+                   ( IDENT '=' )?
+                   ( module_ref | instantiated_module_ref )
+module_ref   ::= module_name
+instantiated_module_ref ::= module_name module_type_arg_list
+
+struct_decl  ::= 'rec'? 'tag'? 'struct' TYPE_IDENT '{' field_list? '}'
+field_list   ::= field (',' field)* ','?
 field        ::= 'mut'? IDENT ':' type
+
+proto_decl   ::= 'proto' TYPE_IDENT module_type_param_list? '{' proto_member_list? '}'
+proto_member_list ::= proto_member (',' proto_member)* ','?
+proto_member ::= proto_method | proto_getter
+proto_method ::= IDENT '(' type_list? ')' return_type
+proto_getter ::= 'get' IDENT ':' type
 
 type_decl    ::= 'type' TYPE_IDENT '=' variant_list ';'
 variant_list ::= '|'? variant ('|' variant)*
 variant      ::= TYPE_IDENT ('{' field_list '}')?
 
-fn_decl      ::= 'fun' IDENT '(' param_list ')' return_type block
-param_list   ::= (param (',' param)* ','?)?
+fn_decl      ::= 'fun' (IDENT | TYPE_IDENT '.' IDENT) '(' param_list? ')' return_type block
+param_list   ::= param (',' param)* ','?
 param        ::= IDENT ':' type
 return_type  ::= 'void'
                | type ('#' type)? (',' type ('#' type)?)*
@@ -755,9 +880,10 @@ import_decl  ::= 'shimport' STRING
                   ';'
 import_param_list ::= import_param (',' import_param)* ','?
 import_param ::= param | type
+jsgen_decl   ::= 'escape' JSGEN IDENT '(' import_param_list? ')' return_type ';'
 export_decl  ::= 'export' fn_decl
 test_decl    ::= 'test' STRING block
-bench_decl   ::= 'bench' STRING '|' IDENT '|' '{' setup_decl '}'
+bench_decl   ::= 'bench' STRING '{' setup_decl '}'
 setup_decl   ::= 'setup' '{' (expr ';')* measure_decl '}'
 measure_decl ::= 'measure' block
 ```
@@ -772,21 +898,27 @@ This section encodes a few core language choices:
 - `export` wraps an ordinary function declaration rather than introducing a
   second export-only syntax
 
+Module bodies reuse most declaration forms, but in the current v1 compiler
+`export` declarations, `proto` declarations, and protocol implementations stay
+top-level only.
+
 === Types
 
 ```ebnf
-type         ::= '?' type | scalar_type | ref_type | func_type
-             |   '(' type ')'
+type         ::= '?' base_type | base_type
+base_type    ::= scalar_type | ref_type | func_type | '(' type ')'
 
 scalar_type  ::= 'i32' | 'u32' | 'i64' | 'u64'
              |   'f32' | 'f64' | 'v128' | 'bool'
 
-ref_type     ::= TYPE_IDENT | 'str'
+ref_type     ::= TYPE_IDENT | qualified_type_ref | instantiated_module_ref | 'str'
              |   'externref' | 'anyref' | 'eqref'
              |   'i31' | 'array' '[' type ']'
+qualified_type_ref ::= module_ref '.' TYPE_IDENT
+                    | instantiated_module_ref '.' TYPE_IDENT
 
-func_type    ::= 'fun' '(' type_list ')' return_type
-type_list    ::= (type (',' type)*)?
+func_type    ::= 'fun' '(' type_list? ')' return_type
+type_list    ::= type (',' type)*
 ```
 
 Nullable references are written as a prefix `?`: `?T` means a nullable `T`,
@@ -796,8 +928,9 @@ lowering to `(ref null $T)`. The `?` binds tightly as a prefix type constructor.
 
 ```ebnf
 expr         ::= literal | IDENT | unary_expr | binary_expr
-             |   call_expr | tuple_expr | pipe_expr | field_expr
-             |   index_expr | if_expr | match_expr | alt_expr
+             |   call_expr | tuple_expr | pipe_expr | type_member_expr
+             |   promoted_module_call_expr | field_expr | index_expr
+             |   if_expr | promote_expr | match_expr | alt_expr
              |   block_expr | for_expr | while_expr | break_expr
              |   assign_expr | bind_expr | else_expr
              |   struct_init | array_init | assert_expr
@@ -815,22 +948,32 @@ tuple_expr   ::= '(' expr ',' expr (',' expr)* ','? ')'
 pipe_expr    ::= expr '-o' pipe_target
 pipe_target  ::= pipe_path
              |   pipe_path '(' pipe_args ')'
-pipe_path    ::= IDENT | BUILTIN_NS | pipe_path '.' IDENT
+pipe_path    ::= IDENT | TYPE_IDENT | BUILTIN_NS | instantiated_module_ref
+             |   pipe_path '.' (IDENT | TYPE_IDENT)
 pipe_args    ::= expr (',' expr)*
              |   pipe_prefix? '_' pipe_suffix?
 pipe_prefix  ::= expr (',' expr)* ','
 pipe_suffix  ::= ',' expr (',' expr)*
 
-call_expr    ::= expr '(' arg_list ')'
-arg_list     ::= (expr (',' expr)* ','?)?
+call_expr    ::= expr '(' arg_list? ')'
+arg_list     ::= expr (',' expr)* ','?
+
+type_member_expr ::= type_path '.' IDENT
+type_path    ::= TYPE_IDENT | qualified_type_ref
+             |   inline_module_type_path | instantiated_module_ref
+inline_module_type_path ::= module_name module_type_arg_list '.' TYPE_IDENT
+
+promoted_module_call_expr ::= module_name module_type_arg_list
+                              '.' IDENT '(' arg_list? ')'
 
 field_expr   ::= expr '.' IDENT
 index_expr   ::= expr '[' expr ']'
 
 namespace_call_expr ::= BUILTIN_NS '.' IDENT ('(' arg_list? ')')?
-ref_null_expr ::= 'ref' '.' 'null' TYPE_IDENT
+ref_null_expr ::= 'ref' '.' 'null' (TYPE_IDENT | qualified_type_ref)
 
 if_expr      ::= 'if' expr block ('else' (if_expr | block))?
+promote_expr ::= 'promote' expr '|' IDENT '|' block ('else' block)?
 
 match_expr   ::= 'match' expr '{' match_arm+ '}'
 match_arm    ::= match_lit '=>' expr ','
@@ -854,7 +997,8 @@ block        ::= '{' (expr ';')* '}'
 break_expr   ::= 'break'
 emit_expr    ::= 'emit' expr
 
-struct_init  ::= TYPE_IDENT '{' (IDENT ':' expr),* '}'
+struct_init  ::= (TYPE_IDENT | qualified_type_ref) '{' field_init_list? '}'
+field_init_list ::= IDENT ':' expr (',' IDENT ':' expr)* ','?
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
 
 assign_expr  ::= (IDENT | field_expr | index_expr) '=' expr
@@ -944,6 +1088,8 @@ The identifier rules reinforce the style guide from the overview chapter:
 The compilation model is deliberately narrow:
 
 - parse source
+- expand modules, constructs, qualified member sugar, and protocol helpers into
+  a flattened source program
 - validate parse errors
 - lower to WAT
 - parse WAT with Binaryen and optimize
@@ -1027,8 +1173,9 @@ The `\` operator lowers on nullable references in two ways:
 
 = Complete Example Walkthrough
 
-The spec closes with a compact program that exercises most of the language
-surface. It is reproduced here as the migration target for the Typst docs.
+The spec closes with a compact program that exercises a broad slice of the
+core expression and data-model surface. Module and protocol features are
+covered earlier and omitted here to keep the walkthrough focused.
 
 ```utu
 // --- types ---

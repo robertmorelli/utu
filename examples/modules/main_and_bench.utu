@@ -18,9 +18,9 @@ fun step(value: i32) ints.Box {
     ints.Box.new(value + 1);
 }
 
-bench "module counter get" |i| {
+bench "module counter get" {
     setup {
-        let box: ints.Box = step(i);
+        let box: ints.Box = step(9);
         measure {
             box.get();
         }
