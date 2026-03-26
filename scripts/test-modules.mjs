@@ -353,6 +353,45 @@ export fun main() i32 {
 }`,
     },
     {
+        name: 'getter-method-sugar-works-for-field-and-if-receivers',
+        expectedReturn: 10,
+        source: `struct Vec {
+    left: i32,
+    right: i32,
+}
+
+struct Holder {
+    inner: Vec,
+}
+
+fun Vec.total(self: Vec) i32 {
+    self.left + self.right;
+}
+
+export fun main() i32 {
+    let holder: Holder = Holder { inner: Vec { left: 1, right: 2 } };
+    holder.inner.total() + (if true { Vec { left: 3, right: 4 }; } else { Vec { left: 9, right: 9 }; }).total();
+}`,
+    },
+    {
+        name: 'captureless-for-loops-declare-and-use-the-implicit-index-local',
+        expectedReturn: 3,
+        source: `export fun main() i32 {
+    let sum: i32 = 0;
+    for (0..3) {
+        sum = sum + 1;
+    };
+    sum;
+}`,
+    },
+    {
+        name: 'large-i64-literals-stay-exact-through-codegen',
+        expectedReturn: 9223372036854775807n,
+        source: `export fun main() i64 {
+    9223372036854775807;
+}`,
+    },
+    {
         name: 'getter-protocol-members-synthesize-for-explicit-implementers',
         expectedReturn: 22,
         source: `proto CounterOps[T] {
@@ -926,6 +965,156 @@ export fun main() i32 {
     0;
 }`,
     },
+    {
+        name: 'module-bodies-reject-test-declarations',
+        message: 'test declarations are not supported inside modules in v1',
+        source: `mod bad {
+    test "inside" {
+        assert true;
+    }
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'module-bodies-reject-bench-declarations',
+        message: 'bench declarations are not supported inside modules in v1',
+        source: `mod bad {
+    bench "inside" {
+        setup {
+            measure {
+                0;
+            }
+        }
+    }
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'module-bodies-reject-construct-declarations',
+        message: 'construct declarations are not supported inside modules in v1',
+        source: `mod boxy[T] {
+    struct Box {
+        value: T,
+    }
+}
+
+mod bad {
+    construct ints = boxy[i32];
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'local-shadowing-is-a-hard-compile-error',
+        message: 'Local shadowing is not allowed; duplicate binding "x"',
+        source: `export fun main() i32 {
+    let x: i32 = 1;
+    {
+        let x: i32 = 2;
+        x;
+    };
+    x;
+}`,
+    },
+    {
+        name: 'for-loops-reject-multiple-range-sources',
+        message: 'for loops support exactly one range source in v1',
+        source: `export fun main() i32 {
+    let sum: i32 = 0;
+    for (0..2, 10..12) |i, j| {
+        sum = sum + i + j;
+    };
+    sum;
+}`,
+    },
+    {
+        name: 'for-loops-reject-multiple-captures',
+        message: 'for loops support at most one capture in v1',
+        source: `export fun main() i32 {
+    let sum: i32 = 0;
+    for (0..2) |i, j| {
+        sum = sum + i + j;
+    };
+    sum;
+}`,
+    },
+    {
+        name: 'value-position-if-without-else-is-rejected',
+        message: 'Value-position if expressions must include an else branch',
+        source: `fun bad(flag: bool) i32 {
+    if flag {
+        1;
+    };
+}
+
+export fun main() i32 {
+    bad(true);
+}`,
+    },
+    {
+        name: 'value-position-promote-without-else-is-rejected',
+        message: 'Value-position promote expressions must include an else branch',
+        source: `struct Box {
+    value: i32,
+}
+
+fun maybe_box(flag: bool) ?Box {
+    if flag { Box { value: 41 }; } else { ref.null Box; };
+}
+
+fun bad(flag: bool) i32 {
+    promote maybe_box(flag) |box| {
+        box.value;
+    };
+}
+
+export fun main() i32 {
+    bad(true);
+}`,
+    },
+    {
+        name: 'struct-init-rejects-missing-fields',
+        message: 'Missing field "right" in struct initializer for "Pair"',
+        source: `struct Pair {
+    left: i32,
+    right: i32,
+}
+
+export fun main() i32 {
+    let pair: Pair = Pair { left: 7 };
+    pair.left;
+}`,
+    },
+    {
+        name: 'struct-init-rejects-duplicate-fields',
+        message: 'Duplicate field "left" in struct initializer for "Pair"',
+        source: `struct Pair {
+    left: i32,
+    right: i32,
+}
+
+export fun main() i32 {
+    let pair: Pair = Pair { left: 7, left: 8, right: 9 };
+    pair.left;
+}`,
+    },
+    {
+        name: 'first-class-function-reference-types-fail-early',
+        message: 'First-class function reference types are not supported yet',
+        source: `shimport "es" callback: fun(i32) i32;
+
+export fun main() i32 {
+    0;
+}`,
+    },
 ];
 
 const binaryenValidationCases = [
@@ -1031,7 +1220,7 @@ export fun main() i32 {
     box.measure();
 }`;
         const { wat } = await compile(source, { mode: 'program', wat: true });
-        if (!wat.includes('(field $__tag i32)'))
+        if (!wat.includes('(field $__tag'))
             throw new Error('Expected tagged structs to lower a hidden $__tag field');
         if (!wat.includes('(table $__utu_proto_table_measure_measure 2 funcref)'))
             throw new Error('Expected a dedicated protocol dispatch table for Measure.measure');
@@ -1039,6 +1228,57 @@ export fun main() i32 {
             throw new Error('Expected Measure.measure elements to be attached to its own table');
         if (!wat.includes('call_indirect $__utu_proto_table_measure_measure'))
             throw new Error('Expected protocol dispatch to use call_indirect');
+    }],
+    ['tagged-sum-parent-protocol-helpers-lower-to-bare-table-dispatch', async () => {
+        const source = `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag type Shape: Measure =
+    | Box { width: i32, height: i32 }
+    | Square { side: i32 };
+
+fun Measure.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: Square) i32 {
+    self.side * self.side;
+}
+
+export fun main() i32 {
+    let shape: Shape = Box { width: 2, height: 3 };
+    shape.measure();
+}`;
+        const { wat } = await compile(source, { mode: 'program', wat: true });
+        if (wat.includes('ref.test'))
+            throw new Error('Expected tagged-sum protocol helpers to avoid ref.test ladders entirely');
+        if (!wat.includes('struct.get $Shape $__tag'))
+            throw new Error('Expected tagged-sum protocol helpers to read the parent tag field directly');
+        if (!wat.includes('call_indirect $__utu_proto_table_measure_measure'))
+            throw new Error('Expected tagged-sum protocol helpers to dispatch via the method table');
+    }],
+    ['protocol-getter-sugar-always-goes-through-the-protocol-helper', async () => {
+        const source = `proto Area[T] {
+    get area: i32,
+};
+
+tag struct Rect {
+    area: i32,
+}
+
+        export fun main() i32 {
+    let rect: Rect = Rect { area: 12 };
+    rect.area;
+}`;
+        const { wat } = await compile(source, { mode: 'program', wat: true });
+        const mainStart = wat.indexOf('(func $main');
+        const mainEnd = wat.indexOf('\n  (export "main"', mainStart);
+        const mainBody = mainStart >= 0 && mainEnd >= 0 ? wat.slice(mainStart, mainEnd) : '';
+        if (!mainBody.includes('call $__utu_proto_dispatch_area_area_'))
+            throw new Error('Expected concrete getter sugar to call the protocol dispatch helper');
+        if (mainBody.includes('struct.get $Rect $area'))
+            throw new Error('Expected concrete getter sugar to avoid direct struct.get bypasses');
     }],
     ['unresolved-field-call-throws-instead-of-emitting-call-ref', async () => {
         try {
@@ -1054,6 +1294,12 @@ export fun main() i32 {
         const many = await inspectOptimizedModule(makeBinaryenDceSource(50));
         if (many.functionCount !== single.functionCount)
             throw new Error(`Expected 50 instantiations to keep ${single.functionCount} optimized function(s), got ${many.functionCount}`);
+    }],
+    ['no-opt-compiles-preserve-unoptimized-module-duplication', async () => {
+        const optimized = await inspectOptimizedModule(makeBinaryenDceSource(50), { optimize: true });
+        const raw = await inspectOptimizedModule(makeBinaryenDceSource(50), { optimize: false });
+        if (raw.functionCount <= optimized.functionCount)
+            throw new Error(`Expected --no-opt compilation to keep more functions than the optimized build, got raw=${raw.functionCount} optimized=${optimized.functionCount}`);
     }],
     ...binaryenValidationCases.map((testCase) => [testCase.name, async () => {
         const result = await validateWat(testCase.wat);
@@ -1073,6 +1319,8 @@ export fun main() i32 {
             const message = String(error?.message ?? error);
             if (message.includes('WebAssembly.Module'))
                 throw new Error(`Expected Binaryen diagnostic, got: ${JSON.stringify(firstLine(message))}`);
+            if (!message.includes('Generated Wasm failed validation:'))
+                throw new Error(`Expected compiler-facing validation prefix, got ${JSON.stringify(firstLine(message))}`);
             if (message.includes(testCase.message)) return;
             throw new Error(`Expected ${JSON.stringify(testCase.message)}, got ${JSON.stringify(firstLine(message))}`);
         }
@@ -1106,8 +1354,8 @@ async function compileAndRun(source) {
     }
 }
 
-async function inspectOptimizedModule(source) {
-    const { wasm } = await compile(source, { mode: 'program' });
+async function inspectOptimizedModule(source, { optimize = true } = {}) {
+    const { wasm } = await compile(source, { mode: 'program', optimize });
     const mod = binaryen.readBinary(wasm);
     try {
         return { functionCount: mod.getNumFunctions() };

@@ -58,7 +58,7 @@ class ModuleExpander {
         this.topLevelAssocNames = new Map();
         this.topLevelProtocolNames = new Set();
         this.topLevelProtocolMembers = new Map();
-        this.topLevelGetterOnlyProtocols = new Set();
+        this.topLevelProtocolSetterMembers = new Map();
         this.topLevelProtocolImplementers = new Map();
         this.topLevelTaggedTypeProtocols = new Map();
         this.topLevelStructFieldTypes = new Map();
@@ -140,6 +140,24 @@ class ModuleExpander {
     collectTopLevelSymbols(ctx) {
         for (const item of kids(this.root)) {
             if (item.type === 'module_decl') this.collectModuleTemplate(item);
+            if (item.type === 'struct_decl') {
+                const nameNode = childOfType(item, 'type_ident');
+                if (nameNode) this.topLevelTypeNames.add(nameNode.text);
+            }
+            if (item.type === 'type_decl') {
+                const nameNode = childOfType(item, 'type_ident');
+                if (nameNode) this.topLevelTypeNames.add(nameNode.text);
+                for (const variant of childrenOfType(childOfType(item, 'variant_list'), 'variant')) {
+                    const variantName = childOfType(variant, 'type_ident');
+                    if (variantName) this.topLevelTypeNames.add(variantName.text);
+                }
+            }
+            if (item.type === 'proto_decl') {
+                const nameNode = childOfType(item, 'type_ident');
+                if (nameNode) this.topLevelProtocolNames.add(nameNode.text);
+            }
+        }
+        for (const item of kids(this.root)) {
             if (item.type === 'struct_decl') this.collectTopLevelStructFields(item, ctx);
             if (item.type === 'type_decl') this.collectTopLevelTypeFields(item, ctx);
             if (item.type === 'proto_decl') this.collectTopLevelProtocol(item, ctx);
@@ -167,8 +185,17 @@ class ModuleExpander {
     collectModuleTemplate(node) {
         const name = moduleNameNode(node).text;
         const items = kids(node).filter((child) => !['identifier', 'type_ident', 'module_name', 'module_type_param_list'].includes(child.type));
-        if (items.some((item) => item.type === 'export_decl'))
-            throw new Error('export declarations are not supported inside modules in v1');
+        const unsupported = items.find((item) => ['module_decl', 'construct_decl', 'export_decl', 'test_decl', 'bench_decl'].includes(item.type)) ?? null;
+        if (unsupported) {
+            const label = {
+                module_decl: 'nested modules',
+                construct_decl: 'construct declarations',
+                export_decl: 'export declarations',
+                test_decl: 'test declarations',
+                bench_decl: 'bench declarations',
+            }[unsupported.type];
+            throw new Error(`${label} are not supported inside modules in v1`);
+        }
         this.moduleNames.add(name);
         this.moduleTemplates.set(name, {
             name,
@@ -185,7 +212,10 @@ class ModuleExpander {
             const fieldName = childOfType(field, 'identifier');
             const typeNode = kids(field).at(-1);
             if (!fieldName || !typeNode) continue;
-            fields.set(fieldName.text, this.describeType(typeNode, ctx));
+            fields.set(fieldName.text, {
+                typeInfo: this.describeType(typeNode, ctx),
+                mut: hasAnon(field, 'mut'),
+            });
         }
         this.topLevelStructFieldTypes.set(nameNode.text, fields);
     }
@@ -204,7 +234,10 @@ class ModuleExpander {
                 const fieldName = childOfType(field, 'identifier');
                 const typeNode = kids(field).at(-1);
                 if (!fieldName || !typeNode) continue;
-                fields.set(fieldName.text, this.describeType(typeNode, ctx));
+                fields.set(fieldName.text, {
+                    typeInfo: this.describeType(typeNode, ctx),
+                    mut: hasAnon(field, 'mut'),
+                });
             }
             this.topLevelStructFieldTypes.set(variantName.text, fields);
         }
@@ -218,15 +251,24 @@ class ModuleExpander {
         const members = memberList
             ? childrenOfType(memberList, 'proto_member')
                 .map((member) => kids(member)[0])
-                .filter((child) => ['proto_method', 'proto_getter'].includes(child?.type))
+                .filter((child) => ['proto_method', 'proto_getter', 'proto_setter'].includes(child?.type))
             : [];
-        if (members.length > 0 && members.every((member) => member.type === 'proto_getter'))
-            this.topLevelGetterOnlyProtocols.add(nameNode.text);
         for (const member of members) {
             const memberName = childOfType(member, 'identifier');
             if (!memberName) continue;
+            if (member.type === 'proto_setter') {
+                this.topLevelProtocolSetterMembers.set(this.protocolMemberKey(nameNode.text, memberName.text), {
+                    setter: true,
+                    arity: 2,
+                    valueInfo: this.describeType(kids(member).at(-1), ctx),
+                });
+                continue;
+            }
             this.topLevelProtocolMembers.set(this.protocolMemberKey(nameNode.text, memberName.text), {
                 getter: member.type === 'proto_getter',
+                arity: member.type === 'proto_getter'
+                    ? 1
+                    : kids(childOfType(member, 'type_list')).length,
                 returnInfo: member.type === 'proto_getter'
                     ? this.describeType(kids(member).at(-1), ctx)
                     : this.describeReturn(childOfType(member, 'return_type'), ctx),
@@ -443,6 +485,10 @@ class ModuleExpander {
         return `__utu_proto_dispatch_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
     }
 
+    mangleProtocolSetterDispatch(protocol, member, selfType) {
+        return `__utu_proto_set_dispatch_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+    }
+
     mangleNamespaceType(namespace, name) {
         return `Utu${namespace.hash}${pascalCase(namespace.template.name)}${pascalCase(name)}`;
     }
@@ -463,6 +509,16 @@ class ModuleExpander {
     }
 
     emitItem(node, ctx, inModule) {
+        if (inModule && ['module_decl', 'construct_decl', 'export_decl', 'test_decl', 'bench_decl'].includes(node.type)) {
+            const label = {
+                module_decl: 'nested modules',
+                construct_decl: 'construct declarations',
+                export_decl: 'export declarations',
+                test_decl: 'test declarations',
+                bench_decl: 'bench declarations',
+            }[node.type];
+            throw new Error(`${label} are not supported inside modules in v1`);
+        }
         switch (node.type) {
             case 'module_decl':
                 return '';
@@ -752,7 +808,7 @@ class ModuleExpander {
                 return child ? this.emitType(child, ctx) : node.text;
             }
             case 'func_type':
-                return `fun(${kids(childOfType(node, 'type_list')).map((child) => this.emitType(child, ctx)).join(', ')}) ${this.emitReturnType(childOfType(node, 'return_type'), ctx)}`;
+                throw new Error('First-class function reference types are not supported yet');
             case 'paren_type':
                 return `(${this.emitType(kids(node)[0], ctx)})`;
             default:
@@ -884,7 +940,7 @@ class ModuleExpander {
         if (callee?.type === 'field_expr') {
             const moduleValue = this.resolveModuleField(callee, ctx);
             if (moduleValue) return `${moduleValue}(${args.join(', ')})`;
-            const method = this.resolveMethodCall(callee, ctx);
+            const method = this.resolveMethodCall(callee, ctx, argNodes.length + 1);
             if (method) return `${method.callee}(${[this.emitExpr(kids(callee)[0], ctx), ...args].join(', ')})`;
         }
 
@@ -903,12 +959,12 @@ class ModuleExpander {
         return `${this.emitExpr(kids(node)[0], ctx)}.${kids(node)[1].text}`;
     }
 
-    resolveMethodCall(node, ctx) {
+    resolveMethodCall(node, ctx, totalArgCount = 1) {
         const [baseNode, memberNode] = kids(node);
         const info = this.inferExprInfo(baseNode, ctx);
         if (!info?.owner || !memberNode) return null;
         const direct = this.resolveAssociatedEntryFromInfo(info, memberNode.text, ctx);
-        return direct ?? this.resolveProtocolDispatchFromInfo(info, memberNode.text);
+        return direct ?? this.resolveProtocolDispatchFromInfo(info, memberNode.text, totalArgCount);
     }
 
     resolveModuleField(node, ctx) {
@@ -1066,27 +1122,74 @@ class ModuleExpander {
         return this.resolveAssociatedEntry(info.owner, memberName, ctx);
     }
 
-    resolveProtocolDispatchFromInfo(info, memberName) {
+    resolveProtocolDispatchFromInfo(info, memberName, totalArgCount = 1) {
         if (!info?.text) return null;
         const entries = this.topLevelProtocolImplsByTypeMember.get(this.protocolTypeMemberKey(info.text, memberName)) ?? [];
-        if (entries.length === 0) {
-            const protocols = [...(this.topLevelTaggedTypeProtocols.get(info.text) ?? new Set())]
-                .filter((protocol) => this.topLevelProtocolMembers.has(this.protocolMemberKey(protocol, memberName)));
-            if (protocols.length === 0) return null;
-            if (protocols.length > 1)
-                throw new Error(`Ambiguous protocol method ".${memberName}()" on type "${info.text}" across protocols: ${protocols.sort().join(', ')}`);
-            const protocol = protocols[0];
+        const matchingEntries = entries.filter((entry) => (this.topLevelProtocolMembers.get(this.protocolMemberKey(entry.protocol, entry.member))?.arity ?? 1) === totalArgCount);
+        if (matchingEntries.length === 0) {
+            const protocols = new Set([...(this.topLevelTaggedTypeProtocols.get(info.text) ?? new Set())]
+                .filter((protocol) => this.topLevelProtocolMembers.get(this.protocolMemberKey(protocol, memberName))?.arity === totalArgCount));
+            for (const protocol of this.fieldBackedReadableProtocols(info.text, memberName, totalArgCount))
+                protocols.add(protocol);
+            const matches = [...protocols];
+            if (matches.length === 0) return null;
+            if (matches.length > 1)
+                throw new Error(`Ambiguous protocol method ".${memberName}()" on type "${info.text}" across protocols: ${matches.sort().join(', ')}`);
+            const protocol = matches[0];
             return {
                 callee: this.mangleProtocolDispatch(protocol, memberName, info.text),
                 returnInfo: this.topLevelProtocolMembers.get(this.protocolMemberKey(protocol, memberName))?.returnInfo ?? null,
             };
         }
-        if (entries.length > 1) {
-            const protocols = entries.map((entry) => entry.protocol).sort().join(', ');
+        if (matchingEntries.length > 1) {
+            const protocols = matchingEntries.map((entry) => entry.protocol).sort().join(', ');
             throw new Error(`Ambiguous protocol method ".${memberName}()" on type "${info.text}" across protocols: ${protocols}`);
         }
-        const entry = entries[0];
+        const entry = matchingEntries[0];
         return { callee: this.mangleProtocolDispatch(entry.protocol, entry.member, entry.selfType), returnInfo: entry.returnInfo };
+    }
+
+    fieldBackedReadableProtocols(selfType, memberName, totalArgCount) {
+        if (totalArgCount !== 1) return [];
+        const field = this.topLevelStructFieldTypes.get(selfType)?.get(memberName) ?? null;
+        if (!field) return [];
+        return [...this.topLevelProtocolMembers.entries()].flatMap(([key, member]) => {
+            if (!member.getter || member.arity !== totalArgCount) return [];
+            const [protocol, readableMember] = splitProtocolMemberKey(key);
+            return readableMember === memberName && sameTypeInfo(field.typeInfo, member.returnInfo) ? [protocol] : [];
+        });
+    }
+
+    hasFieldBackedReadableProtocol(protocol, memberName, selfType, arity) {
+        const member = this.topLevelProtocolMembers.get(this.protocolMemberKey(protocol, memberName));
+        if (!member?.getter || member.arity !== arity) return false;
+        const field = this.topLevelStructFieldTypes.get(selfType)?.get(memberName) ?? null;
+        return !!field && sameTypeInfo(field.typeInfo, member.returnInfo);
+    }
+
+    hasFieldBackedSetterProtocol(protocol, memberName, selfType, arity) {
+        const setter = this.topLevelProtocolSetterMembers.get(this.protocolMemberKey(protocol, memberName));
+        if (!setter || setter.arity !== arity) return false;
+        const field = this.topLevelStructFieldTypes.get(selfType)?.get(memberName) ?? null;
+        return !!field && field.mut && sameTypeInfo(field.typeInfo, setter.valueInfo);
+    }
+
+    inferJoinedExprInfo(nodes, ctx) {
+        const infos = nodes.map((node) => this.inferExprInfo(node, ctx)).filter(Boolean);
+        if (infos.length === 0) return null;
+        const [first] = infos;
+        return infos.every((info) => sameTypeInfo(info, first)) ? first : first;
+    }
+
+    resolveFieldExprInfo(node, ctx) {
+        const [baseNode, memberNode] = kids(node);
+        const baseInfo = this.inferExprInfo(baseNode, ctx);
+        if (!baseInfo?.text || !memberNode) return null;
+        const field = this.topLevelStructFieldTypes.get(baseInfo.text)?.get(memberNode.text) ?? null;
+        if (field) return field.typeInfo;
+        const protocols = this.fieldBackedReadableProtocols(baseInfo.text, memberNode.text, 1);
+        if (protocols.length !== 1) return null;
+        return this.topLevelProtocolMembers.get(this.protocolMemberKey(protocols[0], memberNode.text))?.returnInfo ?? null;
     }
 
     inferExprInfo(node, ctx) {
@@ -1098,14 +1201,34 @@ class ModuleExpander {
                 return this.inferExprInfo(kids(node)[0], ctx);
             case 'struct_init':
                 return this.describeType(kids(node)[0], ctx);
+            case 'field_expr':
+                return this.resolveFieldExprInfo(node, ctx);
+            case 'index_expr': {
+                const objectInfo = this.inferExprInfo(kids(node)[0], ctx);
+                return objectInfo?.text?.startsWith('array[')
+                    ? { text: objectInfo.text.slice(6, -1), owner: null, namespace: null }
+                    : null;
+            }
             case 'call_expr':
                 return this.inferCallExprInfo(node, ctx);
             case 'promoted_module_call_expr':
                 return this.resolveNamespaceValueReturn(this.resolveNamespaceFromModuleRef(node, ctx), childOfType(node, 'identifier')?.text);
+            case 'if_expr':
+                return this.inferJoinedExprInfo([kids(node)[1], kids(node)[2]].filter(Boolean), ctx);
             case 'else_expr':
                 return this.inferExprInfo(kids(node)[1], ctx) ?? this.stripNullable(this.inferExprInfo(kids(node)[0], ctx));
             case 'promote_expr':
                 return this.inferExprInfo(kids(node)[2], ctx) ?? this.inferExprInfo(kids(node)[3], ctx) ?? null;
+            case 'match_expr':
+                return this.inferJoinedExprInfo(childrenOfType(node, 'match_arm').map((arm) => kids(arm).at(-1)), ctx);
+            case 'alt_expr':
+                return this.inferJoinedExprInfo(childrenOfType(node, 'alt_arm').map((arm) => kids(arm).at(-1)), ctx);
+            case 'block_expr':
+                return this.inferExprInfo(childOfType(node, 'block'), ctx);
+            case 'block': {
+                const body = kids(node);
+                return body.length ? this.inferExprInfo(body.at(-1), ctx) : null;
+            }
             default:
                 return null;
         }
@@ -1128,7 +1251,7 @@ class ModuleExpander {
             if (baseNode?.type === 'identifier' && memberNode && !this.isLocalValue(ctx, baseNode.text)) {
                 return this.resolveNamespaceValueReturn(this.resolveMaybeNamespaceName(baseNode.text, ctx), memberNode.text);
             }
-            return this.resolveMethodCall(callee, ctx)?.returnInfo ?? null;
+            return this.resolveMethodCall(callee, ctx, argNodes.length + 1)?.returnInfo ?? null;
         }
         if (callee.type === 'promoted_module_call_expr') {
             return this.resolveNamespaceValueReturn(this.resolveNamespaceFromModuleRef(callee, ctx), childOfType(callee, 'identifier')?.text);
@@ -1210,21 +1333,24 @@ class ModuleExpander {
         if (argNodes.length === 0) throw new Error(`Protocol call "${ownerNode.text}.${memberNode.text}" requires a receiver as its first argument`);
         const selfInfo = this.inferExprInfo(argNodes[0], ctx);
         if (!selfInfo?.text) throw new Error(`Could not resolve the receiver type for protocol call "${ownerNode.text}.${memberNode.text}"`);
-        const impl = this.topLevelProtocolImplsByKey.get(this.protocolImplKey(ownerNode.text, memberNode.text, selfInfo.text));
         const method = this.topLevelProtocolMembers.get(this.protocolMemberKey(ownerNode.text, memberNode.text));
-        if (!impl) {
-            if (this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(ownerNode.text))
-                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: method?.returnInfo ?? null };
-            const field = this.topLevelStructFieldTypes.get(selfInfo.text)?.get(memberNode.text) ?? null;
-            const getterBacked = method?.getter
-                && field
-                && field.text === method.returnInfo?.text
-                && (this.topLevelGetterOnlyProtocols.has(ownerNode.text) || this.topLevelProtocolImplementers.get(ownerNode.text)?.has(selfInfo.text));
-            if (!getterBacked)
-                throw new Error(`Type "${selfInfo.text}" does not implement protocol "${ownerNode.text}" method "${memberNode.text}"`);
-            return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: method.returnInfo };
+        const setter = this.topLevelProtocolSetterMembers.get(this.protocolMemberKey(ownerNode.text, memberNode.text));
+        if (method?.arity === argNodes.length) {
+            const impl = this.topLevelProtocolImplsByKey.get(this.protocolImplKey(ownerNode.text, memberNode.text, selfInfo.text));
+            if (impl)
+                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: impl.returnInfo };
+            if (this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(ownerNode.text)
+                || this.hasFieldBackedReadableProtocol(ownerNode.text, memberNode.text, selfInfo.text, argNodes.length)) {
+                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: method.returnInfo };
+            }
+            throw new Error(`Type "${selfInfo.text}" does not implement protocol "${ownerNode.text}" method "${memberNode.text}"`);
         }
-        return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: impl.returnInfo };
+        if (setter?.arity === argNodes.length
+            && (this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(ownerNode.text)
+                || this.hasFieldBackedSetterProtocol(ownerNode.text, memberNode.text, selfInfo.text, argNodes.length))) {
+            return { callee: this.mangleProtocolSetterDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: null };
+        }
+        throw new Error(`Type "${selfInfo.text}" does not implement protocol "${ownerNode.text}" method "${memberNode.text}"`);
     }
 
     protocolSelfType(node, ctx) {
@@ -1247,7 +1373,12 @@ class ModuleExpander {
 
     emitForExpr(node, ctx) {
         const forCtx = this.pushScope(ctx);
+        const sources = childrenOfType(childOfType(node, 'for_sources'), 'for_source');
+        if (sources.length !== 1)
+            throw new Error('for loops support exactly one range source in v1');
         const captureNode = childOfType(node, 'capture');
+        if (childrenOfType(captureNode, 'identifier').length > 1)
+            throw new Error('for loops support at most one capture in v1');
         for (const ident of childrenOfType(captureNode, 'identifier')) this.declareLocal(forCtx, ident.text);
         return `for (${this.emitForSources(childOfType(node, 'for_sources'), ctx)})${captureNode ? ` |${childrenOfType(captureNode, 'identifier').map((child) => child.text).join(', ')}|` : ''} ${this.emitBlock(childOfType(node, 'block'), forCtx, true)}`;
     }
@@ -1291,4 +1422,13 @@ class ModuleExpander {
         }
         return `{\n${statements.map((stmt) => `    ${stmt}`).join('\n')}\n}`;
     }
+}
+
+function splitProtocolMemberKey(key) {
+    const index = key.indexOf('.');
+    return index === -1 ? [key, ''] : [key.slice(0, index), key.slice(index + 1)];
+}
+
+function sameTypeInfo(left, right) {
+    return (left?.text ?? null) === (right?.text ?? null);
 }

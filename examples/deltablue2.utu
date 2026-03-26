@@ -220,17 +220,17 @@ fun Variable.add_constraint(self: Variable, constraint: Constraint) void {
 
 fun Variable.remove_constraint(self: Variable, constraint: Constraint) void {
     let found: i32 = 0 - 1;
-    for (0..self.constraints.count) |i| {
+    for (0..self.constraints.count) |search_index| {
         if found == 0 - 1 {
-            if (self.constraints.items[i] \ fatal) == constraint {
-                found = i;
+            if (self.constraints.items[search_index] \ fatal) == constraint {
+                found = search_index;
             };
         };
     };
 
     if found != 0 - 1 {
-        for (found..self.constraints.count - 1) |i| {
-            self.constraints.items[i] = self.constraints.items[i + 1];
+        for (found..self.constraints.count - 1) |shift_index| {
+            self.constraints.items[shift_index] = self.constraints.items[shift_index + 1];
         };
         self.constraints.count = self.constraints.count - 1;
     };
@@ -631,23 +631,23 @@ fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
         let variable: Variable = todo.pop_front();
         let determining: ?Constraint = variable.determined_by;
 
-        for (0..variable.constraints.count) |i| {
-            let constraint: Constraint = variable.constraints.items[i] \ fatal;
-            if not constraint.is_satisfied {
-                unsatisfied.append(constraint);
+        for (0..variable.constraints.count) |unsatisfied_index| {
+            let unsatisfied_constraint: Constraint = variable.constraints.items[unsatisfied_index] \ fatal;
+            if not unsatisfied_constraint.is_satisfied {
+                unsatisfied.append(unsatisfied_constraint);
             };
         };
 
-        for (0..variable.constraints.count) |i| {
-            let constraint: Constraint = variable.constraints.items[i] \ fatal;
+        for (0..variable.constraints.count) |consume_index| {
+            let consuming_constraint: Constraint = variable.constraints.items[consume_index] \ fatal;
             let same: bool = false;
             promote determining |active| {
-                same = constraint == active;
+                same = consuming_constraint == active;
             };
             if not same {
-                if constraint.is_satisfied {
-                    constraint.recalculate();
-                    todo.append(constraint.output);
+                if consuming_constraint.is_satisfied {
+                    consuming_constraint.recalculate();
+                    todo.append(consuming_constraint.output);
                 };
             };
         };
@@ -827,7 +827,7 @@ fun change(planner: Planner, variable: Variable, new_value: i32) void {
     edits.append(edit);
 
     let plan: ConstraintList = planner.extract_plan_from_constraints(edits);
-    for (0..10) |i| {
+    for (0..10) |step| {
         variable.value = new_value;
         plan_execute(plan);
     };
@@ -840,18 +840,18 @@ fun chain_test(n: i32) i64 {
     let prev: ?Variable = Variable.null;
     let first: ?Variable = Variable.null;
     let last: ?Variable = Variable.null;
-    for (0..n + 1) |i| {
+    for (0..n + 1) |build_index| {
         let variable: Variable = Variable.new(0, 2);
 
         promote prev |previous| {
             new_equality_constraint(previous, variable, required, planner);
         };
 
-        if i == 0 {
+        if build_index == 0 {
             first = variable;
         };
 
-        if i == n {
+        if build_index == n {
             last = variable;
         };
 
@@ -868,10 +868,10 @@ fun chain_test(n: i32) i64 {
     let plan: ConstraintList = planner.extract_plan_from_constraints(edits);
 
     let failures: i64 = 0;
-    for (0..100) |i| {
-        first_variable.value = i;
+    for (0..100) |check_index| {
+        first_variable.value = check_index;
         plan_execute(plan);
-        if last_variable.value != i {
+        if last_variable.value != check_index {
             failures = failures + 1;
         };
     };
@@ -887,10 +887,10 @@ fun projection_test(n: i32) i64 {
     let src: Variable = dummy;
     let dst: Variable = dummy;
     let dests: array[Variable] = array[Variable].new(n, dummy);
-    for (0..n) |i| {
-        src = Variable.new(i, 3);
-        dst = Variable.new(i, 2);
-        dests[i] = dst;
+    for (0..n) |point_index| {
+        src = Variable.new(point_index, 3);
+        dst = Variable.new(point_index, 2);
+        dests[point_index] = dst;
         new_stay_constraint(src, normal, planner);
         new_scale_constraint(src, scale, offset, dst, required, planner);
     };
@@ -908,15 +908,15 @@ fun projection_test(n: i32) i64 {
     };
 
     change(planner, scale, 5);
-    for (0..n - 1) |i| {
-        if dests[i].value != i * 5 + 1000 {
+    for (0..n - 1) |scaled_index| {
+        if dests[scaled_index].value != scaled_index * 5 + 1000 {
             failures = failures + 1;
         };
     };
 
     change(planner, offset, 2000);
-    for (0..n - 1) |i| {
-        if dests[i].value != i * 5 + 2000 {
+    for (0..n - 1) |offset_index| {
+        if dests[offset_index].value != offset_index * 5 + 2000 {
             failures = failures + 1;
         };
     };

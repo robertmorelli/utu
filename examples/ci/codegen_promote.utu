@@ -17,6 +17,8 @@ fun promote_test(flag: bool) i32 {
 fun promote_no_else(flag: bool) i32 {
     promote maybe_box(flag) |box| {
         box.value;
+    } else {
+        0;
     };
 }
 
@@ -36,7 +38,7 @@ test "promote runs else block on null" {
     assert promote_test(false) == 0;
 }
 
-test "promote without else on non-null" {
+test "promote with an explicit else still returns the non-null value" {
     assert promote_no_else(true) == 41;
 }
 

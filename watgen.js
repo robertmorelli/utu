@@ -252,10 +252,16 @@ const LOCAL_COLLECT_HANDLERS = {
         for (const target of parseBindTargets(node)) ctx.addLocal(locals, seen, target.name, target.type);
     },
     for_expr: (ctx, locals, seen, node) => {
-        parseForSources(childOfType(node, 'for_sources')).forEach((source, i) => {
+        const sources = parseForSources(childOfType(node, 'for_sources'));
+        const captures = parseCapture(childOfType(node, 'capture'));
+        if (sources.length !== 1)
+            throw new Error('for loops support exactly one range source in v1');
+        if (captures.length > 1)
+            throw new Error('for loops support at most one capture in v1');
+        sources.forEach((source, i) => {
             if (source.kind !== 'range') return;
-            const name = parseCapture(childOfType(node, 'capture'))[i];
-            if (name) ctx.addLocal(locals, seen, name, I32);
+            const name = captures[i] ?? `__i_${node.id}`;
+            ctx.addLocal(locals, seen, name, I32);
         });
     },
     match_expr: (ctx, locals, seen, node) => {
@@ -264,6 +270,7 @@ const LOCAL_COLLECT_HANDLERS = {
     },
     alt_expr: (ctx, locals, seen, node) => {
         const subjectType = ctx.inferredToType(ctx.inferType(kids(node)[0])) ?? I32;
+        ctx.addLocal(locals, seen, ctx.altSubjectTempName(node), subjectType);
         for (const arm of childrenOfType(node, 'alt_arm').map(parseAltArm)) {
             if (arm.pattern !== '_') ctx.addLocal(locals, seen, arm.pattern, arm.guard ? { kind: 'named', name: arm.guard } : subjectType);
         }
@@ -418,7 +425,7 @@ const PARSE_TYPE_HANDLERS = {
     nullable_type: node => ({ kind: 'nullable', inner: parseType(kids(node)[0]) }),
     scalar_type: node => ({ kind: 'scalar', name: node.text }),
     ref_type: node => node.children[0].type === 'array' ? { kind: 'array', elem: parseType(kids(node)[0]) } : { kind: 'named', name: node.children[0].text },
-    func_type: node => ({ kind: 'func_type', params: kids(childOfType(node, 'type_list')).map(parseType), returnType: parseReturnType(childOfType(node, 'return_type')) }),
+    func_type: () => { throw new Error('First-class function reference types are not supported yet'); },
     paren_type: node => parseType(kids(node)[0]),
 };
 
@@ -564,7 +571,7 @@ class WatGen {
             const helper = {
                 name: protoDispatchName(impl.protocol, impl.member, impl.selfTypeName),
                 selfTypeName: impl.selfTypeName,
-                tagTypeName: impl.selfTypeName,
+                tagTypeName: this.variantParents.get(impl.selfTypeName) ?? impl.selfTypeName,
                 params: helperParams,
                 returnType: helperReturnType,
                 funcTypeName: slice.funcTypeName,
@@ -616,7 +623,7 @@ class WatGen {
             const helper = {
                 name: protoSetterDispatchName(impl.protocol, impl.member, impl.selfTypeName),
                 selfTypeName: impl.selfTypeName,
-                tagTypeName: impl.selfTypeName,
+                tagTypeName: this.variantParents.get(impl.selfTypeName) ?? impl.selfTypeName,
                 params: helperParams,
                 returnType: null,
                 funcTypeName: slice.funcTypeName,
@@ -639,6 +646,7 @@ class WatGen {
                         const helper = {
                             name: helperName,
                             selfTypeName: typeDecl.name,
+                            tagTypeName: typeDecl.name,
                             params: method.params.map((type, index) => ({
                                 kind: 'param',
                                 name: index === 0 ? 'self' : `arg${index}`,
@@ -647,10 +655,6 @@ class WatGen {
                             returnType: null,
                             funcTypeName: protoSetterFuncTypeName(protocol, method.name),
                             tableName: protoSetterTableName(protocol, method.name),
-                            variantDispatch: typeDecl.variants.map((variant) => ({
-                                variantName: variant.name,
-                                callee: protoSetterDispatchName(protocol, method.name, variant.name),
-                            })),
                         };
                         this.protocolSetterHelpers.push(helper);
                         this.protocolSetterHelpersByTypeMember.set(`${typeDecl.name}.${method.name}`, helper.name);
@@ -662,6 +666,7 @@ class WatGen {
                     const helper = {
                         name: helperName,
                         selfTypeName: typeDecl.name,
+                        tagTypeName: typeDecl.name,
                         params: method.params.map((type, index) => ({
                             kind: 'param',
                             name: index === 0 ? 'self' : `arg${index}`,
@@ -670,10 +675,6 @@ class WatGen {
                         returnType: substituteProtocolType(method.returnType, protoDecl.typeParam, typeDecl.name),
                         funcTypeName: protoFuncTypeName(protocol, method.name),
                         tableName: protoTableName(protocol, method.name),
-                        variantDispatch: typeDecl.variants.map((variant) => ({
-                            variantName: variant.name,
-                            callee: protoDispatchName(protocol, method.name, variant.name),
-                        })),
                     };
                     this.protocolHelpers.push(helper);
                     this.protocolHelpersByTypeMember.set(`${typeDecl.name}.${method.name}`, helper.name);
@@ -919,7 +920,7 @@ class WatGen {
     runtimeTypeFields(typeName) {
         const decl = this.typeDeclMap.get(typeName);
         if (decl?.kind === 'struct_decl') return this.runtimeStructFields(decl);
-        if (decl?.kind === 'type_decl') return [];
+        if (decl?.kind === 'type_decl') return decl.tagged ? [HIDDEN_TAG_FIELD] : [];
         const variant = this.variantDecls.get(typeName);
         if (!variant) return null;
         const parentTypeName = this.variantParents.get(typeName) ?? null;
@@ -1060,7 +1061,11 @@ class WatGen {
     }
 
     emitSumType(decl, indent = '    ') {
-        const lines = [`${indent}(type $${decl.name} (sub (struct)))`];
+        const lines = [this.emitStructLikeType(
+            `${indent}(type $${decl.name} (sub (struct`,
+            decl.tagged ? [HIDDEN_TAG_FIELD] : [],
+            `${indent})))`,
+        )];
         for (const variant of decl.variants)
             lines.push(this.emitStructLikeType(
                 `${indent}(type $${variant.name} (sub $${decl.name} (struct`,
@@ -1116,43 +1121,11 @@ class WatGen {
 
     emitProtocolHelper(helper) {
         return this.emitFunc(helper.name, helper.params, helper.returnType, [], out => {
-            if (helper.variantDispatch) {
-                this.emitProtocolVariantHelper(helper, helper.variantDispatch, out, 0);
-                return;
-            }
             for (const param of helper.params) out.push(`local.get $${param.name}`);
             out.push('local.get $self');
             out.push(`struct.get $${helper.tagTypeName} $${HIDDEN_TAG_FIELD.name}`);
             out.push(`call_indirect $${helper.tableName}${this.callIndirectSig(helper.funcTypeName, null, null)}`);
         });
-    }
-
-    emitProtocolVariantHelper(helper, variants, out, index) {
-        const variant = variants[index];
-        if (!variant) {
-            out.push('unreachable');
-            return;
-        }
-        out.push('local.get $self');
-        out.push(`ref.test (ref $${variant.variantName})`);
-        out.push(`(if${helper.returnType ? ` ${this.watResultList(helper.returnType)}` : ''}`);
-        out.push('  (then');
-        this.pushGenerated(out, lines => {
-            for (const param of helper.params) {
-                if (param.name === 'self') {
-                    lines.push('local.get $self');
-                    lines.push(`ref.cast (ref $${variant.variantName})`);
-                    continue;
-                }
-                lines.push(`local.get $${param.name}`);
-            }
-            lines.push(`call $${variant.callee}`);
-        });
-        out.push('  )');
-        out.push('  (else');
-        this.pushGenerated(out, lines => this.emitProtocolVariantHelper(helper, variants, lines, index + 1));
-        out.push('  )');
-        out.push(')');
     }
 
     emitProtocolElem(slice) {
@@ -1227,6 +1200,12 @@ class WatGen {
     }
 
     emitFunc(name, params, returnType, body, emitBody, extraLocals = [], profileId = null, funcTypeName = null) {
+        const paramNames = new Set();
+        for (const param of params) {
+            if (paramNames.has(param.name))
+                throw new Error(`Duplicate parameter name "${param.name}" is not allowed`);
+            paramNames.add(param.name);
+        }
         this.localTypes = new Map(params.map(param => [param.name, param.type]));
         this.currentReturnType = returnType;
         this.labelStack = [];
@@ -1296,7 +1275,8 @@ class WatGen {
     }
 
     addLocal(locals, seen, name, type) {
-        if (seen.has(name) || this.localTypes.has(name)) return;
+        if (seen.has(name) || this.localTypes.has(name))
+            throw new Error(`Local shadowing is not allowed; duplicate binding "${name}"`);
         seen.add(name);
         locals.push({ name, type });
         this.localTypes.set(name, type);
@@ -1474,10 +1454,9 @@ class WatGen {
     genField(node, out) {
         const [object, field] = kids(node);
         const objectType = this.inferType(object);
-        const directField = this.typeFields(objectType)?.find((candidate) => candidate.name === field.text) ?? null;
         const getterHelper = objectType ? this.protocolHelpersByTypeMember.get(`${objectType}.${field.text}`) : null;
         this.genExpr(object, null, out);
-        if (getterHelper && !directField) {
+        if (getterHelper) {
             out.push(`call $${getterHelper}`);
             return;
         }
@@ -1530,6 +1509,8 @@ class WatGen {
         const resultType = discard ? null : (hint || this.wasmTypeStr(inferredResultType) || null);
         const branchType = resultType ?? branchHint;
         const resultClause = resultType ? ` (result ${resultType})` : '';
+        if (resultType && !elseBranch)
+            throw new Error('Value-position if expressions must include an else branch');
 
         this.genExpr(cond, 'i32', out);
         out.push(`(if${resultClause}`);
@@ -1558,6 +1539,8 @@ class WatGen {
         const resultType = discard ? null : (hint || this.wasmTypeStr(inferredResultType) || null);
         const branchType = resultType ?? branchHint;
         const resultClause = resultType ? ` (result ${resultType})` : '';
+        if (resultType && !elseBlock)
+            throw new Error('Value-position promote expressions must include an else branch');
 
         // Store the nullable value in a temporary local
         const tempName = `__promote_${node.id}`;
@@ -1573,8 +1556,6 @@ class WatGen {
             lines.push('  (then');
             if (elseBlock) {
                 this.pushGenerated(lines, ls => this.genBody(kids(elseBlock), ls, false, branchType), '    ');
-            } else if (resultType) {
-                lines.push('    ' + this.defaultValue(inferredResultType));
             }
             lines.push('  )');
 
@@ -1617,17 +1598,21 @@ class WatGen {
 
         const exitLabel = `$__alt_exit_${node.id}`;
         const labels = typedArms.map((_, i) => `$__alt_${node.id}_${i}`);
+        const tempName = this.altSubjectTempName(node);
 
         out.push(`(block ${exitLabel}${resultType ? ` (result ${resultType})` : ''}`);
         for (let i = typedArms.length - 1; i >= 0; i--) {
             out.push(`  (block ${labels[i]} (result (ref $${typedArms[i].guard}))`);
         }
         this.genExpr(subject, null, out);
+        out.push(`local.set $${tempName}`);
         for (let i = 0; i < typedArms.length; i++) {
+            out.push(`local.get $${tempName}`);
             out.push(`br_on_cast ${labels[i]} (ref $${subjectType}) (ref $${typedArms[i].guard})`);
         }
 
         if (fallback) {
+            out.push(`local.get $${tempName}`);
             if (fallback.pattern !== '_') out.push(`local.set $${fallback.pattern}`);
             else out.push('drop');
             this.genBranchExpr(fallback.expr, resultType, out);
@@ -1641,7 +1626,7 @@ class WatGen {
             if (typedArms[i].pattern !== '_') out.push(`local.set $${typedArms[i].pattern}`);
             else out.push('drop');
             this.genBranchExpr(typedArms[i].expr, resultType, out);
-            if (i !== typedArms.length - 1) out.push(`br ${exitLabel}`);
+            out.push(`br ${exitLabel}`);
         }
 
         out.push(')');
@@ -1722,12 +1707,16 @@ class WatGen {
     genFor(node, out) {
         const sources = parseForSources(childOfType(node, 'for_sources'));
         const captures = parseCapture(childOfType(node, 'capture'));
+        if (sources.length !== 1)
+            throw new Error('for loops support exactly one range source in v1');
+        if (captures.length > 1)
+            throw new Error('for loops support at most one capture in v1');
         const body = childOfType(node, 'block');
         const emitBody = lines => this.genBody(kids(body), lines, false);
 
         const source = sources[0];
         if (source.kind === 'range') {
-            const capture = captures[0] || `__i_${this.uid}`;
+            const capture = captures[0] || `__i_${node.id}`;
             this.genExpr(source.start, 'i32', out);
             out.push(`local.set $${capture}`);
             this.withLoop(out, (breakLabel, continueLabel, uid) => {
@@ -1824,15 +1813,25 @@ class WatGen {
         const typeName = childOfType(node, 'type_ident').text;
         const fields = this.runtimeTypeFields(typeName);
         if (!fields) throw new Error(`Unknown type: ${typeName}`);
-        const fieldMap = new Map(
-            childrenOfType(node, 'field_init').map(field => [kids(field)[0].text, kids(field)[1]])
-        );
-        if (this.taggedStructTags.has(typeName)) out.push(`i32.const ${this.taggedStructTags.get(typeName)}`);
+        const fieldNodes = childrenOfType(node, 'field_init');
+        const fieldMap = new Map();
+        const declaredFields = new Set(fields.filter((field) => field.name !== HIDDEN_TAG_FIELD.name).map((field) => field.name));
+        for (const field of fieldNodes) {
+            const name = kids(field)[0].text;
+            if (fieldMap.has(name))
+                throw new Error(`Duplicate field "${name}" in struct initializer for "${typeName}"`);
+            if (!declaredFields.has(name))
+                throw new Error(`Unknown field "${name}" in struct initializer for "${typeName}"`);
+            fieldMap.set(name, kids(field)[1]);
+        }
+        if (this.taggedStructTags.has(typeName))
+            out.push(`i32.const ${this.taggedStructTags.get(typeName)}`);
         for (const field of fields) {
             if (field.name === HIDDEN_TAG_FIELD.name) continue;
             const value = fieldMap.get(field.name);
-            if (value) this.genExpr(value, this.wasmType(field.type), out);
-            else out.push(this.defaultValue(field.type));
+            if (!value)
+                throw new Error(`Missing field "${field.name}" in struct initializer for "${typeName}"`);
+            this.genExpr(value, this.wasmType(field.type), out);
         }
         out.push(`struct.new $${typeName}`);
     }
@@ -2048,6 +2047,7 @@ class WatGen {
     arrayTypeNameFromInferred(inferred) { return `$${inferred.endsWith('_array') ? inferred : `${inferred}_array`}`; }
     arrayElemKeyFromInferred(inferred) { return inferred?.endsWith('_array') ? inferred.slice(0, -6) : null; }
     scalarMatchTempName(node) { return `__match_subj_${node.id}`; }
+    altSubjectTempName(node) { return `__alt_subj_${node.id}`; }
     scalarMatchBranchTablePlan(node, arms, compareType) {
         if (compareType !== 'i32') return null;
 
@@ -2064,7 +2064,7 @@ class WatGen {
             caseMap.set(value, arm);
         }
 
-        const values = [...caseMap.keys()].sort((left, right) => left - right);
+        const values = [...caseMap.keys()].sort((left, right) => Number(left - right));
         const minValue = values[0];
         const maxValue = values[values.length - 1];
         const span = maxValue - minValue + 1;
@@ -2086,7 +2086,10 @@ class WatGen {
     scalarMatchPatternValue(node) {
         if (!node) return null;
         const patternNode = node.type === 'match_lit' ? kids(node)[0] ?? node : node;
-        if (patternNode.type === 'int_lit') return parseIntLit(patternNode.text);
+        if (patternNode.type === 'int_lit') {
+            const value = parseIntLit(patternNode.text);
+            return typeof value === 'bigint' ? null : value;
+        }
         if (patternNode.text === 'true') return 1;
         if (patternNode.text === 'false') return 0;
         return null;
@@ -2166,6 +2169,7 @@ const parseTypeDecl = (node) => {
         tagged,
         protocols,
         variants: parseVariantList(childOfType(node, 'variant_list')).map((variant) => ({ ...variant, parentTypeName: name })),
+        // Sum variants rely on recursive groups to retain nominal identity under Wasm GC.
         rec: true,
     };
 };
@@ -2310,7 +2314,12 @@ function literalInfo(node) {
     return LITERAL_TEXT_INFO[node.text];
 }
 
-const parseIntLit = (text) => text.startsWith('0x') ? parseInt(text.slice(2), 16) : text.startsWith('0b') ? parseInt(text.slice(2), 2) : parseInt(text, 10);
+const parseIntLit = (text) => {
+    const value = BigInt(text);
+    return value <= BigInt(Number.MAX_SAFE_INTEGER) && value >= BigInt(Number.MIN_SAFE_INTEGER)
+        ? Number(value)
+        : value;
+};
 const flattenTuple = (node, out = []) => {
     if (node.type === 'tuple_expr') {
         for (const child of kids(node)) flattenTuple(child, out);
@@ -2322,7 +2331,7 @@ const flattenTuple = (node, out = []) => {
 
 const mapType = (node, type, parse) => childrenOfType(node, type).map(parse);
 const textOf = (node, type) => childOfType(node, type).text;
-const HIDDEN_TAG_FIELD = Object.freeze({ kind: 'field', mut: false, name: '__tag', type: I32 });
+const HIDDEN_TAG_FIELD = Object.freeze({ kind: 'field', mut: true, name: '__tag', type: I32 });
 const EQREF_TYPE = Object.freeze({ kind: 'named', name: 'eqref' });
 const protocolMethodKey = (protocol, member) => `${protocol}.${member}`;
 const protocolImplKey = (protocol, member, selfType) => `${protocol}.${member}:${selfType}`;
@@ -2361,7 +2370,29 @@ function typeUsesNamed(type, name) {
     }
 }
 function typesEqual(left, right) {
-    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+    if (left === right) return true;
+    if (!left || !right) return !left && !right;
+    if (left.kind !== right.kind) return false;
+    switch (left.kind) {
+        case 'scalar':
+        case 'named':
+            return left.name === right.name;
+        case 'nullable':
+            return typesEqual(left.inner, right.inner);
+        case 'array':
+            return typesEqual(left.elem, right.elem);
+        case 'exclusive':
+            return typesEqual(left.ok, right.ok) && typesEqual(left.err, right.err);
+        case 'multi_return':
+            return left.components.length === right.components.length
+                && left.components.every((component, index) => typesEqual(component, right.components[index]));
+        case 'func_type':
+            return left.params.length === right.params.length
+                && left.params.every((param, index) => typesEqual(param, right.params[index]))
+                && typesEqual(left.returnType, right.returnType);
+        default:
+            return false;
+    }
 }
 function substituteProtocolType(type, typeParamName, selfTypeName) {
     if (!type) return null;

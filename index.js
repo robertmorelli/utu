@@ -18,6 +18,7 @@ import { createUtuTreeSitterParser, withParsedTree } from './parser.js';
 import { childOfType, namedChildren, throwOnParseErrors } from './tree.js';
 
 let _binaryenModule = null;
+let _binaryenQueue = Promise.resolve();
 async function ensureBinaryen() {
     return _binaryenModule ??= (await import('binaryen')).default;
 }
@@ -32,11 +33,11 @@ export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     });
 }
 
-export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false } = {}) {
+export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true } = {}) {
     return withActiveTree(source, { wasmUrl, runtimeWasmUrl }, async (tree) => {
         const { wat, metadata } = watgen(tree, { mode, profile, targetName });
         const fullMetadata = { ...metadata, targetName, artifact: { where, moduleFormat } };
-        const wasm = await compileWat(wat);
+        const wasm = await compileWat(wat, { optimize });
         const js = jsgen(tree, wasm, { mode, profile, where, moduleFormat, metadata: fullMetadata, source: includeSource ? source : null });
         return {
             shim: where === 'packed_base64' ? btoa(js) : js,
@@ -88,32 +89,48 @@ async function withActiveTree(source, initOptions, callback) {
     });
 }
 
-async function compileWat(wat) {
+async function compileWat(wat, { optimize = true } = {}) {
     return withParsedWat(wat, (mod, binaryen) => {
         const message = binaryenValidationMessage(mod);
-        if (message) throw new Error(message);
-        binaryen.setOptimizeLevel(3);
-        binaryen.setShrinkLevel(2);
-        mod.optimize();
+        if (message) throw new Error(`Generated Wasm failed validation: ${message}`);
+        if (optimize) {
+            binaryen.setOptimizeLevel(3);
+            binaryen.setShrinkLevel(2);
+            mod.optimize();
+        }
         return mod.emitBinary();
     });
 }
 
 async function withParsedWat(wat, callback, onError = null) {
-    const binaryen = await ensureBinaryen();
-    let mod;
-    _binaryenCapture.active = true;
-    _binaryenCapture.lines = [];
+    return withBinaryenLock(async () => {
+        const binaryen = await ensureBinaryen();
+        let mod;
+        _binaryenCapture.active = true;
+        _binaryenCapture.lines = [];
+        try {
+            mod = binaryen.parseText(wat);
+            mod.setFeatures(binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue);
+            return await callback(mod, binaryen);
+        } catch (error) {
+            if (onError) return onError(error);
+            throw new Error(`Generated Wasm backend failure: ${formatBinaryenError(error)}`);
+        } finally {
+            _binaryenCapture.active = false;
+            mod?.dispose();
+        }
+    });
+}
+
+async function withBinaryenLock(callback) {
+    const previous = _binaryenQueue;
+    let release;
+    _binaryenQueue = new Promise((resolve) => { release = resolve; });
+    await previous.catch(() => {});
     try {
-        mod = binaryen.parseText(wat);
-        mod.setFeatures(binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue);
-        return await callback(mod, binaryen);
-    } catch (error) {
-        if (onError) return onError(error);
-        throw new Error(formatBinaryenError(error));
+        return await callback();
     } finally {
-        _binaryenCapture.active = false;
-        mod?.dispose();
+        release();
     }
 }
 

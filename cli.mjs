@@ -21,13 +21,13 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 async function compileCmd(args) {
-  const { input, outdir, wat, bun } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun", () => true], "--node": ["bun", () => false], "--outdir": ["outdir", value => value] });
+  const { input, outdir, wat, bun, optimize } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun", () => true], "--node": ["bun", () => false], "--no-opt": ["optimize", () => false], "--outdir": ["outdir", value => value] });
   const file = path.resolve(input);
   const source = await readFile(file, "utf8");
   const outputDir = outdir ? path.resolve(outdir) : bun ? path.dirname(file) : path.resolve(data.compileNodeDefaults.outdir);
   const base = path.join(outputDir, path.basename(file, path.extname(file)));
   const targetName = path.basename(file, path.extname(file));
-  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null });
+  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null, optimize });
   await mkdir(path.dirname(base), { recursive: true });
   const outputs = [!bun && [`${base}.mjs`, shim, "utf8"], !bun && [`${base}.wasm`, wasm], watText && [`${base}.wat`, watText, "utf8"]].filter(Boolean);
   if (bun) await Promise.all([rm(`${base}.mjs`, { force: true }), rm(`${base}.wasm`, { force: true }), wat ? undefined : rm(`${base}.wat`, { force: true })]);
@@ -135,9 +135,9 @@ function loadRuntime(source, { mode = "program", targetName = null } = {}) {
   return loadCompiledRuntime({ source, mode, compileSource, loadModule: shim => loadNodeModuleFromSource(shim), compileOptions: { targetName, where: "external" } });
 }
 
-async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null } = {}) {
+async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null, optimize = true } = {}) {
   await compiler.init();
-  return normalizeCompileArtifact(await compiler.compile(source, { wat, mode, where, moduleFormat, targetName }));
+  return normalizeCompileArtifact(await compiler.compile(source, { wat, mode, where, moduleFormat, targetName, optimize }));
 }
 
 async function getMetadata(source) { await compiler.init(); return compiler.get_metadata(source); }

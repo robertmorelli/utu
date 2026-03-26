@@ -13,11 +13,13 @@ import {
 
 const repoRoot = getRepoRoot(import.meta.url);
 const fixture = buildDiagnosticFixture();
+const compileFixture = buildCompileDiagnosticFixture();
 const failed = await runNamedCases([
   ['language service surfaces targeted diagnostics with tight ranges', testLanguageServiceDiagnostics],
   ['lsp publishes the same targeted diagnostics', testLspDiagnostics],
   ['vs code diagnostics controller surfaces the same targeted diagnostics', testExtensionDiagnostics],
   ['vs code diagnostics controller logs non-source compiler failures once', testExtensionValidationLogSuppression],
+  ['compiler-backed shadowing errors surface through language service, lsp, and extension diagnostics', testCompileDiagnosticsAcrossHosts],
 ]);
 if (failed)
   process.exit(1);
@@ -131,6 +133,76 @@ async function testExtensionValidationLogSuppression() {
   }
 }
 
+async function testCompileDiagnosticsAcrossHosts() {
+  await testLanguageServiceCompileDiagnostic();
+  await testLspCompileDiagnostic();
+  await testExtensionCompileDiagnostic();
+}
+
+async function testLanguageServiceCompileDiagnostic() {
+  const parserService = createParserService();
+  const languageService = new UtuLanguageService(parserService);
+  try {
+    const diagnostics = await languageService.getDiagnostics(createSourceDocument(compileFixture.source, { uri: compileFixture.uri, version: 1 }));
+    expectDiagnosticMessage(diagnostics, compileFixture.message);
+  } finally {
+    languageService.dispose();
+    parserService.dispose();
+  }
+}
+
+async function testLspCompileDiagnostic() {
+  const lspPath = resolve(repoRoot, 'lsp.mjs');
+  const proc = spawn('bun', [lspPath], {
+    cwd: repoRoot,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const session = createJsonRpcSession(proc);
+  try {
+    session.sendRequest('initialize', {
+      processId: process.pid,
+      rootUri: pathToFileURL(repoRoot).toString(),
+      capabilities: {},
+      workspaceFolders: [{ uri: pathToFileURL(repoRoot).toString(), name: 'utu' }],
+    });
+    await session.waitFor((message) => message.id === 1);
+    session.sendNotification('textDocument/didOpen', {
+      textDocument: {
+        uri: compileFixture.uri,
+        languageId: 'utu',
+        version: 1,
+        text: compileFixture.source,
+      },
+    });
+    const publish = await session.waitFor((message) => message.method === 'textDocument/publishDiagnostics');
+    expectDiagnosticMessage(publish.params?.diagnostics ?? [], compileFixture.message);
+  } finally {
+    proc.kill('SIGTERM');
+  }
+}
+
+async function testExtensionCompileDiagnostic() {
+  const stubPackageRoot = resolve(repoRoot, 'node_modules/vscode');
+  const testState = resetVscodeTestState();
+  await writeFakeVscodePackage(stubPackageRoot);
+  const parserService = createParserService();
+  const languageService = new UtuLanguageService(parserService);
+  let controller;
+  try {
+    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'extension/diagnostics.js')).href);
+    const document = Object.assign(createSourceDocument(compileFixture.source, { uri: compileFixture.uri, version: 1 }), { languageId: 'utu' });
+    testState.textDocuments.push(document);
+    controller = new DiagnosticsController(languageService, { appendLine() {}, show() {} }, undefined);
+    await waitFor(() => testState.diagnosticsByUri.has(compileFixture.uri));
+    expectDiagnosticMessage(testState.diagnosticsByUri.get(compileFixture.uri) ?? [], compileFixture.message);
+  } finally {
+    controller?.dispose?.();
+    languageService.dispose();
+    parserService.dispose();
+    await rm(stubPackageRoot, { recursive: true, force: true });
+  }
+}
+
 function createParserService() {
   return new UtuParserService({
     grammarWasmPath: resolve(repoRoot, 'tree-sitter-utu.wasm'),
@@ -139,7 +211,7 @@ function createParserService() {
 }
 
 function resetVscodeTestState() {
-  const state = globalThis.__utuVscodeTestState ??= { textDocuments: [], diagnosticsByUri: new Map() };
+  const state = global.__utuVscodeTestState ??= { textDocuments: [], diagnosticsByUri: new Map() };
   state.textDocuments.length = 0;
   state.diagnosticsByUri = new Map();
   return state;
@@ -230,6 +302,23 @@ fun unknown_type_assoc() math.Pair {
   };
 }
 
+function buildCompileDiagnosticFixture() {
+  const source = `export fun main() i32 {
+    let x: i32 = 1;
+    {
+        let x: i32 = 2;
+        x;
+    };
+    x;
+}
+`;
+  return {
+    uri: 'file:///compile-diagnostics.utu',
+    source,
+    message: 'Local shadowing is not allowed; duplicate binding "x"',
+  };
+}
+
 function parseAnnotatedSource(annotatedSource) {
   const ranges = new Map();
   let source = '';
@@ -273,6 +362,12 @@ function createExpectedDiagnostic(label, message, ranges) {
   if (!range)
     throw new Error(`Missing expected range for ${label}.`);
   return { message, range, source: 'utu' };
+}
+
+function expectDiagnosticMessage(diagnostics, message) {
+  if ((diagnostics ?? []).some((diagnostic) => diagnostic.message === message))
+    return;
+  throw new Error(`Expected diagnostics to include ${JSON.stringify(message)}, got ${JSON.stringify(toComparableDiagnostics(diagnostics ?? []))}`);
 }
 
 function toComparableDiagnostics(diagnostics) {
@@ -389,7 +484,7 @@ async function writeFakeVscodePackage(stubPackageRoot) {
     exports: './index.js',
   };
   const source = `
-const state = globalThis.__utuVscodeTestState ??= { textDocuments: [], diagnosticsByUri: new Map() };
+const state = global.__utuVscodeTestState ??= { textDocuments: [], diagnosticsByUri: new Map() };
 
 function disposable() {
   return { dispose() {} };
