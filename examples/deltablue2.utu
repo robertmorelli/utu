@@ -585,11 +585,7 @@ fun Variable.add_constraints_consuming_to(self: Variable, coll: ConstraintList) 
     let determining: ?Constraint = self.determined_by;
     for (0..self.constraints.count) |i| {
         let constraint: Constraint = self.constraints.items[i] \ fatal;
-        let same: bool = false;
-        promote determining |active| {
-            same = constraint == active;
-        };
-        if not same {
+        if constraint != determining {
             if constraint.is_satisfied {
                 coll.append(constraint);
             };
@@ -640,11 +636,7 @@ fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
 
         for (0..variable.constraints.count) |consume_index| {
             let consuming_constraint: Constraint = variable.constraints.items[consume_index] \ fatal;
-            let same: bool = false;
-            promote determining |active| {
-                same = consuming_constraint == active;
-            };
-            if not same {
+            if consuming_constraint != determining {
                 if consuming_constraint.is_satisfied {
                     consuming_constraint.recalculate();
                     todo.append(consuming_constraint.output);
