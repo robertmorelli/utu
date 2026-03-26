@@ -216,11 +216,13 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     const topLevelValueKeys = new Map();
     const topLevelTypeKeys = new Map();
     const topLevelAssocKeys = new Map();
+    const topLevelSetterAssocKeys = new Map();
     const fieldsByOwner = new Map();
     const moduleNamespaces = new Map();
     const constructAliases = new Map();
     const protocolTypeNames = new Set();
     const protocolAssocKeysBySelf = new Map();
+    const protocolSetterAssocKeysBySelf = new Map();
     const taggedTypeProtocols = new Map();
     const openValueKeys = new Map();
     const openTypeKeys = new Map();
@@ -247,6 +249,18 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         }
         if (protocolAssocKeysBySelf.get(key) !== symbolKey)
             protocolAssocKeysBySelf.set(key, undefined);
+    };
+    const registerProtocolSetterAssocForSelfType = (ownerTypeText, memberName, symbolKey) => {
+        const ownerName = normalizeTypeText(ownerTypeText);
+        if (!ownerName)
+            return;
+        const key = `${ownerName}.${memberName}`;
+        if (!protocolSetterAssocKeysBySelf.has(key)) {
+            protocolSetterAssocKeysBySelf.set(key, symbolKey);
+            return;
+        }
+        if (protocolSetterAssocKeysBySelf.get(key) !== symbolKey)
+            protocolSetterAssocKeysBySelf.set(key, undefined);
     };
     const createSymbol = (nameNode, kind, options) => {
         const span = spanFromNode(document, nameNode);
@@ -329,6 +343,7 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         promoted_module_call_expr: walkPromotedModuleCallExpression,
         struct_init: walkStructInit,
         field_expr: walkFieldExpression,
+        assign_expr: walkAssignExpression,
         call_expr: walkCallExpression,
         namespace_call_expr: walkNamespaceCallExpression,
         array_init: walkArrayInit,
@@ -445,6 +460,24 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             topLevelAssocKeys.set(`${nameNode.text}.${memberNameNode.text}`, getterSymbol.key);
         }
         for (const protoMemberNode of findNamedChildren(findNamedChild(protoDecl, 'proto_member_list'), 'proto_member')) {
+            const setterNode = findNamedChild(protoMemberNode, 'proto_setter');
+            if (!setterNode)
+                continue;
+            const memberNameNode = findNamedChild(setterNode, 'identifier');
+            const typeNode = setterNode.namedChildren.at(-1);
+            if (!memberNameNode || !typeNode)
+                continue;
+            const setterSymbol = createSymbol(memberNameNode, 'function', {
+                detail: `protocol setter on ${nameNode.text}`,
+                name: `${nameNode.text}.${memberNameNode.text}=`,
+                signature: `set ${nameNode.text}.${memberNameNode.text}: ${typeNode.text}`,
+                typeText: typeNode.text,
+                containerName: nameNode.text,
+                topLevel: false,
+            });
+            topLevelSetterAssocKeys.set(`${nameNode.text}.${memberNameNode.text}`, setterSymbol.key);
+        }
+        for (const protoMemberNode of findNamedChildren(findNamedChild(protoDecl, 'proto_member_list'), 'proto_member')) {
             const methodNode = findNamedChild(protoMemberNode, 'proto_method');
             if (!methodNode)
                 continue;
@@ -471,6 +504,11 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
                     if (!assocKey.startsWith(`${protocolName}.`))
                         continue;
                     registerProtocolAssocForSelfType(typeName, assocKey.slice(protocolName.length + 1), symbolKey);
+                }
+                for (const [assocKey, symbolKey] of topLevelSetterAssocKeys.entries()) {
+                    if (!assocKey.startsWith(`${protocolName}.`))
+                        continue;
+                    registerProtocolSetterAssocForSelfType(typeName, assocKey.slice(protocolName.length + 1), symbolKey);
                 }
             }
         }
@@ -941,6 +979,42 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             addSemanticDiagnostic(fieldNameNode, `Unknown field "${fieldNameNode.text}" on type "${formatTypeName(baseType)}".`);
         addResolvedOccurrence(fieldNameNode, 'field', fieldKey);
     }
+    function walkAssignExpression(node) {
+        const [lhsNode, rhsNode] = node.namedChildren;
+        if (!lhsNode)
+            return;
+        if (lhsNode.type === 'field_expr') {
+            const [baseNode, fieldNameNode] = lhsNode.namedChildren;
+            if (baseNode && fieldNameNode) {
+                const moduleNamespace = resolveExpressionNamespaceNode(baseNode);
+                if (moduleNamespace) {
+                    const symbolKey = resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNameNode.text);
+                    if (!symbolKey)
+                        addSemanticDiagnostic(fieldNameNode, `Unknown member "${fieldNameNode.text}" in namespace "${moduleNamespace.name}".`);
+                    addResolvedOccurrence(fieldNameNode, 'value', symbolKey);
+                } else {
+                    walkExpression(baseNode);
+                    const baseType = inferExpressionType(baseNode);
+                    const fieldKey = baseType ? resolveFieldKey(baseType, fieldNameNode.text) : undefined;
+                    const setterKey = resolveSetterKey(lhsNode);
+                    const setterSymbol = lookupSymbol(setterKey);
+                    const protocolSetter = setterSymbol?.detail?.includes('protocol setter');
+                    if (protocolSetter) addResolvedOccurrence(fieldNameNode, 'value', setterKey);
+                    else {
+                        if (baseType && !fieldKey)
+                            addSemanticDiagnostic(fieldNameNode, `Unknown field "${fieldNameNode.text}" on type "${formatTypeName(baseType)}".`);
+                        addResolvedOccurrence(fieldNameNode, 'field', fieldKey);
+                    }
+                }
+            }
+            if (rhsNode)
+                walkExpression(rhsNode);
+            return;
+        }
+        walkExpression(lhsNode);
+        if (rhsNode)
+            walkExpression(rhsNode);
+    }
     function walkCallExpression(node) {
         const [calleeNode, argListNode] = node.namedChildren;
         const args = argListNode?.type === 'arg_list' ? argListNode.namedChildren : [];
@@ -1234,6 +1308,14 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             ?? topLevelAssocKeys.get(`${ownerName}.${memberName}`)
             ?? protocolAssocKeysBySelf.get(`${ownerName}.${memberName}`);
     }
+    function resolveSetterKeyByOwnerName(ownerName, memberName) {
+        const promoted = resolveNamespaceByName(ownerName);
+        return moduleScopes.at(-1)?.assocKeys.get(`${ownerName}.${memberName}`)
+            ?? openTypeNamespaces.get(ownerName)?.assocKeys.get(`${ownerName}.${memberName}`)
+            ?? promoted?.assocKeys.get(`${promoted.promotedTypeName ?? ''}.${memberName}`)
+            ?? topLevelSetterAssocKeys.get(`${ownerName}.${memberName}`)
+            ?? protocolSetterAssocKeysBySelf.get(`${ownerName}.${memberName}`);
+    }
     function resolveAssociatedKey(ownerNode, memberName) {
         if (!ownerNode)
             return undefined;
@@ -1303,10 +1385,21 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
         }
         return resolveAssociatedKeyByOwnerName(ownerInfo.owner, memberName);
     }
+    function resolveSetterKeyFromTypeText(typeText, memberName) {
+        const ownerInfo = resolveOwnerInfoFromTypeText(typeText);
+        if (!ownerInfo?.owner)
+            return undefined;
+        return resolveSetterKeyByOwnerName(ownerInfo.owner, memberName);
+    }
     function resolveMethodCallKey(node) {
         const [baseNode, memberNode] = node.namedChildren;
         const baseType = inferExpressionType(baseNode);
         return memberNode && baseType ? resolveAssociatedKeyFromTypeText(baseType, memberNode.text) : undefined;
+    }
+    function resolveSetterKey(node) {
+        const [baseNode, memberNode] = node.namedChildren;
+        const baseType = inferExpressionType(baseNode);
+        return memberNode && baseType ? resolveSetterKeyFromTypeText(baseType, memberNode.text) : undefined;
     }
     function inferTypeNodeText(node) {
         return node?.type === 'instantiated_module_ref' ? findModuleNameNode(node)?.text : node?.text;

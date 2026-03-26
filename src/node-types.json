@@ -4095,6 +4095,10 @@
         {
           "type": "proto_method",
           "named": true
+        },
+        {
+          "type": "proto_setter",
+          "named": true
         }
       ]
     }
@@ -4132,6 +4136,41 @@
         },
         {
           "type": "type_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "proto_setter",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "func_type",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "nullable_type",
+          "named": true
+        },
+        {
+          "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "ref_type",
+          "named": true
+        },
+        {
+          "type": "scalar_type",
           "named": true
         }
       ]
@@ -5373,6 +5412,10 @@
   },
   {
     "type": "ref",
+    "named": false
+  },
+  {
+    "type": "set",
     "named": false
   },
   {

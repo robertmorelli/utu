@@ -618,6 +618,10 @@
         {
           "type": "SYMBOL",
           "name": "proto_getter"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "proto_setter"
         }
       ]
     },
@@ -660,6 +664,27 @@
         {
           "type": "STRING",
           "value": "get"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_type"
+        }
+      ]
+    },
+    "proto_setter": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "set"
         },
         {
           "type": "SYMBOL",

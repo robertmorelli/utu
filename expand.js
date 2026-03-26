@@ -515,7 +515,7 @@ class ModuleExpander {
         const methods = memberList
             ? childrenOfType(memberList, 'proto_member')
                 .map((member) => kids(member)[0])
-                .filter((member) => ['proto_method', 'proto_getter'].includes(member?.type))
+                .filter((member) => ['proto_method', 'proto_getter', 'proto_setter'].includes(member?.type))
                 .map((member) => this.emitProtoMember(member, ctx))
             : [];
         const typeParamList = typeParams.length ? `[${typeParams.join(', ')}]` : '';
@@ -525,6 +525,8 @@ class ModuleExpander {
     emitProtoMember(node, ctx) {
         return node.type === 'proto_getter'
             ? this.emitProtoGetter(node, ctx)
+            : node.type === 'proto_setter'
+                ? this.emitProtoSetter(node, ctx)
             : this.emitProtoMethod(node, ctx);
     }
 
@@ -538,6 +540,12 @@ class ModuleExpander {
         const nameNode = childOfType(node, 'identifier');
         const typeNode = kids(node).at(-1);
         return `get ${nameNode.text}: ${this.emitType(typeNode, ctx)}`;
+    }
+
+    emitProtoSetter(node, ctx) {
+        const nameNode = childOfType(node, 'identifier');
+        const typeNode = kids(node).at(-1);
+        return `set ${nameNode.text}: ${this.emitType(typeNode, ctx)}`;
     }
 
     emitTypeDecl(node, ctx, inModule) {

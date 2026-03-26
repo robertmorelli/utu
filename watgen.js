@@ -302,6 +302,7 @@ const BODY_TYPE_VISIT_HANDLERS = {
 const ELEM_TYPE_KEY_HANDLERS = {
     scalar: (_ctx, type) => type.name,
     named: (_ctx, type) => type.name,
+    nullable: (ctx, type) => `nullable_${ctx.elemTypeKey(type.inner)}`,
     array: (ctx, type) => `${ctx.elemTypeKey(type.elem)}_array`,
 };
 const SCALAR_PATTERN_GENERATORS = {
@@ -351,9 +352,26 @@ const ASSIGN_TARGET_HANDLERS = {
     },
     field_expr: (ctx, lhs, rhs, out) => {
         const [object, field] = kids(lhs);
+        const objectType = ctx.inferType(object);
+        const directField = ctx.typeFields(objectType)?.find((candidate) => candidate.name === field.text) ?? null;
+        const setterHelper = objectType ? ctx.protocolSetterHelpersByTypeMember.get(`${objectType}.${field.text}`) : null;
+        if (directField && !directField.mut)
+            throw new Error(`Field "${field.text}" on "${objectType}" must be declared "mut" before it can be assigned`);
+        if (setterHelper) {
+            ctx.genExpr(object, null, out);
+            ctx.genExpr(rhs, directField ? ctx.wasmType(directField.type) : null, out);
+            out.push(`call $${setterHelper}`);
+            return;
+        }
+        if (directField) {
+            ctx.genExpr(object, null, out);
+            ctx.genExpr(rhs, ctx.wasmType(directField.type), out);
+            out.push(`struct.set $${objectType} $${field.text}`);
+            return;
+        }
         ctx.genExpr(object, null, out);
         ctx.genExpr(rhs, null, out);
-        out.push(`struct.set $${ctx.inferType(object)} $${field.text}`);
+        out.push(`struct.set $${objectType} $${field.text}`);
     },
     index_expr: (ctx, lhs, rhs, out) => {
         const [object, index] = kids(lhs);
@@ -430,10 +448,17 @@ class WatGen {
         this.variantParents = new Map();
         this.protocolMethodMap = new Map();
         this.protocolImplMap = new Map();
+        this.protocolSetterMap = new Map();
+        this.protocolSetterImplMap = new Map();
         this.protocolImplementersByProtocol = new Map();
         this.protocolSlices = [];
         this.protocolHelpers = [];
         this.protocolThunks = [];
+        this.protocolHelpersByTypeMember = new Map();
+        this.protocolSetterSlices = [];
+        this.protocolSetterHelpers = [];
+        this.protocolSetterThunks = [];
+        this.protocolSetterHelpersByTypeMember = new Map();
 
         this.strings = new Map();
         this.stringList = [];
@@ -475,11 +500,13 @@ class WatGen {
         for (const decl of this.protoDecls) {
             this.validateProtocolDecl(decl);
             for (const method of decl.methods) {
-                this.protocolMethodMap.set(protocolMethodKey(decl.name, method.name), {
+                const entry = {
                     ...method,
                     protocol: decl.name,
                     typeParam: decl.typeParam,
-                });
+                };
+                if (method.setter) this.protocolSetterMap.set(protocolSetterKey(decl.name, method.name), entry);
+                else this.protocolMethodMap.set(protocolMethodKey(decl.name, method.name), entry);
             }
         }
 
@@ -544,6 +571,59 @@ class WatGen {
                 tableName: slice.tableName,
             };
             this.protocolHelpers.push(helper);
+            this.protocolHelpersByTypeMember.set(`${impl.selfTypeName}.${impl.member}`, helper.name);
+            this.callables.set(helper.name, helper);
+        }
+
+        const setterSlicesByKey = new Map();
+        for (const impl of this.protocolSetterImplMap.values()) {
+            const key = protocolSetterKey(impl.protocol, impl.member);
+            const method = this.protocolSetterMap.get(key);
+            const helperParams = method.params.map((type, index) => ({
+                kind: 'param',
+                name: index === 0 ? 'self' : `arg${index}`,
+                type: substituteProtocolType(type, method.typeParam, impl.selfTypeName),
+            }));
+            let slice = setterSlicesByKey.get(key);
+            if (!slice) {
+                slice = {
+                    protocol: impl.protocol,
+                    member: impl.member,
+                    funcTypeName: protoSetterFuncTypeName(impl.protocol, impl.member),
+                    trapName: protoSetterTrapName(impl.protocol, impl.member),
+                    tableName: protoSetterTableName(impl.protocol, impl.member),
+                    elemName: protoSetterElemName(impl.protocol, impl.member),
+                    dispatchParams: this.protocolDispatchParams(method),
+                    returnType: null,
+                    size: sliceSize,
+                    entries: Array.from({ length: sliceSize }, () => protoSetterTrapName(impl.protocol, impl.member)),
+                };
+                setterSlicesByKey.set(key, slice);
+                this.protocolSetterSlices.push(slice);
+            }
+
+            const thunk = {
+                name: protoSetterThunkName(impl.protocol, impl.member, impl.selfTypeName),
+                funcTypeName: slice.funcTypeName,
+                params: slice.dispatchParams,
+                returnType: null,
+                selfTypeName: impl.selfTypeName,
+                impl,
+            };
+            this.protocolSetterThunks.push(thunk);
+            slice.entries[impl.tag] = thunk.name;
+
+            const helper = {
+                name: protoSetterDispatchName(impl.protocol, impl.member, impl.selfTypeName),
+                selfTypeName: impl.selfTypeName,
+                tagTypeName: impl.selfTypeName,
+                params: helperParams,
+                returnType: null,
+                funcTypeName: slice.funcTypeName,
+                tableName: slice.tableName,
+            };
+            this.protocolSetterHelpers.push(helper);
+            this.protocolSetterHelpersByTypeMember.set(`${impl.selfTypeName}.${impl.member}`, helper.name);
             this.callables.set(helper.name, helper);
         }
 
@@ -553,6 +633,30 @@ class WatGen {
                 const protoDecl = this.protoDecls.find((decl) => decl.name === protocol);
                 if (!protoDecl) continue;
                 for (const method of protoDecl.methods) {
+                    if (method.setter) {
+                        const helperName = protoSetterDispatchName(protocol, method.name, typeDecl.name);
+                        if (this.callables.has(helperName)) continue;
+                        const helper = {
+                            name: helperName,
+                            selfTypeName: typeDecl.name,
+                            params: method.params.map((type, index) => ({
+                                kind: 'param',
+                                name: index === 0 ? 'self' : `arg${index}`,
+                                type: substituteProtocolType(type, protoDecl.typeParam, typeDecl.name),
+                            })),
+                            returnType: null,
+                            funcTypeName: protoSetterFuncTypeName(protocol, method.name),
+                            tableName: protoSetterTableName(protocol, method.name),
+                            variantDispatch: typeDecl.variants.map((variant) => ({
+                                variantName: variant.name,
+                                callee: protoSetterDispatchName(protocol, method.name, variant.name),
+                            })),
+                        };
+                        this.protocolSetterHelpers.push(helper);
+                        this.protocolSetterHelpersByTypeMember.set(`${typeDecl.name}.${method.name}`, helper.name);
+                        this.callables.set(helper.name, helper);
+                        continue;
+                    }
                     const helperName = protoDispatchName(protocol, method.name, typeDecl.name);
                     if (this.callables.has(helperName)) continue;
                     const helper = {
@@ -572,6 +676,7 @@ class WatGen {
                         })),
                     };
                     this.protocolHelpers.push(helper);
+                    this.protocolHelpersByTypeMember.set(`${typeDecl.name}.${method.name}`, helper.name);
                     this.callables.set(helper.name, helper);
                 }
             }
@@ -605,14 +710,20 @@ class WatGen {
 
     validateProtocolDecl(decl) {
         if (decl.typeParams.length !== 1) throw new Error(`Protocol "${decl.name}" must declare exactly one type parameter in v1`);
-        const seen = new Set();
+        const seenReadable = new Set();
+        const seenSetter = new Set();
         for (const method of decl.methods) {
+            const seen = method.setter ? seenSetter : seenReadable;
             if (seen.has(method.name)) throw new Error(`Protocol "${decl.name}" declares "${method.name}" more than once`);
             seen.add(method.name);
             if (method.params.length === 0) throw new Error(`Protocol method "${decl.name}.${method.name}" must take the protocol type as its first parameter`);
             if (method.params[0]?.kind !== 'named' || method.params[0].name !== decl.typeParam)
                 throw new Error(`Protocol method "${decl.name}.${method.name}" must use "${decl.typeParam}" as its first parameter`);
             const laterParams = method.params.slice(1);
+            if (method.setter) {
+                if (laterParams.length !== 1) throw new Error(`Protocol setter "${decl.name}.${method.name}" must take exactly one value parameter`);
+                if (method.returnType) throw new Error(`Protocol setter "${decl.name}.${method.name}" must return void`);
+            }
             if (laterParams.some((type) => typeUsesNamed(type, decl.typeParam)) || typeUsesNamed(method.returnType, decl.typeParam))
                 throw new Error(`Protocol method "${decl.name}.${method.name}" may only use "${decl.typeParam}" as the first parameter in v1`);
         }
@@ -620,9 +731,12 @@ class WatGen {
 
     registerProtocolImpl(fn) {
         const method = this.protocolMethodMap.get(protocolMethodKey(fn.protocolOwner, fn.protocolMember));
-        if (!method) throw new Error(`Unknown protocol method "${fn.protocolOwner}.${fn.protocolMember}"`);
-        if (method.getter)
+        const setter = this.protocolSetterMap.get(protocolSetterKey(fn.protocolOwner, fn.protocolMember));
+        if (!method && !setter) throw new Error(`Unknown protocol method "${fn.protocolOwner}.${fn.protocolMember}"`);
+        if (method?.getter)
             throw new Error(`Protocol getter "${fn.protocolOwner}.${fn.protocolMember}" is field-backed and must not be implemented with "fun"`);
+        if (setter)
+            throw new Error(`Protocol setter "${fn.protocolOwner}.${fn.protocolMember}" is field-backed and must not be implemented with "fun"`);
         if (!fn.selfTypeName) throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" must use a concrete named self type`);
         if (!this.taggedStructTags.has(fn.selfTypeName))
             throw new Error(`Type "${fn.selfTypeName}" must be declared with "tag struct" or belong to a "tag type" that implements protocol "${fn.protocolOwner}"`);
@@ -658,36 +772,51 @@ class WatGen {
     synthesizeProtocolGetterImpls() {
         for (const decl of this.protoDecls) {
             const implementers = this.protocolImplementersByProtocol.get(decl.name) ?? new Set();
-            if (decl.methods.length > 0 && decl.methods.every((method) => method.getter)) {
+            if (decl.methods.length > 0 && decl.methods.every((method) => method.getter || method.setter)) {
                 for (const selfTypeName of this.taggedStructTags.keys()) {
-                    if (this.protocolGetterFieldsMatch(decl, selfTypeName)) implementers.add(selfTypeName);
+                    if (this.protocolFieldBackedMembersMatch(decl, selfTypeName)) implementers.add(selfTypeName);
                 }
                 if (implementers.size > 0) this.protocolImplementersByProtocol.set(decl.name, implementers);
             }
 
             for (const selfTypeName of implementers) {
                 for (const method of decl.methods) {
-                    if (!method.getter) continue;
-                    const key = protocolImplKey(decl.name, method.name, selfTypeName);
-                    if (this.protocolImplMap.has(key)) continue;
-                    const field = this.requireProtocolGetterField(decl.name, method, selfTypeName);
-                    this.protocolImplMap.set(key, {
-                        protocol: decl.name,
-                        member: method.name,
-                        selfTypeName,
-                        tag: this.taggedStructTags.get(selfTypeName),
-                        syntheticGetterField: field.name,
-                    });
+                    if (method.getter) {
+                        const key = protocolImplKey(decl.name, method.name, selfTypeName);
+                        if (this.protocolImplMap.has(key)) continue;
+                        const field = this.requireProtocolGetterField(decl.name, method, selfTypeName);
+                        this.protocolImplMap.set(key, {
+                            protocol: decl.name,
+                            member: method.name,
+                            selfTypeName,
+                            tag: this.taggedStructTags.get(selfTypeName),
+                            syntheticGetterField: field.name,
+                        });
+                        continue;
+                    }
+                    if (method.setter) {
+                        const key = protocolSetterImplKey(decl.name, method.name, selfTypeName);
+                        if (this.protocolSetterImplMap.has(key)) continue;
+                        const field = this.requireProtocolSetterField(decl.name, method, selfTypeName);
+                        this.protocolSetterImplMap.set(key, {
+                            protocol: decl.name,
+                            member: method.name,
+                            selfTypeName,
+                            tag: this.taggedStructTags.get(selfTypeName),
+                            syntheticSetterField: field.name,
+                        });
+                    }
                 }
             }
         }
     }
 
-    protocolGetterFieldsMatch(decl, selfTypeName) {
+    protocolFieldBackedMembersMatch(decl, selfTypeName) {
         try {
             for (const method of decl.methods) {
-                if (!method.getter) return false;
-                this.requireProtocolGetterField(decl.name, method, selfTypeName);
+                if (method.getter) this.requireProtocolGetterField(decl.name, method, selfTypeName);
+                else if (method.setter) this.requireProtocolSetterField(decl.name, method, selfTypeName);
+                else return false;
             }
             return true;
         } catch {
@@ -704,13 +833,27 @@ class WatGen {
         return field;
     }
 
+    requireProtocolSetterField(protocol, method, selfTypeName) {
+        const field = this.typeFields(selfTypeName)?.find((candidate) => candidate.name === method.name) ?? null;
+        if (!field)
+            throw new Error(`Type "${selfTypeName}" must declare field "${method.name}" to satisfy protocol setter "${protocol}.${method.name}"`);
+        if (!field.mut)
+            throw new Error(`Protocol setter "${protocol}.${method.name}" requires field "${method.name}" on "${selfTypeName}" to be declared "mut"`);
+        if (!typesEqual(field.type, method.params[1]))
+            throw new Error(`Protocol setter "${protocol}.${method.name}" requires field "${method.name}" on "${selfTypeName}" to have type "${this.typeText(method.params[1])}"`);
+        return field;
+    }
+
     validateProtocolImplementers() {
         for (const decl of this.protoDecls) {
             const implementers = this.protocolImplementersByProtocol.get(decl.name);
             if (!implementers) continue;
             for (const selfTypeName of implementers) {
                 for (const method of decl.methods) {
-                    if (!this.protocolImplMap.has(protocolImplKey(decl.name, method.name, selfTypeName)))
+                    const covered = method.setter
+                        ? this.protocolSetterImplMap.has(protocolSetterImplKey(decl.name, method.name, selfTypeName))
+                        : this.protocolImplMap.has(protocolImplKey(decl.name, method.name, selfTypeName));
+                    if (!covered)
                         throw new Error(`Type "${selfTypeName}" does not fully implement protocol "${decl.name}"; missing "${method.name}"`);
                 }
             }
@@ -721,7 +864,10 @@ class WatGen {
                 if (!protoDecl) throw new Error(`Unknown protocol "${protocol}" on type "${typeDecl.name}"`);
                 for (const variant of typeDecl.variants) {
                     for (const method of protoDecl.methods) {
-                        if (!this.protocolImplMap.has(protocolImplKey(protocol, method.name, variant.name)))
+                        const covered = method.setter
+                            ? this.protocolSetterImplMap.has(protocolSetterImplKey(protocol, method.name, variant.name))
+                            : this.protocolImplMap.has(protocolImplKey(protocol, method.name, variant.name));
+                        if (!covered)
                             throw new Error(`Variant "${variant.name}" does not fully implement protocol "${protocol}" required by type "${typeDecl.name}"; missing "${method.name}"`);
                     }
                 }
@@ -803,7 +949,9 @@ class WatGen {
         for (const imp of this.importVals) lines.push(this.emitImportVal(imp));
         for (const global of this.globalDecls) lines.push(this.emitGlobal(global));
         for (const slice of this.protocolSlices) lines.push(this.emitProtocolFuncType(slice));
+        for (const slice of this.protocolSetterSlices) lines.push(this.emitProtocolFuncType(slice));
         for (const slice of this.protocolSlices) lines.push(this.emitProtocolTable(slice));
+        for (const slice of this.protocolSetterSlices) lines.push(this.emitProtocolTable(slice));
 
         for (const [i, fn] of this.fnItems.entries()) {
             lines.push(this.emitFn(fn, this.profile === 'ticks' ? i : null));
@@ -811,8 +959,11 @@ class WatGen {
         }
 
         for (const slice of this.protocolSlices) lines.push(this.emitProtocolTrapThunk(slice));
+        for (const slice of this.protocolSetterSlices) lines.push(this.emitProtocolTrapThunk(slice));
         for (const thunk of this.protocolThunks) lines.push(this.emitProtocolThunk(thunk));
+        for (const thunk of this.protocolSetterThunks) lines.push(this.emitProtocolThunk(thunk));
         for (const helper of this.protocolHelpers) lines.push(this.emitProtocolHelper(helper));
+        for (const helper of this.protocolSetterHelpers) lines.push(this.emitProtocolHelper(helper));
 
         if (this.mode === 'test') {
             this.testDecls.forEach((test, i) => {
@@ -833,6 +984,7 @@ class WatGen {
         }
 
         for (const slice of this.protocolSlices) lines.push(this.emitProtocolElem(slice));
+        for (const slice of this.protocolSetterSlices) lines.push(this.emitProtocolElem(slice));
 
         lines.push(')');
         return lines.join('\n');
@@ -950,6 +1102,11 @@ class WatGen {
             out.push(`ref.cast (ref $${thunk.selfTypeName})`);
             if (thunk.impl.syntheticGetterField) {
                 out.push(`struct.get $${thunk.selfTypeName} $${thunk.impl.syntheticGetterField}`);
+                return;
+            }
+            if (thunk.impl.syntheticSetterField) {
+                out.push(`local.get $${thunk.params[1].name}`);
+                out.push(`struct.set $${thunk.selfTypeName} $${thunk.impl.syntheticSetterField}`);
                 return;
             }
             for (const param of thunk.params.slice(1)) out.push(`local.get $${param.name}`);
@@ -1316,8 +1473,15 @@ class WatGen {
 
     genField(node, out) {
         const [object, field] = kids(node);
+        const objectType = this.inferType(object);
+        const directField = this.typeFields(objectType)?.find((candidate) => candidate.name === field.text) ?? null;
+        const getterHelper = objectType ? this.protocolHelpersByTypeMember.get(`${objectType}.${field.text}`) : null;
         this.genExpr(object, null, out);
-        out.push(`struct.get $${this.inferType(object)} $${field.text}`);
+        if (getterHelper && !directField) {
+            out.push(`call $${getterHelper}`);
+            return;
+        }
+        out.push(`struct.get $${objectType} $${field.text}`);
     }
 
     genIndex(node, out) {
@@ -1736,7 +1900,19 @@ class WatGen {
         this.requireArrayType(key);
         return `(ref ${this.arrayTypes.get(key)})`;
     }
-    elemKeyWasmType(key) { return SCALAR_WASM[key] || REF_WASM[key] || `(ref $${key})`; }
+    elemKeyWasmType(key) {
+        if (SCALAR_WASM[key]) return SCALAR_WASM[key];
+        if (REF_WASM[key]) return REF_WASM[key];
+        if (key.startsWith('nullable_')) return this.nullableElemKeyWasmType(key.slice('nullable_'.length));
+        return `(ref $${key})`;
+    }
+    nullableElemKeyWasmType(key) {
+        if (SCALAR_WASM[key]) return SCALAR_WASM[key];
+        if (REF_WASM[key]) return NULLABLE_REF_WASM[key] || `(ref null $${key})`;
+        if (key.startsWith('nullable_')) return this.nullableElemKeyWasmType(key.slice('nullable_'.length));
+        if (key.endsWith('_array')) return `(ref null $${key})`;
+        return `(ref null $${key})`;
+    }
     watResultList(returnType) { return this.flattenResultTypes(returnType).map(type => `(result ${type})`).join(' '); }
     funcTypeClause(params, returnType) {
         return [
@@ -1781,7 +1957,18 @@ class WatGen {
     }
 
     inferType(node) { return INFER_TYPE_HANDLERS[node.type]?.(this, node) ?? null; }
-    inferredToType(inferred) { return inferred ? { kind: SCALAR_NAMES.has(inferred) ? 'scalar' : 'named', name: inferred } : null; }
+    inferredToType(inferred) {
+        if (!inferred) return null;
+        if (inferred.startsWith('nullable_')) {
+            const inner = this.inferredToType(inferred.slice('nullable_'.length));
+            return inner ? { kind: 'nullable', inner } : null;
+        }
+        if (inferred.endsWith('_array')) {
+            const elem = this.inferredToType(inferred.slice(0, -6));
+            return elem ? { kind: 'array', elem } : null;
+        }
+        return { kind: SCALAR_NAMES.has(inferred) ? 'scalar' : 'named', name: inferred };
+    }
     exprType(node) {
         if (!node) return null;
         switch (node.type) {
@@ -1960,10 +2147,12 @@ const parseProtoDecl = (node) => {
         methods: memberList
             ? childrenOfType(memberList, 'proto_member')
                 .map((member) => kids(member)[0])
-                .filter((child) => ['proto_method', 'proto_getter'].includes(child?.type))
+                .filter((child) => ['proto_method', 'proto_getter', 'proto_setter'].includes(child?.type))
                 .map((child) => child.type === 'proto_getter'
                     ? parseProtoGetter(child, typeParam)
-                    : parseProtoMethod(child))
+                    : child.type === 'proto_setter'
+                        ? parseProtoSetter(child, typeParam)
+                        : parseProtoMethod(child))
             : [],
     };
 };
@@ -2031,6 +2220,7 @@ const parseProtoMethod = (node) => ({
     params: kids(childOfType(node, 'type_list')).map(parseType),
     returnType: parseReturnType(childOfType(node, 'return_type')),
     getter: false,
+    setter: false,
 });
 const parseProtoGetter = (node, typeParam) => ({
     kind: 'proto_method',
@@ -2038,6 +2228,18 @@ const parseProtoGetter = (node, typeParam) => ({
     params: typeParam ? [{ kind: 'named', name: typeParam }] : [],
     returnType: parseType(kids(node).at(-1)),
     getter: true,
+    setter: false,
+});
+const parseProtoSetter = (node, typeParam) => ({
+    kind: 'proto_method',
+    name: textOf(node, 'identifier'),
+    params: [
+        ...(typeParam ? [{ kind: 'named', name: typeParam }] : []),
+        parseType(kids(node).at(-1)),
+    ],
+    returnType: null,
+    getter: false,
+    setter: true,
 });
 const parseVariantList = (node) => mapType(node, 'variant', parseVariant);
 const parseVariant = (node) => ({ kind: 'variant', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')) });
@@ -2131,6 +2333,14 @@ const protoThunkName = (protocol, member, selfType) => `__utu_proto_thunk_${snak
 const protoTrapName = (protocol, member) => `__utu_proto_trap_${snakeCase(protocol)}_${snakeCase(member)}`;
 const protoTableName = (protocol, member) => `__utu_proto_table_${snakeCase(protocol)}_${snakeCase(member)}`;
 const protoElemName = (protocol, member) => `__utu_proto_elem_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protocolSetterKey = (protocol, member) => `${protocol}.set.${member}`;
+const protocolSetterImplKey = (protocol, member, selfType) => `${protocol}.set.${member}:${selfType}`;
+const protoSetterFuncTypeName = (protocol, member) => `__utu_proto_set_sig_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protoSetterDispatchName = (protocol, member, selfType) => `__utu_proto_set_dispatch_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+const protoSetterThunkName = (protocol, member, selfType) => `__utu_proto_set_thunk_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+const protoSetterTrapName = (protocol, member) => `__utu_proto_set_trap_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protoSetterTableName = (protocol, member) => `__utu_proto_set_table_${snakeCase(protocol)}_${snakeCase(member)}`;
+const protoSetterElemName = (protocol, member) => `__utu_proto_set_elem_${snakeCase(protocol)}_${snakeCase(member)}`;
 function typeUsesNamed(type, name) {
     if (!type) return false;
     switch (type.kind) {

@@ -136,6 +136,7 @@ module.exports = grammar({
     proto_member: $ => choice(
       $.proto_method,
       $.proto_getter,
+      $.proto_setter,
     ),
 
     proto_method: $ => seq(
@@ -148,6 +149,13 @@ module.exports = grammar({
 
     proto_getter: $ => seq(
       'get',
+      $.identifier,
+      ':',
+      $._type,
+    ),
+
+    proto_setter: $ => seq(
+      'set',
       $.identifier,
       ':',
       $._type,

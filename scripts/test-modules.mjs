@@ -411,6 +411,23 @@ export fun main() i32 {
 }`,
     },
     {
+        name: 'nullable-array-elements-are-valid-and-defaultable',
+        expectedReturn: 9,
+        source: `tag struct Box {
+    value: i32,
+}
+
+export fun main() i32 {
+    let xs: array[?Box] = array[?Box].new_default(2);
+    xs[0] = Box { value: 9 };
+    promote xs[0] |value| {
+        value.value;
+    } else {
+        0;
+    };
+}`,
+    },
+    {
         name: 'tagged-sum-protocol-getters-synthesize-for-variants',
         expectedReturn: 19,
         source: `proto ValueOps[T] {
@@ -437,6 +454,46 @@ fun ValueOps.bump(self: RealCounter) i32 {
 export fun main() i32 {
     let counter: Counter = RealCounter { value: 7 };
     ValueOps.value(counter) + counter.bump();
+}`,
+    },
+    {
+        name: 'protocol-setters-synthesize-field-backed-assignment',
+        expectedReturn: 9,
+        source: `proto CounterOps[T] {
+    get value: i32,
+    set value: i32,
+};
+
+tag struct Counter {
+    mut value: i32,
+}
+
+export fun main() i32 {
+    let counter: Counter = Counter { value: 4 };
+    counter.value = 9;
+    counter.value;
+}`,
+    },
+    {
+        name: 'tagged-sum-protocol-setters-dispatch-through-parent-type',
+        expectedReturn: 13,
+        source: `proto CounterOps[T] {
+    get value: i32,
+    set value: i32,
+};
+
+tag type Counter: CounterOps =
+    | EmptyCounter {
+        mut value: i32,
+    }
+    | RealCounter {
+        mut value: i32,
+    };
+
+export fun main() i32 {
+    let counter: Counter = RealCounter { value: 5 };
+    counter.value = 13;
+    counter.value;
 }`,
     },
     {
@@ -678,6 +735,42 @@ tag struct Box {
 
 fun ValueOps.score(self: Box) i32 {
     self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'protocol-setters-require-mutable-fields-on-implementers',
+        message: 'must be declared "mut"',
+        source: `proto ValueOps[T] {
+    set value: i32,
+};
+
+tag struct Box {
+    value: i32,
+}
+
+export fun main() i32 {
+    let box: Box = Box { value: 1 };
+    box.value = 2;
+    0;
+}`,
+    },
+    {
+        name: 'protocol-setters-cannot-be-implemented-manually',
+        message: 'must not be implemented with "fun"',
+        source: `proto Value[T] {
+    set value: i32,
+};
+
+tag struct Box {
+    mut value: i32,
+}
+
+fun Value.value(self: Box, next: i32) void {
+    self.value = next;
 }
 
 export fun main() i32 {

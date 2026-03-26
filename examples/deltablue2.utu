@@ -11,7 +11,7 @@ let direction_forward: i32 = 1;
 let direction_backward: i32 = 0 - 1;
 
 rec struct ConstraintList {
-    items: array[Constraint],
+    items: array[?Constraint],
     mut count: i32,
 }
 
@@ -25,7 +25,7 @@ rec struct Variable {
 }
 
 rec struct VariableList {
-    items: array[Variable],
+    items: array[?Variable],
     mut count: i32,
 }
 
@@ -39,8 +39,8 @@ proto ConstraintOps[T] {
     get strength: i32,
     get is_input: bool,
     get is_satisfied: bool,
-    input(T) Variable,
-    output(T) Variable,
+    get input: Variable,
+    get output: Variable,
     execute(T) void,
     mark_unsatisfied(T) void,
     add_to_graph(T) void,
@@ -53,6 +53,8 @@ proto ConstraintOps[T] {
 
 tag type Constraint: ConstraintOps =
     | EmptyConstraint {
+        input: Variable,
+        output: Variable,
         strength: i32,
         is_input: bool,
         is_satisfied: bool,
@@ -119,12 +121,19 @@ fun next_weaker(strength: i32) i32 {
 }
 
 fun empty_constraint() Constraint {
-    EmptyConstraint { strength: weakest, is_input: false, is_satisfied: false };
+    let dummy: Variable = Variable.placeholder();
+    EmptyConstraint {
+        input: dummy,
+        output: dummy,
+        strength: weakest,
+        is_input: false,
+        is_satisfied: false,
+    };
 }
 
 fun ConstraintList.new(capacity: i32) ConstraintList {
     ConstraintList {
-        items: array[Constraint].new(capacity, empty_constraint()),
+        items: array[?Constraint].new_default(capacity),
         count: 0,
     };
 }
@@ -141,13 +150,19 @@ fun Variable.new(value: i32, constraint_capacity: i32) Variable {
 }
 
 fun Variable.placeholder() Variable {
-    Variable.new(0, 1);
+    Variable {
+        value: 0,
+        constraints: ConstraintList { items: array[?Constraint].new_default(1), count: 0 },
+        determined_by: Constraint.null,
+        mark: 0,
+        walk_strength: weakest,
+        stay: true,
+    };
 }
 
 fun VariableList.new(capacity: i32) VariableList {
-    let dummy: Variable = Variable.placeholder();
     VariableList {
-        items: array[Variable].new(capacity, dummy),
+        items: array[?Variable].new_default(capacity),
         count: 0,
     };
 }
@@ -167,7 +182,7 @@ fun ConstraintList.append(self: ConstraintList, constraint: Constraint) void {
 }
 
 fun ConstraintList.pop_front(self: ConstraintList) Constraint {
-    let constraint: Constraint = self.items[0];
+    let constraint: Constraint = self.items[0] \ fatal;
     for (0..self.count - 1) |i| {
         self.items[i] = self.items[i + 1];
     };
@@ -178,7 +193,7 @@ fun ConstraintList.pop_front(self: ConstraintList) Constraint {
 fun ConstraintList.copy(self: ConstraintList, capacity: i32) ConstraintList {
     let out: ConstraintList = ConstraintList.new(capacity);
     for (0..self.count) |i| {
-        out.append(self.items[i]);
+        out.append(self.items[i] \ fatal);
     };
     out;
 }
@@ -190,7 +205,7 @@ fun VariableList.append(self: VariableList, value: Variable) void {
 }
 
 fun VariableList.pop_front(self: VariableList) Variable {
-    let value: Variable = self.items[0];
+    let value: Variable = self.items[0] \ fatal;
     for (0..self.count - 1) |i| {
         self.items[i] = self.items[i + 1];
     };
@@ -207,7 +222,7 @@ fun Variable.remove_constraint(self: Variable, constraint: Constraint) void {
     let found: i32 = 0 - 1;
     for (0..self.constraints.count) |i| {
         if found == 0 - 1 {
-            if self.constraints.items[i] == constraint {
+            if (self.constraints.items[i] \ fatal) == constraint {
                 found = i;
             };
         };
@@ -247,46 +262,6 @@ fun sync_scale_state(self: ScaleConstraint) void {
         self.input = self.dest;
         self.output = self.src;
     };
-}
-
-fun ConstraintOps.input(self: EmptyConstraint) Variable {
-    fatal;
-}
-
-fun ConstraintOps.input(self: StayConstraint) Variable {
-    self.input;
-}
-
-fun ConstraintOps.input(self: EditConstraint) Variable {
-    self.input;
-}
-
-fun ConstraintOps.input(self: EqualityConstraint) Variable {
-    self.input;
-}
-
-fun ConstraintOps.input(self: ScaleConstraint) Variable {
-    self.input;
-}
-
-fun ConstraintOps.output(self: EmptyConstraint) Variable {
-    fatal;
-}
-
-fun ConstraintOps.output(self: StayConstraint) Variable {
-    self.output;
-}
-
-fun ConstraintOps.output(self: EditConstraint) Variable {
-    self.output;
-}
-
-fun ConstraintOps.output(self: EqualityConstraint) Variable {
-    self.output;
-}
-
-fun ConstraintOps.output(self: ScaleConstraint) Variable {
-    self.output;
 }
 
 fun ConstraintOps.execute(self: EmptyConstraint) void {
@@ -609,13 +584,13 @@ fun Planner.new_mark(self: Planner) i32 {
 fun Variable.add_constraints_consuming_to(self: Variable, coll: ConstraintList) void {
     let determining: ?Constraint = self.determined_by;
     for (0..self.constraints.count) |i| {
-        let constraint: Constraint = self.constraints.items[i];
+        let constraint: Constraint = self.constraints.items[i] \ fatal;
         let same: bool = false;
         promote determining |active| {
             same = constraint == active;
         };
         if not same {
-            if constraint.is_satisfied() {
+            if constraint.is_satisfied {
                 coll.append(constraint);
             };
         };
@@ -629,7 +604,7 @@ fun Planner.add_propagate(self: Planner, constraint: Constraint, mark: i32) bool
 
         while (todo.count > 0) {
             let current: Constraint = todo.pop_front();
-            let current_output: Variable = current.output();
+            let current_output: Variable = current.output;
             if current_output.mark == mark {
                 self.incremental_remove(constraint);
                 emit false;
@@ -657,22 +632,22 @@ fun Planner.remove_propagate_from(self: Planner, out: Variable) ConstraintList {
         let determining: ?Constraint = variable.determined_by;
 
         for (0..variable.constraints.count) |i| {
-            let constraint: Constraint = variable.constraints.items[i];
-            if not constraint.is_satisfied() {
+            let constraint: Constraint = variable.constraints.items[i] \ fatal;
+            if not constraint.is_satisfied {
                 unsatisfied.append(constraint);
             };
         };
 
         for (0..variable.constraints.count) |i| {
-            let constraint: Constraint = variable.constraints.items[i];
+            let constraint: Constraint = variable.constraints.items[i] \ fatal;
             let same: bool = false;
             promote determining |active| {
                 same = constraint == active;
             };
             if not same {
-                if constraint.is_satisfied() {
+                if constraint.is_satisfied {
                     constraint.recalculate();
-                    todo.append(constraint.output());
+                    todo.append(constraint.output);
                 };
             };
         };
@@ -691,7 +666,7 @@ fun Planner.incremental_add(self: Planner, constraint: Constraint) void {
 }
 
 fun Planner.incremental_remove(self: Planner, constraint: Constraint) void {
-    let out: Variable = constraint.output();
+    let out: Variable = constraint.output;
     constraint.mark_unsatisfied();
     constraint.remove_from_graph();
 
@@ -701,8 +676,8 @@ fun Planner.incremental_remove(self: Planner, constraint: Constraint) void {
 
     while (repeat) {
         for (0..unsatisfied.count) |i| {
-            let current: Constraint = unsatisfied.items[i];
-            if current.strength() == strength {
+            let current: Constraint = unsatisfied.items[i] \ fatal;
+            if current.strength == strength {
                 self.incremental_add(current);
             };
             strength = next_weaker(strength);
@@ -718,7 +693,7 @@ fun Planner.make_plan(self: Planner, sources: ConstraintList) ConstraintList {
 
     while (todo.count > 0) {
         let constraint: Constraint = todo.pop_front();
-        let out: Variable = constraint.output();
+        let out: Variable = constraint.output;
         if out.mark != mark {
             if constraint.inputs_known(mark) {
                 plan.append(constraint);
@@ -735,9 +710,9 @@ fun Planner.extract_plan_from_constraints(self: Planner, constraints: Constraint
     let sources: ConstraintList = ConstraintList.new(self.constraint_capacity);
 
     for (0..constraints.count) |i| {
-        let constraint: Constraint = constraints.items[i];
-        if constraint.is_input() {
-            if constraint.is_satisfied() {
+        let constraint: Constraint = constraints.items[i] \ fatal;
+        if constraint.is_input {
+            if constraint.is_satisfied {
                 sources.append(constraint);
             };
         };
@@ -754,12 +729,12 @@ fun Constraint.add_constraint(self: Constraint, planner: Planner) void {
 fun Constraint.satisfy(self: Constraint, planner: Planner, mark: i32) ?Constraint {
     self.choose_method(mark);
 
-    if not self.is_satisfied() {
-        assert self.strength() != required;
+    if not self.is_satisfied {
+        assert self.strength != required;
         Constraint.null;
     } else {
         self.mark_inputs(mark);
-        let out: Variable = self.output();
+        let out: Variable = self.output;
         let overridden: ?Constraint = out.determined_by;
 
         promote overridden |active| {
@@ -776,7 +751,7 @@ fun Constraint.satisfy(self: Constraint, planner: Planner, mark: i32) ?Constrain
 }
 
 fun Constraint.destroy(self: Constraint, planner: Planner) void {
-    if self.is_satisfied() {
+    if self.is_satisfied {
         planner.incremental_remove(self);
     } else {
         self.remove_from_graph();
@@ -785,7 +760,7 @@ fun Constraint.destroy(self: Constraint, planner: Planner) void {
 
 fun plan_execute(plan: ConstraintList) void {
     for (0..plan.count) |i| {
-        let constraint: Constraint = plan.items[i];
+        let constraint: Constraint = plan.items[i] \ fatal;
         constraint.execute();
     };
 }
