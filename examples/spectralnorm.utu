@@ -22,9 +22,9 @@ fun eval_a(i: f64, j: f64) f64 {
 fun part_a_times_u(i: f64, u: array[f64]) f64 {
     let partial_sum: f64 = 0.0;
     let jf: f64 = 0.0;
-    for (0..array.len(u)) |j| {
+    for (0..<array.len(u)) |j| {
         partial_sum = partial_sum + eval_a(i, jf) * u[j];
-        jf = jf + 1.0;
+        jf += 1.0;
     };
     partial_sum;
 }
@@ -32,9 +32,9 @@ fun part_a_times_u(i: f64, u: array[f64]) f64 {
 fun part_at_times_u(i: f64, u: array[f64]) f64 {
     let partial_sum: f64 = 0.0;
     let jf: f64 = 0.0;
-    for (0..array.len(u)) |j| {
+    for (0..<array.len(u)) |j| {
         partial_sum = partial_sum + eval_a(jf, i) * u[j];
-        jf = jf + 1.0;
+        jf += 1.0;
     };
     partial_sum;
 }
@@ -42,9 +42,9 @@ fun part_at_times_u(i: f64, u: array[f64]) f64 {
 fun eval_a_times_u(u: array[f64]) array[f64] {
     let out: array[f64] = array[f64].new(array.len(u), 0.0);
     let ifloat: f64 = 0.0;
-    for (0..array.len(u)) |i| {
+    for (0..<array.len(u)) |i| {
         out[i] = part_a_times_u(ifloat, u);
-        ifloat = ifloat + 1.0;
+        ifloat += 1.0;
     };
     out;
 }
@@ -52,9 +52,9 @@ fun eval_a_times_u(u: array[f64]) array[f64] {
 fun eval_at_times_u(u: array[f64]) array[f64] {
     let out: array[f64] = array[f64].new(array.len(u), 0.0);
     let ifloat: f64 = 0.0;
-    for (0..array.len(u)) |i| {
+    for (0..<array.len(u)) |i| {
         out[i] = part_at_times_u(ifloat, u);
-        ifloat = ifloat + 1.0;
+        ifloat += 1.0;
     };
     out;
 }
@@ -68,14 +68,14 @@ fun spectral_norm(n: i32) f64 {
     let u: array[f64] = array[f64].new(n, 1.0);
     let v: array[f64] = array[f64].new(n, 0.0);
 
-    for (0..10) |dummy| {
+    for (0..<10) |dummy| {
         v = eval_ata_times_u(u);
         u = eval_ata_times_u(v);
     };
 
     let vbv: f64 = 0.0;
     let vv: f64 = 0.0;
-    for (0..n) |i| {
+    for (0..<n) |i| {
         vbv = vbv + u[i] * v[i];
         vv = vv + v[i] * v[i];
     };

@@ -50,17 +50,17 @@ fun benchmark(n: i32) Point {
     let origin: Point = Point { x: 0.0, y: 0.0, z: 0.0 };
     let points: array[Point] = array[Point].new(n, origin);
     let ifloat: f64 = 0.0;
-    for (0..n) |point_index| {
+    for (0..<n) |point_index| {
         points[point_index] = new_point(ifloat);
-        ifloat = ifloat + 1.0;
+        ifloat += 1.0;
     };
 
-    for (0..n) |normalize_index| {
+    for (0..<n) |normalize_index| {
         points[normalize_index] = normalize(points[normalize_index]);
     };
 
     let best: Point = points[0];
-    for (1..n) |best_index| {
+    for (1..<n) |best_index| {
         best = maximize_point(best, points[best_index]);
     };
     best;

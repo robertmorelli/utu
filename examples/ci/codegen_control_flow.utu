@@ -4,8 +4,16 @@ fun max(a: i32, b: i32) i32 {
 
 fun sum_to(n: i32) i32 {
     let sum: i32 = 0;
-    for (0..n) |i| {
-        sum = sum + i;
+    for (0..<n) |i| {
+        sum += i;
+    };
+    sum;
+}
+
+fun sum_to_inclusive(n: i32) i32 {
+    let sum: i32 = 0;
+    for (0...n) |i| {
+        sum += i;
     };
     sum;
 }
@@ -14,15 +22,15 @@ fun countdown_total(n: i32) i32 {
     let cur: i32 = n;
     let total: i32 = 0;
     while (cur > 0) {
-        total = total + cur;
-        cur = cur - 1;
+        total += cur;
+        cur -= 1;
     };
     total;
 }
 
 fun first_over(limit: i32, threshold: i32) i32 {
     search: {
-        for (0..limit) |i| {
+        for (0..<limit) |i| {
             if i > threshold {
                 emit i;
             };
@@ -35,7 +43,7 @@ fun spin_until(limit: i32) i32 {
     let i: i32 = 0;
     done: {
         while () {
-            i = i + 1;
+            i += 1;
             if i == limit {
                 emit i;
             };
@@ -50,6 +58,10 @@ test "if expressions return values" {
 
 test "counted loops sum ranges" {
     assert sum_to(5) == 10;
+}
+
+test "inclusive counted loops include the upper bound" {
+    assert sum_to_inclusive(5) == 15;
 }
 
 test "while loops re-check mutable locals" {

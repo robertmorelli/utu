@@ -1,0 +1,53 @@
+proto P[T] {
+    get x: f32,
+    get y: f32,
+    perimeter(T) f32,
+};
+
+tag type Elipse: P =
+    | Circle {
+        x: f32,
+        y: f32,
+        r: f32,
+    }
+    | Oval {
+        x: f32,
+        y: f32,
+        r: f32,
+        r2: f32,
+    };
+
+tag struct Line: P {
+    x: f32,
+    y: f32,
+    x2: f32,
+    y2: f32,
+};
+
+fun P.perimeter(self: Circle) f32 {
+    2.0 * 3.14 * self.r;
+}
+
+fun P.perimeter(self: Oval) f32 {
+    3.14 * (self.r + self.r2);
+}
+
+fun P.perimeter(self: Line) f32 {
+    ((self.x2 - self.x)^2.0 + (self.y2 - self.y)^2.0)^0.5;
+}
+
+fun perimeter_sum(l: array[P]) f32 {
+    let s: f32 = 0.0;
+    for (0..<l.len()) |i| {
+        s = s + l[i].perimeter();
+    };
+    s;
+}
+
+export fun main() f32 {
+    let my_ps: array[P] = array.new_default(3);
+    my_ps[0] = Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 };
+    my_ps[1] = Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 };
+    my_ps[2] = Circle { x: 0.0, y: 0.0, r: 0.0 };
+    perimeter_sum(my_ps);
+}

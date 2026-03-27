@@ -1,0 +1,47 @@
+struct Box {
+    value: i32,
+}
+
+fun maybe_box(flag: bool, value: i32) ?Box {
+    if flag { Box { value: value }; } else { ref.null Box; };
+}
+
+fun or_value(flag: bool, fallback: i32) i32 {
+    promote maybe_box(flag, 9) |box| {
+        box.value;
+    } else {
+        fallback;
+    };
+}
+
+fun nested_promote(outer: bool, inner: bool) i32 {
+    promote maybe_box(outer, 10) |left| {
+        promote maybe_box(inner, 20) |right| {
+            left.value + right.value;
+        } else {
+            left.value;
+        };
+    } else {
+        0;
+    };
+}
+
+test "nullable 01 fallback uses else branch on null" {
+    assert or_value(false, 77) == 77;
+}
+
+test "nullable 02 fallback preserves boxed value when present" {
+    assert or_value(true, 77) == 9;
+}
+
+test "nullable 03 nested promote uses both values when both exist" {
+    assert nested_promote(true, true) == 30;
+}
+
+test "nullable 04 nested promote keeps outer value when inner is null" {
+    assert nested_promote(true, false) == 10;
+}
+
+test "nullable 05 nested promote returns zero when outer is null" {
+    assert nested_promote(false, true) == 0;
+}

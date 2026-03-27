@@ -11,22 +11,27 @@ proto CounterOps[T] {
     bump(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
     height: i32,
-}
+};
 
-tag struct Rect {
+tag struct Rect: Area {
     area: i32,
-}
+};
 
-tag struct Square {
+tag struct Square: Measure {
     side: i32,
-}
+};
 
-tag struct Counter {
+tag struct Counter: CounterOps {
     value: i32,
-}
+};
+
+struct Shelf {
+    items: array[Measure],
+    current: Measure,
+};
 
 fun Measure.measure(self: Box) i32 {
     self.width * self.height;
@@ -38,6 +43,10 @@ fun Measure.measure(self: Square) i32 {
 
 fun CounterOps.bump(self: Counter) i32 {
     self.value + 1;
+}
+
+fun total_measure(first: Measure, shelf: Shelf) i32 {
+    first.measure() + shelf.current.measure() + shelf.items[1].measure();
 }
 
 fun maybe_box(flag: bool) ?Box {
@@ -56,12 +65,12 @@ test "explicit protocol calls use the first argument as the receiver" {
     assert Measure.measure(box) == 12;
 }
 
-test "getter-only protocols synthesize field-backed dispatch" {
+test "getter-only protocols dispatch when the struct declares them" {
     let rect: Rect = Rect { area: 12 };
     assert Area.area(rect) == 12;
 }
 
-test "protocol getters synthesize for explicit implementers too" {
+test "protocol getters dispatch for explicit implementers too" {
     let counter: Counter = Counter { value: 7 };
     assert CounterOps.value(counter) == 7;
     assert counter.bump() == 8;
@@ -73,4 +82,12 @@ test "protocol methods work with promote captures" {
     } else {
         fatal;
     };
+}
+
+test "protocol values can live in arrays fields and params" {
+    let items: array[Measure] = array.new_default(2);
+    items[0] = Box { width: 2, height: 3 };
+    items[1] = Square { side: 4 };
+    let shelf: Shelf = Shelf { items: items, current: items[0] };
+    assert total_measure(items[1], shelf) == 38;
 }

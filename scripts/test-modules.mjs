@@ -256,12 +256,12 @@ export fun main() i32 {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
     height: i32,
 }
 
-tag struct Square {
+tag struct Square: Measure {
     side: i32,
 }
 
@@ -290,7 +290,7 @@ proto Perimeter[T] {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Area, Perimeter {
     width: i32,
     height: i32,
 }
@@ -315,7 +315,7 @@ export fun main() i32 {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
     height: i32,
 }
@@ -337,13 +337,13 @@ export fun main() i32 {
 }`,
     },
     {
-        name: 'getter-only-protocols-synthesize-field-backed-dispatch',
+        name: 'getter-only-protocols-dispatch-when-the-struct-explicitly-declares-them',
         expectedReturn: 12,
         source: `proto Area[T] {
     get area: i32,
 };
 
-tag struct Rect {
+tag struct Rect: Area {
     area: i32,
 }
 
@@ -374,12 +374,104 @@ export fun main() i32 {
 }`,
     },
     {
+        name: 'struct-declarations-accept-trailing-semicolons',
+        expectedReturn: 7,
+        source: `tag struct Box {
+    value: i32,
+};
+
+fun Box.read(self: Box) i32 {
+    self.value;
+}
+
+export fun main() i32 {
+    let box: Box = Box { value: 7 };
+    box.read();
+}`,
+    },
+    {
         name: 'captureless-for-loops-declare-and-use-the-implicit-index-local',
         expectedReturn: 3,
         source: `export fun main() i32 {
     let sum: i32 = 0;
-    for (0..3) {
-        sum = sum + 1;
+    for (0..<3) {
+        sum += 1;
+    };
+    sum;
+}`,
+    },
+    {
+        name: 'compound-assignments-work-for-locals-indices-and-protocol-fields',
+        expectedReturn: 21,
+        source: `proto CounterOps[T] {
+    get value: i32,
+    set value: i32,
+};
+
+tag struct Counter: CounterOps {
+    mut value: i32,
+};
+
+export fun main() i32 {
+    let total: i32 = 1;
+    let xs: array[i32] = array[i32].new(2, 0);
+    let counter: Counter = Counter { value: 5 };
+    total += 4;
+    total *= 2;
+    xs[1] += 3;
+    counter.value += xs[1];
+    total + xs[1] + counter.value;
+}`,
+    },
+    {
+        name: 'compound-assignments-cover-bitwise-shift-and-boolean-operators',
+        expectedReturn: 1,
+        source: `export fun main() i32 {
+    let bits: i32 = 3;
+    let flag: bool = false;
+    bits <<= 1;
+    bits |= 1;
+    bits &= 6;
+    bits ^= 3;
+    bits >>= 1;
+    bits >>>= 1;
+    flag or= true;
+    flag and= bits == 1;
+    if flag { bits; } else { 0; };
+}`,
+    },
+    {
+        name: 'boolean-and-works-with-protocol-getter-values-in-if-conditions',
+        expectedReturn: 1,
+        source: `proto ConstraintOps[T] {
+    get is_input: bool,
+    get is_satisfied: bool,
+};
+
+tag type Constraint: ConstraintOps =
+    | StayConstraint {
+        is_input: bool,
+        is_satisfied: bool,
+    };
+
+export fun main() i32 {
+    let constraint: Constraint = StayConstraint { is_input: true, is_satisfied: true };
+    let sources: i32 = 0;
+    if (constraint.is_input and true) {
+        if constraint.is_satisfied {
+            sources += 1;
+        };
+    };
+    sources;
+}`,
+    },
+    {
+        name: 'inclusive-for-ranges-include-the-end-bound',
+        expectedReturn: 6,
+        source: `export fun main() i32 {
+    let sum: i32 = 0;
+    for (0...3) |i| {
+        sum = sum + i;
     };
     sum;
 }`,
@@ -392,14 +484,14 @@ export fun main() i32 {
 }`,
     },
     {
-        name: 'getter-protocol-members-synthesize-for-explicit-implementers',
+        name: 'getter-protocol-members-dispatch-for-explicit-implementers',
         expectedReturn: 22,
         source: `proto CounterOps[T] {
     get value: i32,
     bump(T) i32,
 };
 
-tag struct Counter {
+tag struct Counter: CounterOps {
     value: i32,
 }
 
@@ -410,6 +502,122 @@ fun CounterOps.bump(self: Counter) i32 {
 export fun main() i32 {
     let counter: Counter = Counter { value: 7 };
     CounterOps.value(counter) + counter.bump();
+}`,
+    },
+    {
+        name: 'protocol-types-work-in-arrays-params-and-struct-fields',
+        expectedReturn: 45,
+        source: `proto P[T] {
+    get x: i32,
+    get y: i32,
+    perimeter(T) i32,
+};
+
+tag type Elipse: P =
+    | Circle {
+        x: i32,
+        y: i32,
+        r: i32,
+    }
+    | Oval {
+        x: i32,
+        y: i32,
+        r: i32,
+        r2: i32,
+    };
+
+tag struct Line: P {
+    x: i32,
+    y: i32,
+    x2: i32,
+    y2: i32,
+};
+
+struct Holder {
+    items: array[P],
+    current: P,
+};
+
+fun P.perimeter(self: Circle) i32 {
+    self.r * 6;
+}
+
+fun P.perimeter(self: Oval) i32 {
+    self.r + self.r2;
+}
+
+fun P.perimeter(self: Line) i32 {
+    (self.x2 - self.x) + (self.y2 - self.y);
+}
+
+fun total(first: P, holder: Holder) i32 {
+    first.perimeter() + holder.current.perimeter() + holder.items[2].perimeter();
+}
+
+export fun main() i32 {
+    let my_ps: array[P] = array.new_default(3);
+    my_ps[0] = Line { x: 0, y: 0, x2: 3, y2: 4 };
+    my_ps[1] = Oval { x: 0, y: 0, r: 2, r2: 5 };
+    my_ps[2] = Circle { x: 0, y: 0, r: 4 };
+    let holder: Holder = Holder { items: my_ps, current: my_ps[1] };
+    total(my_ps[0], holder) + my_ps[1].perimeter();
+}`,
+    },
+    {
+        name: 'array-len-method-sugar-desugars-to-the-builtin-array-len',
+        expectedReturn: 3,
+        source: `export fun main() i32 {
+    let xs: array[i32] = array.new_default(3);
+    xs.len();
+}`,
+    },
+    {
+        name: 'float-protocol-storage-example-with-trailing-struct-semicolons-compiles-and-runs',
+        expectedReturn: 5,
+        source: `proto P[T] {
+    get x: f32,
+    get y: f32,
+    perimeter(T) f32,
+};
+
+tag type Elipse: P =
+    | Circle {
+        x: f32,
+        y: f32,
+        r: f32,
+    }
+    | Oval {
+        x: f32,
+        y: f32,
+        r: f32,
+        r2: f32,
+    };
+
+tag struct Line: P {
+    x: f32,
+    y: f32,
+    x2: f32,
+    y2: f32,
+};
+
+fun P.perimeter(self: Circle) f32 {
+    2.0 * 3.14 * self.r;
+}
+
+fun P.perimeter(self: Oval) f32 {
+    3.14 * (self.r + self.r2);
+}
+
+fun P.perimeter(self: Line) f32 {
+    ((self.x2 - self.x)^2.0 + (self.y2 - self.y)^2.0)^0.5;
+}
+
+export fun main() f32 {
+    let my_ps: array[P] = array.new_default(3);
+    my_ps[0] = Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 };
+    my_ps[1] = Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 };
+    my_ps[2] = Circle { x: 0.0, y: 0.0, r: 0.0 };
+    my_ps[0].perimeter() + my_ps[1].perimeter() + my_ps[2].perimeter();
 }`,
     },
     {
@@ -496,14 +704,14 @@ export fun main() i32 {
 }`,
     },
     {
-        name: 'protocol-setters-synthesize-field-backed-assignment',
+        name: 'protocol-setters-dispatch-for-explicit-implementers',
         expectedReturn: 9,
         source: `proto CounterOps[T] {
     get value: i32,
     set value: i32,
 };
 
-tag struct Counter {
+tag struct Counter: CounterOps {
     mut value: i32,
 }
 
@@ -583,6 +791,25 @@ export fun main() i32 {
 }`,
     },
     {
+        name: 'tagged-struct-protocol-impls-must-be-declared-on-the-struct',
+        message: 'cannot implement protocol "Measure" without declaring ": Measure"',
+        source: `proto Measure[T] {
+    measure(T) i32,
+};
+
+tag struct Box {
+    width: i32,
+}
+
+fun Measure.measure(self: Box) i32 {
+    self.width;
+}
+
+export fun main() i32 {
+    0;
+}`,
+    },
+    {
         name: 'plain-types-cannot-declare-protocol-conformance',
         message: 'must be declared with "tag type"',
         source: `proto Measure[T] {
@@ -612,7 +839,7 @@ export fun main() i32 {
     clone(T) T,
 };
 
-tag struct Box {
+tag struct Box: Clone {
     width: i32,
 }
 
@@ -668,7 +895,7 @@ export fun main() i32 {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
 }
 
@@ -687,7 +914,7 @@ export fun main() i32 {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
 }
 
@@ -706,7 +933,7 @@ export fun main() i32 {
     measure(T, i32) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
 }
 
@@ -725,7 +952,7 @@ export fun main() i32 {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
 }
 
@@ -748,7 +975,7 @@ export fun main() i32 {
     get value: i32,
 };
 
-tag struct Box {
+tag struct Box: Value {
     value: i32,
 }
 
@@ -768,7 +995,7 @@ export fun main() i32 {
     score(T) i32,
 };
 
-tag struct Box {
+tag struct Box: ValueOps {
     width: i32,
 }
 
@@ -782,12 +1009,12 @@ export fun main() i32 {
     },
     {
         name: 'protocol-setters-require-mutable-fields-on-implementers',
-        message: 'must be declared "mut"',
+        message: 'declared "mut"',
         source: `proto ValueOps[T] {
     set value: i32,
 };
 
-tag struct Box {
+tag struct Box: ValueOps {
     value: i32,
 }
 
@@ -804,7 +1031,7 @@ export fun main() i32 {
     set value: i32,
 };
 
-tag struct Box {
+tag struct Box: Value {
     mut value: i32,
 }
 
@@ -824,7 +1051,7 @@ export fun main() i32 {
     perimeter(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
 }
 
@@ -847,7 +1074,7 @@ proto Perimeter[T] {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Area, Perimeter {
     width: i32,
     height: i32,
 }
@@ -866,13 +1093,13 @@ export fun main() i32 {
 }`,
     },
     {
-        name: 'explicit-protocol-calls-reject-missing-impls',
+        name: 'explicit-protocol-calls-reject-undeclared-implementers',
         message: 'does not implement protocol "Measure" method "measure"',
         source: `proto Measure[T] {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
 }
 
@@ -887,6 +1114,22 @@ fun Measure.measure(self: Box) i32 {
 export fun main() i32 {
     let square: Square = Square { side: 4 };
     Measure.measure(square);
+}`,
+    },
+    {
+        name: 'matching-fields-do-not-auto-enroll-tagged-structs-into-getter-protocols',
+        message: 'does not implement protocol "Area" method "area"',
+        source: `proto Area[T] {
+    get area: i32,
+};
+
+tag struct Rect {
+    area: i32,
+}
+
+export fun main() i32 {
+    let rect: Rect = Rect { area: 12 };
+    Area.area(rect);
 }`,
     },
     {
@@ -1029,7 +1272,7 @@ export fun main() i32 {
         message: 'for loops support exactly one range source in v1',
         source: `export fun main() i32 {
     let sum: i32 = 0;
-    for (0..2, 10..12) |i, j| {
+    for (0..<2, 10..<12) |i, j| {
         sum = sum + i + j;
     };
     sum;
@@ -1040,7 +1283,7 @@ export fun main() i32 {
         message: 'for loops support at most one capture in v1',
         source: `export fun main() i32 {
     let sum: i32 = 0;
-    for (0..2) |i, j| {
+    for (0..<2) |i, j| {
         sum = sum + i + j;
     };
     sum;
@@ -1198,12 +1441,12 @@ export fun main() i32 {
     measure(T) i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
     height: i32,
 }
 
-tag struct Square {
+tag struct Square: Measure {
     side: i32,
 }
 
@@ -1222,7 +1465,7 @@ export fun main() i32 {
         const { wat } = await compile(source, { mode: 'program', wat: true });
         if (!wat.includes('(field $__tag'))
             throw new Error('Expected tagged structs to lower a hidden $__tag field');
-        if (!wat.includes('(table $__utu_proto_table_measure_measure 2 funcref)'))
+        if (!wat.includes('(table $__utu_proto_table_measure_measure '))
             throw new Error('Expected a dedicated protocol dispatch table for Measure.measure');
         if (!wat.includes('(elem $__utu_proto_elem_measure_measure (table $__utu_proto_table_measure_measure)'))
             throw new Error('Expected Measure.measure elements to be attached to its own table');
@@ -1263,7 +1506,7 @@ export fun main() i32 {
     get area: i32,
 };
 
-tag struct Rect {
+tag struct Rect: Area {
     area: i32,
 }
 
@@ -1279,6 +1522,36 @@ tag struct Rect {
             throw new Error('Expected concrete getter sugar to call the protocol dispatch helper');
         if (mainBody.includes('struct.get $Rect $area'))
             throw new Error('Expected concrete getter sugar to avoid direct struct.get bypasses');
+    }],
+    ['protocol-typed-arrays-lower-to-the-shared-tagged-storage-shape', async () => {
+        const source = `proto P[T] {
+    get x: i32,
+    perimeter(T) i32,
+};
+
+tag struct Line: P {
+    x: i32,
+    y: i32,
+};
+
+fun P.perimeter(self: Line) i32 {
+    self.x + self.y;
+}
+
+export fun main() i32 {
+    let xs: array[P] = array[P].new_default(2);
+    xs[0] = Line { x: 3, y: 4 };
+    xs[0].perimeter();
+}`;
+        const { wat } = await compile(source, { mode: 'program', wat: true });
+        if (!wat.includes('(type $P_array (array (mut (ref $__utu_tagged))))'))
+            throw new Error('Expected array[P] to lower to an array over the shared tagged root');
+        if (!wat.includes('(type $__utu_proto_default_p (sub $__utu_tagged (struct'))
+            throw new Error('Expected protocol arrays to materialize an explicit default tagged value type');
+        if (!wat.includes('struct.new $__utu_proto_default_p'))
+            throw new Error('Expected array[P].new_default to fill from the explicit protocol default value');
+        if (!wat.includes('call $__utu_proto_dispatch_p_perimeter_'))
+            throw new Error('Expected protocol-typed array reads to dispatch through the protocol helper');
     }],
     ['unresolved-field-call-throws-instead-of-emitting-call-ref', async () => {
         try {

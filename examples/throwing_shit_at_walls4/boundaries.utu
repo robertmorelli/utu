@@ -1,0 +1,447 @@
+struct Pair {
+    left: i32,
+    right: i32,
+}
+
+fun Pair.new(left: i32, right: i32) Pair {
+    Pair { left: left, right: right };
+}
+
+fun Pair.sum(self: Pair) i32 {
+    self.left + self.right;
+}
+
+fun Pair.swap(self: Pair) Pair {
+    Pair.new(self.right, self.left);
+}
+
+mod boxy[T] {
+    struct Box {
+        mut value: T,
+    }
+
+    fun Box.new(value: T) Box {
+        Box { value: value };
+    }
+
+    fun Box.get(self: Box) T {
+        self.value;
+    }
+
+    fun Box.set(self: Box, value: T) T {
+        self.value = value;
+        self.value;
+    }
+
+    fun wrap(value: T) Box {
+        Box.new(value);
+    }
+}
+
+mod duo[L, R] {
+    struct Duo {
+        left: L,
+        right: R,
+    }
+
+    fun Duo.new(left: L, right: R) Duo {
+        Duo { left: left, right: right };
+    }
+
+    fun Duo.left(self: Duo) L {
+        self.left;
+    }
+
+    fun Duo.right(self: Duo) R {
+        self.right;
+    }
+}
+
+construct ints = boxy[i32];
+construct flags = boxy[bool];
+construct pair_box = boxy[Pair];
+construct maybe_pair_box = boxy[?Pair];
+construct pair_duo = duo[Pair, Pair];
+construct int_flag_duo = duo[i32, bool];
+construct boxy[i32];
+
+struct Rect {
+    width: i32,
+    height: i32,
+}
+
+fun Rect.area(self: Rect) i32 {
+    self.width * self.height;
+}
+
+type Shape =
+    | Empty
+    | Dot { x: i32 }
+    | Span { start: i32, stop: i32 };
+
+fun shape_value(shape: Shape) i32 {
+    alt shape {
+        _: Empty => 0,
+        dot: Dot => dot.x,
+        span: Span => span.stop - span.start,
+    };
+}
+
+fun maybe_pair(flag: bool) ?Pair {
+    if flag { Pair.new(8, 13); } else { ref.null Pair; };
+}
+
+fun maybe_rect(flag: bool) ?Rect {
+    if flag { Rect { width: 3, height: 7 }; } else { ref.null Rect; };
+}
+
+fun choose_word(n: i32) str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        _ => "many",
+    };
+}
+
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+
+fun divrem(a: i32, b: i32) i32, i32 {
+    (a / b, a % b);
+}
+
+fun pair_from_divrem(a: i32, b: i32) Pair {
+    let q: i32, r: i32 = divrem(a, b);
+    Pair.new(q, r);
+}
+
+fun empty_sum() i32 {
+    let total: i32 = 0;
+    for (0..<0) |i| {
+        total = total + i;
+    };
+    total;
+}
+
+fun descending_count(start: i32) i32 {
+    let total: i32 = 0;
+    let current: i32 = start;
+    while (current > 0) {
+        total = total + current;
+        current -= 1;
+    };
+    total;
+}
+
+fun first_gt(xs: array[i32], limit: i32) i32 {
+    seek: {
+        for (0..<array.len(xs)) |i| {
+            if xs[i] > limit {
+                emit xs[i];
+            };
+        };
+        -1;
+    };
+}
+
+fun nested_nullable_score(flag_a: bool, flag_b: bool) i32 {
+    let outer: ?Pair = maybe_pair(flag_a);
+    let inner: Pair = outer \ (maybe_pair(flag_b) \ Pair.new(1, 1));
+    Pair.sum(inner);
+}
+
+fun total_pairs(xs: array[Pair]) i32 {
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + Pair.sum(xs[i]);
+    };
+    total;
+}
+
+fun total_maybe_pairs(xs: array[?Pair]) i32 {
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + Pair.sum(xs[i] \ Pair.new(0, 0));
+    };
+    total;
+}
+
+fun write_defaults_then_sum() i32 {
+    let xs: array[i32] = array[i32].new_default(5);
+    xs[0] = 2;
+    xs[1] = 2;
+    xs[2] = 9;
+    xs[3] = 2;
+    xs[4] = 2;
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + xs[i];
+    };
+    total;
+}
+
+fun copy_overlap_like_flow() i32 {
+    let src: array[i32] = array[i32].new_fixed(4, 5, 6, 7);
+    let dst: array[i32] = array[i32].new_default(4);
+    array.copy(dst, 0, src, 0, 4);
+    dst[1] = dst[1] + dst[2];
+    dst[3];
+}
+
+test "01 direct associated constructor keeps fields" {
+    let pair: Pair = Pair.new(2, 5);
+    assert pair.left == 2;
+    assert pair.right == 5;
+}
+
+test "02 method chaining can round trip through swap" {
+    assert Pair.new(2, 9).swap().swap().sum() == 11;
+}
+
+test "03 construct alias stores integer payloads" {
+    let box: ints.Box = ints.Box.new(4);
+    assert ints.Box.get(box) == 4;
+}
+
+test "04 construct alias mutates integer payloads" {
+    let box: ints.Box = ints.Box.new(4);
+    assert ints.Box.set(box, 12) == 12;
+    assert ints.Box.get(box) == 12;
+}
+
+test "05 separate instantiations keep bools apart from ints" {
+    let left: ints.Box = ints.Box.new(3);
+    let right: flags.Box = flags.Box.new(true);
+    assert ints.Box.get(left) == 3;
+    assert flags.Box.get(right);
+}
+
+test "06 construct alias can store structs" {
+    let box: pair_box.Box = pair_box.Box.new(Pair.new(3, 6));
+    assert Pair.sum(pair_box.Box.get(box)) == 9;
+}
+
+test "07 construct alias can store nullable structs" {
+    let box: maybe_pair_box.Box = maybe_pair_box.Box.new(maybe_pair(false));
+    assert ref.is_null(maybe_pair_box.Box.get(box));
+}
+
+test "08 nested generic alias reads left payload" {
+    let joined: pair_duo.Duo = pair_duo.Duo.new(Pair.new(1, 2), Pair.new(3, 4));
+    assert Pair.sum(pair_duo.Duo.left(joined)) == 3;
+}
+
+test "09 nested generic alias reads right payload" {
+    let joined: pair_duo.Duo = pair_duo.Duo.new(Pair.new(1, 2), Pair.new(3, 4));
+    assert Pair.sum(pair_duo.Duo.right(joined)) == 7;
+}
+
+test "10 open construct imports associated names" {
+    let value: ints.Box = ints.Box.new(11);
+    assert ints.Box.get(value) == 11;
+}
+
+test "11 open construct imports free functions" {
+    let value: ints.Box = ints.wrap(8);
+    assert ints.Box.get(value) == 8;
+}
+
+test "12 open construct names can coexist with aliases" {
+    let a: ints.Box = ints.wrap(4);
+    let b: ints.Box = ints.Box.new(5);
+    assert ints.Box.get(a) + ints.Box.get(b) == 9;
+}
+
+test "13 nullable fallback keeps present values" {
+    assert Pair.sum(maybe_pair(true) \ Pair.new(0, 0)) == 21;
+}
+
+test "14 nullable fallback supplies missing values" {
+    assert Pair.sum(maybe_pair(false) \ Pair.new(4, 5)) == 9;
+}
+
+test "15 nested nullable fallback uses first non-null value" {
+    assert nested_nullable_score(false, true) == 21;
+}
+
+test "16 nested nullable fallback reaches terminal default" {
+    assert nested_nullable_score(false, false) == 2;
+}
+
+test "17 ref.is_null reports null branch" {
+    assert ref.is_null(maybe_pair(false));
+}
+
+test "18 ref.is_null reports present branch" {
+    assert not ref.is_null(maybe_pair(true));
+}
+
+test "19 promote exposes struct fields on success" {
+    promote maybe_pair(true) |pair| {
+        assert pair.left == 8;
+        assert pair.right == 13;
+    } else {
+        fatal;
+    };
+}
+
+test "20 promote works on nullable method receivers" {
+    promote maybe_rect(true) |rect| {
+        assert Rect.area(rect) == 21;
+    } else {
+        fatal;
+    };
+}
+
+test "21 alt chooses empty variant" {
+    assert shape_value(Empty {}) == 0;
+}
+
+test "22 alt chooses single-field payload variant" {
+    assert shape_value(Dot { x: 9 }) == 9;
+}
+
+test "23 alt chooses multi-field payload variant" {
+    assert shape_value(Span { start: 3, stop: 10 }) == 7;
+}
+
+test "24 match chooses exact non-zero arm" {
+    assert str_eq(choose_word(2), "two");
+}
+
+test "25 match chooses exact zero arm" {
+    assert str_eq(choose_word(0), "zero");
+}
+
+test "26 match falls through to wildcard" {
+    assert str_eq(choose_word(12), "many");
+}
+
+test "27 multi-value returns preserve quotient" {
+    let q: i32, r: i32 = divrem(22, 5);
+    assert q == 4;
+    assert r == 2;
+}
+
+test "28 multi-value results compose into structs" {
+    let pair: Pair = pair_from_divrem(22, 5);
+    assert pair.left == 4;
+    assert pair.right == 2;
+}
+
+test "29 zero-iteration for loops leave accumulators unchanged" {
+    assert empty_sum() == 0;
+}
+
+test "30 while loops stop at zero boundary" {
+    assert descending_count(0) == 0;
+}
+
+test "31 while loops re-read mutable locals" {
+    assert descending_count(4) == 10;
+}
+
+test "32 search blocks can exit from first match" {
+    let xs: array[i32] = array[i32].new_fixed(1, 5, 8, 9);
+    assert first_gt(xs, 6) == 8;
+}
+
+test "33 search blocks use fallback when nothing matches" {
+    let xs: array[i32] = array[i32].new_fixed(1, 5, 6);
+    assert first_gt(xs, 9) == -1;
+}
+
+test "34 arrays preserve order through indexing" {
+    let xs: array[i32] = array[i32].new_fixed(4, 5, 6, 7);
+    assert xs[0] == 4;
+    assert xs[3] == 7;
+}
+
+test "35 arrays of structs can be iterated" {
+    let xs: array[Pair] = array[Pair].new_fixed(Pair.new(1, 2), Pair.new(3, 4));
+    assert total_pairs(xs) == 10;
+}
+
+test "36 arrays of nullable structs can use per-slot fallback" {
+    let xs: array[?Pair] = array[?Pair].new_fixed(maybe_pair(true), maybe_pair(false), Pair.new(2, 3));
+    assert total_maybe_pairs(xs) == 26;
+}
+
+test "37 array.new_default can be written slot by slot" {
+    assert write_defaults_then_sum() == 17;
+}
+
+test "38 array.copy results can feed later mutations" {
+    assert copy_overlap_like_flow() == 7;
+}
+
+test "39 array length tracks fixed literals" {
+    let xs: array[i32] = array[i32].new_fixed(9, 8, 7);
+    assert array.len(xs) == 3;
+}
+
+test "40 arrays can store construct-instantiated structs" {
+    let xs: array[ints.Box] = array[ints.Box].new_fixed(ints.Box.new(1), ints.Box.new(5));
+    assert ints.Box.get(xs[0]) + ints.Box.get(xs[1]) == 6;
+}
+
+test "41 arrays of opened construct types keep methods" {
+    let xs: array[ints.Box] = array[ints.Box].new_fixed(ints.wrap(2), ints.wrap(5));
+    assert ints.Box.get(xs[0]) + ints.Box.get(xs[1]) == 7;
+}
+
+test "42 if expressions can feed method calls" {
+    let pair: Pair = if true { Pair.new(3, 8); } else { Pair.new(0, 0); };
+    assert pair.sum() == 11;
+}
+
+test "43 nested if expressions preserve chosen type" {
+    let pair: Pair = if false { Pair.new(0, 0); } else { if true { Pair.new(6, 1); } else { Pair.new(1, 1); }; };
+    assert pair.sum() == 7;
+}
+
+test "44 protocol methods survive nullable fallback" {
+    assert Rect.area(maybe_rect(false) \ Rect { width: 5, height: 2 }) == 10;
+}
+
+test "45 promote can expose protocol methods after arrays" {
+    let xs: array[?Rect] = array[?Rect].new_fixed(maybe_rect(false), maybe_rect(true));
+    promote xs[1] |rect| {
+        assert Rect.area(rect) == 21;
+    } else {
+        fatal;
+    };
+}
+
+test "46 direct field access still works after method calls" {
+    let pair: Pair = Pair.new(10, 4).swap();
+    assert pair.left == 4;
+    assert pair.right == 10;
+}
+
+test "47 bool construct aliases can update and read" {
+    let flag: flags.Box = flags.Box.new(false);
+    assert not flags.Box.get(flag);
+    assert flags.Box.set(flag, true);
+}
+
+test "48 mixed generic construct payloads keep their right-side bool" {
+    let value: int_flag_duo.Duo = int_flag_duo.Duo.new(5, false);
+    assert int_flag_duo.Duo.left(value) == 5;
+    assert not int_flag_duo.Duo.right(value);
+}
+
+test "49 repeated multi-value calls stay independent" {
+    let first: Pair = pair_from_divrem(19, 4);
+    let second: Pair = pair_from_divrem(17, 3);
+    assert first.left == 4;
+    assert first.right == 3;
+    assert second.left == 5;
+    assert second.right == 2;
+}
+
+test "50 construct aliases and opened constructs can combine in one expression" {
+    let left: pair_box.Box = pair_box.Box.new(Pair.new(2, 4));
+    let right: ints.Box = ints.wrap(4);
+    assert Pair.sum(pair_box.Box.get(left)) + ints.Box.get(right) == 10;
+}

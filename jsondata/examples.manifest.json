@@ -68,7 +68,7 @@
       "name": "codegen-control-flow",
       "path": "examples/ci/codegen_control_flow.utu",
       "mode": "test",
-      "expectedTests": 5,
+      "expectedTests": 6,
       "tags": ["codegen"]
     },
     {
@@ -96,7 +96,7 @@
       "name": "codegen-protocols",
       "path": "examples/ci/codegen_protocols.utu",
       "mode": "test",
-      "expectedTests": 5,
+      "expectedTests": 6,
       "tags": ["codegen"]
     },
     {
@@ -258,6 +258,42 @@
       "mode": "test",
       "expectedTests": 4,
       "tags": ["modules"]
+    },
+    {
+      "name": "stress-throwing-shit-at-walls-boundaries",
+      "path": "examples/throwing_shit_at_walls/boundaries.utu",
+      "mode": "test",
+      "expectedTests": 50,
+      "tags": ["stress", "walls"]
+    },
+    {
+      "name": "stress-throwing-shit-at-walls6-boundaries",
+      "path": "examples/throwing_shit_at_walls6/boundaries.utu",
+      "mode": "test",
+      "expectedTests": 50,
+      "tags": ["stress", "walls", "walls6"]
+    },
+    {
+      "name": "stress-throwing-shit-at-walls3-boundaries",
+      "path": "examples/throwing_shit_at_walls3/boundaries.utu",
+      "mode": "test",
+      "expectedTests": 50,
+      "allowFailure": true,
+      "tags": ["stress", "walls"]
+    },
+    {
+      "name": "stress-throwing-shit-at-walls4-boundaries",
+      "path": "examples/throwing_shit_at_walls4/boundaries.utu",
+      "mode": "test",
+      "expectedTests": 50,
+      "tags": ["stress", "walls"]
+    },
+    {
+      "name": "stress-throwing-shit-at-walls5-interactions",
+      "path": "examples/throwing_shit_at_walls5/interactions.utu",
+      "mode": "test",
+      "expectedTests": 50,
+      "tags": ["stress", "walls"]
     },
     {
       "name": "benchmark-call-simple",

@@ -1,0 +1,488 @@
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+
+struct Pair {
+    mut left: i32,
+    mut right: i32,
+}
+
+fun Pair.new(left: i32, right: i32) Pair {
+    Pair { left: left, right: right };
+}
+
+fun Pair.sum(self: Pair) i32 {
+    self.left + self.right;
+}
+
+fun Pair.swap(self: Pair) Pair {
+    Pair.new(self.right, self.left);
+}
+
+fun Pair.bump_left(self: Pair, amount: i32) i32 {
+    self.left = self.left + amount;
+    self.left;
+}
+
+struct Box {
+    width: i32,
+    height: i32,
+}
+
+tag struct TaggedBox: Measure {
+    width: i32,
+    height: i32,
+}
+
+tag struct TaggedLine: Measure {
+    length: i32,
+}
+
+tag struct Score: Value {
+    value: i32,
+}
+
+proto Measure[T] {
+    measure(T) i32,
+};
+
+proto Value[T] {
+    get value: i32,
+};
+
+fun Measure.measure(self: TaggedBox) i32 {
+    self.width * self.height;
+}
+
+fun Measure.measure(self: TaggedLine) i32 {
+    self.length;
+}
+
+mod cell[T] {
+    struct Cell {
+        mut value: T,
+    }
+
+    fun Cell.new(value: T) Cell {
+        Cell { value: value };
+    }
+
+    fun Cell.get(self: Cell) T {
+        self.value;
+    }
+
+    fun Cell.set(self: Cell, value: T) T {
+        self.value = value;
+        self.value;
+    }
+}
+
+mod duo[L, R] {
+    struct Duo {
+        left: L,
+        right: R,
+    }
+
+    fun Duo.new(left: L, right: R) Duo {
+        Duo { left: left, right: right };
+    }
+}
+
+construct int_cells = cell[i32];
+construct pair_cells = cell[Pair];
+construct maybe_pair_cells = cell[?Pair];
+construct pair_duos = duo[Pair, Pair];
+construct score_cells = cell[Score];
+
+type Shape =
+    | Point
+    | Circle { radius: i32 }
+    | Rect { width: i32, height: i32 }
+    | Segment { length: i32 };
+
+fun shape_metric(shape: Shape) i32 {
+    alt shape {
+        _: Point => 0,
+        c: Circle => c.radius * 2,
+        r: Rect => r.width + r.height,
+        s: Segment => s.length,
+    };
+}
+
+fun maybe_pair(flag: bool) ?Pair {
+    if flag { Pair.new(8, 13); } else { ref.null Pair; };
+}
+
+fun maybe_tagged_box(flag: bool) ?TaggedBox {
+    if flag { TaggedBox { width: 3, height: 7 }; } else { ref.null TaggedBox; };
+}
+
+fun choose_pair(flag: bool) Pair {
+    maybe_pair(flag) \ Pair.new(-1, -2);
+}
+
+fun split(n: i32, d: i32) i32, i32 {
+    (n / d, n % d);
+}
+
+fun pair_from_split(n: i32, d: i32) Pair {
+    let q: i32, r: i32 = split(n, d);
+    Pair.new(q, r);
+}
+
+fun range_total(start: i32, stop: i32) i32 {
+    let total: i32 = 0;
+    for (start..<stop) |i| {
+        total = total + i;
+    };
+    total;
+}
+
+fun countdown_sum(start: i32) i32 {
+    let total: i32 = 0;
+    let current: i32 = start;
+    while (current > 0) {
+        total = total + current;
+        current -= 1;
+    };
+    total;
+}
+
+fun first_positive(xs: array[i32]) i32 {
+    pick: {
+        for (0..<array.len(xs)) |i| {
+            if xs[i] > 0 {
+                emit xs[i];
+            };
+        };
+        0;
+    };
+}
+
+fun count_non_null(xs: array[?Pair]) i32 {
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        if not ref.is_null(xs[i]) {
+            total += 1;
+        };
+    };
+    total;
+}
+
+fun array_pair_total(xs: array[Pair]) i32 {
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + Pair.sum(xs[i]);
+    };
+    total;
+}
+
+fun describe(n: i32) str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        _ => "many",
+    };
+}
+
+test "01 empty ranges skip their body" {
+    assert range_total(0, 0) == 0;
+}
+
+test "02 one-element ranges include the lower bound" {
+    assert range_total(4, 5) == 4;
+}
+
+test "03 countdown handles zero without entering the loop" {
+    assert countdown_sum(0) == 0;
+}
+
+test "04 countdown accumulates several iterations" {
+    assert countdown_sum(4) == 10;
+}
+
+test "05 fallback pair appears when nullable is null" {
+    let pair: Pair = choose_pair(false);
+    assert pair.left == -1;
+    assert pair.right == -2;
+}
+
+test "06 fallback pair does not override non-null values" {
+    let pair: Pair = choose_pair(true);
+    assert pair.left == 8;
+    assert pair.right == 13;
+}
+
+test "07 nullable fallback can feed a mutating method" {
+    let pair: Pair = maybe_pair(false) \ Pair.new(1, 2);
+    assert Pair.bump_left(pair, 5) == 6;
+    assert pair.right == 2;
+}
+
+test "08 nullable fallback can feed chained methods" {
+    let pair: Pair = Pair.swap(maybe_pair(false) \ Pair.new(3, 9));
+    assert pair.left == 9;
+}
+
+test "09 promote exposes the original non-null value" {
+    promote maybe_pair(true) |pair| {
+        assert pair.left == 8;
+        assert pair.right == 13;
+    } else {
+        fatal;
+    };
+}
+
+test "10 ref.is_null distinguishes each branch of maybe_pair" {
+    assert ref.is_null(maybe_pair(false));
+    assert not ref.is_null(maybe_pair(true));
+}
+
+test "11 ref.as_non_null preserves identity for structs" {
+    let pair: Pair = Pair.new(5, 6);
+    let checked: Pair = ref.as_non_null(pair);
+    assert ref.eq(pair, checked);
+}
+
+test "12 methods can mutate fields and later reads see the write" {
+    let pair: Pair = Pair.new(2, 9);
+    assert Pair.bump_left(pair, 4) == 6;
+    assert pair.left == 6;
+}
+
+test "13 swapped pairs keep both values in order" {
+    let pair: Pair = Pair.swap(Pair.new(-4, 12));
+    assert pair.left == 12;
+    assert pair.right == -4;
+}
+
+test "14 multi-value destructuring preserves quotient" {
+    let q: i32, r: i32 = split(17, 5);
+    assert q == 3;
+    assert r == 2;
+}
+
+test "15 multi-value helpers can feed struct construction" {
+    let pair: Pair = pair_from_split(17, 5);
+    assert pair.left == 3;
+    assert pair.right == 2;
+}
+
+test "16 repeated multi-value calls do not leak prior state" {
+    let first: Pair = pair_from_split(20, 6);
+    let second: Pair = pair_from_split(11, 4);
+    assert first.left == 3;
+    assert first.right == 2;
+    assert second.left == 2;
+    assert second.right == 3;
+}
+
+test "17 alt handles the empty variant" {
+    assert shape_metric(Point {}) == 0;
+}
+
+test "18 alt handles one payload variant" {
+    assert shape_metric(Circle { radius: 9 }) == 18;
+}
+
+test "19 alt handles another payload variant" {
+    assert shape_metric(Rect { width: 4, height: 6 }) == 10;
+}
+
+test "20 alt can handle a fourth variant in the same enum" {
+    assert shape_metric(Segment { length: 11 }) == 11;
+}
+
+test "21 match can dispatch an exact scalar arm" {
+    assert str_eq(describe(1), "one");
+}
+
+test "22 match can dispatch the default scalar arm" {
+    assert str_eq(describe(7), "many");
+}
+
+test "23 arrays of integers preserve set values" {
+    let xs: array[i32] = array[i32].new_default(3);
+    xs[0] = 5;
+    xs[1] = -2;
+    xs[2] = 9;
+    assert xs[0] == 5;
+    assert xs[1] == -2;
+    assert xs[2] == 9;
+}
+
+test "24 array.copy can clone a full buffer" {
+    let src: array[i32] = array[i32].new_fixed(4, 5, 6);
+    let dst: array[i32] = array[i32].new_default(3);
+    array.copy(dst, 0, src, 0, 3);
+    assert dst[0] == 4;
+    assert dst[1] == 5;
+    assert dst[2] == 6;
+}
+
+test "25 array.copy can perform a zero-length copy" {
+    let src: array[i32] = array[i32].new_fixed(8, 9);
+    let dst: array[i32] = array[i32].new_fixed(1, 2);
+    array.copy(dst, 0, src, 0, 0);
+    assert dst[0] == 1;
+    assert dst[1] == 2;
+}
+
+test "26 array.fill can target an empty range" {
+    let xs: array[i32] = array[i32].new_fixed(3, 4, 5);
+    array.fill(xs, 1, 1, 99);
+    assert xs[0] == 3;
+    assert xs[1] == 4;
+    assert xs[2] == 5;
+}
+
+test "27 array.fill can replace a suffix in place" {
+    let xs: array[i32] = array[i32].new_fixed(3, 4, 5, 6);
+    array.fill(xs, 2, 4, 1);
+    assert xs[0] == 3;
+    assert xs[1] == 4;
+    assert xs[2] == 1;
+    assert xs[3] == 1;
+}
+
+test "28 arrays of structs preserve per-slot mutation" {
+    let pairs: array[Pair] = array[Pair].new_fixed(Pair.new(1, 2), Pair.new(3, 4));
+    assert Pair.bump_left(pairs[0], 7) == 8;
+    assert pairs[0].right == 2;
+    assert pairs[1].left == 3;
+}
+
+test "29 arrays of structs can be aggregated after mutation" {
+    let pairs: array[Pair] = array[Pair].new_fixed(Pair.new(1, 2), Pair.new(3, 4));
+    assert Pair.bump_left(pairs[1], 2) == 5;
+    assert array_pair_total(pairs) == 12;
+}
+
+test "30 arrays of nullable refs can count non-null entries" {
+    let xs: array[?Pair] = array[?Pair].new_fixed(maybe_pair(true), maybe_pair(false), maybe_pair(true));
+    assert count_non_null(xs) == 2;
+}
+
+test "31 arrays of nullable refs can fallback per slot" {
+    let xs: array[?Pair] = array[?Pair].new_fixed(maybe_pair(false), maybe_pair(true));
+    assert Pair.sum(xs[0] \ Pair.new(4, 4)) == 8;
+    assert Pair.sum(xs[1] \ Pair.new(0, 0)) == 21;
+}
+
+test "32 arrays of nullable refs can promote selected slots" {
+    let xs: array[?Pair] = array[?Pair].new_fixed(maybe_pair(true), maybe_pair(false));
+    promote xs[0] |pair| {
+        assert pair.left == 8;
+        assert pair.right == 13;
+    } else {
+        fatal;
+    };
+}
+
+test "33 first_positive returns the early emitted result" {
+    let xs: array[i32] = array[i32].new_fixed(-3, -2, 0, 4, 7);
+    assert first_positive(xs) == 4;
+}
+
+test "34 first_positive keeps the fallback when no hit exists" {
+    let xs: array[i32] = array[i32].new_fixed(-3, -2, 0);
+    assert first_positive(xs) == 0;
+}
+
+test "35 construct aliases can store plain integers" {
+    let cell: int_cells.Cell = int_cells.Cell.new(12);
+    assert int_cells.Cell.get(cell) == 12;
+}
+
+test "36 construct aliases can mutate plain integers" {
+    let cell: int_cells.Cell = int_cells.Cell.new(12);
+    assert int_cells.Cell.set(cell, -5) == -5;
+    assert int_cells.Cell.get(cell) == -5;
+}
+
+test "37 construct aliases can store structs by value" {
+    let cell: pair_cells.Cell = pair_cells.Cell.new(Pair.new(2, 8));
+    let pair: Pair = pair_cells.Cell.get(cell);
+    assert pair.left == 2;
+    assert pair.right == 8;
+}
+
+test "38 construct aliases can update nullable struct payloads" {
+    let cell: maybe_pair_cells.Cell = maybe_pair_cells.Cell.new(maybe_pair(false));
+    assert ref.is_null(maybe_pair_cells.Cell.get(cell));
+    assert not ref.is_null(maybe_pair_cells.Cell.set(cell, maybe_pair(true)));
+    let pair: Pair = maybe_pair_cells.Cell.get(cell) \ Pair.new(0, 0);
+    assert Pair.sum(pair) == 21;
+}
+
+test "39 nested generic aliases can hold tagged structs" {
+    let cell: score_cells.Cell = score_cells.Cell.new(Score { value: 14 });
+    assert Value.value(score_cells.Cell.get(cell)) == 14;
+}
+
+test "40 duo aliases can hold two independent structs" {
+    let both: pair_duos.Duo = pair_duos.Duo.new(Pair.new(1, 9), Pair.new(2, 8));
+    assert Pair.sum(both.left) == 10;
+    assert Pair.sum(both.right) == 10;
+}
+
+test "41 protocol method sugar dispatches across tagged implementers" {
+    let box: TaggedBox = TaggedBox { width: 2, height: 5 };
+    let line: TaggedLine = TaggedLine { length: 9 };
+    assert Measure.measure(box) == 10;
+    assert Measure.measure(line) == 9;
+}
+
+test "42 explicit protocol calls match method sugar results" {
+    let box: TaggedBox = TaggedBox { width: 4, height: 3 };
+    assert Measure.measure(box) == 12;
+}
+
+test "43 protocol getters read tagged struct fields" {
+    let score: Score = Score { value: 23 };
+    assert score.value == 23;
+    assert Value.value(score) == 23;
+}
+
+test "44 nullable tagged values can fallback into protocol calls" {
+    let area: i32 = Measure.measure(maybe_tagged_box(false) \ TaggedBox { width: 4, height: 4 });
+    assert area == 16;
+}
+
+test "45 nullable tagged values preserve their original payload" {
+    let area: i32 = Measure.measure(maybe_tagged_box(true) \ TaggedBox { width: 1, height: 1 });
+    assert area == 21;
+}
+
+test "46 promote can expose tagged protocol methods" {
+    promote maybe_tagged_box(true) |box| {
+        assert Measure.measure(box) == 21;
+    } else {
+        fatal;
+    };
+}
+
+test "47 i31 signed unboxing preserves a negative payload" {
+    let boxed: i31 = i31.new(-9);
+    assert i31.get_s(boxed) == -9;
+}
+
+test "48 i31 unsigned unboxing preserves a larger payload" {
+    let boxed: i31 = i31.new(511);
+    assert i31.get_u(boxed) == 511;
+}
+
+test "49 arrays can store i31 values alongside normal control flow" {
+    let xs: array[i31] = array[i31].new_fixed(i31.new(1), i31.new(2), i31.new(3));
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + i31.get_u(xs[i]);
+    };
+    assert total == 6;
+}
+
+test "50 mixed nullable arrays and protocol-bearing structs stay isolated" {
+    let maybe_pairs: array[?Pair] = array[?Pair].new_fixed(maybe_pair(true), maybe_pair(false));
+    let boxes: array[TaggedBox] = array[TaggedBox].new_fixed(TaggedBox { width: 2, height: 2 }, TaggedBox { width: 1, height: 9 });
+    assert Pair.sum(maybe_pairs[0] \ Pair.new(0, 0)) == 21;
+    assert Pair.sum(maybe_pairs[1] \ Pair.new(5, 6)) == 11;
+    assert Measure.measure(boxes[0]) + Measure.measure(boxes[1]) == 13;
+}

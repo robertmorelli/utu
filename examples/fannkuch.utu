@@ -9,19 +9,19 @@ fun swap(values: array[i32], left: i32, right: i32) void {
 fun reverse_prefix(values: array[i32], last: i32) void {
     let left: i32 = 0;
     let right: i32 = last;
-    for (0..array.len(values)) |step| {
+    for (0..<array.len(values)) |step| {
         if left >= right {
             break;
         };
         swap(values, left, right);
-        left = left + 1;
-        right = right - 1;
+        left += 1;
+        right -= 1;
     };
 }
 
 fun copy_array(values: array[i32]) array[i32] {
     let out: array[i32] = array[i32].new(array.len(values), 0);
-    for (0..array.len(values)) |i| {
+    for (0..<array.len(values)) |i| {
         out[i] = values[i];
     };
     out;
@@ -46,7 +46,7 @@ fun search(perm: array[i32], pos: i32) i32 {
         count_flips(perm);
     } else {
         let best: i32 = 0;
-        for (pos..array.len(perm)) |i| {
+        for (pos..<array.len(perm)) |i| {
             swap(perm, pos, i);
             let candidate: i32 = search(perm, pos + 1);
             if candidate > best {
@@ -60,7 +60,7 @@ fun search(perm: array[i32], pos: i32) i32 {
 
 fun fannkuch(n: i32) i32 {
     let perm: array[i32] = array[i32].new(n, 0);
-    for (0..n) |i| {
+    for (0..<n) |i| {
         perm[i] = i;
     };
     search(perm, 0);

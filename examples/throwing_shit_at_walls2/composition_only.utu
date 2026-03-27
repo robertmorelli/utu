@@ -1,0 +1,81 @@
+escape |(a, b) => a + b| str_concat(str, str) str;
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+
+struct Todo {
+    text: str,
+    mut done: bool,
+}
+
+type Filter =
+    | All
+    | Active
+    | Completed;
+
+fun new_todo(text: str) Todo {
+    Todo { text: text, done: false };
+}
+
+fun toggle(todo: Todo) void {
+    todo.done = not todo.done;
+}
+
+fun matches(todo: Todo, filter: Filter) bool {
+    alt filter {
+        _: All => true,
+        _: Active => not todo.done,
+        _: Completed => todo.done,
+    };
+}
+
+fun count(todos: array[Todo], filter: Filter) i32 {
+    let n: i32 = 0;
+    for (0..<array.len(todos)) |i| {
+        if matches(todos[i], filter) {
+            n += 1;
+        };
+    };
+    n;
+}
+
+fun maybe_status(flag: bool) str {
+    let maybe: ?str = if flag { "online"; } else { null; };
+    maybe \ "offline";
+}
+
+fun greet(name: str) str {
+    name -o str_concat(_, "!");
+}
+
+fun build_todos() array[Todo] {
+    array[Todo].new_fixed(
+        new_todo("learn utu"),
+        new_todo("ship compiler"),
+        new_todo("write tests"),
+    );
+}
+
+test "composition 01 active count sees all untouched todos" {
+    let todos: array[Todo] = build_todos();
+    assert count(todos, Active {}) == 3;
+}
+
+test "composition 02 completed count sees a single toggle" {
+    let todos: array[Todo] = build_todos();
+    toggle(todos[0]);
+    assert count(todos, Completed {}) == 1;
+}
+
+test "composition 03 all count ignores completion state" {
+    let todos: array[Todo] = build_todos();
+    toggle(todos[0]);
+    toggle(todos[1]);
+    assert count(todos, All {}) == 3;
+}
+
+test "composition 04 nullable strings keep fallback ordering" {
+    assert str_eq(maybe_status(false), "offline");
+}
+
+test "composition 05 string helpers keep appended punctuation" {
+    assert str_eq(greet("utu"), "utu!");
+}

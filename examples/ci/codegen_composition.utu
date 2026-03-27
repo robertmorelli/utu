@@ -30,9 +30,9 @@ fun matches(todo: Todo, filter: Filter) bool {
 
 fun count(todos: array[Todo], filter: Filter) i32 {
     let n: i32 = 0;
-    for (0..array.len(todos)) |i| {
+    for (0..<array.len(todos)) |i| {
         if matches(todos[i], filter) {
-            n = n + 1;
+            n += 1;
         };
     };
     n;

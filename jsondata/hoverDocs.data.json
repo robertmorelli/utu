@@ -5,8 +5,8 @@
       "description": "Returns the current length of a GC array value."
     },
     "array.new_default": {
-      "signature": "array[T].new_default(len) array[T]",
-      "description": "Allocates a GC array and fills it with the type default for `T`."
+      "signature": "array.new_default(len) array[T]",
+      "description": "Allocates a GC array using the surrounding expected `array[T]` type and fills it with the type default for `T`. `array[T].new_default(len)` remains valid when the element type is written explicitly."
     },
     "array.copy": {
       "signature": "array.copy(dst, dst_index, src, src_index, len) void",
@@ -195,8 +195,8 @@
       "description": "Declares a top-level protocol surface for table-backed dispatch on tagged receivers. A protocol member is the source-language name for a dedicated Wasm table plus tag-indexed `call_indirect`; methods, getters, and setters all follow that rule. The contract is absolute: this syntax must produce that structure and only that structure in Wasm. In v1, the type parameter may only appear as the first method parameter."
     },
     "for": {
-      "signature": "for (start..end) |binding| { ... };",
-      "description": "Iterates over a range and binds the loop capture inside the body."
+      "signature": "for (start..<end) |binding| { ... }; or for (start...end) |binding| { ... };",
+      "description": "Iterates over a range and binds the loop capture inside the body. `..<` excludes the upper bound, while `...` includes it."
     },
     "if": {
       "signature": "if condition { ... } else { ... };",
@@ -239,8 +239,8 @@
       "description": "Boolean negation operator."
     },
     "tag": {
-      "signature": "tag struct Name { ... }",
-      "description": "Marks a struct as tagged so protocol dispatch can read its hidden runtime tag. Lowers by prepending a hidden first `__tag` field used to index protocol tables for `call_indirect`."
+      "signature": "tag struct Name[: Proto, ...] { ... };",
+      "description": "Marks a struct as tagged so protocol dispatch can read its hidden runtime tag. When a tagged struct declares protocols, that clause is the explicit opt-in for table-backed protocol dispatch. Lowering prepends a hidden first `__tag` field used to index protocol tables for `call_indirect`."
     },
     "while": {
       "signature": "while (condition) { ... };",

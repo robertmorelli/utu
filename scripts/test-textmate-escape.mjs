@@ -61,6 +61,12 @@ assertEmbedded(closeMarker - 1, true, 'last JS character should be embedded');
 assertEmbedded(openMarker, false, 'opening | should not be embedded');
 assertEmbedded(closeMarker, false, 'closing | should not be embedded');
 
+assertOperatorScope('for (0..<3) |i| { };', '..<');
+assertOperatorScope('for (0...3) |i| { };', '...');
+assertOperatorScope('value += 1;', '+=');
+assertOperatorScope('value >>= 1;', '>>=');
+assertOperatorScope('flag and= other;', 'and=');
+
 console.log('PASS textmate escape embedding');
 
 function assertEmbedded(index, expected, label) {
@@ -75,4 +81,14 @@ function tokenAt(index) {
   const token = tokens.find((entry) => entry.startIndex <= index && index < entry.endIndex);
   if (!token) throw new Error(`No token found at column ${index + 1}.`);
   return token;
+}
+
+function assertOperatorScope(lineText, operator) {
+  const lineTokens = grammar.tokenizeLine(lineText).tokens;
+  const start = lineText.indexOf(operator);
+  if (start < 0) throw new Error(`Missing operator ${operator} in fixture line.`);
+  const token = lineTokens.find((entry) => entry.startIndex <= start && start < entry.endIndex);
+  if (!token) throw new Error(`No token found at operator ${operator}.`);
+  if (!token.scopes.includes('keyword.operator.utu'))
+    throw new Error(`Expected ${operator} to use keyword.operator.utu, got ${token.scopes.join(' ')}.`);
 }

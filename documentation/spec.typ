@@ -233,14 +233,14 @@ proto CounterOps[T] {
     set value: i32,
 };
 
-tag struct Box {
+tag struct Box: Measure {
     width: i32,
     height: i32,
-}
+};
 
-tag struct Rect {
+tag struct Rect: Area {
     area: i32,
-}
+};
 
 fun Measure.measure(self: Box) i32 {
     self.width * self.height;
@@ -252,11 +252,13 @@ Key v1 rules:
 - protocols are declared at top level
 - a protocol currently declares exactly one type parameter, and method members
   may use it only as the first parameter
-- concrete protocol implementations live on tagged receiver types
+- concrete protocol implementations live on tagged receiver types, and tagged
+  structs must opt in explicitly with `tag struct Name: Proto`
 - `get` and `set` members are still protocol entries: they get their own tables
   and are invoked through `call_indirect`
-- current field-backed synthesis only supplies the thunk body automatically;
-  it does not change what a protocol member is
+- field-backed getter and setter thunks are only synthesized for receiver types
+  that explicitly declare the protocol; matching fields alone never enroll a
+  type behind the scenes
 - `box.measure()` works when unambiguous, while `Measure.measure(box)` is always
   available as the explicit form
 
@@ -467,7 +469,11 @@ At the Wasm level this is a plain `if` with a result type.
 Utu uses range `for` loops and condition-style `while` loops:
 
 ```utu
-for (0..n) |i| {
+for (0..<n) |i| {
+    sum = sum + i;
+};
+
+for (0...n) |i| {
     sum = sum + i;
 };
 
@@ -486,11 +492,15 @@ The loop forms cover:
 - while-style loops where the header expression is the condition
 - infinite loops using empty parentheses
 
+For counted loops, `start..<end` excludes `end` and `start...end` includes `end`.
+
 The parser accepts comma-separated sources and captures, but current lowering
 only uses the first source/capture pair. The docs therefore describe the
 single-range form that the compiler emits today.
 
-The counted form lowers to the canonical Wasm `block` plus `loop` shape:
+The counted form lowers to the canonical Wasm `block` plus `loop` shape. An
+exclusive range uses `i32.ge_s` at the break edge, while an inclusive range uses
+`i32.gt_s`:
 
 ```wasm
 (local $i i32)
@@ -720,6 +730,7 @@ The array surface is similarly direct:
 
 - `array[T].new(len, init)` -> `array.new $T`
 - `array[T].new_fixed(vals...)` -> `array.new_fixed $T N`
+- `array.new_default(len)` -> `array.new_default $T`, where `T` comes from the surrounding expected `array[T]` type
 - `array[T].new_default(len)` -> `array.new_default $T`
 - `arr[i]` -> `array.get $T`
 - `arr[i] = val` -> `array.set $T`
@@ -868,7 +879,7 @@ construct_decl ::= 'construct'
 module_ref   ::= module_name
 instantiated_module_ref ::= module_name module_type_arg_list
 
-struct_decl  ::= 'rec'? 'tag'? 'struct' TYPE_IDENT '{' field_list? '}'
+struct_decl  ::= 'rec'? 'tag'? 'struct' TYPE_IDENT (':' protocol_list)? '{' field_list? '}' ';'?
 field_list   ::= field (',' field)* ','?
 field        ::= 'mut'? IDENT ':' type
 
@@ -1005,7 +1016,8 @@ alt_arm      ::= IDENT ':' TYPE_IDENT '=>' expr ','
 for_expr     ::= 'for' '(' for_sources ')' capture? block
 while_expr   ::= 'while' '(' expr? ')' block
 for_sources  ::= for_source (',' for_source)*
-for_source   ::= expr '..' expr
+for_source   ::= expr '..<' expr
+             |   expr '...' expr
 capture      ::= '|' IDENT (',' IDENT)* '|'
 
 block_expr   ::= (IDENT ':')? block
@@ -1017,7 +1029,7 @@ struct_init  ::= (TYPE_IDENT | qualified_type_ref) '{' field_init_list? '}'
 field_init_list ::= IDENT ':' expr (',' IDENT ':' expr)* ','?
 array_init   ::= 'array' '[' type ']' '.' IDENT '(' arg_list ')'
 
-assign_expr  ::= (IDENT | field_expr | index_expr) '=' expr
+assign_expr  ::= (IDENT | field_expr | index_expr) ('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '<<=' | '>>=' | '>>>=' | '&=' | '|=' | '^=' | 'and=' | 'or=') expr
 ```
 
 Several of the spec's most distinctive features appear here:
@@ -1226,7 +1238,7 @@ fun matches(todo: Todo, filter: Filter) bool {
 
 fun count(todos: array[Todo], filter: Filter) i32 {
     let n: i32 = 0;
-    for (0..array.len(todos)) |i| {
+    for (0..<array.len(todos)) |i| {
         if matches(todos[i], filter) {
             n = n + 1;
         };
@@ -1589,7 +1601,7 @@ This is the same structured shape Wasm already uses, which is why Utu can make
 ```utu
 fun sum_to(n: i32) i32 {
     let sum: i32 = 0;
-    for (0..n) |i| {
+    for (0..<n) |i| {
         sum = sum + i;
     };
     sum;

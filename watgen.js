@@ -72,6 +72,21 @@ const INFERRED_VALUE_EXPR_TYPES = new Set(data.inferredValueExprTypes);
 const SCALAR_NAMES = new Set(data.scalarNames);
 const I32 = data.i32Type;
 const DISCARD_HINT = data.discardHint;
+const COMPOUND_ASSIGN_BINARY_OPS = new Map([
+    ['+=', '+'],
+    ['-=', '-'],
+    ['*=', '*'],
+    ['/=', '/'],
+    ['%=', '%'],
+    ['<<=', '<<'],
+    ['>>=', '>>'],
+    ['>>>=', '>>>'],
+    ['&=', '&'],
+    ['|=', '|'],
+    ['^=', '^'],
+    ['and=', 'and'],
+    ['or=', 'or'],
+]);
 
 const TOP_LEVEL_COLLECT_HANDLERS = {
     struct_decl: (ctx, item) => {
@@ -80,7 +95,9 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         ctx.typeDeclMap.set(decl.name, decl);
     },
     proto_decl: (ctx, item) => {
-        ctx.protoDecls.push(parseProtoDecl(item));
+        const decl = parseProtoDecl(item);
+        ctx.protoDecls.push(decl);
+        ctx.protocolNames.add(decl.name);
     },
     type_decl: (ctx, item) => {
         const decl = parseTypeDecl(item);
@@ -163,6 +180,29 @@ const ARRAY_NS_CALL_HANDLERS = {
         ctx.genExpr(args[0], null, out);
         out.push('array.len');
     },
+    new: (ctx, args, out, hint) => {
+        const ctor = ctx.arrayCtorInfoFromHint(hint, 'array.new');
+        ctx.genExpr(args[1], ctor.elemWasm, out);
+        ctx.genExpr(args[0], 'i32', out);
+        out.push(`array.new ${ctor.arrayTypeName}`);
+    },
+    new_fixed: (ctx, args, out, hint) => {
+        const ctor = ctx.arrayCtorInfoFromHint(hint, 'array.new_fixed');
+        for (const arg of args) ctx.genExpr(arg, ctor.elemWasm, out);
+        out.push(`array.new_fixed ${ctor.arrayTypeName} ${args.length}`);
+    },
+    new_default: (ctx, args, out, hint) => {
+        const ctor = ctx.arrayCtorInfoFromHint(hint, 'array.new_default');
+        if (ctx.protocolNames.has(ctor.key)) {
+            out.push(`i32.const ${ctx.taggedStructTags.get(protoDefaultTypeName(ctor.key))}`);
+            out.push(`struct.new $${protoDefaultTypeName(ctor.key)}`);
+            ctx.genExpr(args[0], 'i32', out);
+            out.push(`array.new ${ctor.arrayTypeName}`);
+            return;
+        }
+        ctx.genExpr(args[0], 'i32', out);
+        out.push(`array.new_default ${ctor.arrayTypeName}`);
+    },
     copy: (ctx, args, out) => {
         const [dst, di, src, si, len] = args;
         ctx.genExpr(dst, null, out);
@@ -186,7 +226,7 @@ const NS_CALL_HANDLERS = {
         ctx.pushArgs(args, out);
         out.push(`call $str.${method}`);
     },
-    array: (ctx, method, args, out) => ctx.genArrayNsCall(method, args, out),
+    array: (ctx, method, args, out, hint) => ctx.genArrayNsCall(method, args, out, hint),
     ref: (ctx, method, args, out) => ctx.genRefNsCall(method, args, out),
     i31: (ctx, method, args, out) => {
         ctx.pushArgs(args, out);
@@ -250,6 +290,16 @@ const DEFAULT_VALUE_GENERATORS = {
 const LOCAL_COLLECT_HANDLERS = {
     bind_expr: (ctx, locals, seen, node) => {
         for (const target of parseBindTargets(node)) ctx.addLocal(locals, seen, target.name, target.type);
+    },
+    assign_expr: (ctx, locals, seen, node) => {
+        if (!ctx.isCompoundAssign(node)) return;
+        const [lhs] = kids(node);
+        const valueType = ctx.assignValueType(lhs);
+        ctx.addLocal(locals, seen, ctx.assignValueTempName(node), valueType);
+        if (lhs.type === 'field_expr' || lhs.type === 'index_expr')
+            ctx.addLocal(locals, seen, ctx.assignObjectTempName(node), ctx.tempLocalTypeForExpr(kids(lhs)[0]));
+        if (lhs.type === 'index_expr')
+            ctx.addLocal(locals, seen, ctx.assignIndexTempName(node), I32);
     },
     for_expr: (ctx, locals, seen, node) => {
         const sources = parseForSources(childOfType(node, 'for_sources'));
@@ -318,7 +368,7 @@ const SCALAR_PATTERN_GENERATORS = {
 };
 const CALL_CALLEE_HANDLERS = {
     pipe_expr: (ctx, callee, args, out) => ctx.genPipeCall(callee, args, out),
-    namespace_call_expr: (ctx, callee, args, out) => ctx.genNsCall(callee, out, args),
+    namespace_call_expr: (ctx, callee, args, out, hint) => ctx.genNsCall(callee, out, args, hint),
     identifier: (ctx, callee, args, out) => {
         ctx.pushArgs(args, out, ctx.callables.get(callee.text)?.params?.map(param => param.type));
         out.push(`call $${callee.text}`);
@@ -336,34 +386,68 @@ const CALL_CALLEE_HANDLERS = {
     },
 };
 const ARRAY_INIT_HANDLERS = {
-    new: (ctx, args, elemWasm, _arrayTypeName, out) => {
+    new: (ctx, args, elemType, elemWasm, _arrayTypeName, out) => {
         ctx.genExpr(args[1], elemWasm, out);
         ctx.genExpr(args[0], 'i32', out);
         out.push(`array.new ${_arrayTypeName}`);
     },
-    new_fixed: (ctx, args, elemWasm, _arrayTypeName, out) => {
+    new_fixed: (ctx, args, elemType, elemWasm, _arrayTypeName, out) => {
         for (const arg of args) ctx.genExpr(arg, elemWasm, out);
         out.push(`array.new_fixed ${_arrayTypeName} ${args.length}`);
     },
-    new_default: (ctx, args, _elemWasm, _arrayTypeName, out) => {
+    new_default: (ctx, args, elemType, _elemWasm, _arrayTypeName, out) => {
+        if (elemType?.kind === 'named' && ctx.protocolNames.has(elemType.name)) {
+            out.push(`i32.const ${ctx.taggedStructTags.get(protoDefaultTypeName(elemType.name))}`);
+            out.push(`struct.new $${protoDefaultTypeName(elemType.name)}`);
+            ctx.genExpr(args[0], 'i32', out);
+            out.push(`array.new ${_arrayTypeName}`);
+            return;
+        }
         ctx.genExpr(args[0], 'i32', out);
         out.push(`array.new_default ${_arrayTypeName}`);
     },
 };
 const ASSIGN_TARGET_HANDLERS = {
-    identifier: (ctx, lhs, rhs, out) => {
+    identifier: (ctx, lhs, rhs, op, assignNode, out) => {
         const name = lhs.text;
         const type = ctx.localTypes.get(name) ?? ctx.globalTypeMap.get(name) ?? I32;
+        if (op !== '=') {
+            ctx.genExpr(lhs, ctx.wasmType(type), out);
+            out.push(`local.set $${ctx.assignValueTempName(assignNode)}`);
+            ctx.genCompoundAssignValue(assignNode, rhs, type, out);
+            out.push(`${ctx.localTypes.has(name) ? 'local' : 'global'}.set $${name}`);
+            return;
+        }
         ctx.genExpr(rhs, ctx.wasmType(type), out);
         out.push(`${ctx.localTypes.has(name) ? 'local' : 'global'}.set $${name}`);
     },
-    field_expr: (ctx, lhs, rhs, out) => {
+    field_expr: (ctx, lhs, rhs, op, assignNode, out) => {
         const [object, field] = kids(lhs);
         const objectType = ctx.inferType(object);
         const directField = ctx.typeFields(objectType)?.find((candidate) => candidate.name === field.text) ?? null;
+        const getterHelper = objectType ? ctx.protocolHelpersByTypeMember.get(`${objectType}.${field.text}`) : null;
         const setterHelper = objectType ? ctx.protocolSetterHelpersByTypeMember.get(`${objectType}.${field.text}`) : null;
         if (directField && !directField.mut)
             throw new Error(`Field "${field.text}" on "${objectType}" must be declared "mut" before it can be assigned`);
+        if (op !== '=') {
+            if (!directField && !getterHelper)
+                throw new Error(`Compound assignment to "${field.text}" requires a readable field or protocol getter`);
+            const objectTemp = ctx.assignObjectTempName(assignNode);
+            ctx.genExpr(object, null, out);
+            out.push(`local.set $${objectTemp}`);
+            out.push(`local.get $${objectTemp}`);
+            if (getterHelper) out.push(`call $${getterHelper}`);
+            else out.push(`struct.get $${objectType} $${field.text}`);
+            out.push(`local.set $${ctx.assignValueTempName(assignNode)}`);
+            out.push(`local.get $${objectTemp}`);
+            ctx.genCompoundAssignValue(assignNode, rhs, directField?.type ?? ctx.lookupFieldType(objectType, field.text) ?? I32, out);
+            if (setterHelper) {
+                out.push(`call $${setterHelper}`);
+                return;
+            }
+            out.push(`struct.set $${objectType} $${field.text}`);
+            return;
+        }
         if (setterHelper) {
             ctx.genExpr(object, null, out);
             ctx.genExpr(rhs, directField ? ctx.wasmType(directField.type) : null, out);
@@ -380,8 +464,26 @@ const ASSIGN_TARGET_HANDLERS = {
         ctx.genExpr(rhs, null, out);
         out.push(`struct.set $${objectType} $${field.text}`);
     },
-    index_expr: (ctx, lhs, rhs, out) => {
+    index_expr: (ctx, lhs, rhs, op, assignNode, out) => {
         const [object, index] = kids(lhs);
+        if (op !== '=') {
+            const objectTemp = ctx.assignObjectTempName(assignNode);
+            const indexTemp = ctx.assignIndexTempName(assignNode);
+            const arrayType = ctx.arrayTypeNameFromInferred(ctx.inferType(object));
+            ctx.genExpr(object, null, out);
+            out.push(`local.set $${objectTemp}`);
+            ctx.genExpr(index, 'i32', out);
+            out.push(`local.set $${indexTemp}`);
+            out.push(`local.get $${objectTemp}`);
+            out.push(`local.get $${indexTemp}`);
+            out.push(`array.get ${arrayType}`);
+            out.push(`local.set $${ctx.assignValueTempName(assignNode)}`);
+            out.push(`local.get $${objectTemp}`);
+            out.push(`local.get $${indexTemp}`);
+            ctx.genCompoundAssignValue(assignNode, rhs, ctx.inferredToType(ctx.arrayElemKeyFromInferred(ctx.inferType(object))) ?? I32, out);
+            out.push(`array.set ${arrayType}`);
+            return;
+        }
         ctx.genExpr(object, null, out);
         ctx.genExpr(index, 'i32', out);
         ctx.genExpr(rhs, null, out);
@@ -398,13 +500,13 @@ const EXPR_GENERATORS = {
     tuple_expr: (ctx, node, _hint, out) => ctx.genTuple(node, out),
     pipe_expr: (ctx, node, _hint, out) => ctx.genPipe(node, out),
     else_expr: (ctx, node, hint, out) => ctx.genElse(node, hint, out),
-    call_expr: (ctx, node, _hint, out) => ctx.genCall(node, out),
+    call_expr: (ctx, node, hint, out) => ctx.genCall(node, out, hint),
     field_expr: (ctx, node, _hint, out) => ctx.genField(node, out),
     index_expr: (ctx, node, _hint, out) => ctx.genIndex(node, out),
-    namespace_call_expr: (ctx, node, _hint, out) => ctx.genNsCall(node, out),
-    ref_null_expr: (_ctx, node, _hint, out) => {
+    namespace_call_expr: (ctx, node, hint, out) => ctx.genNsCall(node, out, null, hint),
+    ref_null_expr: (ctx, node, _hint, out) => {
         const typeNode = childOfType(node, 'type_ident') ?? childOfType(node, 'qualified_type_ref');
-        out.push(`ref.null $${typeNode.text}`);
+        out.push(`ref.null ${ctx.refNullTarget(typeNode.text)}`);
     },
     if_expr: (ctx, node, hint, out) => ctx.genIf(node, hint, out),
     promote_expr: (ctx, node, hint, out) => ctx.genPromote(node, hint, out),
@@ -458,6 +560,7 @@ class WatGen {
         this.protocolSetterMap = new Map();
         this.protocolSetterImplMap = new Map();
         this.protocolImplementersByProtocol = new Map();
+        this.protocolNames = new Set();
         this.protocolSlices = [];
         this.protocolHelpers = [];
         this.protocolThunks = [];
@@ -526,9 +629,20 @@ class WatGen {
         this.validateProtocolImplementers();
 
         const maxTag = Math.max(-1, ...this.taggedStructTags.values());
-        if (maxTag < 0) return;
-        const sliceSize = maxTag + 1;
-        const slicesByKey = new Map();
+        const sliceSize = Math.max(0, maxTag + 1);
+        const slicesByKey = new Map([...this.protocolMethodMap.entries()].map(([key, method]) => [key, {
+            protocol: method.protocol,
+            member: method.name,
+            funcTypeName: protoFuncTypeName(method.protocol, method.name),
+            trapName: protoTrapName(method.protocol, method.name),
+            tableName: protoTableName(method.protocol, method.name),
+            elemName: protoElemName(method.protocol, method.name),
+            dispatchParams: this.protocolDispatchParams(method),
+            returnType: method.returnType,
+            size: sliceSize,
+            entries: Array.from({ length: sliceSize }, () => protoTrapName(method.protocol, method.name)),
+        }]));
+        this.protocolSlices.push(...slicesByKey.values());
 
         for (const impl of this.protocolImplMap.values()) {
             const key = protocolMethodKey(impl.protocol, impl.member);
@@ -539,23 +653,7 @@ class WatGen {
                 type: substituteProtocolType(type, method.typeParam, impl.selfTypeName),
             }));
             const helperReturnType = substituteProtocolType(method.returnType, method.typeParam, impl.selfTypeName);
-            let slice = slicesByKey.get(key);
-            if (!slice) {
-                slice = {
-                    protocol: impl.protocol,
-                    member: impl.member,
-                    funcTypeName: protoFuncTypeName(impl.protocol, impl.member),
-                    trapName: protoTrapName(impl.protocol, impl.member),
-                    tableName: protoTableName(impl.protocol, impl.member),
-                    elemName: protoElemName(impl.protocol, impl.member),
-                    dispatchParams: this.protocolDispatchParams(method),
-                    returnType: method.returnType,
-                    size: sliceSize,
-                    entries: Array.from({ length: sliceSize }, () => protoTrapName(impl.protocol, impl.member)),
-                };
-                slicesByKey.set(key, slice);
-                this.protocolSlices.push(slice);
-            }
+            const slice = slicesByKey.get(key);
 
             const thunk = {
                 name: protoThunkName(impl.protocol, impl.member, impl.selfTypeName),
@@ -582,7 +680,19 @@ class WatGen {
             this.callables.set(helper.name, helper);
         }
 
-        const setterSlicesByKey = new Map();
+        const setterSlicesByKey = new Map([...this.protocolSetterMap.entries()].map(([key, method]) => [key, {
+            protocol: method.protocol,
+            member: method.name,
+            funcTypeName: protoSetterFuncTypeName(method.protocol, method.name),
+            trapName: protoSetterTrapName(method.protocol, method.name),
+            tableName: protoSetterTableName(method.protocol, method.name),
+            elemName: protoSetterElemName(method.protocol, method.name),
+            dispatchParams: this.protocolDispatchParams(method),
+            returnType: null,
+            size: sliceSize,
+            entries: Array.from({ length: sliceSize }, () => protoSetterTrapName(method.protocol, method.name)),
+        }]));
+        this.protocolSetterSlices.push(...setterSlicesByKey.values());
         for (const impl of this.protocolSetterImplMap.values()) {
             const key = protocolSetterKey(impl.protocol, impl.member);
             const method = this.protocolSetterMap.get(key);
@@ -591,23 +701,7 @@ class WatGen {
                 name: index === 0 ? 'self' : `arg${index}`,
                 type: substituteProtocolType(type, method.typeParam, impl.selfTypeName),
             }));
-            let slice = setterSlicesByKey.get(key);
-            if (!slice) {
-                slice = {
-                    protocol: impl.protocol,
-                    member: impl.member,
-                    funcTypeName: protoSetterFuncTypeName(impl.protocol, impl.member),
-                    trapName: protoSetterTrapName(impl.protocol, impl.member),
-                    tableName: protoSetterTableName(impl.protocol, impl.member),
-                    elemName: protoSetterElemName(impl.protocol, impl.member),
-                    dispatchParams: this.protocolDispatchParams(method),
-                    returnType: null,
-                    size: sliceSize,
-                    entries: Array.from({ length: sliceSize }, () => protoSetterTrapName(impl.protocol, impl.member)),
-                };
-                setterSlicesByKey.set(key, slice);
-                this.protocolSetterSlices.push(slice);
-            }
+            const slice = setterSlicesByKey.get(key);
 
             const thunk = {
                 name: protoSetterThunkName(impl.protocol, impl.member, impl.selfTypeName),
@@ -632,6 +726,43 @@ class WatGen {
             this.protocolSetterHelpers.push(helper);
             this.protocolSetterHelpersByTypeMember.set(`${impl.selfTypeName}.${impl.member}`, helper.name);
             this.callables.set(helper.name, helper);
+        }
+
+        for (const protoDecl of this.protoDecls) {
+            for (const method of protoDecl.methods) {
+                const helperParams = method.params.map((type, index) => ({
+                    kind: 'param',
+                    name: index === 0 ? 'self' : `arg${index}`,
+                    type: substituteProtocolType(type, protoDecl.typeParam, protoDecl.name),
+                }));
+                if (method.setter) {
+                    const helper = {
+                        name: protoSetterDispatchName(protoDecl.name, method.name, protoDecl.name),
+                        selfTypeName: protoDecl.name,
+                        tagTypeName: TAGGED_ROOT_TYPE,
+                        params: helperParams,
+                        returnType: null,
+                        funcTypeName: protoSetterFuncTypeName(protoDecl.name, method.name),
+                        tableName: protoSetterTableName(protoDecl.name, method.name),
+                    };
+                    this.protocolSetterHelpers.push(helper);
+                    this.protocolSetterHelpersByTypeMember.set(`${protoDecl.name}.${method.name}`, helper.name);
+                    this.callables.set(helper.name, helper);
+                    continue;
+                }
+                const helper = {
+                    name: protoDispatchName(protoDecl.name, method.name, protoDecl.name),
+                    selfTypeName: protoDecl.name,
+                    tagTypeName: TAGGED_ROOT_TYPE,
+                    params: helperParams,
+                    returnType: substituteProtocolType(method.returnType, protoDecl.typeParam, protoDecl.name),
+                    funcTypeName: protoFuncTypeName(protoDecl.name, method.name),
+                    tableName: protoTableName(protoDecl.name, method.name),
+                };
+                this.protocolHelpers.push(helper);
+                this.protocolHelpersByTypeMember.set(`${protoDecl.name}.${method.name}`, helper.name);
+                this.callables.set(helper.name, helper);
+            }
         }
 
         for (const typeDecl of this.typeDecls) {
@@ -687,7 +818,13 @@ class WatGen {
     assignTagIds() {
         let nextTag = 0;
         for (const decl of this.structDecls) {
+            if (decl.protocols.length > 0 && !decl.tagged)
+                throw new Error(`Struct "${decl.name}" must be declared with "tag struct" to implement protocols`);
             if (!decl.tagged) continue;
+            for (const protocol of decl.protocols) {
+                if (!this.taggedTypeProtocols.has(decl.name)) this.taggedTypeProtocols.set(decl.name, new Set());
+                this.taggedTypeProtocols.get(decl.name).add(protocol);
+            }
             if (decl.fields.some((field) => field.name === HIDDEN_TAG_FIELD.name))
                 throw new Error(`Tagged struct "${decl.name}" cannot declare a field named "${HIDDEN_TAG_FIELD.name}"`);
             this.taggedStructTags.set(decl.name, nextTag++);
@@ -706,6 +843,9 @@ class WatGen {
                 this.variantParents.set(variant.name, decl.name);
                 this.taggedStructTags.set(variant.name, nextTag++);
             }
+        }
+        for (const decl of this.protoDecls) {
+            this.taggedStructTags.set(protoDefaultTypeName(decl.name), nextTag++);
         }
     }
 
@@ -744,6 +884,9 @@ class WatGen {
         const parentTypeName = this.variantParents.get(fn.selfTypeName) ?? null;
         if (parentTypeName && !this.taggedTypeProtocols.get(parentTypeName)?.has(fn.protocolOwner))
             throw new Error(`Variant "${fn.selfTypeName}" cannot implement protocol "${fn.protocolOwner}" because parent type "${parentTypeName}" does not declare it`);
+        const structDecl = this.structDecls.find((decl) => decl.name === fn.selfTypeName) ?? null;
+        if (structDecl && !structDecl.protocols.includes(fn.protocolOwner))
+            throw new Error(`Struct "${fn.selfTypeName}" cannot implement protocol "${fn.protocolOwner}" without declaring ": ${fn.protocolOwner}"`);
         if (fn.exported) throw new Error(`Protocol implementation "${fn.protocolOwner}.${fn.protocolMember}" cannot be exported directly`);
         const expectedParams = method.params.map((type) => substituteProtocolType(type, method.typeParam, fn.selfTypeName));
         const expectedReturn = substituteProtocolType(method.returnType, method.typeParam, fn.selfTypeName);
@@ -772,13 +915,8 @@ class WatGen {
 
     synthesizeProtocolGetterImpls() {
         for (const decl of this.protoDecls) {
-            const implementers = this.protocolImplementersByProtocol.get(decl.name) ?? new Set();
-            if (decl.methods.length > 0 && decl.methods.every((method) => method.getter || method.setter)) {
-                for (const selfTypeName of this.taggedStructTags.keys()) {
-                    if (this.protocolFieldBackedMembersMatch(decl, selfTypeName)) implementers.add(selfTypeName);
-                }
-                if (implementers.size > 0) this.protocolImplementersByProtocol.set(decl.name, implementers);
-            }
+            const implementers = this.declaredProtocolImplementers(decl.name);
+            if (implementers.size > 0) this.protocolImplementersByProtocol.set(decl.name, implementers);
 
             for (const selfTypeName of implementers) {
                 for (const method of decl.methods) {
@@ -812,17 +950,16 @@ class WatGen {
         }
     }
 
-    protocolFieldBackedMembersMatch(decl, selfTypeName) {
-        try {
-            for (const method of decl.methods) {
-                if (method.getter) this.requireProtocolGetterField(decl.name, method, selfTypeName);
-                else if (method.setter) this.requireProtocolSetterField(decl.name, method, selfTypeName);
-                else return false;
-            }
-            return true;
-        } catch {
-            return false;
+    declaredProtocolImplementers(protocol) {
+        const implementers = new Set(this.protocolImplementersByProtocol.get(protocol) ?? []);
+        for (const decl of this.structDecls) {
+            if (decl.protocols.includes(protocol)) implementers.add(decl.name);
         }
+        for (const decl of this.typeDecls) {
+            if (!decl.protocols.includes(protocol)) continue;
+            for (const variant of decl.variants) implementers.add(variant.name);
+        }
+        return implementers;
     }
 
     requireProtocolGetterField(protocol, method, selfTypeName) {
@@ -846,10 +983,24 @@ class WatGen {
     }
 
     validateProtocolImplementers() {
+        for (const structDecl of this.structDecls) {
+            for (const protocol of structDecl.protocols) {
+                const protoDecl = this.protoDecls.find((decl) => decl.name === protocol);
+                if (!protoDecl) throw new Error(`Unknown protocol "${protocol}" on struct "${structDecl.name}"`);
+                for (const method of protoDecl.methods) {
+                    const covered = method.setter
+                        ? this.protocolSetterImplMap.has(protocolSetterImplKey(protocol, method.name, structDecl.name))
+                        : this.protocolImplMap.has(protocolImplKey(protocol, method.name, structDecl.name));
+                    if (!covered)
+                        throw new Error(`Struct "${structDecl.name}" does not fully implement protocol "${protocol}"; missing "${method.name}"`);
+                }
+            }
+        }
         for (const decl of this.protoDecls) {
             const implementers = this.protocolImplementersByProtocol.get(decl.name);
             if (!implementers) continue;
             for (const selfTypeName of implementers) {
+                if (this.variantParents.has(selfTypeName)) continue;
                 for (const method of decl.methods) {
                     const covered = method.setter
                         ? this.protocolSetterImplMap.has(protocolSetterImplKey(decl.name, method.name, selfTypeName))
@@ -1042,27 +1193,47 @@ class WatGen {
     }
 
     emitPlainTypeDefs() {
-        return [
-            ...this.structDecls.filter(d => !d.rec).map(decl => this.emitStructType(decl, '  ')),
-            ...this.typeDecls.filter(d => !d.rec).flatMap(decl => this.emitSumType(decl, '  ')),
-        ];
+        return [];
     }
 
     emitRecTypeDefs() {
         return [
             ...[...this.arrayTypes].map(([key, name]) => `    (type ${name} (array (mut ${this.elemKeyWasmType(key)})))`),
-            ...this.structDecls.filter(d => d.rec).map(decl => this.emitStructType(decl)),
-            ...this.typeDecls.filter(d => d.rec).flatMap(decl => this.emitSumType(decl)),
+            ...(this.usesTaggedRoot() ? [this.emitTaggedRootType('    '), ...this.emitProtocolDefaultTypes('    ')] : []),
+            ...this.structDecls.map((decl) => this.emitStructType(decl)),
+            ...this.typeDecls.flatMap((decl) => this.emitSumType(decl)),
         ];
     }
 
+    usesTaggedRoot() {
+        return this.taggedStructTags.size > 0 || this.protoDecls.length > 0;
+    }
+
+    emitTaggedRootType(indent = '  ') {
+        return `${indent}(type $${TAGGED_ROOT_TYPE} (sub (struct\n${indent}  ${this.watField(HIDDEN_TAG_FIELD)}\n${indent})))`;
+    }
+
+    emitProtocolDefaultTypes(indent = '  ') {
+        return this.protoDecls.map((decl) => this.emitStructLikeType(
+            `${indent}(type $${protoDefaultTypeName(decl.name)} (sub $${TAGGED_ROOT_TYPE} (struct`,
+            [HIDDEN_TAG_FIELD],
+            `${indent})))`,
+        ));
+    }
+
     emitStructType(decl, indent = '    ') {
-        return this.emitStructLikeType(`${indent}(type $${decl.name} (struct`, this.runtimeStructFields(decl), `${indent}))`);
+        const prefix = decl.tagged
+            ? `${indent}(type $${decl.name} (sub $${TAGGED_ROOT_TYPE} (struct`
+            : `${indent}(type $${decl.name} (struct`;
+        const closing = decl.tagged ? `${indent})))` : `${indent}))`;
+        return this.emitStructLikeType(prefix, this.runtimeStructFields(decl), closing);
     }
 
     emitSumType(decl, indent = '    ') {
         const lines = [this.emitStructLikeType(
-            `${indent}(type $${decl.name} (sub (struct`,
+            decl.tagged
+                ? `${indent}(type $${decl.name} (sub $${TAGGED_ROOT_TYPE} (struct`
+                : `${indent}(type $${decl.name} (sub (struct`,
             decl.tagged ? [HIDDEN_TAG_FIELD] : [],
             `${indent})))`,
         )];
@@ -1377,11 +1548,35 @@ class WatGen {
         }
         const leftType = this.inferType(left) || hint || 'i32';
         const rightType = this.inferType(right) || hint || 'i32';
-        const wasmType = this.dominantType(leftType, rightType);
+        const wasmType = hint && this.isNumericWasmType(hint) && !BINARY_BOOL_OPS.has(op)
+            ? hint
+            : this.dominantType(leftType, rightType);
+
+        if (op === '^' && (wasmType === 'f32' || wasmType === 'f64')) {
+            const exponent = this.floatExponentValue(right);
+            if (exponent === 2) {
+                this.genExpr(left, wasmType, out);
+                this.genExpr(left, wasmType, out);
+                out.push(`${wasmType}.mul`);
+                return;
+            }
+            if (exponent === 0.5) {
+                this.genExpr(left, wasmType, out);
+                out.push(`${wasmType}.sqrt`);
+                return;
+            }
+            throw new Error('Floating-point "^" currently supports only 2.0 and 0.5 exponents');
+        }
 
         this.genExprForBinaryOperand(left, leftType, wasmType, out);
         this.genExprForBinaryOperand(right, rightType, wasmType, out);
         out.push(this.binaryInstr(op, wasmType));
+    }
+
+    floatExponentValue(node) {
+        const target = node?.type === 'paren_expr' ? kids(node)[0] : node;
+        const info = target?.type === 'literal' ? literalInfo(target) : null;
+        return info?.kind === 'float' || info?.kind === 'int' ? Number(info.value) : null;
     }
 
     genExprForBinaryOperand(node, sourceType, targetType, out) {
@@ -1393,7 +1588,8 @@ class WatGen {
     binaryInstr(op, wasmType) {
         const isFloat = wasmType === 'f32' || wasmType === 'f64';
         const isUnsigned = wasmType === 'u32' || wasmType === 'u64';
-        return BINARY_INSTR_BUILDERS[op]({ base: isUnsigned ? wasmType.replace('u', 'i') : wasmType, isFloat, isUnsigned });
+        const base = this.scalarWasmType(isUnsigned ? wasmType.replace('u', 'i') : wasmType);
+        return BINARY_INSTR_BUILDERS[op]({ base, isFloat, isUnsigned });
     }
 
     genTuple(node, out) {
@@ -1430,10 +1626,10 @@ class WatGen {
         out.push(')');
     }
 
-    genCall(node, out) {
+    genCall(node, out, hint = null) {
         const callee = kids(node)[0], args = this.args(node);
         const emit = CALL_CALLEE_HANDLERS[callee.type];
-        if (emit) return void emit(this, callee, args, out);
+        if (emit) return void emit(this, callee, args, out, hint);
         this.pushArgs(args, out);
         this.genExpr(callee, null, out);
         out.push('call_ref');
@@ -1470,7 +1666,7 @@ class WatGen {
         out.push(`array.get ${this.arrayTypeNameFromInferred(this.inferType(object))}`);
     }
 
-    genNsCall(node, out, explicitArgs = null) {
+    genNsCall(node, out, explicitArgs = null, hint = null) {
         const { ns, method } = namespaceInfo(node), args = explicitArgs ?? this.args(node);
         const op = SIMPLE_NS_OPS[ns];
         if (op) {
@@ -1478,11 +1674,11 @@ class WatGen {
             out.push(op);
             return;
         }
-        NS_CALL_HANDLERS[ns](this, method, args, out);
+        NS_CALL_HANDLERS[ns](this, method, args, out, hint);
     }
 
-    genArrayNsCall(method, args, out) {
-        ARRAY_NS_CALL_HANDLERS[method](this, args, out);
+    genArrayNsCall(method, args, out, hint = null) {
+        ARRAY_NS_CALL_HANDLERS[method](this, args, out, hint);
     }
 
     genRefNsCall(method, args, out) {
@@ -1490,8 +1686,8 @@ class WatGen {
             this.genExpr(args[0], null, out);
             const typeName = args[1].text;
             out.push(method === 'cast'
-                ? `ref.cast (ref $${typeName})`
-                : `ref.test (ref $${typeName})`);
+                ? `ref.cast (ref $${this.wasmNamedTypeTarget(typeName)})`
+                : `ref.test (ref $${this.wasmNamedTypeTarget(typeName)})`);
             return;
         }
         this.pushArgs(args.slice(0, method === 'eq' ? 2 : 1), out);
@@ -1722,7 +1918,7 @@ class WatGen {
             this.withLoop(out, (breakLabel, continueLabel, uid) => {
                 out.push(`    local.get $${capture}`);
                 this.pushGenerated(out, lines => this.genExpr(source.end, 'i32', lines));
-                out.push('    i32.ge_s');
+                out.push(source.inclusive ? '    i32.gt_s' : '    i32.ge_s');
                 out.push(`    br_if ${breakLabel}`);
                 this.pushGenerated(out, emitBody);
                 this.bumpI32Local(capture, out, '    ');
@@ -1841,15 +2037,36 @@ class WatGen {
         const elemWasm = this.wasmType(elemType), key = this.elemTypeKey(elemType);
         this.requireArrayType(key);
         const arrayTypeName = this.arrayTypes.get(key);
-        ARRAY_INIT_HANDLERS[method](this, args, elemWasm, arrayTypeName, out);
+        ARRAY_INIT_HANDLERS[method](this, args, elemType, elemWasm, arrayTypeName, out);
     }
 
     requireArrayType(key) { if (!this.arrayTypes.has(key)) this.arrayTypes.set(key, `$${key}_array`); }
+    arrayCtorInfoFromHint(hint, opname) {
+        if (!hint) {
+            throw new Error(`${opname} requires an expected array type such as "let xs: array[T] = array.new_default(...)"`);
+        }
+        const match = /^\(ref(?: null)? (\$[^\s)]+)\)$/.exec(hint);
+        const arrayTypeName = match?.[1] ?? null;
+        if (!arrayTypeName) {
+            throw new Error(`${opname} requires an expected array type, got "${hint}"`);
+        }
+        for (const [key, name] of this.arrayTypes) {
+            if (name === arrayTypeName) {
+                return {
+                    key,
+                    arrayTypeName: name,
+                    elemWasm: this.elemKeyWasmType(key),
+                };
+            }
+        }
+        throw new Error(`${opname} could not resolve the expected array type from "${hint}"`);
+    }
 
     genAssign(node, out) {
         const [lhs, rhs] = kids(node);
+        const op = this.assignOperator(node);
         const emit = ASSIGN_TARGET_HANDLERS[lhs.type];
-        if (emit) return void emit(this, lhs, rhs, out);
+        if (emit) return void emit(this, lhs, rhs, op, node, out);
     }
 
     coerceNumeric(from, to, out) {
@@ -1892,8 +2109,8 @@ class WatGen {
     }
 
     scalarWasmType(name) { return SCALAR_WASM[name] || name; }
-    namedWasmType(name) { return REF_WASM[name] || `(ref $${name})`; }
-    nullableWasmType(inner) { return !inner ? 'externref' : inner.kind === 'named' ? NULLABLE_REF_WASM[inner.name] || `(ref null $${inner.name})` : this.wasmType(inner); }
+    namedWasmType(name) { return REF_WASM[name] || `(ref $${this.wasmNamedTypeTarget(name)})`; }
+    nullableWasmType(inner) { return !inner ? 'externref' : inner.kind === 'named' ? NULLABLE_REF_WASM[inner.name] || `(ref null $${this.wasmNamedTypeTarget(inner.name)})` : this.wasmType(inner); }
     arrayWasmType(elemType) {
         const key = this.elemTypeKey(elemType);
         this.requireArrayType(key);
@@ -1903,14 +2120,14 @@ class WatGen {
         if (SCALAR_WASM[key]) return SCALAR_WASM[key];
         if (REF_WASM[key]) return REF_WASM[key];
         if (key.startsWith('nullable_')) return this.nullableElemKeyWasmType(key.slice('nullable_'.length));
-        return `(ref $${key})`;
+        return `(ref $${this.wasmNamedTypeTarget(key)})`;
     }
     nullableElemKeyWasmType(key) {
         if (SCALAR_WASM[key]) return SCALAR_WASM[key];
         if (REF_WASM[key]) return NULLABLE_REF_WASM[key] || `(ref null $${key})`;
         if (key.startsWith('nullable_')) return this.nullableElemKeyWasmType(key.slice('nullable_'.length));
         if (key.endsWith('_array')) return `(ref null $${key})`;
-        return `(ref null $${key})`;
+        return `(ref null $${this.wasmNamedTypeTarget(key)})`;
     }
     watResultList(returnType) { return this.flattenResultTypes(returnType).map(type => `(result ${type})`).join(' '); }
     funcTypeClause(params, returnType) {
@@ -2041,13 +2258,74 @@ class WatGen {
     typeFields(typeName) { return this.typeDeclMap.get(typeName)?.fields ?? this.variantDecls.get(typeName)?.fields ?? null; }
 
     lookupFieldType(typeName, fieldName) {
-        return this.typeFields(typeName)?.find(field => field.name === fieldName)?.type ?? null;
+        const direct = this.typeFields(typeName)?.find(field => field.name === fieldName)?.type ?? null;
+        if (direct) return direct;
+        const helperName = this.protocolHelpersByTypeMember.get(`${typeName}.${fieldName}`) ?? null;
+        return helperName ? this.lookupCallableReturnType(helperName) : null;
     }
 
     arrayTypeNameFromInferred(inferred) { return `$${inferred.endsWith('_array') ? inferred : `${inferred}_array`}`; }
     arrayElemKeyFromInferred(inferred) { return inferred?.endsWith('_array') ? inferred.slice(0, -6) : null; }
     scalarMatchTempName(node) { return `__match_subj_${node.id}`; }
     altSubjectTempName(node) { return `__alt_subj_${node.id}`; }
+    assignValueTempName(node) { return `__assign_value_${node.id}`; }
+    assignObjectTempName(node) { return `__assign_obj_${node.id}`; }
+    assignIndexTempName(node) { return `__assign_index_${node.id}`; }
+    assignOperator(node) {
+        const [lhs, rhs] = kids(node);
+        return findAnonBetween(node, lhs, rhs);
+    }
+    isCompoundAssign(node) { return this.assignOperator(node) !== '='; }
+    tempLocalTypeForExpr(node) {
+        return this.exprType(node) ?? this.inferredToType(this.inferType(node)) ?? I32;
+    }
+    assignValueType(lhs) {
+        switch (lhs.type) {
+            case 'identifier':
+                return this.localTypes.get(lhs.text) ?? this.globalTypeMap.get(lhs.text) ?? I32;
+            case 'field_expr': {
+                const [object, field] = kids(lhs);
+                return this.lookupFieldType(this.inferType(object), field.text) ?? I32;
+            }
+            case 'index_expr': {
+                const [object] = kids(lhs);
+                const elem = this.arrayElemKeyFromInferred(this.inferType(object));
+                return this.inferredToType(elem) ?? I32;
+            }
+            default:
+                return I32;
+        }
+    }
+    genCompoundAssignValue(node, rhs, targetType, out) {
+        const compoundOp = this.assignOperator(node);
+        const binaryOp = COMPOUND_ASSIGN_BINARY_OPS.get(compoundOp);
+        if (!binaryOp)
+            throw new Error(`Unsupported assignment operator "${compoundOp}"`);
+        const valueTemp = this.assignValueTempName(node);
+        const targetInferred = this.typeName(targetType) ?? this.wasmType(targetType);
+        const wasmType = this.wasmTypeStr(targetInferred) ?? this.wasmType(targetType);
+        if (binaryOp === '^' && (targetInferred === 'f32' || targetInferred === 'f64')) {
+            const exponent = this.floatExponentValue(rhs);
+            if (exponent === 2) {
+                out.push(`local.get $${valueTemp}`);
+                out.push(`local.get $${valueTemp}`);
+                out.push(`${wasmType}.mul`);
+                return;
+            }
+            if (exponent === 0.5) {
+                out.push(`local.get $${valueTemp}`);
+                out.push(`${wasmType}.sqrt`);
+                return;
+            }
+            throw new Error('Floating-point "^" currently supports only 2.0 and 0.5 exponents');
+        }
+        const binaryType = BINARY_BOOL_OPS.has(binaryOp)
+            ? this.dominantType(this.inferType(rhs) || targetInferred, targetInferred)
+            : targetInferred;
+        out.push(`local.get $${valueTemp}`);
+        this.genExprForBinaryOperand(rhs, this.inferType(rhs) || targetInferred, binaryType, out);
+        out.push(this.binaryInstr(binaryOp, binaryType));
+    }
     scalarMatchBranchTablePlan(node, arms, compareType) {
         if (compareType !== 'i32') return null;
 
@@ -2107,7 +2385,8 @@ class WatGen {
     }
     scalarMatchCompareType(inferred) { return SCALAR_MATCH_COMPARE_TYPES[inferred] || 'i32'; }
 
-    refNullTarget(name) { return name === 'str' || name === 'externref' ? 'extern' : `$${name}`; }
+    wasmNamedTypeTarget(name) { return this.protocolNames.has(name) ? TAGGED_ROOT_TYPE : name; }
+    refNullTarget(name) { return name === 'str' || name === 'externref' ? 'extern' : `$${this.wasmNamedTypeTarget(name)}`; }
     defaultValue(type) {
         const emit = DEFAULT_VALUE_GENERATORS[type?.kind];
         if (emit) return emit(this, type);
@@ -2137,7 +2416,14 @@ class WatGen {
     }
 }
 
-const parseStructDecl = (node) => ({ kind: 'struct_decl', name: textOf(node, 'type_ident'), fields: parseFieldList(childOfType(node, 'field_list')), rec: hasAnon(node, 'rec'), tagged: hasAnon(node, 'tag') });
+const parseStructDecl = (node) => ({
+    kind: 'struct_decl',
+    name: textOf(node, 'type_ident'),
+    fields: parseFieldList(childOfType(node, 'field_list')),
+    protocols: childrenOfType(childOfType(node, 'protocol_list'), 'type_ident').map((child) => child.text),
+    rec: hasAnon(node, 'rec'),
+    tagged: hasAnon(node, 'tag'),
+});
 const parseProtoDecl = (node) => {
     const typeParams = childrenOfType(childOfType(node, 'module_type_param_list'), 'type_ident').map((child) => child.text);
     const typeParam = typeParams[0] ?? null;
@@ -2287,7 +2573,10 @@ const parsePipeArgs = (node) => namedChildren(node)
 const pipeArgValues = (target) => target.args.filter(arg => arg.kind === 'arg').map(arg => arg.value);
 const namespaceInfo = (node) => ({ ns: node.children[0].text, method: childOfType(node, 'identifier').text });
 const parseForSources = (node) => mapType(node, 'for_source', parseForSource);
-const parseForSource = (node) => ({ kind: 'range', start: kids(node)[0], end: kids(node)[1] });
+const parseForSource = (node) => {
+    const [start, end] = kids(node);
+    return { kind: 'range', start, end, inclusive: findAnonBetween(node, start, end) === '...' };
+};
 const parseCapture = (node) => mapType(node, 'identifier', child => child.text);
 const parsePromoteCapture = (node) => {
     const ident = childOfType(node, 'identifier');
@@ -2331,6 +2620,7 @@ const flattenTuple = (node, out = []) => {
 
 const mapType = (node, type, parse) => childrenOfType(node, type).map(parse);
 const textOf = (node, type) => childOfType(node, type).text;
+const TAGGED_ROOT_TYPE = '__utu_tagged';
 const HIDDEN_TAG_FIELD = Object.freeze({ kind: 'field', mut: true, name: '__tag', type: I32 });
 const EQREF_TYPE = Object.freeze({ kind: 'named', name: 'eqref' });
 const protocolMethodKey = (protocol, member) => `${protocol}.${member}`;
@@ -2339,6 +2629,7 @@ const protoFuncTypeName = (protocol, member) => `__utu_proto_sig_${snakeCase(pro
 const protoDispatchName = (protocol, member, selfType) => `__utu_proto_dispatch_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
 const protoImplName = (protocol, member, selfType) => `__utu_proto_impl_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
 const protoThunkName = (protocol, member, selfType) => `__utu_proto_thunk_${snakeCase(protocol)}_${snakeCase(member)}_${hashText(selfType)}`;
+const protoDefaultTypeName = (protocol) => `__utu_proto_default_${snakeCase(protocol)}`;
 const protoTrapName = (protocol, member) => `__utu_proto_trap_${snakeCase(protocol)}_${snakeCase(member)}`;
 const protoTableName = (protocol, member) => `__utu_proto_table_${snakeCase(protocol)}_${snakeCase(member)}`;
 const protoElemName = (protocol, member) => `__utu_proto_elem_${snakeCase(protocol)}_${snakeCase(member)}`;

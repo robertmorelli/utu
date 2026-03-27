@@ -8,6 +8,9 @@ import { watgen } from '../watgen.js';
 const FILE_START_RANGE = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
 const FILE_START_OFFSET_RANGE = { start: 0, end: 0 };
 const SYMBOL_METADATA = data.symbolMetadata;
+const BUILTIN_METHOD_COMPLETION_TYPES = new Map([
+    ['array.len', 'i32'],
+]);
 const STATIC_COMPLETION_ITEMS = [
     ...createCompletionItems(KEYWORD_COMPLETIONS, 'keyword'),
     ...createCompletionItems(Object.keys(BUILTIN_METHODS), 'module'),
@@ -106,7 +109,7 @@ export class UtuLanguageService {
     async getCompletionItems(document, position) {
         const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
         const namespaceMatch = linePrefix.match(/\b([a-z0-9_]+)\.$/i);
-        if (namespaceMatch) {
+        if (namespaceMatch && isBuiltinNamespace(namespaceMatch[1])) {
             return (BUILTIN_METHODS[namespaceMatch[1]] ?? []).map((method) => ({
                 label: method,
                 kind: 'method',
@@ -114,9 +117,59 @@ export class UtuLanguageService {
             }));
         }
         const index = await this.getDocumentIndex(document);
+        const memberItems = await this.getMemberCompletionItems(document, position, linePrefix, index);
+        if (memberItems.length) return memberItems;
         return [...STATIC_COMPLETION_ITEMS, ...index.topLevelSymbols
                 .filter((symbol) => symbol.kind !== 'test' && symbol.kind !== 'bench')
                 .map((symbol) => ({ label: symbol.name, kind: SYMBOL_METADATA[symbol.kind].completionKind, detail: symbol.signature }))];
+    }
+    async getMemberCompletionItems(document, position, linePrefix, index) {
+        const context = await this.findMemberCompletionContext(document, position, linePrefix, index);
+        if (!context) return [];
+        if (!context.baseType) return [];
+        return index.getMemberSymbolsForTypeText(context.baseType)
+            .filter((symbol) => memberLabel(symbol).startsWith(context.prefix))
+            .map((symbol) => ({
+                label: memberLabel(symbol),
+                kind: SYMBOL_METADATA[symbol.kind].completionKind,
+                detail: symbol.signature,
+            }));
+    }
+    async findMemberCompletionContext(document, position, linePrefix, index) {
+        const suffixMatch = linePrefix.match(/\.([a-z_][a-z0-9_]*)?$/i);
+        if (!suffixMatch) return null;
+        const memberPrefix = suffixMatch[1] ?? '';
+        const parsedTree = await this.parserService.parseSource(document.getText());
+        try {
+            const rootNode = parsedTree.tree.rootNode;
+            if (memberPrefix) {
+                const anchor = treePoint(position.line, Math.max(position.character - 1, 0));
+                let node = rootNode.namedDescendantForPosition(anchor, anchor);
+                while (node) {
+                    if ((node.type === 'field_expr' || node.type === 'type_member_expr') && memberNodeText(node) === memberPrefix) {
+                        return { baseType: inferCompletionExpressionType(node.namedChildren[0], index), prefix: memberPrefix };
+                    }
+                    node = node.parent;
+                }
+            }
+            const dotColumn = position.character - 1;
+            if (dotColumn < 0) return null;
+            const anchor = treePoint(position.line, Math.max(dotColumn - 1, 0));
+            let node = rootNode.namedDescendantForPosition(anchor, anchor);
+            let best = null;
+            while (node) {
+                if (node.endPosition.row === position.line
+                    && node.endPosition.column === dotColumn
+                    && inferCompletionExpressionType(node, index)) {
+                    best = node;
+                }
+                node = node.parent;
+            }
+            return best ? { baseType: inferCompletionExpressionType(best, index), prefix: '' } : null;
+        }
+        finally {
+            parsedTree.dispose();
+        }
     }
     async getDocumentSemanticTokens(document) {
         const index = await this.getDocumentIndex(document);
@@ -389,7 +442,47 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     for (const item of rootNode.namedChildren)
         walkTopLevelItem(item);
     occurrences.sort((left, right) => comparePositions(left.range.start, right.range.start));
-    return { uri, version: document.version, diagnostics, symbols, symbolByKey, occurrences, topLevelSymbols };
+    return { uri, version: document.version, diagnostics, symbols, symbolByKey, occurrences, topLevelSymbols, getMemberSymbolsForTypeText };
+    function getMemberSymbolsForTypeText(typeText) {
+        const normalizedType = normalizeTypeText(typeText);
+        if (normalizedType.startsWith('array[')) {
+            return (BUILTIN_METHODS.array ?? [])
+                .filter((method) => !method.startsWith('new'))
+                .map((method) => builtinMethodSymbolForType(typeText, method))
+                .filter(Boolean)
+                .sort((left, right) => memberLabel(left).localeCompare(memberLabel(right)));
+        }
+        const ownerInfo = resolveOwnerInfoFromTypeText(typeText);
+        if (!ownerInfo?.owner)
+            return [];
+        const seen = new Set();
+        const results = [];
+        const add = (key) => {
+            if (!key || seen.has(key))
+                return;
+            const symbol = lookupSymbol(key);
+            if (!symbol)
+                return;
+            seen.add(key);
+            results.push(symbol);
+        };
+        for (const candidateType of expandTypeCandidates(typeText)) {
+            for (const fieldKey of fieldsByOwner.get(candidateType)?.values() ?? [])
+                add(fieldKey);
+        }
+        const addAssocEntries = (entries) => {
+            for (const [qualifiedName, key] of entries) {
+                if (!qualifiedName.startsWith(`${ownerInfo.owner}.`))
+                    continue;
+                add(key);
+            }
+        };
+        if (ownerInfo.namespace)
+            addAssocEntries(ownerInfo.namespace.assocKeys.entries());
+        addAssocEntries(topLevelAssocKeys.entries());
+        addAssocEntries(protocolAssocKeysBySelf.entries());
+        return results.sort((left, right) => memberLabel(left).localeCompare(memberLabel(right)));
+    }
     function collectTopLevelDeclarations(item) {
         if (item.type !== 'export_decl')
             return void topLevelHandlers[item.type]?.collect(item);
@@ -1043,7 +1136,16 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             const methodKey = resolveMethodCallKey(calleeNode);
             if (memberNode && methodKey) {
                 walkExpression(baseNode);
-                addResolvedOccurrence(memberNode, 'value', methodKey);
+                if (methodKey.includes('.')) {
+                    const builtinHover = getBuiltinHover(methodKey);
+                    if (builtinHover) {
+                        addBuiltinOccurrence(spanFromNode(document, memberNode), methodKey, memberNode.text);
+                    } else {
+                        addResolvedOccurrence(memberNode, 'value', methodKey);
+                    }
+                } else {
+                    addResolvedOccurrence(memberNode, 'value', methodKey);
+                }
                 walkExpressions(args);
                 return;
             }
@@ -1394,7 +1496,9 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
     function resolveMethodCallKey(node) {
         const [baseNode, memberNode] = node.namedChildren;
         const baseType = inferExpressionType(baseNode);
-        return memberNode && baseType ? resolveAssociatedKeyFromTypeText(baseType, memberNode.text) : undefined;
+        return memberNode && baseType
+            ? resolveAssociatedKeyFromTypeText(baseType, memberNode.text) ?? builtinMethodKeyForType(baseType, memberNode.text)
+            : undefined;
     }
     function resolveSetterKey(node) {
         const [baseNode, memberNode] = node.namedChildren;
@@ -1465,7 +1569,14 @@ function buildDocumentIndex(document, rootNode, diagnostics) {
             return inferIdentifierType(calleeNode);
         if (calleeNode.type === 'field_expr') {
             const methodSymbol = lookupSymbol(resolveMethodCallKey(calleeNode));
-            return methodSymbol?.returnTypeText ?? methodSymbol?.typeText ?? inferFieldExpressionType(calleeNode);
+            if (methodSymbol?.returnTypeText || methodSymbol?.typeText)
+                return methodSymbol.returnTypeText ?? methodSymbol.typeText;
+            const [baseNode, memberNode] = calleeNode.namedChildren;
+            const baseType = inferExpressionType(baseNode);
+            const builtinKey = baseType && memberNode ? builtinMethodKeyForType(baseType, memberNode.text) : undefined;
+            return builtinKey
+                ? getBuiltinReturnType(builtinKey, normalizedArrayElemType(baseType))
+                : inferFieldExpressionType(calleeNode);
         }
         if (calleeNode.type === 'type_member_expr')
             return inferTypeMemberExpressionType(calleeNode);
@@ -1602,6 +1713,107 @@ function normalizeTypeText(typeText) {
     while (value.startsWith('(') && value.endsWith(')'))
         value = value.slice(1, -1).trim();
     return value;
+}
+function treePoint(line, character) {
+    return { row: line, column: character };
+}
+function samePosition(left, right) {
+    return left?.line === right?.line && left?.character === right?.character;
+}
+function sameRange(left, right) {
+    return samePosition(left?.start, right?.start) && samePosition(left?.end, right?.end);
+}
+function nodeRange(node) {
+    return {
+        start: { line: node.startPosition.row, character: node.startPosition.column },
+        end: { line: node.endPosition.row, character: node.endPosition.column },
+    };
+}
+function memberNodeText(node) {
+    return node?.namedChildren.at(-1)?.text ?? '';
+}
+function memberLabel(symbol) {
+    if (symbol.kind === 'field') return symbol.name;
+    const memberName = symbol.name.includes('.') ? symbol.name.slice(symbol.name.lastIndexOf('.') + 1) : symbol.name;
+    return memberName.endsWith('=') ? memberName.slice(0, -1) : memberName;
+}
+function memberSymbolForType(index, typeText, memberName) {
+    return index.getMemberSymbolsForTypeText(typeText).find((symbol) => memberLabel(symbol) === memberName);
+}
+function builtinMethodKeyForType(typeText, memberName) {
+    const normalized = normalizeTypeText(typeText);
+    if (!normalized) return undefined;
+    if (normalized.startsWith('array[') && BUILTIN_METHODS.array?.includes(memberName) && !memberName.startsWith('new'))
+        return `array.${memberName}`;
+    return undefined;
+}
+function builtinMethodSymbolForType(typeText, memberName) {
+    const builtinKey = builtinMethodKeyForType(typeText, memberName);
+    if (!builtinKey) return undefined;
+    const returnTypeText = BUILTIN_METHOD_COMPLETION_TYPES.get(builtinKey) ?? getBuiltinReturnType(builtinKey, normalizedArrayElemType(typeText));
+    return {
+        key: builtinKey,
+        kind: 'function',
+        name: builtinKey,
+        signature: builtinKey,
+        detail: 'builtin method',
+        returnTypeText,
+        topLevel: false,
+    };
+}
+function normalizedArrayElemType(typeText) {
+    const normalized = normalizeTypeText(typeText);
+    const match = /^array\[(.+)\]$/u.exec(normalized ?? '');
+    return match?.[1];
+}
+function inferCompletionExpressionType(node, index) {
+    if (!node)
+        return undefined;
+    switch (node.type) {
+        case 'identifier': {
+            const occurrence = index.occurrences.find((candidate) => candidate.symbolKey && sameRange(candidate.range, nodeRange(node)));
+            const symbol = occurrence?.symbolKey ? index.symbolByKey.get(occurrence.symbolKey) : undefined;
+            return symbol?.typeText ?? symbol?.returnTypeText;
+        }
+        case 'paren_expr':
+        case 'unary_expr':
+            return inferCompletionExpressionType(node.namedChildren[0], index);
+        case 'index_expr': {
+            const baseType = normalizeTypeText(inferCompletionExpressionType(node.namedChildren[0], index) ?? '');
+            const match = /^array\[(.+)\]$/u.exec(baseType);
+            return match?.[1];
+        }
+        case 'field_expr': {
+            const [baseNode, fieldNode] = node.namedChildren;
+            const baseType = inferCompletionExpressionType(baseNode, index);
+            const symbol = baseType && fieldNode
+                ? memberSymbolForType(index, baseType, fieldNode.text) ?? builtinMethodSymbolForType(baseType, fieldNode.text)
+                : undefined;
+            return symbol?.returnTypeText ?? symbol?.typeText;
+        }
+        case 'call_expr': {
+            const calleeNode = node.namedChildren[0];
+            if (!calleeNode) return undefined;
+            if (calleeNode.type === 'identifier') {
+                const occurrence = index.occurrences.find((candidate) => candidate.symbolKey && sameRange(candidate.range, nodeRange(calleeNode)));
+                const symbol = occurrence?.symbolKey ? index.symbolByKey.get(occurrence.symbolKey) : undefined;
+                return symbol?.returnTypeText ?? symbol?.typeText;
+            }
+            if (calleeNode.type === 'field_expr') {
+                const [baseNode, memberNode] = calleeNode.namedChildren;
+                const baseType = inferCompletionExpressionType(baseNode, index);
+                const symbol = baseType && memberNode
+                    ? memberSymbolForType(index, baseType, memberNode.text) ?? builtinMethodSymbolForType(baseType, memberNode.text)
+                    : undefined;
+                return symbol?.returnTypeText ?? symbol?.typeText;
+            }
+            return undefined;
+        }
+        case 'struct_init':
+            return node.namedChildren[0]?.text;
+        default:
+            return undefined;
+    }
 }
 function stripNullableTypeText(typeText) {
     let value = typeText?.trim();

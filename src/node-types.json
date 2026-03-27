@@ -4524,6 +4524,10 @@
           "named": true
         },
         {
+          "type": "protocol_list",
+          "named": true
+        },
+        {
           "type": "type_ident",
           "named": true
         }
@@ -5110,7 +5114,15 @@
     "named": false
   },
   {
+    "type": "%=",
+    "named": false
+  },
+  {
     "type": "&",
+    "named": false
+  },
+  {
+    "type": "&=",
     "named": false
   },
   {
@@ -5126,7 +5138,15 @@
     "named": false
   },
   {
+    "type": "*=",
+    "named": false
+  },
+  {
     "type": "+",
+    "named": false
+  },
+  {
+    "type": "+=",
     "named": false
   },
   {
@@ -5138,6 +5158,10 @@
     "named": false
   },
   {
+    "type": "-=",
+    "named": false
+  },
+  {
     "type": "-o",
     "named": false
   },
@@ -5146,11 +5170,19 @@
     "named": false
   },
   {
-    "type": "..",
+    "type": "...",
+    "named": false
+  },
+  {
+    "type": "..<",
     "named": false
   },
   {
     "type": "/",
+    "named": false
+  },
+  {
+    "type": "/=",
     "named": false
   },
   {
@@ -5167,6 +5199,10 @@
   },
   {
     "type": "<<",
+    "named": false
+  },
+  {
+    "type": "<<=",
     "named": false
   },
   {
@@ -5198,7 +5234,15 @@
     "named": false
   },
   {
+    "type": ">>=",
+    "named": false
+  },
+  {
     "type": ">>>",
+    "named": false
+  },
+  {
+    "type": ">>>=",
     "named": false
   },
   {
@@ -5222,6 +5266,10 @@
     "named": false
   },
   {
+    "type": "^=",
+    "named": false
+  },
+  {
     "type": "_",
     "named": false
   },
@@ -5231,6 +5279,10 @@
   },
   {
     "type": "and",
+    "named": false
+  },
+  {
+    "type": "and=",
     "named": false
   },
   {
@@ -5395,6 +5447,10 @@
     "named": false
   },
   {
+    "type": "or=",
+    "named": false
+  },
+  {
     "type": "pipe_arg_placeholder",
     "named": true
   },
@@ -5484,6 +5540,10 @@
   },
   {
     "type": "|",
+    "named": false
+  },
+  {
+    "type": "|=",
     "named": false
   },
   {

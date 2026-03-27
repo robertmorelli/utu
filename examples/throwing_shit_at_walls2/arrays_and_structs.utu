@@ -1,0 +1,101 @@
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+
+struct Counter {
+    mut value: i32,
+}
+
+struct Todo {
+    text: str,
+    mut done: bool,
+}
+
+fun sum(xs: array[i32]) i32 {
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + xs[i];
+    };
+    total;
+}
+
+fun indexes(len: i32) array[i32] {
+    let xs: array[i32] = array[i32].new_default(len);
+    for (0..<array.len(xs)) |i| {
+        xs[i] = i;
+    };
+    xs;
+}
+
+fun bump(counter: Counter) i32 {
+    counter.value += 1;
+    counter.value;
+}
+
+fun make_todo(text: str) Todo {
+    Todo { text: text, done: false };
+}
+
+fun toggle(todo: Todo) void {
+    todo.done = not todo.done;
+}
+
+fun status(todo: Todo) str {
+    if todo.done { "done"; } else { todo.text; };
+}
+
+test "arrays 01 zero length default array reports len 0" {
+    let xs: array[i32] = array[i32].new_default(0);
+    assert array.len(xs) == 0;
+}
+
+test "arrays 02 zero length filled array reports len 0" {
+    let xs: array[i32] = array[i32].new(0, 9);
+    assert array.len(xs) == 0;
+}
+
+test "arrays 03 filling indexes at size 1 writes index 0" {
+    let xs: array[i32] = indexes(1);
+    assert xs[0] == 0;
+}
+
+test "arrays 04 filling indexes at size 4 writes last index" {
+    let xs: array[i32] = indexes(4);
+    assert xs[3] == 3;
+}
+
+test "arrays 05 summing an empty array returns zero" {
+    let xs: array[i32] = array[i32].new_default(0);
+    assert sum(xs) == 0;
+}
+
+test "arrays 06 copy with zero length keeps destination stable" {
+    let src: array[i32] = array[i32].new_fixed(9, 8, 7);
+    let dst: array[i32] = array[i32].new_fixed(1, 2, 3);
+    array.copy(dst, 0, src, 0, 0);
+    assert sum(dst) == 6;
+}
+
+test "arrays 07 fill with zero length keeps destination stable" {
+    let xs: array[i32] = array[i32].new_fixed(4, 5, 6);
+    array.fill(xs, 1, 99, 0);
+    assert sum(xs) == 15;
+}
+
+test "arrays 08 middle slice copy lands in the expected slots" {
+    let src: array[i32] = array[i32].new_fixed(4, 5, 6, 7);
+    let dst: array[i32] = array[i32].new_fixed(0, 0, 0, 0);
+    array.copy(dst, 1, src, 2, 2);
+    assert sum(dst) == 13;
+}
+
+test "arrays 09 mutable struct fields survive repeated helper calls" {
+    let counter: Counter = Counter { value: 0 };
+    bump(counter);
+    bump(counter);
+    assert counter.value == 2;
+}
+
+test "arrays 10 arrays of structs keep field mutations visible" {
+    let todos: array[Todo] = array[Todo].new_fixed(make_todo("a"), make_todo("b"));
+    toggle(todos[1]);
+    assert str_eq(status(todos[1]), "done");
+}

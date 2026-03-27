@@ -1,0 +1,449 @@
+struct Pair {
+    left: i32,
+    right: i32,
+}
+
+escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+
+fun Pair.new(left: i32, right: i32) Pair {
+    Pair { left: left, right: right };
+}
+
+fun Pair.sum(self: Pair) i32 {
+    self.left + self.right;
+}
+
+fun Pair.flip(self: Pair) Pair {
+    Pair.new(self.right, self.left);
+}
+
+mod cell[T] {
+    struct Cell {
+        mut value: T,
+    }
+
+    fun Cell.new(value: T) Cell {
+        Cell { value: value };
+    }
+
+    fun Cell.get(self: Cell) T {
+        self.value;
+    }
+
+    fun Cell.set(self: Cell, value: T) T {
+        self.value = value;
+        self.value;
+    }
+
+    fun wrap(value: T) Cell {
+        Cell.new(value);
+    }
+}
+
+mod duo[L, R] {
+    struct Duo {
+        left: L,
+        right: R,
+    }
+
+    fun Duo.new(left: L, right: R) Duo {
+        Duo { left: left, right: right };
+    }
+
+    fun Duo.left(self: Duo) L {
+        self.left;
+    }
+
+    fun Duo.right(self: Duo) R {
+        self.right;
+    }
+}
+
+construct ints = cell[i32];
+construct bools = cell[bool];
+construct ints_and_bools = duo[i32, bool];
+construct int_pairs = duo[i32, i32];
+
+struct Box {
+    width: i32,
+    height: i32,
+}
+
+struct AreaBox {
+    area: i32,
+    weight: i32,
+}
+
+fun Box.measure(self: Box) i32 {
+    self.width * self.height;
+}
+
+type Shape =
+    | Point
+    | Circle { radius: i32 }
+    | Rect { width: i32, height: i32 };
+
+fun shape_score(shape: Shape) i32 {
+    alt shape {
+        _: Point => 0,
+        c: Circle => c.radius * 10,
+        r: Rect => r.width + r.height,
+    };
+}
+
+fun pick_label(n: i32) str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        _ => "many",
+    };
+}
+
+fun maybe_pair(flag: bool) ?Pair {
+    if flag { Pair.new(4, 9); } else { ref.null Pair; };
+}
+
+fun maybe_box(flag: bool) ?Box {
+    if flag { Box { width: 2, height: 6 }; } else { ref.null Box; };
+}
+
+fun divmod(a: i32, b: i32) i32, i32 {
+    (a / b, a % b);
+}
+
+fun pair_from_parts(a: i32, b: i32) Pair {
+    let q: i32, r: i32 = divmod(a, b);
+    Pair.new(q, r);
+}
+
+fun sum_range(n: i32) i32 {
+    let total: i32 = 0;
+    for (0..<n) |i| {
+        total = total + i;
+    };
+    total;
+}
+
+fun while_countdown(start: i32) i32 {
+    let total: i32 = 0;
+    let n: i32 = start;
+    while (n > 0) {
+        total = total + n;
+        n -= 1;
+    };
+    total;
+}
+
+fun first_even_or_minus_one(xs: array[i32]) i32 {
+    search: {
+        for (0..<array.len(xs)) |i| {
+            if xs[i] % 2 == 0 {
+                emit xs[i];
+            };
+        };
+        -1;
+    };
+}
+
+fun array_total(xs: array[i32]) i32 {
+    let total: i32 = 0;
+    for (0..<array.len(xs)) |i| {
+        total = total + xs[i];
+    };
+    total;
+}
+
+fun mutate_then_total() i32 {
+    let xs: array[i32] = array[i32].new_default(4);
+    xs[0] = 9;
+    xs[1] = 3;
+    xs[2] = 7;
+    xs[3] = 1;
+    array_total(xs);
+}
+
+fun copied_window_total() i32 {
+    let src: array[i32] = array[i32].new_fixed(5, 6, 7, 8);
+    let dst: array[i32] = array[i32].new_default(4);
+    array.copy(dst, 0, src, 0, 4);
+    array.fill(dst, 1, 4, 2);
+    array_total(dst);
+}
+
+fun maybe_area_box(flag: bool) ?AreaBox {
+    if flag { AreaBox { area: 7, weight: 2 }; } else { ref.null AreaBox; };
+}
+
+fun nested_fallback(flag: bool) i32 {
+    let pair: Pair = maybe_pair(flag) \ Pair.new(1, 2);
+    pair.sum();
+}
+
+test "01 methods on direct constructors work" {
+    assert Pair.new(2, 3).sum() == 5;
+}
+
+test "02 methods can chain after helper returns" {
+    assert pair_from_parts(17, 5).flip().left == 2;
+}
+
+test "03 method sugar reads swapped fields correctly" {
+    assert Pair.new(8, 1).flip().right == 8;
+}
+
+test "04 generic construct alias keeps integer state" {
+    let cell: ints.Cell = ints.Cell.new(4);
+    assert ints.Cell.get(cell) == 4;
+}
+
+test "05 generic construct alias mutates in place" {
+    let cell: ints.Cell = ints.Cell.new(4);
+    assert ints.Cell.set(cell, 9) == 9;
+    assert ints.Cell.get(cell) == 9;
+}
+
+test "06 separate construct instantiations stay independent" {
+    let left: ints.Cell = ints.Cell.new(3);
+    let right: bools.Cell = bools.Cell.new(true);
+    assert ints.Cell.get(left) == 3;
+    assert bools.Cell.get(right);
+}
+
+test "07 opened construct names work after declaration" {
+    let pair: int_pairs.Duo = int_pairs.Duo.new(5, 6);
+    assert int_pairs.Duo.left(pair) + int_pairs.Duo.right(pair) == 11;
+}
+
+test "08 opened construct free functions are callable" {
+    let cell: ints.Cell = ints.wrap(12);
+    assert ints.Cell.get(cell) == 12;
+}
+
+test "09 inline and alias paths produce matching Duo values" {
+    let a: ints_and_bools.Duo = ints_and_bools.Duo.new(2, false);
+    let b: duo[i32, bool].Duo = duo[i32, bool].Duo.new(2, false);
+    assert ints_and_bools.Duo.left(a) == duo[i32, bool].Duo.left(b);
+    assert not ints_and_bools.Duo.right(a);
+    assert not duo[i32, bool].Duo.right(b);
+}
+
+test "10 nullable fallback returns the fallback value" {
+    assert nested_fallback(false) == 3;
+}
+
+test "11 nullable fallback preserves the original value" {
+    assert nested_fallback(true) == 13;
+}
+
+test "12 ref.is_null sees nullable misses" {
+    assert ref.is_null(maybe_pair(false));
+}
+
+test "13 ref.is_null distinguishes nullable hits" {
+    assert not ref.is_null(maybe_pair(true));
+}
+
+test "14 promote exposes inner fields in then branch" {
+    promote maybe_pair(true) |pair| {
+        assert pair.left == 4;
+        assert pair.right == 9;
+    } else {
+        fatal;
+    };
+}
+
+test "15 nullable fallback can feed method sugar" {
+    assert (maybe_pair(false) \ Pair.new(7, 8)).flip().left == 8;
+}
+
+test "16 alt selects the empty variant" {
+    assert shape_score(Point {}) == 0;
+}
+
+test "17 alt selects the circle payload arm" {
+    assert shape_score(Circle { radius: 3 }) == 30;
+}
+
+test "18 alt selects the rect payload arm" {
+    assert shape_score(Rect { width: 4, height: 6 }) == 10;
+}
+
+test "19 match takes an exact scalar arm" {
+    assert str_eq(pick_label(0), "zero");
+}
+
+test "20 match falls through to wildcard" {
+    assert str_eq(pick_label(9), "many");
+}
+
+test "21 protocol method sugar dispatches on tagged values" {
+    let box: Box = Box { width: 3, height: 5 };
+    assert box.measure() == 15;
+}
+
+test "22 protocol explicit call uses receiver argument" {
+    let box: Box = Box { width: 4, height: 2 };
+    assert Box.measure(box) == 8;
+}
+
+test "23 protocol getter returns declared field" {
+    let box: AreaBox = AreaBox { area: 12, weight: 3 };
+    assert box.area == 12;
+}
+
+test "24 protocol values survive nullable promote" {
+    promote maybe_box(true) |box| {
+        assert box.measure() == 12;
+    } else {
+        fatal;
+    };
+}
+
+test "25 multi-value returns bind in order" {
+    let q: i32, r: i32 = divmod(23, 5);
+    assert q == 4;
+    assert r == 3;
+}
+
+test "26 multi-value returns can flow into structs" {
+    let pair: Pair = pair_from_parts(23, 5);
+    assert pair.left == 4;
+    assert pair.right == 3;
+}
+
+test "27 range for loops cover lower bound" {
+    assert sum_range(1) == 0;
+}
+
+test "28 range for loops accumulate several iterations" {
+    assert sum_range(5) == 10;
+}
+
+test "29 while loops re-check mutable locals" {
+    assert while_countdown(4) == 10;
+}
+
+test "30 labeled blocks can return early from loops" {
+    let xs: array[i32] = array[i32].new_fixed(1, 3, 7, 8, 9);
+    assert first_even_or_minus_one(xs) == 8;
+}
+
+test "31 labeled blocks keep fallback when no match appears" {
+    let xs: array[i32] = array[i32].new_fixed(1, 3, 7, 9);
+    assert first_even_or_minus_one(xs) == -1;
+}
+
+test "32 array.new_fixed preserves order through indexing" {
+    let xs: array[i32] = array[i32].new_fixed(4, 5, 6);
+    assert xs[0] == 4;
+    assert xs[2] == 6;
+}
+
+test "33 array.new_default supports later writes" {
+    assert mutate_then_total() == 20;
+}
+
+test "34 array.copy and array.fill compose on the same buffer" {
+    assert copied_window_total() == 21;
+}
+
+test "35 array.len tracks literal array size" {
+    let xs: array[i32] = array[i32].new_fixed(2, 4, 6, 8);
+    assert array.len(xs) == 4;
+}
+
+test "36 arrays of structs keep field mutations visible" {
+    let cells: array[ints.Cell] = array[ints.Cell].new_fixed(ints.Cell.new(1), ints.Cell.new(2));
+    assert ints.Cell.set(cells[0], 7) == 7;
+    assert ints.Cell.get(cells[0]) == 7;
+    assert ints.Cell.get(cells[1]) == 2;
+}
+
+test "37 arrays can store algebraic variants" {
+    let shapes: array[Shape] = array[Shape].new_fixed(Point {}, Circle { radius: 2 }, Rect { width: 2, height: 9 });
+    assert shape_score(shapes[0]) == 0;
+    assert shape_score(shapes[1]) == 20;
+    assert shape_score(shapes[2]) == 11;
+}
+
+test "38 if expressions return values into locals" {
+    let value: i32 = if true { 4; } else { 8; };
+    assert value == 4;
+}
+
+test "39 nested if expressions choose the inner branch" {
+    let value: i32 = if true { if false { 1; } else { 2; }; } else { 3; };
+    assert value == 2;
+}
+
+test "40 nullable fallback can feed protocol method sugar" {
+    assert (maybe_box(false) \ Box { width: 5, height: 2 }).measure() == 10;
+}
+
+test "41 nullable promote can expose protocol getters" {
+    promote maybe_area_box(true) |box| {
+        assert box.area == 7;
+    } else {
+        fatal;
+    };
+}
+
+test "42 direct field access still works after method calls" {
+    let pair: Pair = Pair.new(6, 7).flip();
+    assert pair.left == 7;
+    assert pair.right == 6;
+}
+
+test "43 bool construct aliases can update and read" {
+    let flag: bools.Cell = bools.Cell.new(false);
+    assert not bools.Cell.get(flag);
+    assert bools.Cell.set(flag, true);
+}
+
+test "44 opened Duo names can be used in helper signatures" {
+    let pair: int_pairs.Duo = int_pairs.Duo.new(10, 11);
+    assert int_pairs.Duo.left(pair) == 10;
+    assert int_pairs.Duo.right(pair) == 11;
+}
+
+test "45 arrays and nullability interact through selected values" {
+    let maybe_pairs: array[?Pair] = array[?Pair].new_fixed(maybe_pair(true), maybe_pair(false));
+    assert (maybe_pairs[0] \ Pair.new(0, 0)).sum() == 13;
+    assert (maybe_pairs[1] \ Pair.new(1, 1)).sum() == 2;
+}
+
+test "46 fallback values can come from method-returning helpers" {
+    let pair: Pair = maybe_pair(false) \ Pair.new(3, 4).flip();
+    assert pair.left == 4;
+    assert pair.right == 3;
+}
+
+test "47 alt results can flow into arithmetic" {
+    let value: i32 = shape_score(Circle { radius: 2 }) + shape_score(Point {});
+    assert value == 20;
+}
+
+test "48 multi-value helpers remain stable across repeated calls" {
+    let first: Pair = pair_from_parts(17, 5);
+    let second: Pair = pair_from_parts(19, 4);
+    assert first.left == 3;
+    assert first.right == 2;
+    assert second.left == 4;
+    assert second.right == 3;
+}
+
+test "49 arrays of nullable protocol implementers can promote per slot" {
+    let values: array[?AreaBox] = array[?AreaBox].new_fixed(maybe_area_box(true), maybe_area_box(false));
+    promote values[0] |box| {
+        assert box.area == 7;
+    } else {
+        fatal;
+    };
+    assert ref.is_null(values[1]);
+}
+
+test "50 construct aliases and opened constructs can coexist" {
+    let left: ints.Cell = ints.wrap(5);
+    let right: ints.Cell = ints.Cell.new(6);
+    assert ints.Cell.get(left) + ints.Cell.get(right) == 11;
+}

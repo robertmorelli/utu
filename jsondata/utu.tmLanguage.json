@@ -214,7 +214,7 @@
       "patterns": [
         {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|alt|for|while|break|emit|let|export|shimport|escape|fun|get|struct|type|proto|test|bench|setup|measure|assert|mut|and|or|not|fatal|void|construct|mod|rec|promote|tag)\\b"
+          "match": "\\b(?:if|else|match|alt|for|while|break|emit|let|export|shimport|escape|fun|get|struct|type|proto|test|bench|setup|measure|assert|mut|and(?!\\=)|or(?!\\=)|not|fatal|void|construct|mod|rec|promote|tag)\\b"
         },
         {
           "name": "constant.language.boolean.utu",
@@ -297,7 +297,7 @@
       "patterns": [
         {
           "name": "keyword.operator.utu",
-          "match": "-o|=>|\\.\\.|#|\\\\|==|!=|<=|>=|>>>|<<|>>|[-+*/%&^|=<>;]"
+          "match": "and=|or=|>>>=|>>=|<<=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|-o|=>|\\.\\.\\.|\\.\\.<|#|\\\\|==|!=|<=|>=|>>>|<<|>>|[-+*/%&^|=<>;]"
         }
       ]
     }

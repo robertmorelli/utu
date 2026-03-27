@@ -14,7 +14,7 @@ bench "increment loop" {
     setup {
         let total: i32 = 0;
         measure {
-            total = total + 1;
+            total += 1;
         }
     }
 }

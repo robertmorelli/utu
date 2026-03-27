@@ -113,9 +113,11 @@ module.exports = grammar({
       optional('tag'),
       'struct',
       $.type_ident,
+      optional(seq(':', $.protocol_list)),
       '{',
       optional($.field_list),
       '}',
+      optional(';'),
     ),
 
     proto_decl: $ => seq(
@@ -419,14 +421,14 @@ module.exports = grammar({
 
     // --- Postfix (highest precedence) ---
 
-    call_expr: $ => prec.left(13, seq(
+    call_expr: $ => prec.left(14, seq(
       $._expr,
       '(',
       optional($.arg_list),
       ')',
     )),
 
-    type_member_expr: $ => prec.left(13, seq(
+    type_member_expr: $ => prec.left(14, seq(
       choice(
         $.instantiated_module_ref,
         $.inline_module_type_path,
@@ -437,7 +439,7 @@ module.exports = grammar({
       $.identifier,
     )),
 
-    promoted_module_call_expr: $ => prec.left(14, seq(
+    promoted_module_call_expr: $ => prec.left(15, seq(
       $.module_name,
       $.module_type_arg_list,
       '.',
@@ -447,13 +449,13 @@ module.exports = grammar({
       ')',
     )),
 
-    field_expr: $ => prec.left(13, seq(
+    field_expr: $ => prec.left(14, seq(
       $._expr,
       '.',
       $.identifier,
     )),
 
-    index_expr: $ => prec.left(13, seq(
+    index_expr: $ => prec.left(14, seq(
       $._expr,
       '[',
       $._expr,
@@ -470,18 +472,18 @@ module.exports = grammar({
 
     assert_expr: $ => prec.right(-2, seq('assert', $._expr)),
 
-    unary_expr: $ => prec(12, seq($.unary_op, $._expr)),
+    unary_expr: $ => prec.right(13, seq($.unary_op, $._expr)),
 
     unary_op: $ => choice('-', 'not', '~'),
 
     // --- Binary operators ---
 
     binary_expr: $ => choice(
+      prec.right(12, seq($._expr, '^', $._expr)),
       prec.left(11, seq($._expr, choice('*', '/', '%'), $._expr)),
       prec.left(10, seq($._expr, choice('+', '-'), $._expr)),
       prec.left(9, seq($._expr, choice('<<', '>>', '>>>'), $._expr)),
       prec.left(8, seq($._expr, '&', $._expr)),
-      prec.left(7, seq($._expr, '^', $._expr)),
       prec.left(6, seq($._expr, '|', $._expr)),
       prec.left(5, seq($._expr, choice('==', '!=', '<', '>', '<=', '>='), $._expr)),
       prec.left(4, seq($._expr, 'and', $._expr)),
@@ -584,7 +586,7 @@ module.exports = grammar({
     // lhs may be identifier (local), field_expr, or index_expr
     assign_expr: $ => prec.right(0, seq(
       choice($.identifier, $.field_expr, $.index_expr),
-      '=',
+      choice('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', 'and=', 'or='),
       $._expr,
     )),
 
@@ -678,7 +680,7 @@ module.exports = grammar({
       repeat(seq(',', $.for_source)),
     ),
 
-    for_source: $ => prec(1, seq($._expr, '..', $._expr)),
+    for_source: $ => prec(1, seq($._expr, choice('...', '..<'), $._expr)),
 
     capture: $ => seq(
       '|',

@@ -52,6 +52,42 @@ async function runCoreSuite() {
       );
       expectLabels(items, ['len', 'new_default']);
     }],
+    ['inclusive ranges parse without diagnostics', async () => {
+      const source = [
+        'export fun main() i32 {',
+        '    let sum: i32 = 0;',
+        '    for (0...3) |i| {',
+        '        sum = sum + i;',
+        '    };',
+        '    sum;',
+        '}',
+      ].join('\n');
+      const diagnostics = await languageService.getDiagnostics(
+        createDocument('file:///inclusive-range.utu', source),
+      );
+      expectDeepEqual(diagnostics.map((diagnostic) => diagnostic.message), []);
+    }],
+    ['compound assignments parse without diagnostics', async () => {
+      const source = [
+        'struct Counter {',
+        '    mut value: i32,',
+        '}',
+        '',
+        'export fun main() i32 {',
+        '    let total: i32 = 1;',
+        '    let xs: array[i32] = array[i32].new(2, 0);',
+        '    let counter: Counter = Counter { value: 2 };',
+        '    total += 3;',
+        '    xs[1] <<= 1;',
+        '    counter.value |= 4;',
+        '    total + xs[1] + counter.value;',
+        '}',
+      ].join('\n');
+      const diagnostics = await languageService.getDiagnostics(
+        createDocument('file:///compound-assign.utu', source),
+      );
+      expectDeepEqual(diagnostics.map((diagnostic) => diagnostic.message), []);
+    }],
     ['top level completions', async () => {
       const items = await languageService.getCompletionItems(
         createDocument('file:///top-level.utu', [
@@ -66,6 +102,56 @@ async function runCoreSuite() {
         { line: 5, character: 8 },
       );
       expectLabels(items, ['add_one', 'main']);
+    }],
+    ['protocol array element member completions use the inferred protocol type', async () => {
+      const source = [
+        'proto P[T] {',
+        '    get x: f32,',
+        '    get y: f32,',
+        '    perimeter(T) f32,',
+        '};',
+        '',
+        'fun perimeter_sum(l: array[P]) f32 {',
+        '    let s: f32 = 0.0;',
+        '    s = s + l[0].perim',
+        '    s;',
+        '}',
+      ].join('\n');
+      const items = await languageService.getCompletionItems(
+        createDocument('file:///protocol-array-member.utu', source),
+        { line: 8, character: '    s = s + l[0].perim'.length },
+      );
+      expectLabels(items, ['perimeter']);
+    }],
+    ['protocol array element member completions work immediately after the dot', async () => {
+      const source = [
+        'proto P[T] {',
+        '    get x: f32,',
+        '    get y: f32,',
+        '    perimeter(T) f32,',
+        '};',
+        '',
+        'fun perimeter_sum(l: array[P]) f32 {',
+        '    l[0].',
+        '}',
+      ].join('\n');
+      const items = await languageService.getCompletionItems(
+        createDocument('file:///protocol-array-member-dot.utu', source),
+        { line: 7, character: '    l[0].'.length },
+      );
+      expectLabels(items, ['perimeter', 'x', 'y']);
+    }],
+    ['array values offer builtin method completions through method sugar', async () => {
+      const source = [
+        'fun size(xs: array[i32]) i32 {',
+        '    xs.',
+        '}',
+      ].join('\n');
+      const items = await languageService.getCompletionItems(
+        createDocument('file:///array-methods.utu', source),
+        { line: 1, character: '    xs.'.length },
+      );
+      expectLabels(items, ['len']);
     }],
     ['promote captures are indexed with narrowed local types', async () => {
       const source = [
