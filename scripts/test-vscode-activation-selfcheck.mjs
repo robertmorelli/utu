@@ -8,7 +8,7 @@ import { assertManagedTestModule } from './test-helpers.mjs';
 
 assertManagedTestModule(import.meta.url);
 
-const source = 'export fun main() i32 { 0; }';
+const source = 'fun main() i32 { 0; }';
 
 async function main() {
   const packageMetadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));

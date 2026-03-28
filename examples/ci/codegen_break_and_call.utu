@@ -2,7 +2,7 @@ fun add_one(value: i64) i64 {
     value + 1;
 }
 
-export fun main() i64 {
+fun main() i64 {
     let answer: i64 = 0;
 
     done: {

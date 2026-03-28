@@ -1,7 +1,6 @@
 import { access, readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-
 import { compile } from '../packages/compiler/index.js';
 import {
   analyzeDocument,
@@ -31,7 +30,6 @@ import {
   getRepoRoot,
   runNamedCases,
 } from './test-helpers.mjs';
-
 const repoRoot = getRepoRoot(import.meta.url);
 const grammarCandidates = ['tree-sitter-utu.wasm'];
 const runtimeCandidates = ['web-tree-sitter.wasm', 'node_modules/web-tree-sitter/web-tree-sitter.wasm'];
@@ -42,7 +40,6 @@ if (subcommand !== 'examples' && subcommand !== 'webhost') failed ||= await runC
 if (subcommand !== 'core' && subcommand !== 'webhost') failed ||= await runExamplesSuite();
 if (subcommand !== 'core' && subcommand !== 'examples') failed ||= await runWebhostSuite();
 if (failed) process.exit(1);
-
 async function runCoreSuite() {
   const { grammarWasmPath, runtimeWasmPath } = await loadEditorTestAssets(repoRoot);
   const parserService = new UtuParserService({
@@ -50,7 +47,6 @@ async function runCoreSuite() {
     runtimeWasmPath,
   });
   const languageService = new UtuLanguageService(parserService);
-
   const cases = [
     ['static completions', async () => {
       const items = await languageService.getCompletionItems(
@@ -68,7 +64,7 @@ async function runCoreSuite() {
     }],
     ['inclusive ranges parse without diagnostics', async () => {
       const source = [
-        'export fun main() i32 {',
+        'fun main() i32 {',
         '    let sum: i32 = 0;',
         '    for (0...3) |i| {',
         '        sum = sum + i;',
@@ -87,7 +83,7 @@ async function runCoreSuite() {
         '    mut value: i32,',
         '}',
         '',
-        'export fun main() i32 {',
+        'fun main() i32 {',
         '    let total: i32 = 1;',
         '    let xs: array[i32] = array[i32].new(2, 0);',
         '    let counter: Counter = Counter { value: 2 };',
@@ -109,7 +105,7 @@ async function runCoreSuite() {
           '    value + 1',
           '}',
           '',
-          'export fun main() i64 {',
+          'fun main() i64 {',
           '    add_one(41)',
           '}',
         ].join('\n')),
@@ -241,13 +237,12 @@ async function runCoreSuite() {
         mode: 'editor',
         uri: 'file:///broken-editor.utu',
         sourceText: [
-          'export fun main() i32 {',
+          'fun main() i32 {',
           '    let value =',
           '}',
         ].join('\n'),
         parserService,
       });
-
       expectEqual(analysis.mode, 'editor');
       expectEqual(analysis.syntax.kind, 'syntax');
       expectEqual(analysis.header.kind, 'header');
@@ -257,25 +252,46 @@ async function runCoreSuite() {
     }],
     ['compiler api getDocumentMetadata normalizes header snapshots', async () => {
       const metadata = await getDocumentMetadata({
+        sourceKind: 'program',
         hasMain: true,
+        hasLibrary: false,
+        exports: [{ name: 'main' }],
         tests: [{ name: 'smoke' }],
         benches: [{ name: 'bench-main' }],
       });
-
       expectDeepEqual(metadata, {
+        sourceKind: 'program',
         hasMain: true,
+        hasLibrary: false,
+        exports: ['main'],
         tests: ['smoke'],
         benches: ['bench-main'],
       });
     }],
+    ['compiler api compileDocument classifies and exports library functions', async () => {
+      const result = await compileDocument({
+        sourceText: [
+          'fun helper() i32 {',
+          '    7;',
+          '}',
+          '',
+          'library {',
+          '    fun exposed() i32 {',
+          '        helper();',
+          '    }',
+          '}',
+        ].join('\n'),
+      });
+      expectEqual(result.metadata.sourceKind, 'library');
+      expectDeepEqual(result.metadata.exports, [{ name: 'exposed', exportName: 'exposed' }]);
+    }],
     ['compiler api compileDocument aborts on blocking shared-analysis errors', async () => {
       const result = await compileDocument({
         analyzeResult: {
-          sourceText: 'export fun main() i32 { missing_value; }',
+          sourceText: 'fun main() i32 { missing_value; }',
           diagnostics: [{ severity: 'error', message: 'Undefined value "missing_value".' }],
         },
       });
-
       expectDeepEqual(result, {
         wat: null,
         wasm: null,
@@ -288,23 +304,21 @@ async function runCoreSuite() {
     ['frontend diagnostics entrypoint parses and returns syntax diagnostics', async () => {
       const diagnostics = await collectDocumentDiagnostics({
         sourceText: [
-          'export fun main() i32 {',
+          'fun main() i32 {',
           '    let value =',
           '}',
         ].join('\n'),
         parserService,
       });
-
       expectValue(diagnostics.length > 0, true);
       expectValue(diagnostics.some((diagnostic) => diagnostic.severity === 'error'), true);
     }],
     ['frontend bind entrypoint returns a binding snapshot', async () => {
       const binding = await bindDocument({
-        sourceText: 'export fun main() i32 { 0; }',
+        sourceText: 'fun main() i32 { 0; }',
         parserService,
         languageService,
       });
-
       expectEqual(binding.kind, 'binding');
       expectEqual(binding.mode, 'editor');
       expectEqual(binding.header.hasMain, true);
@@ -313,11 +327,10 @@ async function runCoreSuite() {
     }],
     ['frontend sema entrypoint returns a semantic snapshot', async () => {
       const semantics = await analyzeSemantics({
-        sourceText: 'export fun main() i32 { 0; }',
+        sourceText: 'fun main() i32 { 0; }',
         parserService,
         languageService,
       });
-
       expectEqual(semantics.kind, 'semantic');
       expectEqual(semantics.mode, 'validation');
       expectEqual(semantics.header.hasMain, true);
@@ -369,7 +382,7 @@ async function runCoreSuite() {
         parserService,
         languageService,
       });
-      const document = createSourceDocument('export fun main() i32 { 0; }', {
+      const document = createSourceDocument('fun main() i32 { 0; }', {
         uri: 'file:///analysis-cache.utu',
         version: 1,
       });
@@ -400,7 +413,7 @@ async function runCoreSuite() {
         '    y: f32,',
         '}',
         '',
-        'export fun main() i32 { 0; }',
+        'fun main() i32 { 0; }',
       ].join('\n'), {
         uri: 'file:///header-only.utu',
         version: 1,
@@ -465,7 +478,7 @@ async function runCoreSuite() {
           version: 1,
           text: [
             'fun helper() i32 { 1; }',
-            'export fun main() i32 {',
+            'fun main() i32 {',
             '    missing_value;',
             '}',
           ].join('\n'),
@@ -505,7 +518,7 @@ async function runExamplesSuite() {
 
   // Pre-warm binaryen sequentially to avoid a Bun bug where concurrent
   // top-level-await module imports race and one importer gets an uninitialized module.
-  const warmupSource = 'export fun main() i32 { 0; }';
+  const warmupSource = 'fun main() i32 { 0; }';
   await webCompiler.compile(warmupSource).catch(() => {});
   await cliCompiler.compile(warmupSource).catch(() => {});
 
@@ -572,44 +585,44 @@ async function runWebhostSuite() {
   const sharedModuleLoadOptions = {
     prefix: 'utu-webhost-test-',
   };
-  const consoleLogImport = 'shimport "es" console_log(str) void;';
+  const consoleLogImport = 'escape "es" console_log(str) void;';
 
   const blockerCase = (name, input, expected) => [name, () => expectValue(undefined, expected)];
 
   const compiledCase = (name, input, options, run) => [name, () => withCompiledModule(input, options, run)];
 
   const cases = [
-    blockerCase('allows plain exported mains', `export fun main() i32 {
+    blockerCase('allows plain mains', `fun main() i32 {
     0;
 }`, undefined),
-    blockerCase('allows exported mains with explicit void returns', `export fun main() void {
+    blockerCase('allows mains with explicit void returns', `fun main() void {
     assert true;
 }`, undefined),
-    blockerCase('allows es imports that can be resolved from the JS host', `shimport "es" console_log(str) void;
-shimport "es" math_sqrt(f64) f64;
-export fun main() i32 {
+    blockerCase('allows es imports that can be resolved from the JS host', `escape "es" console_log(str) void;
+escape "es" math_sqrt(f64) f64;
+fun main() i32 {
     console_log("ok");
     0;
 }`, undefined),
-    blockerCase('does not special-case prompt imports', 'shimport "es" prompt(str) str;', undefined),
+    blockerCase('does not special-case prompt imports', 'escape "es" prompt(str) str;', undefined),
     blockerCase(
       'allows browser globals such as fetch',
-      'shimport "es" fetch(str) str;',
+      'escape "es" fetch(str) str;',
       undefined,
     ),
-    blockerCase('does not special-case node imports', 'shimport "node:fs" readFileSync(str) str;', undefined),
+    blockerCase('does not special-case node imports', 'escape "node:fs" readFileSync(str) str;', undefined),
     ['collects no unsupported imports', () => expectDeepEqual([], [])],
-    compiledCase('resolves es functions from explicit host imports', `shimport "es" math_sqrt(f64) f64;
+    compiledCase('resolves es functions from explicit host imports', `escape "es" math_sqrt(f64) f64;
 
-export fun main() f64 {
+fun main() f64 {
     math_sqrt(81.0);
 }`, {}, async (_, { instantiate }) => {
       const exports = await instantiate(undefined, { es: { math_sqrt: Math.sqrt } });
       expectValue(await exports.main?.(), 9);
     }),
-    compiledCase('throws clearly for missing es value imports', `shimport "es" label: str;
+    compiledCase('throws clearly for missing es value imports', `escape "es" label: str;
 
-export fun main() str {
+fun main() str {
     label;
 }`, {}, async (_, { instantiate }) => {
       let message = '';
@@ -621,7 +634,7 @@ export fun main() str {
       expectValue(message, 'Missing host import "es.label"');
     }),
     compiledCase('treats comments as compiler trivia', `// top-level comment
-export fun main() i32 {
+fun main() i32 {
     // block comment
     1 // inline comment
     + 2;
@@ -629,17 +642,17 @@ export fun main() i32 {
       const exports = await instantiate();
       expectValue(await exports.main?.(), 3);
     }),
-    compiledCase('auto-resolves node builtin imports', `shimport "node:fs" existsSync(str) bool;
+    compiledCase('auto-resolves node builtin imports', `escape "node:fs" existsSync(str) bool;
 
-export fun main() bool {
+fun main() bool {
     existsSync("./package.json");
 }`, {}, async (_, { instantiate }) => {
       const exports = await instantiate();
       expectValue(await exports.main?.(), 1);
     }),
-    compiledCase('resolves namespace paths from node module exports', `shimport "node:path" _posix_basename(str) str;
+    compiledCase('resolves namespace paths from node module exports', `escape "node:path" _posix_basename(str) str;
 
-export fun main() str {
+fun main() str {
     _posix_basename("/tmp/demo.txt");
 }`, {}, async (_, { instantiate }) => {
       const exports = await instantiate();
@@ -647,7 +660,7 @@ export fun main() str {
     }),
     compiledCase('loads local-file-node shims through the shared node loader', `${consoleLogImport}
 
-export fun main() void {
+fun main() void {
     "ok" -o console_log;
 }`, {
       where: 'local_file_node',
@@ -687,7 +700,7 @@ bench "sample" {
     }
 }
 
-export fun main() i32 {
+fun main() i32 {
     Console[i32].log(3);
 }`, {}, async (_, { instantiate }) => {
       const exports = await instantiate();

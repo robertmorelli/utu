@@ -143,6 +143,6 @@ bench "call-simple chain" {
     }
 }
 
-export fun main() i64 {
+fun main() i64 {
     test_calls();
 }

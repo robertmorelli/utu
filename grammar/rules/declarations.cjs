@@ -56,7 +56,7 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     global_decl: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
     import_decl: ($) =>
       seq(
-        'shimport',
+        'escape',
         $.string_lit,
         choice(
           seq($.identifier, '(', optional($.import_param_list), ')', $.return_type),
@@ -64,10 +64,17 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
         ),
       ),
     jsgen_decl: ($) =>
-      seq('escape', $.jsgen_lit, $.identifier, '(', optional($.import_param_list), ')', $.return_type),
+      seq(
+        'escape',
+        $.jsgen_lit,
+        choice(
+          seq($.identifier, '(', optional($.import_param_list), ')', $.return_type),
+          seq($.identifier, ':', $._type),
+        ),
+      ),
     import_param_list: ($) => seq($._import_param, repeat(seq(',', $._import_param)), optional(',')),
     _import_param: ($) => choice($.param, $._type),
-    export_decl: ($) => seq('export', $.fn_decl),
+    library_decl: ($) => seq('library', '{', repeat($._library_item), '}'),
     test_decl: ($) => seq('test', $.string_lit, $.block),
     bench_decl: ($) => seq('bench', $.string_lit, '{', $.setup_decl, '}'),
     setup_decl: ($) => seq('setup', '{', repeat(seq($._expr, ';')), $.measure_decl, '}'),

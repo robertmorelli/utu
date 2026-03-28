@@ -14,7 +14,7 @@ fun Measure.measure(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -33,7 +33,7 @@ fun Measure.measure(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -56,7 +56,7 @@ fun Measure.measure(self: Square) i32 {
     self.side * self.side;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -75,7 +75,7 @@ fun Clone.clone(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -94,7 +94,7 @@ fun Measure.measure(self: Box) i32 {
     self.width * self.height;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -112,7 +112,7 @@ fun Measure.measure(self: Box) i32 {
     self.width * self.height;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -131,7 +131,7 @@ fun Measure.measure(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -150,7 +150,7 @@ fun Measure.measure(self: Box) bool {
     true;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -169,7 +169,7 @@ fun Measure.measure(self: Box, scale: bool) i32 {
     if scale { self.width; } else { 0; };
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -192,7 +192,7 @@ fun Measure.measure(self: Box) i32 {
     self.width + 1;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -211,7 +211,7 @@ fun Value.value(self: Box) i32 {
     self.value;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -231,7 +231,7 @@ fun ValueOps.score(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -246,7 +246,7 @@ tag struct Box: ValueOps {
     value: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box { value: 1 };
     box.value = 2;
     0;
@@ -267,7 +267,7 @@ fun Value.value(self: Box, next: i32) void {
     self.value = next;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -287,7 +287,7 @@ fun Measure.area(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -315,7 +315,7 @@ fun Perimeter.measure(self: Box) i32 {
     (self.width + self.height) * 2;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box { width: 3, height: 4 };
     box.measure();
 }`,
@@ -339,7 +339,7 @@ fun Measure.measure(self: Box) i32 {
     self.width;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let square: Square = Square { side: 4 };
     Measure.measure(square);
 }`,
@@ -355,7 +355,7 @@ tag struct Rect {
     area: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let rect: Rect = Rect { area: 12 };
     Area.area(rect);
 }`,
@@ -368,7 +368,7 @@ export fun main() i32 {
     width: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -387,7 +387,7 @@ mod boxy[T] {
 
 construct boxy[i32];
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -404,7 +404,7 @@ mod boxy[T] {
 
 construct boxy[i32];
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -419,20 +419,22 @@ export fun main() i32 {
 
 construct bad = boxy[i32, i64];
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
     {
-        name: 'module-bodies-reject-export-declarations',
-        message: 'export declarations are not supported inside modules in v1',
+        name: 'module-bodies-reject-library-declarations',
+        message: 'library declarations are not supported inside modules in v1',
         source: `mod bad {
-    export fun nope() i32 {
-        0;
+    library {
+        fun nope() i32 {
+            0;
+        }
     }
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -445,7 +447,7 @@ export fun main() i32 {
     }
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -462,7 +464,7 @@ export fun main() i32 {
     }
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
@@ -479,14 +481,14 @@ mod bad {
     construct ints = boxy[i32];
 }
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
     {
         name: 'local-shadowing-is-a-hard-compile-error',
         message: 'Local shadowing is not allowed; duplicate binding "x"',
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let x: i32 = 1;
     {
         let x: i32 = 2;
@@ -498,7 +500,7 @@ export fun main() i32 {
     {
         name: 'for-loops-reject-multiple-range-sources',
         message: 'for loops support exactly one range source in v1',
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let sum: i32 = 0;
     for (0..<2, 10..<12) |i, j| {
         sum = sum + i + j;
@@ -509,7 +511,7 @@ export fun main() i32 {
     {
         name: 'for-loops-reject-multiple-captures',
         message: 'for loops support at most one capture in v1',
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let sum: i32 = 0;
     for (0..<2) |i, j| {
         sum = sum + i + j;
@@ -526,7 +528,7 @@ export fun main() i32 {
     };
 }
 
-export fun main() i32 {
+fun main() i32 {
     bad(true);
 }`,
     },
@@ -547,7 +549,7 @@ fun bad(flag: bool) i32 {
     };
 }
 
-export fun main() i32 {
+fun main() i32 {
     bad(true);
 }`,
     },
@@ -559,7 +561,7 @@ export fun main() i32 {
     right: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let pair: Pair = Pair { left: 7 };
     pair.left;
 }`,
@@ -572,19 +574,49 @@ export fun main() i32 {
     right: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let pair: Pair = Pair { left: 7, left: 8, right: 9 };
     pair.left;
 }`,
     },
     {
+        name: 'main-and-library-are-mutually-exclusive',
+        message: 'UTU files may define either a top-level `main` or `library { ... }`, but not both.',
+        source: `library {
+    fun util() i32 {
+        1;
+    }
+}
+
+fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'main-cannot-live-inside-library',
+        message: '`main` cannot be declared inside `library { ... }`.',
+        source: `library {
+    fun main() i32 {
+        0;
+    }
+}`,
+    },
+    {
+        name: 'module-only-normal-compile-is-rejected',
+        message: 'UTU normal compile requires either a top-level `fun main()` or a `library { ... }` block.',
+        source: `mod Boxy[T] {
+    struct Boxy {
+        value: T,
+    }
+}`,
+    },
+    {
         name: 'first-class-function-reference-types-fail-early',
         message: 'First-class function reference types are not supported yet',
-        source: `shimport "es" callback: fun(i32) i32;
+        source: `escape "es" callback: fun(i32) i32;
 
-export fun main() i32 {
+fun main() i32 {
     0;
 }`,
     },
 ];
-

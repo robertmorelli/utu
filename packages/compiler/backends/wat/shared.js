@@ -58,9 +58,11 @@ import {
     pipeArgValues,
     pipeCallee,
 } from './parse.js';
+import { COMPILE_TARGETS, createCompilePlan, normalizeCompileTarget } from '../../shared/compile-plan.js';
 
-export function watgen(treeOrNode, { mode = 'program', profile = null, targetName = null } = {}) {
-    return new WatGen(rootNode(treeOrNode), mode, profile, targetName).generate();
+export function watgen(treeOrNode, { mode = 'normal', profile = null, targetName = null, plan = null } = {}) {
+    const target = normalizeCompileTarget(mode);
+    return new WatGen(rootNode(treeOrNode), target, profile, targetName, plan).generate();
 }
 
 const kids = namedChildren;
@@ -134,6 +136,15 @@ const COMPOUND_ASSIGN_BINARY_OPS = new Map([
     ['or=', 'or'],
 ]);
 
+const functionExportName = (node) => {
+    const assocNode = childOfType(node, 'associated_fn_name');
+    if (assocNode) {
+        const [ownerNode, memberNode] = kids(assocNode);
+        return ownerNode && memberNode ? `${ownerNode.text}.${memberNode.text}` : null;
+    }
+    return childOfType(node, 'identifier')?.text ?? null;
+};
+
 const TOP_LEVEL_COLLECT_HANDLERS = {
     struct_decl: (ctx, item) => {
         const decl = parseStructDecl(item);
@@ -152,7 +163,11 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         for (const variant of decl.variants) ctx.variantDecls.set(variant.name, variant);
     },
     fn_decl: (ctx, item) => {
-        const fn = parseFnItem(item);
+        const fn = parseFnItem(
+            item,
+            ctx.mode === 'normal'
+                && ctx.compilePlan.exports.some(({ exportName }) => exportName === functionExportName(item)),
+        );
         ctx.fnItems.push(fn);
         ctx.callables.set(fn.name, fn);
     },
@@ -175,15 +190,16 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
     },
     jsgen_decl: (ctx, item) => {
         const decl = parseJsgenDecl(item, ctx.jsgenImportCount++);
-        ctx.importFns.push(decl);
-        ctx.callables.set(decl.name, decl);
+        if (decl.kind === 'import_fn') {
+            ctx.importFns.push(decl);
+            ctx.callables.set(decl.name, decl);
+        }
+        else {
+            ctx.importVals.push(decl);
+            ctx.globalTypeMap.set(decl.name, decl.type);
+        }
     },
-    export_decl: (ctx, item) => {
-        const node = childOfType(item, 'fn_decl');
-        const fn = parseFnItem(node, true);
-        ctx.fnItems.push(fn);
-        ctx.callables.set(fn.name, fn);
-    },
+    library_decl: (ctx, item) => ctx.collectLibraryDecl(item),
     test_decl: (ctx, item) => {
         ctx.testDecls.push({ kind: 'test_decl', name: kids(item)[0].text.slice(1, -1), body: childOfType(item, 'block') });
     },
@@ -570,11 +586,13 @@ const EXPR_GENERATORS = {
     fatal_expr: (_ctx, _node, _hint, out) => out.push('unreachable'),
 };
 export class WatGen {
-    constructor(root, mode, profile = null, targetName = null) {
+    constructor(root, mode, profile = null, targetName = null, plan = null) {
         this.root = root;
         this.mode = mode;
         this.profile = profile;
         this.targetName = targetName;
+        this.compilePlan = plan ?? createCompilePlan(root, { target: mode });
+        this.sourceKind = this.compilePlan.sourceKind;
 
         this.structDecls = [];
         this.protoDecls = [];
@@ -618,7 +636,14 @@ export class WatGen {
         this.currentProfileId = null;
         this.uid = 0;
         this.jsgenImportCount = 0;
-        this.metadata = { tests: [], benches: [] };
+        this.metadata = {
+            sourceKind: this.compilePlan.sourceKind,
+            hasMain: this.compilePlan.hasMain,
+            hasLibrary: this.compilePlan.hasLibrary,
+            exports: this.compilePlan.target === COMPILE_TARGETS.NORMAL ? [...this.compilePlan.exports] : [],
+            tests: [],
+            benches: [],
+        };
     }
 
     nextUid() { return this.uid++; }

@@ -15,6 +15,7 @@ import { jsgen } from '../backends/jsgen.js';
 import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../../document/default-wasm.js';
 import { createUtuTreeSitterParser, withParsedTree } from '../../document/index.js';
 import { childOfType, namedChildren, throwOnParseErrors } from '../frontend/tree.js';
+import { analyzeSourceLayout, createCompilePlan, normalizeCompileTarget } from '../shared/compile-plan.js';
 
 const bundledGrammarWasm = DEFAULT_GRAMMAR_WASM;
 const bundledRuntimeWasm = DEFAULT_RUNTIME_WASM;
@@ -36,11 +37,13 @@ export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
 }
 
 export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true } = {}) {
+    const target = normalizeCompileTarget(mode);
     return withActiveTree(source, { wasmUrl, runtimeWasmUrl }, async (tree) => {
-        const { wat, metadata } = watgen(tree, { mode, profile, targetName });
+        const plan = createCompilePlan(tree, { target });
+        const { wat, metadata } = watgen(tree, { mode: target, profile, targetName, plan });
         const fullMetadata = { ...metadata, targetName, artifact: { where, moduleFormat } };
         const wasm = await compileWat(wat, { optimize });
-        const js = jsgen(tree, wasm, { mode, profile, where, moduleFormat, metadata: fullMetadata, source: includeSource ? source : null });
+        const js = jsgen(tree, wasm, { mode: target, profile, where, moduleFormat, metadata: fullMetadata, source: includeSource ? source : null });
         return {
             shim: where === 'packed_base64' ? btoa(js) : js,
             js,
@@ -137,17 +140,13 @@ async function withBinaryenLock(callback) {
 }
 
 function collectMetadata(root) {
-    const metadata = { exports: [], tests: [], benches: [], hasMain: false };
-    for (const item of namedChildren(root)) {
-        const name = item.type === 'export_decl'
-            ? childOfType(childOfType(item, 'fn_decl'), 'identifier')?.text
-            : namedChildren(item)[0]?.text.slice(1, -1);
-        if (!name) continue;
-        if (item.type === 'export_decl') {
-            metadata.exports.push({ name });
-            metadata.hasMain ||= name === 'main';
-        } else if (item.type === 'test_decl') metadata.tests.push({ name });
-        else if (item.type === 'bench_decl') metadata.benches.push({ name });
-    }
-    return metadata;
+    const layout = analyzeSourceLayout(root);
+    return {
+        sourceKind: layout.sourceKind,
+        hasMain: layout.hasMain,
+        hasLibrary: layout.hasLibrary,
+        exports: layout.exports,
+        tests: layout.tests,
+        benches: layout.benches,
+    };
 }

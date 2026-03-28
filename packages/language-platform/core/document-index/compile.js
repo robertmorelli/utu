@@ -1,5 +1,6 @@
 import { expandSourceWithDiagnostics } from "../../../compiler/frontend/expand.js";
 import { watgen } from "../../../compiler/backends/wat/index.js";
+import { analyzeSourceLayout, COMPILE_TARGETS } from "../../../compiler/shared/compile-plan.js";
 import { cloneDiagnostic, findCompileErrorSpan, FILE_START_OFFSET_RANGE, FILE_START_RANGE } from "../compile-diagnostics.js";
 
 export const COMPILE_DIAGNOSTIC_MODES = Object.freeze({
@@ -29,11 +30,11 @@ async function tryGetCompileDiagnostic(documentState, languageService, document,
             return toFileStartDiagnostic(expansion.diagnostics[0], COMPILE_DIAGNOSTIC_STAGES.FRONTEND_LOWERING);
         }
         if (!expansion.changed) {
-            ({ wat } = watgen(documentState.tree));
+            ({ wat } = watgen(documentState.tree, { plan: createDiagnosticCompilePlan(documentState.tree.rootNode, mode) }));
         } else {
             const expandedParsed = await languageService.parserService.parseSource(expansion.source);
             try {
-                ({ wat } = watgen(expandedParsed.tree));
+                ({ wat } = watgen(expandedParsed.tree, { plan: createDiagnosticCompilePlan(expandedParsed.tree.rootNode, mode) }));
             } finally {
                 expandedParsed.dispose();
             }
@@ -70,6 +71,18 @@ function normalizeCompileDiagnosticMode(mode) {
 
 function shouldRunBackendValidation(mode, languageService) {
     return mode === COMPILE_DIAGNOSTIC_MODES.COMPILE && Boolean(languageService.validateWat);
+}
+
+function createDiagnosticCompilePlan(rootNode, mode) {
+    if (mode === COMPILE_DIAGNOSTIC_MODES.COMPILE)
+        return null;
+    const layout = analyzeSourceLayout(rootNode);
+    if (layout.errors.length > 0)
+        throw new Error(layout.errors[0]);
+    return {
+        ...layout,
+        target: COMPILE_TARGETS.NORMAL,
+    };
 }
 
 function toFileStartDiagnostic(diagnostic, stage) {

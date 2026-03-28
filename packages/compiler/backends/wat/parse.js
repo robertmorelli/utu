@@ -83,7 +83,11 @@ export const parseFnItem = (node, exported = false) => {
         returnType: parseReturnType(childOfType(node, 'return_type')),
         body: childOfType(node, 'block'),
         exported,
-        exportName: exported && !assocNode ? textOf(node, 'identifier') : null,
+        exportName: exported
+            ? assocNode
+                ? `${ownerNode.text}.${memberNode.text}`
+                : textOf(node, 'identifier')
+            : null,
         protocolOwner: ownerNode?.text ?? null,
         protocolMember: memberNode?.text ?? null,
         selfTypeName,
@@ -98,15 +102,27 @@ export const parseImportDecl = (node) => {
         : { kind: 'import_val', module, name, hostName, type: parseType(typeNode) };
 };
 
-export const parseJsgenDecl = (node, index) => ({
-    kind: 'import_fn',
-    module: '',
-    name: textOf(node, 'identifier'),
-    hostName: String(index),
-    jsSource: childOfType(node, 'jsgen_lit')?.text.slice(1, -1) ?? '',
-    params: parseImportParamList(childOfType(node, 'import_param_list')),
-    returnType: parseReturnType(childOfType(node, 'return_type')),
-});
+export const parseJsgenDecl = (node, index) => {
+    const returnType = parseReturnType(childOfType(node, 'return_type'));
+    return returnType
+        ? {
+            kind: 'import_fn',
+            module: '',
+            name: textOf(node, 'identifier'),
+            hostName: String(index),
+            jsSource: childOfType(node, 'jsgen_lit')?.text.slice(1, -1) ?? '',
+            params: parseImportParamList(childOfType(node, 'import_param_list')),
+            returnType,
+        }
+        : {
+            kind: 'import_val',
+            module: '',
+            name: textOf(node, 'identifier'),
+            hostName: String(index),
+            jsSource: childOfType(node, 'jsgen_lit')?.text.slice(1, -1) ?? '',
+            type: parseType(kids(node).at(-1)),
+        };
+};
 
 export const parsePipeTarget = (node) => {
     const argsNode = childOfType(node, 'pipe_args');

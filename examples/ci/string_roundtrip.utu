@@ -14,6 +14,6 @@ fun decorate(value: str) str {
     wrap(value);
 }
 
-export fun main() str {
+fun main() str {
     decorate(label());
 }

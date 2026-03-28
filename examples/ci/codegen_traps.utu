@@ -6,6 +6,6 @@ fun assert_even(x: i32) void {
     assert x % 2 == 0;
 }
 
-export fun main() void {
+fun main() void {
     assert_even(4);
 }

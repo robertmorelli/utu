@@ -1,5 +1,6 @@
 import { BUILTIN_METHODS, getBuiltinNamespaceHover, getBuiltinHover, getCoreTypeHover, getKeywordHover, getLiteralHover, isBuiltinNamespace } from "../hoverDocs.js";
 import { findNamedChild, findNamedChildren, spanFromNode, spanFromOffsets, walkNamedChildren } from "../../../document/index.js";
+import { analyzeSourceLayout } from "../../../compiler/shared/compile-plan.js";
 import { comparePositions, getDocumentUri, rangeKey } from "../types.js";
 import { LITERAL_TYPE_BY_NODE_TYPE, RECURSIVE_EXPRESSION_TYPES, SYMBOL_METADATA } from "../../../language-spec/index.js";
 import { normalizeTypeText, stripNullableTypeText } from "../completion-helpers.js";
@@ -9,6 +10,7 @@ import { createCollectionFns } from "./collect.js";
 
 export function buildDocumentIndex(document, rootNode, diagnostics) {
     const uri = getDocumentUri(document);
+    const sourceLayout = analyzeSourceLayout(rootNode);
     const symbols = [];
     const symbolByKey = new Map();
     const occurrences = [];
@@ -195,6 +197,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         openTypeKeys,
         openTypeNamespaces,
         findModuleNameNode,
+        sourceLayout,
     };
     const {
         collectTopLevelDeclarations,
@@ -278,11 +281,14 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
             addResolvedOccurrence(namespaceNode, 'type', key);
     }
     function walkTopLevelItem(item) {
-        if (item.type !== 'export_decl')
-            return void topLevelHandlers[item.type]?.walk(item);
-        const fnDecl = findNamedChild(item, 'fn_decl');
-        if (fnDecl)
-            walkFunction(fnDecl);
+        if (item.type === 'library_decl') {
+            for (const child of item.namedChildren ?? []) {
+                if (child.type !== 'comment')
+                    walkTopLevelItem(child);
+            }
+            return;
+        }
+        return void topLevelHandlers[item.type]?.walk(item);
     }
     function walkModuleDeclaration(moduleDecl) {
         const namespace = resolveNamespaceNode(findNamedChild(moduleDecl, 'identifier'));
@@ -346,13 +352,17 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
     }
     function walkJsgen(jsgenDecl) {
         const returnTypeNode = findNamedChild(jsgenDecl, 'return_type');
-        if (!returnTypeNode)
+        if (returnTypeNode) {
+            for (const paramNode of findNamedChildren(findNamedChild(jsgenDecl, 'import_param_list'), 'param')) {
+                const typeNode = paramNode.namedChildren.at(-1);
+                if (typeNode) walkTypeAnnotation(typeNode);
+            }
+            walkTypeAnnotation(returnTypeNode);
             return;
-        for (const paramNode of findNamedChildren(findNamedChild(jsgenDecl, 'import_param_list'), 'param')) {
-            const typeNode = paramNode.namedChildren.at(-1);
-            if (typeNode) walkTypeAnnotation(typeNode);
         }
-        walkTypeAnnotation(returnTypeNode);
+        const typeNode = jsgenDecl.namedChildren.at(-1);
+        if (typeNode && typeNode.type !== 'identifier')
+            walkTypeAnnotation(typeNode);
     }
     function walkTest(testDecl) { walkBlock(findNamedChild(testDecl, 'block')); }
     function walkBench(benchDecl) {

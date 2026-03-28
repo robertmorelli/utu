@@ -1,4 +1,4 @@
-shimport "es" _Math_sqrt(f64) f64;
+escape "es" _Math_sqrt(f64) f64;
 struct Point {
     mut x: f64,
     mut y: f64,
@@ -74,7 +74,7 @@ bench "float normalize" {
     }
 }
 
-export fun main() f64 {
+fun main() f64 {
     let best: Point = benchmark(points);
     best.x;
 }

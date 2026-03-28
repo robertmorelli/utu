@@ -56,6 +56,32 @@ const CollectionMixin = class {
             this.benchDecls = this.benchDecls.filter((bench) => bench.name === this.targetName);
     }
 
+    collectLibraryDecl(node) {
+        for (const item of kids(node)) {
+            if (item.type === 'fn_decl') {
+                const fn = parseFnItem(item, this.shouldExportLibraryFunction(item));
+                this.fnItems.push(fn);
+                this.callables.set(fn.name, fn);
+                continue;
+            }
+            const collect = TOP_LEVEL_COLLECT_HANDLERS[item.type];
+            if (collect) collect(this, item);
+            else throw new Error(`Unknown library item: ${item.type}`);
+        }
+    }
+
+    shouldExportLibraryFunction(node) {
+        const assocNode = childOfType(node, 'associated_fn_name');
+        const exportName = assocNode
+            ? (() => {
+                const [ownerNode, memberNode] = kids(assocNode);
+                return ownerNode && memberNode ? `${ownerNode.text}.${memberNode.text}` : null;
+            })()
+            : childOfType(node, 'identifier')?.text ?? null;
+        return this.mode === 'normal'
+            && this.compilePlan.exports.some((entry) => entry.exportName === exportName);
+    }
+
     analyzeProtocols() {
         this.assignTagIds();
 

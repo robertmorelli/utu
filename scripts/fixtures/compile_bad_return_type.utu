@@ -1,3 +1,7 @@
 fun bad() i32 {
     "hi";
 }
+
+fun main() i32 {
+    bad();
+}

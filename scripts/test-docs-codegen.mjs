@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { compile } from '../packages/compiler/index.js';
-import { assertManagedTestModule, getRepoRoot, runNamedCases } from './test-helpers.mjs';
+import { assertManagedTestModule, collectCompileJobs, getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
 assertManagedTestModule(import.meta.url);
 
@@ -137,7 +137,8 @@ const cases = [
 
 if (await runNamedCases(cases.map((testCase) => [testCase.name, async () => {
     const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
-    const { wat, metadata } = await compile(source, { wat: true, mode: testCase.mode ?? 'program' });
+    const mode = testCase.mode ?? collectCompileJobs(source)[0]?.mode ?? 'program';
+    const { wat, metadata } = await compile(source, { wat: true, mode });
     const missing = testCase.snippets.filter((snippet) => !wat.includes(snippet));
     const metadataErrors = [];
     if ('expectedTests' in testCase && metadata.tests.length !== testCase.expectedTests)

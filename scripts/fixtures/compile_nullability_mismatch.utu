@@ -5,3 +5,7 @@ struct Box {
 fun bad() Box {
     ref.null Box;
 }
+
+fun main() Box {
+    bad();
+}

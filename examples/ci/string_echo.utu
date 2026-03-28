@@ -2,6 +2,6 @@ fun echo(value: str) str {
     value;
 }
 
-export fun main() str {
+fun main() str {
     echo("value");
 }

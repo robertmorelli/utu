@@ -48,7 +48,8 @@ export async function collectUtuFiles(dir) {
 }
 
 export function collectCompileJobs(source) {
-  const jobs = [{ mode: 'program' }];
+  const jobs = [];
+  if (/^\s*(fun\s+main\s*\(|library\s*\{)/m.test(source)) jobs.push({ mode: 'program' });
   if (/^\s*test\s+"/m.test(source)) jobs.push({ mode: 'test' });
   if (/^\s*bench\s+"/m.test(source)) jobs.push({ mode: 'bench' });
   return jobs;

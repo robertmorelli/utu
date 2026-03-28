@@ -9,7 +9,7 @@ fun five() str {
     str_add(tostr(2), tostr(3));
 }
 
-export fun main() str {
+fun main() str {
     // greeting("utu");
     five();
 }

@@ -112,7 +112,7 @@
     },
     "str": {
       "signature": "str",
-      "description": "Host-backed string reference. Use `escape` or explicit host imports for string-specific behavior."
+      "description": "Host-backed string reference. Use `escape` helpers for string-specific behavior."
     },
     "u32": {
       "signature": "u32",
@@ -166,17 +166,9 @@
       "signature": "else",
       "description": "Provides the fallback branch of an `if` expression or the unwrap fallback operator."
     },
-    "export": {
-      "signature": "export fun ...",
-      "description": "Marks a UTU function as exported from the compiled Wasm module."
-    },
     "escape": {
-      "signature": "escape |js_expr| name(params) return_type",
-      "description": "Declares an inline host-backed helper implemented by embedded JavaScript."
-    },
-    "shimport": {
-      "signature": "shimport \"module\" name(params) return_type",
-      "description": "Declares a host import available to the compiled Wasm module."
+      "signature": "escape \"module\" name(params) return_type; or escape |js_expr| name(params) return_type",
+      "description": "Declares either a host import backed by a named module or an inline JavaScript helper. Value forms like `escape \"es\" document: externref` and `escape |(() => document)()| document: externref` are also valid."
     },
     "fun": {
       "signature": "fun name(params) return_type",
@@ -205,6 +197,10 @@
     "let": {
       "signature": "let name: Type = expr;",
       "description": "Promotes a value into a reusable binding."
+    },
+    "library": {
+      "signature": "library { ... }",
+      "description": "Marks the enclosed functions as the exported surface of a library file. A file may be either a library, a program with top-level `main`, or a modules-only file."
     },
     "match": {
       "signature": "match value { literal => expr, _ => expr }",

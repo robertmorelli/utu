@@ -894,6 +894,6 @@ bench "deltablue_both" {
     }
 }
 
-export fun main() i64 {
+fun main() i64 {
     delta_blue_impl(200);
 }

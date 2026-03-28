@@ -1,5 +1,6 @@
 import { parseHostImportName } from '../../document/index.js';
 import { rootNode, namedChildren, childOfType, walk, stringLiteralValue } from '../frontend/tree.js';
+import { analyzeSourceLayout } from '../shared/compile-plan.js';
 import data from '../../../jsondata/jsgen.data.json' with { type: 'json' };
 
 const {
@@ -54,19 +55,18 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
 }
 
 function analyze(root, mode, metadata = {}) {
+    const exportNames = Array.isArray(metadata.exports)
+        ? metadata.exports.map((entry) => typeof entry === 'string' ? entry : entry?.name).filter(Boolean)
+        : collectExportNames(root);
     if (Array.isArray(metadata.strings))
-        return { strings: metadata.strings, exportNames: collectExportNames(root) };
+        return { strings: metadata.strings, exportNames };
 
-    const exportNames = collectExportNames(root);
     const strings = new Map(), bodies = [];
     const addBody = (node) => node && bodies.push(node);
 
-    for (const item of namedChildren(root)) {
+    for (const item of topLevelItems(root)) {
         if (item.type === 'fn_decl') addBody(childOfType(item, 'block'));
-        else if (item.type === 'export_decl') {
-            const fn = childOfType(item, 'fn_decl');
-            addBody(childOfType(fn, 'block'));
-        } else if (item.type === 'global_decl') addBody(namedChildren(item).at(-1));
+        else if (item.type === 'global_decl') addBody(namedChildren(item).at(-1));
         else if (item.type === 'test_decl' && mode === 'test') addBody(childOfType(item, 'block'));
         else if (item.type === 'bench_decl' && mode === 'bench') {
             const setup = namedChildren(childOfType(item, 'setup_decl'));
@@ -83,13 +83,7 @@ function analyze(root, mode, metadata = {}) {
 }
 
 function collectExportNames(root) {
-    const exportNames = [];
-    for (const item of namedChildren(root)) {
-        if (item.type !== 'export_decl') continue;
-        const fn = childOfType(item, 'fn_decl');
-        exportNames.push(childOfType(fn, 'identifier').text);
-    }
-    return exportNames;
+    return analyzeSourceLayout(root).exports.map(({ name }) => name);
 }
 
 function groupImports(root, profile = null) {
@@ -105,7 +99,7 @@ function groupImports(root, profile = null) {
     };
 
     let jsgenIdx = 0;
-    for (const item of namedChildren(root)) {
+    for (const item of topLevelItems(root)) {
         if (item.type === 'import_decl') {
             const [moduleNode, nameNode] = namedChildren(item);
             const module = moduleNode.text.slice(1, -1);
@@ -114,19 +108,34 @@ function groupImports(root, profile = null) {
                 ? { kind: 'function', hostName, hostPath, returnType: parseReturnType(childOfType(item, 'return_type')) }
                 : { kind: 'value', hostName, hostPath });
         } else if (item.type === 'jsgen_decl') {
-            groupFor('').entries.push({
-                kind: 'inline_js',
-                hostName: String(jsgenIdx++),
-                jsSource: namedChildren(item)[0].text.slice(1, -1),
-            });
+            const sourceNode = namedChildren(item)[0];
+            const hostName = String(jsgenIdx++);
+            groupFor('').entries.push(childOfType(item, 'return_type')
+                ? {
+                    kind: 'inline_js',
+                    hostName,
+                    jsSource: sourceNode.text.slice(1, -1),
+                }
+                : {
+                    kind: 'inline_value',
+                    hostName,
+                    jsSource: sourceNode.text.slice(1, -1),
+                });
         }
     }
     if (profile === 'ticks') groupFor('__utu_profile').entries.push({ kind: 'function', hostName: 'tick', hostPath: ['tick'] });
     return [...groups.values()];
 }
 
+function topLevelItems(root) {
+    return namedChildren(root).flatMap((item) =>
+        item.type === 'library_decl' ? namedChildren(item) : [item]
+    );
+}
+
 function renderBinding(group, entry) {
     if (entry.kind === 'inline_js') return entry.jsSource;
+    if (entry.kind === 'inline_value') return `(${entry.jsSource})`;
     const hostImportRef = `__hostImports[${JSON.stringify(group.module)}]?.[${JSON.stringify(entry.hostName)}]`;
     const fallbackRef = group.autoResolve
         ? entry.hostPath.reduce((expression, segment) => `${expression}[${JSON.stringify(segment)}]`, group.ref)

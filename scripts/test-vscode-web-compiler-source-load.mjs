@@ -19,12 +19,12 @@ const compilerAssets = {
   wasmUrl: new URL('../tree-sitter-utu.wasm', import.meta.url),
 };
 
-const metadata = await compiler.get_metadata('export fun main() i32 { 0; }', compilerAssets);
+const metadata = await compiler.get_metadata('fun main() i32 { 0; }', compilerAssets);
 if (!metadata.hasMain) {
   throw new Error(`Expected compiler loaded from source text to report a runnable main, received ${JSON.stringify(metadata)}`);
 }
 
-const artifact = await compiler.compile('export fun main() i32 { 0; }', {
+const artifact = await compiler.compile('fun main() i32 { 0; }', {
   ...compilerAssets,
   mode: 'program',
 });

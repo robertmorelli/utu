@@ -17,7 +17,7 @@ export const successCases = [
     }
 }
 
-export fun main() i32 {
+fun main() i32 {
     let v: vec2d.Vec = vec2d.Vec.new(2, 5);
     vec2d.Vec.sum(v);
 }`,
@@ -47,7 +47,7 @@ fun double_inline(value: boxy[i32].Box) i32 {
 
 construct boxy[i32];
 
-export fun main() i32 {
+fun main() i32 {
     let alias_box: box_i32.Box = box_i32.Box.new(7);
     let inline_box: boxy[i32].Box = alias_box;
     let opened_box: Box = Box.new(3);
@@ -78,7 +78,7 @@ fun read_box(value: Box) i32 {
     Box.get(value);
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box.new(9);
     read_box(box);
 }`,
@@ -98,7 +98,7 @@ export fun main() i32 {
 
 construct calc_i32 = calc[i32];
 
-export fun main() i32 {
+fun main() i32 {
     calc_i32.id(calc_i32.twice(5));
 }`,
     },
@@ -134,7 +134,7 @@ export fun main() i32 {
 
 construct pair_i32 = Pair[i32, i32];
 
-export fun main() i32 {
+fun main() i32 {
     let pair: Pair[i32, i32] = Pair[i32, i32].new(5, 6);
     let other: pair_i32.NotPair = pair_i32.NotPair { one: 3 };
     Pair[i32, i32].left(pair) + Pair[i32, i32].right(pair) + pair_i32.NotPair.only(other);
@@ -195,7 +195,7 @@ fun maybe_pair(flag: bool) ?Pair[i32, i32] {
     if flag { Pair[i32, i32].new(2, 9); } else { null; };
 }
 
-export fun main() i32 {
+fun main() i32 {
     let vec: Vec = Vec.new(3, 4);
     let box: ints.Box = ints.Box.new(7);
     vec.total() + box.get() + Pair[i32, i32].new(5, 6).right() + (maybe_pair(true) \\ Pair[i32, i32].new(0, 0)).left();
@@ -224,7 +224,7 @@ fun make_box(value: i32) ints.Box {
     ints.Box.new(value);
 }
 
-export fun main() i32 {
+fun main() i32 {
     make_box(11).get();
 }`,
     },
@@ -239,7 +239,7 @@ export fun main() i32 {
     }
 }
 
-export fun main() i32 {
+fun main() i32 {
     Console[i32].log(3);
 }`,
     },
@@ -267,7 +267,7 @@ fun Measure.measure(self: Square) i32 {
     self.side * self.side;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box { width: 2, height: 3 };
     let square: Square = Square { side: 4 };
     box.measure() + square.measure();
@@ -297,7 +297,7 @@ fun Perimeter.measure(self: Box) i32 {
     (self.width + self.height) * 2;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box { width: 3, height: 4 };
     Area.measure(box) + Perimeter.measure(box);
 }`,
@@ -322,7 +322,7 @@ fun Measure.measure(self: Box) i32 {
     self.width * self.height;
 }
 
-export fun main() i32 {
+fun main() i32 {
     promote maybe_box(true) |box| {
         box.measure();
     } else {
@@ -341,7 +341,7 @@ tag struct Rect: Area {
     area: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let rect: Rect = Rect { area: 12 };
     Area.area(rect);
 }`,
@@ -362,7 +362,7 @@ fun Vec.total(self: Vec) i32 {
     self.left + self.right;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let holder: Holder = Holder { inner: Vec { left: 1, right: 2 } };
     holder.inner.total() + (if true { Vec { left: 3, right: 4 }; } else { Vec { left: 9, right: 9 }; }).total();
 }`,
@@ -378,7 +378,7 @@ fun Box.read(self: Box) i32 {
     self.value;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box { value: 7 };
     box.read();
 }`,
@@ -386,7 +386,7 @@ export fun main() i32 {
     {
         name: 'captureless-for-loops-declare-and-use-the-implicit-index-local',
         expectedReturn: 3,
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let sum: i32 = 0;
     for (0..<3) {
         sum += 1;
@@ -406,7 +406,7 @@ tag struct Counter: CounterOps {
     mut value: i32,
 };
 
-export fun main() i32 {
+fun main() i32 {
     let total: i32 = 1;
     let xs: array[i32] = array[i32].new(2, 0);
     let counter: Counter = Counter { value: 5 };
@@ -420,7 +420,7 @@ export fun main() i32 {
     {
         name: 'compound-assignments-cover-bitwise-shift-and-boolean-operators',
         expectedReturn: 1,
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let bits: i32 = 3;
     let flag: bool = false;
     bits <<= 1;
@@ -448,7 +448,7 @@ tag type Constraint: ConstraintOps =
         is_satisfied: bool,
     };
 
-export fun main() i32 {
+fun main() i32 {
     let constraint: Constraint = StayConstraint { is_input: true, is_satisfied: true };
     let sources: i32 = 0;
     if (constraint.is_input and true) {
@@ -462,7 +462,7 @@ export fun main() i32 {
     {
         name: 'inclusive-for-ranges-include-the-end-bound',
         expectedReturn: 6,
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let sum: i32 = 0;
     for (0...3) |i| {
         sum = sum + i;
@@ -473,7 +473,7 @@ export fun main() i32 {
     {
         name: 'large-i64-literals-stay-exact-through-codegen',
         expectedReturn: 9223372036854775807n,
-        source: `export fun main() i64 {
+        source: `fun main() i64 {
     9223372036854775807;
 }`,
     },
@@ -493,7 +493,7 @@ fun CounterOps.bump(self: Counter) i32 {
     self.value + 8;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let counter: Counter = Counter { value: 7 };
     CounterOps.value(counter) + counter.bump();
 }`,
@@ -548,7 +548,7 @@ fun total(first: P, holder: Holder) i32 {
     first.perimeter() + holder.current.perimeter() + holder.items[2].perimeter();
 }
 
-export fun main() i32 {
+fun main() i32 {
     let my_ps: array[P] = array.new_default(3);
     my_ps[0] = Line { x: 0, y: 0, x2: 3, y2: 4 };
     my_ps[1] = Oval { x: 0, y: 0, r: 2, r2: 5 };
@@ -560,7 +560,7 @@ export fun main() i32 {
     {
         name: 'array-len-method-sugar-desugars-to-the-builtin-array-len',
         expectedReturn: 3,
-        source: `export fun main() i32 {
+        source: `fun main() i32 {
     let xs: array[i32] = array.new_default(3);
     xs.len();
 }`,
@@ -606,7 +606,7 @@ fun P.perimeter(self: Line) f32 {
     ((self.x2 - self.x)^2.0 + (self.y2 - self.y)^2.0)^0.5;
 }
 
-export fun main() f32 {
+fun main() f32 {
     let my_ps: array[P] = array.new_default(3);
     my_ps[0] = Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 };
     my_ps[1] = Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 };
@@ -621,7 +621,7 @@ export fun main() f32 {
     value: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let a: Box = Box { value: 1 };
     let b: Box = a;
     let c: Box = Box { value: 1 };
@@ -642,7 +642,7 @@ export fun main() i32 {
     value: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let maybe: ?Box = Box.null;
     if maybe == Box.null {
         1;
@@ -658,7 +658,7 @@ export fun main() i32 {
     value: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let xs: array[?Box] = array[?Box].new_default(2);
     xs[0] = Box { value: 9 };
     promote xs[0] |value| {
@@ -692,7 +692,7 @@ fun ValueOps.bump(self: RealCounter) i32 {
     self.value + 5;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let counter: Counter = RealCounter { value: 7 };
     ValueOps.value(counter) + counter.bump();
 }`,
@@ -709,7 +709,7 @@ tag struct Counter: CounterOps {
     mut value: i32,
 }
 
-export fun main() i32 {
+fun main() i32 {
     let counter: Counter = Counter { value: 4 };
     counter.value = 9;
     counter.value;
@@ -731,7 +731,7 @@ tag type Counter: CounterOps =
         mut value: i32,
     };
 
-export fun main() i32 {
+fun main() i32 {
     let counter: Counter = RealCounter { value: 5 };
     counter.value = 13;
     counter.value;
@@ -756,7 +756,7 @@ fun Measure.measure(self: Square) i32 {
     self.side * self.side;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let a: Shape = Box { width: 2, height: 3 };
     let b: Shape = Square { side: 3 };
     Measure.measure(a) + b.measure();

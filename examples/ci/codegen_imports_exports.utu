@@ -1,12 +1,12 @@
-shimport "es" console_log(str) void;
-shimport "es" wrap(str) str;
+escape "es" console_log(str) void;
+escape "es" wrap(str) str;
 escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun greet(name: str) str {
     name -o wrap;
 }
 
-export fun main() i64 {
+fun main() i64 {
     3;
 }
 

@@ -27,7 +27,7 @@ export function registerCommands(context, d) {
     register('utu.runMain', async (target, document) => {
         document = await withUtuDocument(document ?? target);
         if (!document) return;
-        if (!indexHasRunnableMain(await d.languageService.getDocumentIndex(document))) return void await vscode.window.showWarningMessage('UTU Run Main requires `export fun main()` in the active file.');
+        if (!indexHasRunnableMain(await d.languageService.getDocumentIndex(document))) return void await vscode.window.showWarningMessage('UTU Run Main requires a top-level `fun main()` and no `library { ... }` block in the active file.');
         const execution = await d.runtimeHost.runMain(document.getText()), label = displayNameForDocument(document);
         show(d.output, `Ran ${label}`, execution.logs, execution.result); vscode.window.setStatusBarMessage(`UTU ran ${label}`, 3000);
     });

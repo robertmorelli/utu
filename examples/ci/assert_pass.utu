@@ -1,4 +1,4 @@
-export fun main() str {
+fun main() str {
     assert true;
     "ok";
 }

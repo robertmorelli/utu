@@ -2,7 +2,10 @@ import { get_metadata as getCoreMetadata } from '../core/index.js';
 
 /**
  * @typedef {Object} DocumentMetadata
+ * @property {'program' | 'library' | 'module_only'} [sourceKind]
  * @property {boolean} hasMain
+ * @property {boolean} [hasLibrary]
+ * @property {Array<string>} [exports]
  * @property {Array<string>} tests
  * @property {Array<string>} benches
  */
@@ -31,7 +34,10 @@ function looksLikeSourceOptions(value) {
 
 function normalizeSourceMetadata(metadata) {
     return {
+        sourceKind: metadata?.sourceKind ?? undefined,
         hasMain: Boolean(metadata?.hasMain),
+        hasLibrary: Boolean(metadata?.hasLibrary),
+        exports: normalizeNameList(metadata?.exports),
         tests: normalizeNameList(metadata?.tests),
         benches: normalizeNameList(metadata?.benches),
     };
@@ -39,7 +45,10 @@ function normalizeSourceMetadata(metadata) {
 
 function normalizeHeaderMetadata(headerSnapshot) {
     return {
+        sourceKind: headerSnapshot.sourceKind ?? undefined,
         hasMain: Boolean(headerSnapshot.hasMain),
+        hasLibrary: Boolean(headerSnapshot.hasLibrary),
+        exports: normalizeNameList(headerSnapshot.exports),
         tests: normalizeNameList(headerSnapshot.tests),
         benches: normalizeNameList(headerSnapshot.benches),
     };

@@ -12,7 +12,8 @@ import {
 
 const CollectMixin = class {
     collectTopLevelSymbols(ctx) {
-        for (const item of kids(this.root)) {
+        const items = this.flattenLibraryItems(kids(this.root));
+        for (const item of items) {
             if (item.type === 'module_decl') this.collectModuleTemplate(item);
             if (item.type === 'struct_decl') {
                 const nameNode = childOfType(item, 'type_ident');
@@ -31,12 +32,12 @@ const CollectMixin = class {
                 if (nameNode) this.topLevelProtocolNames.add(nameNode.text);
             }
         }
-        for (const item of kids(this.root)) {
+        for (const item of items) {
             if (item.type === 'struct_decl') this.collectTopLevelStructFields(item, ctx);
             if (item.type === 'type_decl') this.collectTopLevelTypeFields(item, ctx);
             if (item.type === 'proto_decl') this.collectTopLevelProtocol(item, ctx);
         }
-        this.collectSymbols(kids(this.root), ctx, {
+        this.collectSymbols(items, ctx, {
             onConstruct: (item) => this.applyConstruct(item, ctx),
             onType: (name) => this.topLevelTypeNames.add(name),
             onValue: (name, type) => {
@@ -59,12 +60,12 @@ const CollectMixin = class {
     collectModuleTemplate(node) {
         const name = moduleNameNode(node).text;
         const items = kids(node).filter((child) => !['identifier', 'type_ident', 'module_name', 'module_type_param_list'].includes(child.type));
-        const unsupported = items.find((item) => ['module_decl', 'construct_decl', 'export_decl', 'test_decl', 'bench_decl'].includes(item.type)) ?? null;
+        const unsupported = items.find((item) => ['module_decl', 'construct_decl', 'library_decl', 'test_decl', 'bench_decl'].includes(item.type)) ?? null;
         if (unsupported) {
             const label = {
                 module_decl: 'nested modules',
                 construct_decl: 'construct declarations',
-                export_decl: 'export declarations',
+                library_decl: 'library declarations',
                 test_decl: 'test declarations',
                 bench_decl: 'bench declarations',
             }[unsupported.type];
@@ -269,6 +270,9 @@ const CollectMixin = class {
     collectSymbols(items, ctx, handlers) {
         for (const item of items) {
             switch (item.type) {
+                case 'library_decl':
+                    this.collectSymbols(kids(item), ctx, handlers);
+                    break;
                 case 'module_decl':
                     break;
                 case 'construct_decl':
@@ -287,9 +291,6 @@ const CollectMixin = class {
                     break;
                 case 'fn_decl':
                     this.collectFunctionSymbol(item, ctx, handlers);
-                    break;
-                case 'export_decl':
-                    this.collectFunctionSymbol(childOfType(item, 'fn_decl'), ctx, handlers);
                     break;
                 case 'global_decl':
                     this.collectValueSymbol(item, kids(item).at(-1), ctx, handlers.onValue);
@@ -383,6 +384,10 @@ const CollectMixin = class {
         const target = instNode ?? node;
         const argsNode = childOfType(target, 'module_type_arg_list');
         return { name: moduleNameNode(target).text, argNodes: argsNode ? kids(argsNode) : [] };
+    }
+
+    flattenLibraryItems(items) {
+        return items.flatMap((item) => item.type === 'library_decl' ? kids(item) : [item]);
     }
 };
 

@@ -1,4 +1,5 @@
 import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../../document/default-wasm.js';
+import { analyzeSourceLayout } from '../shared/compile-plan.js';
 import {
     UtuParserService,
     collectParseDiagnostics,
@@ -147,7 +148,9 @@ function hydrateHeaderSnapshot(shallowHeader, index) {
         references: shallowHeader.references,
         tests: symbols.filter((symbol) => symbol.kind === 'test').map(({ name }) => ({ name })),
         benches: symbols.filter((symbol) => symbol.kind === 'bench').map(({ name }) => ({ name })),
-        hasMain: symbols.some((symbol) => symbol.kind === 'function' && symbol.exported && symbol.name === 'main'),
+        hasMain: shallowHeader.hasMain,
+        hasLibrary: shallowHeader.hasLibrary,
+        sourceKind: shallowHeader.sourceKind,
     };
 }
 
@@ -162,91 +165,97 @@ function createSyntaxSnapshot(rootNode, diagnostics) {
 }
 
 export function collectHeaderSnapshot(rootNode, document) {
+    const layout = analyzeSourceLayout(rootNode);
     const header = {
         kind: 'header',
         imports: [],
-        exports: [],
+        exports: layout.exports.map(({ name }) => ({ name, kind: 'function' })),
         symbols: [],
         modules: [],
         constructs: [],
         references: [],
         tests: [],
         benches: [],
-        hasMain: false,
+        hasMain: layout.hasMain,
+        hasLibrary: layout.hasLibrary,
+        sourceKind: layout.sourceKind,
     };
-    for (const item of namedChildren(rootNode)) {
-        if (item.type === 'export_decl') {
-            const nameNode = childOfType(childOfType(item, 'fn_decl'), 'identifier');
-            if (!nameNode)
-                continue;
-            header.exports.push({ name: nameNode.text, kind: 'function' });
-            header.symbols.push({
-                name: nameNode.text,
-                kind: 'function',
-                exported: true,
-                uri: document.uri,
-                ...spanFromNode(document, nameNode),
-            });
-            header.hasMain ||= nameNode.text === 'main';
-            continue;
-        }
-        if (item.type === 'test_decl' || item.type === 'bench_decl') {
-            const name = namedChildren(item)[0]?.text.slice(1, -1);
-            if (!name)
-                continue;
-            const kind = item.type === 'test_decl' ? 'test' : 'bench';
-            header[kind === 'test' ? 'tests' : 'benches'].push({ name });
-            header.symbols.push({
-                name,
-                kind,
-                exported: false,
-                uri: document.uri,
-                ...spanFromNode(document, namedChildren(item)[0] ?? item),
-            });
-            continue;
-        }
-        if (item.type === 'module_decl') {
-            const moduleNode = childOfType(item, 'identifier') ?? childOfType(item, 'type_ident');
-            if (moduleNode)
-                header.modules.push({ name: moduleNode.text });
-            header.references.push(...collectHeaderTypeReferences(item).filter((name) => name !== moduleNode?.text));
-            continue;
-        }
-        if (item.type === 'construct_decl') {
-            const construct = collectConstructDeclaration(item);
-            if (construct)
-                header.constructs.push(construct);
-            continue;
-        }
-        const symbol = collectTopLevelSymbol(item, document);
-        if (symbol) {
-            header.symbols.push(symbol);
-            if (symbol.kind === 'importFunction' || symbol.kind === 'importValue') {
-                header.imports.push({ name: symbol.name, kind: symbol.kind });
-            }
-        }
-        header.references.push(...collectHeaderTypeReferences(item));
-    }
+    for (const item of namedChildren(rootNode))
+        collectHeaderItem(item, document, header, layout, false);
     header.references = [...new Set(header.references.filter(Boolean))];
     return header;
 }
 
-function collectTopLevelSymbol(item, document) {
+function collectHeaderItem(item, document, header, layout, inLibrary) {
+    if (item.type === 'library_decl') {
+        for (const child of namedChildren(item))
+            collectHeaderItem(child, document, header, layout, true);
+        return;
+    }
+    if (item.type === 'test_decl' || item.type === 'bench_decl') {
+        const name = namedChildren(item)[0]?.text.slice(1, -1);
+        if (!name)
+            return;
+        const kind = item.type === 'test_decl' ? 'test' : 'bench';
+        header[kind === 'test' ? 'tests' : 'benches'].push({ name });
+        header.symbols.push({
+            name,
+            kind,
+            exported: false,
+            uri: document.uri,
+            ...spanFromNode(document, namedChildren(item)[0] ?? item),
+        });
+        return;
+    }
+    if (item.type === 'module_decl') {
+        const moduleNode = childOfType(item, 'identifier') ?? childOfType(item, 'type_ident');
+        if (moduleNode)
+            header.modules.push({ name: moduleNode.text });
+        header.references.push(...collectHeaderTypeReferences(item).filter((name) => name !== moduleNode?.text));
+        return;
+    }
+    if (item.type === 'construct_decl') {
+        const construct = collectConstructDeclaration(item);
+        if (construct)
+            header.constructs.push(construct);
+        return;
+    }
+    const symbol = collectTopLevelSymbol(item, document, {
+        exported: item.type === 'fn_decl' && layout.exports.some(({ exportName }) => exportName === functionExportName(item)),
+    });
+    if (symbol) {
+        header.symbols.push(symbol);
+        if (symbol.kind === 'importFunction' || symbol.kind === 'importValue') {
+            header.imports.push({ name: symbol.name, kind: symbol.kind });
+        }
+    }
+    header.references.push(...collectHeaderTypeReferences(item));
+}
+
+function collectTopLevelSymbol(item, document, { exported = false } = {}) {
     if (item.type === 'fn_decl') {
+        const assocNode = childOfType(item, 'associated_fn_name');
+        if (assocNode) {
+            const [ownerNode, memberNode] = namedChildren(assocNode);
+            return ownerNode && memberNode
+                ? { name: `${ownerNode.text}.${memberNode.text}`, kind: 'function', exported, uri: document.uri, ...spanFromNode(document, memberNode) }
+                : null;
+        }
         const nameNode = childOfType(item, 'identifier');
-        return nameNode ? { name: nameNode.text, kind: 'function', exported: false, uri: document.uri, ...spanFromNode(document, nameNode) } : null;
+        return nameNode ? { name: nameNode.text, kind: 'function', exported, uri: document.uri, ...spanFromNode(document, nameNode) } : null;
     }
     if (item.type === 'global_decl') {
         const nameNode = childOfType(item, 'identifier');
         return nameNode ? { name: nameNode.text, kind: 'global', exported: false, uri: document.uri, ...spanFromNode(document, nameNode) } : null;
     }
-    if (item.type === 'import_decl') {
+    if (item.type === 'import_decl' || item.type === 'jsgen_decl') {
         const nameNode = childOfType(item, 'identifier');
+        const returnTypeNode = childOfType(item, 'return_type');
         const typeNode = item.namedChildren.at(-1);
         if (!nameNode) return null;
         return {
             name: nameNode.text,
-            kind: typeNode?.type === 'func_type' ? 'importFunction' : 'importValue',
+            kind: returnTypeNode ? 'importFunction' : 'importValue',
             exported: false,
             uri: document.uri,
             ...spanFromNode(document, nameNode),
@@ -265,6 +274,15 @@ function collectTopLevelSymbol(item, document) {
         return nameNode ? { name: nameNode.text, kind: 'protocol', exported: false, uri: document.uri, ...spanFromNode(document, nameNode) } : null;
     }
     return null;
+}
+
+function functionExportName(node) {
+    const assocNode = childOfType(node, 'associated_fn_name');
+    if (assocNode) {
+        const [ownerNode, memberNode] = namedChildren(assocNode);
+        return ownerNode && memberNode ? `${ownerNode.text}.${memberNode.text}` : null;
+    }
+    return childOfType(node, 'identifier')?.text ?? null;
 }
 
 function cloneDiagnostic(diagnostic) {

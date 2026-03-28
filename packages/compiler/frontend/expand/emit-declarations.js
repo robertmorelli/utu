@@ -12,11 +12,11 @@ import {
 
 const DeclarationEmitterMixin = class {
     emitItem(node, ctx, inModule) {
-        if (inModule && ['module_decl', 'construct_decl', 'export_decl', 'test_decl', 'bench_decl'].includes(node.type)) {
+        if (inModule && ['module_decl', 'construct_decl', 'library_decl', 'test_decl', 'bench_decl'].includes(node.type)) {
             const label = {
                 module_decl: 'nested modules',
                 construct_decl: 'construct declarations',
-                export_decl: 'export declarations',
+                library_decl: 'library declarations',
                 test_decl: 'test declarations',
                 bench_decl: 'bench declarations',
             }[node.type];
@@ -41,8 +41,8 @@ const DeclarationEmitterMixin = class {
                 return `${this.emitImportDecl(node, ctx, inModule)};`;
             case 'jsgen_decl':
                 return `${this.emitJsgenDecl(node, ctx, inModule)};`;
-            case 'export_decl':
-                return inModule ? '' : `export ${this.emitFnDecl(childOfType(node, 'fn_decl'), ctx, false)}`;
+            case 'library_decl':
+                return inModule ? '' : this.emitLibraryDecl(node, ctx);
             case 'test_decl':
                 return inModule ? '' : this.emitTestDecl(node, ctx);
             case 'bench_decl':
@@ -190,7 +190,7 @@ const DeclarationEmitterMixin = class {
     }
 
     emitImportDecl(node, ctx, inModule) {
-        return this.emitExternDecl('shimport', childOfType(node, 'string_lit').text, node, ctx, inModule);
+        return this.emitExternDecl('escape', childOfType(node, 'string_lit').text, node, ctx, inModule);
     }
 
     emitImportParamList(node, ctx) {
@@ -228,6 +228,19 @@ const DeclarationEmitterMixin = class {
             parts.push(`${this.emitExpr(child, ctx)};`);
         }
         return `setup { ${parts.join(' ')} }`;
+    }
+
+    emitLibraryDecl(node, ctx) {
+        const parts = [];
+        for (const child of kids(node)) {
+            if (child.type === 'construct_decl') {
+                this.applyConstruct(child, ctx);
+                continue;
+            }
+            const emitted = this.emitItem(child, ctx, false);
+            if (emitted) parts.push(emitted);
+        }
+        return `library {\n${parts.map((part) => indentBlock(part)).join('\n\n')}\n}`;
     }
 
     describeBareType(name, ctx) {
@@ -331,6 +344,13 @@ const DeclarationEmitterMixin = class {
     }
 
 };
+
+function indentBlock(source) {
+    return source
+        .split('\n')
+        .map((line) => `    ${line}`)
+        .join('\n');
+}
 
 for (const name of Object.getOwnPropertyNames(DeclarationEmitterMixin.prototype)) {
     if (name !== 'constructor') ModuleExpander.prototype[name] = DeclarationEmitterMixin.prototype[name];

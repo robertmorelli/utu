@@ -7,7 +7,7 @@ mod Adder[T] {
 
 }
 
-export fun main() i32 {
+fun main() i32 {
     let y: f32 = Adder[f32].add(2.0,3.0);
     Adder[i32].add(2,3);
 }

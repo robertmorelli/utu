@@ -27,7 +27,7 @@ async function main() {
   const languageService = new UtuLanguageService(parserService);
   const workspaceSymbols = new UtuWorkspaceSymbolIndex(languageService);
   const document = Object.assign(
-    createSourceDocument('export fun main() i32 { 0 }', {
+    createSourceDocument('fun main() i32 { 0 }', {
       uri: `file://${repoRoot}/examples/hello.utu`,
       version: 1,
     }),

@@ -28,7 +28,7 @@ fun Vec.sum(self: Vec) i32 {
     self.x + self.y;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let v: Vec = Vec.new(3, 4);
     v.sum();
 }`;
@@ -60,7 +60,7 @@ fun Measure.measure(self: Square) i32 {
     self.side * self.side;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let box: Box = Box { width: 2, height: 3 };
     box.measure();
 }`;
@@ -91,7 +91,7 @@ fun Measure.measure(self: Square) i32 {
     self.side * self.side;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let shape: Shape = Box { width: 2, height: 3 };
     shape.measure();
 }`;
@@ -112,7 +112,7 @@ tag struct Rect: Area {
     area: i32,
 }
 
-        export fun main() i32 {
+        fun main() i32 {
     let rect: Rect = Rect { area: 12 };
     rect.area;
 }`;
@@ -140,7 +140,7 @@ fun P.perimeter(self: Line) i32 {
     self.x + self.y;
 }
 
-export fun main() i32 {
+fun main() i32 {
     let xs: array[P] = array[P].new_default(2);
     xs[0] = Line { x: 3, y: 4 };
     xs[0].perimeter();
@@ -157,7 +157,7 @@ export fun main() i32 {
     }],
     ['unresolved-field-call-throws-instead-of-emitting-call-ref', async () => {
         try {
-            await compile(`export fun main() i32 { let x: i32 = 0; x.ghost(); }`, { mode: 'program' });
+            await compile(`fun main() i32 { let x: i32 = 0; x.ghost(); }`, { mode: 'program' });
         } catch (error) {
             if (String(error?.message ?? error).includes('ghost')) return;
             throw new Error(`Expected error mentioning 'ghost', got: ${error?.message}`);
@@ -242,7 +242,7 @@ async function inspectOptimizedModule(source, { optimize = true } = {}) {
 function makeBinaryenDceSource(count) {
     const types = Array.from({ length: count }, (_, index) => `struct T${index} {\n    value: i32,\n}`).join('\n\n');
     const constructs = Array.from({ length: count }, (_, index) => `construct foo_${index} = foo[T${index}];`).join('\n');
-    return `shimport "es" input: i32;
+    return `escape "es" input: i32;
 
 mod foo[T] {
     fun bar(value: T) T {
@@ -254,7 +254,7 @@ ${types}
 
 ${constructs}
 
-export fun main() i32 {
+fun main() i32 {
     foo_0.bar(T0 { value: input }).value;
 }`;
 }

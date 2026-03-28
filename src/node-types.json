@@ -1626,21 +1626,6 @@
     }
   },
   {
-    "type": "export_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "fn_decl",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "field",
     "named": true,
     "fields": {},
@@ -2726,6 +2711,10 @@
       "required": true,
       "types": [
         {
+          "type": "func_type",
+          "named": true
+        },
+        {
           "type": "identifier",
           "named": true
         },
@@ -2738,7 +2727,78 @@
           "named": true
         },
         {
+          "type": "nullable_type",
+          "named": true
+        },
+        {
+          "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "ref_type",
+          "named": true
+        },
+        {
           "type": "return_type",
+          "named": true
+        },
+        {
+          "type": "scalar_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "library_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "bench_decl",
+          "named": true
+        },
+        {
+          "type": "construct_decl",
+          "named": true
+        },
+        {
+          "type": "fn_decl",
+          "named": true
+        },
+        {
+          "type": "global_decl",
+          "named": true
+        },
+        {
+          "type": "import_decl",
+          "named": true
+        },
+        {
+          "type": "jsgen_decl",
+          "named": true
+        },
+        {
+          "type": "module_decl",
+          "named": true
+        },
+        {
+          "type": "proto_decl",
+          "named": true
+        },
+        {
+          "type": "struct_decl",
+          "named": true
+        },
+        {
+          "type": "test_decl",
+          "named": true
+        },
+        {
+          "type": "type_decl",
           "named": true
         }
       ]
@@ -3096,10 +3156,6 @@
           "named": true
         },
         {
-          "type": "export_decl",
-          "named": true
-        },
-        {
           "type": "fn_decl",
           "named": true
         },
@@ -3113,6 +3169,10 @@
         },
         {
           "type": "jsgen_decl",
+          "named": true
+        },
+        {
+          "type": "library_decl",
           "named": true
         },
         {
@@ -4469,10 +4529,6 @@
           "named": true
         },
         {
-          "type": "export_decl",
-          "named": true
-        },
-        {
           "type": "fn_decl",
           "named": true
         },
@@ -4486,6 +4542,10 @@
         },
         {
           "type": "jsgen_decl",
+          "named": true
+        },
+        {
+          "type": "library_decl",
           "named": true
         },
         {
@@ -5343,10 +5403,6 @@
     "named": false
   },
   {
-    "type": "export",
-    "named": false
-  },
-  {
     "type": "extern",
     "named": false
   },
@@ -5415,6 +5471,10 @@
     "named": false
   },
   {
+    "type": "library",
+    "named": false
+  },
+  {
     "type": "match",
     "named": false
   },
@@ -5476,10 +5536,6 @@
   },
   {
     "type": "setup",
-    "named": false
-  },
-  {
-    "type": "shimport",
     "named": false
   },
   {

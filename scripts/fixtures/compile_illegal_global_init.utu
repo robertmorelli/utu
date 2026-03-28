@@ -4,6 +4,6 @@ fun one() i32 {
 
 let bad: i32 = one();
 
-export fun main() i32 {
+fun main() i32 {
     bad;
 }

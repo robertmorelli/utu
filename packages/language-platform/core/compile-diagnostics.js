@@ -39,12 +39,23 @@ function findNodeForWatFunction(rootNode, watName) {
         return benches[parseInt(benchMatch[1])] ?? null;
     }
     for (const node of rootNode.namedChildren) {
-        if (node.type !== 'export_decl')
-            continue;
-        const fn = findNamedChild(node, 'fn_decl');
-        const name = findNamedChild(fn, 'identifier')?.text;
-        if (name === watName)
+        if (node.type === 'fn_decl' && exportNameForFunction(node) === watName)
             return node;
+        if (node.type !== 'library_decl')
+            continue;
+        for (const child of node.namedChildren ?? []) {
+            if (child.type === 'fn_decl' && exportNameForFunction(child) === watName)
+                return child;
+        }
     }
     return null;
+}
+
+function exportNameForFunction(fnDecl) {
+    const assocNode = findNamedChild(fnDecl, 'associated_fn_name');
+    if (assocNode) {
+        const [ownerNode, memberNode] = assocNode.namedChildren ?? [];
+        return ownerNode && memberNode ? `${ownerNode.text}.${memberNode.text}` : null;
+    }
+    return findNamedChild(fnDecl, 'identifier')?.text ?? null;
 }

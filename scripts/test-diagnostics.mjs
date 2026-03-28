@@ -109,8 +109,8 @@ async function testExtensionValidationLogSuppression() {
   try {
     const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'packages/hosts/vscode/diagnostics.js')).href);
     const documents = [
-      Object.assign(createSourceDocument('export fun main() i32 { 0; }', { uri: 'file:///validation-a.utu', version: 1 }), { languageId: 'utu' }),
-      Object.assign(createSourceDocument('export fun main() i32 { 1; }', { uri: 'file:///validation-b.utu', version: 1 }), { languageId: 'utu' }),
+      Object.assign(createSourceDocument('fun main() i32 { 0; }', { uri: 'file:///validation-a.utu', version: 1 }), { languageId: 'utu' }),
+      Object.assign(createSourceDocument('fun main() i32 { 1; }', { uri: 'file:///validation-b.utu', version: 1 }), { languageId: 'utu' }),
     ];
     testState.textDocuments.push(...documents);
     controller = new DiagnosticsController(
@@ -306,7 +306,7 @@ fun unknown_type_assoc() math.Pair {
 }
 
 function buildCompileDiagnosticFixture() {
-  const source = `export fun main() i32 {
+  const source = `fun main() i32 {
     let x: i32 = 1;
     {
         let x: i32 = 2;

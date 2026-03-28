@@ -22,11 +22,29 @@ export function createCollectionFns(ctx) {
     } = ctx;
 
     function collectTopLevelDeclarations(item) {
-        if (item.type !== 'export_decl')
-            return void ctx.topLevelHandlers[item.type]?.collect(item);
-        const fnDecl = findNamedChild(item, 'fn_decl');
-        if (fnDecl)
-            collectFunctionDeclaration(fnDecl, true);
+        if (item.type === 'library_decl') {
+            for (const child of item.namedChildren ?? []) {
+                if (child.type !== 'comment')
+                    collectLibraryItem(child);
+            }
+            return;
+        }
+        if (item.type === 'fn_decl') {
+            const nameNode = findNamedChild(item, 'identifier');
+            return void collectFunctionDeclaration(
+                item,
+                ctx.sourceLayout.exports.some(({ exportName }) => exportName === functionExportName(item)),
+            );
+        }
+        return void ctx.topLevelHandlers[item.type]?.collect(item);
+    }
+
+    function collectLibraryItem(item) {
+        if (item.type === 'fn_decl') {
+            collectFunctionDeclaration(item, ctx.sourceLayout.exports.some(({ exportName }) => exportName === functionExportName(item)));
+            return;
+        }
+        ctx.topLevelHandlers[item.type]?.collect(item);
     }
 
     function collectFieldSymbols(ownerSymbol, fieldList) {
@@ -237,9 +255,9 @@ export function createCollectionFns(ctx) {
                 return;
             const paramList = findNamedChild(fnDecl, 'param_list');
             const returnType = findNamedChild(fnDecl, 'return_type');
-            const signature = `${exported ? 'export ' : ''}fun ${ownerNode.text}.${memberNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
+            const signature = `fun ${ownerNode.text}.${memberNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
             const assocSymbol = createSymbol(memberNode, 'function', {
-                detail: namespace ? `method in ${namespace.name}` : exported ? 'exported associated function' : 'associated function',
+                detail: namespace ? `method in ${namespace.name}` : exported ? 'library associated function' : 'associated function',
                 name: `${ownerNode.text}.${memberNode.text}`,
                 signature,
                 returnTypeText: returnType?.text,
@@ -263,9 +281,9 @@ export function createCollectionFns(ctx) {
             return;
         const paramList = findNamedChild(fnDecl, 'param_list');
         const returnType = findNamedChild(fnDecl, 'return_type');
-        const signature = `${exported ? 'export ' : ''}fun ${nameNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
+        const signature = `fun ${nameNode.text}(${paramList?.text ?? ''})${returnType ? ` ${returnType.text}` : ''}`;
         const functionSymbol = createSymbol(nameNode, 'function', {
-            detail: namespace ? `function in ${namespace.name}` : exported ? 'exported function' : 'function',
+            detail: namespace ? `function in ${namespace.name}` : exported ? (nameNode.text === 'main' ? 'program entrypoint' : 'library function') : 'function',
             exported,
             signature,
             returnTypeText: returnType?.text,
@@ -317,7 +335,7 @@ export function createCollectionFns(ctx) {
             const paramList = findNamedChild(importDecl, 'import_param_list');
             const importSymbol = createSymbol(nameNode, 'importFunction', {
                 detail: 'host import',
-                signature: `shimport ${moduleText} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
+                signature: `escape ${moduleText} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
                 returnTypeText: returnTypeNode.text,
                 topLevel: true,
             });
@@ -329,7 +347,7 @@ export function createCollectionFns(ctx) {
             return;
         const importSymbol = createSymbol(nameNode, 'importValue', {
             detail: 'host import value',
-            signature: `shimport ${moduleText} ${nameNode.text}: ${typeNode.text}`,
+            signature: `escape ${moduleText} ${nameNode.text}: ${typeNode.text}`,
             typeText: typeNode.text,
             topLevel: true,
         });
@@ -343,14 +361,19 @@ export function createCollectionFns(ctx) {
             return;
         const paramList = findNamedChild(jsgenDecl, 'import_param_list');
         const returnTypeNode = findNamedChild(jsgenDecl, 'return_type');
-        if (!returnTypeNode)
-            return;
-        const importSymbol = createSymbol(nameNode, 'importFunction', {
-            detail: 'inline js import',
-            signature: `escape ${sourceNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
-            returnTypeText: returnTypeNode.text,
-            topLevel: true,
-        });
+        const importSymbol = returnTypeNode
+            ? createSymbol(nameNode, 'importFunction', {
+                detail: 'inline js import',
+                signature: `escape ${sourceNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
+                returnTypeText: returnTypeNode.text,
+                topLevel: true,
+            })
+            : createSymbol(nameNode, 'importValue', {
+                detail: 'inline js import value',
+                signature: `escape ${sourceNode.text} ${nameNode.text}: ${jsgenDecl.namedChildren.at(-1)?.text ?? 'unknown'}`,
+                typeText: jsgenDecl.namedChildren.at(-1)?.text,
+                topLevel: true,
+            });
         rememberSymbolKey(topLevelValueKeys, importSymbol);
     }
 
@@ -364,7 +387,7 @@ export function createCollectionFns(ctx) {
             const paramList = findNamedChild(importDecl, 'import_param_list');
             const importSymbol = createSymbol(nameNode, 'importFunction', {
                 detail: `host import in ${namespace.name}`,
-                signature: `shimport ${moduleNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
+                signature: `escape ${moduleNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
                 returnTypeText: returnTypeNode.text,
                 containerName: namespace.name,
             });
@@ -376,7 +399,7 @@ export function createCollectionFns(ctx) {
             return;
         const importSymbol = createSymbol(nameNode, 'importValue', {
             detail: `host import value in ${namespace.name}`,
-            signature: `shimport ${moduleNode.text} ${nameNode.text}: ${typeNode.text}`,
+            signature: `escape ${moduleNode.text} ${nameNode.text}: ${typeNode.text}`,
             typeText: typeNode.text,
             containerName: namespace.name,
         });
@@ -387,15 +410,22 @@ export function createCollectionFns(ctx) {
         const sourceNode = findNamedChild(jsgenDecl, 'jsgen_lit');
         const nameNode = findNamedChild(jsgenDecl, 'identifier');
         const returnTypeNode = findNamedChild(jsgenDecl, 'return_type');
-        if (!sourceNode || !nameNode || !returnTypeNode)
+        if (!sourceNode || !nameNode)
             return;
         const paramList = findNamedChild(jsgenDecl, 'import_param_list');
-        const jsgenSymbol = createSymbol(nameNode, 'importFunction', {
-            detail: `inline js import in ${namespace.name}`,
-            signature: `escape ${sourceNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
-            returnTypeText: returnTypeNode.text,
-            containerName: namespace.name,
-        });
+        const jsgenSymbol = returnTypeNode
+            ? createSymbol(nameNode, 'importFunction', {
+                detail: `inline js import in ${namespace.name}`,
+                signature: `escape ${sourceNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
+                returnTypeText: returnTypeNode.text,
+                containerName: namespace.name,
+            })
+            : createSymbol(nameNode, 'importValue', {
+                detail: `inline js import value in ${namespace.name}`,
+                signature: `escape ${sourceNode.text} ${nameNode.text}: ${jsgenDecl.namedChildren.at(-1)?.text ?? 'unknown'}`,
+                typeText: jsgenDecl.namedChildren.at(-1)?.text,
+                containerName: namespace.name,
+            });
         namespace.valueKeys.set(nameNode.text, jsgenSymbol.key);
     }
 
@@ -457,4 +487,13 @@ export function createCollectionFns(ctx) {
         collectTestDeclaration,
         collectBenchDeclaration,
     };
+
+    function functionExportName(fnDecl) {
+        const assocNode = findNamedChild(fnDecl, 'associated_fn_name');
+        if (assocNode) {
+            const [ownerNode, memberNode] = assocNode.namedChildren ?? [];
+            return ownerNode && memberNode ? `${ownerNode.text}.${memberNode.text}` : null;
+        }
+        return findNamedChild(fnDecl, 'identifier')?.text ?? null;
+    }
 }

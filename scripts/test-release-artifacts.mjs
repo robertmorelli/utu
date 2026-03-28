@@ -109,7 +109,7 @@ async function testBundledLspBinary() {
         uri: 'file:///release-artifact-smoke.utu',
         languageId: 'utu',
         version: 1,
-        text: 'export fun main() i32 { 0; }',
+        text: 'fun main() i32 { 0; }',
       },
     });
 

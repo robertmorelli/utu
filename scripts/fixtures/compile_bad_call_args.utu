@@ -5,3 +5,7 @@ fun add(a: i32, b: i32) i32 {
 fun bad() i32 {
     add("hi", 1);
 }
+
+fun main() i32 {
+    bad();
+}

@@ -23,6 +23,9 @@ async function compileCmd(args) {
   const { input, outdir, wat, bun, optimize } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun", () => true], "--node": ["bun", () => false], "--no-opt": ["optimize", () => false], "--outdir": ["outdir", value => value] });
   const file = path.resolve(input);
   const source = await readFile(file, "utf8");
+  const metadata = await getMetadata(source);
+  if (bun && metadata.sourceKind !== 'program')
+    fail('UTU `--bun` output requires a top-level `fun main()` program file.');
   const outputDir = outdir ? path.resolve(outdir) : bun ? path.dirname(file) : path.resolve(data.compileNodeDefaults.outdir);
   const base = path.join(outputDir, path.basename(file, path.extname(file)));
   const targetName = path.basename(file, path.extname(file));
@@ -38,7 +41,7 @@ async function compileCmd(args) {
 async function runCmd(args) {
   const { input } = parseArgs(args, "run", "run needs an input file");
   const source = await readFile(path.resolve(input), "utf8");
-  if (!(await getMetadata(source)).hasMain) fail('UTU run requires `export fun main()` in the input file.');
+  if ((await getMetadata(source)).sourceKind !== 'program') fail('UTU run requires a top-level `fun main()` and no `library { ... }` block.');
   return withRuntime(loadRuntime(source), async ({ exports }) => {
     const result = await exports.main();
     if (result !== undefined) console.log(result);

@@ -1,6 +1,6 @@
 # Utu vs Rust DeltaBlue
 
-Generated: 2026-03-27T19:34:33.156Z
+Generated: 2026-03-28T19:49:44.883Z
 
 ## Benchmark Setup
 
@@ -13,12 +13,12 @@ Generated: 2026-03-27T19:34:33.156Z
 
 | Variant | Source (bytes) | Source rel. smallest | Bundle (bytes) | Bundle / Source |
 | --- | ---: | ---: | ---: | ---: |
-| Utu bundle | 26321 | 1.006x | 5354 | 0.203x |
-| Utu protocols bundle | 26173 | 1x | 5823 | 0.222x |
-| Rust wasm | 34117 | 1.304x | 32283 | 0.946x |
-| Rust native | 34117 | 1.304x | 372912 | 10.93x |
-| Unsafe Rust wasm | 33127 | 1.266x | 24014 | 0.725x |
-| Unsafe Rust native | 33127 | 1.266x | 372272 | 11.238x |
+| Utu bundle | 26282 | 1.006x | 5287 | 0.201x |
+| Utu protocols bundle | 26135 | 1x | 5756 | 0.22x |
+| Rust wasm | 34117 | 1.305x | 32283 | 0.946x |
+| Rust native | 34117 | 1.305x | 372912 | 10.93x |
+| Unsafe Rust wasm | 33127 | 1.268x | 24014 | 0.725x |
+| Unsafe Rust native | 33127 | 1.268x | 372272 | 11.238x |
 
 Source size counts only the benchmark language files. Utu bundle size combines the generated `module.mjs` and `utu.wasm` outputs.
 
@@ -26,20 +26,20 @@ Source size counts only the benchmark language files. Utu bundle size combines t
 
 | Variant | Mean (ms) | Stddev (ms) | Min (ms) | Max (ms) | Relative | Runs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| unsafe_rust_native | 41.247 | 1.725 | 37.989 | 46.49 | 1x | 65 |
-| unsafe_rust_wasm | 80.269 | 1.457 | 77.608 | 83.768 | 1.946x | 33 |
-| utu_wasm | 135.527 | 3.575 | 129.519 | 147.333 | 3.286x | 21 |
-| utu_protocols_wasm | 139.207 | 2.645 | 134.184 | 143.17 | 3.375x | 21 |
-| rc_rust_native | 194.166 | 15.259 | 180.951 | 221.242 | 4.707x | 15 |
-| rc_rust_wasm | 229.511 | 6.136 | 223.13 | 247.289 | 5.564x | 12 |
+| unsafe_rust_native | 40.856 | 1.71 | 36.686 | 44.856 | 1x | 68 |
+| unsafe_rust_wasm | 80.728 | 2.909 | 77.56 | 89.813 | 1.976x | 34 |
+| utu_wasm | 132.532 | 10.823 | 123.538 | 174.809 | 3.244x | 21 |
+| utu_protocols_wasm | 137.321 | 6.67 | 128.371 | 148.734 | 3.361x | 19 |
+| rc_rust_native | 183.14 | 8.361 | 176.345 | 203.067 | 4.483x | 16 |
+| rc_rust_wasm | 228.671 | 3.171 | 223.353 | 234.317 | 5.597x | 13 |
 
 ## Projection Benchmark
 
 | Variant | Mean (ms) | Stddev (ms) | Min (ms) | Max (ms) | Relative | Runs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| unsafe_rust_native | 53.547 | 4.187 | 51.057 | 81.821 | 1x | 50 |
-| unsafe_rust_wasm | 129.133 | 12.592 | 121.821 | 185.171 | 2.412x | 23 |
-| utu_protocols_wasm | 200.38 | 3.228 | 195.094 | 208.334 | 3.742x | 14 |
-| utu_wasm | 201.388 | 3.471 | 196.643 | 208.575 | 3.761x | 14 |
-| rc_rust_native | 305.482 | 15.364 | 292.919 | 345.179 | 5.705x | 10 |
-| rc_rust_wasm | 334.777 | 10.816 | 327.435 | 365.032 | 6.252x | 10 |
+| unsafe_rust_native | 49.951 | 1.253 | 48.892 | 54.889 | 1x | 55 |
+| unsafe_rust_wasm | 121.759 | 0.752 | 120.684 | 123.852 | 2.438x | 23 |
+| utu_wasm | 192.926 | 2.165 | 189.034 | 195.918 | 3.862x | 15 |
+| utu_protocols_wasm | 193.142 | 2.12 | 189.338 | 196.265 | 3.867x | 15 |
+| rc_rust_native | 294.27 | 4.129 | 284.658 | 299.905 | 5.891x | 10 |
+| rc_rust_wasm | 320.965 | 3.173 | 318.194 | 329.003 | 6.426x | 10 |

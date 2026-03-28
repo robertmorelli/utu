@@ -1,5 +1,5 @@
-// shimport "es" _String_prototype_concat(str,str) str;
-shimport "es" _console_log(str) void;
+// escape "es" _String_prototype_concat(str,str) str;
+escape "es" _console_log(str) void;
 
 
 fun greeting(name: str) str {
@@ -15,6 +15,6 @@ bench "hello-name format" {
     }
 }
 
-export fun main() str {
+fun main() str {
     greeting("utu");
 }
