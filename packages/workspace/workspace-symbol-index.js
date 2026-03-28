@@ -1,6 +1,4 @@
-import data from '../../jsondata/languageService.data.json' with { type: 'json' };
-
-const SYMBOL_METADATA = data.symbolMetadata;
+import { SYMBOL_METADATA } from '../language-spec/index.js';
 
 export class UtuWorkspaceSymbolIndex {
     constructor(analysisCache) {

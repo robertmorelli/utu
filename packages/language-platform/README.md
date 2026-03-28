@@ -15,15 +15,16 @@ Public entrypoint:
 
 - [`index.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/index.js)
 
-Migration note:
+Current state:
 
-- this package currently re-exports the legacy `lsp_core` implementation
-- callers should prefer this package over importing `lsp_core/*` directly
+- this package now owns the shared language-service surface directly under `core/` and `providers/`
+- compatibility shims may still exist at older root paths, but new work should land in this package
 
 Key locations:
 
 - [`core/languageService.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/languageService.js)
 - [`core/documentIndex.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/documentIndex.js)
+- [`core/document-index/build.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/document-index/build.js)
 - [`core/symbols.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/symbols.js)
 - [`core/runnables.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/runnables.js)
 - [`core/workspaceSymbols.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/workspaceSymbols.js)
@@ -41,4 +42,4 @@ Key locations:
 Import rule:
 
 - hosts, compiler facades, and workspace/session code may depend on this package
-- this package should become the stable boundary while `lsp_core` is gradually internalized
+- this package is the stable boundary for editor semantics and provider glue

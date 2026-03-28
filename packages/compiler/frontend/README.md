@@ -6,7 +6,8 @@ This directory exposes the phase-oriented entrypoints for UTU's shared frontend.
 - `diagnostics/` owns syntax-diagnostic helpers that stay safe during editing.
 - `bind/` owns symbol-binding entrypoints and returns snapshot-backed binding facts.
 - `sema/` owns semantic-analysis entrypoints and returns validation/compile-ready snapshots.
-- `expand.js` remains the shared source expansion pass used by both compiler and editor flows.
+- `expand.js` remains the shared source expansion surface used by both compiler and editor flows.
+- `expand/shared.js`, `expand/collect.js`, `expand/emit-declarations.js`, and `expand/emit-expressions.js` now hold the phase-oriented expansion internals.
 - `tree.js` remains the low-level tree traversal helper used by frontend and backend code.
 
 Stable entrypoints:

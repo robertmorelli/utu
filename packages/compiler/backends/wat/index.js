@@ -1,1 +1,6 @@
-export { watgen } from './core.js';
+export {
+    isWatBackendInitialized,
+    initializeWatBackend,
+    WAT_BACKEND_PHASES,
+    watgen,
+} from './core.js';

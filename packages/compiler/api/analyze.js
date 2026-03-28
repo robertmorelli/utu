@@ -1,8 +1,8 @@
-import bundledGrammarWasm from '../../../tree-sitter-utu.wasm';
-import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
-import { UtuLanguageService, hasRunnableMain } from '../../language-platform/index.js';
 import { UtuParserService, collectParseDiagnostics, createSourceDocument, spanFromNode } from '../../document/index.js';
 import { childOfType, namedChildren } from '../frontend/tree.js';
+
+const bundledGrammarWasm = new URL('../../../tree-sitter-utu.wasm', import.meta.url);
+const bundledRuntimeWasm = new URL('../../../web-tree-sitter.wasm', import.meta.url);
 
 /**
  * @typedef {'editor' | 'validation' | 'compile'} AnalyzeMode
@@ -33,25 +33,19 @@ import { childOfType, namedChildren } from '../frontend/tree.js';
  */
 
 /**
- * Analyzes a UTU source document.
- *
- * Transitional shared analysis shim:
- * - all modes use the tolerant parser and legacy language service
- * - `editor` mode keeps backend validation off the hot path
- * - `compile` mode enables backend validation through the legacy path
+ * Parses a UTU source document and returns syntax/header snapshots without
+ * requiring the shared semantic language service.
  *
  * @param {AnalyzeOptions} options
- * @returns {Promise<AnalyzeResult>}
+ * @returns {Promise<Pick<AnalyzeResult, 'mode' | 'uri' | 'sourceText' | 'syntax' | 'header' | 'body' | 'diagnostics'>>}
  */
-export async function analyzeDocument(options) {
+export async function analyzeSyntaxAndHeader(options) {
     const {
         mode = 'editor',
         uri = 'memory://utu',
         sourceText,
         version = 0,
         parserService: providedParserService,
-        languageService: providedLanguageService,
-        validateWat = null,
         grammarWasmPath = bundledGrammarWasm,
         runtimeWasmPath = bundledRuntimeWasm,
     } = options;
@@ -66,45 +60,68 @@ export async function analyzeDocument(options) {
         parsedTree = await parserService.parseSource(sourceText);
         const rootNode = parsedTree.tree.rootNode;
         const syntaxDiagnostics = collectParseDiagnostics(rootNode, document).map(cloneDiagnostic);
-        const shallowHeader = collectShallowHeaderSnapshot(rootNode, document);
-        const result = {
+        return {
             mode,
             uri,
             sourceText,
-            syntax: {
-                kind: 'syntax',
-                tree: null,
-                rootType: rootNode.type,
-                treeString: rootNode.toString(),
-                diagnostics: syntaxDiagnostics,
-            },
-            header: shallowHeader,
+            syntax: createSyntaxSnapshot(rootNode, syntaxDiagnostics),
+            header: collectHeaderSnapshot(rootNode, document),
             body: null,
             diagnostics: syntaxDiagnostics,
         };
-        const ownsLanguageService = !providedLanguageService;
-        const languageService = providedLanguageService ?? new UtuLanguageService(parserService, {
-            validateWat: mode === 'compile' ? validateWat : null,
-        });
-        try {
-            const index = await languageService.getDocumentIndex(document);
-            result.header = hydrateHeaderSnapshot(shallowHeader, index);
-            result.body = {
-                kind: 'body',
-                legacyIndex: index,
-                symbols: index.symbols.map(cloneSymbol),
-                topLevelSymbols: index.topLevelSymbols.map(cloneSymbol),
-                occurrences: index.occurrences.map(cloneOccurrence),
-            };
-            result.diagnostics = index.diagnostics.map(cloneDiagnostic);
-            return result;
-        } finally {
-            if (ownsLanguageService) languageService.dispose();
-        }
     } finally {
         parsedTree?.dispose();
         if (ownsParserService) parserService.dispose();
     }
+}
+
+/**
+ * Analyzes a UTU source document.
+ *
+ * Shared analysis entrypoint:
+ * - all modes use the tolerant parser/document pipeline
+ * - `editor` mode keeps backend validation off the hot path
+ * - `compile` mode is the strict consumer-facing mode layered on the same snapshots
+ *
+ * @param {AnalyzeOptions} options
+ * @returns {Promise<AnalyzeResult>}
+ */
+export async function analyzeDocument(options) {
+    const {
+        mode = 'editor',
+        uri = 'memory://utu',
+        sourceText,
+        version = 0,
+        parserService,
+        languageService,
+        validateWat: _validateWat = null,
+        grammarWasmPath = bundledGrammarWasm,
+        runtimeWasmPath = bundledRuntimeWasm,
+    } = options;
+    const result = await analyzeSyntaxAndHeader({
+        mode,
+        uri,
+        sourceText,
+        version,
+        parserService,
+        grammarWasmPath,
+        runtimeWasmPath,
+    });
+    if (!languageService) {
+        return result;
+    }
+    const document = createSourceDocument(sourceText, { uri, version });
+    const index = await languageService.getDocumentIndex(document, { mode });
+    result.header = hydrateHeaderSnapshot(result.header, index);
+    result.body = {
+        kind: 'body',
+        legacyIndex: index,
+        symbols: index.symbols.map(cloneSymbol),
+        topLevelSymbols: index.topLevelSymbols.map(cloneSymbol),
+        occurrences: index.occurrences.map(cloneOccurrence),
+    };
+    result.diagnostics = index.diagnostics.map(cloneDiagnostic);
+    return result;
 }
 
 function hydrateHeaderSnapshot(shallowHeader, index) {
@@ -124,11 +141,21 @@ function hydrateHeaderSnapshot(shallowHeader, index) {
         references: shallowHeader.references,
         tests: symbols.filter((symbol) => symbol.kind === 'test').map(({ name }) => ({ name })),
         benches: symbols.filter((symbol) => symbol.kind === 'bench').map(({ name }) => ({ name })),
-        hasMain: hasRunnableMain(index),
+        hasMain: symbols.some((symbol) => symbol.kind === 'function' && symbol.exported && symbol.name === 'main'),
     };
 }
 
-function collectShallowHeaderSnapshot(rootNode, document) {
+function createSyntaxSnapshot(rootNode, diagnostics) {
+    return {
+        kind: 'syntax',
+        tree: null,
+        rootType: rootNode.type,
+        treeString: rootNode.toString(),
+        diagnostics,
+    };
+}
+
+export function collectHeaderSnapshot(rootNode, document) {
     const header = {
         kind: 'header',
         imports: [],

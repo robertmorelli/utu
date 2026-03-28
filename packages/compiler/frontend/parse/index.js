@@ -1,10 +1,11 @@
-import bundledGrammarWasm from '../../../../tree-sitter-utu.wasm';
-import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
 import {
     UtuParserService,
     collectParseDiagnostics,
     createSourceDocument,
 } from '../../../document/index.js';
+
+const bundledGrammarWasm = new URL('../../../../tree-sitter-utu.wasm', import.meta.url);
+const bundledRuntimeWasm = new URL('../../../../web-tree-sitter.wasm', import.meta.url);
 
 export async function parseDocument({
     sourceText,

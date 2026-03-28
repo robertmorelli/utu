@@ -10,9 +10,9 @@ import { get_metadata as legacyGetMetadata } from '../core/index.js';
 /**
  * Extracts execution metadata from a header snapshot or directly from source text.
  *
- * Phase 1 shim:
+ * Public metadata entrypoint:
  * - header snapshots are normalized directly
- * - source-text options forward to the current root compiler metadata helper
+ * - source-text options forward to the compiler metadata helper
  *
  * @param {Object} headerSnapshotOrOptions
  * @returns {Promise<DocumentMetadata>}

@@ -1,7 +1,18 @@
 import * as vscode from 'vscode';
+import {
+    DIAGNOSTIC_PROVIDER_TRIGGERS,
+    getDocumentDiagnostics,
+} from '../../language-platform/providers/diagnostics.js';
 import { toVscodeDiagnostic } from './adapters/core.js';
 import { createDebouncedUriScheduler, firstUsefulErrorLine, logOutputError, UTU_LANGUAGE_ID } from './shared.js';
+
 const VALIDATION_DELAY_MS = 150;
+const VSCODE_VALIDATION_MODES = Object.freeze({
+    ON_TYPE: 'onType',
+    ON_SAVE: 'onSave',
+    OFF: 'off',
+});
+
 export class DiagnosticsController {
     languageService;
     output;
@@ -18,7 +29,13 @@ export class DiagnosticsController {
         this.languageService = languageService;
         this.output = output;
         this.compilerHost = compilerHost;
-        this.disposables.push(vscode.workspace.onDidOpenTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)), vscode.workspace.onDidChangeTextDocument(({ document }) => this.getValidationMode() === 'onType' && this.isEnabledFor(document) && this.schedule(document)), vscode.workspace.onDidSaveTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)), vscode.workspace.onDidCloseTextDocument((document) => (this.pending.delete(document.uri), this.collection.delete(document.uri))), vscode.workspace.onDidChangeConfiguration((event) => event.affectsConfiguration('utu') && void this.refreshOpenDocuments()));
+        this.disposables.push(
+            vscode.workspace.onDidOpenTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)),
+            vscode.workspace.onDidChangeTextDocument(({ document }) => this.shouldValidateOnType() && this.isEnabledFor(document) && this.schedule(document)),
+            vscode.workspace.onDidSaveTextDocument((document) => this.isEnabledFor(document) && void this.validate(document)),
+            vscode.workspace.onDidCloseTextDocument((document) => (this.pending.delete(document.uri), this.collection.delete(document.uri))),
+            vscode.workspace.onDidChangeConfiguration((event) => event.affectsConfiguration('utu') && void this.refreshOpenDocuments()),
+        );
         void this.refreshOpenDocuments();
     }
     dispose() {
@@ -29,17 +46,19 @@ export class DiagnosticsController {
         this.pending.schedule(document.uri);
     }
     async refreshOpenDocuments() {
-        if (this.getValidationMode() === 'off') {
+        if (this.getValidationMode() === VSCODE_VALIDATION_MODES.OFF) {
             this.collection.clear();
             return;
         }
-        await Promise.all(vscode.workspace.textDocuments.filter((document) => document.languageId === UTU_LANGUAGE_ID).map((document) => this.validate(document)));
+        await Promise.all(vscode.workspace.textDocuments
+            .filter((document) => document.languageId === UTU_LANGUAGE_ID)
+            .map((document) => this.validate(document, DIAGNOSTIC_PROVIDER_TRIGGERS.MANUAL)));
     }
-    async validate(document) {
+    async validate(document, trigger = this.diagnosticTriggerForValidationMode()) {
         const { uri, version } = document;
         try {
-            const diagnostics = await this.languageService.getDiagnostics(document);
-            if (!diagnostics.length && this.compilerHost && !this.compilerValidationUnavailableMessage)
+            const diagnostics = await getDocumentDiagnostics(this.languageService, document, { trigger });
+            if (shouldRunCompilerValidation(trigger) && !diagnostics.length && this.compilerHost && !this.compilerValidationUnavailableMessage)
                 try { await this.compilerHost.compile(document.getText()); }
                 catch (error) {
                     if (isSourceDiagnosticError(error)) {
@@ -58,8 +77,18 @@ export class DiagnosticsController {
             logOutputError(this.output, `[utu] Validation failed for ${uri.fsPath || uri.toString()}`, error);
         }
     }
-    getValidationMode() { return vscode.workspace.getConfiguration('utu').get('validation.mode', 'onType'); }
-    isEnabledFor(document) { return document.languageId === UTU_LANGUAGE_ID && this.getValidationMode() !== 'off'; }
+    getValidationMode() {
+        return normalizeValidationMode(vscode.workspace.getConfiguration('utu').get('validation.mode', VSCODE_VALIDATION_MODES.ON_TYPE));
+    }
+    isEnabledFor(document) { return document.languageId === UTU_LANGUAGE_ID && this.getValidationMode() !== VSCODE_VALIDATION_MODES.OFF; }
+    shouldValidateOnType() {
+        return this.getValidationMode() === VSCODE_VALIDATION_MODES.ON_TYPE;
+    }
+    diagnosticTriggerForValidationMode() {
+        return this.getValidationMode() === VSCODE_VALIDATION_MODES.ON_TYPE
+            ? DIAGNOSTIC_PROVIDER_TRIGGERS.ON_TYPE
+            : DIAGNOSTIC_PROVIDER_TRIGGERS.ON_SAVE;
+    }
     disableCompilerValidation(error) {
         const message = String(error instanceof Error ? error.message : error);
         if (!this.compilerValidationUnavailableMessage) {
@@ -144,4 +173,19 @@ function findSourceRangeForMissingFunction(index, name) {
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
+}
+
+function normalizeValidationMode(mode) {
+    switch (mode) {
+        case VSCODE_VALIDATION_MODES.ON_TYPE:
+        case VSCODE_VALIDATION_MODES.ON_SAVE:
+        case VSCODE_VALIDATION_MODES.OFF:
+            return mode;
+        default:
+            throw new Error(`Unknown VS Code validation mode "${mode}"`);
+    }
+}
+
+function shouldRunCompilerValidation(trigger) {
+    return trigger !== DIAGNOSTIC_PROVIDER_TRIGGERS.ON_TYPE;
 }

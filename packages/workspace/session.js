@@ -1,9 +1,22 @@
 import { UtuParserService } from '../document/index.js';
-import { UtuLanguageService } from '../language-platform/index.js';
 import { UtuAnalysisCache } from './analysis-cache.js';
 import { UtuDependencyGraph } from './dependency-graph.js';
 import { UtuDocumentStore, UtuWorkspaceTextDocument } from './document-store.js';
 import { UtuWorkspaceSymbolIndex } from './workspace-symbol-index.js';
+
+export const WORKSPACE_SESSION_MODES = Object.freeze({
+    EDITOR: 'editor',
+    VALIDATION: 'validation',
+    COMPILE: 'compile',
+});
+
+export const WORKSPACE_SESSION_PHASES = Object.freeze({
+    OPEN_DOCUMENT: 'open-document',
+    UPDATE_DOCUMENT: 'update-document',
+    SAVE_DOCUMENT: 'save-document',
+    READ_DIAGNOSTICS: 'read-diagnostics',
+    READ_DOCUMENT_INDEX: 'read-document-index',
+});
 
 const DEFAULT_DOCUMENT_REQUESTS = [
     ['getHover', 'getHover', undefined],
@@ -39,7 +52,10 @@ export class UtuWorkspaceSession {
             grammarWasmPath,
             runtimeWasmPath,
         });
-        this.languageService = languageService ?? new UtuLanguageService(this.parserService, { validateWat: validateWatOverride });
+        if (!languageService) {
+            throw new Error('UtuWorkspaceSession requires a languageService. Hosts should construct the shared language service and pass it in.');
+        }
+        this.languageService = languageService;
         this.analysisCache = analysisCache ?? new UtuAnalysisCache({
             parserService: this.parserService,
             languageService: this.languageService,
@@ -87,10 +103,10 @@ export class UtuWorkspaceSession {
         this.resetWorkspaceSymbols();
     }
     async openDocument(params) {
-        return this.getFreshDiagnostics(this.documents.open(params), { mode: 'editor' });
+        return this.getFreshDiagnostics(this.documents.open(params), { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.OPEN_DOCUMENT) });
     }
     async updateDocument(params) {
-        return this.getFreshDiagnostics(this.documents.update(params), { mode: 'editor' });
+        return this.getFreshDiagnostics(this.documents.update(params), { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.UPDATE_DOCUMENT) });
     }
     async closeDocument(uri) {
         this.documents.close(uri);
@@ -105,21 +121,22 @@ export class UtuWorkspaceSession {
     async saveDocument(params) {
         const document = this.documents.get(params.uri);
         if (!document || params.text === undefined)
-            return this.getDiagnostics(params.uri, { mode: 'validation' });
+            return this.getDiagnostics(params.uri, { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.SAVE_DOCUMENT) });
         document.setText(params.text, params.version ?? document.version);
-        return this.getFreshDiagnostics(document, { mode: 'validation' });
+        return this.getFreshDiagnostics(document, { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.SAVE_DOCUMENT) });
     }
     async syncDocumentText(params) {
         return this.documents.upsertText(params);
     }
     async getDocumentAnalysis(uri, options = {}) {
-        return this.withDocument(uri, null, (document) => this.analysisCache.analyze(document, options));
+        const mode = normalizeWorkspaceSessionMode(options.mode ?? this.modeForPhase(WORKSPACE_SESSION_PHASES.READ_DIAGNOSTICS));
+        return this.withDocument(uri, null, (document) => this.analysisCache.analyze(document, { ...options, mode }));
     }
     async getDocumentIndex(uri) {
-        const analysis = await this.getDocumentAnalysis(uri, { mode: 'validation' });
+        const analysis = await this.getDocumentAnalysis(uri, { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.READ_DOCUMENT_INDEX) });
         return analysis?.body?.legacyIndex ?? null;
     }
-    async getDiagnostics(uri, { mode = 'validation' } = {}) {
+    async getDiagnostics(uri, { mode = this.modeForPhase(WORKSPACE_SESSION_PHASES.READ_DIAGNOSTICS) } = {}) {
         const analysis = await this.getDocumentAnalysis(uri, { mode });
         return analysis?.diagnostics?.map(cloneDiagnostic) ?? [];
     }
@@ -127,9 +144,10 @@ export class UtuWorkspaceSession {
         await this.ensureWorkspaceSymbols();
         return this.workspaceSymbols.getWorkspaceSymbols(query);
     }
-    async getFreshDiagnostics(document, { mode = 'validation' } = {}) {
+    async getFreshDiagnostics(document, { mode = this.modeForPhase(WORKSPACE_SESSION_PHASES.READ_DIAGNOSTICS) } = {}) {
+        const normalizedMode = normalizeWorkspaceSessionMode(mode);
         this.invalidateDocument(document.uri);
-        const analysis = await this.analysisCache.analyze(document, { mode });
+        const analysis = await this.analysisCache.analyze(document, { mode: normalizedMode });
         this.dependencies.updateDocument(document, analysis.header);
         await this.workspaceSymbols.updateDocument(document);
         this.workspaceSymbolsReady = true;
@@ -158,6 +176,20 @@ export class UtuWorkspaceSession {
             this.workspaceSymbolSyncPromise = undefined;
         }
     }
+
+    modeForPhase(phase) {
+        switch (phase) {
+            case WORKSPACE_SESSION_PHASES.OPEN_DOCUMENT:
+            case WORKSPACE_SESSION_PHASES.SAVE_DOCUMENT:
+            case WORKSPACE_SESSION_PHASES.READ_DIAGNOSTICS:
+            case WORKSPACE_SESSION_PHASES.READ_DOCUMENT_INDEX:
+                return WORKSPACE_SESSION_MODES.VALIDATION;
+            case WORKSPACE_SESSION_PHASES.UPDATE_DOCUMENT:
+                return WORKSPACE_SESSION_MODES.EDITOR;
+            default:
+                throw new Error(`Unknown workspace session phase "${phase}"`);
+        }
+    }
 }
 
 for (const [name, serviceMethod, fallback] of DEFAULT_DOCUMENT_REQUESTS) {
@@ -175,4 +207,15 @@ function cloneDiagnostic(diagnostic) {
         } : diagnostic.range,
         offsetRange: diagnostic.offsetRange ? { ...diagnostic.offsetRange } : undefined,
     };
+}
+
+function normalizeWorkspaceSessionMode(mode) {
+    switch (mode) {
+        case WORKSPACE_SESSION_MODES.EDITOR:
+        case WORKSPACE_SESSION_MODES.VALIDATION:
+        case WORKSPACE_SESSION_MODES.COMPILE:
+            return mode;
+        default:
+            throw new Error(`Unknown workspace session mode "${mode}"`);
+    }
 }

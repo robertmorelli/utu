@@ -1,4 +1,18 @@
-export { analyzeDocument } from './analyze.js';
-export { compileDocument } from './compile.js';
-export { getDocumentMetadata } from './metadata.js';
-export { validateWat } from './validate.js';
+import { analyzeDocument } from './analyze.js';
+import { compileDocument } from './compile.js';
+import { getDocumentMetadata } from './metadata.js';
+import { validateWat } from './validate.js';
+
+export {
+    analyzeDocument,
+    compileDocument,
+    getDocumentMetadata,
+    validateWat,
+};
+
+export const COMPILER_API = Object.freeze({
+    analyzeDocument,
+    compileDocument,
+    getDocumentMetadata,
+    validateWat,
+});

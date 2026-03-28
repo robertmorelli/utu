@@ -27,12 +27,14 @@ Public entrypoint:
 Migration note:
 
 - this package now backs the stdio LSP server and the VS Code host adapter
+- hosts construct the shared parser and language service, then inject them into `UtuWorkspaceSession`
 - `UtuAnalysisCache` provides syntax/header/body snapshot caching by document version
+- syntax/header snapshots can be served without forcing full body analysis
 - `UtuWorkspaceSymbolIndex` consumes header snapshots instead of full body analysis
 - `UtuDependencyGraph` tracks conservative header-level dependencies for invalidation
 
 Import rule:
 
 - hosts may depend on this package
-- this package may depend on `packages/document`, compiler facades, and shared language-service code
-- this package should not depend on VS Code APIs or JSON-RPC transport code
+- this package may depend on `packages/document` and compiler facades
+- this package should not depend on `packages/language-platform`, VS Code APIs, or JSON-RPC transport code

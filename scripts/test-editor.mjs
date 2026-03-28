@@ -3,10 +3,19 @@ import { relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { compile } from '../packages/compiler/index.js';
+import {
+  analyzeDocument,
+  compileDocument,
+  getDocumentMetadata,
+} from '../packages/compiler/api/index.js';
 import { loadNodeModuleFromSource } from '../packages/runtime/node.js';
 import { UtuParserService, createSourceDocument, spanFromOffsets } from '../packages/document/index.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../packages/language-platform/index.js';
-import { UtuAnalysisCache, UtuWorkspaceSession } from '../packages/workspace/index.js';
+import {
+  UtuAnalysisCache,
+  UtuWorkspaceSession,
+  UtuWorkspaceSymbolIndex as HeaderWorkspaceSymbolIndex,
+} from '../packages/workspace/index.js';
 import {
   collectCompileJobs,
   collectUtuFiles,
@@ -223,6 +232,55 @@ async function runCoreSuite() {
         },
       });
     }],
+    ['compiler api analyzeDocument returns tolerant syntax/header snapshots for broken code', async () => {
+      const analysis = await analyzeDocument({
+        mode: 'editor',
+        uri: 'file:///broken-editor.utu',
+        sourceText: [
+          'export fun main() i32 {',
+          '    let value =',
+          '}',
+        ].join('\n'),
+        parserService,
+      });
+
+      expectEqual(analysis.mode, 'editor');
+      expectEqual(analysis.syntax.kind, 'syntax');
+      expectEqual(analysis.header.kind, 'header');
+      expectEqual(analysis.body, null);
+      expectEqual(analysis.header.hasMain, true);
+      expectValue(analysis.diagnostics.length > 0, true);
+    }],
+    ['compiler api getDocumentMetadata normalizes header snapshots', async () => {
+      const metadata = await getDocumentMetadata({
+        hasMain: true,
+        tests: [{ name: 'smoke' }],
+        benches: [{ name: 'bench-main' }],
+      });
+
+      expectDeepEqual(metadata, {
+        hasMain: true,
+        tests: ['smoke'],
+        benches: ['bench-main'],
+      });
+    }],
+    ['compiler api compileDocument aborts on blocking shared-analysis errors', async () => {
+      const result = await compileDocument({
+        analyzeResult: {
+          sourceText: 'export fun main() i32 { missing_value; }',
+          diagnostics: [{ severity: 'error', message: 'Undefined value "missing_value".' }],
+        },
+      });
+
+      expectDeepEqual(result, {
+        wat: null,
+        wasm: null,
+        js: null,
+        shim: null,
+        metadata: null,
+        backendDiagnostics: [{ message: 'Compilation aborted due to frontend errors.' }],
+      });
+    }],
     ['workspace symbol index caches unchanged versions', async () => {
       let getDocumentIndexCalls = 0;
       const workspaceSymbols = new UtuWorkspaceSymbolIndex({
@@ -281,6 +339,76 @@ async function runCoreSuite() {
       expectEqual(editor.body.kind, 'body');
       expectEqual(editor.header.hasMain, true);
       expectValue(Array.isArray(editor.header.symbols), true);
+    }],
+    ['analysis cache can serve header snapshots without invoking body analysis', async () => {
+      let bodyAnalysisCalls = 0;
+      const cache = new UtuAnalysisCache({
+        parserService,
+        languageService: {
+          async getDocumentIndex() {
+            bodyAnalysisCalls += 1;
+            throw new Error('header snapshot path should not request body analysis');
+          },
+        },
+      });
+      const document = createSourceDocument([
+        'struct Vec2 {',
+        '    x: f32,',
+        '    y: f32,',
+        '}',
+        '',
+        'export fun main() i32 { 0; }',
+      ].join('\n'), {
+        uri: 'file:///header-only.utu',
+        version: 1,
+      });
+
+      const header = await cache.getHeaderSnapshot(document);
+      const syntax = await cache.getSyntaxSnapshot(document);
+
+      expectEqual(bodyAnalysisCalls, 0);
+      expectEqual(header.kind, 'header');
+      expectEqual(header.hasMain, true);
+      expectValue(header.symbols.some((symbol) => symbol.name === 'Vec2' && symbol.kind === 'struct'), true);
+      expectEqual(syntax.kind, 'syntax');
+      expectValue(Array.isArray(syntax.diagnostics), true);
+    }],
+    ['workspace package symbol index is driven by header snapshots', async () => {
+      let headerSnapshotCalls = 0;
+      const workspaceSymbols = new HeaderWorkspaceSymbolIndex({
+        async getHeaderSnapshot(document) {
+          headerSnapshotCalls += 1;
+          return {
+            kind: 'header',
+            symbols: [
+              {
+                name: document.symbolName,
+                kind: 'function',
+                signature: `${document.symbolName}()`,
+                uri: document.uri,
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: 0, character: document.symbolName.length },
+                },
+              },
+            ],
+          };
+        },
+      });
+
+      const alphaV1 = { uri: 'file:///alpha-header.utu', version: 1, symbolName: 'alpha' };
+      const betaV1 = { uri: 'file:///beta-header.utu', version: 1, symbolName: 'beta' };
+
+      await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
+      expectEqual(headerSnapshotCalls, 2);
+      expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('').map((symbol) => symbol.name).sort(), ['alpha', 'beta']);
+
+      await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
+      expectEqual(headerSnapshotCalls, 2);
+
+      await workspaceSymbols.updateDocument({ ...alphaV1, version: 2, symbolName: 'alpha2' });
+      expectEqual(headerSnapshotCalls, 3);
+      expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('alpha').map((symbol) => symbol.name), ['alpha2']);
     }],
     ['workspace session returns semantic editor diagnostics and header-backed workspace symbols', async () => {
       const session = new UtuWorkspaceSession({

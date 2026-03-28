@@ -11,9 +11,9 @@ import { compile as legacyCompile } from '../core/index.js';
 /**
  * Lowers a UTU document into target artifacts.
  *
- * Phase 1 shim:
- * wraps the current root compiler entrypoint and optionally respects a
- * precomputed analysis result when the caller already has one.
+ * Public compile entrypoint:
+ * optionally respects a precomputed analysis result when the caller already
+ * has one, so compile mode can gate backend work on shared diagnostics.
  *
  * @param {CompileOptions} options
  * @returns {Promise<Object>}

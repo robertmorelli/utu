@@ -30,6 +30,28 @@ import {
 import data from '../../../jsondata/lsp.data.json' with { type: 'json' };
 
 const COMPLETION_ITEM_KINDS = data.completionItemKinds;
+const LSP_REQUEST_METHODS = Object.freeze({
+  INITIALIZE: 'initialize',
+  SHUTDOWN: 'shutdown',
+  HOVER: 'textDocument/hover',
+  DEFINITION: 'textDocument/definition',
+  REFERENCES: 'textDocument/references',
+  DOCUMENT_HIGHLIGHT: 'textDocument/documentHighlight',
+  COMPLETION: 'textDocument/completion',
+  DOCUMENT_SYMBOL: 'textDocument/documentSymbol',
+  WORKSPACE_SYMBOL: 'workspace/symbol',
+  SEMANTIC_TOKENS_FULL: 'textDocument/semanticTokens/full',
+});
+const LSP_NOTIFICATION_METHODS = Object.freeze({
+  DID_OPEN: 'textDocument/didOpen',
+  DID_CHANGE: 'textDocument/didChange',
+  DID_SAVE: 'textDocument/didSave',
+  DID_CLOSE: 'textDocument/didClose',
+  DID_CHANGE_WORKSPACE_FOLDERS: 'workspace/didChangeWorkspaceFolders',
+  PUBLISH_DIAGNOSTICS: 'textDocument/publishDiagnostics',
+  EXIT: 'exit',
+});
+
 const identity = (value) => value;
 const mapArray = (map) => (values) => values.map(map);
 const withInitialization = (run) => (session, params) =>
@@ -56,40 +78,40 @@ const textDocumentNotification = (run) =>
   );
 
 const REQUEST_HANDLERS = {
-  initialize: async (session, params) => {
+  [LSP_REQUEST_METHODS.INITIALIZE]: async (session, params) => {
     session.server.setWorkspaceFolders(getWorkspaceFolderUris(params));
     session.initialized = true;
     return INITIALIZE_RESULT;
   },
-  shutdown: async (session) => {
+  [LSP_REQUEST_METHODS.SHUTDOWN]: async (session) => {
     session.shutdownRequested = true;
     return null;
   },
-  'textDocument/hover': textDocumentPositionRequest('getHover', toLspHover),
-  'textDocument/definition': textDocumentPositionRequest('getDefinition', toLspLocation),
-  'textDocument/references': textDocumentPositionRequest(
+  [LSP_REQUEST_METHODS.HOVER]: textDocumentPositionRequest('getHover', toLspHover),
+  [LSP_REQUEST_METHODS.DEFINITION]: textDocumentPositionRequest('getDefinition', toLspLocation),
+  [LSP_REQUEST_METHODS.REFERENCES]: textDocumentPositionRequest(
     'getReferences',
     mapArray(toLspLocation),
     (params) => [getIncludeDeclaration(params)],
   ),
-  'textDocument/documentHighlight': textDocumentPositionRequest(
+  [LSP_REQUEST_METHODS.DOCUMENT_HIGHLIGHT]: textDocumentPositionRequest(
     'getDocumentHighlights',
     mapArray(toLspDocumentHighlight),
   ),
-  'textDocument/completion': textDocumentPositionRequest(
+  [LSP_REQUEST_METHODS.COMPLETION]: textDocumentPositionRequest(
     'getCompletionItems',
     mapArray((item) => toLspCompletionItem(item, COMPLETION_ITEM_KINDS)),
   ),
-  'textDocument/documentSymbol': textDocumentRequest(
+  [LSP_REQUEST_METHODS.DOCUMENT_SYMBOL]: textDocumentRequest(
     'getDocumentSymbols',
     mapArray(toLspDocumentSymbol),
   ),
-  'workspace/symbol': withInitialization(async (session, params) =>
+  [LSP_REQUEST_METHODS.WORKSPACE_SYMBOL]: withInitialization(async (session, params) =>
     (await session.server.getWorkspaceSymbols(getWorkspaceSymbolQuery(params))).map(
       toLspWorkspaceSymbol,
     ),
   ),
-  'textDocument/semanticTokens/full': textDocumentRequest('getDocumentSemanticTokens', (tokens) => ({
+  [LSP_REQUEST_METHODS.SEMANTIC_TOKENS_FULL]: textDocumentRequest('getDocumentSemanticTokens', (tokens) => ({
     data: encodeSemanticTokens(tokens),
   })),
 };
@@ -100,10 +122,10 @@ const IGNORED_NOTIFICATION_HANDLERS = Object.fromEntries(
 
 const NOTIFICATION_HANDLERS = {
   ...IGNORED_NOTIFICATION_HANDLERS,
-  'textDocument/didOpen': textDocumentNotification((session, textDocument) =>
+  [LSP_NOTIFICATION_METHODS.DID_OPEN]: textDocumentNotification((session, textDocument) =>
     withDocumentDiagnostics(session, textDocument, () => session.server.openDocument(textDocument)),
   ),
-  'textDocument/didChange': textDocumentNotification((session, textDocument, params) =>
+  [LSP_NOTIFICATION_METHODS.DID_CHANGE]: textDocumentNotification((session, textDocument, params) =>
     withDocumentDiagnostics(session, textDocument, () =>
       session.server.updateDocument({
         uri: textDocument.uri,
@@ -112,7 +134,7 @@ const NOTIFICATION_HANDLERS = {
       }),
     ),
   ),
-  'textDocument/didSave': textDocumentNotification((session, textDocument, params) =>
+  [LSP_NOTIFICATION_METHODS.DID_SAVE]: textDocumentNotification((session, textDocument, params) =>
     withDocumentDiagnostics(session, textDocument, () =>
       session.server.saveDocument({
         uri: textDocument.uri,
@@ -120,16 +142,16 @@ const NOTIFICATION_HANDLERS = {
       }),
     ),
   ),
-  'textDocument/didClose': textDocumentNotification(async (session, textDocument) => {
+  [LSP_NOTIFICATION_METHODS.DID_CLOSE]: textDocumentNotification(async (session, textDocument) => {
     await session.server.closeDocument(textDocument.uri);
     session.publishDiagnostics(textDocument.uri, []);
   }),
-  'workspace/didChangeWorkspaceFolders': withInitialization(async (session, params) => {
+  [LSP_NOTIFICATION_METHODS.DID_CHANGE_WORKSPACE_FOLDERS]: withInitialization(async (session, params) => {
     const { added, removed } = getWorkspaceFolderChanges(params);
     session.server.addWorkspaceFolders(added);
     session.server.removeWorkspaceFolders(removed);
   }),
-  exit: async (session) => session.exit(),
+  [LSP_NOTIFICATION_METHODS.EXIT]: async (session) => session.exit(),
 };
 
 export class UtuLspSession {
@@ -177,7 +199,7 @@ export class UtuLspSession {
   }
 
   publishDiagnostics(uri, diagnostics) {
-    this.connection.sendNotification('textDocument/publishDiagnostics', {
+    this.connection.sendNotification(LSP_NOTIFICATION_METHODS.PUBLISH_DIAGNOSTICS, {
       uri,
       diagnostics: diagnostics.map(toLspDiagnostic),
     });

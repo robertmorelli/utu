@@ -1,16 +1,41 @@
 import * as vscode from 'vscode';
+import { UtuParserService } from '../../document/index.js';
+import {
+    DIAGNOSTIC_PROVIDER_TRIGGERS,
+    getDocumentDiagnostics,
+} from '../../language-platform/providers/diagnostics.js';
+import { UtuLanguageService } from '../../language-platform/index.js';
 import { UtuWorkspaceSession } from '../../workspace/index.js';
 import { UTU_EXCLUDE, UTU_GLOB } from './shared.js';
 
+const VSCODE_ADAPTER_REQUESTS = Object.freeze({
+    DIAGNOSTICS: 'diagnostics',
+    DOCUMENT_INDEX: 'document-index',
+    HOVER: 'hover',
+    DEFINITION: 'definition',
+    REFERENCES: 'references',
+    DOCUMENT_HIGHLIGHTS: 'document-highlights',
+    COMPLETION_ITEMS: 'completion-items',
+    SEMANTIC_TOKENS: 'semantic-tokens',
+    DOCUMENT_SYMBOLS: 'document-symbols',
+});
+
 export function createVscodeWorkspaceAdapter({ grammarWasmPath, runtimeWasmPath, output }) {
-    const session = new UtuWorkspaceSession({
-        workspaceFolders: getWorkspaceFolderUris(),
+    const parserService = new UtuParserService({
         grammarWasmPath,
         runtimeWasmPath,
     });
-    const languageService = new VscodeSessionLanguageService(session);
-    const workspaceSymbols = createWorkspaceSymbolController(session, languageService, output);
-    return { session, languageService, workspaceSymbols };
+    const languageService = new UtuLanguageService(parserService);
+    const session = new UtuWorkspaceSession({
+        workspaceFolders: getWorkspaceFolderUris(),
+        parserService,
+        languageService,
+        grammarWasmPath,
+        runtimeWasmPath,
+    });
+    const sessionLanguageService = new VscodeSessionLanguageService(session);
+    const workspaceSymbols = createWorkspaceSymbolController(session, sessionLanguageService, output);
+    return { session, languageService: sessionLanguageService, workspaceSymbols };
 }
 
 class VscodeSessionLanguageService {
@@ -33,41 +58,41 @@ class VscodeSessionLanguageService {
             text: document.getText(),
         });
     }
-    async getDiagnostics(document) {
-        const synced = await this.syncDocument(document);
-        return this.session.getFreshDiagnostics(synced, { mode: 'editor' });
+    async getDiagnostics(document, options = {}) {
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.DIAGNOSTICS, async (synced) => getDocumentDiagnostics({
+            getDiagnostics: (_document, requestOptions = {}) => this.session.getFreshDiagnostics(synced, requestOptions),
+        }, synced, {
+            trigger: options.trigger ?? DIAGNOSTIC_PROVIDER_TRIGGERS.ON_TYPE,
+            mode: options.mode,
+        }));
     }
     async getDocumentIndex(document) {
-        await this.syncDocument(document);
-        return this.session.getDocumentIndex(document.uri.toString());
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.DOCUMENT_INDEX, () => this.session.getDocumentIndex(document.uri.toString()));
     }
     async getHover(document, position) {
-        await this.syncDocument(document);
-        return this.session.getHover(document.uri.toString(), position);
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.HOVER, () => this.session.getHover(document.uri.toString(), position));
     }
     async getDefinition(document, position) {
-        await this.syncDocument(document);
-        return this.session.getDefinition(document.uri.toString(), position);
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.DEFINITION, () => this.session.getDefinition(document.uri.toString(), position));
     }
     async getReferences(document, position, includeDeclaration) {
-        await this.syncDocument(document);
-        return this.session.getReferences(document.uri.toString(), position, includeDeclaration);
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.REFERENCES, () => this.session.getReferences(document.uri.toString(), position, includeDeclaration));
     }
     async getDocumentHighlights(document, position) {
-        await this.syncDocument(document);
-        return this.session.getDocumentHighlights(document.uri.toString(), position);
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.DOCUMENT_HIGHLIGHTS, () => this.session.getDocumentHighlights(document.uri.toString(), position));
     }
     async getCompletionItems(document, position) {
-        await this.syncDocument(document);
-        return this.session.getCompletionItems(document.uri.toString(), position);
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.COMPLETION_ITEMS, () => this.session.getCompletionItems(document.uri.toString(), position));
     }
     async getDocumentSemanticTokens(document) {
-        await this.syncDocument(document);
-        return this.session.getDocumentSemanticTokens(document.uri.toString());
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.SEMANTIC_TOKENS, () => this.session.getDocumentSemanticTokens(document.uri.toString()));
     }
     async getDocumentSymbols(document) {
-        await this.syncDocument(document);
-        return this.session.getDocumentSymbols(document.uri.toString());
+        return this.withSyncedDocument(document, VSCODE_ADAPTER_REQUESTS.DOCUMENT_SYMBOLS, () => this.session.getDocumentSymbols(document.uri.toString()));
+    }
+    async withSyncedDocument(document, _request, action) {
+        const synced = await this.syncDocument(document);
+        return action(synced);
     }
 }
 

@@ -61,10 +61,30 @@ Root-level files that used to own behavior now act as wrappers:
 - Split reusable WAT backend helpers into:
   - `packages/compiler/backends/wat/parse.js`
   - `packages/compiler/backends/wat/protocol.js`
+- Split the remaining WAT backend hotspot into:
+  - `packages/compiler/backends/wat/shared.js`
+  - `packages/compiler/backends/wat/collect.js`
+  - `packages/compiler/backends/wat/emit-module.js`
+  - `packages/compiler/backends/wat/generate-expressions.js`
+  - `packages/compiler/backends/wat/type-helpers.js`
+- Split the remaining module expander hotspot into:
+  - `packages/compiler/frontend/expand/shared.js`
+  - `packages/compiler/frontend/expand/collect.js`
+  - `packages/compiler/frontend/expand/emit-declarations.js`
+  - `packages/compiler/frontend/expand/emit-expressions.js`
+- Removed compiler-facing static `.wasm` module imports from the shared API/core parse paths in favor of URL-based defaults so Node ESM host flows can import the refactored package surfaces without treating Wasm files as JavaScript modules.
+- Fixed the post-split WAT backend and expander helper seams so the decomposed files carry the same runtime helper set as the pre-split hotspots.
 
 ### Document / Workspace / Language Platform
 
 - Extracted parser and mutable document logic into `packages/document`.
+- Split `packages/document` ownership by concern into:
+  - `text-document.js`
+  - `mutable-document.js`
+  - `spans.js`
+  - `syntax.js`
+  - `tree-sitter.js`
+- Kept `packages/document/index.js` as the stable compatibility surface over the new document modules.
 - Extracted shared workspace/session logic into `packages/workspace`.
 - Split workspace internals into:
   - `packages/workspace/document-store.js`
@@ -73,8 +93,11 @@ Root-level files that used to own behavior now act as wrappers:
   - `packages/workspace/workspace-symbol-index.js`
   - `packages/workspace/session.js`
 - Added explicit syntax/header/body snapshot caching through `UtuAnalysisCache`.
+- Made syntax/header snapshots available without forcing full body analysis, so workspace symbols and dependency tracking can stay on the shallow path.
 - Added conservative header-level dependency tracking through `UtuDependencyGraph`.
 - Moved workspace symbol indexing onto header snapshots inside `packages/workspace`.
+- Routed VS Code diagnostics through explicit `editor` vs `validation` modes so compile-backed validation stays off the on-type hot path.
+- Moved shared language-service construction out of `packages/workspace` and into the host layer so workspace/session code stays a scheduler/cache boundary instead of owning editor semantics.
 - Moved language-service ownership into `packages/language-platform/core`.
 - Added provider-oriented language-platform entrypoints under `packages/language-platform/providers/`.
 - Split reusable language-platform helpers into:
@@ -83,6 +106,9 @@ Root-level files that used to own behavior now act as wrappers:
   - `packages/language-platform/core/workspaceSymbols.js`
   - `packages/language-platform/core/completion-helpers.js`
   - `packages/language-platform/core/compile-diagnostics.js`
+- Split the remaining language-service hotspot into:
+  - `packages/language-platform/core/document-index/build.js`
+  - `packages/language-platform/core/documentIndex.js` as the service wrapper
 - Rewired compiler API, LSP, extension, and tests to import through package boundaries.
 
 ### Runtime
@@ -151,6 +177,8 @@ Root-level files that used to own behavior now act as wrappers:
   - `packages/workspace`
   - `packages/hosts`
 - Updated `refactor.md` with the architecture and rollout rationale.
+- Added `scripts/check-architecture.mjs` plus `npm run check:architecture` to track the refactor's soft 800-line file-size guardrail and make remaining oversized files explicit.
+- Extended `scripts/check-architecture.mjs` to verify package import direction so lower layers cannot drift upward into `workspace`, `language-platform`, or `hosts`.
 
 ## Verification History
 
@@ -158,6 +186,7 @@ These checks passed after the current package/host relocation:
 
 - `bun ./scripts/test-diagnostics.mjs`
 - `bun ./scripts/test-editor.mjs core`
+- `node ./scripts/check-architecture.mjs`
 - `bun ./scripts/test-vscode-activation-selfcheck.mjs`
 - `bun ./scripts/test-vscode-activation-language-version-repro.mjs`
 - `bun ./scripts/test-vscode-web-extension-activation-log-repro.mjs`
@@ -168,23 +197,25 @@ These checks passed after the current package/host relocation:
 - `bun ./cli.mjs compile ./examples/hello.utu --outdir /tmp/utu-runtime-split-check --wat`
 - `bun ./cli.mjs compile ./examples/hello.utu --outdir /tmp/utu-postbuild-check --wat`
 - `bun ./cli.mjs compile ./examples/hello.utu --outdir /tmp/utu-100-check --wat`
+- `node ./scripts/test-vscode-web-extension-activation-log-repro.mjs`
+- `bun ./scripts/test-modules.mjs`
+- `bun ./scripts/test-examples.mjs`
+- `bun ./scripts/test-diagnostics.mjs`
+- `bun ./scripts/test-all.mjs`
 
-## Remaining Intentional Debt
+## Refactor State
 
-This refactor lands the package boundaries, shared session/cache/dependency layer, host unification, runtime split, grammar helper split, provider/phase entrypoints, and an initial WAT helper split, but it does not fully rewrite the remaining internals of `watgen` or the document-indexing logic in `languageService`.
+`refactor.md` is now fully represented in the codebase and verification flow.
 
-What is done:
+The package-oriented reshape, host unification, shared workspace/session layer, explicit syntax/header/body snapshots, and the major hotspot splits are now in place together:
 
 - the repo is organized around stable package boundaries
-- hosts now depend on those package boundaries
-- LSP and VS Code now share a workspace/session orchestration layer
-- syntax/header/body snapshots exist as explicit cache tiers
-- header-level dependency invalidation exists as a shared workspace concern
+- hosts depend on those package boundaries instead of root-level ownership files
+- hosts compose the shared parser/language-service stack and inject it into the workspace/session layer
+- LSP and VS Code share workspace/session orchestration
+- syntax/header/body snapshots exist as explicit cache tiers, with syntax/header snapshots available without paying for body analysis
+- the previous oversized `wat`, `expand`, and `documentIndex` entry files now act as focused wrappers over phase-oriented helper modules
 - build/test paths prefer the new structure
-- legacy root paths are compatibility shims
+- legacy root paths remain compatibility shims
 
-What remains for a future semantic rewrite:
-
-- deeper `watgen` decomposition
-- deeper document-index decomposition behind the new provider entrypoints
-- eventual optional HIR if `watgen` splitting alone stops being enough
+The remaining work is normal language/compiler evolution inside the new structure, not unfinished refactor migration.

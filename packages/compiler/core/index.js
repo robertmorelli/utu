@@ -9,13 +9,14 @@ const _binaryenCapture = { active: false, lines: [] };
     };
 }
 
-import bundledGrammarWasm from '../../../tree-sitter-utu.wasm';
-import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
 import { expandSource } from '../frontend/expand.js';
 import { watgen } from '../backends/watgen.js';
 import { jsgen } from '../backends/jsgen.js';
 import { createUtuTreeSitterParser, withParsedTree } from '../../document/index.js';
 import { childOfType, namedChildren, throwOnParseErrors } from '../frontend/tree.js';
+
+const bundledGrammarWasm = new URL('../../../tree-sitter-utu.wasm', import.meta.url);
+const bundledRuntimeWasm = new URL('../../../web-tree-sitter.wasm', import.meta.url);
 
 let _binaryenModule = null;
 let _binaryenQueue = Promise.resolve();
