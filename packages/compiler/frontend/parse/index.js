@@ -1,52 +1,12 @@
+import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../../../document/default-wasm.js';
 import {
     UtuParserService,
     collectParseDiagnostics,
     createSourceDocument,
 } from '../../../document/index.js';
 
-const runtimeGlobals = Function('return this')();
-const bundledGrammarWasm = resolveBundledAssetUrl('../../../../tree-sitter-utu.wasm');
-const bundledRuntimeWasm = resolveBundledAssetUrl('../../../../web-tree-sitter.wasm');
-
-function resolveBundledAssetUrl(relativePath) {
-    const assetName = relativePath.split('/').at(-1);
-    const baseUrl = typeof runtimeGlobals.__utuModuleSourceAssetBaseUrl === 'string'
-        ? runtimeGlobals.__utuModuleSourceAssetBaseUrl
-        : typeof import.meta?.url === 'string'
-        ? import.meta.url
-        : typeof runtimeGlobals.location?.href === 'string'
-            ? runtimeGlobals.location.href
-            : null;
-    if (!baseUrl)
-        return undefined;
-    const rootUrl = deriveAssetRootUrl(baseUrl);
-    return resolveAssetUrl(rootUrl && assetName ? assetName : relativePath, rootUrl ?? baseUrl);
-}
-
-function deriveAssetRootUrl(baseUrl) {
-    let url;
-    try {
-        url = new URL(baseUrl);
-    } catch {
-        return null;
-    }
-    const segments = url.pathname.split('/');
-    const markerIndex = Math.max(segments.lastIndexOf('dist'), segments.lastIndexOf('packages'));
-    if (markerIndex <= 0)
-        return null;
-    url.pathname = `${segments.slice(0, markerIndex).join('/')}/`;
-    url.search = '';
-    url.hash = '';
-    return url;
-}
-
-function resolveAssetUrl(pathname, baseUrl) {
-    try {
-        return new URL(pathname, baseUrl);
-    } catch {
-        return undefined;
-    }
-}
+const bundledGrammarWasm = DEFAULT_GRAMMAR_WASM;
+const bundledRuntimeWasm = DEFAULT_RUNTIME_WASM;
 
 export async function parseDocument({
     sourceText,

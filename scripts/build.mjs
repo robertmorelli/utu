@@ -245,6 +245,7 @@ async function buildCli() {
   await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
   await rm(cliPackageRoot, { recursive: true, force: true });
   await exec('bun', ['build', '--target=bun', '--outdir', cliPackageRoot, cliEntry]);
+  await writeCliBundleWrapper();
   await exec('bun', ['build', '--compile', '--target=bun', '--outfile', cliBinaryPath, cliEntry]);
 }
 
@@ -261,6 +262,16 @@ async function buildAllArtifacts() {
   await buildCli();
   await buildLsp();
   await packageVsix();
+}
+
+async function writeCliBundleWrapper() {
+  const wrapperPath = resolve(cliPackageRoot, 'cli.js');
+  const wrapperSource = `#!/usr/bin/env bun
+const runtimeGlobals = Function('return this')();
+runtimeGlobals.__utuModuleSourceAssetBaseUrl = new URL('./', import.meta.url).href;
+await import('./main.js');
+`;
+  await writeFile(wrapperPath, wrapperSource, 'utf8');
 }
 
 async function stageWebDevExtension() {

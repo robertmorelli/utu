@@ -37,10 +37,10 @@ The checked-in compiler, examples, and tests currently cover:
 
 Notable current limits:
 
-- first-class function references are parsed but not supported as a stable compiler feature yet
+- first-class function references are parsed, but the compiler rejects them with explicit errors until that surface is stabilized
 - module bodies do not support nested `export` declarations in v1
 - `proto` declarations and protocol implementations stay top-level only in v1
-- the parser accepts multiple `for` sources/captures, but current lowering only uses the first pair
+- `for` loops support exactly one range source and at most one capture in v1
 
 ## Commands
 
@@ -49,6 +49,25 @@ Notable current limits:
 - `UTU: Show Generated JavaScript`
 - `UTU: Show Generated WAT`
 - `UTU: Show Syntax Tree`
+
+## Quick Start
+
+Install dependencies and build the toolchain from the repo root:
+
+```sh
+bun install
+bun run build
+```
+
+Try the bundled CLI against checked-in examples:
+
+```sh
+./utu run ./examples/hello.utu
+./utu test ./examples/ci/tests_basic.utu
+./utu bench ./examples/bench/bench_basic.utu --seconds 0.1 --samples 3 --warmup 1
+```
+
+To exercise the extension locally, open the repo in VS Code and run the `UTU: Run Web Extension in VS Code` launch configuration.
 
 ## Development
 
@@ -77,8 +96,8 @@ The build emits the web extension plus the current compiler bundles and Bun exec
 - `dist/web/extension.js`: the browser/webworker extension host entrypoint for `vscode.dev`
 - `dist/compiler.web.mjs`: the browser-targeted compiler bundle built directly from the shared compiler sources
 - `dist/compiler.mjs`: the Node-targeted compiler bundle built directly from the shared compiler sources
-- `./utu`: bundled Bun CLI executable
-- `./utu-lsp`: bundled Bun LSP executable
+- `./utu`: bundled self-contained Bun CLI executable
+- `./utu-lsp`: bundled self-contained Bun LSP executable
 
 The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared package core, and the standalone stdio UTU LSP server builds from `./packages/hosts/lsp/main.mjs`. UTU targets modern ES runtimes, so the browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 

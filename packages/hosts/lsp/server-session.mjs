@@ -1,6 +1,5 @@
 import process from 'node:process';
-import { dirname, resolve as resolvePath } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../../document/default-wasm.js';
 import { UtuLanguageServer } from './server/index.js';
 import { JsonRpcConnection } from './transport/jsonRpcConnection.mjs';
 import {
@@ -156,8 +155,8 @@ const NOTIFICATION_HANDLERS = {
 
 export class UtuLspSession {
   constructor({
-    grammarWasmPath = resolveServerAssetPath('tree-sitter-utu.wasm'),
-    runtimeWasmPath = resolveServerAssetPath('web-tree-sitter.wasm'),
+    grammarWasmPath = DEFAULT_GRAMMAR_WASM,
+    runtimeWasmPath = DEFAULT_RUNTIME_WASM,
   } = {}) {
     this.server = new UtuLanguageServer({ grammarWasmPath, runtimeWasmPath });
     this.connection = new JsonRpcConnection({
@@ -232,8 +231,4 @@ export class UtuLspSession {
 export function startLspServer(options = {}) {
   process.stdin.resume();
   new UtuLspSession(options);
-}
-
-function resolveServerAssetPath(assetName) {
-  return resolvePath(dirname(fileURLToPath(import.meta.url)), '../../../', assetName);
 }

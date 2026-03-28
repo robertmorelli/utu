@@ -45,6 +45,9 @@ jobs:
       - name: Run full test suite
         run: bun run test
 
+      - name: Verify desktop activation
+        run: bash ./scripts/test-vscode-desktop-activation.sh
+
   tooling-macos:
     name: Tooling (macOS latest, Node 24)
     runs-on: macos-latest

@@ -278,7 +278,6 @@
       "path": "examples/throwing_shit_at_walls3/boundaries.utu",
       "mode": "test",
       "expectedTests": 50,
-      "allowFailure": true,
       "tags": ["stress", "walls"]
     },
     {

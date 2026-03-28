@@ -46,8 +46,6 @@ jobs:
       - name: Verify LSP artifacts
         run: |
           test -f ./utu-lsp
-          test -f ./tree-sitter-utu.wasm
-          test -f ./web-tree-sitter.wasm
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -55,5 +53,3 @@ jobs:
           name: utu-lsp-release
           path: |
             utu-lsp
-            tree-sitter-utu.wasm
-            web-tree-sitter.wasm

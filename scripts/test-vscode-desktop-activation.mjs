@@ -2,6 +2,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 
 import { assertManagedTestModule, getRepoRoot } from './test-helpers.mjs';
 
@@ -9,6 +10,7 @@ assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 const vsixPath = resolve(repoRoot, 'dist/utu-vscode-0.1.1.vsix');
+const requireDesktopActivation = process.env.UTU_REQUIRE_DESKTOP_ACTIVATION === '1';
 
 await main();
 
@@ -25,7 +27,9 @@ async function main() {
       '--force',
     ], 'VSIX install failed');
 
-    await runCode([
+    const existingLogDirs = new Set(await listLogDirs(userDataDir));
+
+    await launchCode([
       '--user-data-dir', userDataDir,
       '--extensions-dir', extensionsDir,
       '--new-window',
@@ -34,19 +38,26 @@ async function main() {
       repoRoot,
     ], 'VS Code launch failed');
 
-    const logDir = await waitForLaunchLogDir(userDataDir);
+    const logDir = await waitForLaunchLogDir(userDataDir, existingLogDirs);
+    if (!logDir) {
+      throw new Error('Timed out waiting for a post-launch VS Code log directory.');
+    }
     const activated = await waitForActivation(logDir);
     if (!activated) {
+      if (requireDesktopActivation) {
+        throw new Error('VS Code launch did not produce desktop window logs for the launched session.');
+      }
       console.log('PASS vscode desktop activation (skipped: no desktop window logs)');
       return;
     }
 
+    await waitForUtuCommandRegistration(logDir);
     const failures = await collectActivationFailures(logDir);
     if (failures.length) {
       throw new Error(failures.join('\n'));
     }
 
-    console.log('PASS vscode desktop activation');
+    console.log('PASS vscode desktop activation (verified VSIX install, extension activation, and command registration)');
   } finally {
     await killCodeProcessesForProfile(userDataDir);
     await rm(tempRoot, { recursive: true, force: true });
@@ -54,29 +65,67 @@ async function main() {
 }
 
 async function runCode(args, label) {
-  const proc = Bun.spawn(['code', ...args], {
-    cwd: repoRoot,
-    stdout: 'pipe',
-    stderr: 'pipe',
+  const { stdout, stderr, exitCode } = await new Promise((resolvePromise, rejectPromise) => {
+    const proc = spawn('code', args, {
+      cwd: repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (chunk) => {
+      stdout += chunk.toString('utf8');
+    });
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    proc.once('error', rejectPromise);
+    proc.once('exit', (exitCode) => {
+      resolvePromise({ stdout, stderr, exitCode: exitCode ?? 0 });
+    });
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
   if (exitCode !== 0) {
     throw new Error(`${label}: ${[stdout.trim(), stderr.trim()].filter(Boolean).join('\n') || `exit ${exitCode}`}`);
   }
 }
 
-async function waitForLaunchLogDir(userDataDir, timeoutMs = 15000) {
+async function launchCode(args, label) {
+  const exitCode = await new Promise((resolvePromise, rejectPromise) => {
+    const proc = spawn('bash', ['-lc', `code ${args.map(shellEscape).join(' ')} >/dev/null 2>&1`], {
+      cwd: repoRoot,
+      stdio: 'ignore',
+    });
+    proc.once('error', rejectPromise);
+    proc.once('exit', (code) => resolvePromise(code ?? 0));
+  });
+  if (exitCode !== 0) {
+    throw new Error(`${label}: exit ${exitCode}`);
+  }
+}
+
+function shellEscape(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+async function waitForLaunchLogDir(userDataDir, knownLogDirs = new Set(), timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
+  let fallbackLogDir = null;
   while (Date.now() < deadline) {
     const dirs = await listLogDirs(userDataDir);
-    if (dirs.length) return dirs.at(-1);
+    const launchDirs = dirs.filter((dir) => !knownLogDirs.has(dir));
+    if (launchDirs.length && !fallbackLogDir) {
+      fallbackLogDir = launchDirs.at(-1) ?? null;
+    }
+    for (const dir of dirs.toReversed()) {
+      if (!fallbackLogDir) {
+        fallbackLogDir = dir;
+      }
+      if ((await findWindowLogDirs(dir)).length > 0) {
+        return dir;
+      }
+    }
     await sleep(250);
   }
-  throw new Error('Timed out waiting for VS Code log directory.');
+  return fallbackLogDir;
 }
 
 async function listLogDirs(userDataDir) {
@@ -99,6 +148,25 @@ async function waitForActivation(logDir, timeoutMs = 20000) {
   return (await findWindowLogDirs(logDir)).length > 0
     ? Promise.reject(new Error('Timed out waiting for robertmorelli.utu-vscode activation in exthost.log.'))
     : false;
+}
+
+async function waitForUtuCommandRegistration(logDir, timeoutMs = 20000) {
+  const expectedMarkers = [
+    'ExtHostCommands#registerCommand utu.compileCurrentFile',
+    'ExtHostCommands#registerCommand utu.runMain',
+  ];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const exthostLogs = await findExthostLogs(logDir);
+    for (const exthostLog of exthostLogs) {
+      const text = await readFile(exthostLog, 'utf8').catch(() => '');
+      if (expectedMarkers.every((marker) => text.includes(marker))) {
+        return;
+      }
+    }
+    await sleep(250);
+  }
+  throw new Error(`Timed out waiting for UTU command registration markers: ${expectedMarkers.join(', ')}`);
 }
 
 async function collectActivationFailures(logDir) {

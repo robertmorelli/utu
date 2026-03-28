@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
+import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../../document/default-wasm.js';
 import { activateUtuExtension } from './activate.js';
 import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, loadModuleFromSource, normalizeCompileArtifact, withRuntime } from '../../runtime/index.js';
 
 export async function activate(context) {
-    const grammarWasmPath = await readExtensionBytes(context, 'tree-sitter-utu.wasm');
-    const parserRuntimeWasmPath = await readExtensionBytes(context, 'web-tree-sitter.wasm');
+    const grammarWasmPath = DEFAULT_GRAMMAR_WASM;
+    const parserRuntimeWasmPath = DEFAULT_RUNTIME_WASM;
     const runtimeHost = new WebCompilerHost({
         compilerModuleUri: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs'),
         compilerAssetBaseUrl: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs').toString(),
@@ -22,27 +23,12 @@ export async function activate(context) {
 }
 export function deactivate() { }
 
-async function readExtensionFile(context, ...segments) {
-    return vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, ...segments));
-}
-
 function decodeUtf8(bytes) {
     return new TextDecoder('utf-8').decode(bytes);
 }
 
 function stripSourceMapComment(source) {
     return source.replace(/\n\/\/# sourceMappingURL=.*$/u, '');
-}
-
-async function readExtensionBytes(context, ...segments) {
-    const uri = vscode.Uri.joinPath(context.extensionUri, ...segments);
-    try {
-        return await vscode.workspace.fs.readFile(uri);
-    } catch {
-        const response = await fetch(uri.toString());
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return new Uint8Array(await response.arrayBuffer());
-    }
 }
 
 class WebCompilerHost {

@@ -328,7 +328,7 @@ test "25 array.copy can perform a zero-length copy" {
 
 test "26 array.fill can target an empty range" {
     let xs: array[i32] = array[i32].new_fixed(3, 4, 5);
-    array.fill(xs, 1, 1, 99);
+    array.fill(xs, 1, 99, 0);
     assert xs[0] == 3;
     assert xs[1] == 4;
     assert xs[2] == 5;
@@ -336,7 +336,7 @@ test "26 array.fill can target an empty range" {
 
 test "27 array.fill can replace a suffix in place" {
     let xs: array[i32] = array[i32].new_fixed(3, 4, 5, 6);
-    array.fill(xs, 2, 4, 1);
+    array.fill(xs, 2, 1, 2);
     assert xs[0] == 3;
     assert xs[1] == 4;
     assert xs[2] == 1;

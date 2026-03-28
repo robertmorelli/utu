@@ -5,6 +5,11 @@
     "module": "./scripts/test-file-sizes.mjs"
   },
   {
+    "id": "release:artifacts",
+    "label": "Release artifacts",
+    "module": "./scripts/test-release-artifacts.mjs"
+  },
+  {
     "id": "examples:all",
     "label": "Examples (all)",
     "module": "./scripts/test-examples.mjs"
