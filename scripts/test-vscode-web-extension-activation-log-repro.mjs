@@ -4,7 +4,9 @@ import { pathToFileURL } from 'node:url';
 
 import * as treeSitter from 'web-tree-sitter';
 
-import { getRepoRoot } from './test-helpers.mjs';
+import { assertManagedTestModule, getRepoRoot } from './test-helpers.mjs';
+
+assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 const stubPackageRoot = resolve(repoRoot, 'node_modules/vscode');

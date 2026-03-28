@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import data from "../../../jsondata/cli.data.json" with { type: "json" };
 import { compileDocument, getDocumentMetadata } from "../../compiler/api/index.js";
-import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, loadNodeModuleFromSource, normalizeCompileArtifact, withRuntime } from "../../runtime/node.js";
+import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from "../../runtime/index.js";
+import { loadNodeModuleFromSource } from "../../runtime/loadNodeModuleFromSource.mjs";
 
 const help = data.help;
 main().catch(error => (console.error(text(error)), process.exitCode = 1));

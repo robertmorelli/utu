@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { toVscodeRange } from './adapters/core.js';
-import { DEFAULT_BENCHMARK_OPTIONS } from '../../runtime/browser.js';
+import { DEFAULT_BENCHMARK_OPTIONS } from '../../runtime/index.js';
 import { displayNameForUri } from './generatedDocuments.js';
 import { collectRunnableEntries } from '../../language-platform/index.js';
 import { createDebouncedUriScheduler, logOutputError, UTU_EXCLUDE, UTU_GLOB, UTU_LANGUAGE_ID } from './shared.js';

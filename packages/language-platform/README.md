@@ -22,7 +22,6 @@ Current state:
 
 Key locations:
 
-- [`core/languageService.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/languageService.js)
 - [`core/documentIndex.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/documentIndex.js)
 - [`core/document-index/build.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/document-index/build.js)
 - [`core/symbols.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/language-platform/core/symbols.js)

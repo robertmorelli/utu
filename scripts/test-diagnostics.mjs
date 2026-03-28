@@ -6,10 +6,13 @@ import { pathToFileURL } from 'node:url';
 import { UtuParserService, createSourceDocument } from '../packages/document/index.js';
 import { UtuLanguageService } from '../packages/language-platform/index.js';
 import {
+  assertManagedTestModule,
   expectDeepEqual,
   getRepoRoot,
   runNamedCases,
 } from './test-helpers.mjs';
+
+assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 const fixture = buildDiagnosticFixture();

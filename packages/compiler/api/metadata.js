@@ -1,4 +1,4 @@
-import { get_metadata as legacyGetMetadata } from '../core/index.js';
+import { get_metadata as getCoreMetadata } from '../core/index.js';
 
 /**
  * @typedef {Object} DocumentMetadata
@@ -20,7 +20,7 @@ import { get_metadata as legacyGetMetadata } from '../core/index.js';
 export async function getDocumentMetadata(headerSnapshotOrOptions) {
     if (looksLikeSourceOptions(headerSnapshotOrOptions)) {
         const { sourceText, wasmUrl, runtimeWasmUrl } = headerSnapshotOrOptions;
-        return normalizeLegacyMetadata(await legacyGetMetadata(sourceText, { wasmUrl, runtimeWasmUrl }));
+        return normalizeSourceMetadata(await getCoreMetadata(sourceText, { wasmUrl, runtimeWasmUrl }));
     }
     return normalizeHeaderMetadata(headerSnapshotOrOptions ?? {});
 }
@@ -29,7 +29,7 @@ function looksLikeSourceOptions(value) {
     return typeof value?.sourceText === 'string';
 }
 
-function normalizeLegacyMetadata(metadata) {
+function normalizeSourceMetadata(metadata) {
     return {
         hasMain: Boolean(metadata?.hasMain),
         tests: normalizeNameList(metadata?.tests),

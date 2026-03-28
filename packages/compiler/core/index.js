@@ -1,5 +1,5 @@
 // Set up binaryen stderr capture before the module loads so its bound console.error
-// points at our wrapper, not the original. This must run before ensureBinaryen().
+// points at our interceptor, not the original. This must run before ensureBinaryen().
 const _binaryenCapture = { active: false, lines: [] };
 {
     const _origErr = console.error;
@@ -10,13 +10,54 @@ const _binaryenCapture = { active: false, lines: [] };
 }
 
 import { expandSource } from '../frontend/expand.js';
-import { watgen } from '../backends/watgen.js';
+import { watgen } from '../backends/wat/index.js';
 import { jsgen } from '../backends/jsgen.js';
 import { createUtuTreeSitterParser, withParsedTree } from '../../document/index.js';
 import { childOfType, namedChildren, throwOnParseErrors } from '../frontend/tree.js';
 
-const bundledGrammarWasm = new URL('../../../tree-sitter-utu.wasm', import.meta.url);
-const bundledRuntimeWasm = new URL('../../../web-tree-sitter.wasm', import.meta.url);
+const runtimeGlobals = Function('return this')();
+const bundledGrammarWasm = resolveBundledAssetUrl('../../../tree-sitter-utu.wasm');
+const bundledRuntimeWasm = resolveBundledAssetUrl('../../../web-tree-sitter.wasm');
+
+function resolveBundledAssetUrl(relativePath) {
+    const assetName = relativePath.split('/').at(-1);
+    const baseUrl = typeof runtimeGlobals.__utuModuleSourceAssetBaseUrl === 'string'
+        ? runtimeGlobals.__utuModuleSourceAssetBaseUrl
+        : typeof import.meta?.url === 'string'
+        ? import.meta.url
+        : typeof runtimeGlobals.location?.href === 'string'
+            ? runtimeGlobals.location.href
+            : null;
+    if (!baseUrl)
+        return undefined;
+    const rootUrl = deriveAssetRootUrl(baseUrl);
+    return resolveAssetUrl(rootUrl && assetName ? assetName : relativePath, rootUrl ?? baseUrl);
+}
+
+function deriveAssetRootUrl(baseUrl) {
+    let url;
+    try {
+        url = new URL(baseUrl);
+    } catch {
+        return null;
+    }
+    const segments = url.pathname.split('/');
+    const markerIndex = Math.max(segments.lastIndexOf('dist'), segments.lastIndexOf('packages'));
+    if (markerIndex <= 0)
+        return null;
+    url.pathname = `${segments.slice(0, markerIndex).join('/')}/`;
+    url.search = '';
+    url.hash = '';
+    return url;
+}
+
+function resolveAssetUrl(pathname, baseUrl) {
+    try {
+        return new URL(pathname, baseUrl);
+    } catch {
+        return undefined;
+    }
+}
 
 let _binaryenModule = null;
 let _binaryenQueue = Promise.resolve();

@@ -12,8 +12,6 @@ Use this package for:
 Public entrypoints:
 
 - [`index.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/runtime/index.js)
-- [`browser.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/runtime/browser.js)
-- [`node.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/runtime/node.js)
 
 Key modules:
 
@@ -27,7 +25,7 @@ Key modules:
 
 Import rule:
 
-- browser-safe code should import from `browser.js` or `index.js`
-- Node-only code that needs `loadNodeModuleFromSource()` should import from `node.js`
+- browser-safe code should import from `index.js`
+- Node-only code that needs `loadNodeModuleFromSource()` should import from `loadNodeModuleFromSource.mjs`
 - CLI, tests, and hosts should prefer this package over root-level runtime helper paths
 - runtime entrypoints now live only in this package

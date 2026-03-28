@@ -1,7 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 
-import { getRepoRoot } from './test-helpers.mjs';
+import { assertManagedTestModule, getRepoRoot } from './test-helpers.mjs';
+
+assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 const failures = [];

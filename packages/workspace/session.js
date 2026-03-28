@@ -134,7 +134,7 @@ export class UtuWorkspaceSession {
     }
     async getDocumentIndex(uri) {
         const analysis = await this.getDocumentAnalysis(uri, { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.READ_DOCUMENT_INDEX) });
-        return analysis?.body?.legacyIndex ?? null;
+        return analysis?.body?.documentIndex ?? null;
     }
     async getDiagnostics(uri, { mode = this.modeForPhase(WORKSPACE_SESSION_PHASES.READ_DIAGNOSTICS) } = {}) {
         const analysis = await this.getDocumentAnalysis(uri, { mode });

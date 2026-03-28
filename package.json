@@ -28,7 +28,7 @@
     "wasm",
     "tree-sitter"
   ],
-  "main": "./dist/web/extension.js",
+  "main": "./dist/node/extension.cjs",
   "browser": "./dist/web/extension.js",
   "activationEvents": [
     "workspaceContains:**/*.utu"
@@ -134,7 +134,7 @@
     "build": "node ./scripts/build.mjs",
     "bump": "node ./scripts/bump.mjs",
     "check:architecture": "node ./scripts/check-architecture.mjs",
-    "test": "bun run build && bun ./scripts/test-all.mjs",
+    "test": "UTU_SUITE_GATE=utu_test bun ./scripts/run-test-suite.mjs",
     "vrust": "bun ./scripts/deltablue-rust.mjs compare && bun ./scripts/deltablue-rust.mjs report",
     "watch": "bun run build --watch"
   },

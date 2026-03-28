@@ -7,7 +7,7 @@ import { expandSource } from '../packages/compiler/frontend/expand.js';
 import { jsgen } from '../packages/compiler/backends/jsgen.js';
 import { createUtuTreeSitterParser } from '../packages/document/index.js';
 import { throwOnParseErrors } from '../packages/compiler/frontend/tree.js';
-import { watgen } from '../packages/compiler/backends/watgen.js';
+import { watgen } from '../packages/compiler/backends/wat/index.js';
 
 const DEFAULT_MODE = 'program';
 const DEFAULT_ITERATIONS = 6;

@@ -3,7 +3,9 @@ import * as treeSitter from 'web-tree-sitter';
 
 import { UtuParserService, createSourceDocument } from '../packages/document/index.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../packages/language-platform/index.js';
-import { getRepoRoot } from './test-helpers.mjs';
+import { assertManagedTestModule, getRepoRoot } from './test-helpers.mjs';
+
+assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 const expectedMessage = 'Incompatible language version 0. Compatibility range 13 through 15.';

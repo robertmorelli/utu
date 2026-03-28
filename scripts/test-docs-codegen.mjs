@@ -2,7 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { compile } from '../packages/compiler/index.js';
-import { getRepoRoot, runNamedCases } from './test-helpers.mjs';
+import { assertManagedTestModule, getRepoRoot, runNamedCases } from './test-helpers.mjs';
+
+assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 

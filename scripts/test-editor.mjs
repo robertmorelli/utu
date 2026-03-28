@@ -8,7 +8,10 @@ import {
   compileDocument,
   getDocumentMetadata,
 } from '../packages/compiler/api/index.js';
-import { loadNodeModuleFromSource } from '../packages/runtime/node.js';
+import { bindDocument } from '../packages/compiler/frontend/bind/index.js';
+import { collectDocumentDiagnostics } from '../packages/compiler/frontend/diagnostics/index.js';
+import { analyzeSemantics } from '../packages/compiler/frontend/sema/index.js';
+import { loadNodeModuleFromSource } from '../packages/runtime/loadNodeModuleFromSource.mjs';
 import { UtuParserService, createSourceDocument, spanFromOffsets } from '../packages/document/index.js';
 import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../packages/language-platform/index.js';
 import {
@@ -17,6 +20,7 @@ import {
   UtuWorkspaceSymbolIndex as HeaderWorkspaceSymbolIndex,
 } from '../packages/workspace/index.js';
 import {
+  getManagedTestArgs,
   collectCompileJobs,
   collectUtuFiles,
   createDocument,
@@ -32,7 +36,7 @@ const repoRoot = getRepoRoot(import.meta.url);
 const grammarCandidates = ['tree-sitter-utu.wasm'];
 const runtimeCandidates = ['web-tree-sitter.wasm', 'node_modules/web-tree-sitter/web-tree-sitter.wasm'];
 const loadEditorTestAssets = (root) => loadAssetSet(root, 'UTU grammar wasm'), loadPackagedEditorTestAssets = (root) => loadAssetSet(root, 'packaged VS Code grammar wasm'), loadCliCompilerTestAssets = (root) => loadAssetSet(root, 'CLI grammar wasm');
-const subcommand = process.argv[2] ?? 'all';
+const [subcommand = 'all'] = getManagedTestArgs(import.meta.url);
 let failed = false;
 if (subcommand !== 'examples' && subcommand !== 'webhost') failed ||= await runCoreSuite();
 if (subcommand !== 'core' && subcommand !== 'webhost') failed ||= await runExamplesSuite();
@@ -280,6 +284,45 @@ async function runCoreSuite() {
         metadata: null,
         backendDiagnostics: [{ message: 'Compilation aborted due to frontend errors.' }],
       });
+    }],
+    ['frontend diagnostics entrypoint parses and returns syntax diagnostics', async () => {
+      const diagnostics = await collectDocumentDiagnostics({
+        sourceText: [
+          'export fun main() i32 {',
+          '    let value =',
+          '}',
+        ].join('\n'),
+        parserService,
+      });
+
+      expectValue(diagnostics.length > 0, true);
+      expectValue(diagnostics.some((diagnostic) => diagnostic.severity === 'error'), true);
+    }],
+    ['frontend bind entrypoint returns a binding snapshot', async () => {
+      const binding = await bindDocument({
+        sourceText: 'export fun main() i32 { 0; }',
+        parserService,
+        languageService,
+      });
+
+      expectEqual(binding.kind, 'binding');
+      expectEqual(binding.mode, 'editor');
+      expectEqual(binding.header.hasMain, true);
+      expectEqual(binding.body.kind, 'body');
+      expectEqual(binding.syntax.kind, 'syntax');
+    }],
+    ['frontend sema entrypoint returns a semantic snapshot', async () => {
+      const semantics = await analyzeSemantics({
+        sourceText: 'export fun main() i32 { 0; }',
+        parserService,
+        languageService,
+      });
+
+      expectEqual(semantics.kind, 'semantic');
+      expectEqual(semantics.mode, 'validation');
+      expectEqual(semantics.header.hasMain, true);
+      expectEqual(semantics.body.kind, 'body');
+      expectEqual(semantics.syntax.kind, 'syntax');
     }],
     ['workspace symbol index caches unchanged versions', async () => {
       let getDocumentIndexCalls = 0;

@@ -1,4 +1,4 @@
-import { compile as legacyCompile } from '../core/index.js';
+import { compile as compileCore } from '../core/index.js';
 
 /**
  * @typedef {Object} CompileOptions
@@ -37,7 +37,7 @@ export async function compileDocument(options) {
     if (typeof sourceText !== 'string') {
         throw new TypeError('compileDocument requires sourceText or an analyzeResult with sourceText.');
     }
-    const artifact = await legacyCompile(sourceText, compileOptions);
+    const artifact = await compileCore(sourceText, compileOptions);
     return {
         ...artifact,
         wat: artifact.wat ?? null,

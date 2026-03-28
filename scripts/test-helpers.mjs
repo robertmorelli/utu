@@ -3,8 +3,33 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSourceDocument } from '../packages/document/index.js';
 
+const runtimeGlobals = Function('return this')();
+
 export function getRepoRoot(importMetaUrl) {
   return resolve(dirname(fileURLToPath(importMetaUrl)), '..');
+}
+
+export function isDirectModuleExecution(importMetaUrl) {
+  return Boolean(process.argv[1]) && resolve(process.argv[1]) === fileURLToPath(importMetaUrl);
+}
+
+export function failDirectTestExecution(importMetaUrl) {
+  if (!isDirectModuleExecution(importMetaUrl)) return;
+  console.error('Individual test scripts are disabled. Run `bun run test`.');
+  process.exit(1);
+}
+
+export function getManagedTestArgs(importMetaUrl) {
+  failDirectTestExecution(importMetaUrl);
+  const token = runtimeGlobals.__utuManagedTestToken;
+  const args = runtimeGlobals.__utuManagedTestArgs;
+  if (typeof token !== 'string' || token.length === 0 || !Array.isArray(args))
+    throw new Error('UTU test modules must be launched by `bun run test`.');
+  return [...args];
+}
+
+export function assertManagedTestModule(importMetaUrl) {
+  void getManagedTestArgs(importMetaUrl);
 }
 
 export async function collectUtuFiles(dir) {

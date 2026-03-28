@@ -9,7 +9,7 @@ Primary entrypoints:
 
 Layout:
 
-- `core/`: legacy compile orchestration kept behind a package boundary
+- `core/`: compile orchestration and binaryen integration
 - `frontend/`: phase-oriented frontend entrypoints
   See [`frontend/README.md`](/Users/robertmorelli/Documents/personal-repos/utu/packages/compiler/frontend/README.md)
 - `backends/`: WAT and JS emitters

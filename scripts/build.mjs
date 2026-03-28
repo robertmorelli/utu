@@ -7,7 +7,8 @@ import { getRepoRoot } from './test-helpers.mjs';
 
 const extensionRoot = getRepoRoot(import.meta.url);
 const compilerEntry = resolve(extensionRoot, 'packages/compiler/index.js');
-const extensionHostEntry = resolve(extensionRoot, 'packages/hosts/vscode/extension.web.js');
+const extensionWebHostEntry = resolve(extensionRoot, 'packages/hosts/vscode/extension.web.js');
+const extensionNodeHostEntry = resolve(extensionRoot, 'packages/hosts/vscode/extension.node.js');
 const cliEntry = resolve(extensionRoot, 'packages/hosts/cli/main.mjs');
 const cliPackageRoot = resolve(extensionRoot, 'dist/cli-package');
 const webDevExtensionRoot = resolve(extensionRoot, 'dist/web-dev-extension');
@@ -55,10 +56,21 @@ const activeTargets = [
   createTarget('extension', {
     platform: 'browser',
     target: 'esnext',
-    entryPoints: [extensionHostEntry],
+    entryPoints: [extensionWebHostEntry],
     outfile: resolve(extensionRoot, 'dist/web/extension.cjs'),
     format: 'cjs',
     external: ['vscode', 'fs', 'fs/promises', 'module', 'os', 'path', 'url'],
+    loader: {
+      '.wasm': 'binary',
+    },
+  }),
+  createTarget('extension-node', {
+    platform: 'node',
+    target: 'esnext',
+    entryPoints: [extensionNodeHostEntry],
+    outfile: resolve(extensionRoot, 'dist/node/extension.cjs'),
+    format: 'cjs',
+    external: ['vscode', 'binaryen'],
     loader: {
       '.wasm': 'binary',
     },
@@ -129,8 +141,19 @@ function createTarget(label, config) {
 
 async function postprocessBundle(target) {
   if (!target.outfile) return;
-  const source = await readFile(target.outfile, 'utf8');
-  if (!source.includes('Uint8Array.fromBase64(')) return;
+  let source = await readFile(target.outfile, 'utf8');
+  let changed = false;
+
+  if (target.label === 'extension-node' && source.includes('var import_meta = {};')) {
+    source = source.replace('var import_meta = {};', 'var import_meta = { url: require("url").pathToFileURL(__filename).href };');
+    changed = true;
+  }
+
+  if (!source.includes('Uint8Array.fromBase64(')) {
+    if (changed) await writeFile(target.outfile, source, 'utf8');
+    return;
+  }
+
   const helper = `const __utuFromBase64 = (input) => {
   if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(input);
   const decode = typeof atob === "function"
@@ -143,7 +166,8 @@ async function postprocessBundle(target) {
 };
 
 `;
-  await writeFile(target.outfile, helper + source.replaceAll('Uint8Array.fromBase64(', '__utuFromBase64('), 'utf8');
+  source = helper + source.replaceAll('Uint8Array.fromBase64(', '__utuFromBase64(');
+  await writeFile(target.outfile, source, 'utf8');
 }
 
 
@@ -211,6 +235,12 @@ async function writeRepoWebEntrypointAlias() {
   ]);
 }
 
+async function writeNodeBundlePackageMetadata() {
+  const nodeDistRoot = resolve(extensionRoot, 'dist/node');
+  await mkdir(nodeDistRoot, { recursive: true });
+  await writeFile(resolve(nodeDistRoot, 'package.json'), `${JSON.stringify({ type: 'commonjs' }, null, 2)}\n`, 'utf8');
+}
+
 async function buildCli() {
   await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
   await rm(cliPackageRoot, { recursive: true, force: true });
@@ -226,6 +256,7 @@ async function buildLsp() {
 async function buildAllArtifacts() {
   await writeWebBundlePackageMetadata();
   await writeRepoWebEntrypointAlias();
+  await writeNodeBundlePackageMetadata();
   await stageWebDevExtension();
   await buildCli();
   await buildLsp();
@@ -236,7 +267,7 @@ async function stageWebDevExtension() {
   const rootPackage = JSON.parse(await readFile(resolve(extensionRoot, 'package.json'), 'utf8'));
   const stagedPackage = {
     ...rootPackage,
-    main: './dist/web/extension.js',
+    main: './dist/node/extension.cjs',
     browser: './dist/web/extension.js',
   };
 
@@ -248,6 +279,7 @@ async function stageWebDevExtension() {
 
   await rm(webDevExtensionRoot, { recursive: true, force: true });
   await mkdir(resolve(webDevExtensionRoot, 'dist/web'), { recursive: true });
+  await mkdir(resolve(webDevExtensionRoot, 'dist/node'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'dist'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'jsondata'), { recursive: true });
 
@@ -255,6 +287,7 @@ async function stageWebDevExtension() {
 
   await Promise.all([
     writeFile(resolve(webDevExtensionRoot, 'package.json'), `${JSON.stringify(stagedPackage, null, 2)}\n`, 'utf8'),
+    cp(resolve(extensionRoot, 'dist/node/extension.cjs'), resolve(webDevExtensionRoot, 'dist/node/extension.cjs')),
     cp(resolve(extensionRoot, 'dist/web/extension.js'), resolve(webDevExtensionRoot, 'dist/web/extension.js')),
     cp(resolve(extensionRoot, 'dist/web/extension.js.map'), resolve(webDevExtensionRoot, 'dist/web/extension.js.map')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs')),

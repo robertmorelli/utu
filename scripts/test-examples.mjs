@@ -2,14 +2,14 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile } from '../packages/compiler/index.js';
-import { loadNodeModuleFromSource } from '../packages/runtime/node.js';
-import { collectCompileJobs, collectUtuFiles, firstLine, getRepoRoot, runCli, runNamedCases } from './test-helpers.mjs';
+import { loadNodeModuleFromSource } from '../packages/runtime/loadNodeModuleFromSource.mjs';
+import { collectCompileJobs, collectUtuFiles, firstLine, getManagedTestArgs, getRepoRoot, runCli, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
 const CLI_CASES = [
     ['assert-pass', ['run', 'examples/ci/assert_pass.utu'], 0, 'ok'], ['assert-fail', ['run', 'examples/ci/assert_fail.utu'], 1, 'Unreachable code'],
     ['tests-basic', ['test', 'examples/ci/tests_basic.utu'], 0, 'PASS adds two numbers'], ['tests-codegen-surface', ['test', 'examples/ci/codegen_test_surface.utu'], 0, 'PASS top-level tests become synthesized exports'],
-    ['tests-nullable', ['test', 'examples/ci/codegen_nullable.utu'], 0, 'PASS else fallback runs on null'], ['tests-string-builtins', ['test', 'examples/ci/node_builtin_imports.utu'], 0, 'PASS string helpers work without legacy builtins'],
+    ['tests-nullable', ['test', 'examples/ci/codegen_nullable.utu'], 0, 'PASS else fallback runs on null'], ['tests-string-builtins', ['test', 'examples/ci/node_builtin_imports.utu'], 0, 'PASS string helpers work without builtin host helpers'],
     ['tests-globals', ['test', 'examples/ci/codegen_globals.utu'], 0, 'PASS top-level numeric globals lower to global.get'], ['tests-scalar-match', ['test', 'examples/ci/codegen_scalar_match.utu'], 0, 'PASS float match can take a specific arm'],
     ['tests-alt-fallback', ['test', 'examples/ci/codegen_alt_fallback.utu'], 0, 'PASS alt fallback can bind and forward the unmatched value'], ['tests-fail', ['test', 'examples/ci/tests_fail.utu'], 1, 'FAIL fails'],
     ['compile-bad-return-type', ['compile', 'scripts/fixtures/compile_bad_return_type.utu'], 1, 'function body type must match'], ['compile-bad-call-args', ['compile', 'scripts/fixtures/compile_bad_call_args.utu'], 1, 'call param types must match'],
@@ -22,7 +22,7 @@ const CLI_CASES = [
 ];
 const CLI_BENCH_EXAMPLE_CASES = [['call-simple', 'examples/call_simple.utu', ['call-simple chain:']], ['deltablue', 'examples/deltablue.utu', ['deltablue_chain:', 'deltablue_projection:']], ['fannkuch', 'examples/fannkuch.utu', ['fannkuch:']], ['float', 'examples/float.utu', ['float normalize:']], ['hello-name', 'examples/hello_name.utu', ['hello-name format:']], ['spectralnorm', 'examples/spectralnorm.utu', ['spectralnorm:']], ['modules-main-and-bench', 'examples/modules/main_and_bench.utu', ['module counter get:']]];
 
-const options = parseArgs(process.argv.slice(2));
+const options = parseArgs(getManagedTestArgs(import.meta.url));
 await (options.cli ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));
 
 async function runCase(testCase) {

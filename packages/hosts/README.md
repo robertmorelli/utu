@@ -11,7 +11,6 @@ Layout:
 - [`lsp/protocol-adapters/index.mjs`](/Users/robertmorelli/Documents/personal-repos/utu/packages/hosts/lsp/protocol-adapters/index.mjs): request/response adapters and LSP encoding
 - [`lsp/server/index.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/hosts/lsp/server/index.js): shared LSP language server core
 - [`vscode/extension.web.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/hosts/vscode/extension.web.js): VS Code web extension host
-- [`vscode/index.js`](/Users/robertmorelli/Documents/personal-repos/utu/packages/hosts/vscode/index.js): VS Code host module surface
 
 Compatibility:
 

@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import { activateUtuExtension } from './activate.js';
-import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, loadModuleFromSource, normalizeCompileArtifact, withRuntime } from '../../runtime/browser.js';
+import { DEFAULT_BENCHMARK_OPTIONS, executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, loadModuleFromSource, normalizeCompileArtifact, withRuntime } from '../../runtime/index.js';
 
 export async function activate(context) {
     const grammarWasmPath = await readExtensionBytes(context, 'tree-sitter-utu.wasm');
     const parserRuntimeWasmPath = await readExtensionBytes(context, 'web-tree-sitter.wasm');
     const runtimeHost = new WebCompilerHost({
         compilerModuleUri: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs'),
+        compilerAssetBaseUrl: vscode.Uri.joinPath(context.extensionUri, 'dist', 'compiler.web.mjs').toString(),
         grammarWasmPath,
         runtimeWasmPath: parserRuntimeWasmPath,
     });
@@ -36,11 +37,11 @@ function stripSourceMapComment(source) {
 async function readExtensionBytes(context, ...segments) {
     const uri = vscode.Uri.joinPath(context.extensionUri, ...segments);
     try {
-        const response = await fetch(uri.toString(true));
+        return await vscode.workspace.fs.readFile(uri);
+    } catch {
+        const response = await fetch(uri.toString());
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return new Uint8Array(await response.arrayBuffer());
-    } catch {
-        return readExtensionFile(context, ...segments);
     }
 }
 
@@ -61,14 +62,23 @@ class WebCompilerHost {
     }
     async compileSource(source, { mode = 'program', ...options } = {}) {
         const compiler = await this.getCompiler();
-        return normalizeCompileArtifact(await compiler.compile(source, { ...options, mode }));
+        return normalizeCompileArtifact(await compiler.compile(source, { ...this.getCompilerOptions(), ...options, mode }));
     }
     loadRuntime(source, mode, compileOptions = {}, prepareRuntime) { return loadCompiledRuntime({ source, mode, compileSource: (input, options = {}) => this.compileSource(input, options), loadModule: loadModuleFromSource, prepareRuntime, compileOptions }); }
-    async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, {}); }
+    async getMetadata(source) { return (await this.getCompiler()).get_metadata(source, this.getCompilerOptions()); }
     async getCompiler() { return (this.compilerPromise ??= this.loadCompiler()); }
     async loadCompiler() {
         const source = stripSourceMapComment(decodeUtf8(await vscode.workspace.fs.readFile(this.options.compilerModuleUri)));
-        return loadModuleFromSource(source, { identifier: 'utu-compiler-web' });
+        return loadModuleFromSource(source, {
+            assetBaseUrl: this.options.compilerAssetBaseUrl,
+            identifier: 'utu-compiler-web',
+        });
+    }
+    getCompilerOptions() {
+        return {
+            wasmUrl: this.options.grammarWasmPath,
+            runtimeWasmUrl: this.options.runtimeWasmPath,
+        };
     }
 }
 async function getNamedTarget(source, getMetadata, kind, ordinal) {

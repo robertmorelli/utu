@@ -2,10 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import textmate from 'vscode-textmate';
 import oniguruma from 'vscode-oniguruma';
-import { getRepoRoot } from './test-helpers.mjs';
+import { assertManagedTestModule, getRepoRoot } from './test-helpers.mjs';
 
 const { Registry } = textmate;
 const { loadWASM, OnigScanner, OnigString } = oniguruma;
+
+assertManagedTestModule(import.meta.url);
 
 const repoRoot = getRepoRoot(import.meta.url);
 const grammarPath = resolve(repoRoot, 'jsondata/utu.tmLanguage.json');

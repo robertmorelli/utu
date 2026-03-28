@@ -14,6 +14,9 @@ export function createTreeSitterInitOptions(runtimeWasmSource) {
     if (runtimeWasm instanceof Uint8Array) {
         return {
             wasmBinary: runtimeWasm,
+            // Some web-tree-sitter builds still consult locateFile during startup
+            // even when instantiateWasm / wasmBinary are supplied.
+            locateFile: () => 'web-tree-sitter.wasm',
             instantiateWasm(imports, successCallback) {
                 void WebAssembly.instantiate(runtimeWasm, imports)
                     .then(({ instance, module }) => successCallback(instance, module));
@@ -25,10 +28,10 @@ export function createTreeSitterInitOptions(runtimeWasmSource) {
 }
 
 export async function createUtuTreeSitterParser({
-    wasmUrl: legacyGrammarWasmUrl,
-    runtimeWasmUrl: legacyRuntimeWasmUrl,
-    grammarWasmPath = legacyGrammarWasmUrl,
-    runtimeWasmPath = legacyRuntimeWasmUrl,
+    wasmUrl,
+    runtimeWasmUrl,
+    grammarWasmPath = wasmUrl,
+    runtimeWasmPath = runtimeWasmUrl,
 } = {}) {
     await Parser.init(createTreeSitterInitOptions(runtimeWasmPath));
     const parser = new Parser();

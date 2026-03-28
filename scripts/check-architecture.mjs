@@ -25,6 +25,7 @@ const trackedFiles = [
   'packages/compiler/frontend/expand/collect.js',
   'packages/compiler/frontend/expand/emit-declarations.js',
   'packages/compiler/frontend/expand/emit-expressions.js',
+  'packages/language-platform/core/document-index/build.js',
   'packages/language-platform/core/documentIndex.js',
   'packages/document/index.js',
   'packages/workspace/session.js',
@@ -67,7 +68,7 @@ const results = await Promise.all(trackedFiles.map(async (relativePath) => {
 
 const warnings = results.filter(({ lines }) => lines > SOFT_LIMIT);
 const importViolations = await collectImportViolations();
-const legacyPathViolations = await collectLegacyPathViolations();
+const forbiddenPathViolations = await collectForbiddenPathViolations();
 
 for (const { relativePath, lines } of results) {
   const status = lines > SOFT_LIMIT ? 'WARN' : 'OK';
@@ -88,11 +89,11 @@ if (importViolations.length) {
   process.exitCode = 1;
 }
 
-if (legacyPathViolations.length) {
+if (forbiddenPathViolations.length) {
   console.log('');
-  console.log('Architecture error: legacy pre-refactor entrypoints still exist.');
-  for (const violation of legacyPathViolations) {
-    console.log(`ERR  legacy ${violation}`);
+  console.log('Architecture error: forbidden entrypoints still exist.');
+  for (const violation of forbiddenPathViolations) {
+    console.log(`ERR  forbidden ${violation}`);
   }
   process.exitCode = 1;
 }
@@ -123,7 +124,7 @@ async function collectImportViolations() {
   return violations;
 }
 
-async function collectLegacyPathViolations() {
+async function collectForbiddenPathViolations() {
   const violations = [];
   for (const relativePath of forbiddenLegacyPaths) {
     try {

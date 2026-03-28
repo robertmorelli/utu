@@ -1,3 +1,9 @@
 import { startLspServer } from './server-session.mjs';
 
-startLspServer();
+async function main() {
+  await startLspServer();
+}
+
+await main();
+
+// This file stays intentionally small, but not hidden.

@@ -1,87 +1,103 @@
 [
   {
+    "id": "repo:file-sizes",
+    "label": "Repository file sizes",
+    "module": "./scripts/test-file-sizes.mjs"
+  },
+  {
     "id": "examples:all",
     "label": "Examples (all)",
-    "command": ["bun", "./scripts/test-examples.mjs"]
+    "module": "./scripts/test-examples.mjs"
   },
   {
     "id": "language",
     "label": "Language CLI",
-    "command": ["bun", "./scripts/test-examples.mjs", "--cli"]
+    "module": "./scripts/test-examples.mjs",
+    "args": ["--cli"]
   },
   {
     "id": "editor:web-compiler-source-load",
     "label": "Editor web compiler source load",
-    "command": ["node", "./scripts/test-vscode-web-compiler-source-load.mjs"]
+    "module": "./scripts/test-vscode-web-compiler-source-load.mjs"
   },
   {
     "id": "editor:activation-selfcheck",
     "label": "Editor activation self-check",
-    "command": ["node", "./scripts/test-vscode-activation-selfcheck.mjs"]
+    "module": "./scripts/test-vscode-activation-selfcheck.mjs"
   },
   {
     "id": "editor:activation-language-version-repro",
     "label": "Editor activation language-version repro",
-    "command": ["node", "./scripts/test-vscode-activation-language-version-repro.mjs"]
+    "module": "./scripts/test-vscode-activation-language-version-repro.mjs"
   },
   {
     "id": "editor:activation-log-repro",
     "label": "Editor activation log repro",
-    "command": ["node", "./scripts/test-vscode-web-extension-activation-log-repro.mjs"]
+    "module": "./scripts/test-vscode-web-extension-activation-log-repro.mjs"
+  },
+  {
+    "id": "editor:desktop-activation",
+    "label": "Editor desktop activation",
+    "module": "./scripts/test-vscode-desktop-activation.mjs"
   },
   {
     "id": "editor:core",
     "label": "Editor core",
-    "command": ["bun", "./scripts/test-editor.mjs", "core"]
+    "module": "./scripts/test-editor.mjs",
+    "args": ["core"]
   },
   {
     "id": "editor:diagnostics",
     "label": "Editor diagnostics",
-    "command": ["bun", "./scripts/test-diagnostics.mjs"]
+    "module": "./scripts/test-diagnostics.mjs"
   },
   {
     "id": "editor:examples",
     "label": "Editor examples",
-    "command": ["bun", "./scripts/test-editor.mjs", "examples"]
+    "module": "./scripts/test-editor.mjs",
+    "args": ["examples"]
   },
   {
     "id": "editor:webhost",
     "label": "Editor webhost",
-    "command": ["bun", "./scripts/test-editor.mjs", "webhost"]
+    "module": "./scripts/test-editor.mjs",
+    "args": ["webhost"]
   },
   {
     "id": "examples:compile",
     "label": "Examples compile",
-    "command": ["bun", "./scripts/test-examples.mjs", "--compile-all"]
+    "module": "./scripts/test-examples.mjs",
+    "args": ["--compile-all"]
   },
   {
     "id": "examples:bench",
     "label": "Examples bench",
-    "command": ["bun", "./scripts/test-examples.mjs", "--cli", "--cli-bench-examples"]
+    "module": "./scripts/test-examples.mjs",
+    "args": ["--cli", "--cli-bench-examples"]
   },
   {
     "id": "stress",
     "label": "Stress runtime",
-    "command": ["bun", "./scripts/test-stress-runtime.mjs"]
+    "module": "./scripts/test-stress-runtime.mjs"
   },
   {
     "id": "docs:codegen",
     "label": "Docs codegen",
-    "command": ["bun", "./scripts/test-docs-codegen.mjs"]
+    "module": "./scripts/test-docs-codegen.mjs"
   },
   {
     "id": "language:modules",
     "label": "Language modules",
-    "command": ["bun", "./scripts/test-modules.mjs"]
+    "module": "./scripts/test-modules.mjs"
   },
   {
     "id": "grammar:textmate-escape",
     "label": "Grammar TextMate escape",
-    "command": ["node", "./scripts/test-textmate-escape.mjs"]
+    "module": "./scripts/test-textmate-escape.mjs"
   },
   {
     "id": "no-globalthis",
     "label": "No global object access",
-    "command": ["node", "./scripts/test-no-global-this.mjs"]
+    "module": "./scripts/test-no-global-this.mjs"
   }
 ]

@@ -15,7 +15,7 @@ with implementation ownership living only in those package boundaries.
 
 ## Current State
 
-The package relocation is complete and the old root-level ownership paths have been removed.
+The package relocation is complete and implementation ownership lives under `packages/`.
 
 Real implementation ownership now lives in:
 
@@ -55,7 +55,7 @@ Real implementation ownership now lives in:
   - `packages/compiler/frontend/expand/emit-declarations.js`
   - `packages/compiler/frontend/expand/emit-expressions.js`
 - Removed compiler-facing static `.wasm` module imports from the shared API/core parse paths in favor of URL-based defaults so Node ESM host flows can import the refactored package surfaces without treating Wasm files as JavaScript modules.
-- Fixed the post-split WAT backend and expander helper seams so the decomposed files carry the same runtime helper set as the pre-split hotspots.
+- Fixed the backend and expander helper seams so the decomposed files carry the same runtime helper set across the split modules.
 
 ### Document / Workspace / Language Platform
 
@@ -90,24 +90,20 @@ Real implementation ownership now lives in:
   - `packages/language-platform/core/compile-diagnostics.js`
 - Split the remaining language-service hotspot into:
   - `packages/language-platform/core/document-index/build.js`
-  - `packages/language-platform/core/documentIndex.js` as the service wrapper
+  - `packages/language-platform/core/documentIndex.js` as the service entrypoint
 - Rewired compiler API, LSP, extension, and tests to import through package boundaries.
 
 ### Runtime
 
 - Moved runtime helpers into `packages/runtime`.
-- Split runtime entrypoints by environment:
-  - `packages/runtime/index.js`: shared/browser-safe surface
-  - `packages/runtime/browser.js`: explicit browser-safe host surface
-  - `packages/runtime/node.js`: Node-only additions including `loadNodeModuleFromSource()`
+- Kept `packages/runtime/index.js` as the shared runtime surface and used module-specific imports for Node-only helpers.
 - Split runtime responsibilities into:
   - `packages/runtime/artifact.js`
   - `packages/runtime/loader.js`
   - `packages/runtime/run-main.js`
   - `packages/runtime/run-test.js`
   - `packages/runtime/run-bench.js`
-- Rewired CLI and Node-based tests to use `packages/runtime/node.js`.
-- Rewired the web extension to use `packages/runtime/browser.js`.
+- Rewired CLI, tests, and the web extension to import runtime helpers from the owning runtime modules directly.
 
 ### Hosts
 
@@ -120,7 +116,6 @@ Real implementation ownership now lives in:
   - `packages/hosts/lsp/server/index.js`
 - Moved VS Code extension implementation to `packages/hosts/vscode/`.
 - Rewired the VS Code host to a shared workspace/session adapter instead of a separate ad hoc parser/workspace-symbol stack.
-- Removed the old root host entrypoints after callers were moved to `packages/hosts/*`.
 
 ### Build / Packaging
 
@@ -129,7 +124,7 @@ Real implementation ownership now lives in:
   - `packages/hosts/cli/main.mjs`
   - `packages/hosts/lsp/main.mjs`
   - `packages/hosts/vscode/extension.web.js`
-- Removed root wrappers so package boundaries are now the only source entrypoints.
+- Package boundaries are now the only source entrypoints.
 
 ### Grammar / Spec / Frontend Surface
 
@@ -141,7 +136,7 @@ Real implementation ownership now lives in:
   - `grammar/rules/expressions.cjs`
   - `grammar/rules/literals.cjs`
   - `grammar/rules/identifiers.cjs`
-- Kept `grammar.cjs` as the single composed grammar source and added `grammar.js` compatibility for `tree-sitter generate`.
+- Kept `grammar.cjs` as the single composed grammar source and retained `grammar.js` for `tree-sitter generate`.
 - Added phase-oriented frontend entrypoints under:
   - `packages/compiler/frontend/parse/`
   - `packages/compiler/frontend/diagnostics/`
@@ -164,7 +159,7 @@ Real implementation ownership now lives in:
 
 ## Verification History
 
-These checks passed after the current package/host relocation:
+These checks passed with the current package layout:
 
 - `bun ./scripts/test-diagnostics.mjs`
 - `bun ./scripts/test-editor.mjs core`
@@ -196,8 +191,8 @@ The package-oriented reshape, host unification, shared workspace/session layer, 
 - hosts compose the shared parser/language-service stack and inject it into the workspace/session layer
 - LSP and VS Code share workspace/session orchestration
 - syntax/header/body snapshots exist as explicit cache tiers, with syntax/header snapshots available without paying for body analysis
-- the previous oversized `wat`, `expand`, and `documentIndex` entry files have been replaced by phase-oriented helper modules and package entrypoints
+- the oversized `wat`, `expand`, and `documentIndex` entry files have been replaced by phase-oriented helper modules and package entrypoints
 - build/test paths prefer the new structure
-- no legacy root compatibility layer remains
+- no root-level alias layer remains
 
-The remaining work is normal language/compiler evolution inside the new structure, not unfinished refactor migration.
+The remaining work is normal language/compiler evolution inside the new structure.

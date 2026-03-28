@@ -5,6 +5,6 @@ fun readme_prefix() str {
     substring("# UTU README", 0, 5);
 }
 
-test "string helpers work without legacy builtins" {
+test "string helpers work without builtin host helpers" {
     assert str_eq(readme_prefix(), "# UTU");
 }
