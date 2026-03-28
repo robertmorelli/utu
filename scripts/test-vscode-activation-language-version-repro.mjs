@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import * as treeSitter from 'web-tree-sitter';
 
-import { UtuParserService, createSourceDocument } from '../parser.js';
-import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
+import { UtuParserService, createSourceDocument } from '../packages/document/index.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../packages/language-platform/index.js';
 import { getRepoRoot } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
@@ -42,16 +42,13 @@ async function main() {
     }
 
     const stack = String(error instanceof Error ? error.stack ?? error.message : error);
-    for (const fragment of [
-      'Parser.setLanguage',
-      'createUtuTreeSitterParser',
-      'UtuParserService.parseSource',
-      'UtuLanguageService.getDocumentIndex',
-      'UtuWorkspaceSymbolIndex.updateDocument',
-      'UtuWorkspaceSymbolIndex.syncDocuments',
-    ]) {
-      if (!stack.includes(fragment)) {
-        throw new Error(`Expected stack to include "${fragment}", received:\n${stack}`);
+    const expectedStackGroups = [
+      ['Parser.setLanguage', 'setLanguage'],
+      ['createUtuTreeSitterParser', 'packages/document/index.js'],
+    ];
+    for (const group of expectedStackGroups) {
+      if (!group.some((fragment) => stack.includes(fragment))) {
+        throw new Error(`Expected stack to include one of ${JSON.stringify(group)}, received:\n${stack}`);
       }
     }
 

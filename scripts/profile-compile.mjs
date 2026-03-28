@@ -3,11 +3,11 @@ import path from 'node:path';
 
 import bundledGrammarWasm from '../tree-sitter-utu.wasm';
 import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
-import { expandSource } from '../expand.js';
-import { jsgen } from '../jsgen.js';
-import { createUtuTreeSitterParser } from '../parser.js';
-import { throwOnParseErrors } from '../tree.js';
-import { watgen } from '../watgen.js';
+import { expandSource } from '../packages/compiler/frontend/expand.js';
+import { jsgen } from '../packages/compiler/backends/jsgen.js';
+import { createUtuTreeSitterParser } from '../packages/document/index.js';
+import { throwOnParseErrors } from '../packages/compiler/frontend/tree.js';
+import { watgen } from '../packages/compiler/backends/watgen.js';
 
 const DEFAULT_MODE = 'program';
 const DEFAULT_ITERATIONS = 6;

@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createSourceDocument } from '../parser.js';
+import { createSourceDocument } from '../packages/document/index.js';
 
 export function getRepoRoot(importMetaUrl) {
   return resolve(dirname(fileURLToPath(importMetaUrl)), '..');

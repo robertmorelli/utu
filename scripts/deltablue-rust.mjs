@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import * as compiler from '../index.js';
+import * as compiler from '../packages/compiler/index.js';
 import { getRepoRoot } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);

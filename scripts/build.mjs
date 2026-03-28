@@ -6,12 +6,13 @@ import process from 'node:process';
 import { getRepoRoot } from './test-helpers.mjs';
 
 const extensionRoot = getRepoRoot(import.meta.url);
-const compilerSourceRoot = extensionRoot;
-const cliEntry = resolve(extensionRoot, 'cli.mjs');
+const compilerEntry = resolve(extensionRoot, 'packages/compiler/index.js');
+const extensionHostEntry = resolve(extensionRoot, 'packages/hosts/vscode/extension.web.js');
+const cliEntry = resolve(extensionRoot, 'packages/hosts/cli/main.mjs');
 const cliPackageRoot = resolve(extensionRoot, 'dist/cli-package');
 const webDevExtensionRoot = resolve(extensionRoot, 'dist/web-dev-extension');
 const cliBinaryPath = resolve(extensionRoot, 'utu');
-const lspEntry = resolve(extensionRoot, 'lsp.mjs');
+const lspEntry = resolve(extensionRoot, 'packages/hosts/lsp/main.mjs');
 const lspBinaryPath = resolve(extensionRoot, 'utu-lsp');
 const vsceBinaryPath = resolve(extensionRoot, 'node_modules/.bin/vsce');
 const treeSitterBinaryPath = resolve(extensionRoot, 'node_modules/.bin/tree-sitter');
@@ -21,7 +22,15 @@ const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
 const grammarSourcePath = resolve(extensionRoot, 'grammar.cjs');
 const grammarCompatPath = resolve(extensionRoot, 'grammar.js');
 const grammarSourceInputs = [grammarSourcePath];
-const compilerInputRoots = [compilerSourceRoot];
+const artifactInputRoots = [
+  resolve(extensionRoot, 'packages'),
+  resolve(extensionRoot, 'jsondata'),
+  resolve(extensionRoot, 'package.json'),
+  resolve(extensionRoot, 'language-configuration.json'),
+  resolve(extensionRoot, 'README.md'),
+  resolve(extensionRoot, 'CHANGELOG.md'),
+  resolve(extensionRoot, 'LICENSE'),
+];
 const staticAssetInputs = [treeSitterRuntimeSource, grammarDest];
 const ignoredWatchEntries = new Set([
   '.git',
@@ -46,7 +55,7 @@ const activeTargets = [
   createTarget('extension', {
     platform: 'browser',
     target: 'esnext',
-    entryPoints: [resolve(extensionRoot, 'extension/extension.web.js')],
+    entryPoints: [extensionHostEntry],
     outfile: resolve(extensionRoot, 'dist/web/extension.cjs'),
     format: 'cjs',
     external: ['vscode', 'fs', 'fs/promises', 'module', 'os', 'path', 'url'],
@@ -57,7 +66,7 @@ const activeTargets = [
   createTarget('compiler-web', {
     platform: 'browser',
     target: 'esnext',
-    entryPoints: [resolve(compilerSourceRoot, 'index.js')],
+    entryPoints: [compilerEntry],
     outfile: resolve(extensionRoot, 'dist/compiler.web.mjs'),
     format: 'esm',
     external: ['fs', 'fs/promises', 'module', 'path', 'url'],
@@ -69,7 +78,7 @@ const activeTargets = [
   createTarget('compiler-node', {
     platform: 'node',
     target: 'esnext',
-    entryPoints: [resolve(compilerSourceRoot, 'index.js')],
+    entryPoints: [compilerEntry],
     outfile: resolve(extensionRoot, 'dist/compiler.mjs'),
     format: 'esm',
     external: ['binaryen', 'web-tree-sitter'],
@@ -349,7 +358,7 @@ async function findFreshestFile(paths) {
 }
 
 async function watchCompilerInputs(compilerContexts) {
-  let compilerState = await snapshotState(compilerInputRoots, { recursive: true });
+  let compilerState = await snapshotState(artifactInputRoots, { recursive: true });
   let assetState = await snapshotState(staticAssetInputs);
   let grammarSourceState = await snapshotState(grammarSourceInputs);
   let syncTimer;
@@ -363,7 +372,7 @@ async function watchCompilerInputs(compilerContexts) {
     void (async () => {
       try {
         const [nextCompilerState, nextAssetState, nextGrammarSourceState] = await Promise.all([
-          snapshotState(compilerInputRoots, { recursive: true }),
+          snapshotState(artifactInputRoots, { recursive: true }),
           snapshotState(staticAssetInputs),
           snapshotState(grammarSourceInputs),
         ]);

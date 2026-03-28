@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import * as compiler from '../index.js';
-import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from '../loadCompiledRuntime.mjs';
-import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
+import * as compiler from '../packages/compiler/index.js';
+import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, loadNodeModuleFromSource, normalizeCompileArtifact, withRuntime } from '../packages/runtime/node.js';
 import { expectDeepEqual, expectEqual, getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);

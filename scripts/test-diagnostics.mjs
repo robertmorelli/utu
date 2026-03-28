@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-import { UtuParserService, createSourceDocument } from '../parser.js';
-import { UtuLanguageService } from '../lsp_core/languageService.js';
+import { UtuParserService, createSourceDocument } from '../packages/document/index.js';
+import { UtuLanguageService } from '../packages/language-platform/index.js';
 import {
   expectDeepEqual,
   getRepoRoot,

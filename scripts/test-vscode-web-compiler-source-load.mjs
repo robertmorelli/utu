@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { loadModuleFromSource } from '../moduleSourceLoader.mjs';
+import { loadModuleFromSource } from '../packages/runtime/browser.js';
 
 const source = await readFile(new URL('../dist/compiler.web.mjs', import.meta.url), 'utf8');
 const compiler = await loadModuleFromSource(source, { identifier: 'compiler.web-test' });

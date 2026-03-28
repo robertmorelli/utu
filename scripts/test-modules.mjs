@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { compile, validateWat } from '../index.js';
+import { compile, validateWat } from '../packages/compiler/index.js';
 import binaryen from 'binaryen';
-import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
+import { loadNodeModuleFromSource } from '../packages/runtime/node.js';
 import { firstLine, runNamedCases } from './test-helpers.mjs';
 
 const successCases = [

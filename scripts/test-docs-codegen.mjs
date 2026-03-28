@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { compile } from '../index.js';
+import { compile } from '../packages/compiler/index.js';
 import { getRepoRoot, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);

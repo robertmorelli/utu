@@ -2,10 +2,11 @@ import { access, readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { compile } from '../index.js';
-import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
-import { UtuParserService, createSourceDocument, spanFromOffsets } from '../parser.js';
-import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
+import { compile } from '../packages/compiler/index.js';
+import { loadNodeModuleFromSource } from '../packages/runtime/node.js';
+import { UtuParserService, createSourceDocument, spanFromOffsets } from '../packages/document/index.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../packages/language-platform/index.js';
+import { UtuAnalysisCache, UtuWorkspaceSession } from '../packages/workspace/index.js';
 import {
   collectCompileJobs,
   collectUtuFiles,
@@ -261,6 +262,49 @@ async function runCoreSuite() {
 
       await workspaceSymbols.syncDocuments([betaV1], { replace: true });
       expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('').map((symbol) => symbol.name), ['beta']);
+    }],
+    ['analysis cache reuses richer snapshot tiers for the same document version', async () => {
+      const cache = new UtuAnalysisCache({
+        parserService,
+        languageService,
+      });
+      const document = createSourceDocument('export fun main() i32 { 0; }', {
+        uri: 'file:///analysis-cache.utu',
+        version: 1,
+      });
+      const validation = await cache.analyze(document, { mode: 'validation' });
+      const editor = await cache.analyze(document, { mode: 'editor' });
+
+      expectValue(editor === validation, true);
+      expectEqual(editor.syntax.kind, 'syntax');
+      expectEqual(editor.header.kind, 'header');
+      expectEqual(editor.body.kind, 'body');
+      expectEqual(editor.header.hasMain, true);
+      expectValue(Array.isArray(editor.header.symbols), true);
+    }],
+    ['workspace session returns semantic editor diagnostics and header-backed workspace symbols', async () => {
+      const session = new UtuWorkspaceSession({
+        parserService,
+        languageService,
+      });
+      try {
+        const uri = 'file:///workspace-session.utu';
+        const diagnostics = await session.openDocument({
+          uri,
+          version: 1,
+          text: [
+            'fun helper() i32 { 1; }',
+            'export fun main() i32 {',
+            '    missing_value;',
+            '}',
+          ].join('\n'),
+        });
+
+        expectValue(diagnostics.some((diagnostic) => diagnostic.message.includes('Undefined value "missing_value".')), true);
+        expectDeepEqual((await session.getWorkspaceSymbols('')).map((symbol) => symbol.name).sort(), ['helper', 'main']);
+      } finally {
+        session.dispose();
+      }
     }],
   ];
 

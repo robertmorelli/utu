@@ -1,7 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 
-import { createSourceDocument, UtuParserService } from '../parser.js';
-import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../lsp_core/languageService.js';
+import { createSourceDocument, UtuParserService } from '../packages/document/index.js';
+import { UtuLanguageService, UtuWorkspaceSymbolIndex } from '../packages/language-platform/index.js';
 
 const source = 'export fun main() i32 { 0; }';
 

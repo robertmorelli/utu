@@ -1,8 +1,8 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compile } from '../index.js';
-import { loadNodeModuleFromSource } from '../loadNodeModuleFromSource.mjs';
+import { compile } from '../packages/compiler/index.js';
+import { loadNodeModuleFromSource } from '../packages/runtime/node.js';
 import { collectCompileJobs, collectUtuFiles, firstLine, getRepoRoot, runCli, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
