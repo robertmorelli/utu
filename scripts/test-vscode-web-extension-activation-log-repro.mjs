@@ -17,7 +17,7 @@ async function main() {
   try {
     await writeFakeVscodePackage(outputLines);
 
-    const { activateUtuExtension } = await import(pathToFileURL(resolve(repoRoot, 'extension/activate.js')).href);
+    const { activateUtuExtension } = await import(pathToFileURL(resolve(repoRoot, 'packages/hosts/vscode/activate.js')).href);
     const [grammarWasmPath, runtimeWasmPath] = await Promise.all([
       readFile(new URL('../tree-sitter-utu.wasm', import.meta.url)),
       readFile(new URL('../web-tree-sitter.wasm', import.meta.url)),

@@ -696,7 +696,7 @@ async function attemptCompile(compilerModule, source, mode, assets) {
 }
 
 async function loadIsolatedCompiler(label) {
-  return import(new URL(`../index.js?instance=${label}`, import.meta.url).href);
+  return import(new URL(`../packages/compiler/index.js?instance=${label}`, import.meta.url).href);
 }
 
 async function loadWebCompiler(root) {

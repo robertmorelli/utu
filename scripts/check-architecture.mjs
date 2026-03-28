@@ -29,6 +29,33 @@ const trackedFiles = [
   'packages/document/index.js',
   'packages/workspace/session.js',
 ];
+const forbiddenLegacyPaths = [
+  'cli.mjs',
+  'expand-utils.js',
+  'expand.js',
+  'extension/activate.js',
+  'extension/adapters/core.js',
+  'extension/commands.js',
+  'extension/diagnostics.js',
+  'extension/extension.web.js',
+  'extension/generatedDocuments.js',
+  'extension/languageProviders.js',
+  'extension/shared.js',
+  'extension/testing.js',
+  'index.js',
+  'jsgen.js',
+  'loadCompiledRuntime.mjs',
+  'loadNodeModuleFromSource.mjs',
+  'lsp.mjs',
+  'lsp_core/hoverDocs.js',
+  'lsp_core/languageService.js',
+  'lsp_core/types.js',
+  'lsp_server/index.js',
+  'moduleSourceLoader.mjs',
+  'parser.js',
+  'tree.js',
+  'watgen.js',
+];
 
 const results = await Promise.all(trackedFiles.map(async (relativePath) => {
   const source = await readFile(resolve(repoRoot, relativePath), 'utf8');
@@ -40,6 +67,7 @@ const results = await Promise.all(trackedFiles.map(async (relativePath) => {
 
 const warnings = results.filter(({ lines }) => lines > SOFT_LIMIT);
 const importViolations = await collectImportViolations();
+const legacyPathViolations = await collectLegacyPathViolations();
 
 for (const { relativePath, lines } of results) {
   const status = lines > SOFT_LIMIT ? 'WARN' : 'OK';
@@ -56,6 +84,15 @@ if (importViolations.length) {
   console.log('Architecture error: upward package imports were found.');
   for (const violation of importViolations) {
     console.log(`ERR  import ${violation.importer} -> ${violation.imported}`);
+  }
+  process.exitCode = 1;
+}
+
+if (legacyPathViolations.length) {
+  console.log('');
+  console.log('Architecture error: legacy pre-refactor entrypoints still exist.');
+  for (const violation of legacyPathViolations) {
+    console.log(`ERR  legacy ${violation}`);
   }
   process.exitCode = 1;
 }
@@ -82,6 +119,17 @@ async function collectImportViolations() {
         imported: relative(repoRoot, resolved),
       });
     }
+  }
+  return violations;
+}
+
+async function collectLegacyPathViolations() {
+  const violations = [];
+  for (const relativePath of forbiddenLegacyPaths) {
+    try {
+      await readFile(resolve(repoRoot, relativePath), 'utf8');
+      violations.push(relativePath);
+    } catch {}
   }
   return violations;
 }

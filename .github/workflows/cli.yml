@@ -45,7 +45,7 @@ jobs:
 
       - name: Check help text
         run: |
-          output="$(bun ./cli.mjs help)"
+          output="$(bun ./packages/hosts/cli/main.mjs help)"
           echo "$output"
           grep -Fq 'utu compile <input> [--outdir <dir>] [--wat] [--bun|--node]' <<<"$output"
           grep -Fq 'utu run <input>' <<<"$output"
@@ -53,7 +53,7 @@ jobs:
       - name: Check usage errors
         run: |
           set +e
-          output="$(bun ./cli.mjs compile 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs compile 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -61,7 +61,7 @@ jobs:
           grep -Fq 'compile needs an input file' <<<"$output"
 
           set +e
-          output="$(bun ./cli.mjs nope 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs nope 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -71,7 +71,7 @@ jobs:
       - name: Compile Node output explicitly
         run: |
           rm -rf dist/ci-node
-          output="$(bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
           echo "$output"
           grep -Fq 'call_simple.mjs' <<<"$output"
           grep -Fq 'call_simple.wasm' <<<"$output"
@@ -80,7 +80,7 @@ jobs:
       - name: Compile with source CLI
         run: |
           rm -rf dist/ci-src
-          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --node --wat
+          bun ./packages/hosts/cli/main.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --node --wat
           test -f dist/ci-src/call_simple.mjs
           test -f dist/ci-src/call_simple.wasm
           test -f dist/ci-src/call_simple.wat
@@ -94,7 +94,7 @@ jobs:
       - name: Compile Bun executable
         run: |
           rm -rf dist/ci-bun
-          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-bun --bun
+          bun ./packages/hosts/cli/main.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-bun --bun
           test -f dist/ci-bun/call_simple
 
       - name: Compile with bundled CLI
@@ -113,7 +113,7 @@ jobs:
 
       - name: Run with source CLI
         run: |
-          output="$(bun ./cli.mjs run ./examples/call_simple.utu 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs run ./examples/call_simple.utu 2>&1)"
           echo "$output"
           grep -Fxq '177280n' <<<"$output"
 
@@ -125,7 +125,7 @@ jobs:
 
       - name: Test with source CLI
         run: |
-          output="$(bun ./cli.mjs test ./examples/ci/tests_basic.utu 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs test ./examples/ci/tests_basic.utu 2>&1)"
           echo "$output"
           grep -Fq 'PASS adds two numbers' <<<"$output"
           grep -Fq 'PASS adds negatives' <<<"$output"
@@ -139,7 +139,7 @@ jobs:
 
       - name: Bench with source CLI
         run: |
-          output="$(bun ./cli.mjs bench ./examples/bench/bench_basic.utu --seconds 0.01 --samples 1 --warmup 0 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs bench ./examples/bench/bench_basic.utu --seconds 0.01 --samples 1 --warmup 0 2>&1)"
           echo "$output"
           grep -Fq 'sum loop:' <<<"$output"
 
@@ -172,7 +172,7 @@ jobs:
 
       - name: Check help text
         run: |
-          output="$(bun ./cli.mjs help)"
+          output="$(bun ./packages/hosts/cli/main.mjs help)"
           echo "$output"
           grep -Fq 'utu compile <input> [--outdir <dir>] [--wat] [--bun|--node]' <<<"$output"
           grep -Fq 'utu run <input>' <<<"$output"
@@ -180,7 +180,7 @@ jobs:
       - name: Check usage errors
         run: |
           set +e
-          output="$(bun ./cli.mjs compile 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs compile 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -188,7 +188,7 @@ jobs:
           grep -Fq 'compile needs an input file' <<<"$output"
 
           set +e
-          output="$(bun ./cli.mjs nope 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs nope 2>&1)"
           exit_code=$?
           set -e
           echo "$output"
@@ -198,7 +198,7 @@ jobs:
       - name: Compile Node output explicitly
         run: |
           rm -rf dist/ci-node
-          output="$(bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-node --node 2>&1)"
           echo "$output"
           grep -Fq 'call_simple.mjs' <<<"$output"
           grep -Fq 'call_simple.wasm' <<<"$output"
@@ -207,7 +207,7 @@ jobs:
       - name: Compile with source CLI
         run: |
           rm -rf dist/ci-src
-          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --node --wat
+          bun ./packages/hosts/cli/main.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-src --node --wat
           test -f dist/ci-src/call_simple.mjs
           test -f dist/ci-src/call_simple.wasm
           test -f dist/ci-src/call_simple.wat
@@ -221,7 +221,7 @@ jobs:
       - name: Compile Bun executable
         run: |
           rm -rf dist/ci-bun
-          bun ./cli.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-bun --bun
+          bun ./packages/hosts/cli/main.mjs compile ./examples/call_simple.utu --outdir ./dist/ci-bun --bun
           test -f dist/ci-bun/call_simple
 
       - name: Compile with bundled CLI
@@ -240,7 +240,7 @@ jobs:
 
       - name: Run with source CLI
         run: |
-          output="$(bun ./cli.mjs run ./examples/call_simple.utu 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs run ./examples/call_simple.utu 2>&1)"
           echo "$output"
           grep -Fxq '177280n' <<<"$output"
 
@@ -252,7 +252,7 @@ jobs:
 
       - name: Test with source CLI
         run: |
-          output="$(bun ./cli.mjs test ./examples/ci/tests_basic.utu 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs test ./examples/ci/tests_basic.utu 2>&1)"
           echo "$output"
           grep -Fq 'PASS adds two numbers' <<<"$output"
           grep -Fq 'PASS adds negatives' <<<"$output"
@@ -266,7 +266,7 @@ jobs:
 
       - name: Bench with source CLI
         run: |
-          output="$(bun ./cli.mjs bench ./examples/bench/bench_basic.utu --seconds 0.01 --samples 1 --warmup 0 2>&1)"
+          output="$(bun ./packages/hosts/cli/main.mjs bench ./examples/bench/bench_basic.utu --seconds 0.01 --samples 1 --warmup 0 2>&1)"
           echo "$output"
           grep -Fq 'sum loop:' <<<"$output"
 

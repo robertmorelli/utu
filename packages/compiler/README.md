@@ -22,4 +22,4 @@ Layout:
 Import rule:
 
 - hosts and scripts should prefer `packages/compiler/index.js` or `packages/compiler/api/index.js`
-- root-level compiler files remain compatibility shims only
+- no root-level compiler ownership files remain; use this package directly

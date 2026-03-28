@@ -11,11 +11,11 @@ Reshape UTU around package-oriented boundaries that are easy for humans and AI a
 - `packages/workspace`
 - `packages/hosts`
 
-with legacy root paths retained only as compatibility shims.
+with implementation ownership living only in those package boundaries.
 
 ## Current State
 
-The package relocation is effectively complete.
+The package relocation is complete and the old root-level ownership paths have been removed.
 
 Real implementation ownership now lives in:
 
@@ -28,24 +28,6 @@ Real implementation ownership now lives in:
 - `packages/hosts/lsp`
 - `packages/hosts/vscode`
 
-Root-level files that used to own behavior now act as wrappers:
-
-- `index.js`
-- `expand.js`
-- `tree.js`
-- `watgen.js`
-- `jsgen.js`
-- `expand-utils.js`
-- `parser.js`
-- `loadCompiledRuntime.mjs`
-- `loadNodeModuleFromSource.mjs`
-- `moduleSourceLoader.mjs`
-- `cli.mjs`
-- `lsp.mjs`
-- `lsp_server/index.js`
-- `extension/*`
-- `lsp_core/*`
-
 ## Completed
 
 ### Compiler
@@ -57,7 +39,7 @@ Root-level files that used to own behavior now act as wrappers:
   - `packages/compiler/backends`
   - `packages/compiler/shared`
 - Added `packages/compiler/index.js` as the package entrypoint.
-- Rewired scripts and tooling to prefer `packages/compiler/*` over root shims.
+- Rewired scripts and tooling to use `packages/compiler/*` directly.
 - Split reusable WAT backend helpers into:
   - `packages/compiler/backends/wat/parse.js`
   - `packages/compiler/backends/wat/protocol.js`
@@ -84,7 +66,7 @@ Root-level files that used to own behavior now act as wrappers:
   - `spans.js`
   - `syntax.js`
   - `tree-sitter.js`
-- Kept `packages/document/index.js` as the stable compatibility surface over the new document modules.
+- Kept `packages/document/index.js` as the package-local public surface over the document modules.
 - Extracted shared workspace/session logic into `packages/workspace`.
 - Split workspace internals into:
   - `packages/workspace/document-store.js`
@@ -138,7 +120,7 @@ Root-level files that used to own behavior now act as wrappers:
   - `packages/hosts/lsp/server/index.js`
 - Moved VS Code extension implementation to `packages/hosts/vscode/`.
 - Rewired the VS Code host to a shared workspace/session adapter instead of a separate ad hoc parser/workspace-symbol stack.
-- Restored root `cli.mjs`, `lsp.mjs`, `lsp_server/index.js`, and `extension/*` as thin wrappers.
+- Removed the old root host entrypoints after callers were moved to `packages/hosts/*`.
 
 ### Build / Packaging
 
@@ -147,7 +129,7 @@ Root-level files that used to own behavior now act as wrappers:
   - `packages/hosts/cli/main.mjs`
   - `packages/hosts/lsp/main.mjs`
   - `packages/hosts/vscode/extension.web.js`
-- Kept root wrappers only for compatibility and direct local invocation.
+- Removed root wrappers so package boundaries are now the only source entrypoints.
 
 ### Grammar / Spec / Frontend Surface
 
@@ -194,9 +176,9 @@ These checks passed after the current package/host relocation:
 - `bun ./scripts/test-stress-runtime.mjs`
 - `./node_modules/.bin/tree-sitter generate`
 - `bun run build`
-- `bun ./cli.mjs compile ./examples/hello.utu --outdir /tmp/utu-runtime-split-check --wat`
-- `bun ./cli.mjs compile ./examples/hello.utu --outdir /tmp/utu-postbuild-check --wat`
-- `bun ./cli.mjs compile ./examples/hello.utu --outdir /tmp/utu-100-check --wat`
+- `bun ./packages/hosts/cli/main.mjs compile ./examples/hello.utu --outdir /tmp/utu-runtime-split-check --wat`
+- `bun ./packages/hosts/cli/main.mjs compile ./examples/hello.utu --outdir /tmp/utu-postbuild-check --wat`
+- `bun ./packages/hosts/cli/main.mjs compile ./examples/hello.utu --outdir /tmp/utu-100-check --wat`
 - `node ./scripts/test-vscode-web-extension-activation-log-repro.mjs`
 - `bun ./scripts/test-modules.mjs`
 - `bun ./scripts/test-examples.mjs`
@@ -214,8 +196,8 @@ The package-oriented reshape, host unification, shared workspace/session layer, 
 - hosts compose the shared parser/language-service stack and inject it into the workspace/session layer
 - LSP and VS Code share workspace/session orchestration
 - syntax/header/body snapshots exist as explicit cache tiers, with syntax/header snapshots available without paying for body analysis
-- the previous oversized `wat`, `expand`, and `documentIndex` entry files now act as focused wrappers over phase-oriented helper modules
+- the previous oversized `wat`, `expand`, and `documentIndex` entry files have been replaced by phase-oriented helper modules and package entrypoints
 - build/test paths prefer the new structure
-- legacy root paths remain compatibility shims
+- no legacy root compatibility layer remains
 
 The remaining work is normal language/compiler evolution inside the new structure, not unfinished refactor migration.

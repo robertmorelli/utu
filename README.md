@@ -19,7 +19,7 @@ This repo builds the full UTU toolchain from the repo root: the VS Code extensio
 - commands to compile or run the active file and inspect generated JavaScript, WAT, and the parser tree
 - test and benchmark discovery through the VS Code Testing view and per-declaration code lenses
 - the reusable language core now lives in `.`, with `./extension` acting as the thin adapter layer
-- the standalone `utu-lsp` server now builds from `./lsp.mjs`
+- the standalone `utu-lsp` server now builds from `./packages/hosts/lsp/main.mjs`
 - compiler bundles that build directly from `.`, so the extension uses the same compile path as the CLI and other tooling
 - a web extension bundle for `vscode.dev` at `dist/web/extension.js`
 
@@ -80,7 +80,7 @@ The build emits the web extension plus the current compiler bundles and Bun exec
 - `./utu`: bundled Bun CLI executable
 - `./utu-lsp`: bundled Bun LSP executable
 
-The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared `.` core, and the standalone stdio UTU LSP server builds from `./lsp.mjs`. UTU targets modern ES runtimes, so the browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
+The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared package core, and the standalone stdio UTU LSP server builds from `./packages/hosts/lsp/main.mjs`. UTU targets modern ES runtimes, so the browser host can compile files, run `export fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
 
 Design note: do not add VS Code-specific behavior to the compiler or generated shim just to make the extension UI work. The compiler should stay shared and host-agnostic. If the editor needs better run output, prefer surfacing `main()` return values and wiring explicit host/runtime imports rather than teaching codegen about VS Code.
 

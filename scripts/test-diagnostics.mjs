@@ -37,7 +37,7 @@ async function testLanguageServiceDiagnostics() {
 }
 
 async function testLspDiagnostics() {
-  const lspPath = resolve(repoRoot, 'lsp.mjs');
+  const lspPath = resolve(repoRoot, 'packages/hosts/lsp/main.mjs');
   const proc = spawn('bun', [lspPath], {
     cwd: repoRoot,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -77,7 +77,7 @@ async function testExtensionDiagnostics() {
   const languageService = new UtuLanguageService(parserService);
   let controller;
   try {
-    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'extension/diagnostics.js')).href);
+    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'packages/hosts/vscode/diagnostics.js')).href);
     const document = Object.assign(createDocument(fixture.source), { languageId: 'utu' });
     testState.textDocuments.push(document);
     controller = new DiagnosticsController(languageService, { appendLine() {}, show() {} }, undefined);
@@ -104,7 +104,7 @@ async function testExtensionValidationLogSuppression() {
   const languageService = new UtuLanguageService(parserService);
   let controller;
   try {
-    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'extension/diagnostics.js')).href);
+    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'packages/hosts/vscode/diagnostics.js')).href);
     const documents = [
       Object.assign(createSourceDocument('export fun main() i32 { 0; }', { uri: 'file:///validation-a.utu', version: 1 }), { languageId: 'utu' }),
       Object.assign(createSourceDocument('export fun main() i32 { 1; }', { uri: 'file:///validation-b.utu', version: 1 }), { languageId: 'utu' }),
@@ -152,7 +152,7 @@ async function testLanguageServiceCompileDiagnostic() {
 }
 
 async function testLspCompileDiagnostic() {
-  const lspPath = resolve(repoRoot, 'lsp.mjs');
+  const lspPath = resolve(repoRoot, 'packages/hosts/lsp/main.mjs');
   const proc = spawn('bun', [lspPath], {
     cwd: repoRoot,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -189,7 +189,7 @@ async function testExtensionCompileDiagnostic() {
   const languageService = new UtuLanguageService(parserService);
   let controller;
   try {
-    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'extension/diagnostics.js')).href);
+    const { DiagnosticsController } = await import(pathToFileURL(resolve(repoRoot, 'packages/hosts/vscode/diagnostics.js')).href);
     const document = Object.assign(createSourceDocument(compileFixture.source, { uri: compileFixture.uri, version: 1 }), { languageId: 'utu' });
     testState.textDocuments.push(document);
     controller = new DiagnosticsController(languageService, { appendLine() {}, show() {} }, undefined);

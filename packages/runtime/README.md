@@ -30,4 +30,4 @@ Import rule:
 - browser-safe code should import from `browser.js` or `index.js`
 - Node-only code that needs `loadNodeModuleFromSource()` should import from `node.js`
 - CLI, tests, and hosts should prefer this package over root-level runtime helper paths
-- root-level runtime files remain compatibility shims during migration
+- runtime entrypoints now live only in this package

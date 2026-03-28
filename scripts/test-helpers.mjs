@@ -74,7 +74,7 @@ export async function runNamedCases(cases) {
 }
 
 export async function runCli(args, stdin) {
-  const proc = Bun.spawn(['bun', './cli.mjs', ...args], { stdin: stdin === undefined ? 'ignore' : 'pipe', stdout: 'pipe', stderr: 'pipe' });
+  const proc = Bun.spawn(['bun', './packages/hosts/cli/main.mjs', ...args], { stdin: stdin === undefined ? 'ignore' : 'pipe', stdout: 'pipe', stderr: 'pipe' });
   if (stdin !== undefined) {
     proc.stdin.write(stdin);
     proc.stdin.end();

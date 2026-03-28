@@ -15,5 +15,5 @@ Layout:
 
 Compatibility:
 
-- root `cli.mjs`, `lsp.mjs`, `lsp_server/index.js`, and `extension/*` stay in place as thin wrappers
+- host entrypoints live only under `packages/hosts/*`
 - build tooling now points at `packages/hosts/*` directly

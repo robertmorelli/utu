@@ -18,7 +18,7 @@ Public entrypoint:
 Current state:
 
 - this package now owns the shared language-service surface directly under `core/` and `providers/`
-- compatibility shims may still exist at older root paths, but new work should land in this package
+- this package is the only supported home for language-platform code
 
 Key locations:
 
