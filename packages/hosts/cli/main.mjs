@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import data from "../../../jsondata/cli.data.json" with { type: "json" };
 import { compileDocument, getDocumentMetadata } from "../../compiler/api/index.js";
 import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from "../../runtime/index.js";
@@ -22,14 +23,15 @@ async function main(argv = process.argv.slice(2)) {
 async function compileCmd(args) {
   const { input, outdir, wat, bun, optimize } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun", () => true], "--node": ["bun", () => false], "--no-opt": ["optimize", () => false], "--outdir": ["outdir", value => value] });
   const file = path.resolve(input);
+  const fileUri = pathToFileURL(file).href;
   const source = await readFile(file, "utf8");
-  const metadata = await getMetadata(source);
+  const metadata = await getMetadata(source, { uri: fileUri, loadImport: loadFileImport });
   if (bun && metadata.sourceKind !== 'program')
     fail('UTU `--bun` output requires a top-level `fun main()` program file.');
   const outputDir = outdir ? path.resolve(outdir) : bun ? path.dirname(file) : path.resolve(data.compileNodeDefaults.outdir);
   const base = path.join(outputDir, path.basename(file, path.extname(file)));
   const targetName = path.basename(file, path.extname(file));
-  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null, optimize });
+  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null, optimize, uri: fileUri, loadImport: loadFileImport });
   await mkdir(path.dirname(base), { recursive: true });
   const outputs = [!bun && [`${base}.mjs`, shim, "utf8"], !bun && [`${base}.wasm`, wasm], watText && [`${base}.wat`, watText, "utf8"]].filter(Boolean);
   if (bun) await Promise.all([rm(`${base}.mjs`, { force: true }), rm(`${base}.wasm`, { force: true }), wat ? undefined : rm(`${base}.wat`, { force: true })]);
@@ -40,9 +42,10 @@ async function compileCmd(args) {
 
 async function runCmd(args) {
   const { input } = parseArgs(args, "run", "run needs an input file");
-  const source = await readFile(path.resolve(input), "utf8");
-  if ((await getMetadata(source)).sourceKind !== 'program') fail('UTU run requires a top-level `fun main()` and no `library { ... }` block.');
-  return withRuntime(loadRuntime(source), async ({ exports }) => {
+  const file = path.resolve(input);
+  const source = await readFile(file, "utf8");
+  if ((await getMetadata(source, { uri: pathToFileURL(file).href, loadImport: loadFileImport })).sourceKind !== 'program') fail('UTU run requires a top-level `fun main()` and no `library { ... }` block.');
+  return withRuntime(loadRuntime(source, { uri: pathToFileURL(file).href }), async ({ exports }) => {
     const result = await exports.main();
     if (result !== undefined) console.log(result);
   });
@@ -50,11 +53,12 @@ async function runCmd(args) {
 
 async function testCmd(args) {
   const { input } = parseArgs(args, "test", "test needs an input file");
-  const source = await readFile(path.resolve(input), "utf8");
-  const { tests } = await getMetadata(source);
+  const file = path.resolve(input);
+  const source = await readFile(file, "utf8");
+  const { tests } = await getMetadata(source, { uri: pathToFileURL(file).href, loadImport: loadFileImport });
   if (!tests.length) fail("No tests found");
   let failed = false;
-  await withRuntime(loadRuntime(source, { mode: "test" }), async runtime => {
+  await withRuntime(loadRuntime(source, { mode: "test", uri: pathToFileURL(file).href }), async runtime => {
     for (const [ordinal, name] of tests.entries()) {
       const result = await executeRuntimeTest(runtime, ordinal, { formatError: text });
       console.log(`${result.passed ? "PASS" : "FAIL"} ${result.name}`);
@@ -66,10 +70,11 @@ async function testCmd(args) {
 
 async function benchCmd(args) {
   const { input, seconds, samples, warmup } = parseArgs(args, "bench", "bench needs an input file", data.benchDefaults, { "--seconds": ["seconds", value => parseNumber(value, "--seconds", Number.parseFloat, n => n > 0)], "--samples": ["samples", value => parseNumber(value, "--samples", Number.parseInt, n => n >= 1)], "--warmup": ["warmup", value => parseNumber(value, "--warmup", Number.parseInt, n => n >= 0)] });
-  const source = await readFile(path.resolve(input), "utf8");
-  const { benches } = await getMetadata(source);
+  const file = path.resolve(input);
+  const source = await readFile(file, "utf8");
+  const { benches } = await getMetadata(source, { uri: pathToFileURL(file).href, loadImport: loadFileImport });
   if (!benches.length) fail("No benchmarks found");
-  await withRuntime(loadRuntime(source, { mode: "bench" }), async runtime => {
+  await withRuntime(loadRuntime(source, { mode: "bench", uri: pathToFileURL(file).href }), async runtime => {
     for (const [ordinal] of benches.entries()) {
       console.log((await executeRuntimeBenchmark(runtime, ordinal, { seconds, samples, warmup })).summary);
     }
@@ -133,16 +138,27 @@ function exec(command, args) {
   });
 }
 
-function loadRuntime(source, { mode = "program", targetName = null } = {}) {
-  return loadCompiledRuntime({ source, mode, compileSource, loadModule: shim => loadNodeModuleFromSource(shim), compileOptions: { targetName, where: "external" } });
+function loadRuntime(source, { mode = "program", targetName = null, uri = null } = {}) {
+  return loadCompiledRuntime({ source, mode, compileSource, loadModule: shim => loadNodeModuleFromSource(shim), compileOptions: { targetName, where: "external", uri, loadImport: loadFileImport } });
 }
 
-async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null, optimize = true } = {}) {
+async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null, optimize = true, uri = null, loadImport = null } = {}) {
   return normalizeCompileArtifact(await compileDocument({
-    uri: "memory://utu-cli",
+    uri: uri ?? "memory://utu-cli",
     sourceText: source,
-    compileOptions: { wat, mode, where, moduleFormat, targetName, optimize },
+    compileOptions: { wat, mode, where, moduleFormat, targetName, optimize, loadImport },
   }));
 }
 
-async function getMetadata(source) { return getDocumentMetadata({ sourceText: source }); }
+async function getMetadata(source, { uri = null, loadImport = null } = {}) {
+  return getDocumentMetadata({ sourceText: source, uri, loadImport });
+}
+
+async function loadFileImport(fromUri, specifier) {
+  const target = new URL(specifier, fromUri ?? pathToFileURL(process.cwd()).href);
+  if (target.protocol !== 'file:') fail(`UTU file imports currently require file:// URLs, received ${JSON.stringify(target.href)}`);
+  return {
+    uri: target.href,
+    source: await readFile(target, "utf8"),
+  };
+}

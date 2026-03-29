@@ -54,6 +54,16 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     _return_component: ($) => seq($._type, optional(seq('#', $._type))),
     void_type: (_) => 'void',
     global_decl: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
+    file_import_decl: ($) =>
+      seq(
+        'import',
+        $.imported_module_name,
+        optional($.captured_module_name),
+        'from',
+        $.string_lit,
+      ),
+    imported_module_name: ($) => $.module_name,
+    captured_module_name: ($) => seq('|', $.module_name, '|'),
     import_decl: ($) =>
       seq(
         'escape',

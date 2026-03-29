@@ -253,6 +253,20 @@
       "tags": ["modules"]
     },
     {
+      "name": "multi-file-main",
+      "path": "examples/multi_file/main.utu",
+      "mode": "run",
+      "expectedReturn": 43,
+      "tags": ["modules", "multi_file"]
+    },
+    {
+      "name": "multi-file-tests",
+      "path": "examples/multi_file/tests.utu",
+      "mode": "test",
+      "expectedTests": 2,
+      "tags": ["modules", "multi_file"]
+    },
+    {
       "name": "modules-multiple-instantiations",
       "path": "examples/modules/multiple_instantiations.utu",
       "mode": "test",

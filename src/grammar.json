@@ -38,6 +38,19 @@
           "members": [
             {
               "type": "SYMBOL",
+              "name": "file_import_decl"
+            },
+            {
+              "type": "STRING",
+              "value": ";"
+            }
+          ]
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
               "name": "construct_decl"
             },
             {
@@ -139,6 +152,19 @@
         {
           "type": "SYMBOL",
           "name": "module_decl"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "file_import_decl"
+            },
+            {
+              "type": "STRING",
+              "value": ";"
+            }
+          ]
         },
         {
           "type": "SEQ",
@@ -1275,6 +1301,60 @@
         {
           "type": "SYMBOL",
           "name": "_expr"
+        }
+      ]
+    },
+    "file_import_decl": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "import"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "imported_module_name"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "captured_module_name"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "from"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "string_lit"
+        }
+      ]
+    },
+    "imported_module_name": {
+      "type": "SYMBOL",
+      "name": "module_name"
+    },
+    "captured_module_name": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "|"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "module_name"
+        },
+        {
+          "type": "STRING",
+          "value": "|"
         }
       ]
     },

@@ -1,13 +1,16 @@
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { compile, validateWat } from '../packages/compiler/index.js';
 import binaryen from 'binaryen';
 import { loadNodeModuleFromSource } from '../packages/runtime/loadNodeModuleFromSource.mjs';
-import { assertManagedTestModule, firstLine, runNamedCases } from './test-helpers.mjs';
+import { assertManagedTestModule, firstLine, getRepoRoot, loadNodeFileImport, runNamedCases } from './test-helpers.mjs';
 
 import { binaryenCompileFailureCases, binaryenValidationCases } from './test-module-cases/binaryen-cases.mjs';
 import { failureCases } from './test-module-cases/failure-cases.mjs';
 import { successCases } from './test-module-cases/success-cases.mjs';
 
+const repoRoot = getRepoRoot(import.meta.url);
 const cases = [
     ...successCases.map((testCase) => [testCase.name, async () => {
         const actual = await compileAndRun(testCase.source);
@@ -176,6 +179,29 @@ fun main() i32 {
         if (raw.functionCount <= optimized.functionCount)
             throw new Error(`Expected --no-opt compilation to keep more functions than the optimized build, got raw=${raw.functionCount} optimized=${optimized.functionCount}`);
     }],
+    ['cross-file-imports-inline-and-run-through-transitive-module-dependencies', async () => {
+        const entryPath = resolve(repoRoot, 'examples/multi_file/main.utu');
+        const source = await readFile(entryPath, 'utf8');
+        const actual = await compileAndRun(source, { uri: pathToFileURL(entryPath).href, loadImport: loadNodeFileImport });
+        if (actual !== 43)
+            throw new Error(`Expected return 43, got ${actual}`);
+    }],
+    ['cross-file-imports-rename-module-promotion-before-tests-run', async () => {
+        const entryPath = resolve(repoRoot, 'examples/multi_file/tests.utu');
+        const source = await readFile(entryPath, 'utf8');
+        const { shim, metadata } = await compile(source, { mode: 'test', uri: pathToFileURL(entryPath).href, loadImport: loadNodeFileImport });
+        const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-modules-' });
+        try {
+            const exports = await compiledModule.module.instantiate();
+            for (const test of metadata.tests) {
+                if (typeof exports[test.exportName] !== 'function')
+                    throw new Error(`Missing export ${test.exportName}`);
+                await exports[test.exportName]();
+            }
+        } finally {
+            await compiledModule.cleanup?.();
+        }
+    }],
     ...binaryenValidationCases.map((testCase) => [testCase.name, async () => {
         const result = await validateWat(testCase.wat);
         if (!result) throw new Error('Expected WAT validation to fail');
@@ -216,8 +242,8 @@ fun main() i32 {
 if (await runNamedCases(cases))
     process.exit(1);
 
-async function compileAndRun(source) {
-    const { shim } = await compile(source, { mode: 'program' });
+async function compileAndRun(source, compileOptions = {}) {
+    const { shim } = await compile(source, { mode: 'program', ...compileOptions });
     const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-modules-' });
     try {
         const exports = await compiledModule.module.instantiate();

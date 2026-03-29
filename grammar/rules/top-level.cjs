@@ -5,6 +5,7 @@ exports.buildTopLevelRules = function buildTopLevelRules() {
     _item: ($) =>
       choice(
         $.module_decl,
+        seq($.file_import_decl, ';'),
         seq($.construct_decl, ';'),
         $.struct_decl,
         seq($.proto_decl, ';'),
@@ -20,6 +21,7 @@ exports.buildTopLevelRules = function buildTopLevelRules() {
     _library_item: ($) =>
       choice(
         $.module_decl,
+        seq($.file_import_decl, ';'),
         seq($.construct_decl, ';'),
         $.struct_decl,
         seq($.proto_decl, ';'),

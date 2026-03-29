@@ -52,6 +52,11 @@
     "args": ["core"]
   },
   {
+    "id": "editor:cross-file-definitions",
+    "label": "Editor cross-file definitions",
+    "module": "./scripts/test-cross-file-definitions.mjs"
+  },
+  {
     "id": "editor:diagnostics",
     "label": "Editor diagnostics",
     "module": "./scripts/test-diagnostics.mjs"

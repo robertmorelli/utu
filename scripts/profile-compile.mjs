@@ -54,11 +54,11 @@ const binaryenLoadStart = performance.now();
 const binaryen = (await import('binaryen')).default;
 const binaryenLoadMs = performance.now() - binaryenLoadStart;
 
-for (let index = 0; index < config.warmup; index += 1) runOne(parser, binaryen, source, config.mode);
+for (let index = 0; index < config.warmup; index += 1) await runOne(parser, binaryen, source, config.mode);
 
 const runs = [];
 for (let index = 0; index < config.iterations; index += 1) {
-  runs.push(runOne(parser, binaryen, source, config.mode));
+  runs.push(await runOne(parser, binaryen, source, config.mode));
 }
 
 const phaseTotals = Object.fromEntries(PHASES.map((phase) => [phase, 0]));
@@ -89,7 +89,7 @@ for (const phase of PHASES) {
   console.log(`${PHASE_LABELS[phase].padEnd(20)} ${formatMs(phaseMs).padStart(10)}  ${share.toFixed(1).padStart(5)}%`);
 }
 
-function runOne(parser, binaryen, source, mode) {
+async function runOne(parser, binaryen, source, mode) {
   const phases = Object.fromEntries(PHASES.map((phase) => [phase, 0]));
 
   const parseOriginalStart = performance.now();
@@ -102,7 +102,7 @@ function runOne(parser, binaryen, source, mode) {
     throwOnParseErrors(tree.rootNode);
 
     const expandStart = performance.now();
-    const expandedSource = expandSource(tree, source);
+    const expandedSource = await expandSource(tree, source);
     phases.expand = performance.now() - expandStart;
 
     let activeTree = tree;

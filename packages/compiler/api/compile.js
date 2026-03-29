@@ -21,6 +21,7 @@ import { compile as compileCore } from '../core/index.js';
 export async function compileDocument(options) {
     const {
         analyzeResult = null,
+        uri = analyzeResult?.uri,
         sourceText = analyzeResult?.sourceText,
         compileOptions = {},
     } = options;
@@ -37,7 +38,7 @@ export async function compileDocument(options) {
     if (typeof sourceText !== 'string') {
         throw new TypeError('compileDocument requires sourceText or an analyzeResult with sourceText.');
     }
-    const artifact = await compileCore(sourceText, compileOptions);
+    const artifact = await compileCore(sourceText, { uri, ...compileOptions });
     return {
         ...artifact,
         wat: artifact.wat ?? null,

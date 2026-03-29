@@ -3,7 +3,7 @@ import { dirname, extname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile } from '../packages/compiler/index.js';
 import { loadNodeModuleFromSource } from '../packages/runtime/loadNodeModuleFromSource.mjs';
-import { collectCompileJobs, collectUtuFiles, firstLine, getManagedTestArgs, getRepoRoot, runCli, runNamedCases } from './test-helpers.mjs';
+import { collectCompileJobs, collectUtuFiles, firstLine, getManagedTestArgs, getRepoRoot, loadNodeFileImport, runCli, runNamedCases } from './test-helpers.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
 const CLI_CASES = [
@@ -16,6 +16,7 @@ const CLI_CASES = [
     ['compile-nullability-mismatch', ['compile', 'scripts/fixtures/compile_nullability_mismatch.utu'], 1, 'function body type must match'], ['compile-illegal-global-init', ['compile', 'scripts/fixtures/compile_illegal_global_init.utu'], 1, 'global init must be constant'],
     ['compile-bad-pipe-placeholders', ['compile', 'scripts/fixtures/compile_bad_pipe_placeholders.utu'], 1, 'local $_ does not exist'], ['run-break-and-call', ['run', 'examples/ci/codegen_break_and_call.utu'], 0, '42'],
     ['run-call-simple', ['run', 'examples/call_simple.utu'], 0, '177280'], ['run-fannkuch', ['run', 'examples/fannkuch.utu'], 0, '10'],
+    ['run-multi-file-main', ['run', 'examples/multi_file/main.utu'], 0, '43'], ['tests-multi-file', ['test', 'examples/multi_file/tests.utu'], 0, 'PASS captured file imports rename promoted types'],
     ['run-float', ['run', 'examples/float.utu'], 0, '0.8048597948298679'], ['run-hello-name', ['run', 'examples/hello_name.utu'], 0, 'hello \nhi'],
     ['run-spectralnorm', ['run', 'examples/spectralnorm.utu'], 0, '1.2742222097429006'], ['run-deltablue', ['run', 'examples/deltablue.utu'], 0, '0'],
     ['bench-basic', ['bench', 'examples/bench/bench_basic.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'sum loop:'], ['bench-codegen-surface', ['bench', 'examples/ci/codegen_test_surface.utu', '--seconds', '0.01', '--samples', '1', '--warmup', '0'], 0, 'increment loop:'],
@@ -26,9 +27,14 @@ const options = parseArgs(getManagedTestArgs(import.meta.url));
 await (options.cli ? runCliCases(options.cliBenchExamples) : options.compileAll ? runCompileAll(options) : runManifestCases(options));
 
 async function runCase(testCase) {
-    const source = await readFile(resolve(repoRoot, testCase.path), 'utf8');
+    const filePath = resolve(repoRoot, testCase.path);
+    const source = await readFile(filePath, 'utf8');
     const mode = testCase.mode ?? 'run';
-    const { shim, metadata } = await compile(source, { mode: mode === 'test' ? 'test' : 'program' });
+    const { shim, metadata } = await compile(source, {
+        mode: mode === 'test' ? 'test' : 'program',
+        uri: pathToFileURL(filePath).href,
+        loadImport: loadNodeFileImport,
+    });
     const result = { name: testCase.name, path: testCase.path, mode, allowFailure: Boolean(testCase.allowFailure), logs: [], status: 'passed' };
     if (mode === 'compile') return result;
     const compiledModule = await loadNodeModuleFromSource(shim, { prefix: 'utu-example-' });
@@ -140,7 +146,11 @@ async function runCompileAll(options) {
 
         for (const { mode } of collectCompileJobs(source)) {
             try {
-                const { metadata } = await compile(source, { mode });
+                const { metadata } = await compile(source, {
+                    mode,
+                    uri: pathToFileURL(file).href,
+                    loadImport: loadNodeFileImport,
+                });
                 const details = mode === 'test' ? ` ${metadata.tests.length} tests` : mode === 'bench' ? ` ${metadata.benches.length} benches` : '';
                 console.log(`PASS ${rel} [${mode}]${details}`);
             } catch (error) {

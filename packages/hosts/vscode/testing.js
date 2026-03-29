@@ -5,7 +5,7 @@ import { displayNameForUri } from './generatedDocuments.js';
 import { collectRunnableEntries } from '../../language-platform/index.js';
 import { createDebouncedUriScheduler, logOutputError, UTU_EXCLUDE, UTU_GLOB, UTU_LANGUAGE_ID } from './shared.js';
 const TEST_TAG = new vscode.TestTag('utu-test'), BENCH_TAG = new vscode.TestTag('utu-bench');
-const RUNNERS = { test: { label: 'UTU Tests', tag: TEST_TAG, run: (dependencies, source, ordinal) => dependencies.runtimeHost.runTest(source, ordinal) }, bench: { label: 'UTU Benchmarks', tag: BENCH_TAG, run: (dependencies, source, ordinal) => dependencies.runtimeHost.runBenchmark(source, ordinal, getBenchmarkOptionsFromConfig()) } };
+const RUNNERS = { test: { label: 'UTU Tests', tag: TEST_TAG, run: (dependencies, source, ordinal, options) => dependencies.runtimeHost.runTest(source, ordinal, options) }, bench: { label: 'UTU Benchmarks', tag: BENCH_TAG, run: (dependencies, source, ordinal, options) => dependencies.runtimeHost.runBenchmark(source, ordinal, { ...getBenchmarkOptionsFromConfig(), ...options }) } };
 export function registerTesting(context, dependencies) {
     const controller = vscode.tests.createTestController('utu', 'UTU');
     const itemData = new WeakMap();
@@ -55,7 +55,7 @@ export function registerTesting(context, dependencies) {
                         const data = itemData.get(item);
                         if (!data || data.kind !== kind) continue;
                         run.started(item);
-                        const result = await RUNNERS[kind].run(dependencies, source, data.ordinal);
+                        const result = await RUNNERS[kind].run(dependencies, source, data.ordinal, { uri: uri.toString() });
                         if (result.logs.length || result.summary) run.appendOutput(`${[...result.logs, ...(result.summary ? [result.summary] : [])].join('\r\n')}\r\n`);
                         if (kind === 'test' && !result.passed) run.failed(item, new vscode.TestMessage(result.error ?? 'Test failed.'), result.durationMs);
                         else run.passed(item, result.durationMs);

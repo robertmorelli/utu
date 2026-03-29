@@ -31,17 +31,17 @@ export function needsExpansion(treeOrNode) {
     return containsModuleFeature(rootNode(treeOrNode));
 }
 
-export function expandSource(treeOrNode, source, options = {}) {
-    return expandSourceWithDiagnostics(treeOrNode, source, options).source;
+export async function expandSource(treeOrNode, source, options = {}) {
+    return (await expandSourceWithDiagnostics(treeOrNode, source, options)).source;
 }
 
-export function expandSourceWithDiagnostics(treeOrNode, source, options = {}) {
+export async function expandSourceWithDiagnostics(treeOrNode, source, options = {}) {
     const { mode, recover } = normalizeExpandOptions(options);
     const root = rootNode(treeOrNode);
     const shouldExpand = containsModuleFeature(root);
     if (!shouldExpand) return createExpandResult({ mode, source, changed: false });
     try {
-        const expandedSource = new ModuleExpander(root, source).expand();
+        const expandedSource = await new ModuleExpander(root, source, options).expand();
         return createExpandResult({
             mode,
             source: expandedSource,

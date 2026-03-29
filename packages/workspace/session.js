@@ -1,5 +1,8 @@
 import { UtuParserService } from '../document/index.js';
+import { symbolToMarkup } from '../language-platform/core/document-index/build.js';
 import { UtuAnalysisCache } from './analysis-cache.js';
+import { resolveCrossFileDefinition, resolveCrossFileSymbol } from './cross-file-definition.js';
+import { getWorkspaceDocumentHighlights, getWorkspaceReferences } from './cross-file-references.js';
 import { UtuDependencyGraph } from './dependency-graph.js';
 import { UtuDocumentStore, UtuWorkspaceTextDocument } from './document-store.js';
 import { UtuWorkspaceSymbolIndex } from './workspace-symbol-index.js';
@@ -19,10 +22,6 @@ export const WORKSPACE_SESSION_PHASES = Object.freeze({
 });
 
 const DEFAULT_DOCUMENT_REQUESTS = [
-    ['getHover', 'getHover', undefined],
-    ['getDefinition', 'getDefinition', undefined],
-    ['getReferences', 'getReferences', []],
-    ['getDocumentHighlights', 'getDocumentHighlights', []],
     ['getCompletionItems', 'getCompletionItems', []],
     ['getDocumentSemanticTokens', 'getDocumentSemanticTokens', []],
     ['getDocumentSymbols', 'getDocumentSymbols', []],
@@ -140,6 +139,26 @@ export class UtuWorkspaceSession {
         const analysis = await this.getDocumentAnalysis(uri, { mode });
         return analysis?.diagnostics?.map(cloneDiagnostic) ?? [];
     }
+    async getDefinition(uri, position) {
+        return this.withDocument(uri, undefined, async (document) => {
+            const local = await this.languageService.getDefinition(document, position);
+            return local ?? resolveCrossFileDefinition(this, document, position);
+        });
+    }
+    async getHover(uri, position) {
+        return this.withDocument(uri, undefined, async (document) => {
+            const local = await this.languageService.getHover(document, position);
+            if (local)
+                return local;
+            return formatCrossFileHover(await resolveCrossFileSymbol(this, document, position));
+        });
+    }
+    async getReferences(uri, position, includeDeclaration = false) {
+        return this.withDocument(uri, [], (document) => getWorkspaceReferences(this, document, position, includeDeclaration));
+    }
+    async getDocumentHighlights(uri, position) {
+        return this.withDocument(uri, [], (document) => getWorkspaceDocumentHighlights(this, document, position));
+    }
     async getWorkspaceSymbols(query) {
         await this.ensureWorkspaceSymbols();
         return this.workspaceSymbols.getWorkspaceSymbols(query);
@@ -218,4 +237,32 @@ function normalizeWorkspaceSessionMode(mode) {
         default:
             throw new Error(`Unknown workspace session mode "${mode}"`);
     }
+}
+
+function formatCrossFileHover(result) {
+    if (!result)
+        return undefined;
+    if (result.symbol) {
+        return {
+            contents: symbolToMarkup(result.symbol),
+            range: cloneRange(result.sourceRange),
+        };
+    }
+    if (result.kind === 'module') {
+        return {
+            contents: {
+                kind: 'markdown',
+                value: `\`\`\`utu\nmod ${result.moduleName}\n\`\`\`\n\nImported from \`${result.binding?.specifier ?? 'unknown'}\``,
+            },
+            range: cloneRange(result.sourceRange),
+        };
+    }
+    return undefined;
+}
+
+function cloneRange(range) {
+    return range ? {
+        start: { line: range.start.line, character: range.start.character },
+        end: { line: range.end.line, character: range.end.character },
+    } : undefined;
 }

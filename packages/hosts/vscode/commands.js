@@ -16,25 +16,25 @@ export function registerCommands(context, d) {
     register('utu.compileCurrentFile', async (document) => {
         document = await withUtuDocument(document);
         return document && vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Compiling ${displayNameForDocument(document)}` }, async () => {
-        const result = await d.compilerHost.compile(document.getText(), {}), label = displayNameForDocument(document);
+        const result = await d.compilerHost.compile(document.getText(), { uri: document.uri.toString() }), label = displayNameForDocument(document);
         d.output.appendLine(`[utu] Compiled ${document.uri.fsPath || document.uri.toString()} (${result.shim.length} JS chars, ${result.wasm.byteLength} wasm bytes)`);
         vscode.window.setStatusBarMessage(`UTU compiled ${label}`, 3000);
         });
     });
-    showGenerated('utu.showGeneratedJavaScript', 'js', (document) => d.compilerHost.compile(document.getText(), {}));
-    showGenerated('utu.showGeneratedWat', 'wat', async (document) => (await d.compilerHost.compile(document.getText(), { wat: true })).wat ?? '; compiler did not return WAT output');
+    showGenerated('utu.showGeneratedJavaScript', 'js', (document) => d.compilerHost.compile(document.getText(), { uri: document.uri.toString() }));
+    showGenerated('utu.showGeneratedWat', 'wat', async (document) => (await d.compilerHost.compile(document.getText(), { wat: true, uri: document.uri.toString() })).wat ?? '; compiler did not return WAT output');
     showGenerated('utu.showSyntaxTree', 'tree', (document) => d.parserService.getTreeString(document.getText()));
     register('utu.runMain', async (target, document) => {
         document = await withUtuDocument(document ?? target);
         if (!document) return;
         if (!indexHasRunnableMain(await d.languageService.getDocumentIndex(document))) return void await vscode.window.showWarningMessage('UTU Run Main requires a top-level `fun main()` and no `library { ... }` block in the active file.');
-        const execution = await d.runtimeHost.runMain(document.getText()), label = displayNameForDocument(document);
+        const execution = await d.runtimeHost.runMain(document.getText(), { uri: document.uri.toString() }), label = displayNameForDocument(document);
         show(d.output, `Ran ${label}`, execution.logs, execution.result); vscode.window.setStatusBarMessage(`UTU ran ${label}`, 3000);
     });
-    for (const [name, runner, title, status, pick] of [['utu.runTestAt', (source, ordinal) => d.runtimeHost.runTest(source, ordinal), (result) => `${result.passed ? 'Passed' : 'Failed'} test "${result.name}"`, (result) => result.passed ? `UTU passed ${result.name}` : `UTU failed ${result.name}`, (result) => result.error], ['utu.runBenchmarkAt', (source, ordinal) => d.runtimeHost.runBenchmark(source, ordinal, getBenchmarkOptionsFromConfig()), (result) => `Benchmarked "${result.name}"`, (result) => `UTU benchmarked ${result.name}`, (result) => result.summary]]) register(name, async (target, ordinal, document) => {
+    for (const [name, runner, title, status, pick] of [['utu.runTestAt', (source, ordinal, options) => d.runtimeHost.runTest(source, ordinal, options), (result) => `${result.passed ? 'Passed' : 'Failed'} test "${result.name}"`, (result) => result.passed ? `UTU passed ${result.name}` : `UTU failed ${result.name}`, (result) => result.error], ['utu.runBenchmarkAt', (source, ordinal, options) => d.runtimeHost.runBenchmark(source, ordinal, { ...getBenchmarkOptionsFromConfig(), ...options }), (result) => `Benchmarked "${result.name}"`, (result) => `UTU benchmarked ${result.name}`, (result) => result.summary]]) register(name, async (target, ordinal, document) => {
         document = await withUtuDocument(document ?? target);
         if (!document) return;
-        const result = await runner(document.getText(), Number(ordinal));
+        const result = await runner(document.getText(), Number(ordinal), { uri: document.uri.toString() });
         show(d.output, title(result), result.logs, pick(result)); vscode.window.setStatusBarMessage(status(result), 3000);
     });
 }

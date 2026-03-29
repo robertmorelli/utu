@@ -25,7 +25,15 @@ export function createVscodeWorkspaceAdapter({ grammarWasmPath, runtimeWasmPath,
         grammarWasmPath,
         runtimeWasmPath,
     });
-    const languageService = new UtuLanguageService(parserService);
+    const languageService = new UtuLanguageService(parserService, {
+        loadImport: async (fromUri, specifier) => {
+            const target = vscode.Uri.parse(new URL(specifier, fromUri ?? 'file:///').href, true);
+            return {
+                uri: target.toString(),
+                source: new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(target)),
+            };
+        },
+    });
     const session = new UtuWorkspaceSession({
         workspaceFolders: getWorkspaceFolderUris(),
         parserService,

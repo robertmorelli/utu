@@ -58,25 +58,7 @@ const CollectMixin = class {
     }
 
     collectModuleTemplate(node) {
-        const name = moduleNameNode(node).text;
-        const items = kids(node).filter((child) => !['identifier', 'type_ident', 'module_name', 'module_type_param_list'].includes(child.type));
-        const unsupported = items.find((item) => ['module_decl', 'construct_decl', 'library_decl', 'test_decl', 'bench_decl'].includes(item.type)) ?? null;
-        if (unsupported) {
-            const label = {
-                module_decl: 'nested modules',
-                construct_decl: 'construct declarations',
-                library_decl: 'library declarations',
-                test_decl: 'test declarations',
-                bench_decl: 'bench declarations',
-            }[unsupported.type];
-            throw new Error(`${label} are not supported inside modules in v1`);
-        }
-        this.moduleNames.add(name);
-        this.moduleTemplates.set(name, {
-            name,
-            typeParams: childrenOfType(childOfType(node, 'module_type_param_list'), 'type_ident').map((child) => child.text),
-            items,
-        });
+        this.registerModuleTemplate(this.buildModuleTemplate(node));
     }
 
     collectTopLevelStructFields(node, ctx) {
@@ -190,14 +172,14 @@ const CollectMixin = class {
     resolveNamespaceByNameAndArgs(name, argNodes, ctx) {
         if (argNodes.length === 0 && ctx.aliases.has(name)) return ctx.aliases.get(name);
 
-        const template = this.moduleTemplates.get(name);
+        const template = ctx.moduleBindings.get(name) ?? this.moduleTemplates.get(name);
         const argTexts = argNodes.map((typeNode) => this.emitType(typeNode, ctx));
         return this.ensureNamespace(template, argTexts, ctx);
     }
 
     resolveMaybeNamespaceName(name, ctx) {
         if (ctx.aliases.has(name)) return ctx.aliases.get(name);
-        const template = this.moduleTemplates.get(name);
+        const template = ctx.moduleBindings.get(name) ?? this.moduleTemplates.get(name);
         return template && template.typeParams.length === 0 ? this.ensureNamespace(template, [], ctx) : null;
     }
 
@@ -237,6 +219,7 @@ const CollectMixin = class {
         const moduleCtx = this.cloneContext(ctx, {
             namespace,
             typeParams: new Map([...ctx.typeParams, ...namespace.typeParams]),
+            moduleBindings: template.moduleBindings ?? ctx.moduleBindings,
             localValueScopes: [],
         });
         this.collectNamespaceNames(namespace, moduleCtx);
@@ -274,6 +257,7 @@ const CollectMixin = class {
                     this.collectSymbols(kids(item), ctx, handlers);
                     break;
                 case 'module_decl':
+                case 'file_import_decl':
                     break;
                 case 'construct_decl':
                     handlers.onConstruct?.(item);

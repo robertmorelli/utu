@@ -28,6 +28,7 @@ import {
   expectValue,
   firstLine,
   getRepoRoot,
+  loadNodeFileImport,
   runNamedCases,
 } from './test-helpers.mjs';
 const repoRoot = getRepoRoot(import.meta.url);
@@ -46,7 +47,7 @@ async function runCoreSuite() {
     grammarWasmPath,
     runtimeWasmPath,
   });
-  const languageService = new UtuLanguageService(parserService);
+  const languageService = new UtuLanguageService(parserService, { loadImport: loadNodeFileImport });
   const cases = [
     ['static completions', async () => {
       const items = await languageService.getCompletionItems(
@@ -362,14 +363,11 @@ async function runCoreSuite() {
 
       const alphaV1 = { uri: 'file:///alpha.utu', version: 1, symbolName: 'alpha' };
       const betaV1 = { uri: 'file:///beta.utu', version: 1, symbolName: 'beta' };
-
       await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
       expectEqual(getDocumentIndexCalls, 2);
       expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('').map((symbol) => symbol.name).sort(), ['alpha', 'beta']);
-
       await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
       expectEqual(getDocumentIndexCalls, 2);
-
       await workspaceSymbols.updateDocument({ ...alphaV1, version: 2, symbolName: 'alpha2' });
       expectEqual(getDocumentIndexCalls, 3);
       expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('alpha').map((symbol) => symbol.name), ['alpha2']);
@@ -454,14 +452,11 @@ async function runCoreSuite() {
 
       const alphaV1 = { uri: 'file:///alpha-header.utu', version: 1, symbolName: 'alpha' };
       const betaV1 = { uri: 'file:///beta-header.utu', version: 1, symbolName: 'beta' };
-
       await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
       expectEqual(headerSnapshotCalls, 2);
       expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('').map((symbol) => symbol.name).sort(), ['alpha', 'beta']);
-
       await workspaceSymbols.syncDocuments([alphaV1, betaV1], { replace: true });
       expectEqual(headerSnapshotCalls, 2);
-
       await workspaceSymbols.updateDocument({ ...alphaV1, version: 2, symbolName: 'alpha2' });
       expectEqual(headerSnapshotCalls, 3);
       expectDeepEqual(workspaceSymbols.getWorkspaceSymbols('alpha').map((symbol) => symbol.name), ['alpha2']);
@@ -510,7 +505,7 @@ async function runExamplesSuite() {
     grammarWasmPath: editorAssets.grammarWasmPath,
     runtimeWasmPath: editorAssets.runtimeWasmPath,
   });
-  const languageService = new UtuLanguageService(parserService);
+  const languageService = new UtuLanguageService(parserService, { loadImport: loadNodeFileImport });
   const [webCompiler, cliCompiler] = await Promise.all([
     loadWebCompiler(repoRoot),
     loadIsolatedCompiler('cli'),
@@ -535,8 +530,8 @@ async function runExamplesSuite() {
 
       for (const { mode } of jobs) {
         const [webResult, cliResult] = await Promise.all([
-          attemptCompile(webCompiler, source, mode, editorAssets),
-          attemptCompile(cliCompiler, source, mode, cliAssets),
+          attemptCompile(webCompiler, source, mode, file),
+          attemptCompile(cliCompiler, source, mode, file),
         ]);
         results.push({ mode, webResult, cliResult });
       }
@@ -739,9 +734,13 @@ async function expectHoverContains(languageService, document, source, marker, ch
     throw new Error(`Expected hover for ${JSON.stringify(marker)} to include ${JSON.stringify(fragment)}, received ${JSON.stringify(value)}`);
 }
 
-async function attemptCompile(compilerModule, source, mode, assets) {
+async function attemptCompile(compilerModule, source, mode, file) {
   try {
-    await compilerModule.compile(source, { mode });
+    await compilerModule.compile(source, {
+      mode,
+      uri: pathToFileURL(file).href,
+      loadImport: loadNodeFileImport,
+    });
     return { ok: true };
   } catch (error) {
     return {

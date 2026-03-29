@@ -59,7 +59,7 @@ export class DiagnosticsController {
         try {
             const diagnostics = await getDocumentDiagnostics(this.languageService, document, { trigger });
             if (shouldRunCompilerValidation(trigger) && !diagnostics.length && this.compilerHost && !this.compilerValidationUnavailableMessage)
-                try { await this.compilerHost.compile(document.getText()); }
+                try { await this.compilerHost.compile(document.getText(), { uri: document.uri.toString() }); }
                 catch (error) {
                     if (isSourceDiagnosticError(error)) {
                         const index = await this.languageService.getDocumentIndex(document);

@@ -1,6 +1,6 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createSourceDocument } from '../packages/document/index.js';
 
 const runtimeGlobals = Function('return this')();
@@ -41,10 +41,21 @@ export async function collectUtuFiles(dir) {
       files.push(...await collectUtuFiles(fullPath));
       continue;
     }
-    if (entry.isFile() && entry.name.endsWith('.utu'))
+    if (entry.isFile() && entry.name.endsWith('.utu') && !entry.name.startsWith('_'))
       files.push(fullPath);
   }
   return files;
+}
+
+export async function loadNodeFileImport(fromUri, specifier) {
+  const base = typeof fromUri === 'string' && fromUri.length > 0 ? new URL(fromUri) : pathToFileURL(resolve(process.cwd(), '.'));
+  const target = new URL(specifier, base);
+  if (target.protocol !== 'file:')
+    throw new Error(`UTU file imports currently require file:// URLs, received ${JSON.stringify(target.href)}`);
+  return {
+    uri: target.href,
+    source: await readFile(fileURLToPath(target), 'utf8'),
+  };
 }
 
 export function collectCompileJobs(source) {

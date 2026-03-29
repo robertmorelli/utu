@@ -1,0 +1,7 @@
+import boxes from "./_boxes.utu";
+
+construct boxes;
+
+fun main() i32 {
+    Box.score(Box.new(20));
+}

@@ -22,8 +22,8 @@ import { get_metadata as getCoreMetadata } from '../core/index.js';
  */
 export async function getDocumentMetadata(headerSnapshotOrOptions) {
     if (looksLikeSourceOptions(headerSnapshotOrOptions)) {
-        const { sourceText, wasmUrl, runtimeWasmUrl } = headerSnapshotOrOptions;
-        return normalizeSourceMetadata(await getCoreMetadata(sourceText, { wasmUrl, runtimeWasmUrl }));
+        const { sourceText, wasmUrl, runtimeWasmUrl, uri, loadImport } = headerSnapshotOrOptions;
+        return normalizeSourceMetadata(await getCoreMetadata(sourceText, { wasmUrl, runtimeWasmUrl, uri, loadImport }));
     }
     return normalizeHeaderMetadata(headerSnapshotOrOptions ?? {});
 }

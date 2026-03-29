@@ -139,6 +139,7 @@ function hydrateHeaderSnapshot(shallowHeader, index) {
         imports: symbols
             .filter((symbol) => symbol.kind === 'importFunction' || symbol.kind === 'importValue')
             .map(({ name, kind, signature, typeText }) => ({ name, kind, signature, typeText })),
+        fileImports: shallowHeader.fileImports,
         exports: symbols
             .filter((symbol) => symbol.exported)
             .map(({ name, kind, signature }) => ({ name, kind, signature })),
@@ -173,6 +174,7 @@ export function collectHeaderSnapshot(rootNode, document) {
         symbols: [],
         modules: [],
         constructs: [],
+        fileImports: [],
         references: [],
         tests: [],
         benches: [],
@@ -218,6 +220,12 @@ function collectHeaderItem(item, document, header, layout, inLibrary) {
         const construct = collectConstructDeclaration(item);
         if (construct)
             header.constructs.push(construct);
+        return;
+    }
+    if (item.type === 'file_import_decl') {
+        const fileImport = collectFileImportDeclaration(item);
+        if (fileImport)
+            header.fileImports.push(fileImport);
         return;
     }
     const symbol = collectTopLevelSymbol(item, document, {
@@ -328,6 +336,22 @@ function collectConstructDeclaration(item) {
     return {
         alias: aliasNode?.type === 'identifier' ? aliasNode.text : null,
         target,
+    };
+}
+
+function collectFileImportDeclaration(item) {
+    const sourceNode = childOfType(item, 'imported_module_name');
+    const captureNode = childOfType(item, 'captured_module_name');
+    const specifierNode = childOfType(item, 'string_lit');
+    const sourceModuleName = collectNamespaceReference(childOfType(sourceNode, 'module_name') ?? sourceNode);
+    const capturedModuleName = collectNamespaceReference(childOfType(captureNode, 'module_name') ?? captureNode);
+    if (!sourceModuleName || !specifierNode)
+        return null;
+    return {
+        sourceModuleName,
+        localName: capturedModuleName ?? sourceModuleName,
+        capturedModuleName: capturedModuleName ?? null,
+        specifier: specifierNode.text.slice(1, -1),
     };
 }
 

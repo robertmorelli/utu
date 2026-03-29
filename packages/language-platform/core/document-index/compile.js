@@ -15,7 +15,7 @@ export const COMPILE_DIAGNOSTIC_STAGES = Object.freeze({
 
 export async function collectCompileDiagnostics(documentState, languageService, document, { mode = COMPILE_DIAGNOSTIC_MODES.VALIDATION } = {}) {
     const normalizedMode = normalizeCompileDiagnosticMode(mode);
-    const diagnostics = documentState.index.diagnostics.map(cloneDiagnostic);
+    const diagnostics = getBaseDiagnostics(documentState).map(cloneDiagnostic);
     if (diagnostics.length > 0) return diagnostics;
     const compileDiagnostic = await tryGetCompileDiagnostic(documentState, languageService, document, normalizedMode);
     if (compileDiagnostic) diagnostics.push(compileDiagnostic);
@@ -25,7 +25,18 @@ export async function collectCompileDiagnostics(documentState, languageService, 
 async function tryGetCompileDiagnostic(documentState, languageService, document, mode) {
     let wat;
     try {
-        const expansion = expandSourceWithDiagnostics(documentState.tree, documentState.source, { mode });
+        const expansion = await expandSourceWithDiagnostics(documentState.tree, documentState.source, {
+            mode,
+            uri: document.uri,
+            loadImport: languageService.loadImport ?? null,
+            parseSource: async (sourceText) => {
+                const parsed = await languageService.parserService.parseSource(sourceText);
+                return {
+                    root: parsed.tree.rootNode,
+                    dispose: () => parsed.dispose(),
+                };
+            },
+        });
         if (expansion.diagnostics.length > 0) {
             return toFileStartDiagnostic(expansion.diagnostics[0], COMPILE_DIAGNOSTIC_STAGES.FRONTEND_LOWERING);
         }
@@ -94,4 +105,24 @@ function toFileStartDiagnostic(diagnostic, stage) {
         source: diagnostic.source ?? "utu",
         stage,
     };
+}
+
+function getBaseDiagnostics(documentState) {
+    if (hasTopLevelFileImports(documentState.tree.rootNode))
+        return documentState.parseDiagnostics ?? [];
+    return documentState.index.diagnostics;
+}
+
+function hasTopLevelFileImports(rootNode) {
+    for (const item of rootNode?.namedChildren ?? []) {
+        if (item.type === "file_import_decl")
+            return true;
+        if (item.type !== "library_decl")
+            continue;
+        for (const child of item.namedChildren ?? []) {
+            if (child.type === "file_import_decl")
+                return true;
+        }
+    }
+    return false;
 }

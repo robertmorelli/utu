@@ -1341,6 +1341,21 @@
     }
   },
   {
+    "type": "captured_module_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "module_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "construct_decl",
     "named": true,
     "fields": {},
@@ -1932,6 +1947,29 @@
       "types": [
         {
           "type": "field",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "file_import_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "captured_module_name",
+          "named": true
+        },
+        {
+          "type": "imported_module_name",
+          "named": true
+        },
+        {
+          "type": "string_lit",
           "named": true
         }
       ]
@@ -2530,6 +2568,21 @@
     }
   },
   {
+    "type": "imported_module_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "module_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "index_expr",
     "named": true,
     "fields": {},
@@ -2763,6 +2816,10 @@
         },
         {
           "type": "construct_decl",
+          "named": true
+        },
+        {
+          "type": "file_import_decl",
           "named": true
         },
         {
@@ -4529,6 +4586,10 @@
           "named": true
         },
         {
+          "type": "file_import_decl",
+          "named": true
+        },
+        {
           "type": "fn_decl",
           "named": true
         },
@@ -5435,6 +5496,10 @@
     "named": false
   },
   {
+    "type": "from",
+    "named": false
+  },
+  {
     "type": "fun",
     "named": false
   },
@@ -5456,6 +5521,10 @@
   },
   {
     "type": "if",
+    "named": false
+  },
+  {
+    "type": "import",
     "named": false
   },
   {

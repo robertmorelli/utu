@@ -12,9 +12,10 @@ import {
 
 const DeclarationEmitterMixin = class {
     emitItem(node, ctx, inModule) {
-        if (inModule && ['module_decl', 'construct_decl', 'library_decl', 'test_decl', 'bench_decl'].includes(node.type)) {
+        if (inModule && ['module_decl', 'file_import_decl', 'construct_decl', 'library_decl', 'test_decl', 'bench_decl'].includes(node.type)) {
             const label = {
                 module_decl: 'nested modules',
+                file_import_decl: 'file imports',
                 construct_decl: 'construct declarations',
                 library_decl: 'library declarations',
                 test_decl: 'test declarations',
@@ -24,6 +25,8 @@ const DeclarationEmitterMixin = class {
         }
         switch (node.type) {
             case 'module_decl':
+                return '';
+            case 'file_import_decl':
                 return '';
             case 'construct_decl':
                 return '';

@@ -1,0 +1,13 @@
+import boxes |crate| from "./_boxes.utu";
+
+construct crate;
+
+test "captured file imports rename promoted types" {
+    let box: Box = Box.new(4);
+    assert Box.score(box) == 11;
+}
+
+test "captured file imports still support qualified names" {
+    let box: crate.Box = crate.Box.new(5);
+    assert crate.Box.score(box) == 13;
+}

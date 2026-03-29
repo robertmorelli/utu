@@ -1,0 +1,15 @@
+import mathops |ops| from "./_ops.utu";
+
+mod boxes {
+    struct Box {
+        value: i32,
+    }
+
+    fun Box.new(value: i32) Box {
+        Box { value: value };
+    }
+
+    fun Box.score(self: Box) i32 {
+        ops.double(self.value) + ops.triple(1);
+    }
+}

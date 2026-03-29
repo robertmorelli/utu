@@ -42,11 +42,13 @@ function createCompletionItems(labels, kind) {
 export class UtuLanguageService {
     parserService;
     validateWat;
+    loadImport;
     cache = new Map();
 
-    constructor(parserService, { validateWat = null } = {}) {
+    constructor(parserService, { validateWat = null, loadImport = null } = {}) {
         this.parserService = parserService;
         this.validateWat = validateWat;
+        this.loadImport = loadImport;
     }
 
     dispose() { this.clear(); }
@@ -82,13 +84,14 @@ export class UtuLanguageService {
 
         const source = document.getText();
         const parsed = await this.parserService.parseSource(source);
-        const diagnostics = collectParseDiagnostics(parsed.tree.rootNode, document);
-        const index = buildDocumentIndex(document, parsed.tree.rootNode, diagnostics);
+        const parseDiagnostics = collectParseDiagnostics(parsed.tree.rootNode, document);
+        const index = buildDocumentIndex(document, parsed.tree.rootNode, parseDiagnostics.map(cloneDiagnostic));
         const entry = {
             version: document.version,
             source,
             parsed,
             tree: parsed.tree,
+            parseDiagnostics,
             index,
             indexByMode: new Map([[DOCUMENT_INDEX_MODES.EDITOR, index]]),
         };

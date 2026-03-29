@@ -36,9 +36,9 @@ export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     });
 }
 
-export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true } = {}) {
+export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true, uri = null, loadImport = null } = {}) {
     const target = normalizeCompileTarget(mode);
-    return withActiveTree(source, { wasmUrl, runtimeWasmUrl }, async (tree) => {
+    return withActiveTree(source, { wasmUrl, runtimeWasmUrl, uri, loadImport }, async (tree) => {
         const plan = createCompilePlan(tree, { target });
         const { wat, metadata } = watgen(tree, { mode: target, profile, targetName, plan });
         const fullMetadata = { ...metadata, targetName, artifact: { where, moduleFormat } };
@@ -66,8 +66,8 @@ export async function validateWat(wat) {
     }));
 }
 
-export async function get_metadata(source, { wasmUrl, runtimeWasmUrl } = {}) {
-    return withActiveTree(source, { wasmUrl, runtimeWasmUrl }, (tree) => collectMetadata(tree.rootNode));
+export async function get_metadata(source, { wasmUrl, runtimeWasmUrl, uri = null, loadImport = null } = {}) {
+    return withActiveTree(source, { wasmUrl, runtimeWasmUrl, uri, loadImport }, (tree) => collectMetadata(tree.rootNode));
 }
 
 function binaryenValidationMessage(mod) {
@@ -84,13 +84,23 @@ async function withActiveTree(source, initOptions, callback) {
     if (!parser) await init(initOptions);
     return withParsedTree(parser, source, (tree) => {
         throwOnParseErrors(tree.rootNode);
-        const expandedSource = expandSource(tree, source);
-        return expandedSource === source
+        return expandSource(tree, source, {
+            uri: initOptions?.uri ?? null,
+            loadImport: initOptions?.loadImport ?? null,
+            parseSource: async (importedSource) => {
+                const importedTree = parser.parse(importedSource);
+                if (!importedTree) throw new Error('Tree-sitter returned no syntax tree for the imported document.');
+                return {
+                    root: importedTree.rootNode,
+                    dispose: () => importedTree.delete?.(),
+                };
+            },
+        }).then((expandedSource) => expandedSource === source
             ? callback(tree)
             : withParsedTree(parser, expandedSource, (expandedTree) => {
                 throwOnParseErrors(expandedTree.rootNode);
                 return callback(expandedTree);
-            });
+            }));
     });
 }
 
