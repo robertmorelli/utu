@@ -1,44 +1,18 @@
 import { SYMBOL_METADATA } from '../language-spec/index.js';
+import { cloneWorkspaceSymbol } from '../language-platform/core/symbols.js';
+import { CachedWorkspaceSymbolIndex } from '../language-platform/core/workspaceSymbolsBase.js';
 
-export class UtuWorkspaceSymbolIndex {
+export class UtuWorkspaceSymbolIndex extends CachedWorkspaceSymbolIndex {
     constructor(analysisCache) {
+        super();
         this.analysisCache = analysisCache;
-        this.entries = new Map();
     }
-    clear() {
-        this.entries.clear();
+    getDocumentUri(document) {
+        return document.uri;
     }
-    deleteDocument(uri) {
-        this.entries.delete(uri);
-    }
-    async updateDocument(document) {
-        const uri = document.uri;
-        const cached = this.entries.get(uri);
-        if (cached?.version === document.version)
-            return cached.symbols;
+    async loadSymbols(document, uri) {
         const header = await this.analysisCache.getHeaderSnapshot(document);
-        const symbols = collectWorkspaceSymbols(header, uri);
-        this.entries.set(uri, { version: document.version, symbols });
-        return symbols;
-    }
-    async syncDocuments(documents, { replace = false } = {}) {
-        const seen = new Set();
-        for (const document of documents) {
-            seen.add(document.uri);
-            await this.updateDocument(document);
-        }
-        if (!replace)
-            return;
-        for (const uri of this.entries.keys()) {
-            if (!seen.has(uri))
-                this.entries.delete(uri);
-        }
-    }
-    getWorkspaceSymbols(query = '') {
-        const loweredQuery = query.trim().toLowerCase();
-        return [...this.entries.values()].flatMap(({ symbols }) => symbols
-            .filter((symbol) => !loweredQuery || symbol.name.toLowerCase().includes(loweredQuery))
-            .map(cloneWorkspaceSymbol));
+        return collectWorkspaceSymbols(header, uri);
     }
 }
 
@@ -57,16 +31,6 @@ function collectWorkspaceSymbols(header, defaultUri) {
                 },
             }];
     });
-}
-
-function cloneWorkspaceSymbol(symbol) {
-    return {
-        ...symbol,
-        location: {
-            uri: symbol.location.uri,
-            range: copyRange(symbol.location.range),
-        },
-    };
 }
 
 function copyRange(range) {

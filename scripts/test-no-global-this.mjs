@@ -24,7 +24,7 @@ console.log('PASS no-global-this');
 async function scanRepo(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
-    if (entry.name === '.build' || entry.name === '.git' || entry.name === 'dist' || entry.name === 'node_modules')
+    if (entry.name === '.build' || entry.name === '.git' || entry.name === '.vscode-test-web' || entry.name === 'dist' || entry.name === 'node_modules')
       continue;
     const fullPath = resolve(dir, entry.name);
     if (entry.isDirectory()) {

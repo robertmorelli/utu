@@ -1,4 +1,4 @@
-escape "es" _Math_sqrt(f64) f64;
+escape |Math.sqrt| _Math_sqrt(f64) f64;
 let default_n: i32 = 130;
 
 // fun sqrt_newton(value: f64) f64 {

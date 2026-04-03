@@ -6,18 +6,6 @@ export const findNamedChildren = (node, type) => node?.namedChildren.filter((chi
 export const walkNamedChildren = (node, visit) => node.namedChildren.forEach(visit);
 export const stringLiteralName = (node) => node.text.startsWith('"') && node.text.endsWith('"') ? node.text.slice(1, -1) : node.text;
 
-export function parseHostImportName(name) {
-    if (!name.startsWith('_')) {
-        return { hostName: name, hostPath: [name] };
-    }
-    const hostPath = name
-        .slice(1)
-        .replace(/__/g, '\0')
-        .split('_')
-        .map((segment) => segment.replace(/\0/g, '_'));
-    return { hostName: hostPath.join('.'), hostPath };
-}
-
 export function collectParseDiagnostics(rootNode, documentOrSource) {
     const document = toSourceDocument(documentOrSource);
     const diagnostics = [];

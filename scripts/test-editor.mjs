@@ -580,9 +580,9 @@ async function runWebhostSuite() {
   const sharedModuleLoadOptions = {
     prefix: 'utu-webhost-test-',
   };
-  const consoleLogImport = 'escape "es" console_log(str) void;';
+  const consoleLogImport = 'escape |console.log| console_log(str) void;';
 
-  const blockerCase = (name, input, expected) => [name, () => expectValue(undefined, expected)];
+  const blockerCase = (name, input, expected, options = {}) => [name, () => expectCompileOutcome(input, expected, options)];
 
   const compiledCase = (name, input, options, run) => [name, () => withCompiledModule(input, options, run)];
 
@@ -593,40 +593,30 @@ async function runWebhostSuite() {
     blockerCase('allows mains with explicit void returns', `fun main() void {
     assert true;
 }`, undefined),
-    blockerCase('allows es imports that can be resolved from the JS host', `escape "es" console_log(str) void;
-escape "es" math_sqrt(f64) f64;
+    blockerCase('allows inline-js escapes', `escape |console.log| console_log(str) void;
+escape |Math.sqrt| math_sqrt(f64) f64;
 fun main() i32 {
     console_log("ok");
     0;
 }`, undefined),
-    blockerCase('does not special-case prompt imports', 'escape "es" prompt(str) str;', undefined),
-    blockerCase(
-      'allows browser globals such as fetch',
-      'escape "es" fetch(str) str;',
-      undefined,
-    ),
-    blockerCase('does not special-case node imports', 'escape "node:fs" readFileSync(str) str;', undefined),
+    blockerCase('rejects plain host imports without inline js', 'escape prompt(str) str;', 'Unexpected token at 1:1'),
+    blockerCase('rejects removed named host import syntax', 'escape "node:fs" readFileSync(str) str;', 'Unexpected token at 1:1'),
     ['collects no unsupported imports', () => expectDeepEqual([], [])],
-    compiledCase('resolves es functions from explicit host imports', `escape "es" math_sqrt(f64) f64;
+    compiledCase('resolves inline-js escapes without external host imports', `escape |Math.sqrt| math_sqrt(f64) f64;
 
 fun main() f64 {
     math_sqrt(81.0);
 }`, {}, async (_, { instantiate }) => {
-      const exports = await instantiate(undefined, { es: { math_sqrt: Math.sqrt } });
+      const exports = await instantiate();
       expectValue(await exports.main?.(), 9);
     }),
-    compiledCase('throws clearly for missing es value imports', `escape "es" label: str;
+    compiledCase('inline-js value escapes instantiate without host wiring', `escape |"ok"| label: str;
 
 fun main() str {
     label;
 }`, {}, async (_, { instantiate }) => {
-      let message = '';
-      try {
-        await instantiate();
-      } catch (error) {
-        message = firstLine(error?.message ?? error);
-      }
-      expectValue(message, 'Missing host import "es.label"');
+      const exports = await instantiate();
+      expectValue(await exports.main?.(), 'ok');
     }),
     compiledCase('treats comments as compiler trivia', `// top-level comment
 fun main() i32 {
@@ -637,15 +627,7 @@ fun main() i32 {
       const exports = await instantiate();
       expectValue(await exports.main?.(), 3);
     }),
-    compiledCase('auto-resolves node builtin imports', `escape "node:fs" existsSync(str) bool;
-
-fun main() bool {
-    existsSync("./package.json");
-}`, {}, async (_, { instantiate }) => {
-      const exports = await instantiate();
-      expectValue(await exports.main?.(), 1);
-    }),
-    compiledCase('resolves namespace paths from node module exports', `escape "node:path" _posix_basename(str) str;
+    compiledCase('inline-js escapes can reference JS namespace paths directly', `escape |((value) => value.split("/").pop())| _posix_basename(str) str;
 
 fun main() str {
     _posix_basename("/tmp/demo.txt");
@@ -661,14 +643,12 @@ fun main() void {
       where: 'local_file_node',
     }, async (_, { instantiate }) => {
       const logs = [];
-      const console_log = (line) => {
-        logs.push(String(line));
-      };
-      const exports = await instantiate(undefined, { es: { console_log } });
+      globalThis.console = { ...(globalThis.console ?? {}), log: (line) => logs.push(String(line)) };
+      const exports = await instantiate();
       expectValue(await exports.main?.(), undefined);
       expectDeepEqual(logs, ['ok']);
     }),
-    compiledCase('instantiates benchmark modules with es host imports', `${consoleLogImport}
+    compiledCase('instantiates benchmark modules with default escape host imports', `${consoleLogImport}
 
 bench "sample" {
     setup {
@@ -680,10 +660,8 @@ bench "sample" {
       mode: 'bench',
     }, async (result, { instantiate }) => {
       const logs = [];
-      const console_log = (line) => {
-        logs.push(String(line));
-      };
-      const exports = await instantiate(undefined, { es: { console_log } });
+      globalThis.console = { ...(globalThis.console ?? {}), log: (line) => logs.push(String(line)) };
+      const exports = await instantiate();
       expectValue(await exports[getBenchExport(result)](3), undefined);
       expectDeepEqual(logs, ['ok', 'ok', 'ok']);
     }),
@@ -717,6 +695,21 @@ fun main() i32 {
   }
 
   return runNamedCases(cases);
+}
+
+async function expectCompileOutcome(sourceText, expectedError, options = {}) {
+  try {
+    await compile(sourceText, options);
+  } catch (error) {
+    if (expectedError === undefined) throw error;
+    const message = String(error?.message ?? error);
+    if (!message.includes(expectedError))
+      throw new Error(`Expected compile error including ${JSON.stringify(expectedError)}, received ${JSON.stringify(firstLine(message))}`);
+    return;
+  }
+
+  if (expectedError !== undefined)
+    throw new Error(`Expected compile error including ${JSON.stringify(expectedError)}, but compilation succeeded.`);
 }
 
 function expectLabels(items, expectedLabels) {

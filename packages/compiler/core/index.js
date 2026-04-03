@@ -36,16 +36,17 @@ export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
     });
 }
 
-export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true, uri = null, loadImport = null } = {}) {
+export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', provided_wasm_bytes = false, providedWasmBytes = false, moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true, uri = null, loadImport = null } = {}) {
     const target = normalizeCompileTarget(mode);
+    const wasmLocation = provided_wasm_bytes || providedWasmBytes ? 'provided_wasm_bytes' : where;
     return withActiveTree(source, { wasmUrl, runtimeWasmUrl, uri, loadImport }, async (tree) => {
         const plan = createCompilePlan(tree, { target });
         const { wat, metadata } = watgen(tree, { mode: target, profile, targetName, plan });
-        const fullMetadata = { ...metadata, targetName, artifact: { where, moduleFormat } };
+        const fullMetadata = { ...metadata, targetName, artifact: { where: wasmLocation, moduleFormat } };
         const wasm = await compileWat(wat, { optimize });
-        const js = jsgen(tree, wasm, { mode: target, profile, where, moduleFormat, metadata: fullMetadata, source: includeSource ? source : null });
+        const js = jsgen(tree, wasm, { mode: target, profile, where: wasmLocation, moduleFormat, metadata: fullMetadata, source: includeSource ? source : null });
         return {
-            shim: where === 'packed_base64' ? btoa(js) : js,
+            shim: wasmLocation === 'packed_base64' ? btoa(js) : js,
             js,
             wasm,
             metadata: fullMetadata,

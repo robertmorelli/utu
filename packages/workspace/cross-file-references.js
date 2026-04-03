@@ -1,6 +1,8 @@
 import { findNamedChild, spanFromNode } from '../document/index.js';
-import { treePoint } from '../language-platform/core/completion-helpers.js';
+import { sameRange, treePoint } from '../language-platform/core/completion-helpers.js';
 import { getOccurrencesForSymbol, resolveSymbol } from '../language-platform/core/document-index/build.js';
+import { copyRange, rangeKey } from '../language-platform/core/types.js';
+import { findModuleNameNode, sameNode } from './cross-file-shared.js';
 import { collectCrossFileReferences, resolveCrossFileSymbol } from './cross-file-definition.js';
 
 export async function getWorkspaceReferences(session, document, position, includeDeclaration = false) {
@@ -8,9 +10,11 @@ export async function getWorkspaceReferences(session, document, position, includ
     if (!target)
         return session.languageService.getReferences(document, position, includeDeclaration);
     const locations = new Map();
-    if (target.kind === 'symbol' && target.uri === document.uri) {
-        for (const reference of await getLocalSymbolReferences(session, document, position, includeDeclaration))
+    if (target.kind === 'symbol') {
+        for (const reference of await getTargetDocumentSymbolReferences(session, target, includeDeclaration))
             locations.set(locationKey(reference), reference);
+    } else if (target.uri === document.uri) {
+        locations.set(locationKey(target.declaration), cloneLocation(target.declaration));
     }
     if (includeDeclaration)
         locations.set(locationKey(target.declaration), cloneLocation(target.declaration));
@@ -54,14 +58,20 @@ async function resolveWorkspaceReferenceTarget(session, document, position) {
     return foreign ? targetFromForeignResult(foreign) : undefined;
 }
 
-async function getLocalSymbolReferences(session, document, position, includeDeclaration) {
-    const index = await session.languageService.getDocumentIndex(document);
-    const symbol = resolveSymbol(index, position);
-    if (!symbol)
+async function getTargetDocumentSymbolReferences(session, target, includeDeclaration) {
+    if (target.kind !== 'symbol')
         return [];
-    return getOccurrencesForSymbol(index, symbol.key)
+    const document = await session.documents.resolve(target.uri);
+    if (!document)
+        return [];
+    const index = await session.languageService.getDocumentIndex(document);
+    return getDocumentSymbolReferences(document, index, target.identity.symbolKey, includeDeclaration);
+}
+
+function getDocumentSymbolReferences(document, index, symbolKey, includeDeclaration) {
+    return getOccurrencesForSymbol(index, symbolKey)
         .filter((occurrence) => includeDeclaration || !occurrence.isDefinition)
-        .map((occurrence) => ({ uri: index.uri, range: copyRange(occurrence.range) }));
+        .map((occurrence) => ({ uri: document.uri, range: copyRange(occurrence.range) }));
 }
 
 async function resolveLocalModuleTarget(session, document, position) {
@@ -102,22 +112,8 @@ function targetFromForeignResult(result) {
     };
 }
 
-function findModuleNameNode(node) {
-    return findNamedChild(findNamedChild(node, 'module_name'), 'identifier')
-        ?? findNamedChild(findNamedChild(node, 'module_name'), 'type_ident')
-        ?? findNamedChild(node, 'identifier')
-        ?? findNamedChild(node, 'type_ident');
-}
-
-function sameNode(left, right) {
-    return Boolean(left && right)
-        && left.type === right.type
-        && left.startIndex === right.startIndex
-        && left.endIndex === right.endIndex;
-}
-
 function locationKey(location) {
-    return `${location.uri}:${location.range.start.line}:${location.range.start.character}:${location.range.end.line}:${location.range.end.character}`;
+    return `${location.uri}:${rangeKey(location.range)}`;
 }
 
 function compareLocations(left, right) {
@@ -128,20 +124,6 @@ function compareLocations(left, right) {
         || left.range.end.character - right.range.end.character;
 }
 
-function sameRange(left, right) {
-    return left.start.line === right.start.line
-        && left.start.character === right.start.character
-        && left.end.line === right.end.line
-        && left.end.character === right.end.character;
-}
-
 function cloneLocation(location) {
     return { uri: location.uri, range: copyRange(location.range) };
-}
-
-function copyRange(range) {
-    return {
-        start: { line: range.start.line, character: range.start.character },
-        end: { line: range.end.line, character: range.end.character },
-    };
 }

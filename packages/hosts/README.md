@@ -16,3 +16,4 @@ Compatibility:
 
 - host entrypoints live only under `packages/hosts/*`
 - build tooling now points at `packages/hosts/*` directly
+- the VS Code host is `vscode.dev`-first; desktop compatibility must flow through the same web host rather than a separate desktop implementation

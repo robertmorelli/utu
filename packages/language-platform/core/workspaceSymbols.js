@@ -1,44 +1,17 @@
 import { getDocumentUri } from './types.js';
-import { cloneWorkspaceSymbol, collectWorkspaceSymbols } from './symbols.js';
+import { collectWorkspaceSymbols } from './symbols.js';
+import { CachedWorkspaceSymbolIndex } from './workspaceSymbolsBase.js';
 
-export class UtuWorkspaceSymbolIndex {
+export class UtuWorkspaceSymbolIndex extends CachedWorkspaceSymbolIndex {
     constructor(languageService) {
+        super();
         this.languageService = languageService;
-        this.entries = new Map();
     }
-    clear() {
-        this.entries.clear();
+    getDocumentUri(document) {
+        return getDocumentUri(document);
     }
-    deleteDocument(uri) {
-        this.entries.delete(uri);
-    }
-    async updateDocument(document) {
-        const uri = getDocumentUri(document);
-        const cached = this.entries.get(uri);
-        if (cached?.version === document.version)
-            return cached.symbols;
+    async loadSymbols(document) {
         const index = await this.languageService.getDocumentIndex(document);
-        const symbols = collectWorkspaceSymbols(index.topLevelSymbols);
-        this.entries.set(uri, { version: document.version, symbols });
-        return symbols;
-    }
-    async syncDocuments(documents, { replace = false } = {}) {
-        const seen = new Set();
-        for (const document of documents) {
-            const uri = getDocumentUri(document);
-            seen.add(uri);
-            await this.updateDocument(document);
-        }
-        if (!replace)
-            return;
-        for (const uri of this.entries.keys())
-            if (!seen.has(uri))
-                this.entries.delete(uri);
-    }
-    getWorkspaceSymbols(query = '') {
-        const loweredQuery = query.trim().toLowerCase();
-        return [...this.entries.values()].flatMap(({ symbols }) => symbols
-            .filter((symbol) => !loweredQuery || symbol.name.toLowerCase().includes(loweredQuery))
-            .map(cloneWorkspaceSymbol));
+        return collectWorkspaceSymbols(index.topLevelSymbols);
     }
 }

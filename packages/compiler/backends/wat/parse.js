@@ -6,7 +6,6 @@ import {
     namedChildren,
     stringLiteralValue,
 } from '../../frontend/tree.js';
-import { parseHostImportName } from '../../../document/index.js';
 import data from '../../../../jsondata/watgen.data.json' with { type: 'json' };
 import { protoImplName } from './protocol.js';
 
@@ -16,6 +15,8 @@ const LITERAL_TEXT_INFO = data.literalTextInfo;
 const PARSE_TYPE_HANDLERS = {
     nullable_type: (node) => ({ kind: 'nullable', inner: parseType(kids(node)[0]) }),
     scalar_type: (node) => ({ kind: 'scalar', name: node.text }),
+    type_ident: (node) => ({ kind: 'named', name: node.text }),
+    identifier: (node) => ({ kind: 'named', name: node.text }),
     ref_type: (node) => node.children[0].type === 'array' ? { kind: 'array', elem: parseType(kids(node)[0]) } : { kind: 'named', name: node.children[0].text },
     func_type: () => { throw new Error('First-class function reference types are not supported yet'); },
     paren_type: (node) => parseType(kids(node)[0]),
@@ -94,17 +95,10 @@ export const parseFnItem = (node, exported = false) => {
     };
 };
 
-export const parseImportDecl = (node) => {
-    const [moduleNode, nameNode, typeNode] = kids(node), module = moduleNode.text.slice(1, -1), name = nameNode.text;
-    const { hostName } = parseHostImportName(name);
-    return hasAnon(node, '(')
-        ? { kind: 'import_fn', module, name, hostName, params: parseImportParamList(childOfType(node, 'import_param_list')), returnType: parseReturnType(childOfType(node, 'return_type')) }
-        : { kind: 'import_val', module, name, hostName, type: parseType(typeNode) };
-};
-
 export const parseJsgenDecl = (node, index) => {
-    const returnType = parseReturnType(childOfType(node, 'return_type'));
-    return returnType
+    const returnTypeNode = childOfType(node, 'return_type');
+    const returnType = parseReturnType(returnTypeNode);
+    return returnTypeNode
         ? {
             kind: 'import_fn',
             module: '',

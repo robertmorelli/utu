@@ -107,6 +107,96 @@ const CollectMixin = class {
         const nameNode = childOfType(node, 'type_ident');
         if (!nameNode) return;
         this.topLevelProtocolNames.add(nameNode.text);
+        this.collectProtocolMembers(nameNode.text, node, ctx);
+    }
+
+    collectNamespaceTypeNames(namespace) {
+        for (const item of namespace.template.items) {
+            if (item.type === 'struct_decl' || item.type === 'type_decl' || item.type === 'proto_decl') {
+                const nameNode = childOfType(item, 'type_ident');
+                if (nameNode) {
+                    this.registerNamespaceType(namespace, nameNode.text);
+                    if (item.type === 'proto_decl') {
+                        if (!namespace.protocolNames)
+                            namespace.protocolNames = new Set();
+                        namespace.protocolNames.add(nameNode.text);
+                    }
+                }
+            }
+            if (item.type === 'type_decl') {
+                for (const variant of childrenOfType(childOfType(item, 'variant_list'), 'variant')) {
+                    const variantName = childOfType(variant, 'type_ident');
+                    if (variantName)
+                        this.registerNamespaceType(namespace, variantName.text);
+                }
+            }
+        }
+    }
+
+    collectNamespaceDeclarations(namespace, ctx) {
+        for (const item of namespace.template.items) {
+            if (item.type === 'struct_decl') this.collectNamespaceStructFields(item, namespace, ctx);
+            if (item.type === 'type_decl') this.collectNamespaceTypeFields(item, namespace, ctx);
+            if (item.type === 'proto_decl') this.collectNamespaceProtocol(item, namespace, ctx);
+        }
+    }
+
+    collectNamespaceStructFields(node, namespace, ctx) {
+        const rawName = childOfType(node, 'type_ident')?.text;
+        const typeName = rawName ? namespace.typeNames.get(rawName) : null;
+        if (!typeName) return;
+        const protocolNames = childrenOfType(childOfType(node, 'protocol_list'), 'type_ident')
+            .map((child) => namespace.typeNames.get(child.text) ?? child.text);
+        if (hasAnon(node, 'tag') && protocolNames.length > 0)
+            this.topLevelTaggedTypeProtocols.set(typeName, new Set(protocolNames));
+        const fields = new Map();
+        for (const field of childrenOfType(childOfType(node, 'field_list'), 'field')) {
+            const fieldName = childOfType(field, 'identifier');
+            const typeNode = kids(field).at(-1);
+            if (!fieldName || !typeNode) continue;
+            fields.set(fieldName.text, {
+                typeInfo: this.describeType(typeNode, ctx),
+                mut: hasAnon(field, 'mut'),
+            });
+        }
+        this.topLevelStructFieldTypes.set(typeName, fields);
+    }
+
+    collectNamespaceTypeFields(node, namespace, ctx) {
+        const rawName = childOfType(node, 'type_ident')?.text;
+        const typeName = rawName ? namespace.typeNames.get(rawName) : null;
+        if (!typeName) return;
+        const protocolNames = childrenOfType(childOfType(node, 'protocol_list'), 'type_ident')
+            .map((child) => namespace.typeNames.get(child.text) ?? child.text);
+        if (hasAnon(node, 'tag') && protocolNames.length > 0)
+            this.topLevelTaggedTypeProtocols.set(typeName, new Set(protocolNames));
+        for (const variant of childrenOfType(childOfType(node, 'variant_list'), 'variant')) {
+            const variantNameNode = childOfType(variant, 'type_ident');
+            const variantName = variantNameNode ? namespace.typeNames.get(variantNameNode.text) : null;
+            if (!variantName) continue;
+            const fields = new Map();
+            for (const field of childrenOfType(childOfType(variant, 'field_list'), 'field')) {
+                const fieldName = childOfType(field, 'identifier');
+                const typeNode = kids(field).at(-1);
+                if (!fieldName || !typeNode) continue;
+                fields.set(fieldName.text, {
+                    typeInfo: this.describeType(typeNode, ctx),
+                    mut: hasAnon(field, 'mut'),
+                });
+            }
+            this.topLevelStructFieldTypes.set(variantName, fields);
+        }
+    }
+
+    collectNamespaceProtocol(node, namespace, ctx) {
+        const rawName = childOfType(node, 'type_ident')?.text;
+        const protocolName = rawName ? namespace.typeNames.get(rawName) : null;
+        if (!protocolName) return;
+        this.topLevelProtocolNames.add(protocolName);
+        this.collectProtocolMembers(protocolName, node, ctx);
+    }
+
+    collectProtocolMembers(protocolName, node, ctx) {
         const memberList = childOfType(node, 'proto_member_list');
         const members = memberList
             ? childrenOfType(memberList, 'proto_member')
@@ -117,14 +207,14 @@ const CollectMixin = class {
             const memberName = childOfType(member, 'identifier');
             if (!memberName) continue;
             if (member.type === 'proto_setter') {
-                this.topLevelProtocolSetterMembers.set(this.protocolMemberKey(nameNode.text, memberName.text), {
+                this.topLevelProtocolSetterMembers.set(this.protocolMemberKey(protocolName, memberName.text), {
                     setter: true,
                     arity: 2,
                     valueInfo: this.describeType(kids(member).at(-1), ctx),
                 });
                 continue;
             }
-            this.topLevelProtocolMembers.set(this.protocolMemberKey(nameNode.text, memberName.text), {
+            this.topLevelProtocolMembers.set(this.protocolMemberKey(protocolName, memberName.text), {
                 getter: member.type === 'proto_getter',
                 arity: member.type === 'proto_getter'
                     ? 1
@@ -222,6 +312,8 @@ const CollectMixin = class {
             moduleBindings: template.moduleBindings ?? ctx.moduleBindings,
             localValueScopes: [],
         });
+        this.collectNamespaceTypeNames(namespace);
+        this.collectNamespaceDeclarations(namespace, moduleCtx);
         this.collectNamespaceNames(namespace, moduleCtx);
         namespace.source = namespace.template.items
             .map((item) => this.emitItem(item, moduleCtx, true))
@@ -247,6 +339,7 @@ const CollectMixin = class {
                 namespace.assocNames.set(key, this.mangleNamespaceAssoc(namespace, owner, member));
                 namespace.assocReturns.set(key, returnInfo);
             },
+            onProtocolImpl: (protocol, member, node, returnInfo) => this.collectTopLevelProtocolImpl(protocol, member, node, ctx, returnInfo),
         });
     }
 
@@ -266,6 +359,7 @@ const CollectMixin = class {
                     handlers.onType(childOfType(item, 'type_ident').text);
                     break;
                 case 'proto_decl':
+                    handlers.onType?.(childOfType(item, 'type_ident').text);
                     break;
                 case 'type_decl':
                     handlers.onType(childOfType(item, 'type_ident').text);
@@ -279,7 +373,6 @@ const CollectMixin = class {
                 case 'global_decl':
                     this.collectValueSymbol(item, kids(item).at(-1), ctx, handlers.onValue);
                     break;
-                case 'import_decl':
                 case 'jsgen_decl': {
                     const returnTypeNode = childOfType(item, 'return_type');
                     this.collectValueSymbol(item, returnTypeNode ?? kids(item).at(-1), ctx, returnTypeNode ? handlers.onFunction : handlers.onValue, returnTypeNode);
@@ -294,8 +387,9 @@ const CollectMixin = class {
         const returnInfo = this.describeReturn(childOfType(node, 'return_type'), ctx);
         if (assocNode) {
             const [ownerNode, nameNode] = kids(assocNode);
-            if (this.topLevelProtocolNames.has(ownerNode.text)) {
-                handlers.onProtocolImpl?.(ownerNode.text, nameNode.text, node, returnInfo);
+            const protocolOwner = this.resolveProtocolOwnerName(ownerNode.text, ctx);
+            if (protocolOwner) {
+                handlers.onProtocolImpl?.(protocolOwner, nameNode.text, node, returnInfo);
                 return;
             }
             handlers.onAssoc(ownerNode.text, nameNode.text, returnInfo);
@@ -325,6 +419,7 @@ const CollectMixin = class {
     }
 
     registerNamespaceType(namespace, name) {
+        if (namespace.typeNames.has(name)) return;
         const value = this.mangleNamespaceType(namespace, name);
         namespace.typeNames.set(name, value);
         if (name === namespace.template.name) {
@@ -361,6 +456,12 @@ const CollectMixin = class {
 
     mangleNamespaceAssoc(namespace, owner, member) {
         return `__utu_${snakeCase(namespace.template.name)}_${namespace.hash}_${snakeCase(owner)}_${snakeCase(member)}`;
+    }
+
+    resolveProtocolOwnerName(name, ctx) {
+        if (this.topLevelProtocolNames.has(name)) return name;
+        const mapped = ctx.namespace?.typeNames.get(name);
+        return mapped && this.topLevelProtocolNames.has(mapped) ? mapped : null;
     }
 
     getModuleRef(node) {

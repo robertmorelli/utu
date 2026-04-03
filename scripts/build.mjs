@@ -17,6 +17,7 @@ const lspEntry = resolve(extensionRoot, 'packages/hosts/lsp/main.mjs');
 const lspBinaryPath = resolve(extensionRoot, 'utu-lsp');
 const vsceBinaryPath = resolve(extensionRoot, 'node_modules/.bin/vsce');
 const treeSitterBinaryPath = resolve(extensionRoot, 'node_modules/.bin/tree-sitter');
+const webExtensionTestsSource = resolve(extensionRoot, 'scripts/vscode-web-extension-tests.cjs');
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
@@ -290,6 +291,7 @@ async function stageWebDevExtension() {
 
   await rm(webDevExtensionRoot, { recursive: true, force: true });
   await mkdir(resolve(webDevExtensionRoot, 'dist/web'), { recursive: true });
+  await mkdir(resolve(webDevExtensionRoot, 'dist/web/test/suite'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'dist/node'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'dist'), { recursive: true });
   await mkdir(resolve(webDevExtensionRoot, 'jsondata'), { recursive: true });
@@ -303,6 +305,7 @@ async function stageWebDevExtension() {
     cp(resolve(extensionRoot, 'dist/web/extension.js.map'), resolve(webDevExtensionRoot, 'dist/web/extension.js.map')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs.map'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs.map')),
+    cp(webExtensionTestsSource, resolve(webDevExtensionRoot, 'dist/web/test/suite/extensionTests.js')),
     cp(resolve(extensionRoot, 'language-configuration.json'), resolve(webDevExtensionRoot, 'language-configuration.json')),
     cp(resolve(extensionRoot, 'README.md'), resolve(webDevExtensionRoot, 'README.md')),
     cp(resolve(extensionRoot, 'CHANGELOG.md'), resolve(webDevExtensionRoot, 'CHANGELOG.md')),

@@ -6,7 +6,7 @@ import {
     getBuiltinHover,
     isBuiltinNamespace,
 } from "./hoverDocs.js";
-import { collectParseDiagnostics, getWordAtPosition } from "../../document/index.js";
+import { collectParseDiagnostics, createSourceDocument, findNamedChild, getWordAtPosition } from "../../document/index.js";
 import { copyRange, getDocumentUri } from "./types.js";
 import { SYMBOL_METADATA } from "../../language-spec/index.js";
 import { memberLabel, memberNodeText, inferCompletionExpressionType, treePoint } from "./completion-helpers.js";
@@ -76,10 +76,15 @@ export class UtuLanguageService {
             : rememberModeIndex(documentState, normalizedMode, { ...documentState.index, diagnostics });
     }
 
-    async getCachedDocumentState(document) {
+    async getCachedDocumentState(document, { importStack = new Set() } = {}) {
         const cacheKey = getDocumentUri(document);
         const cached = this.cache.get(cacheKey);
-        if (cached && cached.version === document.version) return cached;
+        if (cached && cached.version === document.version) {
+            if (cached.status !== "building" || importStack.has(cacheKey))
+                return cached;
+            await cached.readyPromise;
+            return cached;
+        }
         cached?.parsed?.dispose();
 
         const source = document.getText();
@@ -89,14 +94,80 @@ export class UtuLanguageService {
         const entry = {
             version: document.version,
             source,
+            document,
             parsed,
             tree: parsed.tree,
             parseDiagnostics,
             index,
             indexByMode: new Map([[DOCUMENT_INDEX_MODES.EDITOR, index]]),
+            status: "building",
+            readyPromise: null,
         };
+        entry.readyPromise = this.populateImportedBindings(entry, document, importStack);
         this.cache.set(cacheKey, entry);
+        await entry.readyPromise;
         return entry;
+    }
+
+    async populateImportedBindings(entry, document, importStack) {
+        try {
+            const importedBindings = await this.loadImportedBindings(
+                document,
+                entry.tree.rootNode,
+                new Set([...importStack, getDocumentUri(document)]),
+            );
+            if (importedBindings.length === 0)
+                return;
+            const index = buildDocumentIndex(
+                document,
+                entry.tree.rootNode,
+                entry.parseDiagnostics.map(cloneDiagnostic),
+                { importedBindings },
+            );
+            entry.index = index;
+            entry.indexByMode.set(DOCUMENT_INDEX_MODES.EDITOR, index);
+        } catch {
+            // Keep the local-only index when import loading fails in editor mode.
+        } finally {
+            entry.status = "ready";
+            entry.readyPromise = null;
+        }
+    }
+
+    async loadImportedBindings(document, rootNode, importStack) {
+        if (typeof this.loadImport !== "function")
+            return [];
+        const bindings = [];
+        for (const fileImport of collectFileImports(rootNode)) {
+            const binding = await this.loadImportedBinding(document, fileImport, importStack);
+            if (binding)
+                bindings.push(binding);
+        }
+        return bindings;
+    }
+
+    async loadImportedBinding(document, fileImport, importStack) {
+        let loaded;
+        try {
+            loaded = await this.loadImport(getDocumentUri(document), fileImport.specifier);
+        } catch {
+            return null;
+        }
+        if (!loaded?.uri || typeof loaded.source !== "string")
+            return null;
+        const importedDocument = createSourceDocument(loaded.source, {
+            uri: loaded.uri,
+            version: Number.isFinite(loaded.version) ? loaded.version : 0,
+        });
+        const targetState = await this.getCachedDocumentState(importedDocument, { importStack });
+        const targetNamespace = targetState.index.declaredModuleNamespaces?.get(fileImport.sourceModuleName);
+        if (!targetNamespace)
+            return null;
+        return {
+            ...fileImport,
+            namespace: cloneImportedNamespace(targetNamespace, fileImport.localName),
+            foreignSymbols: targetState.index.symbolByKey,
+        };
     }
 
     async getHover(document, position) {
@@ -251,4 +322,52 @@ function normalizeDocumentIndexMode(mode) {
 function rememberModeIndex(documentState, mode, index) {
     documentState.indexByMode.set(mode, index);
     return index;
+}
+
+function collectFileImports(rootNode) {
+    const imports = [];
+    for (const item of rootNode?.namedChildren ?? [])
+        collectFileImport(item, imports);
+    return imports;
+}
+
+function collectFileImport(item, imports) {
+    if (!item)
+        return;
+    if (item.type === "library_decl") {
+        for (const child of item.namedChildren ?? [])
+            collectFileImport(child, imports);
+        return;
+    }
+    if (item.type !== "file_import_decl")
+        return;
+    const sourceNode = findImportModuleName(findNamedChild(item, "imported_module_name"));
+    const captureNode = findImportModuleName(findNamedChild(item, "captured_module_name"));
+    const specifierNode = findNamedChild(item, "string_lit");
+    if (!sourceNode || !specifierNode)
+        return;
+    imports.push({
+        sourceModuleName: sourceNode.text,
+        localName: captureNode?.text ?? sourceNode.text,
+        specifier: specifierNode.text.slice(1, -1),
+    });
+}
+
+function findImportModuleName(node) {
+    return findNamedChild(findNamedChild(node, "module_name"), "identifier")
+        ?? findNamedChild(findNamedChild(node, "module_name"), "type_ident")
+        ?? findNamedChild(node, "identifier")
+        ?? findNamedChild(node, "type_ident");
+}
+
+function cloneImportedNamespace(namespace, localName) {
+    return {
+        name: localName,
+        symbolKey: namespace.symbolKey,
+        typeKeys: new Map(namespace.typeKeys),
+        typeParamKeys: new Map(namespace.typeParamKeys),
+        valueKeys: new Map(namespace.valueKeys),
+        assocKeys: new Map(namespace.assocKeys),
+        promotedTypeName: namespace.promotedTypeName,
+    };
 }

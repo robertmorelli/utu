@@ -41,9 +41,15 @@
     "module": "./scripts/test-vscode-web-extension-activation-log-repro.mjs"
   },
   {
-    "id": "editor:desktop-activation",
-    "label": "Editor desktop activation",
-    "module": "./scripts/test-vscode-desktop-activation.mjs"
+    "id": "editor:web-extension-smoke",
+    "label": "Editor web extension smoke",
+    "module": "./scripts/test-vscode-web-extension-smoke.mjs"
+  },
+  {
+    "id": "editor:web-browser-chromium",
+    "label": "Editor web browser (chromium)",
+    "module": "./scripts/test-vscode-web-browser.mjs",
+    "args": ["chromium"]
   },
   {
     "id": "editor:core",
@@ -99,6 +105,16 @@
     "id": "language:modules",
     "label": "Language modules",
     "module": "./scripts/test-modules.mjs"
+  },
+  {
+    "id": "language:feature-interactions",
+    "label": "Language feature interactions",
+    "module": "./scripts/test-feature-interactions.mjs"
+  },
+  {
+    "id": "workspace:interactions",
+    "label": "Workspace interactions",
+    "module": "./scripts/test-workspace-interactions.mjs"
   },
   {
     "id": "grammar:textmate-escape",

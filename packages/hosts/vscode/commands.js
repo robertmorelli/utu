@@ -21,7 +21,7 @@ export function registerCommands(context, d) {
         vscode.window.setStatusBarMessage(`UTU compiled ${label}`, 3000);
         });
     });
-    showGenerated('utu.showGeneratedJavaScript', 'js', (document) => d.compilerHost.compile(document.getText(), { uri: document.uri.toString() }));
+    showGenerated('utu.showGeneratedJavaScript', 'js', async (document) => (await d.compilerHost.compile(document.getText(), { uri: document.uri.toString() })).shim ?? '');
     showGenerated('utu.showGeneratedWat', 'wat', async (document) => (await d.compilerHost.compile(document.getText(), { wat: true, uri: document.uri.toString() })).wat ?? '; compiler did not return WAT output');
     showGenerated('utu.showSyntaxTree', 'tree', (document) => d.parserService.getTreeString(document.getText()));
     register('utu.runMain', async (target, document) => {

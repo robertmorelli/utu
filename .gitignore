@@ -54,3 +54,5 @@ codex.json
 codex.yml
 bun.lock
 tree-sitter-utu.wasm
+
+.vscode-test-web/

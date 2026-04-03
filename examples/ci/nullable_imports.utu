@@ -1,7 +1,7 @@
 struct ApiError {}
 
-escape "es" maybe_label(bool) ?str;
-escape "es" maybe_structured(bool) str # ApiError;
+escape |(flag) => { if (flag) return "online"; throw new Error("offline"); }| maybe_label(bool) ?str;
+escape |(flag) => { if (flag) return ["online", null]; throw new Error("offline"); }| maybe_structured(bool) str # ApiError;
 escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun label_or_default(flag: bool) str {

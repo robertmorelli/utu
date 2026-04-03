@@ -196,7 +196,16 @@ const ExpressionGeneratorMixin = class {
             return;
         }
 
-        const wasmType = hint || this.wasmTypeStr(this.inferType(fallback)) || this.wasmTypeStr(this.inferType(expr)) || 'externref';
+        const fallbackType = this.inferredToType(this.inferType(fallback));
+        const exprType = this.inferredToType(this.inferType(expr));
+        const wasmType = hint
+            || (fallbackType ? this.wasmType(fallbackType) : null)
+            || (exprType?.kind === 'nullable'
+                ? this.wasmType(exprType.inner)
+                : exprType
+                    ? this.wasmType(exprType)
+                    : null)
+            || 'externref';
         const label = `$__else_${this.nextUid()}`;
         out.push(`(block ${label} (result ${wasmType})`);
         this.pushGenerated(out, lines => this.genExpr(expr, null, lines), '  ');

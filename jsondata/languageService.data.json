@@ -1,5 +1,11 @@
 {
   "symbolMetadata": {
+    "module": {
+      "role": "value",
+      "completionKind": "module",
+      "documentSymbolKind": "module",
+      "semanticTokenType": "namespace"
+    },
     "function": {
       "role": "value",
       "completionKind": "function",

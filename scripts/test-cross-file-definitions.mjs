@@ -26,10 +26,12 @@ const boxesPath = resolve(examplesRoot, '_boxes.utu');
 const opsPath = resolve(examplesRoot, '_ops.utu');
 
 const failed = await runNamedCases([
+  ['workspace editor diagnostics resolve imported modules without false errors', testCrossFileEditorDiagnostics],
   ['workspace definitions resolve imported modules types and members across files', testCrossFileDefinitions],
   ['workspace hover resolves imported modules types and members across files', testCrossFileHover],
   ['workspace references resolve imported modules types and members across files', testCrossFileReferences],
   ['workspace highlights resolve imported modules types and members inside the current file', testCrossFileHighlights],
+  ['workspace semantic tokens highlight imported modules and opened types', testCrossFileSemanticTokens],
   ['workspace dependency graph tracks direct file-import edges', testFileImportDependencyGraph],
 ]);
 
@@ -46,6 +48,17 @@ async function testCrossFileDefinitions() {
     await expectDefinition(session, testsPath, 'crate.Box.new', 2, boxesPath, 'mod boxes', 'boxes');
     await expectDefinition(session, testsPath, 'crate.Box.score', 'crate.Box.'.length, boxesPath, 'fun Box.score', 'score');
     await expectDefinition(session, boxesPath, 'ops.double', 'ops.'.length, opsPath, 'fun double', 'double');
+  });
+}
+
+async function testCrossFileEditorDiagnostics() {
+  await withWorkspaceSession(async (session) => {
+    await openWorkspaceDocument(session, testsPath);
+    await openWorkspaceDocument(session, boxesPath);
+    await openWorkspaceDocument(session, opsPath);
+
+    await expectNoDiagnostics(session, testsPath, 'editor');
+    await expectNoDiagnostics(session, boxesPath, 'editor');
   });
 }
 
@@ -105,6 +118,20 @@ async function testCrossFileHighlights() {
   });
 }
 
+async function testCrossFileSemanticTokens() {
+  await withWorkspaceSession(async (session) => {
+    await openWorkspaceDocument(session, testsPath);
+    await openWorkspaceDocument(session, boxesPath);
+    await openWorkspaceDocument(session, opsPath);
+
+    await expectSemanticToken(session, testsPath, 'import boxes |crate|', 'boxes', 'namespace');
+    await expectSemanticToken(session, testsPath, 'import boxes |crate|', 'crate', 'namespace');
+    await expectSemanticToken(session, testsPath, 'let box: Box =', 'Box', 'type');
+    await expectSemanticToken(session, boxesPath, 'ops.double', 'ops', 'namespace');
+    await expectSemanticToken(session, boxesPath, 'ops.double', 'double', 'function');
+  });
+}
+
 async function withWorkspaceSession(run) {
   const parserService = new UtuParserService({
     grammarWasmPath: resolve(repoRoot, 'tree-sitter-utu.wasm'),
@@ -159,6 +186,16 @@ async function expectHoverContains(session, sourcePath, marker, offset, fragment
     throw new Error(`Expected hover for ${JSON.stringify(marker)} to include ${JSON.stringify(fragment)}, received ${JSON.stringify(value)}`);
 }
 
+async function expectNoDiagnostics(session, sourcePath, mode) {
+  const sourceUri = pathToFileURL(sourcePath).toString();
+  const document = session.documents.get(sourceUri);
+  if (!document)
+    throw new Error(`Expected open workspace document for ${sourcePath}`);
+  const diagnostics = await session.getFreshDiagnostics(document, { mode });
+  if (diagnostics.length > 0)
+    throw new Error(`Expected no diagnostics for ${sourcePath}, received ${JSON.stringify(diagnostics)}`);
+}
+
 async function expectReferencesInclude(session, sourcePath, marker, offset, expectedLocations) {
   const sourceUri = pathToFileURL(sourcePath).toString();
   const sourceText = await readFile(sourcePath, 'utf8');
@@ -186,6 +223,17 @@ async function expectHighlightsInclude(session, sourcePath, marker, offset, expe
     if (!actualKeys.has(rangeKey(expected)))
       throw new Error(`Expected highlights for ${JSON.stringify(marker)} to include ${JSON.stringify(expected)}, received ${JSON.stringify(highlights)}`);
   }
+}
+
+async function expectSemanticToken(session, sourcePath, snippet, token, type) {
+  const sourceUri = pathToFileURL(sourcePath).toString();
+  const sourceText = await readFile(sourcePath, 'utf8');
+  const expectedRange = tokenRange(sourceUri, sourceText, snippet, token);
+  const tokens = await session.getDocumentSemanticTokens(sourceUri);
+  const match = tokens.find((candidate) => rangeKey(candidate.range) === rangeKey(expectedRange));
+  if (!match)
+    throw new Error(`Expected semantic token for ${JSON.stringify(token)} in ${sourcePath}, received ${JSON.stringify(tokens)}`);
+  expectEqual(match.type, type);
 }
 
 function positionForMarker(uri, sourceText, marker, offset) {

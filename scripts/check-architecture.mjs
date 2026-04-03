@@ -57,6 +57,7 @@ const forbiddenLegacyPaths = [
   'tree.js',
   'watgen.js',
 ];
+const vscodeDesktopShimPath = resolve(repoRoot, 'packages/hosts/vscode/extension.node.js');
 
 const results = await Promise.all(trackedFiles.map(async (relativePath) => {
   const source = await readFile(resolve(repoRoot, relativePath), 'utf8');
@@ -69,6 +70,7 @@ const results = await Promise.all(trackedFiles.map(async (relativePath) => {
 const warnings = results.filter(({ lines }) => lines > SOFT_LIMIT);
 const importViolations = await collectImportViolations();
 const forbiddenPathViolations = await collectForbiddenPathViolations();
+const desktopShimViolation = await collectDesktopShimViolation();
 
 for (const { relativePath, lines } of results) {
   const status = lines > SOFT_LIMIT ? 'WARN' : 'OK';
@@ -95,6 +97,13 @@ if (forbiddenPathViolations.length) {
   for (const violation of forbiddenPathViolations) {
     console.log(`ERR  forbidden ${violation}`);
   }
+  process.exitCode = 1;
+}
+
+if (desktopShimViolation) {
+  console.log('');
+  console.log('Architecture error: the desktop VS Code entrypoint must remain a thin shim over the web host.');
+  console.log(`ERR  desktop-shim ${desktopShimViolation}`);
   process.exitCode = 1;
 }
 
@@ -133,6 +142,13 @@ async function collectForbiddenPathViolations() {
     } catch {}
   }
   return violations;
+}
+
+async function collectDesktopShimViolation() {
+  const source = await readFile(vscodeDesktopShimPath, 'utf8');
+  const normalized = source.replace(/\s+/g, ' ').trim();
+  const expected = `import { activate as activateWeb, deactivate as deactivateWeb, } from './extension.web.js'; export async function activate(context) { return activateWeb(context); } export function deactivate() { return deactivateWeb(); }`;
+  return normalized === expected ? null : relative(repoRoot, vscodeDesktopShimPath);
 }
 
 async function listPackageSourceFiles(directory) {

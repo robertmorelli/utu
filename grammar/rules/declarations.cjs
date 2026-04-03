@@ -64,15 +64,6 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
       ),
     imported_module_name: ($) => $.module_name,
     captured_module_name: ($) => seq('|', $.module_name, '|'),
-    import_decl: ($) =>
-      seq(
-        'escape',
-        $.string_lit,
-        choice(
-          seq($.identifier, '(', optional($.import_param_list), ')', $.return_type),
-          seq($.identifier, ':', $._type),
-        ),
-      ),
     jsgen_decl: ($) =>
       seq(
         'escape',

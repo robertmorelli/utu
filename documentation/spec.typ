@@ -294,8 +294,8 @@ non-null at runtime.
 The same `A # B` spelling is used on ES host imports:
 
 ```utu
-shimport "es" fetch(str) ?Response;
-shimport "es" fetch(str) Response # ApiError;
+escape |fetch| fetch(str) ?Response;
+escape |fetch| fetch(str) Response # ApiError;
 ```
 
 Those imports still lower to direct Wasm multi-value signatures. The source
@@ -643,14 +643,14 @@ The discipline is:
 
 == Imports
 
-Host imports use `shimport "<module>" ...`:
+Inline JS escapes use `escape |...| ...`:
 
 ```utu
-shimport "es" console_log(str) void;
-shimport "es" fetch(str) ?Response;
-shimport "es" fetch(str) Response # ApiError;
-shimport "es" document: externref;
-shimport "node:path" basename(str) str;
+escape |console.log| console_log(str) void;
+escape |fetch| fetch(str) ?Response;
+escape |fetch| fetch(str) Response # ApiError;
+escape |document| document: externref;
+escape |path.basename| basename(str) str;
 ```
 
 == Exports
@@ -853,7 +853,7 @@ top-level declarations, and comments are line comments only.
 
 ```ebnf
 program      ::= item*
-item         ::= module_decl | construct_decl ';' | import_decl | export_decl
+item         ::= module_decl | construct_decl ';' | export_decl
                | fn_decl | proto_decl ';' | type_decl ';' | struct_decl
                | global_decl ';' | jsgen_decl ';' | test_decl | bench_decl
 ```
@@ -867,7 +867,7 @@ JS helpers, and opt-in in-source tests and benchmarks.
 ```ebnf
 module_decl  ::= 'mod' module_name module_type_param_list? '{' module_item* '}'
 module_item  ::= module_decl | construct_decl ';' | struct_decl | type_decl ';'
-               | fn_decl | global_decl ';' | import_decl ';' | jsgen_decl ';'
+               | fn_decl | global_decl ';' | jsgen_decl ';'
                | test_decl | bench_decl
 module_name  ::= IDENT | TYPE_IDENT
 module_type_param_list ::= '[' TYPE_IDENT (',' TYPE_IDENT)* ','? ']'
@@ -901,13 +901,12 @@ return_type  ::= 'void'
                | type ('#' type)? (',' type ('#' type)?)*
 
 global_decl  ::= 'let' IDENT ':' type '=' expr ';'
-import_decl  ::= 'shimport' STRING
+import_param_list ::= import_param (',' import_param)* ','?
+import_param ::= param | type
+jsgen_decl   ::= 'escape' JSGEN
                   ( IDENT '(' import_param_list? ')' return_type
                   | IDENT ':' type )
                   ';'
-import_param_list ::= import_param (',' import_param)* ','?
-import_param ::= param | type
-jsgen_decl   ::= 'escape' JSGEN IDENT '(' import_param_list? ')' return_type ';'
 export_decl  ::= 'export' fn_decl
 test_decl    ::= 'test' STRING block
 bench_decl   ::= 'bench' STRING '{' setup_decl '}'
@@ -1771,7 +1770,7 @@ key point: sum-type matching is really type refinement through WasmGC casts.
   [*WAT*],
   [
 ```utu
-shimport "es" console_log(str) void;
+escape |console.log| console_log(str) void;
 
 export fun main() void {
     "hello world" -o console_log;

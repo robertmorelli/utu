@@ -14,6 +14,7 @@ export function createCollectionFns(ctx) {
         topLevelSetterAssocKeys,
         topLevelTypeKeys,
         topLevelValueKeys,
+        declaredModuleNamespaces,
         moduleNamespaces,
         constructAliases,
         openValueKeys,
@@ -182,14 +183,30 @@ export function createCollectionFns(ctx) {
         const moduleNameNode = ctx.findModuleNameNode(moduleDecl);
         if (!moduleNameNode)
             return;
+        const moduleSymbol = createSymbol(moduleNameNode, 'module', {
+            detail: 'module',
+            signature: `mod ${moduleNameNode.text}`,
+            topLevel: true,
+        });
         const namespace = {
             name: moduleNameNode.text,
+            symbolKey: moduleSymbol.key,
             typeKeys: new Map(),
+            typeParamKeys: new Map(),
             valueKeys: new Map(),
             assocKeys: new Map(),
             promotedTypeName: undefined,
         };
+        declaredModuleNamespaces.set(namespace.name, namespace);
         moduleNamespaces.set(namespace.name, namespace);
+        for (const typeParamNode of findNamedChildren(findNamedChild(moduleDecl, 'module_type_param_list'), 'type_ident')) {
+            const typeParamSymbol = createSymbol(typeParamNode, 'sumType', {
+                detail: `type parameter in ${namespace.name}`,
+                signature: typeParamNode.text,
+                containerName: namespace.name,
+            });
+            namespace.typeParamKeys.set(typeParamNode.text, typeParamSymbol.key);
+        }
         for (const item of moduleDecl.namedChildren) {
             switch (item.type) {
                 case 'struct_decl':
@@ -203,9 +220,6 @@ export function createCollectionFns(ctx) {
                     break;
                 case 'global_decl':
                     collectModuleGlobal(item, namespace);
-                    break;
-                case 'import_decl':
-                    collectModuleImport(item, namespace);
                     break;
                 case 'jsgen_decl':
                     collectModuleJsgen(item, namespace);
@@ -324,36 +338,6 @@ export function createCollectionFns(ctx) {
         namespace.valueKeys.set(nameNode.text, globalSymbol.key);
     }
 
-    function collectImportDeclaration(importDecl) {
-        const moduleNode = findNamedChild(importDecl, 'string_lit');
-        const nameNode = findNamedChild(importDecl, 'identifier');
-        if (!moduleNode || !nameNode)
-            return;
-        const moduleText = moduleNode.text;
-        const returnTypeNode = findNamedChild(importDecl, 'return_type');
-        if (returnTypeNode) {
-            const paramList = findNamedChild(importDecl, 'import_param_list');
-            const importSymbol = createSymbol(nameNode, 'importFunction', {
-                detail: 'host import',
-                signature: `escape ${moduleText} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
-                returnTypeText: returnTypeNode.text,
-                topLevel: true,
-            });
-            rememberSymbolKey(topLevelValueKeys, importSymbol);
-            return;
-        }
-        const typeNode = importDecl.namedChildren.at(-1);
-        if (!typeNode || typeNode.type === 'identifier')
-            return;
-        const importSymbol = createSymbol(nameNode, 'importValue', {
-            detail: 'host import value',
-            signature: `escape ${moduleText} ${nameNode.text}: ${typeNode.text}`,
-            typeText: typeNode.text,
-            topLevel: true,
-        });
-        rememberSymbolKey(topLevelValueKeys, importSymbol);
-    }
-
     function collectJsgenDeclaration(jsgenDecl) {
         const sourceNode = findNamedChild(jsgenDecl, 'jsgen_lit');
         const nameNode = findNamedChild(jsgenDecl, 'identifier');
@@ -375,35 +359,6 @@ export function createCollectionFns(ctx) {
                 topLevel: true,
             });
         rememberSymbolKey(topLevelValueKeys, importSymbol);
-    }
-
-    function collectModuleImport(importDecl, namespace) {
-        const moduleNode = findNamedChild(importDecl, 'string_lit');
-        const nameNode = findNamedChild(importDecl, 'identifier');
-        if (!moduleNode || !nameNode)
-            return;
-        const returnTypeNode = findNamedChild(importDecl, 'return_type');
-        if (returnTypeNode) {
-            const paramList = findNamedChild(importDecl, 'import_param_list');
-            const importSymbol = createSymbol(nameNode, 'importFunction', {
-                detail: `host import in ${namespace.name}`,
-                signature: `escape ${moduleNode.text} ${nameNode.text}(${paramList?.text ?? ''}) ${returnTypeNode.text}`,
-                returnTypeText: returnTypeNode.text,
-                containerName: namespace.name,
-            });
-            namespace.valueKeys.set(nameNode.text, importSymbol.key);
-            return;
-        }
-        const typeNode = importDecl.namedChildren.at(-1);
-        if (!typeNode || typeNode.type === 'identifier')
-            return;
-        const importSymbol = createSymbol(nameNode, 'importValue', {
-            detail: `host import value in ${namespace.name}`,
-            signature: `escape ${moduleNode.text} ${nameNode.text}: ${typeNode.text}`,
-            typeText: typeNode.text,
-            containerName: namespace.name,
-        });
-        namespace.valueKeys.set(nameNode.text, importSymbol.key);
     }
 
     function collectModuleJsgen(jsgenDecl, namespace) {
@@ -479,9 +434,7 @@ export function createCollectionFns(ctx) {
         collectFunctionDeclaration,
         collectGlobalDeclaration,
         collectModuleGlobal,
-        collectImportDeclaration,
         collectJsgenDeclaration,
-        collectModuleImport,
         collectModuleJsgen,
         collectConstructDeclaration,
         collectTestDeclaration,

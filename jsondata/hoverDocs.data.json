@@ -167,8 +167,8 @@
       "description": "Provides the fallback branch of an `if` expression or the unwrap fallback operator."
     },
     "escape": {
-      "signature": "escape \"module\" name(params) return_type; or escape |js_expr| name(params) return_type",
-      "description": "Declares either a host import backed by a named module or an inline JavaScript helper. Value forms like `escape \"es\" document: externref` and `escape |(() => document)()| document: externref` are also valid."
+      "signature": "escape |js_expr| name(params) return_type",
+      "description": "Declares an inline JavaScript helper. Value forms like `escape |(() => document)()| document: externref` are also valid."
     },
     "fun": {
       "signature": "fun name(params) return_type",

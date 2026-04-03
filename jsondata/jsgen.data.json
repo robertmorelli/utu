@@ -5,6 +5,7 @@
     "relative_url",
     "local_file_node",
     "external",
+    "provided_wasm_bytes",
     "bun"
   ],
   "supportedModuleFormats": [

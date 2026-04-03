@@ -1,4 +1,3 @@
-import { parseHostImportName } from '../../document/index.js';
 import { rootNode, namedChildren, childOfType, walk, stringLiteralValue } from '../frontend/tree.js';
 import { analyzeSourceLayout } from '../shared/compile-plan.js';
 import data from '../../../jsondata/jsgen.data.json' with { type: 'json' };
@@ -24,7 +23,7 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
     if (where === 'bun') lines.push(`import __wasmBytes from './${metadata.targetName ?? 'program'}.wasm';`);
     if (moduleImports.some(({ autoResolve }) => autoResolve)) lines.push(HOST_MODULE_LINES.join('\n'));
 
-    lines.push('export async function instantiate(__wasmOverride, __hostImports = {}) {');
+    lines.push(`export async function instantiate(${where === 'provided_wasm_bytes' ? '__wasm_bytes' : '__wasmOverride'}, __hostImports = {}) {`);
     for (const group of moduleImports)
         if (group.autoResolve)
             lines.push(`  const ${group.ref} = await __importHostModule(${JSON.stringify(group.module)});`);
@@ -34,6 +33,7 @@ export function jsgen(treeOrNode, binary, { mode = 'program', profile = null, wh
         : where === 'local_file_node'
         ? `__wasmOverride ?? await (await import("node:fs/promises")).readFile(new URL(import.meta.url.replace(/\\.(?:[cm]?js|mjs)$/u, ".wasm")))`
         : where === 'external' ? '__wasmOverride'
+        : where === 'provided_wasm_bytes' ? '__wasm_bytes'
         : `__wasmOverride ?? ${where === 'base64' || where === 'packed_base64' ? `Uint8Array.from(atob(${JSON.stringify(btoa(Array.from(binary, byte => String.fromCharCode(byte)).join('')))}),c=>c.charCodeAt(0))` : '__wasmBytes'}`;
 
     const importParts = [];
@@ -100,14 +100,7 @@ function groupImports(root, profile = null) {
 
     let jsgenIdx = 0;
     for (const item of topLevelItems(root)) {
-        if (item.type === 'import_decl') {
-            const [moduleNode, nameNode] = namedChildren(item);
-            const module = moduleNode.text.slice(1, -1);
-            const { hostName, hostPath } = parseHostImportName(nameNode.text);
-            groupFor(module).entries.push(item.text.includes('(')
-                ? { kind: 'function', hostName, hostPath, returnType: parseReturnType(childOfType(item, 'return_type')) }
-                : { kind: 'value', hostName, hostPath });
-        } else if (item.type === 'jsgen_decl') {
+        if (item.type === 'jsgen_decl') {
             const sourceNode = namedChildren(item)[0];
             const hostName = String(jsgenIdx++);
             groupFor('').entries.push(childOfType(item, 'return_type')
@@ -134,22 +127,13 @@ function topLevelItems(root) {
 }
 
 function renderBinding(group, entry) {
-    if (entry.kind === 'inline_js') return entry.jsSource;
-    if (entry.kind === 'inline_value') return `(${entry.jsSource})`;
+    if (entry.kind === 'inline_js' || entry.kind === 'inline_value') return entry.jsSource;
     const hostImportRef = `__hostImports[${JSON.stringify(group.module)}]?.[${JSON.stringify(entry.hostName)}]`;
-    const fallbackRef = group.autoResolve
-        ? entry.hostPath.reduce((expression, segment) => `${expression}[${JSON.stringify(segment)}]`, group.ref)
-        : (group.module === '__utu_profile' ? ['__utu_profile', ...entry.hostPath] : entry.hostPath)
-            .map((segment, index) => index === 0
-                ? `(typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : global))[${JSON.stringify(segment)}]`
-                : /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)
-                    ? `.${segment}`
-                    : `[${JSON.stringify(segment)}]`).join('');
-    const resolvedRef = `(${hostImportRef} ?? ${fallbackRef})`;
-    if (entry.kind === 'value') {
-        const valueRef = group.autoResolve ? resolvedRef : hostImportRef;
-        return `(() => { const __value = ${valueRef}; if (__value === undefined) throw new Error(${JSON.stringify(`Missing host import "${group.module}.${entry.hostName}"`)}); return __value; })()`;
-    }
+    const resolvedRef = group.autoResolve
+        ? `(${hostImportRef} ?? ${entry.hostPath.reduce((expression, segment) => `${expression}[${JSON.stringify(segment)}]`, group.ref)})`
+        : hostImportRef;
+    if (entry.kind === 'value')
+        return group.autoResolve ? resolvedRef : hostImportRef;
     const fallbackValue = !entry.returnType?.length
         ? null
         : entry.returnType.length === 1

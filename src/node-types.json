@@ -2486,53 +2486,6 @@
     }
   },
   {
-    "type": "import_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "import_param_list",
-          "named": true
-        },
-        {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "return_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
-          "named": true
-        },
-        {
-          "type": "string_lit",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "import_param_list",
     "named": true,
     "fields": {},
@@ -2828,10 +2781,6 @@
         },
         {
           "type": "global_decl",
-          "named": true
-        },
-        {
-          "type": "import_decl",
           "named": true
         },
         {
@@ -3221,10 +3170,6 @@
           "named": true
         },
         {
-          "type": "import_decl",
-          "named": true
-        },
-        {
           "type": "jsgen_decl",
           "named": true
         },
@@ -3242,6 +3187,10 @@
         },
         {
           "type": "module_type_param_list",
+          "named": true
+        },
+        {
+          "type": "proto_decl",
           "named": true
         },
         {
@@ -4595,10 +4544,6 @@
         },
         {
           "type": "global_decl",
-          "named": true
-        },
-        {
-          "type": "import_decl",
           "named": true
         },
         {

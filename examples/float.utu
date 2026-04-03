@@ -1,4 +1,4 @@
-escape "es" _Math_sqrt(f64) f64;
+escape |Math.sqrt| _Math_sqrt(f64) f64;
 struct Point {
     mut x: f64,
     mut y: f64,

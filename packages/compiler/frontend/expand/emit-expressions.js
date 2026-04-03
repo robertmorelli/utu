@@ -516,28 +516,41 @@ const ExpressionEmitterMixin = class {
     resolveProtocolTypeMemberCall(node, argNodes, ctx) {
         const memberNode = childOfType(node, 'identifier');
         const ownerNode = kids(node).find((child) => child !== memberNode);
-        if (!memberNode || ownerNode?.type !== 'type_ident' || !this.topLevelProtocolNames.has(ownerNode.text)) return null;
-        if (argNodes.length === 0) throw new Error(`Protocol call "${ownerNode.text}.${memberNode.text}" requires a receiver as its first argument`);
+        const protocolName = this.resolveProtocolOwnerNode(ownerNode, ctx);
+        if (!memberNode || !protocolName) return null;
+        if (argNodes.length === 0) throw new Error(`Protocol call "${protocolName}.${memberNode.text}" requires a receiver as its first argument`);
         const selfInfo = this.inferExprInfo(argNodes[0], ctx);
-        if (!selfInfo?.text) throw new Error(`Could not resolve the receiver type for protocol call "${ownerNode.text}.${memberNode.text}"`);
-        const method = this.topLevelProtocolMembers.get(this.protocolMemberKey(ownerNode.text, memberNode.text));
-        const setter = this.topLevelProtocolSetterMembers.get(this.protocolMemberKey(ownerNode.text, memberNode.text));
+        if (!selfInfo?.text) throw new Error(`Could not resolve the receiver type for protocol call "${protocolName}.${memberNode.text}"`);
+        const method = this.topLevelProtocolMembers.get(this.protocolMemberKey(protocolName, memberNode.text));
+        const setter = this.topLevelProtocolSetterMembers.get(this.protocolMemberKey(protocolName, memberNode.text));
         if (method?.arity === argNodes.length) {
-            if (selfInfo.text === ownerNode.text)
-                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, ownerNode.text), returnInfo: method.returnInfo };
-            const impl = this.topLevelProtocolImplsByKey.get(this.protocolImplKey(ownerNode.text, memberNode.text, selfInfo.text));
+            if (selfInfo.text === protocolName)
+                return { callee: this.mangleProtocolDispatch(protocolName, memberNode.text, protocolName), returnInfo: method.returnInfo };
+            const impl = this.topLevelProtocolImplsByKey.get(this.protocolImplKey(protocolName, memberNode.text, selfInfo.text));
             if (impl)
-                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: impl.returnInfo };
-            if (this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(ownerNode.text)) {
-                return { callee: this.mangleProtocolDispatch(ownerNode.text, memberNode.text, selfInfo.text), returnInfo: method.returnInfo };
+                return { callee: this.mangleProtocolDispatch(protocolName, memberNode.text, selfInfo.text), returnInfo: impl.returnInfo };
+            if (this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(protocolName)) {
+                return { callee: this.mangleProtocolDispatch(protocolName, memberNode.text, selfInfo.text), returnInfo: method.returnInfo };
             }
-            throw new Error(`Type "${selfInfo.text}" does not implement protocol "${ownerNode.text}" method "${memberNode.text}"`);
+            throw new Error(`Type "${selfInfo.text}" does not implement protocol "${protocolName}" method "${memberNode.text}"`);
         }
         if (setter?.arity === argNodes.length
-            && (selfInfo.text === ownerNode.text || this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(ownerNode.text))) {
-            return { callee: this.mangleProtocolSetterDispatch(ownerNode.text, memberNode.text, selfInfo.text === ownerNode.text ? ownerNode.text : selfInfo.text), returnInfo: null };
+            && (selfInfo.text === protocolName || this.topLevelTaggedTypeProtocols.get(selfInfo.text)?.has(protocolName))) {
+            return { callee: this.mangleProtocolSetterDispatch(protocolName, memberNode.text, selfInfo.text === protocolName ? protocolName : selfInfo.text), returnInfo: null };
         }
-        throw new Error(`Type "${selfInfo.text}" does not implement protocol "${ownerNode.text}" method "${memberNode.text}"`);
+        throw new Error(`Type "${selfInfo.text}" does not implement protocol "${protocolName}" method "${memberNode.text}"`);
+    }
+
+    resolveProtocolOwnerNode(node, ctx) {
+        if (!node) return null;
+        if (node.type === 'type_ident') return this.resolveProtocolOwnerName(node.text, ctx);
+        if (!['qualified_type_ref', 'inline_module_type_path', 'instantiated_module_ref'].includes(node.type))
+            return null;
+        const namespace = this.resolveNamespaceFromModuleRef(node, ctx);
+        const ownerName = childOfType(node, 'type_ident')?.text ?? namespace.promotedTypeName;
+        if (!ownerName) return null;
+        const resolvedName = namespace.typeNames.get(ownerName) ?? ownerName;
+        return this.topLevelProtocolNames.has(resolvedName) ? resolvedName : null;
     }
 
     protocolSelfType(node, ctx) {

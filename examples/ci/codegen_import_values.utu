@@ -1,6 +1,6 @@
-escape "es" lucky: i32;
-escape "es" label: str;
-escape "es" document: externref;
+escape |41| lucky: i32;
+escape |"utu"| label: str;
+escape |({})| document: externref;
 escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun score() i32 {

@@ -10,6 +10,7 @@
     "variable": "Variable"
   },
   "symbolKinds": {
+    "module": "Module",
     "enum": "Enum",
     "enumMember": "EnumMember",
     "event": "Event",
@@ -39,6 +40,7 @@
   ],
   "semanticTokenLegend": {
     "types": [
+      "namespace",
       "type",
       "enumMember",
       "function",

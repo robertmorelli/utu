@@ -54,10 +54,11 @@ export class UtuWorkspaceSession {
         if (!languageService) {
             throw new Error('UtuWorkspaceSession requires a languageService. Hosts should construct the shared language service and pass it in.');
         }
-        this.languageService = languageService;
+        this.languageService = createWorkspaceAnalysisLanguageService(languageService, this.documents);
+        this.analysisLanguageService = this.languageService;
         this.analysisCache = analysisCache ?? new UtuAnalysisCache({
             parserService: this.parserService,
-            languageService: this.languageService,
+            languageService: this.analysisLanguageService,
             validateWat: validateWatOverride,
             grammarWasmPath,
             runtimeWasmPath,
@@ -108,12 +109,15 @@ export class UtuWorkspaceSession {
         return this.getFreshDiagnostics(this.documents.update(params), { mode: this.modeForPhase(WORKSPACE_SESSION_PHASES.UPDATE_DOCUMENT) });
     }
     async closeDocument(uri) {
-        this.documents.close(uri);
-        this.dependencies.deleteDocument(uri);
         this.invalidateDocument(uri);
+        this.documents.close(uri);
         const document = await this.documents.resolve(uri);
-        if (!document)
+        if (!document) {
+            this.dependencies.deleteDocument(uri);
             return this.workspaceSymbols.deleteDocument(uri);
+        }
+        const header = await this.analysisCache.getHeaderSnapshot(document);
+        this.dependencies.updateDocument(document, header);
         await this.workspaceSymbols.updateDocument(document);
         this.workspaceSymbolsReady = true;
     }
@@ -148,9 +152,11 @@ export class UtuWorkspaceSession {
     async getHover(uri, position) {
         return this.withDocument(uri, undefined, async (document) => {
             const local = await this.languageService.getHover(document, position);
-            if (local)
+            const localDefinition = await this.languageService.getDefinition(document, position);
+            if (localDefinition)
                 return local;
-            return formatCrossFileHover(await resolveCrossFileSymbol(this, document, position));
+            const foreign = await resolveCrossFileSymbol(this, document, position);
+            return formatCrossFileHover(foreign) ?? local;
         });
     }
     async getReferences(uri, position, includeDeclaration = false) {
@@ -258,6 +264,32 @@ function formatCrossFileHover(result) {
         };
     }
     return undefined;
+}
+
+function createWorkspaceAnalysisLanguageService(languageService, documents) {
+    const wrapped = Object.create(languageService);
+    wrapped.loadImport = async (fromUri, specifier) => {
+        let targetUri = null;
+        try {
+            targetUri = new URL(specifier, fromUri).href;
+        } catch {
+            targetUri = null;
+        }
+        if (targetUri?.startsWith('file://')) {
+            const document = await documents.resolve(targetUri);
+            if (document) {
+                return {
+                    uri: targetUri,
+                    source: document.getText(),
+                    version: document.version,
+                };
+            }
+        }
+        if (typeof languageService?.loadImport === 'function')
+            return languageService.loadImport(fromUri, specifier);
+        throw new Error(`UTU file imports currently require file:// URLs, received ${JSON.stringify(targetUri ?? specifier)}`);
+    };
+    return wrapped;
 }
 
 function cloneRange(range) {

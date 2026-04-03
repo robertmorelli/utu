@@ -8,7 +8,7 @@ type Filter =
     | Active
     | Completed;
 
-escape "es" wrap(str) str;
+escape |(value) => `[${value}]`| wrap(str) str;
 escape |(a, b) => a + b| str_concat(str, str) str;
 escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 

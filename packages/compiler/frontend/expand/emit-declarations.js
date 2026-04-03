@@ -40,8 +40,6 @@ const DeclarationEmitterMixin = class {
                 return this.emitFnDecl(node, ctx, inModule);
             case 'global_decl':
                 return `${this.emitGlobalDecl(node, ctx, inModule)};`;
-            case 'import_decl':
-                return `${this.emitImportDecl(node, ctx, inModule)};`;
             case 'jsgen_decl':
                 return `${this.emitJsgenDecl(node, ctx, inModule)};`;
             case 'library_decl':
@@ -72,8 +70,8 @@ const DeclarationEmitterMixin = class {
     }
 
     emitProtoDecl(node, ctx, inModule) {
-        if (inModule) throw new Error('proto declarations are not supported inside modules in v1');
         const nameNode = childOfType(node, 'type_ident');
+        const protocolName = inModule ? ctx.namespace.typeNames.get(nameNode.text) : nameNode.text;
         const typeParams = childrenOfType(childOfType(node, 'module_type_param_list'), 'type_ident').map((child) => child.text);
         const memberList = childOfType(node, 'proto_member_list');
         const methods = memberList
@@ -83,7 +81,7 @@ const DeclarationEmitterMixin = class {
                 .map((member) => this.emitProtoMember(member, ctx))
             : [];
         const typeParamList = typeParams.length ? `[${typeParams.join(', ')}]` : '';
-        return `proto ${nameNode.text}${typeParamList} {\n${methods.map((method) => `    ${method},`).join('\n')}\n};`;
+        return `proto ${protocolName}${typeParamList} {\n${methods.map((method) => `    ${method},`).join('\n')}\n};`;
     }
 
     emitProtoMember(node, ctx) {
@@ -133,8 +131,9 @@ const DeclarationEmitterMixin = class {
     emitFnDecl(node, ctx, inModule) {
         const assocNode = childOfType(node, 'associated_fn_name');
         const protocolOwner = assocNode ? kids(assocNode)[0]?.text ?? null : null;
+        const resolvedProtocolOwner = protocolOwner ? this.resolveProtocolOwnerName(protocolOwner, ctx) : null;
         const name = assocNode
-            ? this.topLevelProtocolNames.has(protocolOwner)
+            ? resolvedProtocolOwner
                 ? this.emitProtocolImplName(node, ctx, inModule)
                 : this.emitAssociatedFnName(assocNode, ctx, inModule)
             : inModule
@@ -149,9 +148,11 @@ const DeclarationEmitterMixin = class {
     }
 
     emitProtocolImplName(node, ctx, inModule) {
-        if (inModule) throw new Error('protocol implementations are not supported inside modules in v1');
         const assocNode = childOfType(node, 'associated_fn_name');
         const [ownerNode, nameNode] = kids(assocNode);
+        if (inModule) {
+            return `${ctx.namespace.typeNames.get(ownerNode.text) ?? ownerNode.text}.${nameNode.text}`;
+        }
         return `${ownerNode.text}.${nameNode.text}`;
     }
 
@@ -167,6 +168,15 @@ const DeclarationEmitterMixin = class {
     emitParam(node, ctx) {
         const [nameNode, typeNode] = kids(node);
         return `${nameNode.text}: ${this.emitType(typeNode, ctx)}`;
+    }
+
+    emitImportParamList(node, ctx) {
+        if (!node) return '';
+        return kids(node)
+            .map((child) => child.type === 'param'
+                ? this.emitParam(child, ctx)
+                : this.emitType(child, ctx))
+            .join(', ');
     }
 
     emitReturnType(node, ctx) {
@@ -193,11 +203,7 @@ const DeclarationEmitterMixin = class {
     }
 
     emitImportDecl(node, ctx, inModule) {
-        return this.emitExternDecl('escape', childOfType(node, 'string_lit').text, node, ctx, inModule);
-    }
-
-    emitImportParamList(node, ctx) {
-        return kids(node).map((child) => child.type === 'param' ? this.emitParam(child, ctx) : this.emitType(child, ctx)).join(', ');
+        return this.emitExternDecl('escape', childOfType(node, 'string_lit')?.text ?? '', node, ctx, inModule);
     }
 
     emitJsgenDecl(node, ctx, inModule) {
@@ -208,9 +214,10 @@ const DeclarationEmitterMixin = class {
         const nameNode = childOfType(node, 'identifier');
         const name = inModule ? ctx.namespace.freeValueNames.get(nameNode.text) : nameNode.text;
         const returnTypeNode = childOfType(node, 'return_type');
+        const prefix = sourceText ? `${keyword} ${sourceText} ${name}` : `${keyword} ${name}`;
         return returnTypeNode
-            ? `${keyword} ${sourceText} ${name}(${this.emitImportParamList(childOfType(node, 'import_param_list'), ctx)}) ${this.emitReturnType(returnTypeNode, ctx)}`
-            : `${keyword} ${sourceText} ${name}: ${this.emitType(kids(node).at(-1), ctx)}`;
+            ? `${prefix}(${this.emitImportParamList(childOfType(node, 'import_param_list'), ctx)}) ${this.emitReturnType(returnTypeNode, ctx)}`
+            : `${prefix}: ${this.emitType(kids(node).at(-1), ctx)}`;
     }
 
     emitTestDecl(node, ctx) {

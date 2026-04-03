@@ -1,5 +1,5 @@
-escape "es" console_log(str) void;
-escape "es" wrap(str) str;
+escape |console.log| console_log(str) void;
+escape |(value) => `[${value}]`| wrap(str) str;
 escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
 
 fun greet(name: str) str {

@@ -10,6 +10,7 @@
     "enumMember": 20
   },
   "documentSymbolKinds": {
+    "module": 2,
     "method": 6,
     "function": 12,
     "enum": 10,
@@ -27,6 +28,7 @@
     "error": 1
   },
   "semanticTokenTypes": [
+    "namespace",
     "type",
     "enumMember",
     "function",
@@ -78,6 +80,7 @@
       "semanticTokensProvider": {
         "legend": {
           "tokenTypes": [
+            "namespace",
             "type",
             "enumMember",
             "function",

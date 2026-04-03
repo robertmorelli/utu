@@ -140,6 +140,27 @@
           }
         },
         {
+          "name": "meta.declaration.file-import.utu",
+          "match": "\\b(import)\\s+([a-z_][a-zA-Z0-9_]*|[A-Z][a-zA-Z0-9_]*)(?:\\s+(\\|[a-z_][a-zA-Z0-9_]*\\||\\|[A-Z][a-zA-Z0-9_]*\\|))?\\s+(from)\\s+(\"(?:\\\\.|[^\"\\\\])*\")",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "entity.name.namespace.utu"
+            },
+            "3": {
+              "name": "entity.name.namespace.utu"
+            },
+            "4": {
+              "name": "keyword.control.utu"
+            },
+            "5": {
+              "name": "string.quoted.double.utu"
+            }
+          }
+        },
+        {
           "name": "meta.declaration.import-function.utu",
           "match": "\\b(escape)\\s+(\"[^\"]+\")\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
           "captures": {
@@ -211,7 +232,7 @@
       "patterns": [
         {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|alt|for|while|break|emit|let|library|escape|fun|get|struct|type|proto|test|bench|setup|measure|assert|mut|and(?!\\=)|or(?!\\=)|not|fatal|void|construct|mod|rec|promote|tag)\\b"
+          "match": "\\b(?:if|else|match|alt|for|while|break|emit|let|library|escape|fun|import|from|get|struct|type|proto|test|bench|setup|measure|assert|mut|and(?!\\=)|or(?!\\=)|not|fatal|void|construct|mod|rec|promote|tag)\\b"
         },
         {
           "name": "constant.language.boolean.utu",
@@ -281,7 +302,7 @@
       "patterns": [
         {
           "name": "support.function.call.utu",
-          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|break\\b|emit\\b|let\\b|library\\b|escape\\b|fun\\b|get\\b|struct\\b|type\\b|proto\\b|test\\b|bench\\b|setup\\b|measure\\b|assert\\b|mut\\b|and\\b|or\\b|not\\b|fatal\\b|void\\b|construct\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|break\\b|emit\\b|let\\b|library\\b|escape\\b|fun\\b|import\\b|from\\b|get\\b|struct\\b|type\\b|proto\\b|test\\b|bench\\b|setup\\b|measure\\b|assert\\b|mut\\b|and\\b|or\\b|not\\b|fatal\\b|void\\b|construct\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
           "captures": {
             "1": {
               "name": "entity.name.function.utu"

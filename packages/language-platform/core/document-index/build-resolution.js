@@ -283,6 +283,7 @@ export function createDocumentIndexResolutionFns({
 
     function resolveTypeKey(name) {
         return moduleScopes.at(-1)?.typeKeys.get(name)
+            ?? moduleScopes.at(-1)?.typeParamKeys?.get(name)
             ?? openTypeKeys.get(name)
             ?? resolvePromotedTypeKeyByName(name)
             ?? topLevelTypeKeys.get(name);

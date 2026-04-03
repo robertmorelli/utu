@@ -111,19 +111,6 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "import_decl"
-            },
-            {
-              "type": "STRING",
-              "value": ";"
-            }
-          ]
-        },
-        {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
               "name": "jsgen_decl"
             },
             {
@@ -231,19 +218,6 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "import_decl"
-            },
-            {
-              "type": "STRING",
-              "value": ";"
-            }
-          ]
-        },
-        {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
               "name": "jsgen_decl"
             },
             {
@@ -291,6 +265,19 @@
           "members": [
             {
               "type": "SYMBOL",
+              "name": "proto_decl"
+            },
+            {
+              "type": "STRING",
+              "value": ";"
+            }
+          ]
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
               "name": "type_decl"
             },
             {
@@ -309,19 +296,6 @@
             {
               "type": "SYMBOL",
               "name": "global_decl"
-            },
-            {
-              "type": "STRING",
-              "value": ";"
-            }
-          ]
-        },
-        {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "import_decl"
             },
             {
               "type": "STRING",
@@ -1355,74 +1329,6 @@
         {
           "type": "STRING",
           "value": "|"
-        }
-      ]
-    },
-    "import_decl": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "escape"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "string_lit"
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "identifier"
-                },
-                {
-                  "type": "STRING",
-                  "value": "("
-                },
-                {
-                  "type": "CHOICE",
-                  "members": [
-                    {
-                      "type": "SYMBOL",
-                      "name": "import_param_list"
-                    },
-                    {
-                      "type": "BLANK"
-                    }
-                  ]
-                },
-                {
-                  "type": "STRING",
-                  "value": ")"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "return_type"
-                }
-              ]
-            },
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "identifier"
-                },
-                {
-                  "type": "STRING",
-                  "value": ":"
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_type"
-                }
-              ]
-            }
-          ]
         }
       ]
     },

@@ -45,7 +45,6 @@ import {
     parseCapture,
     parseFnItem,
     parseForSources,
-    parseImportDecl,
     parseIntLit,
     parseJsgenDecl,
     parseMatchArm,
@@ -176,17 +175,6 @@ const TOP_LEVEL_COLLECT_HANDLERS = {
         const decl = { kind: 'global_decl', name: name.text, type: parseType(type), value };
         ctx.globalDecls.push(decl);
         ctx.globalTypeMap.set(decl.name, decl.type);
-    },
-    import_decl: (ctx, item) => {
-        const decl = parseImportDecl(item);
-        if (decl.kind === 'import_fn') {
-            ctx.importFns.push(decl);
-            ctx.callables.set(decl.name, decl);
-        }
-        else {
-            ctx.importVals.push(decl);
-            ctx.globalTypeMap.set(decl.name, decl.type);
-        }
     },
     jsgen_decl: (ctx, item) => {
         const decl = parseJsgenDecl(item, ctx.jsgenImportCount++);
@@ -332,6 +320,21 @@ const INFER_TYPE_HANDLERS = {
     struct_init: (_ctx, node) => childOfType(node, 'type_ident').text,
     array_init: (ctx, node) => `${ctx.elemTypeKey(parseType(kids(node)[0]))}_array`,
     if_expr: (ctx, node) => ctx.inferType(kids(node)[1]),
+    else_expr: (ctx, node) => {
+        const [expr, fallback] = kids(node);
+        const exprType = ctx.inferType(expr);
+        if (fallback.type === 'fatal_expr')
+            return typeof exprType === 'string' && exprType.startsWith('nullable_')
+                ? exprType.slice('nullable_'.length)
+                : exprType;
+        const fallbackType = ctx.inferType(fallback);
+        if (typeof exprType === 'string' && exprType.startsWith('nullable_')) {
+            const innerType = exprType.slice('nullable_'.length);
+            if (!fallbackType || fallbackType === innerType)
+                return innerType;
+        }
+        return fallbackType || exprType;
+    },
     promote_expr: (ctx, node) => ctx.inferType(kids(node)[2]),
     block: (ctx, node) => ctx.inferType(kids(node).at(-1)),
     assert_expr: () => null,
@@ -698,7 +701,6 @@ export {
     parseCapture,
     parseFnItem,
     parseForSources,
-    parseImportDecl,
     parseIntLit,
     parseJsgenDecl,
     parseMatchArm,

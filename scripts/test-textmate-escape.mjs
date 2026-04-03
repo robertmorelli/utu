@@ -68,6 +68,10 @@ assertOperatorScope('for (0...3) |i| { };', '...');
 assertOperatorScope('value += 1;', '+=');
 assertOperatorScope('value >>= 1;', '>>=');
 assertOperatorScope('flag and= other;', 'and=');
+assertScopeIncludes('import boxes from "./_boxes.utu";', 'import', 'keyword.control.utu');
+assertScopeIncludes('import boxes from "./_boxes.utu";', 'from', 'keyword.control.utu');
+assertScopeIncludes('import mathops |ops| from "./_ops.utu";', 'import', 'keyword.control.utu');
+assertScopeIncludes('import mathops |ops| from "./_ops.utu";', 'from', 'keyword.control.utu');
 
 console.log('PASS textmate escape embedding');
 
@@ -93,4 +97,14 @@ function assertOperatorScope(lineText, operator) {
   if (!token) throw new Error(`No token found at operator ${operator}.`);
   if (!token.scopes.includes('keyword.operator.utu'))
     throw new Error(`Expected ${operator} to use keyword.operator.utu, got ${token.scopes.join(' ')}.`);
+}
+
+function assertScopeIncludes(lineText, snippet, expectedScope) {
+  const lineTokens = grammar.tokenizeLine(lineText).tokens;
+  const start = lineText.indexOf(snippet);
+  if (start < 0) throw new Error(`Missing snippet ${JSON.stringify(snippet)} in fixture line.`);
+  const token = lineTokens.find((entry) => entry.startIndex <= start && start < entry.endIndex);
+  if (!token) throw new Error(`No token found at snippet ${JSON.stringify(snippet)}.`);
+  if (!token.scopes.includes(expectedScope))
+    throw new Error(`Expected ${JSON.stringify(snippet)} to use ${expectedScope}, got ${token.scopes.join(' ')}.`);
 }

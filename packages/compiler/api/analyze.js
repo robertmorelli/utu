@@ -256,10 +256,9 @@ function collectTopLevelSymbol(item, document, { exported = false } = {}) {
         const nameNode = childOfType(item, 'identifier');
         return nameNode ? { name: nameNode.text, kind: 'global', exported: false, uri: document.uri, ...spanFromNode(document, nameNode) } : null;
     }
-    if (item.type === 'import_decl' || item.type === 'jsgen_decl') {
+    if (item.type === 'jsgen_decl') {
         const nameNode = childOfType(item, 'identifier');
         const returnTypeNode = childOfType(item, 'return_type');
-        const typeNode = item.namedChildren.at(-1);
         if (!nameNode) return null;
         return {
             name: nameNode.text,

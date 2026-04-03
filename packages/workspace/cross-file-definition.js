@@ -1,5 +1,8 @@
 import { findNamedChild, spanFromNode } from '../document/index.js';
-import { treePoint } from '../language-platform/core/completion-helpers.js';
+import { inferCompletionExpressionType, normalizeTypeText, treePoint } from '../language-platform/core/completion-helpers.js';
+import { resolveSymbol } from '../language-platform/core/document-index/build.js';
+import { copyRange, rangeKey } from '../language-platform/core/types.js';
+import { findModuleNameNode, sameNode } from './cross-file-shared.js';
 
 export async function resolveCrossFileDefinition(session, document, position) {
     const result = await resolveCrossFileSymbol(session, document, position);
@@ -18,7 +21,7 @@ export async function resolveCrossFileSymbol(session, document, position) {
         return undefined;
     const targetCache = new Map();
     for (let node = anchor; node; node = node.parent) {
-        const context = resolveDefinitionContext(node, anchor, bindingState);
+        const context = resolveDefinitionContext(node, anchor, bindingState, documentState.index);
         if (!context)
             continue;
         const result = await resolveDefinitionTarget(session, document, context, targetCache);
@@ -38,12 +41,12 @@ export async function collectCrossFileReferences(session, document, targetIdenti
     const references = [];
     const seen = new Set();
     await walkNamedNodes(documentState.tree.rootNode, async (node) => {
-        for (const context of collectReferenceContexts(node, bindingState)) {
+        for (const context of collectReferenceContexts(node, bindingState, documentState.index)) {
             const result = await resolveDefinitionTarget(session, document, context, targetCache);
             if (!matchesTargetIdentity(targetIdentity, result))
                 continue;
             const location = { uri: document.uri, range: copyRange(spanFromNode(document, context.sourceNode).range) };
-            const key = `${location.uri}:${location.range.start.line}:${location.range.start.character}:${location.range.end.line}:${location.range.end.character}`;
+            const key = `${location.uri}:${rangeKey(location.range)}`;
             if (seen.has(key))
                 continue;
             seen.add(key);
@@ -78,7 +81,7 @@ function buildImportedBindingState(header = {}) {
     return { visibleBindings, openBindings };
 }
 
-function resolveDefinitionContext(node, anchor, bindingState) {
+function resolveDefinitionContext(node, anchor, bindingState, index) {
     switch (node.type) {
         case 'file_import_decl':
             return resolveFileImportContext(node, anchor, bindingState);
@@ -89,10 +92,12 @@ function resolveDefinitionContext(node, anchor, bindingState) {
         case 'qualified_type_ref':
             return resolveQualifiedTypeContext(node, anchor, bindingState);
         case 'field_expr':
-            return resolveFieldContext(node, anchor, bindingState);
+            return resolveFieldContext(node, anchor, bindingState, index);
         default:
             break;
     }
+    if (sameNode(node, anchor) && node.type === 'identifier')
+        return resolveOpenValueContext(node, bindingState);
     if (sameNode(node, anchor) && node.type === 'type_ident')
         return { kind: 'open_type', typeName: node.text, sourceNode: node };
     return undefined;
@@ -146,17 +151,20 @@ function resolveTypeMemberContext(node, anchor, bindingState) {
     return undefined;
 }
 
-function resolveFieldContext(node, anchor, bindingState) {
+function resolveFieldContext(node, anchor, bindingState, index) {
     const [baseNode, memberNode] = node.namedChildren ?? [];
-    if (baseNode?.type !== 'identifier')
-        return undefined;
-    const binding = bindingState.visibleBindings.get(baseNode.text);
-    if (!binding)
-        return undefined;
-    if (containsNode(baseNode, anchor))
-        return { kind: 'module', binding, sourceNode: baseNode };
-    if (containsNode(memberNode, anchor))
-        return { kind: 'member', binding, memberName: memberNode.text, ownerTypeName: null, sourceNode: memberNode };
+    const namespaceBinding = baseNode?.type === 'identifier' ? bindingState.visibleBindings.get(baseNode.text) : undefined;
+    if (namespaceBinding) {
+        if (containsNode(baseNode, anchor))
+            return { kind: 'module', binding: namespaceBinding, sourceNode: baseNode };
+        if (containsNode(memberNode, anchor))
+            return { kind: 'member', binding: namespaceBinding, memberName: memberNode.text, ownerTypeName: null, sourceNode: memberNode };
+    }
+    const typedMemberContext = memberNode && containsNode(memberNode, anchor)
+        ? resolveTypedMemberContext(baseNode, memberNode, bindingState, index)
+        : undefined;
+    if (typedMemberContext)
+        return typedMemberContext;
     return undefined;
 }
 
@@ -174,6 +182,12 @@ function resolveImportedMemberContext(ownerNode, memberNode, bindingState) {
     return undefined;
 }
 
+function resolveOpenValueContext(node, bindingState) {
+    return bindingState.openBindings.length > 0
+        ? { kind: 'open_value', valueName: node.text, sourceNode: node }
+        : undefined;
+}
+
 async function resolveDefinitionTarget(session, document, context, targetCache) {
     switch (context.kind) {
         case 'module':
@@ -182,6 +196,8 @@ async function resolveDefinitionTarget(session, document, context, targetCache) 
             return finalizeCrossFileResult(document, context, findTargetTypeLocation(await loadImportedTarget(session, document.uri, context.binding, targetCache), context.binding.sourceModuleName, context.typeName));
         case 'member':
             return finalizeCrossFileResult(document, context, findTargetMemberLocation(await loadImportedTarget(session, document.uri, context.binding, targetCache), context.binding.sourceModuleName, context.memberName, context.ownerTypeName));
+        case 'open_value':
+            return resolveOpenImportedLocation(session, document, context, targetCache, findTargetMemberLocation);
         case 'open_type':
             return resolveOpenImportedLocation(session, document, context, targetCache, findTargetTypeLocation);
         case 'open_member':
@@ -271,14 +287,7 @@ function bindingFromImportNode(node, bindingState) {
     return bindingState.visibleBindings.get(captureNode?.text ?? '') ?? bindingState.visibleBindings.get(sourceNode?.text ?? '');
 }
 
-function findModuleNameNode(node) {
-    return findNamedChild(findNamedChild(node, 'module_name'), 'identifier')
-        ?? findNamedChild(findNamedChild(node, 'module_name'), 'type_ident')
-        ?? findNamedChild(node, 'identifier')
-        ?? findNamedChild(node, 'type_ident');
-}
-
-function collectReferenceContexts(node, bindingState) {
+function collectReferenceContexts(node, bindingState, index) {
     switch (node.type) {
         case 'file_import_decl':
             return collectFileImportReferenceContexts(node, bindingState);
@@ -289,7 +298,9 @@ function collectReferenceContexts(node, bindingState) {
         case 'type_member_expr':
             return collectTypeMemberReferenceContexts(node, bindingState);
         case 'field_expr':
-            return collectFieldReferenceContexts(node, bindingState);
+            return collectFieldReferenceContexts(node, bindingState, index);
+        case 'identifier':
+            return collectOpenValueReferenceContexts(node, bindingState, index);
         case 'type_ident':
             return isStandaloneOpenTypeNode(node) ? [{ kind: 'open_type', typeName: node.text, sourceNode: node }] : [];
         default:
@@ -339,17 +350,54 @@ function collectTypeMemberReferenceContexts(node, bindingState) {
     return context ? [context] : [];
 }
 
-function collectFieldReferenceContexts(node, bindingState) {
+function collectFieldReferenceContexts(node, bindingState, index) {
     const [baseNode, memberNode] = node.namedChildren ?? [];
-    if (baseNode?.type !== 'identifier')
-        return [];
-    const binding = bindingState.visibleBindings.get(baseNode.text);
-    if (!binding)
-        return [];
-    const contexts = [{ kind: 'module', binding, sourceNode: baseNode }];
-    if (memberNode)
-        contexts.push({ kind: 'member', binding, memberName: memberNode.text, ownerTypeName: null, sourceNode: memberNode });
+    const namespaceBinding = baseNode?.type === 'identifier' ? bindingState.visibleBindings.get(baseNode.text) : undefined;
+    const contexts = [];
+    if (namespaceBinding && baseNode) {
+        contexts.push({ kind: 'module', binding: namespaceBinding, sourceNode: baseNode });
+        if (memberNode)
+            contexts.push({ kind: 'member', binding: namespaceBinding, memberName: memberNode.text, ownerTypeName: null, sourceNode: memberNode });
+    }
+    const typedMemberContext = memberNode ? resolveTypedMemberContext(baseNode, memberNode, bindingState, index) : undefined;
+    if (typedMemberContext)
+        contexts.push(typedMemberContext);
     return contexts;
+}
+
+function resolveTypedMemberContext(baseNode, memberNode, bindingState, index) {
+    const baseType = normalizeTypeText(inferCompletionExpressionType(baseNode, index) ?? '');
+    if (!baseType)
+        return undefined;
+    const lastDot = baseType.lastIndexOf('.');
+    if (lastDot >= 0) {
+        const ownerTypeName = baseType.slice(lastDot + 1);
+        const namespaceText = baseType.slice(0, lastDot);
+        const binding = resolveBindingForTypeNamespace(namespaceText, bindingState);
+        return binding && ownerTypeName
+            ? { kind: 'member', binding, memberName: memberNode.text, ownerTypeName, sourceNode: memberNode }
+            : undefined;
+    }
+    return bindingState.openBindings.length > 0
+        ? { kind: 'open_member', typeName: baseType, memberName: memberNode.text, sourceNode: memberNode }
+        : undefined;
+}
+
+function resolveBindingForTypeNamespace(typeNamespace, bindingState) {
+    const normalized = normalizeTypeText(typeNamespace);
+    if (!normalized)
+        return undefined;
+    const bracketIndex = normalized.indexOf('[');
+    const bindingName = bracketIndex >= 0 ? normalized.slice(0, bracketIndex) : normalized;
+    return bindingState.visibleBindings.get(bindingName);
+}
+
+function collectOpenValueReferenceContexts(node, bindingState, index) {
+    if (bindingState.openBindings.length === 0 || !isStandaloneOpenValueNode(node))
+        return [];
+    if (resolveSymbol(index, nodePosition(node)))
+        return [];
+    return [{ kind: 'open_value', valueName: node.text, sourceNode: node }];
 }
 
 function isStandaloneOpenTypeNode(node) {
@@ -367,6 +415,37 @@ function isStandaloneOpenTypeNode(node) {
     ].includes(parentType);
 }
 
+function isStandaloneOpenValueNode(node) {
+    const parentType = node.parent?.type;
+    return ![
+        'associated_fn_name',
+        'module_name',
+        'captured_module_name',
+        'imported_module_name',
+        'file_import_decl',
+        'module_decl',
+        'struct_decl',
+        'type_decl',
+        'proto_decl',
+        'global_decl',
+        'jsgen_decl',
+        'param',
+        'capture',
+        'bind_target',
+        'field_init',
+        'field_decl',
+        'type_member_expr',
+        'field_expr',
+    ].includes(parentType);
+}
+
+function nodePosition(node) {
+    return {
+        line: node.startPosition.row,
+        character: node.startPosition.column,
+    };
+}
+
 function containsNode(target, candidate) {
     for (let node = candidate; node; node = node.parent) {
         if (sameNode(target, node))
@@ -375,12 +454,6 @@ function containsNode(target, candidate) {
     return false;
 }
 
-function sameNode(left, right) {
-    return Boolean(left && right)
-        && left.type === right.type
-        && left.startIndex === right.startIndex
-        && left.endIndex === right.endIndex;
-}
 
 function matchesTargetIdentity(targetIdentity, result) {
     if (!targetIdentity || !result)
@@ -399,6 +472,8 @@ async function walkNamedNodes(node, visit) {
 }
 
 function resolveOpenImportedTarget(target, moduleName, context, resolveLocation) {
+    if (context.kind === 'open_value')
+        return resolveLocation(target, moduleName, context.valueName, null);
     if (context.kind === 'open_type')
         return resolveLocation(target, moduleName, context.typeName);
     if (context.kind === 'open_member')
@@ -421,11 +496,4 @@ function finalizeCrossFileResult(document, context, target) {
         binding: context.binding,
         sourceRange: spanFromNode(document, context.sourceNode).range,
     } : undefined;
-}
-
-function copyRange(range) {
-    return {
-        start: { line: range.start.line, character: range.start.character },
-        end: { line: range.end.line, character: range.end.character },
-    };
 }

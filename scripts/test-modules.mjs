@@ -8,10 +8,16 @@ import { assertManagedTestModule, firstLine, getRepoRoot, loadNodeFileImport, ru
 
 import { binaryenCompileFailureCases, binaryenValidationCases } from './test-module-cases/binaryen-cases.mjs';
 import { failureCases } from './test-module-cases/failure-cases.mjs';
+import { moduleProtocolSuccessCases } from './test-module-cases/module-protocol-success-cases.mjs';
 import { successCases } from './test-module-cases/success-cases.mjs';
 
 const repoRoot = getRepoRoot(import.meta.url);
 const cases = [
+    ...moduleProtocolSuccessCases.map((testCase) => [testCase.name, async () => {
+        const actual = await compileAndRun(testCase.source);
+        if (actual !== testCase.expectedReturn)
+            throw new Error(`Expected return ${testCase.expectedReturn}, got ${actual}`);
+    }]),
     ...successCases.map((testCase) => [testCase.name, async () => {
         const actual = await compileAndRun(testCase.source);
         if (actual !== testCase.expectedReturn)
@@ -179,6 +185,19 @@ fun main() i32 {
         if (raw.functionCount <= optimized.functionCount)
             throw new Error(`Expected --no-opt compilation to keep more functions than the optimized build, got raw=${raw.functionCount} optimized=${optimized.functionCount}`);
     }],
+    ['provided-wasm-bytes-shim-stays-minimal-and-host-driven', async () => {
+        const { shim, metadata } = await compile('fun main() i32 { 7; }', { mode: 'program', provided_wasm_bytes: true });
+        if (!shim.includes('export async function instantiate(__wasm_bytes, __hostImports = {})'))
+            throw new Error('Expected provided_wasm_bytes shims to require __wasm_bytes directly');
+        if (!shim.includes('WebAssembly.instantiate(__wasm_bytes, {})'))
+            throw new Error('Expected provided_wasm_bytes shims to instantiate the host-supplied bytes directly');
+        for (const forbidden of ['__wasmOverride', 'node:fs/promises', 'fetch(', 'atob(', "__wasmBytes"]) {
+            if (shim.includes(forbidden))
+                throw new Error(`Expected provided_wasm_bytes shims to omit ${JSON.stringify(forbidden)}, got ${JSON.stringify(shim)}`);
+        }
+        if (metadata.artifact?.where !== 'provided_wasm_bytes')
+            throw new Error(`Expected artifact.where to be "provided_wasm_bytes", got ${JSON.stringify(metadata.artifact?.where)}`);
+    }],
     ['cross-file-imports-inline-and-run-through-transitive-module-dependencies', async () => {
         const entryPath = resolve(repoRoot, 'examples/multi_file/main.utu');
         const source = await readFile(entryPath, 'utf8');
@@ -268,7 +287,7 @@ async function inspectOptimizedModule(source, { optimize = true } = {}) {
 function makeBinaryenDceSource(count) {
     const types = Array.from({ length: count }, (_, index) => `struct T${index} {\n    value: i32,\n}`).join('\n\n');
     const constructs = Array.from({ length: count }, (_, index) => `construct foo_${index} = foo[T${index}];`).join('\n');
-    return `escape "es" input: i32;
+    return `escape |41| input: i32;
 
 mod foo[T] {
     fun bar(value: T) T {

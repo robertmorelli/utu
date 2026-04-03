@@ -1,6 +1,6 @@
 # UTU
 
-UTU is a web-first language and compiler for building small, high-performance WasmGC bundles.
+UTU is a `vscode.dev`-first language and compiler for building small, high-performance WasmGC bundles.
 
 This repo builds the full UTU toolchain from the repo root: the VS Code extension, the bundled CLI, and the standalone LSP binary.
 
@@ -22,6 +22,7 @@ This repo builds the full UTU toolchain from the repo root: the VS Code extensio
 - the standalone `utu-lsp` server now builds from `./packages/hosts/lsp/main.mjs`
 - compiler bundles that build directly from `.`, so the extension uses the same compile path as the CLI and other tooling
 - a web extension bundle for `vscode.dev` at `dist/web/extension.js`
+- a desktop compatibility entrypoint that intentionally forwards into the same web extension host instead of maintaining a separate desktop codepath
 
 ## Current Language Surface
 
@@ -85,6 +86,14 @@ bun run test
 
 `bun run test` verifies that the test manifest covers every checked-in `scripts/test-*.mjs` regression and then runs the full suite.
 
+Run the real browser-host smoke test directly in Chromium:
+
+```sh
+npm run test:web-browser
+```
+
+That path uses `@vscode/test-web` to start a local VS Code web host, mount the repo as a virtual workspace, activate the staged web extension, and exercise UTU commands against files in [`examples`](/Users/robertmorelli/Documents/personal-repos/utu/examples).
+
 For rebuild-on-change:
 
 ```sh
@@ -99,7 +108,9 @@ The build emits the web extension plus the current compiler bundles and Bun exec
 - `./utu`: bundled self-contained Bun CLI executable
 - `./utu-lsp`: bundled self-contained Bun LSP executable
 
-The extension is packaged as a web-first `vscode.dev` target. Language intelligence comes from the shared package core, and the standalone stdio UTU LSP server builds from `./packages/hosts/lsp/main.mjs`. UTU targets modern ES runtimes, so the browser host can compile files, run top-level `fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
+The extension is packaged as a `vscode.dev`-first target. Language intelligence comes from the shared package core, and the standalone stdio UTU LSP server builds from `./packages/hosts/lsp/main.mjs`. UTU targets modern ES runtimes, so the browser host can compile files, run top-level `fun main()`, and execute discovered tests and benches through the Testing view while keeping hover, definitions, diagnostics, symbols, semantic tokens, and completions available.
+
+Policy note: the VS Code extension host should stay web-safe first. Desktop VS Code is treated as a compatibility shell around the same web host, not as a separate product surface with extra extension behavior. Do not add desktop-only activation logic, Node-only editor features, or native-extension plumbing to make desktop happy when the equivalent web-safe behavior exists.
 
 Design note: do not add VS Code-specific behavior to the compiler or generated shim just to make the extension UI work. The compiler should stay shared and host-agnostic. If the editor needs better run output, prefer surfacing `main()` return values and wiring explicit host/runtime imports rather than teaching codegen about VS Code.
 

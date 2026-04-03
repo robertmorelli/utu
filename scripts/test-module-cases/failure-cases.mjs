@@ -321,6 +321,90 @@ fun main() i32 {
 }`,
     },
     {
+        name: 'module-local-protocol-impls-require-tagged-structs',
+        message: 'must be declared with "tag struct"',
+        source: `mod boxy[T] {
+    proto Measure[Self] {
+        measure(Self) T,
+    };
+
+    struct Box {
+        value: T,
+    }
+
+    fun Measure.measure(self: Box) T {
+        self.value;
+    }
+}
+
+construct ints = boxy[i32];
+
+fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'module-local-tagged-struct-protocol-impls-must-be-declared-on-the-struct',
+        message: 'cannot implement protocol',
+        source: `mod boxy[T] {
+    proto Measure[Self] {
+        measure(Self) T,
+    };
+
+    tag struct Box {
+        value: T,
+    }
+
+    fun Measure.measure(self: Box) T {
+        self.value;
+    }
+}
+
+construct ints = boxy[i32];
+
+fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'module-local-protocol-decls-require-exactly-one-type-parameter',
+        message: 'must declare exactly one type parameter',
+        source: `mod boxy[T] {
+    proto Measure[Self, Other] {
+        measure(Self) T,
+    };
+}
+
+construct ints = boxy[i32];
+
+fun main() i32 {
+    0;
+}`,
+    },
+    {
+        name: 'module-local-protocol-getters-cannot-be-implemented-manually',
+        message: 'must not be implemented with "fun"',
+        source: `mod boxy[T] {
+    proto ValueOps[Self] {
+        get value: T,
+    };
+
+    tag struct Box: ValueOps {
+        value: T,
+    }
+
+    fun ValueOps.value(self: Box) T {
+        self.value;
+    }
+}
+
+construct ints = boxy[i32];
+
+fun main() i32 {
+    0;
+}`,
+    },
+    {
         name: 'explicit-protocol-calls-reject-undeclared-implementers',
         message: 'does not implement protocol "Measure" method "measure"',
         source: `proto Measure[T] {
@@ -613,7 +697,7 @@ fun main() i32 {
     {
         name: 'first-class-function-reference-types-fail-early',
         message: 'First-class function reference types are not supported yet',
-        source: `escape "es" callback: fun(i32) i32;
+        source: `escape |((value) => value)| callback: fun(i32) i32;
 
 fun main() i32 {
     0;

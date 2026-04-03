@@ -8,7 +8,7 @@ import { findOccurrenceAtPosition, findSymbolAtPosition } from "../symbols.js";
 import { createDocumentIndexResolutionFns } from "./build-resolution.js";
 import { createCollectionFns } from "./collect.js";
 
-export function buildDocumentIndex(document, rootNode, diagnostics) {
+export function buildDocumentIndex(document, rootNode, diagnostics, { importedBindings = [] } = {}) {
     const uri = getDocumentUri(document);
     const sourceLayout = analyzeSourceLayout(rootNode);
     const symbols = [];
@@ -20,6 +20,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
     const topLevelAssocKeys = new Map();
     const topLevelSetterAssocKeys = new Map();
     const fieldsByOwner = new Map();
+    const declaredModuleNamespaces = new Map();
     const moduleNamespaces = new Map();
     const constructAliases = new Map();
     const protocolTypeNames = new Set();
@@ -113,6 +114,22 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         diagnostics.push({ message, range: span.range, offsetRange: span.offsetRange, severity: 'error', source: 'utu' });
     };
     const lookupSymbol = (key) => (key ? symbolByKey.get(key) : undefined);
+    const addForeignSymbol = (symbol) => {
+        if (!symbol || symbolByKey.has(symbol.key))
+            return;
+        symbolByKey.set(symbol.key, symbol);
+    };
+    const importedBindingsByLocalName = new Map();
+    for (const binding of importedBindings) {
+        if (!binding?.localName || !binding.namespace)
+            continue;
+        importedBindingsByLocalName.set(binding.localName, binding);
+        moduleNamespaces.set(binding.localName, binding.namespace);
+        if (binding.foreignSymbols) {
+            for (const symbol of binding.foreignSymbols.values())
+                addForeignSymbol(symbol);
+        }
+    }
     const declareLocalSymbol = (nameNode, kind, detail, typeNode, signature = typeNode ? `${nameNode.text}: ${typeNode.text}` : nameNode.text) => {
         if (typeNode)
             walkTypeAnnotation(typeNode);
@@ -191,6 +208,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         topLevelSetterAssocKeys,
         topLevelTypeKeys,
         topLevelValueKeys,
+        declaredModuleNamespaces,
         moduleNamespaces,
         constructAliases,
         openValueKeys,
@@ -209,21 +227,20 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         collectModuleDeclaration,
         collectFunctionDeclaration,
         collectGlobalDeclaration,
-        collectImportDeclaration,
         collectJsgenDeclaration,
         collectConstructDeclaration,
         collectTestDeclaration,
         collectBenchDeclaration,
     } = createCollectionFns(collectionCtx);
     const topLevelHandlers = {
+        file_import_decl: { collect: () => { }, walk: walkFileImportDeclaration },
         module_decl: { collect: collectModuleDeclaration, walk: walkModuleDeclaration },
-        construct_decl: { collect: collectConstructDeclaration, walk: () => { } },
+        construct_decl: { collect: collectConstructDeclaration, walk: walkConstructDeclaration },
         struct_decl: { collect: collectStructDeclaration, walk: walkStruct },
         proto_decl: { collect: collectProtoDeclaration, walk: () => { } },
         type_decl: { collect: collectTypeDeclaration, walk: walkTypeDeclaration },
         fn_decl: { collect: (item) => collectFunctionDeclaration(item, false), walk: walkFunction },
         global_decl: { collect: collectGlobalDeclaration, walk: walkGlobal },
-        import_decl: { collect: collectImportDeclaration, walk: walkImport },
         jsgen_decl: { collect: collectJsgenDeclaration, walk: walkJsgen },
         test_decl: { collect: collectTestDeclaration, walk: walkTest },
         bench_decl: { collect: collectBenchDeclaration, walk: walkBench },
@@ -259,12 +276,53 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
     for (const item of rootNode.namedChildren)
         walkTopLevelItem(item);
     occurrences.sort((left, right) => comparePositions(left.range.start, right.range.start));
-    return { uri, version: document.version, diagnostics, symbols, symbolByKey, occurrences, topLevelSymbols, getMemberSymbolsForTypeText };
+    return {
+        uri,
+        version: document.version,
+        diagnostics,
+        symbols,
+        symbolByKey,
+        occurrences,
+        topLevelSymbols,
+        moduleNamespaces,
+        declaredModuleNamespaces,
+        getMemberSymbolsForTypeText,
+    };
     function walkIdentifierExpression(node) {
         const symbolKey = resolveValueKey(node.text);
         if (!symbolKey)
             addSemanticDiagnostic(node, `Undefined value "${node.text}".`);
         addResolvedOccurrence(node, 'value', symbolKey);
+    }
+    function addNamespaceOccurrence(node, namespace) {
+        const targetNode = findModuleNameNode(node) ?? node;
+        if (targetNode)
+            addResolvedOccurrence(targetNode, 'value', namespace?.symbolKey);
+    }
+    function walkFileImportDeclaration(node) {
+        const sourceNode = findModuleNameNode(findNamedChild(node, 'imported_module_name'));
+        const captureNode = findModuleNameNode(findNamedChild(node, 'captured_module_name'));
+        const binding = importedBindingsByLocalName.get(captureNode?.text ?? sourceNode?.text ?? '');
+        if (sourceNode)
+            addResolvedOccurrence(sourceNode, 'value', binding?.namespace?.symbolKey);
+        if (captureNode)
+            addResolvedOccurrence(captureNode, 'value', binding?.namespace?.symbolKey);
+    }
+    function walkModuleReference(node) {
+        if (!node)
+            return;
+        const namespaceNode = findModuleNameNode(node);
+        const namespace = resolveNamespaceNode(node);
+        if (namespaceNode && !namespace)
+            addSemanticDiagnostic(namespaceNode, `Unknown module or construct alias "${namespaceNode.text}".`);
+        if (namespaceNode)
+            addResolvedOccurrence(namespaceNode, 'value', namespace?.symbolKey);
+        const moduleNameNode = findNamedChild(node, 'module_name');
+        for (const child of node.namedChildren ?? []) {
+            if (child === moduleNameNode || child === namespaceNode)
+                continue;
+            walkTypeAnnotation(child);
+        }
     }
     function walkQualifiedTypeLike(node) {
         const { key, namespace, namespaceNode, typeNode } = getTypeResolution(node);
@@ -275,6 +333,8 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         else if (typeNode && !key) {
             addSemanticDiagnostic(typeNode, `Unknown type "${typeNode.text}" in namespace "${namespace.name}".`);
         }
+        if (namespaceNode)
+            addResolvedOccurrence(namespaceNode, 'value', namespace?.symbolKey);
         if (typeNode)
             addResolvedOccurrence(typeNode, 'type', key);
         else if (namespaceNode)
@@ -291,7 +351,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         return void topLevelHandlers[item.type]?.walk(item);
     }
     function walkModuleDeclaration(moduleDecl) {
-        const namespace = resolveNamespaceNode(findNamedChild(moduleDecl, 'identifier'));
+        const namespace = resolveNamespaceNode(findModuleNameNode(moduleDecl));
         if (!namespace)
             return;
         moduleScopes.push(namespace);
@@ -305,6 +365,15 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         finally {
             moduleScopes.pop();
         }
+    }
+    function walkConstructDeclaration(constructDecl) {
+        const namedChildren = constructDecl.namedChildren ?? [];
+        const aliasNode = namedChildren[0]?.type === 'identifier' && namedChildren.length > 1 ? namedChildren[0] : undefined;
+        const moduleNode = aliasNode ? namedChildren[1] : namedChildren[0];
+        const namespace = resolveNamespaceNode(moduleNode);
+        if (aliasNode)
+            addResolvedOccurrence(aliasNode, 'value', namespace?.symbolKey);
+        walkModuleReference(moduleNode);
     }
     function walkFieldTypeAnnotations(fieldList) {
         for (const fieldNode of findNamedChildren(fieldList, 'field')) {
@@ -335,20 +404,6 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
     function walkGlobal(globalDecl) {
         walkTypeAnnotation(globalDecl.namedChildren[1]);
         walkExpression(globalDecl.namedChildren[2]);
-    }
-    function walkImport(importDecl) {
-        const returnTypeNode = findNamedChild(importDecl, 'return_type');
-        if (returnTypeNode) {
-            for (const paramNode of findNamedChildren(findNamedChild(importDecl, 'import_param_list'), 'param')) {
-                const typeNode = paramNode.namedChildren.at(-1);
-                if (typeNode) walkTypeAnnotation(typeNode);
-            }
-            walkTypeAnnotation(returnTypeNode);
-            return;
-        }
-        const typeNode = importDecl.namedChildren.at(-1);
-        if (typeNode && typeNode.type !== 'identifier')
-            walkTypeAnnotation(typeNode);
     }
     function walkJsgen(jsgenDecl) {
         const returnTypeNode = findNamedChild(jsgenDecl, 'return_type');
@@ -436,6 +491,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
             return;
         const moduleNamespace = resolveExpressionNamespaceNode(baseNode);
         if (moduleNamespace) {
+            addNamespaceOccurrence(baseNode, moduleNamespace);
             const symbolKey = resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNameNode.text);
             if (!symbolKey)
                 addSemanticDiagnostic(fieldNameNode, `Unknown member "${fieldNameNode.text}" in namespace "${moduleNamespace.name}".`);
@@ -465,6 +521,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
             if (baseNode && fieldNameNode) {
                 const moduleNamespace = resolveExpressionNamespaceNode(baseNode);
                 if (moduleNamespace) {
+                    addNamespaceOccurrence(baseNode, moduleNamespace);
                     const symbolKey = resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, fieldNameNode.text);
                     if (!symbolKey)
                         addSemanticDiagnostic(fieldNameNode, `Unknown member "${fieldNameNode.text}" in namespace "${moduleNamespace.name}".`);
@@ -510,6 +567,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
             const [baseNode, memberNode] = calleeNode.namedChildren;
             const moduleNamespace = resolveExpressionNamespaceNode(baseNode);
             if (moduleNamespace && memberNode) {
+                addNamespaceOccurrence(baseNode, moduleNamespace);
                 const symbolKey = resolveNamespaceValueOrPromotedAssocKey(moduleNamespace, memberNode.text);
                 if (!symbolKey)
                     addSemanticDiagnostic(memberNode, `Unknown member "${memberNode.text}" in namespace "${moduleNamespace.name}".`);
@@ -565,6 +623,7 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
     function walkPromotedModuleCallExpression(node) {
         const namespace = resolveNamespaceByName(findModuleNameNode(node)?.text ?? '');
         const memberNode = findNamedChild(node, 'identifier');
+        addNamespaceOccurrence(node, namespace);
         if (memberNode)
             addResolvedOccurrence(memberNode, 'value', resolveNamespaceValueOrPromotedAssocKey(namespace, memberNode.text));
         walkExpressions(findNamedChild(node, 'arg_list')?.namedChildren ?? []);
@@ -617,12 +676,14 @@ export function buildDocumentIndex(document, rootNode, diagnostics) {
         else {
             const namespace = resolveExpressionNamespaceNode(first);
             if (namespace && second?.type === 'identifier' && pathParts.length === 2) {
+                addNamespaceOccurrence(first, namespace);
                 const symbolKey = resolveNamespaceValueOrPromotedAssocKey(namespace, second.text);
                 if (!symbolKey)
                     addSemanticDiagnostic(second, `Unknown member "${second.text}" in namespace "${namespace.name}".`);
                 addResolvedOccurrence(second, 'value', symbolKey);
             }
             else if (namespace && second?.type === 'type_ident' && pathParts[2]?.type === 'identifier') {
+                addNamespaceOccurrence(first, namespace);
                 const typeKey = namespace.typeKeys.get(second.text);
                 if (!typeKey)
                     addSemanticDiagnostic(second, `Unknown type "${second.text}" in namespace "${namespace.name}".`);
