@@ -25,9 +25,8 @@ export async function runTreeWalkRewritePass(_passName, context, visit) {
     return rewriteStageTree(context.tree, visit);
 }
 
-// e2.5 Expand Declarations:
 // rewrite module-owned declarations into canonical top-level declaration forms.
-export async function runE25ExpandDeclarations(context) {
+export async function runExpandDeclarations(context) {
     const expansion = context.analyses["load-expansion-imports"] ?? context.analyses["prepare-expansion-options"] ?? null;
     if (!expansion) {
     }

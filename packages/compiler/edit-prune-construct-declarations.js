@@ -1,9 +1,8 @@
-import { runStage2DropNodeTypesRewrite } from "./expansion-rewrite-pass.js";
+import { runExpansionDropNodeTypesRewrite } from "./expansion-rewrite-pass.js";
 
-// e2.8 Prune Construct Declarations:
 // remove construct declarations after declaration expansion materialization.
-export async function runE28PruneConstructDeclarations(context) {
-    return runStage2DropNodeTypesRewrite("e2.8", context, ["construct_decl"], {
+export async function runPruneConstructDeclarations(context) {
+    return runExpansionDropNodeTypesRewrite("prune-construct-declarations", context, ["construct_decl"], {
         useRewritePlan: true,
     });
 }

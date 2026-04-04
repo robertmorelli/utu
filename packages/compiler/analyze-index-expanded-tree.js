@@ -16,9 +16,8 @@ const RESIDUAL_MODULE_DECLARATION_NODES = [
     "file_import_decl",
 ];
 
-// a2.7 Index Expanded Tree:
-// inventory post-e2.5 expansion syntax nodes and detect residual module declarations.
-export async function runA27IndexExpandedTree(context) {
+// inventory post-expansion syntax nodes and detect residual module declarations.
+export async function runIndexExpandedTree(context) {
     const counts = collectNodeCounts(context.tree, EXPANSION_SYNTAX_NODES);
     const residualModuleSyntaxCount = RESIDUAL_MODULE_DECLARATION_NODES
         .reduce((sum, type) => sum + (counts.byType[type] ?? 0), 0);

@@ -1,4 +1,5 @@
-import { ensureStage2TopLevelDeclarations } from "./expansion-session.js";
+import { readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { ensureExpansionTopLevelDeclarations } from "./expansion-session.js";
 
 function collectModuleTemplateSummary(expander) {
     return [...(expander?.moduleTemplates?.values?.() ?? [])]
@@ -11,8 +12,8 @@ function collectModuleTemplateSummary(expander) {
         .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export async function runA215CollectTopLevelExpansionFacts(context) {
-    const expansionState = context.artifacts.stage2Expansion ?? null;
+export async function runCollectTopLevelExpansionFacts(context) {
+    const expansionState = readCompilerArtifact(context, "expansionSession");
     if (!expansionState?.shouldExpand) {
         return {
             moduleNames: [],
@@ -28,7 +29,7 @@ export async function runA215CollectTopLevelExpansionFacts(context) {
             },
         };
     }
-    await ensureStage2TopLevelDeclarations(expansionState);
+    await ensureExpansionTopLevelDeclarations(expansionState);
     const expander = expansionState.expander;
     return {
         ...expansionState.topLevelDeclarations,

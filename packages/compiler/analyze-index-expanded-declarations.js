@@ -32,9 +32,8 @@ function declarationName(node) {
     return null;
 }
 
-// a2.8 Index Expanded Declarations:
 // gather declaration names from the expanded tree for downstream collision checks.
-export async function runA28IndexExpandedDeclarations(context) {
+export async function runIndexExpandedDeclarations(context) {
     const entries = [];
     const countsByKind = {};
     const names = new Map();

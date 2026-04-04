@@ -13,12 +13,12 @@ import {
     throwOnParseErrors,
 } from "./stage-tree.js";
 
-// TODO(architecture): SCARY: this analysis pass reuses a1.5 layout analysis and then walks header trees again.
+// TODO(architecture): SCARY: this analysis pass reuses analyze-source-layout
+// facts and then walks header trees again.
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
-// a1.4 Collect Header Snapshot:
 // gather shallow header facts from the parsed syntax tree.
-export async function runA14CollectHeaderSnapshot(context) {
+export async function runCollectHeaderSnapshot(context) {
     const parsed = context.artifacts.parse;
     const root = rootNode(parsed?.legacyTree ?? context.legacyTree ?? context.tree ?? parsed?.tree ?? null);
     const document = parsed?.document ?? context.analyses["load-source"]?.document ?? null;

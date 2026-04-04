@@ -1,9 +1,9 @@
-// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over multiple Stage-2 facts.
+// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over
+// multiple expansion facts.
 // It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.
 
-// a2.12 Freeze Expansion Facts:
-// publish one immutable Stage-2 artifact consumed by downstream stages and tooling.
-export async function runA212FreezeExpansionFacts(context) {
+// publish one immutable expansion artifact consumed by downstream stages and tooling.
+export async function runFreezeExpansionFacts(context) {
     const expansion = context.artifacts.expansion ?? null;
     const treeIndex = context.analyses["index-expanded-tree"] ?? null;
     const declarationIndex = context.analyses["index-expanded-declarations"] ?? null;

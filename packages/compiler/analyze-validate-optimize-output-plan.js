@@ -1,5 +1,5 @@
 import { runEmptyAnalysisPass } from "./analysis-pass-utils.js";
-import { readCompilerStageBundle } from "./compiler-stage-runtime.js";
+import { readCompilerArtifact, readCompilerStageBundle } from "./compiler-stage-runtime.js";
 import { rootNode, throwOnParseErrors } from "./stage-tree.js";
 
 export async function runAnalyzeValidateOptimizeOutputPlan(context) {
@@ -40,6 +40,6 @@ export async function runAnalyzeValidateOptimizeOutputPlan(context) {
         sourceForJs: context.options?.includeSource
             ? (context.options?.originalSource ?? context.source)
             : null,
-        hasBinaryenArtifact: Boolean((backendStage?.binaryenArtifact ?? context.artifacts.stage4Binaryen)?.wasm),
+        hasBinaryenArtifact: Boolean((backendStage?.binaryenArtifact ?? readCompilerArtifact(context, "binaryenArtifact"))?.wasm),
     };
 }

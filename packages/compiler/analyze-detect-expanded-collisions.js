@@ -1,10 +1,10 @@
-// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over a2.8.
+// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over
+// index-expanded-declarations.
 // It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.
 
-// a2.9 Detect Expanded Collisions:
 // identify duplicate declarations and cross-kind naming collisions post-expansion.
-export async function runA29DetectExpandedCollisions(context) {
-    const indexed = context.analyses["a2.8"] ?? { declarations: [], duplicates: [] };
+export async function runDetectExpandedCollisions(context) {
+    const indexed = context.analyses["index-expanded-declarations"] ?? { declarations: [], duplicates: [] };
     const collisionsByName = new Map();
 
     for (const entry of indexed.declarations ?? []) {
@@ -20,13 +20,13 @@ export async function runA29DetectExpandedCollisions(context) {
         ...(indexed.duplicates ?? []).map(({ name, count }) => ({
             severity: "warning",
             source: "utu",
-            phase: "a2.9",
+            phase: "detect-expanded-collisions",
             message: `Expanded tree contains duplicate declaration \"${name}\" (${count} declarations).`,
         })),
         ...kindCollisions.map(({ name, kinds }) => ({
             severity: "warning",
             source: "utu",
-            phase: "a2.9",
+            phase: "detect-expanded-collisions",
             message: `Expanded tree reuses declaration name \"${name}\" across kinds: ${kinds.join(", ")}.`,
         })),
     ];

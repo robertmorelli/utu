@@ -1,9 +1,8 @@
-import { runStage2DropNodeTypesRewrite } from "./expansion-rewrite-pass.js";
+import { runExpansionDropNodeTypesRewrite } from "./expansion-rewrite-pass.js";
 
-// e2.9 Prune File Imports:
 // remove file import declarations once expansion has materialized imported declarations.
-export async function runE29PruneFileImports(context) {
-    return runStage2DropNodeTypesRewrite("e2.9", context, ["file_import_decl"], {
+export async function runPruneFileImports(context) {
+    return runExpansionDropNodeTypesRewrite("prune-file-imports", context, ["file_import_decl"], {
         useRewritePlan: true,
     });
 }

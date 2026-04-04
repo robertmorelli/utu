@@ -1,12 +1,12 @@
-import { cloneStageTree } from "./compiler-stage-runtime.js";
+import { cloneStageTree, readCompilerArtifact } from "./compiler-stage-runtime.js";
 
-export function finalizeStage2ExpandedSource(expansionState, {
+export function finalizeExpandedSource(expansionState, {
     typeDeclarations = null,
     functionDeclarations = null,
     topLevelEmission = null,
 } = {}) {
     if (!expansionState) {
-        throw new Error("Stage 2 expansion state is required.");
+        throw new Error("Expansion session is required.");
     }
     if (!expansionState.shouldExpand) {
         const result = {
@@ -40,7 +40,7 @@ export function finalizeStage2ExpandedSource(expansionState, {
 }
 
 export async function runEditFinalizeExpandedSource(context) {
-    const materialized = finalizeStage2ExpandedSource(context.artifacts.stage2Expansion ?? null, {
+    const materialized = finalizeExpandedSource(readCompilerArtifact(context, "expansionSession"), {
         typeDeclarations: context.artifacts.expansionTypeDeclarations ?? null,
         functionDeclarations: context.artifacts.expansionFunctionAndRuntimeDeclarations ?? null,
         topLevelEmission: context.artifacts.expansionTopLevelEmission ?? null,
@@ -52,3 +52,5 @@ export async function runEditFinalizeExpandedSource(context) {
         },
     };
 }
+
+export const finalizeStage2ExpandedSource = finalizeExpandedSource;

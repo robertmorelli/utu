@@ -1,9 +1,9 @@
-import { cloneStageTree } from "./compiler-stage-runtime.js";
-import { prepareStage2ExpansionEmission } from "./analyze-prepare-expansion.js";
-import { emitStage253Item } from "./expansion-materialize-items.js";
-import { emitStage2FunctionAndRuntimeDeclarations } from "./edit-emit-function-runtime-declarations.js";
-import { finalizeStage2ExpandedSource } from "./edit-finalize-expanded-source.js";
-import { emitStage2TypeDeclarations } from "./edit-emit-type-declarations.js";
+import { cloneStageTree, readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { prepareExpansionEmission } from "./analyze-prepare-expansion.js";
+import { emitExpansionItem } from "./expansion-materialize-items.js";
+import { emitExpansionFunctionAndRuntimeDeclarations } from "./edit-emit-function-runtime-declarations.js";
+import { finalizeExpandedSource } from "./edit-finalize-expanded-source.js";
+import { emitExpansionTypeDeclarations } from "./edit-emit-type-declarations.js";
 
 const TOP_LEVEL_TYPE_NODE_TYPES = new Set([
     "struct_decl",
@@ -17,9 +17,9 @@ const TOP_LEVEL_VALUE_NODE_TYPES = new Set([
     "jsgen_decl",
 ]);
 
-export async function emitStage2TopLevelExpandedItems(expansionState, preparation = null) {
+export async function emitExpansionTopLevelItems(expansionState, preparation = null) {
     if (!expansionState) {
-        throw new Error("Stage 2 expansion state is required.");
+        throw new Error("Expansion session is required.");
     }
     if (!expansionState.shouldExpand) {
         return {
@@ -31,13 +31,13 @@ export async function emitStage2TopLevelExpandedItems(expansionState, preparatio
 
     const emissionPreparation = preparation
         ?? expansionState.emissionPreparation
-        ?? await prepareStage2ExpansionEmission(expansionState);
+        ?? await prepareExpansionEmission(expansionState);
     const topLevelCtx = emissionPreparation.rootContext ?? expansionState.expander.createRootContext();
     const topLevelTypeBlocks = [];
     const topLevelValueBlocks = [];
     const topLevelOtherBlocks = [];
     for (const item of emissionPreparation.topLevelItems) {
-        const emitted = emitStage253Item(expansionState.expander, item, topLevelCtx, false);
+        const emitted = emitExpansionItem(expansionState.expander, item, topLevelCtx, false);
         if (!emitted) continue;
         if (TOP_LEVEL_TYPE_NODE_TYPES.has(item.type)) {
             topLevelTypeBlocks.push(emitted);
@@ -59,21 +59,21 @@ export async function emitStage2TopLevelExpandedItems(expansionState, preparatio
     return result;
 }
 
-export async function materializeStage2ExpandedSource(expansionState) {
-    const preparation = await prepareStage2ExpansionEmission(expansionState);
-    const typeDeclarations = await emitStage2TypeDeclarations(expansionState, preparation);
-    const functionDeclarations = await emitStage2FunctionAndRuntimeDeclarations(expansionState, preparation);
-    const topLevelEmission = await emitStage2TopLevelExpandedItems(expansionState, preparation);
-    return finalizeStage2ExpandedSource(expansionState, {
+export async function materializeExpandedSource(expansionState) {
+    const preparation = await prepareExpansionEmission(expansionState);
+    const typeDeclarations = await emitExpansionTypeDeclarations(expansionState, preparation);
+    const functionDeclarations = await emitExpansionFunctionAndRuntimeDeclarations(expansionState, preparation);
+    const topLevelEmission = await emitExpansionTopLevelItems(expansionState, preparation);
+    return finalizeExpandedSource(expansionState, {
         typeDeclarations,
         functionDeclarations,
         topLevelEmission,
     });
 }
 
-export async function runE253MaterializeExpandedSource(context) {
-    const topLevelEmission = await emitStage2TopLevelExpandedItems(
-        context.artifacts.stage2Expansion ?? null,
+export async function runMaterializeExpandedSource(context) {
+    const topLevelEmission = await emitExpansionTopLevelItems(
+        readCompilerArtifact(context, "expansionSession"),
         context.analyses["prepare-expansion-emission"] ?? null,
     );
     return {

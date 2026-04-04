@@ -1,4 +1,5 @@
 import { runTreeWalkRewritePass } from "./rewrite-pass.js";
+import { readCompilerArtifact } from "./compiler-stage-runtime.js";
 import { collectJsgenPlanFromTree } from "./js-emission-plan.js";
 import { rootNode } from "./stage-tree.js";
 import data from "../../jsondata/jsgen.data.json" with { type: "json" };
@@ -63,46 +64,45 @@ export function jsgen(treeOrNode, binary, {
     return lines.join("\n");
 }
 
-// e5.2 Emit:
 // emit final artifacts such as wasm, debug WAT, JS shims, and metadata.
-export async function runE52Emit(context) {
-    const a51 = context.analyses["validate-output-plan"] ?? {};
-    const a52 = context.analyses["analyze-js-emission-inputs"] ?? {};
-    if (!a51.shouldEmitCompileArtifacts) {
-        return runTreeWalkRewritePass("e5.2", context, (node) => node);
+export async function runEmitOutput(context) {
+    const outputPlan = context.analyses["validate-output-plan"] ?? {};
+    const jsEmissionInputs = context.analyses["analyze-js-emission-inputs"] ?? {};
+    if (!outputPlan.shouldEmitCompileArtifacts) {
+        return runTreeWalkRewritePass("emit-output", context, (node) => node);
     }
-    const stage5 = context.artifacts.stage5 ?? null;
-    if (!stage5) {
-        throw new Error("e5.2 requires stage5 artifacts from e5.1 before emission.");
+    const backendArtifacts = readCompilerArtifact(context, "backendArtifacts");
+    if (!backendArtifacts) {
+        throw new Error("emit-output requires build-backend-artifacts to run before emission.");
     }
     const fullMetadata = {
-        ...(stage5.metadata ?? {}),
-        targetName: a51.backendOptions?.targetName ?? context.options?.targetName ?? null,
+        ...(backendArtifacts.metadata ?? {}),
+        targetName: outputPlan.backendOptions?.targetName ?? context.options?.targetName ?? null,
         artifact: {
-            where: a51.wasmLocation ?? "base64",
-            moduleFormat: a51.moduleFormat ?? "esm",
+            where: outputPlan.wasmLocation ?? "base64",
+            moduleFormat: outputPlan.moduleFormat ?? "esm",
         },
     };
-    const js = jsgen(context.tree, stage5.wasm, {
-        mode: a52.mode ?? normalizeEmitMode(a51.backendOptions?.mode ?? "program"),
-        profile: a52.profile ?? a51.backendOptions?.profile ?? null,
-        where: a51.wasmLocation ?? "base64",
-        moduleFormat: a51.moduleFormat ?? "esm",
+    const js = jsgen(context.tree, backendArtifacts.wasm, {
+        mode: jsEmissionInputs.mode ?? normalizeEmitMode(outputPlan.backendOptions?.mode ?? "program"),
+        profile: jsEmissionInputs.profile ?? outputPlan.backendOptions?.profile ?? null,
+        where: outputPlan.wasmLocation ?? "base64",
+        moduleFormat: outputPlan.moduleFormat ?? "esm",
         metadata: fullMetadata,
-        source: a51.sourceForJs ?? null,
-        plan: a52.jsgen ?? null,
+        source: outputPlan.sourceForJs ?? null,
+        plan: jsEmissionInputs.jsgen ?? null,
     });
-    const shim = (a51.wasmLocation ?? "base64") === "packed_base64" ? btoa(js) : js;
+    const shim = (outputPlan.wasmLocation ?? "base64") === "packed_base64" ? btoa(js) : js;
     return {
-        tree: await runTreeWalkRewritePass("e5.2", context, (node) => node),
+        tree: await runTreeWalkRewritePass("emit-output", context, (node) => node),
         artifacts: {
-            stage5,
+            backendArtifacts,
             output: {
                 shim,
                 js,
-                wasm: stage5.wasm,
+                wasm: backendArtifacts.wasm,
                 metadata: fullMetadata,
-                ...(a51.binaryenOptions?.emitWat ? { wat: stage5.wat } : {}),
+                ...(outputPlan.binaryenOptions?.emitWat ? { wat: backendArtifacts.wat } : {}),
             },
         },
     };

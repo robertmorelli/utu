@@ -9,9 +9,8 @@ export { SOURCE_KINDS };
 // TODO(architecture): SCARY: this pass walks the normalized tree and then re-analyzes the parse tree in the same file.
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
-// a1.5 Analyze Source Layout:
 // collect top-level runnable/export shape once so later passes consume one artifact.
-export async function runA15AnalyzeSourceLayout(context) {
+export async function runAnalyzeSourceLayout(context) {
     runTreeWalkAnalysisPass("analyze-source-layout", context, {
         visit: () => {},
     });

@@ -1,23 +1,23 @@
 import {
-    createStage2ExpansionState,
-    disposeStage2ExpansionState,
+    createExpansionSession,
+    disposeExpansionSession,
 } from "./expansion-session.js";
-import { materializeStage2ExpandedSource } from "./edit-materialize-expanded-source.js";
+import { materializeExpandedSource } from "./edit-materialize-expanded-source.js";
 import {
-    needsStage2Expansion,
-    normalizeStage2ExpandOptions,
+    needsExpansion,
+    normalizeExpansionOptions,
 } from "./analyze-expansion-plan.js";
 
 function createApiState(treeOrNode, source, options = {}) {
-    const shouldExpand = needsStage2Expansion(treeOrNode);
-    return createStage2ExpansionState({
+    const shouldExpand = needsExpansion(treeOrNode);
+    return createExpansionSession({
         treeOrNode,
         source,
         uri: options.uri ?? null,
         loadImport: options.loadImport ?? null,
         parseSource: options.parseSource ?? null,
         expandOptions: {
-            ...normalizeStage2ExpandOptions(options),
+            ...normalizeExpansionOptions(options),
             shouldExpand,
             hasModuleFeatures: shouldExpand,
         },
@@ -27,16 +27,16 @@ function createApiState(treeOrNode, source, options = {}) {
 export async function expandSource(treeOrNode, source, options = {}) {
     const state = createApiState(treeOrNode, source, options);
     try {
-        return (await materializeStage2ExpandedSource(state)).source;
+        return (await materializeExpandedSource(state)).source;
     } finally {
-        disposeStage2ExpansionState(state);
+        disposeExpansionSession(state);
     }
 }
 
 export async function expandSourceWithDiagnostics(treeOrNode, source, options = {}) {
     const state = createApiState(treeOrNode, source, options);
     try {
-        return await materializeStage2ExpandedSource(state);
+        return await materializeExpandedSource(state);
     } catch (error) {
         return {
             changed: false,
@@ -49,6 +49,6 @@ export async function expandSourceWithDiagnostics(treeOrNode, source, options = 
             source,
         };
     } finally {
-        disposeStage2ExpansionState(state);
+        disposeExpansionSession(state);
     }
 }

@@ -1,4 +1,5 @@
-import { ensureStage2NamespaceDiscovery } from "./expansion-session.js";
+import { readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { ensureExpansionNamespaceDiscovery } from "./expansion-session.js";
 
 function snapshotNamespaceSummary(namespace) {
     return {
@@ -15,8 +16,8 @@ function snapshotNamespaceSummary(namespace) {
     };
 }
 
-export async function runA216BuildExpansionNamespaces(context) {
-    const expansionState = context.artifacts.stage2Expansion ?? null;
+export async function runBuildExpansionNamespaces(context) {
+    const expansionState = readCompilerArtifact(context, "expansionSession");
     if (!expansionState?.shouldExpand) {
         return {
             namespaces: [],
@@ -25,7 +26,7 @@ export async function runA216BuildExpansionNamespaces(context) {
             nameMangles: [],
         };
     }
-    await ensureStage2NamespaceDiscovery(expansionState);
+    await ensureExpansionNamespaceDiscovery(expansionState);
     const expander = expansionState.expander;
     const namespaces = expander.namespaceOrder.map(snapshotNamespaceSummary);
     expansionState.namespaceModel = {

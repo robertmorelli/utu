@@ -1,6 +1,6 @@
-import { cloneStageTree } from "./compiler-stage-runtime.js";
-import { prepareStage2ExpansionEmission } from "./analyze-prepare-expansion.js";
-import { emitStage253Item } from "./expansion-materialize-items.js";
+import { cloneStageTree, readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { prepareExpansionEmission } from "./analyze-prepare-expansion.js";
+import { emitExpansionItem } from "./expansion-materialize-items.js";
 
 const TYPE_DECL_NODE_TYPES = new Set([
     "struct_decl",
@@ -20,7 +20,7 @@ function createNamespaceContext(expansionState, namespace) {
     );
 }
 
-export async function emitStage2TypeDeclarations(expansionState, preparation = null) {
+export async function emitExpansionTypeDeclarations(expansionState, preparation = null) {
     if (!expansionState?.shouldExpand) {
         return {
             blocks: [],
@@ -29,13 +29,13 @@ export async function emitStage2TypeDeclarations(expansionState, preparation = n
     }
     const emissionPreparation = preparation
         ?? expansionState.emissionPreparation
-        ?? await prepareStage2ExpansionEmission(expansionState);
+        ?? await prepareExpansionEmission(expansionState);
     const blocks = [];
     for (const namespacePlan of emissionPreparation.namespaces) {
         const ctx = createNamespaceContext(expansionState, namespacePlan.namespace);
         for (const item of namespacePlan.typeItems) {
             if (!TYPE_DECL_NODE_TYPES.has(item.type)) continue;
-            const emitted = emitStage253Item(expansionState.expander, item, ctx, true);
+            const emitted = emitExpansionItem(expansionState.expander, item, ctx, true);
             if (emitted) blocks.push(emitted);
         }
     }
@@ -47,9 +47,9 @@ export async function emitStage2TypeDeclarations(expansionState, preparation = n
     return result;
 }
 
-export async function runE251EmitTypeDeclarations(context) {
-    const expansionState = context.artifacts.stage2Expansion ?? null;
-    const typeDeclarations = await emitStage2TypeDeclarations(
+export async function runEmitTypeDeclarations(context) {
+    const expansionState = readCompilerArtifact(context, "expansionSession");
+    const typeDeclarations = await emitExpansionTypeDeclarations(
         expansionState,
         context.analyses["prepare-expansion-emission"] ?? null,
     );

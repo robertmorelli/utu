@@ -1,4 +1,5 @@
-import { ensureStage2TopLevelDeclarations } from "./expansion-session.js";
+import { readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { ensureExpansionTopLevelDeclarations } from "./expansion-session.js";
 
 function mapEntries(map) {
     return [...map.entries()].map(([name, value]) => ({ name, value }));
@@ -15,8 +16,8 @@ function collectProtocolDispatchTableSummary(expander) {
         .sort((left, right) => `${left.protocol}.${left.member}:${left.selfType}`.localeCompare(`${right.protocol}.${right.member}:${right.selfType}`));
 }
 
-export async function runA217CollectExpansionSymbolFacts(context) {
-    const expansionState = context.artifacts.stage2Expansion ?? null;
+export async function runCollectExpansionSymbolFacts(context) {
+    const expansionState = readCompilerArtifact(context, "expansionSession");
     if (!expansionState?.shouldExpand) {
         return {
             valueTypes: {},
@@ -28,7 +29,7 @@ export async function runA217CollectExpansionSymbolFacts(context) {
             protocolDispatchTables: [],
         };
     }
-    await ensureStage2TopLevelDeclarations(expansionState);
+    await ensureExpansionTopLevelDeclarations(expansionState);
     const expander = expansionState.expander;
     const facts = {
         valueTypes: mapEntries(expander.topLevelValueTypes),

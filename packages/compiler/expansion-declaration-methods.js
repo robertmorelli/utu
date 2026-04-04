@@ -1,4 +1,4 @@
-import { cloneStageTree } from "./compiler-stage-runtime.js";
+import { cloneStageTree, readCompilerArtifact } from "./compiler-stage-runtime.js";
 import { childOfType, childrenOfType, hasAnon, kids } from "./expansion-shared.js";
 
 export function emitStructDecl(node, ctx, inModule) {
@@ -170,10 +170,10 @@ export function emitExternDecl(keyword, sourceText, node, ctx, inModule) {
         : `${prefix}: ${this.emitType(kids(node).at(-1), ctx)}`;
 }
 
-// e2.5.0 Prepare Declaration Emission:
-// make declaration-emission helpers an explicit Stage-2 edit boundary before unit emission passes consume them.
-export async function runE250PrepareDeclarationEmission(context) {
-    const expansionState = context.artifacts.stage2Expansion ?? null;
+// make declaration-emission helpers an explicit edit boundary before unit
+// emission passes consume them.
+export async function runPrepareDeclarationEmission(context) {
+    const expansionState = readCompilerArtifact(context, "expansionSession");
     return {
         tree: cloneStageTree(context.tree),
         artifacts: {

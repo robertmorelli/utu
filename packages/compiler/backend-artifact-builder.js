@@ -1,4 +1,4 @@
-import { readCompilerStageBundle } from "./compiler-stage-runtime.js";
+import { readCompilerArtifact, readCompilerStageBundle } from "./compiler-stage-runtime.js";
 import { runTreeWalkRewritePass } from "./rewrite-pass.js";
 import { compileBinaryen } from "./binaryen-build.js";
 import { mergeBackendMetadata, normalizeMode } from "./backend-metadata-defaults.js";
@@ -8,66 +8,65 @@ export async function buildBackendArtifactsFromTree(treeOrNode, {
     emitWat = false,
     ...backendOptions
 } = {}) {
-    const stage4Binaryen = await compileBinaryen(treeOrNode, {
+    const binaryenArtifact = await compileBinaryen(treeOrNode, {
         optimize,
         emitWat,
         ...backendOptions,
     });
-    const emitted = await stage4Binaryen.ir.emitArtifacts({
+    const emitted = await binaryenArtifact.ir.emitArtifacts({
         optimize,
         emitWat,
     });
     return {
-        ...stage4Binaryen,
+        ...binaryenArtifact,
         ...emitted,
-        ...(emitWat && typeof stage4Binaryen.wat === "string" ? { wat: stage4Binaryen.wat } : {}),
+        ...(emitWat && typeof binaryenArtifact.wat === "string" ? { wat: binaryenArtifact.wat } : {}),
     };
 }
 
-// e5.1 Build backend artifacts:
-// consume the backend builder output as the stage-5 artifact contract.
-export async function runE51BuildBackendArtifacts(context) {
-    const a51 = context.analyses["validate-output-plan"] ?? {};
+// consume the backend builder output as the output-stage artifact contract.
+export async function runBuildBackendArtifacts(context) {
+    const outputPlan = context.analyses["validate-output-plan"] ?? {};
     const backendStage = readCompilerStageBundle(context, "backend");
-    const a43 = backendStage?.metadataDefaults ?? context.analyses["prepare-backend-metadata-defaults"] ?? {};
-    const tree = await runTreeWalkRewritePass("e5.1", context, (node) => node);
-    if (!a51.shouldEmitCompileArtifacts) return { tree };
+    const backendMetadataDefaults = backendStage?.metadataDefaults ?? context.analyses["prepare-backend-metadata-defaults"] ?? {};
+    const tree = await runTreeWalkRewritePass("build-backend-artifacts", context, (node) => node);
+    if (!outputPlan.shouldEmitCompileArtifacts) return { tree };
 
     const source = context.source ?? context.options?.originalSource ?? null;
-    const prebuilt = backendStage?.binaryenArtifact ?? context.artifacts.stage4Binaryen ?? null;
-    const stage5Raw = prebuilt
+    const prebuiltBinaryenArtifact = backendStage?.binaryenArtifact ?? readCompilerArtifact(context, "binaryenArtifact");
+    const backendArtifactsRaw = prebuiltBinaryenArtifact
         ? {
-            ...prebuilt,
-            ...(await prebuilt.ir.emitArtifacts({
-                optimize: a51.binaryenOptions?.optimize ?? true,
-                emitWat: a51.binaryenOptions?.emitWat ?? false,
+            ...prebuiltBinaryenArtifact,
+            ...(await prebuiltBinaryenArtifact.ir.emitArtifacts({
+                optimize: outputPlan.binaryenOptions?.optimize ?? true,
+                emitWat: outputPlan.binaryenOptions?.emitWat ?? false,
             })),
-            ...(a51.binaryenOptions?.emitWat && typeof prebuilt.wat === "string" ? { wat: prebuilt.wat } : {}),
+            ...(outputPlan.binaryenOptions?.emitWat && typeof prebuiltBinaryenArtifact.wat === "string" ? { wat: prebuiltBinaryenArtifact.wat } : {}),
         }
         : await buildBackendArtifactsFromTree(
             context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null,
             {
-                ...(a51.backendOptions ?? {}),
-                mode: normalizeMode(a51.backendOptions?.mode ?? a43.mode ?? "program"),
-                optimize: a51.binaryenOptions?.optimize ?? true,
-                emitWat: a51.binaryenOptions?.emitWat ?? false,
+                ...(outputPlan.backendOptions ?? {}),
+                mode: normalizeMode(outputPlan.backendOptions?.mode ?? backendMetadataDefaults.mode ?? "program"),
+                optimize: outputPlan.binaryenOptions?.optimize ?? true,
+                emitWat: outputPlan.binaryenOptions?.emitWat ?? false,
                 source,
                 uri: context.uri ?? null,
                 loadImport: context.loadImport ?? null,
             },
         );
-    const stage5 = {
-        ...stage5Raw,
+    const backendArtifacts = {
+        ...backendArtifactsRaw,
         metadata: mergeBackendMetadata(
-            a43.metadataDefaults ?? {},
-            stage5Raw?.metadata ?? {},
+            backendMetadataDefaults.metadataDefaults ?? {},
+            backendArtifactsRaw?.metadata ?? {},
         ),
     };
-    prebuilt?.ir?.dispose?.();
-    if (stage5.ir) delete stage5.ir;
+    prebuiltBinaryenArtifact?.ir?.dispose?.();
+    if (backendArtifacts.ir) delete backendArtifacts.ir;
 
     return {
         tree,
-        artifacts: { stage5 },
+        artifacts: { backendArtifacts },
     };
 }

@@ -1,6 +1,6 @@
 import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../document/default-wasm.js';
 import { createUtuTreeSitterParser } from '../document/index.js';
-import { runCompilerNewCompile, runCompilerNewMetadata } from './pipeline.js';
+import { runCompilerCompile, runCompilerMetadata } from './pipeline.js';
 
 let binaryenModulePromise = null;
 const importBinaryen = Function(
@@ -192,7 +192,7 @@ export async function init({ wasmUrl, runtimeWasmUrl } = {}) {
 
 export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWasmUrl, mode = 'program', profile = null, where = 'base64', provided_wasm_bytes = false, providedWasmBytes = false, moduleFormat = 'esm', targetName = null, includeSource = false, optimize = true, uri = null, loadImport = null } = {}) {
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
-    return runCompilerNewCompile({
+    return runCompilerCompile({
         source,
         parser,
         uri,
@@ -214,7 +214,7 @@ export async function compile(source, { wat: emitWat = false, wasmUrl, runtimeWa
 
 export async function get_metadata(source, { wasmUrl, runtimeWasmUrl, uri = null, loadImport = null } = {}) {
     if (!parser) await init({ wasmUrl, runtimeWasmUrl });
-    return runCompilerNewMetadata({
+    return runCompilerMetadata({
         source,
         parser,
         uri,

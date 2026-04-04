@@ -1,5 +1,6 @@
 import { namedChildren } from "./expansion-shared.js";
-import { ensureStage2NamespaceDiscovery } from "./expansion-session.js";
+import { readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { ensureExpansionNamespaceDiscovery } from "./expansion-session.js";
 
 const TYPE_DECL_NODE_TYPES = new Set([
     "struct_decl",
@@ -32,7 +33,7 @@ function partitionNamespaceItems(namespace) {
     };
 }
 
-export async function prepareStage2ExpansionEmission(expansionState) {
+export async function prepareExpansionEmission(expansionState) {
     if (!expansionState?.shouldExpand) {
         const result = {
             rootContext: null,
@@ -43,7 +44,7 @@ export async function prepareStage2ExpansionEmission(expansionState) {
         return result;
     }
 
-    await ensureStage2NamespaceDiscovery(expansionState);
+    await ensureExpansionNamespaceDiscovery(expansionState);
 
     const result = {
         rootContext: expansionState.expander.createRootContext(),
@@ -55,5 +56,7 @@ export async function prepareStage2ExpansionEmission(expansionState) {
 }
 
 export async function runAnalyzePrepareExpansion(context) {
-    return prepareStage2ExpansionEmission(context.artifacts.stage2Expansion ?? null);
+    return prepareExpansionEmission(readCompilerArtifact(context, "expansionSession"));
 }
+
+export const prepareStage2ExpansionEmission = prepareExpansionEmission;

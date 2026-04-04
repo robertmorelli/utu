@@ -1,4 +1,4 @@
-export async function runA24ConstructNamespaces(context) {
+export async function runBuildNamespaceAliases(context) {
     const header = context.analyses["discover-expansion-declarations"]?.header ?? {};
     const resolved = context.analyses["resolve-imports"] ?? {};
     const aliases = new Map();

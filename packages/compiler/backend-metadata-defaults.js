@@ -1,7 +1,8 @@
 import { runTreeWalkAnalysisPass } from "./analysis-pass-utils.js";
 import { rootNode } from "./stage-tree.js";
 
-// TODO(architecture): SCARY: this analysis pass stacks a4.1/a3.3 facts and then performs another tree walk.
+// TODO(architecture): SCARY: this analysis pass stacks lowering and semantic
+// facts and then performs another tree walk.
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
 export function createBackendMetadataDefaults({
@@ -78,7 +79,7 @@ function collectLegacyTreeFacts(root) {
         };
     }
 
-    return runTreeWalkAnalysisPass("a4.3", { tree: root }, {
+    return runTreeWalkAnalysisPass("prepare-backend-metadata-defaults", { tree: root }, {
         root,
         initialState: () => ({
             hasMain: false,

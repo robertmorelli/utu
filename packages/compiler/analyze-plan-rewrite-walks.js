@@ -1,17 +1,16 @@
 import { collectNodeCounts } from "./header-reference-utils.js";
 
 const REWRITE_TARGETS = {
-    "e2.7": ["comment"],
-    "e2.8": ["construct_decl"],
-    "e2.9": ["file_import_decl"],
-    "e2.10": ["module_decl"],
-    "e2.11": ["promoted_module_call_expr", "namespace_call_expr", "pipe_expr", "type_member_expr"],
-    "e2.12": ["comment"],
+    "normalize-post-expansion": ["comment"],
+    "prune-construct-declarations": ["construct_decl"],
+    "prune-file-imports": ["file_import_decl"],
+    "prune-module-declarations": ["module_decl"],
+    "normalize-expansion-residuals": ["promoted_module_call_expr", "namespace_call_expr", "pipe_expr", "type_member_expr"],
+    "finalize-expansion-tree": ["comment"],
 };
 
-// a2.10 Plan Rewrite Walks:
 // build a cheap pass activation plan from expanded-tree syntax counts.
-export async function runA210PlanRewriteWalks(context) {
+export async function runPlanExpansionRewrites(context) {
     const allTargets = new Set(Object.values(REWRITE_TARGETS).flat());
     const counts = collectNodeCounts(context.tree, allTargets).byType;
 

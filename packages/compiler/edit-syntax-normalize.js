@@ -21,8 +21,7 @@ function normalizeStageTree(tree) {
     return tree ? normalizeStageNode(tree) : null;
 }
 
-// e1.3 Syntax Normalize:
 // clean up raw parse output into a stable compiler-owned syntax tree shape.
-export async function runE13SyntaxNormalize(context) {
+export async function runNormalizeSyntax(context) {
     return normalizeStageTree(context.tree);
 }

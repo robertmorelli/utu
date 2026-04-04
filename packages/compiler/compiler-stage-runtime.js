@@ -26,64 +26,45 @@ export function cloneStageTree(tree) {
     return tree ? cloneStageNode(tree) : null;
 }
 
-const LEGACY_PASS_KEY_ALIASES = Object.freeze(new Map([
-    ["load-source", "a1.1"],
-    ["parse-source", "e1.2"],
-    ["collect-syntax-diagnostics", "a1.3"],
-    ["normalize-syntax", "e1.3"],
-    ["build-stage-tree", "e1.4"],
-    ["collect-header-snapshot", "a1.4"],
-    ["analyze-source-layout", "a1.5"],
-    ["collect-header-references", "a2.0"],
-    ["discover-expansion-declarations", "a2.1"],
-    ["build-module-graph", "a2.2"],
-    ["resolve-imports", "a2.3"],
-    ["build-namespace-aliases", "a2.4"],
-    ["plan-expansion", "a2.5"],
-    ["prepare-expansion-options", "a2.6"],
-    ["load-expansion-imports", "a2.14"],
-    ["collect-top-level-expansion-facts", "a2.15"],
-    ["build-expansion-namespaces", "a2.16"],
-    ["collect-expansion-symbol-facts", "a2.17"],
-    ["emit-type-declarations", "e2.5.1"],
-    ["emit-function-runtime-declarations", "e2.5.2"],
-    ["materialize-expanded-source", "e2.5.3"],
-    ["parse-materialized-source", "e2.5.4"],
-    ["index-expanded-tree", "a2.7"],
-    ["index-expanded-declarations", "a2.8"],
-    ["detect-expanded-collisions", "a2.9"],
-    ["plan-expansion-rewrites", "a2.10"],
-    ["validate-expansion-boundary", "a2.11"],
-    ["freeze-expansion-facts", "a2.12"],
-    ["rewrite-type-values", "e2.6.1"],
-    ["rewrite-calls-and-pipes", "e2.6.2"],
-    ["rewrite-core-control", "e2.6.3"],
-    ["normalize-post-expansion", "e2.7"],
-    ["prune-construct-declarations", "e2.8"],
-    ["prune-file-imports", "e2.9"],
-    ["prune-module-declarations", "e2.10"],
-    ["normalize-expansion-residuals", "e2.11"],
-    ["finalize-expansion-tree", "e2.12"],
-    ["index-post-expansion-layout", "a2.13"],
-    ["index-top-level-symbols", "a3.1"],
-    ["bind-top-level-symbols", "a3.2"],
-    ["check-semantics", "a3.3"],
-    ["plan-compile", "a3.4"],
-    ["collect-lowering-metadata", "a4.1"],
-    ["collect-binaryen-metadata", "a4.2"],
-    ["prepare-backend-metadata-defaults", "a4.3"],
-    ["lower-to-backend-ir", "e4.1"],
-    ["build-binaryen-module", "e4.2"],
-    ["validate-output-plan", "a5.1"],
-    ["build-backend-artifacts", "e5.1"],
-    ["analyze-js-emission-inputs", "a5.2"],
-    ["emit-output", "e5.2"],
-]));
+function resolveArtifactContainer(target) {
+    if (!target || typeof target !== "object") {
+        return null;
+    }
+    return target.artifacts && typeof target.artifacts === "object"
+        ? target.artifacts
+        : target;
+}
 
-function mirrorLegacyPassKey(container, key, value) {
-    const legacyKey = LEGACY_PASS_KEY_ALIASES.get(key);
-    if (!legacyKey || legacyKey === key) return;
-    container[legacyKey] = value;
+export function mergeCompilerArtifacts(existingArtifacts, incomingArtifacts) {
+    return {
+        ...(existingArtifacts ?? {}),
+        ...(incomingArtifacts ?? {}),
+    };
+}
+
+export function readCompilerArtifact(target, artifactName) {
+    const artifacts = resolveArtifactContainer(target);
+    if (!artifacts) return null;
+    return Object.hasOwn(artifacts, artifactName) ? artifacts[artifactName] : null;
+}
+
+export function writeCompilerArtifact(target, artifactName, value) {
+    const artifacts = resolveArtifactContainer(target);
+    if (!artifacts) return value;
+    artifacts[artifactName] = value;
+    return value;
+}
+
+export function deleteCompilerArtifact(target, artifactName) {
+    const artifacts = resolveArtifactContainer(target);
+    if (!artifacts) return;
+    delete artifacts[artifactName];
+}
+
+function disposeCompilerArtifacts(state) {
+    readCompilerArtifact(state, "expansionSession")?.dispose?.();
+    readCompilerArtifact(state, "binaryenArtifact")?.ir?.dispose?.();
+    readCompilerArtifact(state, "backendArtifacts")?.ir?.dispose?.();
 }
 
 export function createCompilerContext(state) {
@@ -153,7 +134,6 @@ function hasSharedStageNodes(left, right) {
 
 export async function runCompilerAnalysis(state, key, fn) {
     state.analyses[key] = await fn(createCompilerContext(state));
-    mirrorLegacyPassKey(state.analyses, key, state.analyses[key]);
 }
 
 export async function runCompilerRewrite(state, key, fn) {
@@ -185,24 +165,41 @@ export async function runCompilerRewrite(state, key, fn) {
         state.disposeLegacyTree = result.disposeLegacyTree ?? (() => {});
     }
     if (result.artifacts && typeof result.artifacts === "object") {
-        state.artifacts = { ...state.artifacts, ...result.artifacts };
+        state.artifacts = mergeCompilerArtifacts(state.artifacts, result.artifacts);
     }
     state.artifacts[key] = result;
-    mirrorLegacyPassKey(state.artifacts, key, result);
     return result;
 }
 
-export async function runCompilerStageSteps(state, steps, handlers = {}) {
+export async function runCompilerPipelineSteps(state, steps, {
+    runAnalysis = runCompilerAnalysis,
+    runRewrite = runCompilerRewrite,
+    beforeStepHooks = null,
+    afterStepHooks = null,
+    stopAfterStepKey = null,
+    shouldStop = null,
+} = {}) {
     for (const step of steps) {
+        const before = beforeStepHooks?.get(step.key);
+        if (before) await before(state, step);
+
         if (step.kind === "analysis") {
-            await handlers.runAnalysis(state, step.key, step.run);
-            continue;
+            await runAnalysis(state, step.key, step.run);
+        } else if (step.kind === "rewrite") {
+            await runRewrite(state, step.key, step.run);
+        } else {
+            throw new Error(`Unknown compiler pipeline step kind "${step.kind}".`);
         }
-        if (step.kind === "rewrite") {
-            await handlers.runRewrite(state, step.key, step.run);
-            continue;
+
+        const after = afterStepHooks?.get(step.key);
+        if (after) await after(state, step);
+
+        if (stopAfterStepKey && step.key === stopAfterStepKey) {
+            return;
         }
-        throw new Error(`Unknown compiler stage step kind "${step.kind}".`);
+        if (shouldStop?.(step, state)) {
+            return;
+        }
     }
 }
 
@@ -214,17 +211,13 @@ export function snapshotPipelineState(state) {
         analyses: state.analyses,
         artifacts: state.artifacts,
         dispose() {
-            state.artifacts.stage2Expansion?.dispose?.();
-            state.artifacts.stage4Binaryen?.ir?.dispose?.();
-            state.artifacts.stage5?.ir?.dispose?.();
+            disposeCompilerArtifacts(state);
             state.disposeLegacyTree?.();
         },
     };
 }
 
 export function disposePipelineState(state) {
-    state.artifacts.stage2Expansion?.dispose?.();
-    state.artifacts.stage4Binaryen?.ir?.dispose?.();
-    state.artifacts.stage5?.ir?.dispose?.();
+    disposeCompilerArtifacts(state);
     state.disposeLegacyTree?.();
 }

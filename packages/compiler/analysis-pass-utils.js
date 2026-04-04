@@ -1,8 +1,7 @@
 import { createSourceDocument } from "../document/index.js";
 
-// a1.1 Load:
 // establish the initial source/document/load-context artifact for the pipeline.
-export async function runA11Load(context) {
+export async function runLoadSource(context) {
     return {
         source: context.source,
         uri: context.uri ?? 'memory://utu',

@@ -1,4 +1,4 @@
-export async function runA23ResolveImports(context) {
+export async function runResolveImports(context) {
     const header = context.analyses["discover-expansion-declarations"]?.header ?? {};
     const graph = context.analyses["build-module-graph"] ?? {};
     const uri = context.uri ?? "memory://utu";
@@ -26,7 +26,7 @@ export async function runA23ResolveImports(context) {
                 diagnostics.push({
                     severity: "warning",
                     source: "utu",
-                    phase: "a2.3",
+                    phase: "resolve-imports",
                     message: `Import "${entry.specifier}" did not return source/root from loader.`,
                 });
             }
@@ -34,7 +34,7 @@ export async function runA23ResolveImports(context) {
             diagnostics.push({
                 severity: "error",
                 source: "utu",
-                phase: "a2.3",
+                phase: "resolve-imports",
                 message: `Failed to resolve import "${entry.specifier}": ${error?.message ?? String(error)}`,
             });
         }

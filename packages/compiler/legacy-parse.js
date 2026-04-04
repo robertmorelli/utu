@@ -3,8 +3,7 @@ import { cloneStageNode as cloneLegacyNode } from "./compiler-stage-runtime.js";
 
 export { cloneLegacyNode };
 
-// e1.2 Parse:
-export async function runE12Parse(context) {
+export async function runParseSource(context) {
     const load = context.analyses["load-source"] ?? {};
     const parsed = parseTree(context.parser, load.source ?? context.source, "Tree-sitter returned no syntax tree for the document.");
     const document = load.document ?? null;

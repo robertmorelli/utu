@@ -1,5 +1,6 @@
 import { parseTree } from "../document/tree-sitter.js";
-import { ensureStage2Imports } from "./expansion-session.js";
+import { readCompilerArtifact } from "./compiler-stage-runtime.js";
+import { ensureExpansionImports } from "./expansion-session.js";
 
 function collectModuleTemplateSummary(expander) {
     return [...(expander?.moduleTemplates?.values?.() ?? [])]
@@ -36,8 +37,8 @@ async function snapshotLoadedFiles(expansionState) {
     return loadedFiles;
 }
 
-export async function runA214LoadExpansionImports(context) {
-    const expansionState = context.artifacts.stage2Expansion ?? null;
+export async function runLoadExpansionImports(context) {
+    const expansionState = readCompilerArtifact(context, "expansionSession");
     if (expansionState && !expansionState.parseSource) {
         expansionState.parseSource = async (sourceText) => {
             const parsed = parseTree(
@@ -60,7 +61,7 @@ export async function runA214LoadExpansionImports(context) {
             parseCache: [],
         };
     }
-    await ensureStage2Imports(expansionState);
+    await ensureExpansionImports(expansionState);
     return {
         loadedFileCount: expansionState.expander.loadedFiles.size,
         importedModuleCount: expansionState.expander.moduleTemplates.size,

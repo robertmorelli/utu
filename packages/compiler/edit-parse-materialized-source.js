@@ -6,8 +6,8 @@ import { rewriteStageTree } from "./rewrite-pass.js";
 // TODO(architecture): SCARY: this rewrite pass reparses, re-diagnoses, and rewrites in one file.
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
-// e2.5.4 Parse Materialized Source to Stage Tree:
-export async function runE254ParseMaterializedSource(context) {
+// parse the materialized expansion source back into the compiler tree format.
+export async function runParseMaterializedSource(context) {
     const materialized = context.artifacts.expansionMaterializedSource ?? null;
     const rewrittenSource = materialized?.source ?? context.source;
     const parsed = parseTree(context.parser, rewrittenSource, "Tree-sitter returned no syntax tree for the rewritten document.");

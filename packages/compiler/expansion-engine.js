@@ -72,7 +72,7 @@ const EXPANSION_METHODS = Object.freeze({
     ...expressionFns,
 });
 
-export function createStage2Expander(root, source, options = {}) {
+export function createExpansionExpander(root, source, options = {}) {
     return {
         root,
         source,
@@ -103,3 +103,5 @@ export function createStage2Expander(root, source, options = {}) {
         ...EXPANSION_METHODS,
     };
 }
+
+export const createStage2Expander = createExpansionExpander;

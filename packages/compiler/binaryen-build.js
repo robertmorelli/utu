@@ -46,32 +46,32 @@ export async function compileBinaryen(treeOrNode, options = {}) {
     };
 }
 
-export async function runE42BuildBinaryen(context) {
-    const a42 = context.analyses["collect-binaryen-metadata"] ?? {};
-    const a41 = context.analyses["collect-lowering-metadata"] ?? {};
-    const a43 = context.analyses["prepare-backend-metadata-defaults"] ?? {};
-    const tree = await runTreeWalkRewritePass("e4.2", context, (node) => node);
-    if (!a42.shouldBuildBinaryen) return { tree };
+export async function runBuildBinaryenModule(context) {
+    const binaryenMetadata = context.analyses["collect-binaryen-metadata"] ?? {};
+    const loweringMetadata = context.analyses["collect-lowering-metadata"] ?? {};
+    const backendMetadataDefaults = context.analyses["prepare-backend-metadata-defaults"] ?? {};
+    const tree = await runTreeWalkRewritePass("build-binaryen-module", context, (node) => node);
+    if (!binaryenMetadata.shouldBuildBinaryen) return { tree };
 
-    const stage4BinaryenRaw = await compileBinaryen(context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null, {
-        mode: normalizeMode(a41.backendOptions?.mode ?? a43.mode ?? "program"),
-        profile: a41.backendOptions?.profile ?? null,
-        targetName: a41.backendOptions?.targetName ?? null,
-        plan: a41.backendOptions?.plan ?? null,
-        optimize: a42.optimize ?? true,
-        emitWat: a42.emitWat ?? false,
+    const binaryenArtifactRaw = await compileBinaryen(context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null, {
+        mode: normalizeMode(loweringMetadata.backendOptions?.mode ?? backendMetadataDefaults.mode ?? "program"),
+        profile: loweringMetadata.backendOptions?.profile ?? null,
+        targetName: loweringMetadata.backendOptions?.targetName ?? null,
+        plan: loweringMetadata.backendOptions?.plan ?? null,
+        optimize: binaryenMetadata.optimize ?? true,
+        emitWat: binaryenMetadata.emitWat ?? false,
     });
-    const stage4Binaryen = {
-        ...stage4BinaryenRaw,
+    const binaryenArtifact = {
+        ...binaryenArtifactRaw,
         metadata: mergeBackendMetadata(
-            a43.metadataDefaults ?? {},
-            stage4BinaryenRaw?.metadata ?? {},
+            backendMetadataDefaults.metadataDefaults ?? {},
+            binaryenArtifactRaw?.metadata ?? {},
         ),
     };
 
     return {
         tree,
-        artifacts: { stage4Binaryen },
+        artifacts: { binaryenArtifact },
     };
 }
 

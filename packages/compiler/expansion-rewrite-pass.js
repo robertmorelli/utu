@@ -16,7 +16,7 @@ function normalizeNodeTypes(nodeTypes) {
         : [];
 }
 
-export async function runStage2IdentityRewrite(passName, context) {
+export async function runExpansionIdentityRewrite(passName, context) {
     const plan = getPlannedRewriteEntry(context, passName);
     if (plan && plan.active === false) {
         return runTreeWalkRewritePass(passName, context, (node) => node);
@@ -24,7 +24,7 @@ export async function runStage2IdentityRewrite(passName, context) {
     return runTreeWalkRewritePass(passName, context, (node) => node);
 }
 
-export async function runStage2CommentStripRewrite(passName, context) {
+export async function runExpansionCommentStripRewrite(passName, context) {
     const plan = getPlannedRewriteEntry(context, passName);
     if (plan && plan.active === false) {
         return runTreeWalkRewritePass(passName, context, (node) => node);
@@ -32,7 +32,7 @@ export async function runStage2CommentStripRewrite(passName, context) {
     return runTreeWalkRewritePass(passName, context, (node) => (node.type === "comment" ? null : node));
 }
 
-export async function runStage2DropNodeTypesRewrite(passName, context, nodeTypes, {
+export async function runExpansionDropNodeTypesRewrite(passName, context, nodeTypes, {
     skipWhenRecovered = true,
     useRewritePlan = false,
 } = {}) {
@@ -52,8 +52,7 @@ export async function runStage2DropNodeTypesRewrite(passName, context, nodeTypes
     });
 }
 
-// e2.6 Expand Expression Sugar:
 // rewrite syntax-owned module/namespace expression sugar without semantic guessing.
-export async function runE26ExpandExpressionSugar(context) {
-    return runStage2IdentityRewrite("e2.6", context);
+export async function runRewriteExpressionSugar(context) {
+    return runExpansionIdentityRewrite("rewrite-expression-sugar", context);
 }

@@ -68,8 +68,7 @@ export function throwOnParseErrors(node) {
     if (errors.length) throw new Error(`Parse errors:\n${errors.join("\n")}`);
 }
 
-// e1.4 Build Stage Tree:
 // freeze the public stage-tree contract into a dedicated compiler-owned edit boundary.
-export async function runE14BuildStageTree(context) {
+export async function runBuildStageTree(context) {
     return cloneStageTree(context.tree);
 }

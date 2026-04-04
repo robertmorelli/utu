@@ -65,7 +65,7 @@ function collectStrings(root, mode) {
         type: "emit_plan_root",
         namedChildren: bodies,
     };
-    return runTreeWalkAnalysisPass("a5.2", { tree: syntheticRoot }, {
+    return runTreeWalkAnalysisPass("analyze-js-emission-inputs", { tree: syntheticRoot }, {
         root: syntheticRoot,
         initialState: () => ({ strings: new Map() }),
         childrenOf: (node) => node?.namedChildren ?? [],

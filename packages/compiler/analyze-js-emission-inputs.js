@@ -1,5 +1,5 @@
 import { runEmptyAnalysisPass } from "./analysis-pass-utils.js";
-import { readCompilerStageBundle } from "./compiler-stage-runtime.js";
+import { readCompilerArtifact, readCompilerStageBundle } from "./compiler-stage-runtime.js";
 import { collectJsgenPlanFromTree } from "./js-emission-plan.js";
 import { rootNode } from "./stage-tree.js";
 
@@ -24,8 +24,8 @@ export async function runAnalyzeJsEmissionInputs(context) {
         };
     }
 
-    const stage5 = context.artifacts.stage5 ?? null;
-    const metadata = stage5?.metadata ?? {};
+    const backendArtifacts = readCompilerArtifact(context, "backendArtifacts");
+    const metadata = backendArtifacts?.metadata ?? {};
     const semanticsStage = readCompilerStageBundle(context, "semantics");
     const semantic = semanticsStage?.semantic ?? context.analyses["check-semantics"] ?? {};
     return {

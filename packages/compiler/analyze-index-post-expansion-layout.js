@@ -62,10 +62,10 @@ function finalizeLayout(state, tree) {
     };
 }
 
-// a2.13 Index Post-Expansion Layout:
-// tree-walk finalized stage-2 syntax and cache declaration/layout facts for semantics.
-export async function runA213IndexPostExpansionLayout(context) {
-    return runTreeWalkAnalysisPass("a2.13", context, {
+// tree-walk finalized expansion syntax and cache declaration/layout facts for
+// the semantic passes.
+export async function runIndexPostExpansionLayout(context) {
+    return runTreeWalkAnalysisPass("index-post-expansion-layout", context, {
         initialState: () => ({
             symbols: [],
         }),
