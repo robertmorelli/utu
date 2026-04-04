@@ -7,7 +7,6 @@ import { rewriteStageTree } from "./e2_5.js";
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
 // e2.5.4 Parse Materialized Source to Stage Tree:
-// parse the Stage-2 expanded source back into the legacy tree plus compiler-owned stage tree.
 export async function runE254ParseMaterializedSource(context) {
     const materialized = context.artifacts.expansionMaterializedSource ?? null;
     const rewrittenSource = materialized?.source ?? context.source;
@@ -20,7 +19,6 @@ export async function runE254ParseMaterializedSource(context) {
     return {
         source: rewrittenSource,
         tree: expandedStageTree,
-        legacyTree: parsed.tree,
         disposeLegacyTree: parsed.dispose,
         artifacts: {
             expansion: {
@@ -30,7 +28,6 @@ export async function runE254ParseMaterializedSource(context) {
             expand: {
                 changed: Boolean(materialized?.changed),
                 source: rewrittenSource,
-                legacyTree: parsed.tree,
             },
         },
     };

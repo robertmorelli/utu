@@ -25,7 +25,6 @@ export async function runE51BuildBackendArtifacts(context) {
     const source = context.source ?? context.options?.originalSource ?? null;
     const prebuilt = context.artifacts.stage4Binaryen ?? null;
     const stage5Raw = prebuilt ?? await buildBackendArtifactsFromTree(
-        context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null,
         {
             ...(a51.backendOptions ?? {}),
             mode: normalizeMode(a51.backendOptions?.mode ?? a43.mode ?? "program"),

@@ -7,7 +7,7 @@ import {
     kids,
     namedChildren,
     sameTypeInfo,
-} from "./e2_5_expand/core.js";
+} from "./stage2/expansion/core.js";
 
 export const stage252ExpressionMethods = {
     resolveBareValue(name, ctx) {

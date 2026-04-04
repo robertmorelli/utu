@@ -3,7 +3,7 @@ import {
     childrenOfType,
     hasAnon,
     kids,
-} from "./expansion/bootstrap.js";
+} from "../stage2-expansion-shared.js";
 import { collectStage2ModuleTemplateSummary } from "./load-imports.js";
 import {
     runStage2ExpansionStep,

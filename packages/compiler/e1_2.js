@@ -20,7 +20,6 @@ export function cloneLegacyNode(node) {
 }
 
 // e1.2 Parse:
-// parse the loaded source into a legacy tree plus compiler-owned stage tree.
 export async function runE12Parse(context) {
     const load = context.analyses["a1.1"] ?? {};
     const parsed = parseTree(context.parser, load.source ?? context.source, "Tree-sitter returned no syntax tree for the document.");
@@ -30,7 +29,6 @@ export async function runE12Parse(context) {
         uri: load.uri ?? context.uri ?? 'memory://utu',
         version: load.version ?? context.version ?? 0,
         document,
-        legacyTree: parsed.tree,
         disposeLegacyTree: parsed.dispose,
         tree: cloneLegacyNode(parsed.tree.rootNode),
     };

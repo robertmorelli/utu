@@ -9,12 +9,8 @@ import {
 // a2.17 Collect Symbol/Return Facts:
 // walk top-level declarations in source order and capture value/function/protocol return facts.
 export async function runA217CollectSymbolReturnFacts(context) {
-    const pipeline = context.analyses["a2.16"]?.pipeline ?? context.analyses["a2.15"]?.pipeline ?? null;
-    const facts = await collectStage2SymbolFacts(pipeline);
-    return {
-        pipeline,
-        ...facts,
-    };
+    const expansionState = context.artifacts.stage2Expansion ?? null;
+    return collectStage2SymbolFacts(expansionState);
 }
 
 export { collectSymbolFactsFromExpander };

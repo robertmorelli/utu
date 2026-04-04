@@ -10,8 +10,6 @@ export async function runA43PrepareBackendMetadataDefaults(context) {
     runEmptyAnalysisPass("a4.3", context);
     const a41 = context.analyses["a4.1"] ?? {};
     const semantic = context.analyses["a3.3"] ?? {};
-    const legacyRoot = rootNode(context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null);
-    const treeFacts = collectLegacyTreeFacts(legacyRoot);
     const mode = normalizeMode(a41.backendOptions?.mode ?? context.options?.mode ?? "program");
 
     return {

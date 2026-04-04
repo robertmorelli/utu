@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { validateWat } from '../packages/compiler/index.js';
+import { compileDocument } from '../packages/compiler/api/index.js';
 import { createSourceDocument, UtuParserService } from '../packages/document/index.js';
 import { UtuLanguageService } from '../packages/language-platform/index.js';
 import { UtuWorkspaceSession } from '../packages/workspace/index.js';
@@ -35,11 +35,12 @@ async function testWorkspaceCompileDiagnosticsFollowOpenImports() {
       grammarWasmPath: resolve(repoRoot, 'tree-sitter-utu.wasm'),
       runtimeWasmPath: resolve(repoRoot, 'web-tree-sitter.wasm'),
     });
-    const languageService = new UtuLanguageService(parserService, { validateWat });
+    const languageService = new UtuLanguageService(parserService, { compileDocument });
     const session = new UtuWorkspaceSession({
       workspaceFolders: [pathToFileURL(resolve(mainPath, '..')).toString()],
       parserService,
       languageService,
+      compileDocument,
     });
     try {
       const depUri = pathToFileURL(depPath).toString();
@@ -77,11 +78,12 @@ async function testWorkspaceReferencesIncludeDefiningModuleUses() {
       grammarWasmPath: resolve(repoRoot, 'tree-sitter-utu.wasm'),
       runtimeWasmPath: resolve(repoRoot, 'web-tree-sitter.wasm'),
     });
-    const languageService = new UtuLanguageService(parserService, { validateWat });
+    const languageService = new UtuLanguageService(parserService, { compileDocument });
     const session = new UtuWorkspaceSession({
       workspaceFolders: [pathToFileURL(resolve(mainPath, '..')).toString()],
       parserService,
       languageService,
+      compileDocument,
     });
     try {
       const depUri = pathToFileURL(depPath).toString();
@@ -114,11 +116,12 @@ async function testWorkspaceMethodSugarResolvesThroughConstructAliases() {
       grammarWasmPath: resolve(repoRoot, 'tree-sitter-utu.wasm'),
       runtimeWasmPath: resolve(repoRoot, 'web-tree-sitter.wasm'),
     });
-    const languageService = new UtuLanguageService(parserService, { validateWat });
+    const languageService = new UtuLanguageService(parserService, { compileDocument });
     const session = new UtuWorkspaceSession({
       workspaceFolders: [pathToFileURL(resolve(mainPath, '..')).toString()],
       parserService,
       languageService,
+      compileDocument,
     });
     try {
       const depUri = pathToFileURL(depPath).toString();

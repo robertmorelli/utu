@@ -1,5 +1,6 @@
-import { parseTree } from "../document/tree-sitter.js";
-import { containsModuleFeature, rootNode, kids } from "./stage2/expansion/core.js";
+import { containsModuleFeature, rootNode } from "./stage2-expansion-shared.js";
+import { loadStage2ExpansionImports } from "./stage2/load-imports.js";
+import { buildStage2NamespaceModel } from "./stage2/namespaces.js";
 import { collectTopLevelDeclarationsFromExpander } from "./stage2/top-level-facts.js";
 import { collectSymbolFactsFromExpander } from "./stage2/symbol-facts.js";
 import {
@@ -123,7 +124,6 @@ export function createExpandResult({
 // normalize Stage-2 expansion options and gate whether expansion work is required.
 export async function runA26PrepareDeclarationExpansion(context) {
     const expansionPlan = context.analyses["a2.5"] ?? null;
-    const treeOrNode = context.artifacts.parse?.legacyTree ?? context.legacyTree ?? null;
     const options = normalizeExpandOptions(expansionPlan ?? context.options ?? {});
     const hasModuleFeatures = needsExpansion(treeOrNode);
     return {
@@ -172,9 +172,12 @@ async function runStage2ExpansionPipeline(root, source, options = {}) {
         expandOptions: options,
     });
     try {
-        await runStage2ExpansionStep(expansionState, async (expander) => {
-            await expander.loadRootFileImports();
+        await loadStage2ExpansionImports(expansionState);
+        await runStage2ExpansionStep(expansionState, (expander) => {
             collectTopLevelDeclarationsFromExpander(expander);
+        });
+        await buildStage2NamespaceModel(expansionState);
+        await runStage2ExpansionStep(expansionState, (expander) => {
             collectSymbolFactsFromExpander(expander);
         });
         const materialized = await materializeStage2ExpandedSource(expansionState);

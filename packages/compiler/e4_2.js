@@ -38,7 +38,6 @@ export async function runE42BuildBinaryen(context) {
     }
 
     const stage4BinaryenRaw = await compileBinaryen(
-        context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null,
         {
             mode: normalizeMode(a41.backendOptions?.mode ?? a43.mode ?? "program"),
             profile: a41.backendOptions?.profile ?? null,

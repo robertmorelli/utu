@@ -7,9 +7,6 @@ import { childOfType, namedChildren, rootNode } from "./a1_4.js";
 
 export function runStage3IndexPass(context) {
     const root = rootNode(
-        context?.legacyTree
-        ?? context?.artifacts?.expand?.legacyTree
-        ?? context?.artifacts?.parse?.legacyTree
         ?? context?.tree
         ?? null,
     );

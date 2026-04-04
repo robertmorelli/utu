@@ -8,7 +8,6 @@ Purpose: build the initial syntax artifacts and normalized stage tree.
 
 Steps:
 - `a1.1` (`a1_1.js`): load source context and setup inputs.
-- `e1.2` (`e1_2.js`): parse source into the legacy syntax tree.
 - `a1.3` (`a1_3.js`): collect syntax diagnostics.
 - `e1.3` (`e1_3.js`): normalize syntax into the stage tree.
 - `a1.4` (`a1_4.js`): collect header snapshot metadata.

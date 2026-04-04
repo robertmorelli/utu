@@ -6,10 +6,6 @@ import { buildStage2NamespaceModel } from "./stage2/namespaces.js";
 // a2.16 Build Namespace Model:
 // preview construct-instantiated namespaces and capture stable namespace/name-mangle facts.
 export async function runA216BuildNamespaceModel(context) {
-    const pipeline = context.analyses["a2.15"]?.pipeline ?? context.analyses["a2.14"]?.pipeline ?? null;
-    const namespaces = await buildStage2NamespaceModel(pipeline);
-    return {
-        pipeline,
-        ...namespaces,
-    };
+    const expansionState = context.artifacts.stage2Expansion ?? null;
+    return buildStage2NamespaceModel(expansionState);
 }

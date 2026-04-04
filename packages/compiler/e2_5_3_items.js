@@ -1,4 +1,4 @@
-import { childOfType, kids } from "./stage2/expansion/core.js";
+import { childOfType, kids } from "./stage2-expansion-shared.js";
 
 const UNSUPPORTED_MODULE_ITEM_LABELS = Object.freeze({
     module_decl: "nested modules",

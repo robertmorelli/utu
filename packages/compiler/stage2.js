@@ -29,10 +29,11 @@ import { runE29PruneFileImports } from "./e2_9.js";
 import { runE210PruneModuleDeclarations } from "./e2_10.js";
 import { runE211NormalizeExpansionResiduals } from "./e2_11.js";
 import { runE212FinalizeExpansionTree } from "./e2_12.js";
+import { parseTree } from "../document/tree-sitter.js";
 import {
-    createStage2ExpansionSession,
-    disposeStage2ExpansionSession,
-} from "./stage2/session.js";
+    createStage2ExpansionState,
+    disposeStage2ExpansionState,
+} from "./stage2/expansion-state.js";
 
 // Stage 2 runner:
 // own expansion analysis/rewrite ordering before semantics.
@@ -45,13 +46,11 @@ export async function runCompilerNewStage2(state, { runAnalysis, runRewrite }) {
     await runAnalysis(state, "a2.5", runA25PlanDeclarationExpansion);
     await runAnalysis(state, "a2.6", runA26PrepareDeclarationExpansion);
 
-    state.artifacts.stage2Expansion = createStage2ExpansionSession({
-        treeOrNode: state.artifacts.parse?.legacyTree ?? state.legacyTree ?? null,
+    state.artifacts.stage2Expansion = createStage2ExpansionState({
         source: state.source,
         uri: state.uri ?? null,
         loadImport: state.loadImport ?? null,
         parseSource: async (sourceText) => {
-            const { parseTree } = await import("../document/tree-sitter.js");
             const parsed = parseTree(
                 state.parser,
                 sourceText,
@@ -91,6 +90,6 @@ export async function runCompilerNewStage2(state, { runAnalysis, runRewrite }) {
         await runRewrite(state, "e2.12", runE212FinalizeExpansionTree);
         await runAnalysis(state, "a2.13", runA213IndexPostExpansionLayout);
     } finally {
-        disposeStage2ExpansionSession(state.artifacts.stage2Expansion);
+        disposeStage2ExpansionState(state.artifacts.stage2Expansion);
     }
 }

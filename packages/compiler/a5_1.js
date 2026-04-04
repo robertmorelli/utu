@@ -8,10 +8,6 @@ import { rootNode, throwOnParseErrors } from "./a1_4.js";
 // validate and optimize finalized Binaryen modules without new language lowering.
 export async function runA51ValidateOptimize(context) {
     runEmptyAnalysisPass("a5.1", context);
-    const legacyTree = context.artifacts.expand?.legacyTree
-        ?? context.artifacts.parse?.legacyTree
-        ?? context.legacyTree;
-    const root = rootNode(legacyTree);
     throwOnParseErrors(root);
     const check = context.analyses["a3.4"] ?? {};
     const intent = check.intent ?? context.options?.intent ?? "compile";

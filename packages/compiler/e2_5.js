@@ -26,7 +26,6 @@ export async function runTreeWalkRewritePass(_passName, context, visit) {
 export async function runE25ExpandDeclarations(context) {
     const expansion = context.analyses["a2.14"] ?? context.analyses["a2.6"] ?? null;
     if (!expansion) {
-        throw new Error("e2.5 requires declaration expansion analysis (a2.14 or legacy a2.6). Run Stage 2 analysis passes before rewrites.");
     }
     // Full-tree rewrite contract: always parse and rewrite the entire tree from output source.
     const rewrittenSource = expansion.source;
@@ -39,7 +38,6 @@ export async function runE25ExpandDeclarations(context) {
     return {
         source: rewrittenSource,
         tree: expandedStageTree,
-        legacyTree: parsed.tree,
         disposeLegacyTree: parsed.dispose,
         artifacts: {
             expansion: {
@@ -49,7 +47,6 @@ export async function runE25ExpandDeclarations(context) {
             expand: {
                 changed: expansion.changed,
                 source: rewrittenSource,
-                legacyTree: parsed.tree,
             },
         },
     };

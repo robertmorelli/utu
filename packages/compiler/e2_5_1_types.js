@@ -1,4 +1,4 @@
-import { childOfType, childrenOfType, hasAnon, kids } from "./e2_5_expand/core.js";
+import { childOfType, childrenOfType, hasAnon, kids } from "./stage2/expansion/core.js";
 
 export const stage251TypeDeclarationMethods = {
     emitStructDecl(node, ctx, inModule) {

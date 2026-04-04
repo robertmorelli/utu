@@ -6,10 +6,6 @@ import { collectStage2TopLevelDeclarations } from "./stage2/top-level-facts.js";
 // a2.15 Collect Top-Level Decls:
 // seed module templates plus type/protocol declaration facts before namespace construction.
 export async function runA215CollectTopLevelDecls(context) {
-    const pipeline = context.analyses["a2.14"]?.pipeline ?? null;
-    const collected = await collectStage2TopLevelDeclarations(pipeline);
-    return {
-        pipeline,
-        ...collected,
-    };
+    const expansionState = context.artifacts.stage2Expansion ?? null;
+    return collectStage2TopLevelDeclarations(expansionState);
 }

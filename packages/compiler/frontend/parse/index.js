@@ -29,7 +29,6 @@ export async function parseDocument({
     if (ownsParserService)
         parserService.dispose();
     return {
-        tree: stage1.artifacts.parse.legacyTree,
         diagnostics: stage1.artifacts.parse.diagnostics,
         document: stage1.artifacts.parse.document,
         normalizedTree: stage1.artifacts.syntaxNormalize,

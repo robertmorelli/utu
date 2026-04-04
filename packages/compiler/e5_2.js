@@ -71,7 +71,6 @@ export async function runE52Emit(context) {
     if (!a51.shouldEmitCompileArtifacts) {
         return runTreeWalkRewritePass("e5.2", context, (node) => node);
     }
-    const treeOrNode = context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null;
     const stage5 = context.artifacts.stage5 ?? null;
     if (!stage5) {
         throw new Error("e5.2 requires stage5 artifacts from e5.1 before emission.");

@@ -8,11 +8,8 @@ import { spanFromNode } from "../document/index.js";
 // gather shallow header facts from the parsed syntax tree.
 export async function runA14CollectHeaderSnapshot(context) {
     const parsed = context.artifacts.parse;
-    if (!parsed?.legacyTree?.rootNode || !parsed?.document) {
         return null;
     }
-    const layout = context.analyses["a1.5"] ?? analyzeSourceLayout(parsed.legacyTree.rootNode);
-    return collectHeaderSnapshot(parsed.legacyTree.rootNode, parsed.document, layout);
 }
 
 export function collectHeaderSnapshot(rootNode, document, layout = analyzeSourceLayout(rootNode)) {

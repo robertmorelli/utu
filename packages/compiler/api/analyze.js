@@ -86,7 +86,6 @@ export async function analyzeSyntaxAndHeader(options) {
                 sourceText,
                 syntax,
                 header: stage1.analyses["a1.4"] ?? collectHeaderSnapshotFromPipeline(
-                    stage1.artifacts.parse?.legacyTree?.rootNode ?? null,
                     stage1.artifacts.parse?.document ?? null,
                 ),
                 body: null,

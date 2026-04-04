@@ -1,4 +1,4 @@
-import { kids } from "./expansion/bootstrap.js";
+import { kids } from "../stage2-expansion-shared.js";
 import {
     runStage2ExpansionStep,
     summarizeStage2ExpansionState,

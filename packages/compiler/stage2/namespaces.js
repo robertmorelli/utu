@@ -1,7 +1,7 @@
 import {
     childOfType,
     kids,
-} from "./expansion/bootstrap.js";
+} from "../stage2-expansion-shared.js";
 import {
     runStage2ExpansionStep,
     summarizeStage2ExpansionState,

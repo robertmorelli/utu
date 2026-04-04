@@ -1,4 +1,4 @@
-import { kids } from "./expansion/bootstrap.js";
+import { kids } from "../stage2-expansion-shared.js";
 import { emitStage253Item } from "../e2_5_3_items.js";
 import {
     disposeStage2ExpansionState,

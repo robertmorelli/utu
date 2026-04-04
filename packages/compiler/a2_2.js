@@ -7,7 +7,6 @@ import { namedChildren } from "./a1_4.js";
 // connect discovered declarations into a symbolic module/import dependency graph.
 export async function runA22BuildModuleGraph(context) {
     const discovered = context.analyses["a2.1"]?.header ?? null;
-    const root = context.artifacts.parse?.legacyTree?.rootNode ?? context.legacyTree?.rootNode ?? null;
     const modules = (discovered?.modules ?? []).map(({ name }) => name);
     const moduleSet = new Set(modules);
     const edges = [];

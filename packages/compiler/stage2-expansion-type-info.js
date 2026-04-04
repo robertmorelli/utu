@@ -1,4 +1,4 @@
-import { childOfType, kids, namedChildren } from "./e2_5_expand/core.js";
+import { childOfType, kids, namedChildren } from "./stage2/expansion/core.js";
 
 export const stage2ExpansionTypeInfoMethods = {
     describeBareType(name, ctx) {

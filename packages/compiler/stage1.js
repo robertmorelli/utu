@@ -48,7 +48,6 @@ function createStage1State({
         analyses: {},
         artifacts: {},
         tree: null,
-        legacyTree: null,
         disposeLegacyTree: () => {},
     };
 }
@@ -62,7 +61,6 @@ function createStage1Context(state) {
         options: state.options,
         parser: state.parser,
         tree: state.tree,
-        legacyTree: state.legacyTree,
         analyses: state.analyses,
         artifacts: state.artifacts,
     };
@@ -76,7 +74,6 @@ function isRewriteResult(value) {
     if (!value || typeof value !== "object") return false;
     return "tree" in value
         || "source" in value
-        || "legacyTree" in value
         || "disposeLegacyTree" in value
         || "artifacts" in value;
 }
@@ -124,11 +121,8 @@ async function runRewrite(state, key, fn) {
     if (typeof result.source === "string") {
         state.source = result.source;
     }
-    if (result.legacyTree && result.legacyTree !== state.legacyTree) {
         state.disposeLegacyTree?.();
-        state.legacyTree = result.legacyTree;
         state.disposeLegacyTree = result.disposeLegacyTree ?? (() => {});
-    } else if (typeof result.disposeLegacyTree === "function" && result.legacyTree === state.legacyTree) {
         state.disposeLegacyTree = result.disposeLegacyTree;
     }
     if (result.artifacts && typeof result.artifacts === "object") {
@@ -147,7 +141,6 @@ export async function runCompilerNewStage1(options = {}) {
     const parsed = await runRewrite(state, "e1.2", runE12Parse);
     state.artifacts.parse = {
         ...(parsed ?? {}),
-        legacyTree: state.legacyTree,
         disposeLegacyTree: state.disposeLegacyTree,
         tree: state.tree,
     };
@@ -166,7 +159,6 @@ export async function runCompilerNewStage1(options = {}) {
         state.artifacts.header = state.analyses["a1.4"];
         return {
             source: state.source,
-            legacyTree: state.legacyTree,
             stageTree: state.tree,
             analyses: state.analyses,
             artifacts: state.artifacts,
@@ -183,7 +175,6 @@ export async function runCompilerNewStage1(options = {}) {
 // Build the public syntax snapshot from stage-1 artifacts.
 export function createStage1SyntaxSnapshot(stage1Result) {
     const parseArtifact = stage1Result?.artifacts?.parse ?? null;
-    const rootNode = parseArtifact?.legacyTree?.rootNode ?? null;
     const diagnostics = (parseArtifact?.diagnostics ?? []).map((diagnostic) => ({ ...diagnostic }));
     return {
         kind: 'syntax',

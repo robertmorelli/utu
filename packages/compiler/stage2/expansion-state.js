@@ -1,8 +1,8 @@
+import { createStage2Expander } from "../stage2-expansion-engine.js";
 import {
     containsModuleFeature,
-    ModuleExpander,
     rootNode,
-} from "./expansion/bootstrap.js";
+} from "../stage2-expansion-shared.js";
 
 export function createStage2ExpansionDiagnostic(error) {
     return {
@@ -37,7 +37,7 @@ export function createStage2ExpansionState({
         recovered: false,
         error: null,
         diagnostics: [],
-        expander: shouldExpand ? new ModuleExpander(root, source, { uri, loadImport, parseSource }) : null,
+        expander: shouldExpand ? createStage2Expander(root, source, { uri, loadImport, parseSource }) : null,
         typeDeclarationUnits: [],
         functionRuntimeDeclarationUnits: [],
         materializedSource: source,

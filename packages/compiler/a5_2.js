@@ -19,10 +19,7 @@ export async function runA52AnalyzeEmitPlan(context) {
         };
     }
 
-    const legacyTree = context.legacyTree
-        ?? context.artifacts.parse?.legacyTree
         ?? null;
-    const root = rootNode(legacyTree);
     const stage5 = context.artifacts.stage5 ?? null;
     const metadata = stage5?.metadata ?? {};
     const semantic = context.analyses["a3.3"] ?? {};

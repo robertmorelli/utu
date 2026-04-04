@@ -1,4 +1,4 @@
-import { childOfType, childrenOfType, kids } from "./e2_5_expand/core.js";
+import { childOfType, childrenOfType, kids } from "./stage2/expansion/core.js";
 
 export const stage252DeclarationMethods = {
     emitFnDecl(node, ctx, inModule) {
