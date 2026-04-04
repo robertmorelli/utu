@@ -1,23 +1,5 @@
 import { parseTree } from "../document/tree-sitter.js";
-import { runCollectHeaderReferences } from "./analyze-header-references.js";
-import { runDiscoverExpansionDeclarations } from "./analyze-header-snapshot.js";
-import { runBuildModuleGraph } from "./analyze-build-module-graph.js";
-import { runResolveImports } from "./analyze-resolve-imports.js";
-import { runBuildNamespaceAliases } from "./analyze-namespace-aliases.js";
-import { runPlanExpansion } from "./analyze-expansion-plan.js";
-import { runPrepareExpansionOptions } from "./analyze-expansion-options.js";
-import { runLoadExpansionImports } from "./analyze-load-expansion-imports.js";
-import { runCollectTopLevelExpansionFacts } from "./analyze-collect-top-level-expansion-facts.js";
-import { runBuildExpansionNamespaces } from "./analyze-build-expansion-namespaces.js";
-import { runCollectExpansionSymbolFacts } from "./analyze-collect-expansion-symbol-facts.js";
-import { runAnalyzePrepareExpansion } from "./analyze-prepare-expansion.js";
-import { runIndexExpandedTree } from "./analyze-index-expanded-tree.js";
-import { runIndexExpandedDeclarations } from "./analyze-index-expanded-declarations.js";
-import { runDetectExpandedCollisions } from "./analyze-detect-expanded-collisions.js";
-import { runPlanExpansionRewrites } from "./analyze-plan-rewrite-walks.js";
-import { runValidateExpansionBoundary } from "./analyze-validate-expansion-boundary.js";
-import { runFreezeExpansionFacts } from "./analyze-freeze-expansion-facts.js";
-import { runIndexPostExpansionLayout } from "./analyze-index-post-expansion-layout.js";
+import { runExpand } from "./analyze-expand.js";
 import { runAnalyzeIndexSymbolsAndDeclarations } from "./analyze-index-symbols-and-declarations.js";
 import { runAnalyzeBindReferences } from "./analyze-bind-references.js";
 import { runAnalyzeSemanticChecks } from "./analyze-semantic-checks.js";
@@ -27,20 +9,8 @@ import { runAnalyzeCollectBinaryenMetadata } from "./analyze-collect-binaryen-me
 import { runAnalyzePrepareBackendMetadataDefaults } from "./analyze-prepare-backend-metadata-defaults.js";
 import { runAnalyzeValidateOptimizeOutputPlan } from "./analyze-validate-optimize-output-plan.js";
 import { runAnalyzeJsEmissionInputs } from "./analyze-js-emission-inputs.js";
-import { runEmitTypeDeclarations } from "./edit-emit-type-declarations.js";
-import { runEmitFunctionRuntimeDeclarations } from "./edit-emit-function-runtime-declarations.js";
-import { runEditFinalizeExpandedSource } from "./edit-finalize-expanded-source.js";
-import { runMaterializeExpandedSource } from "./edit-materialize-expanded-source.js";
-import { runParseMaterializedSource } from "./edit-parse-materialized-source.js";
-import { runRewriteTypeValues } from "./edit-type-value-resolution.js";
-import { runRewriteCallsAndPipes } from "./edit-call-and-pipe-rewriting.js";
-import { runRewriteCoreControl } from "./edit-core-and-control-rewriting.js";
-import { runNormalizePostExpansion } from "./edit-post-expand-normalize.js";
-import { runPruneConstructDeclarations } from "./edit-prune-construct-declarations.js";
-import { runPruneFileImports } from "./edit-prune-file-imports.js";
-import { runPruneModuleDeclarations } from "./edit-prune-module-declarations.js";
-import { runNormalizeExpansionResiduals } from "./edit-normalize-expansion-residuals.js";
-import { runFinalizeExpansionTree } from "./edit-finalize-expansion-tree.js";
+import { runParseExpandedSource } from "./edit-parse-expanded-source.js";
+import { runCanonicalizeExpandedTree } from "./edit-canonicalize-expanded-tree.js";
 import { runLowerToBackendIr } from "./edit-lower-to-backend-ir.js";
 import { runBuildBinaryenModule } from "./binaryen-build.js";
 import { runBuildBackendArtifacts } from "./backend-artifact-builder.js";
@@ -71,52 +41,18 @@ export {
 
 const PIPELINE_STAGES = Object.freeze([
     { name: "syntax", afterStepKey: "collect-header-snapshot" },
-    { name: "expansion-preparation", afterStepKey: "prepare-expansion-options" },
-    { name: "expansion-discovery", afterStepKey: "collect-expansion-symbol-facts" },
-    { name: "expansion-materialization", afterStepKey: "parse-materialized-source" },
-    { name: "post-expansion-analysis", afterStepKey: "freeze-expansion-facts" },
-    { name: "expansion-cleanup", afterStepKey: "index-post-expansion-layout" },
+    { name: "expand", afterStepKey: "parse-expanded-source" },
+    { name: "canonicalize-expanded-tree", afterStepKey: "canonicalize-expanded-tree" },
     { name: "semantics", afterStepKey: "check-semantics" },
-    { name: "compile-plan", afterStepKey: "plan-compile" },
-    { name: "lowering", afterStepKey: "build-binaryen-module" },
+    { name: "backend", afterStepKey: "build-backend-artifacts" },
     { name: "output", afterStepKey: "emit-output" },
 ]);
 
 const COMPILER_PIPELINE_STEPS = Object.freeze([
     ...COMPILER_SYNTAX_STEPS,
-    { kind: "analysis", key: "collect-header-references", run: runCollectHeaderReferences },
-    { kind: "analysis", key: "discover-expansion-declarations", run: runDiscoverExpansionDeclarations },
-    { kind: "analysis", key: "build-module-graph", run: runBuildModuleGraph },
-    { kind: "analysis", key: "resolve-imports", run: runResolveImports },
-    { kind: "analysis", key: "build-namespace-aliases", run: runBuildNamespaceAliases },
-    { kind: "analysis", key: "plan-expansion", run: runPlanExpansion },
-    { kind: "analysis", key: "prepare-expansion-options", run: runPrepareExpansionOptions },
-    { kind: "analysis", key: "load-expansion-imports", run: runLoadExpansionImports },
-    { kind: "analysis", key: "collect-top-level-expansion-facts", run: runCollectTopLevelExpansionFacts },
-    { kind: "analysis", key: "build-expansion-namespaces", run: runBuildExpansionNamespaces },
-    { kind: "analysis", key: "collect-expansion-symbol-facts", run: runCollectExpansionSymbolFacts },
-    { kind: "analysis", key: "prepare-expansion-emission", run: runAnalyzePrepareExpansion },
-    { kind: "rewrite", key: "emit-type-declarations", run: runEmitTypeDeclarations },
-    { kind: "rewrite", key: "emit-function-runtime-declarations", run: runEmitFunctionRuntimeDeclarations },
-    { kind: "rewrite", key: "materialize-expanded-source", run: runMaterializeExpandedSource },
-    { kind: "rewrite", key: "finalize-expanded-source", run: runEditFinalizeExpandedSource },
-    { kind: "rewrite", key: "parse-materialized-source", run: runParseMaterializedSource },
-    { kind: "analysis", key: "index-expanded-tree", run: runIndexExpandedTree },
-    { kind: "analysis", key: "index-expanded-declarations", run: runIndexExpandedDeclarations },
-    { kind: "analysis", key: "detect-expanded-collisions", run: runDetectExpandedCollisions },
-    { kind: "analysis", key: "plan-expansion-rewrites", run: runPlanExpansionRewrites },
-    { kind: "analysis", key: "validate-expansion-boundary", run: runValidateExpansionBoundary },
-    { kind: "analysis", key: "freeze-expansion-facts", run: runFreezeExpansionFacts },
-    { kind: "rewrite", key: "rewrite-type-values", run: runRewriteTypeValues },
-    { kind: "rewrite", key: "rewrite-calls-and-pipes", run: runRewriteCallsAndPipes },
-    { kind: "rewrite", key: "rewrite-core-control", run: runRewriteCoreControl },
-    { kind: "rewrite", key: "normalize-post-expansion", run: runNormalizePostExpansion },
-    { kind: "rewrite", key: "prune-construct-declarations", run: runPruneConstructDeclarations },
-    { kind: "rewrite", key: "prune-file-imports", run: runPruneFileImports },
-    { kind: "rewrite", key: "prune-module-declarations", run: runPruneModuleDeclarations },
-    { kind: "rewrite", key: "normalize-expansion-residuals", run: runNormalizeExpansionResiduals },
-    { kind: "rewrite", key: "finalize-expansion-tree", run: runFinalizeExpansionTree },
-    { kind: "analysis", key: "index-post-expansion-layout", run: runIndexPostExpansionLayout },
+    { kind: "analysis", key: "expand", run: runExpand },
+    { kind: "rewrite", key: "parse-expanded-source", run: runParseExpandedSource },
+    { kind: "rewrite", key: "canonicalize-expanded-tree", run: runCanonicalizeExpandedTree },
     { kind: "analysis", key: "index-top-level-symbols", run: runAnalyzeIndexSymbolsAndDeclarations },
     { kind: "analysis", key: "bind-top-level-symbols", run: runAnalyzeBindReferences },
     { kind: "analysis", key: "check-semantics", run: runAnalyzeSemanticChecks },
@@ -141,45 +77,28 @@ const PIPELINE_STEP_KEYS = Object.freeze(new Set(
 ));
 
 function publishExpansionBundle(state) {
-    updateCompilerStageBundle(state, "expansion", {
-        preparation: {
-            headerReferences: state.analyses["collect-header-references"] ?? null,
-            declarations: state.analyses["discover-expansion-declarations"] ?? null,
-            moduleGraph: state.analyses["build-module-graph"] ?? null,
-            resolvedImports: state.analyses["resolve-imports"] ?? null,
-            namespacePreparation: state.analyses["build-namespace-aliases"] ?? null,
-            expansionPlan: state.analyses["plan-expansion"] ?? null,
-            expansionOptions: state.analyses["prepare-expansion-options"] ?? null,
-        },
-        discovery: {
-            imports: state.analyses["load-expansion-imports"] ?? null,
-            topLevelDeclarations: state.analyses["collect-top-level-expansion-facts"] ?? null,
-            namespaces: state.analyses["build-expansion-namespaces"] ?? null,
-            symbolFacts: state.analyses["collect-expansion-symbol-facts"] ?? null,
-        },
-        materialization: {
-            emissionPreparation: state.analyses["prepare-expansion-emission"] ?? null,
-            declarationEmission: state.artifacts.expansionDeclarationEmission ?? null,
-            typeDeclarations: state.artifacts.expansionTypeDeclarations ?? null,
-            functionAndRuntimeDeclarations: state.artifacts.expansionFunctionAndRuntimeDeclarations ?? null,
-            topLevelEmission: state.artifacts.expansionTopLevelEmission ?? null,
-            materializedSource: state.artifacts.expansionMaterializedSource ?? null,
-            reparsedExpansion: state.artifacts.expansion ?? null,
-        },
-        postExpansion: {
-            indexedTree: state.analyses["index-expanded-tree"] ?? null,
-            indexedDeclarations: state.analyses["index-expanded-declarations"] ?? null,
-            collisions: state.analyses["detect-expanded-collisions"] ?? null,
-            rewritePlan: state.analyses["plan-expansion-rewrites"] ?? null,
-            validation: state.analyses["validate-expansion-boundary"] ?? null,
-            frozenFacts: state.analyses["freeze-expansion-facts"] ?? null,
-        },
-        cleanup: {
-            finalLayout: state.analyses["index-post-expansion-layout"] ?? null,
+    const expand = state.analyses["expand"] ?? null;
+    const bundle = {
+        state: expand?.state ?? null,
+        declarationEmission: state.artifacts.expansionDeclarationEmission ?? expand?.declarationEmission ?? null,
+        emissionPreparation: expand?.emissionPreparation ?? null,
+        typeDeclarations: state.artifacts.expansionTypeDeclarations ?? expand?.typeDeclarations ?? null,
+        functionAndRuntimeDeclarations: state.artifacts.expansionFunctionAndRuntimeDeclarations ?? expand?.functionAndRuntimeDeclarations ?? null,
+        topLevelEmission: state.artifacts.expansionTopLevelEmission ?? expand?.topLevelEmission ?? null,
+        materializedSource: state.artifacts.expansionMaterializedSource ?? expand?.materializedSource ?? null,
+        reparsedExpansion: state.artifacts.expansion ?? null,
+        canonicalization: state.artifacts.expansionCanonicalization ?? null,
+        finalExpansion: state.artifacts.expansion ?? null,
+        finalTree: state.tree ?? null,
+    };
+    updateCompilerStageBundle(state, "expand", bundle);
+    if (state.artifacts.expansionCanonicalization) {
+        updateCompilerStageBundle(state, "canonicalize-expanded-tree", {
+            canonicalization: state.artifacts.expansionCanonicalization,
             finalExpansion: state.artifacts.expansion ?? null,
             finalTree: state.tree ?? null,
-        },
-    });
+        });
+    }
 }
 
 function publishSemanticsBundle(state) {
@@ -229,7 +148,7 @@ function ensureExpansionSession(state) {
                 dispose: parsed.dispose,
             };
         },
-        expandOptions: state.analyses["prepare-expansion-options"] ?? state.analyses["plan-expansion"] ?? state.options ?? {},
+        expandOptions: state.options ?? {},
     });
     writeCompilerArtifact(state, "expansionSession", expansionSession);
     return expansionSession;
@@ -243,22 +162,39 @@ function releaseExpansionSession(state) {
 }
 
 const BEFORE_STEP_HOOKS = Object.freeze(new Map([
-    ["load-expansion-imports", (state) => ensureExpansionSession(state)],
+    ["expand", (state) => ensureExpansionSession(state)],
 ]));
+
+function captureExpandArtifacts(state) {
+    const expand = state.analyses["expand"] ?? null;
+    if (!expand) return;
+    writeCompilerArtifact(state, "expansionStateSnapshot", expand.state ?? null);
+    writeCompilerArtifact(state, "expansionDeclarationEmission", expand.declarationEmission ?? null);
+    writeCompilerArtifact(state, "expansionTypeDeclarations", expand.typeDeclarations ?? null);
+    writeCompilerArtifact(state, "expansionFunctionAndRuntimeDeclarations", expand.functionAndRuntimeDeclarations ?? null);
+    writeCompilerArtifact(state, "expansionTopLevelEmission", expand.topLevelEmission ?? null);
+    writeCompilerArtifact(state, "expansionMaterializedSource", expand.materializedSource ?? null);
+    writeCompilerArtifact(state, "expand", {
+        changed: Boolean(expand.materializedSource?.changed),
+        source: expand.materializedSource?.source ?? state.source,
+    });
+}
 
 const AFTER_STEP_HOOKS = Object.freeze(new Map([
     ...COMPILER_SYNTAX_AFTER_STEP_HOOKS,
-    ["prepare-expansion-options", (state) => publishExpansionBundle(state)],
-    ["collect-expansion-symbol-facts", (state) => publishExpansionBundle(state)],
-    ["parse-materialized-source", (state) => publishExpansionBundle(state)],
-    ["freeze-expansion-facts", (state) => publishExpansionBundle(state)],
-    ["index-post-expansion-layout", (state) => {
+    ["expand", (state) => {
+        captureExpandArtifacts(state);
+        publishExpansionBundle(state);
+    }],
+    ["parse-expanded-source", (state) => publishExpansionBundle(state)],
+    ["canonicalize-expanded-tree", (state) => {
         publishExpansionBundle(state);
         releaseExpansionSession(state);
     }],
     ["check-semantics", (state) => publishSemanticsBundle(state)],
     ["plan-compile", (state) => publishSemanticsBundle(state)],
     ["build-binaryen-module", (state) => publishBackendBundle(state)],
+    ["build-backend-artifacts", (state) => publishBackendBundle(state)],
     ["emit-output", (state) => publishOutputBundle(state)],
 ]));
 

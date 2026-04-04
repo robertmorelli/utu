@@ -79,6 +79,7 @@ export function createExpansionExpander(root, source, options = {}) {
         uri: options.uri ?? null,
         loadImport: options.loadImport ?? null,
         parseSource: options.parseSource ?? null,
+        session: options.session ?? null,
         moduleTemplates: new Map(),
         moduleNames: new Set(),
         namespaceCache: new Map(),

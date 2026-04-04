@@ -100,13 +100,18 @@ export function applyConstruct(node, ctx) {
     const aliasNode = named[0]?.type === 'identifier' && ['module_ref', 'instantiated_module_ref'].includes(named[1]?.type) ? named[0] : null;
     const moduleRef = childOfType(node, 'module_ref') ?? childOfType(node, 'instantiated_module_ref');
     const namespace = this.resolveNamespaceFromModuleRef(moduleRef, ctx);
+    const moduleCtx = this.createNamespaceContext(namespace, ctx);
+    this.populateNamespaceTypes(namespace, moduleCtx);
+    this.populateNamespaceDeclarations(namespace, moduleCtx);
+    this.populateNamespaceValues(namespace, moduleCtx);
 
     if (aliasNode) {
         ctx.aliases.set(aliasNode.text, namespace);
-        return;
+        return namespace;
     }
 
     this.openNamespace(namespace, ctx);
+    return namespace;
 }
 
 export function openNamespace(namespace, ctx) {
@@ -134,16 +139,16 @@ export function resolveNamespaceByNameAndArgs(name, argNodes, ctx) {
     if (argNodes.length === 0 && ctx.aliases.has(name)) return ctx.aliases.get(name);
     const template = ctx.moduleBindings.get(name) ?? this.moduleTemplates.get(name);
     const argTexts = argNodes.map((typeNode) => this.emitType(typeNode, ctx));
-    return this.ensureNamespace(template, argTexts, ctx);
+    return this.ensureNamespaceShell(template, argTexts, ctx);
 }
 
 export function resolveMaybeNamespaceName(name, ctx) {
     if (ctx.aliases.has(name)) return ctx.aliases.get(name);
     const template = ctx.moduleBindings.get(name) ?? this.moduleTemplates.get(name);
-    return template && template.typeParams.length === 0 ? this.ensureNamespace(template, [], ctx) : null;
+    return template && template.typeParams.length === 0 ? this.ensureNamespaceShell(template, [], ctx) : null;
 }
 
-export function ensureNamespace(template, argTexts, ctx) {
+export function ensureNamespaceShell(template, argTexts, ctx) {
     if (!template) throw new Error('Unknown module reference');
     if (argTexts.length !== template.typeParams.length) {
         throw new Error(`module ${template.name} expects ${template.typeParams.length} type argument(s), received ${argTexts.length}`);
@@ -172,22 +177,53 @@ export function ensureNamespace(template, argTexts, ctx) {
         promotedTypeName: null,
         promotedType: null,
         source: '',
+        typesPopulated: false,
+        declarationsPopulated: false,
+        valuesPopulated: false,
+        nestedDiscoveryComplete: false,
     };
 
     this.namespaceCache.set(key, namespace);
     this.namespaceOrder.push(namespace);
-
-    const moduleCtx = this.cloneContext(ctx, {
-        namespace,
-        typeParams: new Map([...ctx.typeParams, ...namespace.typeParams]),
-        moduleBindings: template.moduleBindings ?? ctx.moduleBindings,
-        localValueScopes: [],
-    });
-    this.collectNamespaceTypeNames(namespace);
-    this.collectNamespaceDeclarations(namespace, moduleCtx);
-    this.collectNamespaceNames(namespace, moduleCtx);
+    this.session?.pendingNamespaceKeys?.add(key);
 
     return namespace;
+}
+
+export function createNamespaceContext(namespace, ctx = this.createRootContext()) {
+    return this.cloneContext(ctx, {
+        namespace,
+        typeParams: new Map([...ctx.typeParams, ...namespace.typeParams]),
+        moduleBindings: namespace.template.moduleBindings ?? ctx.moduleBindings,
+        localValueScopes: [],
+    });
+}
+
+export function populateNamespaceTypes(namespace) {
+    if (!namespace || namespace.typesPopulated) return namespace;
+    this.collectNamespaceTypeNames(namespace);
+    namespace.typesPopulated = true;
+    return namespace;
+}
+
+export function populateNamespaceDeclarations(namespace, ctx) {
+    if (!namespace || namespace.declarationsPopulated) return namespace;
+    this.populateNamespaceTypes(namespace);
+    this.collectNamespaceDeclarations(namespace, ctx ?? this.createNamespaceContext(namespace));
+    namespace.declarationsPopulated = true;
+    return namespace;
+}
+
+export function populateNamespaceValues(namespace, ctx) {
+    if (!namespace || namespace.valuesPopulated) return namespace;
+    this.populateNamespaceDeclarations(namespace, ctx ?? this.createNamespaceContext(namespace));
+    this.collectNamespaceNames(namespace, ctx ?? this.createNamespaceContext(namespace));
+    namespace.valuesPopulated = true;
+    return namespace;
+}
+
+export function ensureNamespace(template, argTexts, ctx) {
+    return this.ensureNamespaceShell(template, argTexts, ctx);
 }
 
 export function collectNamespaceNames(namespace, ctx) {

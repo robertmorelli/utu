@@ -17,6 +17,7 @@ function createApiState(treeOrNode, source, options = {}) {
         loadImport: options.loadImport ?? null,
         parseSource: options.parseSource ?? null,
         expandOptions: {
+            ...options,
             ...normalizeExpansionOptions(options),
             shouldExpand,
             hasModuleFeatures: shouldExpand,

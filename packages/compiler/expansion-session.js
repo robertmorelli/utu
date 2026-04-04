@@ -1,18 +1,21 @@
 import { createExpansionExpander } from "./expansion-engine.js";
-import { emitExpansionItem } from "./expansion-materialize-items.js";
+import { runExpansionFixedPoint } from "./expansion-fixed-point.js";
 import { namedChildren, rootNode } from "./expansion-shared.js";
 import {
     needsExpansion,
     normalizeExpansionOptions,
 } from "./analyze-expansion-plan.js";
 
-function snapshotExpansionTopLevelDeclarations(state) {
-    return {
-        moduleNames: [...state.expander.moduleTemplates.keys()].sort(),
-        typeNames: [...state.expander.topLevelTypeNames].sort(),
-        valueNames: [...state.expander.topLevelValueNames].sort(),
-        protocolNames: [...state.expander.topLevelProtocolNames].sort(),
-    };
+function initializeRootImportWork(rootItems) {
+    const pendingImportKeys = new Set();
+    const importWorkItems = new Map();
+    rootItems.forEach((item, index) => {
+        if (item.type !== "file_import_decl") return;
+        const key = `${index}:${item.text}`;
+        pendingImportKeys.add(key);
+        importWorkItems.set(key, { key, node: item });
+    });
+    return { pendingImportKeys, importWorkItems };
 }
 
 export function createExpansionSession({
@@ -26,37 +29,67 @@ export function createExpansionSession({
     const root = rootNode(treeOrNode);
     const options = normalizeExpansionOptions(expandOptions);
     const shouldExpand = expandOptions?.shouldExpand ?? needsExpansion(root);
-    return {
+    const rootItems = [...namedChildren(root)];
+    const { pendingImportKeys, importWorkItems } = initializeRootImportWork(rootItems);
+    const state = {
         root,
+        rootItems,
+        rootLinearItems: null,
+        rootItemContexts: [],
+        rootContext: null,
         source,
         uri,
         loadImport,
         parseSource,
         ...options,
+        maxIterations: Number.isFinite(expandOptions?.maxIterations)
+            ? Math.max(0, Math.trunc(expandOptions.maxIterations))
+            : 64,
         hasModuleFeatures: shouldExpand,
         shouldExpand,
         diagnostics: [],
         recovered: false,
         error: null,
+        pendingImportKeys,
+        processedImportKeys: new Set(),
+        importWorkItems,
+        pendingNamespaceKeys: new Set(),
+        processedNamespaceKeys: new Set(),
+        pendingNestedNamespaceKeys: new Set(),
+        processedNestedNamespaceKeys: new Set(),
+        knownRootConstructs: new Set(),
+        knownRootModuleRefs: new Set(),
+        iteration: 0,
+        changedSinceLastIteration: false,
         importsLoaded: false,
         topLevelCollected: false,
         namespacesPrimed: false,
+        rootDefinitionsCollected: false,
+        rootConstructsDiscovered: false,
+        rootNamespaceInstantiationsDiscovered: false,
+        expansionFactsFinalized: false,
+        fixedPoint: null,
+        fixedPointPassRuns: [],
         topLevelDeclarations: null,
         namespaceModel: null,
         symbolFacts: null,
+        emissionPreparation: null,
         typeDeclarations: null,
         functionDeclarations: null,
         materialized: null,
-        expander: createExpansionExpander(root, source, {
-            uri,
-            loadImport,
-            parseSource,
-        }),
+        expander: null,
         __disposed: false,
         dispose() {
             disposeExpansionSession(this);
         },
     };
+    state.expander = createExpansionExpander(root, source, {
+        uri,
+        loadImport,
+        parseSource,
+        session: state,
+    });
+    return state;
 }
 
 export function disposeExpansionSession(state) {
@@ -70,56 +103,20 @@ export function disposeExpansionSession(state) {
 }
 
 export async function ensureExpansionImports(state) {
-    if (!state || state.importsLoaded || !state.shouldExpand) return state;
-    await state.expander.loadRootFileImports();
-    state.importsLoaded = true;
+    if (!state || !state.shouldExpand) return state;
+    await runExpansionFixedPoint(state);
     return state;
 }
 
 export async function ensureExpansionTopLevelDeclarations(state) {
     if (!state || !state.shouldExpand) return state;
-    if (state.topLevelCollected || state.topLevelDeclarations) return state;
-    if (state.expander.moduleTemplates.size > 0 || state.expander.topLevelTypeNames.size > 0 || state.expander.topLevelValueNames.size > 0) {
-        state.topLevelCollected = true;
-        state.topLevelDeclarations = snapshotExpansionTopLevelDeclarations(state);
-        return state;
-    }
-
-    await ensureExpansionImports(state);
-    const ctx = state.expander.createRootContext();
-    state.expander.collectTopLevelSymbols(ctx);
-    state.topLevelCollected = true;
-    state.topLevelDeclarations = snapshotExpansionTopLevelDeclarations(state);
+    await runExpansionFixedPoint(state);
     return state;
 }
 
 export async function ensureExpansionNamespaceDiscovery(state) {
     if (!state || !state.shouldExpand) return state;
-    await ensureExpansionTopLevelDeclarations(state);
-    let previousNamespaceCount = -1;
-    while (previousNamespaceCount !== state.expander.namespaceOrder.length) {
-        previousNamespaceCount = state.expander.namespaceOrder.length;
-        const discoveryCtx = state.expander.createRootContext();
-        for (const item of namedChildren(state.root)) {
-            void emitExpansionItem(state.expander, item, discoveryCtx, false);
-        }
-        for (let index = 0; index < state.expander.namespaceOrder.length; index += 1) {
-            const namespace = state.expander.namespaceOrder[index];
-            const namespaceCtx = state.expander.cloneContext(
-                state.expander.createRootContext(),
-                {
-                    namespace,
-                    typeParams: new Map(namespace.typeParams),
-                    moduleBindings: namespace.template.moduleBindings ?? new Map(),
-                    localValueScopes: [],
-                },
-            );
-            for (const item of namespace.template.items) {
-                void emitExpansionItem(state.expander, item, namespaceCtx, true);
-            }
-        }
-    }
-    state.namespacesPrimed = true;
+    await runExpansionFixedPoint(state);
     return state;
 }
 

@@ -112,6 +112,11 @@
     "module": "./scripts/test-feature-interactions.mjs"
   },
   {
+    "id": "language:expansion-fixed-point",
+    "label": "Language expansion fixed point",
+    "module": "./scripts/test-expansion-fixed-point.mjs"
+  },
+  {
     "id": "workspace:interactions",
     "label": "Workspace interactions",
     "module": "./scripts/test-workspace-interactions.mjs"

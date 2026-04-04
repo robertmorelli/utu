@@ -7,9 +7,11 @@ export function describeBareType(name, ctx) {
     if (this.topLevelProtocolNames.has(name)) return { text: name, owner: name, namespace: null };
     if (ctx.openTypes.has(name)) {
         const namespace = ctx.openTypes.get(name);
+        this.populateNamespaceTypes(namespace);
         return { text: namespace.typeNames.get(name), owner: name, namespace };
     }
     const namespace = this.resolveMaybeNamespaceName(name, ctx);
+    if (namespace) this.populateNamespaceTypes(namespace);
     return namespace?.promotedType
         ? { text: namespace.promotedType, owner: namespace.promotedTypeName, namespace }
         : { text: name, owner: null, namespace: null };
@@ -24,12 +26,14 @@ export function describeType(node, ctx) {
             return this.describeBareType(node.text, ctx);
         case 'instantiated_module_ref': {
             const namespace = this.resolveNamespaceFromModuleRef(node, ctx);
+            this.populateNamespaceTypes(namespace);
             return { text: this.resolvePromotedType(namespace), owner: namespace.promotedTypeName, namespace };
         }
         case 'qualified_type_ref': {
             const moduleRef = childOfType(node, 'module_ref') ?? childOfType(node, 'instantiated_module_ref');
             const typeNode = childOfType(node, 'type_ident');
             const namespace = this.resolveNamespaceFromModuleRef(moduleRef, ctx);
+            this.populateNamespaceTypes(namespace);
             return { text: namespace.typeNames.get(typeNode.text), owner: typeNode.text, namespace };
         }
         case 'nullable_type': {
@@ -97,5 +101,6 @@ export function resolveBareType(name, ctx) {
 }
 
 export function resolvePromotedType(namespace) {
+    this.populateNamespaceTypes(namespace);
     return namespace.promotedType;
 }

@@ -1,6 +1,6 @@
 import { childOfType, childrenOfType, hasAnon, kids } from './expansion-shared.js';
 
-export function collectTopLevelSymbols(ctx) {
+export function collectTopLevelDefinitionNames() {
     const items = this.flattenLibraryItems(kids(this.root));
     for (const item of items) {
         if (item.type === 'module_decl') this.collectModuleTemplate(item);
@@ -21,13 +21,20 @@ export function collectTopLevelSymbols(ctx) {
             if (nameNode) this.topLevelProtocolNames.add(nameNode.text);
         }
     }
+}
 
+export function collectTopLevelDefinitions(ctx) {
+    this.collectTopLevelDefinitionNames();
+    const items = this.flattenLibraryItems(kids(this.root));
     for (const item of items) {
         if (item.type === 'struct_decl') this.collectTopLevelStructFields(item, ctx);
         if (item.type === 'type_decl') this.collectTopLevelTypeFields(item, ctx);
         if (item.type === 'proto_decl') this.collectTopLevelProtocol(item, ctx);
     }
+}
 
+export function collectTopLevelValueFacts(ctx) {
+    const items = this.flattenLibraryItems(kids(this.root));
     this.collectSymbols(items, ctx, {
         onConstruct: (item) => this.applyConstruct(item, ctx),
         onType: (name) => this.topLevelTypeNames.add(name),
@@ -46,6 +53,11 @@ export function collectTopLevelSymbols(ctx) {
         },
         onProtocolImpl: (protocol, member, node, returnInfo) => this.collectTopLevelProtocolImpl(protocol, member, node, ctx, returnInfo),
     });
+}
+
+export function collectTopLevelSymbols(ctx) {
+    this.collectTopLevelDefinitions(ctx);
+    this.collectTopLevelValueFacts(ctx);
 }
 
 export function collectModuleTemplate(node) {
@@ -136,8 +148,10 @@ export function collectProtocolMembers(protocolName, node, ctx) {
 export function collectTopLevelProtocolImpl(protocol, member, node, ctx, returnInfo) {
     const selfType = this.protocolSelfType(node, ctx);
     if (!selfType) return;
+    const key = this.protocolImplKey(protocol, member, selfType);
+    if (this.topLevelProtocolImplsByKey.has(key)) return;
     const entry = { protocol, member, selfType, returnInfo };
-    this.topLevelProtocolImplsByKey.set(this.protocolImplKey(protocol, member, selfType), entry);
+    this.topLevelProtocolImplsByKey.set(key, entry);
     if (!this.topLevelProtocolImplementers.has(protocol)) this.topLevelProtocolImplementers.set(protocol, new Set());
     this.topLevelProtocolImplementers.get(protocol).add(selfType);
     const typeMemberKey = this.protocolTypeMemberKey(selfType, member);

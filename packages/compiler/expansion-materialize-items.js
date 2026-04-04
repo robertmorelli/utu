@@ -19,9 +19,6 @@ export function emitExpansionItem(expander, node, ctx, inModule) {
         case "file_import_decl":
             return "";
         case "construct_decl":
-            if (!inModule) {
-                expander.applyConstruct(node, ctx);
-            }
             return "";
         case "struct_decl":
             return expander.emitStructDecl(node, ctx, inModule);
@@ -69,10 +66,6 @@ export function emitExpansionSetupDecl(expander, node, ctx) {
 export function emitExpansionLibraryDecl(expander, node, ctx) {
     const parts = [];
     for (const child of kids(node)) {
-        if (child.type === "construct_decl") {
-            expander.applyConstruct(child, ctx);
-            continue;
-        }
         const emitted = emitExpansionItem(expander, child, ctx, false);
         if (emitted) parts.push(emitted);
     }

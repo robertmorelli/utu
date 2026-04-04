@@ -1,6 +1,7 @@
 import { cloneStageTree, readCompilerArtifact } from "./compiler-stage-runtime.js";
-import { prepareExpansionEmission } from "./analyze-prepare-expansion.js";
-import { emitExpansionItem } from "./expansion-materialize-items.js";
+import { prepareExpansionEmission } from "./expansion-emission.js";
+import { runExpansionFixedPoint } from "./expansion-fixed-point.js";
+import { emitExpansionItem, indentExpansionBlock } from "./expansion-materialize-items.js";
 import { emitExpansionFunctionAndRuntimeDeclarations } from "./edit-emit-function-runtime-declarations.js";
 import { finalizeExpandedSource } from "./edit-finalize-expanded-source.js";
 import { emitExpansionTypeDeclarations } from "./edit-emit-type-declarations.js";
@@ -17,6 +18,18 @@ const TOP_LEVEL_VALUE_NODE_TYPES = new Set([
     "jsgen_decl",
 ]);
 
+function emitPreparedTopLevelItem(expansionState, plan) {
+    if (plan.item.type !== "library_decl") {
+        return emitExpansionItem(expansionState.expander, plan.item, plan.ctx, false);
+    }
+    const parts = [];
+    for (const childPlan of plan.childPlans ?? []) {
+        const emitted = emitExpansionItem(expansionState.expander, childPlan.item, childPlan.ctx, false);
+        if (emitted) parts.push(emitted);
+    }
+    return `library {\n${parts.map(indentExpansionBlock).join("\n\n")}\n}`;
+}
+
 export async function emitExpansionTopLevelItems(expansionState, preparation = null) {
     if (!expansionState) {
         throw new Error("Expansion session is required.");
@@ -29,21 +42,28 @@ export async function emitExpansionTopLevelItems(expansionState, preparation = n
         };
     }
 
+    await runExpansionFixedPoint(expansionState);
     const emissionPreparation = preparation
         ?? expansionState.emissionPreparation
         ?? await prepareExpansionEmission(expansionState);
-    const topLevelCtx = emissionPreparation.rootContext ?? expansionState.expander.createRootContext();
     const topLevelTypeBlocks = [];
     const topLevelValueBlocks = [];
     const topLevelOtherBlocks = [];
-    for (const item of emissionPreparation.topLevelItems) {
-        const emitted = emitExpansionItem(expansionState.expander, item, topLevelCtx, false);
+    const topLevelPlans = emissionPreparation.topLevelPlans
+        ?? emissionPreparation.topLevelItems?.map((item) => ({
+            item,
+            ctx: emissionPreparation.rootContext ?? expansionState.expander.createRootContext(),
+            childPlans: [],
+        }))
+        ?? [];
+    for (const plan of topLevelPlans) {
+        const emitted = emitPreparedTopLevelItem(expansionState, plan);
         if (!emitted) continue;
-        if (TOP_LEVEL_TYPE_NODE_TYPES.has(item.type)) {
+        if (TOP_LEVEL_TYPE_NODE_TYPES.has(plan.item.type)) {
             topLevelTypeBlocks.push(emitted);
             continue;
         }
-        if (TOP_LEVEL_VALUE_NODE_TYPES.has(item.type)) {
+        if (TOP_LEVEL_VALUE_NODE_TYPES.has(plan.item.type)) {
             topLevelValueBlocks.push(emitted);
             continue;
         }
@@ -60,6 +80,7 @@ export async function emitExpansionTopLevelItems(expansionState, preparation = n
 }
 
 export async function materializeExpandedSource(expansionState) {
+    await runExpansionFixedPoint(expansionState);
     const preparation = await prepareExpansionEmission(expansionState);
     const typeDeclarations = await emitExpansionTypeDeclarations(expansionState, preparation);
     const functionDeclarations = await emitExpansionFunctionAndRuntimeDeclarations(expansionState, preparation);
@@ -74,7 +95,7 @@ export async function materializeExpandedSource(expansionState) {
 export async function runMaterializeExpandedSource(context) {
     const topLevelEmission = await emitExpansionTopLevelItems(
         readCompilerArtifact(context, "expansionSession"),
-        context.analyses["prepare-expansion-emission"] ?? null,
+        context.analyses["expand"]?.emissionPreparation ?? null,
     );
     return {
         tree: cloneStageTree(context.tree),

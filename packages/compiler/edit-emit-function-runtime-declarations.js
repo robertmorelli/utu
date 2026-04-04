@@ -1,5 +1,6 @@
 import { cloneStageTree, readCompilerArtifact } from "./compiler-stage-runtime.js";
-import { prepareExpansionEmission } from "./analyze-prepare-expansion.js";
+import { prepareExpansionEmission } from "./expansion-emission.js";
+import { runExpansionFixedPoint } from "./expansion-fixed-point.js";
 import { emitExpansionItem } from "./expansion-materialize-items.js";
 
 const FUNCTION_DECL_NODE_TYPES = new Set([
@@ -27,6 +28,7 @@ export async function emitExpansionFunctionAndRuntimeDeclarations(expansionState
             source: "",
         };
     }
+    await runExpansionFixedPoint(expansionState);
     const emissionPreparation = preparation
         ?? expansionState.emissionPreparation
         ?? await prepareExpansionEmission(expansionState);
@@ -51,7 +53,7 @@ export async function runEmitFunctionRuntimeDeclarations(context) {
     const expansionState = readCompilerArtifact(context, "expansionSession");
     const functionAndRuntimeDeclarations = await emitExpansionFunctionAndRuntimeDeclarations(
         expansionState,
-        context.analyses["prepare-expansion-emission"] ?? null,
+        context.analyses["expand"]?.emissionPreparation ?? null,
     );
     return {
         tree: cloneStageTree(context.tree),

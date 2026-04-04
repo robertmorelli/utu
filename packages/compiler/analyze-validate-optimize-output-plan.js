@@ -8,7 +8,7 @@ export async function runAnalyzeValidateOptimizeOutputPlan(context) {
     throwOnParseErrors(root);
     const semanticsStage = readCompilerStageBundle(context, "semantics");
     const backendStage = readCompilerStageBundle(context, "backend");
-    const expansionStage = readCompilerStageBundle(context, "expansion");
+    const expandStage = readCompilerStageBundle(context, "expand");
     const compilePlan = semanticsStage?.compilePlan ?? context.analyses["plan-compile"] ?? {};
     const intent = compilePlan.intent ?? context.options?.intent ?? "compile";
     const target = compilePlan.target ?? context.options?.mode ?? "program";
@@ -18,8 +18,8 @@ export async function runAnalyzeValidateOptimizeOutputPlan(context) {
             : (context.options?.where ?? "base64"));
     const loweringMetadata = backendStage?.loweringMetadata ?? context.analyses["collect-lowering-metadata"] ?? {};
     const binaryenMetadata = backendStage?.binaryenMetadata ?? context.analyses["collect-binaryen-metadata"] ?? {};
-    const expansion = expansionStage?.cleanup?.finalExpansion
-        ?? expansionStage?.materialization?.reparsedExpansion
+    const expansion = expandStage?.finalExpansion
+        ?? expandStage?.reparsedExpansion
         ?? context.artifacts.expansion
         ?? null;
     return {
