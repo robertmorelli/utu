@@ -1,8 +1,8 @@
-import { runA41CollectLoweringMetadata } from "./a4_1.js";
-import { runA42CollectBinaryenMetadata } from "./a4_2.js";
-import { runA43PrepareBackendMetadataDefaults } from "./a4_3.js";
-import { runE41LowerToBackendIr } from "./e4_1.js";
-import { runE42BuildBinaryen } from "./e4_2.js";
+import { runA41CollectLoweringMetadata } from "./analyze-collect-lowering-metadata.js";
+import { runA42CollectBinaryenMetadata } from "./analyze-collect-binaryen-metadata.js";
+import { runA43PrepareBackendMetadataDefaults } from "./analyze-prepare-backend-metadata-defaults.js";
+import { runE41LowerToBackendIr } from "./edit-lower-to-backend-ir.js";
+import { runE42BuildBinaryen } from "./edit-build-binaryen-artifacts.js";
 
 // Stage 4 runner:
 // own backend metadata orchestration.

@@ -1,7 +1,7 @@
-import { runA31Index } from "./a3_1.js";
-import { runA32Bind } from "./a3_2.js";
-import { runA33Check } from "./a3_3.js";
-import { runA34PlanCompile } from "./a3_4.js";
+import { runA31Index } from "./analyze-index-symbols-and-declarations.js";
+import { runA32Bind } from "./analyze-bind-references.js";
+import { runA33Check } from "./analyze-semantic-checks.js";
+import { runA34PlanCompile } from "./analyze-plan-compile.js";
 
 // Stage 3 runner:
 // own semantic analysis ordering and outputs for downstream lowering.

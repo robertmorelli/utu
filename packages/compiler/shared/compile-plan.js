@@ -1,4 +1,4 @@
-import { childOfType, namedChildren, rootNode } from "../frontend/tree.js";
+import { childOfType, namedChildren, rootNode } from "../stage-tree.js";
 
 export const SOURCE_KINDS = Object.freeze({
     PROGRAM: "program",

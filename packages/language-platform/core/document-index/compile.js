@@ -1,6 +1,6 @@
-import { expandSourceWithDiagnostics } from "../../../../packages/compiler/a2_6.js";
-import { analyzeSourceLayout } from "../../../../packages/compiler/a1_5.js";
-import { COMPILE_TARGETS } from "../../../../packages/compiler/a3_4.js";
+import { expandSourceWithDiagnostics } from "../../../compiler/stage2/api.js";
+import { analyzeSourceLayout } from "../../../../packages/compiler/source-layout.js";
+import { COMPILE_TARGETS } from "../../../../packages/compiler/stage3-compile-plan.js";
 import { findNamedChild, findNamedChildren, spanFromNode } from "../../../document/index.js";
 import { cloneDiagnostic, findCompileErrorSpan, FILE_START_OFFSET_RANGE, FILE_START_RANGE } from "../compile-diagnostics.js";
 

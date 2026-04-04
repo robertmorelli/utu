@@ -22,7 +22,7 @@ const skippedPrefixes = [
 const skippedFiles = new Set([
   'bun.lock',
   'package-lock.json',
-  'packages/compiler/a2_6.js',
+  'packages/compiler/stage2/expansion-state.js',
   'tree-sitter-utu.wasm',
   'utu.png',
   'web-tree-sitter.wasm',

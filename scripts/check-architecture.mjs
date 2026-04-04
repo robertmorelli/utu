@@ -14,8 +14,8 @@ const PACKAGE_LAYER_ORDER = new Map([
 ]);
 
 const trackedFiles = [
-  'packages/compiler/e4_2.js',
-  'packages/compiler/a2_6.js',
+  'packages/compiler/edit-build-binaryen-artifacts.js',
+  'packages/compiler/stage2/expansion-state.js',
   'packages/language-platform/core/document-index/build.js',
   'packages/language-platform/core/documentIndex.js',
   'packages/document/index.js',

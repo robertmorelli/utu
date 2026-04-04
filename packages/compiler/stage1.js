@@ -1,9 +1,10 @@
-import { runA11Load } from "./a1_1.js";
-import { runA13CollectSyntaxDiagnostics } from "./a1_3.js";
-import { runE12Parse } from "./e1_2.js";
-import { runE13SyntaxNormalize } from "./e1_3.js";
-import { runA15AnalyzeSourceLayout } from "./a1_5.js";
-import { runA14CollectHeaderSnapshot } from "./a1_4.js";
+import { runA11Load } from "./analyze-load.js";
+import { runA13CollectSyntaxDiagnostics } from "./analyze-syntax-diagnostics.js";
+import { runE12Parse } from "./edit-parse.js";
+import { runE13SyntaxNormalize } from "./edit-syntax-normalize.js";
+import { runE14BuildStageTree } from "./edit-stage-tree.js";
+import { runA15AnalyzeSourceLayout } from "./analyze-source-layout.js";
+import { runA14CollectHeaderSnapshot } from "./analyze-header-snapshot.js";
 
 function clonePoint(point) {
     return point
@@ -12,15 +13,20 @@ function clonePoint(point) {
 }
 
 export function cloneStageNode(node) {
+    const children = Array.from(node.children ?? [], cloneStageNode);
     return {
+        id: node.id ?? null,
         type: node.type,
         text: node.text,
         isNamed: Boolean(node.isNamed),
+        hasError: Boolean(node.hasError),
+        isMissing: Boolean(node.isMissing),
         startIndex: node.startIndex ?? null,
         endIndex: node.endIndex ?? null,
         startPosition: clonePoint(node.startPosition),
         endPosition: clonePoint(node.endPosition),
-        children: Array.from(node.children ?? [], cloneStageNode),
+        children,
+        namedChildren: children.filter((child) => child?.isNamed),
     };
 }
 
@@ -159,6 +165,8 @@ export async function runCompilerNewStage1(options = {}) {
     try {
         await runRewrite(state, "e1.3", runE13SyntaxNormalize);
         state.artifacts.syntaxNormalize = state.tree;
+        await runRewrite(state, "e1.4", runE14BuildStageTree);
+        state.artifacts.stageTree = state.tree;
         await runAnalysis(state, "a1.5", runA15AnalyzeSourceLayout);
         state.artifacts.sourceLayout = state.analyses["a1.5"];
         await runAnalysis(state, "a1.4", runA14CollectHeaderSnapshot);

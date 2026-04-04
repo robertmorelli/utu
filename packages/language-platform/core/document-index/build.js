@@ -1,6 +1,6 @@
 import { BUILTIN_METHODS } from "../hoverDocs.js";
 import { spanFromNode, walkNamedChildren } from "../../../document/index.js";
-import { analyzeSourceLayout } from "../../../../packages/compiler/a1_5.js";
+import { analyzeSourceLayout } from "../../../../packages/compiler/source-layout.js";
 import { comparePositions, getDocumentUri, rangeKey } from "../types.js";
 import { SYMBOL_METADATA } from "../../../language-spec/index.js";
 import { normalizeTypeText } from "../completion-helpers.js";

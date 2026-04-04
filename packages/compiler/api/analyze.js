@@ -5,7 +5,7 @@ import {
 } from '../../document/index.js';
 import { runCompilerNewStage1 } from '../stage1.js';
 import { createStage1SyntaxSnapshot } from '../stage1.js';
-import { collectHeaderSnapshot as collectHeaderSnapshotFromPipeline } from '../a1_4.js';
+import { collectHeaderSnapshot as collectHeaderSnapshotFromPipeline } from '../header-snapshot.js';
 import { hydrateHeaderSnapshot } from './analyze-header.js';
 import {
     cloneDiagnostic,

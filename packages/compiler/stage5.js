@@ -1,7 +1,7 @@
-import { runA51ValidateOptimize } from "./a5_1.js";
-import { runA52AnalyzeEmitPlan } from "./a5_2.js";
-import { runE51BuildBackendArtifacts } from "./e5_1.js";
-import { runE52Emit } from "./e5_2.js";
+import { runA51ValidateOptimize } from "./analyze-validate-optimize-output-plan.js";
+import { runA52AnalyzeEmitPlan } from "./analyze-js-emission-inputs.js";
+import { runE51BuildBackendArtifacts } from "./edit-build-backend-artifacts.js";
+import { runE52Emit } from "./edit-emit-output-artifacts.js";
 
 // Stage 5 runner:
 // own final validation and artifact emission ordering.
