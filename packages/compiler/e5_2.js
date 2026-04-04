@@ -83,7 +83,7 @@ export async function runE52Emit(context) {
             moduleFormat: a51.moduleFormat ?? "esm",
         },
     };
-    const js = jsgen(treeOrNode, stage5.wasm, {
+    const js = jsgen(context.tree, stage5.wasm, {
         mode: a52.mode ?? normalizeEmitMode(a51.backendOptions?.mode ?? "program"),
         profile: a52.profile ?? a51.backendOptions?.profile ?? null,
         where: a51.wasmLocation ?? "base64",

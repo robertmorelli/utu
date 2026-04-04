@@ -50,15 +50,15 @@ const CollectionMixin = class {
             if (collect) collect(this, item);
             else throw new Error(`Unknown top-level item: ${item.type}`);
         }
-        if (this.mode === 'test' && this.targetName !== null)
+        if (this.mode === "test" && this.targetName !== null)
             this.testDecls = this.testDecls.filter((test) => test.name === this.targetName);
-        if (this.mode === 'bench' && this.targetName !== null)
+        if (this.mode === "bench" && this.targetName !== null)
             this.benchDecls = this.benchDecls.filter((bench) => bench.name === this.targetName);
     }
 
     collectLibraryDecl(node) {
         for (const item of kids(node)) {
-            if (item.type === 'fn_decl') {
+            if (item.type === "fn_decl") {
                 const fn = parseFnItem(item, this.shouldExportLibraryFunction(item));
                 this.fnItems.push(fn);
                 this.callables.set(fn.name, fn);
@@ -71,14 +71,14 @@ const CollectionMixin = class {
     }
 
     shouldExportLibraryFunction(node) {
-        const assocNode = childOfType(node, 'associated_fn_name');
+        const assocNode = childOfType(node, "associated_fn_name");
         const exportName = assocNode
             ? (() => {
                 const [ownerNode, memberNode] = kids(assocNode);
                 return ownerNode && memberNode ? `${ownerNode.text}.${memberNode.text}` : null;
             })()
-            : childOfType(node, 'identifier')?.text ?? null;
-        return this.mode === 'normal'
+            : childOfType(node, "identifier")?.text ?? null;
+        return this.mode === "normal"
             && this.compilePlan.exports.some((entry) => entry.exportName === exportName);
     }
 
@@ -126,8 +126,8 @@ const CollectionMixin = class {
             const key = protocolMethodKey(impl.protocol, impl.member);
             const method = this.protocolMethodMap.get(key);
             const helperParams = method.params.map((type, index) => ({
-                kind: 'param',
-                name: index === 0 ? 'self' : `arg${index}`,
+                kind: "param",
+                name: index === 0 ? "self" : `arg${index}`,
                 type: substituteProtocolType(type, method.typeParam, impl.selfTypeName),
             }));
             const helperReturnType = substituteProtocolType(method.returnType, method.typeParam, impl.selfTypeName);
@@ -175,8 +175,8 @@ const CollectionMixin = class {
             const key = protocolSetterKey(impl.protocol, impl.member);
             const method = this.protocolSetterMap.get(key);
             const helperParams = method.params.map((type, index) => ({
-                kind: 'param',
-                name: index === 0 ? 'self' : `arg${index}`,
+                kind: "param",
+                name: index === 0 ? "self" : `arg${index}`,
                 type: substituteProtocolType(type, method.typeParam, impl.selfTypeName),
             }));
             const slice = setterSlicesByKey.get(key);
@@ -209,8 +209,8 @@ const CollectionMixin = class {
         for (const protoDecl of this.protoDecls) {
             for (const method of protoDecl.methods) {
                 const helperParams = method.params.map((type, index) => ({
-                    kind: 'param',
-                    name: index === 0 ? 'self' : `arg${index}`,
+                    kind: "param",
+                    name: index === 0 ? "self" : `arg${index}`,
                     type: substituteProtocolType(type, protoDecl.typeParam, protoDecl.name),
                 }));
                 if (method.setter) {
@@ -257,8 +257,8 @@ const CollectionMixin = class {
                             selfTypeName: typeDecl.name,
                             tagTypeName: typeDecl.name,
                             params: method.params.map((type, index) => ({
-                                kind: 'param',
-                                name: index === 0 ? 'self' : `arg${index}`,
+                                kind: "param",
+                                name: index === 0 ? "self" : `arg${index}`,
                                 type: substituteProtocolType(type, protoDecl.typeParam, typeDecl.name),
                             })),
                             returnType: null,
@@ -277,8 +277,8 @@ const CollectionMixin = class {
                         selfTypeName: typeDecl.name,
                         tagTypeName: typeDecl.name,
                         params: method.params.map((type, index) => ({
-                            kind: 'param',
-                            name: index === 0 ? 'self' : `arg${index}`,
+                            kind: "param",
+                            name: index === 0 ? "self" : `arg${index}`,
                             type: substituteProtocolType(type, protoDecl.typeParam, typeDecl.name),
                         })),
                         returnType: substituteProtocolType(method.returnType, protoDecl.typeParam, typeDecl.name),
@@ -336,7 +336,7 @@ const CollectionMixin = class {
             if (seen.has(method.name)) throw new Error(`Protocol "${decl.name}" declares "${method.name}" more than once`);
             seen.add(method.name);
             if (method.params.length === 0) throw new Error(`Protocol method "${decl.name}.${method.name}" must take the protocol type as its first parameter`);
-            if (method.params[0]?.kind !== 'named' || method.params[0].name !== decl.typeParam)
+            if (method.params[0]?.kind !== "named" || method.params[0].name !== decl.typeParam)
                 throw new Error(`Protocol method "${decl.name}.${method.name}" must use "${decl.typeParam}" as its first parameter`);
             const laterParams = method.params.slice(1);
             if (method.setter) {
@@ -507,31 +507,31 @@ const CollectionMixin = class {
 
     protocolDispatchParams(method) {
         return [
-            { kind: 'param', name: 'self', type: EQREF_TYPE },
-            ...method.params.slice(1).map((type, index) => ({ kind: 'param', name: `arg${index + 1}`, type })),
+            { kind: "param", name: "self", type: EQREF_TYPE },
+            ...method.params.slice(1).map((type, index) => ({ kind: "param", name: `arg${index + 1}`, type })),
         ];
     }
 
     scanAll() {
         for (const fn of this.fnItems) this.scanNode(fn.body);
         for (const global of this.globalDecls) this.scanNode(global.value);
-        if (this.mode === 'test') for (const test of this.testDecls) this.scanNode(test.body);
-        if (this.mode === 'bench') for (const bench of this.benchDecls) {
+        if (this.mode === "test") for (const test of this.testDecls) this.scanNode(test.body);
+        if (this.mode === "bench") for (const bench of this.benchDecls) {
             for (const stmt of bench.setupPrelude) this.scanNode(stmt);
             this.scanNode(bench.measureBody);
         }
     }
 
     scanNode(node) {
-        walk(node, child => {
+        walk(node, (child) => {
             const value = stringLiteralValue(child);
             if (value !== null) this.internString(value);
-
-            if (child.type === 'pipe_expr') {
-                void pipeCallee(parsePipeTarget(childOfType(child, 'pipe_target')));
+            if (child.type === "pipe_expr") {
+                void pipeCallee(parsePipeTarget(childOfType(child, "pipe_target")));
             }
         });
     }
+
     bodyItems(body) { return Array.isArray(body) ? body : kids(body); }
 
     internString(value) {
@@ -548,8 +548,8 @@ const CollectionMixin = class {
 
     runtimeTypeFields(typeName) {
         const decl = this.typeDeclMap.get(typeName);
-        if (decl?.kind === 'struct_decl') return this.runtimeStructFields(decl);
-        if (decl?.kind === 'type_decl') return decl.tagged ? [HIDDEN_TAG_FIELD] : [];
+        if (decl?.kind === "struct_decl") return this.runtimeStructFields(decl);
+        if (decl?.kind === "type_decl") return decl.tagged ? [HIDDEN_TAG_FIELD] : [];
         const variant = this.variantDecls.get(typeName);
         if (!variant) return null;
         const parentTypeName = this.variantParents.get(typeName) ?? null;

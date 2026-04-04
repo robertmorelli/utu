@@ -18,8 +18,7 @@ export async function runA52AnalyzeEmitPlan(context) {
             jsgen: emptyJsgenPlan(),
         };
     }
-
-        ?? null;
+    const root = rootNode(context.tree) ?? null;
     const stage5 = context.artifacts.stage5 ?? null;
     const metadata = stage5?.metadata ?? {};
     const semantic = context.analyses["a3.3"] ?? {};

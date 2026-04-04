@@ -6,10 +6,7 @@ import { childOfType, namedChildren, rootNode } from "./a1_4.js";
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
 export function runStage3IndexPass(context) {
-    const root = rootNode(
-        ?? context?.tree
-        ?? null,
-    );
+    const root = rootNode(context?.tree ?? null);
     const layout = analyzeSourceLayout(root);
     const symbols = [];
     const symbolsByName = {};

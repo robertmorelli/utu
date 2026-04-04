@@ -91,5 +91,6 @@ export async function runCompilerNewStage2(state, { runAnalysis, runRewrite }) {
         await runAnalysis(state, "a2.13", runA213IndexPostExpansionLayout);
     } finally {
         disposeStage2ExpansionState(state.artifacts.stage2Expansion);
+        delete state.artifacts.stage2Expansion;
     }
 }

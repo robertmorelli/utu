@@ -8,11 +8,31 @@ import { spanFromNode } from "../document/index.js";
 // gather shallow header facts from the parsed syntax tree.
 export async function runA14CollectHeaderSnapshot(context) {
     const parsed = context.artifacts.parse;
-        return null;
+    const document = parsed?.document ?? context.analyses["a1.1"]?.document ?? null;
+    if (!root || !document) {
+        return collectHeaderSnapshot(null, null);
     }
+    return collectHeaderSnapshot(root, document, context.analyses["a1.5"] ?? analyzeSourceLayout(root));
 }
 
 export function collectHeaderSnapshot(rootNode, document, layout = analyzeSourceLayout(rootNode)) {
+    if (!rootNode || !document) {
+        return {
+            kind: 'header',
+            imports: [],
+            exports: [],
+            symbols: [],
+            modules: [],
+            constructs: [],
+            fileImports: [],
+            references: [],
+            tests: [],
+            benches: [],
+            hasMain: false,
+            hasLibrary: false,
+            sourceKind: 'script',
+        };
+    }
     const header = {
         kind: 'header',
         imports: [],

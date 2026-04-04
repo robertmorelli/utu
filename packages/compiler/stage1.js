@@ -121,8 +121,11 @@ async function runRewrite(state, key, fn) {
     if (typeof result.source === "string") {
         state.source = result.source;
     }
+    if (result.legacyTree && result.legacyTree !== state.legacyTree) {
         state.disposeLegacyTree?.();
+        state.legacyTree = result.legacyTree;
         state.disposeLegacyTree = result.disposeLegacyTree ?? (() => {});
+    } else if (typeof result.disposeLegacyTree === "function" && result.legacyTree === state.legacyTree) {
         state.disposeLegacyTree = result.disposeLegacyTree;
     }
     if (result.artifacts && typeof result.artifacts === "object") {

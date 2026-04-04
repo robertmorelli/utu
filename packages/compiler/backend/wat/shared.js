@@ -9,6 +9,7 @@ import {
     walkBlock,
     stringLiteralValue,
 } from '../../a1_4.js';
+import { analyzeSourceLayout } from '../../a1_5.js';
 import data from './watgen.data.json' with { type: 'json' };
 import {
     EQREF_TYPE,
