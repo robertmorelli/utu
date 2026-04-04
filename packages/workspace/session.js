@@ -40,7 +40,7 @@ export class UtuWorkspaceSession {
         documents = null,
         documentClass = UtuWorkspaceTextDocument,
         skippedWorkspaceDirectories = [],
-        validateWat: validateWatOverride = null,
+        compileDocument: compileDocumentOverride = null,
     } = {}) {
         this.documents = documents ?? new UtuDocumentStore({
             workspaceFolders,
@@ -59,7 +59,7 @@ export class UtuWorkspaceSession {
         this.analysisCache = analysisCache ?? new UtuAnalysisCache({
             parserService: this.parserService,
             languageService: this.analysisLanguageService,
-            validateWat: validateWatOverride,
+            compileDocument: compileDocumentOverride,
             grammarWasmPath,
             runtimeWasmPath,
         });

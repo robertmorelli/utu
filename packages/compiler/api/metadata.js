@@ -1,4 +1,4 @@
-import { get_metadata as getCoreMetadata } from '../core/index.js';
+import { get_metadata as getCoreMetadata } from '../core.js';
 
 /**
  * @typedef {Object} DocumentMetadata

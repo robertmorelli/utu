@@ -3,11 +3,10 @@ import path from 'node:path';
 
 import bundledGrammarWasm from '../tree-sitter-utu.wasm';
 import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
-import { expandSource } from '../packages/compiler/frontend/expand.js';
-import { jsgen } from '../packages/compiler/backends/jsgen.js';
+import { expandSource } from '../packages/compiler/a2_6.js';
+import { compile } from '../packages/compiler/index.js';
 import { createUtuTreeSitterParser } from '../packages/document/index.js';
-import { throwOnParseErrors } from '../packages/compiler/frontend/tree.js';
-import { watgen } from '../packages/compiler/backends/wat/index.js';
+import { throwOnParseErrors } from '../packages/compiler/a1_4.js';
 
 const DEFAULT_MODE = 'program';
 const DEFAULT_ITERATIONS = 6;
@@ -16,25 +15,13 @@ const PHASES = [
   'parseOriginal',
   'expand',
   'parseExpanded',
-  'watgen',
-  'binaryenParse',
-  'validatePre',
-  'optimize',
-  'validatePost',
-  'emitBinary',
-  'jsgen',
+  'compile',
 ];
 const PHASE_LABELS = {
   parseOriginal: 'parse original',
   expand: 'expand',
   parseExpanded: 'parse expanded',
-  watgen: 'watgen',
-  binaryenParse: 'binaryen parseText',
-  validatePre: 'validate pre-opt',
-  optimize: 'binaryen optimize',
-  validatePost: 'validate post-opt',
-  emitBinary: 'emit binary',
-  jsgen: 'jsgen',
+  compile: 'compile',
 };
 
 const config = parseArgs(process.argv.slice(2));
@@ -50,15 +37,11 @@ const parser = await createUtuTreeSitterParser({
 });
 const parserInitMs = performance.now() - parserInitStart;
 
-const binaryenLoadStart = performance.now();
-const binaryen = (await import('binaryen')).default;
-const binaryenLoadMs = performance.now() - binaryenLoadStart;
-
-for (let index = 0; index < config.warmup; index += 1) await runOne(parser, binaryen, source, config.mode);
+for (let index = 0; index < config.warmup; index += 1) await runOne(parser, source, config.mode);
 
 const runs = [];
 for (let index = 0; index < config.iterations; index += 1) {
-  runs.push(await runOne(parser, binaryen, source, config.mode));
+  runs.push(await runOne(parser, source, config.mode));
 }
 
 const phaseTotals = Object.fromEntries(PHASES.map((phase) => [phase, 0]));
@@ -77,9 +60,7 @@ console.log(`Mode: ${config.mode}`);
 console.log(`Warmup: ${config.warmup}`);
 console.log(`Iterations: ${config.iterations}`);
 console.log(`Init parser: ${formatMs(parserInitMs)}`);
-console.log(`Load binaryen: ${formatMs(binaryenLoadMs)}`);
 console.log(`Expanded source: ${latest.expanded ? 'yes' : 'no'}`);
-console.log(`WAT bytes: ${latest.watBytes}`);
 console.log(`Wasm bytes: ${latest.wasmBytes}`);
 console.log(`Average total: ${formatMs(averageTotalMs)}`);
 console.log('');
@@ -89,7 +70,7 @@ for (const phase of PHASES) {
   console.log(`${PHASE_LABELS[phase].padEnd(20)} ${formatMs(phaseMs).padStart(10)}  ${share.toFixed(1).padStart(5)}%`);
 }
 
-async function runOne(parser, binaryen, source, mode) {
+async function runOne(parser, source, mode) {
   const phases = Object.fromEntries(PHASES.map((phase) => [phase, 0]));
 
   const parseOriginalStart = performance.now();
@@ -115,64 +96,25 @@ async function runOne(parser, binaryen, source, mode) {
       activeTree = expandedTree;
     }
 
-    const watgenStart = performance.now();
-    const { wat, metadata } = watgen(activeTree, { mode });
-    phases.watgen = performance.now() - watgenStart;
+    const compileStart = performance.now();
+    const { wasm } = await compile(source, {
+      mode,
+      optimize: true,
+      wasmUrl: bundledGrammarWasm,
+      runtimeWasmUrl: bundledRuntimeWasm,
+    });
+    phases.compile = performance.now() - compileStart;
 
-    const parseTextStart = performance.now();
-    const mod = binaryen.parseText(wat);
-    phases.binaryenParse = performance.now() - parseTextStart;
-    mod.setFeatures(binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.Multivalue);
-
-    try {
-      const validatePreStart = performance.now();
-      const preValidationError = getValidationError(mod);
-      phases.validatePre = performance.now() - validatePreStart;
-      if (preValidationError) throw new Error(preValidationError);
-
-      const optimizeStart = performance.now();
-      binaryen.setOptimizeLevel(3);
-      binaryen.setShrinkLevel(2);
-      mod.optimize();
-      phases.optimize = performance.now() - optimizeStart;
-
-      const validatePostStart = performance.now();
-      const postValidationError = getValidationError(mod);
-      phases.validatePost = performance.now() - validatePostStart;
-      if (postValidationError) throw new Error(postValidationError);
-
-      const emitBinaryStart = performance.now();
-      const wasm = mod.emitBinary();
-      phases.emitBinary = performance.now() - emitBinaryStart;
-
-      const jsgenStart = performance.now();
-      jsgen(activeTree, wasm, { mode, where: 'external', moduleFormat: 'esm', metadata });
-      phases.jsgen = performance.now() - jsgenStart;
-
-      return {
-        phases,
-        totalMs: PHASES.reduce((sum, phase) => sum + phases[phase], 0),
-        expanded: expandedSource !== source,
-        watBytes: wat.length,
-        wasmBytes: wasm.length,
-      };
-    } finally {
-      mod.dispose();
-    }
+    return {
+      phases,
+      totalMs: PHASES.reduce((sum, phase) => sum + phases[phase], 0),
+      expanded: expandedSource !== source,
+      wasmBytes: wasm.length,
+    };
   } finally {
     expandedTree?.delete();
     tree.delete();
   }
-}
-
-function getValidationError(mod) {
-  if (mod.validate()) return null;
-  try {
-    new WebAssembly.Module(mod.emitBinary());
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
-  return 'Binaryen validation failed.';
 }
 
 function parseArgs(argv) {

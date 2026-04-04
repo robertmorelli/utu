@@ -2,16 +2,18 @@ import * as vscode from 'vscode';
 import { hasRunnableMain } from '../../language-platform/index.js';
 import { registerCommands } from './commands.js'; import { DiagnosticsController } from './diagnostics.js';
 import { GeneratedDocumentStore } from './generatedDocuments.js'; import { registerLanguageProviders } from './languageProviders.js';
-import { UTU_GLOB } from './shared.js';
+import { UTU_GLOB, UTU_LANGUAGE_ID } from './shared.js';
 import { registerTesting } from './testing.js';
 import { createVscodeWorkspaceAdapter } from './workspaceAdapter.js';
 export function activateUtuExtension(context, options) {
-    const output = vscode.window.createOutputChannel('UTU'), generatedDocuments = new GeneratedDocumentStore(), { session, languageService, workspaceSymbols } = createVscodeWorkspaceAdapter({ grammarWasmPath: options.grammarWasmPath, runtimeWasmPath: options.parserRuntimeWasmPath, output }), diagnostics = new DiagnosticsController(languageService, output, options.diagnosticsCompilerHost ?? options.compilerHost), statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem(), refreshMainContext = createMainContextRefresher(languageService, options.runtimeHost), workspaceWatcher = vscode.workspace.createFileSystemWatcher(UTU_GLOB);
-    const syncDocument = (document) => { void workspaceSymbols.updateDocument(document); if (document === vscode.window.activeTextEditor?.document) void refreshMainContext(document); };
+    const output = vscode.window.createOutputChannel('UTU'), generatedDocuments = new GeneratedDocumentStore(), { session, languageService, workspaceSymbols } = createVscodeWorkspaceAdapter({ grammarWasmPath: options.grammarWasmPath, runtimeWasmPath: options.parserRuntimeWasmPath, output, compileDocument: options.compileDocument ?? null }), diagnostics = new DiagnosticsController(languageService, output, options.diagnosticsCompilerHost ?? options.compilerHost), statusBarItem = options.showCompileStatusBar === false ? undefined : createCompileStatusBarItem(), refreshMainContext = createMainContextRefresher(languageService, options.runtimeHost), workspaceWatcher = vscode.workspace.createFileSystemWatcher(UTU_GLOB);
+    const syncDocument = (document) => { if (!isUtuDocument(document))
+        return; void workspaceSymbols.updateDocument(document); if (document === vscode.window.activeTextEditor?.document) void refreshMainContext(document); };
     const subscriptions = [
         output, generatedDocuments, diagnostics, workspaceWatcher, { dispose: () => { workspaceSymbols.clear(); session.dispose(); } },
         vscode.workspace.onDidChangeTextDocument(({ document }) => { syncDocument(document); }),
-        vscode.workspace.onDidCloseTextDocument((document) => { void session.closeDocument(document.uri.toString()); void workspaceSymbols.refreshUri(document.uri); if (document === vscode.window.activeTextEditor?.document) void vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false); }),
+        vscode.workspace.onDidCloseTextDocument((document) => { if (!isUtuDocument(document))
+            return; void session.closeDocument(document.uri.toString()); void workspaceSymbols.refreshUri(document.uri); if (document === vscode.window.activeTextEditor?.document) void vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false); }),
         vscode.workspace.registerTextDocumentContentProvider('utu-generated', generatedDocuments),
         vscode.window.onDidChangeActiveTextEditor((editor) => { updateStatusBarItem(statusBarItem, editor); void refreshMainContext(editor?.document); }),
         vscode.workspace.onDidChangeWorkspaceFolders(() => void workspaceSymbols.syncWorkspace()),
@@ -26,15 +28,16 @@ export function activateUtuExtension(context, options) {
     void workspaceSymbols.ensureInitialized(); void refreshMainContext(vscode.window.activeTextEditor?.document);
 }
 function createCompileStatusBarItem() { const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100); item.name = 'UTU Compile'; item.text = '$(play) UTU Compile'; item.tooltip = 'Compile the active UTU file'; item.command = 'utu.compileCurrentFile'; return item; }
-function updateStatusBarItem(item, editor) { if (item) editor?.document.languageId === 'utu' ? item.show() : item.hide(); }
+function updateStatusBarItem(item, editor) { if (item) editor?.document.languageId === UTU_LANGUAGE_ID ? item.show() : item.hide(); }
 function createMainContextRefresher(languageService, runtimeHost) {
     let refreshVersion = 0;
     return async (document) => {
         const currentVersion = ++refreshVersion;
         try {
-            const hasRunnable = document?.languageId === 'utu' && hasRunnableMain(await languageService.getDocumentIndex(document)) && !(await runtimeHost.getRunMainBlocker?.(document.getText()));
+            const hasRunnable = document?.languageId === UTU_LANGUAGE_ID && hasRunnableMain(await languageService.getDocumentIndex(document)) && !(await runtimeHost.getRunMainBlocker?.(document.getText()));
             if (currentVersion === refreshVersion) await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', hasRunnable);
         }
         catch { if (currentVersion === refreshVersion) await vscode.commands.executeCommand('setContext', 'utu.hasRunnableMain', false); }
     };
 }
+function isUtuDocument(document) { return document?.languageId === UTU_LANGUAGE_ID; }

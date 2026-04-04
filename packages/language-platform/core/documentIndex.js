@@ -41,13 +41,13 @@ function createCompletionItems(labels, kind) {
 
 export class UtuLanguageService {
     parserService;
-    validateWat;
+    compileDocument;
     loadImport;
     cache = new Map();
 
-    constructor(parserService, { validateWat = null, loadImport = null } = {}) {
+    constructor(parserService, { compileDocument = null, loadImport = null } = {}) {
         this.parserService = parserService;
-        this.validateWat = validateWat;
+        this.compileDocument = compileDocument;
         this.loadImport = loadImport;
     }
 

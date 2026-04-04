@@ -1,15 +1,15 @@
-import { childOfType, namedChildren, rootNode } from '../frontend/tree.js';
+import { childOfType, namedChildren, rootNode } from "../frontend/tree.js";
 
 export const SOURCE_KINDS = Object.freeze({
-    PROGRAM: 'program',
-    LIBRARY: 'library',
-    MODULE_ONLY: 'module_only',
+    PROGRAM: "program",
+    LIBRARY: "library",
+    MODULE_ONLY: "module_only",
 });
 
 export const COMPILE_TARGETS = Object.freeze({
-    NORMAL: 'normal',
-    TEST: 'test',
-    BENCH: 'bench',
+    NORMAL: "normal",
+    TEST: "test",
+    BENCH: "bench",
 });
 
 const LEGACY_MODE_TO_TARGET = Object.freeze({
@@ -35,10 +35,10 @@ export function analyzeSourceLayout(treeOrNode) {
     let hasLibrary = false;
 
     for (const item of namedChildren(root)) {
-        if (item.type === 'library_decl') {
+        if (item.type === "library_decl") {
             hasLibrary = true;
             for (const child of namedChildren(item)) {
-                if (child.type === 'fn_decl') {
+                if (child.type === "fn_decl") {
                     const fn = describeFunction(child);
                     if (fn) {
                         libraryFunctions.push(fn);
@@ -51,7 +51,7 @@ export function analyzeSourceLayout(treeOrNode) {
             continue;
         }
 
-        if (item.type === 'fn_decl') {
+        if (item.type === "fn_decl") {
             const fn = describeFunction(item);
             if (fn?.isMain) topLevelMains.push(fn);
             continue;
@@ -62,10 +62,10 @@ export function analyzeSourceLayout(treeOrNode) {
 
     const errors = [];
     if (libraryMains.length > 0) {
-        errors.push('`main` cannot be declared inside `library { ... }`.');
+        errors.push("`main` cannot be declared inside `library { ... }`.");
     }
     if (hasLibrary && topLevelMains.length > 0) {
-        errors.push('UTU files may define either a top-level `main` or `library { ... }`, but not both.');
+        errors.push("UTU files may define either a top-level `main` or `library { ... }`, but not both.");
     }
 
     const sourceKind = hasLibrary
@@ -96,7 +96,7 @@ export function createCompilePlan(treeOrNode, { target = COMPILE_TARGETS.NORMAL 
     const layout = analyzeSourceLayout(treeOrNode);
     if (layout.errors.length > 0) throw new Error(layout.errors[0]);
     if (normalizedTarget === COMPILE_TARGETS.NORMAL && layout.sourceKind === SOURCE_KINDS.MODULE_ONLY) {
-        throw new Error('UTU normal compile requires either a top-level `fun main()` or a `library { ... }` block.');
+        throw new Error("UTU normal compile requires either a top-level `fun main()` or a `library { ... }` block.");
     }
     return {
         ...layout,
@@ -105,8 +105,8 @@ export function createCompilePlan(treeOrNode, { target = COMPILE_TARGETS.NORMAL 
 }
 
 function describeFunction(node) {
-    const nameNode = childOfType(node, 'identifier');
-    const assocNode = childOfType(node, 'associated_fn_name');
+    const nameNode = childOfType(node, "identifier");
+    const assocNode = childOfType(node, "associated_fn_name");
     if (!nameNode && !assocNode) return null;
     if (assocNode) {
         const [ownerNode, memberNode] = namedChildren(assocNode);
@@ -120,14 +120,14 @@ function describeFunction(node) {
     return {
         name: nameNode.text,
         exportName: nameNode.text,
-        isMain: nameNode.text === 'main',
+        isMain: nameNode.text === "main",
     };
 }
 
 function collectRunnableDeclaration(node, tests, benches) {
-    if (node.type !== 'test_decl' && node.type !== 'bench_decl') return;
+    if (node.type !== "test_decl" && node.type !== "bench_decl") return;
     const first = namedChildren(node)[0];
     const name = first?.text?.slice(1, -1);
     if (!name) return;
-    (node.type === 'test_decl' ? tests : benches).push({ name });
+    (node.type === "test_decl" ? tests : benches).push({ name });
 }

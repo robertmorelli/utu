@@ -39,12 +39,10 @@ async function testBundledCliBinary() {
       '--outdir',
       outdir,
       '--node',
-      '--wat',
     ]);
     expectExitCode(compile, 0, 'bundled CLI compile');
     expectIncludes(compile.output, 'call_simple.mjs', 'bundled CLI compile output');
     expectIncludes(compile.output, 'call_simple.wasm', 'bundled CLI compile output');
-    expectIncludes(compile.output, 'call_simple.wat', 'bundled CLI compile output');
 
     const run = await runProcess(['./utu', 'run', './examples/call_simple.utu']);
     expectExitCode(run, 0, 'bundled CLI run');

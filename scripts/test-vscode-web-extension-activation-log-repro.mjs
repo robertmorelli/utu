@@ -50,9 +50,21 @@ async function main() {
       throw new Error(`Expected activation log to include "${expectedMessage}", received:\n${joined || '(no output)'}`);
     }
 
+    const outputCountBeforeNonUtuChange = outputLines.length;
+    emitNonUtuDocumentChange();
+    await flushAsyncWork();
+    const nonUtuWorkspaceSymbolErrors = outputLines
+      .slice(outputCountBeforeNonUtuChange)
+      .filter((line) => line.includes('[workspace symbols] update output:'));
+    if (nonUtuWorkspaceSymbolErrors.length > 0) {
+      throw new Error(`Non-UTU document updates should be ignored by workspace symbols, received:\n${nonUtuWorkspaceSymbolErrors.join('\n')}`);
+    }
+
     console.log(`PASS vscode activation log repro (verified workspace log contains expected error: ${expectedMessage})`);
   } finally {
     treeSitter.Language.load = originalLoad;
+    delete global.__utuActivationFireDidChangeTextDocument;
+    delete global.__utuActivationLogLines;
     await rm(stubPackageRoot, { recursive: true, force: true });
   }
 }
@@ -81,7 +93,13 @@ import { readFile } from 'node:fs/promises';
 
 const fixtureUris = ${JSON.stringify(fixtureUris)};
 const outputLines = global.__utuActivationLogLines ?? [];
+const textChangeListeners = new Set();
+const runtimeGlobals = Function('return this')();
 let findFilesCalls = 0;
+
+runtimeGlobals.__utuActivationFireDidChangeTextDocument = (document) => {
+  for (const listener of textChangeListeners) listener({ document });
+};
 
 function disposable() {
   return { dispose() {} };
@@ -189,7 +207,10 @@ export const workspace = {
     return { get(_key, fallback) { return fallback; } };
   },
   createFileSystemWatcher() { return { onDidCreate() { return disposable(); }, onDidChange() { return disposable(); }, onDidDelete() { return disposable(); }, dispose() {} }; },
-  onDidChangeTextDocument() { return disposable(); },
+  onDidChangeTextDocument(listener) {
+    textChangeListeners.add(listener);
+    return disposable(() => textChangeListeners.delete(listener));
+  },
   onDidCloseTextDocument() { return disposable(); },
   onDidChangeWorkspaceFolders() { return disposable(); },
   onDidOpenTextDocument() { return disposable(); },
@@ -242,6 +263,25 @@ async function flushAsyncWork() {
   for (let index = 0; index < 10; index += 1) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
   }
+}
+
+function emitNonUtuDocumentChange() {
+  const fire = global.__utuActivationFireDidChangeTextDocument;
+  if (typeof fire !== 'function') {
+    throw new Error('Missing non-UTU change emitter from fake VS Code package.');
+  }
+  fire({
+    uri: {
+      toString() {
+        return 'output:extension-output-robertmorelli.utu-vscode-%231-UTU';
+      },
+    },
+    version: 1,
+    languageId: 'log',
+    getText() {
+      return '[workspace symbols] parse output event';
+    },
+  });
 }
 
 await main();

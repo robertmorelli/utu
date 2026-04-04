@@ -1,4 +1,4 @@
-import { compile as compileCore } from '../core/index.js';
+import { compile as compileCore } from '../core.js';
 
 /**
  * @typedef {Object} CompileOptions

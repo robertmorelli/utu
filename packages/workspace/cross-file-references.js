@@ -11,7 +11,7 @@ export async function getWorkspaceReferences(session, document, position, includ
         return session.languageService.getReferences(document, position, includeDeclaration);
     const locations = new Map();
     if (target.kind === 'symbol') {
-        for (const reference of await getTargetDocumentSymbolReferences(session, target, includeDeclaration))
+        for (const reference of await getWorkspaceSymbolReferences(session, target, includeDeclaration))
             locations.set(locationKey(reference), reference);
     } else if (target.uri === document.uri) {
         locations.set(locationKey(target.declaration), cloneLocation(target.declaration));
@@ -58,14 +58,18 @@ async function resolveWorkspaceReferenceTarget(session, document, position) {
     return foreign ? targetFromForeignResult(foreign) : undefined;
 }
 
-async function getTargetDocumentSymbolReferences(session, target, includeDeclaration) {
+async function getWorkspaceSymbolReferences(session, target, includeDeclaration) {
     if (target.kind !== 'symbol')
         return [];
-    const document = await session.documents.resolve(target.uri);
-    if (!document)
-        return [];
-    const index = await session.languageService.getDocumentIndex(document);
-    return getDocumentSymbolReferences(document, index, target.identity.symbolKey, includeDeclaration);
+    const references = [];
+    for (const candidate of await session.documents.listWorkspaceDocuments()) {
+        const index = await session.languageService.getDocumentIndex(candidate);
+        if (!index)
+            continue;
+        const includeDocumentDeclaration = includeDeclaration || candidate.uri !== target.uri;
+        references.push(...getDocumentSymbolReferences(candidate, index, target.identity.symbolKey, includeDocumentDeclaration));
+    }
+    return references;
 }
 
 function getDocumentSymbolReferences(document, index, symbolKey, includeDeclaration) {

@@ -1,6 +1,7 @@
-import { expandSourceWithDiagnostics } from "../../../compiler/frontend/expand.js";
-import { watgen } from "../../../compiler/backends/wat/index.js";
-import { analyzeSourceLayout, COMPILE_TARGETS } from "../../../compiler/shared/compile-plan.js";
+import { expandSourceWithDiagnostics } from "../../../../packages/compiler/a2_6.js";
+import { analyzeSourceLayout } from "../../../../packages/compiler/a1_5.js";
+import { COMPILE_TARGETS } from "../../../../packages/compiler/a3_4.js";
+import { findNamedChild, findNamedChildren, spanFromNode } from "../../../document/index.js";
 import { cloneDiagnostic, findCompileErrorSpan, FILE_START_OFFSET_RANGE, FILE_START_RANGE } from "../compile-diagnostics.js";
 
 export const COMPILE_DIAGNOSTIC_MODES = Object.freeze({
@@ -17,13 +18,18 @@ export async function collectCompileDiagnostics(documentState, languageService, 
     const normalizedMode = normalizeCompileDiagnosticMode(mode);
     const diagnostics = getBaseDiagnostics(documentState).map(cloneDiagnostic);
     if (diagnostics.length > 0) return diagnostics;
+    const localShadowingDiagnostic = findLocalShadowingDiagnostic(documentState.tree.rootNode, document);
+    if (localShadowingDiagnostic) {
+        diagnostics.push(localShadowingDiagnostic);
+        return diagnostics;
+    }
     const compileDiagnostic = await tryGetCompileDiagnostic(documentState, languageService, document, normalizedMode);
     if (compileDiagnostic) diagnostics.push(compileDiagnostic);
     return diagnostics;
 }
 
 async function tryGetCompileDiagnostic(documentState, languageService, document, mode) {
-    let wat;
+    let sourceText = documentState.source;
     try {
         const expansion = await expandSourceWithDiagnostics(documentState.tree, documentState.source, {
             mode,
@@ -40,16 +46,7 @@ async function tryGetCompileDiagnostic(documentState, languageService, document,
         if (expansion.diagnostics.length > 0) {
             return toFileStartDiagnostic(expansion.diagnostics[0], COMPILE_DIAGNOSTIC_STAGES.FRONTEND_LOWERING);
         }
-        if (!expansion.changed) {
-            ({ wat } = watgen(documentState.tree, { plan: createDiagnosticCompilePlan(documentState.tree.rootNode, mode) }));
-        } else {
-            const expandedParsed = await languageService.parserService.parseSource(expansion.source);
-            try {
-                ({ wat } = watgen(expandedParsed.tree, { plan: createDiagnosticCompilePlan(expandedParsed.tree.rootNode, mode) }));
-            } finally {
-                expandedParsed.dispose();
-            }
-        }
+        sourceText = expansion.changed ? expansion.source : documentState.source;
     } catch (error) {
         return toFileStartDiagnostic({
             message: error?.message || String(error),
@@ -58,16 +55,37 @@ async function tryGetCompileDiagnostic(documentState, languageService, document,
         }, COMPILE_DIAGNOSTIC_STAGES.FRONTEND_LOWERING);
     }
     if (!shouldRunBackendValidation(mode, languageService)) return null;
-    const result = await languageService.validateWat(wat);
-    if (!result) return null;
-    const span = findCompileErrorSpan(documentState.tree.rootNode, result.message, result.binaryenOutput, document);
-    return {
-        message: result.message,
-        ...span,
-        severity: "error",
-        source: "utu",
-        stage: COMPILE_DIAGNOSTIC_STAGES.BACKEND_VALIDATION,
-    };
+    try {
+        await languageService.compileDocument?.({
+            uri: document.uri,
+            sourceText,
+            compileOptions: {
+                mode: COMPILE_TARGETS.NORMAL,
+                optimize: false,
+                loadImport: languageService.loadImport ?? null,
+            },
+        });
+        return null;
+    } catch (error) {
+        const message = error?.message || String(error);
+        const binaryenOutput = error?.binaryenOutput ?? [];
+        const isBackendValidation = binaryenOutput.length > 0 || message.includes('Generated Wasm failed validation:') || message.includes('Generated Wasm backend failure:');
+        if (!isBackendValidation) {
+            return toFileStartDiagnostic({
+                message,
+                severity: "error",
+                source: "utu",
+            }, COMPILE_DIAGNOSTIC_STAGES.FRONTEND_LOWERING);
+        }
+        const span = findCompileErrorSpan(documentState.tree.rootNode, message, binaryenOutput, document);
+        return {
+            message,
+            ...span,
+            severity: "error",
+            source: "utu",
+            stage: COMPILE_DIAGNOSTIC_STAGES.BACKEND_VALIDATION,
+        };
+    }
 }
 
 function normalizeCompileDiagnosticMode(mode) {
@@ -81,7 +99,7 @@ function normalizeCompileDiagnosticMode(mode) {
 }
 
 function shouldRunBackendValidation(mode, languageService) {
-    return mode === COMPILE_DIAGNOSTIC_MODES.COMPILE && Boolean(languageService.validateWat);
+    return mode === COMPILE_DIAGNOSTIC_MODES.COMPILE && typeof languageService.compileDocument === 'function';
 }
 
 function createDiagnosticCompilePlan(rootNode, mode) {
@@ -125,4 +143,86 @@ function hasTopLevelFileImports(rootNode) {
         }
     }
     return false;
+}
+
+function findLocalShadowingDiagnostic(rootNode, document) {
+    const localScopeStack = [];
+    const pushScope = () => void localScopeStack.push(new Set());
+    const popScope = () => void localScopeStack.pop();
+    const declareLocal = (identifierNode) => {
+        if (!identifierNode || localScopeStack.length === 0)
+            return null;
+        const name = identifierNode.text;
+        for (const scope of localScopeStack) {
+            if (scope.has(name)) {
+                const span = spanFromNode(document, identifierNode);
+                return {
+                    message: `Local shadowing is not allowed; duplicate binding "${name}"`,
+                    range: span.range,
+                    offsetRange: span.offsetRange,
+                    severity: "error",
+                    source: "utu",
+                    stage: COMPILE_DIAGNOSTIC_STAGES.FRONTEND_LOWERING,
+                };
+            }
+        }
+        localScopeStack.at(-1).add(name);
+        return null;
+    };
+    const walkNode = (node) => {
+        if (!node)
+            return null;
+        if (node.type === "fn_decl") {
+            pushScope();
+            try {
+                for (const paramNode of findNamedChildren(findNamedChild(node, "param_list"), "param")) {
+                    const diagnostic = declareLocal(findNamedChild(paramNode, "identifier"));
+                    if (diagnostic)
+                        return diagnostic;
+                }
+                return walkNode(findNamedChild(node, "block"));
+            }
+            finally {
+                popScope();
+            }
+        }
+        if (node.type === "block") {
+            pushScope();
+            try {
+                for (const child of node.namedChildren ?? []) {
+                    const diagnostic = walkNode(child);
+                    if (diagnostic)
+                        return diagnostic;
+                }
+                return null;
+            }
+            finally {
+                popScope();
+            }
+        }
+        if (node.type === "bind_expr") {
+            for (const bindTarget of node.namedChildren.slice(0, -1)) {
+                if (bindTarget.type !== "bind_target")
+                    continue;
+                const diagnostic = declareLocal(findNamedChild(bindTarget, "identifier"));
+                if (diagnostic)
+                    return diagnostic;
+            }
+            for (const child of node.namedChildren) {
+                if (child.type === "bind_target")
+                    continue;
+                const diagnostic = walkNode(child);
+                if (diagnostic)
+                    return diagnostic;
+            }
+            return null;
+        }
+        for (const child of node.namedChildren ?? []) {
+            const diagnostic = walkNode(child);
+            if (diagnostic)
+                return diagnostic;
+        }
+        return null;
+    };
+    return walkNode(rootNode);
 }

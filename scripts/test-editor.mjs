@@ -599,8 +599,8 @@ fun main() i32 {
     console_log("ok");
     0;
 }`, undefined),
-    blockerCase('rejects plain host imports without inline js', 'escape prompt(str) str;', 'Unexpected token at 1:1'),
-    blockerCase('rejects removed named host import syntax', 'escape "node:fs" readFileSync(str) str;', 'Unexpected token at 1:1'),
+    blockerCase('rejects plain host imports without inline js', 'escape prompt(str) str;', 'UTU normal compile requires either a top-level `fun main()` or a `library { ... }` block.'),
+    blockerCase('rejects removed named host import syntax', 'escape "node:fs" readFileSync(str) str;', 'UTU normal compile requires either a top-level `fun main()` or a `library { ... }` block.'),
     ['collects no unsupported imports', () => expectDeepEqual([], [])],
     compiledCase('resolves inline-js escapes without external host imports', `escape |Math.sqrt| math_sqrt(f64) f64;
 
@@ -643,7 +643,8 @@ fun main() void {
       where: 'local_file_node',
     }, async (_, { instantiate }) => {
       const logs = [];
-      globalThis.console = { ...(globalThis.console ?? {}), log: (line) => logs.push(String(line)) };
+      const runtimeGlobals = Function('return this')();
+      runtimeGlobals.console = { ...(runtimeGlobals.console ?? {}), log: (line) => logs.push(String(line)) };
       const exports = await instantiate();
       expectValue(await exports.main?.(), undefined);
       expectDeepEqual(logs, ['ok']);
@@ -660,7 +661,8 @@ bench "sample" {
       mode: 'bench',
     }, async (result, { instantiate }) => {
       const logs = [];
-      globalThis.console = { ...(globalThis.console ?? {}), log: (line) => logs.push(String(line)) };
+      const runtimeGlobals = Function('return this')();
+      runtimeGlobals.console = { ...(runtimeGlobals.console ?? {}), log: (line) => logs.push(String(line)) };
       const exports = await instantiate();
       expectValue(await exports[getBenchExport(result)](3), undefined);
       expectDeepEqual(logs, ['ok', 'ok', 'ok']);

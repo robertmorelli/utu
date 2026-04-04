@@ -21,6 +21,8 @@ const webExtensionTestsSource = resolve(extensionRoot, 'scripts/vscode-web-exten
 const treeSitterRuntimeSource = resolve(extensionRoot, 'node_modules/web-tree-sitter/web-tree-sitter.wasm');
 const treeSitterRuntimeDest = resolve(extensionRoot, 'web-tree-sitter.wasm');
 const grammarDest = resolve(extensionRoot, 'tree-sitter-utu.wasm');
+const binaryenModuleSource = resolve(extensionRoot, 'node_modules/binaryen/index.js');
+const binaryenModuleDest = resolve(extensionRoot, 'dist/binaryen.mjs');
 const grammarSourcePath = resolve(extensionRoot, 'grammar.cjs');
 const grammarCompatPath = resolve(extensionRoot, 'grammar.js');
 const grammarSourceInputs = [grammarSourcePath];
@@ -33,7 +35,7 @@ const artifactInputRoots = [
   resolve(extensionRoot, 'CHANGELOG.md'),
   resolve(extensionRoot, 'LICENSE'),
 ];
-const staticAssetInputs = [treeSitterRuntimeSource, grammarDest];
+const staticAssetInputs = [treeSitterRuntimeSource, grammarDest, binaryenModuleSource];
 const ignoredWatchEntries = new Set([
   '.git',
   'node_modules',
@@ -205,7 +207,12 @@ function createWatchReadyPlugin(label, tracker) {
 }
 
 async function syncAssets() {
-  await Promise.all([cp(treeSitterRuntimeSource, treeSitterRuntimeDest), syncGrammarArtifact()]);
+  await mkdir(resolve(extensionRoot, 'dist'), { recursive: true });
+  await Promise.all([
+    cp(treeSitterRuntimeSource, treeSitterRuntimeDest),
+    cp(binaryenModuleSource, binaryenModuleDest),
+    syncGrammarArtifact(),
+  ]);
 }
 
 async function resetBuildArtifacts() {
@@ -303,6 +310,7 @@ async function stageWebDevExtension() {
     cp(resolve(extensionRoot, 'dist/node/extension.cjs'), resolve(webDevExtensionRoot, 'dist/node/extension.cjs')),
     cp(resolve(extensionRoot, 'dist/web/extension.js'), resolve(webDevExtensionRoot, 'dist/web/extension.js')),
     cp(resolve(extensionRoot, 'dist/web/extension.js.map'), resolve(webDevExtensionRoot, 'dist/web/extension.js.map')),
+    cp(resolve(extensionRoot, 'dist/binaryen.mjs'), resolve(webDevExtensionRoot, 'dist/binaryen.mjs')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs')),
     cp(resolve(extensionRoot, 'dist/compiler.web.mjs.map'), resolve(webDevExtensionRoot, 'dist/compiler.web.mjs.map')),
     cp(webExtensionTestsSource, resolve(webDevExtensionRoot, 'dist/web/test/suite/extensionTests.js')),

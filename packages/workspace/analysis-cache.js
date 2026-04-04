@@ -1,4 +1,4 @@
-import { analyzeDocument, analyzeSyntaxAndHeader } from '../compiler/api/analyze.js';
+import { analyzeDocument, analyzeSyntaxAndHeader } from '../../packages/compiler/api/analyze.js';
 import { toSourceDocument } from '../document/index.js';
 
 export const ANALYSIS_CACHE_MODES = Object.freeze({
@@ -24,14 +24,14 @@ export class UtuAnalysisCache {
     constructor({
         parserService = null,
         languageService = null,
-        validateWat = null,
+        compileDocument = null,
         grammarWasmPath,
         runtimeWasmPath,
     } = {}) {
         this.entries = new Map();
         this.parserService = parserService;
         this.languageService = languageService;
-        this.validateWat = validateWat;
+        this.compileDocument = compileDocument;
         this.grammarWasmPath = grammarWasmPath;
         this.runtimeWasmPath = runtimeWasmPath;
     }
@@ -59,7 +59,7 @@ export class UtuAnalysisCache {
             version: document.version,
             parserService: options.parserService ?? this.parserService,
             languageService: options.languageService ?? this.languageService,
-            validateWat: options.validateWat ?? this.validateWat,
+            compileDocument: options.compileDocument ?? this.compileDocument,
             grammarWasmPath: options.grammarWasmPath ?? this.grammarWasmPath,
             runtimeWasmPath: options.runtimeWasmPath ?? this.runtimeWasmPath,
         });

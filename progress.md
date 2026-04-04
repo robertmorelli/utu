@@ -49,11 +49,12 @@ Real implementation ownership now lives in:
   - `packages/compiler/backends/wat/emit-module.js`
   - `packages/compiler/backends/wat/generate-expressions.js`
   - `packages/compiler/backends/wat/type-helpers.js`
-- Split the remaining module expander hotspot into:
-  - `packages/compiler/frontend/expand/shared.js`
-  - `packages/compiler/frontend/expand/collect.js`
-  - `packages/compiler/frontend/expand/emit-declarations.js`
-  - `packages/compiler/frontend/expand/emit-expressions.js`
+- Replaced the module expander god files with smaller expansion modules under:
+  - `packages/compiler/frontend/expand/runtime.js`
+  - `packages/compiler/frontend/expand/module-expander.js`
+  - `packages/compiler/frontend/expand/module-loading.js`
+  - `packages/compiler/frontend/expand/collect/*`
+  - `packages/compiler/frontend/expand/emit/*`
 - Removed compiler-facing static `.wasm` module imports from the shared API/core parse paths in favor of URL-based defaults so Node ESM host flows can import the refactored package surfaces without treating Wasm files as JavaScript modules.
 - Fixed the backend and expander helper seams so the decomposed files carry the same runtime helper set across the split modules.
 

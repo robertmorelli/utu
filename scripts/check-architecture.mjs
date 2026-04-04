@@ -14,17 +14,12 @@ const PACKAGE_LAYER_ORDER = new Map([
 ]);
 
 const trackedFiles = [
-  'packages/compiler/backends/wat/core.js',
-  'packages/compiler/backends/wat/shared.js',
-  'packages/compiler/backends/wat/collect.js',
-  'packages/compiler/backends/wat/emit-module.js',
-  'packages/compiler/backends/wat/generate-expressions.js',
-  'packages/compiler/backends/wat/type-helpers.js',
-  'packages/compiler/frontend/expand.js',
-  'packages/compiler/frontend/expand/shared.js',
-  'packages/compiler/frontend/expand/collect.js',
-  'packages/compiler/frontend/expand/emit-declarations.js',
-  'packages/compiler/frontend/expand/emit-expressions.js',
+  'packages/compiler/e4_2.js',
+  'packages/compiler/a2_6.js',
+  'packages/compiler/stage2/expansion/module-expander.js',
+  'packages/compiler/stage2/expansion/module-loading.js',
+  'packages/compiler/stage2/expansion/collect/namespaces-expand.js',
+  'packages/compiler/stage2/expansion/emit/expressions-core.js',
   'packages/language-platform/core/document-index/build.js',
   'packages/language-platform/core/documentIndex.js',
   'packages/document/index.js',

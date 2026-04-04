@@ -68,10 +68,9 @@ async function withCliRuntime(source, { mode }, run) {
   }), run);
 }
 
-async function compileSource(source, { wat = false, mode = 'program', where = 'base64', moduleFormat = 'esm', targetName = null, optimize = true } = {}) {
+async function compileSource(source, { mode = 'program', where = 'base64', moduleFormat = 'esm', targetName = null, optimize = true } = {}) {
     await compiler.init();
     return normalizeCompileArtifact(await compiler.compile(source, {
-        wat,
         mode,
         where,
         moduleFormat,

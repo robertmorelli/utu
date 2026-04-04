@@ -1,15 +1,15 @@
 export function pascalCase(value) {
-    const parts = String(value).match(/[A-Za-z0-9]+/g) ?? ['X'];
-    return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('');
+    const parts = String(value).match(/[A-Za-z0-9]+/g) ?? ["X"];
+    return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join("");
 }
 
 export function snakeCase(value) {
     const normalized = String(value)
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-        .replace(/[^A-Za-z0-9_]+/g, '_')
-        .replace(/_+/g, '_')
+        .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+        .replace(/[^A-Za-z0-9_]+/g, "_")
+        .replace(/_+/g, "_")
         .toLowerCase();
-    return normalized || 'x';
+    return normalized || "x";
 }
 
 export function hashText(value) {

@@ -1,63 +1,67 @@
 const EMPTY = [];
 
-export const rootNode = n => n?.rootNode ?? n;
-export const namedChildren = n => {
-    const children = n?.namedChildren ?? EMPTY;
-    return children.some(c => c.type === 'comment') ? children.filter(c => c.type !== 'comment') : children;
+export const rootNode = (node) => node?.rootNode ?? node;
+export const namedChildren = (node) => {
+    const children = node?.namedChildren ?? EMPTY;
+    return children.some((child) => child.type === "comment")
+        ? children.filter((child) => child.type !== "comment")
+        : children;
 };
-export const childOfType = (n, t) => {
-    for (const child of n?.namedChildren ?? EMPTY) {
-        if (child.type === t) return child;
+export const childOfType = (node, type) => {
+    for (const child of node?.namedChildren ?? EMPTY) {
+        if (child.type === type) return child;
     }
     return null;
 };
-export const childrenOfType = (n, t) => {
+export const childrenOfType = (node, type) => {
     const matches = [];
-    for (const child of n?.namedChildren ?? EMPTY) {
-        if (child.type === t) matches.push(child);
+    for (const child of node?.namedChildren ?? EMPTY) {
+        if (child.type === type) matches.push(child);
     }
     return matches;
 };
-export const hasAnon = (n, t) => (n?.children ?? []).some(c => !c.isNamed && c.type === t);
-export const walk = (n, v) => {
-    if (!n) return;
-    v(n);
-    for (const child of n.namedChildren ?? EMPTY) {
-        if (child.type !== 'comment') walk(child, v);
+export const hasAnon = (node, type) => (node?.children ?? []).some((child) => !child.isNamed && child.type === type);
+export const walk = (node, visit) => {
+    if (!node) return;
+    visit(node);
+    for (const child of node.namedChildren ?? EMPTY) {
+        if (child.type !== "comment") walk(child, visit);
     }
 };
-export const walkBlock = (b, v) => {
-    for (const stmt of b?.namedChildren ?? EMPTY) {
-        if (stmt.type !== 'comment') walk(stmt, v);
+export const walkBlock = (block, visit) => {
+    for (const statement of block?.namedChildren ?? EMPTY) {
+        if (statement.type !== "comment") walk(statement, visit);
     }
 };
 
-export const stringLiteralValue = n => {
-    const c = n?.type === 'literal' ? (n.namedChildren ?? EMPTY)[0] ?? null : null;
-    return c?.type === 'string_lit' ? c.text.slice(1, -1)
-        : c?.type === 'multiline_string_lit' ? childrenOfType(c, 'multiline_string_line').map(l => l.text.slice(2)).join('\n')
-        : null;
+export const stringLiteralValue = (node) => {
+    const child = node?.type === "literal" ? (node.namedChildren ?? EMPTY)[0] ?? null : null;
+    return child?.type === "string_lit"
+        ? child.text.slice(1, -1)
+        : child?.type === "multiline_string_lit"
+            ? childrenOfType(child, "multiline_string_line").map((line) => line.text.slice(2)).join("\n")
+            : null;
 };
 
-export function findAnonBetween(n, l, r) {
+export function findAnonBetween(node, left, right) {
     let gap = 0;
-    for (const c of n?.children ?? []) {
-        if (c.id === l.id) gap = 1;
-        else if (c.id === r.id) break;
-        else if (gap && !c.isNamed) return c.type;
+    for (const child of node?.children ?? []) {
+        if (child.id === left.id) gap = 1;
+        else if (child.id === right.id) break;
+        else if (gap && !child.isNamed) return child.type;
     }
-    return '?';
+    return "?";
 }
 
-export function throwOnParseErrors(n) {
-    if (!n?.hasError) return;
-    const errs = [];
-    const collect = c => {
-        if (c?.type === 'ERROR' || c?.isMissing) {
-            errs.push(`  ${c.type === 'ERROR' ? 'Unexpected token' : `Missing ${c.type}`} at ${c.startPosition.row + 1}:${c.startPosition.column + 1}`);
+export function throwOnParseErrors(node) {
+    if (!node?.hasError) return;
+    const errors = [];
+    const collect = (child) => {
+        if (child?.type === "ERROR" || child?.isMissing) {
+            errors.push(`  ${child.type === "ERROR" ? "Unexpected token" : `Missing ${child.type}`} at ${child.startPosition.row + 1}:${child.startPosition.column + 1}`);
         }
-        c?.children?.forEach(collect);
+        child?.children?.forEach(collect);
     };
-    collect(n);
-    if (errs.length) throw new Error(`Parse errors:\n${errs.join('\n')}`);
+    collect(node);
+    if (errors.length) throw new Error(`Parse errors:\n${errors.join("\n")}`);
 }

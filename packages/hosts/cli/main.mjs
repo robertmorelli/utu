@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import data from "../../../jsondata/cli.data.json" with { type: "json" };
-import { compileDocument, getDocumentMetadata } from "../../compiler/api/index.js";
+import { compileDocument, getDocumentMetadata } from "../../../packages/compiler/api/index.js";
 import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, normalizeCompileArtifact, withRuntime } from "../../runtime/index.js";
 import { loadNodeModuleFromSource } from "../../runtime/loadNodeModuleFromSource.mjs";
 
@@ -21,7 +21,7 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 async function compileCmd(args) {
-  const { input, outdir, wat, bun, optimize } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--wat": ["wat"], "--bun": ["bun", () => true], "--node": ["bun", () => false], "--no-opt": ["optimize", () => false], "--outdir": ["outdir", value => value] });
+  const { input, outdir, bun, optimize } = parseArgs(args, "compile", "compile needs an input file", data.compileDefaults, { "--bun": ["bun", () => true], "--node": ["bun", () => false], "--no-opt": ["optimize", () => false], "--outdir": ["outdir", value => value] });
   const file = path.resolve(input);
   const fileUri = pathToFileURL(file).href;
   const source = await readFile(file, "utf8");
@@ -31,10 +31,10 @@ async function compileCmd(args) {
   const outputDir = outdir ? path.resolve(outdir) : bun ? path.dirname(file) : path.resolve(data.compileNodeDefaults.outdir);
   const base = path.join(outputDir, path.basename(file, path.extname(file)));
   const targetName = path.basename(file, path.extname(file));
-  const { shim, wasm, wat: watText } = await compileSource(source, { wat, where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null, optimize, uri: fileUri, loadImport: loadFileImport });
+  const { shim, wasm } = await compileSource(source, { where: bun ? "bun" : "local_file_node", moduleFormat: "esm", targetName: bun ? targetName : null, optimize, uri: fileUri, loadImport: loadFileImport });
   await mkdir(path.dirname(base), { recursive: true });
-  const outputs = [!bun && [`${base}.mjs`, shim, "utf8"], !bun && [`${base}.wasm`, wasm], watText && [`${base}.wat`, watText, "utf8"]].filter(Boolean);
-  if (bun) await Promise.all([rm(`${base}.mjs`, { force: true }), rm(`${base}.wasm`, { force: true }), wat ? undefined : rm(`${base}.wat`, { force: true })]);
+  const outputs = [!bun && [`${base}.mjs`, shim, "utf8"], !bun && [`${base}.wasm`, wasm]].filter(Boolean);
+  if (bun) await Promise.all([rm(`${base}.mjs`, { force: true }), rm(`${base}.wasm`, { force: true }), rm(`${base}.wat`, { force: true })]);
   await Promise.all(outputs.map(([filePath, value, encoding]) => writeFile(filePath, value, encoding)));
   outputs.forEach(([filePath]) => console.log(`Wrote ${filePath}`));
   if (bun) console.log(`Wrote ${await buildBunExecutable(base, shim, wasm, targetName)}`);
@@ -142,11 +142,11 @@ function loadRuntime(source, { mode = "program", targetName = null, uri = null }
   return loadCompiledRuntime({ source, mode, compileSource, loadModule: shim => loadNodeModuleFromSource(shim), compileOptions: { targetName, where: "external", uri, loadImport: loadFileImport } });
 }
 
-async function compileSource(source, { wat = false, mode = "program", where = "base64", moduleFormat = "esm", targetName = null, optimize = true, uri = null, loadImport = null } = {}) {
+async function compileSource(source, { mode = "program", where = "base64", moduleFormat = "esm", targetName = null, optimize = true, uri = null, loadImport = null } = {}) {
   return normalizeCompileArtifact(await compileDocument({
     uri: uri ?? "memory://utu-cli",
     sourceText: source,
-    compileOptions: { wat, mode, where, moduleFormat, targetName, optimize, loadImport },
+    compileOptions: { mode, where, moduleFormat, targetName, optimize, loadImport },
   }));
 }
 

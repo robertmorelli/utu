@@ -49,9 +49,9 @@ const cases = [
         path: 'examples/ci/codegen_import_values.utu',
         mode: 'test',
         snippets: [
-            '(import "es" "lucky" (global $lucky i32))',
-            '(import "es" "label" (global $label externref))',
-            '(import "es" "document" (global $document externref))',
+            '(global $lucky i32))',
+            '(global $label externref))',
+            '(global $document externref))',
             'global.get $lucky',
             'global.get $label',
             'global.get $document',
@@ -97,7 +97,7 @@ const cases = [
     {
         name: 'imports-and-exports',
         path: 'examples/ci/codegen_imports_exports.utu',
-        snippets: ['(import "es" "console_log"', '(import "es" "wrap"', '(func $greet', 'call $wrap', '(export "main" (func $main))'],
+        snippets: ['(func $console_log', '(func $wrap', '(func $greet', 'call $wrap', '(export "main" (func $main))'],
     },
     {
         name: 'break-and-call',

@@ -6,7 +6,7 @@ import {
 } from '../../language-platform/providers/diagnostics.js';
 import { UtuLanguageService } from '../../language-platform/index.js';
 import { UtuWorkspaceSession } from '../../workspace/index.js';
-import { UTU_EXCLUDE, UTU_GLOB } from './shared.js';
+import { UTU_EXCLUDE, UTU_GLOB, UTU_LANGUAGE_ID } from './shared.js';
 
 const VSCODE_ADAPTER_REQUESTS = Object.freeze({
     DIAGNOSTICS: 'diagnostics',
@@ -20,12 +20,13 @@ const VSCODE_ADAPTER_REQUESTS = Object.freeze({
     DOCUMENT_SYMBOLS: 'document-symbols',
 });
 
-export function createVscodeWorkspaceAdapter({ grammarWasmPath, runtimeWasmPath, output }) {
+export function createVscodeWorkspaceAdapter({ grammarWasmPath, runtimeWasmPath, output, compileDocument = null }) {
     const parserService = new UtuParserService({
         grammarWasmPath,
         runtimeWasmPath,
     });
     const languageService = new UtuLanguageService(parserService, {
+        compileDocument,
         loadImport: async (fromUri, specifier) => {
             const target = vscode.Uri.parse(new URL(specifier, fromUri ?? 'file:///').href, true);
             return {
@@ -114,7 +115,7 @@ function createWorkspaceSymbolController(session, languageService, output) {
         const documents = [];
         for (const uri of uris) {
             const document = await vscode.workspace.openTextDocument(uri);
-            if (document.languageId !== 'utu')
+            if (!isWorkspaceSymbolDocument(document))
                 continue;
             documents.push(await languageService.syncDocument(document));
         }
@@ -136,6 +137,8 @@ function createWorkspaceSymbolController(session, languageService, output) {
             await syncWorkspace();
         },
         async updateDocument(document) {
+            if (!isWorkspaceSymbolDocument(document))
+                return;
             await schedule(`update ${document.uri}`, async () => {
                 const synced = await languageService.syncDocument(document);
                 await session.workspaceSymbols.updateDocument(synced);
@@ -161,4 +164,8 @@ function createWorkspaceSymbolController(session, languageService, output) {
 
 function getWorkspaceFolderUris() {
     return (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString());
+}
+
+function isWorkspaceSymbolDocument(document) {
+    return document?.languageId === UTU_LANGUAGE_ID && document?.uri?.scheme !== 'output';
 }
