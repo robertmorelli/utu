@@ -16,6 +16,7 @@ export async function runA15AnalyzeSourceLayout(context) {
         visit: () => {},
     });
     const parsed = context.artifacts.parse ?? null;
+    const root = rootNode(parsed?.legacyTree ?? context.legacyTree ?? context.tree ?? parsed?.tree ?? null);
     if (!root) {
         return {
             sourceKind: "module_only",

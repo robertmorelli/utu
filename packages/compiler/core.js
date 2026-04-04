@@ -3,7 +3,9 @@ import { createUtuTreeSitterParser } from '../document/index.js';
 import { runCompilerNewCompile, runCompilerNewMetadata } from './pipeline.js';
 
 let binaryenModulePromise = null;
-const importBinaryen = Function('return import("binaryen")');
+const importBinaryen = Function(
+    'return ((Function("return this")()).__utuBinaryenLoader ? (Function("return this")()).__utuBinaryenLoader() : import("binaryen"))',
+);
 const importNodeChildProcess = Function('return import("node:child_process")');
 const validateWatSubprocessScript = resolveLocalScriptPath('./subprocess/validate-wat-subprocess.mjs');
 

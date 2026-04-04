@@ -10,6 +10,7 @@ export async function runA22BuildModuleGraph(context) {
     const modules = (discovered?.modules ?? []).map(({ name }) => name);
     const moduleSet = new Set(modules);
     const edges = [];
+    const root = context.tree ?? context.legacyTree?.rootNode ?? context.artifacts.parse?.legacyTree?.rootNode ?? null;
 
     if (root) {
         walk(root, (node) => {

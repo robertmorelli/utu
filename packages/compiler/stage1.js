@@ -48,6 +48,7 @@ function createStage1State({
         analyses: {},
         artifacts: {},
         tree: null,
+        legacyTree: null,
         disposeLegacyTree: () => {},
     };
 }
@@ -61,6 +62,7 @@ function createStage1Context(state) {
         options: state.options,
         parser: state.parser,
         tree: state.tree,
+        legacyTree: state.legacyTree,
         analyses: state.analyses,
         artifacts: state.artifacts,
     };
@@ -126,7 +128,7 @@ async function runRewrite(state, key, fn) {
         state.legacyTree = result.legacyTree;
         state.disposeLegacyTree = result.disposeLegacyTree ?? (() => {});
     } else if (typeof result.disposeLegacyTree === "function" && result.legacyTree === state.legacyTree) {
-        state.disposeLegacyTree = result.disposeLegacyTree;
+        state.disposeLegacyTree = result.disposeLegacyTree ?? (() => {});
     }
     if (result.artifacts && typeof result.artifacts === "object") {
         state.artifacts = { ...state.artifacts, ...result.artifacts };
@@ -144,6 +146,7 @@ export async function runCompilerNewStage1(options = {}) {
     const parsed = await runRewrite(state, "e1.2", runE12Parse);
     state.artifacts.parse = {
         ...(parsed ?? {}),
+        legacyTree: state.legacyTree,
         disposeLegacyTree: state.disposeLegacyTree,
         tree: state.tree,
     };
@@ -162,6 +165,7 @@ export async function runCompilerNewStage1(options = {}) {
         state.artifacts.header = state.analyses["a1.4"];
         return {
             source: state.source,
+            legacyTree: state.legacyTree,
             stageTree: state.tree,
             analyses: state.analyses,
             artifacts: state.artifacts,
@@ -178,10 +182,11 @@ export async function runCompilerNewStage1(options = {}) {
 // Build the public syntax snapshot from stage-1 artifacts.
 export function createStage1SyntaxSnapshot(stage1Result) {
     const parseArtifact = stage1Result?.artifacts?.parse ?? null;
+    const rootNode = parseArtifact?.tree ?? stage1Result?.stageTree ?? null;
     const diagnostics = (parseArtifact?.diagnostics ?? []).map((diagnostic) => ({ ...diagnostic }));
     return {
         kind: 'syntax',
-        tree: null,
+        tree: rootNode,
         rootType: rootNode?.type ?? null,
         treeString: rootNode?.toString?.() ?? '',
         diagnostics,

@@ -10,6 +10,7 @@ import { executeRuntimeBenchmark, executeRuntimeTest, loadCompiledRuntime, norma
 import { loadNodeModuleFromSource } from "../../runtime/loadNodeModuleFromSource.mjs";
 
 const help = data.help;
+installBinaryenLoader();
 main().catch(error => (console.error(text(error)), process.exitCode = 1));
 
 async function main(argv = process.argv.slice(2)) {
@@ -110,6 +111,43 @@ function parseNumber(value, flag, parse, valid) {
 
 function fail(message) { throw new Error(message); }
 function text(error) { return error instanceof Error ? error.message : String(error); }
+
+function installBinaryenLoader() {
+  const runtimeGlobals = Function('return this')();
+  const previousLoader = runtimeGlobals.__utuBinaryenLoader;
+  let loaderPromise = null;
+  runtimeGlobals.__utuBinaryenLoader = async () => {
+    loaderPromise ??= loadBinaryenModuleFromSource().catch(async (error) => {
+      if (typeof previousLoader === 'function')
+        return previousLoader();
+      throw error;
+    });
+    return loaderPromise;
+  };
+}
+
+async function loadBinaryenModuleFromSource() {
+  const sourcePath = await resolveBinaryenSourcePath();
+  const source = await readFile(sourcePath, 'utf8');
+  const { module } = await loadNodeModuleFromSource(source, { prefix: 'utu-binaryen-' });
+  return module;
+}
+
+async function resolveBinaryenSourcePath() {
+  const candidates = [
+    path.resolve(process.cwd(), 'dist/binaryen.mjs'),
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../dist/binaryen.mjs'),
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../../dist/binaryen.mjs'),
+    path.resolve(process.cwd(), 'node_modules/binaryen/index.js'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      await readFile(candidate, 'utf8');
+      return candidate;
+    } catch {}
+  }
+  throw new Error('Could not locate a Binaryen module source file.');
+}
 
 async function buildBunExecutable(base, shim, wasm, targetName) {
   const buildRoot = path.join(tmpdir(), "utu-bun-build");

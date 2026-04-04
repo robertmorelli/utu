@@ -1,5 +1,5 @@
 import { cloneStageTree } from "./stage1.js";
-import { emitStage2TypeDeclarations } from "./stage2/declaration-emission.js";
+import { emitStage2TypeDeclarations } from "./a2_6.js";
 
 // e2.5.1 Emit Type Declarations:
 // materialize namespace/type/protocol declaration units before the final source join step.

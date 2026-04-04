@@ -33,7 +33,7 @@ import { parseTree } from "../document/tree-sitter.js";
 import {
     createStage2ExpansionState,
     disposeStage2ExpansionState,
-} from "./stage2/expansion-state.js";
+} from "./a2_6.js";
 
 // Stage 2 runner:
 // own expansion analysis/rewrite ordering before semantics.

@@ -44,6 +44,7 @@ const ignoredWatchEntries = new Set([
   'web-tree-sitter.wasm',
 ]);
 const watchMode = process.argv.includes('--watch');
+const skipVsixPackaging = process.env.UTU_SKIP_VSIX === '1' || process.env.UTU_SUITE_GATE === 'utu_test';
 const watchMessages = { start: 'Watching UTU extension sources...', ready: 'UTU_EXTENSION_READY' };
 const browserDefine = {
   ['global' + 'This.process']: 'undefined',
@@ -269,6 +270,7 @@ async function buildAllArtifacts() {
   await stageWebDevExtension();
   await buildCli();
   await buildLsp();
+  if (skipVsixPackaging) return;
   await packageVsix();
 }
 

@@ -1,5 +1,5 @@
 import { cloneStageTree } from "./stage1.js";
-import { materializeStage2ExpandedSource } from "./stage2/materialize-source.js";
+import { materializeStage2ExpandedSource } from "./a2_6.js";
 
 // e2.5.3 Emit Top-Level Items and Materialize Source:
 // join namespace outputs plus rewritten top-level items into one expanded source artifact.

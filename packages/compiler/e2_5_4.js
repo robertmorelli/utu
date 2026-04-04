@@ -18,6 +18,7 @@ export async function runE254ParseMaterializedSource(context) {
     );
     return {
         source: rewrittenSource,
+        legacyTree: parsed.tree,
         tree: expandedStageTree,
         disposeLegacyTree: parsed.dispose,
         artifacts: {

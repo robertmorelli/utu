@@ -1,8 +1,6 @@
 import { runCompilerNewStage1 } from "./stage1.js";
 import { runCompilerNewStage2 } from "./stage2.js";
 import { runCompilerNewStage3 } from "./stage3.js";
-import { runCompilerNewStage4 } from "./stage4.js";
-import { runCompilerNewStage5 } from "./stage5.js";
 import { cloneStageTree } from "./stage1.js";
 
 // Full packages/compiler pipeline runner:
@@ -16,6 +14,7 @@ function createContext(state) {
         options: state.options,
         parser: state.parser,
         tree: state.tree,
+        legacyTree: state.legacyTree,
         analyses: state.analyses,
         artifacts: state.artifacts,
     };
@@ -89,6 +88,31 @@ async function runRewrite(state, key, fn) {
     state.artifacts[key] = result;
 }
 
+function snapshotPipelineState(state) {
+    return {
+        source: state.source,
+        legacyTree: state.legacyTree,
+        stageTree: state.tree,
+        analyses: state.analyses,
+        artifacts: state.artifacts,
+        dispose() {
+            state.artifacts.stage4Binaryen?.ir?.dispose?.();
+            state.artifacts.stage5?.ir?.dispose?.();
+            state.disposeLegacyTree?.();
+        },
+    };
+}
+
+async function loadStage4Runner() {
+    const stage4 = await import("./stage4.js");
+    return stage4.runCompilerNewStage4;
+}
+
+async function loadStage5Runner() {
+    const stage5 = await import("./stage5.js");
+    return stage5.runCompilerNewStage5;
+}
+
 export async function runCompilerNewPipeline({
     source,
     parser,
@@ -96,6 +120,7 @@ export async function runCompilerNewPipeline({
     version = 0,
     loadImport = null,
     options = {},
+    stopAfterStage = 5,
 } = {}) {
     const state = {
         source,
@@ -107,6 +132,7 @@ export async function runCompilerNewPipeline({
         analyses: {},
         artifacts: {},
         tree: null,
+        legacyTree: null,
         disposeLegacyTree: () => {},
     };
 
@@ -120,25 +146,24 @@ export async function runCompilerNewPipeline({
     });
     state.analyses = { ...state.analyses, ...stage1.analyses };
     state.artifacts = { ...state.artifacts, ...stage1.artifacts };
+    state.legacyTree = stage1.legacyTree;
     state.disposeLegacyTree = stage1.dispose;
     state.tree = stage1.stageTree;
 
     try {
         await runCompilerNewStage2(state, { runAnalysis, runRewrite });
+        if (stopAfterStage <= 2) return snapshotPipelineState(state);
         await runCompilerNewStage3(state, { runAnalysis });
+        if (stopAfterStage <= 3) return snapshotPipelineState(state);
+        const runCompilerNewStage4 = await loadStage4Runner();
         await runCompilerNewStage4(state, { runAnalysis, runRewrite });
+        if (stopAfterStage <= 4) return snapshotPipelineState(state);
+        const runCompilerNewStage5 = await loadStage5Runner();
         await runCompilerNewStage5(state, { runAnalysis, runRewrite });
-
-        return {
-            source: state.source,
-            stageTree: state.tree,
-            analyses: state.analyses,
-            artifacts: state.artifacts,
-            dispose() {
-                state.disposeLegacyTree?.();
-            },
-        };
+        return snapshotPipelineState(state);
     } catch (error) {
+        state.artifacts.stage4Binaryen?.ir?.dispose?.();
+        state.artifacts.stage5?.ir?.dispose?.();
         state.disposeLegacyTree?.();
         throw error;
     }
@@ -163,6 +188,7 @@ export async function runCompilerNewCompile({
             originalSource: source,
             ...compileOptions,
         },
+        stopAfterStage: 5,
     });
     try {
         return pipeline.artifacts.output ?? null;
@@ -188,6 +214,7 @@ export async function runCompilerNewMetadata({
             intent: "metadata",
             mode: "program",
         },
+        stopAfterStage: 3,
     });
     try {
         return pipeline.analyses["a3.3"]?.sourceMetadata ?? null;

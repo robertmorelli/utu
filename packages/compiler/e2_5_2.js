@@ -1,5 +1,5 @@
 import { cloneStageTree } from "./stage1.js";
-import { emitStage2FunctionAndRuntimeDeclarations } from "./stage2/declaration-emission.js";
+import { emitStage2FunctionAndRuntimeDeclarations } from "./a2_6.js";
 
 // e2.5.2 Emit Function and Runtime Declarations:
 // materialize function/global/jsgen declaration units ahead of full-source materialization.

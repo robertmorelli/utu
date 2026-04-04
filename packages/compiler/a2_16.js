@@ -1,4 +1,4 @@
-import { buildStage2NamespaceModel } from "./stage2/namespaces.js";
+import { buildStage2NamespaceModel } from "./a2_6.js";
 
 // TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over a2.15/a2.14 pipeline state.
 // It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.

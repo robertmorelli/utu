@@ -16,10 +16,6 @@ const PACKAGE_LAYER_ORDER = new Map([
 const trackedFiles = [
   'packages/compiler/e4_2.js',
   'packages/compiler/a2_6.js',
-  'packages/compiler/stage2-expansion-engine.js',
-  'packages/compiler/stage2-expansion-loading.js',
-  'packages/compiler/stage2-expansion-namespaces.js',
-  'packages/compiler/stage2-expansion-expressions.js',
   'packages/language-platform/core/document-index/build.js',
   'packages/language-platform/core/documentIndex.js',
   'packages/document/index.js',

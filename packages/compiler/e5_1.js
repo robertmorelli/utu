@@ -7,11 +7,19 @@ export async function buildBackendArtifactsFromTree(treeOrNode, {
     emitWat = false,
     ...backendOptions
 } = {}) {
-    return compileBinaryen(treeOrNode, {
+    const stage4Binaryen = await compileBinaryen(treeOrNode, {
         optimize,
         emitWat,
         ...backendOptions,
     });
+    const emitted = await stage4Binaryen.ir.emitArtifacts({
+        optimize,
+        emitWat,
+    });
+    return {
+        ...stage4Binaryen,
+        ...emitted,
+    };
 }
 
 // e5.1 Build backend artifacts:
@@ -24,17 +32,26 @@ export async function runE51BuildBackendArtifacts(context) {
 
     const source = context.source ?? context.options?.originalSource ?? null;
     const prebuilt = context.artifacts.stage4Binaryen ?? null;
-    const stage5Raw = prebuilt ?? await buildBackendArtifactsFromTree(
-        {
-            ...(a51.backendOptions ?? {}),
-            mode: normalizeMode(a51.backendOptions?.mode ?? a43.mode ?? "program"),
-            optimize: a51.binaryenOptions?.optimize ?? true,
-            emitWat: a51.binaryenOptions?.emitWat ?? false,
-            source,
-            uri: context.uri ?? null,
-            loadImport: context.loadImport ?? null,
-        },
-    );
+    const stage5Raw = prebuilt
+        ? {
+            ...prebuilt,
+            ...(await prebuilt.ir.emitArtifacts({
+                optimize: a51.binaryenOptions?.optimize ?? true,
+                emitWat: a51.binaryenOptions?.emitWat ?? false,
+            })),
+        }
+        : await buildBackendArtifactsFromTree(
+            context.legacyTree ?? context.artifacts.parse?.legacyTree ?? null,
+            {
+                ...(a51.backendOptions ?? {}),
+                mode: normalizeMode(a51.backendOptions?.mode ?? a43.mode ?? "program"),
+                optimize: a51.binaryenOptions?.optimize ?? true,
+                emitWat: a51.binaryenOptions?.emitWat ?? false,
+                source,
+                uri: context.uri ?? null,
+                loadImport: context.loadImport ?? null,
+            },
+        );
     const stage5 = {
         ...stage5Raw,
         metadata: mergeBackendMetadata(
@@ -42,6 +59,8 @@ export async function runE51BuildBackendArtifacts(context) {
             stage5Raw?.metadata ?? {},
         ),
     };
+    prebuilt?.ir?.dispose?.();
+    if (stage5.ir) delete stage5.ir;
 
     return {
         tree,

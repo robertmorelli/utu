@@ -1,5 +1,5 @@
 import { parseTree } from "../document/tree-sitter.js";
-import { loadStage2ExpansionImports } from "./stage2/load-imports.js";
+import { loadStage2ExpansionImports } from "./a2_6.js";
 
 // TODO(architecture): SCARY: this analysis pass is layering on top of a2.6/a2.5 instead of owning one stage boundary.
 // It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.

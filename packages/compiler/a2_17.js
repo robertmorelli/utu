@@ -1,4 +1,4 @@
-import { collectStage2SymbolFacts } from "./stage2/symbol-facts.js";
+import { collectStage2SymbolFacts } from "./a2_6.js";
 
 // TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over a2.16/a2.15 pipeline state.
 // It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.

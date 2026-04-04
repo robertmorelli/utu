@@ -10,7 +10,8 @@ import { headerItemKey } from "./a2_0.js";
 // inventory modules, imports, constructs, and other expansion-relevant declarations.
 export async function runA21DiscoverDeclarations(context) {
     const parsed = context.artifacts.parse ?? null;
-    const document = parsed?.document ?? null;
+    const root = parsed?.legacyTree?.rootNode ?? context.legacyTree?.rootNode ?? context.tree ?? null;
+    const document = parsed?.document ?? context.analyses["a1.1"]?.document ?? null;
     const syntaxDiagnostics = (parsed?.diagnostics ?? []).map(cloneDiagnostic);
     const headerReferences = context.analyses["a2.0"] ?? null;
     const sourceLayout = context.analyses["a1.5"] ?? analyzeSourceLayout(root);
