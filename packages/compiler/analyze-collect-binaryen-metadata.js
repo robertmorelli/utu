@@ -1,14 +1,11 @@
 import { runEmptyAnalysisPass } from "./analysis-pass-utils.js";
+import { readCompilerStageBundle } from "./compiler-stage-runtime.js";
 
-// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over a3.4.
-// It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.
-
-// a4.2 Collect Binaryen Metadata:
-// gather build metadata and options consumed by e4.2.
-export async function runA42CollectBinaryenMetadata(context) {
-    runEmptyAnalysisPass("a4.2", context);
-    const check = context.analyses["a3.4"] ?? {};
-    const intent = check.intent ?? context.options?.intent ?? "compile";
+export async function runAnalyzeCollectBinaryenMetadata(context) {
+    runEmptyAnalysisPass("collect-binaryen-metadata", context);
+    const semanticsStage = readCompilerStageBundle(context, "semantics");
+    const compilePlan = semanticsStage?.compilePlan ?? context.analyses["plan-compile"] ?? {};
+    const intent = compilePlan.intent ?? context.options?.intent ?? "compile";
     return {
         shouldBuildBinaryen: intent === "compile",
         optimize: context.options?.optimize ?? true,

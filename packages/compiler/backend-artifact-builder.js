@@ -1,3 +1,4 @@
+import { readCompilerStageBundle } from "./compiler-stage-runtime.js";
 import { runTreeWalkRewritePass } from "./rewrite-pass.js";
 import { compileBinaryen } from "./binaryen-build.js";
 import { mergeBackendMetadata, normalizeMode } from "./backend-metadata-defaults.js";
@@ -26,13 +27,14 @@ export async function buildBackendArtifactsFromTree(treeOrNode, {
 // e5.1 Build backend artifacts:
 // consume the backend builder output as the stage-5 artifact contract.
 export async function runE51BuildBackendArtifacts(context) {
-    const a51 = context.analyses["a5.1"] ?? {};
-    const a43 = context.analyses["a4.3"] ?? {};
+    const a51 = context.analyses["validate-output-plan"] ?? {};
+    const backendStage = readCompilerStageBundle(context, "backend");
+    const a43 = backendStage?.metadataDefaults ?? context.analyses["prepare-backend-metadata-defaults"] ?? {};
     const tree = await runTreeWalkRewritePass("e5.1", context, (node) => node);
     if (!a51.shouldEmitCompileArtifacts) return { tree };
 
     const source = context.source ?? context.options?.originalSource ?? null;
-    const prebuilt = context.artifacts.stage4Binaryen ?? null;
+    const prebuilt = backendStage?.binaryenArtifact ?? context.artifacts.stage4Binaryen ?? null;
     const stage5Raw = prebuilt
         ? {
             ...prebuilt,

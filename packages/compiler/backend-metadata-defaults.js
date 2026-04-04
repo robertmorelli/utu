@@ -1,20 +1,17 @@
-import { runEmptyAnalysisPass, runTreeWalkAnalysisPass } from "./analysis-pass-utils.js";
-import { rootNode } from "./header-snapshot.js";
+import { runTreeWalkAnalysisPass } from "./analysis-pass-utils.js";
+import { rootNode } from "./stage-tree.js";
 
 // TODO(architecture): SCARY: this analysis pass stacks a4.1/a3.3 facts and then performs another tree walk.
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
 
-// a4.3 Prepare Backend Metadata Defaults:
-// normalize semantic metadata defaults for backend artifacts consumed by later stages.
-export async function runA43PrepareBackendMetadataDefaults(context) {
-    runEmptyAnalysisPass("a4.3", context);
-    const a41 = context.analyses["a4.1"] ?? {};
-    const semantic = context.analyses["a3.3"] ?? {};
-    const mode = normalizeMode(a41.backendOptions?.mode ?? context.options?.mode ?? "program");
-    const treeFacts = collectLegacyTreeFacts(
-        rootNode(context.tree ?? context.legacyTree?.rootNode ?? context.artifacts.parse?.legacyTree?.rootNode ?? null),
-    );
-
+export function createBackendMetadataDefaults({
+    loweringMetadata = {},
+    semantic = {},
+    treeOrNode = null,
+    options = {},
+} = {}) {
+    const mode = normalizeMode(loweringMetadata.backendOptions?.mode ?? options.mode ?? "program");
+    const treeFacts = collectLegacyTreeFacts(rootNode(treeOrNode));
     return {
         mode,
         metadataDefaults: {

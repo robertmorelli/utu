@@ -2,7 +2,7 @@ import { DEFAULT_GRAMMAR_WASM, DEFAULT_RUNTIME_WASM } from '../../../document/de
 import {
     UtuParserService,
 } from '../../../document/index.js';
-import { runCompilerNewStage1 } from '../../stage1.js';
+import { runCompilerSyntaxPipeline } from '../../syntax-pipeline.js';
 
 const bundledGrammarWasm = DEFAULT_GRAMMAR_WASM;
 const bundledRuntimeWasm = DEFAULT_RUNTIME_WASM;
@@ -20,19 +20,23 @@ export async function parseDocument({
         grammarWasmPath,
         runtimeWasmPath,
     });
-    const stage1 = await runCompilerNewStage1({
+    const syntaxPipeline = await runCompilerSyntaxPipeline({
         source: sourceText,
         parser: await parserService.getParser(),
         uri,
         version,
     });
-    if (ownsParserService)
-        parserService.dispose();
-    return {
-        diagnostics: stage1.artifacts.parse.diagnostics,
-        document: stage1.artifacts.parse.document,
-        normalizedTree: stage1.artifacts.syntaxNormalize,
-    };
+    try {
+        return {
+            diagnostics: syntaxPipeline.artifacts.parse.diagnostics,
+            document: syntaxPipeline.artifacts.parse.document,
+            normalizedTree: syntaxPipeline.artifacts.syntaxNormalize,
+        };
+    } finally {
+        syntaxPipeline.dispose();
+        if (ownsParserService)
+            parserService.dispose();
+    }
 }
 
 export { UtuParserService } from '../../../document/index.js';

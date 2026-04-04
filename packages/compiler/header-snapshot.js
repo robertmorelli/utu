@@ -1,5 +1,17 @@
 import { analyzeSourceLayout } from "./source-layout.js";
 import { spanFromNode } from "../document/index.js";
+import {
+    rootNode,
+    namedChildren,
+    childOfType,
+    childrenOfType,
+    hasAnon,
+    walk,
+    walkBlock,
+    stringLiteralValue,
+    findAnonBetween,
+    throwOnParseErrors,
+} from "./stage-tree.js";
 
 // TODO(architecture): SCARY: this analysis pass reuses a1.5 layout analysis and then walks header trees again.
 // It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
@@ -9,11 +21,11 @@ import { spanFromNode } from "../document/index.js";
 export async function runA14CollectHeaderSnapshot(context) {
     const parsed = context.artifacts.parse;
     const root = rootNode(parsed?.legacyTree ?? context.legacyTree ?? context.tree ?? parsed?.tree ?? null);
-    const document = parsed?.document ?? context.analyses["a1.1"]?.document ?? null;
+    const document = parsed?.document ?? context.analyses["load-source"]?.document ?? null;
     if (!root || !document) {
         return collectHeaderSnapshot(null, null);
     }
-    return collectHeaderSnapshot(root, document, context.analyses["a1.5"] ?? analyzeSourceLayout(root));
+    return collectHeaderSnapshot(root, document, context.analyses["analyze-source-layout"] ?? analyzeSourceLayout(root));
 }
 
 export function collectHeaderSnapshot(rootNode, document, layout = analyzeSourceLayout(rootNode)) {
@@ -222,68 +234,15 @@ function collectNamespaceReference(node) {
     return node.text ?? null;
 }
 
-const EMPTY = [];
-
-export const rootNode = (node) => node?.rootNode ?? node;
-export const namedChildren = (node) => {
-    const children = node?.namedChildren ?? EMPTY;
-    return children.some((child) => child.type === "comment")
-        ? children.filter((child) => child.type !== "comment")
-        : children;
+export {
+    rootNode,
+    namedChildren,
+    childOfType,
+    childrenOfType,
+    hasAnon,
+    walk,
+    walkBlock,
+    stringLiteralValue,
+    findAnonBetween,
+    throwOnParseErrors,
 };
-export const childOfType = (node, type) => {
-    for (const child of node?.namedChildren ?? EMPTY) {
-        if (child.type === type) return child;
-    }
-    return null;
-};
-export const childrenOfType = (node, type) => {
-    const matches = [];
-    for (const child of node?.namedChildren ?? EMPTY) {
-        if (child.type === type) matches.push(child);
-    }
-    return matches;
-};
-export const hasAnon = (node, type) => (node?.children ?? []).some((child) => !child.isNamed && child.type === type);
-export const walk = (node, visit) => {
-    if (!node) return;
-    visit(node);
-    for (const child of node.namedChildren ?? EMPTY) {
-        if (child.type !== "comment") walk(child, visit);
-    }
-};
-export const walkBlock = (block, visit) => {
-    for (const statement of block?.namedChildren ?? EMPTY) {
-        if (statement.type !== "comment") walk(statement, visit);
-    }
-};
-
-export const stringLiteralValue = (node) => {
-    const child = node?.type === "literal" ? (node.namedChildren ?? EMPTY)[0] ?? null : null;
-    return child?.type === "string_lit" ? child.text.slice(1, -1)
-        : child?.type === "multiline_string_lit" ? childrenOfType(child, "multiline_string_line").map((line) => line.text.slice(2)).join("\n")
-            : null;
-};
-
-export function findAnonBetween(node, left, right) {
-    let gap = 0;
-    for (const child of node?.children ?? []) {
-        if (child.id === left.id) gap = 1;
-        else if (child.id === right.id) break;
-        else if (gap && !child.isNamed) return child.type;
-    }
-    return "?";
-}
-
-export function throwOnParseErrors(node) {
-    if (!node?.hasError) return;
-    const errors = [];
-    const collect = (child) => {
-        if (child?.type === "ERROR" || child?.isMissing) {
-            errors.push(`  ${child.type === "ERROR" ? "Unexpected token" : `Missing ${child.type}`} at ${child.startPosition.row + 1}:${child.startPosition.column + 1}`);
-        }
-        child?.children?.forEach(collect);
-    };
-    collect(node);
-    if (errors.length) throw new Error(`Parse errors:\n${errors.join("\n")}`);
-}

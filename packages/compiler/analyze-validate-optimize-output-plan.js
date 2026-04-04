@@ -1,36 +1,38 @@
 import { runEmptyAnalysisPass } from "./analysis-pass-utils.js";
-import { rootNode, throwOnParseErrors } from "./header-snapshot.js";
+import { readCompilerStageBundle } from "./compiler-stage-runtime.js";
+import { rootNode, throwOnParseErrors } from "./stage-tree.js";
 
-// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over Stage 3 and Stage 4 facts.
-// It MUST split into a new explicit compiler stage instead of stacking more analysis in this file.
-
-// a5.1 Validate Optimize:
-// validate and optimize finalized Binaryen modules without new language lowering.
-export async function runA51ValidateOptimize(context) {
-    runEmptyAnalysisPass("a5.1", context);
+export async function runAnalyzeValidateOptimizeOutputPlan(context) {
+    runEmptyAnalysisPass("validate-output-plan", context);
     const root = rootNode(context.tree ?? context.legacyTree?.rootNode ?? context.artifacts.parse?.legacyTree?.rootNode ?? null);
     throwOnParseErrors(root);
-    const check = context.analyses["a3.4"] ?? {};
-    const intent = check.intent ?? context.options?.intent ?? "compile";
-    const target = check.target ?? context.options?.mode ?? "program";
-    const wasmLocation = check.wasmLocation
+    const semanticsStage = readCompilerStageBundle(context, "semantics");
+    const backendStage = readCompilerStageBundle(context, "backend");
+    const expansionStage = readCompilerStageBundle(context, "expansion");
+    const compilePlan = semanticsStage?.compilePlan ?? context.analyses["plan-compile"] ?? {};
+    const intent = compilePlan.intent ?? context.options?.intent ?? "compile";
+    const target = compilePlan.target ?? context.options?.mode ?? "program";
+    const wasmLocation = compilePlan.wasmLocation
         ?? ((context.options?.provided_wasm_bytes || context.options?.providedWasmBytes)
             ? "provided_wasm_bytes"
             : (context.options?.where ?? "base64"));
-    const stage4 = context.analyses["a4.1"] ?? {};
-    const stage4Binaryen = context.analyses["a4.2"] ?? {};
-    const expansion = context.artifacts.expansion ?? null;
+    const loweringMetadata = backendStage?.loweringMetadata ?? context.analyses["collect-lowering-metadata"] ?? {};
+    const binaryenMetadata = backendStage?.binaryenMetadata ?? context.analyses["collect-binaryen-metadata"] ?? {};
+    const expansion = expansionStage?.cleanup?.finalExpansion
+        ?? expansionStage?.materialization?.reparsedExpansion
+        ?? context.artifacts.expansion
+        ?? null;
     return {
         expandedSource: context.source,
         changed: Boolean(expansion?.changed),
         shouldEmitCompileArtifacts: intent === "compile",
         backendOptions: {
-            ...(stage4.backendOptions ?? {}),
+            ...(loweringMetadata.backendOptions ?? {}),
             mode: target,
         },
         binaryenOptions: {
-            optimize: stage4Binaryen.optimize ?? (context.options?.optimize ?? true),
-            emitWat: stage4Binaryen.emitWat ?? Boolean(context.options?.wat),
+            optimize: binaryenMetadata.optimize ?? (context.options?.optimize ?? true),
+            emitWat: binaryenMetadata.emitWat ?? Boolean(context.options?.wat),
         },
         wasmLocation,
         moduleFormat: context.options?.moduleFormat ?? "esm",
@@ -38,6 +40,6 @@ export async function runA51ValidateOptimize(context) {
         sourceForJs: context.options?.includeSource
             ? (context.options?.originalSource ?? context.source)
             : null,
-        hasBinaryenArtifact: Boolean(context.artifacts.stage4Binaryen?.wasm),
+        hasBinaryenArtifact: Boolean((backendStage?.binaryenArtifact ?? context.artifacts.stage4Binaryen)?.wasm),
     };
 }

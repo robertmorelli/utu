@@ -1,40 +1,5 @@
-import { runEmptyAnalysisPass, runTreeWalkAnalysisPass } from "./analysis-pass-utils.js";
-import { rootNode, namedChildren, childOfType, stringLiteralValue } from "./header-snapshot.js";
-
-// TODO(architecture): SCARY: this analysis pass stacks prior analyses and performs multiple tree scans for emit planning.
-// It MUST split into a new explicit compiler stage until this file owns at most one tree walk.
-
-// a5.2 Analyze Emit Plan:
-// precompute jsgen-oriented tree facts so e5.2 consumes a pipeline analysis output.
-export async function runA52AnalyzeEmitPlan(context) {
-    runEmptyAnalysisPass("a5.2", context);
-    const a51 = context.analyses["a5.1"] ?? {};
-    const mode = normalizeEmitMode(a51.backendOptions?.mode ?? "program");
-    const profile = a51.backendOptions?.profile ?? null;
-    if (!a51.shouldEmitCompileArtifacts) {
-        return {
-            mode,
-            profile,
-            jsgen: emptyJsgenPlan(),
-        };
-    }
-    const root = rootNode(context.tree) ?? null;
-    const stage5 = context.artifacts.stage5 ?? null;
-    const metadata = stage5?.metadata ?? {};
-    const semantic = context.analyses["a3.3"] ?? {};
-    return {
-        mode,
-        profile,
-        jsgen: collectJsgenPlanFromTree(root, {
-            mode,
-            profile,
-            metadata,
-            semantic,
-        }),
-    };
-}
-
-export const runA52PrepareEmitPlan = runA52AnalyzeEmitPlan;
+import { runTreeWalkAnalysisPass } from "./analysis-pass-utils.js";
+import { rootNode, namedChildren, childOfType, stringLiteralValue } from "./stage-tree.js";
 
 export function collectJsgenPlanFromTree(root, {
     mode = "program",
@@ -59,18 +24,6 @@ export function collectJsgenPlanFromTree(root, {
         exportNames,
         moduleImports,
     };
-}
-
-function emptyJsgenPlan() {
-    return {
-        strings: [],
-        exportNames: [],
-        moduleImports: [],
-    };
-}
-
-function normalizeEmitMode(mode) {
-    return mode === "normal" ? "program" : mode;
 }
 
 function normalizeExportNames(entries = []) {

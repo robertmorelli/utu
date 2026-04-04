@@ -47,9 +47,9 @@ export async function compileBinaryen(treeOrNode, options = {}) {
 }
 
 export async function runE42BuildBinaryen(context) {
-    const a42 = context.analyses["a4.2"] ?? {};
-    const a41 = context.analyses["a4.1"] ?? {};
-    const a43 = context.analyses["a4.3"] ?? {};
+    const a42 = context.analyses["collect-binaryen-metadata"] ?? {};
+    const a41 = context.analyses["collect-lowering-metadata"] ?? {};
+    const a43 = context.analyses["prepare-backend-metadata-defaults"] ?? {};
     const tree = await runTreeWalkRewritePass("e4.2", context, (node) => node);
     if (!a42.shouldBuildBinaryen) return { tree };
 

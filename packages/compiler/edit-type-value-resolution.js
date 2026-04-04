@@ -1,4 +1,4 @@
-import { cloneStageTree } from "./stage1.js";
+import { cloneStageTree } from "./compiler-stage-runtime.js";
 
 // e2.6.1 Type/Value Resolution Layer:
 // reserve a dedicated expression-resolution pass boundary ahead of later syntax pruning.

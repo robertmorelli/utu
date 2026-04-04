@@ -1,32 +1,11 @@
 import { parseTree } from "../document/tree-sitter.js";
+import { cloneStageNode as cloneLegacyNode } from "./compiler-stage-runtime.js";
 
-function clonePoint(point) {
-    return point
-        ? { row: point.row, column: point.column }
-        : null;
-}
-
-export function cloneLegacyNode(node) {
-    const children = Array.from(node.children ?? [], cloneLegacyNode);
-    return {
-        id: node.id ?? null,
-        type: node.type,
-        text: node.text,
-        isNamed: Boolean(node.isNamed),
-        hasError: Boolean(node.hasError),
-        isMissing: Boolean(node.isMissing),
-        startIndex: node.startIndex ?? null,
-        endIndex: node.endIndex ?? null,
-        startPosition: clonePoint(node.startPosition),
-        endPosition: clonePoint(node.endPosition),
-        children,
-        namedChildren: children.filter((child) => child?.isNamed),
-    };
-}
+export { cloneLegacyNode };
 
 // e1.2 Parse:
 export async function runE12Parse(context) {
-    const load = context.analyses["a1.1"] ?? {};
+    const load = context.analyses["load-source"] ?? {};
     const parsed = parseTree(context.parser, load.source ?? context.source, "Tree-sitter returned no syntax tree for the document.");
     const document = load.document ?? null;
     return {

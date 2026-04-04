@@ -1,4 +1,4 @@
-import { runStage2CommentStripRewrite } from "./stage2-rewrite-pass.js";
+import { runStage2CommentStripRewrite } from "./expansion-rewrite-pass.js";
 
 // e2.7 Post-Expand Normalize:
 // enforce one stable post-expansion tree shape for later semantic stages.

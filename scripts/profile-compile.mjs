@@ -3,10 +3,10 @@ import path from 'node:path';
 
 import bundledGrammarWasm from '../tree-sitter-utu.wasm';
 import bundledRuntimeWasm from 'web-tree-sitter/web-tree-sitter.wasm';
-import { expandSource } from '../packages/compiler/stage2/api.js';
+import { expandSource } from '../packages/compiler/expansion-api.js';
 import { compile } from '../packages/compiler/index.js';
 import { createUtuTreeSitterParser } from '../packages/document/index.js';
-import { throwOnParseErrors } from '../packages/compiler/analyze-header-snapshot.js';
+import { throwOnParseErrors } from '../packages/compiler/stage-tree.js';
 
 const DEFAULT_MODE = 'program';
 const DEFAULT_ITERATIONS = 6;

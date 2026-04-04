@@ -1,4 +1,4 @@
-import { runStage2DropNodeTypesRewrite } from "./stage2-rewrite-pass.js";
+import { runStage2DropNodeTypesRewrite } from "./expansion-rewrite-pass.js";
 
 // e2.9 Prune File Imports:
 // remove file import declarations once expansion has materialized imported declarations.

@@ -1,7 +1,7 @@
 import { collectParseDiagnostics } from "../document/index.js";
 import { parseTree } from "../document/tree-sitter.js";
 import { cloneLegacyNode } from "./legacy-parse.js";
-import { cloneStageTree } from "./stage1.js";
+import { cloneStageTree } from "./compiler-stage-runtime.js";
 
 export async function runDuplicateRewritePass(_passName, context) {
     return cloneStageTree(context.tree);
@@ -28,7 +28,7 @@ export async function runTreeWalkRewritePass(_passName, context, visit) {
 // e2.5 Expand Declarations:
 // rewrite module-owned declarations into canonical top-level declaration forms.
 export async function runE25ExpandDeclarations(context) {
-    const expansion = context.analyses["a2.14"] ?? context.analyses["a2.6"] ?? null;
+    const expansion = context.analyses["load-expansion-imports"] ?? context.analyses["prepare-expansion-options"] ?? null;
     if (!expansion) {
     }
     // Full-tree rewrite contract: always parse and rewrite the entire tree from output source.

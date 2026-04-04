@@ -3,9 +3,8 @@ import {
     UtuParserService,
     createSourceDocument,
 } from '../../document/index.js';
-import { runCompilerNewStage1 } from '../stage1.js';
-import { createStage1SyntaxSnapshot } from '../stage1.js';
 import { collectHeaderSnapshot as collectHeaderSnapshotFromPipeline } from '../header-snapshot.js';
+import { createCompilerSyntaxSnapshot, runCompilerSyntaxPipeline } from '../syntax-pipeline.js';
 import { hydrateHeaderSnapshot } from './analyze-header.js';
 import {
     cloneDiagnostic,
@@ -67,7 +66,7 @@ export async function analyzeSyntaxAndHeader(options) {
         runtimeWasmPath,
     });
     try {
-        const stage1 = await runCompilerNewStage1({
+        const syntaxPipeline = await runCompilerSyntaxPipeline({
             source: sourceText,
             parser: await parserService.getParser(),
             uri,
@@ -79,20 +78,20 @@ export async function analyzeSyntaxAndHeader(options) {
             },
         });
         try {
-            const syntax = createStage1SyntaxSnapshot(stage1);
+            const syntax = createCompilerSyntaxSnapshot(syntaxPipeline);
             return {
                 mode,
                 uri,
                 sourceText,
                 syntax,
-                header: stage1.analyses["a1.4"] ?? collectHeaderSnapshotFromPipeline(
-                    stage1.artifacts.parse?.document ?? null,
+                header: syntaxPipeline.artifacts.header ?? collectHeaderSnapshotFromPipeline(
+                    syntaxPipeline.artifacts.parse?.document ?? null,
                 ),
                 body: null,
                 diagnostics: (syntax.diagnostics ?? []).map(cloneDiagnostic),
             };
         } finally {
-            stage1.dispose();
+            syntaxPipeline.dispose();
         }
     } finally {
         if (ownsParserService) parserService.dispose();

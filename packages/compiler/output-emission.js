@@ -1,6 +1,6 @@
 import { runTreeWalkRewritePass } from "./rewrite-pass.js";
 import { collectJsgenPlanFromTree } from "./js-emission-plan.js";
-import { rootNode } from "./header-snapshot.js";
+import { rootNode } from "./stage-tree.js";
 import data from "../../jsondata/jsgen.data.json" with { type: "json" };
 
 const {
@@ -66,8 +66,8 @@ export function jsgen(treeOrNode, binary, {
 // e5.2 Emit:
 // emit final artifacts such as wasm, debug WAT, JS shims, and metadata.
 export async function runE52Emit(context) {
-    const a51 = context.analyses["a5.1"] ?? {};
-    const a52 = context.analyses["a5.2"] ?? {};
+    const a51 = context.analyses["validate-output-plan"] ?? {};
+    const a52 = context.analyses["analyze-js-emission-inputs"] ?? {};
     if (!a51.shouldEmitCompileArtifacts) {
         return runTreeWalkRewritePass("e5.2", context, (node) => node);
     }

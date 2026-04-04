@@ -1,19 +1,12 @@
-// TODO(architecture): SCARY: this analysis pass is analysis-on-analysis over a2.1 and a2.2.
-// It MUST split into a new explicit compiler stage instead of layering more analysis in this file.
-
-// a2.3 Resolve Imports:
-// resolve symbolic imports to concrete files/modules and validate reachability.
 export async function runA23ResolveImports(context) {
-    const header = context.analyses["a2.1"]?.header ?? {};
-    const graph = context.analyses["a2.2"] ?? {};
+    const header = context.analyses["discover-expansion-declarations"]?.header ?? {};
+    const graph = context.analyses["build-module-graph"] ?? {};
     const uri = context.uri ?? "memory://utu";
     const loadImport = context.loadImport ?? null;
-
-    const fileImports = header.fileImports ?? [];
     const resolvedFileImports = [];
     const diagnostics = [];
 
-    for (const fileImport of fileImports) {
+    for (const fileImport of header.fileImports ?? []) {
         const entry = {
             sourceModuleName: fileImport.sourceModuleName ?? null,
             localName: fileImport.localName ?? null,

@@ -1,26 +1,4 @@
-function clonePoint(point) {
-    return point
-        ? { row: point.row, column: point.column }
-        : null;
-}
-
-function cloneStageNode(node) {
-    const children = Array.from(node.children ?? [], cloneStageNode);
-    return {
-        id: node.id ?? null,
-        type: node.type,
-        text: node.text,
-        isNamed: Boolean(node.isNamed),
-        hasError: Boolean(node.hasError),
-        isMissing: Boolean(node.isMissing),
-        startIndex: node.startIndex ?? null,
-        endIndex: node.endIndex ?? null,
-        startPosition: clonePoint(node.startPosition),
-        endPosition: clonePoint(node.endPosition),
-        children,
-        namedChildren: children.filter((child) => child?.isNamed),
-    };
-}
+import { cloneStageTree } from "./compiler-stage-runtime.js";
 
 const EMPTY = [];
 
@@ -93,5 +71,5 @@ export function throwOnParseErrors(node) {
 // e1.4 Build Stage Tree:
 // freeze the public stage-tree contract into a dedicated compiler-owned edit boundary.
 export async function runE14BuildStageTree(context) {
-    return context.tree ? cloneStageNode(context.tree) : null;
+    return cloneStageTree(context.tree);
 }

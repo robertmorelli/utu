@@ -1,4 +1,4 @@
-import { runStage2DropNodeTypesRewrite } from "./stage2-rewrite-pass.js";
+import { runStage2DropNodeTypesRewrite } from "./expansion-rewrite-pass.js";
 
 // e2.10 Prune Module Declarations:
 // remove module declaration containers from canonical expanded trees.

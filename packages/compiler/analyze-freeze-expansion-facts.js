@@ -5,11 +5,11 @@
 // publish one immutable Stage-2 artifact consumed by downstream stages and tooling.
 export async function runA212FreezeExpansionFacts(context) {
     const expansion = context.artifacts.expansion ?? null;
-    const treeIndex = context.analyses["a2.7"] ?? null;
-    const declarationIndex = context.analyses["a2.8"] ?? null;
-    const collisions = context.analyses["a2.9"] ?? null;
-    const rewritePlan = context.analyses["a2.10"] ?? null;
-    const boundary = context.analyses["a2.11"] ?? null;
+    const treeIndex = context.analyses["index-expanded-tree"] ?? null;
+    const declarationIndex = context.analyses["index-expanded-declarations"] ?? null;
+    const collisions = context.analyses["detect-expanded-collisions"] ?? null;
+    const rewritePlan = context.analyses["plan-expansion-rewrites"] ?? null;
+    const boundary = context.analyses["validate-expansion-boundary"] ?? null;
 
     const facts = Object.freeze({
         changed: Boolean(expansion?.changed),
