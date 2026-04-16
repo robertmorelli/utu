@@ -1,84 +1,131 @@
 exports.buildDeclarationRules = function buildDeclarationRules() {
   return {
+    // Nominal qualifier: nom[tag], nom[rec], nom[tag, rec]
+    nom_qualifier: ($) => seq('nom', '[', $.nom_tag, repeat(seq(',', $.nom_tag)), ']'),
+    nom_tag: (_) => choice('tag', 'rec'),
+
+    // & refers to the promoted type inside a module body
+    promoted_type: (_) => '&',
+
+    // Modules
     module_decl: ($) =>
       seq('mod', $.module_name, optional($.module_type_param_list), '{', repeat($._module_item), '}'),
     module_name: ($) => choice($.identifier, $.type_ident),
     module_type_param_list: ($) =>
-      seq('[', $.type_ident, repeat(seq(',', $.type_ident)), optional(','), ']'),
-    construct_decl: ($) =>
-      seq(
-        'construct',
-        choice(
-          seq($.identifier, '=', choice($.instantiated_module_ref, $.module_ref)),
-          choice($.instantiated_module_ref, $.module_ref),
-        ),
-      ),
+      seq('[', $.module_type_param, repeat(seq(',', $.module_type_param)), optional(','), ']'),
+    module_type_param: ($) => seq(optional(choice('in', 'out')), $.type_ident),
     module_ref: ($) => $.module_name,
     instantiated_module_ref: ($) => prec(2, seq($.module_name, $.module_type_arg_list)),
     module_type_arg_list: ($) => seq('[', $._type, repeat(seq(',', $._type)), optional(','), ']'),
     inline_module_type_path: ($) =>
       prec(3, seq($.module_name, $.module_type_arg_list, '.', $.type_ident)),
+
+    // Protocol/type implementation list: [P1, P2], [&], or []
+    impl_list: ($) =>
+      seq(
+        '[',
+        optional(seq(
+          choice($.type_ident, $.promoted_type),
+          repeat(seq(',', choice($.type_ident, $.promoted_type))),
+          optional(','),
+        )),
+        ']',
+      ),
+
+    // Structs: nom? struct (TypeIdent | &) impl_list? : | field ...
     struct_decl: ($) =>
       seq(
-        optional('rec'),
-        optional('tag'),
+        optional($.nom_qualifier),
         'struct',
-        $.type_ident,
-        optional(seq(':', $.protocol_list)),
-        '{',
-        optional($.field_list),
-        '}',
-        optional(';'),
+        choice($.type_ident, $.promoted_type),
+        optional($.impl_list),
+        ':',
+        repeat(seq('|', $.field)),
       ),
+    field: ($) => seq($.identifier, ':', $._type),
+    field_list: ($) => seq($.field, repeat(seq(',', $.field)), optional(',')),
+
+    // Protocols: proto (TypeIdent | &) : | member ...
     proto_decl: ($) =>
-      seq('proto', $.type_ident, optional($.module_type_param_list), '{', optional($.proto_member_list), '}'),
-    proto_member_list: ($) => seq($.proto_member, repeat(seq(',', $.proto_member)), optional(',')),
-    proto_member: ($) => choice($.proto_method, $.proto_getter, $.proto_setter),
-    proto_method: ($) => seq($.identifier, '(', optional($.type_list), ')', $.return_type),
+      seq(
+        'proto',
+        choice($.type_ident, $.promoted_type),
+        ':',
+        repeat(seq('|', $.proto_member)),
+      ),
+    proto_member: ($) => choice($.proto_get_setter, $.proto_getter, $.proto_setter, $.proto_method),
     proto_getter: ($) => seq('get', $.identifier, ':', $._type),
     proto_setter: ($) => seq('set', $.identifier, ':', $._type),
-    field_list: ($) => seq($.field, repeat(seq(',', $.field)), optional(',')),
-    field: ($) => seq(optional('mut'), $.identifier, ':', $._type),
-    protocol_list: ($) => seq($.type_ident, repeat(seq(',', $.type_ident))),
-    type_decl: ($) =>
-      seq(optional('tag'), 'type', $.type_ident, optional(seq(':', $.protocol_list)), '=', $.variant_list),
-    variant_list: ($) => seq(optional('|'), $.variant, repeat(seq('|', $.variant))),
-    variant: ($) => seq($.type_ident, optional(seq('{', optional($.field_list), '}'))),
-    fn_decl: ($) =>
-      seq('fun', choice($.identifier, $.associated_fn_name), '(', optional($.param_list), ')', $.return_type, $.block),
-    associated_fn_name: ($) => seq($.type_ident, '.', $.identifier),
-    param_list: ($) => seq($.param, repeat(seq(',', $.param)), optional(',')),
-    param: ($) => seq($.identifier, ':', $._type),
-    return_type: ($) =>
-      choice($.void_type, seq($._return_component, repeat(seq(',', $._return_component)))),
-    _return_component: ($) => seq($._type, optional(seq('#', $._type))),
-    void_type: (_) => 'void',
-    global_decl: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
-    file_import_decl: ($) =>
+    proto_get_setter: ($) => seq('get', 'set', $.identifier, ':', $._type),
+    proto_method: ($) => seq($.identifier, '(', optional($.type_list), ')', $.return_type),
+
+    // Enums (replaces type): nom? enum (TypeIdent | &) impl_list? : | Variant { fields }? ...
+    enum_decl: ($) =>
       seq(
-        'import',
-        $.imported_module_name,
-        optional($.captured_module_name),
-        'from',
-        $.string_lit,
+        optional($.nom_qualifier),
+        'enum',
+        choice($.type_ident, $.promoted_type),
+        optional($.impl_list),
+        ':',
+        repeat(seq('|', $.variant)),
       ),
-    imported_module_name: ($) => $.module_name,
-    captured_module_name: ($) => seq('|', $.module_name, '|'),
-    jsgen_decl: ($) =>
-      seq(
-        'escape',
-        $.jsgen_lit,
-        choice(
-          seq($.identifier, '(', optional($.import_param_list), ')', $.return_type),
-          seq($.identifier, ':', $._type),
+    variant: ($) => seq($.type_ident, optional(seq('{', optional($.field_list), '}'))),
+
+    // Functions: fn name self? ( params? ) return_type block
+    fn_decl: ($) =>
+      seq('fn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', $.return_type, $.block),
+    fn_name: ($) =>
+      choice(
+        $.identifier,
+        seq(
+          choice($.type_ident, $.promoted_type),
+          optional($.module_type_arg_list),
+          '.',
+          $.identifier,
         ),
       ),
-    import_param_list: ($) => seq($._import_param, repeat(seq(',', $._import_param)), optional(',')),
-    _import_param: ($) => choice($.param, $._type),
-    library_decl: ($) => seq('library', '{', repeat($._library_item), '}'),
+    self_param: ($) => seq('|', $.identifier, '|'),
+    param_list: ($) => seq($.param, repeat(seq(',', $.param)), optional(',')),
+    param: ($) => seq($.identifier, ':', $._type),
+    return_type: ($) => choice($.void_type, $._type),
+    void_type: (_) => 'void',
+    type_list: ($) => seq($._type, repeat(seq(',', $._type))),
+
+    // Global constant
+    global_decl: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
+
+    // Using: cross-file imports and within-file aliases
+    using_decl: ($) =>
+      seq(
+        'using',
+        $.module_name,
+        optional($.module_type_arg_list),
+        optional($.captured_module_name),
+        optional(seq('from', $._from_path)),
+      ),
+    captured_module_name: ($) => seq('|', $.module_name, '|'),
+
+    // Import path: either a quoted string or a platform:module URI token.
+    // platform_path is a single atomic token (no internal whitespace) so it
+    // cannot be confused with the ':' used in type annotations.
+    // Examples: std:array, node:fs, browser:dom, vscode_dev:workspace
+    _from_path: ($) => choice($.string_lit, $.platform_path),
+    platform_path: (_) => /[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*/,
+
+    // Wasm-native type binding: type (TypeIdent | &) = @dsl\| ... |/
+    // Used to declare that the promoted type maps to a wasm intrinsic
+    // (e.g. wasm array, externref, i31) rather than a utu struct or enum.
+    type_decl: ($) => seq('type', choice($.type_ident, $.promoted_type), '=', $.dsl_expr),
+
+    // Export forms
+    export_lib_decl: ($) => seq('export', 'lib', '{', repeat($._library_item), '}'),
+    export_main_decl: ($) =>
+      seq('export', 'main', '(', optional($.param_list), ')', $.return_type, $.block),
+
+    // Tests and benchmarks
     test_decl: ($) => seq('test', $.string_lit, $.block),
-    bench_decl: ($) => seq('bench', $.string_lit, '{', $.setup_decl, '}'),
-    setup_decl: ($) => seq('setup', '{', repeat(seq($._expr, ';')), $.measure_decl, '}'),
+    bench_decl: ($) =>
+      seq('bench', $.string_lit, '{', repeat(seq($._expr, ';')), $.measure_decl, '}'),
     measure_decl: ($) => seq('measure', $.block),
   };
 };

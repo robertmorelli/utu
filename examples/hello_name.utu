@@ -1,20 +1,18 @@
 // escape |String.prototype.concat.call.bind(String.prototype.concat)| _String_prototype_concat(str,str) str;
-escape |console.log| _console_log(str) void;
+let _console_log: fun(str) void = @es\|console.log|/;
 
 
-fun greeting(name: str) str {
+fn greeting(name: str) str {
     _console_log("hello ");
     "hi";
 }
 
 bench "hello-name format" {
-    setup {
-        measure {
-            greeting("utu");
-        }
+    measure {
+        greeting("utu");
     }
 }
 
-fun main() str {
+fn main() str {
     greeting("utu");
 }

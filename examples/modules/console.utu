@@ -1,13 +1,13 @@
 
 mod Adder[T] {
-    escape |(a,b) => a + b| add_(T, T) T;
-    fun add(t: T, c: T) T {
+    let add_: fun(T, T) T = @es\|(a,b) => a + b|/;
+    fn add(t: T, c: T) T {
         add_(t, c);
     }
 
 }
 
-fun main() i32 {
+fn main() i32 {
     let y: f32 = Adder[f32].add(2.0,3.0);
     Adder[i32].add(2,3);
 }

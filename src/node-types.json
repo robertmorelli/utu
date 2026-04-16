@@ -12,10 +12,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -44,11 +40,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -72,6 +68,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -85,6 +85,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -104,7 +108,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -135,23 +143,15 @@
     }
   },
   {
-    "type": "alt_expr",
+    "type": "alt_default",
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": true,
       "types": [
         {
-          "type": "alt_arm",
-          "named": true
-        },
-        {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -183,11 +183,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -211,6 +211,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -224,6 +228,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -243,7 +251,158 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "type_member_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "alt_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_arm",
+          "named": true
+        },
+        {
+          "type": "alt_default",
+          "named": true
+        },
+        {
+          "type": "alt_expr",
+          "named": true
+        },
+        {
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
+          "named": true
+        },
+        {
+          "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "promote_expr",
+          "named": true
+        },
+        {
+          "type": "promoted_module_call_expr",
+          "named": true
+        },
+        {
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -282,10 +441,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -314,11 +469,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -342,6 +497,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -355,6 +514,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -374,7 +537,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -401,45 +568,6 @@
     }
   },
   {
-    "type": "array_init",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "arg_list",
-          "named": true
-        },
-        {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "assert_expr",
     "named": true,
     "fields": {},
@@ -449,10 +577,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -484,11 +608,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -512,6 +636,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -525,6 +653,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -544,7 +676,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -583,10 +719,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -615,11 +747,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -643,6 +775,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -656,6 +792,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -675,7 +815,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -702,25 +846,6 @@
     }
   },
   {
-    "type": "associated_fn_name",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "type_ident",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "bench_decl",
     "named": true,
     "fields": {},
@@ -729,30 +854,7 @@
       "required": true,
       "types": [
         {
-          "type": "setup_decl",
-          "named": true
-        },
-        {
-          "type": "string_lit",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "binary_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -784,11 +886,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -812,6 +914,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -824,7 +930,15 @@
           "named": true
         },
         {
+          "type": "measure_decl",
+          "named": true
+        },
+        {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -844,7 +958,154 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
+          "named": true
+        },
+        {
+          "type": "string_lit",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "type_member_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "binary_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_expr",
+          "named": true
+        },
+        {
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
+          "named": true
+        },
+        {
+          "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "promote_expr",
+          "named": true
+        },
+        {
+          "type": "promoted_module_call_expr",
+          "named": true
+        },
+        {
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -883,10 +1144,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -903,10 +1160,6 @@
           "named": true
         },
         {
-          "type": "bind_target",
-          "named": true
-        },
-        {
           "type": "block_expr",
           "named": true
         },
@@ -919,11 +1172,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -939,11 +1192,19 @@
           "named": true
         },
         {
+          "type": "func_type",
+          "named": true
+        },
+        {
           "type": "identifier",
           "named": true
         },
         {
           "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "implicit_struct_init",
           "named": true
         },
         {
@@ -963,7 +1224,19 @@
           "named": true
         },
         {
+          "type": "null_expr",
+          "named": true
+        },
+        {
+          "type": "nullable_type",
+          "named": true
+        },
+        {
           "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "paren_type",
           "named": true
         },
         {
@@ -979,7 +1252,23 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "ref_type",
+          "named": true
+        },
+        {
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "scalar_type",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -1006,41 +1295,6 @@
     }
   },
   {
-    "type": "bind_target",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "block",
     "named": true,
     "fields": {},
@@ -1050,10 +1304,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -1085,11 +1335,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -1113,6 +1363,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -1126,6 +1380,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -1145,7 +1403,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -1207,10 +1469,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -1239,11 +1497,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -1267,6 +1525,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -1280,6 +1542,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -1299,7 +1565,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -1356,7 +1626,7 @@
     }
   },
   {
-    "type": "construct_decl",
+    "type": "dsl_expr",
     "named": true,
     "fields": {},
     "children": {
@@ -1364,15 +1634,11 @@
       "required": true,
       "types": [
         {
+          "type": "dsl_body",
+          "named": true
+        },
+        {
           "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "instantiated_module_ref",
-          "named": true
-        },
-        {
-          "type": "module_ref",
           "named": true
         }
       ]
@@ -1391,10 +1657,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -1423,11 +1685,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -1451,6 +1713,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -1464,6 +1730,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -1483,7 +1753,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -1510,131 +1784,69 @@
     }
   },
   {
-    "type": "emit_expr",
+    "type": "enum_decl",
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
-          "type": "alt_expr",
+          "type": "impl_list",
           "named": true
         },
         {
-          "type": "array_init",
+          "type": "nom_qualifier",
           "named": true
         },
         {
-          "type": "assert_expr",
+          "type": "promoted_type",
           "named": true
         },
         {
-          "type": "assign_expr",
+          "type": "type_ident",
           "named": true
         },
         {
-          "type": "binary_expr",
+          "type": "variant",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "export_lib_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "fn_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "export_main_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "block",
           "named": true
         },
         {
-          "type": "bind_expr",
+          "type": "param_list",
           "named": true
         },
         {
-          "type": "block_expr",
-          "named": true
-        },
-        {
-          "type": "break_expr",
-          "named": true
-        },
-        {
-          "type": "call_expr",
-          "named": true
-        },
-        {
-          "type": "else_expr",
-          "named": true
-        },
-        {
-          "type": "emit_expr",
-          "named": true
-        },
-        {
-          "type": "fatal_expr",
-          "named": true
-        },
-        {
-          "type": "field_expr",
-          "named": true
-        },
-        {
-          "type": "for_expr",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "if_expr",
-          "named": true
-        },
-        {
-          "type": "index_expr",
-          "named": true
-        },
-        {
-          "type": "literal",
-          "named": true
-        },
-        {
-          "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
-          "named": true
-        },
-        {
-          "type": "paren_expr",
-          "named": true
-        },
-        {
-          "type": "pipe_expr",
-          "named": true
-        },
-        {
-          "type": "promote_expr",
-          "named": true
-        },
-        {
-          "type": "promoted_module_call_expr",
-          "named": true
-        },
-        {
-          "type": "ref_null_expr",
-          "named": true
-        },
-        {
-          "type": "struct_init",
-          "named": true
-        },
-        {
-          "type": "tuple_expr",
-          "named": true
-        },
-        {
-          "type": "type_member_expr",
-          "named": true
-        },
-        {
-          "type": "unary_expr",
-          "named": true
-        },
-        {
-          "type": "while_expr",
+          "type": "return_type",
           "named": true
         }
       ]
@@ -1665,6 +1877,10 @@
           "named": true
         },
         {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
           "type": "ref_type",
           "named": true
         },
@@ -1685,10 +1901,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -1720,11 +1932,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -1748,6 +1960,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -1761,6 +1977,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -1780,7 +2000,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -1819,10 +2043,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -1851,11 +2071,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -1879,6 +2099,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -1892,6 +2116,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -1911,7 +2139,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -1953,29 +2185,6 @@
     }
   },
   {
-    "type": "file_import_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "captured_module_name",
-          "named": true
-        },
-        {
-          "type": "imported_module_name",
-          "named": true
-        },
-        {
-          "type": "string_lit",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "fn_decl",
     "named": true,
     "fields": {},
@@ -1984,15 +2193,11 @@
       "required": true,
       "types": [
         {
-          "type": "associated_fn_name",
-          "named": true
-        },
-        {
           "type": "block",
           "named": true
         },
         {
-          "type": "identifier",
+          "type": "fn_name",
           "named": true
         },
         {
@@ -2001,6 +2206,37 @@
         },
         {
           "type": "return_type",
+          "named": true
+        },
+        {
+          "type": "self_param",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "fn_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "module_type_arg_list",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "type_ident",
           "named": true
         }
       ]
@@ -2042,10 +2278,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -2074,11 +2306,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -2102,6 +2334,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -2115,6 +2351,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -2134,7 +2374,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -2207,10 +2451,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -2239,11 +2479,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -2271,6 +2511,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -2284,6 +2528,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -2311,7 +2559,7 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "promoted_type",
           "named": true
         },
         {
@@ -2319,7 +2567,15 @@
           "named": true
         },
         {
+          "type": "return_expr",
+          "named": true
+        },
+        {
           "type": "scalar_type",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -2363,10 +2619,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -2399,11 +2651,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -2427,6 +2679,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -2440,6 +2696,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -2459,7 +2719,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -2486,7 +2750,26 @@
     }
   },
   {
-    "type": "import_param_list",
+    "type": "impl_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "type_ident",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "implicit_struct_init",
     "named": true,
     "fields": {},
     "children": {
@@ -2494,42 +2777,11 @@
       "required": true,
       "types": [
         {
-          "type": "func_type",
+          "type": "field_init",
           "named": true
         },
         {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "param",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "imported_module_name",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "module_name",
+          "type": "promoted_type",
           "named": true
         }
       ]
@@ -2545,10 +2797,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -2580,11 +2828,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -2608,6 +2856,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -2621,6 +2873,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -2640,7 +2896,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -2709,108 +2969,6 @@
     }
   },
   {
-    "type": "jsgen_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "import_param_list",
-          "named": true
-        },
-        {
-          "type": "jsgen_lit",
-          "named": true
-        },
-        {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "return_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "library_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "bench_decl",
-          "named": true
-        },
-        {
-          "type": "construct_decl",
-          "named": true
-        },
-        {
-          "type": "file_import_decl",
-          "named": true
-        },
-        {
-          "type": "fn_decl",
-          "named": true
-        },
-        {
-          "type": "global_decl",
-          "named": true
-        },
-        {
-          "type": "jsgen_decl",
-          "named": true
-        },
-        {
-          "type": "module_decl",
-          "named": true
-        },
-        {
-          "type": "proto_decl",
-          "named": true
-        },
-        {
-          "type": "struct_decl",
-          "named": true
-        },
-        {
-          "type": "test_decl",
-          "named": true
-        },
-        {
-          "type": "type_decl",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "literal",
     "named": true,
     "fields": {},
@@ -2850,7 +3008,146 @@
           "named": true
         },
         {
-          "type": "array_init",
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
+          "named": true
+        },
+        {
+          "type": "match_lit",
+          "named": true
+        },
+        {
+          "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "promote_expr",
+          "named": true
+        },
+        {
+          "type": "promoted_module_call_expr",
+          "named": true
+        },
+        {
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "type_member_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "match_default",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_expr",
           "named": true
         },
         {
@@ -2882,11 +3179,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -2910,6 +3207,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -2922,11 +3223,11 @@
           "named": true
         },
         {
-          "type": "match_lit",
+          "type": "namespace_call_expr",
           "named": true
         },
         {
-          "type": "namespace_call_expr",
+          "type": "null_expr",
           "named": true
         },
         {
@@ -2946,7 +3247,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -2985,10 +3290,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -3017,11 +3318,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -3045,6 +3346,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -3057,11 +3362,19 @@
           "named": true
         },
         {
+          "type": "match_default",
+          "named": true
+        },
+        {
           "type": "match_expr",
           "named": true
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -3081,7 +3394,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -3158,7 +3475,7 @@
           "named": true
         },
         {
-          "type": "construct_decl",
+          "type": "enum_decl",
           "named": true
         },
         {
@@ -3167,18 +3484,6 @@
         },
         {
           "type": "global_decl",
-          "named": true
-        },
-        {
-          "type": "jsgen_decl",
-          "named": true
-        },
-        {
-          "type": "library_decl",
-          "named": true
-        },
-        {
-          "type": "module_decl",
           "named": true
         },
         {
@@ -3263,11 +3568,30 @@
           "named": true
         },
         {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
           "type": "ref_type",
           "named": true
         },
         {
           "type": "scalar_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "module_type_param",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_ident",
           "named": true
         }
       ]
@@ -3282,7 +3606,7 @@
       "required": true,
       "types": [
         {
-          "type": "type_ident",
+          "type": "module_type_param",
           "named": true
         }
       ]
@@ -3323,6 +3647,41 @@
     }
   },
   {
+    "type": "nom_qualifier",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "nom_tag",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "nom_tag",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "null_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_ident",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "nullable_type",
     "named": true,
     "fields": {},
@@ -3336,6 +3695,10 @@
         },
         {
           "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
           "named": true
         },
         {
@@ -3371,6 +3734,10 @@
         },
         {
           "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
           "named": true
         },
         {
@@ -3412,10 +3779,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -3444,11 +3807,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -3472,6 +3835,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -3485,6 +3852,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -3504,7 +3875,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -3551,6 +3926,10 @@
           "named": true
         },
         {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
           "type": "ref_type",
           "named": true
         },
@@ -3571,10 +3950,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -3606,11 +3981,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -3634,6 +4009,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -3647,6 +4026,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -3666,7 +4049,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -3687,6 +4074,21 @@
         },
         {
           "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "pipe_arg_placeholder",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "promoted_type",
           "named": true
         }
       ]
@@ -3758,10 +4160,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -3790,11 +4188,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -3818,6 +4216,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -3831,6 +4233,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -3854,7 +4260,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -3908,21 +4318,6 @@
     }
   },
   {
-    "type": "promote_capture",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "identifier",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "promote_expr",
     "named": true,
     "fields": {},
@@ -3932,10 +4327,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -3955,10 +4346,6 @@
           "named": true
         },
         {
-          "type": "block",
-          "named": true
-        },
-        {
           "type": "block_expr",
           "named": true
         },
@@ -3971,11 +4358,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -3999,6 +4386,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -4015,15 +4406,15 @@
           "named": true
         },
         {
+          "type": "null_expr",
+          "named": true
+        },
+        {
           "type": "paren_expr",
           "named": true
         },
         {
           "type": "pipe_expr",
-          "named": true
-        },
-        {
-          "type": "promote_capture",
           "named": true
         },
         {
@@ -4035,7 +4426,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -4089,6 +4484,11 @@
     }
   },
   {
+    "type": "promoted_type",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "proto_decl",
     "named": true,
     "fields": {},
@@ -4097,15 +4497,54 @@
       "required": true,
       "types": [
         {
-          "type": "module_type_param_list",
+          "type": "promoted_type",
           "named": true
         },
         {
-          "type": "proto_member_list",
+          "type": "proto_member",
           "named": true
         },
         {
           "type": "type_ident",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "proto_get_setter",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "func_type",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "nullable_type",
+          "named": true
+        },
+        {
+          "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "ref_type",
+          "named": true
+        },
+        {
+          "type": "scalar_type",
           "named": true
         }
       ]
@@ -4136,6 +4575,10 @@
           "named": true
         },
         {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
           "type": "ref_type",
           "named": true
         },
@@ -4155,6 +4598,10 @@
       "required": true,
       "types": [
         {
+          "type": "proto_get_setter",
+          "named": true
+        },
+        {
           "type": "proto_getter",
           "named": true
         },
@@ -4164,21 +4611,6 @@
         },
         {
           "type": "proto_setter",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "proto_member_list",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "proto_member",
           "named": true
         }
       ]
@@ -4232,26 +4664,15 @@
           "named": true
         },
         {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
           "type": "ref_type",
           "named": true
         },
         {
           "type": "scalar_type",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "protocol_list",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "type_ident",
           "named": true
         }
       ]
@@ -4281,25 +4702,6 @@
     }
   },
   {
-    "type": "ref_null_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "qualified_type_ref",
-          "named": true
-        },
-        {
-          "type": "type_ident",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "ref_type",
     "named": true,
     "fields": {},
@@ -4308,31 +4710,11 @@
       "required": false,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
           "type": "instantiated_module_ref",
           "named": true
         },
         {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
           "type": "qualified_type_ref",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         },
         {
@@ -4343,59 +4725,15 @@
     }
   },
   {
-    "type": "return_type",
+    "type": "return_expr",
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
+      "multiple": false,
       "required": false,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "nullable_type",
-          "named": true
-        },
-        {
-          "type": "paren_type",
-          "named": true
-        },
-        {
-          "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
-          "named": true
-        },
-        {
-          "type": "void_type",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "scalar_type",
-    "named": true,
-    "fields": {}
-  },
-  {
-    "type": "setup_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -4427,11 +4765,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -4455,6 +4793,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -4467,11 +4809,11 @@
           "named": true
         },
         {
-          "type": "measure_decl",
+          "type": "namespace_call_expr",
           "named": true
         },
         {
-          "type": "namespace_call_expr",
+          "type": "null_expr",
           "named": true
         },
         {
@@ -4491,7 +4833,209 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "type_member_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "return_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "func_type",
+          "named": true
+        },
+        {
+          "type": "nullable_type",
+          "named": true
+        },
+        {
+          "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "ref_type",
+          "named": true
+        },
+        {
+          "type": "scalar_type",
+          "named": true
+        },
+        {
+          "type": "void_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "scalar_type",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "self_param",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "slice_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_expr",
+          "named": true
+        },
+        {
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
+          "named": true
+        },
+        {
+          "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "promote_expr",
+          "named": true
+        },
+        {
+          "type": "promoted_module_call_expr",
+          "named": true
+        },
+        {
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -4531,11 +5075,15 @@
           "named": true
         },
         {
-          "type": "construct_decl",
+          "type": "enum_decl",
           "named": true
         },
         {
-          "type": "file_import_decl",
+          "type": "export_lib_decl",
+          "named": true
+        },
+        {
+          "type": "export_main_decl",
           "named": true
         },
         {
@@ -4544,14 +5092,6 @@
         },
         {
           "type": "global_decl",
-          "named": true
-        },
-        {
-          "type": "jsgen_decl",
-          "named": true
-        },
-        {
-          "type": "library_decl",
           "named": true
         },
         {
@@ -4571,7 +5111,7 @@
           "named": true
         },
         {
-          "type": "type_decl",
+          "type": "using_decl",
           "named": true
         }
       ]
@@ -4586,11 +5126,19 @@
       "required": true,
       "types": [
         {
-          "type": "field_list",
+          "type": "field",
           "named": true
         },
         {
-          "type": "protocol_list",
+          "type": "impl_list",
+          "named": true
+        },
+        {
+          "type": "nom_qualifier",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
           "named": true
         },
         {
@@ -4655,10 +5203,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -4687,11 +5231,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -4715,6 +5259,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -4728,6 +5276,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -4747,7 +5299,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -4782,15 +5338,15 @@
       "required": true,
       "types": [
         {
-          "type": "protocol_list",
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
           "named": true
         },
         {
           "type": "type_ident",
-          "named": true
-        },
-        {
-          "type": "variant_list",
           "named": true
         }
       ]
@@ -4814,6 +5370,10 @@
         },
         {
           "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
           "named": true
         },
         {
@@ -4871,10 +5431,6 @@
           "named": true
         },
         {
-          "type": "array_init",
-          "named": true
-        },
-        {
           "type": "assert_expr",
           "named": true
         },
@@ -4903,11 +5459,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -4931,6 +5487,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -4944,6 +5504,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -4963,7 +5527,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -4999,6 +5567,37 @@
     "fields": {}
   },
   {
+    "type": "using_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "captured_module_name",
+          "named": true
+        },
+        {
+          "type": "module_name",
+          "named": true
+        },
+        {
+          "type": "module_type_arg_list",
+          "named": true
+        },
+        {
+          "type": "platform_path",
+          "named": true
+        },
+        {
+          "type": "string_lit",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "variant",
     "named": true,
     "fields": {},
@@ -5018,21 +5617,6 @@
     }
   },
   {
-    "type": "variant_list",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "variant",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "while_expr",
     "named": true,
     "fields": {},
@@ -5042,10 +5626,6 @@
       "types": [
         {
           "type": "alt_expr",
-          "named": true
-        },
-        {
-          "type": "array_init",
           "named": true
         },
         {
@@ -5081,11 +5661,11 @@
           "named": true
         },
         {
-          "type": "else_expr",
+          "type": "dsl_expr",
           "named": true
         },
         {
-          "type": "emit_expr",
+          "type": "else_expr",
           "named": true
         },
         {
@@ -5109,6 +5689,10 @@
           "named": true
         },
         {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
           "type": "index_expr",
           "named": true
         },
@@ -5122,6 +5706,10 @@
         },
         {
           "type": "namespace_call_expr",
+          "named": true
+        },
+        {
+          "type": "null_expr",
           "named": true
         },
         {
@@ -5141,7 +5729,11 @@
           "named": true
         },
         {
-          "type": "ref_null_expr",
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
           "named": true
         },
         {
@@ -5169,10 +5761,6 @@
   },
   {
     "type": "!=",
-    "named": false
-  },
-  {
-    "type": "#",
     "named": false
   },
   {
@@ -5316,6 +5904,10 @@
     "named": false
   },
   {
+    "type": "@",
+    "named": false
+  },
+  {
     "type": "[",
     "named": false
   },
@@ -5336,10 +5928,6 @@
     "named": false
   },
   {
-    "type": "_",
-    "named": false
-  },
-  {
     "type": "alt",
     "named": false
   },
@@ -5353,14 +5941,6 @@
   },
   {
     "type": "any",
-    "named": false
-  },
-  {
-    "type": "anyref",
-    "named": false
-  },
-  {
-    "type": "array",
     "named": false
   },
   {
@@ -5385,27 +5965,22 @@
   },
   {
     "type": "comment",
-    "named": true,
-    "extra": true
+    "named": true
   },
   {
-    "type": "construct",
-    "named": false
+    "type": "dsl_body",
+    "named": true
   },
   {
     "type": "else",
     "named": false
   },
   {
-    "type": "emit",
+    "type": "enum",
     "named": false
   },
   {
-    "type": "eqref",
-    "named": false
-  },
-  {
-    "type": "escape",
+    "type": "export",
     "named": false
   },
   {
@@ -5435,6 +6010,10 @@
   {
     "type": "float_lit",
     "named": true
+  },
+  {
+    "type": "fn",
+    "named": false
   },
   {
     "type": "for",
@@ -5469,7 +6048,7 @@
     "named": false
   },
   {
-    "type": "import",
+    "type": "in",
     "named": false
   },
   {
@@ -5477,15 +6056,27 @@
     "named": true
   },
   {
-    "type": "jsgen_lit",
-    "named": true
-  },
-  {
     "type": "let",
     "named": false
   },
   {
-    "type": "library",
+    "type": "lib",
+    "named": false
+  },
+  {
+    "type": "m128",
+    "named": false
+  },
+  {
+    "type": "m32",
+    "named": false
+  },
+  {
+    "type": "m64",
+    "named": false
+  },
+  {
+    "type": "main",
     "named": false
   },
   {
@@ -5505,7 +6096,7 @@
     "named": true
   },
   {
-    "type": "mut",
+    "type": "nom",
     "named": false
   },
   {
@@ -5525,7 +6116,11 @@
     "named": false
   },
   {
-    "type": "pipe_arg_placeholder",
+    "type": "out",
+    "named": false
+  },
+  {
+    "type": "platform_path",
     "named": true
   },
   {
@@ -5545,11 +6140,11 @@
     "named": false
   },
   {
-    "type": "set",
+    "type": "return",
     "named": false
   },
   {
-    "type": "setup",
+    "type": "set",
     "named": false
   },
   {
@@ -5593,6 +6188,10 @@
     "named": false
   },
   {
+    "type": "using",
+    "named": false
+  },
+  {
     "type": "v128",
     "named": false
   },
@@ -5602,6 +6201,14 @@
   },
   {
     "type": "while",
+    "named": false
+  },
+  {
+    "type": "xor",
+    "named": false
+  },
+  {
+    "type": "xor=",
     "named": false
   },
   {
@@ -5622,6 +6229,10 @@
   },
   {
     "type": "~",
+    "named": false
+  },
+  {
+    "type": "~>",
     "named": false
   }
 ]

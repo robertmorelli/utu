@@ -1,15 +1,15 @@
 let default_arg: i32 = 6;
 
-fun swap(values: array[i32], left: i32, right: i32) void {
+fn swap(values: array[i32], left: i32, right: i32) void {
     let temp: i32 = values[left];
     values[left] = values[right];
     values[right] = temp;
 }
 
-fun reverse_prefix(values: array[i32], last: i32) void {
+fn reverse_prefix(values: array[i32], last: i32) void {
     let left: i32 = 0;
     let right: i32 = last;
-    for (0..<array.len(values)) |step| {
+    for (0..<values.len) |step| {
         if left >= right {
             break;
         };
@@ -19,15 +19,15 @@ fun reverse_prefix(values: array[i32], last: i32) void {
     };
 }
 
-fun copy_array(values: array[i32]) array[i32] {
-    let out: array[i32] = array[i32].new(array.len(values), 0);
-    for (0..<array.len(values)) |i| {
+fn copy_array(values: array[i32]) array[i32] {
+    let out: array[i32] = array[i32].new(values.len, 0);
+    for (0..<values.len) |i| {
         out[i] = values[i];
     };
     out;
 }
 
-fun count_flips_work(work: array[i32], flips: i32) i32 {
+fn count_flips_work(work: array[i32], flips: i32) i32 {
     if work[0] == 0 {
         flips;
     } else {
@@ -36,17 +36,17 @@ fun count_flips_work(work: array[i32], flips: i32) i32 {
     };
 }
 
-fun count_flips(values: array[i32]) i32 {
+fn count_flips(values: array[i32]) i32 {
     let work: array[i32] = copy_array(values);
     count_flips_work(work, 0);
 }
 
-fun search(perm: array[i32], pos: i32) i32 {
-    if pos == array.len(perm) {
+fn search(perm: array[i32], pos: i32) i32 {
+    if pos == perm.len {
         count_flips(perm);
     } else {
         let best: i32 = 0;
-        for (pos..<array.len(perm)) |i| {
+        for (pos..<perm.len) |i| {
             swap(perm, pos, i);
             let candidate: i32 = search(perm, pos + 1);
             if candidate > best {
@@ -58,7 +58,7 @@ fun search(perm: array[i32], pos: i32) i32 {
     };
 }
 
-fun fannkuch(n: i32) i32 {
+fn fannkuch(n: i32) i32 {
     let perm: array[i32] = array[i32].new(n, 0);
     for (0..<n) |i| {
         perm[i] = i;
@@ -75,13 +75,11 @@ test "fannkuch(5) = 7" {
 }
 
 bench "fannkuch" {
-    setup {
-        measure {
-            fannkuch(5);
-        }
+    measure {
+        fannkuch(5);
     }
 }
 
-fun main() i32 {
+fn main() i32 {
     fannkuch(default_arg);
 }

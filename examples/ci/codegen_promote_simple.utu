@@ -1,17 +1,15 @@
-struct Box {
-    value: i32,
+struct Box:
+    | value : i32
+
+fn maybe_box() ?Box {
+    Box.null;
 }
 
-fun maybe_box() ?Box {
-    ref.null Box;
-}
-
-library {
-    fun test_promote() i32 {
-        promote maybe_box() |box| {
-            box.value;
-        } else {
-            0;
+export lib {
+    fn test_promote() i32 {
+        promote maybe_box() {
+            |box| => box.value,
+            ~> 0,
         };
     }
 }

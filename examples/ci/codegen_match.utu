@@ -1,31 +1,33 @@
-escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
 
-type Shape =
+enum Shape:
     | Circle { radius: i32 }
     | Rect { width: i32, height: i32 }
-    | Triangle { base: i32, height: i32 };
+    | Triangle { base: i32, height: i32 }
 
-fun area(shape: Shape) i32 {
+fn area(shape: Shape) i32 {
     alt shape {
-        c: Circle => c.radius * c.radius,
-        r: Rect => r.width * r.height,
-        t: Triangle => t.base * t.height / 2,
+        Circle |c| => c.radius * c.radius,
+        Rect |r| => r.width * r.height,
+        Triangle |t| => t.base * t.height / 2,
+        ~> 0,
     };
 }
 
-fun describe(shape: Shape) str {
+fn describe(shape: Shape) str {
     alt shape {
-        _: Circle => "circle",
-        _: Rect => "rect",
-        _: Triangle => "triangle",
+        Circle => "circle",
+        Rect => "rect",
+        Triangle => "triangle",
+        ~> "unknown",
     };
 }
 
-fun tag(kind: i32) str {
+fn tag(kind: i32) str {
     match kind {
         0 => "zero",
         1 => "one",
-        _ => "many",
+        ~> "many",
     };
 }
 

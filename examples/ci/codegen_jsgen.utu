@@ -1,6 +1,6 @@
-escape |(a, b) => a + b| str_add(str, str) str;
+let str_add: fun(str, str) str = @es\|(a, b) => a + b|/;
 
-fun main() str {
+fn main() str {
     let prefix: str = "co";
     str_add(prefix, "dex");
 }

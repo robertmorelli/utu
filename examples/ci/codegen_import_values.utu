@@ -1,17 +1,17 @@
-escape |41| lucky: i32;
-escape |"utu"| label: str;
-escape |({})| document: externref;
-escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+let lucky: i32 = @es\|41|/;
+let label: str = @es\|"utu"|/;
+let document: externref = @es\|({})|/;
+let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
 
-fun score() i32 {
+fn score() i32 {
     lucky + 1;
 }
 
-fun named() bool {
+fn named() bool {
     str_eq(label, "utu");
 }
 
-fun doc_present() bool {
+fn doc_present() bool {
     not ref.is_null(document);
 }
 

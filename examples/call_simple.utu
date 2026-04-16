@@ -1,8 +1,8 @@
-fun qux() i64 {
+fn qux() i64 {
     0;
 }
 
-fun quux(a: i64) i64 {
+fn quux(a: i64) i64 {
     let sink: i64 = 0;
     sink = sink + qux();
     sink = sink + qux();
@@ -27,7 +27,7 @@ fun quux(a: i64) i64 {
     sink + a;
 }
 
-fun baz(a: i64, b: i64) i64 {
+fn baz(a: i64, b: i64) i64 {
     let sink: i64 = 0;
     sink = sink + quux(a);
     sink = sink + quux(a);
@@ -52,7 +52,7 @@ fun baz(a: i64, b: i64) i64 {
     sink + b;
 }
 
-fun bar(a: i64, b: i64, c: i64) i64 {
+fn bar(a: i64, b: i64, c: i64) i64 {
     let sink: i64 = 0;
     sink = sink + baz(a, b);
     sink = sink + baz(a, b);
@@ -77,7 +77,7 @@ fun bar(a: i64, b: i64, c: i64) i64 {
     sink + c;
 }
 
-fun foo(a: i64, b: i64, c: i64, d: i64) i64 {
+fn foo(a: i64, b: i64, c: i64, d: i64) i64 {
     let sink: i64 = 0;
     sink = sink + bar(a, b, c);
     sink = sink + bar(a, b, c);
@@ -102,7 +102,7 @@ fun foo(a: i64, b: i64, c: i64, d: i64) i64 {
     sink + d;
 }
 
-fun test_calls() i64 {
+fn test_calls() i64 {
     let sink: i64 = 0;
     let one: i64 = 1;
     let two: i64 = 2;
@@ -132,17 +132,15 @@ fun test_calls() i64 {
 }
 
 bench "call-simple chain" {
-    setup {
-        let one: i64 = 1;
-        let two: i64 = 2;
-        let three: i64 = 3;
-        let four: i64 = 4;
-        measure {
-            foo(one, two, three, four);
-        }
+    let one: i64 = 1;
+    let two: i64 = 2;
+    let three: i64 = 3;
+    let four: i64 = 4;
+    measure {
+        foo(one, two, three, four);
     }
 }
 
-fun main() i64 {
+fn main() i64 {
     test_calls();
 }

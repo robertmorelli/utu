@@ -1,20 +1,19 @@
 mod boxy[T] {
-    struct Box {
-        value: T,
-    }
+    struct Box:
+        | value : T
 
-    fun Box.new(value: T) Box {
+    fn Box.new(value: T) Box {
         Box { value: value };
     }
 
-    fun Box.get(self: Box) T {
+    fn Box.get |self| () T {
         self.value;
     }
 }
 
-construct box_i32 = boxy[i32];
+using boxy[i32] |box_i32|;
 
-fun double_inline(value: boxy[i32].Box) i32 {
+fn double_inline(value: boxy[i32].Box) i32 {
     value.get() * 2;
 }
 

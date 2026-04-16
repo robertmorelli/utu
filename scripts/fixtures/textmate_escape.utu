@@ -1,1 +1,0 @@
-escape |(a,b) => a + b| add(str, str) str;

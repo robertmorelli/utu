@@ -1,28 +1,27 @@
 mod boxy[T] {
-    struct Box {
-        value: T,
-    }
+    struct Box:
+        | value : T
 
-    fun Box.new(value: T) Box {
+    fn Box.new(value: T) Box {
         Box { value: value };
     }
 
-    fun Box.get(self: Box) T {
+    fn Box.get |self| () T {
         self.value;
     }
 
-    fun id(value: T) T {
+    fn id(value: T) T {
         value;
     }
 }
 
-construct box_i32 = boxy[i32];
+using boxy[i32] |box_i32|;
 
-fun read_inline(value: boxy[i32].Box) i32 {
+fn read_inline(value: boxy[i32].Box) i32 {
     value.get();
 }
 
-test "construct aliases expose qualified types" {
+test "using aliases expose qualified types" {
     let box: box_i32.Box = box_i32.Box.new(7);
     assert box.get() == 7;
 }
@@ -32,7 +31,7 @@ test "alias and inline paths share one instantiation" {
     assert read_inline(box) == 5;
 }
 
-test "construct aliases qualify free functions" {
+test "using aliases qualify free functions" {
     assert box_i32.id(11) == 11;
 }
 

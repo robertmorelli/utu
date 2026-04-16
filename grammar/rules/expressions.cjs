@@ -13,11 +13,12 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.else_expr,
         $.promoted_module_call_expr,
         $.type_member_expr,
+        $.null_expr,
         $.field_expr,
         $.index_expr,
+        $.slice_expr,
         $.call_expr,
         $.namespace_call_expr,
-        $.ref_null_expr,
         $.if_expr,
         $.promote_expr,
         $.match_expr,
@@ -26,111 +27,146 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.for_expr,
         $.while_expr,
         $.break_expr,
-        $.emit_expr,
+        $.return_expr,
         $.bind_expr,
         $.struct_init,
-        $.array_init,
+        $.implicit_struct_init,
         $.assign_expr,
         alias('fatal', $.fatal_expr),
+        $.dsl_expr,
       ),
+
     paren_expr: ($) => seq('(', $._expr, ')'),
+
+    // .{a, b, c}
+    tuple_expr: ($) =>
+      seq('.', '{', $._expr, repeat(seq(',', $._expr)), optional(','), '}'),
+
     call_expr: ($) => prec.left(14, seq($._expr, '(', optional($.arg_list), ')')),
+
+    // TypeIdent.method or Module[T].method
     type_member_expr: ($) =>
-      prec.left(
-        14,
-        seq(
-          choice($.instantiated_module_ref, $.inline_module_type_path, $.qualified_type_ref, $.type_ident),
-          '.',
-          $.identifier,
-        ),
-      ),
+      prec.left(14, seq(
+        choice($.instantiated_module_ref, $.inline_module_type_path, $.qualified_type_ref, $.type_ident),
+        '.',
+        $.identifier,
+      )),
+
+    // T1.null — null reference for type T1
+    null_expr: ($) => prec(15, seq($.type_ident, '.', 'null')),
+
     promoted_module_call_expr: ($) =>
-      prec.left(
-        15,
-        seq($.module_name, $.module_type_arg_list, '.', $.identifier, '(', optional($.arg_list), ')'),
-      ),
+      prec.left(15, seq(
+        $.module_name, $.module_type_arg_list, '.', $.identifier, '(', optional($.arg_list), ')',
+      )),
+
     field_expr: ($) => prec.left(14, seq($._expr, '.', $.identifier)),
+
+    // a[i]
     index_expr: ($) => prec.left(14, seq($._expr, '[', $._expr, ']')),
+
+    // a[start, end] — slice for str and array
+    slice_expr: ($) => prec.left(14, seq($._expr, '[', $._expr, ',', $._expr, ']')),
+
     arg_list: ($) => seq($._expr, repeat(seq(',', $._expr)), optional(',')),
+
     assert_expr: ($) => prec.right(-2, seq('assert', $._expr)),
+
     unary_expr: ($) => prec.right(13, seq($.unary_op, $._expr)),
     unary_op: (_) => choice('-', 'not', '~'),
+
+    // Precedence (high to low): ^ · * / % · + - · << >> >>> · & · | · == != < > <= >= · and · xor · or
     binary_expr: ($) =>
       choice(
-        prec.right(12, seq($._expr, '^', $._expr)),
-        prec.left(11, seq($._expr, choice('*', '/', '%'), $._expr)),
-        prec.left(10, seq($._expr, choice('+', '-'), $._expr)),
-        prec.left(9, seq($._expr, choice('<<', '>>', '>>>'), $._expr)),
-        prec.left(8, seq($._expr, '&', $._expr)),
-        prec.left(6, seq($._expr, '|', $._expr)),
-        prec.left(5, seq($._expr, choice('==', '!=', '<', '>', '<=', '>='), $._expr)),
-        prec.left(4, seq($._expr, 'and', $._expr)),
-        prec.left(3, seq($._expr, 'or', $._expr)),
+        prec.right(12, seq($._expr, '^',                                       $._expr)),
+        prec.left(11,  seq($._expr, choice('*', '/', '%'),                     $._expr)),
+        prec.left(10,  seq($._expr, choice('+', '-'),                          $._expr)),
+        prec.left(9,   seq($._expr, choice('<<', '>>', '>>>'),                 $._expr)),
+        prec.left(8,   seq($._expr, '&',                                       $._expr)),
+        prec.left(6,   seq($._expr, '|',                                       $._expr)),
+        prec.left(5,   seq($._expr, choice('==', '!=', '<', '>', '<=', '>='), $._expr)),
+        prec.left(4,   seq($._expr, 'and',                                     $._expr)),
+        prec.left(3,   seq($._expr, 'xor',                                     $._expr)),
+        prec.left(2,   seq($._expr, 'or',                                      $._expr)),
       ),
-    else_expr: ($) => prec.left(2, seq($._expr, '\\', $._expr)),
-    pipe_expr: ($) => prec.left(1, seq($._expr, '-o', $.pipe_target)),
+
+    // null fallback
+    else_expr: ($) => prec.left(1, seq($._expr, '\\', $._expr)),
+
+    // pipe
+    pipe_expr: ($) => prec.left(0, seq($._expr, '-o', $.pipe_target)),
     pipe_target: ($) => choice($._pipe_path, seq($._pipe_path, '(', $.pipe_args, ')')),
     _pipe_path: ($) =>
-      prec.left(
-        1,
-        seq(
-          choice(alias($._builtin_ns, $.identifier), $.instantiated_module_ref, $.identifier, $.type_ident),
-          repeat(seq('.', choice($.identifier, $.type_ident))),
-        ),
-      ),
+      prec.left(15, seq(
+        choice(alias($._builtin_ns, $.identifier), $.instantiated_module_ref, $.identifier, $.type_ident),
+        repeat(seq('.', choice($.identifier, $.type_ident))),
+      )),
     _builtin_ns: (_) =>
-      choice('str', 'array', 'i31', 'ref', 'extern', 'any', 'i32', 'i64', 'f32', 'f64'),
+      choice('str', 'i31', 'ref', 'extern', 'any', 'i32', 'i64', 'f32', 'f64'),
     pipe_args: ($) => choice($.pipe_args_no_placeholder, $.pipe_args_with_placeholder),
     pipe_args_no_placeholder: ($) =>
       seq(alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))), optional(',')),
+    // & is the pipe placeholder: foo(&, extra)
+    pipe_arg_placeholder: ($) => $.promoted_type,
     pipe_args_with_placeholder: ($) =>
       seq(
-        optional(
-          seq(alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))), ','),
-        ),
-        alias('_', $.pipe_arg_placeholder),
-        optional(
-          seq(',', alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg)))),
-        ),
+        optional(seq(alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))), ',')),
+        $.pipe_arg_placeholder,
+        optional(seq(',', alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))))),
         optional(','),
       ),
-    tuple_expr: ($) => seq('(', $._expr, ',', $._expr, repeat(seq(',', $._expr)), optional(','), ')'),
+
     namespace_call_expr: ($) =>
-      prec.left(13, seq($._builtin_ns, '.', $.identifier, optional(seq('(', optional($.arg_list), ')')))),
-    ref_null_expr: ($) => seq('ref', '.', 'null', choice($.type_ident, $.qualified_type_ref)),
+      prec.left(13, seq(
+        $._builtin_ns, '.', $.identifier, optional(seq('(', optional($.arg_list), ')')),
+      )),
+
     assign_expr: ($) =>
-      prec.right(
-        0,
-        seq(
-          choice($.identifier, $.field_expr, $.index_expr),
-          choice('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', 'and=', 'or='),
-          $._expr,
-        ),
-      ),
+      prec.right(0, seq(
+        choice($.identifier, $.field_expr, $.index_expr),
+        choice('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', 'and=', 'or=', 'xor='),
+        $._expr,
+      )),
+
     if_expr: ($) =>
       prec.right(seq('if', $._expr, $.block, optional(seq('else', choice($.if_expr, $.block))))),
+
+    // promote expr { |x| => expr, ~> fallback, }
     promote_expr: ($) =>
-      seq('promote', $._expr, $.promote_capture, $.block, optional(seq('else', $.block))),
-    promote_capture: ($) => seq('|', $.identifier, '|'),
-    match_expr: ($) => seq('match', $._expr, '{', repeat1($.match_arm), '}'),
-    match_arm: ($) => seq(choice('_', $.match_lit), '=>', $._expr, ','),
-    alt_expr: ($) => seq('alt', $._expr, '{', repeat1($.alt_arm), '}'),
-    alt_arm: ($) =>
-      choice(
-        seq(choice('_', $.identifier), ':', $.type_ident, '=>', $._expr, ','),
-        seq(choice('_', $.identifier), '=>', $._expr, ','),
+      seq(
+        'promote',
+        $._expr,
+        '{',
+        seq('|', $.identifier, '|', '=>', $._expr, ','),
+        optional(seq('~>', $._expr, ',')),
+        '}',
       ),
+
+    // match on scalars; ~> is the default arm
+    match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), $.match_default, '}'),
+    match_arm: ($) => seq($.match_lit, '=>', $._expr, ','),
+    match_default: ($) => seq('~>', $._expr, ','),
+
+    // alt on enum variants; ~> is the default arm
+    alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), $.alt_default, '}'),
+    alt_arm: ($) => seq($.type_ident, optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
+    alt_default: ($) => seq('~>', $._expr, ','),
+
     for_expr: ($) => seq('for', '(', $.for_sources, ')', optional($.capture), $.block),
     while_expr: ($) => seq('while', '(', optional($._expr), ')', $.block),
     for_sources: ($) => seq($.for_source, repeat(seq(',', $.for_source))),
     for_source: ($) => prec(1, seq($._expr, choice('...', '..<'), $._expr)),
     capture: ($) => seq('|', $.identifier, repeat(seq(',', $.identifier)), '|'),
+
     block_expr: ($) => prec.right(seq(optional(seq($.identifier, ':')), $.block)),
     block: ($) => seq('{', repeat(seq($._expr, ';')), '}'),
+
     break_expr: (_) => 'break',
-    emit_expr: ($) => prec.right(seq('emit', $._expr)),
-    bind_expr: ($) => seq('let', $.bind_target, repeat(seq(',', $.bind_target)), '=', $._expr),
-    bind_target: ($) => seq($.identifier, ':', $._type),
+    return_expr: ($) => prec.right(seq('return', optional($._expr))),
+
+    bind_expr: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
+
+    // Explicit struct init: T1 { field: expr, ... }
     struct_init: ($) =>
       seq(
         choice($.type_ident, $.qualified_type_ref),
@@ -138,7 +174,18 @@ exports.buildExpressionRules = function buildExpressionRules() {
         optional(seq($.field_init, repeat(seq(',', $.field_init)), optional(','))),
         '}',
       ),
+    // Implicit struct init (type inferred from &): &{ field: expr, ... }
+    implicit_struct_init: ($) =>
+      seq(
+        $.promoted_type,
+        '{',
+        optional(seq($.field_init, repeat(seq(',', $.field_init)), optional(','))),
+        '}',
+      ),
     field_init: ($) => seq($.identifier, ':', $._expr),
-    array_init: ($) => seq('array', '[', $._type, ']', '.', $.identifier, '(', optional($.arg_list), ')'),
+
+    // DSL escape: @name\| raw body |/
+    dsl_expr: ($) => seq('@', $.identifier, $.dsl_body),
+    dsl_body: (_) => token(seq('\\|', /([^|]|\|[^\/])*/, '|/')),
   };
 };

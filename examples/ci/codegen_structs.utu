@@ -1,32 +1,30 @@
-escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
 
-struct Vec2 {
-    x: f32,
-    y: f32,
-}
+struct Vec2:
+    | x : f32
+    | y : f32
 
-struct Todo {
-    text: str,
-    mut done: bool,
-}
+struct Todo:
+    | text : str
+    | done : bool
 
-fun make_vec() Vec2 {
+fn make_vec() Vec2 {
     Vec2 { x: 1.0, y: 2.0 };
 }
 
-fun get_x(v: Vec2) f32 {
+fn get_x(v: Vec2) f32 {
     v.x;
 }
 
-fun new_todo(text: str) Todo {
+fn new_todo(text: str) Todo {
     Todo { text: text, done: false };
 }
 
-fun toggle(todo: Todo) void {
+fn toggle(todo: Todo) void {
     todo.done = not todo.done;
 }
 
-fun done_text(todo: Todo) str {
+fn done_text(todo: Todo) str {
     if todo.done { "done"; } else { todo.text; };
 }
 

@@ -1,167 +1,22 @@
 {
-  "name": "utu-vscode",
-  "displayName": "UTU",
-  "description": "Web-first language and compiler for building tiny, high-performance Wasm bundles.",
+  "name": "utu",
+  "version": "0.1.0",
+  "description": "Compiler for the Utu language — tree-sitter frontend, HTML IR, WasmGC backend.",
   "author": "Robert Morelli",
-  "version": "0.1.1",
-  "publisher": "robertmorelli",
-  "icon": "utu.png",
   "license": "MIT",
   "type": "module",
-  "module": "packages/compiler/index.js",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/robertmorelli/utu.git"
-  },
-  "bugs": {
-    "url": "https://github.com/robertmorelli/utu/issues"
-  },
-  "homepage": "https://github.com/robertmorelli/utu#readme",
-  "engines": {
-    "vscode": "^1.96.0"
-  },
-  "categories": [
-    "Programming Languages"
-  ],
-  "keywords": [
-    "utu",
-    "wasm",
-    "tree-sitter"
-  ],
-  "main": "./dist/node/extension.cjs",
-  "browser": "./dist/web/extension.js",
-  "activationEvents": [
-    "workspaceContains:**/*.utu"
-  ],
-  "contributes": {
-    "languages": [
-      {
-        "id": "utu",
-        "aliases": [
-          "UTU",
-          "utu"
-        ],
-        "extensions": [
-          ".utu"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "utu",
-        "scopeName": "source.utu",
-        "path": "./jsondata/utu.tmLanguage.json",
-        "embeddedLanguages": {
-          "meta.embedded.inline.javascript": "javascript"
-        }
-      }
-    ],
-    "commands": [
-      {
-        "command": "utu.compileCurrentFile",
-        "title": "UTU: Compile Current File",
-        "category": "UTU"
-      },
-      {
-        "command": "utu.runMain",
-        "title": "UTU: Run Main",
-        "category": "UTU",
-        "enablement": "utu.hasRunnableMain"
-      },
-      {
-        "command": "utu.showGeneratedJavaScript",
-        "title": "UTU: Show Generated JavaScript",
-        "category": "UTU"
-      },
-      {
-        "command": "utu.showGeneratedWat",
-        "title": "UTU: Show Generated WAT",
-        "category": "UTU"
-      },
-      {
-        "command": "utu.showSyntaxTree",
-        "title": "UTU: Show Syntax Tree",
-        "category": "UTU"
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "utu.runMain",
-          "when": "editorLangId == utu",
-          "group": "navigation"
-        }
-      ]
-    },
-    "configuration": {
-      "title": "UTU",
-      "properties": {
-        "utu.validation.mode": {
-          "type": "string",
-          "enum": [
-            "onType",
-            "onSave",
-            "off"
-          ],
-          "default": "onType",
-          "markdownDescription": "Controls when UTU syntax diagnostics run."
-        },
-        "utu.bench.seconds": {
-          "type": "number",
-          "default": 1,
-          "markdownDescription": "Target duration for each UTU benchmark sample in seconds."
-        },
-        "utu.bench.samples": {
-          "type": "number",
-          "default": 10,
-          "markdownDescription": "How many benchmark samples to run in the Testing view."
-        },
-        "utu.bench.warmup": {
-          "type": "number",
-          "default": 2,
-          "markdownDescription": "Warmup benchmark samples to run before reporting timings."
-        }
-      }
-    },
-    "configurationDefaults": {
-      "[utu]": {
-        "editor.semanticHighlighting.enabled": true
-      }
-    }
+  "exports": {
+    ".": "./src/index.js"
   },
   "scripts": {
     "build": "node ./scripts/build.mjs",
-    "bump": "node ./scripts/bump.mjs",
-    "check:architecture": "node ./scripts/check-architecture.mjs",
-    "test": "UTU_SUITE_GATE=utu_test bun ./scripts/run-test-suite.mjs",
-    "test:web-browser": "node ./scripts/test-vscode-web-browser.mjs chromium",
-    "test:web-browser:chromium": "node ./scripts/test-vscode-web-browser.mjs chromium",
-    "test:web-browser:webkit": "node ./scripts/test-vscode-web-browser.mjs webkit",
-    "vrust": "bun ./scripts/deltablue-rust.mjs compare && bun ./scripts/deltablue-rust.mjs report",
-    "watch": "bun run build --watch"
+    "test": "bun ./scripts/run-tests.mjs"
   },
-  "files": [
-    "dist",
-    "jsondata/utu.tmLanguage.json",
-    "language-configuration.json",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    "utu.png",
-    "web-tree-sitter.wasm",
-    "tree-sitter-utu.wasm"
-  ],
   "dependencies": {
-    "@vscode/vsce": "^3.7.1",
-    "binaryen": "^125.0.0",
+    "linkedom": "^0.18.12",
     "web-tree-sitter": "^0.26.7"
   },
   "devDependencies": {
-    "@vscode/test-web": "^0.0.80",
-    "esbuild": "^0.27.4",
-    "tree-sitter-cli": "^0.26.7",
-    "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.3.2"
+    "tree-sitter-cli": "^0.26.7"
   }
 }

@@ -1,8 +1,6 @@
 bench "sum loop" {
-    setup {
-        let total: i32 = 0;
-        measure {
-            total += 1;
-        }
+    let total: i32 = 0;
+    measure {
+        total += 1;
     }
 }

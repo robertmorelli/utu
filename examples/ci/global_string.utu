@@ -1,5 +1,5 @@
 let greeting: str = "hello";
 
-fun main() str {
+fn main() str {
     greeting;
 }

@@ -1,29 +1,28 @@
 mod bucket[T] {
-    struct Box {
-        value: T,
-    }
+    struct Box:
+        | value : T
 
-    fun Box.new(value: T) Box {
+    fn Box.new(value: T) Box {
         Box { value: value };
     }
 
-    fun Box.get(self: Box) T {
+    fn Box.get |self| () T {
         self.value;
     }
 
-    fun id(value: T) T {
+    fn id(value: T) T {
         value;
     }
 }
 
-construct ints = bucket[i32];
-construct flags = bucket[bool];
+using bucket[i32] |ints|;
+using bucket[bool] |flags|;
 
-fun read_int(box: ints.Box) i32 {
+fn read_int(box: ints.Box) i32 {
     box.get();
 }
 
-fun read_flag(box: flags.Box) bool {
+fn read_flag(box: flags.Box) bool {
     box.get();
 }
 
@@ -41,7 +40,7 @@ test "inline paths resolve the matching instantiation" {
     assert not flag_box.get();
 }
 
-test "free functions resolve through both construct aliases" {
+test "free functions resolve through both using aliases" {
     assert ints.id(8) == 8;
     assert flags.id(true);
 }

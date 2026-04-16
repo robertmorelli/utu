@@ -1,36 +1,36 @@
-struct Todo {
-    text: str,
-    mut done: bool,
-}
+struct Todo:
+    | text : str
+    | done : bool
 
-type Filter =
+enum Filter:
     | All
     | Active
-    | Completed;
+    | Completed
 
-escape |(value) => `[${value}]`| wrap(str) str;
-escape |(a, b) => a + b| str_concat(str, str) str;
-escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+let wrap: fun(str) str = @es\|(value) => `[${value}]`|/;
+let str_concat: fun(str, str) str = @es\|(a, b) => a + b|/;
+let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
 
-fun new_todo(text: str) Todo {
+fn new_todo(text: str) Todo {
     Todo { text: text, done: false };
 }
 
-fun toggle(todo: Todo) void {
+fn toggle(todo: Todo) void {
     todo.done = not todo.done;
 }
 
-fun matches(todo: Todo, filter: Filter) bool {
+fn matches(todo: Todo, filter: Filter) bool {
     alt filter {
-        _: All => true,
-        _: Active => not todo.done,
-        _: Completed => todo.done,
+        All => true,
+        Active => not todo.done,
+        Completed => todo.done,
+        ~> false,
     };
 }
 
-fun count(todos: array[Todo], filter: Filter) i32 {
+fn count(todos: array[Todo], filter: Filter) i32 {
     let n: i32 = 0;
-    for (0..<array.len(todos)) |i| {
+    for (0..<todos.len) |i| {
         if matches(todos[i], filter) {
             n += 1;
         };
@@ -38,16 +38,16 @@ fun count(todos: array[Todo], filter: Filter) i32 {
     n;
 }
 
-fun status(flag: bool) str {
+fn status(flag: bool) str {
     let maybe: ?str = if flag { "online"; } else { null; };
     maybe \ "offline";
 }
 
-fun greet(name: str) str {
-    name -o wrap -o str_concat(_, "!");
+fn greet(name: str) str {
+    name -o wrap -o str_concat(&, "!");
 }
 
-fun build_todos() array[Todo] {
+fn build_todos() array[Todo] {
     array[Todo].new_fixed(
         new_todo("learn utu"),
         new_todo("ship compiler"),

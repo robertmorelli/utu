@@ -1,7 +1,7 @@
-escape |Math.sqrt| _Math_sqrt(f64) f64;
+let _Math_sqrt: fun(f64) f64 = @es\|Math.sqrt|/;
 let default_n: i32 = 130;
 
-// fun sqrt_newton(value: f64) f64 {
+// fn sqrt_newton(value: f64) f64 {
 //     if value <= 0.0 {
 //         0.0;
 //     } else {
@@ -15,56 +15,56 @@ let default_n: i32 = 130;
 //     };
 // }
 
-fun eval_a(i: f64, j: f64) f64 {
+fn eval_a(i: f64, j: f64) f64 {
     1.0 / (((i + j) * (i + j + 1.0) / 2.0) + i + 1.0);
 }
 
-fun part_a_times_u(i: f64, u: array[f64]) f64 {
+fn part_a_times_u(i: f64, u: array[f64]) f64 {
     let partial_sum: f64 = 0.0;
     let jf: f64 = 0.0;
-    for (0..<array.len(u)) |j| {
+    for (0..<u.len) |j| {
         partial_sum = partial_sum + eval_a(i, jf) * u[j];
         jf += 1.0;
     };
     partial_sum;
 }
 
-fun part_at_times_u(i: f64, u: array[f64]) f64 {
+fn part_at_times_u(i: f64, u: array[f64]) f64 {
     let partial_sum: f64 = 0.0;
     let jf: f64 = 0.0;
-    for (0..<array.len(u)) |j| {
+    for (0..<u.len) |j| {
         partial_sum = partial_sum + eval_a(jf, i) * u[j];
         jf += 1.0;
     };
     partial_sum;
 }
 
-fun eval_a_times_u(u: array[f64]) array[f64] {
-    let out: array[f64] = array[f64].new(array.len(u), 0.0);
+fn eval_a_times_u(u: array[f64]) array[f64] {
+    let out: array[f64] = array[f64].new(u.len, 0.0);
     let ifloat: f64 = 0.0;
-    for (0..<array.len(u)) |i| {
+    for (0..<u.len) |i| {
         out[i] = part_a_times_u(ifloat, u);
         ifloat += 1.0;
     };
     out;
 }
 
-fun eval_at_times_u(u: array[f64]) array[f64] {
-    let out: array[f64] = array[f64].new(array.len(u), 0.0);
+fn eval_at_times_u(u: array[f64]) array[f64] {
+    let out: array[f64] = array[f64].new(u.len, 0.0);
     let ifloat: f64 = 0.0;
-    for (0..<array.len(u)) |i| {
+    for (0..<u.len) |i| {
         out[i] = part_at_times_u(ifloat, u);
         ifloat += 1.0;
     };
     out;
 }
 
-fun eval_ata_times_u(u: array[f64]) array[f64] {
+fn eval_ata_times_u(u: array[f64]) array[f64] {
     let tmp: array[f64] = eval_a_times_u(u);
     eval_at_times_u(tmp);
 }
 
-fun spectral_norm(n: i32) f64 {
+fn spectral_norm(n: i32) f64 {
     let u: array[f64] = array[f64].new(n, 1.0);
     let v: array[f64] = array[f64].new(n, 0.0);
 
@@ -83,13 +83,11 @@ fun spectral_norm(n: i32) f64 {
 }
 
 bench "spectralnorm" {
-    setup {
-        measure {
-            spectral_norm(64);
-        }
+    measure {
+        spectral_norm(64);
     }
 }
 
-fun main() f64 {
+fn main() f64 {
     spectral_norm(default_n);
 }

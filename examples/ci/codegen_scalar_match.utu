@@ -1,23 +1,24 @@
-fun pick_bool(flag: bool) i32 {
+fn pick_bool(flag: bool) i32 {
     match flag {
         true => 1,
         false => 2,
+        ~> 0,
     };
 }
 
-fun pick_float(x: f64) i32 {
+fn pick_float(x: f64) i32 {
     match x {
         1.5 => 15,
         2.5 => 25,
-        _ => 99,
+        ~> 99,
     };
 }
 
-fun pick_int(x: i32) i32 {
+fn pick_int(x: i32) i32 {
     match x {
         0 => 10,
         1 => 20,
-        _ => 30,
+        ~> 30,
     };
 }
 

@@ -1,14 +1,14 @@
-escape |(a, b) => a + b| str_concat(str, str) str;
-escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+let str_concat: fun(str, str) str = @es\|(a, b) => a + b|/;
+let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
 
 let seed: i32 = 41;
 let banner: str = "ok";
 
-fun next() i32 {
+fn next() i32 {
     seed + 1;
 }
 
-fun loud() str {
+fn loud() str {
     str_concat(banner, "!");
 }
 

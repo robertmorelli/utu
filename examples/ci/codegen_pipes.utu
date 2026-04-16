@@ -1,29 +1,29 @@
-fun inc(x: i32) i32 {
+fn inc(x: i32) i32 {
     x + 1;
 }
 
-fun double(x: i32) i32 {
+fn double(x: i32) i32 {
     x * 2;
 }
 
-fun clamp(val: i32, lo: i32, hi: i32) i32 {
+fn clamp(val: i32, lo: i32, hi: i32) i32 {
     if val < lo { lo; } else if val > hi { hi; } else { val; };
 }
 
-fun affine(scale: i32, value: i32, offset: i32) i32 {
+fn affine(scale: i32, value: i32, offset: i32) i32 {
     value * scale + offset;
 }
 
-fun use_pipe(x: i32) i32 {
+fn use_pipe(x: i32) i32 {
     x -o inc -o double;
 }
 
-fun clamp_unit(x: i32) i32 {
-    x -o clamp(_, 0, 10);
+fn clamp_unit(x: i32) i32 {
+    x -o clamp(&, 0, 10);
 }
 
-fun scale_then_offset(x: i32) i32 {
-    x -o affine(3, _, 1);
+fn scale_then_offset(x: i32) i32 {
+    x -o affine(3, &, 1);
 }
 
 test "simple pipes become nested calls" {

@@ -1,14 +1,14 @@
-fun add(a: i32, b: i32) i32 {
+fn add(a: i32, b: i32) i32 {
     a + b;
 }
 
-fun scaled_sum(a: i32, b: i32) i32 {
+fn scaled_sum(a: i32, b: i32) i32 {
     let sum: i32 = add(a, b);
     let diff: i32 = a - b;
     sum * 2 + diff;
 }
 
-fun bit_mix(a: i32, b: i32) i32 {
+fn bit_mix(a: i32, b: i32) i32 {
     ((a << 2) ^ b) & 31;
 }
 

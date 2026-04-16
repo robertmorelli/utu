@@ -1,8 +1,8 @@
-import boxes from "./_boxes.utu";
+using boxes from "./_boxes.utu";
 
-construct boxes;
+using boxes;
 
 
-fun main() i32 {
+fn main() i32 {
     Box.score(Box.new(20));
 }

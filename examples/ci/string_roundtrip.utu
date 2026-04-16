@@ -1,19 +1,19 @@
-escape |(a, b) => a + b| str_concat(str, str) str;
+let str_concat: fun(str, str) str = @es\|(a, b) => a + b|/;
 
-fun label() str {
+fn label() str {
     "done";
 }
 
-fun wrap(value: str) str {
+fn wrap(value: str) str {
     "["
-    -o str_concat(_, value)
-    -o str_concat(_, "]");
+    -o str_concat(&, value)
+    -o str_concat(&, "]");
 }
 
-fun decorate(value: str) str {
+fn decorate(value: str) str {
     wrap(value);
 }
 
-fun main() str {
+fn main() str {
     decorate(label());
 }

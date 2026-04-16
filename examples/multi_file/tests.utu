@@ -1,7 +1,7 @@
-import boxes |crate| from "./_boxes.utu";
+using boxes |crate| from "./_boxes.utu";
 
-construct crate;
-fun main() void {}
+using crate;
+fn main() void {}
 
 test "captured file imports rename promoted types" {
     let box: Box = Box.new(4);

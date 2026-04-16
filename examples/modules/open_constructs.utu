@@ -1,33 +1,32 @@
 mod cell[T] {
-    struct Cell {
-        value: T,
-    }
+    struct Cell:
+        | value : T
 
-    fun Cell.new(value: T) Cell {
+    fn Cell.new(value: T) Cell {
         Cell { value: value };
     }
 
-    fun Cell.get(self: Cell) T {
+    fn Cell.get |self| () T {
         self.value;
     }
 
-    fun wrap(value: T) Cell {
+    fn wrap(value: T) Cell {
         Cell.new(value);
     }
 }
 
-construct cell[i32];
+using cell[i32];
 
-fun opened_sum(left: Cell, right: Cell) i32 {
+fn opened_sum(left: Cell, right: Cell) i32 {
     left.get() + right.get();
 }
 
-test "open construct imports types" {
+test "open using imports types" {
     let cell: Cell = Cell.new(3);
     assert cell.get() == 3;
 }
 
-test "open construct imports free functions" {
+test "open using imports free functions" {
     assert wrap(4).get() == 4;
 }
 

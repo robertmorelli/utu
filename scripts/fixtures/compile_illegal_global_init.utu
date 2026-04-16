@@ -1,9 +1,0 @@
-fun one() i32 {
-    1;
-}
-
-let bad: i32 = one();
-
-fun main() i32 {
-    bad;
-}

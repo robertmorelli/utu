@@ -1,7 +1,7 @@
-fun echo(value: str) str {
+fn echo(value: str) str {
     value;
 }
 
-fun main() str {
+fn main() str {
     echo("value");
 }

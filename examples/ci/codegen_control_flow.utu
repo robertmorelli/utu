@@ -1,8 +1,8 @@
-fun max(a: i32, b: i32) i32 {
+fn max(a: i32, b: i32) i32 {
     if a > b { a; } else { b; };
 }
 
-fun sum_to(n: i32) i32 {
+fn sum_to(n: i32) i32 {
     let sum: i32 = 0;
     for (0..<n) |i| {
         sum += i;
@@ -10,7 +10,7 @@ fun sum_to(n: i32) i32 {
     sum;
 }
 
-fun sum_to_inclusive(n: i32) i32 {
+fn sum_to_inclusive(n: i32) i32 {
     let sum: i32 = 0;
     for (0...n) |i| {
         sum += i;
@@ -18,7 +18,7 @@ fun sum_to_inclusive(n: i32) i32 {
     sum;
 }
 
-fun countdown_total(n: i32) i32 {
+fn countdown_total(n: i32) i32 {
     let cur: i32 = n;
     let total: i32 = 0;
     while (cur > 0) {
@@ -28,28 +28,30 @@ fun countdown_total(n: i32) i32 {
     total;
 }
 
-fun first_over(limit: i32, threshold: i32) i32 {
-    search: {
-        for (0..<limit) |i| {
-            if i > threshold {
-                emit i;
-            };
+fn first_over(limit: i32, threshold: i32) i32 {
+    let found: i32 = 0 - 1;
+    let done: bool = false;
+    for (0..<limit) |i| {
+        if done {
+            break;
         };
-        0 - 1;
+        if i > threshold {
+            found = i;
+            done = true;
+        };
     };
+    found;
 }
 
-fun spin_until(limit: i32) i32 {
+fn spin_until(limit: i32) i32 {
     let i: i32 = 0;
-    done: {
-        while () {
-            i += 1;
-            if i == limit {
-                emit i;
-            };
+    while () {
+        i += 1;
+        if i == limit {
+            return i;
         };
-        0;
     };
+    0;
 }
 
 test "if expressions return values" {

@@ -1,36 +1,34 @@
 mod Pair[L, R] {
-    struct Pair {
-        left: L,
-        right: R,
-    }
+    struct Pair:
+        | left : L
+        | right : R
 
-    struct NotPair {
-        one: L,
-    }
+    struct NotPair:
+        | one : L
 
-    fun Pair.new(left: L, right: R) Pair {
+    fn Pair.new(left: L, right: R) Pair {
         Pair { left: left, right: right };
     }
 
-    fun Pair.left(self: Pair) L {
+    fn Pair.left |self| () L {
         self.left;
     }
 
-    fun Pair.right(self: Pair) R {
+    fn Pair.right |self| () R {
         self.right;
     }
 
-    fun NotPair.only(self: NotPair) L {
+    fn NotPair.only |self| () L {
         self.one;
     }
 }
 
 
-fun maybe_pair(flag: bool) ?Pair[i32, i32] {
+fn maybe_pair(flag: bool) ?Pair[i32, i32] {
     if flag { Pair[i32, i32].new(2, 9); } else { null; };
 }
 
-construct pair_i32 = Pair[i32, i32];
+using Pair[i32, i32] |pair_i32|;
 
 test "non-promoted inner types stay qualified" {
     let value: pair_i32.NotPair = pair_i32.NotPair { one: 5 };

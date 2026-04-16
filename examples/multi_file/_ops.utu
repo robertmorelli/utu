@@ -1,9 +1,9 @@
 mod mathops {
-    fun double(value: i32) i32 {
+    fn double(value: i32) i32 {
         value * 2;
     }
 
-    fun triple(value: i32) i32 {
+    fn triple(value: i32) i32 {
         value * 3;
     }
 }

@@ -1,33 +1,30 @@
 mod counter[T] {
-    struct Box {
-        value: T,
-    }
+    struct Box:
+        | value : T
 
-    fun Box.new(value: T) Box {
+    fn Box.new(value: T) Box {
         Box { value: value };
     }
 
-    fun Box.get(self: Box) T {
+    fn Box.get |self| () T {
         self.value;
     }
 }
 
-construct ints = counter[i32];
+using counter[i32] |ints|;
 
-fun step(value: i32) ints.Box {
+fn step(value: i32) ints.Box {
     ints.Box.new(value + 1);
 }
 
 bench "module counter get" {
-    setup {
-        let box: ints.Box = step(9);
-        measure {
-            box.get();
-        }
+    let box: ints.Box = step(9);
+    measure {
+        box.get();
     }
 }
 
-fun main() i32 {
+fn main() i32 {
     let alias_box: ints.Box = step(9);
     let inline_box: counter[i32].Box = counter[i32].Box.new(12);
     alias_box.get() + inline_box.get();

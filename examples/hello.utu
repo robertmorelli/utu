@@ -1,15 +1,15 @@
-escape |(a,b) => a + b| str_add(str,str) str;
-escape |(a) => a| tostr(i32) str;
+let str_add: fun(str,str) str = @es\|(a,b) => a + b|/;
+let tostr: fun(i32) str = @es\|(a) => a|/;
 
-fun greeting(name: str) str {
+fn greeting(name: str) str {
     str_add("hello ", name);
 }
 
-fun five() str {
+fn five() str {
     str_add(tostr(2), tostr(3));
 }
 
-fun main() str {
+fn main() str {
     // greeting("utu");
     five();
 }

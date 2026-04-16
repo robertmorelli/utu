@@ -1,16 +1,12 @@
-fun add_one(value: i64) i64 {
+fn add_one(value: i64) i64 {
     value + 1;
 }
 
-fun main() i64 {
+fn main() i64 {
     let answer: i64 = 0;
-
-    done: {
-        while () {
-            answer = add_one(41);
-            emit answer;
-        };
-
-        0;
+    while () {
+        answer = add_one(41);
+        return answer;
     };
+    answer;
 }

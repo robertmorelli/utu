@@ -1,25 +1,25 @@
-fun first_plus_len(xs: array[i32]) i32 {
+fn first_plus_len(xs: array[i32]) i32 {
     let first: i32 = xs[0];
-    first + array.len(xs);
+    first + xs.len;
 }
 
-fun filled_sum() i32 {
+fn filled_sum() i32 {
     let xs: array[i32] = array[i32].new(4, 3);
-    xs[0] + xs[3] + array.len(xs);
+    xs[0] + xs[3] + xs.len;
 }
 
-fun fixed_sum() i32 {
+fn fixed_sum() i32 {
     let xs: array[i32] = array[i32].new_fixed(4, 5, 6);
     xs[0] + xs[1] + xs[2];
 }
 
-fun default_write() i32 {
+fn default_write() i32 {
     let xs: array[i32] = array[i32].new_default(3);
     xs[1] = 9;
     xs[1];
 }
 
-fun copy_and_fill_total() i32 {
+fn copy_and_fill_total() i32 {
     let src: array[i32] = array[i32].new_fixed(1, 2, 3, 4);
     let dst: array[i32] = array[i32].new_default(4);
     array.copy(dst, 0, src, 0, 4);

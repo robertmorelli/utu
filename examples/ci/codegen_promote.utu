@@ -1,32 +1,28 @@
-struct Box {
-    value: i32,
+struct Box:
+    | value : i32
+
+fn maybe_box(flag: bool) ?Box {
+    if flag { Box { value: 41 }; } else { Box.null; };
 }
 
-fun maybe_box(flag: bool) ?Box {
-    if flag { Box { value: 41 }; } else { ref.null Box; };
-}
-
-fun promote_test(flag: bool) i32 {
-    promote maybe_box(flag) |box| {
-        box.value;
-    } else {
-        0;
+fn promote_test(flag: bool) i32 {
+    promote maybe_box(flag) {
+        |box| => box.value,
+        ~> 0,
     };
 }
 
-fun promote_no_else(flag: bool) i32 {
-    promote maybe_box(flag) |box| {
-        box.value;
-    } else {
-        0;
+fn promote_no_else(flag: bool) i32 {
+    promote maybe_box(flag) {
+        |box| => box.value,
+        ~> 0,
     };
 }
 
-fun inferred_promote_test(flag: bool) i32 {
-    promote maybe_box(flag) |box| {
-        box.value + 1;
-    } else {
-        0;
+fn inferred_promote_test(flag: bool) i32 {
+    promote maybe_box(flag) {
+        |box| => box.value + 1,
+        ~> 0,
     };
 }
 

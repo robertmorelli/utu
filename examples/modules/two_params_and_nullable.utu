@@ -1,25 +1,24 @@
 mod duo[L, R] {
-    struct Pair {
-        left: L,
-        right: R,
-    }
+    struct Pair:
+        | left : L
+        | right : R
 
-    fun Pair.new(left: L, right: R) Pair {
+    fn Pair.new(left: L, right: R) Pair {
         Pair { left: left, right: right };
     }
 
-    fun Pair.left(self: Pair) L {
+    fn Pair.left |self| () L {
         self.left;
     }
 
-    fun Pair.right(self: Pair) R {
+    fn Pair.right |self| () R {
         self.right;
     }
 }
 
-construct ints = duo[i32, i32];
+using duo[i32, i32] |ints|;
 
-fun maybe_pair(flag: bool) ?ints.Pair {
+fn maybe_pair(flag: bool) ?ints.Pair {
     if flag { ints.Pair.new(2, 9); } else { null; };
 }
 

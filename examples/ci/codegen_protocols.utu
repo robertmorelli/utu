@@ -1,56 +1,48 @@
-proto Measure[T] {
-    measure(T) i32,
-};
+proto Measure:
+    | measure() i32
 
-proto Area[T] {
-    get area: i32,
-};
+proto Area:
+    | get area : i32
 
-proto CounterOps[T] {
-    get value: i32,
-    bump(T) i32,
-};
+proto CounterOps:
+    | get value : i32
+    | bump() i32
 
-tag struct Box: Measure {
-    width: i32,
-    height: i32,
-};
+nom[tag] struct Box[Measure]:
+    | width : i32
+    | height : i32
 
-tag struct Rect: Area {
-    area: i32,
-};
+nom[tag] struct Rect[Area]:
+    | area : i32
 
-tag struct Square: Measure {
-    side: i32,
-};
+nom[tag] struct Square[Measure]:
+    | side : i32
 
-tag struct Counter: CounterOps {
-    value: i32,
-};
+nom[tag] struct Counter[CounterOps]:
+    | value : i32
 
-struct Shelf {
-    items: array[Measure],
-    current: Measure,
-};
+struct Shelf:
+    | items : array[Measure]
+    | current : Measure
 
-fun Measure.measure(self: Box) i32 {
+fn Measure[Box].measure |self| () i32 {
     self.width * self.height;
 }
 
-fun Measure.measure(self: Square) i32 {
+fn Measure[Square].measure |self| () i32 {
     self.side * self.side;
 }
 
-fun CounterOps.bump(self: Counter) i32 {
+fn CounterOps[Counter].bump |self| () i32 {
     self.value + 1;
 }
 
-fun total_measure(first: Measure, shelf: Shelf) i32 {
+fn total_measure(first: Measure, shelf: Shelf) i32 {
     first.measure() + shelf.current.measure() + shelf.items[1].measure();
 }
 
-fun maybe_box(flag: bool) ?Box {
-    if flag { Box { width: 2, height: 5 }; } else { ref.null Box; };
+fn maybe_box(flag: bool) ?Box {
+    if flag { Box { width: 2, height: 5 }; } else { Box.null; };
 }
 
 test "protocol method sugar dispatches on tagged structs" {
@@ -77,10 +69,9 @@ test "protocol getters dispatch for explicit implementers too" {
 }
 
 test "protocol methods work with promote captures" {
-    promote maybe_box(true) |box| {
-        assert box.measure() == 10;
-    } else {
-        fatal;
+    promote maybe_box(true) {
+        |box| => assert box.measure() == 10,
+        ~> fatal,
     };
 }
 

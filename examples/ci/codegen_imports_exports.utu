@@ -1,12 +1,12 @@
-escape |console.log| console_log(str) void;
-escape |(value) => `[${value}]`| wrap(str) str;
-escape |(a, b) => a === b ? 1 : 0| str_eq(str, str) bool;
+let console_log: fun(str) void = @es\|console.log|/;
+let wrap: fun(str) str = @es\|(value) => `[${value}]`|/;
+let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
 
-fun greet(name: str) str {
+fn greet(name: str) str {
     name -o wrap;
 }
 
-fun main() i64 {
+fn main() i64 {
     3;
 }
 
