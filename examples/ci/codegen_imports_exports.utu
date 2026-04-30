@@ -1,6 +1,6 @@
-let console_log: fun(str) void = @es\|console.log|/;
-let wrap: fun(str) str = @es\|(value) => `[${value}]`|/;
-let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
+let console_log: fun(str) void = @es/\console.log\/;
+let wrap: fun(str) str = @es/\(value) => `[${value}]`\/;
+let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 fn greet(name: str) str {
     name -o wrap;

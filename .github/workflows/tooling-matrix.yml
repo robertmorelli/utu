@@ -39,8 +39,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Reject runtime dependencies
+        run: node -e 'const d=require("./package.json").dependencies||{}; if(Object.keys(d).length){console.error("Runtime deps not allowed:",d); process.exit(1)}'
+
       - name: Build everything
         run: bun run build
+
+      - name: Run bundle smoke test
+        run: bun run test:bundle
 
       - name: Run full test suite
         run: bun run test
@@ -70,8 +76,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Reject runtime dependencies
+        run: node -e 'const d=require("./package.json").dependencies||{}; if(Object.keys(d).length){console.error("Runtime deps not allowed:",d); process.exit(1)}'
+
       - name: Build everything
         run: bun run build
+
+      - name: Run bundle smoke test
+        run: bun run test:bundle
 
       - name: Run full test suite
         run: bun run test

@@ -8,17 +8,17 @@ proto CounterOps:
     | get value : i32
     | bump() i32
 
-nom[tag] struct Box[Measure]:
+tag struct Box[Measure]:
     | width : i32
     | height : i32
 
-nom[tag] struct Rect[Area]:
+tag struct Rect[Area]:
     | area : i32
 
-nom[tag] struct Square[Measure]:
+tag struct Square[Measure]:
     | side : i32
 
-nom[tag] struct Counter[CounterOps]:
+tag struct Counter[CounterOps]:
     | value : i32
 
 struct Shelf:

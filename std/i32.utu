@@ -1,0 +1,32 @@
+// std/i32.utu — i32 scalar type module
+// & is a WasmGC i32 value (stack-only, never heap-allocated, never nullable).
+
+mod i32 {
+    type & = @ir/\ <ir-wasm-scalar kind="i32"/> \/
+
+    fn &:add  |a, b| & { @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \/; }
+    fn &:sub  |a, b| & { @ir/\ <ir-i32-sub><ir-ident name="a"/><ir-ident name="b"/></ir-i32-sub> \/; }
+    fn &:mul  |a, b| & { @ir/\ <ir-i32-mul><ir-ident name="a"/><ir-ident name="b"/></ir-i32-mul> \/; }
+    fn &:div  |a, b| & { @ir/\ <ir-i32-div-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-div-s> \/; }
+    fn &:rem  |a, b| & { @ir/\ <ir-i32-rem-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-rem-s> \/; }
+    fn &:band |a, b| & { @ir/\ <ir-i32-and><ir-ident name="a"/><ir-ident name="b"/></ir-i32-and> \/; }
+    fn &:bor  |a, b| & { @ir/\ <ir-i32-or><ir-ident name="a"/><ir-ident name="b"/></ir-i32-or> \/; }
+    fn &:bxor |a, b| & { @ir/\ <ir-i32-xor><ir-ident name="a"/><ir-ident name="b"/></ir-i32-xor> \/; }
+    fn &:shl  |a, b| & { @ir/\ <ir-i32-shl><ir-ident name="a"/><ir-ident name="b"/></ir-i32-shl> \/; }
+    fn &:shr  |a, b| & { @ir/\ <ir-i32-shr-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-shr-s> \/; }
+    fn &:ushr |a, b| & { @ir/\ <ir-i32-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-i32-shr-u> \/; }
+    fn &:eq   |a, b| bool { @ir/\ <ir-i32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i32-eq> \/; }
+    fn &:ne   |a, b| bool { @ir/\ <ir-i32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i32-ne> \/; }
+    fn &:lt   |a, b| bool { @ir/\ <ir-i32-lt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-lt-s> \/; }
+    fn &:le   |a, b| bool { @ir/\ <ir-i32-le-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-le-s> \/; }
+    fn &:gt   |a, b| bool { @ir/\ <ir-i32-gt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-gt-s> \/; }
+    fn &:ge   |a, b| bool { @ir/\ <ir-i32-ge-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-ge-s> \/; }
+    // wasm has no i32.neg / i32.not; express them with real ops.
+    //   neg a  = 0 - a
+    //   bnot a = a xor 0xFFFFFFFF (-1)
+    fn &:neg  |a| & { @ir/\ <ir-i32-sub><ir-lit kind="int" type="i32" value="0"/><ir-ident name="a"/></ir-i32-sub> \/; }
+    fn &:bnot |a| & { @ir/\ <ir-i32-xor><ir-ident name="a"/><ir-lit kind="int" type="i32" value="-1"/></ir-i32-xor> \/; }
+    fn clz(x: &) & { @ir/\ <ir-i32-clz><ir-ident name="x"/></ir-i32-clz> \/; }
+    fn ctz(x: &) & { @ir/\ <ir-i32-ctz><ir-ident name="x"/></ir-i32-ctz> \/; }
+    fn popcnt(x: &) & { @ir/\ <ir-i32-popcnt><ir-ident name="x"/></ir-i32-popcnt> \/; }
+}

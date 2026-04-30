@@ -1825,6 +1825,10 @@
         {
           "type": "fn_decl",
           "named": true
+        },
+        {
+          "type": "op_decl",
+          "named": true
         }
       ]
     }
@@ -3495,6 +3499,10 @@
           "named": true
         },
         {
+          "type": "op_decl",
+          "named": true
+        },
+        {
           "type": "proto_decl",
           "named": true
         },
@@ -3707,6 +3715,41 @@
         },
         {
           "type": "scalar_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "op_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "capture",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "return_type",
+          "named": true
+        },
+        {
+          "type": "type_ident",
           "named": true
         }
       ]
@@ -5912,10 +5955,6 @@
     "named": false
   },
   {
-    "type": "\\",
-    "named": false
-  },
-  {
     "type": "]",
     "named": false
   },
@@ -5965,7 +6004,8 @@
   },
   {
     "type": "comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "dsl_body",
@@ -6113,6 +6153,10 @@
   },
   {
     "type": "or=",
+    "named": false
+  },
+  {
+    "type": "orelse",
     "named": false
   },
   {

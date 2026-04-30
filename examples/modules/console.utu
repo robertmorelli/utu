@@ -1,6 +1,6 @@
 
 mod Adder[T] {
-    let add_: fun(T, T) T = @es\|(a,b) => a + b|/;
+    let add_: fun(T, T) T = @es/\(a,b) => a + b\/;
     fn add(t: T, c: T) T {
         add_(t, c);
     }

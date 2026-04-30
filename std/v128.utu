@@ -1,0 +1,41 @@
+// std/v128.utu — v128 SIMD vector type module
+// & is the WebAssembly 128-bit SIMD vector type.
+// Interpreted as different lane types depending on the operation:
+//   i8x16, i16x8, i32x4, i64x2, f32x4, f64x2
+//
+// Operator overloads are intentionally not defined here — SIMD arithmetic
+// requires knowing the lane interpretation (e.g. i32x4:add vs f32x4:add).
+// Use the specific sub-modules (e.g. i32x4, f32x4) for typed SIMD ops.
+// The bitwise ops below are lane-interpretation-independent.
+
+mod v128 {
+    type & = @ir/\ <ir-wasm-scalar kind="v128"/> \/
+
+    fn zero() & { @ir/\ <ir-v128-const data-type="v128" bytes="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/; }
+    fn ones() & { @ir/\ <ir-v128-const data-type="v128" bytes="255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255"/> \/; }
+
+    fn &:band |a, b| & { @ir/\ <ir-v128-and><ir-ident name="a"/><ir-ident name="b"/></ir-v128-and> \/; }
+    fn &:bor  |a, b| & { @ir/\ <ir-v128-or><ir-ident name="a"/><ir-ident name="b"/></ir-v128-or> \/; }
+    fn &:bxor |a, b| & { @ir/\ <ir-v128-xor><ir-ident name="a"/><ir-ident name="b"/></ir-v128-xor> \/; }
+    fn &:bnot |a| & { @ir/\ <ir-v128-not><ir-ident name="a"/></ir-v128-not> \/; }
+    fn &:eq   |a, b| & {
+        @ir/\ <ir-v128-not><ir-v128-xor><ir-ident name="a"/><ir-ident name="b"/></ir-v128-xor></ir-v128-not> \/;
+    }
+    fn &:ne   |a, b| & {
+        @ir/\ <ir-v128-xor><ir-ident name="a"/><ir-ident name="b"/></ir-v128-xor> \/;
+    }
+
+    fn andnot(a: v128, b: v128) v128 {
+        @ir/\ <ir-v128-andnot><ir-ident name="a"/><ir-ident name="b"/></ir-v128-andnot> \/;
+    }
+    fn bitselect(a: v128, b: v128, mask: v128) v128 {
+        @ir/\ <ir-v128-bitselect>
+            <ir-ident name="a"/>
+            <ir-ident name="b"/>
+            <ir-ident name="mask"/>
+        </ir-v128-bitselect> \/;
+    }
+    fn any_true(a: v128) bool {
+        @ir/\ <ir-v128-any-true><ir-ident name="a"/></ir-v128-any-true> \/;
+    }
+}

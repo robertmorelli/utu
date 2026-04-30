@@ -94,8 +94,17 @@
       ]
     },
     "_library_item": {
-      "type": "SYMBOL",
-      "name": "fn_decl"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "fn_decl"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "op_decl"
+        }
+      ]
     },
     "_module_item": {
       "type": "CHOICE",
@@ -119,6 +128,10 @@
         {
           "type": "SYMBOL",
           "name": "fn_decl"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "op_decl"
         },
         {
           "type": "SEQ",
@@ -2370,7 +2383,7 @@
           },
           {
             "type": "STRING",
-            "value": "\\"
+            "value": "orelse"
           },
           {
             "type": "SYMBOL",
@@ -3008,8 +3021,16 @@
           }
         },
         {
-          "type": "SYMBOL",
-          "name": "match_default"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "match_default"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "STRING",
@@ -3078,8 +3099,16 @@
           }
         },
         {
-          "type": "SYMBOL",
-          "name": "alt_default"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "alt_default"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "STRING",
@@ -3603,15 +3632,15 @@
         "members": [
           {
             "type": "STRING",
-            "value": "\\|"
+            "value": "/\\"
           },
           {
             "type": "PATTERN",
-            "value": "([^|]|\\|[^\\/])*"
+            "value": "([^\\\\]|\\\\[^\\/])*"
           },
           {
             "type": "STRING",
-            "value": "|/"
+            "value": "\\/"
           }
         ]
       }
@@ -3800,6 +3829,48 @@
         {
           "type": "SYMBOL",
           "name": "dsl_expr"
+        }
+      ]
+    },
+    "op_decl": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "fn"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "type_ident"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "promoted_type"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "capture"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "return_type"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "block"
         }
       ]
     }

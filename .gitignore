@@ -6,8 +6,6 @@ out
 dist
 .artifacts
 *.tgz
-/utu
-/utu-lsp
 
 # code coverage
 coverage
@@ -39,13 +37,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .build
 .claude
 .generated
-examples/Benchmark
 *.vsix
 
 spec.md
 .npm-cache
-lsp/.npm-cache
-cli_artifact/.npm-cache
 examples/rust_benchmarks/rust_deltablue/target
 examples/rust_benchmarks/rust_deltablue_arena/target
 .emscripten-cache
@@ -56,3 +51,5 @@ bun.lock
 tree-sitter-utu.wasm
 
 .vscode-test-web/
+.tmp
+.tmp/*

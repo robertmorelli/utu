@@ -1,7 +1,10 @@
 exports.buildDeclarationRules = function buildDeclarationRules() {
   return {
-    // Nominal qualifier: nom[tag], nom[rec], nom[tag, rec]
-    nom_qualifier: ($) => seq('nom', '[', $.nom_tag, repeat(seq(',', $.nom_tag)), ']'),
+    // Nominal qualifier: bare `tag`, `rec`, or `tag rec` prefix on struct/enum.
+    // (Prior surface was `nom[tag, rec]`; flattened per the_future.md "use simpler
+    // surface syntax for the common cases".)  IR shape unchanged: ir-nom-qualifier
+    // with a `tags` attribute listing the markers in source order.
+    nom_qualifier: ($) => repeat1($.nom_tag),
     nom_tag: (_) => choice('tag', 'rec'),
 
     // & refers to the promoted type inside a module body
@@ -112,7 +115,13 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     _from_path: ($) => choice($.string_lit, $.platform_path),
     platform_path: (_) => /[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*/,
 
-    // Wasm-native type binding: type (TypeIdent | &) = @dsl\| ... |/
+    // Operator overload: fn TypeIdent:opName |a, b| ReturnType { ... }
+    // Unary:  fn TypeIdent:neg |a|    ReturnType { ... }
+    // Binary: fn TypeIdent:add |a, b| ReturnType { ... }
+    op_decl: ($) =>
+      seq('fn', $.type_ident, ':', $.identifier, $.capture, $.return_type, $.block),
+
+    // Wasm-native type binding: type (TypeIdent | &) = @dsl/\ ... \/
     // Used to declare that the promoted type maps to a wasm intrinsic
     // (e.g. wasm array, externref, i31) rather than a utu struct or enum.
     type_decl: ($) => seq('type', choice($.type_ident, $.promoted_type), '=', $.dsl_expr),

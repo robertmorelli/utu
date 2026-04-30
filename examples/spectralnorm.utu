@@ -1,4 +1,4 @@
-let _Math_sqrt: fun(f64) f64 = @es\|Math.sqrt|/;
+let _Math_sqrt: fun(f64) f64 = @es/\Math.sqrt\/;
 let default_n: i32 = 130;
 
 // fn sqrt_newton(value: f64) f64 {

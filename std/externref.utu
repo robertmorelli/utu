@@ -1,0 +1,11 @@
+// std/externref.utu — externref opaque external reference type module
+// & maps to the WebAssembly externref type: an opaque, garbage-collected
+// reference to a host (JavaScript) object.
+// Externrefs ARE nullable: ?externref is valid.
+//
+// No arithmetic or comparison operators — externrefs are fully opaque.
+// Host operations are accessed via @ir DSL or imported JS functions.
+
+mod externref {
+    type & = @ir/\ <ir-wasm-ref kind="extern"/> \/
+}

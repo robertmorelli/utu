@@ -1,4 +1,4 @@
-let str_add: fun(str, str) str = @es\|(a, b) => a + b|/;
+let str_add: fun(str, str) str = @es/\(a, b) => a + b\/;
 
 fn main() str {
     let prefix: str = "co";

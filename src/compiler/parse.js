@@ -29,6 +29,7 @@ import {
 import { walkers as declWalkers } from './parse-decls.js';
 import { walkers as exprWalkers } from './parse-exprs.js';
 import { walkers as typeWalkers } from './parse-types.js';
+import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 // These were previously defined here; now they live in parse-helpers.js.
@@ -59,6 +60,9 @@ function dispatchNode(n, doc, source) {
   if (fn) return fn(n, doc, source, dispatchNode);
 
   // Special cases not in sub-module registries
+  if (['int_lit', 'float_lit', 'string_lit', 'multiline_string_lit', 'bool_lit', 'null_lit'].includes(n.type)) {
+    return registry.get('literal')?.(n, doc, source, dispatchNode) ?? walkUnknown(n, doc, source);
+  }
   if (n.type === 'return_type') return dispatchNode(namedChildren(n)[0], doc, source);
   if (n.type === 'paren_type')  return dispatchNode(namedChildren(n)[0], doc, source);
   if (n.type === 'comment')     return null;
@@ -84,7 +88,10 @@ function walkUnknown(n, doc, source) {
   node.setAttribute('ts-type', n.type);
   node.setAttribute('raw', text(n));
   if (n.type === 'ERROR' || n.isMissing) {
-    node.dataset.error = 'parse-error';
+    stampDiagnostic(node, DIAGNOSTIC_KINDS.PARSE_ERROR, `Parse error at ${n.startPosition.row + 1}:${n.startPosition.column + 1}`, {
+      tsType: n.type,
+      missing: Boolean(n.isMissing),
+    });
     if (n.isMissing) node.dataset.missing = 'true';
   }
   return node;
@@ -98,7 +105,7 @@ function stampSyntaxDiagnostics(root, cstRoot) {
   root.dataset.parseErrorCount = String(diagnostics.length);
   if (diagnostics.length) {
     root.dataset.parseErrors = JSON.stringify(diagnostics);
-    root.dataset.error = 'parse-error';
+    stampDiagnostic(root, DIAGNOSTIC_KINDS.PARSE_ERROR, `${diagnostics.length} parse error(s)`);
   }
 }
 
@@ -128,8 +135,11 @@ function walkSyntaxDiagnostics(node, acc) {
  * @param {string} source
  * @param {() => Document} [createDoc] - document factory for DI.
  */
-export function treeToIR(tree, source, createDoc = createIRDocument) {
+export function treeToIR(tree, source, sourceFileOrCreateDoc = '', maybeCreateDoc = createIRDocument) {
+  const createDoc = typeof sourceFileOrCreateDoc === 'function' ? sourceFileOrCreateDoc : maybeCreateDoc;
+  const sourceFile = (typeof sourceFileOrCreateDoc === 'string' ? sourceFileOrCreateDoc : '') || '<memory>';
   const doc  = createDoc();
+  doc.__utuSourceFile = sourceFile;
   const root = walkSourceFile(tree.rootNode, doc, source);
   stampSyntaxDiagnostics(root, tree.rootNode);
   doc.body.appendChild(root);

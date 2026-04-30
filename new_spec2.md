@@ -5,7 +5,7 @@
 ## Top-level forms
 
 ```
-// library of reusable declarations
+// library of reusable declarations — may only contain functions
 export lib {
     fn exported_thing(...) ... {
         ...
@@ -19,7 +19,7 @@ export main(...) ... {
 ```
 
 Rules:
-- `export lib` is a codegen annotation surface. It contains only functions.
+- `export lib` is a codegen annotation surface. It contains **only functions** — no structs, enums, globals, or tests.
 - `export lib` does not create any importable Utu interface. It only marks enclosed functions for Wasm export to JS.
 - `export main` and `export lib` are mutually exclusive in one entry file.
 
@@ -30,10 +30,15 @@ Rules:
 Nominal qualifiers prefix struct and enum declarations. They can be combined.
 
 ```
-nom[tag]
-nom[rec]
-nom[tag, rec]
+tag
+rec
+tag rec
 ```
+
+`tag` enables tag-based dispatch (`alt` over enum variants becomes `br_table`).
+`rec` makes the type `(sub …)`-able so other types can extend it (`alt` over a
+struct hierarchy becomes a `br_on_cast` chain). Most users start with no
+qualifier; reach for `tag` or `rec` when the compiler diagnostic recommends one.
 
 ---
 
@@ -57,7 +62,7 @@ proto P1:
 ## Structs
 
 ```
-nom[tag] struct T1[P1, P2]:
+tag struct T1[P1, P2]:
     | field1 : i32
     | field2 : T2
 
@@ -74,12 +79,12 @@ struct T2:
 Enums replace the old `type` declaration. Variants may carry named fields.
 
 ```
-nom[tag] enum Color:
+tag enum Color:
     | Red
     | Green
     | Blue
 
-nom[tag] enum Result[P1]:
+tag enum Result[P1]:
     | Ok { value : i32 }
     | Err { message : str }
 ```
@@ -110,15 +115,43 @@ fn P1[T1].foo |t1| (a: i32) void {
 fn P1.foo |p1| (a: i32) void {
     ...
 }
+
+// operator overload — colon syntax, two captures (lhs, rhs)
+// the operator name maps to the infix operator it implements
+fn T1:add |a, b| T1 {
+    ...
+}
+fn T1:sub  |a, b| T1 { ... }
+fn T1:mul  |a, b| T1 { ... }
+fn T1:div  |a, b| T1 { ... }
+fn T1:rem  |a, b| T1 { ... }
+fn T1:eq   |a, b| bool { ... }   // ==
+fn T1:ne   |a, b| bool { ... }   // !=
+fn T1:lt   |a, b| bool { ... }   // <
+fn T1:le   |a, b| bool { ... }   // <=
+fn T1:gt   |a, b| bool { ... }   // >
+fn T1:ge   |a, b| bool { ... }   // >=
+fn T1:band |a, b| T1 { ... }     // &
+fn T1:bor  |a, b| T1 { ... }     // |
+fn T1:bxor |a, b| T1 { ... }     // ^
+fn T1:shl  |a, b| T1 { ... }     // <<
+fn T1:shr  |a, b| T1 { ... }     // >>
+fn T1:ushr |a, b| T1 { ... }     // >>>
+fn T1:neg  |a|    T1 { ... }     // unary -
+fn T1:bnot |a|    T1 { ... }     // unary ~
 ```
+
+When the compiler sees `a + b` where `a : T1`, it desugars to `T1:add(a, b)`.  
+If no operator overload exists for the type, it is a compile error.  
+Scalars (`i32`, `f32`, etc.) provide built-in operator implementations via their std modules.
 
 ---
 
 ## Modules
 
 Modules are parameterized by types or protocols. Inside a module, `&` refers to the promoted type — the type that the module defines or exposes as its primary interface (inspired by `&` in nested CSS).
-Modules are the unit of importing as well as the only unit of type parameterization
-Modules do not nest.
+Modules are the unit of importing as well as the only unit of type parameterization.
+**Modules do not nest.**
 
 ```
 // module parameterized by concrete types
@@ -129,7 +162,7 @@ mod M1[T1, T2] {
         | get set c : f32
         | foo(T1) T2
 
-    nom[tag] struct T3[&]:
+    tag struct T3[&]:
         | field1 : i32
         | field2 : T2
 
@@ -147,7 +180,7 @@ mod M1[T1, T2] {
 // in P:  contravariant — P only in input positions (parameter types)
 // no annotation: invariant
 mod Pair[out P1, in P2] {
-    nom[tag] struct &[]:
+    tag struct &[]:
         | first  : P1
         | second : P2
 
@@ -158,21 +191,78 @@ mod Pair[out P1, in P2] {
         };
     }
 }
+
+// wasm-native type binding — & maps to a wasm intrinsic instead of a utu struct/enum
+// any wasm type can be declared this way: GC arrays, externref, i31, scalar value types, etc.
+mod Array[T1] {
+    type & = @ir/\ <ir-wasm-array elem="T1" mut="true"/> \/
+
+    fn &.new(n: i32) & { ... }
+    fn &.get |self| (i: i32) T1 { ... }
+    fn &.set |self| (i: i32, v: T1) void { ... }
+    fn &.len |self| () i32 { ... }
+}
+
+// scalar type as module — & resolves to the wasm scalar value type
+// all arithmetic operators are defined here as operator overloads
+mod i32 {
+    type & = @ir/\ <ir-wasm-scalar kind="i32"/> \/
+
+    fn &:add  |a, b| & { @ir/\ <ir-i32-add/> \/; }
+    fn &:sub  |a, b| & { @ir/\ <ir-i32-sub/> \/; }
+    fn &:mul  |a, b| & { @ir/\ <ir-i32-mul/> \/; }
+    fn &:eq   |a, b| bool { @ir/\ <ir-i32-eq/> \/; }
+    // ... etc.
+    fn clz(x: &) & { @ir/\ <ir-i32-clz/> \/; }
+}
 ```
 
 Rules:
-- A `mod` body may contain structs, protocols, enums, functions, globals, tests, and benches.
-- A `mod` body may not contain another `mod`.
+- A `mod` body may contain `type` declarations, structs, protocols, enums, functions, globals, tests, and benches.
+- A `mod` body may **not** contain another `mod`.
+
+---
+
+## Type declarations (wasm-native binding)
+
+Inside a module, `type` binds the promoted type `&` (or a named type alias) to a wasm-level descriptor provided via `@ir`:
+
+```
+type & = @ir/\ <ir-wasm-array elem="T1" mut="true"/> \/
+type & = @ir/\ <ir-wasm-scalar kind="i32"/> \/
+type & = @ir/\ <ir-wasm-extern/> \/      // externref (e.g. JS strings, DOM nodes)
+type & = @ir/\ <ir-wasm-i31/> \/
+```
+
+After instantiation, type parameters in the `@ir` body are substituted with concrete types.  
+The codegen backend reads the `ir-wasm-*` node and emits the appropriate wasm type definition.
 
 ---
 
 ## Using (imports and aliases)
 
-`using` brings a module into scope. `from "..."` is required for cross-file imports. Without `from`, it creates a within-file alias.
+`using` brings a module into scope. `from "..."` or `from platform:name` is required for cross-file imports. Without `from`, it creates a within-file alias.
+
+The following standard modules are **auto-imported** into every file (no explicit `using` needed):
+
+```
+// numeric scalars — also defines operator overloads for each type
+i32  u32  i64  u64
+f32  f64
+bool
+// reference types
+str        // externref-backed string with JS interop
+Array      // std:array — mutable WasmGC array, invariant in T1
+```
+
+All auto-imported names can be shadowed by an explicit `using ... |Alias|`.
 
 ```
 // cross-file import
 using M1 from "...";
+
+// platform standard library import
+using M1 from std:m1;
 
 // cross-file import with alias
 using M1 |M2| from "...";
@@ -185,11 +275,16 @@ using M1 |M2|;
 
 // within-file instantiation with alias
 using M1[i32, f64] |NumMap|;
+
+// inline instantiation (no alias needed — compiler derives name automatically)
+fn f() Array[i32] { Array[i32].new(10); }
 ```
 
 ---
 
 ## Scalar types
+
+Scalars are value types — they live on the wasm stack, not the heap, and are never nullable by default.
 
 ```
 i32  u32  i64  u64   // integers
@@ -199,15 +294,19 @@ v128                 // SIMD
 bool                 // boolean
 ```
 
-Reference types: `externref`, `i31`, `array[T]`, `str` (which is just an externref with special treatment), struct made by using `struct` and `enum`, functions with the syntax `.(...) -> ...`
+Reference types: `externref`, `i31`, `Array[T]`, `str`, structs and enums, functions `fun(T1, T2) R`.
 
-Nullable: prefix with `?` — e.g. `?T1`, `?i32`
+Nullable: prefix with `?` — e.g. `?T1`, `?i32`.
+
 ---
 
 ## Operators
 
+All operators desugar to operator overload calls (`fn T1:op |a, b|`).  
+Precedence (high to low): `^` · `* / %` · `+ -` · `<< >> >>>` · `&` · `|` · `== != < > <= >=` · `and` · `xor` · `or` · `orelse` · `|>`
+
 ```
-// arithmetic (+ also concatenates str)
+// arithmetic
 +  -  *  /  %
 
 // bitwise
@@ -216,20 +315,18 @@ Nullable: prefix with `?` — e.g. `?T1`, `?i32`
 // comparison
 ==  !=  <  >  <=  >=
 
-// logical
-and  or  not xor
+// logical (not overloadable — always bool operands)
+and  or  not  xor
 
 // null fallback (else)
-\
+orelse
 
 // pipe
--o
+|>
 
 // assignment
-=  +=  -=  *=  /=  %=  &=  |=  ^=  <<=  >>=  >>>=  and=  or= xor=
+=  +=  -=  *=  /=  %=  &=  |=  ^=  <<=  >>=  >>>=  and=  or=  xor=
 ```
-
-Precedence (high to low): `^` · `* / %` · `+ -` · `<< >> >>>` · `&` · `|` · `== != < > <= >=` · `and` · `xor` · `or` · `\` · `-o`
 
 ---
 
@@ -238,30 +335,24 @@ Precedence (high to low): `^` · `* / %` · `+ -` · `<< >> >>>` · `&` · `|` �
 ```
 // literals
 42        0xff      0b1010    // int
-0xff      0b1010              // mask
 3.14      1.0e-9              // float
 "hello"                       // string
 \\multiline                   // multiline string (each line prefixed \\)
 true  false  null
 
-// tuple
-.{a, b, c}
-
 // struct init
 T1 { field1: 10, field2: x }
 
-// implicit struct init only for simple assignments
+// implicit struct init (type inferred from &)
 let t1: T1 = &{ field1: 10, field2: x };
 
+// array (Array is auto-imported from std:array)
+Array[i32].new(10)
 
-// array
-array[i32].new(10)
-
-// field access and length
+// field access
 expr.field
-s.len             // works on str and array
-a[i]              // index
-a[start, end]     // slice — works on str and array
+a[i]              // index — desugars to Array[T].get(a, i)
+a[start, end]     // slice — desugars to Array[T].slice(a, start, end)
 
 // call
 foo(a, b)
@@ -290,7 +381,7 @@ promote expr {
         ~> ...,
 }
 
-// for / while (note that for loop captures are always i64) (these also support labels)
+// for / while (for loop captures are always i64) (support labels)
 for (0 ... 10) |i| { ... }     // inclusive
 for (0 ..< 10) |i| { ... }     // exclusive
 while (cond) { ... }
@@ -299,8 +390,8 @@ while (cond) { ... }
 let x: i32 = expr
 
 // pipe
-expr -o foo
-expr -o foo(&, extra)
+expr |> foo
+expr |> foo(&, extra)
 
 // assert / fatal
 assert cond
@@ -315,15 +406,17 @@ label: { ... }
 
 ---
 
-## Builtin namespaces
+## Builtin static methods
 
-Builtin types expose static methods via dot syntax. These are not user-definable.
+Some types expose static methods that are not operator overloads.  
+These live on the module and are called with `T.method(...)` syntax:
 
 ```
-i32.clz(x)        // numeric ops — i32, u32, i64, u64, f32, f64
+i32.clz(x)        // count leading zeros — i32, u32, i64, u64
+i32.ctz(x)        // count trailing zeros
+f32.sqrt(x)       // sqrt, floor, ceil, etc.
 str.char(n)       // construct single-char string from code point
-array[T].new(n)   // array ops
-i31.get(x)        // i31 ref ops
+i31.get(x)        // i31 ref unbox
 T1.null           // null reference for type T1
 ```
 
@@ -335,11 +428,11 @@ T1.null           // null reference for type T1
 // global constant
 let PI: f64 = 3.14159;
 
-// DSL expressions — @name\| body |/
-// builtins: @es (JavaScript), @utu (utu source), @wat (WAT)
+// DSL expressions — @name/\ body \/
+// builtins: @es (JavaScript), @utu (utu source), @ir (raw IR xml), @wat (WAT)
 // body is raw text handed to the named DSL module at compile time
-let foo: .(i32, str) -> i32 = @es\| return a + b |/;
-let value: f64 = @utu\| some.utu.expr |/;
+let foo: fun(i32, str) f64 = @es/\ return a + b \/;
+let value: f64 = @utu/\ some.utu.expr \/;
 ```
 
 ---

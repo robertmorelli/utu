@@ -4,6 +4,9 @@
 // module params against uses in function/protocol signatures and nested
 // function types.
 
+import { firstTypeChild } from './ir-helpers.js';
+import { DIAGNOSTIC_KINDS, compilerError, related } from './diagnostics.js';
+
 export function checkModuleVariance(doc) {
   const root = doc?.body?.firstChild;
   if (!root) return;
@@ -18,8 +21,16 @@ export function checkModuleVariance(doc) {
         visitType(site.typeNode, site.polarity, node => {
           if (node.localName !== 'ir-type-ref' || node.getAttribute('name') !== name) return;
           if (!isAllowed(variance, site.polarity)) {
-            throw new Error(
-              `module variance (${mod.getAttribute('name')}.${name}): '${variance}' parameter used in ${site.polarity} position`
+            throw compilerError(
+              DIAGNOSTIC_KINDS.MODULE_VARIANCE,
+              `module variance (${mod.getAttribute('name')}.${name}): '${variance}' parameter used in ${site.polarity} position`,
+              node,
+              {
+                module: mod.getAttribute('name'),
+                variance,
+                polarity: site.polarity,
+                related: [related(params.find(p => p.getAttribute('name') === name), 'module parameter')],
+              },
             );
           }
         });
@@ -90,13 +101,10 @@ function flip(polarity) {
   return polarity === 'in' ? 'out' : 'in';
 }
 
-function firstTypeChild(node) {
-  return [...node.children].find(child => child.localName.startsWith('ir-type-'));
-}
-
+// Local return-type lookup keeps the legacy 'ir-unknown' fallback so this pass
+// continues to flag mistyped returns even when the parser produces an unknown
+// node.  ir-helpers.fnReturnType strips that branch deliberately (it's only
+// useful pre-error-reporting).
 function fnReturnType(fn) {
-  return [...fn.children].find(child =>
-    child.localName.startsWith('ir-type-') ||
-    (child.localName === 'ir-unknown' && child.getAttribute('ts-type') === 'return_type')
-  );
+  return fn.querySelector(':scope > [ts-type=\"return_type\"], :scope > ir-type-ref, :scope > ir-type-void, :scope > ir-type-nullable, :scope > ir-type-fn, :scope > ir-type-inst, :scope > ir-type-self');
 }

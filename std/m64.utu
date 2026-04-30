@@ -1,0 +1,19 @@
+// std/m64.utu — m64 bitmask type module
+// & is a 64-bit bitmask value (same wasm representation as i64).
+// Intended for use as a lane-selection mask, not a general integer.
+// Supports bitwise and comparison ops; arithmetic (add/sub/mul) is excluded.
+
+mod m64 {
+    type & = @ir/\ <ir-wasm-scalar kind="m64"/> \/
+
+    fn &:band |a, b| & { @ir/\ <ir-i64-and><ir-ident name="a"/><ir-ident name="b"/></ir-i64-and> \/; }
+    fn &:bor  |a, b| & { @ir/\ <ir-i64-or><ir-ident name="a"/><ir-ident name="b"/></ir-i64-or> \/; }
+    fn &:bxor |a, b| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-ident name="b"/></ir-i64-xor> \/; }
+    // wasm has no bitwise not; synthesise it as xor with the all-ones mask.
+    fn &:bnot |a| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-lit kind="int" type="i64" value="-1"/></ir-i64-xor> \/; }
+    fn &:shl  |a, b| & { @ir/\ <ir-i64-shl><ir-ident name="a"/><ir-ident name="b"/></ir-i64-shl> \/; }
+    fn &:shr  |a, b| & { @ir/\ <ir-i64-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-i64-shr-u> \/; }
+    fn &:ushr |a, b| & { @ir/\ <ir-i64-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-i64-shr-u> \/; }
+    fn &:eq   |a, b| bool { @ir/\ <ir-i64-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i64-eq> \/; }
+    fn &:ne   |a, b| bool { @ir/\ <ir-i64-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i64-ne> \/; }
+}

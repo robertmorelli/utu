@@ -1,5 +1,39 @@
-mod Prelude {
-    fn answer() i32 {
-        return 42;
-    }
-}
+// std/prelude.utu — automatically injected into every compilation
+//
+// Every name listed here is visible in user code without an explicit `using`.
+// The compiler prepends these modules before processing any file.
+//
+// Scalar value types (stack-allocated, never nullable):
+//   i32, u32, i64, u64 — signed/unsigned integers
+//   f32, f64           — floating-point
+//   bool               — boolean (i32 underneath, 0=false 1=true)
+//   m32, m64, m128     — bitmask integers (32/64/128-bit)
+//   v128               — 128-bit SIMD vector
+//
+// Reference types (heap-allocated, nullable via ?T):
+//   str                — Binaryen stringref-backed host string
+//   externref          — opaque host (JavaScript) reference
+//   i31                — 31-bit integer packed into a GC reference
+//
+// Generic collections:
+//   Array              — mutable GC array, parameterised by element type
+//
+// Compiler directives:
+//   literal_defaults   — `<ir-literal-defaults>` map for type inference
+
+using i32              from std:i32;
+using u32              from std:u32;
+using i64              from std:i64;
+using u64              from std:u64;
+using f32              from std:f32;
+using f64              from std:f64;
+using bool             from std:bool;
+using m32              from std:m32;
+using m64              from std:m64;
+using m128             from std:m128;
+using v128             from std:v128;
+using str              from std:str;
+using externref        from std:externref;
+using i31              from std:i31;
+using Array            from std:array;
+using literal_defaults from std:literal_defaults;

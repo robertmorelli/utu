@@ -1,0 +1,41 @@
+// std/str.utu — str string reference type module
+// & maps to Binaryen's stringref-backed host string model.
+// This is a deliberate Binaryen feature, not a core Wasm GC heap type like
+// arrays or structs. Utu treats it as a first-class type because Binaryen is
+// the backend and can optimize JS-style string operations directly.
+// They ARE nullable: ?str is valid.
+//
+// Operator overloads:
+//   s1 + s2    → str:add(s1, s2)   — concatenation
+//   s1 == s2   → str:eq(s1, s2)    — equality
+//   s1 != s2   → str:ne(s1, s2)    — inequality
+
+mod str {
+    type & = @ir/\ <ir-wasm-ref kind="string"/> \/
+
+    // Concatenation via the + operator.
+    fn &:add |a, b| & { @ir/\ <ir-string-concat><ir-ident name="a"/><ir-ident name="b"/></ir-string-concat> \/; }
+
+    // Equality — structural (content) comparison.
+    fn &:eq |a, b| bool { @ir/\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \/; }
+    fn &:ne |a, b| bool { @ir/\ <ir-string-ne><ir-ident name="a"/><ir-ident name="b"/></ir-string-ne> \/; }
+
+    // Number of UTF-16 code units in the host string.
+    fn len(s: &) i32 {
+        @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
+    }
+
+    // Substring [start, end) — returns a new string.
+    fn slice(s: &, start: i32, end_: i32) & {
+        @ir/\ <ir-string-slice-wtf16>
+            <ir-ident name="s"/>
+            <ir-ident name="start"/>
+            <ir-ident name="end_"/>
+        </ir-string-slice-wtf16> \/;
+    }
+
+    // Read one UTF-16 code unit at index i.
+    fn get(s: &, i: i32) i32 {
+        @ir/\ <ir-string-get-wtf16><ir-ident name="s"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+    }
+}

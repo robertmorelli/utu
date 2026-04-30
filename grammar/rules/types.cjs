@@ -2,17 +2,12 @@ exports.buildTypeRules = function buildTypeRules() {
   return {
     _type: ($) => choice($.nullable_type, $._base_type),
     nullable_type: ($) => seq('?', $._base_type),
-    _base_type: ($) => choice($.scalar_type, $.ref_type, $.func_type, $.paren_type, $.promoted_type),
-    scalar_type: (_) =>
-      choice('i32', 'u32', 'i64', 'u64', 'm32', 'm64', 'm128', 'f32', 'f64', 'v128', 'bool'),
+    _base_type: ($) => choice($.ref_type, $.func_type, $.paren_type, $.promoted_type),
     ref_type: ($) =>
       choice(
         $.type_ident,
         $.qualified_type_ref,
         $.instantiated_module_ref,
-        'str',
-        'externref',
-        'i31',
       ),
     qualified_type_ref: ($) =>
       choice(

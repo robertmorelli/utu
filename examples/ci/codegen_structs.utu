@@ -1,4 +1,4 @@
-let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
+let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 struct Vec2:
     | x : f32

@@ -18,7 +18,6 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.index_expr,
         $.slice_expr,
         $.call_expr,
-        $.namespace_call_expr,
         $.if_expr,
         $.promote_expr,
         $.match_expr,
@@ -90,19 +89,18 @@ exports.buildExpressionRules = function buildExpressionRules() {
         prec.left(2,   seq($._expr, 'or',                                      $._expr)),
       ),
 
-    // null fallback
-    else_expr: ($) => prec.left(1, seq($._expr, '\\', $._expr)),
+    // null fallback — `expr orelse default` (was `\` in v1; see the_future.md
+    // "replace `\` with `orelse`")
+    else_expr: ($) => prec.left(1, seq($._expr, 'orelse', $._expr)),
 
     // pipe
     pipe_expr: ($) => prec.left(0, seq($._expr, '-o', $.pipe_target)),
     pipe_target: ($) => choice($._pipe_path, seq($._pipe_path, '(', $.pipe_args, ')')),
     _pipe_path: ($) =>
       prec.left(15, seq(
-        choice(alias($._builtin_ns, $.identifier), $.instantiated_module_ref, $.identifier, $.type_ident),
+        choice($.instantiated_module_ref, $.identifier, $.type_ident),
         repeat(seq('.', choice($.identifier, $.type_ident))),
       )),
-    _builtin_ns: (_) =>
-      choice('str', 'i31', 'ref', 'extern', 'any', 'i32', 'i64', 'f32', 'f64'),
     pipe_args: ($) => choice($.pipe_args_no_placeholder, $.pipe_args_with_placeholder),
     pipe_args_no_placeholder: ($) =>
       seq(alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))), optional(',')),
@@ -115,11 +113,6 @@ exports.buildExpressionRules = function buildExpressionRules() {
         optional(seq(',', alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))))),
         optional(','),
       ),
-
-    namespace_call_expr: ($) =>
-      prec.left(13, seq(
-        $._builtin_ns, '.', $.identifier, optional(seq('(', optional($.arg_list), ')')),
-      )),
 
     assign_expr: ($) =>
       prec.right(0, seq(
@@ -143,12 +136,12 @@ exports.buildExpressionRules = function buildExpressionRules() {
       ),
 
     // match on scalars; ~> is the default arm
-    match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), $.match_default, '}'),
+    match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), optional($.match_default), '}'),
     match_arm: ($) => seq($.match_lit, '=>', $._expr, ','),
     match_default: ($) => seq('~>', $._expr, ','),
 
     // alt on enum variants; ~> is the default arm
-    alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), $.alt_default, '}'),
+    alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), optional($.alt_default), '}'),
     alt_arm: ($) => seq($.type_ident, optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
     alt_default: ($) => seq('~>', $._expr, ','),
 
@@ -184,8 +177,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
       ),
     field_init: ($) => seq($.identifier, ':', $._expr),
 
-    // DSL escape: @name\| raw body |/
+    // DSL escape: @name/\ raw body \/
     dsl_expr: ($) => seq('@', $.identifier, $.dsl_body),
-    dsl_body: (_) => token(seq('\\|', /([^|]|\|[^\/])*/, '|/')),
+    dsl_body: (_) => token(seq('/\\', /([^\\]|\\[^\/])*/, '\\/')),
   };
 };

@@ -12,7 +12,7 @@
 //
 // The rest of the compiler can pretend modules never existed.
 
-import { nextNodeId } from './parse.js';
+import { replaceNodeMeta } from './ir-helpers.js';
 
 /**
  * @param {Document} doc - linkedom document after passes 1-3
@@ -28,8 +28,7 @@ export function hoistModules(doc, { debugAssertions = false } = {}) {
 
     // ── 1. Build renaming map: & → moduleName, everything else → M__name ────
     const renamings = new Map(
-      [...mod.children]
-        .filter(d => d.getAttribute('name'))
+      [...mod.querySelectorAll(':scope > [name]')]
         .map(d => {
           const n = d.getAttribute('name');
           return [n, n === '&' ? moduleName : `${moduleName}__${n}`];
@@ -38,12 +37,8 @@ export function hoistModules(doc, { debugAssertions = false } = {}) {
 
     // ── 2. Replace <ir-type-self> nodes (& as a type reference) ─────────────
     for (const self of [...mod.querySelectorAll('ir-type-self')]) {
-      const ref = doc.createElement('ir-type-ref');
-      ref.id              = `n${nextNodeId()}`;
+      const ref = replaceNodeMeta(doc.createElement('ir-type-ref'), self, 'hoist-modules', 'type-self');
       ref.setAttribute('name', moduleName);
-      ref.dataset.start      = self.dataset.start ?? '';
-      ref.dataset.end        = self.dataset.end   ?? '';
-      ref.dataset.originFile = self.dataset.originFile ?? '';
       self.replaceWith(ref);
     }
 
@@ -68,6 +63,16 @@ export function hoistModules(doc, { debugAssertions = false } = {}) {
         if (irFn) irFn.setAttribute('name', `${renamed}.${fnName.getAttribute('name')}`);
       }
     }
+    // operator functions: fn &:add → fn ModuleName:add
+    for (const fnName of [...mod.querySelectorAll('ir-fn-name[kind="operator"]')]) {
+      const recv = fnName.getAttribute('receiver');
+      const renamedRecv = recv === '&' ? moduleName : (renamings.get(recv) ?? recv);
+      fnName.setAttribute('receiver', renamedRecv);
+      const opName = fnName.getAttribute('name');
+      const irFn   = fnName.parentElement;
+      if (irFn) irFn.setAttribute('name', `${renamedRecv}:${opName}`);
+    }
+
     // free functions: ir-fn[name] is just the short name — prefix it
     for (const fnName of [...mod.querySelectorAll('ir-fn-name[kind="free"]')]) {
       const irFn  = fnName.parentElement;
@@ -86,7 +91,7 @@ export function hoistModules(doc, { debugAssertions = false } = {}) {
     }
 
     // ── 5. Rename the declaration nodes themselves ────────────────────────────
-    for (const decl of [...mod.children]) {
+    for (const decl of mod.querySelectorAll(':scope > [name]')) {
       const renamed = renamings.get(decl.getAttribute('name'));
       if (renamed) decl.setAttribute('name', renamed);
     }
@@ -128,7 +133,7 @@ function assertHoistModules(doc) {
   }
 
   const seen = new Set();
-  for (const child of [...root.children]) {
+  for (const child of root.querySelectorAll(':scope > [name]')) {
     const name = child.getAttribute?.('name');
     if (!name) continue;
     if (seen.has(name)) {

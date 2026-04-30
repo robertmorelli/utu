@@ -3,6 +3,9 @@
 // Rewrites the retained target surface in the entry file into ordinary
 // top-level declarations with annotations for later codegen.
 
+import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
+import { restampSubtree } from './parse.js';
+
 export function bringTargetToTopLevel(doc, { target = 'analysis', filePath = '', debugAssertions = false } = {}) {
   if (target === 'analysis') return doc;
 
@@ -27,11 +30,10 @@ export function bringTargetToTopLevel(doc, { target = 'analysis', filePath = '',
 }
 
 function rewriteExportMain(node, doc) {
-  const fn = doc.createElement('ir-fn');
-  copySpan(fn, node);
+  const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', 'export-main');
   fn.dataset.export = 'main';
 
-  const fnName = doc.createElement('ir-fn-name');
+  const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', 'export-main-name');
   fnName.setAttribute('kind', 'free');
   fnName.setAttribute('name', 'main');
   fnName.setAttribute('raw', 'main');
@@ -53,22 +55,20 @@ function rewriteExportLib(node) {
 }
 
 function rewriteBlockDecl(node, doc, name, role) {
-  const fn = doc.createElement('ir-fn');
-  copySpan(fn, node);
+  const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', role);
   fn.dataset.role = role;
   if (node.getAttribute('label')) fn.dataset.label = node.getAttribute('label');
 
-  const fnName = doc.createElement('ir-fn-name');
+  const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', `${role}-name`);
   fnName.setAttribute('kind', 'free');
   fnName.setAttribute('name', name);
   fnName.setAttribute('raw', name);
   fn.appendChild(fnName);
 
-  const ret = doc.createElement('ir-type-void');
+  const ret = createSyntheticNode(doc, 'ir-type-void', node, 'bring-target', `${role}-return`);
   fn.appendChild(ret);
 
-  const block = doc.createElement('ir-block');
-  copySpan(block, node);
+  const block = createSyntheticNode(doc, 'ir-block', node, 'bring-target', `${role}-block`);
   for (const child of [...node.children]) block.appendChild(child);
   fn.appendChild(block);
 
@@ -76,30 +76,33 @@ function rewriteBlockDecl(node, doc, name, role) {
 }
 
 function rewriteBenchDecl(node, doc, name) {
-  const fn = doc.createElement('ir-fn');
-  copySpan(fn, node);
+  const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', 'bench');
   fn.dataset.role = 'bench';
   if (node.getAttribute('label')) fn.dataset.label = node.getAttribute('label');
 
-  const fnName = doc.createElement('ir-fn-name');
+  const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', 'bench-name');
   fnName.setAttribute('kind', 'free');
   fnName.setAttribute('name', name);
   fnName.setAttribute('raw', name);
   fn.appendChild(fnName);
 
-  const ret = doc.createElement('ir-type-void');
+  const ret = createSyntheticNode(doc, 'ir-type-void', node, 'bring-target', 'bench-return');
   fn.appendChild(ret);
 
-  const block = doc.createElement('ir-block');
-  copySpan(block, node);
+  const block = createSyntheticNode(doc, 'ir-block', node, 'bring-target', 'bench-block');
 
   for (const child of [...node.children]) {
     if (child.localName !== 'ir-measure') {
       block.appendChild(child);
       continue;
     }
-    const measureBlock = child.firstElementChild?.cloneNode(true) ?? doc.createElement('ir-block');
+    const measureBlock = child.firstElementChild?.cloneNode(true) ?? createSyntheticNode(doc, 'ir-block', child, 'bring-target', 'bench-measure');
+    if (child.firstElementChild) restampSubtree(measureBlock, child.dataset.originFile);
     measureBlock.dataset.role = 'measure';
+    measureBlock.dataset.synthetic ??= 'true';
+    measureBlock.dataset.rewritePass ??= 'bring-target';
+    measureBlock.dataset.rewriteKind ??= 'bench-measure';
+    measureBlock.dataset.rewriteOf ??= child.dataset.originId ?? child.id ?? '';
     block.appendChild(measureBlock);
   }
 
@@ -116,9 +119,4 @@ function assertBroughtToTopLevel(root, { target, filePath }) {
   if (target === 'bench' && root.querySelector('ir-measure')) {
     throw new Error(`bring target (${filePath}): found ir-measure after bench normalization`);
   }
-}
-
-function copySpan(to, from) {
-  if (from.dataset.start != null) to.dataset.start = from.dataset.start;
-  if (from.dataset.end != null) to.dataset.end = from.dataset.end;
 }

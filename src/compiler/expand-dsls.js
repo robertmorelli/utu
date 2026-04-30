@@ -1,6 +1,7 @@
 import { T } from './ir-tags.js';
 import { nextNodeId, restampSubtree } from './parse.js';
 import { collectDslArtifacts, createDslArtifactState, stampDslArtifacts } from './collect-dsl-artifacts.js';
+import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
 
 export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
   const root = doc?.body?.firstChild;
@@ -26,18 +27,29 @@ export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
       freshName: (prefix = '__dsl') => `${prefix}_${nextId++}`,
     });
     if (!result) continue;
+    collectDslArtifacts(root, artifacts, result, node => cloneForSite(node, site));
+    if (result.replace) {
+      const target = result.replace.target ?? node;
+      const replacement = replaceRoot(cloneForSite(result.replace.node, site), target, result.replace.kind ?? 'dsl-replacement');
+      target.replaceWith(replacement);
+      continue;
+    }
     if (result.node) {
-      node.replaceWith(cloneForSite(result.node, site));
+      node.replaceWith(replaceRoot(cloneForSite(result.node, site), node, 'direct-node'));
       continue;
     }
     if (!result.fn) continue;
     if (result.fn.localName !== T.FN) throw new Error(`expand dsls (${name}): plugin must return ir-fn`);
 
     const helper = cloneForSite(result.fn, site);
+    helper.dataset.synthetic = 'true';
+    helper.dataset.rewritePass = 'expand-dsls';
+    helper.dataset.rewriteKind = 'dsl-helper';
+    helper.dataset.rewriteOf = node.dataset.originId ?? node.id ?? '';
+    helper.dataset.dslName = name;
     const helperName = helper.getAttribute('name') || helper.querySelector(T.FN_NAME)?.getAttribute('raw');
     if (!helperName) throw new Error(`expand dsls (${name}): helper fn is missing a name`);
 
-    collectDslArtifacts(root, artifacts, result, node => cloneForSite(node, site));
     root.insertBefore(helper, root.firstChild);
     node.replaceWith(buildCall(doc, node, site, helperName, result.inlineArgs ?? []));
   }
@@ -48,12 +60,9 @@ export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
 }
 
 function buildCall(doc, node, site, helperName, inlineArgs) {
-  const call = doc.createElement(T.CALL);
-  const callee = doc.createElement(T.IDENT);
-  const args = doc.createElement(T.ARG_LIST);
-  stampSynthetic(call, node);
-  stampSynthetic(callee, node);
-  stampSynthetic(args, node);
+  const call = replaceNodeMeta(doc.createElement(T.CALL), node, 'expand-dsls', 'dsl-call');
+  const callee = createSyntheticNode(doc, T.IDENT, node, 'expand-dsls', 'dsl-callee');
+  const args = createSyntheticNode(doc, T.ARG_LIST, node, 'expand-dsls', 'dsl-args');
   callee.setAttribute('name', helperName);
   for (const arg of inlineArgs) args.appendChild(cloneForSite(arg, site));
   call.appendChild(callee);
@@ -70,7 +79,14 @@ function cloneForSite(node, site) {
 
 function rebaseSubtreeRanges(root, site) {
   for (const node of [root, ...root.querySelectorAll('*')]) {
-    if (site.originFile) node.dataset.originFile = site.originFile;
+    if (site.originFile) {
+      node.dataset.originFile = site.originFile;
+      node.dataset.sourceFile = site.originFile;
+    }
+    node.dataset.row ??= site.row;
+    node.dataset.col ??= site.col;
+    node.dataset.endRow ??= site.endRow;
+    node.dataset.endCol ??= site.endCol;
     const start = num(node.dataset.start);
     const end = num(node.dataset.end);
     if (start == null || end == null || end > site.limit) continue;
@@ -79,11 +95,18 @@ function rebaseSubtreeRanges(root, site) {
   }
 }
 
-function stampSynthetic(node, site) {
-  node.id = `n${nextNodeId()}`;
-  if (site.dataset.start != null) node.dataset.start = site.dataset.start;
-  if (site.dataset.end != null) node.dataset.end = site.dataset.end;
-  if (site.dataset.originFile != null) node.dataset.originFile = site.dataset.originFile;
+function replaceRoot(node, site, kind) {
+  node.id = site.id ?? `n${nextNodeId()}`;
+  node.dataset.row ??= site.dataset.row;
+  node.dataset.col ??= site.dataset.col;
+  node.dataset.endRow ??= site.dataset.endRow;
+  node.dataset.endCol ??= site.dataset.endCol;
+  node.dataset.sourceFile ??= site.dataset.sourceFile ?? site.dataset.originFile;
+  node.dataset.synthetic = 'true';
+  node.dataset.rewritePass = 'expand-dsls';
+  node.dataset.rewriteKind = kind;
+  node.dataset.rewriteOf = site.dataset.originId ?? site.id ?? '';
+  return node;
 }
 
 function num(value, fallback = null) {
@@ -101,12 +124,16 @@ function siteInfo(node, root) {
     innerBase: num(node.dataset.bodyInnerStart, num(node.dataset.start)),
     limit: (node.getAttribute('body') ?? '').length,
     originFile: node.dataset.originFile ?? root.dataset.file,
+    row: node.dataset.row,
+    col: node.dataset.col,
+    endRow: node.dataset.endRow,
+    endCol: node.dataset.endCol,
   };
 }
 
 function assertExpanded(root, dsls) {
   for (const node of [...root.querySelectorAll(T.DSL)]) {
     const name = node.getAttribute('name');
-    if (name && dsls[name]) throw new Error(`expand dsls: registered DSL '${name}' survived expansion`);
+    if (name && dsls[name] && !dsls[name].allowResidual) throw new Error(`expand dsls: registered DSL '${name}' survived expansion`);
   }
 }

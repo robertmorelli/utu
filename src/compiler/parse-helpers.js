@@ -3,7 +3,7 @@
 // Extracted to avoid circular imports between parse.js and its sub-modules.
 // parse.js re-exports these; sub-modules import from here directly.
 
-import { parseHTML } from 'linkedom';
+import { parseHTML } from 'linkedom/worker';
 
 // ── Node id counter ───────────────────────────────────────────────────────────
 
@@ -18,8 +18,12 @@ export function nextNodeId()    { return _nodeId++; }
 export function restampSubtree(root, originFile) {
   const walk = (el) => {
     if (typeof el.setAttribute !== 'function') return;
+    if (!el.dataset.originId && el.id) el.dataset.originId = el.id;
     el.id = `n${_nodeId++}`;
-    if (originFile) el.dataset.originFile = originFile;
+    if (originFile) {
+      el.dataset.originFile = originFile;
+      el.dataset.sourceFile ??= originFile;
+    }
     for (const child of el.children ?? []) walk(child);
   };
   walk(root);
@@ -61,8 +65,18 @@ export function append(parent, children) {
 // Stamp source span and assign a document-unique numeric id on every IR node.
 export function stamp(e, n) {
   e.id            = `n${_nodeId++}`;
+  e.dataset.originId = e.id;
   e.dataset.start = n.startIndex;
   e.dataset.end   = n.endIndex;
+  e.dataset.row = String(n.startPosition.row + 1);
+  e.dataset.col = String(n.startPosition.column + 1);
+  e.dataset.endRow = String(n.endPosition.row + 1);
+  e.dataset.endCol = String(n.endPosition.column + 1);
+  const sourceFile = e.ownerDocument?.__utuSourceFile;
+  if (sourceFile) {
+    e.dataset.sourceFile = sourceFile;
+    e.dataset.originFile = sourceFile;
+  }
   return e;
 }
 

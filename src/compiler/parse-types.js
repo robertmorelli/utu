@@ -13,12 +13,6 @@ function walkNullableType(n, doc, source, dispatch) {
   return node;
 }
 
-function walkScalarType(n, doc, source, dispatch) {
-  const node = stamp(el(T.TYPE_SCALAR, doc), n);
-  node.setAttribute('kind', text(n));
-  return node;
-}
-
 function walkRefType(n, doc, source, dispatch) {
   const children = namedChildren(n);
   if (children.length === 0) {
@@ -30,6 +24,18 @@ function walkRefType(n, doc, source, dispatch) {
 }
 
 function walkTypeIdent(n, doc, source, dispatch) {
+  const node = stamp(el(T.TYPE_REF, doc), n);
+  node.setAttribute('name', text(n));
+  return node;
+}
+
+// `scalar_type` is a grammar-level alternation of the built-in scalar names
+// (i32, f64, bool, …).  The set of accepted names lives in the grammar for
+// parsing convenience only — the IR treats every scalar exactly the same as
+// any other type reference, so we lower it to `<ir-type-ref>` here.  Adding
+// a new scalar width is therefore a stdlib change (plus one grammar string
+// alt) rather than a compiler-wide change.
+function walkScalarType(n, doc, source, dispatch) {
   const node = stamp(el(T.TYPE_REF, doc), n);
   node.setAttribute('name', text(n));
   return node;
@@ -79,8 +85,8 @@ function walkVoidType(n, doc, source, dispatch) {
 
 export const walkers = {
   'nullable_type':          walkNullableType,
-  'scalar_type':            walkScalarType,
   'ref_type':               walkRefType,
+  'scalar_type':            walkScalarType,
   'type_ident':             walkTypeIdent,
   'qualified_type_ref':     walkQualifiedTypeRef,
   'instantiated_module_ref': walkInstModuleRef,

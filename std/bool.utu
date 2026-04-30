@@ -1,0 +1,15 @@
+// std/bool.utu — bool scalar type module
+// & is a WasmGC i32 used as boolean (0 = false, 1 = true).
+// Logical operators live here like every other operator; the compiler lowers
+// `and`, `or`, `xor`, and `not` through this module instead of hardcoding them.
+
+mod bool {
+    type & = @ir/\ <ir-wasm-scalar kind="bool"/> \/
+
+    fn &:eq  |a, b| bool { @ir/\ <ir-i32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i32-eq> \/; }
+    fn &:ne  |a, b| bool { @ir/\ <ir-i32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i32-ne> \/; }
+    fn &:and |a, b| bool { @ir/\ <ir-i32-and><ir-ident name="a"/><ir-ident name="b"/></ir-i32-and> \/; }
+    fn &:or  |a, b| bool { @ir/\ <ir-i32-or><ir-ident name="a"/><ir-ident name="b"/></ir-i32-or> \/; }
+    fn &:xor |a, b| bool { @ir/\ <ir-i32-xor><ir-ident name="a"/><ir-ident name="b"/></ir-i32-xor> \/; }
+    fn &:not |a| bool { @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-eqz> \/; }
+}

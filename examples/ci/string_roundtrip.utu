@@ -1,4 +1,4 @@
-let str_concat: fun(str, str) str = @es\|(a, b) => a + b|/;
+let str_concat: fun(str, str) str = @es/\(a, b) => a + b\/;
 
 fn label() str {
     "done";

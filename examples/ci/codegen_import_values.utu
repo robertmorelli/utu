@@ -1,7 +1,7 @@
-let lucky: i32 = @es\|41|/;
-let label: str = @es\|"utu"|/;
-let document: externref = @es\|({})|/;
-let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
+let lucky: i32 = @es/\41\/;
+let label: str = @es/\"utu"\/;
+let document: externref = @es/\({})\/;
+let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 fn score() i32 {
     lucky + 1;

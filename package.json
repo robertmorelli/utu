@@ -6,17 +6,25 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./dist/utu.js"
   },
+  "files": [
+    "dist/utu.js",
+    "PRINCIPLES.md",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "node ./scripts/build.mjs",
-    "test": "bun ./scripts/run-tests.mjs"
+    "test:bundle": "bun ./scripts/bundle-smoke-test.mjs",
+    "test": "bun ./scripts/run-tests.mjs --both-debug-modes"
   },
-  "dependencies": {
-    "linkedom": "^0.18.12",
-    "web-tree-sitter": "^0.26.7"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "binaryen": "^125.0.0",
+    "esbuild": "^0.27.4",
+    "linkedom": "^0.18.12",
+    "web-tree-sitter": "^0.26.7",
     "tree-sitter-cli": "^0.26.7"
   }
 }

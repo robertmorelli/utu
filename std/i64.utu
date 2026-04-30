@@ -1,0 +1,27 @@
+// std/i64.utu — i64 scalar type module
+mod i64 {
+    type & = @ir/\ <ir-wasm-scalar kind="i64"/> \/
+
+    fn &:add  |a, b| & { @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="b"/></ir-i64-add> \/; }
+    fn &:sub  |a, b| & { @ir/\ <ir-i64-sub><ir-ident name="a"/><ir-ident name="b"/></ir-i64-sub> \/; }
+    fn &:mul  |a, b| & { @ir/\ <ir-i64-mul><ir-ident name="a"/><ir-ident name="b"/></ir-i64-mul> \/; }
+    fn &:div  |a, b| & { @ir/\ <ir-i64-div-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-div-s> \/; }
+    fn &:rem  |a, b| & { @ir/\ <ir-i64-rem-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-rem-s> \/; }
+    fn &:band |a, b| & { @ir/\ <ir-i64-and><ir-ident name="a"/><ir-ident name="b"/></ir-i64-and> \/; }
+    fn &:bor  |a, b| & { @ir/\ <ir-i64-or><ir-ident name="a"/><ir-ident name="b"/></ir-i64-or> \/; }
+    fn &:bxor |a, b| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-ident name="b"/></ir-i64-xor> \/; }
+    fn &:shl  |a, b| & { @ir/\ <ir-i64-shl><ir-ident name="a"/><ir-ident name="b"/></ir-i64-shl> \/; }
+    fn &:shr  |a, b| & { @ir/\ <ir-i64-shr-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-shr-s> \/; }
+    fn &:ushr |a, b| & { @ir/\ <ir-i64-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-i64-shr-u> \/; }
+    fn &:eq   |a, b| bool { @ir/\ <ir-i64-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i64-eq> \/; }
+    fn &:ne   |a, b| bool { @ir/\ <ir-i64-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i64-ne> \/; }
+    fn &:lt   |a, b| bool { @ir/\ <ir-i64-lt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-lt-s> \/; }
+    fn &:le   |a, b| bool { @ir/\ <ir-i64-le-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-le-s> \/; }
+    fn &:gt   |a, b| bool { @ir/\ <ir-i64-gt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-gt-s> \/; }
+    fn &:ge   |a, b| bool { @ir/\ <ir-i64-ge-s><ir-ident name="a"/><ir-ident name="b"/></ir-i64-ge-s> \/; }
+    // wasm has no i64.neg / i64.not; express them with real ops.
+    //   neg a  = 0 - a
+    //   bnot a = a xor 0xFFFFFFFFFFFFFFFF (-1)
+    fn &:neg  |a| & { @ir/\ <ir-i64-sub><ir-lit kind="int" type="i64" value="0"/><ir-ident name="a"/></ir-i64-sub> \/; }
+    fn &:bnot |a| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-lit kind="int" type="i64" value="-1"/></ir-i64-xor> \/; }
+}

@@ -3,7 +3,7 @@ proto P:
     | get y : f32
     | perimeter() f32
 
-nom[tag] enum Elipse[P]:
+tag enum Elipse[P]:
     | Circle {
         x: f32,
         y: f32,
@@ -16,7 +16,7 @@ nom[tag] enum Elipse[P]:
         r2: f32,
     }
 
-nom[tag] struct Line[P]:
+tag struct Line[P]:
     | x : f32
     | y : f32
     | x2 : f32

@@ -1,5 +1,5 @@
 // escape |String.prototype.concat.call.bind(String.prototype.concat)| _String_prototype_concat(str,str) str;
-let _console_log: fun(str) void = @es\|console.log|/;
+let _console_log: fun(str) void = @es/\console.log\/;
 
 
 fn greeting(name: str) str {

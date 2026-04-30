@@ -8,12 +8,12 @@
 // further resolution.  Unknown names get data-error="unknown-type:Name".
 //
 // Returns the index map so later passes can reuse it without re-querying.
+import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 
-// All built-in type names that require no declaration lookup.
-const PRIMITIVES = new Set([
-  'i32','u32','i64','u64','m32','m64','m128','f32','f64','v128',
-  'bool','str','externref','i31','void',
-]);
+// Only 'void' bypasses declaration lookup.
+// Every named source type, including stdlib scalars and refs, should arrive
+// here as a normal ir-type-ref that resolves through the shared index.
+const PRIMITIVES = new Set(['void']);
 
 /**
  * @param {Document} doc
@@ -30,6 +30,11 @@ export function linkTypeDecls(doc) {
     ':scope > ir-struct, :scope > ir-enum, :scope > ir-proto, :scope > ir-type-def'
   )) {
     index.set(decl.getAttribute('name'), decl);
+    if (decl.localName === 'ir-enum') {
+      for (const variant of decl.querySelectorAll(':scope > ir-variant')) {
+        index.set(variant.getAttribute('name'), variant);
+      }
+    }
   }
 
   // ── 2. Resolve ir-type-ref nodes ──────────────────────────────────────────
@@ -39,15 +44,18 @@ export function linkTypeDecls(doc) {
     const decl = index.get(name);
     if (decl) {
       ref.dataset.declId = decl.id;
+      ref.dataset.declOriginId = decl.dataset.originId ?? decl.id;
+      ref.dataset.declKind = decl.localName;
+      ref.dataset.declName = name;
     } else {
-      ref.dataset.error = `unknown-type:${name}`;
+      stampDiagnostic(ref, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown type '${name}'`, { name });
     }
   }
 
   // ── 3. ir-type-qualified should be gone after hoisting ────────────────────
   // If any remain they indicate a bug in the hoisting pass — flag them.
   for (const q of root.querySelectorAll('ir-type-qualified')) {
-    q.dataset.error = 'unresolved-qualified-type';
+    stampDiagnostic(q, DIAGNOSTIC_KINDS.REWRITE_INVARIANT, 'Unresolved qualified type after hoisting');
   }
 
   return index;

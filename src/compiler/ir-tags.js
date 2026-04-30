@@ -8,12 +8,13 @@ export const T = Object.freeze({
 
   // ── Top-level declarations ────────────────────────────────────────────────
   MODULE:         'ir-module',
-  TYPE_DEF:       'ir-type-def',        // type & = @ir\| wasm descriptor |/
+  TYPE_DEF:       'ir-type-def',        // type & = @ir/\ wasm descriptor \/
   USING:          'ir-using',
   STRUCT:         'ir-struct',
   PROTO:          'ir-proto',
   ENUM:           'ir-enum',
   FN:             'ir-fn',
+  EXTERN_FN:      'ir-extern-fn',
   GLOBAL:         'ir-global',
   EXPORT_LIB:     'ir-export-lib',
   EXPORT_MAIN:    'ir-export-main',
@@ -41,7 +42,6 @@ export const T = Object.freeze({
 
   // ── Types ─────────────────────────────────────────────────────────────────
   TYPE_NULLABLE:  'ir-type-nullable',   // ?T
-  TYPE_SCALAR:    'ir-type-scalar',     // i32, f64, bool, …
   TYPE_REF:       'ir-type-ref',        // TypeIdent
   TYPE_QUALIFIED: 'ir-type-qualified',  // Module.Type or Module[T].Type
   TYPE_INST:      'ir-type-inst',       // Module[T1, T2]
@@ -52,24 +52,25 @@ export const T = Object.freeze({
   // ── Expressions ───────────────────────────────────────────────────────────
   LIT:            'ir-lit',             // int/float/string/bool/null literal
   IDENT:          'ir-ident',           // identifier reference
-  TUPLE:          'ir-tuple',           // .{a, b, c}
   BLOCK:          'ir-block',           // { stmts... }
   PAREN:          'ir-paren',           // (expr)
 
   UNARY:          'ir-unary',           // -expr, not expr, ~expr
   BINARY:         'ir-binary',          // expr op expr
   ASSIGN:         'ir-assign',          // lhs op= rhs
-  PIPE:           'ir-pipe',            // expr -o target
+  PIPE:           'ir-pipe',            // expr |> target
   ELSE:           'ir-else',            // expr \ fallback  (null fallback)
 
   CALL:           'ir-call',            // expr(args)
-  NS_CALL:        'ir-ns-call',         // i32.clz(x), array[T].new(n)
   TYPE_MEMBER:    'ir-type-member',     // TypeIdent.method (static call form)
   MOD_CALL:       'ir-mod-call',        // Module[T].method(args)
   FIELD_ACCESS:   'ir-field-access',    // expr.field
   INDEX:          'ir-index',           // expr[i]
   SLICE:          'ir-slice',           // expr[start, end]
   NULL_REF:       'ir-null-ref',        // Type.null
+  REF_TEST:       'ir-ref-test',        // ref.test expr against a heap subtype
+  REF_CAST:       'ir-ref-cast',        // ref.cast expr to a heap subtype
+  REF_IS_NULL:    'ir-ref-is-null',     // ref.is_null expr
 
   IF:             'ir-if',              // if cond { } else { }
   WHILE:          'ir-while',           // while (cond) { }
@@ -90,7 +91,7 @@ export const T = Object.freeze({
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }
   FIELD_INIT:     'ir-field-init',      // field: expr inside struct init
   ASSERT:         'ir-assert',          // assert cond
-  DSL:            'ir-dsl',             // @name\| body |/
+  DSL:            'ir-dsl',             // @name/\ body \/
 
   ARG_LIST:       'ir-arg-list',
   CAPTURE:        'ir-capture',         // |i| capture in for

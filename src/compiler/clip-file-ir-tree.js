@@ -3,7 +3,10 @@
 // Removes entry-only surfaces from imported files, and prunes non-selected
 // surfaces from the entry file. This pass is purely local to one file IR tree.
 
+import { DIAGNOSTIC_KINDS, compilerError, related } from './diagnostics.js';
+
 const ENTRY_SURFACES = ['ir-export-lib', 'ir-export-main', 'ir-test', 'ir-bench'];
+const ENTRY_SURFACE_SELECTOR = ENTRY_SURFACES.join(', ');
 
 export function clipFileIRTree(doc, { target = 'analysis', isEntryFile, filePath = '', debugAssertions = false }) {
   const root = doc?.body?.firstChild;
@@ -12,14 +15,10 @@ export function clipFileIRTree(doc, { target = 'analysis', isEntryFile, filePath
   if (isEntryFile) assertExportConflicts(root, filePath);
 
   if (!isEntryFile) {
-    for (const sel of ENTRY_SURFACES) {
-      for (const node of [...root.querySelectorAll(sel)]) node.remove();
-    }
+    for (const node of root.querySelectorAll(ENTRY_SURFACE_SELECTOR)) node.remove();
   } else if (target !== 'analysis') {
     const keep = keepSelectorsForTarget(target);
-    for (const sel of ENTRY_SURFACES.filter(sel => !keep.has(sel))) {
-      for (const node of [...root.querySelectorAll(sel)]) node.remove();
-    }
+    for (const node of root.querySelectorAll(ENTRY_SURFACES.filter(sel => !keep.has(sel)).join(', '))) node.remove();
   }
 
   if (debugAssertions) assertClipped(root, { target, isEntryFile, filePath });
@@ -27,17 +26,32 @@ export function clipFileIRTree(doc, { target = 'analysis', isEntryFile, filePath
 }
 
 function assertExportConflicts(root, filePath) {
-  const exportLibs = [...root.querySelectorAll('ir-export-lib')];
-  const exportMains = [...root.querySelectorAll('ir-export-main')];
+  const exportLibs = root.querySelectorAll('ir-export-lib');
+  const exportMains = root.querySelectorAll('ir-export-main');
 
   if (exportLibs.length > 1) {
-    throw new Error(`entry surface (${filePath}): multiple export lib declarations`);
+    throw compilerError(
+      DIAGNOSTIC_KINDS.ENTRY_SURFACE_CONFLICT,
+      `entry surface (${filePath}): multiple export lib declarations`,
+      exportLibs[0],
+      { related: [...exportLibs].slice(1).map(n => related(n, 'conflicting export lib')) },
+    );
   }
   if (exportMains.length > 1) {
-    throw new Error(`entry surface (${filePath}): multiple export main declarations`);
+    throw compilerError(
+      DIAGNOSTIC_KINDS.ENTRY_SURFACE_CONFLICT,
+      `entry surface (${filePath}): multiple export main declarations`,
+      exportMains[0],
+      { related: [...exportMains].slice(1).map(n => related(n, 'conflicting export main')) },
+    );
   }
   if (exportLibs.length && exportMains.length) {
-    throw new Error(`entry surface (${filePath}): export lib and export main are mutually exclusive`);
+    throw compilerError(
+      DIAGNOSTIC_KINDS.ENTRY_SURFACE_CONFLICT,
+      `entry surface (${filePath}): export lib and export main are mutually exclusive`,
+      exportLibs[0],
+      { related: [related(exportMains[0], 'conflicting export main')] },
+    );
   }
 }
 

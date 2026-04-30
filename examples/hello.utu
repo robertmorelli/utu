@@ -1,5 +1,5 @@
-let str_add: fun(str,str) str = @es\|(a,b) => a + b|/;
-let tostr: fun(i32) str = @es\|(a) => a|/;
+let str_add: fun(str,str) str = @es/\(a,b) => a + b\/;
+let tostr: fun(i32) str = @es/\(a) => a\/;
 
 fn greeting(name: str) str {
     str_add("hello ", name);

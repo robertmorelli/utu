@@ -1,0 +1,21 @@
+// std/literal_defaults.utu — default static type for each literal syntax kind
+//
+// The compiler reads <ir-literal-defaults> during type inference to decide
+// what `data-type` to stamp on every literal.  Each <ir-default kind="X"
+// type="Y"/> says: a literal whose parse-kind is X is typed as Y.
+//
+// Changing a default is a stdlib edit, not a compiler edit.  To make int
+// literals default to i64, swap the line below; nothing else needs to move.
+
+mod literal_defaults {
+    type LiteralDefaults = @ir/\
+      <ir-literal-defaults>
+        <ir-default kind="int"          type="i32"/>
+        <ir-default kind="float"        type="f64"/>
+        <ir-default kind="bool"         type="bool"/>
+        <ir-default kind="string"       type="str"/>
+        <ir-default kind="string-multi" type="str"/>
+        <ir-default kind="null"         type="null"/>
+      </ir-literal-defaults>
+    \/
+}

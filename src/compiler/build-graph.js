@@ -8,6 +8,8 @@
 
 import { treeToIR, createIRDocument } from './parse.js';
 import { clipFileIRTree } from './clip-file-ir-tree.js';
+import { stampOriginFile } from './ir-helpers.js';
+import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
 
 /**
  * @param {string} entryPath - absolute path or URL of the entry file
@@ -38,16 +40,19 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
   async function visitSource(filePath, source) {
     const c = color.get(filePath);
     if (c === 'done')   return;
-    if (c === 'active') throw new Error(`Import cycle detected at: ${filePath}`);
+    if (c === 'active') throw compilerError(DIAGNOSTIC_KINDS.IMPORT_CYCLE, `Import cycle detected at: ${filePath}`);
 
     color.set(filePath, 'active');
 
     const tree   = parser.parse(source);
-    const doc    = treeToIR(tree, source, createDocument);
+    const doc    = treeToIR(tree, source, filePath, createDocument);
     // Every ir-source-file needs data-file so cloned nodes can trace back to
     // their origin. This is the one place we know the canonical path.
     const fileRoot = doc.body.firstChild;
-    if (fileRoot) fileRoot.dataset.file = filePath;
+    if (fileRoot) {
+      fileRoot.dataset.file = filePath;
+      stampOriginFile(fileRoot, filePath);
+    }
     clipFileIRTree(doc, {
       target,
       isEntryFile: filePath === entryPath,
@@ -61,14 +66,22 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
     if (root) {
       for (const u of [...root.querySelectorAll('ir-using[from]')]) {
         const raw = u.getAttribute('from');
+        u.dataset.importFromRaw = raw;
         // Platform URIs (e.g. std:array, node:fs) are looked up in the stdlib
         // registry and kept as-is (the URI is the canonical key). Relative and
         // absolute file paths go through resolvePath as before.
         const isPlatformUri = isPlatformImportPath(raw);
         const abs = isPlatformUri ? raw : resolvePath(filePath, raw);
         u.setAttribute('from', abs);
+        u.dataset.importFrom = abs;
+        u.dataset.importKind = isPlatformUri ? 'platform' : 'file';
         if (isPlatformUri) {
-          if (!stdlib.has(abs)) throw new Error(`Unknown platform import: ${abs}`);
+          if (!stdlib.has(abs)) {
+            throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT, `Unknown platform import: ${abs}`, u, {
+              importPath: abs,
+              importKind: 'platform',
+            });
+          }
           await visitSource(abs, stdlib.get(abs));
         } else {
           await visit(abs);

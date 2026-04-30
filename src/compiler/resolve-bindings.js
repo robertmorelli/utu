@@ -7,13 +7,14 @@
 // data-error="unknown-variable:name".
 //
 // Scope chain (outermost to innermost):
-//   global   — ir-fn and ir-global declarations
+//   global   — ir-fn, ir-extern-fn, and ir-global declarations
 //   fn       — ir-self-param, each ir-param
 //   block    — ir-let (added in statement order), ir-capture (for loops)
 //   arm      — ir-alt-arm binding, ir-promote binding
 //
 // data-binding-id values point to:
-//   ir-param, ir-self-param, ir-let, ir-capture, ir-fn, ir-global
+//   ir-param, ir-self-param, ir-let, ir-capture, ir-fn, ir-extern-fn, ir-global
+import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 
 /**
  * @param {Document} doc
@@ -25,7 +26,9 @@ export function resolveBindings(doc) {
   // ── Global scope: top-level fns and globals ───────────────────────────────
   const globalScope = new Map();
   for (const n of root.querySelectorAll(
-    ':scope > ir-fn, :scope > ir-global'
+    ':scope > ir-fn, :scope > ir-extern-fn, :scope > ir-global, ' +
+    ':scope > ir-export-lib > ir-fn, :scope > ir-export-lib > ir-global, ' +
+    ':scope > ir-export-main > ir-fn, :scope > ir-export-main > ir-global'
   )) {
     // fns are keyed by their short method name for simple ident lookups
     // e.g. `ir-fn[name="Foo.bar"]` is NOT in global scope by "Foo.bar" —
@@ -37,7 +40,9 @@ export function resolveBindings(doc) {
   }
 
   // ── Walk each function body ───────────────────────────────────────────────
-  for (const fn of root.querySelectorAll(':scope > ir-fn')) {
+  for (const fn of root.querySelectorAll(
+    ':scope > ir-fn, :scope > ir-export-lib > ir-fn, :scope > ir-export-main > ir-fn'
+  )) {
     const scopes = [globalScope, new Map()]; // fn scope on top of global
     const fnScope = scopes[1];
 
@@ -76,7 +81,7 @@ function walkNode(node, scopes, frame) {
   switch (node.localName) {
     case 'ir-let': {
       // Walk the init expression first (RHS can't see the name being bound)
-      const init = lastChild(node);
+      const init = node.lastElementChild;
       if (init) walkNode(init, scopes, frame);
       frame.set(node.getAttribute('name'), node);
       return;
@@ -84,8 +89,15 @@ function walkNode(node, scopes, frame) {
     case 'ir-ident': {
       const name = node.getAttribute('name');
       const decl = lookup(name, scopes);
-      if (decl) node.dataset.bindingId = decl.id;
-      else      node.dataset.error     = `unknown-variable:${name}`;
+      if (decl) {
+        node.dataset.bindingId = decl.id;
+        node.dataset.bindingOriginId = decl.dataset.originId ?? decl.id;
+        node.dataset.bindingKind = decl.localName;
+        node.dataset.bindingName = decl.getAttribute('name')
+          ?? decl.querySelector?.(':scope > ir-fn-name')?.getAttribute('name')
+          ?? name;
+      }
+      else      stampDiagnostic(node, DIAGNOSTIC_KINDS.UNKNOWN_VARIABLE, `Unknown variable '${name}'`, { name });
       return;
     }
     case 'ir-block':
@@ -117,7 +129,7 @@ function walkNode(node, scopes, frame) {
       if (scrutinee) walkNode(scrutinee, scopes, frame);
       for (const arm of arms) {
         const binding = arm.getAttribute('binding');
-        const armBody = lastChild(arm);
+        const armBody = arm.lastElementChild;
         if (binding && armBody) {
           const armFrame = new Map();
           armFrame.set(binding, arm);
@@ -146,11 +158,21 @@ function walkNode(node, scopes, frame) {
       if (children[2]) walkNode(children[2], scopes, frame); // default arm
       return;
     }
+    case 'ir-type-member': {
+      const typeNode = node.firstElementChild;
+      const args = node.querySelector(':scope > ir-arg-list');
+      if (typeNode) walkNode(typeNode, scopes, frame);
+      if (args) walkNode(args, scopes, frame);
+      return;
+    }
+    case 'ir-mod-call': {
+      const typeArgs = node.querySelector(':scope > ir-type-args');
+      const args = node.querySelector(':scope > ir-arg-list');
+      if (typeArgs) walkNode(typeArgs, scopes, frame);
+      if (args) walkNode(args, scopes, frame);
+      return;
+    }
     default:
       for (const child of node.children) walkNode(child, scopes, frame);
   }
-}
-
-function lastChild(node) {
-  return node.children[node.children.length - 1] ?? null;
 }

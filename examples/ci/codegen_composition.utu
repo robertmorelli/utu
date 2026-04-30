@@ -7,9 +7,9 @@ enum Filter:
     | Active
     | Completed
 
-let wrap: fun(str) str = @es\|(value) => `[${value}]`|/;
-let str_concat: fun(str, str) str = @es\|(a, b) => a + b|/;
-let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
+let wrap: fun(str) str = @es/\(value) => `[${value}]`\/;
+let str_concat: fun(str, str) str = @es/\(a, b) => a + b\/;
+let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 fn new_todo(text: str) Todo {
     Todo { text: text, done: false };

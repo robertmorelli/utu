@@ -1,5 +1,5 @@
-let str_concat: fun(str, str) str = @es\|(a, b) => a + b|/;
-let str_eq: fun(str, str) bool = @es\|(a, b) => a === b ? 1 : 0|/;
+let str_concat: fun(str, str) str = @es/\(a, b) => a + b\/;
+let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 let seed: i32 = 41;
 let banner: str = "ok";

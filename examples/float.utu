@@ -1,4 +1,4 @@
-let _Math_sqrt: fun(f64) f64 = @es\|Math.sqrt|/;
+let _Math_sqrt: fun(f64) f64 = @es/\Math.sqrt\/;
 struct Point:
     | x : f64
     | y : f64

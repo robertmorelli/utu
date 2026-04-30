@@ -46,13 +46,22 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
       // record which file the ranges belong to for source-location resolution.
       const clone = srcModule.cloneNode(true);
       restampSubtree(clone, targetPath);
+      clone.dataset.synthetic = 'true';
+      clone.dataset.rewritePass = 'inline-imports';
+      clone.dataset.rewriteKind = 'imported-module';
+      clone.dataset.rewriteOf = srcModule.dataset.originId ?? srcModule.id ?? '';
+      clone.dataset.importedFrom = targetPath;
+      clone.dataset.importedVia = using.dataset.originId ?? using.id ?? '';
+      clone.dataset.importedModule = moduleName ?? '';
+      clone.dataset.importKind = using.dataset.importKind ?? '';
+      if (using.dataset.importFromRaw) clone.dataset.importFromRaw = using.dataset.importFromRaw;
       using.parentNode.insertBefore(clone, using);
 
       // If the using has an alias or type args, pass 3 needs to see it — just
       // drop the `from` so it looks like a within-file using.
       // If it was a bare `using M from "..."` (no alias, no type args) the
       // module is now in scope by name and the using node is dead.
-      if (using.getAttribute('alias') || using.querySelector('ir-type-args')) using.removeAttribute('from');
+      if (using.getAttribute('alias') || using.querySelector(':scope > ir-type-args')) using.removeAttribute('from');
       else using.remove();
     }
   }

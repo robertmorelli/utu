@@ -2,14 +2,19 @@
 //
 // Rewrites `&{ ... }` into an explicit `ir-struct-init[type="..."]` when the
 // target type is explicitly available in the surrounding IR.
+import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
 
 export function lowerImplicitStructInit(doc, { debugAssertions = false } = {}) {
   const root = doc?.body?.firstChild;
   if (!root) return;
 
   for (const init of [...root.querySelectorAll('ir-struct-init[implicit="true"]')]) {
-    init.setAttribute('type', inferStructType(init));
+    const { type, source } = inferStructType(init);
+    init.setAttribute('type', type);
     init.removeAttribute('implicit');
+    init.dataset.loweredImplicitStructInit = 'true';
+    init.dataset.loweredBy = 'lower-implicit-struct-init';
+    init.dataset.inferredTypeSource = source;
   }
 
   if (debugAssertions && root.querySelector('ir-struct-init[implicit="true"]')) {
@@ -19,15 +24,20 @@ export function lowerImplicitStructInit(doc, { debugAssertions = false } = {}) {
 
 function inferStructType(init) {
   const parent = init.parentNode;
-  if (!parent) throw new Error('lower implicit struct init: missing parent node');
+  if (!parent) throw compilerError(DIAGNOSTIC_KINDS.IMPLICIT_STRUCT_INIT, 'lower implicit struct init: missing parent node', init);
 
   const type =
-    (parent.localName === 'ir-let' || parent.localName === 'ir-global') ? findDeclaredType(parent) :
-    parent.localName === 'ir-return' ? findFnReturnType(findAncestor(parent, 'ir-fn')) :
-    '';
-  if (type) return type;
+    (parent.localName === 'ir-let' || parent.localName === 'ir-global') ? { type: findDeclaredType(parent), source: parent.localName } :
+    parent.localName === 'ir-return' ? { type: findFnReturnType(findAncestor(parent, 'ir-fn')), source: 'ir-return' } :
+    null;
+  if (type?.type) return type;
 
-  throw new Error(`lower implicit struct init: cannot infer target type for implicit struct init under ${parent.localName}`);
+  throw compilerError(
+    DIAGNOSTIC_KINDS.IMPLICIT_STRUCT_INIT,
+    `lower implicit struct init: cannot infer target type for implicit struct init under ${parent.localName}`,
+    init,
+    { parent: parent.localName },
+  );
 }
 
 function findDeclaredType(node) {

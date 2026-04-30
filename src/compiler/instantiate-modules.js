@@ -1,4 +1,5 @@
 import { restampSubtree } from './parse.js';
+import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
 
 // instantiate-modules.js — Pass 3
 //
@@ -41,7 +42,7 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
   for (const using of [...root.querySelectorAll('ir-using')]) {
     const moduleName = using.getAttribute('module');
     const alias      = using.getAttribute('alias');
-    const typeArgsEl = using.querySelector('ir-type-args');
+    const typeArgsEl = using.querySelector(':scope > ir-type-args');
 
     // No module name means the node is malformed — just drop it.
     if (!moduleName) { using.remove(); continue; }
@@ -67,6 +68,14 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     const clone = srcModule.cloneNode(true);
     // Re-stamp ids — cloneNode copies them and they'd collide in the document.
     restampSubtree(clone, originFile);
+    clone.dataset.synthetic = 'true';
+    clone.dataset.rewritePass = 'instantiate-modules';
+    clone.dataset.rewriteKind = typeArgsEl ? 'module-instantiation' : 'module-alias';
+    clone.dataset.rewriteOf = srcModule.dataset.originId ?? srcModule.id ?? '';
+    clone.dataset.instantiatedVia = using.dataset.originId ?? using.id ?? '';
+    clone.dataset.instantiatedFrom = moduleName;
+    clone.dataset.instantiatedFromOriginId = srcModule.dataset.originId ?? srcModule.id ?? '';
+    if (alias) clone.dataset.instantiatedAs = alias;
 
     if (typeArgsEl) {
       const paramNames    = [...clone.querySelectorAll('ir-module-param')]
@@ -100,7 +109,7 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     if (!moduleName) continue;
     const srcMod = findModule(moduleName);
     if (!srcMod?.querySelector('ir-module-params')) continue; // not parameterised
-    const typeArgEls = [...(node.querySelector('ir-type-args')?.children ?? [])];
+    const typeArgEls = [...(node.querySelector(':scope > ir-type-args')?.children ?? [])];
     if (typeArgEls.length === 0) continue; // no type args — not an instantiation
     const mangled = mangleName(moduleName, typeArgEls);
     if (!inlineInsts.has(mangled)) inlineInsts.set(mangled, { moduleName, typeArgEls });
@@ -114,6 +123,14 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     const originFile = srcModule.dataset.originFile ?? root.dataset.file;
     const clone = srcModule.cloneNode(true);
     restampSubtree(clone, originFile);
+    clone.dataset.synthetic = 'true';
+    clone.dataset.rewritePass = 'instantiate-modules';
+    clone.dataset.rewriteKind = 'inline-module-instantiation';
+    clone.dataset.rewriteOf = srcModule.dataset.originId ?? srcModule.id ?? '';
+    clone.dataset.instantiatedFrom = moduleName;
+    clone.dataset.instantiatedFromOriginId = srcModule.dataset.originId ?? srcModule.id ?? '';
+    clone.dataset.instantiatedAs = mangled;
+    clone.dataset.instantiatedAt = nodeOriginId(typeArgEls[0], srcModule);
     const paramNames = [...clone.querySelectorAll('ir-module-param')].map(p => p.getAttribute('name'));
     substituteTypeParams(clone, paramNames, typeArgEls, root.dataset.file);
     clone.querySelector('ir-module-params')?.remove();
@@ -125,16 +142,12 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
   for (const node of [...root.querySelectorAll('ir-type-inst')]) {
     const moduleName = node.getAttribute('module');
     if (!moduleName) continue;
-    const typeArgEls = [...(node.querySelector('ir-type-args')?.children ?? [])];
+    const typeArgEls = [...(node.querySelector(':scope > ir-type-args')?.children ?? [])];
     if (typeArgEls.length === 0) continue;
     const mangled = mangleName(moduleName, typeArgEls);
     if (!findModule(mangled) && !root.querySelector(`ir-struct[name="${mangled}"], ir-enum[name="${mangled}"], ir-type-def[name="${mangled}"]`)) continue;
-    const ref = node.ownerDocument.createElement('ir-type-ref');
-    ref.id = node.id;
+    const ref = replaceNodeMeta(node.ownerDocument.createElement('ir-type-ref'), node, 'instantiate-modules', 'inline-type-inst');
     ref.setAttribute('name', mangled);
-    ref.dataset.start = node.dataset.start ?? '';
-    ref.dataset.end   = node.dataset.end   ?? '';
-    if (node.dataset.originFile) ref.dataset.originFile = node.dataset.originFile;
     node.replaceWith(ref);
   }
 
@@ -142,28 +155,25 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     const moduleName = node.getAttribute('module') ??
                        namedModuleName(node);
     if (!moduleName) continue;
-    const typeArgEls = [...(node.querySelector('ir-type-args')?.children ?? [])];
+    const typeArgEls = [...(node.querySelector(':scope > ir-type-args')?.children ?? [])];
     if (typeArgEls.length === 0) continue;
     const mangled = mangleName(moduleName, typeArgEls);
-    if (!findModule(mangled)) continue;
+    if (!findModule(mangled) && !root.querySelector(`ir-struct[name="${mangled}"], ir-enum[name="${mangled}"], ir-type-def[name="${mangled}"]`)) continue;
     // Rewrite: ir-mod-call → ir-call with ir-type-member callee
     const doc2 = node.ownerDocument;
-    const call   = doc2.createElement('ir-call');
-    const callee = doc2.createElement('ir-type-member');
+    const call   = replaceNodeMeta(doc2.createElement('ir-call'), node, 'instantiate-modules', 'inline-mod-call');
+    const callee = createSyntheticNode(doc2, 'ir-type-member', node, 'instantiate-modules', 'inline-mod-callee');
     const args   = node.querySelector('ir-arg-list');
-    call.id = node.id;
-    call.dataset.start = node.dataset.start ?? '';
-    call.dataset.end   = node.dataset.end   ?? '';
-    if (node.dataset.originFile) call.dataset.originFile = node.dataset.originFile;
     // The method name is the last identifier child of ir-mod-call.
-    const methodName = [...node.children]
-      .reverse()
-      .find(c => c.localName === 'ir-ident' || c.localName === 'ir-fn-name')
-      ?.getAttribute('name');
+    const methodName = [...node.querySelectorAll(':scope > ir-ident, :scope > ir-fn-name')].at(-1)?.getAttribute('name');
     callee.setAttribute('type', mangled);
     callee.setAttribute('method', methodName ?? '');
     call.appendChild(callee);
-    if (args) call.appendChild(args.cloneNode(true));
+    if (args) {
+      const clone = args.cloneNode(true);
+      restampSubtree(clone, args.dataset.originFile);
+      call.appendChild(clone);
+    }
     node.replaceWith(call);
   }
 
@@ -196,6 +206,8 @@ function substituteTypeParams(node, paramNames, concreteTypes, originFile) {
     const clone = concreteTypes[idx].cloneNode(true);
     // Re-stamp: same type arg used in multiple instantiations would collide.
     restampSubtree(clone, originFile);
+    clone.dataset.substitutedTypeParam = paramNames[idx];
+    clone.dataset.substitutedFrom = concreteTypes[idx].dataset.originId ?? concreteTypes[idx].id ?? '';
     ref.replaceWith(clone);
   }
   // ir-type-inst[module="P"] — P used as a module reference (e.g. P[i32])
@@ -204,6 +216,8 @@ function substituteTypeParams(node, paramNames, concreteTypes, originFile) {
     if (idx < 0) continue;
     const clone = concreteTypes[idx].cloneNode(true);
     restampSubtree(clone, originFile);
+    clone.dataset.substitutedTypeParam = paramNames[idx];
+    clone.dataset.substitutedFrom = concreteTypes[idx].dataset.originId ?? concreteTypes[idx].id ?? '';
     inst.replaceWith(clone);
   }
   // ir-dsl[body] inside ir-type-def — the body string may embed type param
@@ -227,13 +241,13 @@ function mangleName(moduleName, typeArgEls) {
 
 // Extract the module name from an ir-mod-call node's first identifier-like child.
 function namedModuleName(node) {
-  return node.querySelector(':scope > ir-ident')?.getAttribute('name') ?? null;
+  const first = node.firstElementChild;
+  return first?.getAttribute('name') ?? first?.getAttribute('raw') ?? null;
 }
 
 // Produce a short text name for a concrete type node (for DSL body substitution).
 function typeNodeToText(node) {
   switch (node.localName) {
-    case 'ir-type-scalar':   return node.getAttribute('kind') ?? 'i32';
     case 'ir-type-ref':      return node.getAttribute('name') ?? 'unknown';
     case 'ir-type-inst': {
       const mod  = node.getAttribute('module') ?? '';
@@ -243,6 +257,14 @@ function typeNodeToText(node) {
     case 'ir-type-void':     return 'void';
     default:                 return node.getAttribute('name') ?? node.localName;
   }
+}
+
+function nodeOriginId(...nodes) {
+  for (const node of nodes) {
+    const id = node?.dataset?.originId ?? node?.id;
+    if (id) return id;
+  }
+  return '';
 }
 
 function assertInstantiateModules(doc) {
