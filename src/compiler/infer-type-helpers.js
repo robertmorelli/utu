@@ -1,6 +1,7 @@
 // infer-type-helpers.js — shared type inference helpers
 
-import { typeNodeToStr, fnReturnType } from './ir-helpers.js';
+import { fnReturnType, fnSignatureType, declaredTypeStr } from './ir-helpers.js';
+import { unwrapNullable } from './type-strings.js';
 export { unifyTypes } from './type-rules.js';
 
 export function collectLiteralDefaults(root) {
@@ -8,8 +9,25 @@ export function collectLiteralDefaults(root) {
   for (const block of root.querySelectorAll('ir-literal-defaults')) {
     for (const entry of block.querySelectorAll(':scope > ir-default')) {
       const kind = entry.getAttribute('kind');
-      const type = entry.getAttribute('type');
+      const type = entry.getAttribute('type-name');
       if (kind && type) map.set(kind, type);
+    }
+  }
+  return map;
+}
+
+/**
+ * kind → set of type names a literal of that kind may adopt from its context.
+ * Declared by std/LiteralDefaults.utu; nominal, so types that merely share a
+ * representation are not interchangeable.
+ */
+export function collectLiteralAdopters(root) {
+  const map = new Map();
+  for (const block of root.querySelectorAll('ir-literal-defaults')) {
+    for (const entry of block.querySelectorAll(':scope > ir-default')) {
+      const kind = entry.getAttribute('kind');
+      const adopts = entry.getAttribute('adopts');
+      if (kind && adopts) map.set(kind, new Set(adopts.split(/\s+/).filter(Boolean)));
     }
   }
   return map;
@@ -22,14 +40,10 @@ export function bindingType(node) {
   switch (node.localName) {
     case 'ir-param':
     case 'ir-let':
-    case 'ir-global': {
-      // First child that is a type node
-      for (const child of node.children) {
-        const t = typeNodeToStr(child);
-        if (t) return t;
-      }
-      return null;
-    }
+    case 'ir-global':
+      // Closure parameters may have no type annotation; inference fills their
+      // type in from the closure's expected type and stamps it directly.
+      return declaredTypeStr(node) ?? node.dataset?.['typeName'] ?? null;
     case 'ir-self-param': {
       // Type is the receiver of the enclosing ir-fn
       const fn = node.closest('ir-fn');
@@ -40,14 +54,21 @@ export function bindingType(node) {
     }
     case 'ir-fn':
     case 'ir-extern-fn':
-      return fnReturnType(node);
+      // A named function in value position is a function pointer.  Direct
+      // calls do not come through here — infer-expr resolves `f(x)` from the
+      // declaration itself — so this is only reached when the name is used as
+      // a value.  The exception is an `@es` value import, which is a value
+      // wearing a zero-arg function as its representation.
+      return node.dataset?.valueAccessor === 'true'
+        ? fnReturnType(node)
+        : fnSignatureType(node);
     case 'ir-capture':
       return captureType(node);
     case 'ir-alt-arm':
       return node.getAttribute('variant') ?? null;
     case 'ir-promote': {
-      const scrutineeType = node.firstElementChild?.dataset.type ?? '';
-      return scrutineeType.startsWith('?') ? scrutineeType.slice(1) : scrutineeType;
+      const scrutineeType = node.firstElementChild?.dataset['typeName'] ?? '';
+      return unwrapNullable(scrutineeType);
     }
     default:
       return null;
@@ -58,7 +79,7 @@ export function bindingType(node) {
 function captureType(node) {
   const forNode = node.closest('ir-for');
   const source = forNode?.querySelector(':scope > ir-for-source');
-  return source?.firstElementChild?.dataset.type
-    ?? source?.lastElementChild?.dataset.type
+  return source?.firstElementChild?.dataset['typeName']
+    ?? source?.lastElementChild?.dataset['typeName']
     ?? null;
 }

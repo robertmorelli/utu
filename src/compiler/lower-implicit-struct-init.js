@@ -1,6 +1,6 @@
 // lower-implicit-struct-init.js — remove implicit struct init sugar
 //
-// Rewrites `&{ ... }` into an explicit `ir-struct-init[type="..."]` when the
+// Rewrites `&{ ... }` into an explicit `ir-struct-init[type-name="..."]` when the
 // target type is explicitly available in the surrounding IR.
 import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
 
@@ -10,7 +10,7 @@ export function lowerImplicitStructInit(doc, { debugAssertions = false } = {}) {
 
   for (const init of [...root.querySelectorAll('ir-struct-init[implicit="true"]')]) {
     const { type, source } = inferStructType(init);
-    init.setAttribute('type', type);
+    init.setAttribute('type-name', type);
     init.removeAttribute('implicit');
     init.dataset.loweredImplicitStructInit = 'true';
     init.dataset.loweredBy = 'lower-implicit-struct-init';
@@ -28,7 +28,7 @@ function inferStructType(init) {
 
   const type =
     (parent.localName === 'ir-let' || parent.localName === 'ir-global') ? { type: findDeclaredType(parent), source: parent.localName } :
-    parent.localName === 'ir-return' ? { type: findFnReturnType(findAncestor(parent, 'ir-fn')), source: 'ir-return' } :
+    parent.localName === 'ir-return' ? { type: findFnReturnType(parent.closest('ir-fn')), source: 'ir-return' } :
     null;
   if (type?.type) return type;
 
@@ -62,11 +62,3 @@ function explicitTypeName(node) {
   return '';
 }
 
-function findAncestor(node, localName) {
-  let cur = node.parentNode;
-  while (cur) {
-    if (cur.localName === localName) return cur;
-    cur = cur.parentNode;
-  }
-  return null;
-}

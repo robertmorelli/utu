@@ -44,11 +44,8 @@ spec.md
 examples/rust_benchmarks/rust_deltablue/target
 examples/rust_benchmarks/rust_deltablue_arena/target
 .emscripten-cache
-web-tree-sitter.wasm
 codex.json
 codex.yml
-bun.lock
-tree-sitter-utu.wasm
 
 .vscode-test-web/
 .tmp

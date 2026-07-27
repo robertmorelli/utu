@@ -121,11 +121,19 @@ export function walkPipeExpr(n, doc, source, dispatch) {
   return node;
 }
 
+// The argument list is wrapped: pipe_target > pipe_args >
+// pipe_args_{with,no}_placeholder > pipe_arg*.  Walking only the target's
+// direct children silently drops every argument, which then shows up as a
+// bogus arity error at the call site rather than as anything pipe-related.
+const PIPE_ARG_WRAPPERS = new Set([
+  'pipe_args', 'pipe_args_with_placeholder', 'pipe_args_no_placeholder',
+]);
+
 export function walkPipeTarget(n, doc, source, dispatch) {
   const tgt = stamp(el('ir-pipe-target', doc), n);
   // Named children of pipe_target (after _pipe_path is transparent):
-  // identifiers/type_idents forming the path, plus pipe_arg/pipe_arg_placeholder nodes
-  for (const child of namedChildren(n)) {
+  // identifiers/type_idents forming the path, plus the wrapped argument list.
+  for (const child of flattenPipeArgs(namedChildren(n))) {
     switch (child.type) {
       case 'identifier':
       case 'type_ident': {
@@ -157,6 +165,16 @@ export function walkPipeTarget(n, doc, source, dispatch) {
   return tgt;
 }
 
+/** Splice the contents of any argument-list wrapper into the sibling stream. */
+function flattenPipeArgs(children) {
+  const out = [];
+  for (const child of children) {
+    if (PIPE_ARG_WRAPPERS.has(child.type)) out.push(...flattenPipeArgs(namedChildren(child)));
+    else out.push(child);
+  }
+  return out;
+}
+
 export function walkCallExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.CALL, doc), n);
   const children = namedChildren(n);
@@ -177,7 +195,10 @@ export function walkTypeMemberExpr(n, doc, source, dispatch) {
   node.setAttribute('raw', text(n));
   const children = namedChildren(n);
   if (children.length > 0) {
-    node.setAttribute('method', text(children[children.length - 1]));
+    const methodNode = children[children.length - 1];
+    node.setAttribute('method', text(methodNode));
+    node.dataset.methodStart = String(methodNode.startIndex);
+    node.dataset.methodEnd = String(methodNode.endIndex);
     for (const child of children.slice(0, -1)) {
       const ir = dispatch(child, doc, source);
       if (ir) node.appendChild(ir);
@@ -186,23 +207,14 @@ export function walkTypeMemberExpr(n, doc, source, dispatch) {
   return node;
 }
 
-export function walkNamespaceCallExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.TYPE_MEMBER, doc), n);
-  const raw = text(n);
-  node.setAttribute('raw', raw);
-  const dot = raw.lastIndexOf('.');
-  if (dot >= 0) {
-    const typeRef = stamp(el(T.TYPE_REF, doc), n);
-    typeRef.setAttribute('name', raw.slice(0, dot));
-    node.setAttribute('method', raw.slice(dot + 1));
-    node.appendChild(typeRef);
-  }
-  return node;
-}
-
 export function walkModCallExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.MOD_CALL, doc), n);
   node.setAttribute('raw', text(n));
+  const methodNode = [...namedChildren(n)].reverse().find(child => child.type === 'identifier' || child.type === 'fn_name');
+  if (methodNode) {
+    node.dataset.methodStart = String(methodNode.startIndex);
+    node.dataset.methodEnd = String(methodNode.endIndex);
+  }
   append(node, walkChildren(n, doc, source, dispatch));
   return node;
 }
@@ -211,7 +223,11 @@ export function walkFieldExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.FIELD_ACCESS, doc), n);
   const children = namedChildren(n);
   if (children[0]) node.appendChild(dispatch(children[0], doc, source));
-  if (children[1]) node.setAttribute('field', text(children[1]));
+  if (children[1]) {
+    node.setAttribute('field', text(children[1]));
+    node.dataset.fieldStart = String(children[1].startIndex);
+    node.dataset.fieldEnd = String(children[1].endIndex);
+  }
   return node;
 }
 
@@ -235,6 +251,6 @@ export function walkSliceExpr(n, doc, source, dispatch) {
 export function walkNullExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.NULL_REF, doc), n);
   const typeN = namedChildren(n)[0];
-  if (typeN) node.setAttribute('type', text(typeN));
+  if (typeN) node.setAttribute('type-name', text(typeN));
   return node;
 }

@@ -1,4 +1,4 @@
-// std/array.utu — Array[T1]
+// std/Array.utu — Array[T1]
 //
 // & maps to a WasmGC mutable array type with element type T1.
 //
@@ -9,48 +9,48 @@
 
 mod Array[T1] {
     // Declare & as a WasmGC mutable array type with element T1.
-    // After instantiation with e.g. T1=i32 this becomes:
-    //   (type $Array__i32 (array (mut i32)))
-    type & = @ir/\ <ir-wasm-array elem="T1" mut="true"/> \/
+    // After instantiation with e.g. T1=I32 this becomes:
+    //   (type $Array__I32 (array (mut I32)))
+    type & = @ir/\ <ir-wasm-array type-repr="wasm-array:elem=T1:mut=true"/> \/
 
     // ── Index operator targets ─────────────────────────────────────────────
     // These are called by the compiler when it lowers a[i], a[s,e], a[i]=v.
 
     // a[i] — read element at index i.
-    fn &.get_index |self| (i: i32) T1 {
+    fn &.get_index |self| (i: I32) T1 {
         @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
     }
 
     // a[i] = v — write element at index i (returns void).
-    fn &.set_index |self| (i: i32, v: T1) void {
+    fn &.set_index |self| (i: I32, v: T1) void {
         @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
     }
 
     // a[s, e] — copy subrange [start, end) into a new array.
-    fn &.get_slice |self| (start: i32, end_: i32) & {
+    fn &.get_slice |self| (start: I32, end_: I32) & {
         @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
     }
 
     // ── Named methods (explicit call syntax) ──────────────────────────────
 
-    // Create a zero-initialised array of n elements.
-    fn &.new(n: i32) & {
-        @ir/\ <ir-array-new><ir-ident name="n"/></ir-array-new> \/;
+    // Create an Array of n elements, initialized with fill.
+    fn &.new(n: I32, fill: T1) & {
+        @ir/\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \/;
     }
 
     // Number of elements.
-    fn &.len |self| () i32 {
+    fn &.len |self| () I32 {
         @ir/\ <ir-array-len><ir-ident name="self"/></ir-array-len> \/;
     }
 
     // Aliases kept for explicit call sites.
-    fn &.get |self| (i: i32) T1 {
+    fn &.get |self| (i: I32) T1 {
         @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
     }
-    fn &.set |self| (i: i32, v: T1) void {
+    fn &.set |self| (i: I32, v: T1) void {
         @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
     }
-    fn &.slice |self| (start: i32, end_: i32) & {
+    fn &.slice |self| (start: I32, end_: I32) & {
         @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
     }
 }

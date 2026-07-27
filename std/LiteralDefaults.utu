@@ -1,0 +1,31 @@
+// std/LiteralDefaults.utu — default static type for each literal syntax kind
+//
+// The compiler reads <ir-literal-defaults> during type inference to decide
+// what `data-type-name` to stamp on every literal.  Each <ir-default kind="X"
+// type-name="Y"/> says: a literal whose parse-kind is X is typed as Y.
+//
+// Changing a default is a stdlib edit, not a compiler edit.  To make int
+// literals default to I64, swap the line below; nothing else needs to move.
+//
+// `adopts` lists the types a literal of that kind may take on when its context
+// declares one — `let x: I64 = 0` types the literal as I64 rather than
+// defaulting to I32 and then failing.  The default only applies when nothing
+// better is known.
+//
+// This list is nominal, not representational: `Bool` is a wasm i32 like `I32`
+// is, but it is not in `adopts` for int, so `takes_bool(1)` is still an error.
+// Sharing a representation must never make two types interchangeable — see
+// TYPES.md.
+
+mod LiteralDefaults {
+    type LiteralDefaults = @ir/\
+      <ir-literal-defaults>
+        <ir-default kind="int" type-name="I32" adopts="I32 U32 I64 U64 M32 M64"/>
+        <ir-default kind="float" type-name="F64" adopts="F32 F64"/>
+        <ir-default kind="bool" type-name="Bool"/>
+        <ir-default kind="string" type-name="Str"/>
+        <ir-default kind="string-multi" type-name="Str"/>
+        <ir-default kind="null" type-name="null"/>
+      </ir-literal-defaults>
+    \/
+}

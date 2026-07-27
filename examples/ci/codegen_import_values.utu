@@ -1,17 +1,17 @@
-let lucky: i32 = @es/\41\/;
-let label: str = @es/\"utu"\/;
-let document: externref = @es/\({})\/;
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let lucky: I32 = @es/\41\/;
+let label: Str = @es/\"utu"\/;
+let document: Externref = @es/\({})\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
-fn score() i32 {
+fn score() I32 {
     lucky + 1;
 }
 
-fn named() bool {
+fn named() Bool {
     str_eq(label, "utu");
 }
 
-fn doc_present() bool {
+fn doc_present() Bool {
     not ref.is_null(document);
 }
 
@@ -23,6 +23,6 @@ test "imported string globals flow into string helpers" {
     assert named();
 }
 
-test "imported externref globals can stay non-null" {
+test "imported Externref globals can stay non-null" {
     assert doc_present();
 }

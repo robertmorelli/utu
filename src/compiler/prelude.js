@@ -1,7 +1,7 @@
 import { treeToIR } from './parse.js';
 
 export function collectPreludeModules({ parser, stdlib, createDocument }) {
-  const preludeSource = stdlib.get('std:prelude');
+  const preludeSource = stdlib.get('std:Prelude');
   if (!preludeSource) return [];
 
   const preludeDoc = treeToIR(parser.parse(preludeSource), preludeSource, createDocument);

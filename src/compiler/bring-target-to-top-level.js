@@ -31,6 +31,7 @@ export function bringTargetToTopLevel(doc, { target = 'analysis', filePath = '',
 
 function rewriteExportMain(node, doc) {
   const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', 'export-main');
+  fn.setAttribute('name', 'main');
   fn.dataset.export = 'main';
 
   const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', 'export-main-name');
@@ -56,7 +57,15 @@ function rewriteExportLib(node) {
 
 function rewriteBlockDecl(node, doc, name, role) {
   const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', role);
+  fn.setAttribute('name', name);
   fn.dataset.role = role;
+  // The whole point of the test/bench targets is that the host can run these,
+  // so they have to reach the wasm exports.  The description stays on the node
+  // for a runner to report against.
+  fn.dataset.export = role;
+  if (node.querySelector(':scope > ir-lit[kind="string"]')) {
+    fn.dataset.description = node.querySelector(':scope > ir-lit[kind="string"]').getAttribute('value') ?? '';
+  }
   if (node.getAttribute('label')) fn.dataset.label = node.getAttribute('label');
 
   const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', `${role}-name`);

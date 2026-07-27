@@ -11,7 +11,7 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sourceFile = path.join(ROOT, '.tmp', 'bundle-smoke.utu');
 const source = `
   export lib {
-    fn answer() i32 { 42; }
+    fn answer() I32 { 42; }
   }
 `;
 

@@ -27,8 +27,48 @@ export function stampDiagnostic(node, kind, message, extra = {}) {
   node.dataset.error = kind;
   node.dataset.errorKind = kind;
   node.dataset.errorMessage = message;
-  if (Object.keys(extra).length) node.dataset.errorData = JSON.stringify(extra);
+  const normalized = normalizeDiagnosticExtra(extra, { kind, message });
+  if (Object.keys(normalized).length) node.dataset.errorData = JSON.stringify(normalized);
   return node;
+}
+
+export function suspect(node, label = '') {
+  stampSuspectedInvolvement(node, label);
+  return { label, ...nodeRef(node) };
+}
+
+export function stampSuspectedInvolvement(node, label = '', extra = {}) {
+  if (!node?.dataset) return node;
+  const current = parseJsonArray(node.dataset.errorSuspects);
+  current.push({ label, ...extra });
+  node.dataset.errorSuspect = 'true';
+  node.dataset.errorSuspects = JSON.stringify(current);
+  return node;
+}
+
+function normalizeDiagnosticExtra(extra, diagnostic) {
+  const out = { ...extra };
+  if (Array.isArray(out.relatedNodes)) {
+    out.related = [...(Array.isArray(out.related) ? out.related : [])];
+    for (const item of out.relatedNodes) {
+      const node = item?.node ?? item;
+      const label = item?.label ?? '';
+      stampSuspectedInvolvement(node, label, { kind: diagnostic.kind, message: diagnostic.message });
+      out.related.push({ label, ...nodeRef(node) });
+    }
+    delete out.relatedNodes;
+  }
+  return out;
+}
+
+function parseJsonArray(text) {
+  if (!text) return [];
+  try {
+    const value = JSON.parse(text);
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
 }
 
 export function compilerError(kind, message, node, extra = {}) {

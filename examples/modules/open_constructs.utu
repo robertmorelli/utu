@@ -15,9 +15,9 @@ mod cell[T] {
     }
 }
 
-using cell[i32];
+using cell[I32];
 
-fn opened_sum(left: Cell, right: Cell) i32 {
+fn opened_sum(left: Cell, right: Cell) I32 {
     left.get() + right.get();
 }
 

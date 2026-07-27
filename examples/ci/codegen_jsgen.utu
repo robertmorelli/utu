@@ -1,6 +1,6 @@
-let str_add: fun(str, str) str = @es/\(a, b) => a + b\/;
+let str_add: fun(Str, Str) Str = @es/\(a, b) => a + b\/;
 
-fn main() str {
-    let prefix: str = "co";
+fn main() Str {
+    let prefix: Str = "co";
     str_add(prefix, "dex");
 }

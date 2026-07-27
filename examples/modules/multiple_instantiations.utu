@@ -15,14 +15,14 @@ mod bucket[T] {
     }
 }
 
-using bucket[i32] |ints|;
-using bucket[bool] |flags|;
+using bucket[I32] |ints|;
+using bucket[Bool] |flags|;
 
-fn read_int(box: ints.Box) i32 {
+fn read_int(box: ints.Box) I32 {
     box.get();
 }
 
-fn read_flag(box: flags.Box) bool {
+fn read_flag(box: flags.Box) Bool {
     box.get();
 }
 
@@ -34,8 +34,8 @@ test "multiple instantiations keep separate qualified types" {
 }
 
 test "inline paths resolve the matching instantiation" {
-    let int_box: bucket[i32].Box = ints.Box.new(4);
-    let flag_box: bucket[bool].Box = flags.Box.new(false);
+    let int_box: bucket[I32].Box = ints.Box.new(4);
+    let flag_box: bucket[Bool].Box = flags.Box.new(false);
     assert int_box.get() == 4;
     assert not flag_box.get();
 }

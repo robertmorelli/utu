@@ -18,22 +18,22 @@ it generalizes to every type.
 
 | utu type-name | type-repr            |
 |---------------|----------------------|
-| `i32`         | wasm `i32`           |
-| `u32`         | wasm `i32`           |
-| `m32`         | wasm `i32`           |
-| `i64`         | wasm `i64`           |
-| `f32`         | wasm `f32`           |
-| `f64`         | wasm `f64`           |
-| `bool`        | wasm `i32`           |
-| `str`         | wasm `stringref`     |
-| `externref`   | wasm `externref`     |
-| `i31`         | wasm `i31`           |
+| `I32`         | wasm `I32`           |
+| `U32`         | wasm `I32`           |
+| `M32`         | wasm `I32`           |
+| `I64`         | wasm `I64`           |
+| `F32`         | wasm `F32`           |
+| `F64`         | wasm `F64`           |
+| `Bool`        | wasm `I32`           |
+| `Str`         | wasm `stringref`     |
+| `Externref`   | wasm `Externref`     |
+| `I31`         | wasm `I31`           |
 | `Point`       | wasm-gc struct Point |
 | `Shape`       | wasm-gc enum Shape   |
 
-`i32`, `u32`, and `m32` are distinct utu types with distinct stdlib /
+`I32`, `U32`, and `M32` are distinct utu types with distinct stdlib /
 operator surfaces, but they share a wasm representation. The same
-pattern applies to any future type that names an `externref`-backed
+pattern applies to any future type that names an `Externref`-backed
 host value: the names are distinct, the representation is shared.
 
 ## Consequences
@@ -41,7 +41,7 @@ host value: the names are distinct, the representation is shared.
 **The typechecker compares by `type-name`.** Code like
 
 ```utu
-let a: u32 = some_i32_value;
+let a: U32 = some_i32_value;
 ```
 
 is rejected even though both sides have the same `type-repr`. Same
@@ -50,7 +50,7 @@ representation.
 
 **Codegen ignores `type-name` for storage and ABI decisions.** It
 resolves the utu type through the registry to its `type-repr` and uses
-that. A wasm parameter, return type, struct field, or array element is
+that. A wasm parameter, return type, struct field, or Array element is
 chosen by representation, not by name.
 
 **The split is uniform.** Every type — scalar, GC-heap, host-ref, or
@@ -61,12 +61,12 @@ for host references, no dual mechanism. One registry, two axes.
 ## What this enables (without committing to it yet)
 
 A future `.d.ts` ingester can emit many distinct utu type-names that
-share an `externref` representation:
+share an `Externref` representation:
 
 - `Document`, `Element`, `Node`, `Response`, … — distinct nominal
-  types, all `externref` underneath.
+  types, all `Externref` underneath.
 - The typechecker prevents accidental cross-assignment between them.
-- Codegen treats them uniformly as `externref` parameters / fields.
+- Codegen treats them uniformly as `Externref` parameters / fields.
 
 The ingester is downstream and not yet committed. The split is
 upstream and worth landing on its own merits — it cleans up the

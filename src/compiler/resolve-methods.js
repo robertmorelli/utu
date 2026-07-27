@@ -5,25 +5,26 @@
 // Resolves method calls and field accesses using types stamped in pass 7.
 //
 //   ir-call { ir-field-access … }  — instance method call
-//     Find ir-fn[name="RecvType.method"], stamp data-fn-id + data-type on call.
+//     Find ir-fn[name="RecvType.method"], stamp data-fn-id + data-type-name on call.
 //   ir-call { ir-type-member … }   — static call TypeName.method
 //     Same resolution via qualified name.
 //   ir-field-access (not in call position)
-//     Look up struct field in typeIndex, stamp data-type.
+//     Look up struct field in typeIndex, stamp data-type-name.
 //
 // Requires passes 5–7 (type linking, binding resolution, type inference).
 //
 // stampFieldAccessTypes(doc, typeIndex) is exported separately so the
 // compiler can run *just* the field-access part before lowerOperators —
 // otherwise `p.x + p.y` lowers to nothing because the operands carry no
-// data-type yet, and the backend later trips on the un-lowered ir-binary.
+// data-type-name yet, and the backend later trips on the un-lowered ir-binary.
 
 import { typeNodeToStr, fnReturnType } from './infer-types.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { unwrapNullable } from './type-strings.js';
 
 /**
  * @param {Document}             doc
- * @param {Map<string, Element>} typeIndex  from linkTypeDecls (pass 5)
+ * @param {Map<string, object>} typeIndex  from linkTypeDecls (pass 5)
  */
 export function resolveMethods(doc, typeIndex) {
   const root = doc.body.firstChild;
@@ -59,7 +60,7 @@ export function resolveMethods(doc, typeIndex) {
 }
 
 /**
- * Stamp `data-type` on every `ir-field-access` node whose receiver has a
+ * Stamp `data-type-name` on every `ir-field-access` node whose receiver has a
  * known type, by looking the field up in the struct field index.
  *
  * Iterates to fixed point so chains like `a.b.c` resolve from the innermost
@@ -70,7 +71,7 @@ export function resolveMethods(doc, typeIndex) {
  * decide which overload (T:add) to dispatch to.
  *
  * @param {Document}             doc
- * @param {Map<string, Element>} typeIndex  from linkTypeDecls
+ * @param {Map<string, object>} typeIndex  from linkTypeDecls
  */
 export function stampFieldAccessTypes(doc, typeIndex) {
   const root = doc.body.firstChild;
@@ -87,13 +88,13 @@ function stampFieldsFromIndex(root, fieldIndex) {
   for (let iter = 0; iter < 8 && changed; iter++) {
     changed = false;
     for (const fa of accesses) {
-      if (fa.dataset.type) continue;
+      if (fa.dataset['typeName']) continue;
       const recv = fa.firstElementChild;
-      if (!recv?.dataset.type) continue;
-      const field = lookupField(recv.dataset.type, fa.getAttribute('field'), fieldIndex);
+      if (!recv?.dataset['typeName']) continue;
+      const field = lookupField(recv.dataset['typeName'], fa.getAttribute('field'), fieldIndex);
       if (field?.type) {
-        fa.dataset.type = field.type;
-        fa.dataset.fieldOwnerType = recv.dataset.type;
+        fa.dataset['typeName'] = field.type;
+        fa.dataset.fieldOwnerName = recv.dataset['typeName'];
         changed = true;
       }
     }
@@ -105,13 +106,13 @@ function stampFieldsFromIndex(root, fieldIndex) {
   // Final pass: anything still un-typed gets a clear error so debugging
   // doesn't hinge on guessing why a downstream pass tripped.
   for (const fa of accesses) {
-    if (fa.dataset.type) continue;
+    if (fa.dataset['typeName']) continue;
     if (isUnknownMethodCallee(fa)) continue;
     const recv = fa.firstElementChild;
-    if (recv?.dataset.type) {
+    if (recv?.dataset['typeName']) {
       stampDiagnostic(fa, DIAGNOSTIC_KINDS.UNKNOWN_FIELD, `Unknown field '${fa.getAttribute('field')}'`, {
         field: fa.getAttribute('field'),
-        receiverType: recv.dataset.type,
+        receiverName: recv.dataset['typeName'],
       });
     }
   }
@@ -142,7 +143,7 @@ function resolveTypeNamespaceCall(call, fieldAccess, fnIndex, typeIndex) {
   recv.dataset.bindingName = fn.getAttribute('name');
   call.dataset.fnId = fn.id;
   call.dataset.fnOriginId = fn.dataset.originId ?? fn.id;
-  call.dataset.type = fnReturnType(fn);
+  call.dataset['typeName'] = fnReturnType(fn);
   call.dataset.resolvedAs = 'static-method';
   call.dataset.resolvedName = fn.getAttribute('name');
   fieldAccess.dataset.fnId = fn.id;
@@ -152,9 +153,9 @@ function resolveTypeNamespaceCall(call, fieldAccess, fnIndex, typeIndex) {
 
 function resolveMethodCall(call, fieldAccess, fnIndex, fieldIndex) {
   const recv = fieldAccess.firstElementChild;
-  if (!recv?.dataset.type) return;
+  if (!recv?.dataset['typeName']) return;
   const methodName = fieldAccess.getAttribute('field');
-  const recvName = receiverTypeName(recv.dataset.type);
+  const recvName = receiverName(recv.dataset['typeName']);
   if (!recvName || !methodName) return;
 
   const fn = resolveQualifiedMethod(fnIndex, recvName, methodName, 'instance');
@@ -163,24 +164,24 @@ function resolveMethodCall(call, fieldAccess, fnIndex, fieldIndex) {
     call.dataset.fnId      = fn.id;
     call.dataset.fnOriginId = fn.dataset.originId ?? fn.id;
     call.dataset.resolvedName = fn.getAttribute('name');
-    call.dataset.type      = fnReturnType(fn);
+    call.dataset['typeName']      = fnReturnType(fn);
     call.dataset.resolvedAs = 'method';
-    fieldAccess.dataset.type = call.dataset.type; // field-access itself gets return type
+    fieldAccess.dataset['typeName'] = call.dataset['typeName']; // field-access itself gets return type
     fieldAccess.dataset.resolvedAs = 'method';
-    fieldAccess.dataset.receiverType = recv.dataset.type;
+    fieldAccess.dataset.receiverName = recv.dataset['typeName'];
   } else {
     // Only callable fields may be used with call syntax; data fields are not methods.
-    const field = lookupField(recv.dataset.type, methodName, fieldIndex);
+    const field = lookupField(recv.dataset['typeName'], methodName, fieldIndex);
     if (field?.callable) {
-      fieldAccess.dataset.type = field.type;
+      fieldAccess.dataset['typeName'] = field.type;
       fieldAccess.dataset.resolvedAs = 'field';
-      fieldAccess.dataset.fieldOwnerType = recv.dataset.type;
+      fieldAccess.dataset.fieldOwnerName = recv.dataset['typeName'];
     }
     else {
       clearDiagnostic(fieldAccess);
       stampDiagnostic(call, DIAGNOSTIC_KINDS.UNKNOWN_METHOD, `Unknown method '${recvName}.${methodName}'`, {
         method: methodName,
-        receiverType: recv.dataset.type,
+        receiverName: recv.dataset['typeName'],
       });
     }
   }
@@ -188,13 +189,13 @@ function resolveMethodCall(call, fieldAccess, fnIndex, fieldIndex) {
 
 function resolveStaticCall(call, typeMember, fnIndex) {
   // ir-type-member carries the type as a child ir-type-ref node (primary) or
-  // a `type` attribute (fallback, used by buildOpCall in lower-operators.js).
+  // a `type-name` attribute (fallback, used by buildOpCall in lower-operators.js).
   // e.g. T.foo  → <ir-type-member method="foo"><ir-type-ref name="T"/></ir-type-member>
   const methodName = typeMember.getAttribute('method');
   const typeNode   = typeMember.firstElementChild;
   const typeName   = typeNode
     ? typeNodeToStr(typeNode)
-    : typeMember.getAttribute('type'); // fallback for operator-lowered calls
+    : (typeMember.getAttribute('type-name') || typeMember.getAttribute('type')); // fallback for rewritten/lowered calls
   if (!typeName || !methodName) return;
 
   const syntax = typeMember.dataset.rewriteKind === 'operator-callee' ? 'operator' : 'static';
@@ -202,7 +203,7 @@ function resolveStaticCall(call, typeMember, fnIndex) {
   if (fn) {
     call.dataset.fnId       = fn.id;
     call.dataset.fnOriginId = fn.dataset.originId ?? fn.id;
-    call.dataset.type       = fnReturnType(fn);
+    call.dataset['typeName']       = fnReturnType(fn);
     call.dataset.resolvedAs = 'static-method';
     call.dataset.resolvedName = fn.getAttribute('name');
     typeMember.dataset.fnId = fn.id;
@@ -210,14 +211,14 @@ function resolveStaticCall(call, typeMember, fnIndex) {
   } else {
     stampDiagnostic(call, DIAGNOSTIC_KINDS.UNKNOWN_METHOD, `Unknown method '${typeName}.${methodName}'`, {
       method: methodName,
-      receiverType: typeName,
+      receiverName: typeName,
     });
   }
 }
 
-function receiverTypeName(typeStr) {
+function receiverName(typeStr) {
   if (!typeStr) return null;
-  return typeStr.startsWith('?') ? typeStr.slice(1) : typeStr;
+  return unwrapNullable(typeStr);
 }
 
 function resolveQualifiedMethod(fnIndex, typeName, methodName, syntax) {
@@ -234,8 +235,11 @@ function functionLookupKeys(fn) {
 
   const dot = /^(.+)\.([^.]+)$/.exec(name);
   if (dot) {
-    const syntax = fn.querySelector(':scope > ir-self-param') ? 'instance' : 'static';
-    return [methodLookupKey(syntax, dot[1], dot[2]), name];
+    const fnName = fn.querySelector(':scope > ir-fn-name');
+    if (fn.querySelector(':scope > ir-self-param') || fnName?.getAttribute('kind') === 'method') {
+      return [methodLookupKey('instance', dot[1], dot[2]), methodLookupKey('static', dot[1], dot[2]), name];
+    }
+    return [methodLookupKey('static', dot[1], dot[2]), name];
   }
 
   const split = name.lastIndexOf('__');
@@ -250,48 +254,23 @@ function methodLookupKey(syntax, typeName, methodName) {
   return `${syntax}:${typeName}.${methodName}`;
 }
 
-function lookupFieldType(typeStr, fieldName, fieldIndex) {
-  return lookupField(typeStr, fieldName, fieldIndex)?.type ?? null;
-}
-
 function lookupField(typeStr, fieldName, fieldIndex) {
   if (!typeStr || !fieldName) return null;
-  const typeName = typeStr.startsWith('?') ? typeStr.slice(1) : typeStr;
+  const typeName = unwrapNullable(typeStr);
   return fieldIndex.get(typeName)?.get(fieldName) ?? null;
 }
 
 function buildFieldIndex(typeIndex) {
-  const index = new Map(); // typeName → Map<fieldName, typeStr>
-  for (const [name, decl] of typeIndex) {
-    if (decl.localName === 'ir-struct' || decl.localName === 'ir-variant') {
-      const fields = new Map();
-      for (const field of decl.querySelectorAll(':scope > ir-field')) {
-        const fieldName  = field.getAttribute('name');
-        const typeChild  = field.firstElementChild;
-        if (fieldName && typeChild) fields.set(fieldName, fieldInfo(typeChild));
-      }
-      index.set(name, fields);
-      continue;
+  const index = new Map();
+  for (const [name, entry] of typeIndex) {
+    if (!entry.fields || entry.kind === 'wasm-gc-enum') continue;
+    const fields = new Map();
+    for (const { name: fname, type } of entry.fields) {
+      if (fname && fname !== '__tag') fields.set(fname, { type, callable: type?.startsWith('fun(') ?? false });
     }
-    if (decl.localName !== 'ir-enum') continue;
-    for (const variant of decl.querySelectorAll(':scope > ir-variant')) {
-      const fields = new Map();
-      for (const field of variant.querySelectorAll(':scope > ir-field')) {
-        const fieldName  = field.getAttribute('name');
-        const typeChild  = field.firstElementChild;
-        if (fieldName && typeChild) fields.set(fieldName, fieldInfo(typeChild));
-      }
-      index.set(variant.getAttribute('name'), fields);
-    }
+    index.set(name, fields);
   }
   return index;
-}
-
-function fieldInfo(typeChild) {
-  return {
-    type: typeNodeToStr(typeChild),
-    callable: typeChild?.localName === 'ir-type-fn',
-  };
 }
 
 function stampDeferredValueTypes(root) {
@@ -301,18 +280,18 @@ function stampDeferredValueTypes(root) {
     changed = false;
 
     for (const node of root.querySelectorAll('ir-else')) {
-      if (node.dataset.type) continue;
-      const lhs = node.firstElementChild?.dataset.type ?? '';
+      if (node.dataset['typeName']) continue;
+      const lhs = node.firstElementChild?.dataset['typeName'] ?? '';
       if (!lhs) continue;
-      node.dataset.type = lhs.startsWith('?') ? lhs.slice(1) : lhs;
+      node.dataset['typeName'] = unwrapNullable(lhs);
       changed = true;
     }
 
     for (const node of root.querySelectorAll('ir-paren')) {
-      if (node.dataset.type) continue;
-      const innerType = node.firstElementChild?.dataset.type;
+      if (node.dataset['typeName']) continue;
+      const innerType = node.firstElementChild?.dataset['typeName'];
       if (!innerType) continue;
-      node.dataset.type = innerType;
+      node.dataset['typeName'] = innerType;
       changed = true;
     }
     exhausted = changed && iter === 7;

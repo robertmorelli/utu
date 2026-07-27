@@ -31,9 +31,32 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.struct_init,
         $.implicit_struct_init,
         $.assign_expr,
+        $.closure_expr,
+        $.await_expr,
         alias('fatal', $.fatal_expr),
         $.dsl_expr,
       ),
+
+    // await p — suspend until the promise settles, then continue with its value.
+    // Binds tighter than any binary operator so `await a + b` is `(await a) + b`,
+    // matching JS.
+    await_expr: ($) => prec.right(13, seq('await', $._expr)),
+
+    // cl(x, y) { ... }         — parameter types come from the expectation
+    // cl(x: I32) I32 { ... }   — annotated when there is no expectation to read
+    //
+    // The leading keyword is what keeps this unambiguous: `|…|` is already the
+    // binder form for self-params, alt/promote arms, and `for` captures, and a
+    // bare `|` is infix bitwise-or.  Captures are implicit, as in JS — scalars
+    // are snapshot by value, GC references share the object.
+    //
+    // No return type means the next token after `)` is `{`, so one token of
+    // lookahead separates "block" from "return type then block".
+    closure_expr: ($) =>
+      seq('cl', '(', optional($.closure_param_list), ')', optional($.return_type), $.block),
+    closure_param_list: ($) =>
+      seq($.closure_param, repeat(seq(',', $.closure_param)), optional(',')),
+    closure_param: ($) => seq($.identifier, optional(seq(':', $._type))),
 
     paren_expr: ($) => seq('(', $._expr, ')'),
 

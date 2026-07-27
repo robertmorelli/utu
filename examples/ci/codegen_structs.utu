@@ -1,22 +1,22 @@
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 struct Vec2:
-    | x : f32
-    | y : f32
+    | x : F32
+    | y : F32
 
 struct Todo:
-    | text : str
-    | done : bool
+    | text : Str
+    | done : Bool
 
 fn make_vec() Vec2 {
     Vec2 { x: 1.0, y: 2.0 };
 }
 
-fn get_x(v: Vec2) f32 {
+fn get_x(v: Vec2) F32 {
     v.x;
 }
 
-fn new_todo(text: str) Todo {
+fn new_todo(text: Str) Todo {
     Todo { text: text, done: false };
 }
 
@@ -24,7 +24,7 @@ fn toggle(todo: Todo) void {
     todo.done = not todo.done;
 }
 
-fn done_text(todo: Todo) str {
+fn done_text(todo: Todo) Str {
     if todo.done { "done"; } else { todo.text; };
 }
 

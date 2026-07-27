@@ -11,24 +11,24 @@ mod boxy[T] {
     }
 }
 
-using boxy[i32] |box_i32|;
+using boxy[I32] |box_i32|;
 
-fn double_inline(value: boxy[i32].Box) i32 {
+fn double_inline(value: boxy[I32].Box) I32 {
     value.get() * 2;
 }
 
 test "inline qualified types work in signatures" {
-    let box: boxy[i32].Box = boxy[i32].Box.new(6);
+    let box: boxy[I32].Box = boxy[I32].Box.new(6);
     assert double_inline(box) == 12;
 }
 
 test "inline qualified associated calls work" {
-    let box: boxy[i32].Box = boxy[i32].Box.new(10);
+    let box: boxy[I32].Box = boxy[I32].Box.new(10);
     assert box.get() == 10;
 }
 
 test "inline qualified associated calls work from values" {
-    let box: boxy[i32].Box = boxy[i32].Box.new(4);
+    let box: boxy[I32].Box = boxy[I32].Box.new(4);
     assert box.get() == 4;
 }
 

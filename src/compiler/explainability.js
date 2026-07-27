@@ -45,12 +45,13 @@ export function pushProfileFact(artifacts, kind, node, extra = {}) {
 export function explainNode(node) {
   return {
     ...nodeRef(node),
-    type: node?.dataset?.type ?? null,
-    typeSource: node?.dataset?.typeSource ?? null,
+    typeName: node?.dataset?.typeName ?? null,
+    typeRepr: node?.dataset?.typeRepr ?? null,
+    inferenceSource: node?.dataset?.inferenceSource ?? null,
     bindingId: node?.dataset?.bindingId ?? null,
     bindingOriginId: node?.dataset?.bindingOriginId ?? null,
-    declId: node?.dataset?.declId ?? null,
-    declOriginId: node?.dataset?.declOriginId ?? null,
+    resolvesToId: node?.dataset?.resolvesToId ?? null,
+    resolvesToOriginId: node?.dataset?.resolvesToOriginId ?? null,
     fnId: node?.dataset?.fnId ?? null,
     fnOriginId: node?.dataset?.fnOriginId ?? null,
   };

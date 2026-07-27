@@ -16,6 +16,15 @@ export function walkWhileExpr(n, doc, source, dispatch) {
     const ir = dispatch(child, doc, source);
     if (ir) node.appendChild(ir);
   }
+  // `while () { … }` is a deliberate grammar form meaning "loop forever".
+  // Synthesise the `true` condition here so every later pass sees an ordinary
+  // conditional loop and needs no special case for the missing operand.
+  if (node.children.length < 2) {
+    const cond = stamp(el(T.LIT, doc), n);
+    cond.setAttribute('kind', 'bool');
+    cond.setAttribute('value', 'true');
+    node.insertBefore(cond, node.firstChild);
+  }
   return node;
 }
 

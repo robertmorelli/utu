@@ -1,19 +1,19 @@
-// std/f32.utu — f32 scalar type module
-// & is a WasmGC f32 value (stack-only, never heap-allocated, never nullable).
+// std/F32.utu — F32 scalar type module
+// & is a WasmGC F32 value (stack-only, never heap-allocated, never nullable).
 
-mod f32 {
-    type & = @ir/\ <ir-wasm-scalar kind="f32"/> \/
+mod F32 {
+    type & = @ir/\ <ir-wasm-scalar type-repr="wasm-f32"/> \/
 
     fn &:add  |a, b| & { @ir/\ <ir-f32-add><ir-ident name="a"/><ir-ident name="b"/></ir-f32-add> \/; }
     fn &:sub  |a, b| & { @ir/\ <ir-f32-sub><ir-ident name="a"/><ir-ident name="b"/></ir-f32-sub> \/; }
     fn &:mul  |a, b| & { @ir/\ <ir-f32-mul><ir-ident name="a"/><ir-ident name="b"/></ir-f32-mul> \/; }
     fn &:div  |a, b| & { @ir/\ <ir-f32-div><ir-ident name="a"/><ir-ident name="b"/></ir-f32-div> \/; }
-    fn &:eq   |a, b| bool { @ir/\ <ir-f32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-f32-eq> \/; }
-    fn &:ne   |a, b| bool { @ir/\ <ir-f32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-f32-ne> \/; }
-    fn &:lt   |a, b| bool { @ir/\ <ir-f32-lt><ir-ident name="a"/><ir-ident name="b"/></ir-f32-lt> \/; }
-    fn &:le   |a, b| bool { @ir/\ <ir-f32-le><ir-ident name="a"/><ir-ident name="b"/></ir-f32-le> \/; }
-    fn &:gt   |a, b| bool { @ir/\ <ir-f32-gt><ir-ident name="a"/><ir-ident name="b"/></ir-f32-gt> \/; }
-    fn &:ge   |a, b| bool { @ir/\ <ir-f32-ge><ir-ident name="a"/><ir-ident name="b"/></ir-f32-ge> \/; }
+    fn &:eq   |a, b| Bool { @ir/\ <ir-f32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-f32-eq> \/; }
+    fn &:ne   |a, b| Bool { @ir/\ <ir-f32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-f32-ne> \/; }
+    fn &:lt   |a, b| Bool { @ir/\ <ir-f32-lt><ir-ident name="a"/><ir-ident name="b"/></ir-f32-lt> \/; }
+    fn &:le   |a, b| Bool { @ir/\ <ir-f32-le><ir-ident name="a"/><ir-ident name="b"/></ir-f32-le> \/; }
+    fn &:gt   |a, b| Bool { @ir/\ <ir-f32-gt><ir-ident name="a"/><ir-ident name="b"/></ir-f32-gt> \/; }
+    fn &:ge   |a, b| Bool { @ir/\ <ir-f32-ge><ir-ident name="a"/><ir-ident name="b"/></ir-f32-ge> \/; }
     fn &:neg  |a| & { @ir/\ <ir-f32-neg><ir-ident name="a"/></ir-f32-neg> \/; }
     fn abs(x: &)  & { @ir/\ <ir-f32-abs><ir-ident name="x"/></ir-f32-abs> \/; }
     fn sqrt(x: &) & { @ir/\ <ir-f32-sqrt><ir-ident name="x"/></ir-f32-sqrt> \/; }

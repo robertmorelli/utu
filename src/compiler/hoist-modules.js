@@ -13,6 +13,7 @@
 // The rest of the compiler can pretend modules never existed.
 
 import { replaceNodeMeta } from './ir-helpers.js';
+import { moduleMemberName } from './module-names.js';
 
 /**
  * @param {Document} doc - linkedom document after passes 1-3
@@ -31,7 +32,7 @@ export function hoistModules(doc, { debugAssertions = false } = {}) {
       [...mod.querySelectorAll(':scope > [name]')]
         .map(d => {
           const n = d.getAttribute('name');
-          return [n, n === '&' ? moduleName : `${moduleName}__${n}`];
+          return [n, moduleMemberName(moduleName, n)];
         })
     );
 

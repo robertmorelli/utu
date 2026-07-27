@@ -1,14 +1,14 @@
-let str_concat: fun(str, str) str = @es/\(a, b) => a + b\/;
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let str_concat: fun(Str, Str) Str = @es/\(a, b) => a + b\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
-let seed: i32 = 41;
-let banner: str = "ok";
+let seed: I32 = 41;
+let banner: Str = "ok";
 
-fn next() i32 {
+fn next() I32 {
     seed + 1;
 }
 
-fn loud() str {
+fn loud() Str {
     str_concat(banner, "!");
 }
 

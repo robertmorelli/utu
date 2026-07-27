@@ -1,21 +1,21 @@
 struct Box:
-    | value : i32
+    | value : I32
 
-fn maybe_box(flag: bool) ?Box {
+fn maybe_box(flag: Bool) ?Box {
     if flag { Box { value: 41 }; } else { Box.null; };
 }
 
-fn or_zero(flag: bool) i32 {
+fn or_zero(flag: Bool) I32 {
     let item: Box = maybe_box(flag) \ Box { value: 0 };
     item.value;
 }
 
-fn force_value(flag: bool) i32 {
+fn force_value(flag: Bool) I32 {
     let item: Box = maybe_box(flag) \ fatal;
     item.value;
 }
 
-fn has_box(flag: bool) bool {
+fn has_box(flag: Bool) Bool {
     not ref.is_null(maybe_box(flag));
 }
 

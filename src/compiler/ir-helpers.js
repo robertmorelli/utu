@@ -16,7 +16,7 @@ import { nextNodeId } from './parse.js';
  * Read the canonical type string off an ir-type-* element.
  * Returns null for any node that isn't a type.
  *
- *   <ir-type-ref name="i32"/>      → "i32"
+ *   <ir-type-ref name="I32"/>      → "I32"
  *   <ir-type-void/>                → "void"
  *   <ir-type-nullable><…/></…>     → "?<inner>"
  */
@@ -25,16 +25,15 @@ export function typeNodeToStr(typeNode) {
   switch (typeNode.localName) {
     case 'ir-type-ref':    return typeNode.getAttribute('name');
     case 'ir-type-void':   return 'void';
-    case 'ir-type-fn': {
+    case 'ir-type-fn':
+    case 'ir-type-cl': {
+      // Parameters are real type nodes — parse-types.js splices the grammar's
+      // `type_list` wrapper away so there is no raw string to re-parse here.
+      const keyword = typeNode.localName === 'ir-type-cl' ? 'cl' : 'fun';
       const children = [...typeNode.children];
       const ret = children[children.length - 1];
-      const rawList = children[0]?.localName === 'ir-unknown' && children[0].getAttribute('ts-type') === 'type_list'
-        ? children[0].getAttribute('raw')
-        : null;
-      const params = rawList
-        ? rawList.split(',').map(part => part.trim()).filter(Boolean)
-        : children.slice(0, -1).map(typeNodeToStr).filter(Boolean);
-      return `fun(${params.join(', ')}) ${typeNodeToStr(ret) ?? 'void'}`;
+      const params = children.slice(0, -1).map(typeNodeToStr).filter(Boolean);
+      return `${keyword}(${params.join(', ')}) ${typeNodeToStr(ret) ?? 'void'}`;
     }
     case 'ir-type-nullable': {
       const inner = typeNodeToStr(typeNode.children[0]);
@@ -44,32 +43,81 @@ export function typeNodeToStr(typeNode) {
   }
 }
 
-/**
- * The first child of `node` whose tag begins with `ir-type-`, or null.
- * Used to read the declared type off ir-param, ir-let, ir-global, etc.
- */
+/** First `ir-type-*` child of `node`, or null. */
 export function firstTypeChild(node) {
-  if (!node) return null;
-  for (const child of node.children) {
+  // Matched by prefix rather than by an explicit list of tags: the list has to
+  // be extended every time a type form is added (it already missed `ir-type-cl`
+  // once), and a second copy in standard-dsls.js had silently diverged to this
+  // rule. Type nodes that `typeNodeToStr` cannot spell still yield null there,
+  // so widening the match does not widen what counts as a declared type.
+  for (const child of node?.children ?? []) {
     if (child.localName?.startsWith('ir-type-')) return child;
   }
   return null;
 }
 
-/**
- * Return type of an ir-fn, as a string.  The return type is the first child
- * that isn't fn-name / self-param / param-list / block.  Defaults to 'void'
- * when no annotation is present.
- */
+/** Declared type string of a binding-bearing node (ir-param, ir-let, ir-global). */
+export function declaredTypeStr(node) {
+  return typeNodeToStr(firstTypeChild(node));
+}
+
+/** Return type of an ir-fn as a string; defaults to 'void' when unannotated. */
 export function fnReturnType(fn) {
-  for (const child of fn.children) {
-    const tag = child.localName;
-    if (tag === 'ir-fn-name' || tag === 'ir-self-param' ||
-        tag === 'ir-param-list' || tag === 'ir-block') continue;
-    const t = typeNodeToStr(child);
-    if (t) return t;
-  }
-  return 'void';
+  return declaredTypeStr(fn) ?? 'void';
+}
+
+/**
+ * The `fun(...) R` type of an ir-fn / ir-extern-fn *used as a value*.
+ *
+ * A named function referenced without call parentheses is a function pointer,
+ * which is the only way to produce a `fun` value — `fun` has no literal form.
+ * Both node kinds share the shape (fn-name, param-list, return type), so one
+ * reader covers them.
+ */
+export function fnSignatureType(fn) {
+  const params = paramsOf(fn)
+    .map(param => declaredTypeStr(param) ?? param.dataset?.['typeName'] ?? 'unknown');
+  return `fun(${params.join(', ')}) ${fnReturnType(fn)}`;
+}
+
+// ── Structural accessors ────────────────────────────────────────────────────
+//
+// The same two `:scope >` selectors appeared a dozen times each. Naming them
+// keeps the IR shape knowledge in one place: if a declaration ever gains a
+// second block or a wrapped parameter list, one edit covers every reader.
+
+/** Declared parameters of an ir-fn, ir-extern-fn, ir-export-main, or ir-closure. */
+export function paramsOf(node) {
+  return [...(node?.querySelectorAll(':scope > ir-param-list > ir-param') ?? [])];
+}
+
+/** The body block of a declaration, or null. */
+export function bodyOf(node) {
+  return node?.querySelector(':scope > ir-block') ?? null;
+}
+
+/** The `|self|` parameter of a method, or null. */
+export function selfParamOf(node) {
+  return node?.querySelector(':scope > ir-self-param') ?? null;
+}
+
+/** Whether `node` is a function declaration — utu's own, or an `@es` import. */
+export function isFunctionDecl(node) {
+  return node?.localName === 'ir-fn' || node?.localName === 'ir-extern-fn';
+}
+
+/**
+ * The function declaration an `ir-call` names directly, or null.
+ *
+ * Only covers a plain `ir-ident` callee: method and static calls are matched by
+ * receiver type in resolve-methods, and calling a `fun`/`cl` value has no
+ * declaration at all.
+ */
+export function directCalleeDecl(call, doc) {
+  const callee = call?.firstElementChild;
+  if (callee?.localName !== 'ir-ident' || !callee.dataset.bindingId) return null;
+  const decl = doc.getElementById(callee.dataset.bindingId);
+  return isFunctionDecl(decl) ? decl : null;
 }
 
 // ── Span / origin propagation ───────────────────────────────────────────────
@@ -139,9 +187,11 @@ export function stampOriginFile(root, originFile) {
   return root;
 }
 
+
+
 export function stampType(node, type, source = '') {
   if (!node || !type) return node;
-  node.dataset.type = type;
-  if (source) node.dataset.typeSource = source;
+  node.dataset['typeName'] = type;
+  if (source) node.dataset['inferenceSource'] = source;
   return node;
 }

@@ -1,11 +1,11 @@
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 enum Shape:
-    | Circle { radius: i32 }
-    | Rect { width: i32, height: i32 }
-    | Triangle { base: i32, height: i32 }
+    | Circle { radius: I32 }
+    | Rect { width: I32, height: I32 }
+    | Triangle { base: I32, height: I32 }
 
-fn area(shape: Shape) i32 {
+fn area(shape: Shape) I32 {
     alt shape {
         Circle |c| => c.radius * c.radius,
         Rect |r| => r.width * r.height,
@@ -14,7 +14,7 @@ fn area(shape: Shape) i32 {
     };
 }
 
-fn describe(shape: Shape) str {
+fn describe(shape: Shape) Str {
     alt shape {
         Circle => "circle",
         Rect => "rect",
@@ -23,7 +23,7 @@ fn describe(shape: Shape) str {
     };
 }
 
-fn tag(kind: i32) str {
+fn tag(kind: I32) Str {
     match kind {
         0 => "zero",
         1 => "one",

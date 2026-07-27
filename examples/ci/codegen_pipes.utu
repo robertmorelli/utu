@@ -1,28 +1,28 @@
-fn inc(x: i32) i32 {
+fn inc(x: I32) I32 {
     x + 1;
 }
 
-fn double(x: i32) i32 {
+fn double(x: I32) I32 {
     x * 2;
 }
 
-fn clamp(val: i32, lo: i32, hi: i32) i32 {
+fn clamp(val: I32, lo: I32, hi: I32) I32 {
     if val < lo { lo; } else if val > hi { hi; } else { val; };
 }
 
-fn affine(scale: i32, value: i32, offset: i32) i32 {
+fn affine(scale: I32, value: I32, offset: I32) I32 {
     value * scale + offset;
 }
 
-fn use_pipe(x: i32) i32 {
+fn use_pipe(x: I32) I32 {
     x -o inc -o double;
 }
 
-fn clamp_unit(x: i32) i32 {
+fn clamp_unit(x: I32) I32 {
     x -o clamp(&, 0, 10);
 }
 
-fn scale_then_offset(x: i32) i32 {
+fn scale_then_offset(x: I32) I32 {
     x -o affine(3, &, 1);
 }
 

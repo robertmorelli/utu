@@ -1,6 +1,8 @@
 import { matchScalarIntrinsic } from './codegen/intrinsics.js';
-
-const BUILTIN_TYPES = new Set(['void', 'null']);
+import { callableParts, INFERRED_PRIMITIVES } from './type-rules.js';
+import { collectScalarKinds } from './link-type-decls.js';
+import { unwrapNullable } from './type-strings.js';
+import { bodyOf } from './ir-helpers.js';
 
 const UNARY_INTRINSICS = new Set([
   'abs', 'ceil', 'clz', 'ctz', 'eqz', 'floor', 'nearest', 'neg', 'not',
@@ -18,7 +20,7 @@ const NULLARY_INTRINSICS = new Set(['const']);
  *
  * @param {Document} doc
  * @param {object} [opts]
- * @param {Map<string, Element>} [opts.typeIndex]
+ * @param {Map<string, object>} [opts.typeIndex]
  * @param {string} [opts.phase]
  * @param {boolean} [opts.requireBindings]
  */
@@ -27,7 +29,7 @@ export function validateIrStructure(doc, opts = {}) {
   if (!root) return;
 
   const { typeIndex = null, phase = 'unknown', requireBindings = false, target = 'normal' } = opts;
-  const scalarKinds = typeIndex ? scalarKindsFromTypeIndex(typeIndex) : null;
+  const scalarKinds = typeIndex ? collectScalarKinds(typeIndex) : null;
   const ctx = { typeIndex, phase, requireBindings, scalarKinds, target };
 
   for (const rule of rulesForPhase(phase, opts)) rule(root, ctx);
@@ -107,7 +109,7 @@ function assertExternFns(root, { phase }) {
     if (paramLists.length !== 1) {
       fail(phase, fn, 'ir-extern-fn must have exactly one ir-param-list child');
     }
-    if (fn.querySelector(':scope > ir-block')) {
+    if (bodyOf(fn)) {
       fail(phase, fn, 'ir-extern-fn must not have an ir-block body');
     }
     const signatureChildren = [...fn.children].filter(child =>
@@ -144,10 +146,10 @@ function assertBindings(root, { phase }) {
 }
 
 function assertTypes(root, { typeIndex, phase }) {
-  for (const node of root.querySelectorAll('[data-type]')) {
-    const type = node.dataset.type;
+  for (const node of root.querySelectorAll('[data-type-name]')) {
+    const type = node.dataset['typeName'];
     if (type && !resolvesType(type, typeIndex)) {
-      fail(phase, node, `data-type "${type}" does not resolve in the type registry`);
+      fail(phase, node, `data-type-name "${type}" does not resolve in the type registry`);
     }
   }
 }
@@ -171,21 +173,17 @@ function assertNoResidualBackendControl(root, { phase, target }) {
 }
 
 function resolvesType(type, typeIndex) {
-  const name = type.startsWith('?') ? type.slice(1) : type;
-  return BUILTIN_TYPES.has(name) || typeIndex.has(name);
+  const name = unwrapNullable(type);
+  // Callable types are structural, not registry entries: `fun(I32) Bool` names
+  // no declaration.  Validate their components instead.
+  const callable = callableParts(name);
+  if (callable) {
+    return [...callable.params, callable.ret]
+      .every(part => part === 'void' || resolvesType(part, typeIndex));
+  }
+  return INFERRED_PRIMITIVES.has(name) || typeIndex.has(name);
 }
 
-function scalarKindsFromTypeIndex(typeIndex) {
-  const kinds = new Set();
-  for (const decl of typeIndex.values()) {
-    const scalar = decl.localName === 'ir-type-def'
-      ? decl.querySelector(':scope > ir-wasm-scalar')
-      : null;
-    const kind = scalar?.getAttribute('kind');
-    if (kind) kinds.add(kind);
-  }
-  return kinds;
-}
 
 function scalarIntrinsicArity(op) {
   if (NULLARY_INTRINSICS.has(op)) return 0;

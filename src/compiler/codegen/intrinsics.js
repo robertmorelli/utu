@@ -16,35 +16,28 @@
 //      Here `<ir-i32-sub>` is the recognised intrinsic, `<ir-lit>` becomes
 //      a constant, and `<ir-ident a>` is substituted with the call arg.
 //
-// The set of recognised intrinsic tag prefixes is NOT hardcoded: we walk
-// every `<ir-wasm-scalar kind="…"/>` declaration in the stdlib at compile
-// time and accept `<ir-{kind}-{op}>` as an intrinsic for any such kind
-// (see codegen/types.js::collectScalarKinds).  Adding a new scalar width
-// is a stdlib change, not a compiler change.
-//
-// The `(kind → binaryen namespace)` mapping is the one legitimate piece of
-// wasm knowledge; it lives in `./types.js::scalarKindToBinaryenNamespace`
-// alongside `scalarKindToBinaryenType`.  This file never invents its own
-// scalar list and never second-guesses the registry.
+// The set of recognised intrinsic tag prefixes is registry-driven: the
+// stdlib declares scalar `kind` and `family`, and codegen accepts
+// `<ir-{kind}-{op}>` for those entries.
 //
 // Reference / i31 / v128 / string ops are not yet supported; they throw.
 
-import { scalarKindToBinaryenNamespace } from './types.js';
+import { binaryen } from './types.js';
 import { emitArrayIntrinsic } from './arrays.js';
 import { emitStringIntrinsic } from './strings.js';
+import { paramsOf } from '../ir-helpers.js';
 
 const SCALAR_TAG_RE = /^ir-([a-z0-9]+)-(.+)$/;
 
 /**
  * If `localName` is a scalar-intrinsic tag whose kind is known to
- * `scalarKinds`, return `{ kind, op, namespace }`.  Otherwise null.
+ * registry, return `{ kind, op, namespace }`. Otherwise null.
  */
-export function matchScalarIntrinsic(localName, scalarKinds) {
+export function matchScalarIntrinsic(localName, scalarRegistry) {
   const match = SCALAR_TAG_RE.exec(localName);
   if (!match) return null;
   const kind = match[1];
-  if (!scalarKinds.has(kind)) return null;
-  const namespace = scalarKindToBinaryenNamespace(kind);
+  const namespace = scalarRegistry?.get(kind) ?? null;
   if (!namespace) return null;
   return { kind, op: match[2].replace(/-/g, '_'), namespace };
 }
@@ -61,8 +54,7 @@ function isRefOp(localName) {
 
 /**
  * @param {Element}      node           any IR element
- * @param {Set<string>}  scalarKinds    kinds declared by the stdlib
- *                                      (see codegen/types.js::collectScalarKinds)
+ * @param {Map<string,string>|Set<string>} scalarRegistry scalar kind registry
  * @returns {boolean}                   true if `node` is one of the primitive
  *                                      wasm op tags (scalar intrinsic registered
  *                                      by the stdlib, or a still-unsupported
@@ -87,7 +79,7 @@ export function isIntrinsicOp(node, scalarKinds) {
  * mapping in scope.
  *
  * @param {Element}     fn
- * @param {Set<string>} scalarKinds
+ * @param {Map<string,string>|Set<string>} scalarKinds
  */
 export function describeIntrinsicWrapper(fn, scalarKinds) {
   const block = fn?.querySelector?.(':scope > ir-block');
@@ -96,7 +88,7 @@ export function describeIntrinsicWrapper(fn, scalarKinds) {
   if (stmts.length !== 1) return null;
   const op = stmts[0];
   if (!isIntrinsicOp(op, scalarKinds)) return null;
-  const params = [...fn.querySelectorAll(':scope > ir-param-list > ir-param')]
+  const params = paramsOf(fn)
     .map((p) => p.getAttribute('name'));
   return { op, params };
 }
@@ -113,6 +105,7 @@ export function describeIntrinsicWrapper(fn, scalarKinds) {
 export function emitScalarIntrinsic(opNode, ctx, emitExpr) {
   const intr = matchScalarIntrinsic(opNode.localName, ctx.scalarKinds);
   if (!intr) return null;
+  if (!intr.namespace) throw new Error(`codegen: scalar kind "${intr.kind}" has no registered binaryen namespace`);
   if (intr.kind === 'v128' && intr.op === 'const') return emitV128Const(opNode, ctx.module);
   const argExprs = [...opNode.children].map((c) => emitExpr(c, ctx));
   const space = ctx.module[intr.namespace];
@@ -146,6 +139,15 @@ export function emitRefIntrinsic(opNode, ctx, emitExpr) {
     case 'ir-ref-ne': {
       const args = [...opNode.children].map((c) => emitExpr(c, ctx));
       return ctx.module.i32.eqz(ctx.module.ref.eq(args[0], args[1]));
+    }
+    // Promise subscription. Both operands are externref regardless of the
+    // promise's element type, so one host import covers every instantiation —
+    // unlike closure calls, which need one per signature.
+    case 'ir-promise-then':
+    case 'ir-promise-catch': {
+      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
+      const field = opNode.localName === 'ir-promise-then' ? 'promise_then' : 'promise_catch';
+      return ctx.module.call(`__utu_${field}`, args, binaryen.none);
     }
     default:
       return null;

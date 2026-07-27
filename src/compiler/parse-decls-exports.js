@@ -24,7 +24,10 @@ export function walkTypeDecl(n, doc, source, dispatch) {
 export function walkGlobalDecl(n, doc, source, dispatch) {
   const node = stamp(el(T.GLOBAL, doc), n);
   const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
+  if (children[0]) {
+    node.setAttribute('name', text(children[0]));
+    stampNameRange(node, children[0]);
+  }
   for (const child of children.slice(1)) {
     const ir = dispatch(child, doc, source);
     if (ir) node.appendChild(ir);
@@ -40,6 +43,8 @@ export function walkExportLibDecl(n, doc, source, dispatch) {
 
 export function walkExportMainDecl(n, doc, source, dispatch) {
   const node = stamp(el(T.EXPORT_MAIN, doc), n);
+  const mainToken = n.children?.find?.(child => child.type === 'main');
+  if (mainToken) stampNameRange(node, mainToken);
   for (const child of namedChildren(n)) {
     switch (child.type) {
       case 'param_list':  node.appendChild(walkParamList(child, doc, source, dispatch)); break;
@@ -62,7 +67,10 @@ export function walkExportMainDecl(n, doc, source, dispatch) {
 export function walkTestDecl(n, doc, source, dispatch) {
   const node = stamp(el(T.TEST, doc), n);
   const children = namedChildren(n);
-  if (children[0]) node.setAttribute('label', text(children[0]).slice(1, -1));
+  if (children[0]) {
+    node.setAttribute('label', text(children[0]).slice(1, -1));
+    stampLabelRange(node, children[0]);
+  }
   if (children[1]) node.appendChild(walkBlock(children[1], doc, source, dispatch));
   return node;
 }
@@ -70,7 +78,10 @@ export function walkTestDecl(n, doc, source, dispatch) {
 export function walkBenchDecl(n, doc, source, dispatch) {
   const node = stamp(el(T.BENCH, doc), n);
   const children = namedChildren(n);
-  if (children[0]) node.setAttribute('label', text(children[0]).slice(1, -1));
+  if (children[0]) {
+    node.setAttribute('label', text(children[0]).slice(1, -1));
+    stampLabelRange(node, children[0]);
+  }
   for (const child of children.slice(1)) {
     const ir = dispatch(child, doc, source);
     if (ir) node.appendChild(ir);
@@ -83,5 +94,15 @@ export function walkMeasure(n, doc, source, dispatch) {
   const blockN = namedChildren(n)[0];
   if (blockN) node.appendChild(walkBlock(blockN, doc, source, dispatch));
   return node;
+}
+
+function stampNameRange(node, syntaxNode) {
+  node.dataset.nameStart = String(syntaxNode.startIndex);
+  node.dataset.nameEnd = String(syntaxNode.endIndex);
+}
+
+function stampLabelRange(node, syntaxNode) {
+  node.dataset.labelStart = String(syntaxNode.startIndex);
+  node.dataset.labelEnd = String(syntaxNode.endIndex);
 }
 

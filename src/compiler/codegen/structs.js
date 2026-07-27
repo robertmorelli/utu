@@ -18,13 +18,13 @@ import { emitExpr } from './expr.js';
 
 /**
  * `T1 { field: expr, ... }` and `&{ field: expr, ... }` (after
- * lower-implicit-struct-init has filled in the type attribute).
+ * lower-implicit-struct-init has filled in the type-name attribute).
  *
  * Re-orders field-init children by declared field index so that source order
  * doesn't have to match wasm slot order.
  */
 export function emitStructInit(node, ctx) {
-  const typeName = node.dataset.type ?? node.getAttribute('type');
+  const typeName = node.dataset['typeName'] ?? node.getAttribute('type-name');
   if (!typeName) throw new Error('codegen: ir-struct-init has no type');
   const info = ctx.structTypes.get(typeName);
   if (!info) throw new Error(`codegen: ir-struct-init type "${typeName}" is not a registered heap type`);
@@ -42,7 +42,7 @@ export function emitStructInit(node, ctx) {
   for (const [fname] of info.fieldIndex) {
     if (fname === '__tag') {
       if (info.tagValue == null) throw new Error(`codegen: synthetic tag missing for ${typeName}`);
-      operands.push(emitTagConst(ctx, info.tagType ?? 'i32', info.tagValue));
+      operands.push(emitTagConst(ctx, info.tagType ?? 'I32', info.tagValue));
       continue;
     }
     const e = provided.get(fname);
@@ -58,20 +58,20 @@ export function emitStructInit(node, ctx) {
 function emitTagConst(ctx, tagType, tagValue) {
   const ns = ctx.scalarNamespaceOf(tagType);
   if (ns === 'i32') return ctx.module.i32.const(tagValue);
-  if (ns === 'i64') return ctx.module.i64.const(tagValue, 0);
+  if (ns === 'i64') return ctx.module.i64.const(BigInt(tagValue));
   throw new Error(`codegen: enum tag type "${tagType}" must be an integer scalar`);
 }
 
 /**
  * `expr.field` — read.
- * Receiver type comes from `data-type` (stamped by stampFieldAccessTypes
+ * Receiver type comes from `data-type-name` (stamped by stampFieldAccessTypes
  * before operator lowering, so binary ops over fields work too).
  */
 export function emitFieldGet(node, ctx) {
   const recv = node.children[0];
   if (!recv) throw new Error('codegen: ir-field-access has no receiver');
-  const recvType = recv.dataset.type;
-  if (!recvType) throw new Error('codegen: ir-field-access receiver has no data-type');
+  const recvType = recv.dataset['typeName'];
+  if (!recvType) throw new Error('codegen: ir-field-access receiver has no data-type-name');
 
   // `?Foo.x` reads from a non-null ref at runtime — null check is the
   // caller's responsibility (promote handles it; here we trust the static
@@ -109,8 +109,8 @@ export function emitFieldSet(assignNode, ctx) {
   if (!lhs || !rhs) throw new Error('codegen: ir-assign field-set missing lhs/rhs');
 
   const recv = lhs.children[0];
-  const recvType = recv?.dataset.type;
-  if (!recvType) throw new Error('codegen: ir-field-access receiver has no data-type');
+  const recvType = recv?.dataset['typeName'];
+  if (!recvType) throw new Error('codegen: ir-field-access receiver has no data-type-name');
 
   const structName = recvType.startsWith('?') ? recvType.slice(1) : recvType;
   const info = ctx.structTypes.get(structName);
@@ -139,8 +139,8 @@ export function emitFieldSet(assignNode, ctx) {
  * (string/array null support arrives when those types are registered too).
  */
 export function emitNullRef(node, ctx) {
-  const typeName = node.getAttribute('type');
-  if (!typeName) throw new Error('codegen: ir-null-ref missing type attribute');
+  const typeName = node.getAttribute('type-name');
+  if (!typeName) throw new Error('codegen: ir-null-ref missing type-name attribute');
   const info = ctx.structTypes.get(typeName);
   if (!info) throw new Error(`codegen: ir-null-ref type "${typeName}" is not a registered struct`);
   return ctx.module.ref.null(info.nullableRefType);

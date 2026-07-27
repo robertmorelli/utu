@@ -78,7 +78,7 @@ export function emitBreak(node, ctx, emitExpr) {
 
 // ── match ───────────────────────────────────────────────────────────────────
 //
-// IR:  <ir-match data-type="T">
+// IR:  <ir-match data-type-name="T">
 //        <scrutinee/>
 //        <ir-match-arm pattern="N1"><body/></ir-match-arm>
 //        ...
@@ -106,14 +106,14 @@ export function emitMatch(node, ctx, emitExpr) {
   const scrut   = node.children[0];
   const arms    = [...node.querySelectorAll(':scope > ir-match-arm')];
   const defArm  = node.querySelector(':scope > ir-default-arm');
-  const retType = ctx.toType(node.dataset.type ?? 'void');
+  const retType = ctx.toType(node.dataset['typeName'] ?? 'void');
 
   if (arms.length === 0) {
     return defArm ? emitExpr(armBody(defArm), ctx) : m.unreachable();
   }
 
   // Sort arms by pattern value; check density.
-  const scrutTypeName = scrut.dataset.type ?? '';
+  const scrutTypeName = scrut.dataset['typeName'] ?? '';
   const ns = ctx.scalarNamespaceOf(scrutTypeName);
   const sorted = arms
     .map(a => ({ arm: a, pat: parseMatchLiteral(a.getAttribute('pattern'), ns) }))
@@ -166,7 +166,7 @@ function emitMatchTable(m, ctx, scrut, sorted, defArm, min, retType, emitExpr) {
 // if/else fallback for sparse patterns.
 function emitMatchChain(m, ctx, scrut, sorted, defArm, retType, emitExpr) {
   // Cache the scrutinee in a local so each comparison reads it without re-running side effects.
-  const scrutTypeName = scrut.dataset.type;
+  const scrutTypeName = scrut.dataset['typeName'];
   if (!scrutTypeName) throw new Error('codegen: match scrutinee has no type');
   const scrutType = ctx.toType(scrutTypeName);
   const slot = ctx.addLocal(scrutTypeName);
@@ -178,7 +178,7 @@ function emitMatchChain(m, ctx, scrut, sorted, defArm, retType, emitExpr) {
     throw new Error(`codegen: match scrutinee type "${scrutTypeName}" is not a scalar match type`);
   }
   const constOf = (n) => {
-    if (ns === 'i64') return m.i64.const(Number(BigInt.asIntN(32, n)), Number(BigInt.asIntN(32, n >> 32n)));
+    if (ns === 'i64') return m.i64.const(n);
     if (ns === 'i32') return m.i32.const(Number(BigInt.asIntN(32, n)));
     return m[ns].const(Number(n));
   };
@@ -216,7 +216,7 @@ function emitMatchChain(m, ctx, scrut, sorted, defArm, retType, emitExpr) {
 
 export function emitAlt(node, ctx, emitExpr) {
   const scrutinee = node.firstElementChild;
-  const scrutType = scrutinee?.dataset.type ?? '';
+  const scrutType = scrutinee?.dataset['typeName'] ?? '';
   throw new Error(
     `codegen: residual ir-alt over <${scrutType}> reached backend — ` +
     `supported rec-alt should have been lowered earlier; remaining cases are bound rec-alt or tag-alt`
@@ -225,7 +225,7 @@ export function emitAlt(node, ctx, emitExpr) {
 
 export function emitPromote(node, ctx, emitExpr) {
   const scrutinee = node.firstElementChild;
-  const scrutType = scrutinee?.dataset.type ?? '';
+  const scrutType = scrutinee?.dataset['typeName'] ?? '';
   throw new Error(
     `codegen: residual ir-promote over <${scrutType}> reached backend — ` +
     'supported promote should have been lowered earlier'
@@ -254,6 +254,30 @@ function parseIntLiteral(s) {
 
 function comparePattern(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// ── assert / fatal ────────────────────────────────────────────────────────────
+
+/**
+ * `assert cond` traps when the condition is false. Bool is represented as i32,
+ * so the test is an i32.eqz on the condition.
+ *
+ * A trap is the right failure mode here: it is observable from the host as a
+ * RuntimeError, needs no runtime support, and cannot be caught and ignored by
+ * the code under test.
+ */
+export function emitAssert(node, ctx, emitExpr) {
+  const cond = node.firstElementChild;
+  if (!cond) throw new Error('codegen: ir-assert has no condition');
+  return ctx.module.if(
+    ctx.module.i32.eqz(emitExpr(cond, ctx)),
+    ctx.module.unreachable(),
+  );
+}
+
+/** `fatal` traps unconditionally. */
+export function emitFatal(node, ctx) {
+  return ctx.module.unreachable();
 }
 
 // For a void-typed match, arms drop their value and fall through to br $result

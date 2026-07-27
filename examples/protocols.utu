@@ -1,49 +1,49 @@
 proto P:
-    | get x : f32
-    | get y : f32
-    | perimeter() f32
+    | get x : F32
+    | get y : F32
+    | perimeter() F32
 
 tag enum Elipse[P]:
     | Circle {
-        x: f32,
-        y: f32,
-        r: f32,
+        x: F32,
+        y: F32,
+        r: F32,
     }
     | Oval {
-        x: f32,
-        y: f32,
-        r: f32,
-        r2: f32,
+        x: F32,
+        y: F32,
+        r: F32,
+        r2: F32,
     }
 
 tag struct Line[P]:
-    | x : f32
-    | y : f32
-    | x2 : f32
-    | y2 : f32
+    | x : F32
+    | y : F32
+    | x2 : F32
+    | y2 : F32
 
-fn P[Circle].perimeter |self| () f32 {
+fn P[Circle].perimeter |self| () F32 {
     2.0 * 3.14 * self.r;
 }
 
-fn P[Oval].perimeter |self| () f32 {
+fn P[Oval].perimeter |self| () F32 {
     3.14 * (self.r + self.r2);
 }
 
-fn P[Line].perimeter |self| () f32 {
+fn P[Line].perimeter |self| () F32 {
     ((self.x2 - self.x)^2.0 + (self.y2 - self.y)^2.0)^0.5;
 }
 
-fn perimeter_sum(l: array[P]) f32 {
-    let s: f32 = 0.0;
+fn perimeter_sum(l: Array[P]) F32 {
+    let s: F32 = 0.0;
     for (0..<l.len) |i| {
         s = s + l[i].perimeter();
     };
     s;
 }
 
-fn main() f32 {
-    let my_ps: array[P] = array.new_default(3);
+fn main() F32 {
+    let my_ps: Array[P] = Array.new_default(3);
     my_ps[0] = Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 };
     my_ps[1] = Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 };
     my_ps[2] = Circle { x: 0.0, y: 0.0, r: 0.0 };

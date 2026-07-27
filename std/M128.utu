@@ -1,13 +1,13 @@
-// std/m128.utu — m128 bitmask type module
-// & is a 128-bit SIMD mask value (same wasm representation as v128).
+// std/M128.utu — M128 bitmask type module
+// & is a 128-bit SIMD mask value (same wasm representation as V128).
 // Used for lane-selection in SIMD operations.
 // Supports bitwise ops; interpreted as four 32-bit lanes of all-zeros/all-ones.
 
-mod m128 {
-    type & = @ir/\ <ir-wasm-scalar kind="m128"/> \/
+mod M128 {
+    type & = @ir/\ <ir-wasm-scalar type-repr="wasm-v128"/> \/
 
-    fn zero() & { @ir/\ <ir-v128-const data-type="m128" bytes="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/; }
-    fn ones() & { @ir/\ <ir-v128-const data-type="m128" bytes="255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255"/> \/; }
+    fn zero() & { @ir/\ <ir-v128-const data-type-name="M128" bytes="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/; }
+    fn ones() & { @ir/\ <ir-v128-const data-type-name="M128" bytes="255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255"/> \/; }
 
     fn &:band |a, b| & { @ir/\ <ir-v128-and><ir-ident name="a"/><ir-ident name="b"/></ir-v128-and> \/; }
     fn &:bor  |a, b| & { @ir/\ <ir-v128-or><ir-ident name="a"/><ir-ident name="b"/></ir-v128-or> \/; }
@@ -21,17 +21,17 @@ mod m128 {
     }
 
     // Select lanes from two vectors using this mask (all-ones = take from a, all-zeros = take from b).
-    fn bitselect(a: m128, b: m128, mask: m128) m128 {
+    fn bitselect(a: M128, b: M128, mask: M128) M128 {
         @ir/\ <ir-v128-bitselect>
             <ir-ident name="a"/>
             <ir-ident name="b"/>
             <ir-ident name="mask"/>
         </ir-v128-bitselect> \/;
     }
-    fn andnot(a: m128, b: m128) m128 {
+    fn andnot(a: M128, b: M128) M128 {
         @ir/\ <ir-v128-andnot><ir-ident name="a"/><ir-ident name="b"/></ir-v128-andnot> \/;
     }
-    fn any_true(a: m128) bool {
+    fn any_true(a: M128) Bool {
         @ir/\ <ir-v128-any-true><ir-ident name="a"/></ir-v128-any-true> \/;
     }
 }

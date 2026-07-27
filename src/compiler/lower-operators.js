@@ -10,11 +10,11 @@
 //   a[i] = v       (where a : T)  →  T.set_index(a, i, v)
 //
 // Logical operators (`and`, `or`, `xor`, `not`) are overloads like every
-// other operator — declared by `std/bool.utu` as `&:and`, `&:or`, `&:xor`,
+// other operator — declared by `std/Bool.utu` as `&:and`, `&:or`, `&:xor`,
 // `&:not`.  The compiler routes them through this pass the same way it
 // routes `+` or `-`; there is no special path for logical operators.
 //
-// Must run AFTER inferTypes (needs data-type on operands).
+// Must run AFTER inferTypes (needs data-type-name on operands).
 // The null fallback and pipe are left untouched.
 //
 // Compound assignment is desugared first:
@@ -24,11 +24,15 @@
 import { restampSubtree } from './parse.js';
 import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { isOperandless } from './type-rules.js';
 
 // Infix operator token → operator function name (colon convention).
 // The function-name half is what the stdlib declares — see e.g.
-// `std/i32.utu` (`&:add`) and `std/bool.utu` (`&:and`).
-const BINARY_OP_FN = {
+// `std/I32.utu` (`&:add`) and `std/Bool.utu` (`&:and`).
+// Exported so infer-expr.js resolves an operator's result type through the same
+// overload this pass will lower it to.  If the two maps drifted, inference and
+// lowering would disagree about which `fn T:op` a token means.
+export const BINARY_OP_FN = {
   '+':   'add',  '-':   'sub',  '*':   'mul',  '/':   'div',  '%':   'rem',
   '&':   'band', '|':   'bor',  '^':   'bxor',
   '<<':  'shl',  '>>':  'shr',  '>>>': 'ushr',
@@ -46,7 +50,7 @@ const COMPOUND_TO_BINARY = {
 };
 
 // Unary operator token → operator function name (colon convention)
-const UNARY_OP_FN = {
+export const UNARY_OP_FN = {
   '-':   'neg',
   '~':   'bnot',
   'not': 'not',
@@ -96,8 +100,8 @@ export function lowerOperators(doc) {
     const [base, idx] = [...lhs.children];
     if (!base) continue;
 
-    const typeName = base.dataset.type ?? lhs.dataset.type;
-    if (!typeName || typeName === 'void' || typeName === 'null') continue;
+    const typeName = base.dataset['typeName'] ?? lhs.dataset['typeName'];
+    if (isOperandless(typeName)) continue;
 
     // Replace the ir-assign with a set_index call
     node.replaceWith(buildMethodCall(
@@ -116,8 +120,8 @@ export function lowerOperators(doc) {
     const [lhs, rhs] = [...node.children];
     if (!lhs || !rhs) continue;
 
-    const typeName = lhs.dataset.type ?? node.dataset.type;
-    if (!typeName || typeName === 'void' || typeName === 'null') {
+    const typeName = lhs.dataset['typeName'] ?? node.dataset['typeName'];
+    if (isOperandless(typeName)) {
       stampUntypedOperator(node, op, lhs);
       continue;
     }
@@ -135,8 +139,8 @@ export function lowerOperators(doc) {
     const operand = node.firstElementChild;
     if (!operand) continue;
 
-    const typeName = operand.dataset.type ?? node.dataset.type;
-    if (!typeName || typeName === 'void' || typeName === 'null') {
+    const typeName = operand.dataset['typeName'] ?? node.dataset['typeName'];
+    if (isOperandless(typeName)) {
       stampUntypedOperator(node, op, operand);
       continue;
     }
@@ -150,8 +154,8 @@ export function lowerOperators(doc) {
     const [base, idx] = [...node.children];
     if (!base) continue;
 
-    const typeName = base.dataset.type ?? node.dataset.type;
-    if (!typeName || typeName === 'void' || typeName === 'null') {
+    const typeName = base.dataset['typeName'] ?? node.dataset['typeName'];
+    if (isOperandless(typeName)) {
       stampUntypedOperator(node, '[]', base);
       continue;
     }
@@ -167,8 +171,8 @@ export function lowerOperators(doc) {
     const [base, start, end_] = [...node.children];
     if (!base) continue;
 
-    const typeName = base.dataset.type ?? node.dataset.type;
-    if (!typeName || typeName === 'void' || typeName === 'null') {
+    const typeName = base.dataset['typeName'] ?? node.dataset['typeName'];
+    if (isOperandless(typeName)) {
       stampUntypedOperator(node, '[,]', base);
       continue;
     }
@@ -184,7 +188,7 @@ export function lowerOperators(doc) {
 
 function stampUntypedOperator(node, op, operand) {
   if (node.dataset.errorKind) return;
-  const actual = operand?.dataset?.type ?? node.dataset.type ?? 'unknown';
+  const actual = operand?.dataset?.typeName ?? node.dataset['typeName'] ?? 'unknown';
   stampDiagnostic(node, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Cannot lower operator '${op}' with operand type ${actual}`, {
     operator: op,
     operandType: actual,
@@ -194,7 +198,7 @@ function stampUntypedOperator(node, op, operand) {
 // ── Builders ──────────────────────────────────────────────────────────────────
 
 // Build a COLON operator call:  T:fnName(arg0, arg1, ...)
-// The callee is ir-type-member with a `type` attribute (fast path — no child
+// The callee is ir-type-member with a `type-name` attribute (fast path — no child
 // type node needed since resolveStaticCall falls back to the attribute).
 // Used for overloadable binary/unary operators (T:add, T:neg, …).
 function buildOpCall(doc, site, typeName, fnName, argNodes) {
@@ -204,11 +208,11 @@ function buildOpCall(doc, site, typeName, fnName, argNodes) {
 
   replaceNodeMeta(call, site, 'lower-operators', 'operator-call');
   call.dataset.operatorName = fnName;
-  call.dataset.operatorReceiverType = typeName;
-  if (site.dataset.type) call.dataset.type = site.dataset.type;
+  call.dataset.operatorReceiverName = typeName;
+  if (site.dataset['typeName']) call.dataset['typeName'] = site.dataset['typeName'];
 
-  // Keep type as a plain attribute — resolveStaticCall's fallback reads it.
-  callee.setAttribute('type',   typeName);
+  // Keep type-name as a plain attribute — resolveStaticCall's fallback reads it.
+  callee.setAttribute('type-name', typeName);
   callee.setAttribute('method', fnName);
 
   // Move args (don't clone) so nested operators captured by an outer
@@ -231,8 +235,8 @@ function buildMethodCall(doc, site, typeName, fnName, argNodes) {
 
   replaceNodeMeta(call, site, 'lower-operators', 'method-call');
   call.dataset.operatorName = fnName;
-  call.dataset.operatorReceiverType = typeName;
-  if (site.dataset.type) call.dataset.type = site.dataset.type;
+  call.dataset.operatorReceiverName = typeName;
+  if (site.dataset['typeName']) call.dataset['typeName'] = site.dataset['typeName'];
 
   typeRef.setAttribute('name', typeName);
   callee.setAttribute('method', fnName);

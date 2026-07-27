@@ -1,4 +1,3 @@
-import { binaryen } from './types.js';
 
 export function emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr) {
   switch (opNode.localName) {
@@ -11,9 +10,10 @@ export function emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr) {
   }
 }
 
-function emitArrayNew([lenNode], ctx, emitExpr) {
+function emitArrayNew([lenNode, fillNode], ctx, emitExpr) {
   if (!lenNode) throw new Error('codegen: ir-array-new missing length');
   const info = arrayInfoFromCall(ctx);
+  if (fillNode) return ctx.module.array.new(info.heapType, emitExpr(fillNode, ctx), emitExpr(lenNode, ctx));
   return ctx.module.array.new_default(info.heapType, emitExpr(lenNode, ctx));
 }
 
@@ -46,9 +46,9 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
   if (!selfNode || !startNode || !endNode) throw new Error('codegen: ir-array-slice missing self/start/end');
   const m = ctx.module;
   const info = arrayInfoFromNode(selfNode, ctx);
-  const selfSlot = ctx.addLocal(selfNode.dataset.type ?? '');
-  const startTypeName = startNode.dataset.type ?? 'i32';
-  const endTypeName = endNode.dataset.type ?? 'i32';
+  const selfSlot = ctx.addLocal(selfNode.dataset['typeName'] ?? '');
+  const startTypeName = startNode.dataset['typeName'] ?? 'I32';
+  const endTypeName = endNode.dataset['typeName'] ?? 'I32';
   const lenTypeName = startTypeName;
   const startType = ctx.toType(startTypeName);
   const endType = ctx.toType(endTypeName);
@@ -61,7 +61,7 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
   const startSlot = ctx.addLocal(startTypeName);
   const endSlot = ctx.addLocal(endTypeName);
   const lenSlot = ctx.addLocal(lenTypeName);
-  const outSlot = ctx.addLocal(selfNode.dataset.type ?? '');
+  const outSlot = ctx.addLocal(selfNode.dataset['typeName'] ?? '');
 
   return m.block(
     null,
@@ -85,7 +85,7 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
 }
 
 function zeroConst(m, namespace) {
-  return namespace === 'i64' ? m.i64.const(0, 0) : m[namespace].const(0);
+  return namespace === 'i64' ? m.i64.const(0n) : m[namespace].const(0);
 }
 
 function castArrayRef(node, ctx, emitExpr) {
@@ -96,12 +96,12 @@ function castArrayRef(node, ctx, emitExpr) {
 function arrayInfoFromCall(ctx) {
   const call = ctx.currentCall;
   const callee = call?.firstElementChild;
-  const t = call?.dataset.type ?? callee?.dataset.type ?? '';
+  const t = call?.dataset['typeName'] ?? callee?.dataset['typeName'] ?? '';
   return arrayInfoFromType(t, ctx);
 }
 
 function arrayInfoFromNode(node, ctx) {
-  return arrayInfoFromType(node.dataset.type ?? '', ctx);
+  return arrayInfoFromType(node.dataset['typeName'] ?? '', ctx);
 }
 
 function arrayInfoFromType(typeName, ctx) {

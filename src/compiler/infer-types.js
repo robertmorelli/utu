@@ -2,12 +2,13 @@
 
 import { collectLiteralDefaults } from './infer-type-helpers.js';
 import { inferBlock, inferExpr } from './infer-expr.js';
+import { forEachCodeBody } from './code-surfaces.js';
 
 export { typeNodeToStr, fnReturnType } from './ir-helpers.js';
 
 /**
  * @param {Document}          doc
- * @param {Map<string, Element>} typeIndex  from linkTypeDecls (pass 5)
+ * @param {Map<string, object>} typeIndex  from linkTypeDecls (pass 5)
  */
 export function inferTypes(doc, typeIndex) {
   const root = doc.body.firstChild;
@@ -19,12 +20,9 @@ export function inferTypes(doc, typeIndex) {
   }
 
   const literalDefaults = collectLiteralDefaults(root);
-  const env = { doc, fnIndex, literalDefaults };
+  const env = { doc, fnIndex, literalDefaults, typeIndex };
 
-  for (const fn of root.querySelectorAll('ir-fn')) {
-    const body = fn.querySelector(':scope > ir-block');
-    if (body) inferBlock(body, env);
-  }
+  forEachCodeBody(root, (body) => inferBlock(body, env));
 
   for (const g of root.querySelectorAll('ir-global')) {
     const init = g.lastElementChild;

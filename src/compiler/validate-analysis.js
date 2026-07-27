@@ -1,7 +1,8 @@
-import { typeNodeToStr, fnReturnType } from './ir-helpers.js';
+import { bodyOf, declaredTypeStr, firstTypeChild, fnReturnType, isFunctionDecl, paramsOf, typeNodeToStr } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { validateExpressionAssumptions } from './validate-expression-assumptions.js';
 import { isAssignable } from './type-rules.js';
+import { typeEntryDecl } from './link-type-decls.js';
 
 export function validateAnalysis(doc, typeIndex) {
   const root = doc.body.firstChild;
@@ -31,7 +32,8 @@ function buildFnIndex(root) {
 
 function buildFieldIndex(typeIndex) {
   const map = new Map();
-  for (const [name, decl] of typeIndex) {
+  for (const [name, entry] of typeIndex) {
+    const decl = typeEntryDecl(entry);
     if (decl.localName !== 'ir-struct' && decl.localName !== 'ir-variant') continue;
     const fields = new Map();
     for (const field of decl.querySelectorAll(':scope > ir-field')) {
@@ -48,25 +50,31 @@ function validateCalls(root, fnIndex, ctx) {
   for (const call of root.querySelectorAll('ir-call')) {
     const fn = resolvedFn(call, fnIndex);
     if (!fn) continue;
-    const expected = [...fn.querySelectorAll(':scope > ir-param-list > ir-param')];
+    const expected = paramsOf(fn);
     const actual = [...call.querySelectorAll(':scope > ir-arg-list > *')];
-    if (expected.length !== actual.length) {
+    const methodAsStatic = call.dataset.resolvedAs === 'static-method'
+      && fn.querySelector(':scope > ir-fn-name')?.getAttribute('kind') === 'method'
+      && actual.length === expected.length + 1;
+    if (!methodAsStatic && expected.length !== actual.length) {
       stampDiagnostic(call, DIAGNOSTIC_KINDS.WRONG_ARITY, `Wrong arity: expected ${expected.length}, got ${actual.length}`, {
         expected: expected.length,
         actual: actual.length,
         function: fn.getAttribute('name'),
+        relatedNodes: [{ node: fn, label: `function '${fn.getAttribute('name')}' is declared here` }],
       });
       continue;
     }
+    const actualOffset = methodAsStatic ? 1 : 0;
     for (let i = 0; i < expected.length; i++) {
       const expectedType = typeNodeToStr(expected[i].firstElementChild);
-      const actualType = actual[i]?.dataset.type;
+      const actualType = actual[i + actualOffset]?.dataset['typeName'];
       if (expectedType && actualType && !isAssignable(actualType, expectedType, ctx)) {
-        stampDiagnostic(actual[i], DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expectedType}, got ${actualType}`, {
+        stampDiagnostic(actual[i + actualOffset], DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expectedType}, got ${actualType}`, {
           expected: expectedType,
           actual: actualType,
           function: fn.getAttribute('name'),
           argument: i,
+          relatedNodes: [{ node: expected[i], label: `parameter ${i + 1} expects ${expectedType}` }],
         });
       }
     }
@@ -78,7 +86,7 @@ function resolvedFn(call, fnIndex) {
   const callee = call.firstElementChild;
   if (callee?.localName === 'ir-ident' && callee.dataset.bindingId) {
     const bound = call.ownerDocument.getElementById(callee.dataset.bindingId);
-    return bound?.localName === 'ir-fn' || bound?.localName === 'ir-extern-fn' ? bound : null;
+    return isFunctionDecl(bound) ? bound : null;
   }
   if (call.dataset.resolvedName) return fnIndex.get(call.dataset.resolvedName) ?? null;
   return null;
@@ -94,19 +102,22 @@ function validateAssignments(root, ctx) {
     }
     if (lhs.localName === 'ir-ident') {
       const decl = lhs.dataset.bindingId ? root.ownerDocument.getElementById(lhs.dataset.bindingId) : null;
-      if (decl?.localName === 'ir-global' || decl?.localName === 'ir-fn' || decl?.localName === 'ir-extern-fn') {
+      if (decl?.localName === 'ir-global' || isFunctionDecl(decl)) {
         stampDiagnostic(lhs, DIAGNOSTIC_KINDS.ASSIGNMENT_TO_IMMUTABLE, `Cannot assign to immutable '${lhs.getAttribute('name')}'`, {
           name: lhs.getAttribute('name'),
           bindingKind: decl.localName,
+          relatedNodes: [{ node: decl, label: `'${lhs.getAttribute('name')}' is declared immutable here` }],
         });
       }
     }
-    const lhsType = lhs.dataset.type;
-    const rhsType = rhs.dataset.type;
+    const lhsType = lhs.dataset['typeName'];
+    const rhsType = rhs.dataset['typeName'];
     if (lhsType && rhsType && !isAssignable(rhsType, lhsType, ctx)) {
+      const decl = lhs.localName === 'ir-ident' && lhs.dataset.bindingId ? root.ownerDocument.getElementById(lhs.dataset.bindingId) : null;
       stampDiagnostic(rhs, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${lhsType}, got ${rhsType}`, {
         expected: lhsType,
         actual: rhsType,
+        relatedNodes: decl ? [{ node: decl, label: `assignment target is typed ${lhsType}` }] : [{ node: lhs, label: `assignment target is typed ${lhsType}` }],
       });
     }
   }
@@ -122,14 +133,15 @@ function validateResidualEsDsls(root) {
 
 function validateDeclaredTypes(root, ctx) {
   for (const node of root.querySelectorAll('ir-let, ir-global')) {
-    const expected = declaredType(node);
+    const expected = declaredTypeStr(node);
     const init = node.lastElementChild;
-    const actual = init?.dataset.type;
+    const actual = init?.dataset['typeName'];
     if (expected && actual && !isAssignable(actual, expected, ctx)) {
       stampDiagnostic(init, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expected}, got ${actual}`, {
         expected,
         actual,
         binding: node.getAttribute('name'),
+        relatedNodes: [{ node: firstTypeChild(node) ?? node, label: `declared type is ${expected}` }],
       });
     }
   }
@@ -137,7 +149,7 @@ function validateDeclaredTypes(root, ctx) {
 
 function validateStructInits(root, fieldIndex, ctx) {
   for (const init of root.querySelectorAll('ir-struct-init')) {
-    const typeName = init.getAttribute('type');
+    const typeName = init.getAttribute('type-name');
     const fields = fieldIndex.get(typeName);
     if (!fields) continue;
     const seen = new Set();
@@ -150,13 +162,14 @@ function validateStructInits(root, fieldIndex, ctx) {
       seen.add(name);
       const field = fields.get(name);
       if (!field) continue;
-      const actual = fieldInit.lastElementChild?.dataset.type;
+      const actual = fieldInit.lastElementChild?.dataset['typeName'];
       if (field.type && actual && !isAssignable(actual, field.type, ctx)) {
         stampDiagnostic(fieldInit.lastElementChild, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${field.type}, got ${actual}`, {
           expected: field.type,
           actual,
           field: name,
           type: typeName,
+          relatedNodes: [{ node: field.node, label: `field '${name}' is declared as ${field.type}` }],
         });
       }
     }
@@ -171,11 +184,11 @@ function validateStructInits(root, fieldIndex, ctx) {
 
 function validateNullableAccess(root) {
   for (const access of root.querySelectorAll('ir-field-access')) {
-    const recvType = access.firstElementChild?.dataset.type;
+    const recvType = access.firstElementChild?.dataset['typeName'];
     if (!recvType?.startsWith('?')) continue;
     stampDiagnostic(access, DIAGNOSTIC_KINDS.NULLABLE_ACCESS, `Cannot access field '${access.getAttribute('field')}' on nullable ${recvType}`, {
       field: access.getAttribute('field'),
-      receiverType: recvType,
+      receiverName: recvType,
     });
   }
 }
@@ -187,7 +200,7 @@ function validateExhaustiveAltsAndMatches(root, ctx) {
 
 function validateAltExhaustive(alt, ctx) {
   if (hasDefaultArm(alt)) return;
-  const scrutineeType = alt.firstElementChild?.dataset.type;
+  const scrutineeType = alt.firstElementChild?.dataset['typeName'];
   const variants = enumVariants(scrutineeType, ctx.typeIndex);
   if (!variants) return;
 
@@ -209,16 +222,16 @@ function validateAltExhaustive(alt, ctx) {
 
 function validateMatchExhaustive(match, ctx) {
   if (hasDefaultArm(match)) return;
-  const scrutineeType = match.firstElementChild?.dataset.type;
-  if (scrutineeType === 'bool') {
+  const scrutineeType = match.firstElementChild?.dataset['typeName'];
+  if (scrutineeType === 'Bool') {
     const patterns = new Set([...match.querySelectorAll(':scope > ir-match-arm')].map(arm => arm.getAttribute('pattern')));
     const missing = ['true', 'false'].filter(value => !patterns.has(value));
     if (missing.length) {
       stampDiagnostic(
         match,
         DIAGNOSTIC_KINDS.NON_EXHAUSTIVE_MATCH,
-        `Missing bool case '${missing[0]}' in match`,
-        { type: 'bool', missing }
+        `Missing Bool case '${missing[0]}' in match`,
+        { type: 'Bool', missing }
       );
     }
     return;
@@ -252,7 +265,7 @@ function hasDefaultArm(node) {
 }
 
 function enumVariants(typeName, typeIndex) {
-  const decl = typeName ? typeIndex.get(typeName) : null;
+  const decl = typeEntryDecl(typeName ? typeIndex.get(typeName) : null);
   if (decl?.localName !== 'ir-enum') return null;
   return [...decl.querySelectorAll(':scope > ir-variant')]
     .map(variant => variant.getAttribute('name'))
@@ -262,13 +275,14 @@ function enumVariants(typeName, typeIndex) {
 function validateReturnTypes(root, ctx) {
   for (const fn of root.querySelectorAll('ir-fn')) {
     const expected = fnReturnType(fn);
-    const body = fn.querySelector(':scope > ir-block');
+    const body = bodyOf(fn);
     const actual = returnBodyType(body);
     if (expected && expected !== 'void' && actual && !isAssignable(actual, expected, ctx)) {
       stampDiagnostic(body.lastElementChild ?? body, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expected}, got ${actual}`, {
         expected,
         actual,
         function: fn.getAttribute('name'),
+        relatedNodes: [{ node: firstTypeChild(fn) ?? fn, label: `function return type is ${expected}` }],
       });
     }
   }
@@ -276,12 +290,13 @@ function validateReturnTypes(root, ctx) {
 
 function returnBodyType(body) {
   const last = body?.lastElementChild;
-  if (last?.localName === 'ir-return') return last.firstElementChild?.dataset.type ?? 'void';
-  return body?.dataset.type;
+  if (last?.localName === 'ir-return') return last.firstElementChild?.dataset['typeName'] ?? 'void';
+  return body?.dataset['typeName'];
 }
 
 function validateRecursiveStructs(typeIndex) {
-  for (const [name, decl] of typeIndex) {
+  for (const [name, entry] of typeIndex) {
+    const decl = typeEntryDecl(entry);
     if (decl.localName !== 'ir-struct') continue;
     const visiting = new Set();
     if (reachesStruct(name, name, typeIndex, visiting)) {
@@ -293,7 +308,7 @@ function validateRecursiveStructs(typeIndex) {
 function reachesStruct(target, current, typeIndex, visiting) {
   if (visiting.has(current)) return false;
   visiting.add(current);
-  const decl = typeIndex.get(current);
+  const decl = typeEntryDecl(typeIndex.get(current));
   if (decl?.localName !== 'ir-struct') return false;
   for (const field of decl.querySelectorAll(':scope > ir-field')) {
     const t = typeNodeToStr(field.firstElementChild);
@@ -304,10 +319,3 @@ function reachesStruct(target, current, typeIndex, visiting) {
   return false;
 }
 
-function declaredType(node) {
-  for (const child of node.children) {
-    const t = typeNodeToStr(child);
-    if (t) return t;
-  }
-  return null;
-}

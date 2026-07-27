@@ -111,15 +111,15 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // Import path: either a quoted string or a platform:module URI token.
     // platform_path is a single atomic token (no internal whitespace) so it
     // cannot be confused with the ':' used in type annotations.
-    // Examples: std:array, node:fs, browser:dom, vscode_dev:workspace
+    // Examples: std:Array, node:fs, browser:dom, vscode_dev:workspace
     _from_path: ($) => choice($.string_lit, $.platform_path),
-    platform_path: (_) => /[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*/,
+    platform_path: (_) => /[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*/,
 
     // Operator overload: fn TypeIdent:opName |a, b| ReturnType { ... }
     // Unary:  fn TypeIdent:neg |a|    ReturnType { ... }
     // Binary: fn TypeIdent:add |a, b| ReturnType { ... }
     op_decl: ($) =>
-      seq('fn', $.type_ident, ':', $.identifier, $.capture, $.return_type, $.block),
+      seq('fn', choice($.type_ident, $.promoted_type), ':', $.identifier, $.capture, $.return_type, $.block),
 
     // Wasm-native type binding: type (TypeIdent | &) = @dsl/\ ... \/
     // Used to declare that the promoted type maps to a wasm intrinsic

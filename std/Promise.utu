@@ -1,0 +1,35 @@
+// std/Promise.utu — Promise[T]
+//
+// & maps to WebAssembly externref, so a `Promise[T]` IS a real JavaScript
+// promise. Nothing is wrapped, boxed, or marshalled: a promise obtained from
+// `fetch` is the same object utu passes back to JS, and a promise utu produces
+// is directly `await`-able from JS.
+//
+// This is the same decision as `cl` — see new_spec2.md. Many distinct nominal
+// types share the Externref representation (TYPES.md), so `Promise[Str]` and
+// `Promise[I32]` are different utu types that the typechecker keeps apart while
+// codegen treats both as externref.
+//
+// Two ways to consume one:
+//
+//   p.then(cl(v) { … })   works on every JS host, no suspension involved
+//   await p               straight-line code; needs a JSPI-capable host
+//
+// `then` is the portable floor and `await` is the ergonomic layer over it.
+
+mod Promise[T1] {
+    type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
+
+    // Subscribe to fulfilment. `on_value` is a `cl`, so it is already a JS
+    // function — the host hands it straight to `p.then` with nothing between.
+    // Both operands are externref whatever T1 is, so this needs one host
+    // import rather than one per instantiation.
+    fn &.then |self| (on_value: cl(T1) void) void {
+        @ir/\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \/;
+    }
+
+    // Subscribe to rejection. The reason is an opaque host value.
+    fn &.catch |self| (on_error: cl(Externref) void) void {
+        @ir/\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \/;
+    }
+}

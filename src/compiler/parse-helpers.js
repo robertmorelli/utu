@@ -16,17 +16,15 @@ export function nextNodeId()    { return _nodeId++; }
  * nodes already in the document.
  */
 export function restampSubtree(root, originFile) {
-  const walk = (el) => {
-    if (typeof el.setAttribute !== 'function') return;
+  if (typeof root?.setAttribute !== 'function') return;
+  for (const el of [root, ...root.querySelectorAll('*')]) {
     if (!el.dataset.originId && el.id) el.dataset.originId = el.id;
     el.id = `n${_nodeId++}`;
     if (originFile) {
       el.dataset.originFile = originFile;
       el.dataset.sourceFile ??= originFile;
     }
-    for (const child of el.children ?? []) walk(child);
-  };
-  walk(root);
+  }
 }
 
 // ── Document creation ─────────────────────────────────────────────────────────

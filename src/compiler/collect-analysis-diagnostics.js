@@ -34,19 +34,57 @@ export function collectAnalysisDiagnostics(doc) {
   }
 
   for (const node of root.querySelectorAll('[data-error-kind]')) {
+    const data = parseJson(node.dataset.errorData);
     diagnostics.push({
       kind: node.dataset.errorKind,
       severity: 'error',
       message: node.dataset.errorMessage ?? node.dataset.errorKind,
       primary: nodeRef(node),
-      related: parseJson(node.dataset.errorData)?.related ?? [],
+      context: nearestDiagnosticContext(node),
+      related: data?.related ?? [],
       notes: [],
       fixes: [],
-      data: parseJson(node.dataset.errorData),
+      data,
     });
   }
 
   return diagnostics;
+}
+
+function nearestDiagnosticContext(node) {
+  for (let cur = node; cur; cur = cur.parentElement) {
+    if (isLargeConstruct(cur)) {
+      return {
+        ...nodeRef(cur),
+        label: contextLabel(cur),
+      };
+    }
+  }
+  return null;
+}
+
+function isLargeConstruct(node) {
+  switch (node?.localName) {
+    case 'ir-fn':
+    case 'ir-test':
+    case 'ir-bench':
+    case 'ir-module':
+    case 'ir-struct':
+    case 'ir-enum':
+    case 'ir-protocol':
+    case 'ir-impl':
+    case 'ir-export-main':
+    case 'ir-export-lib':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function contextLabel(node) {
+  const tag = node.localName?.replace(/^ir-/, '') ?? 'context';
+  const name = node.getAttribute?.('name') || node.getAttribute?.('label') || '';
+  return name ? `${tag} ${name}` : tag;
 }
 
 function parseJson(text) {

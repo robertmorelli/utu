@@ -3,6 +3,6 @@ using boxes from "./_boxes.utu";
 using boxes;
 
 
-fn main() i32 {
+fn main() I32 {
     Box.score(Box.new(20));
 }

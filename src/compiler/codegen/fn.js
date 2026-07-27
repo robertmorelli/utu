@@ -16,6 +16,7 @@
 import { binaryen, fnReturnType, declaredTypeStr } from './types.js';
 import { emitExpr } from './expr.js';
 import { noteFunction } from './explainability.js';
+import { paramsOf, bodyOf, selfParamOf } from '../ir-helpers.js';
 
 /**
  * @param {Element} fn   ir-fn (already analysed)
@@ -28,10 +29,10 @@ export function emitFn(fn, ctx) {
   if (!name) throw new Error('codegen: ir-fn missing name attribute');
 
   // ── Params: positionally allocated to local slots 0..N-1 ──────────────────
-  const paramNodes = [...fn.querySelectorAll(':scope > ir-param-list > ir-param')];
+  const paramNodes = paramsOf(fn);
   const paramTypes = [];
   const locals     = new Map(); // bindingId → { index, type }
-  const selfParam = fn.querySelector(':scope > ir-self-param');
+  const selfParam = selfParamOf(fn);
 
   if (selfParam) {
     const recvType = fn.querySelector(':scope > ir-fn-name')?.getAttribute('receiver');
@@ -42,7 +43,7 @@ export function emitFn(fn, ctx) {
   }
 
   for (const p of paramNodes) {
-    const tStr = declaredTypeStr(p);
+    const tStr = declaredTypeStr(p) ?? implicitOperatorParamType(fn);
     if (!tStr) throw new Error(`codegen: ir-param "${p.getAttribute('name')}" has no type annotation`);
     const tId = ctx.toType(tStr);
     locals.set(p.id, { index: paramTypes.length, type: tId });
@@ -68,7 +69,7 @@ export function emitFn(fn, ctx) {
   };
 
   // ── Body ──────────────────────────────────────────────────────────────────
-  const body = fn.querySelector(':scope > ir-block');
+  const body = bodyOf(fn);
   const bodyExpr = body ? emitExpr(body, fnCtx) : m.nop();
 
   const funcRef = m.addFunction(
@@ -84,6 +85,11 @@ export function emitFn(fn, ctx) {
   noteFunction(ctx.artifacts, fn, name, retType);
 
   return { name, retType };
+}
+
+function implicitOperatorParamType(fn) {
+  if (fn.getAttribute('kind') !== 'operator') return null;
+  return fn.querySelector(':scope > ir-fn-name')?.getAttribute('receiver') ?? null;
 }
 
 function applyDebugLocations(ctx, funcRef) {

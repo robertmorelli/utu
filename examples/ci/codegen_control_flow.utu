@@ -1,26 +1,26 @@
-fn max(a: i32, b: i32) i32 {
+fn max(a: I32, b: I32) I32 {
     if a > b { a; } else { b; };
 }
 
-fn sum_to(n: i32) i32 {
-    let sum: i32 = 0;
+fn sum_to(n: I32) I32 {
+    let sum: I32 = 0;
     for (0..<n) |i| {
         sum += i;
     };
     sum;
 }
 
-fn sum_to_inclusive(n: i32) i32 {
-    let sum: i32 = 0;
+fn sum_to_inclusive(n: I32) I32 {
+    let sum: I32 = 0;
     for (0...n) |i| {
         sum += i;
     };
     sum;
 }
 
-fn countdown_total(n: i32) i32 {
-    let cur: i32 = n;
-    let total: i32 = 0;
+fn countdown_total(n: I32) I32 {
+    let cur: I32 = n;
+    let total: I32 = 0;
     while (cur > 0) {
         total += cur;
         cur -= 1;
@@ -28,9 +28,9 @@ fn countdown_total(n: i32) i32 {
     total;
 }
 
-fn first_over(limit: i32, threshold: i32) i32 {
-    let found: i32 = 0 - 1;
-    let done: bool = false;
+fn first_over(limit: I32, threshold: I32) I32 {
+    let found: I32 = 0 - 1;
+    let done: Bool = false;
     for (0..<limit) |i| {
         if done {
             break;
@@ -43,8 +43,8 @@ fn first_over(limit: i32, threshold: i32) i32 {
     found;
 }
 
-fn spin_until(limit: i32) i32 {
-    let i: i32 = 0;
+fn spin_until(limit: I32) I32 {
+    let i: I32 = 0;
     while () {
         i += 1;
         if i == limit {

@@ -20,6 +20,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -37,6 +41,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -81,10 +89,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -163,6 +167,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -180,6 +188,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -224,10 +236,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -310,6 +318,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -327,6 +339,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -371,10 +387,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -449,6 +461,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -466,6 +482,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -510,10 +530,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -588,6 +604,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -605,6 +625,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -649,10 +673,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -727,6 +747,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -744,6 +768,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -791,7 +819,146 @@
           "named": true
         },
         {
-          "type": "namespace_call_expr",
+          "type": "null_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "pipe_expr",
+          "named": true
+        },
+        {
+          "type": "promote_expr",
+          "named": true
+        },
+        {
+          "type": "promoted_module_call_expr",
+          "named": true
+        },
+        {
+          "type": "return_expr",
+          "named": true
+        },
+        {
+          "type": "slice_expr",
+          "named": true
+        },
+        {
+          "type": "struct_init",
+          "named": true
+        },
+        {
+          "type": "tuple_expr",
+          "named": true
+        },
+        {
+          "type": "type_member_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "while_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "await_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "alt_expr",
+          "named": true
+        },
+        {
+          "type": "assert_expr",
+          "named": true
+        },
+        {
+          "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "await_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "bind_expr",
+          "named": true
+        },
+        {
+          "type": "block_expr",
+          "named": true
+        },
+        {
+          "type": "break_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
+          "named": true
+        },
+        {
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "else_expr",
+          "named": true
+        },
+        {
+          "type": "fatal_expr",
+          "named": true
+        },
+        {
+          "type": "field_expr",
+          "named": true
+        },
+        {
+          "type": "for_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "implicit_struct_init",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "match_expr",
           "named": true
         },
         {
@@ -866,6 +1033,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -883,6 +1054,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -931,10 +1106,6 @@
         },
         {
           "type": "measure_decl",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -1013,6 +1184,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -1030,6 +1205,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -1074,10 +1253,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -1152,6 +1327,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -1169,6 +1348,14 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
+          "named": true
+        },
+        {
+          "type": "closure_type",
           "named": true
         },
         {
@@ -1220,10 +1407,6 @@
           "named": true
         },
         {
-          "type": "namespace_call_expr",
-          "named": true
-        },
-        {
           "type": "null_expr",
           "named": true
         },
@@ -1261,10 +1444,6 @@
         },
         {
           "type": "return_expr",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         },
         {
@@ -1315,6 +1494,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -1332,6 +1515,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -1376,10 +1563,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -1477,6 +1660,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -1494,6 +1681,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -1538,10 +1729,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -1626,6 +1813,102 @@
     }
   },
   {
+    "type": "closure_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "closure_param_list",
+          "named": true
+        },
+        {
+          "type": "return_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "closure_param",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "closure_type",
+          "named": true
+        },
+        {
+          "type": "func_type",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "nullable_type",
+          "named": true
+        },
+        {
+          "type": "paren_type",
+          "named": true
+        },
+        {
+          "type": "promoted_type",
+          "named": true
+        },
+        {
+          "type": "ref_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "closure_param_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "closure_param",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "closure_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "return_type",
+          "named": true
+        },
+        {
+          "type": "type_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "dsl_expr",
     "named": true,
     "fields": {},
@@ -1665,6 +1948,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -1682,6 +1969,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -1726,10 +2017,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -1825,10 +2112,6 @@
         {
           "type": "fn_decl",
           "named": true
-        },
-        {
-          "type": "op_decl",
-          "named": true
         }
       ]
     }
@@ -1865,6 +2148,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -1886,10 +2173,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -1916,6 +2199,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -1933,6 +2220,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -1977,10 +2268,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -2055,6 +2342,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -2072,6 +2363,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -2116,10 +2411,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -2290,6 +2581,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -2307,6 +2602,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -2351,10 +2650,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -2463,6 +2758,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -2480,6 +2779,14 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
+          "named": true
+        },
+        {
+          "type": "closure_type",
           "named": true
         },
         {
@@ -2531,10 +2838,6 @@
           "named": true
         },
         {
-          "type": "namespace_call_expr",
-          "named": true
-        },
-        {
           "type": "null_expr",
           "named": true
         },
@@ -2575,10 +2878,6 @@
           "named": true
         },
         {
-          "type": "scalar_type",
-          "named": true
-        },
-        {
           "type": "slice_expr",
           "named": true
         },
@@ -2606,11 +2905,6 @@
     }
   },
   {
-    "type": "identifier",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "if_expr",
     "named": true,
     "fields": {},
@@ -2628,6 +2922,10 @@
         },
         {
           "type": "assign_expr",
+          "named": true
+        },
+        {
+          "type": "await_expr",
           "named": true
         },
         {
@@ -2652,6 +2950,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -2696,10 +2998,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -2812,6 +3110,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -2829,6 +3131,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -2873,10 +3179,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -3020,6 +3322,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -3037,6 +3343,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -3085,10 +3395,6 @@
         },
         {
           "type": "match_lit",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -3163,6 +3469,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -3180,6 +3490,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -3224,10 +3538,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -3302,6 +3612,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -3319,6 +3633,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -3371,10 +3689,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -3564,6 +3878,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -3581,10 +3899,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -3636,25 +3950,6 @@
     }
   },
   {
-    "type": "namespace_call_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "arg_list",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "nom_qualifier",
     "named": true,
     "fields": {},
@@ -3698,6 +3993,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -3711,10 +4010,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -3764,6 +4059,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -3785,10 +4084,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -3830,6 +4125,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -3847,6 +4146,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -3891,10 +4194,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -3957,6 +4256,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -3974,10 +4277,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -4004,6 +4303,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -4021,6 +4324,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -4065,10 +4372,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -4211,6 +4514,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -4228,6 +4535,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -4272,10 +4583,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -4381,6 +4688,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -4398,6 +4709,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -4442,10 +4757,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -4563,6 +4874,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -4584,10 +4899,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -4602,6 +4913,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -4623,10 +4938,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -4691,6 +5002,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -4712,10 +5027,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -4750,7 +5061,7 @@
     "fields": {},
     "children": {
       "multiple": false,
-      "required": false,
+      "required": true,
       "types": [
         {
           "type": "instantiated_module_ref",
@@ -4788,6 +5099,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -4805,6 +5120,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -4849,10 +5168,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -4915,6 +5230,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -4935,20 +5254,11 @@
           "named": true
         },
         {
-          "type": "scalar_type",
-          "named": true
-        },
-        {
           "type": "void_type",
           "named": true
         }
       ]
     }
-  },
-  {
-    "type": "scalar_type",
-    "named": true,
-    "fields": {}
   },
   {
     "type": "self_param",
@@ -4986,6 +5296,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -5003,6 +5317,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -5047,10 +5365,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -5139,6 +5453,10 @@
         },
         {
           "type": "module_decl",
+          "named": true
+        },
+        {
+          "type": "op_decl",
           "named": true
         },
         {
@@ -5254,6 +5572,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -5271,6 +5593,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -5315,10 +5641,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -5404,6 +5726,10 @@
       "required": true,
       "types": [
         {
+          "type": "closure_type",
+          "named": true
+        },
+        {
           "type": "func_type",
           "named": true
         },
@@ -5421,10 +5747,6 @@
         },
         {
           "type": "ref_type",
-          "named": true
-        },
-        {
-          "type": "scalar_type",
           "named": true
         }
       ]
@@ -5482,6 +5804,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -5499,6 +5825,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -5543,10 +5873,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -5680,6 +6006,10 @@
           "named": true
         },
         {
+          "type": "await_expr",
+          "named": true
+        },
+        {
           "type": "binary_expr",
           "named": true
         },
@@ -5701,6 +6031,10 @@
         },
         {
           "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "closure_expr",
           "named": true
         },
         {
@@ -5745,10 +6079,6 @@
         },
         {
           "type": "match_expr",
-          "named": true
-        },
-        {
-          "type": "namespace_call_expr",
           "named": true
         },
         {
@@ -5979,19 +6309,15 @@
     "named": false
   },
   {
-    "type": "any",
-    "named": false
-  },
-  {
     "type": "assert",
     "named": false
   },
   {
-    "type": "bench",
+    "type": "await",
     "named": false
   },
   {
-    "type": "bool",
+    "type": "bench",
     "named": false
   },
   {
@@ -6001,6 +6327,10 @@
   {
     "type": "break_expr",
     "named": true
+  },
+  {
+    "type": "cl",
+    "named": false
   },
   {
     "type": "comment",
@@ -6021,22 +6351,6 @@
   },
   {
     "type": "export",
-    "named": false
-  },
-  {
-    "type": "extern",
-    "named": false
-  },
-  {
-    "type": "externref",
-    "named": false
-  },
-  {
-    "type": "f32",
-    "named": false
-  },
-  {
-    "type": "f64",
     "named": false
   },
   {
@@ -6072,16 +6386,8 @@
     "named": false
   },
   {
-    "type": "i31",
-    "named": false
-  },
-  {
-    "type": "i32",
-    "named": false
-  },
-  {
-    "type": "i64",
-    "named": false
+    "type": "identifier",
+    "named": true
   },
   {
     "type": "if",
@@ -6104,18 +6410,6 @@
     "named": false
   },
   {
-    "type": "m128",
-    "named": false
-  },
-  {
-    "type": "m32",
-    "named": false
-  },
-  {
-    "type": "m64",
-    "named": false
-  },
-  {
     "type": "main",
     "named": false
   },
@@ -6134,10 +6428,6 @@
   {
     "type": "multiline_string_line",
     "named": true
-  },
-  {
-    "type": "nom",
-    "named": false
   },
   {
     "type": "not",
@@ -6180,19 +6470,11 @@
     "named": false
   },
   {
-    "type": "ref",
-    "named": false
-  },
-  {
     "type": "return",
     "named": false
   },
   {
     "type": "set",
-    "named": false
-  },
-  {
-    "type": "str",
     "named": false
   },
   {
@@ -6224,19 +6506,7 @@
     "named": true
   },
   {
-    "type": "u32",
-    "named": false
-  },
-  {
-    "type": "u64",
-    "named": false
-  },
-  {
     "type": "using",
-    "named": false
-  },
-  {
-    "type": "v128",
     "named": false
   },
   {

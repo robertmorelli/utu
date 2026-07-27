@@ -1,27 +1,16 @@
-// codegen/types.js — utu type strings / scalar kinds → binaryen type ids
+// codegen/types.js — utu type strings / registry reprs → binaryen type ids
 //
-// The compiler stamps `data-type` strings like "i32", "f64", "bool", "void",
+// The compiler stamps `data-type-name` strings like "I32", "F64", "Bool", "void",
 // "?Foo", or a struct/array name. This module maps those strings to the
 // numeric type ids used by binaryen.js.
 //
-// This file is the ONE legitimate place in the compiler that hardcodes
-// knowledge of wasm scalar kinds: binaryen.js exposes five scalar
-// namespaces (`m.i32`, `m.i64`, `m.f32`, `m.f64`, `m.v128`) with
-// corresponding type ids, and the `kind` attribute on
-// `<ir-wasm-scalar kind="..."/>` in the stdlib is the handshake name.
-// Every other codegen site resolves scalar facts by looking up a name
-// in a registry — the registry is built from the stdlib declarations
-// at compile time, and this module provides the only kind→wasm mapping.
+// Binaryen exposes five scalar namespaces and a small set of builtin ref
+// type ids. The stdlib declares which family/builtin a type uses; this file
+// validates those declared names and indexes binaryen by them.
 //
 // Entry points:
 //   utuToBinaryenType(typeStr)
 //     Minimal fallback for compiler-only type spellings like `void`.
-//   scalarKindToBinaryenType(kind)
-//     Maps an ir-wasm-scalar `kind="..."` attribute to a binaryen primitive.
-//   scalarKindToBinaryenNamespace(kind)
-//     Maps a kind to the binaryen JS namespace name (`'i32' | 'i64' |
-//     'f32' | 'f64' | 'v128'`).  Use the returned string as `m[ns]` to
-//     pick the right family of ops (e.g. `m.i32.add(...)`).
 //   makeTypeMapper(structTypes)
 //     Returns a `(typeStr) => binaryen type id` closure that resolves type
 //     names through the registry built by `buildModule()` (see ./index.js).
@@ -31,11 +20,16 @@
 // garbage.
 
 import binaryen from 'binaryen';
-import { firstTypeChild, typeNodeToStr, fnReturnType } from '../ir-helpers.js';
+import { typeNodeToStr, fnReturnType, declaredTypeStr } from '../ir-helpers.js';
+import { WASM_REF_BINARYEN_TYPES, WASM_SCALAR_FAMILIES } from '../link-type-decls.js';
+
+// The registry owns this; re-exported so codegen keeps one type-related import.
+export { collectScalarKinds } from '../link-type-decls.js';
+import { unwrapNullable } from '../type-strings.js';
 
 // Re-export so codegen modules can import everything type-related from one
 // place without crossing a directory boundary on every line.
-export { typeNodeToStr, fnReturnType, binaryen };
+export { typeNodeToStr, fnReturnType, declaredTypeStr, binaryen };
 
 export function utuToBinaryenType(typeStr) {
   if (!typeStr) return binaryen.none;
@@ -43,68 +37,31 @@ export function utuToBinaryenType(typeStr) {
   throw new Error(`codegen: unsupported builtin type "${typeStr}"`);
 }
 
-export function scalarKindToBinaryenType(kind) {
-  const ns = scalarKindToBinaryenNamespace(kind);
-  return ns == null ? null : binaryen[ns];
+export function scalarFamilyToBinaryenType(family) {
+  assertScalarFamily(family);
+  return binaryen[family];
 }
 
-/**
- * The wasm has exactly five scalar-op families: i32, i64, f32, f64, v128.
- * Every scalar kind declared by the stdlib maps to one of them.  Signed vs
- * unsigned integer types share a family (the sign lives on the op, not the
- * type); bool / m32 / m64 / m128 are just width-tagged aliases for the
- * corresponding integer family.
- *
- * @param {string} kind  value of `<ir-wasm-scalar kind="..."/>`
- * @returns {string|null}  the `m[ns]` namespace name, or null if unknown.
- */
-export function scalarKindToBinaryenNamespace(kind) {
-  switch (kind) {
-    case 'i32':
-    case 'u32':
-    case 'bool':
-    case 'm32':
-      return 'i32';
-    case 'i64':
-    case 'u64':
-    case 'm64':
-      return 'i64';
-    case 'f32':
-      return 'f32';
-    case 'f64':
-      return 'f64';
-    case 'v128':
-    case 'm128':
-      return 'v128';
-    default:
-      return null;
+export function refBinaryenNameToType(name) {
+  assertRefBinaryenName(name);
+  return binaryen[name];
+}
+
+export function assertScalarFamily(family) {
+  if (!WASM_SCALAR_FAMILIES.has(family) || binaryen[family] == null) {
+    throw new Error(`codegen: unsupported wasm scalar family "${family}"`);
+  }
+}
+
+export function assertRefBinaryenName(name) {
+  if (!WASM_REF_BINARYEN_TYPES.has(name) || binaryen[name] == null) {
+    throw new Error(`codegen: unsupported binaryen ref type "${name}"`);
   }
 }
 
 /**
- * Map an `<ir-wasm-ref kind="..."/>` kind attribute to the binaryen ref-type
- * id.  Like `scalarKindToBinaryenNamespace`, this is the ONE legitimate place
- * the compiler hardcodes ref-kind knowledge: binaryen.js exposes a fixed set
- * of WasmGC reference types (externref, stringref, i31ref, …) and the `kind`
- * attribute on `<ir-wasm-ref>` in the stdlib is the handshake name.  All
- * other codegen sites resolve ref kinds via the registry built from stdlib
- * declarations at compile time.
- *
- * @param {string} kind  value of `<ir-wasm-ref kind="..."/>`
- * @returns {number|null}  binaryen type id, or null if unknown.
- */
-export function refKindToBinaryenType(kind) {
-  switch (kind) {
-    case 'extern': return binaryen.externref;
-    case 'string': return binaryen.stringref;
-    case 'i31':    return binaryen.i31ref;
-    default:       return null;
-  }
-}
-
-/**
- * Build a closure that resolves any utu type string the codegen needs:
- * scalars, struct names, and nullable variants like "?Foo".
+ * Build a closure that resolves any utu type-name the codegen needs by
+ * looking up its backend type-repr in the codegen registry.
  *
  * @param {Map<string, StructTypeInfo>} structTypes  from buildHeapTypes()
  *   for the StructTypeInfo shape.
@@ -120,14 +77,23 @@ export function makeTypeMapper(structTypes) {
     let name = typeStr;
     if (name.startsWith('?')) { nullable = true; name = name.slice(1); }
 
+    // Callable types have no declaration to register from, so they are added
+    // to this same registry off the stamped type names — see
+    // registerCallableTypes.  `fun(...)` resolves to a typed function
+    // reference, `cl(...)` to externref.
     const info = structTypes.get(name);
-    if (info?.binaryenType != null) {
+    if (!info) {
+      throw new Error(`codegen: unsupported type "${typeStr}" (no stdlib type-def or heap type match)`);
+    }
+
+    if (info.scalarFamily) {
       if (nullable) throw new Error(`codegen: scalar type "${name}" cannot be nullable`);
       return info.binaryenType;
     }
-    if (info) return nullable ? info.nullableRefType : info.refType;
 
-    throw new Error(`codegen: unsupported type "${typeStr}" (no stdlib type-def or heap type match)`);
+    if (info.refType != null) return nullable ? info.nullableRefType : info.refType;
+
+    throw new Error(`codegen: type "${typeStr}" has unsupported type-repr "${info.typeRepr}"`);
   };
 }
 
@@ -137,10 +103,9 @@ export function makeTypeMapper(structTypes) {
  * `m[ns]` namespace (literal constants, numeric comparisons, arithmetic)
  * from a utu type name.  Returns null for non-scalar names.
  *
- * The registry entries are populated by `buildHeapTypes` — which walks
- * every `:scope > ir-type-def > ir-wasm-scalar` in the document — so the
- * set of names this function recognises is exactly the set declared by
- * the stdlib.  No parallel table; no parallel opinion.
+ * The registry entries are populated by the single type registry, so the
+ * set of names this function recognises is exactly the set declared by the
+ * stdlib. No parallel table; no parallel opinion.
  *
  * @param {Map<string, StructTypeInfo>} structTypes
  * @returns {(typeStr: string) => (string|null)}
@@ -148,32 +113,17 @@ export function makeTypeMapper(structTypes) {
 export function makeScalarNamespaceLookup(structTypes) {
   return function scalarNamespaceOf(typeStr) {
     if (!typeStr) return null;
-    const name = typeStr.startsWith('?') ? typeStr.slice(1) : typeStr;
+    const name = unwrapNullable(typeStr);
     return structTypes.get(name)?.binaryenNamespace ?? null;
   };
 }
 
-/**
- * Build a `Set<kind>` of every wasm scalar kind the stdlib has declared.
- * Used by the intrinsic dispatcher to answer "is `<ir-i64-foo>` a known
- * scalar tag?" without hardcoding a kind list of its own.
- *
- * @param {Map<string, StructTypeInfo>} structTypes
- * @returns {Set<string>}
- */
-export function collectScalarKinds(structTypes) {
-  const kinds = new Set();
-  for (const info of structTypes.values()) {
-    if (info?.scalarKind) kinds.add(info.scalarKind);
-  }
-  return kinds;
+export function makeScalarKindLookup(structTypes) {
+  return function scalarKindOf(typeStr) {
+    if (!typeStr) return null;
+    const name = unwrapNullable(typeStr);
+    return structTypes.get(name)?.scalarKind ?? null;
+  };
 }
 
-/**
- * Read the declared type of a binding-bearing node (ir-param, ir-let,
- * ir-global) by finding its first ir-type-* child.  Returns the type string
- * or null when no annotation is present.
- */
-export function declaredTypeStr(node) {
-  return typeNodeToStr(firstTypeChild(node));
-}
+

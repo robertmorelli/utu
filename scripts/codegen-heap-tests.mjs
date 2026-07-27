@@ -4,18 +4,18 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: struct round-trip — define, construct, read field, return', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_struct.utu', source: `
       struct Point:
-        | x : i32
-        | y : i32
+        | x : I32
+        | y : I32
       export lib {
-        fn make_x(a: i32, b: i32) i32 {
+        fn make_x(a: I32, b: I32) I32 {
           let p: Point = Point { x: a, y: b };
           p.x;
         }
-        fn make_y(a: i32, b: i32) i32 {
+        fn make_y(a: I32, b: I32) I32 {
           let p: Point = Point { x: a, y: b };
           p.y;
         }
-        fn swapped(a: i32, b: i32) i32 {
+        fn swapped(a: I32, b: I32) I32 {
           let p: Point = Point { y: b, x: a };
           p.x + p.y;
         }
@@ -29,13 +29,13 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: nested struct fields round-trip through struct.new/get', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_nested_struct.utu', source: `
       struct Point:
-        | x : i32
-        | y : i32
+        | x : I32
+        | y : I32
       struct Line:
         | start : Point
         | end : Point
       export lib {
-        fn dx(ax: i32, ay: i32, bx: i32, by: i32) i32 {
+        fn dx(ax: I32, ay: I32, bx: I32, by: I32) I32 {
           let l: Line = Line {
             start: Point { x: ax, y: ay },
             end: Point { x: bx, y: by },
@@ -50,9 +50,9 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: struct field assignment lowers to struct.set', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_struct_set.utu', source: `
       struct Counter:
-        | n : i32
+        | n : I32
       export lib {
-        fn bump_twice(start: i32) i32 {
+        fn bump_twice(start: I32) I32 {
           let c: Counter = Counter { n: start };
           c.n = c.n + 1;
           c.n = c.n + 1;
@@ -66,13 +66,13 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: nested struct field assignment round-trips through cast + struct.set', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_nested_struct_set.utu', source: `
       struct Point:
-        | x : i32
-        | y : i32
+        | x : I32
+        | y : I32
       struct Line:
         | start : Point
         | end : Point
       export lib {
-        fn shift_start(ax: i32, ay: i32) i32 {
+        fn shift_start(ax: I32, ay: I32) I32 {
           let l: Line = Line {
             start: Point { x: ax, y: ay },
             end: Point { x: 0, y: 0 },
@@ -88,12 +88,12 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: T.null lowers to ref.null and round-trips through promote', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_ref.utu', source: `
       struct Counter:
-        | n : i32
+        | n : I32
       export lib {
-        fn maybe_counter(flag: bool) ?Counter {
+        fn maybe_counter(flag: Bool) ?Counter {
           if flag { Counter { n: 41 }; } else { Counter.null; };
         }
-        fn read_counter(flag: bool) i32 {
+        fn read_counter(flag: Bool) I32 {
           promote maybe_counter(flag) {
             |c| => c.n + 1,
             ~> 0,
@@ -108,9 +108,9 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: context-typed null literal lowers to ref.null', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_literal.utu', source: `
       struct Counter:
-        | n : i32
+        | n : I32
       export lib {
-        fn from_let() i32 {
+        fn from_let() I32 {
           let c: ?Counter = null;
           promote c {
             |value| => value.n,
@@ -126,12 +126,12 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'lowered_promote_normal.utu', `
       struct Counter:
-        | n : i32
+        | n : I32
       export lib {
-        fn maybe(flag: bool) ?Counter {
+        fn maybe(flag: Bool) ?Counter {
           if flag { Counter { n: 7 }; } else { Counter.null; };
         }
-        fn unwrap(flag: bool) i32 {
+        fn unwrap(flag: Bool) I32 {
           promote maybe(flag) {
             |c| => c.n,
             ~> 0,
@@ -150,10 +150,10 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: implicit struct init &{} works when context type is known', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_implicit_init.utu', source: `
       struct Pair:
-        | a : i32
-        | b : i32
+        | a : I32
+        | b : I32
       export lib {
-        fn sum() i32 {
+        fn sum() I32 {
           let p: Pair = &{ a: 7, b: 8 };
           p.a + p.b;
         }
@@ -165,12 +165,12 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: orelse unwraps nullable refs and uses fallback on null', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_orelse.utu', source: `
       struct Counter:
-        | n : i32
+        | n : I32
       export lib {
-        fn maybe_counter(flag: bool) ?Counter {
+        fn maybe_counter(flag: Bool) ?Counter {
           if flag { Counter { n: 7 }; } else { Counter.null; };
         }
-        fn pick(flag: bool) i32 {
+        fn pick(flag: Bool) I32 {
           let c: Counter = maybe_counter(flag) orelse Counter { n: 99 };
           c.n;
         }
@@ -183,9 +183,9 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: enum variant constructors lower as heap values with payload fields', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_variant_ctor.utu', source: `
       enum Shape:
-        | Circle { radius: i32 }
+        | Circle { radius: I32 }
       export lib {
-        fn radius() i32 {
+        fn radius() I32 {
           let c: Circle = Circle { radius: 7 };
           c.radius;
         }
@@ -194,28 +194,28 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.radius(), 7);
   });
 
-  for (const tagType of ['i64', 'u32']) {
-    test(`codegen: enum alt dispatch honors non-i32 tag type (${tagType})`, async ({ ROOT }) => {
+  for (const tagType of ['I64', 'U32']) {
+    test(`codegen: enum alt dispatch honors non-I32 tag type (${tagType})`, async ({ ROOT }) => {
       const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
       const { linkTypeDecls } = await import('../src/compiler/link-type-decls.js');
       const { lowerBackendControl } = await import('../src/compiler/lower-backend-control.js');
       const compiler = await makeCompiler({ ROOT, target: 'analysis' });
       await withTempUtu(ROOT, `codegen_alt_${tagType}_tag.utu`, `
         enum Shape:
-          | Circle { radius: i32 }
-          | Rect { width: i32 }
+          | Circle { radius: I32 }
+          | Rect { width: I32 }
         export lib {
-          fn classify(shape: Shape) i32 {
+          fn classify(shape: Shape) I32 {
             alt shape {
               Circle => 11,
               Rect => 22,
               ~> 99,
             };
           }
-          fn circle() i32 {
+          fn circle() I32 {
             classify(Circle { radius: 7 });
           }
-          fn rect() i32 {
+          fn rect() I32 {
             classify(Rect { width: 4 });
           }
         }
@@ -228,7 +228,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         doc.querySelector('ir-enum[name="Shape"]')?.setAttribute('tag-type', tagType);
         const typeIndex = linkTypeDecls(doc);
         lowerBackendControl(doc, typeIndex, { target: 'normal' });
-        assert(!doc.querySelector('ir-alt'), `non-i32 tag alt should be lowered before codegen (${tagType})`);
+        assert(!doc.querySelector('ir-alt'), `non-I32 tag alt should be lowered before codegen (${tagType})`);
         assert(
           doc.querySelector(`ir-call[data-resolved-name="${tagType}:eq"]`),
           `tag dispatch should resolve ${tagType}:eq`,
@@ -245,26 +245,26 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
   test('codegen: alt dispatches enum variants by rec shape and fallback', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_alt_dispatch.utu', source: `
       enum Shape:
-        | Circle { radius: i32 }
-        | Rect { width: i32, height: i32 }
-        | Triangle { base: i32, height: i32, skew: i32 }
+        | Circle { radius: I32 }
+        | Rect { width: I32, height: I32 }
+        | Triangle { base: I32, height: I32, skew: I32 }
       export lib {
-        fn classify(shape: Shape) i32 {
+        fn classify(shape: Shape) I32 {
           alt shape {
             Circle => 7,
             ~> fallback(shape),
           };
         }
-        fn fallback(shape: Shape) i32 {
+        fn fallback(shape: Shape) I32 {
           alt shape {
             Rect => 12,
             Triangle => 9,
             ~> 0,
           };
         }
-        fn circle() i32 { classify(Circle { radius: 7 }); }
-        fn rect() i32 { classify(Rect { width: 3, height: 4 }); }
-        fn triangle() i32 { classify(Triangle { base: 5, height: 4, skew: 1 }); }
+        fn circle() I32 { classify(Circle { radius: 7 }); }
+        fn rect() I32 { classify(Rect { width: 3, height: 4 }); }
+        fn triangle() I32 { classify(Triangle { base: 5, height: 4, skew: 1 }); }
       }
     ` });
     assertEq(instance.exports.circle(), 7);

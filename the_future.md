@@ -161,6 +161,15 @@ Direction:
 
 ## Async/await
 
+**Landed:** `Promise[T]` is a real JS promise (std/Promise.utu), `.then` /
+`.catch` work on any JS host, and `await` works through WebAssembly's JS Promise
+Integration — see new_spec2.md. There is no `async` keyword and no function
+colouring: the host suspends the wasm stack, so the compiler needs no CPS or
+state-machine transform at all. `await` requires a JSPI-capable host (Chrome
+126+, Node 23+, Bun); `.then` does not.
+
+Still open: async generators, async streams, and `for await`.
+
 Utu should have first-class `async` / `await`.
 
 This matters not because it is theoretically elegant, but because it dramatically reduces adoption friction for JS/Dart/web developers.
@@ -323,13 +332,25 @@ Utu should piggyback on the TS/npm ecosystem rather than fighting it.
 
 ### Server-side and edge runtimes
 
-Browser and node interop is the headline, but Utu should also be a serious option for:
+Browser and node interop is the headline. Utu should also be a serious option for
+JS-hosted edge runtimes:
 
-- WASI runtimes (Wasmtime, Wasmer, Spin)
-- Cloudflare Workers, Fastly Compute@Edge, Vercel Edge
-- generic serverless wasm hosts
+- Cloudflare Workers, Vercel Edge, Deno Deploy
+- generic V8/JSC-hosted serverless wasm hosts
 
-Wasm is increasingly a server-side and edge platform. Utu's small-bundle story is even more compelling there than in the browser. The stdlib organization should accommodate non-JS hosts cleanly.
+Utu's small-bundle story is even more compelling there than in the browser.
+
+**Not planned: non-JS wasm hosts.** WASI runtimes (Wasmtime, Wasmer, Spin) and
+JS-free edge hosts (Fastly Compute@Edge) are explicitly out of scope.
+
+This follows from the closure design: `cl(...)` is always an externref to a JS
+function, so that any Utu closure can be handed to any JS callback with no
+marshalling. That is what makes DOM work feel invisible, and it is the right
+trade for Utu's core audience — but it means closures have no representation on
+a host without JS. Rather than carry a second closure representation and double
+the test matrix (PRINCIPLES #7), Utu requires a JS host.
+
+The stdlib does not need to accommodate non-JS hosts.
 
 ## Standard library must be top notch
 
@@ -351,7 +372,7 @@ Common interop should be organized by platform:
 - browser APIs live in the browser library
 - Node APIs live in the node library
 - Bun APIs live in the bun library
-- WASI / edge runtimes get their own libraries
+- JS-hosted edge runtimes get their own libraries
 
 This should make per-platform interop feel built in and unsurprising.
 
@@ -494,7 +515,7 @@ The practical order of importance is:
 6. add async generators, closures, iteration, and pattern-matching depth
 7. make TS def imports and npm usage first-class
 8. keep DSLs powerful, but hide the common cases behind stdlib (and finish `@wat`)
-9. build strong platform libraries for browser, node, bun, and edge runtimes
+9. build strong platform libraries for browser, node, bun, and JS-hosted edge runtimes
 10. ship the dev shell (dev server, doc generator, reproducible builds)
 11. keep pushing toward tiny bundles and excellent interop-heavy performance
 

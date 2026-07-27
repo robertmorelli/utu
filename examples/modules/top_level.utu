@@ -24,11 +24,11 @@ mod Pair[L, R] {
 }
 
 
-fn maybe_pair(flag: bool) ?Pair[i32, i32] {
-    if flag { Pair[i32, i32].new(2, 9); } else { null; };
+fn maybe_pair(flag: Bool) ?Pair[I32, I32] {
+    if flag { Pair[I32, I32].new(2, 9); } else { null; };
 }
 
-using Pair[i32, i32] |pair_i32|;
+using Pair[I32, I32] |pair_i32|;
 
 test "non-promoted inner types stay qualified" {
     let value: pair_i32.NotPair = pair_i32.NotPair { one: 5 };
@@ -36,11 +36,11 @@ test "non-promoted inner types stay qualified" {
 }
 
 test "same-name module types promote into top-level type paths" {
-    let pair: Pair[i32, i32] = Pair[i32, i32].new(3, 4);
+    let pair: Pair[I32, I32] = Pair[I32, I32].new(3, 4);
     assert pair.left() + pair.right() == 7;
 }
 
 test "promoted module types work in nullable positions" {
-    let maybe: ?Pair[i32, i32] = maybe_pair(true);
-    assert (maybe \ Pair[i32, i32].new(0, 0)).right() == 9;
+    let maybe: ?Pair[I32, I32] = maybe_pair(true);
+    assert (maybe \ Pair[I32, I32].new(0, 0)).right() == 9;
 }

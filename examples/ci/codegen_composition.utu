@@ -1,17 +1,17 @@
 struct Todo:
-    | text : str
-    | done : bool
+    | text : Str
+    | done : Bool
 
 enum Filter:
     | All
     | Active
     | Completed
 
-let wrap: fun(str) str = @es/\(value) => `[${value}]`\/;
-let str_concat: fun(str, str) str = @es/\(a, b) => a + b\/;
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let wrap: fun(Str) Str = @es/\(value) => `[${value}]`\/;
+let str_concat: fun(Str, Str) Str = @es/\(a, b) => a + b\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
-fn new_todo(text: str) Todo {
+fn new_todo(text: Str) Todo {
     Todo { text: text, done: false };
 }
 
@@ -19,7 +19,7 @@ fn toggle(todo: Todo) void {
     todo.done = not todo.done;
 }
 
-fn matches(todo: Todo, filter: Filter) bool {
+fn matches(todo: Todo, filter: Filter) Bool {
     alt filter {
         All => true,
         Active => not todo.done,
@@ -28,8 +28,8 @@ fn matches(todo: Todo, filter: Filter) bool {
     };
 }
 
-fn count(todos: array[Todo], filter: Filter) i32 {
-    let n: i32 = 0;
+fn count(todos: Array[Todo], filter: Filter) I32 {
+    let n: I32 = 0;
     for (0..<todos.len) |i| {
         if matches(todos[i], filter) {
             n += 1;
@@ -38,31 +38,31 @@ fn count(todos: array[Todo], filter: Filter) i32 {
     n;
 }
 
-fn status(flag: bool) str {
-    let maybe: ?str = if flag { "online"; } else { null; };
+fn status(flag: Bool) Str {
+    let maybe: ?Str = if flag { "online"; } else { null; };
     maybe \ "offline";
 }
 
-fn greet(name: str) str {
+fn greet(name: Str) Str {
     name -o wrap -o str_concat(&, "!");
 }
 
-fn build_todos() array[Todo] {
-    array[Todo].new_fixed(
+fn build_todos() Array[Todo] {
+    Array[Todo].new_fixed(
         new_todo("learn utu"),
         new_todo("ship compiler"),
         new_todo("write tests"),
     );
 }
 
-test "composition keeps array mutations visible to matches" {
-    let todos: array[Todo] = build_todos();
+test "composition keeps Array mutations visible to matches" {
+    let todos: Array[Todo] = build_todos();
     toggle(todos[0]);
     assert count(todos, Active {}) == 2;
 }
 
 test "composition can count completed variants" {
-    let todos: array[Todo] = build_todos();
+    let todos: Array[Todo] = build_todos();
     toggle(todos[0]);
     assert count(todos, Completed {}) == 1;
 }

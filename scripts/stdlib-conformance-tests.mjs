@@ -1,4 +1,4 @@
-const COVERED_STDLIBS = ['i32', 'u32', 'i64', 'u64', 'f32', 'f64', 'm32', 'm64', 'm128', 'bool', 'str', 'i31', 'v128'];
+const COVERED_STDLIBS = ['I32', 'U32', 'I64', 'U64', 'F32', 'F64', 'M32', 'M64', 'M128', 'Bool', 'Str', 'I31', 'V128'];
 
 export function registerStdlibConformanceTests({ test, makeCompiler, assert, assertEq, assertNoErrors }) {
   test('stdlib conformance: scalar intrinsic golden results', async ({ ROOT }) => {
@@ -6,7 +6,7 @@ export function registerStdlibConformanceTests({ test, makeCompiler, assert, ass
     await runCases(instance, scalarIntrinsicCases(), assert, assertEq);
   });
 
-  test('stdlib conformance: mask/ref/str/v128 intrinsic golden results (real wasm)', async ({ ROOT }) => {
+  test('stdlib conformance: mask/ref/Str/V128 intrinsic golden results (real wasm)', async ({ ROOT }) => {
     const cases = extendedIntrinsicCases();
     await assertStdlibCoverage(ROOT, [...scalarIntrinsicCases(), ...cases], assert);
     const compileOnly = cases.filter((c) => c.compileOnly);
@@ -74,24 +74,24 @@ function declaredOps(src) {
 
 function scalarIntrinsicCases() {
   return [
-    ...integerCases({ type: 'i32', signed: true, bigint: false, div: -3, rem: -1, shr: -4, ushr: 2147483644 }),
-    ...integerCases({ type: 'u32', signed: false, bigint: false, div: 2000000000, rem: 2, shr: 1073741824, ushr: 1073741824 }),
-    ...integerCases({ type: 'i64', signed: true, bigint: true, div: -3n, rem: -1n, shr: -4n, ushr: 9223372036854775804n }),
-    ...integerCases({ type: 'u64', signed: false, bigint: true, div: 9223372036854775807n, rem: 1n, shr: 4611686018427387904n, ushr: 4611686018427387904n }),
-    ...floatCases('f32', 0),
-    ...floatCases('f64'),
+    ...integerCases({ type: 'I32', signed: true, bigint: false, div: -3, rem: -1, shr: -4, ushr: 2147483644 }),
+    ...integerCases({ type: 'U32', signed: false, bigint: false, div: 2000000000, rem: 2, shr: 1073741824, ushr: 1073741824 }),
+    ...integerCases({ type: 'I64', signed: true, bigint: true, div: -3n, rem: -1n, shr: -4n, ushr: 9223372036854775804n }),
+    ...integerCases({ type: 'U64', signed: false, bigint: true, div: 9223372036854775807n, rem: 1n, shr: 4611686018427387904n, ushr: 4611686018427387904n }),
+    ...floatCases('F32', 0),
+    ...floatCases('F64'),
   ];
 }
 
 function extendedIntrinsicCases() {
   return [
-    ...maskCases32('m32'),
-    ...maskCases64('m64'),
+    ...maskCases32('M32'),
+    ...maskCases64('M64'),
     ...boolCases(),
     ...strCases(),
     ...i31Cases(),
-    ...v128Cases('v128'),
-    ...v128Cases('m128'),
+    ...v128Cases('V128'),
+    ...v128Cases('M128'),
   ];
 }
 
@@ -125,7 +125,7 @@ function integerCases({ type, signed, bigint, div, rem, shr, ushr }) {
     ['neg', unary(type, '5', '-a'), neg],
     ['bnot', unary(type, '0', '~a'), bnot],
   ];
-  if (type === 'i32') {
+  if (type === 'I32') {
     cases.push(
       ['clz', callUnary(type, 'clz', '16'), 27],
       ['ctz', callUnary(type, 'ctz', '16'), 4],
@@ -164,36 +164,36 @@ function maskCases64(type) {
 }
 
 function boolCases() {
-  return typedCases('bool', 'bool', [
-    ['eq', bin('bool', 'true', 'true', '=='), true],
-    ['ne', bin('bool', 'true', 'false', '!='), true],
-    ['and', bin('bool', 'true', 'false', 'and'), false],
-    ['or', bin('bool', 'true', 'false', 'or'), true],
-    ['xor', bin('bool', 'true', 'false', 'xor'), true],
-    ['not', unary('bool', 'false', 'not a'), true],
-  ], null, 'bool');
+  return typedCases('Bool', 'Bool', [
+    ['eq', bin('Bool', 'true', 'true', '=='), true],
+    ['ne', bin('Bool', 'true', 'false', '!='), true],
+    ['and', bin('Bool', 'true', 'false', 'and'), false],
+    ['or', bin('Bool', 'true', 'false', 'or'), true],
+    ['xor', bin('Bool', 'true', 'false', 'xor'), true],
+    ['not', unary('Bool', 'false', 'not a'), true],
+  ], null, 'Bool');
 }
 
 function strCases() {
   return [
-    stdCase('str', 'add', 'std_str_add_len', '', 'i32', 'str.len("ut" + "u")', [], 3),
-    stdCase('str', 'add', 'std_str_add_eq', '', 'i32', 'if "a" + "b" == "ab" { 1; } else { 0; }', [], 1),
-    stdCase('str', 'eq', 'std_str_eq', '', 'i32', 'if "same" == "same" { 1; } else { 0; }', [], 1),
-    stdCase('str', 'ne', 'std_str_ne', '', 'i32', 'if "same" != "diff" { 1; } else { 0; }', [], 1),
-    stdCase('str', 'len', 'std_str_len', '', 'i32', 'str.len("hello")', [], 5),
-    stdCase('str', 'len', 'std_str_len_non_ascii', '', 'i32', 'str.len("hé")', [], 2),
-    stdCase('str', 'slice', 'std_str_slice_roundtrip', '', 'i32', 'if str.slice("hello", 1, 3) == "el" { 1; } else { 0; }', [], 1),
-    stdCase('str', 'get', 'std_str_get', '', 'i32', 'str.get("hello", 4)', [], 111),
+    stdCase('Str', 'add', 'std_str_add_len', '', 'I32', 'Str.len("ut" + "u")', [], 3),
+    stdCase('Str', 'add', 'std_str_add_eq', '', 'I32', 'if "a" + "b" == "ab" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'eq', 'std_str_eq', '', 'I32', 'if "same" == "same" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'ne', 'std_str_ne', '', 'I32', 'if "same" != "diff" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'len', 'std_str_len', '', 'I32', 'Str.len("hello")', [], 5),
+    stdCase('Str', 'len', 'std_str_len_non_ascii', '', 'I32', 'Str.len("hé")', [], 2),
+    stdCase('Str', 'slice', 'std_str_slice_roundtrip', '', 'I32', 'if Str.slice("hello", 1, 3) == "el" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'get', 'std_str_get', '', 'I32', 'Str.get("hello", 4)', [], 111),
   ];
 }
 
 function i31Cases() {
   return [
-    stdCase('i31', 'from_i32', 'std_i31_from_i32_get_s', 'x: i32', 'i32', 'i31.get_s(i31.from_i32(x))', [123], 123),
-    stdCase('i31', 'get_s', 'std_i31_get_s_sign', '', 'i32', 'i31.get_s(i31.from_i32(1073741824))', [], -1073741824),
-    stdCase('i31', 'get_u', 'std_i31_get_u_sign', '', 'i32', 'i31.get_u(i31.from_i32(1073741824))', [], 1073741824),
-    stdCase('i31', 'eq', 'std_i31_eq', '', 'i32', 'if i31.from_i32(7) == i31.from_i32(7) { 1; } else { 0; }', [], 1),
-    stdCase('i31', 'ne', 'std_i31_ne', '', 'i32', 'if i31.from_i32(7) != i31.from_i32(8) { 1; } else { 0; }', [], 1),
+    stdCase('I31', 'from_i32', 'std_i31_from_i32_get_s', 'x: I32', 'I32', 'I31.get_s(I31.from_i32(x))', [123], 123),
+    stdCase('I31', 'get_s', 'std_i31_get_s_sign', '', 'I32', 'I31.get_s(I31.from_i32(1073741824))', [], -1073741824),
+    stdCase('I31', 'get_u', 'std_i31_get_u_sign', '', 'I32', 'I31.get_u(I31.from_i32(1073741824))', [], 1073741824),
+    stdCase('I31', 'eq', 'std_i31_eq', '', 'I32', 'if I31.from_i32(7) == I31.from_i32(7) { 1; } else { 0; }', [], 1),
+    stdCase('I31', 'ne', 'std_i31_ne', '', 'I32', 'if I31.from_i32(7) != I31.from_i32(8) { 1; } else { 0; }', [], 1),
   ];
 }
 
@@ -202,17 +202,17 @@ function v128Cases(type) {
   const ones = `${type}.ones()`;
   const anyTrue = `${type}.any_true`;
   return [
-    stdCase(type, 'zero', `std_${type}_zero`, '', 'i32', boolExpr(`${anyTrue}(${zero})`), [], 0),
-    stdCase(type, 'ones', `std_${type}_ones`, '', 'i32', boolExpr(`${anyTrue}(${ones})`), [], 1),
-    stdCase(type, 'band', `std_${type}_band_any`, '', 'i32', boolExpr(`${anyTrue}(${ones} & ${zero})`), [], 0),
-    stdCase(type, 'bor', `std_${type}_bor_any`, '', 'i32', boolExpr(`${anyTrue}(${zero} | ${ones})`), [], 1),
-    stdCase(type, 'bxor', `std_${type}_bxor_zero`, '', 'i32', boolExpr(`${anyTrue}(${ones} ^ ${ones})`), [], 0),
-    stdCase(type, 'bnot', `std_${type}_bnot_zero`, '', 'i32', boolExpr(`${anyTrue}(~${zero})`), [], 1),
-    stdCase(type, 'eq', `std_${type}_eq_any`, '', 'i32', boolExpr(`${anyTrue}(${ones} == ${ones})`), [], 1),
-    stdCase(type, 'ne', `std_${type}_ne_any`, '', 'i32', boolExpr(`${anyTrue}(${ones} != ${zero})`), [], 1),
-    stdCase(type, 'andnot', `std_${type}_andnot`, '', 'i32', boolExpr(`${anyTrue}(${type}.andnot(${ones}, ${ones}))`), [], 0),
-    stdCase(type, 'bitselect', `std_${type}_bitselect`, '', 'i32', boolExpr(`${anyTrue}(${type}.bitselect(${ones}, ${zero}, ${ones}))`), [], 1),
-    stdCase(type, 'any_true', `std_${type}_any_true`, '', 'i32', boolExpr(`${anyTrue}(${ones})`), [], 1),
+    stdCase(type, 'zero', `std_${type}_zero`, '', 'I32', boolExpr(`${anyTrue}(${zero})`), [], 0),
+    stdCase(type, 'ones', `std_${type}_ones`, '', 'I32', boolExpr(`${anyTrue}(${ones})`), [], 1),
+    stdCase(type, 'band', `std_${type}_band_any`, '', 'I32', boolExpr(`${anyTrue}(${ones} & ${zero})`), [], 0),
+    stdCase(type, 'bor', `std_${type}_bor_any`, '', 'I32', boolExpr(`${anyTrue}(${zero} | ${ones})`), [], 1),
+    stdCase(type, 'bxor', `std_${type}_bxor_zero`, '', 'I32', boolExpr(`${anyTrue}(${ones} ^ ${ones})`), [], 0),
+    stdCase(type, 'bnot', `std_${type}_bnot_zero`, '', 'I32', boolExpr(`${anyTrue}(~${zero})`), [], 1),
+    stdCase(type, 'eq', `std_${type}_eq_any`, '', 'I32', boolExpr(`${anyTrue}(${ones} == ${ones})`), [], 1),
+    stdCase(type, 'ne', `std_${type}_ne_any`, '', 'I32', boolExpr(`${anyTrue}(${ones} != ${zero})`), [], 1),
+    stdCase(type, 'andnot', `std_${type}_andnot`, '', 'I32', boolExpr(`${anyTrue}(${type}.andnot(${ones}, ${ones}))`), [], 0),
+    stdCase(type, 'bitselect', `std_${type}_bitselect`, '', 'I32', boolExpr(`${anyTrue}(${type}.bitselect(${ones}, ${zero}, ${ones}))`), [], 1),
+    stdCase(type, 'any_true', `std_${type}_any_true`, '', 'I32', boolExpr(`${anyTrue}(${ones})`), [], 1),
   ];
 }
 
@@ -251,7 +251,7 @@ function typedCases(type, returnType, cases, approx = null, stdlib = null) {
       stdlib,
       op,
       name: `std_${type}_${op}`,
-      returnType: boolReturn ? 'i32' : returnType,
+      returnType: boolReturn ? 'I32' : returnType,
       params: body.params,
       expr: boolReturn ? `if ${body.expr} { 1; } else { 0; }` : body.expr,
       args: body.args,
@@ -282,9 +282,9 @@ function callBinary(type, op, a, b) {
 }
 
 function arg(type, value) {
-  if (type === 'i64' || type === 'u64' || type === 'm64') return intLiteral(value);
-  if (type === 'f32' || type === 'f64') return Number(value);
-  if (type === 'bool') return value === 'true' ? 1 : 0;
+  if (type === 'I64' || type === 'U64' || type === 'M64') return intLiteral(value);
+  if (type === 'F32' || type === 'F64') return Number(value);
+  if (type === 'Bool') return value === 'true' ? 1 : 0;
   return Number(intLiteral(value));
 }
 

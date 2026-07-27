@@ -1,5 +1,6 @@
 import { restampSubtree } from './parse.js';
-import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
+import { createSyntheticNode, replaceNodeMeta, sourceId } from './ir-helpers.js';
+import { instantiatedModuleName, recordInstantiation } from './module-names.js';
 
 // instantiate-modules.js — Pass 3
 //
@@ -58,7 +59,7 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     if (!srcModule) throw new Error(`Module '${moduleName}' not found during instantiation`);
 
     // `using M |Alias|` on a parameterized module: clone including ir-module-params
-    // so the alias is itself parameterized. `Alias[i64, i64]` will find it by
+    // so the alias is itself parameterized. `Alias[I64, I64]` will find it by
     // name on the next pass through sweep 1 and instantiate it normally.
     // The original parameterized M is still cleaned up in sweep 2.
 
@@ -98,8 +99,8 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
   // ── Sweep 1b: inline auto-instantiation ──────────────────────────────────
   // Collect every ir-type-inst and ir-mod-call that references a parameterised
   // module and instantiate it on-demand using a deterministic mangled name.
-  // This handles `Array[i32]` used directly in types and expressions without
-  // a prior explicit `using Array[i32] |Alias|`.
+  // This handles `Array[I32]` used directly in types and expressions without
+  // a prior explicit `using Array[I32] |Alias|`.
 
   // First pass: collect unique (moduleName, concreteTypeNodes[]) combos.
   const inlineInsts = new Map(); // mangled name → { moduleName, typeArgEls }
@@ -130,6 +131,12 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     clone.dataset.instantiatedFrom = moduleName;
     clone.dataset.instantiatedFromOriginId = srcModule.dataset.originId ?? srcModule.id ?? '';
     clone.dataset.instantiatedAs = mangled;
+    // Record the arguments so consumers never have to split the mangled name
+    // apart — which is ambiguous once an argument is itself instantiated.
+    recordInstantiation(clone, moduleName, typeArgEls.map(typeNodeToText));
+    for (const decl of clone.querySelectorAll(':scope > ir-type-def, :scope > ir-struct, :scope > ir-enum')) {
+      if (decl.getAttribute('name') === '&') recordInstantiation(decl, moduleName, typeArgEls.map(typeNodeToText));
+    }
     clone.dataset.instantiatedAt = nodeOriginId(typeArgEls[0], srcModule);
     const paramNames = [...clone.querySelectorAll('ir-module-param')].map(p => p.getAttribute('name'));
     substituteTypeParams(clone, paramNames, typeArgEls, root.dataset.file);
@@ -168,6 +175,8 @@ export function instantiateModules(doc, { debugAssertions = false } = {}) {
     const methodName = [...node.querySelectorAll(':scope > ir-ident, :scope > ir-fn-name')].at(-1)?.getAttribute('name');
     callee.setAttribute('type', mangled);
     callee.setAttribute('method', methodName ?? '');
+    if (node.dataset.methodStart) callee.dataset.methodStart = node.dataset.methodStart;
+    if (node.dataset.methodEnd) callee.dataset.methodEnd = node.dataset.methodEnd;
     call.appendChild(callee);
     if (args) {
       const clone = args.cloneNode(true);
@@ -210,7 +219,7 @@ function substituteTypeParams(node, paramNames, concreteTypes, originFile) {
     clone.dataset.substitutedFrom = concreteTypes[idx].dataset.originId ?? concreteTypes[idx].id ?? '';
     ref.replaceWith(clone);
   }
-  // ir-type-inst[module="P"] — P used as a module reference (e.g. P[i32])
+  // ir-type-inst[module="P"] — P used as a module reference (e.g. P[I32])
   for (const inst of [...node.querySelectorAll('ir-type-inst')]) {
     const idx = paramNames.indexOf(inst.getAttribute('module'));
     if (idx < 0) continue;
@@ -231,12 +240,10 @@ function substituteTypeParams(node, paramNames, concreteTypes, originFile) {
   }
 }
 
-// Derive a deterministic mangled name for a module instantiation.
-// Array[i32]       → Array__i32
-// Map[str, i32]    → Map__str__i32
+// The naming convention lives in module-names.js; this only supplies the
+// argument spellings.
 function mangleName(moduleName, typeArgEls) {
-  const parts = typeArgEls.map(typeNodeToText);
-  return `${moduleName}__${parts.join('__')}`;
+  return instantiatedModuleName(moduleName, typeArgEls.map(typeNodeToText));
 }
 
 // Extract the module name from an ir-mod-call node's first identifier-like child.
@@ -250,21 +257,29 @@ function typeNodeToText(node) {
   switch (node.localName) {
     case 'ir-type-ref':      return node.getAttribute('name') ?? 'unknown';
     case 'ir-type-inst': {
-      const mod  = node.getAttribute('module') ?? '';
-      const args = [...node.children].map(typeNodeToText).join(',');
-      return args ? `${mod}[${args}]` : mod;
+      // Descend through the ir-type-args wrapper — mapping the wrapper itself
+      // yielded the literal text "ir-type-args" — and spell the result with the
+      // mangled form, since that is the name the nested instantiation actually
+      // hoists to. `Promise[Array[I32]]` must reach `Promise__Array__I32`, not
+      // `Promise__Array[ir-type-args]`.
+      const mod = node.getAttribute('module') ?? '';
+      const args = typeArgChildren(node).map(typeNodeToText);
+      return args.length ? instantiatedModuleName(mod, args) : mod;
     }
     case 'ir-type-void':     return 'void';
     default:                 return node.getAttribute('name') ?? node.localName;
   }
 }
 
+/** The type arguments of an ir-type-inst, past the ir-type-args wrapper. */
+function typeArgChildren(node) {
+  const args = node.querySelector(':scope > ir-type-args');
+  return [...(args?.children ?? node.children)];
+}
+
+// First node that has an origin id. `sourceId` owns what "origin id" means.
 function nodeOriginId(...nodes) {
-  for (const node of nodes) {
-    const id = node?.dataset?.originId ?? node?.id;
-    if (id) return id;
-  }
-  return '';
+  return nodes.map(sourceId).find(Boolean) ?? '';
 }
 
 function assertInstantiateModules(doc) {

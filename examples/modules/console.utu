@@ -7,7 +7,7 @@ mod Adder[T] {
 
 }
 
-fn main() i32 {
-    let y: f32 = Adder[f32].add(2.0,3.0);
-    Adder[i32].add(2,3);
+fn main() I32 {
+    let y: F32 = Adder[F32].add(2.0,3.0);
+    Adder[I32].add(2,3);
 }

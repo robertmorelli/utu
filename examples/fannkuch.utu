@@ -1,14 +1,14 @@
-let default_arg: i32 = 6;
+let default_arg: I32 = 6;
 
-fn swap(values: array[i32], left: i32, right: i32) void {
-    let temp: i32 = values[left];
+fn swap(values: Array[I32], left: I32, right: I32) void {
+    let temp: I32 = values[left];
     values[left] = values[right];
     values[right] = temp;
 }
 
-fn reverse_prefix(values: array[i32], last: i32) void {
-    let left: i32 = 0;
-    let right: i32 = last;
+fn reverse_prefix(values: Array[I32], last: I32) void {
+    let left: I32 = 0;
+    let right: I32 = last;
     for (0..<values.len) |step| {
         if left >= right {
             break;
@@ -19,15 +19,15 @@ fn reverse_prefix(values: array[i32], last: i32) void {
     };
 }
 
-fn copy_array(values: array[i32]) array[i32] {
-    let out: array[i32] = array[i32].new(values.len, 0);
+fn copy_array(values: Array[I32]) Array[I32] {
+    let out: Array[I32] = Array[I32].new(values.len, 0);
     for (0..<values.len) |i| {
         out[i] = values[i];
     };
     out;
 }
 
-fn count_flips_work(work: array[i32], flips: i32) i32 {
+fn count_flips_work(work: Array[I32], flips: I32) I32 {
     if work[0] == 0 {
         flips;
     } else {
@@ -36,19 +36,19 @@ fn count_flips_work(work: array[i32], flips: i32) i32 {
     };
 }
 
-fn count_flips(values: array[i32]) i32 {
-    let work: array[i32] = copy_array(values);
+fn count_flips(values: Array[I32]) I32 {
+    let work: Array[I32] = copy_array(values);
     count_flips_work(work, 0);
 }
 
-fn search(perm: array[i32], pos: i32) i32 {
+fn search(perm: Array[I32], pos: I32) I32 {
     if pos == perm.len {
         count_flips(perm);
     } else {
-        let best: i32 = 0;
+        let best: I32 = 0;
         for (pos..<perm.len) |i| {
             swap(perm, pos, i);
-            let candidate: i32 = search(perm, pos + 1);
+            let candidate: I32 = search(perm, pos + 1);
             if candidate > best {
                 best = candidate;
             };
@@ -58,8 +58,8 @@ fn search(perm: array[i32], pos: i32) i32 {
     };
 }
 
-fn fannkuch(n: i32) i32 {
-    let perm: array[i32] = array[i32].new(n, 0);
+fn fannkuch(n: I32) I32 {
+    let perm: Array[I32] = Array[I32].new(n, 0);
     for (0..<n) |i| {
         perm[i] = i;
     };
@@ -80,6 +80,6 @@ bench "fannkuch" {
     }
 }
 
-fn main() i32 {
+fn main() I32 {
     fannkuch(default_arg);
 }

@@ -32,6 +32,8 @@ import { buildGraph } from './build-graph.js';
 import { bringTargetToTopLevel } from './bring-target-to-top-level.js';
 import { checkModuleVariance } from './check-module-variance.js';
 import { lowerImplicitStructInit } from './lower-implicit-struct-init.js';
+import { lowerClosures } from './lower-closures.js';
+import { applyLiteralTypes } from './apply-literal-types.js';
 import { lowerPipe } from './lower-pipe.js';
 import { inlineImports } from './inline-imports.js';
 import { instantiateModules } from './instantiate-modules.js';
@@ -49,6 +51,7 @@ import { PLATFORM_SOURCES } from './platform-sources.generated.js';
 import { stampOriginFile } from './ir-helpers.js';
 import { createExplainabilityArtifacts, pushDiagnostic } from './explainability.js';
 import { collectAnalysisDiagnostics } from './collect-analysis-diagnostics.js';
+import { createAnalysisSnapshot } from './analysis-snapshot.js';
 import { collectPreludeModules } from './prelude.js';
 import { validateIrStructure } from './validate-ir-structure.js';
 import {
@@ -85,8 +88,8 @@ import {
  *   Parse a source string directly into IR (no file I/O).
  * @property {(filePath: string) => Promise<Document>} compileFile
  *   Read a file via the injected `readFile` and compile it to IR.
- * @property {(filePath: string) => Promise<{ doc: Document | null, artifacts: ReturnType<typeof createExplainabilityArtifacts> }>} analyzeFile
- *   Compile a file into IR plus structured explainability artifacts.
+ * @property {(filePath: string) => Promise<{ doc: Document | null, artifacts: ReturnType<typeof createExplainabilityArtifacts>, snapshot: ReturnType<typeof createAnalysisSnapshot> }>} analyzeFile
+ *   Compile a file into IR plus structured explainability artifacts and query snapshot.
  */
 
 /**
@@ -112,7 +115,7 @@ export function createCompiler(env) {
   function parseSource(source, filePath = '') {
     resetNodeIds();
     const tree   = parser.parse(source);
-    const ir     = treeToIR(tree, source, filePath, createDocument);
+    const ir     = treeToIR(tree, source, filePath, createDocument, { collectAnalysisTokens: target === 'analysis' });
     const root   = ir.body.firstChild;
     if (root && filePath) {
       root.setAttribute('data-file', filePath);
@@ -135,10 +138,12 @@ export function createCompiler(env) {
     try {
       const doc = await compileFileInternal(filePath);
       for (const diagnostic of collectAnalysisDiagnostics(doc)) pushDiagnostic(artifacts, diagnostic);
-      return { doc, artifacts };
+      const snapshot = createAnalysisSnapshot(doc, artifacts);
+      return { doc, artifacts, snapshot };
     } catch (error) {
       if (error?.diagnostic) pushDiagnostic(artifacts, error.diagnostic);
-      throw Object.assign(error, { artifacts });
+      const snapshot = createAnalysisSnapshot(null, artifacts);
+      throw Object.assign(error, { artifacts, snapshot });
     }
   }
 
@@ -152,6 +157,7 @@ export function createCompiler(env) {
       createDocument,
       target,
       debugAssertions,
+      collectAnalysisTokens: target === 'analysis',
     });
     debugAssert(graph.get(filePath), 'buildGraph');
     bringTargetToTopLevel(graph.get(filePath), { target, filePath, debugAssertions });
@@ -160,7 +166,7 @@ export function createCompiler(env) {
     debugAssert(doc, 'inlineImports');
 
     // ── Prelude injection ─────────────────────────────────────────────────────
-    // Prepend standard modules (i32, u32, …, Array) that are not already
+    // Prepend standard modules (I32, U32, …, Array) that are not already
     // present in the merged document.  Injected before the first child so
     // they appear as the earliest declarations and are visible to all passes.
     const mergedRoot = doc.body.firstChild;
@@ -170,7 +176,7 @@ export function createCompiler(env) {
         const src = stdlib.get(stdPath);
         if (!src) continue;
         const preludeTree = parser.parse(src);
-        const preludeDoc  = treeToIR(preludeTree, src, stdPath, createDocument);
+        const preludeDoc  = treeToIR(preludeTree, src, stdPath, createDocument, { collectAnalysisTokens: false });
         const child = preludeDoc.body.firstChild?.querySelector(`:scope > ir-module[name="${modName}"]`);
         if (!child) continue;
         const clone = child.cloneNode(true);
@@ -198,16 +204,28 @@ export function createCompiler(env) {
     expandDsls(doc, { dsls: dslRegistry, debugAssertions });
     debugAssert(doc, 'expandDsls');
     // Analysis passes
-    const typeIndex = linkTypeDecls(doc);
+    let typeIndex = linkTypeDecls(doc);
     debugAssert(doc, 'linkTypeDecls', { typeIndex });
     resolveBindings(doc);
     debugAssert(doc, 'resolveBindings', { typeIndex, requireBindings: true });
+    // Numeric literals take the type their context declares before inference
+    // runs, because that type feeds every enclosing expression.
+    applyLiteralTypes(doc, typeIndex);
+    debugAssert(doc, 'applyLiteralTypes', { typeIndex, requireBindings: true });
     inferTypes(doc, typeIndex);
     debugAssert(doc, 'inferTypes', { typeIndex, requireBindings: true });
+    // Closure conversion consumes the capture sets recorded by resolveBindings
+    // and the parameter types filled in by inferTypes, so it runs after both.
+    // It introduces one environment struct per closure, so the registry is
+    // rebuilt before any later pass reads a type from it.
+    if (lowerClosures(doc, typeIndex)) {
+      typeIndex = linkTypeDecls(doc);
+      debugAssert(doc, 'lowerClosures', { typeIndex, requireBindings: true });
+    }
     // Stamp field-access types early so operator overload dispatch in
-    // lowerOperators can read `data-type` off operands like `p.x`.
+    // lowerOperators can read `data-type-name` off operands like `p.x`.
     // resolveMethods re-runs the same loop later — idempotent because each
-    // node short-circuits once it already has data-type.
+    // node short-circuits once it already has data-type-name.
     stampFieldAccessTypes(doc, typeIndex);
     debugAssert(doc, 'stampFieldAccessTypes', { typeIndex, requireBindings: true });
     let converged = false;

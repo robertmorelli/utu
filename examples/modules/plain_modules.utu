@@ -1,22 +1,22 @@
 mod math {
     struct Pair:
-        | left : i32
-        | right : i32
+        | left : I32
+        | right : I32
 
-    fn Pair.new(left: i32, right: i32) Pair {
+    fn Pair.new(left: I32, right: I32) Pair {
         Pair { left: left, right: right };
     }
 
-    fn Pair.sum |self| () i32 {
+    fn Pair.sum |self| () I32 {
         self.left + self.right;
     }
 
-    fn inc(value: i32) i32 {
+    fn inc(value: I32) I32 {
         value + 1;
     }
 }
 
-fn pair_total(pair: math.Pair) i32 {
+fn pair_total(pair: math.Pair) I32 {
     pair.sum();
 }
 

@@ -1,0 +1,41 @@
+// std/prelude.utu — automatically injected into every compilation
+//
+// Every name listed here is visible in user code without an explicit `using`.
+// The compiler prepends these modules before processing any file.
+//
+// Scalar value types (stack-allocated, never nullable):
+//   I32, U32, I64, U64 — signed/unsigned integers
+//   F32, F64           — floating-point
+//   Bool               — boolean (I32 underneath, 0=false 1=true)
+//   M32, M64, M128     — bitmask integers (32/64/128-bit)
+//   V128               — 128-bit SIMD vector
+//
+// Reference types (heap-allocated, nullable via ?T):
+//   Str                — Binaryen stringref-backed host string
+//   Externref          — opaque host (JavaScript) reference
+//   I31                — 31-bit integer packed into a GC reference
+//
+// Generic collections:
+//   Array              — mutable GC Array, parameterised by element type
+//
+// Compiler directives:
+//   Promise[T]        — a real JavaScript promise, held as an externref
+//   LiteralDefaults   — `<ir-literal-defaults>` map for type inference
+
+using I32              from std:I32;
+using U32              from std:U32;
+using I64              from std:I64;
+using U64              from std:U64;
+using F32              from std:F32;
+using F64              from std:F64;
+using Bool             from std:Bool;
+using M32              from std:M32;
+using M64              from std:M64;
+using M128             from std:M128;
+using V128             from std:V128;
+using Str              from std:Str;
+using Externref        from std:Externref;
+using I31              from std:I31;
+using Array            from std:Array;
+using Promise          from std:Promise;
+using LiteralDefaults from std:LiteralDefaults;

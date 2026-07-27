@@ -15,12 +15,17 @@ import {
   binaryen,
   makeTypeMapper,
   makeScalarNamespaceLookup,
+  makeScalarKindLookup,
   collectScalarKinds,
 } from './types.js';
 import { emitFn } from './fn.js';
 import { describeIntrinsicWrapper } from './intrinsics.js';
 import { buildHeapTypes } from './heap-types.js';
 import { noteBinarySize, noteExport, noteStructType } from './explainability.js';
+import {
+  createSignatureTypes, installClosureImports, registerCallableTypes,
+} from './closures.js';
+import { linkTypeDecls } from '../link-type-decls.js';
 
 /**
  * @param {Document} doc  fully-analysed IR (target='normal')
@@ -45,9 +50,11 @@ export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
   if (!root) return m;
 
   // Phase 1 — register all top-level struct types in one TypeBuilder pass.
-  const structTypes        = buildHeapTypes(root);
+  const typeIndex          = linkTypeDecls(doc);
+  const structTypes        = buildHeapTypes(root, typeIndex);
   const toType             = makeTypeMapper(structTypes);
   const scalarNamespaceOf  = makeScalarNamespaceLookup(structTypes);
+  const scalarKindOf       = makeScalarKindLookup(structTypes);
   const scalarKinds        = collectScalarKinds(structTypes);
   for (const node of root.querySelectorAll(':scope > ir-struct, :scope > ir-enum, :scope > ir-enum > ir-variant')) {
     noteStructType(artifacts, node, structTypes.get(node.getAttribute('name')));
@@ -56,17 +63,29 @@ export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
   // fn-id index covers every ir-fn anywhere in the document, including std-lib
   // wrappers (so call resolution can detect them as intrinsics).
   const fnById = new Map();
+  const fnByName = new Map();
   for (const fn of root.querySelectorAll('ir-fn, ir-extern-fn')) {
     if (fn.id) fnById.set(fn.id, fn);
+    const name = fn.getAttribute('name');
+    if (name) fnByName.set(name, fn);
   }
+
+  // Callable types are structural, so they are registered from the stamped
+  // type names rather than from declarations — after the struct registry
+  // exists, since a signature may mention a struct.
+  const signatureRefType = createSignatureTypes();
+  registerCallableTypes(root, structTypes, toType, signatureRefType);
 
   const ctx = {
     module: m,
     fnById,
+    fnByName,
     structTypes,
     toType,
     scalarNamespaceOf,
+    scalarKindOf,
     scalarKinds,
+    signatureRefType,
     artifacts,
     debug: sourceMap ? createDebugInfo(m) : null,
   };
@@ -76,6 +95,9 @@ export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
     const result = toType(spec.result ?? 'void');
     m.addFunctionImport(spec.localName ?? spec.name, spec.module, spec.name, params, result);
   }
+
+  // Host closure imports must exist before any body that calls them.
+  installClosureImports(m, root, ctx);
 
   // Emit user fns (anything top-level that isn't itself an intrinsic wrapper).
   for (const fn of root.querySelectorAll(':scope > ir-fn')) {

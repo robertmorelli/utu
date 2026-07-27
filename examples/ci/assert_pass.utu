@@ -1,4 +1,4 @@
-fn main() str {
+fn main() Str {
     assert true;
     "ok";
 }

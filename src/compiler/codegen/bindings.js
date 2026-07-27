@@ -3,7 +3,10 @@
 import { binaryen } from './types.js';
 import { emitNullLiteral, isNullLiteral } from './null-literals.js';
 import { emitFieldSet } from './structs.js';
-import { firstTypeChild, typeNodeToStr } from '../ir-helpers.js';
+import { emitFunRef } from './closures.js';
+import { firstTypeChild, paramsOf, selfParamOf, typeNodeToStr } from '../ir-helpers.js';
+import { callableParts } from '../type-rules.js';
+import { isVoidStatement } from '../ir-tags.js';
 
 // ── Bindings ──────────────────────────────────────────────────────────────────
 
@@ -21,8 +24,14 @@ export function emitIdent(node, ctx, emitExpr) {
   const bid = node.dataset.bindingId;
   if (!bid) throw new Error(`codegen: ir-ident "${name}" has no binding`);
   const decl = ctx.fnById?.get(bid);
+  // A named function in value position is a function reference.  Checked
+  // before the zero-arg case below, so a `fun() R` value is not mistaken for a
+  // call to an `@es` value import.
+  if (decl && callableParts(node.dataset['typeName'])?.kind === 'fun') {
+    return emitFunRef(decl, ctx);
+  }
   if (decl && noParams(decl)) {
-    return ctx.module.call(decl.getAttribute('name'), [], ctx.toType(node.dataset.type ?? 'void'));
+    return ctx.module.call(decl.getAttribute('name'), [], ctx.toType(node.dataset['typeName'] ?? 'void'));
   }
   const slot = ctx.locals.get(bid);
   if (!slot) throw new Error(`codegen: ir-ident "${name}" has no local slot`);
@@ -30,7 +39,7 @@ export function emitIdent(node, ctx, emitExpr) {
 }
 
 function noParams(fn) {
-  return fn.querySelectorAll(':scope > ir-param-list > ir-param').length === 0 && !fn.querySelector(':scope > ir-self-param');
+  return paramsOf(fn).length === 0 && !selfParamOf(fn);
 }
 
 // ── Blocks & statements ──────────────────────────────────────────────────────
@@ -40,12 +49,12 @@ export function emitBlock(node, ctx, emitExpr) {
   if (stmts.length === 0) return ctx.module.nop();
 
   // Last statement is the block's value if the block is non-void.
-  // Fall back to the actual last child's type if the block's own data-type
+  // Fall back to the actual last child's type if the block's own data-type-name
   // is stale: inferTypes can leave the block untyped when its tail expression
   // depends on field accesses (typed by stampFieldAccessTypes later) or on
   // ir-call nodes synthesised by lowerOperators (typed by resolveMethods later).
-  const blockType = node.dataset.type
-    || node.children[node.children.length - 1]?.dataset.type;
+  const blockType = node.dataset['typeName']
+    || node.children[node.children.length - 1]?.dataset['typeName'];
   const valueType = blockType && blockType !== 'void'
     ? ctx.toType(blockType)
     : binaryen.none;
@@ -57,7 +66,7 @@ export function emitBlock(node, ctx, emitExpr) {
     const e = isLast && isNullLiteral(child) && blockType?.startsWith('?')
       ? emitNullLiteral(child, ctx, blockType)
       : emitExpr(child, ctx);
-    if (isLast || isVoidStmt(child)) {
+    if (isLast || isVoidStatement(child)) {
       exprs.push(e);
     } else {
       // Discard non-tail expression result so the block stays well-typed.
@@ -67,16 +76,9 @@ export function emitBlock(node, ctx, emitExpr) {
   return ctx.module.block(null, exprs, valueType);
 }
 
-function isVoidStmt(node) {
-  const t = node.localName;
-  return t === 'ir-let' || t === 'ir-assign' || t === 'ir-while' ||
-         t === 'ir-for' || t === 'ir-return' || t === 'ir-break' ||
-         t === 'ir-assert' || t === 'ir-fatal';
-}
-
 export function emitLet(node, ctx, emitExpr) {
   const init = node.children[node.children.length - 1];
-  const typeStr = readDeclaredType(node) ?? init.dataset.type ?? 'void';
+  const typeStr = readDeclaredType(node) ?? init.dataset['typeName'] ?? 'void';
   const initExpr = isNullLiteral(init) && typeStr.startsWith('?')
     ? emitNullLiteral(init, ctx, typeStr)
     : emitExpr(init, ctx);
@@ -85,7 +87,7 @@ export function emitLet(node, ctx, emitExpr) {
   return ctx.module.local.set(idx, initExpr);
 }
 
-// The declared type annotation, if the let has one (e.g. `let x: i32 = …`).
+// The declared type annotation, if the let has one (e.g. `let x: I32 = …`).
 // Falls back to the canonical reader so all passes agree on the type string.
 function readDeclaredType(letNode) {
   return typeNodeToStr(firstTypeChild(letNode));
@@ -113,14 +115,14 @@ export function emitAssign(node, ctx, emitExpr) {
 
 export function emitRefTest(node, ctx, emitExpr) {
   const inner = node.firstElementChild;
-  const typeName = node.getAttribute('type');
+  const typeName = node.getAttribute('type-name');
   if (!inner || !typeName) throw new Error('codegen: ir-ref-test missing expr or type');
   return ctx.module.ref.test(emitExpr(inner, ctx), ctx.toType(typeName));
 }
 
 export function emitRefCast(node, ctx, emitExpr) {
   const inner = node.firstElementChild;
-  const typeName = node.getAttribute('type');
+  const typeName = node.getAttribute('type-name');
   if (!inner || !typeName) throw new Error('codegen: ir-ref-cast missing expr or type');
   return ctx.module.ref.cast(emitExpr(inner, ctx), ctx.toType(typeName));
 }
@@ -130,4 +132,3 @@ export function emitRefIsNull(node, ctx, emitExpr) {
   if (!inner) throw new Error('codegen: ir-ref-is-null missing expr');
   return ctx.module.ref.is_null(emitExpr(inner, ctx));
 }
-

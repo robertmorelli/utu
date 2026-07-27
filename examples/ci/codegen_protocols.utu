@@ -1,47 +1,47 @@
 proto Measure:
-    | measure() i32
+    | measure() I32
 
 proto Area:
-    | get area : i32
+    | get area : I32
 
 proto CounterOps:
-    | get value : i32
-    | bump() i32
+    | get value : I32
+    | bump() I32
 
 tag struct Box[Measure]:
-    | width : i32
-    | height : i32
+    | width : I32
+    | height : I32
 
 tag struct Rect[Area]:
-    | area : i32
+    | area : I32
 
 tag struct Square[Measure]:
-    | side : i32
+    | side : I32
 
 tag struct Counter[CounterOps]:
-    | value : i32
+    | value : I32
 
 struct Shelf:
-    | items : array[Measure]
+    | items : Array[Measure]
     | current : Measure
 
-fn Measure[Box].measure |self| () i32 {
+fn Measure[Box].measure |self| () I32 {
     self.width * self.height;
 }
 
-fn Measure[Square].measure |self| () i32 {
+fn Measure[Square].measure |self| () I32 {
     self.side * self.side;
 }
 
-fn CounterOps[Counter].bump |self| () i32 {
+fn CounterOps[Counter].bump |self| () I32 {
     self.value + 1;
 }
 
-fn total_measure(first: Measure, shelf: Shelf) i32 {
+fn total_measure(first: Measure, shelf: Shelf) I32 {
     first.measure() + shelf.current.measure() + shelf.items[1].measure();
 }
 
-fn maybe_box(flag: bool) ?Box {
+fn maybe_box(flag: Bool) ?Box {
     if flag { Box { width: 2, height: 5 }; } else { Box.null; };
 }
 
@@ -76,7 +76,7 @@ test "protocol methods work with promote captures" {
 }
 
 test "protocol values can live in arrays fields and params" {
-    let items: array[Measure] = array.new_default(2);
+    let items: Array[Measure] = Array.new_default(2);
     items[0] = Box { width: 2, height: 3 };
     items[1] = Square { side: 4 };
     let shelf: Shelf = Shelf { items: items, current: items[0] };

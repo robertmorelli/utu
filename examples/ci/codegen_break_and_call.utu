@@ -1,9 +1,9 @@
-fn add_one(value: i64) i64 {
+fn add_one(value: I64) I64 {
     value + 1;
 }
 
-fn main() i64 {
-    let answer: i64 = 0;
+fn main() I64 {
+    let answer: I64 = 0;
     while () {
         answer = add_one(41);
         return answer;

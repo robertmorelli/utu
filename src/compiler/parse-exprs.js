@@ -3,7 +3,6 @@
 import {
   walkArgList, walkAssignExpr, walkBinaryExpr, walkCallExpr, walkElseExpr,
   walkFieldExpr, walkIdentifier, walkIndexExpr, walkLiteral, walkModCallExpr,
-  walkNamespaceCallExpr,
   walkNullExpr, walkParenExpr, walkPipeExpr, walkSliceExpr, walkTypeMemberExpr,
   walkUnaryExpr,
 } from './parse-exprs-basic.js';
@@ -13,8 +12,8 @@ import {
   walkMatchExpr, walkPromoteExpr, walkWhileExpr,
 } from './parse-exprs-control.js';
 import {
-  walkAssertExpr, walkBindExpr, walkBreakExpr, walkDslExpr, walkFatalExpr,
-  walkFieldInit, walkReturnExpr, walkStructInit,
+  walkAssertExpr, walkAwaitExpr, walkBindExpr, walkBreakExpr, walkClosureExpr, walkDslExpr,
+  walkFatalExpr, walkFieldInit, walkReturnExpr, walkStructInit,
 } from './parse-exprs-statements.js';
 
 export const walkers = {
@@ -27,7 +26,6 @@ export const walkers = {
   'else_expr':                   walkElseExpr,
   'pipe_expr':                   walkPipeExpr,
   'call_expr':                   walkCallExpr,
-  'namespace_call_expr':         walkNamespaceCallExpr,
   'type_member_expr':            walkTypeMemberExpr,
   'promoted_module_call_expr':   walkModCallExpr,
   'field_expr':                  walkFieldExpr,
@@ -49,6 +47,8 @@ export const walkers = {
   'assert_expr':                 walkAssertExpr,
   'struct_init':                 (n, doc, source, dispatch) => walkStructInit(n, doc, source, dispatch, false),
   'implicit_struct_init':        (n, doc, source, dispatch) => walkStructInit(n, doc, source, dispatch, true),
+  'closure_expr':                walkClosureExpr,
+  'await_expr':                  walkAwaitExpr,
   'dsl_expr':                    walkDslExpr,
   'match_arm':                   walkMatchArm,
   'match_default':               walkDefaultArm,

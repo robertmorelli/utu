@@ -11,9 +11,9 @@ mod counter[T] {
     }
 }
 
-using counter[i32] |ints|;
+using counter[I32] |ints|;
 
-fn step(value: i32) ints.Box {
+fn step(value: I32) ints.Box {
     ints.Box.new(value + 1);
 }
 
@@ -24,8 +24,8 @@ bench "module counter get" {
     }
 }
 
-fn main() i32 {
+fn main() I32 {
     let alias_box: ints.Box = step(9);
-    let inline_box: counter[i32].Box = counter[i32].Box.new(12);
+    let inline_box: counter[I32].Box = counter[I32].Box.new(12);
     alias_box.get() + inline_box.get();
 }

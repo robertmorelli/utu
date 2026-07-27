@@ -19,12 +19,12 @@ import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
  *   resolvePath — (fromFile: string, importPath: string) => string
  *                 resolves a relative import path to an absolute key
  *   stdlib      — Map<string, string>  platform URI → utu source
- *                 e.g. "std:array" → "<source>". Defaults to empty map.
+ *                 e.g. "std:Array" → "<source>". Defaults to empty map.
  * @returns {Promise<{ graph: Map<string, Document>, order: string[] }>}
  *   graph — filePath → linkedom Document (ir-source-file at body.firstChild)
  *   order — topological order, dependencies before dependents
  */
-export async function buildGraph(entryPath, { parser, readFile, resolvePath, stdlib = new Map(), createDocument = createIRDocument, target = 'analysis', debugAssertions = false }) {
+export async function buildGraph(entryPath, { parser, readFile, resolvePath, stdlib = new Map(), createDocument = createIRDocument, target = 'analysis', debugAssertions = false, collectAnalysisTokens = target === 'analysis' }) {
   /** @type {Map<string, Document>} */
   const graph = new Map();
   /** @type {string[]} */
@@ -45,7 +45,7 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
     color.set(filePath, 'active');
 
     const tree   = parser.parse(source);
-    const doc    = treeToIR(tree, source, filePath, createDocument);
+    const doc    = treeToIR(tree, source, filePath, createDocument, { collectAnalysisTokens });
     // Every ir-source-file needs data-file so cloned nodes can trace back to
     // their origin. This is the one place we know the canonical path.
     const fileRoot = doc.body.firstChild;
@@ -67,7 +67,7 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
       for (const u of [...root.querySelectorAll('ir-using[from]')]) {
         const raw = u.getAttribute('from');
         u.dataset.importFromRaw = raw;
-        // Platform URIs (e.g. std:array, node:fs) are looked up in the stdlib
+        // Platform URIs (e.g. std:Array, node:fs) are looked up in the stdlib
         // registry and kept as-is (the URI is the canonical key). Relative and
         // absolute file paths go through resolvePath as before.
         const isPlatformUri = isPlatformImportPath(raw);
@@ -99,7 +99,7 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
 }
 
 function isPlatformImportPath(path) {
-  return /^[a-z][a-zA-Z0-9_]*:[a-z][a-zA-Z0-9_]*$/.test(path);
+  return /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(path);
 }
 
 function assertBuildGraph(graph, order) {

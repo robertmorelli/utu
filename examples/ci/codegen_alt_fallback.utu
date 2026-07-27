@@ -1,16 +1,16 @@
 enum Shape:
-    | Circle { radius: i32 }
-    | Rect { width: i32, height: i32 }
-    | Triangle { base: i32, height: i32 }
+    | Circle { radius: I32 }
+    | Rect { width: I32, height: I32 }
+    | Triangle { base: I32, height: I32 }
 
-fn classify(shape: Shape) i32 {
+fn classify(shape: Shape) I32 {
     alt shape {
         Circle |c| => c.radius,
         ~> fallback_score(shape),
     };
 }
 
-fn fallback_score(shape: Shape) i32 {
+fn fallback_score(shape: Shape) I32 {
     alt shape {
         Rect => 20,
         Triangle => 30,

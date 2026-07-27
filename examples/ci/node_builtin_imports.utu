@@ -1,7 +1,7 @@
-let substring: fun(str, i32, i32) str = @es/\(s, start, end) => s.substring(start, end)\/;
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let substring: fun(Str, I32, I32) Str = @es/\(s, start, end) => s.substring(start, end)\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
-fn readme_prefix() str {
+fn readme_prefix() Str {
     substring("# UTU README", 0, 5);
 }
 

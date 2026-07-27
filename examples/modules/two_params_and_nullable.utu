@@ -16,9 +16,9 @@ mod duo[L, R] {
     }
 }
 
-using duo[i32, i32] |ints|;
+using duo[I32, I32] |ints|;
 
-fn maybe_pair(flag: bool) ?ints.Pair {
+fn maybe_pair(flag: Bool) ?ints.Pair {
     if flag { ints.Pair.new(2, 9); } else { null; };
 }
 
@@ -33,6 +33,6 @@ test "module types work in nullable positions" {
 }
 
 test "inline two parameter type paths work" {
-    let pair: duo[i32, i32].Pair = ints.Pair.new(5, 6);
+    let pair: duo[I32, I32].Pair = ints.Pair.new(5, 6);
     assert pair.left() == 5;
 }

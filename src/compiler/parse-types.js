@@ -29,24 +29,12 @@ function walkTypeIdent(n, doc, source, dispatch) {
   return node;
 }
 
-// `scalar_type` is a grammar-level alternation of the built-in scalar names
-// (i32, f64, bool, …).  The set of accepted names lives in the grammar for
-// parsing convenience only — the IR treats every scalar exactly the same as
-// any other type reference, so we lower it to `<ir-type-ref>` here.  Adding
-// a new scalar width is therefore a stdlib change (plus one grammar string
-// alt) rather than a compiler-wide change.
-function walkScalarType(n, doc, source, dispatch) {
-  const node = stamp(el(T.TYPE_REF, doc), n);
-  node.setAttribute('name', text(n));
-  return node;
-}
-
 function walkQualifiedTypeRef(n, doc, source, dispatch) {
   const node = stamp(el(T.TYPE_QUALIFIED, doc), n);
   node.setAttribute('raw', text(n));
   const children = namedChildren(n);
   const typeName = children[children.length - 1];
-  if (typeName) node.setAttribute('type', text(typeName));
+  if (typeName) node.setAttribute('type-name', text(typeName));
   for (const child of children.slice(0, -1)) {
     const ir = dispatch(child, doc, source);
     if (ir) node.appendChild(ir);
@@ -67,10 +55,29 @@ function walkInstModuleRef(n, doc, source, dispatch) {
 }
 
 function walkFuncType(n, doc, source, dispatch) {
-  const node = stamp(el(T.TYPE_FN, doc), n);
+  return walkCallableType(n, doc, source, dispatch, T.TYPE_FN);
+}
+
+function walkClosureType(n, doc, source, dispatch) {
+  return walkCallableType(n, doc, source, dispatch, T.TYPE_CL);
+}
+
+// `fun(...) R` and `cl(...) R` have identical shape; only the tag differs.
+//
+// The parameter list arrives wrapped in a `type_list`, whose children are the
+// real types. Splicing them in here rather than letting the wrapper through is
+// what makes them ordinary type nodes: otherwise the list survives as opaque
+// raw text, and everything downstream has to re-parse that string — which also
+// hides any module instantiation inside it, so `fun(Str) Promise[Str]` would
+// never instantiate `Promise[Str]`.
+function walkCallableType(n, doc, source, dispatch, tag) {
+  const node = stamp(el(tag, doc), n);
   for (const child of namedChildren(n)) {
-    const ir = dispatch(child, doc, source);
-    if (ir) node.appendChild(ir);
+    const parts = child.type === 'type_list' ? namedChildren(child) : [child];
+    for (const part of parts) {
+      const ir = dispatch(part, doc, source);
+      if (ir) node.appendChild(ir);
+    }
   }
   return node;
 }
@@ -86,11 +93,11 @@ function walkVoidType(n, doc, source, dispatch) {
 export const walkers = {
   'nullable_type':          walkNullableType,
   'ref_type':               walkRefType,
-  'scalar_type':            walkScalarType,
   'type_ident':             walkTypeIdent,
   'qualified_type_ref':     walkQualifiedTypeRef,
   'instantiated_module_ref': walkInstModuleRef,
   'func_type':              walkFuncType,
+  'closure_type':           walkClosureType,
   'promoted_type':          walkPromotedType,
   'void_type':              walkVoidType,
 };

@@ -30,6 +30,7 @@ import { walkers as declWalkers } from './parse-decls.js';
 import { walkers as exprWalkers } from './parse-exprs.js';
 import { walkers as typeWalkers } from './parse-types.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { ANALYSIS_TOKENS, collectAnalysisTokens } from './analysis-tokens.js';
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 // These were previously defined here; now they live in parse-helpers.js.
@@ -135,11 +136,18 @@ function walkSyntaxDiagnostics(node, acc) {
  * @param {string} source
  * @param {() => Document} [createDoc] - document factory for DI.
  */
-export function treeToIR(tree, source, sourceFileOrCreateDoc = '', maybeCreateDoc = createIRDocument) {
+export function treeToIR(tree, source, sourceFileOrCreateDoc = '', maybeCreateDoc = createIRDocument, options = {}) {
+  if (typeof maybeCreateDoc === 'object' && maybeCreateDoc !== null) {
+    options = maybeCreateDoc;
+    maybeCreateDoc = createIRDocument;
+  }
   const createDoc = typeof sourceFileOrCreateDoc === 'function' ? sourceFileOrCreateDoc : maybeCreateDoc;
   const sourceFile = (typeof sourceFileOrCreateDoc === 'string' ? sourceFileOrCreateDoc : '') || '<memory>';
   const doc  = createDoc();
   doc.__utuSourceFile = sourceFile;
+  if (options.collectAnalysisTokens) {
+    doc[ANALYSIS_TOKENS] = collectAnalysisTokens(tree.rootNode, sourceFile);
+  }
   const root = walkSourceFile(tree.rootNode, doc, source);
   stampSyntaxDiagnostics(root, tree.rootNode);
   doc.body.appendChild(root);

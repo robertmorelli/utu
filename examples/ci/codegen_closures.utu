@@ -1,0 +1,58 @@
+struct Counter:
+    | n : I32
+
+fn double(x: I32) I32 {
+    x * 2;
+}
+
+fn call_fun(n: I32) I32 {
+    let f: fun(I32) I32 = double;
+    f(n);
+}
+
+fn call_closure(n: I32) I32 {
+    let f: cl(I32) I32 = cl(x) { x * n; };
+    f(3);
+}
+
+fn decayed(n: I32) I32 {
+    let c: cl(I32) I32 = double;
+    c(n);
+}
+
+fn nested(m: I32) I32 {
+    let outer: cl(I32) I32 = cl(x) {
+        let inner: cl(I32) I32 = cl(y) { y + m; };
+        inner(x);
+    };
+    outer(5);
+}
+
+fn capture_modes() I32 {
+    let base: I32 = 100;
+    let c: Counter = Counter { n: 1 };
+    let read: cl() I32 = cl() { base + c.n; };
+    base = 999;
+    c.n = 5;
+    read();
+}
+
+test "fun values call through the function table" {
+    assert call_fun(21) == 42;
+}
+
+test "closures capture their environment" {
+    assert call_closure(7) == 21;
+}
+
+test "a fun decays to a closure" {
+    assert decayed(4) == 8;
+}
+
+test "a nested closure sees captures threaded through the outer one" {
+    assert nested(4) == 9;
+}
+
+test "scalars are snapshot, GC references are shared" {
+    assert capture_modes() == 105;
+}

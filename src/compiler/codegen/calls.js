@@ -6,10 +6,22 @@ import {
   emitWrapperBody,
   matchScalarIntrinsic,
 } from './intrinsics.js';
+import { emitClosureCall, emitFunCall } from './closures.js';
+import { callableParts } from '../type-rules.js';
 
 // ── Calls ─────────────────────────────────────────────────────────────────────
 
 export function emitCall(node, ctx, emitExpr) {
+  // Calling a callable *value* rather than a named function.  `fun` is a wasm
+  // function reference, so the call stays inside wasm via call_ref; `cl` is a
+  // JS function, so the call goes out through a per-signature host import.
+  const calleeParts = callableParts(node.firstElementChild?.dataset?.['typeName']);
+  if (calleeParts) {
+    return calleeParts.kind === 'fun'
+      ? emitFunCall(node, calleeParts, ctx, emitExpr)
+      : emitClosureCall(node, calleeParts, ctx, emitExpr);
+  }
+
   const fn = resolveCallTarget(node, ctx);
   if (!fn) throw new Error('codegen: ir-call has unresolved target');
 
@@ -42,7 +54,7 @@ export function emitCall(node, ctx, emitExpr) {
   }
 
   const argExprs = callArgNodes.map(a => emitExpr(a, ctx));
-  const retType = ctx.toType(node.dataset.type ?? 'void');
+  const retType = ctx.toType(node.dataset['typeName'] ?? 'void');
   return ctx.module.call(fn.getAttribute('name'), argExprs, retType);
 }
 
@@ -76,11 +88,11 @@ export function emitOrElse(node, ctx, emitExpr) {
   const [expr, fallback] = [...node.children];
   if (!expr || !fallback) throw new Error('codegen: ir-else missing expr/fallback');
 
-  const exprType = expr.dataset.type ?? '';
+  const exprType = expr.dataset['typeName'] ?? '';
   if (!exprType.startsWith('?')) return emitExpr(expr, ctx);
 
   const m = ctx.module;
-  const resultType = ctx.toType(node.dataset.type ?? exprType.slice(1));
+  const resultType = ctx.toType(node.dataset['typeName'] ?? exprType.slice(1));
   const slot = ctx.addLocal(exprType);
   const init = m.local.set(slot, emitExpr(expr, ctx));
   const get = () => m.local.get(slot, ctx.toType(exprType));

@@ -1,7 +1,7 @@
 import { DOMParser } from 'linkedom/worker';
 import { treeToIR } from './parse.js';
 import { T } from './ir-tags.js';
-import { createSyntheticNode } from './ir-helpers.js';
+import { createSyntheticNode, firstTypeChild, typeNodeToStr } from './ir-helpers.js';
 
 export function createStandardDsls({ parser, createDocument }) {
   return {
@@ -97,41 +97,19 @@ function expandEsDsl({ doc, node, body, freshName }) {
   };
 }
 
-function firstTypeChild(node) {
-  return [...node.children].find(child => child.localName?.startsWith('ir-type-')) ?? null;
-}
-
+// Types are spelled by the shared reader — a local copy here previously did not
+// know about `cl(...)`, so a closure-typed parameter silently vanished from the
+// import signature.
 function signatureFromType(typeNode) {
   if (typeNode.localName === T.TYPE_FN) {
     const children = [...typeNode.children];
-    const ret = children[children.length - 1];
-    const rawList = children[0]?.localName === 'ir-unknown' && children[0].getAttribute('ts-type') === 'type_list'
-      ? children[0].getAttribute('raw')
-      : null;
     return {
       isFunction: true,
-      params: rawList ? splitTypeList(rawList) : children.slice(0, -1).map(typeNameFromNode).filter(Boolean),
-      result: typeNameFromNode(ret) ?? 'void',
+      params: children.slice(0, -1).map(typeNodeToStr).filter(Boolean),
+      result: typeNodeToStr(children[children.length - 1]) ?? 'void',
     };
   }
-  return { isFunction: false, params: [], result: typeNameFromNode(typeNode) };
-}
-
-function splitTypeList(raw) {
-  return raw.split(',').map(part => part.trim()).filter(Boolean);
-}
-
-function typeNameFromNode(typeNode) {
-  if (!typeNode) return null;
-  switch (typeNode.localName) {
-    case T.TYPE_REF: return typeNode.getAttribute('name');
-    case T.TYPE_VOID: return 'void';
-    case T.TYPE_NULLABLE: {
-      const inner = typeNameFromNode(typeNode.firstElementChild);
-      return inner ? `?${inner}` : null;
-    }
-    default: return null;
-  }
+  return { isFunction: false, params: [], result: typeNodeToStr(typeNode) };
 }
 
 function buildExternFn(doc, site, name, sig, importName) {
@@ -160,6 +138,10 @@ function buildExternFn(doc, site, name, sig, importName) {
 function buildValueWrapper(doc, site, name, resultType, call) {
   const fn = createSyntheticNode(doc, T.FN, site, 'expand-dsls', 'dsl-es-value-wrapper');
   fn.setAttribute('name', name);
+  // `let x: I32 = @es/\…\/` imports a *value*, but is represented as a zero-arg
+  // function so the import can be called on demand.  Referencing the name must
+  // therefore yield the imported value, not a function pointer to the wrapper.
+  fn.dataset.valueAccessor = 'true';
   const fnName = createSyntheticNode(doc, T.FN_NAME, site, 'expand-dsls', 'dsl-es-value-wrapper-name');
   fnName.setAttribute('name', name);
   fnName.setAttribute('raw', name);

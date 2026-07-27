@@ -13,7 +13,7 @@ Status legend (right-hand margin on each item):
 Wasm dialect: WasmGC + reference types + bulk memory + mutable globals.
 Today's binaryen feature flags (`codegen/index.js`) only enable
 `MutableGlobals | BulkMemory`; everything reference-typed will require flipping
-on `GC | ReferenceTypes` (and `SIMD128` for v128) before it can validate.
+on `GC | ReferenceTypes` (and `SIMD128` for V128) before it can validate.
 
 ---
 
@@ -59,13 +59,13 @@ the dispatch instructions that target it. They do not add user-visible fields.
 
 ### `tag` on a **struct**                                          **PLAN**
 
-Adds a synthetic first field `__tag : i32` set at construction. The tag value
+Adds a synthetic first field `__tag : I32` set at construction. The tag value
 is fixed per type and assigned by `link-type-decls` (any nominal struct gets a
 unique non-zero tag in its type-family). Used by `alt` over an open
 struct hierarchy.
 
 ```wat
-(type $T (struct (field $__tag i32) (field $f1 …) …))
+(type $T (struct (field $__tag I32) (field $f1 …) …))
 ```
 
 ### `rec` on a **struct**                                          **PLAN**
@@ -85,7 +85,7 @@ See the variant-enum section for details.
 
 ### `tag rec`                                                     **PLAN**
 
-Both apply: the struct has a `__tag : i32` first field *and* is extensible.
+Both apply: the struct has a `__tag : I32` first field *and* is extensible.
 `alt` may dispatch by tag (cheaper) or by `br_on_cast` (necessary if the variant
 carries fields the parent doesn't). Codegen prefers tag dispatch when the arms
 only need to discriminate (no field reads on cast value).
@@ -109,10 +109,10 @@ representation.
 
 ```
 proto P:
-  | get a : i32
-  | set b : f64
+  | get a : I32
+  | set b : F64
   | get set c : T1
-  | foo(i32, f64) T2
+  | foo(I32, F64) T2
   | bar() void
 ```
 
@@ -122,11 +122,11 @@ Lowers to:
 ;; one funcref slot per member; getters/setters get distinct slots
 (type $P_vtable
   (struct
-    (field $get_a (ref (func (param (ref $P_data)) (result i32))))
-    (field $set_b (ref (func (param (ref $P_data)) (param f64))))
+    (field $get_a (ref (func (param (ref $P_data)) (result I32))))
+    (field $set_b (ref (func (param (ref $P_data)) (param F64))))
     (field $get_c (ref (func (param (ref $P_data)) (result <T1>))))
     (field $set_c (ref (func (param (ref $P_data)) (param  <T1>))))
-    (field $foo   (ref (func (param (ref $P_data)) (param i32) (param f64) (result <T2>))))
+    (field $foo   (ref (func (param (ref $P_data)) (param I32) (param F64) (result <T2>))))
     (field $bar   (ref (func (param (ref $P_data)))))))
 ```
 
@@ -222,13 +222,13 @@ T1 { field1: 10, field2: x }
 →
 
 ```wat
-(struct.new $T1 (i32.const 10) (local.get $x))
+(struct.new $T1 (I32.const 10) (local.get $x))
 ```
 
 For `tag` structs, the `__tag` field is prepended automatically:
 
 ```wat
-(struct.new $T1 (i32.const <tag-of-T1>) (i32.const 10) (local.get $x))
+(struct.new $T1 (I32.const <tag-of-T1>) (I32.const 10) (local.get $x))
 ```
 
 Implicit init `&{ … }` is identical — `&` is resolved to the surrounding
@@ -250,12 +250,12 @@ Enums are always `tag` per spec. Two sub-shapes:
 tag enum Color: | Red | Green | Blue
 ```
 
-Lowers to a plain i32 valtype. No struct allocated. Variant constants
+Lowers to a plain I32 valtype. No struct allocated. Variant constants
 assigned at link time:
 
 ```wat
 ;; Red = 0, Green = 1, Blue = 2
-(i32.const 0) (i32.const 1) (i32.const 2)
+(I32.const 0) (I32.const 1) (I32.const 2)
 ```
 
 ### Variant enum (named-field variants)
@@ -263,29 +263,29 @@ assigned at link time:
 ```utu
 tag enum Result[T]:
   | Ok  { value : T }
-  | Err { message : str }
+  | Err { message : Str }
 ```
 
 Lowers to a parent-and-subtypes hierarchy:
 
 ```wat
-(type $Result      (sub (struct (field $__tag i32))))
-(type $Result_Ok   (sub $Result (struct (field $__tag i32) (field $value <T>))))
-(type $Result_Err  (sub $Result (struct (field $__tag i32) (field $message externref))))
+(type $Result      (sub (struct (field $__tag I32))))
+(type $Result_Ok   (sub $Result (struct (field $__tag I32) (field $value <T>))))
+(type $Result_Err  (sub $Result (struct (field $__tag I32) (field $message Externref))))
 ```
 
 > **WasmGC subtyping note.** The `$__tag` in `$Result_Ok` is **not a second
 > field** — it's the WasmGC text-format requirement that a subtype spell out
 > the full prefix of its parent's fields. Physically there is **one** tag slot
 > at offset 0; the parent's `$__tag` and the child's `$__tag` are the same
-> memory. `struct.new $Result_Ok (tag) (value)` allocates 2 i32 slots
+> memory. `struct.new $Result_Ok (tag) (value)` allocates 2 I32 slots
 > (+ object header), not 3. Field labels in WasmGC are local to each type def;
 > we reuse the name for clarity but they're independent symbols.
 
 Construction `Ok { value: 42 }`:
 
 ```wat
-(struct.new $Result_Ok (i32.const 0) (i32.const 42))
+(struct.new $Result_Ok (I32.const 0) (I32.const 42))
 ;; tag (offset 0) | value (offset 4)
 ```
 
@@ -316,7 +316,7 @@ Mangled name `T.foo`, self prepended as the first param:
 (func $T.foo (param $t1 <ref-to-T>) (param $a …) … (result <ret>) …)
 ```
 
-For `T = i32` etc., self is the scalar valtype directly.
+For `T = I32` etc., self is the scalar valtype directly.
 For struct/enum self, self is `(ref $T)`. The wasm function is plain — no
 implicit dispatch. All call-site monomorphism.
 
@@ -326,14 +326,14 @@ Same as a free fn but namespaced under T. No self param.
 
 ### Operator overload `fn T:add |a, b| T`                               **DONE (intrinsics) / PLAN (user-defined)**
 
-For std-lib scalar wrappers (`fn i32:add |a,b| i32 { @ir/\ <ir-i32-add/> \/ }`),
+For std-lib scalar wrappers (`fn I32:add |a,b| I32 { @ir/\ <ir-i32-add/> \/ }`),
 the function is **never emitted as a real wasm function**. `lowerOperators`
-rewrites `a + b` to `i32:add(a, b)`; `emitCall` sees the wrapper, recognizes
+rewrites `a + b` to `I32:add(a, b)`; `emitCall` sees the wrapper, recognizes
 its `@ir` body via `describeIntrinsicWrapper` (`codegen/intrinsics.js`), and
 inlines the corresponding wasm op directly:
 
 ```wat
-(i32.add <a-expr> <b-expr>)
+(I32.add <a-expr> <b-expr>)
 ```
 
 User-defined overloads on user types lower as ordinary methods (a real wasm
@@ -357,12 +357,12 @@ provided (rare); otherwise there is no body and each impl must supply one.
 
 - `&` is resolved by `expandPromotedType` (in earlier passes) to the module's
   promoted type before codegen sees the IR.
-- `using M[i32, f64]` produces a fresh instantiation. Names inside are
+- `using M[I32, F64]` produces a fresh instantiation. Names inside are
   mangled with the type-arg suffixes: `M__i32__f64.fn_name`,
   `M__i32__f64.&` (which itself was already resolved to the type name).
-- `using M[i32, f64] |Alias|` adds an in-scope alias; codegen still sees the
+- `using M[I32, F64] |Alias|` adds an in-scope alias; codegen still sees the
   mangled global name.
-- Inline instantiation `Array[i32].new(10)` triggers auto-instantiation
+- Inline instantiation `Array[I32].new(10)` triggers auto-instantiation
   (already implemented and tested).
 
 `mod` does not nest — enforced at parse time.
@@ -380,13 +380,13 @@ codegen reads the `<ir-wasm-*>` node from inside the `ir-type-def` and emits:
 
 | `<ir-wasm-…>` form                              | wasm type emitted                                       | status   |
 |-------------------------------------------------|---------------------------------------------------------|----------|
-| `<ir-wasm-scalar kind="i32"/>`                  | `i32` (no type def — collapsed to valtype)              | **DONE** |
-| `<ir-wasm-scalar kind="f64"/>` …                | `f64` …                                                 | **DONE** |
+| `<ir-wasm-scalar kind="I32"/>`                  | `I32` (no type def — collapsed to valtype)              | **DONE** |
+| `<ir-wasm-scalar kind="F64"/>` …                | `F64` …                                                 | **DONE** |
 | `<ir-wasm-array elem="T" mut="true"/>`          | `(type $name (array (mut <T>)))`                        | **PLAN** |
 | `<ir-wasm-array elem="T" mut="false"/>`         | `(type $name (array <T>))`                              | **PLAN** |
-| `<ir-wasm-extern/>`                             | `externref` (collapsed to valtype)                      | **PLAN** |
-| `<ir-wasm-i31/>`                                | `i31ref` (collapsed to valtype)                         | **PLAN** |
-| `<ir-wasm-v128/>`                               | `v128` (collapsed to valtype)                           | **PLAN** |
+| `<ir-wasm-extern/>`                             | `Externref` (collapsed to valtype)                      | **PLAN** |
+| `<ir-wasm-I31/>`                                | `i31ref` (collapsed to valtype)                         | **PLAN** |
+| `<ir-wasm-V128/>`                               | `V128` (collapsed to valtype)                           | **PLAN** |
 
 Type-arg substitution into the `@ir` body is done **before** codegen
 (`module-instantiate` pass), so the codegen always sees concrete elements.
@@ -399,7 +399,7 @@ Pure pre-codegen concern. By the time codegen runs, every name has been
 resolved to its instantiated module's mangled identifier. `using` produces no
 wasm output of its own.
 
-Auto-imports (`i32 u32 i64 u64 f32 f64 bool str Array`) are handled by the
+Auto-imports (`I32 U32 I64 U64 F32 F64 Bool Str Array`) are handled by the
 loader registering them in the binding scope; codegen sees no difference
 between an explicit and an auto `using`.
 
@@ -409,25 +409,25 @@ between an explicit and an auto `using`.
 
 | utu      | wasm valtype  | notes                                            | status   |
 |----------|---------------|--------------------------------------------------|----------|
-| `i32`    | `i32`         | signed ops                                       | **DONE** |
-| `u32`    | `i32`         | unsigned ops (`div_u`, `shr_u`, `lt_u`, …)       | **DONE** |
-| `i64`    | `i64`         |                                                  | **DONE** |
-| `u64`    | `i64`         |                                                  | **DONE** |
-| `f32`    | `f32`         |                                                  | **DONE** |
-| `f64`    | `f64`         |                                                  | **DONE** |
-| `bool`   | `i32`         | 0 = false, 1 = true; comparisons return 0/1      | **DONE** |
-| `m32`    | `i32`         | mask — only bitwise + comparison ops legal       | **PLAN** |
-| `m64`    | `i64`         |                                                  | **PLAN** |
-| `m128`   | `v128`        |                                                  | **PLAN** |
-| `v128`   | `v128`        | requires `Features.SIMD128`                      | **PLAN** |
-| `str`    | `externref`   | constructed via host imports                     | **PLAN** |
-| `Array[T]` | `(ref $Array_T)` (per-T monomorph)            | mutable WasmGC array                | **PLAN** |
+| `I32`    | `I32`         | signed ops                                       | **DONE** |
+| `U32`    | `I32`         | unsigned ops (`div_u`, `shr_u`, `lt_u`, …)       | **DONE** |
+| `I64`    | `I64`         |                                                  | **DONE** |
+| `U64`    | `I64`         |                                                  | **DONE** |
+| `F32`    | `F32`         |                                                  | **DONE** |
+| `F64`    | `F64`         |                                                  | **DONE** |
+| `Bool`   | `I32`         | 0 = false, 1 = true; comparisons return 0/1      | **DONE** |
+| `M32`    | `I32`         | mask — only bitwise + comparison ops legal       | **PLAN** |
+| `M64`    | `I64`         |                                                  | **PLAN** |
+| `M128`   | `V128`        |                                                  | **PLAN** |
+| `V128`   | `V128`        | requires `Features.SIMD128`                      | **PLAN** |
+| `Str`    | `Externref`   | constructed via host imports                     | **PLAN** |
+| `Array[T]` | `(ref $Array_T)` (per-T monomorph)            | mutable WasmGC Array                | **PLAN** |
 | `?T` (ref) | `(ref null $T)`                              | nullable ref                        | **PLAN** |
 | `?T` (scalar) | not allowed                              | type checker rejects                | **DONE** |
 
 The scalar codegen relies on namespace-mapping in `codegen/intrinsics.js`:
-`u32→i32`, `u64→i64`. Unsigned intent is preserved by which **op variant** is
-called (e.g. `i32.div_u`), not by a separate type id.
+`U32→I32`, `U64→I64`. Unsigned intent is preserved by which **op variant** is
+called (e.g. `I32.div_u`), not by a separate type id.
 
 ---
 
@@ -448,13 +448,13 @@ then lowered the normal way.
 
 ### Logical `and / or / not / xor`                                       **DONE**
 
-Lowered through the normal operator pipeline on `bool`:
+Lowered through the normal operator pipeline on `Bool`:
 
 ```wat
-and  →  bool:and(a, b)
-or   →  bool:or(a, b)
-xor  →  bool:xor(a, b)
-not  →  bool:not(a)
+and  →  Bool:and(a, b)
+or   →  Bool:or(a, b)
+xor  →  Bool:xor(a, b)
+not  →  Bool:not(a)
 ```
 
 The stdlib definitions use `@ir` to reach the underlying wasm ops, so the
@@ -482,7 +482,7 @@ arm.
 
 `lowerPipe` rewrites to an ordinary `ir-call`. Zero runtime cost.
 
-### Assignment `=`                                                       **DONE for scalar + struct fields / PLAN for globals + array index**
+### Assignment `=`                                                       **DONE for scalar + struct fields / PLAN for globals + Array index**
 
 - `x = v` where x is a local → `(local.set $x v)`.
 - `g = v` where g is a global → `(global.set $g v)` (PLAN — globals not yet
@@ -491,7 +491,7 @@ arm.
   `codegen/structs.js`, dispatched from `emitAssign` when LHS is an
   ir-field-access).
 - `a[i] = v` → `lowerOperators` rewrites to `Array[T].set_index(a, i, v)`;
-  the impl uses `array.set` (PLAN).
+  the impl uses `Array.set` (PLAN).
 
 ---
 
@@ -501,10 +501,10 @@ arm.
 
 | literal             | wasm                                       | status   |
 |---------------------|--------------------------------------------|----------|
-| `42`, `0xff`, `0b…` | `i32.const N` (default; promotes to i64 by use-site)| **DONE** |
-| `3.14`, `1e-9`      | `f64.const N` (default; coerced to f32 by use-site) | **DONE** |
-| `true` / `false`    | `i32.const 1` / `i32.const 0`              | **DONE** |
-| `"hello"`           | host-import call returning externref       | **PLAN** |
+| `42`, `0xff`, `0b…` | `I32.const N` (default; promotes to I64 by use-site)| **DONE** |
+| `3.14`, `1e-9`      | `F64.const N` (default; coerced to F32 by use-site) | **DONE** |
+| `true` / `false`    | `I32.const 1` / `I32.const 0`              | **DONE** |
+| `"hello"`           | host-import call returning Externref       | **PLAN** |
 | `\\multiline`       | concatenation of line literals via host import | **PLAN** |
 | `null`              | `ref.null <inferred-ref-type>`             | **DONE for `T.null` on registered structs / PLAN for bare `null` literal** |
 
@@ -525,10 +525,10 @@ node to an explicit `ir-struct-init[type="..."]` using the surrounding
 declared type before codegen runs, so `emitStructInit` doesn't even know
 which form the user wrote.
 
-### Array `Array[i32].new(10)`                                           **PLAN**
+### Array `Array[I32].new(10)`                                           **PLAN**
 
 ```wat
-(array.new_default $Array_i32 (i32.const 10))
+(Array.new_default $Array_i32 (I32.const 10))
 ```
 
 ### Field access `expr.field`                                            **DONE**
@@ -549,13 +549,13 @@ For unsigned-narrowing fields (e.g. `i8` packed in struct — not in spec yet),
 `lowerOperators` rewrites to `T.get_index(a, i)`. For `Array[T]`:
 
 ```wat
-(array.get $Array_T <a> <i>)
+(Array.get $Array_T <a> <i>)
 ```
 
 ### Slice `a[s, e]`                                                      **PLAN**
 
-`lowerOperators` rewrites to `T.get_slice(a, s, e)`. Impl in std:array
-allocates a new array and copies via `array.copy`. No first-class wasm slice.
+`lowerOperators` rewrites to `T.get_slice(a, s, e)`. Impl in std:Array
+allocates a new Array and copies via `Array.copy`. No first-class wasm slice.
 
 ### Call `foo(a, b)` and `T.method(a)`                                   **DONE**
 
@@ -588,7 +588,7 @@ Two paths in `emitMatch` (`codegen/control.js`):
     (block $arm_n …
       (block $arm_0
         (br_table $arm_0 … $arm_n $default
-          (i32.sub <expr> (i32.const <min>)))))    ;; idx = expr - min
+          (I32.sub <expr> (I32.const <min>)))))    ;; idx = expr - min
     arm_0_body  br $result …)
   default_body  br $result)
 ```
@@ -599,25 +599,25 @@ Cache scrutinee in a local, then if/else chain:
 
 ```wat
 (local.set $s <expr>)
-(if (i32.eq (local.get $s) (i32.const 0))
+(if (I32.eq (local.get $s) (I32.const 0))
   (then arm_0_body)
-  (else (if (i32.eq (local.get $s) (i32.const 100))
+  (else (if (I32.eq (local.get $s) (I32.const 100))
           (then arm_1_body)
           (else default_body))))
 ```
 
 Both paths support void-typed match (no `result`, arms `br` without payload).
 
-Pattern types other than int (bool, float, str) are **PLAN**:
-- `bool` — same dense table with min=0, two arms.
-- `float` — sparse-only path (`f64.eq` instead of `i32.eq`); never br_table.
-- `str` — chain of `str.eq` host-import calls; sparse-only.
+Pattern types other than int (Bool, float, Str) are **PLAN**:
+- `Bool` — same dense table with min=0, two arms.
+- `float` — sparse-only path (`F64.eq` instead of `I32.eq`); never br_table.
+- `Str` — chain of `Str.eq` host-import calls; sparse-only.
 
 ### `alt expr { Variant => …, ~> default }`                               **DONE for unbound rec-alt with distinct runtime shapes / STUB for bound arms and tag-alt**
 
 Three sub-shapes depending on the scrutinee's nominal qualifier:
 
-**Over a `tag` enum (i32 tag, no payload variants):**
+**Over a `tag` enum (I32 tag, no payload variants):**
 
 Identical to `match` over the tag value. Variants are pre-assigned
 contiguous tags by `link-type-decls`, so the dense `br_table` path always
@@ -703,8 +703,8 @@ in `codegen/control.js` header.
 
 ### `for (a … b) |i| { … }` and `for (a ..< b) |i| { … }`                **PLAN**
 
-Inclusive `…` and exclusive `..<` iterators over an i64 range. Capture `|i|` is
-**always i64** (spec: "for loop captures are always i64").
+Inclusive `…` and exclusive `..<` iterators over an I64 range. Capture `|i|` is
+**always I64** (spec: "for loop captures are always I64").
 
 ```wat
 ;; for (a ... b) |i|       — inclusive
@@ -712,13 +712,13 @@ Inclusive `…` and exclusive `..<` iterators over an i64 range. Capture `|i|` i
 (local.set $end <b-expr>)
 (block $brk
   (loop $cnt
-    (br_if $brk (i64.gt_s (local.get $i) (local.get $end)))
+    (br_if $brk (I64.gt_s (local.get $i) (local.get $end)))
     <body>
-    (local.set $i (i64.add (local.get $i) (i64.const 1)))
+    (local.set $i (I64.add (local.get $i) (I64.const 1)))
     (br $cnt)))
 ```
 
-`..<` differs only in `i64.ge_s` (exit when `i >= end`) instead of `i64.gt_s`.
+`..<` differs only in `I64.ge_s` (exit when `i >= end`) instead of `I64.gt_s`.
 
 Labels: `for outer: (…) |i| { … }` wraps both blocks with `$outer_brk` /
 `$outer_cnt` labels usable by labeled `break`.
@@ -728,7 +728,7 @@ Labels: `for outer: (…) |i| { … }` wraps both blocks with `$outer_brk` /
 ```wat
 (block $brk
   (loop $cnt
-    (br_if $brk (i32.eqz <cond>))
+    (br_if $brk (I32.eqz <cond>))
     <body>
     (br $cnt)))
 ```
@@ -754,19 +754,19 @@ argument (or whichever position the placeholder occupied).
 ### `assert cond`                                                        **PLAN**
 
 ```wat
-(if (i32.eqz <cond>)
-  (then (call $__utu_assert_failed (i32.const <span-id>))
+(if (I32.eqz <cond>)
+  (then (call $__utu_assert_failed (I32.const <span-id>))
         (unreachable)))
 ```
 
 `$__utu_assert_failed` is a host import (`(import "utu" "assert_failed"
-(func (param i32)))`). The span-id maps to a string in the
+(func (param I32)))`). The span-id maps to a string in the
 debug-side-table for error reporting.
 
 ### `fatal`                                                              **PLAN**
 
 ```wat
-(call $__utu_fatal (i32.const <span-id>))
+(call $__utu_fatal (I32.const <span-id>))
 (unreachable)
 ```
 
@@ -794,15 +794,15 @@ Allows `break label` from anywhere inside.
 
 | utu form        | wasm                                                | status   |
 |-----------------|-----------------------------------------------------|----------|
-| `i32.clz(x)`    | `(i32.clz <x>)`                                     | **DONE** |
-| `i32.ctz(x)`    | `(i32.ctz <x>)`                                     | **DONE** |
-| `i32.popcnt(x)` | `(i32.popcnt <x>)`                                  | **DONE** |
-| `i64.clz(x)` …  | `(i64.clz <x>)` …                                   | **DONE** |
-| `f32.sqrt(x)`   | `(f32.sqrt <x>)`                                    | **DONE** |
-| `f32.floor/ceil/trunc/nearest(x)` | corresponding wasm op            | **DONE** |
-| `f64.…(x)` …    | as above                                            | **DONE** |
-| `str.char(n)`   | `(call $__utu_str_char <n>)` (host import)          | **PLAN** |
-| `i31.get(x)`    | `(i31.get_s <x>)` (signed by spec convention)       | **PLAN** |
+| `I32.clz(x)`    | `(I32.clz <x>)`                                     | **DONE** |
+| `I32.ctz(x)`    | `(I32.ctz <x>)`                                     | **DONE** |
+| `I32.popcnt(x)` | `(I32.popcnt <x>)`                                  | **DONE** |
+| `I64.clz(x)` …  | `(I64.clz <x>)` …                                   | **DONE** |
+| `F32.sqrt(x)`   | `(F32.sqrt <x>)`                                    | **DONE** |
+| `F32.floor/ceil/trunc/nearest(x)` | corresponding wasm op            | **DONE** |
+| `F64.…(x)` …    | as above                                            | **DONE** |
+| `Str.char(n)`   | `(call $__utu_str_char <n>)` (host import)          | **PLAN** |
+| `I31.get(x)`    | `(I31.get_s <x>)` (signed by spec convention)       | **PLAN** |
 | `T.null`        | `(ref.null $T)`                                     | **PLAN** |
 
 Mechanism: each is the wasm op directly inlined by `codegen/intrinsics.js`,
@@ -880,9 +880,9 @@ pass/fail per test.
 ```wat
 (func $__bench_N (export "__bench_N")
   …setup…
-  (call $__utu_bench_start (i32.const <id>))
+  (call $__utu_bench_start (I32.const <id>))
   …measure-body…
-  (call $__utu_bench_end (i32.const <id>))
+  (call $__utu_bench_end (I32.const <id>))
   …teardown…)
 ```
 
@@ -897,8 +897,8 @@ host calls.
 Every type-parameterized declaration is monomorphized at instantiation. The
 mangling convention is `Name__Arg1__Arg2…`:
 
-- `Array[i32]` → `Array__i32`
-- `Pair[i32, str]` → `Pair__i32__str`
+- `Array[I32]` → `Array__I32`
+- `Pair[I32, Str]` → `Pair__i32__str`
 - `M1[A, B].foo` → `M1__A__B.foo`
 
 Codegen never sees a generic — by the time we reach `codegen/index.js`, every
@@ -922,7 +922,7 @@ m.setFeatures(
   binaryen.Features.BulkMemory     |
   binaryen.Features.ReferenceTypes |
   binaryen.Features.GC             |
-  binaryen.Features.SIMD128            // only if v128 used
+  binaryen.Features.SIMD128            // only if V128 used
 );
 ```
 

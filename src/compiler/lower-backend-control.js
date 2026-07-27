@@ -1,6 +1,9 @@
 import { restampSubtree } from './parse.js';
 import { createSyntheticNode } from './ir-helpers.js';
 
+import { typeEntryDecl } from './link-type-decls.js';
+import { unwrapNullable } from './type-strings.js';
+
 export function lowerBackendControl(doc, typeIndex, { target = 'normal' } = {}) {
   if (target === 'analysis') return;
   const root = doc.body.firstChild;
@@ -21,10 +24,10 @@ function lowerAlt(alt, typeIndex) {
   const scrutinee = alt.firstElementChild;
   const arms = [...alt.querySelectorAll(':scope > ir-alt-arm')];
   const defaultArm = alt.querySelector(':scope > ir-default-arm');
-  const scrutType = scrutinee?.dataset.type ?? '';
+  const scrutType = scrutinee?.dataset['typeName'] ?? '';
   if (!scrutinee || !scrutType || arms.length === 0) return null;
 
-  const decl = typeIndex.get(scrutType);
+  const decl = typeEntryDecl(typeIndex.get(scrutType));
   if (decl?.localName === 'ir-enum') return lowerTagAlt(alt, typeIndex, decl, scrutinee, arms, defaultArm);
   return lowerRecAlt(alt, scrutinee, arms, defaultArm);
 }
@@ -69,7 +72,7 @@ function lowerPromote(node) {
   const scrutinee = node.firstElementChild;
   const thenArm = node.querySelector(':scope > ir-promote-arm');
   const defaultArm = node.querySelector(':scope > ir-default-arm');
-  const scrutType = scrutinee?.dataset.type ?? '';
+  const scrutType = scrutinee?.dataset['typeName'] ?? '';
   if (!scrutinee || !thenArm || !scrutType.startsWith('?')) return null;
 
   const block = lowerSubjectBlock(node, scrutinee);
@@ -80,14 +83,14 @@ function lowerPromote(node) {
   ifNode.appendChild(elseBody ?? wrapBody(node, createSyntheticNode(node.ownerDocument, 'ir-fatal', node, 'lower-backend-control', 'promote-null-fatal')));
   ifNode.appendChild(thenBody);
   block.node.appendChild(ifNode);
-  if (node.dataset.type) block.node.dataset.type = node.dataset.type;
+  if (node.dataset['typeName']) block.node.dataset['typeName'] = node.dataset['typeName'];
   return block.node;
 }
 
 function lowerPromoteBody(site, subjectLet, subjectName, arm) {
   const binding = site.getAttribute('binding');
   const scrutType = subjectLet.firstElementChild?.getAttribute('name') ?? '';
-  const valueType = scrutType.startsWith('?') ? scrutType.slice(1) : scrutType;
+  const valueType = unwrapNullable(scrutType);
   const body = cloneBody(arm);
   if (!binding || !site.id) return wrapBody(site, body);
 
@@ -119,9 +122,9 @@ function lowerSubjectBlock(site, scrutinee) {
   const subjectName = `__ctl_subj_${site.id || 'anon'}`;
   const subjectLet = createSyntheticNode(doc, 'ir-let', site, 'lower-backend-control', 'control-subject');
   const subjectType = createSyntheticNode(doc, 'ir-type-ref', site, 'lower-backend-control', 'control-subject-type');
-  const scrutType = scrutinee.dataset.type ?? '';
+  const scrutType = scrutinee.dataset['typeName'] ?? '';
   subjectLet.setAttribute('name', subjectName);
-  subjectLet.dataset.type = scrutType;
+  subjectLet.dataset['typeName'] = scrutType;
   subjectType.setAttribute('name', scrutType);
   subjectLet.appendChild(subjectType);
   subjectLet.appendChild(cloneNode(scrutinee));
@@ -136,7 +139,7 @@ function makeBindingLet(site, subjectLet, subjectName, name, id, type, initExpr)
   letNode.id = id;
   letNode.dataset.originId = site.dataset.originId ?? id;
   letNode.setAttribute('name', name);
-  letNode.dataset.type = type;
+  letNode.dataset['typeName'] = type;
   typeNode.setAttribute('name', type);
   letNode.appendChild(typeNode);
   letNode.appendChild(initExpr);
@@ -146,8 +149,8 @@ function makeBindingLet(site, subjectLet, subjectName, name, id, type, initExpr)
 function makeRefTest(site, subjectLet, subjectName, variant) {
   const doc = site.ownerDocument;
   const test = createSyntheticNode(doc, 'ir-ref-test', site, 'lower-backend-control', 'ref-test');
-  test.setAttribute('type', variant ?? '');
-  test.dataset.type = 'bool';
+  test.setAttribute('type-name', variant ?? '');
+  test.dataset['typeName'] = 'Bool';
   test.appendChild(makeBoundIdent(subjectLet, subjectName));
   return test;
 }
@@ -155,9 +158,9 @@ function makeRefTest(site, subjectLet, subjectName, variant) {
 function makeRefIsNull(site, subjectLet, subjectName, scrutType) {
   const doc = site.ownerDocument;
   const test = createSyntheticNode(doc, 'ir-ref-is-null', site, 'lower-backend-control', 'ref-is-null');
-  test.dataset.type = 'bool';
+  test.dataset['typeName'] = 'Bool';
   const ident = makeBoundIdent(subjectLet, subjectName);
-  ident.dataset.type = scrutType;
+  ident.dataset['typeName'] = scrutType;
   test.appendChild(ident);
   return test;
 }
@@ -165,8 +168,8 @@ function makeRefIsNull(site, subjectLet, subjectName, scrutType) {
 function makeRefCast(site, subjectLet, subjectName, type) {
   const doc = site.ownerDocument;
   const cast = createSyntheticNode(doc, 'ir-ref-cast', site, 'lower-backend-control', 'ref-cast');
-  cast.setAttribute('type', type);
-  cast.dataset.type = type;
+  cast.setAttribute('type-name', type);
+  cast.dataset['typeName'] = type;
   cast.appendChild(makeBoundIdent(subjectLet, subjectName));
   return cast;
 }
@@ -174,7 +177,7 @@ function makeRefCast(site, subjectLet, subjectName, type) {
 function makeFieldAccess(site, recv, field, type) {
   const fieldNode = createSyntheticNode(site.ownerDocument, 'ir-field-access', site, 'lower-backend-control', 'field-access');
   fieldNode.setAttribute('field', field);
-  fieldNode.dataset.type = type;
+  fieldNode.dataset['typeName'] = type;
   fieldNode.appendChild(recv);
   return fieldNode;
 }
@@ -190,8 +193,8 @@ function makeEqTest(site, lhs, rhsValue, tagType, eqFn) {
   callee.setAttribute('method', 'eq');
   lit.setAttribute('kind', 'int');
   lit.setAttribute('value', String(rhsValue));
-  lit.dataset.type = tagType;
-  call.dataset.type = 'bool';
+  lit.dataset['typeName'] = tagType;
+  call.dataset['typeName'] = 'Bool';
   if (eqFn) {
     call.dataset.fnId = eqFn.id;
     call.dataset.fnOriginId = eqFn.dataset.originId ?? eqFn.id;
@@ -207,7 +210,7 @@ function makeEqTest(site, lhs, rhsValue, tagType, eqFn) {
 }
 
 function enumTagType(node) {
-  return node.getAttribute('tag-type') ?? node.dataset.tagType ?? 'i32';
+  return node.getAttribute('tag-type') ?? node.dataset.tagType ?? 'I32';
 }
 
 function makeIf(site, cond, thenBody, elseBody) {
@@ -215,8 +218,8 @@ function makeIf(site, cond, thenBody, elseBody) {
   ifNode.appendChild(cond);
   ifNode.appendChild(thenBody);
   if (elseBody) ifNode.appendChild(elseBody);
-  const t = thenBody.dataset.type ?? elseBody?.dataset.type;
-  if (t) ifNode.dataset.type = t;
+  const t = thenBody.dataset['typeName'] ?? elseBody?.dataset['typeName'];
+  if (t) ifNode.dataset['typeName'] = t;
   return ifNode;
 }
 
@@ -227,27 +230,27 @@ function makeBoundIdent(subjectLet, subjectName) {
   ident.dataset.bindingOriginId = subjectLet.dataset.originId ?? subjectLet.id;
   ident.dataset.bindingKind = subjectLet.localName;
   ident.dataset.bindingName = subjectName;
-  ident.dataset.type = subjectLet.dataset.type ?? subjectLet.firstElementChild?.getAttribute('name') ?? '';
+  ident.dataset['typeName'] = subjectLet.dataset['typeName'] ?? subjectLet.firstElementChild?.getAttribute('name') ?? '';
   return ident;
 }
 
 function wrapBody(site, body) {
   if (body.localName === 'ir-block') return body;
   const block = createSyntheticNode(site.ownerDocument, 'ir-block', body, 'lower-backend-control', 'body-block');
-  if (body.dataset.type) block.dataset.type = body.dataset.type;
+  if (body.dataset['typeName']) block.dataset['typeName'] = body.dataset['typeName'];
   block.appendChild(body);
   return block;
 }
 
 function stampBlockType(block, site, arms, defaultArm) {
-  const resultType = site.dataset.type
-    ?? arms[0]?.lastElementChild?.dataset.type
-    ?? defaultArm?.lastElementChild?.dataset.type;
-  if (resultType) block.dataset.type = resultType;
+  const resultType = site.dataset['typeName']
+    ?? arms[0]?.lastElementChild?.dataset['typeName']
+    ?? defaultArm?.lastElementChild?.dataset['typeName'];
+  if (resultType) block.dataset['typeName'] = resultType;
 }
 
 function tagValue(typeIndex, enumDecl, arm) {
-  const variantDecl = typeIndex.get(arm.getAttribute('variant') ?? '');
+  const variantDecl = typeEntryDecl(typeIndex.get(arm.getAttribute('variant') ?? ''));
   const variants = [...enumDecl.querySelectorAll(':scope > ir-variant')];
   return Math.max(0, variants.indexOf(variantDecl));
 }

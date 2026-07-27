@@ -3,7 +3,7 @@
 import { emitRefIntrinsic, emitScalarIntrinsic, matchScalarIntrinsic } from './intrinsics.js';
 import {
   emitIf, emitWhile, emitReturn, emitBreak,
-  emitMatch, emitAlt, emitPromote,
+  emitMatch, emitAlt, emitPromote, emitAssert, emitFatal,
 } from './control.js';
 import { emitStructInit, emitFieldGet, emitNullRef } from './structs.js';
 import { emitLit } from './literals.js';
@@ -12,6 +12,7 @@ import {
   emitRefCast, emitRefIsNull, emitRefTest,
 } from './bindings.js';
 import { emitCall, emitOrElse } from './calls.js';
+import { emitAwait, emitClosureDecay, emitMakeClosure } from './closures.js';
 import { emitStringIntrinsic } from './strings.js';
 
 export function emitExpr(node, ctx) {
@@ -39,6 +40,11 @@ export function emitExpr(node, ctx) {
     case 'ir-binary':
     case 'ir-unary':
       throw new Error(`codegen: residual <${node.localName}> reached backend — operator lowering should have rewritten it`);
+    case 'ir-make-closure':  expr = emitMakeClosure(node, ctx, emitExpr); break;
+    case 'ir-closure-decay': expr = emitClosureDecay(node, ctx, emitExpr); break;
+    case 'ir-await':         expr = emitAwait(node, ctx, emitExpr); break;
+    case 'ir-assert':        expr = emitAssert(node, ctx, emitExpr); break;
+    case 'ir-fatal':         expr = emitFatal(node, ctx); break;
     case 'ir-if':            expr = emitIf(node, ctx, emitExpr); break;
     case 'ir-while':         expr = emitWhile(node, ctx, emitExpr); break;
     case 'ir-return':        expr = emitReturn(node, ctx, emitExpr); break;

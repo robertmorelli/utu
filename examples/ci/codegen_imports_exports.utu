@@ -1,12 +1,12 @@
-let console_log: fun(str) void = @es/\console.log\/;
-let wrap: fun(str) str = @es/\(value) => `[${value}]`\/;
-let str_eq: fun(str, str) bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let console_log: fun(Str) void = @es/\console.log\/;
+let wrap: fun(Str) Str = @es/\(value) => `[${value}]`\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
-fn greet(name: str) str {
+fn greet(name: Str) Str {
     name -o wrap;
 }
 
-fn main() i64 {
+fn main() I64 {
     3;
 }
 

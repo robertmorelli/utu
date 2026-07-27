@@ -6,11 +6,67 @@ import { T } from './ir-tags.js';
 export function walkBindExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.LET, doc), n);
   const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
+  if (children[0]) {
+    node.setAttribute('name', text(children[0]));
+    node.dataset.nameStart = String(children[0].startIndex);
+    node.dataset.nameEnd = String(children[0].endIndex);
+  }
   for (const child of children.slice(1)) {
     const ir = dispatch(child, doc, source);
     if (ir) node.appendChild(ir);
   }
+  return node;
+}
+
+// cl(x, y) [R] { ... }
+//
+// Shaped like an ir-fn on purpose: ir-param-list, optional return type, then
+// ir-block.  Closure conversion lifts this node into a real top-level ir-fn,
+// so keeping the child order identical means the lifted function needs no
+// re-shaping.  Parameter types are optional here — when absent, they are
+// filled in from the closure's expectation during inference.
+export function walkClosureExpr(n, doc, source, dispatch) {
+  const node = stamp(el(T.CLOSURE, doc), n);
+  for (const child of namedChildren(n)) {
+    switch (child.type) {
+      case 'closure_param_list': {
+        const paramList = stamp(el(T.PARAM_LIST, doc), child);
+        for (const p of namedChildren(child)) {
+          if (p.type !== 'closure_param') continue;
+          const param = stamp(el(T.PARAM, doc), p);
+          const parts = namedChildren(p);
+          if (parts[0]) param.setAttribute('name', text(parts[0]));
+          if (parts[1]) param.appendChild(dispatch(parts[1], doc, source));
+          paramList.appendChild(param);
+        }
+        node.appendChild(paramList);
+        break;
+      }
+      case 'return_type': {
+        // tree-sitter wraps the real type; unwrap it as walkFnDecl does.
+        const inner = namedChildren(child)[0];
+        if (inner) node.appendChild(dispatch(inner, doc, source));
+        break;
+      }
+      default: {
+        const ir = dispatch(child, doc, source);
+        if (ir) node.appendChild(ir);
+      }
+    }
+  }
+  // An empty parameter list is still a parameter list — downstream passes read
+  // it positionally, so synthesise one when the source wrote `cl() { … }`.
+  if (!node.querySelector(':scope > ir-param-list')) {
+    node.insertBefore(stamp(el(T.PARAM_LIST, doc), n), node.firstChild);
+  }
+  return node;
+}
+
+// await p — one operand, the promise.
+export function walkAwaitExpr(n, doc, source, dispatch) {
+  const node = stamp(el(T.AWAIT, doc), n);
+  const inner = namedChildren(n)[0];
+  if (inner) node.appendChild(dispatch(inner, doc, source));
   return node;
 }
 
@@ -42,7 +98,7 @@ export function walkStructInit(n, doc, source, dispatch, implicit) {
   const children = namedChildren(n);
   let i = 0;
   if (!implicit && children[i] && (children[i].type === 'type_ident' || children[i].type === 'qualified_type_ref')) {
-    node.setAttribute('type', text(children[i]));
+    node.setAttribute('type-name', text(children[i]));
     i++;
   }
   for (; i < children.length; i++) {

@@ -1,6 +1,6 @@
-// std/u32.utu — u32 scalar type module
-mod u32 {
-    type & = @ir/\ <ir-wasm-scalar kind="u32"/> \/
+// std/U32.utu — U32 scalar type module
+mod U32 {
+    type & = @ir/\ <ir-wasm-scalar type-repr="wasm-i32"/> \/
 
     fn &:add  |a, b| & { @ir/\ <ir-u32-add><ir-ident name="a"/><ir-ident name="b"/></ir-u32-add> \/; }
     fn &:sub  |a, b| & { @ir/\ <ir-u32-sub><ir-ident name="a"/><ir-ident name="b"/></ir-u32-sub> \/; }
@@ -13,15 +13,15 @@ mod u32 {
     fn &:shl  |a, b| & { @ir/\ <ir-u32-shl><ir-ident name="a"/><ir-ident name="b"/></ir-u32-shl> \/; }
     fn &:shr  |a, b| & { @ir/\ <ir-u32-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-shr-u> \/; }
     fn &:ushr |a, b| & { @ir/\ <ir-u32-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-shr-u> \/; }
-    fn &:eq   |a, b| bool { @ir/\ <ir-u32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-u32-eq> \/; }
-    fn &:ne   |a, b| bool { @ir/\ <ir-u32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-u32-ne> \/; }
-    fn &:lt   |a, b| bool { @ir/\ <ir-u32-lt-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-lt-u> \/; }
-    fn &:le   |a, b| bool { @ir/\ <ir-u32-le-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-le-u> \/; }
-    fn &:gt   |a, b| bool { @ir/\ <ir-u32-gt-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-gt-u> \/; }
-    fn &:ge   |a, b| bool { @ir/\ <ir-u32-ge-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-ge-u> \/; }
-    // wasm has no u32.neg / u32.not; express them with real ops.
+    fn &:eq   |a, b| Bool { @ir/\ <ir-u32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-u32-eq> \/; }
+    fn &:ne   |a, b| Bool { @ir/\ <ir-u32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-u32-ne> \/; }
+    fn &:lt   |a, b| Bool { @ir/\ <ir-u32-lt-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-lt-u> \/; }
+    fn &:le   |a, b| Bool { @ir/\ <ir-u32-le-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-le-u> \/; }
+    fn &:gt   |a, b| Bool { @ir/\ <ir-u32-gt-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-gt-u> \/; }
+    fn &:ge   |a, b| Bool { @ir/\ <ir-u32-ge-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-ge-u> \/; }
+    // wasm has no U32.neg / U32.not; express them with real ops.
     //   neg a  = 0 - a   (well-defined mod 2^32)
     //   bnot a = a xor 0xFFFFFFFF
-    fn &:neg  |a| & { @ir/\ <ir-u32-sub><ir-lit kind="int" type="u32" value="0"/><ir-ident name="a"/></ir-u32-sub> \/; }
-    fn &:bnot |a| & { @ir/\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type="u32" value="-1"/></ir-u32-xor> \/; }
+    fn &:neg  |a| & { @ir/\ <ir-u32-sub><ir-lit kind="int" type-name="U32" value="0"/><ir-ident name="a"/></ir-u32-sub> \/; }
+    fn &:bnot |a| & { @ir/\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="U32" value="-1"/></ir-u32-xor> \/; }
 }

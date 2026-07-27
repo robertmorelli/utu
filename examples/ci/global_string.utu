@@ -1,5 +1,5 @@
-let greeting: str = "hello";
+let greeting: Str = "hello";
 
-fn main() str {
+fn main() Str {
     greeting;
 }
