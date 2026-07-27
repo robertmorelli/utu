@@ -127,8 +127,15 @@ type(first) --id--> type(parent)
 ```
 
 The first occurrence is the authority; it binds the expectation of every later
-one, and the comparison happens where it always does. `if c { x } else { y }`
-makes `type(x)` the type of the whole expression and expects `y` to match.
+one. `if c { x } else { y }` makes `type(x)` the type of the whole expression
+and expects `y` to match.
+
+**Confluence compares differently from a declared context.** A declared type
+coerces one way — the value must fit the declaration. Branches *unify*: either
+may widen to the other, and `null` is compatible with both, so
+`if c { 1 } else { T.null }` is accepted. Because the relation differs, these
+edges are not recorded as `data-expect`; folding them into the same comparison
+would silently tighten the language.
 
 This is deliberate. A lattice join would need a least-upper-bound over a
 nominal type system that does not have one, and would erase which branch was

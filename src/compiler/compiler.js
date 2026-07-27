@@ -46,6 +46,7 @@ import { resolveMethods, stampFieldAccessTypes } from './resolve-methods.js';
 import { expandDsls } from './expand-dsls.js';
 import { lowerBackendControl } from './lower-backend-control.js';
 import { validateAnalysis } from './validate-analysis.js';
+import { recordExpectations } from './record-expectations.js';
 import { createStandardDsls } from './standard-dsls.js';
 import { PLATFORM_SOURCES } from './platform-sources.generated.js';
 import { stampOriginFile } from './ir-helpers.js';
@@ -244,6 +245,11 @@ export function createCompiler(env) {
     if (!converged) {
       throw new Error('compiler: operator/method lowering did not converge after 8 iterations');
     }
+    // Record the binding graph's expectation edges before validating, so the
+    // comparison and its blame both read from the graph rather than
+    // re-deriving the context at each diagnostic site.
+    recordExpectations(doc, typeIndex);
+    debugAssert(doc, 'recordExpectations', { typeIndex, requireBindings: true });
     validateAnalysis(doc, typeIndex);
     debugAssert(doc, 'validateAnalysis', { typeIndex, requireBindings: true });
     lowerBackendControl(doc, typeIndex, { target });

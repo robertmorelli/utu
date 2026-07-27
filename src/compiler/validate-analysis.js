@@ -1,5 +1,6 @@
 import { bodyOf, declaredTypeStr, firstTypeChild, fnReturnType, isFunctionDecl, paramsOf, typeNodeToStr } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { expectationLabel } from './record-expectations.js';
 import { validateExpressionAssumptions } from './validate-expression-assumptions.js';
 import { isAssignable } from './type-rules.js';
 import { typeEntryDecl } from './link-type-decls.js';
@@ -12,14 +13,17 @@ export function validateAnalysis(doc, typeIndex) {
   const fieldIndex = buildFieldIndex(typeIndex);
   const ctx = { typeIndex };
 
-  validateCalls(root, fnIndex, ctx);
-  validateAssignments(root, ctx);
-  validateDeclaredTypes(root, ctx);
+  // Phase 2 of the binding graph: every declared type has already been
+  // recorded on the value it constrains, so one comparison covers bindings,
+  // assignments, arguments, struct fields and return position — and blame is
+  // read off the edge instead of being written out at each site.
+  validateExpectations(root, ctx);
+  validateCallArity(root, fnIndex);
+  validateAssignmentTargets(root);
   validateExpressionAssumptions(root, ctx, isAssignable);
   validateStructInits(root, fieldIndex, ctx);
   validateExhaustiveAltsAndMatches(root, ctx);
   validateNullableAccess(root);
-  validateReturnTypes(root, ctx);
   validateRecursiveStructs(typeIndex);
   validateResidualEsDsls(root);
 }
@@ -46,7 +50,33 @@ function buildFieldIndex(typeIndex) {
   return map;
 }
 
-function validateCalls(root, fnIndex, ctx) {
+/**
+ * Compare each node's type against the expectation recorded on it.
+ *
+ * This is the only place a type mismatch is reported. The declaration that
+ * imposed the expectation is already on the node, so the "related" note points
+ * at it without this having to know which kind of context it was.
+ */
+function validateExpectations(root, ctx) {
+  const doc = root.ownerDocument;
+  for (const node of root.querySelectorAll('[data-expect]')) {
+    const expected = node.dataset.expect;
+    const actual = node.dataset['typeName'];
+    if (!expected || !actual || isAssignable(actual, expected, ctx)) continue;
+
+    const source = node.dataset.expectFrom ? doc.getElementById(node.dataset.expectFrom) : null;
+    stampDiagnostic(node, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expected}, got ${actual}`, {
+      expected,
+      actual,
+      site: node.dataset.expectSite,
+      relatedNodes: source
+        ? [{ node: source, label: expectationLabel(node.dataset.expectSite, expected) }]
+        : [],
+    });
+  }
+}
+
+function validateCallArity(root, fnIndex) {
   for (const call of root.querySelectorAll('ir-call')) {
     const fn = resolvedFn(call, fnIndex);
     if (!fn) continue;
@@ -64,20 +94,6 @@ function validateCalls(root, fnIndex, ctx) {
       });
       continue;
     }
-    const actualOffset = methodAsStatic ? 1 : 0;
-    for (let i = 0; i < expected.length; i++) {
-      const expectedType = typeNodeToStr(expected[i].firstElementChild);
-      const actualType = actual[i + actualOffset]?.dataset['typeName'];
-      if (expectedType && actualType && !isAssignable(actualType, expectedType, ctx)) {
-        stampDiagnostic(actual[i + actualOffset], DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expectedType}, got ${actualType}`, {
-          expected: expectedType,
-          actual: actualType,
-          function: fn.getAttribute('name'),
-          argument: i,
-          relatedNodes: [{ node: expected[i], label: `parameter ${i + 1} expects ${expectedType}` }],
-        });
-      }
-    }
   }
 }
 
@@ -92,7 +108,7 @@ function resolvedFn(call, fnIndex) {
   return null;
 }
 
-function validateAssignments(root, ctx) {
+function validateAssignmentTargets(root) {
   for (const assign of root.querySelectorAll('ir-assign')) {
     const [lhs, rhs] = [...assign.children];
     if (!lhs || !rhs) continue;
@@ -110,16 +126,6 @@ function validateAssignments(root, ctx) {
         });
       }
     }
-    const lhsType = lhs.dataset['typeName'];
-    const rhsType = rhs.dataset['typeName'];
-    if (lhsType && rhsType && !isAssignable(rhsType, lhsType, ctx)) {
-      const decl = lhs.localName === 'ir-ident' && lhs.dataset.bindingId ? root.ownerDocument.getElementById(lhs.dataset.bindingId) : null;
-      stampDiagnostic(rhs, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${lhsType}, got ${rhsType}`, {
-        expected: lhsType,
-        actual: rhsType,
-        relatedNodes: decl ? [{ node: decl, label: `assignment target is typed ${lhsType}` }] : [{ node: lhs, label: `assignment target is typed ${lhsType}` }],
-      });
-    }
   }
 }
 
@@ -131,21 +137,6 @@ function validateResidualEsDsls(root) {
   }
 }
 
-function validateDeclaredTypes(root, ctx) {
-  for (const node of root.querySelectorAll('ir-let, ir-global')) {
-    const expected = declaredTypeStr(node);
-    const init = node.lastElementChild;
-    const actual = init?.dataset['typeName'];
-    if (expected && actual && !isAssignable(actual, expected, ctx)) {
-      stampDiagnostic(init, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expected}, got ${actual}`, {
-        expected,
-        actual,
-        binding: node.getAttribute('name'),
-        relatedNodes: [{ node: firstTypeChild(node) ?? node, label: `declared type is ${expected}` }],
-      });
-    }
-  }
-}
 
 function validateStructInits(root, fieldIndex, ctx) {
   for (const init of root.querySelectorAll('ir-struct-init')) {
@@ -162,16 +153,6 @@ function validateStructInits(root, fieldIndex, ctx) {
       seen.add(name);
       const field = fields.get(name);
       if (!field) continue;
-      const actual = fieldInit.lastElementChild?.dataset['typeName'];
-      if (field.type && actual && !isAssignable(actual, field.type, ctx)) {
-        stampDiagnostic(fieldInit.lastElementChild, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${field.type}, got ${actual}`, {
-          expected: field.type,
-          actual,
-          field: name,
-          type: typeName,
-          relatedNodes: [{ node: field.node, label: `field '${name}' is declared as ${field.type}` }],
-        });
-      }
     }
     for (const [name] of fields) {
       if (!seen.has(name)) {
@@ -272,21 +253,6 @@ function enumVariants(typeName, typeIndex) {
     .filter(Boolean);
 }
 
-function validateReturnTypes(root, ctx) {
-  for (const fn of root.querySelectorAll('ir-fn')) {
-    const expected = fnReturnType(fn);
-    const body = bodyOf(fn);
-    const actual = returnBodyType(body);
-    if (expected && expected !== 'void' && actual && !isAssignable(actual, expected, ctx)) {
-      stampDiagnostic(body.lastElementChild ?? body, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Type mismatch: expected ${expected}, got ${actual}`, {
-        expected,
-        actual,
-        function: fn.getAttribute('name'),
-        relatedNodes: [{ node: firstTypeChild(fn) ?? fn, label: `function return type is ${expected}` }],
-      });
-    }
-  }
-}
 
 function returnBodyType(body) {
   const last = body?.lastElementChild;

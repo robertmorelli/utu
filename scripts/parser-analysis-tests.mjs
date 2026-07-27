@@ -518,6 +518,50 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     });
   });
 
+  test('analysis: type mismatches blame the declaration that imposed the type', async ({ ROOT }) => {
+    // One comparison covers bindings, arguments, struct fields and return
+    // position, and the "related" note is read off the recorded edge rather
+    // than written out at each diagnostic site.
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    await withTempUtu(ROOT, 'analysis_derived_blame.utu', `
+      struct Pt:
+        | x : I32
+      fn takes(n: I32) I32 { n; }
+      export lib {
+        fn bad_arg() I32 { takes(true); }
+        fn bad_let() I32 { let a: I32 = true; a; }
+        fn bad_field() Pt { Pt { x: true }; }
+        fn bad_ret() I32 { true; }
+      }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      const labels = artifacts.diagnostics
+        .filter(d => d.kind === 'type-mismatch')
+        .map(d => d.related?.[0]?.label);
+      assertEq(labels.length, 4, JSON.stringify(labels));
+      for (const want of ['parameter expects I32', 'declared type is I32',
+                          'field is declared as I32', 'function return type is I32']) {
+        assert(labels.includes(want), `missing blame "${want}" in ${JSON.stringify(labels)}`);
+      }
+    });
+  });
+
+  test('analysis: method-call arguments get the same contexts as free calls', async ({ ROOT }) => {
+    // The enumeration only resolved direct callees, so a literal passed to a
+    // method never learned its declared type: `b.set64(7)` rejected a valid
+    // integer literal.
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    await withTempUtu(ROOT, 'analysis_method_args.utu', `
+      struct Box:
+        | v : I64
+      fn Box.set64 |self| (n: I64) void { self.v = n; }
+      export lib { fn go(b: Box) void { b.set64(7); } }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      assertEq(artifacts.diagnostics.length, 0, JSON.stringify(artifacts.diagnostics.map(d => d.message)));
+    });
+  });
+
   test('analysis: closure CI example analyses cleanly', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const { artifacts } = await compiler.analyzeFile(`${ROOT}/examples/ci/codegen_closures.utu`);
