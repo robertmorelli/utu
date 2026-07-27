@@ -562,6 +562,39 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     });
   });
 
+  test('graphs: binding, expectation and provenance edges are readable back', async ({ ROOT }) => {
+    const { extractGraphs, countByKind } = await import('../src/compiler/graph-view.js');
+    const { renderGraphHtml } = await import('../src/compiler/graph-html.js');
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    const source = `
+      struct Pt:
+        | x : I32
+      fn takes(n: I32) I32 { n; }
+      export lib {
+        fn ok(p: Pt) I32 { takes(p.x); }
+        fn bad() I32 { takes(true); }
+      }
+    `;
+    await withTempUtu(ROOT, 'analysis_graphs.utu', source, async (file) => {
+      const { doc } = await compiler.analyzeFile(file);
+      const { nodes, edges } = extractGraphs(doc);
+      const counts = countByKind(edges);
+      assert(counts.binding > 0, 'expected binding edges');
+      assert(counts.expectation > 0, 'expected expectation edges');
+      assert(nodes.size > 0, 'expected nodes');
+
+      // Every edge must name nodes that exist — the visualiser draws them.
+      for (const edge of edges) {
+        assert(nodes.has(edge.from) && nodes.has(edge.to), `dangling ${edge.kind} edge`);
+      }
+
+      const html = renderGraphHtml(doc, source, file);
+      assert(html.startsWith('<!doctype html>'), 'expected a complete document');
+      assert(!/src=|href=|@import/.test(html), 'the page must be self-contained');
+      assert(html.includes('class="edge k-expectation"'), 'expected expectation edges drawn');
+    });
+  });
+
   test('analysis: closure CI example analyses cleanly', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const { artifacts } = await compiler.analyzeFile(`${ROOT}/examples/ci/codegen_closures.utu`);

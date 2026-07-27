@@ -43,46 +43,37 @@ export function hoistModules(doc, { debugAssertions = false } = {}) {
       self.replaceWith(ref);
     }
 
-    // ── 3. Update ir-fn-name receivers and sync ir-fn[name] ──────────────────
-    // self receivers (&.method) resolve to moduleName
-    for (const fnName of [...mod.querySelectorAll('ir-fn-name[receiver-kind="self"]')]) {
-      fnName.setAttribute('receiver', moduleName);
-      fnName.removeAttribute('receiver-kind');
-      // Sync parent ir-fn[name]: "&.method" → "ModuleName.method"
+    // ── 3. Rewrite function names ────────────────────────────────────────────
+    // Four shapes — `&.method`, `Type.method`, `&:op`, and a free `fn` — that
+    // differ only in how the receiver is renamed and how the name recomposes.
+    // They were four walks, each re-syncing the parent `ir-fn[name]` by hand;
+    // missing that sync silently breaks every lookup keyed on the function
+    // name, with no diagnostic anywhere near the cause.
+    for (const fnName of [...mod.querySelectorAll('ir-fn-name')]) {
       const irFn = fnName.parentElement;
-      if (irFn) irFn.setAttribute('name', `${moduleName}.${fnName.getAttribute('name')}`);
-    }
-    // type receivers (Foo.method inside a module) get the prefixed name
-    for (const fnName of [...mod.querySelectorAll('ir-fn-name[receiver-kind="type"]')]) {
-      const recv    = fnName.getAttribute('receiver');
-      const renamed = renamings.get(recv);
-      if (renamed) {
-        fnName.setAttribute('receiver', renamed);
-        fnName.removeAttribute('receiver-kind');
-        // Sync parent ir-fn[name]: "Foo.method" → "M__Foo.method"
-        const irFn = fnName.parentElement;
-        if (irFn) irFn.setAttribute('name', `${renamed}.${fnName.getAttribute('name')}`);
-      }
-    }
-    // operator functions: fn &:add → fn ModuleName:add
-    for (const fnName of [...mod.querySelectorAll('ir-fn-name[kind="operator"]')]) {
-      const recv = fnName.getAttribute('receiver');
-      const renamedRecv = recv === '&' ? moduleName : (renamings.get(recv) ?? recv);
-      fnName.setAttribute('receiver', renamedRecv);
-      const opName = fnName.getAttribute('name');
-      const irFn   = fnName.parentElement;
-      if (irFn) irFn.setAttribute('name', `${renamedRecv}:${opName}`);
-    }
+      const kind = fnName.getAttribute('kind');
 
-    // free functions: ir-fn[name] is just the short name — prefix it
-    for (const fnName of [...mod.querySelectorAll('ir-fn-name[kind="free"]')]) {
-      const irFn  = fnName.parentElement;
-      const short = fnName.getAttribute('name');
-      const prefixed = renamings.get(short);
-      if (irFn && prefixed) {
-        irFn.setAttribute('name', prefixed);
+      if (kind === 'free') {
+        const prefixed = renamings.get(fnName.getAttribute('name'));
+        if (!prefixed) continue;
         fnName.setAttribute('name', prefixed);
+        irFn?.setAttribute('name', prefixed);
+        continue;
       }
+
+      const recvKind = fnName.getAttribute('receiver-kind');
+      const recv = fnName.getAttribute('receiver');
+      // `&` is in the renaming map as the module's own name. An operator on an
+      // unknown receiver keeps it; a method on one is left for diagnostics.
+      const renamed = recvKind === 'self'
+        ? (renamings.get(recv) ?? moduleName)
+        : (renamings.get(recv) ?? (kind === 'operator' ? recv : null));
+      if (renamed == null) continue;
+
+      fnName.setAttribute('receiver', renamed);
+      if (recvKind) fnName.removeAttribute('receiver-kind');
+      const separator = kind === 'operator' ? ':' : '.';
+      irFn?.setAttribute('name', `${renamed}${separator}${fnName.getAttribute('name')}`);
     }
 
     // ── 4. Rename ir-type-ref nodes throughout the subtree ───────────────────

@@ -47,6 +47,11 @@ async function main() {
     return;
   }
 
+  if (command === 'graph') {
+    await writeGraph(compiler, file, process.argv.slice(4));
+    return;
+  }
+
   if (command === 'build-exe') {
     await buildExe(compiler, file, process.argv.slice(4));
     return;
@@ -103,6 +108,27 @@ async function displayDebugFile(compiler, file, options = {}) {
     showLineNumbers: options.showLineNumbers ?? false,
     showDiagnostics: false,
   });
+}
+
+// `utu graph <file> [-o out.html]` — render the compiler's graphs over the
+// source they came from. Self-contained: no assets, no network.
+async function writeGraph(compiler, file, args) {
+  const { renderGraphHtml } = await import('../src/compiler/graph-html.js');
+  const outFlag = args.indexOf('-o') >= 0 ? args.indexOf('-o') : args.indexOf('--out');
+  const out = outFlag >= 0
+    ? path.resolve(args[outFlag + 1])
+    : path.resolve(`${path.basename(file, '.utu')}.graph.html`);
+
+  const source = await fs.readFile(file, 'utf8');
+  let doc;
+  try {
+    ({ doc } = await compiler.analyzeFile(file));
+  } catch (error) {
+    doc = error.doc ?? null;
+    if (!doc) throw error;
+  }
+  await fs.writeFile(out, renderGraphHtml(doc, source, file));
+  console.error(`wrote ${out}`);
 }
 
 async function buildExe(compiler, file, args) {
