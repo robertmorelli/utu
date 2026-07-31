@@ -32,9 +32,12 @@ export function moduleMemberName(moduleName, member) {
  * Record what an instantiation produced, so the arguments can be recovered
  * without parsing the mangled name.
  */
-export function recordInstantiation(node, moduleName, typeArgNames) {
+export function recordInstantiation(node, moduleName, typeArgNames, displayArgNames = typeArgNames) {
   node.dataset.moduleBase = moduleName;
   node.dataset.moduleArgs = JSON.stringify(typeArgNames);
+  // Preserve the source-level generic spelling. Tooling must never have to
+  // reverse the deliberately ambiguous `__` backend name.
+  node.dataset.displayName = `${moduleName}[${displayArgNames.join(', ')}]`;
 }
 
 /**

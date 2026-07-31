@@ -25,6 +25,12 @@ export function walkProtoDecl(n, doc, source, dispatch) {
     switch (child.type) {
       case 'type_ident':      node.setAttribute('name', text(child)); break;
       case 'promoted_type':   node.setAttribute('name', '&'); break;
+      case 'proto_member': {
+        const member = namedChildren(child)[0];
+        const ir = member ? dispatch(member, doc, source) : null;
+        if (ir) node.appendChild(ir);
+        break;
+      }
       default: {
         const ir = dispatch(child, doc, source);
         if (ir) node.appendChild(ir);

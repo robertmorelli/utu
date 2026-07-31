@@ -22,7 +22,7 @@ fn eval_a(i: F64, j: F64) F64 {
 fn part_a_times_u(i: F64, u: Array[F64]) F64 {
     let partial_sum: F64 = 0.0;
     let jf: F64 = 0.0;
-    for (0..<u.len) |j| {
+    for (0..<u.len()) |j| {
         partial_sum = partial_sum + eval_a(i, jf) * u[j];
         jf += 1.0;
     };
@@ -32,7 +32,7 @@ fn part_a_times_u(i: F64, u: Array[F64]) F64 {
 fn part_at_times_u(i: F64, u: Array[F64]) F64 {
     let partial_sum: F64 = 0.0;
     let jf: F64 = 0.0;
-    for (0..<u.len) |j| {
+    for (0..<u.len()) |j| {
         partial_sum = partial_sum + eval_a(jf, i) * u[j];
         jf += 1.0;
     };
@@ -40,9 +40,9 @@ fn part_at_times_u(i: F64, u: Array[F64]) F64 {
 }
 
 fn eval_a_times_u(u: Array[F64]) Array[F64] {
-    let out: Array[F64] = Array[F64].new(u.len, 0.0);
+    let out: Array[F64] = Array[F64].new(u.len(), 0.0);
     let ifloat: F64 = 0.0;
-    for (0..<u.len) |i| {
+    for (0..<u.len()) |i| {
         out[i] = part_a_times_u(ifloat, u);
         ifloat += 1.0;
     };
@@ -50,9 +50,9 @@ fn eval_a_times_u(u: Array[F64]) Array[F64] {
 }
 
 fn eval_at_times_u(u: Array[F64]) Array[F64] {
-    let out: Array[F64] = Array[F64].new(u.len, 0.0);
+    let out: Array[F64] = Array[F64].new(u.len(), 0.0);
     let ifloat: F64 = 0.0;
-    for (0..<u.len) |i| {
+    for (0..<u.len()) |i| {
         out[i] = part_at_times_u(ifloat, u);
         ifloat += 1.0;
     };

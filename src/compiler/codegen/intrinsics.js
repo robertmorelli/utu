@@ -25,7 +25,7 @@
 import { binaryen } from './types.js';
 import { emitArrayIntrinsic } from './arrays.js';
 import { emitStringIntrinsic } from './strings.js';
-import { paramsOf } from '../ir-helpers.js';
+import { paramsOf, selfParamOf } from '../ir-helpers.js';
 
 const SCALAR_TAG_RE = /^ir-([a-z0-9]+)-(.+)$/;
 
@@ -47,6 +47,10 @@ export function matchScalarIntrinsic(localName, scalarRegistry) {
 // wrappers and the caller produces a clear "not yet" error instead of a
 // misleading "unhandled IR node" message from the generic dispatcher.
 const REF_TAG_PREFIXES = ['ir-i31-', 'ir-ref-', 'ir-string-', 'ir-v128-', 'ir-array-'];
+const EMITTED_REF_OPS = new Set([
+  'ir-i31-new', 'ir-i31-get-s', 'ir-i31-get-u', 'ir-ref-eq', 'ir-ref-ne',
+  'ir-promise-then', 'ir-promise-catch',
+]);
 
 function isRefOp(localName) {
   return REF_TAG_PREFIXES.some((p) => localName.startsWith(p));
@@ -88,7 +92,8 @@ export function describeIntrinsicWrapper(fn, scalarKinds) {
   if (stmts.length !== 1) return null;
   const op = stmts[0];
   if (!isIntrinsicOp(op, scalarKinds)) return null;
-  const params = paramsOf(fn)
+  const self = selfParamOf(fn);
+  const params = [...(self ? [self] : []), ...paramsOf(fn)]
     .map((p) => p.getAttribute('name'));
   return { op, params };
 }
@@ -105,47 +110,35 @@ export function describeIntrinsicWrapper(fn, scalarKinds) {
 export function emitScalarIntrinsic(opNode, ctx, emitExpr) {
   const intr = matchScalarIntrinsic(opNode.localName, ctx.scalarKinds);
   if (!intr) return null;
-  if (!intr.namespace) throw new Error(`codegen: scalar kind "${intr.kind}" has no registered binaryen namespace`);
-  if (intr.kind === 'v128' && intr.op === 'const') return emitV128Const(opNode, ctx.module);
-  const argExprs = [...opNode.children].map((c) => emitExpr(c, ctx));
+  const args = [...opNode.children].map(child => emitExpr(child, ctx));
+  return emitScalar(opNode, intr, args, ctx);
+}
+
+function emitScalar(node, intr, args, ctx) {
+  if (intr.namespace === 'v128' && ctx.requirements) ctx.requirements.conservativeSweep = true;
+  if (intr.kind === 'v128' && intr.op === 'const') return emitV128Const(node, ctx.module);
   const space = ctx.module[intr.namespace];
   const fn = space?.[intr.op];
-  if (typeof fn !== 'function') {
-    throw new Error(
-      `codegen: binaryen has no ${intr.namespace}.${intr.op} for tag <${opNode.localName}>`,
-    );
-  }
-  return fn.call(space, ...argExprs);
+  if (typeof fn !== 'function') throw new Error(
+    `codegen: binaryen has no ${intr.namespace}.${intr.op} for tag <${node.localName}>`);
+  return fn.call(space, ...args);
 }
 
 export function emitRefIntrinsic(opNode, ctx, emitExpr) {
+  if (!EMITTED_REF_OPS.has(opNode.localName)) return null;
+  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
+  const args = [...opNode.children].map(child => emitExpr(child, ctx));
   switch (opNode.localName) {
-    case 'ir-i31-new': {
-      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
-      return ctx.module.ref.i31(args[0]);
-    }
-    case 'ir-i31-get-s': {
-      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
-      return ctx.module.i31.get_s(args[0]);
-    }
-    case 'ir-i31-get-u': {
-      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
-      return ctx.module.i31.get_u(args[0]);
-    }
-    case 'ir-ref-eq': {
-      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
-      return ctx.module.ref.eq(args[0], args[1]);
-    }
-    case 'ir-ref-ne': {
-      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
-      return ctx.module.i32.eqz(ctx.module.ref.eq(args[0], args[1]));
-    }
+    case 'ir-i31-new': return ctx.module.ref.i31(args[0]);
+    case 'ir-i31-get-s': return ctx.module.i31.get_s(args[0]);
+    case 'ir-i31-get-u': return ctx.module.i31.get_u(args[0]);
+    case 'ir-ref-eq': return ctx.module.ref.eq(args[0], args[1]);
+    case 'ir-ref-ne': return ctx.module.i32.eqz(ctx.module.ref.eq(args[0], args[1]));
     // Promise subscription. Both operands are externref regardless of the
     // promise's element type, so one host import covers every instantiation —
     // unlike closure calls, which need one per signature.
     case 'ir-promise-then':
     case 'ir-promise-catch': {
-      const args = [...opNode.children].map((c) => emitExpr(c, ctx));
       const field = opNode.localName === 'ir-promise-then' ? 'promise_then' : 'promise_catch';
       return ctx.module.call(`__utu_${field}`, args, binaryen.none);
     }
@@ -202,18 +195,7 @@ export function emitIntrinsic(opNode, argNodes, ctx, emitExpr) {
   if (str) return str;
 
   const intr = matchScalarIntrinsic(opNode.localName, ctx.scalarKinds);
-  if (intr) {
-    if (intr.kind === 'v128' && intr.op === 'const') return emitV128Const(opNode, ctx.module);
-    const argExprs = argNodes.map((node) => emitExpr(node, ctx));
-    const space = ctx.module[intr.namespace];
-    const fn = space?.[intr.op];
-    if (typeof fn !== 'function') {
-      throw new Error(
-        `codegen: binaryen has no ${intr.namespace}.${intr.op} for tag <${opNode.localName}>`,
-      );
-    }
-    return fn.call(space, ...argExprs);
-  }
+  if (intr) return emitScalar(opNode, intr, argNodes.map(node => emitExpr(node, ctx)), ctx);
 
   if (isRefOp(opNode.localName)) {
     throw new Error(

@@ -1,0 +1,23 @@
+export lib {
+  fn run(n: I32) I32 {
+    let flags: Array[I32] = Array[I32].new(n, 1);
+    if n > 0 { flags[0] = 0; };
+    if n > 1 { flags[1] = 0; };
+    let p: I32 = 2;
+    while (p * p < n) {
+      if flags[p] == 1 {
+        let j: I32 = p * p;
+        while (j < n) {
+          flags[j] = 0;
+          j = j + p;
+        };
+      };
+      p = p + 1;
+    };
+    let count: I32 = 0;
+    for (2..<n) |i| {
+      count += flags[i];
+    };
+    count;
+  }
+}

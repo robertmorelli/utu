@@ -1,4 +1,5 @@
-import { nextNodeId } from './parse.js';
+import { nextNodeId, restampSubtree } from './parse.js';
+import { retainedGraphs } from './graph-store.js';
 
 // ir-helpers.js — Shared helpers that operate on the post-parse IR DOM
 //
@@ -109,8 +110,8 @@ export function isFunctionDecl(node) {
 /**
  * The function declaration an `ir-call` names directly, or null.
  *
- * Only covers a plain `ir-ident` callee: method and static calls are matched by
- * receiver type in resolve-methods, and calling a `fun`/`cl` value has no
+ * Only covers a plain `ir-ident` callee: the type graph matches method and
+ * static calls by receiver type, and calling a `fun`/`cl` value has no
  * declaration at all.
  */
 export function directCalleeDecl(call, doc) {
@@ -127,16 +128,12 @@ export function directCalleeDecl(call, doc) {
  * lowering passes that fabricate new IR nodes — without this, errors would
  * point at the wrong place (or worse, nowhere).
  */
+const SPAN_KEYS = ['start', 'end', 'originFile', 'row', 'col', 'endRow', 'endCol', 'sourceFile'];
+
 export function copySpan(to, from) {
-  if (!from?.dataset) return to;
-  if (from.dataset.start      != null) to.dataset.start      = from.dataset.start;
-  if (from.dataset.end        != null) to.dataset.end        = from.dataset.end;
-  if (from.dataset.originFile != null) to.dataset.originFile = from.dataset.originFile;
-  if (from.dataset.row        != null) to.dataset.row        = from.dataset.row;
-  if (from.dataset.col        != null) to.dataset.col        = from.dataset.col;
-  if (from.dataset.endRow     != null) to.dataset.endRow     = from.dataset.endRow;
-  if (from.dataset.endCol     != null) to.dataset.endCol     = from.dataset.endCol;
-  if (from.dataset.sourceFile != null) to.dataset.sourceFile = from.dataset.sourceFile;
+  for (const key of SPAN_KEYS) {
+    if (from?.dataset?.[key] != null) to.dataset[key] = from.dataset[key];
+  }
   return to;
 }
 
@@ -155,27 +152,66 @@ export function copyDiagnosticMeta(to, from) {
   return to;
 }
 
-export function replaceNodeMeta(to, from, pass, kind = '') {
-  to.id = from?.id ?? `n${nextNodeId()}`;
-  copyDiagnosticMeta(to, from);
-  to.dataset.synthetic = 'true';
-  to.dataset.rewritePass = pass;
-  if (kind) to.dataset.rewriteKind = kind;
-  const rewriteOf = sourceId(from);
-  if (rewriteOf) to.dataset.rewriteOf = rewriteOf;
-  return to;
-}
-
-export function createSyntheticNode(doc, tag, from, pass, kind = '') {
-  const node = doc.createElement(tag);
-  node.id = `n${nextNodeId()}`;
+function stampRewrite(node, from, pass, kind) {
   copyDiagnosticMeta(node, from);
   node.dataset.synthetic = 'true';
   node.dataset.rewritePass = pass;
   if (kind) node.dataset.rewriteKind = kind;
-  const rewriteOf = sourceId(from);
-  if (rewriteOf) node.dataset.rewriteOf = rewriteOf;
+  const source = sourceId(from);
+  if (source) node.dataset.rewriteOf = source;
   return node;
+}
+
+export function replaceNodeMeta(to, from, pass, kind = '') {
+  to.id = from?.id ?? `n${nextNodeId(to.ownerDocument)}`;
+  return stampRewrite(to, from, pass, kind);
+}
+
+const GRAPH_FACT_KEYS = [
+  'typeName', 'expect', 'expectFrom', 'expectSite', 'fnId', 'fnOriginId',
+  'resolvedName', 'resolvedAs', 'fieldIndex', 'fieldDeclId',
+  'error', 'errorKind', 'errorMessage', 'errorData',
+];
+
+export function inheritGraphFacts(to, from) {
+  for (const key of GRAPH_FACT_KEYS) {
+    if (from?.dataset?.[key] != null) to.dataset[key] = from.dataset[key];
+  }
+  const facts = retainedGraphs(from?.ownerDocument).diagnostics?.facts;
+  const diagnostic = facts?.get(from?.id);
+  if (diagnostic) {
+    facts.delete(from.id);
+    facts.set(to.id, { ...diagnostic, node: to });
+  }
+  return to;
+}
+
+export function replaceTypedNode(from, to) {
+  inheritGraphFacts(to, from);
+  from.replaceWith(to);
+  return to;
+}
+
+export function cloneGraphSubtree(node) {
+  const clone = node.cloneNode(true);
+  const originals = [node, ...node.querySelectorAll('*')];
+  const copies = [clone, ...clone.querySelectorAll('*')];
+  restampSubtree(clone, node.dataset.originFile);
+  const graphs = retainedGraphs(node.ownerDocument);
+  originals.forEach((original, index) => {
+    const copy = copies[index];
+    const declaration = graphs.scope?.resolutions.get(original.id);
+    if (declaration) graphs.scope.resolutions.set(copy.id, declaration);
+    const diagnostic = graphs.diagnostics?.facts.get(original.id);
+    if (diagnostic) graphs.diagnostics.facts.set(copy.id, { ...diagnostic, node: copy });
+  });
+  return clone;
+}
+
+export function createSyntheticNode(doc, tag, from, pass, kind = '') {
+  const node = doc.createElement(tag);
+  node.id = `n${nextNodeId(doc)}`;
+  return stampRewrite(node, from, pass, kind);
 }
 
 export function stampOriginFile(root, originFile) {

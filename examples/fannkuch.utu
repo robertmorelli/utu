@@ -1,5 +1,3 @@
-let default_arg: I32 = 6;
-
 fn swap(values: Array[I32], left: I32, right: I32) void {
     let temp: I32 = values[left];
     values[left] = values[right];
@@ -9,7 +7,7 @@ fn swap(values: Array[I32], left: I32, right: I32) void {
 fn reverse_prefix(values: Array[I32], last: I32) void {
     let left: I32 = 0;
     let right: I32 = last;
-    for (0..<values.len) |step| {
+    for (0..<values.len()) |step| {
         if left >= right {
             break;
         };
@@ -20,8 +18,8 @@ fn reverse_prefix(values: Array[I32], last: I32) void {
 }
 
 fn copy_array(values: Array[I32]) Array[I32] {
-    let out: Array[I32] = Array[I32].new(values.len, 0);
-    for (0..<values.len) |i| {
+    let out: Array[I32] = Array[I32].new(values.len(), 0);
+    for (0..<values.len()) |i| {
         out[i] = values[i];
     };
     out;
@@ -42,11 +40,11 @@ fn count_flips(values: Array[I32]) I32 {
 }
 
 fn search(perm: Array[I32], pos: I32) I32 {
-    if pos == perm.len {
+    if pos == perm.len() {
         count_flips(perm);
     } else {
         let best: I32 = 0;
-        for (pos..<perm.len) |i| {
+        for (pos..<perm.len()) |i| {
             swap(perm, pos, i);
             let candidate: I32 = search(perm, pos + 1);
             if candidate > best {
@@ -80,6 +78,6 @@ bench "fannkuch" {
     }
 }
 
-fn main() I32 {
-    fannkuch(default_arg);
+export main() I32 {
+    fannkuch(6);
 }

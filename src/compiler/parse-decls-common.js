@@ -3,26 +3,30 @@
 import { stamp, el, text, namedChildren, append, walkChildren } from './parse-helpers.js';
 import { T } from './ir-tags.js';
 
-export function walkNomQualifier(n, doc, source, dispatch) {
-  const node = stamp(el(T.NOM_QUALIFIER, doc), n);
-  const tags = namedChildren(n).map(c => text(c));
-  node.setAttribute('tags', tags.join(','));
+function walkNameList(tag, attribute, n, doc) {
+  const node = stamp(el(tag, doc), n);
+  node.setAttribute(attribute, namedChildren(n).map(text).join(','));
   return node;
 }
 
+export function walkNomQualifier(n, doc, source, dispatch) {
+  return walkNameList(T.NOM_QUALIFIER, 'tags', n, doc);
+}
+
 export function walkImplList(n, doc, source, dispatch) {
-  const node = stamp(el(T.IMPL_LIST, doc), n);
-  const impls = namedChildren(n).map(c => text(c));
-  node.setAttribute('impls', impls.join(','));
+  return walkNameList(T.IMPL_LIST, 'impls', n, doc);
+}
+
+function walkNamedType(tag, n, doc, source, dispatch) {
+  const node = stamp(el(tag, doc), n);
+  const [name, type] = namedChildren(n);
+  if (name) node.setAttribute('name', text(name));
+  if (type) node.appendChild(dispatch(type, doc, source));
   return node;
 }
 
 export function walkField(n, doc, source, dispatch) {
-  const node = stamp(el(T.FIELD, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  return node;
+  return walkNamedType(T.FIELD, n, doc, source, dispatch);
 }
 
 export function walkVariant(n, doc, source, dispatch) {
@@ -49,11 +53,7 @@ export function walkSelfParam(n, doc, source, dispatch) {
 }
 
 export function walkParam(n, doc, source, dispatch) {
-  const node = stamp(el(T.PARAM, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  return node;
+  return walkNamedType(T.PARAM, n, doc, source, dispatch);
 }
 
 export function walkParamList(n, doc, source, dispatch) {
@@ -101,27 +101,15 @@ export function walkModuleTypeArgList(n, doc, source, dispatch) {
 // ── Protocol members ──────────────────────────────────────────────────────────
 
 export function walkProtoGetter(n, doc, source, dispatch) {
-  const node = stamp(el(T.PROTO_GET, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  return node;
+  return walkNamedType(T.PROTO_GET, n, doc, source, dispatch);
 }
 
 export function walkProtoSetter(n, doc, source, dispatch) {
-  const node = stamp(el(T.PROTO_SET, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  return node;
+  return walkNamedType(T.PROTO_SET, n, doc, source, dispatch);
 }
 
 export function walkProtoGetSetter(n, doc, source, dispatch) {
-  const node = stamp(el(T.PROTO_GET_SET, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.setAttribute('name', text(children[0]));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  return node;
+  return walkNamedType(T.PROTO_GET_SET, n, doc, source, dispatch);
 }
 
 export function walkProtoMethod(n, doc, source, dispatch) {
@@ -129,6 +117,17 @@ export function walkProtoMethod(n, doc, source, dispatch) {
   const children = namedChildren(n);
   if (children[0]) node.setAttribute('name', text(children[0]));
   for (const child of children.slice(1)) {
+    if (child.type === 'type_list') {
+      const params = stamp(el(T.PARAM_LIST, doc), child);
+      for (const type of namedChildren(child)) {
+        const param = stamp(el(T.PARAM, doc), type);
+        const ir = dispatch(type, doc, source);
+        if (ir) param.appendChild(ir);
+        params.appendChild(param);
+      }
+      node.appendChild(params);
+      continue;
+    }
     const ir = dispatch(child, doc, source);
     if (ir) node.appendChild(ir);
   }

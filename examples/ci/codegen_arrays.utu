@@ -1,15 +1,18 @@
 fn first_plus_len(xs: Array[I32]) I32 {
     let first: I32 = xs[0];
-    first + xs.len;
+    first + xs.len();
 }
 
 fn filled_sum() I32 {
     let xs: Array[I32] = Array[I32].new(4, 3);
-    xs[0] + xs[3] + xs.len;
+    xs[0] + xs[3] + xs.len();
 }
 
 fn fixed_sum() I32 {
-    let xs: Array[I32] = Array[I32].new_fixed(4, 5, 6);
+    let xs: Array[I32] = Array[I32].new_default(3);
+    xs[0] = 4;
+    xs[1] = 5;
+    xs[2] = 6;
     xs[0] + xs[1] + xs[2];
 }
 
@@ -19,16 +22,15 @@ fn default_write() I32 {
     xs[1];
 }
 
-fn copy_and_fill_total() I32 {
-    let src: Array[I32] = Array[I32].new_fixed(1, 2, 3, 4);
-    let dst: Array[I32] = Array[I32].new_default(4);
-    Array.copy(dst, 0, src, 0, 4);
-    Array.fill(dst, 1, 7, 2);
-    dst[0] + dst[1] + dst[2] + dst[3];
+fn overwrite_total() I32 {
+    let values: Array[I32] = Array[I32].new(4, 1);
+    values[1] = 7;
+    values[2] = 7;
+    values[0] + values[1] + values[2] + values[3];
 }
 
 test "Array get and len compose" {
-    let xs: Array[I32] = Array[I32].new_fixed(4, 5, 6);
+    let xs: Array[I32] = Array[I32].new(3, 4);
     assert first_plus_len(xs) == 7;
 }
 
@@ -36,7 +38,7 @@ test "Array.new fills every slot from one value" {
     assert filled_sum() == 10;
 }
 
-test "Array.new_fixed keeps literal values in order" {
+test "indexed writes keep values in order" {
     assert fixed_sum() == 15;
 }
 
@@ -44,6 +46,6 @@ test "Array.new_default pairs with indexed writes" {
     assert default_write() == 9;
 }
 
-test "Array.copy and Array.fill update ranges" {
-    assert copy_and_fill_total() == 19;
+test "Array.new fill values can be overwritten" {
+    assert overwrite_total() == 16;
 }

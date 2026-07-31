@@ -6,88 +6,56 @@
 
 import { firstTypeChild } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, compilerError, related } from './diagnostics.js';
+import { typeUses } from './declaration-graph.js';
 
-export function checkModuleVariance(doc) {
+export function checkModuleVariance(doc, graph = null) {
   const root = doc?.body?.firstChild;
   if (!root) return;
 
-  for (const mod of [...root.querySelectorAll('ir-module')]) {
+  for (const mod of graph?.modules.values() ?? root.querySelectorAll('ir-module')) {
     const params = [...mod.querySelectorAll('ir-module-param[variance]')];
     if (!params.length) continue;
 
-    const paramVariance = new Map(params.map(p => [p.getAttribute('name'), p.getAttribute('variance')]));
-    for (const [name, variance] of paramVariance) {
-      for (const site of signatureTypeSites(mod)) {
-        visitType(site.typeNode, site.polarity, node => {
-          if (node.localName !== 'ir-type-ref' || node.getAttribute('name') !== name) return;
-          if (!isAllowed(variance, site.polarity)) {
-            throw compilerError(
-              DIAGNOSTIC_KINDS.MODULE_VARIANCE,
-              `module variance (${mod.getAttribute('name')}.${name}): '${variance}' parameter used in ${site.polarity} position`,
-              node,
-              {
-                module: mod.getAttribute('name'),
-                variance,
-                polarity: site.polarity,
-                related: [related(params.find(p => p.getAttribute('name') === name), 'module parameter')],
-              },
-            );
-          }
-        });
+    for (const param of params) {
+      const name = param.getAttribute('name');
+      const variance = param.getAttribute('variance');
+      for (const site of signatureTypeSites(mod)) for (const use of typeUses(site.typeNode, site.polarity)) {
+        if (use.node.localName !== 'ir-type-ref' || use.node.getAttribute('name') !== name) continue;
+        graph?.edge('variance-use', param, use.node, { variance, polarity: use.polarity });
+        if (!isAllowed(variance, use.polarity)) {
+          const message = `module variance (${mod.getAttribute('name')}.${name}): '${variance}' parameter used in ${use.polarity} position`;
+          graph?.fail(use.node, DIAGNOSTIC_KINDS.MODULE_VARIANCE, message, { variance, polarity: use.polarity });
+          throw compilerError(DIAGNOSTIC_KINDS.MODULE_VARIANCE, message, use.node, {
+            module: mod.getAttribute('name'), variance, polarity: use.polarity,
+            related: [related(param, 'module parameter')],
+          });
+        }
       }
     }
   }
 }
 
 function* signatureTypeSites(mod) {
-  for (const field of [...mod.querySelectorAll('ir-fn > ir-param-list > ir-param')]) {
-    const typeNode = firstTypeChild(field);
-    if (typeNode) yield { typeNode, polarity: 'in' };
+  for (const [selector, polarity] of [
+    ['ir-fn > ir-param-list > ir-param', 'in'],
+    ['ir-proto-get', 'out'],
+    ['ir-proto-set', 'in'],
+  ]) for (const node of mod.querySelectorAll(selector)) {
+    const typeNode = firstTypeChild(node);
+    if (typeNode) yield { typeNode, polarity };
   }
-
-  for (const fn of [...mod.querySelectorAll('ir-fn')]) {
+  for (const fn of mod.querySelectorAll('ir-fn')) {
     const typeNode = fnReturnType(fn);
     if (typeNode) yield { typeNode, polarity: 'out' };
   }
-
-  for (const getter of [...mod.querySelectorAll('ir-proto-get')]) {
-    const typeNode = firstTypeChild(getter);
-    if (typeNode) yield { typeNode, polarity: 'out' };
-  }
-
-  for (const setter of [...mod.querySelectorAll('ir-proto-set')]) {
-    const typeNode = firstTypeChild(setter);
-    if (typeNode) yield { typeNode, polarity: 'in' };
-  }
-
-  for (const pair of [...mod.querySelectorAll('ir-proto-get-set')]) {
+  for (const pair of mod.querySelectorAll('ir-proto-get-set')) {
     const typeNode = firstTypeChild(pair);
-    if (typeNode) {
-      yield { typeNode, polarity: 'in' };
-      yield { typeNode, polarity: 'out' };
-    }
+    if (typeNode) for (const polarity of ['in', 'out']) yield { typeNode, polarity };
   }
-
-  for (const method of [...mod.querySelectorAll('ir-proto-method')]) {
+  for (const method of mod.querySelectorAll('ir-proto-method')) {
     const children = [...method.children];
     for (const child of children.slice(0, -1)) yield { typeNode: child, polarity: 'in' };
     if (children.at(-1)) yield { typeNode: children.at(-1), polarity: 'out' };
-  }
-}
-
-function visitType(node, polarity, visit) {
-  if (!node) return;
-  visit(node);
-
-  if (node.localName === 'ir-type-fn') {
-    const children = [...node.children];
-    for (const child of children.slice(0, -1)) visitType(child, flip(polarity), visit);
-    if (children.at(-1)) visitType(children.at(-1), polarity, visit);
-    return;
-  }
-
-  for (const child of [...node.children]) {
-    visitType(child, polarity, visit);
   }
 }
 
@@ -97,9 +65,6 @@ function isAllowed(variance, polarity) {
   return true;
 }
 
-function flip(polarity) {
-  return polarity === 'in' ? 'out' : 'in';
-}
 
 // Local return-type lookup keeps the legacy 'ir-unknown' fallback so this pass
 // continues to flag mistyped returns even when the parser produces an unknown

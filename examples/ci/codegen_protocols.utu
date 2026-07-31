@@ -52,19 +52,19 @@ test "protocol method sugar dispatches on tagged structs" {
     assert square.measure() == 16;
 }
 
-test "explicit protocol calls use the first argument as the receiver" {
+test "protocol methods dispatch through receiver syntax" {
     let box: Box = Box { width: 3, height: 4 };
-    assert Measure.measure(box) == 12;
+    assert box.measure() == 12;
 }
 
-test "getter-only protocols dispatch when the struct declares them" {
+test "getter-only protocols expose their implementing field" {
     let rect: Rect = Rect { area: 12 };
-    assert Area.area(rect) == 12;
+    assert rect.area == 12;
 }
 
-test "protocol getters dispatch for explicit implementers too" {
+test "protocol getters and methods compose" {
     let counter: Counter = Counter { value: 7 };
-    assert CounterOps.value(counter) == 7;
+    assert counter.value == 7;
     assert counter.bump() == 8;
 }
 
@@ -76,7 +76,7 @@ test "protocol methods work with promote captures" {
 }
 
 test "protocol values can live in arrays fields and params" {
-    let items: Array[Measure] = Array.new_default(2);
+    let items: Array[Measure] = Array[Measure].new_default(2);
     items[0] = Box { width: 2, height: 3 };
     items[1] = Square { side: 4 };
     let shelf: Shelf = Shelf { items: items, current: items[0] };

@@ -38,4 +38,30 @@ mod Str {
     fn get(s: &, i: I32) I32 {
         @ir/\ <ir-string-get-wtf16><ir-ident name="s"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
     }
+
+    // Receiver/index forms mirror Array's surface while preserving the
+    // existing static Str.len/slice/get entry points.
+    fn &.len |self| () I32 {
+        @ir/\ <ir-string-measure-utf16><ir-ident name="self"/></ir-string-measure-utf16> \/;
+    }
+    fn &.slice |self| (start: I32, end_: I32) & {
+        @ir/\ <ir-string-slice-wtf16>
+            <ir-ident name="self"/>
+            <ir-ident name="start"/>
+            <ir-ident name="end_"/>
+        </ir-string-slice-wtf16> \/;
+    }
+    fn &.get |self| (i: I32) I32 {
+        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+    }
+    fn &.get_index |self| (i: I32) I32 {
+        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+    }
+    fn &.get_slice |self| (start: I32, end_: I32) & {
+        @ir/\ <ir-string-slice-wtf16>
+            <ir-ident name="self"/>
+            <ir-ident name="start"/>
+            <ir-ident name="end_"/>
+        </ir-string-slice-wtf16> \/;
+    }
 }

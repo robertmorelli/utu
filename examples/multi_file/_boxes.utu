@@ -1,14 +1,14 @@
 using mathops |ops| from "./_ops.utu";
 
 mod boxes {
-    struct Box:
+    struct &:
         | value : I32
 
-    fn Box.new(value: I32) Box {
-        Box { value: value };
+    fn &.new(value: I32) & {
+        &{ value: value };
     }
 
-    fn Box.score |self| () I32 {
+    fn &.score |self| () I32 {
         ops.double(self.value) + ops.triple(1);
     }
 }

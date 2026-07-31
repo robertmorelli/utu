@@ -1,251 +1,103 @@
-// lower-operators.js — Pass between inferTypes and resolveMethods
-//
-// Rewrites ir-binary, ir-unary, ir-index, ir-slice, and index-assigns into
-// ir-call nodes using the operator overload convention:
-//
-//   a + b          (where a : T)  →  T:add(a, b)
-//   -a             (where a : T)  →  T:neg(a)
-//   a[i]           (where a : T)  →  T.get_index(a, i)
-//   a[s, e]        (where a : T)  →  T.get_slice(a, s, e)
-//   a[i] = v       (where a : T)  →  T.set_index(a, i, v)
-//
-// Logical operators (`and`, `or`, `xor`, `not`) are overloads like every
-// other operator — declared by `std/Bool.utu` as `&:and`, `&:or`, `&:xor`,
-// `&:not`.  The compiler routes them through this pass the same way it
-// routes `+` or `-`; there is no special path for logical operators.
-//
-// Must run AFTER inferTypes (needs data-type-name on operands).
-// The null fallback and pipe are left untouched.
-//
-// Compound assignment is desugared first:
-//   x += rhs  →  x = x + rhs
-// Then the resulting ir-binary is lowered in the same pass.
+// Lower typed surface operators into ordinary calls. Type selection belongs to
+// the graph; this pass only changes representation.
 
-import { restampSubtree } from './parse.js';
-import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
-import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { cloneGraphSubtree, createSyntheticNode, replaceNodeMeta, replaceTypedNode } from './ir-helpers.js';
 import { isOperandless } from './type-rules.js';
+import { actualType } from './type-graph.js';
+import { BINARY_OP_FN, COMPOUND_OP, UNARY_OP_FN } from './operator-specs.js';
 
-// Infix operator token → operator function name (colon convention).
-// The function-name half is what the stdlib declares — see e.g.
-// `std/I32.utu` (`&:add`) and `std/Bool.utu` (`&:and`).
-// Exported so infer-expr.js resolves an operator's result type through the same
-// overload this pass will lower it to.  If the two maps drifted, inference and
-// lowering would disagree about which `fn T:op` a token means.
-export const BINARY_OP_FN = {
-  '+':   'add',  '-':   'sub',  '*':   'mul',  '/':   'div',  '%':   'rem',
-  '&':   'band', '|':   'bor',  '^':   'bxor',
-  '<<':  'shl',  '>>':  'shr',  '>>>': 'ushr',
-  '==':  'eq',   '!=':  'ne',
-  '<':   'lt',   '<=':  'le',   '>':   'gt',   '>=':  'ge',
-  'and': 'and',  'or':  'or',   'xor': 'xor',
-};
+// Compatibility exports for standalone pass consumers.
+export { BINARY_OP_FN, UNARY_OP_FN } from './operator-specs.js';
 
-// Compound assignment op → the base binary op
-const COMPOUND_TO_BINARY = {
-  '+=': '+', '-=': '-', '*=': '*', '/=': '/', '%=': '%',
-  '&=': '&', '|=': '|', '^=': '^',
-  '<<=': '<<', '>>=': '>>', '>>>=': '>>>',
-  'and=': 'and', 'or=': 'or', 'xor=': 'xor',
-};
-
-// Unary operator token → operator function name (colon convention)
-export const UNARY_OP_FN = {
-  '-':   'neg',
-  '~':   'bnot',
-  'not': 'not',
-};
-
-/**
- * @param {Document} doc
- */
-export function lowerOperators(doc) {
+export function lowerOperators(doc, typeGraph = null) {
   const root = doc.body.firstChild;
   if (!root) return false;
+  let changed = lowerCompounds(root);
+  changed = lowerIndexAssignments(root, typeGraph) || changed;
+
+  const expressions = [...root.querySelectorAll('ir-binary, ir-unary, ir-index, ir-slice')].reverse();
+  for (const node of expressions) {
+    const spec = operatorSpec(node, typeGraph);
+    if (!spec) continue;
+    if (isOperandless(spec.owner)) continue;
+    replaceTypedNode(node, buildCall(node, spec));
+    changed = true;
+  }
+  return Boolean(changed);
+}
+
+function lowerCompounds(root) {
   let changed = false;
-
-  // ── 1. Desugar compound assignment (x += rhs → x = x + rhs) ─────────────
-  for (const node of [...root.querySelectorAll('ir-assign')]) {
-    const op = node.getAttribute('op') ?? '=';
-    const binOp = COMPOUND_TO_BINARY[op];
-    if (!binOp) continue; // plain '=' — leave it
-
-    const [lhs, rhs] = [...node.children];
+  for (const assign of root.querySelectorAll('ir-assign')) {
+    const op = COMPOUND_OP[assign.getAttribute('op') ?? '='];
+    if (!op) continue;
+    const [lhs, rhs] = [...assign.children];
     if (!lhs || !rhs) continue;
-
-    const doc2 = node.ownerDocument;
-    const binary = createSyntheticNode(doc2, 'ir-binary', node, 'lower-operators', 'compound-binary');
-    binary.setAttribute('op', binOp);
-    for (const part of [lhs, rhs]) {
-      const clone = part.cloneNode(true);
-      restampSubtree(clone, part.dataset.originFile);
-      binary.appendChild(clone);
-    }
-
-    node.setAttribute('op', '=');
-    rhs.replaceWith(binary);
+    const binary = createSyntheticNode(assign.ownerDocument, 'ir-binary', assign, 'lower-operators', 'compound-binary');
+    binary.setAttribute('op', op);
+    for (const value of [lhs, rhs]) binary.appendChild(cloneGraphSubtree(value));
+    assign.setAttribute('op', '=');
+    replaceTypedNode(rhs, binary);
     changed = true;
   }
-
-  // ── 2. Desugar index-assign (a[i] = v  →  T.set_index(a, i, v)) ─────────
-  //
-  // Must run before the ir-index lowering pass so we can pull the lhs apart.
-  for (const node of [...root.querySelectorAll('ir-assign')]) {
-    const op = node.getAttribute('op') ?? '=';
-    if (op !== '=') continue; // compound already desugared above
-
-    const [lhs, rhs] = [...node.children];
-    if (lhs?.localName !== 'ir-index') continue;
-
-    const [base, idx] = [...lhs.children];
-    if (!base) continue;
-
-    const typeName = base.dataset['typeName'] ?? lhs.dataset['typeName'];
-    if (isOperandless(typeName)) continue;
-
-    // Replace the ir-assign with a set_index call
-    node.replaceWith(buildMethodCall(
-      node.ownerDocument, node, typeName, 'set_index',
-      [base, idx, rhs],
-    ));
-    changed = true;
-  }
-
-  // ── 3. Lower ir-binary → ir-call ─────────────────────────────────────────
-  for (const node of [...root.querySelectorAll('ir-binary')].reverse()) {
-    const op = node.getAttribute('op');
-    const fnName = BINARY_OP_FN[op];
-    if (!fnName) continue;
-
-    const [lhs, rhs] = [...node.children];
-    if (!lhs || !rhs) continue;
-
-    const typeName = lhs.dataset['typeName'] ?? node.dataset['typeName'];
-    if (isOperandless(typeName)) {
-      stampUntypedOperator(node, op, lhs);
-      continue;
-    }
-
-    node.replaceWith(buildOpCall(node.ownerDocument, node, typeName, fnName, [lhs, rhs]));
-    changed = true;
-  }
-
-  // ── 4. Lower ir-unary → ir-call ──────────────────────────────────────────
-  for (const node of [...root.querySelectorAll('ir-unary')].reverse()) {
-    const op = node.getAttribute('op');
-    const fnName = UNARY_OP_FN[op];
-    if (!fnName) continue;
-
-    const operand = node.firstElementChild;
-    if (!operand) continue;
-
-    const typeName = operand.dataset['typeName'] ?? node.dataset['typeName'];
-    if (isOperandless(typeName)) {
-      stampUntypedOperator(node, op, operand);
-      continue;
-    }
-
-    node.replaceWith(buildOpCall(node.ownerDocument, node, typeName, fnName, [operand]));
-    changed = true;
-  }
-
-  // ── 5. Lower ir-index → T.get_index(base, idx) ───────────────────────────
-  for (const node of [...root.querySelectorAll('ir-index')]) {
-    const [base, idx] = [...node.children];
-    if (!base) continue;
-
-    const typeName = base.dataset['typeName'] ?? node.dataset['typeName'];
-    if (isOperandless(typeName)) {
-      stampUntypedOperator(node, '[]', base);
-      continue;
-    }
-
-    node.replaceWith(buildMethodCall(
-      node.ownerDocument, node, typeName, 'get_index', [base, idx],
-    ));
-    changed = true;
-  }
-
-  // ── 6. Lower ir-slice → T.get_slice(base, start, end) ────────────────────
-  for (const node of [...root.querySelectorAll('ir-slice')]) {
-    const [base, start, end_] = [...node.children];
-    if (!base) continue;
-
-    const typeName = base.dataset['typeName'] ?? node.dataset['typeName'];
-    if (isOperandless(typeName)) {
-      stampUntypedOperator(node, '[,]', base);
-      continue;
-    }
-
-    node.replaceWith(buildMethodCall(
-      node.ownerDocument, node, typeName, 'get_slice', [base, start, end_],
-    ));
-    changed = true;
-  }
-
   return changed;
 }
 
-function stampUntypedOperator(node, op, operand) {
-  if (node.dataset.errorKind) return;
-  const actual = operand?.dataset?.typeName ?? node.dataset['typeName'] ?? 'unknown';
-  stampDiagnostic(node, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Cannot lower operator '${op}' with operand type ${actual}`, {
-    operator: op,
-    operandType: actual,
-  });
+function lowerIndexAssignments(root, graph) {
+  let changed = false;
+  for (const assign of [...root.querySelectorAll('ir-assign')]) {
+    const [target, value] = [...assign.children];
+    if ((assign.getAttribute('op') ?? '=') !== '=' || target?.localName !== 'ir-index') continue;
+    const [base, index] = [...target.children];
+    const owner = (graph && actualType(graph, base)) ?? base?.dataset.typeName
+      ?? (graph && actualType(graph, target)) ?? target.dataset.typeName;
+    if (!base || isOperandless(owner)) continue;
+    replaceTypedNode(assign, buildCall(assign, {
+      owner, method: 'set_index', syntax: 'method', args: [base, index, value], label: '[]=',
+    }));
+    changed = true;
+  }
+  return changed;
 }
 
-// ── Builders ──────────────────────────────────────────────────────────────────
-
-// Build a COLON operator call:  T:fnName(arg0, arg1, ...)
-// The callee is ir-type-member with a `type-name` attribute (fast path — no child
-// type node needed since resolveStaticCall falls back to the attribute).
-// Used for overloadable binary/unary operators (T:add, T:neg, …).
-function buildOpCall(doc, site, typeName, fnName, argNodes) {
-  const call    = doc.createElement('ir-call');
-  const callee  = createSyntheticNode(doc, 'ir-type-member', site, 'lower-operators', 'operator-callee');
-  const argList = createSyntheticNode(doc, 'ir-arg-list', site, 'lower-operators', 'operator-args');
-
-  replaceNodeMeta(call, site, 'lower-operators', 'operator-call');
-  call.dataset.operatorName = fnName;
-  call.dataset.operatorReceiverName = typeName;
-  if (site.dataset['typeName']) call.dataset['typeName'] = site.dataset['typeName'];
-
-  // Keep type-name as a plain attribute — resolveStaticCall's fallback reads it.
-  callee.setAttribute('type-name', typeName);
-  callee.setAttribute('method', fnName);
-
-  // Move args (don't clone) so nested operators captured by an outer
-  // querySelectorAll iteration remain reachable and get lowered too.
-  for (const arg of argNodes) if (arg) argList.appendChild(arg);
-
-  call.appendChild(callee);
-  call.appendChild(argList);
-  return call;
+function operatorSpec(node, graph) {
+  const args = [...node.children];
+  const first = args[0];
+  const owner = (graph && actualType(graph, first)) ?? first?.dataset.typeName
+    ?? (graph && actualType(graph, node)) ?? node.dataset.typeName;
+  if (node.localName === 'ir-binary') {
+    const op = node.getAttribute('op');
+    return { owner, method: BINARY_OP_FN[op], syntax: 'operator', args, label: op };
+  }
+  if (node.localName === 'ir-unary') {
+    const op = node.getAttribute('op');
+    return { owner, method: UNARY_OP_FN[op], syntax: 'operator', args, label: op };
+  }
+  if (node.localName === 'ir-index') return { owner, method: 'get_index', syntax: 'method', args, label: '[]' };
+  if (node.localName === 'ir-slice') return { owner, method: 'get_slice', syntax: 'method', args, label: '[,]' };
+  return null;
 }
 
-// Build a DOT method call:  T.fnName(arg0, arg1, ...)
-// The callee is ir-type-member with a child ir-type-ref (primary format read
-// by resolveStaticCall).  Used for index operators (get_index, set_index, …).
-function buildMethodCall(doc, site, typeName, fnName, argNodes) {
-  const call    = doc.createElement('ir-call');
-  const callee  = createSyntheticNode(doc, 'ir-type-member', site, 'lower-operators', 'method-callee');
-  const typeRef = createSyntheticNode(doc, 'ir-type-ref', site, 'lower-operators', 'method-type');
-  const argList = createSyntheticNode(doc, 'ir-arg-list', site, 'lower-operators', 'method-args');
+function buildCall(site, { owner, method, syntax, args }) {
+  const doc = site.ownerDocument;
+  const call = doc.createElement('ir-call');
+  const callee = createSyntheticNode(doc, 'ir-type-member', site, 'lower-operators', `${syntax}-callee`);
+  const argList = createSyntheticNode(doc, 'ir-arg-list', site, 'lower-operators', `${syntax}-args`);
+  replaceNodeMeta(call, site, 'lower-operators', `${syntax}-call`);
 
-  replaceNodeMeta(call, site, 'lower-operators', 'method-call');
-  call.dataset.operatorName = fnName;
-  call.dataset.operatorReceiverName = typeName;
-  if (site.dataset['typeName']) call.dataset['typeName'] = site.dataset['typeName'];
+  call.dataset.operatorName = method;
+  call.dataset.operatorReceiverName = owner;
+  if (site.dataset.typeName) call.dataset.typeName = site.dataset.typeName;
 
-  typeRef.setAttribute('name', typeName);
-  callee.setAttribute('method', fnName);
-  callee.appendChild(typeRef);
-
-  // Move args (don't clone) so nested operators captured by an outer
-  // querySelectorAll iteration remain reachable and get lowered too.
-  for (const arg of argNodes) if (arg) argList.appendChild(arg);
-
+  callee.setAttribute('method', method);
+  if (syntax === 'operator') {
+    callee.setAttribute('type-name', owner);
+  } else {
+    const type = createSyntheticNode(doc, 'ir-type-ref', site, 'lower-operators', 'method-type');
+    type.setAttribute('name', owner);
+    callee.appendChild(type);
+  }
+  for (const arg of args) if (arg) argList.appendChild(arg);
   call.appendChild(callee);
   call.appendChild(argList);
   return call;

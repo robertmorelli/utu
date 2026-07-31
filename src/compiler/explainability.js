@@ -1,4 +1,5 @@
 import { nodeRef } from './diagnostics.js';
+import { retainedGraphs } from './graph-store.js';
 
 export function createExplainabilityArtifacts() {
   return {
@@ -48,12 +49,16 @@ export function explainNode(node) {
     typeName: node?.dataset?.typeName ?? null,
     typeRepr: node?.dataset?.typeRepr ?? null,
     inferenceSource: node?.dataset?.inferenceSource ?? null,
+    expectedType: node?.dataset?.expect ?? null,
+    expectationSourceId: node?.dataset?.expectFrom ?? null,
     bindingId: node?.dataset?.bindingId ?? null,
     bindingOriginId: node?.dataset?.bindingOriginId ?? null,
     resolvesToId: node?.dataset?.resolvesToId ?? null,
     resolvesToOriginId: node?.dataset?.resolvesToOriginId ?? null,
     fnId: node?.dataset?.fnId ?? null,
     fnOriginId: node?.dataset?.fnOriginId ?? null,
+    fieldIndex: node?.dataset?.fieldIndex ?? null,
+    fieldDeclarationId: node?.dataset?.fieldDeclId ?? null,
   };
 }
 
@@ -68,7 +73,10 @@ export function loweringTrace(node) {
   push('importedFrom', node.dataset.importedFrom);
   push('instantiatedFrom', node.dataset.instantiatedFrom);
   push('instantiatedAs', node.dataset.instantiatedAs);
-  push('substitutedTypeParam', node.dataset.substitutedTypeParam);
+  const substitution = retainedGraphs(node.ownerDocument).elaboration?.edges
+    .find(edge => edge.kind === 'substitutes' && edge.from === node.id);
+  push('substitutedTypeParam', node.dataset.substitutedTypeParam ?? substitution?.parameter);
+  push('substitutedFrom', node.dataset.substitutedFrom ?? substitution?.to);
   push('dslName', node.dataset.dslName);
   return trace;
 }

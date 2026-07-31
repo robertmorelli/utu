@@ -24,14 +24,13 @@
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { firstTypeChild, typeNodeToStr } from './ir-helpers.js';
 import { callableParts, isCallableType, SOURCE_PRIMITIVES } from './type-rules.js';
-
-
+export { typeEntryDecl } from './type-entries.js';
 
 /**
  * @param {Document} doc
  * @returns {Map<string, TypeEntry>}  type-name → registry entry
  */
-export function linkTypeDecls(doc) {
+export function linkTypeDecls(doc, graph = null) {
   const root = doc.body.firstChild;
   if (!root) return new Map();
 
@@ -43,6 +42,7 @@ export function linkTypeDecls(doc) {
   )) {
     const name = decl.getAttribute('name');
     index.set(name, makeTypeEntry(name, decl));
+    graph?.add(decl, 'type-declaration');
     if (decl.localName === 'ir-enum') {
       const enumEntry = index.get(name);
       const tagType = enumEntry.tagType;
@@ -81,7 +81,9 @@ export function linkTypeDecls(doc) {
       ref.dataset.resolvesToKind = decl.localName;
       ref.dataset['typeName'] = entry.typeName;
       ref.dataset['typeRepr'] = entry.typeRepr;
+      graph?.edge('type-resolves', ref, decl, { name });
     } else {
+      graph?.fail(ref, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown type '${name}'`, { name });
       stampDiagnostic(ref, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown type '${name}'`, { name });
     }
   }
@@ -114,10 +116,6 @@ export function collectScalarKinds(entries) {
   return kinds;
 }
 
-export function typeEntryDecl(entry) {
-  return entry?.decl ?? null;
-}
-
 function makeTypeEntry(typeName, decl) {
   const entry = computeTypeEntry(typeName, decl);
   decl.dataset['typeName'] = entry.typeName;
@@ -148,6 +146,14 @@ function makeVariantEntry(typeName, decl, superName, tagType, tagValue) {
   return entry;
 }
 
+const REPRESENTATIONS = [
+  ['ir-wasm-scalar', 'wasm-scalar', (repr, name) => ({
+    scalarKind: name, scalarFamily: parseScalarRepr(repr, name),
+  })],
+  ['ir-wasm-ref', 'wasm-ref', (repr, name) => ({ refBinaryen: parseRefRepr(repr, name) })],
+  ['ir-wasm-array', 'wasm-array', parseArrayRepr],
+];
+
 function computeTypeEntry(typeName, decl) {
   const base = { typeName, decl, kind: decl.localName };
   if (decl.localName === 'ir-struct') {
@@ -172,42 +178,11 @@ function computeTypeEntry(typeName, decl) {
   if (decl.localName === 'ir-proto') return { ...base, typeRepr: `utu-proto:${typeName}` };
   if (decl.localName !== 'ir-type-def') return { ...base, typeRepr: `utu:${typeName}` };
 
-  const scalar = decl.querySelector(':scope > ir-wasm-scalar');
-  if (scalar) {
-    const typeRepr = requiredAttr(scalar, 'type-repr', typeName);
-    const scalarFamily = parseScalarRepr(typeRepr, typeName);
-    return {
-      ...base,
-      kind: 'wasm-scalar',
-      typeRepr,
-      scalarKind: typeName,
-      scalarFamily,
-    };
-  }
-
-  const ref = decl.querySelector(':scope > ir-wasm-ref');
-  if (ref) {
-    const typeRepr = requiredAttr(ref, 'type-repr', typeName);
-    const refBinaryen = parseRefRepr(typeRepr, typeName);
-    return {
-      ...base,
-      kind: 'wasm-ref',
-      typeRepr,
-      refBinaryen,
-    };
-  }
-
-  const array = decl.querySelector(':scope > ir-wasm-array');
-  if (array) {
-    const typeRepr = requiredAttr(array, 'type-repr', typeName);
-    const { arrayElem, arrayMutable } = parseArrayRepr(typeRepr, typeName);
-    return {
-      ...base,
-      kind: 'wasm-array',
-      typeRepr,
-      arrayElem,
-      arrayMutable,
-    };
+  for (const [selector, kind, facts] of REPRESENTATIONS) {
+    const node = decl.querySelector(`:scope > ${selector}`);
+    if (!node) continue;
+    const typeRepr = requiredAttr(node, 'type-repr', typeName);
+    return { ...base, kind, typeRepr, ...facts(typeRepr, typeName) };
   }
 
   return { ...base, typeRepr: `utu-type-def:${typeName}` };
@@ -244,7 +219,7 @@ function readTagType(decl) {
 }
 
 export const WASM_SCALAR_FAMILIES = new Set(['i32', 'i64', 'f32', 'f64', 'v128']);
-export const WASM_REF_BINARYEN_TYPES = new Set(['externref', 'stringref', 'i31ref']);
+export const WASM_REF_BINARYEN_TYPES = new Set(['externref', 'stringref', 'i31ref', 'anyref']);
 
 function requiredAttr(node, attr, typeName) {
   const value = node.getAttribute(attr);

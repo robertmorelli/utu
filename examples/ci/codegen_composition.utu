@@ -30,7 +30,7 @@ fn matches(todo: Todo, filter: Filter) Bool {
 
 fn count(todos: Array[Todo], filter: Filter) I32 {
     let n: I32 = 0;
-    for (0..<todos.len) |i| {
+    for (0..<todos.len()) |i| {
         if matches(todos[i], filter) {
             n += 1;
         };
@@ -40,7 +40,7 @@ fn count(todos: Array[Todo], filter: Filter) I32 {
 
 fn status(flag: Bool) Str {
     let maybe: ?Str = if flag { "online"; } else { null; };
-    maybe \ "offline";
+    maybe orelse "offline";
 }
 
 fn greet(name: Str) Str {
@@ -48,11 +48,10 @@ fn greet(name: Str) Str {
 }
 
 fn build_todos() Array[Todo] {
-    Array[Todo].new_fixed(
-        new_todo("learn utu"),
-        new_todo("ship compiler"),
-        new_todo("write tests"),
-    );
+    let todos: Array[Todo] = Array[Todo].new(3, new_todo("learn utu"));
+    todos[1] = new_todo("ship compiler");
+    todos[2] = new_todo("write tests");
+    todos;
 }
 
 test "composition keeps Array mutations visible to matches" {

@@ -62,19 +62,19 @@ export function walkClosureExpr(n, doc, source, dispatch) {
   return node;
 }
 
-// await p — one operand, the promise.
-export function walkAwaitExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.AWAIT, doc), n);
-  const inner = namedChildren(n)[0];
-  if (inner) node.appendChild(dispatch(inner, doc, source));
+function walkOptionalOperand(tag, n, doc, source, dispatch) {
+  const node = stamp(el(tag, doc), n);
+  const operand = namedChildren(n)[0];
+  if (operand) node.appendChild(dispatch(operand, doc, source));
   return node;
 }
 
+export function walkAwaitExpr(n, doc, source, dispatch) {
+  return walkOptionalOperand(T.AWAIT, n, doc, source, dispatch);
+}
+
 export function walkReturnExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.RETURN, doc), n);
-  const exprN = namedChildren(n)[0];
-  if (exprN) node.appendChild(dispatch(exprN, doc, source));
-  return node;
+  return walkOptionalOperand(T.RETURN, n, doc, source, dispatch);
 }
 
 export function walkBreakExpr(n, doc, source, dispatch) {
@@ -86,10 +86,7 @@ export function walkFatalExpr(n, doc, source, dispatch) {
 }
 
 export function walkAssertExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.ASSERT, doc), n);
-  const exprN = namedChildren(n)[0];
-  if (exprN) node.appendChild(dispatch(exprN, doc, source));
-  return node;
+  return walkOptionalOperand(T.ASSERT, n, doc, source, dispatch);
 }
 
 export function walkStructInit(n, doc, source, dispatch, implicit) {

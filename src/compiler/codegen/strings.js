@@ -1,11 +1,14 @@
 import { binaryen } from './types.js';
 
 export function emitStringLiteral(node, ctx) {
+  if (ctx.requirements) ctx.requirements.strings = true;
   const raw = decodeStringLiteral(node.getAttribute('value') ?? '');
   return stringConst(ctx.module, raw);
 }
 
 export function emitStringIntrinsic(opNode, argNodes, ctx, emitExpr) {
+  if (!opNode.localName.startsWith('ir-string-')) return null;
+  if (ctx.requirements) ctx.requirements.strings = true;
   const [a, b, c] = argNodes;
   const m = ctx.module;
 

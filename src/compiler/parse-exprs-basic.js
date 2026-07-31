@@ -3,53 +3,20 @@
 import { stamp, el, text, namedChildren, append, walkChildren } from './parse-helpers.js';
 import { T } from './ir-tags.js';
 
+const LITERAL_KINDS = new Map([
+  ['int_lit', 'int'], ['float_lit', 'float'], ['string_lit', 'string'],
+  ['multiline_string_lit', 'string-multi'], ['bool_lit', 'bool'], ['null_lit', 'null'],
+]);
+
 export function walkLiteral(n, doc, source, dispatch) {
   const node = stamp(el(T.LIT, doc), n);
-  if (n.type === 'int_lit') {
-    node.setAttribute('kind', 'int');
-    node.setAttribute('value', text(n));
-    return node;
-  }
-  if (n.type === 'float_lit') {
-    node.setAttribute('kind', 'float');
-    node.setAttribute('value', text(n));
-    return node;
-  }
-  if (n.type === 'string_lit') {
-    node.setAttribute('kind', 'string');
-    node.setAttribute('value', text(n));
-    return node;
-  }
-  if (n.type === 'multiline_string_lit') {
-    node.setAttribute('kind', 'string-multi');
-    node.setAttribute('value', text(n));
-    return node;
-  }
-  if (n.type === 'bool_lit') {
-    node.setAttribute('kind', 'bool');
-    node.setAttribute('value', text(n));
-    return node;
-  }
-  if (n.type === 'null_lit') {
-    node.setAttribute('kind', 'null');
-    node.setAttribute('value', text(n));
-    return node;
-  }
-  const child = namedChildren(n)[0];
-  if (!child) {
-    const raw = text(n);
-    node.setAttribute('kind', raw === 'true' || raw === 'false' ? 'bool' : 'null');
-    node.setAttribute('value', raw);
-    return node;
-  }
-  switch (child.type) {
-    case 'int_lit':              node.setAttribute('kind', 'int'); break;
-    case 'float_lit':            node.setAttribute('kind', 'float'); break;
-    case 'string_lit':           node.setAttribute('kind', 'string'); break;
-    case 'multiline_string_lit': node.setAttribute('kind', 'string-multi'); break;
-    default:                     node.setAttribute('kind', child.type); break;
-  }
-  node.setAttribute('value', text(child));
+  const valueNode = LITERAL_KINDS.has(n.type) ? n : namedChildren(n)[0];
+  const value = text(valueNode ?? n);
+  const kind = valueNode
+    ? (LITERAL_KINDS.get(valueNode.type) ?? valueNode.type)
+    : (value === 'true' || value === 'false' ? 'bool' : 'null');
+  node.setAttribute('kind', kind);
+  node.setAttribute('value', value);
   return node;
 }
 
@@ -76,40 +43,27 @@ export function walkUnaryExpr(n, doc, source, dispatch) {
   return node;
 }
 
-export function walkBinaryExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.BINARY, doc), n);
+function walkInfix(tag, n, doc, source, dispatch) {
+  const node = stamp(el(tag, doc), n);
   const children = namedChildren(n);
-  if (children.length >= 2) {
-    const lhs = children[0];
-    const rhs = children[children.length - 1];
-    const op = source.slice(lhs.endIndex, rhs.startIndex).trim();
-    node.setAttribute('op', op);
-    node.appendChild(dispatch(lhs, doc, source));
-    node.appendChild(dispatch(rhs, doc, source));
-  }
+  if (children.length < 2) return node;
+  const lhs = children[0];
+  const rhs = children.at(-1);
+  node.setAttribute('op', source.slice(lhs.endIndex, rhs.startIndex).trim());
+  append(node, [dispatch(lhs, doc, source), dispatch(rhs, doc, source)]);
   return node;
+}
+
+export function walkBinaryExpr(n, doc, source, dispatch) {
+  return walkInfix(T.BINARY, n, doc, source, dispatch);
 }
 
 export function walkAssignExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.ASSIGN, doc), n);
-  const children = namedChildren(n);
-  if (children.length >= 2) {
-    const lhs = children[0];
-    const rhs = children[children.length - 1];
-    const op = source.slice(lhs.endIndex, rhs.startIndex).trim();
-    node.setAttribute('op', op);
-    node.appendChild(dispatch(lhs, doc, source));
-    node.appendChild(dispatch(rhs, doc, source));
-  }
-  return node;
+  return walkInfix(T.ASSIGN, n, doc, source, dispatch);
 }
 
 export function walkElseExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.ELSE, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.appendChild(dispatch(children[0], doc, source));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  return node;
+  return walkOperands(T.ELSE, n, doc, source, dispatch);
 }
 
 export function walkPipeExpr(n, doc, source, dispatch) {
@@ -231,21 +185,18 @@ export function walkFieldExpr(n, doc, source, dispatch) {
   return node;
 }
 
-export function walkIndexExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.INDEX, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.appendChild(dispatch(children[0], doc, source));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
+function walkOperands(tag, n, doc, source, dispatch) {
+  const node = stamp(el(tag, doc), n);
+  append(node, namedChildren(n).map(child => dispatch(child, doc, source)));
   return node;
 }
 
+export function walkIndexExpr(n, doc, source, dispatch) {
+  return walkOperands(T.INDEX, n, doc, source, dispatch);
+}
+
 export function walkSliceExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.SLICE, doc), n);
-  const children = namedChildren(n);
-  if (children[0]) node.appendChild(dispatch(children[0], doc, source));
-  if (children[1]) node.appendChild(dispatch(children[1], doc, source));
-  if (children[2]) node.appendChild(dispatch(children[2], doc, source));
-  return node;
+  return walkOperands(T.SLICE, n, doc, source, dispatch);
 }
 
 export function walkNullExpr(n, doc, source, dispatch) {

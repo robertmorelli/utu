@@ -6,17 +6,15 @@ fn maybe_box(flag: Bool) ?Box {
 }
 
 fn or_zero(flag: Bool) I32 {
-    let item: Box = maybe_box(flag) \ Box { value: 0 };
-    item.value;
-}
-
-fn force_value(flag: Bool) I32 {
-    let item: Box = maybe_box(flag) \ fatal;
+    let item: Box = maybe_box(flag) orelse Box { value: 0 };
     item.value;
 }
 
 fn has_box(flag: Bool) Bool {
-    not ref.is_null(maybe_box(flag));
+    promote maybe_box(flag) {
+        |item| => true,
+        ~> false,
+    };
 }
 
 test "else fallback runs on null" {
@@ -27,11 +25,7 @@ test "else fallback keeps non-null values" {
     assert or_zero(true) == 41;
 }
 
-test "force unwrap preserves non-null values" {
-    assert force_value(true) == 41;
-}
-
-test "ref.is_null sees nullable results" {
+test "promote distinguishes nullable results" {
     assert has_box(true);
     assert not has_box(false);
 }

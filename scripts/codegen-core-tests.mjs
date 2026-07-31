@@ -24,6 +24,86 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.bit_mix(3, 5), 9);
   });
 
+  test('codegen: operator literals adopt the lowered receiver type', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_operator_literal_context.utu',
+      source: `
+        export lib {
+          fn add_one_i64(value: I64) I64 { value + 1; }
+          fn half_f64(value: F64) F64 { value / 2.0; }
+        }
+      `,
+    });
+    assertEq(instance.exports.add_one_i64(41n), 42n);
+    assertEq(instance.exports.half_f64(9), 4.5);
+  });
+
+  test('codegen: plain and inline-parameterized module paths survive hoisting', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_module_paths.utu',
+      source: `
+        mod math {
+          struct Pair:
+            | left : I32
+            | right : I32
+          fn Pair.new(left: I32, right: I32) Pair { Pair { left: left, right: right }; }
+          fn Pair.sum |self| () I32 { self.left + self.right; }
+          fn inc(value: I32) I32 { value + 1; }
+        }
+        mod boxy[T] {
+          struct Box:
+            | value : T
+          fn Box.new(value: T) Box { Box { value: value }; }
+          fn Box.get |self| () T { self.value; }
+        }
+        using boxy[I32] |box_i32|;
+        mod cell[T] {
+          struct Cell:
+            | value : T
+          fn Cell.new(value: T) Cell { Cell { value: value }; }
+          fn Cell.get |self| () T { self.value; }
+          fn wrap(value: T) Cell { Cell.new(value); }
+        }
+        using cell[I32];
+        export lib {
+          fn plain() I32 { math.inc(math.Pair.new(2, 3).sum()); }
+          fn parameterized() I32 { boxy[I32].Box.new(7).get(); }
+          fn alias_path() I32 { box_i32.Box.new(8).get(); }
+          fn open_path() I32 { wrap(9).get() + Cell.new(1).get(); }
+        }
+      `,
+    });
+    assertEq(instance.exports.plain(), 6);
+    assertEq(instance.exports.parameterized(), 7);
+    assertEq(instance.exports.alias_path(), 8);
+    assertEq(instance.exports.open_path(), 10);
+  });
+
+  test('codegen: scalar and string globals support reads', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_globals_runtime.utu',
+      source: `
+        let seed: I32 = 41;
+        let banner: Str = "ok";
+        export lib {
+          fn next() I32 { seed + 1; }
+          fn loud() Str { banner + "!"; }
+        }
+      `,
+    });
+    assertEq(instance.exports.next(), 42);
+    assertEq(instance.exports.loud(), 'ok!');
+  });
+
   test('codegen: explainability facts include functions/exports/size', async ({ ROOT }) => {
     const { emitBinary } = await import('../src/compiler/codegen/index.js');
     const { createExplainabilityArtifacts } = await import('../src/index.js');
@@ -41,6 +121,85 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assert(artifacts.lowerings.some(x => x.kind === 'codegen-export'), 'expected codegen-export fact');
       assert(artifacts.sizes.some(x => x.kind === 'wasm-module'), 'expected wasm-module size fact');
     });
+  });
+
+  test('codegen: string lowering imports are emitted only when strings survive codegen', async ({ ROOT }) => {
+    const { emitBinary, JS_STRING_BUILTINS_COMPILE_OPTIONS } = await import('../src/compiler/codegen/index.js');
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    await withTempUtu(ROOT, 'codegen_import_shaking.utu', `
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `, async (file) => {
+      const doc = await compiler.compileFile(file);
+      const binary = emitBinary(doc);
+      const module = await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
+      const imports = WebAssembly.Module.imports(module);
+      assert(!imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
+      assert(binary.length < 200, `string-free scalar module unexpectedly large: ${binary.length} bytes`);
+    });
+    await withTempUtu(ROOT, 'codegen_string_import_shaking.utu', `
+      export lib { fn join(a: Str, b: Str) Str { a + b; } }
+    `, async (file) => {
+      const doc = await compiler.compileFile(file);
+      const binary = emitBinary(doc);
+      await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
+      const encoded = new TextDecoder('latin1').decode(binary);
+      assert(encoded.includes('concat'), 'concat-only module should retain the concat builtin');
+      for (const unused of ['substring', 'charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
+        assert(!encoded.includes(unused), `concat-only module retained unrelated string builtin ${unused}`);
+      }
+      assert(binary.length < 150, `concat-only module unexpectedly large: ${binary.length} bytes`);
+    });
+    await withTempUtu(ROOT, 'codegen_midpoint_insert_size.utu', `
+      export lib {
+        fn run(base: Str, piece: Str, repeats: I32) Str {
+          let i: I32 = 0;
+          let out: Str = base;
+          while (i < repeats) {
+            let size: I32 = Str.len(out);
+            let middle: I32 = size / 2;
+            out = Str.slice(out, 0, middle) + piece + Str.slice(out, middle, size);
+            i = i + 1;
+          };
+          out;
+        }
+      }
+    `, async (file) => {
+      const doc = await compiler.compileFile(file);
+      assertNoErrors(doc);
+      const binary = emitBinary(doc);
+      await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
+      const encoded = new TextDecoder('latin1').decode(binary);
+      for (const required of ['concat', 'length', 'substring']) {
+        assert(encoded.includes(required), `midpoint insertion dropped required string builtin ${required}`);
+      }
+      const importModuleCount = encoded.split('wasm:js-string').length - 1;
+      assertEq(importModuleCount, 3, 'midpoint insertion should retain exactly three string builtin imports');
+      for (const unused of ['charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
+        assert(!encoded.includes(unused), `midpoint insertion retained unrelated string builtin ${unused}`);
+      }
+      assert(binary.length <= 192, `midpoint insertion module exceeded its size ceiling: ${binary.length} bytes`);
+    });
+  });
+
+  test('codegen: strings support receiver methods and index sugar like Array', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_string_receiver_methods.utu',
+      source: `
+        export lib {
+          fn len(s: Str) I32 { s.len(); }
+          fn get(s: Str, i: I32) I32 { s.get(i); }
+          fn index(s: Str, i: I32) I32 { s[i]; }
+          fn slice(s: Str) Str { s[1, 3]; }
+        }
+      `,
+    });
+    assertEq(instance.exports.len('hello'), 5);
+    assertEq(instance.exports.get('hello', 1), 101);
+    assertEq(instance.exports.index('hello', 4), 111);
+    assertEq(instance.exports.slice('hello'), 'el');
   });
 
   test('codegen: emitBinary can return a wasm source map', async ({ ROOT }) => {
@@ -129,6 +288,65 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.fact(5), 120);
   });
 
+  test('codegen: exclusive and inclusive for ranges execute and support break', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_for_ranges.utu',
+      source: `
+        export lib {
+          fn exclusive(n: I32) I32 {
+            let total: I32 = 0;
+            for (0..<n) |i| { total += i; };
+            total;
+          }
+          fn inclusive(n: I32) I32 {
+            let total: I32 = 0;
+            for (0...n) |i| { total += i; };
+            total;
+          }
+          fn first_three(n: I32) I32 {
+            let total: I32 = 0;
+            for (0..<n) |i| {
+              if i == 3 { break; };
+              total += i;
+            };
+            total;
+          }
+          fn wide(end_: I64) I64 {
+            let start: I64 = 0;
+            let total: I64 = 0;
+            for (start..<end_) |i| { total += i; };
+            total;
+          }
+          fn inclusive_u64_max(start: U64) U64 {
+            let total: U64 = 0;
+            for (start...start) |i| { total += 1; };
+            total;
+          }
+          fn zipped() I32 {
+            let total: I32 = 0;
+            for (0..<5, 10..<13) |left, right| { total += left + right; };
+            total;
+          }
+          fn no_capture() I32 {
+            let total: I32 = 0;
+            for (0..<3) { total += 1; };
+            total;
+          }
+        }
+      `,
+    });
+    assertEq(instance.exports.exclusive(5), 10);
+    assertEq(instance.exports.inclusive(5), 15);
+    assertEq(instance.exports.first_three(20), 3);
+    assertEq(instance.exports.wide(5n), 10n);
+    assertEq(instance.exports.inclusive_u64_max(0xffffffffffffffffn), 1n);
+    assertEq(instance.exports.zipped(), 36);
+    assertEq(instance.exports.no_capture(), 3);
+  });
+
   test('codegen: match lowers dense patterns to br_table and sparse to if/else', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({
       ROOT,
@@ -162,6 +380,24 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.sparse_pick(0), 1);
     assertEq(instance.exports.sparse_pick(100), 2);
     assertEq(instance.exports.sparse_pick(50), 0);
+  });
+
+  test('codegen: Bool match patterns lower to integer constants', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_bool_match.utu',
+      source: `
+        export lib {
+          fn pick(flag: Bool) I32 {
+            match flag { true => 11, false => 22, ~> 33, };
+          }
+        }
+      `,
+    });
+    assertEq(instance.exports.pick(1), 11);
+    assertEq(instance.exports.pick(0), 22);
   });
 
   test('codegen: sparse I64 match preserves full-width arm patterns', async ({ ROOT }) => {
@@ -576,6 +812,30 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     // A real timer elapses inside the wasm frame — straight-line utu code,
     // suspended and resumed by the host with no CPS transform in the compiler.
     assertEq(await promisifyExports(instance, spec).compute(20), 41);
+  });
+
+  test('examples: every examples/working program compiles and executes', async ({ ROOT }) => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const { buildImportObject, emitBinary, instantiateLowered } = await import('../src/index.js');
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    const expected = new Map([
+      ['hello.utu', 42],
+      ['arrays_and_for.utu', 140],
+      ['structs.utu', 25],
+      ['strings.utu', 'hello from utu'],
+      ['closures.utu', 42],
+    ]);
+    for (const [name, value] of expected) {
+      const file = path.join(ROOT, 'examples', 'working', name);
+      const doc = await compiler.compileFile(file);
+      assertNoErrors(doc);
+      const { instance } = await instantiateLowered(emitBinary(doc), buildImportObject(doc));
+      assertEq(await instance.exports.main(), value, `${name} returned the wrong result`);
+    }
+    const entries = (await fs.readdir(path.join(ROOT, 'examples', 'working')))
+      .filter(name => name.endsWith('.utu')).sort();
+    assertEq(entries.join(','), [...expected.keys()].sort().join(','), 'every guaranteed working example needs an execution expectation');
   });
 
   test('codegen: @es CI examples compile cleanly', async ({ ROOT }) => {

@@ -12,6 +12,8 @@
 // in the entry file. No `from` attributes remain anywhere.
 
 import { restampSubtree } from './parse.js';
+import { hoistModule } from './hoist-modules.js';
+import { lowerPipesIn } from './lower-pipe.js';
 
 /**
  * @param {Map<string, Document>} graph
@@ -42,27 +44,33 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
         `Module '${moduleName}' not found in '${targetPath}' (imported by '${filePath}')`
       );
 
+      // Imported modules close over their file's own module imports. Carry the
+      // already-inlined support modules and within-file usings with the public
+      // module; cloning only srcModule leaves aliases inside it unbound.
+      for (const support of [...targetRoot.children]) {
+        if (support === srcModule || !['ir-module', 'ir-using'].includes(support.localName)) continue;
+        if (support.localName === 'ir-module'
+          && root.querySelector(`:scope > ir-module[name="${support.getAttribute('name')}"]`)) continue;
+        if (support.localName === 'ir-using' && hasEquivalentUsing(root, support)) continue;
+        using.parentNode.insertBefore(cloneImportedNode(doc, support, targetPath, 'import-support'), using);
+      }
+
       // Clone, re-stamp ids (cloneNode copies them — they'd collide), and
       // record which file the ranges belong to for source-location resolution.
-      const clone = srcModule.cloneNode(true);
-      restampSubtree(clone, targetPath);
-      clone.dataset.synthetic = 'true';
-      clone.dataset.rewritePass = 'inline-imports';
-      clone.dataset.rewriteKind = 'imported-module';
-      clone.dataset.rewriteOf = srcModule.dataset.originId ?? srcModule.id ?? '';
-      clone.dataset.importedFrom = targetPath;
-      clone.dataset.importedVia = using.dataset.originId ?? using.id ?? '';
-      clone.dataset.importedModule = moduleName ?? '';
-      clone.dataset.importKind = using.dataset.importKind ?? '';
-      if (using.dataset.importFromRaw) clone.dataset.importFromRaw = using.dataset.importFromRaw;
+      const clone = cloneImportedNode(doc, srcModule, targetPath, 'imported-module');
       using.parentNode.insertBefore(clone, using);
 
-      // If the using has an alias or type args, pass 3 needs to see it — just
-      // drop the `from` so it looks like a within-file using.
-      // If it was a bare `using M from "..."` (no alias, no type args) the
-      // module is now in scope by name and the using node is dead.
-      if (using.getAttribute('alias') || using.querySelector(':scope > ir-type-args')) using.removeAttribute('from');
-      else using.remove();
+      // Aliased/generic imports remain templates for elaboration. Bare imports
+      // materialize directly into the flat declaration namespace.
+      if (using.getAttribute('alias') || using.querySelector(':scope > ir-type-args')) {
+        using.removeAttribute('from');
+      } else {
+        if (filePath === order.at(-1) && !clone.querySelector(':scope > ir-module-params')) {
+          lowerPipesIn(clone);
+          hoistModule(clone, root);
+        }
+        using.remove();
+      }
     }
   }
 
@@ -70,6 +78,27 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
   const doc = graph.get(order[order.length - 1]);
   if (debugAssertions) assertInlineImports(doc);
   return doc;
+}
+
+function cloneImportedNode(doc, source, targetPath, kind) {
+  const clone = doc.importNode?.(source, true) ?? source.cloneNode(true);
+  restampSubtree(clone, targetPath, doc);
+  clone.dataset.synthetic = 'true';
+  clone.dataset.rewritePass = 'inline-imports';
+  clone.dataset.rewriteKind = kind;
+  clone.dataset.rewriteOf = source.dataset.originId ?? source.id ?? '';
+  clone.dataset.importedFrom = targetPath;
+  return clone;
+}
+
+function hasEquivalentUsing(root, candidate) {
+  const module = candidate.getAttribute('module');
+  const alias = candidate.getAttribute('alias');
+  return [...root.querySelectorAll(':scope > ir-using:not([from])')].some(using =>
+    using.getAttribute('module') === module
+    && using.getAttribute('alias') === alias
+    && (using.querySelector(':scope > ir-type-args')?.textContent ?? '')
+      === (candidate.querySelector(':scope > ir-type-args')?.textContent ?? ''));
 }
 
 function assertInlineImports(doc) {

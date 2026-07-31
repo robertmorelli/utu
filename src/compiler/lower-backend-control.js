@@ -1,23 +1,24 @@
-import { restampSubtree } from './parse.js';
-import { createSyntheticNode } from './ir-helpers.js';
+import { cloneGraphSubtree, createSyntheticNode, replaceTypedNode } from './ir-helpers.js';
 
 import { typeEntryDecl } from './link-type-decls.js';
 import { unwrapNullable } from './type-strings.js';
 
 export function lowerBackendControl(doc, typeIndex, { target = 'normal' } = {}) {
-  if (target === 'analysis') return;
+  if (target === 'analysis') return false;
   const root = doc.body.firstChild;
-  if (!root) return;
+  if (!root) return false;
+  let changed = false;
 
   for (const promote of [...root.querySelectorAll('ir-promote')]) {
     const lowered = lowerPromote(promote);
-    if (lowered) promote.replaceWith(lowered);
+    if (lowered) { replaceTypedNode(promote, lowered); changed = true; }
   }
 
   for (const alt of [...root.querySelectorAll('ir-alt')]) {
     const lowered = lowerAlt(alt, typeIndex);
-    if (lowered) alt.replaceWith(lowered);
+    if (lowered) { replaceTypedNode(alt, lowered); changed = true; }
   }
+  return changed;
 }
 
 function lowerAlt(alt, typeIndex) {
@@ -27,42 +28,23 @@ function lowerAlt(alt, typeIndex) {
   const scrutType = scrutinee?.dataset['typeName'] ?? '';
   if (!scrutinee || !scrutType || arms.length === 0) return null;
 
-  const decl = typeEntryDecl(typeIndex.get(scrutType));
-  if (decl?.localName === 'ir-enum') return lowerTagAlt(alt, typeIndex, decl, scrutinee, arms, defaultArm);
-  return lowerRecAlt(alt, scrutinee, arms, defaultArm);
-}
-
-function lowerTagAlt(alt, typeIndex, enumDecl, scrutinee, arms, defaultArm) {
+  const enumDecl = typeEntryDecl(typeIndex.get(scrutType));
   const block = lowerSubjectBlock(alt, scrutinee);
   let tail = defaultArm ? cloneBody(defaultArm) : null;
-  const tagType = enumTagType(enumDecl);
-  const eqFn = alt.ownerDocument.body.firstChild?.querySelector(`:scope > ir-fn[name="${tagType}:eq"]`);
-  const subjIdent = makeBoundIdent(block.subjectLet, block.subjectName);
-  const tagExpr = makeFieldAccess(alt, subjIdent, '__tag', tagType);
-
+  let condition;
+  if (enumDecl?.localName === 'ir-enum') {
+    const tagType = enumTagType(enumDecl);
+    const eqFn = alt.ownerDocument.body.firstChild?.querySelector(`:scope > ir-fn[name="${tagType}:eq"]`);
+    const tag = makeFieldAccess(alt, makeBoundIdent(block.subjectLet, block.subjectName), '__tag', tagType);
+    condition = arm => makeEqTest(alt, cloneNode(tag), tagValue(typeIndex, enumDecl, arm), tagType, eqFn);
+  } else {
+    condition = arm => makeRefTest(alt, block.subjectLet, block.subjectName, arm.getAttribute('variant'));
+  }
   for (let i = arms.length - 1; i >= 0; i--) {
     const arm = arms[i];
-    const cond = makeEqTest(alt, cloneNode(tagExpr), tagValue(typeIndex, enumDecl, arm), tagType, eqFn);
     const body = lowerArmBody(alt, block.subjectLet, block.subjectName, arm);
-    tail = makeIf(arm, cond, body, tail);
+    tail = makeIf(arm, condition(arm), body, tail);
   }
-
-  if (tail) block.node.appendChild(tail);
-  stampBlockType(block.node, alt, arms, defaultArm);
-  return block.node;
-}
-
-function lowerRecAlt(alt, scrutinee, arms, defaultArm) {
-  const block = lowerSubjectBlock(alt, scrutinee);
-  let tail = defaultArm ? cloneBody(defaultArm) : null;
-
-  for (let i = arms.length - 1; i >= 0; i--) {
-    const arm = arms[i];
-    const cond = makeRefTest(alt, block.subjectLet, block.subjectName, arm.getAttribute('variant'));
-    const body = lowerArmBody(alt, block.subjectLet, block.subjectName, arm);
-    tail = makeIf(arm, cond, body, tail);
-  }
-
   if (tail) block.node.appendChild(tail);
   stampBlockType(block.node, alt, arms, defaultArm);
   return block.node;
@@ -193,6 +175,7 @@ function makeEqTest(site, lhs, rhsValue, tagType, eqFn) {
   callee.setAttribute('method', 'eq');
   lit.setAttribute('kind', 'int');
   lit.setAttribute('value', String(rhsValue));
+  lit.setAttribute('type-name', tagType);
   lit.dataset['typeName'] = tagType;
   call.dataset['typeName'] = 'Bool';
   if (eqFn) {
@@ -260,7 +243,5 @@ function cloneBody(node) {
 }
 
 function cloneNode(node) {
-  const clone = node.cloneNode(true);
-  restampSubtree(clone, node.dataset.originFile);
-  return clone;
+  return cloneGraphSubtree(node);
 }

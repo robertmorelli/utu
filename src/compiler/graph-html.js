@@ -9,6 +9,7 @@
 // No external assets, matching PRINCIPLES #1: one file, opens anywhere.
 
 import { extractGraphs, countByKind, EDGE_KINDS } from './graph-view.js';
+import { ANALYSIS_TOKENS } from './analysis-tokens.js';
 
 const KIND_STYLE = {
   binding:     { colour: '#2563eb', label: 'binding — a use resolves to its declaration' },
@@ -29,6 +30,7 @@ const GUTTER = 62;
 export function renderGraphHtml(doc, source, file) {
   const { nodes, edges } = extractGraphs(doc);
   const lines = source.split('\n');
+  const syntax = (doc?.[ANALYSIS_TOKENS] ?? []).filter(token => token.file === file);
 
   // Only nodes that actually take part in an edge, and only those with a
   // position in this file — the prelude contributes thousands otherwise.
@@ -58,9 +60,18 @@ export function renderGraphHtml(doc, source, file) {
   .count { color: #6b7280; }
   .wrap { overflow-x: auto; border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
           border-radius: 6px; }
-  svg { display: block; font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  svg { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px; font-variant-ligatures: none; }
   .ln { fill: #9ca3af; }
-  .src { fill: CanvasText; white-space: pre; }
+  .src { fill: CanvasText; white-space: pre; font-variant-ligatures: none; }
+  .syn-keyword, .syn-keyword-control, .syn-keyword-storage, .syn-keyword-control-import { fill: #c678dd; }
+  .syn-function { fill: #61afef; }
+  .syn-type { fill: #56b6c2; }
+  .syn-string { fill: #98c379; }
+  .syn-constant-numeric, .syn-constant-builtin { fill: #d19a66; }
+  .syn-comment { fill: #7f848e; font-style: italic; }
+  .syn-operator, .syn-keyword-operator { fill: #e06c75; }
+  .syn-attribute { fill: #e5c07b; }
   .node { fill: color-mix(in srgb, CanvasText 8%, transparent); }
   .node.err { fill: color-mix(in srgb, #dc2626 22%, transparent); }
   .edge { fill: none; stroke-width: 1.4; opacity: .75; }
@@ -75,7 +86,7 @@ export function renderGraphHtml(doc, source, file) {
 <div class="wrap">
 ${drawn.length === 0
   ? '<div class="empty">No graph edges anchored in this file.</div>'
-  : svg(lines, placed, drawn, width, height)}
+  : svg(lines, placed, drawn, width, height, syntax)}
 </div>
 <script>
 for (const box of document.querySelectorAll('input[data-kind]')) {
@@ -98,11 +109,14 @@ function legend(counts) {
   }).join('');
 }
 
-function svg(lines, placed, edges, width, height) {
+function svg(lines, placed, edges, width, height, syntax) {
+  let sourceOffset = 0;
   const text = lines.map((line, i) => {
     const y = (i + 1) * LINE_H;
+    const rendered = highlightedLine(line, sourceOffset, syntax);
+    sourceOffset += line.length + 1;
     return `<text class="ln" x="8" y="${y}">${String(i + 1).padStart(3)}</text>` +
-           `<text class="src" x="${GUTTER}" y="${y}">${escapeHtml(line)}</text>`;
+           `<text class="src" x="${GUTTER}" y="${y}">${rendered}</text>`;
   }).join('\n');
 
   const boxes = [...placed.values()].map((node) => {
@@ -124,11 +138,37 @@ function svg(lines, placed, edges, width, height) {
            `<title>${escapeHtml(edge.label ?? edge.kind)}</title></path>`;
   }).join('\n');
 
+  // Arcs belong behind the source. Drawing them last made dense graphs look
+  // detached from their anchors and allowed strokes to obscure the text.
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-${text}
-${boxes}
 ${arcs}
+${boxes}
+${text}
 </svg>`;
+}
+
+function highlightedLine(line, lineStart, syntax) {
+  if (!line.length) return '';
+  const lineEnd = lineStart + line.length;
+  const tokens = syntax.filter(token => token.start < lineEnd && token.end > lineStart);
+  const boundaries = new Set([0, line.length]);
+  for (const token of tokens) {
+    boundaries.add(Math.max(0, token.start - lineStart));
+    boundaries.add(Math.min(line.length, token.end - lineStart));
+  }
+  const points = [...boundaries].sort((a, b) => a - b);
+  let html = '';
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i], end = points[i + 1];
+    if (end <= start) continue;
+    const matches = tokens.filter(token => token.start - lineStart <= start && token.end - lineStart >= end)
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start));
+    const role = String(matches[0]?.role ?? '').replace(/[^a-z0-9-]/gi, '-');
+    html += `<tspan class="${role ? `syn-${role}` : ''}" x="${GUTTER + start * CHAR_W}" ` +
+      `textLength="${(end - start) * CHAR_W}" lengthAdjust="spacingAndGlyphs">` +
+      `${escapeHtml(line.slice(start, end))}</tspan>`;
+  }
+  return html;
 }
 
 function box(node) {

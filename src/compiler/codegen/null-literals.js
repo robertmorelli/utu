@@ -4,10 +4,8 @@ export function isNullLiteral(node) {
   return node?.localName === 'ir-lit' && (node.getAttribute('kind') === 'null' || node.dataset['typeName'] === 'null');
 }
 
-export function emitNullLiteral(node, ctx, expectedType = '') {
-  const type = expectedType && expectedType !== 'null'
-    ? expectedType
-    : node.dataset.expectedType ?? '';
+export function emitNullLiteral(node, ctx) {
+  const type = ctx.expectedOf(node) ?? '';
   if (!type.startsWith('?')) {
     throw new Error('codegen: untyped null literal reached backend; use T.null or a nullable context');
   }

@@ -1,0 +1,4 @@
+export main() Str {
+    let greeting: Str = "hello";
+    greeting + " from utu";
+}

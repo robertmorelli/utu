@@ -7,24 +7,23 @@
 //   emitFieldSet  (assign, ctx)  — `expr.field = value`        → struct.set
 //   emitNullRef   (node, ctx)    — `T.null`                    → ref.null T
 //
-// emit* helpers re-import emitExpr from ./expr.js when they need to recurse —
-// that pulls expr.js back in for the recursion edge but keeps structs.js fully
-// self-contained for the struct-shaped IR nodes.
+// Recursive expression emission is injected by expr.js, keeping this module a
+// leaf in the codegen dependency graph.
 
 import { binaryen } from './types.js';
-import { emitExpr } from './expr.js';
 
 // ── Emit helpers ─────────────────────────────────────────────────────────────
 
 /**
  * `T1 { field: expr, ... }` and `&{ field: expr, ... }` (after
- * lower-implicit-struct-init has filled in the type-name attribute).
+ * the type graph has filled in the type-name attribute).
  *
  * Re-orders field-init children by declared field index so that source order
  * doesn't have to match wasm slot order.
  */
-export function emitStructInit(node, ctx) {
-  const typeName = node.dataset['typeName'] ?? node.getAttribute('type-name');
+export function emitStructInit(node, ctx, emitExpr) {
+  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
+  const typeName = ctx.typeOf(node) ?? node.getAttribute('type-name');
   if (!typeName) throw new Error('codegen: ir-struct-init has no type');
   const info = ctx.structTypes.get(typeName);
   if (!info) throw new Error(`codegen: ir-struct-init type "${typeName}" is not a registered heap type`);
@@ -64,13 +63,14 @@ function emitTagConst(ctx, tagType, tagValue) {
 
 /**
  * `expr.field` — read.
- * Receiver type comes from `data-type-name` (stamped by stampFieldAccessTypes
+ * Receiver type comes from `data-type-name` (stamped by the type graph
  * before operator lowering, so binary ops over fields work too).
  */
-export function emitFieldGet(node, ctx) {
+export function emitFieldGet(node, ctx, emitExpr) {
+  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const recv = node.children[0];
   if (!recv) throw new Error('codegen: ir-field-access has no receiver');
-  const recvType = recv.dataset['typeName'];
+  const recvType = ctx.typeOf(recv);
   if (!recvType) throw new Error('codegen: ir-field-access receiver has no data-type-name');
 
   // `?Foo.x` reads from a non-null ref at runtime — null check is the
@@ -81,7 +81,10 @@ export function emitFieldGet(node, ctx) {
   if (!info) throw new Error(`codegen: ir-field-access on unknown struct "${structName}"`);
 
   const fieldName = node.getAttribute('field');
-  const field = info.fieldIndex.get(fieldName);
+  if (info.decl?.localName === 'ir-proto') {
+    return emitProtocolFieldGet(node, recv, structName, fieldName, ctx, emitExpr);
+  }
+  const field = resolvedField(node, info, ctx);
   if (!field) throw new Error(`codegen: struct ${structName} has no field "${fieldName}"`);
 
   let recvExpr = emitExpr(recv, ctx);
@@ -103,13 +106,14 @@ export function emitFieldGet(node, ctx) {
  * The wasm `struct.set` op is a statement (no result), so callers should
  * treat this as a void expression.
  */
-export function emitFieldSet(assignNode, ctx) {
+export function emitFieldSet(assignNode, ctx, emitExpr) {
+  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const lhs = assignNode.children[0];
   const rhs = assignNode.children[1];
   if (!lhs || !rhs) throw new Error('codegen: ir-assign field-set missing lhs/rhs');
 
   const recv = lhs.children[0];
-  const recvType = recv?.dataset['typeName'];
+  const recvType = ctx.typeOf(recv);
   if (!recvType) throw new Error('codegen: ir-field-access receiver has no data-type-name');
 
   const structName = recvType.startsWith('?') ? recvType.slice(1) : recvType;
@@ -117,7 +121,10 @@ export function emitFieldSet(assignNode, ctx) {
   if (!info) throw new Error(`codegen: field-set on unknown struct "${structName}"`);
 
   const fieldName = lhs.getAttribute('field');
-  const field = info.fieldIndex.get(fieldName);
+  if (info.decl?.localName === 'ir-proto') {
+    return emitProtocolFieldSet(lhs, rhs, recv, structName, fieldName, ctx, emitExpr);
+  }
+  const field = resolvedField(lhs, info, ctx);
   if (!field) throw new Error(`codegen: struct ${structName} has no field "${fieldName}"`);
 
   let recvExpr = emitExpr(recv, ctx);
@@ -138,7 +145,73 @@ export function emitFieldSet(assignNode, ctx) {
  * we hand it the registry's `nullableRefType`. Throws for unknown types
  * (string/array null support arrives when those types are registered too).
  */
+function emitProtocolFieldGet(node, recv, protocol, fieldName, ctx, emitExpr) {
+  const m = ctx.module;
+  const receiverType = ctx.toType(protocol);
+  const receiverSlot = ctx.addLocal(protocol);
+  const resultType = ctx.toType(ctx.typeOf(node));
+  const getReceiver = () => m.local.get(receiverSlot, receiverType);
+  let dispatch = m.unreachable();
+  const implementations = protocolFieldImplementations(ctx, protocol, fieldName);
+  if (!implementations.length) throw new Error(`codegen: protocol ${protocol}.${fieldName} has no field implementations`);
+  for (const { info, field } of implementations.reverse()) {
+    const concrete = info.refType;
+    const value = m.struct.get(field.index, m.ref.cast(getReceiver(), concrete), field.binaryenType, false);
+    dispatch = m.if(m.ref.test(getReceiver(), concrete), value, dispatch);
+  }
+  return m.block(null, [m.local.set(receiverSlot, emitExpr(recv, ctx)), dispatch], resultType);
+}
+
+function emitProtocolFieldSet(lhs, rhs, recv, protocol, fieldName, ctx, emitExpr) {
+  const m = ctx.module;
+  const receiverType = ctx.toType(protocol);
+  const receiverSlot = ctx.addLocal(protocol);
+  const valueTypeName = ctx.typeOf(rhs);
+  const valueType = ctx.toType(valueTypeName);
+  const valueSlot = ctx.addLocal(valueTypeName);
+  const getReceiver = () => m.local.get(receiverSlot, receiverType);
+  let dispatch = m.unreachable();
+  const implementations = protocolFieldImplementations(ctx, protocol, fieldName);
+  if (!implementations.length) throw new Error(`codegen: protocol ${protocol}.${fieldName} has no field implementations`);
+  for (const { info, field } of implementations.reverse()) {
+    const concrete = info.refType;
+    const set = m.struct.set(field.index, m.ref.cast(getReceiver(), concrete), m.local.get(valueSlot, valueType));
+    dispatch = m.if(m.ref.test(getReceiver(), concrete), set, dispatch);
+  }
+  return m.block(null, [
+    m.local.set(receiverSlot, emitExpr(recv, ctx)),
+    m.local.set(valueSlot, emitExpr(rhs, ctx)),
+    dispatch,
+  ], binaryen.none);
+}
+
+function protocolFieldImplementations(ctx, protocol, fieldName) {
+  const out = [];
+  for (const info of ctx.structTypes.values()) {
+    if (info.decl?.localName !== 'ir-struct' && info.decl?.localName !== 'ir-variant') continue;
+    const declaration = info.decl.localName === 'ir-variant' ? info.decl.parentElement : info.decl;
+    const protocols = (declaration.querySelector(':scope > ir-impl-list')?.getAttribute('impls') ?? '')
+      .split(',').map(name => name.trim()).filter(Boolean);
+    const field = info.fieldIndex?.get(fieldName);
+    if (protocols.includes(protocol) && field) out.push({ info, field });
+  }
+  return out;
+}
+
+function resolvedField(node, info, ctx = null) {
+  const canonical = ctx?.fieldOf(node);
+  if (canonical && Number.isInteger(canonical.index)) {
+    for (const field of info.fieldIndex.values()) if (field.index === canonical.index) return field;
+  }
+  const index = Number(node.dataset.fieldIndex);
+  if (Number.isInteger(index)) {
+    for (const field of info.fieldIndex.values()) if (field.index === index) return field;
+  }
+  return info.fieldIndex.get(node.getAttribute('field'));
+}
+
 export function emitNullRef(node, ctx) {
+  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const typeName = node.getAttribute('type-name');
   if (!typeName) throw new Error('codegen: ir-null-ref missing type-name attribute');
   const info = ctx.structTypes.get(typeName);

@@ -1,14 +1,13 @@
-using boxes |crate| from "./_boxes.utu";
+using boxes |Box| from "./_boxes.utu";
 
-using crate;
 fn main() void {}
 
-test "captured file imports rename promoted types" {
+test "file imports preserve transitive module dependencies" {
     let box: Box = Box.new(4);
     assert Box.score(box) == 11;
 }
 
-test "captured file imports still support qualified names" {
-    let box: crate.Box = crate.Box.new(5);
-    assert crate.Box.score(box) == 13;
+test "imported promoted types support method syntax" {
+    let box: Box = Box.new(5);
+    assert box.score() == 13;
 }

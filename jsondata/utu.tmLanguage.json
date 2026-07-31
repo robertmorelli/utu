@@ -1,0 +1,323 @@
+{
+  "name": "UTU",
+  "scopeName": "source.utu",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#testBench"
+    },
+    {
+      "include": "#jsgen"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#parameters"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#members"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#invocations"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.utu",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "testBench": {
+      "patterns": [
+        {
+          "name": "meta.test-or-bench.utu",
+          "match": "\\b(test|bench)\\s+(\"(?:\\\\.|[^\"\\\\])*\")",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "entity.name.section.utu"
+            }
+          }
+        }
+      ]
+    },
+    "jsgen": {
+      "patterns": [
+        {
+          "name": "meta.declaration.jsgen.utu",
+          "begin": "\\b(escape)\\b\\s+\\|",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.utu"
+            }
+          },
+          "end": "\\|(?=\\s+[a-z_][a-zA-Z0-9_]*\\s*\\()",
+          "patterns": [
+            {
+              "begin": "(?=[^|])",
+              "end": "(?=\\|)",
+              "contentName": "meta.embedded.inline.javascript",
+              "patterns": [
+                {
+                  "include": "source.js"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.other.multiline.utu",
+          "match": "\\\\\\\\[^\\n]*$"
+        },
+        {
+          "name": "string.quoted.double.utu",
+          "match": "\"(?:\\\\.|[^\"\\\\])*\""
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.utu",
+          "match": "\\b\\d+\\.\\d+(?:[eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.hex.utu",
+          "match": "\\b0x[0-9a-fA-F]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.utu",
+          "match": "\\b0b[01]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.utu",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "name": "meta.declaration.function.utu",
+          "match": "\\b(fn)\\s+([a-z_][a-zA-Z0-9_]*(?:\\.[a-z_][a-zA-Z0-9_]*)?)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "entity.name.function.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.declaration.file-import.utu",
+          "match": "\\b(using)\\s+([a-z_][a-zA-Z0-9_]*|[A-Z][a-zA-Z0-9_]*)(?:\\s+(\\|[a-z_][a-zA-Z0-9_]*\\||\\|[A-Z][a-zA-Z0-9_]*\\|))?\\s+(from)\\s+(\"(?:\\\\.|[^\"\\\\])*\"|[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "entity.name.namespace.utu"
+            },
+            "3": {
+              "name": "entity.name.namespace.utu"
+            },
+            "4": {
+              "name": "keyword.control.utu"
+            },
+            "5": {
+              "name": "string.quoted.double.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.declaration.import-function.utu",
+          "match": "\\b(escape)\\s+(\"[^\"]+\")\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "string.quoted.double.utu"
+            },
+            "3": {
+              "name": "entity.name.function.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.declaration.import-value.utu",
+          "match": "\\b(escape)\\s+(\"[^\"]+\")\\s+([a-z_][a-zA-Z0-9_]*)\\s*(?=\\s*:)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "string.quoted.double.utu"
+            },
+            "3": {
+              "name": "variable.other.definition.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.declaration.type.utu",
+          "match": "\\b(struct|enum|type|proto)\\s+([A-Z][a-zA-Z0-9_]*|&)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "entity.name.type.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.variant.utu",
+          "match": "(\\|)\\s*([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.union.utu"
+            },
+            "2": {
+              "name": "entity.name.type.variant.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.declaration.binding.utu",
+          "match": "\\b(let)\\s+([a-z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.utu"
+            },
+            "2": {
+              "name": "variable.other.definition.utu"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.utu",
+          "match": "\\b(?:if|else|match|alt|for|while|break|return|let|export|lib|fn|using|from|get|set|struct|enum|type|proto|test|bench|measure|assert|and(?!\\=)|or(?!\\=)|not|void|mod|rec|promote|tag|in|out)\\b"
+        },
+        {
+          "name": "constant.language.boolean.utu",
+          "match": "\\b(?:true|false|null)\\b"
+        }
+      ]
+    },
+    "parameters": {
+      "patterns": [
+        {
+          "name": "meta.parameter.utu",
+          "match": "([,(])\\s*([a-z_][a-zA-Z0-9_]*)\\s*(?=:)",
+          "captures": {
+            "1": {
+              "name": "punctuation.separator.parameters.utu"
+            },
+            "2": {
+              "name": "variable.parameter.utu"
+            }
+          }
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.builtin.utu",
+          "match": "\\b(?:I32|U32|I64|U64|F32|F64|V128|M128|Bool|Str|Externref|Anyref|Eqref|I31|Array|Promise|void)\\b"
+        },
+        {
+          "name": "support.type.user.utu",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "members": {
+      "patterns": [
+        {
+          "name": "variable.other.member.utu",
+          "match": "\\.\\s*([a-z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.utu"
+            }
+          }
+        },
+        {
+          "name": "meta.property.utu",
+          "match": "\\b([a-z_][a-zA-Z0-9_]*)\\s*(?=:)",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.utu"
+            }
+          }
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.utu",
+          "match": "\\b(?:Array|Str|I31|Ref|Externref|I32|I64|F32|F64|V128)\\.[a-z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "invocations": {
+      "patterns": [
+        {
+          "name": "support.function.call.utu",
+          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|while\\b|break\\b|return\\b|let\\b|export\\b|lib\\b|fn\\b|using\\b|from\\b|get\\b|set\\b|struct\\b|enum\\b|type\\b|proto\\b|test\\b|bench\\b|measure\\b|assert\\b|and\\b|or\\b|not\\b|void\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.utu"
+            }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.utu",
+          "match": "and=|or=|>>>=|>>=|<<=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|-o|=>|\\.\\.\\.|\\.\\.<|#|\\\\|==|!=|<=|>=|>>>|<<|>>|[-+*/%&^|=<>;]"
+        }
+      ]
+    }
+  }
+}

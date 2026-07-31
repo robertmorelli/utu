@@ -4,7 +4,7 @@ import { readRuntimeSpec, utuRuntimeImports } from './runtime/host-imports.js';
 
 export { createCompiler, initParser } from './compiler/compiler.js';
 export { treeToIR, createIRDocument, resetNodeIds, nextNodeId, restampSubtree } from './compiler/parse.js';
-export { buildGraph } from './compiler/build-graph.js';
+export { buildGraph, buildModuleGraph } from './compiler/build-graph.js';
 export { clipFileIRTree } from './compiler/clip-file-ir-tree.js';
 export { bringTargetToTopLevel } from './compiler/bring-target-to-top-level.js';
 export { checkModuleVariance } from './compiler/check-module-variance.js';
@@ -16,7 +16,24 @@ export { hoistModules } from './compiler/hoist-modules.js';
 export { linkTypeDecls } from './compiler/link-type-decls.js';
 export { resolveBindings } from './compiler/resolve-bindings.js';
 export { inferTypes, typeNodeToStr, fnReturnType } from './compiler/infer-types.js';
+export {
+  actualType, actualizeTypeGraph, applyContextualRewrites, bindingOf, buildTypeGraph,
+  checkTypeGraph, expectedTypes, invalidateTypeGraph, originOf, planCoercions,
+  planContextualRewrites, projectTypeGraph, projectedActualType, projectedBindingOf,
+  recordTypeGraph, resolvedFieldOf, resolvedFunctionOf, settleTypeGraph, solveTypeGraph,
+} from './compiler/type-graph.js';
 export { resolveMethods } from './compiler/resolve-methods.js';
+export { buildDeclarationGraph, typeUses } from './compiler/declaration-graph.js';
+export { buildElaborationGraph } from './compiler/elaboration-graph.js';
+export { buildProgramIndex, nodesOf, refreshProgramIndex } from './compiler/program-index.js';
+export { buildBackendPlan } from './compiler/backend-plan.js';
+export { rebuildSemanticGraphs } from './compiler/semantic-analysis.js';
+export { projectGraphs } from './compiler/project-graphs.js';
+export {
+  buildCallGraph, buildControlFlowGraph, buildLayoutGraph, buildTypeDeclarationGraph,
+  retainGraph, retainedGraphs,
+} from './compiler/semantic-graphs.js';
+export { assertGraphRevision, replaceRetainedGraphs } from './compiler/graph-store.js';
 export { createDslArtifactState, collectDslArtifacts, stampDslArtifacts } from './compiler/collect-dsl-artifacts.js';
 export { expandDsls } from './compiler/expand-dsls.js';
 export { createStandardDsls } from './compiler/standard-dsls.js';
@@ -32,6 +49,8 @@ export {
 } from './compiler/explainability.js';
 export { collectAnalysisDiagnostics } from './compiler/collect-analysis-diagnostics.js';
 export { createAnalysisSnapshot, collectRangeEntries } from './compiler/analysis-snapshot.js';
+export { createAnalysisQueries } from './compiler/analysis-queries.js';
+export { renderGraphHtml } from './compiler/graph-html.js';
 export { formatDiagnostic, formatDiagnostics } from './compiler/format-diagnostics.js';
 export { renderHighlightedSource, computeLineStarts, lineForOffset } from './compiler/source-renderer.js';
 export { validateIrStructure } from './compiler/validate-ir-structure.js';

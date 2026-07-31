@@ -1,6 +1,62 @@
 import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
 
 export function registerCodegenHeapTests({ test, assert, assertEq, assertNoErrors, makeCompiler }) {
+  test('codegen: protocols dispatch across struct and enum implementors', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'codegen_protocol_dispatch.utu',
+      source: `
+        proto Score:
+          | score(I32) I32
+        struct Point[Score]:
+          | value : I32
+        tag enum Item[Score]:
+          | Bonus { value: I32 }
+        fn Score[Point].score |self| (bonus: I32) I32 { self.value + bonus; }
+        fn Score[Bonus].score |self| (bonus: I32) I32 { self.value * 2 + bonus; }
+        fn total(values: Array[Score]) I32 {
+          let out: I32 = 0;
+          for (0..<values.len()) |i| { out += values[i].score(1); };
+          out;
+        }
+        export main() I32 {
+          let values: Array[Score] = Array[Score].new_default(2);
+          values[0] = Point { value: 3 };
+          values[1] = Bonus { value: 4 };
+          total(values);
+        }
+      `,
+    });
+    assertEq(instance.exports.main(), 13);
+  });
+
+  test('codegen: WasmGC arrays support fill, indexing, mutation, and nested loops', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_arrays_nested.utu', source: `
+      export lib {
+        fn count_primes(n: I32) I32 {
+          let flags: Array[I32] = Array[I32].new(n, 1);
+          flags[0] = 0;
+          flags[1] = 0;
+          let p: I32 = 2;
+          while (p * p < n) {
+            if flags[p] == 1 {
+              let j: I32 = p * p;
+              while (j < n) { flags[j] = 0; j = j + p; };
+            };
+            p = p + 1;
+          };
+          let i: I32 = 2;
+          let count: I32 = 0;
+          while (i < n) { count = count + flags[i]; i = i + 1; };
+          count;
+        }
+      }
+    ` });
+    assertEq(instance.exports.count_primes(100), 25);
+  });
+
   test('codegen: struct round-trip — define, construct, read field, return', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_struct.utu', source: `
       struct Point:
@@ -120,6 +176,44 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       }
     ` });
     assertEq(instance.exports.from_let(), 7);
+  });
+
+  test('codegen: bare null in an if branch adopts the nullable return type', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_branch.utu', source: `
+      struct Counter:
+        | n : I32
+      export lib {
+        fn maybe(flag: Bool) ?Counter {
+          if flag { Counter { n: 9 }; } else { null; };
+        }
+        fn read(flag: Bool) I32 {
+          promote maybe(flag) {
+            |value| => value.n,
+            ~> 4,
+          };
+        }
+      }
+    ` });
+    assertEq(instance.exports.read(true), 9);
+    assertEq(instance.exports.read(false), 4);
+  });
+
+  test('codegen: promote preserves a literal false fallback', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_promote_false.utu', source: `
+      struct Counter:
+        | n : I32
+      export lib {
+        fn has_value(flag: Bool) Bool {
+          let value: ?Counter = if flag { Counter { n: 1 }; } else { null; };
+          promote value {
+            |counter| => true,
+            ~> false,
+          };
+        }
+      }
+    ` });
+    assertEq(instance.exports.has_value(true), 1);
+    assertEq(instance.exports.has_value(false), 0);
   });
 
   test('compile: normal target lowers promote before codegen', async ({ ROOT }) => {

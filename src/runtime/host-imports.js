@@ -1,6 +1,7 @@
 // runtime/host-imports.js — the host half of utu's runtime contract
 //
-// The compiler stamps what it needs onto the document; this builds the matching
+// The backend plan owns what the runtime needs and compatibility projection
+// stamps that plan onto the document; this builds the matching
 // import object. Kept dependency-free and separate from the compiler because
 // two very different callers need it:
 //

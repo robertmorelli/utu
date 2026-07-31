@@ -5,21 +5,34 @@
 
 import { parseHTML } from 'linkedom/worker';
 
-// ── Node id counter ───────────────────────────────────────────────────────────
+// ── Document-local node ids ──────────────────────────────────────────────────
 
-let _nodeId = 0;
-export function resetNodeIds()  { _nodeId = 0; }
-export function nextNodeId()    { return _nodeId++; }
+// Compilation is asynchronous and callers may run more than one compiler at a
+// time. Identity therefore belongs to an IR document, never to this module.
+const NODE_IDS = new WeakMap();
+let legacyNodeId = 0;
+
+export function resetNodeIds(doc = null) {
+  if (doc) NODE_IDS.set(doc, 0);
+  else legacyNodeId = 0; // compatibility for callers using nextNodeId() directly
+}
+
+export function nextNodeId(doc = null) {
+  if (!doc) return legacyNodeId++;
+  const id = NODE_IDS.get(doc) ?? 0;
+  NODE_IDS.set(doc, id + 1);
+  return id;
+}
 
 /**
  * Re-stamp ids on every element in a cloned subtree so no ids collide with
  * nodes already in the document.
  */
-export function restampSubtree(root, originFile) {
+export function restampSubtree(root, originFile, destinationDoc = root?.ownerDocument) {
   if (typeof root?.setAttribute !== 'function') return;
   for (const el of [root, ...root.querySelectorAll('*')]) {
     if (!el.dataset.originId && el.id) el.dataset.originId = el.id;
-    el.id = `n${_nodeId++}`;
+    el.id = `n${nextNodeId(destinationDoc)}`;
     if (originFile) {
       el.dataset.originFile = originFile;
       el.dataset.sourceFile ??= originFile;
@@ -62,7 +75,7 @@ export function append(parent, children) {
 
 // Stamp source span and assign a document-unique numeric id on every IR node.
 export function stamp(e, n) {
-  e.id            = `n${_nodeId++}`;
+  e.id            = `n${nextNodeId(e.ownerDocument)}`;
   e.dataset.originId = e.id;
   e.dataset.start = n.startIndex;
   e.dataset.end   = n.endIndex;

@@ -13,8 +13,10 @@ import {
   createCompilerEnv,
   makeCompiler as makeCompilerBase,
 } from './test-harness.mjs';
+import { registerAdversarialCompilerTests } from './adversarial-compiler-tests.mjs';
 import { registerCodegenCoreTests } from './codegen-core-tests.mjs';
 import { registerCodegenHeapTests } from './codegen-heap-tests.mjs';
+import { registerExamplesConformanceTests } from './examples-conformance-tests.mjs';
 import { registerIrStructureTests } from './ir-structure-tests.mjs';
 import { registerNegativeDiagnosticTests } from './negative-diagnostic-tests.mjs';
 import { registerParserAnalysisTests } from './parser-analysis-tests.mjs';
@@ -47,6 +49,8 @@ registerIrStructureTests({ test, assertThrows });
 registerCodegenCoreTests(suiteContext);
 registerStdlibConformanceTests(suiteContext);
 registerCodegenHeapTests(suiteContext);
+registerAdversarialCompilerTests(suiteContext);
+registerExamplesConformanceTests(suiteContext);
 registerNegativeDiagnosticTests({ test, makeCompiler, assert });
 
 async function main() {

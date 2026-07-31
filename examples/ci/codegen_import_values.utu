@@ -2,6 +2,7 @@ let lucky: I32 = @es/\41\/;
 let label: Str = @es/\"utu"\/;
 let document: Externref = @es/\({})\/;
 let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let ref_present: fun(Externref) Bool = @es/\value => value !== null ? 1 : 0\/;
 
 fn score() I32 {
     lucky + 1;
@@ -12,7 +13,7 @@ fn named() Bool {
 }
 
 fn doc_present() Bool {
-    not ref.is_null(document);
+    ref_present(document);
 }
 
 test "imported numeric globals contribute to arithmetic" {

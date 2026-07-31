@@ -29,7 +29,7 @@ test "two type parameters fill struct fields" {
 
 test "module types work in nullable positions" {
     let maybe: ?ints.Pair = maybe_pair(true);
-    assert (maybe \ ints.Pair.new(0, 0)).right() == 9;
+    assert (maybe orelse ints.Pair.new(0, 0)).right() == 9;
 }
 
 test "inline two parameter type paths work" {

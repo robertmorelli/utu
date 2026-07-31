@@ -23,13 +23,15 @@
 //   GC ref  → shared.    The reference is copied, so mutation *through* it is
 //             observed. Rebinding the original variable is not, in either case.
 //
-// This pass must run after resolveBindings (it consumes `ir-closure-env`) and
-// before the type registry is finalised, since it introduces new struct types.
+// This pass must run after resolveBindings (it consumes scope-graph captures)
+// and before the type registry is finalised, since it introduces new structs.
 
-import { bodyOf, createSyntheticNode, declaredTypeStr, firstTypeChild, typeNodeToStr } from './ir-helpers.js';
-import { forEachTypeContext } from './type-contexts.js';
+import { bodyOf, createSyntheticNode, firstTypeChild, replaceTypedNode, typeNodeToStr } from './ir-helpers.js';
+import { actualType, planCoercions } from './type-graph.js';
 import { callableParts } from './type-rules.js';
 import { T } from './ir-tags.js';
+import { retainedGraphs } from './graph-store.js';
+export { closureCallImport } from './closure-abi.js';
 
 const ENV_PARAM = '__env';
 
@@ -37,10 +39,13 @@ const ENV_PARAM = '__env';
  * @param {Document} doc
  * @returns {boolean} whether any closure was lifted
  */
-export function lowerClosures(doc, typeIndex) {
+export function lowerClosures(doc, typeIndex, graph) {
   const root = doc.body.firstChild;
   if (!root) return false;
+  const scopeGraph = retainedGraphs(doc).scope;
 
+  if (!graph.coercions.length) planCoercions(graph);
+  insertDecays(graph);
   let index = 0;
   let changed = false;
   // Innermost-first: pick a closure that contains no other closure.
@@ -48,41 +53,34 @@ export function lowerClosures(doc, typeIndex) {
     const closure = [...root.querySelectorAll('ir-closure')]
       .find(node => !node.querySelector('ir-closure'));
     if (!closure) break;
-    liftClosure(closure, root, index++, typeIndex);
+    liftClosure(closure, root, index++, typeIndex, graph, scopeGraph);
     changed = true;
   }
 
-  insertDecays(root, typeIndex);
-  recordRuntimeImports(root);
-  recordPromiseImports(root);
   return changed;
 }
 
 // ── Closure decay ─────────────────────────────────────────────────────────────
 //
 // `fun` converts to `cl` by wrapping the function reference in a thunk over an
-// empty environment.  This is the one coercion that needs a representation
-// change, so it becomes an explicit node rather than being waved through by
-// `isAssignable`.
+// empty environment. This representation-changing coercion is planned by the
+// graph and materialized here.
 //
-// The sites are enumerated by type-contexts.js rather than here — see that file
-// for why the two passes that need them must share one list.
+// Sites come directly from the graph's expectation edges.
 
-function insertDecays(root, typeIndex) {
-  forEachTypeContext(root, { typeIndex }, decayInto);
+function insertDecays(graph) {
+  for (const coercion of graph.coercions) {
+    if (coercion.kind === 'fun-to-cl') decayInto(coercion.node, coercion.to);
+  }
 }
 
 function decayInto(node, expectedType) {
   if (!node || !expectedType) return;
-  const actual = callableParts(node.dataset?.['typeName']);
-  const expected = callableParts(expectedType);
-  if (!actual || !expected) return;
-  if (actual.kind !== 'fun' || expected.kind !== 'cl') return;
 
   const doc = node.ownerDocument;
   const decay = createSyntheticNode(doc, T.CLOSURE_DECAY, node, 'lower-closures', 'closure-decay');
+  replaceTypedNode(node, decay);
   decay.dataset['typeName'] = expectedType;
-  node.replaceWith(decay);
   decay.appendChild(node);
 
   // A block's type is its tail's type, and the tail just changed
@@ -95,104 +93,34 @@ function decayInto(node, expectedType) {
   }
 }
 
-// ── Runtime import surface ────────────────────────────────────────────────────
-//
-// Every distinct closure signature the program calls needs its own typed wasm
-// import, because wasm imports are monomorphic.  The names are recorded on the
-// document so the host can build a matching import object without re-deriving
-// them from the IR.
-
-function recordRuntimeImports(root) {
-  const signatures = new Set();
-  let needsNew = root.querySelector('ir-make-closure, ir-closure-decay') != null;
-
-  for (const call of root.querySelectorAll('ir-call')) {
-    const parts = callableParts(call.firstElementChild?.dataset?.['typeName']);
-    if (parts?.kind === 'cl') signatures.add(closureCallImport(parts));
-  }
-  if (!needsNew && signatures.size === 0) return;
-
-  root.dataset.closureRuntime = JSON.stringify({
-    new: needsNew,
-    calls: [...signatures].sort(),
-  });
-}
-
-// Promise subscription needs one host import per operation, not per type: the
-// promise and the callback are both externref whatever the element type is.
-function recordPromiseImports(root) {
-  const ops = new Set();
-  if (root.querySelector('ir-promise-then')) ops.add('promise_then');
-  if (root.querySelector('ir-promise-catch')) ops.add('promise_catch');
-
-  // `await` needs one import per awaited value type, because the import's
-  // result type is that value's type and wasm imports are monomorphic. The
-  // host wraps each one in `WebAssembly.Suspending`, which is what actually
-  // suspends the wasm stack.
-  const awaits = new Set();
-  for (const node of root.querySelectorAll('ir-await')) {
-    const value = node.dataset['typeName'];
-    if (value) awaits.add(value);
-  }
-
-  // Any function that can transitively await has to be reachable from a
-  // `promising` entry point, so exports are recorded for the host to wrap.
-  const asyncExports = [...root.querySelectorAll('ir-fn[data-export]')]
-    .filter(fn => fn.querySelector('ir-await'))
-    .map(fn => fn.getAttribute('name'))
-    .filter(Boolean);
-
-  if (ops.size === 0 && awaits.size === 0) return;
-  root.dataset.promiseRuntime = JSON.stringify({
-    ops: [...ops].sort(),
-    awaits: [...awaits].sort(),
-    asyncExports: asyncExports.sort(),
-  });
-}
-
-/** Import field name for calling a closure of this signature. */
-export function closureCallImport(parts) {
-  const tag = [...parts.params, parts.ret]
-    .map(type => type.replace(/[^A-Za-z0-9]/g, '_'))
-    .join('_');
-  return `closure_call_${tag || 'void'}`;
-}
-
-function liftClosure(closure, root, index, typeIndex) {
+function liftClosure(closure, root, index, typeIndex, graph, scopeGraph) {
   const doc = closure.ownerDocument;
   const envType = `__ClosureEnv${index}`;
   const fnName = `__closure${index}`;
-  const captures = readCaptures(closure, typeIndex);
+  const captures = readCaptures(closure, typeIndex, graph, scopeGraph);
 
   root.insertBefore(buildEnvStruct(doc, closure, envType, captures), root.firstChild);
-  root.appendChild(buildLiftedFn(doc, closure, fnName, envType, captures));
-  closure.replaceWith(buildMakeClosure(doc, closure, fnName, envType, captures));
+  root.appendChild(buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph));
+  replaceTypedNode(closure, buildMakeClosure(doc, closure, fnName, envType, captures));
 }
 
 // ── Captures ──────────────────────────────────────────────────────────────────
 
-function readCaptures(closure, typeIndex) {
-  const doc = closure.ownerDocument;
-  return [...closure.querySelectorAll(':scope > ir-closure-env > ir-closure-cap')].map((cap) => {
-    const decl = doc.getElementById(cap.dataset.bindingId);
-    const type = captureTypeOf(decl);
+function readCaptures(closure, typeIndex, graph, scopeGraph) {
+  return [...(scopeGraph?.captures.get(closure.id) ?? [])].map(([name, decl]) => {
+    const type = actualType(graph, decl) ?? 'unknown';
     // Value types live on the wasm stack, so capturing one necessarily copies
     // it. Which types those are comes from the registry, not a list here — a
     // scalar added to the stdlib would otherwise be silently misclassified as
     // a shared reference.
     const isScalar = typeIndex?.get(type)?.scalarFamily != null;
     return {
-      name: cap.getAttribute('name'),
-      bindingId: cap.dataset.bindingId,
+      name,
+      bindingId: decl.id,
       type,
       mode: isScalar ? 'snapshot' : 'shared',
     };
   });
-}
-
-function captureTypeOf(decl) {
-  if (!decl) return 'unknown';
-  return declaredTypeStr(decl) ?? decl.dataset?.['typeName'] ?? 'unknown';
 }
 
 // ── Construction ──────────────────────────────────────────────────────────────
@@ -210,7 +138,7 @@ function buildEnvStruct(doc, site, envType, captures) {
   return struct;
 }
 
-function buildLiftedFn(doc, closure, fnName, envType, captures) {
+function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
   const fn = createSyntheticNode(doc, T.FN, closure, 'lower-closures', 'closure-lifted-fn');
   fn.setAttribute('name', fnName);
   fn.dataset.closureLifted = 'true';
@@ -245,7 +173,7 @@ function buildLiftedFn(doc, closure, fnName, envType, captures) {
 
   const body = bodyOf(closure);
   if (body) {
-    rewriteCaptureReads(body, captures, envParam, doc, closure);
+    rewriteCaptureReads(body, captures, envParam, doc, closure, scopeGraph);
     fn.appendChild(body);
   }
   return fn;
@@ -281,12 +209,13 @@ function buildMakeClosure(doc, closure, fnName, envType, captures) {
  * binding id rather than by name so a shadowed inner binding of the same name
  * is left alone.
  */
-function rewriteCaptureReads(body, captures, envParam, doc, site) {
+function rewriteCaptureReads(body, captures, envParam, doc, site, scopeGraph) {
   if (captures.length === 0) return;
   const byBinding = new Map(captures.map(capture => [capture.bindingId, capture]));
 
   for (const ident of [...body.querySelectorAll('ir-ident')]) {
-    const capture = byBinding.get(ident.dataset.bindingId);
+    const bindingId = scopeGraph?.resolutions.get(ident.id)?.id ?? ident.dataset.bindingId;
+    const capture = byBinding.get(bindingId);
     if (!capture) continue;
 
     const access = createSyntheticNode(doc, T.FIELD_ACCESS, ident, 'lower-closures', 'closure-capture-read');
@@ -302,7 +231,7 @@ function rewriteCaptureReads(body, captures, envParam, doc, site) {
     receiver.dataset['typeName'] = access.dataset.fieldOwnerName;
 
     access.appendChild(receiver);
-    ident.replaceWith(access);
+    replaceTypedNode(ident, access);
   }
 }
 

@@ -1,8 +1,7 @@
 // graph-view.js — read the compiler's graphs back out as nodes and edges
 //
-// utu records several graphs directly on the IR rather than in side structures,
-// so "extracting" them is really just naming the attributes that already carry
-// them:
+// The live type, scope, and provenance graphs are canonical. Their settled
+// public projection is also recorded on the IR for node labels and compatibility:
 //
 //   binding      data-binding-id     a use → the declaration it resolves to
 //   expectation  data-expect-from    a value → the declaration whose type it
@@ -10,21 +9,23 @@
 //   provenance   data-rewrite-of     a synthesised node → what it was rewritten
 //                                    from, across every lowering pass
 //
-// Nothing here computes anything. If a graph needs deriving, it belongs in the
-// pass that knows how — this is the read side, shared by the visualiser and by
-// anything else that wants to traverse rather than re-query the DOM.
+// Edges below come from retained graphs; projected attributes are read only for
+// display metadata and as a provenance fallback for standalone pass users.
+
+import { retainedGraphs } from './graph-store.js';
 
 export const EDGE_KINDS = Object.freeze(['binding', 'expectation', 'provenance']);
 
 /**
  * @param {Document} doc  a compiled IR document
- * @returns {{ nodes: Map<string, object>, edges: object[] }}
+ * @returns {{ nodes: Map<string, object>, edges: object[], graphs: object }}
  */
 export function extractGraphs(doc) {
   const root = doc?.body?.firstChild;
+  const graphs = retainedGraphs(doc);
   const nodes = new Map();
   const edges = [];
-  if (!root) return { nodes, edges };
+  if (!root) return { nodes, edges, graphs };
 
   const record = (node) => {
     if (!node?.id || nodes.has(node.id)) return nodes.get(node.id);
@@ -35,7 +36,7 @@ export function extractGraphs(doc) {
       type: node.dataset?.['typeName'] ?? null,
       expect: node.dataset?.expect ?? null,
       pass: node.dataset?.rewritePass ?? null,
-      file: node.dataset?.sourceFile ?? null,
+      file: node.dataset?.sourceFile ?? node.dataset?.originFile ?? node.dataset?.file ?? null,
       row: toInt(node.dataset?.row),
       col: toInt(node.dataset?.col),
       endRow: toInt(node.dataset?.endRow),
@@ -46,33 +47,32 @@ export function extractGraphs(doc) {
     return entry;
   };
 
-  const link = (fromNode, toId, kind, label) => {
-    if (!toId) return;
-    const target = doc.getElementById(toId);
-    if (!target) return;
-    record(fromNode);
-    record(target);
-    edges.push({ from: fromNode.id, to: target.id, kind, label });
+  const link = (from, to, kind, label) => {
+    if (!from?.id || !to?.id) return;
+    record(from); record(to);
+    edges.push({ from: from.id, to: to.id, kind, label });
   };
 
-  for (const node of root.querySelectorAll('*')) {
-    if (!node.localName?.startsWith('ir-')) continue;
-
-    if (node.dataset.bindingId) {
-      link(node, node.dataset.bindingId, 'binding', 'resolves to');
-    }
-    if (node.dataset.expectFrom) {
-      link(node, node.dataset.expectFrom, 'expectation', node.dataset.expectSite ?? 'expects');
-    }
-    // Provenance names an *origin* id, which is often the id of a node that
-    // has since been replaced — `link` drops those. A synthetic node inherits
-    // its origin id from its source, so it can also name itself; skip that.
-    if (node.dataset.rewriteOf && node.dataset.rewriteOf !== node.id) {
-      link(node, node.dataset.rewriteOf, 'provenance', node.dataset.rewritePass ?? 'rewritten from');
+  const uses = new Map([...graphs.scope?.scopes.values() ?? []]
+    .flatMap(scope => [...scope.uses].map(use => [use.id, use])));
+  for (const [id, declaration] of graphs.scope?.resolutions ?? []) {
+    link(uses.get(id) ?? doc.getElementById(id), declaration, 'binding', 'resolves to');
+  }
+  for (const expectation of graphs.types?.expectations ?? []) {
+    const source = typeof expectation.source === 'function' ? expectation.source() : expectation.source;
+    link(expectation.value, source, 'expectation', expectation.site ?? 'expects');
+  }
+  const provenance = graphs.program?.provenance
+    ?? [...root.querySelectorAll('[data-rewrite-of]')].map(node => ({
+      node, source: doc.getElementById(node.dataset.rewriteOf), pass: node.dataset.rewritePass,
+    }));
+  for (const fact of provenance) {
+    if (fact.source && fact.source !== fact.node) {
+      link(fact.node, fact.source, 'provenance', fact.pass ?? 'rewritten from');
     }
   }
 
-  return { nodes, edges };
+  return { nodes, edges, graphs };
 }
 
 /** Group edges by kind, for a legend or per-kind toggles. */

@@ -24,19 +24,19 @@ mod boxy[T] {
 }
 
 mod Pair[L, R] {
-    struct Pair:
+    struct &:
         | left : L
         | right : R
 
-    fn Pair.new(left: L, right: R) Pair {
-        Pair { left: left, right: right };
+    fn &.new(left: L, right: R) & {
+        &{ left: left, right: right };
     }
 
-    fn Pair.left |self| () L {
+    fn &.left |self| () L {
         self.left;
     }
 
-    fn Pair.right |self| () R {
+    fn &.right |self| () R {
         self.right;
     }
 }
@@ -81,5 +81,5 @@ test "promoted module call results can chain methods" {
 }
 
 test "else results can flow into methods" {
-    assert (maybe_pair(true) \ Pair[I32, I32].new(0, 0)).right() == 9;
+    assert (maybe_pair(true) orelse Pair[I32, I32].new(0, 0)).right() == 9;
 }

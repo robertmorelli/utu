@@ -1,136 +1,176 @@
-// hoist-modules.js — Pass 4
-//
-// hoistModules(doc) → void
-//
-// Eliminates the module abstraction entirely. After this pass:
-//   - No <ir-module> nodes exist
-//   - No <ir-type-self> nodes exist (& resolved to a concrete name)
-//   - All declarations are direct children of <ir-source-file>
-//   - Names are unique: declarations that were named & get the module name;
-//     other declarations inside a module are prefixed (ModuleName__DeclName)
-//     to prevent collisions across multiple instantiations
-//
-// The rest of the compiler can pretend modules never existed.
+// Materialize module declarations into the flat source-file namespace.
 
 import { replaceNodeMeta } from './ir-helpers.js';
 import { moduleMemberName } from './module-names.js';
+import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 
-/**
- * @param {Document} doc - linkedom document after passes 1-3
- * @param {object} [opts]
- * @param {boolean} [opts.debugAssertions]
- */
-export function hoistModules(doc, { debugAssertions = false } = {}) {
-  const root = doc.body.firstChild; // <ir-source-file>
+export function hoistModules(doc, { debugAssertions = false, graph = null } = {}) {
+  const root = doc.body.firstChild;
   if (!root) return;
+  for (const module of [...root.querySelectorAll('ir-module')]) hoistModule(module, root, graph);
+  diagnoseDuplicateDeclarations(root);
+  if (debugAssertions) assertHoistModules(doc);
+}
 
-  for (const mod of [...root.querySelectorAll('ir-module')]) {
-    const moduleName = mod.getAttribute('name');
+export function hoistModule(module, root, graph = null) {
+  const moduleName = module.getAttribute('name');
+  const moduleDisplayName = module.dataset.displayName ?? moduleName;
+  retainSourceDisplayNames(module, moduleDisplayName);
+  const renamings = new Map([...module.querySelectorAll(':scope > [name]')]
+    .map(node => {
+      const name = node.getAttribute('name');
+      return [name, moduleMemberName(moduleName, name)];
+    }));
 
-    // ── 1. Build renaming map: & → moduleName, everything else → M__name ────
-    const renamings = new Map(
-      [...mod.querySelectorAll(':scope > [name]')]
-        .map(d => {
-          const n = d.getAttribute('name');
-          return [n, moduleMemberName(moduleName, n)];
-        })
-    );
+  rewriteExternalModuleReferences(root, module, moduleName, renamings);
 
-    // ── 2. Replace <ir-type-self> nodes (& as a type reference) ─────────────
-    for (const self of [...mod.querySelectorAll('ir-type-self')]) {
-      const ref = replaceNodeMeta(doc.createElement('ir-type-ref'), self, 'hoist-modules', 'type-self');
-      ref.setAttribute('name', moduleName);
-      self.replaceWith(ref);
+  for (const self of [...module.querySelectorAll('ir-type-self')]) {
+    const ref = replaceNodeMeta(module.ownerDocument.createElement('ir-type-ref'), self, 'hoist-modules', 'type-self');
+    ref.setAttribute('name', moduleName);
+    ref.dataset.displayName = moduleDisplayName;
+    self.replaceWith(ref);
+  }
+  const valueNames = new Set([
+    ...[...module.querySelectorAll(':scope > ir-global')].map(node => node.getAttribute('name')),
+    ...[...module.querySelectorAll(':scope > ir-fn > ir-fn-name[kind="free"]')].map(node => node.getAttribute('name')),
+  ]);
+  for (const ident of module.querySelectorAll('ir-ident')) {
+    const name = ident.getAttribute('name');
+    if (valueNames.has(name) && !hasLexicalShadow(ident, name)) rename(ident, renamings);
+  }
+  for (const nameNode of module.querySelectorAll('ir-fn-name')) renameFunction(nameNode, renamings, moduleName);
+  for (const ref of module.querySelectorAll('ir-type-ref')) rename(ref, renamings);
+  for (const node of module.querySelectorAll('[type-name]')) {
+    const renamed = renamings.get(node.getAttribute('type-name'));
+    if (renamed) node.setAttribute('type-name', renamed);
+  }
+  for (const declaration of module.querySelectorAll(':scope > [name]')) {
+    const from = declaration.getAttribute('name');
+    rename(declaration, renamings);
+    graph?.edge('hoists', module, declaration, { from, name: declaration.getAttribute('name') });
+  }
+  while (module.firstChild) root.insertBefore(module.firstChild, module);
+  module.remove();
+}
+
+function retainSourceDisplayNames(module, moduleDisplayName) {
+  for (const declaration of module.querySelectorAll(':scope > [name]')) {
+    if (declaration.dataset.displayName) continue;
+    const sourceName = declaration.getAttribute('name');
+    if (sourceName === '&') declaration.dataset.displayName = moduleDisplayName;
+  }
+  for (const fn of module.querySelectorAll(':scope > ir-fn')) {
+    const name = fn.querySelector(':scope > ir-fn-name');
+    if (!name) continue;
+    const receiver = name.getAttribute('receiver');
+    const method = name.getAttribute('name');
+    const displayName = receiver === '&' || name.getAttribute('receiver-kind') === 'self'
+      ? `${moduleDisplayName}.${method}`
+      : receiver ? `${receiver}.${method}` : method;
+    fn.dataset.displayName = displayName;
+    name.dataset.displayName = displayName;
+  }
+}
+
+function hasLexicalShadow(ident, name) {
+  const fn = ident.closest('ir-fn, ir-closure');
+  if (fn?.querySelector(`:scope > ir-param-list > ir-param[name="${name}"], :scope > ir-self-param[name="${name}"]`)) return true;
+  for (let node = ident.parentElement; node && node !== fn; node = node.parentElement) {
+    if (node.localName !== 'ir-block') continue;
+    for (const child of node.children) {
+      if (child === ident || child.contains(ident)) break;
+      if (child.localName === 'ir-let' && child.getAttribute('name') === name) return true;
     }
+  }
+  return false;
+}
 
-    // ── 3. Rewrite function names ────────────────────────────────────────────
-    // Four shapes — `&.method`, `Type.method`, `&:op`, and a free `fn` — that
-    // differ only in how the receiver is renamed and how the name recomposes.
-    // They were four walks, each re-syncing the parent `ir-fn[name]` by hand;
-    // missing that sync silently breaks every lookup keyed on the function
-    // name, with no diagnostic anywhere near the cause.
-    for (const fnName of [...mod.querySelectorAll('ir-fn-name')]) {
-      const irFn = fnName.parentElement;
-      const kind = fnName.getAttribute('kind');
-
-      if (kind === 'free') {
-        const prefixed = renamings.get(fnName.getAttribute('name'));
-        if (!prefixed) continue;
-        fnName.setAttribute('name', prefixed);
-        irFn?.setAttribute('name', prefixed);
-        continue;
-      }
-
-      const recvKind = fnName.getAttribute('receiver-kind');
-      const recv = fnName.getAttribute('receiver');
-      // `&` is in the renaming map as the module's own name. An operator on an
-      // unknown receiver keeps it; a method on one is left for diagnostics.
-      const renamed = recvKind === 'self'
-        ? (renamings.get(recv) ?? moduleName)
-        : (renamings.get(recv) ?? (kind === 'operator' ? recv : null));
-      if (renamed == null) continue;
-
-      fnName.setAttribute('receiver', renamed);
-      if (recvKind) fnName.removeAttribute('receiver-kind');
-      const separator = kind === 'operator' ? ':' : '.';
-      irFn?.setAttribute('name', `${renamed}${separator}${fnName.getAttribute('name')}`);
-    }
-
-    // ── 4. Rename ir-type-ref nodes throughout the subtree ───────────────────
-    for (const ref of [...mod.querySelectorAll('ir-type-ref')]) {
-      const renamed = renamings.get(ref.getAttribute('name'));
-      if (renamed) ref.setAttribute('name', renamed);
-    }
-
-    // ── 5. Rename the declaration nodes themselves ────────────────────────────
-    for (const decl of mod.querySelectorAll(':scope > [name]')) {
-      const renamed = renamings.get(decl.getAttribute('name'));
-      if (renamed) decl.setAttribute('name', renamed);
-    }
-
-    // ── 6. Hoist children into <ir-source-file> at the module's position ─────
-    while (mod.firstChild) root.insertBefore(mod.firstChild, mod);
-    mod.remove();
+function rewriteExternalModuleReferences(root, module, moduleName, renamings) {
+  // `M.Type` is represented as ir-type-qualified until the module's concrete
+  // declarations are known. Resolve it while that module is still present;
+  // leaving it for linkTypeDecls loses the namespace after hoisting.
+  for (const qualified of [...root.querySelectorAll('ir-type-qualified')]) {
+    if (module.contains(qualified)) continue;
+    const owner = qualified.firstElementChild?.getAttribute('name')
+      ?? qualified.firstElementChild?.getAttribute('module')
+      ?? qualified.getAttribute('raw')?.split('.').slice(0, -1).join('.');
+    if (owner !== moduleName) continue;
+    const member = qualified.getAttribute('type-name');
+    const name = renamings.get(member);
+    if (!name) continue;
+    const ref = replaceNodeMeta(qualified.ownerDocument.createElement('ir-type-ref'), qualified,
+      'hoist-modules', 'qualified-type');
+    ref.setAttribute('name', name);
+    qualified.replaceWith(ref);
   }
 
-  if (debugAssertions) assertHoistModules(doc);
+  // Lowercase module free calls parse as an ordinary field access (`M.fn`).
+  // Turn only known free members into identifiers; value field access remains
+  // untouched and is resolved later from its receiver type.
+  const freeNames = new Set([...module.querySelectorAll(':scope > ir-fn > ir-fn-name[kind="free"]')]
+    .map(node => node.getAttribute('name')).filter(Boolean));
+  for (const field of [...root.querySelectorAll('ir-field-access')]) {
+    if (module.contains(field) || !freeNames.has(field.getAttribute('field'))) continue;
+    const base = field.firstElementChild;
+    if (base?.localName !== 'ir-ident' || base.getAttribute('name') !== moduleName) continue;
+    const ident = replaceNodeMeta(field.ownerDocument.createElement('ir-ident'), field,
+      'hoist-modules', 'module-free-member');
+    ident.setAttribute('name', renamings.get(field.getAttribute('field')));
+    field.replaceWith(ident);
+  }
+}
+
+function renameFunction(nameNode, renamings, moduleName) {
+  const fn = nameNode.parentElement;
+  const kind = nameNode.getAttribute('kind');
+  if (kind === 'free') {
+    const name = renamings.get(nameNode.getAttribute('name'));
+    if (name) {
+      nameNode.setAttribute('name', name);
+      fn?.setAttribute('name', name);
+    }
+    return;
+  }
+  const receiver = nameNode.getAttribute('receiver');
+  const renamed = nameNode.getAttribute('receiver-kind') === 'self'
+    ? (renamings.get(receiver) ?? moduleName)
+    : (renamings.get(receiver) ?? (kind === 'operator' ? receiver : null));
+  if (renamed == null) return;
+  nameNode.setAttribute('receiver', renamed);
+  nameNode.removeAttribute('receiver-kind');
+  fn?.setAttribute('name', `${renamed}${kind === 'operator' ? ':' : '.'}${nameNode.getAttribute('name')}`);
+}
+
+function rename(node, renamings) {
+  const name = renamings.get(node.getAttribute('name'));
+  if (name) node.setAttribute('name', name);
 }
 
 function assertHoistModules(doc) {
   const root = doc?.body?.firstChild;
-  if (!root || root.localName !== 'ir-source-file') {
-    throw new Error('pass4: missing ir-source-file root');
+  if (!root || root.localName !== 'ir-source-file') throw new Error('pass4: missing ir-source-file root');
+  for (const selector of ['ir-module', 'ir-using', 'ir-module-params', 'ir-module-param', 'ir-type-self']) {
+    if (root.querySelector(selector)) throw new Error(`pass4: found ${selector} after hoistModules`);
   }
-
-  for (const sel of [
-    'ir-module',
-    'ir-using',
-    'ir-module-params',
-    'ir-module-param',
-    'ir-type-self',
-  ]) {
-    if (root.querySelector(sel)) {
-      throw new Error(`pass4: found ${sel} after hoistModules`);
-    }
-  }
-
   if (root.querySelector('ir-fn-name[receiver-kind="self"]')) {
     throw new Error('pass4: found unresolved self receiver (receiver-kind="self") after hoistModules');
   }
-
-  const ampNamed = [...root.querySelectorAll('[name]')]
-    .find(node => node.getAttribute('name') === '&');
-  if (ampNamed) {
+  if ([...root.querySelectorAll('[name]')].some(node => node.getAttribute('name') === '&')) {
     throw new Error('pass4: found unresolved & name after hoistModules');
   }
+}
 
-  const seen = new Set();
+function diagnoseDuplicateDeclarations(root) {
+  const seen = new Map();
   for (const child of root.querySelectorAll(':scope > [name]')) {
-    const name = child.getAttribute?.('name');
+    const name = child.getAttribute('name');
     if (!name) continue;
-    if (seen.has(name)) {
-      throw new Error(`pass4: duplicate top-level name '${name}' after hoistModules`);
-    }
-    seen.add(name);
+    const first = seen.get(name);
+    if (!first) { seen.set(name, child); continue; }
+    stampDiagnostic(child, DIAGNOSTIC_KINDS.DUPLICATE_DECLARATION,
+      `Duplicate top-level declaration '${name}'`, {
+        name,
+        relatedNodes: [{ node: first, label: `First declaration of '${name}' is here` }],
+      });
   }
 }

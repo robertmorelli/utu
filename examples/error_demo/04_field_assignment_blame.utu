@@ -1,0 +1,13 @@
+// ERROR DEMO: field assignment mismatch
+//
+// The assigned Bool comes from `enabled`; the I32 expectation comes from the
+// `retries` field declaration. Semantic X-Ray should show both source lines.
+
+struct Config:
+    | retries : I32
+    | enabled : Bool
+
+fn field_blame_demo(config: Config) void {
+    let enabled: Bool = config.enabled;
+    config.retries = enabled;
+}

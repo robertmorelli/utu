@@ -1,20 +1,20 @@
 mod Pair[L, R] {
-    struct Pair:
+    struct &:
         | left : L
         | right : R
 
     struct NotPair:
         | one : L
 
-    fn Pair.new(left: L, right: R) Pair {
-        Pair { left: left, right: right };
+    fn &.new(left: L, right: R) & {
+        &{ left: left, right: right };
     }
 
-    fn Pair.left |self| () L {
+    fn &.left |self| () L {
         self.left;
     }
 
-    fn Pair.right |self| () R {
+    fn &.right |self| () R {
         self.right;
     }
 
@@ -31,7 +31,7 @@ fn maybe_pair(flag: Bool) ?Pair[I32, I32] {
 using Pair[I32, I32] |pair_i32|;
 
 test "non-promoted inner types stay qualified" {
-    let value: pair_i32.NotPair = pair_i32.NotPair { one: 5 };
+    let value: pair_i32.NotPair = &{ one: 5 };
     assert pair_i32.NotPair.only(value) == 5;
 }
 
@@ -42,5 +42,5 @@ test "same-name module types promote into top-level type paths" {
 
 test "promoted module types work in nullable positions" {
     let maybe: ?Pair[I32, I32] = maybe_pair(true);
-    assert (maybe \ Pair[I32, I32].new(0, 0)).right() == 9;
+    assert (maybe orelse Pair[I32, I32].new(0, 0)).right() == 9;
 }

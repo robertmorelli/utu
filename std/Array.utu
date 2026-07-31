@@ -38,7 +38,12 @@ mod Array[T1] {
         @ir/\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \/;
     }
 
-    // Number of elements.
+    // Create an Array with Wasm's default value for T1 (zero or null).
+    fn &.new_default(n: I32) & {
+        @ir/\ <ir-array-new><ir-ident name="n"/></ir-array-new> \/;
+    }
+
+    // Number of elements. Call as `array.len()`.
     fn &.len |self| () I32 {
         @ir/\ <ir-array-len><ir-ident name="self"/></ir-array-len> \/;
     }

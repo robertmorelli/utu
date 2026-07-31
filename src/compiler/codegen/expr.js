@@ -2,7 +2,7 @@
 
 import { emitRefIntrinsic, emitScalarIntrinsic, matchScalarIntrinsic } from './intrinsics.js';
 import {
-  emitIf, emitWhile, emitReturn, emitBreak,
+  emitIf, emitWhile, emitFor, emitReturn, emitBreak,
   emitMatch, emitAlt, emitPromote, emitAssert, emitFatal,
 } from './control.js';
 import { emitStructInit, emitFieldGet, emitNullRef } from './structs.js';
@@ -14,6 +14,7 @@ import {
 import { emitCall, emitOrElse } from './calls.js';
 import { emitAwait, emitClosureDecay, emitMakeClosure } from './closures.js';
 import { emitStringIntrinsic } from './strings.js';
+import { emitArrayIntrinsic } from './arrays.js';
 
 export function emitExpr(node, ctx) {
   if (!node) return ctx.module.nop();
@@ -27,6 +28,8 @@ export function emitExpr(node, ctx) {
   if (refIntrinsic) return withDebugLocation(node, refIntrinsic, ctx);
   const stringIntrinsic = emitStringIntrinsic(node, [...node.children], ctx, emitExpr);
   if (stringIntrinsic) return withDebugLocation(node, stringIntrinsic, ctx);
+  const arrayIntrinsic = emitArrayIntrinsic(node, [...node.children], ctx, emitExpr);
+  if (arrayIntrinsic) return withDebugLocation(node, arrayIntrinsic, ctx);
 
   switch (node.localName) {
     case 'ir-lit':           expr = emitLit(node, ctx); break;
@@ -47,13 +50,14 @@ export function emitExpr(node, ctx) {
     case 'ir-fatal':         expr = emitFatal(node, ctx); break;
     case 'ir-if':            expr = emitIf(node, ctx, emitExpr); break;
     case 'ir-while':         expr = emitWhile(node, ctx, emitExpr); break;
+    case 'ir-for':           expr = emitFor(node, ctx, emitExpr); break;
     case 'ir-return':        expr = emitReturn(node, ctx, emitExpr); break;
     case 'ir-break':         expr = emitBreak(node, ctx, emitExpr); break;
     case 'ir-match':         expr = emitMatch(node, ctx, emitExpr); break;
     case 'ir-alt':           expr = emitAlt(node, ctx, emitExpr); break;
     case 'ir-promote':       expr = emitPromote(node, ctx, emitExpr); break;
-    case 'ir-struct-init':   expr = emitStructInit(node, ctx); break;
-    case 'ir-field-access':  expr = emitFieldGet(node, ctx); break;
+    case 'ir-struct-init':   expr = emitStructInit(node, ctx, emitExpr); break;
+    case 'ir-field-access':  expr = emitFieldGet(node, ctx, emitExpr); break;
     case 'ir-null-ref':      expr = emitNullRef(node, ctx); break;
     case 'ir-ref-test':      expr = emitRefTest(node, ctx, emitExpr); break;
     case 'ir-ref-cast':      expr = emitRefCast(node, ctx, emitExpr); break;

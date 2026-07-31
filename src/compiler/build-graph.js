@@ -1,6 +1,6 @@
 // build-graph.js — Pass 1
 //
-// buildGraph(entryPath, env) → { graph, order }
+// buildModuleGraph(entryPath, env) → { graph, order, imports }
 //
 // Recursively reads and parses every file reachable via `using ... from "..."`.
 // Returns the complete file graph and a topologically sorted order
@@ -20,15 +20,17 @@ import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
  *                 resolves a relative import path to an absolute key
  *   stdlib      — Map<string, string>  platform URI → utu source
  *                 e.g. "std:Array" → "<source>". Defaults to empty map.
- * @returns {Promise<{ graph: Map<string, Document>, order: string[] }>}
+ * @returns {Promise<{ graph: Map<string, Document>, order: string[], imports: Array<object> }>}
  *   graph — filePath → linkedom Document (ir-source-file at body.firstChild)
  *   order — topological order, dependencies before dependents
+ *   imports — normalized source import edges with blame nodes
  */
-export async function buildGraph(entryPath, { parser, readFile, resolvePath, stdlib = new Map(), createDocument = createIRDocument, target = 'analysis', debugAssertions = false, collectAnalysisTokens = target === 'analysis' }) {
+export async function buildModuleGraph(entryPath, { parser, readFile, resolvePath, stdlib = new Map(), createDocument = createIRDocument, target = 'analysis', debugAssertions = false, collectAnalysisTokens = target === 'analysis' }) {
   /** @type {Map<string, Document>} */
   const graph = new Map();
   /** @type {string[]} */
   const order = [];
+  const imports = [];
   // DFS colouring: undefined = unvisited, 'active' = on stack, 'done' = finished
   /** @type {Map<string, 'active' | 'done'>} */
   const color = new Map();
@@ -66,15 +68,13 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
     if (root) {
       for (const u of [...root.querySelectorAll('ir-using[from]')]) {
         const raw = u.getAttribute('from');
-        u.dataset.importFromRaw = raw;
         // Platform URIs (e.g. std:Array, node:fs) are looked up in the stdlib
         // registry and kept as-is (the URI is the canonical key). Relative and
         // absolute file paths go through resolvePath as before.
         const isPlatformUri = isPlatformImportPath(raw);
         const abs = isPlatformUri ? raw : resolvePath(filePath, raw);
         u.setAttribute('from', abs);
-        u.dataset.importFrom = abs;
-        u.dataset.importKind = isPlatformUri ? 'platform' : 'file';
+        imports.push({ from: filePath, to: abs, node: u, raw, kind: isPlatformUri ? 'platform' : 'file' });
         if (isPlatformUri) {
           if (!stdlib.has(abs)) {
             throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT, `Unknown platform import: ${abs}`, u, {
@@ -95,8 +95,11 @@ export async function buildGraph(entryPath, { parser, readFile, resolvePath, std
 
   await visit(entryPath);
   if (debugAssertions) assertBuildGraph(graph, order);
-  return { graph, order };
+  return { graph, order, imports };
 }
+
+// Historical public name retained for standalone consumers.
+export const buildGraph = buildModuleGraph;
 
 function isPlatformImportPath(path) {
   return /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(path);

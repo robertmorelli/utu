@@ -1,10 +1,9 @@
 // codegen/bindings.js — locals, blocks, lets, and assignments
 
 import { binaryen } from './types.js';
-import { emitNullLiteral, isNullLiteral } from './null-literals.js';
 import { emitFieldSet } from './structs.js';
 import { emitFunRef } from './closures.js';
-import { firstTypeChild, paramsOf, selfParamOf, typeNodeToStr } from '../ir-helpers.js';
+import { paramsOf, selfParamOf } from '../ir-helpers.js';
 import { callableParts } from '../type-rules.js';
 import { isVoidStatement } from '../ir-tags.js';
 
@@ -21,21 +20,23 @@ export function emitIdent(node, ctx, emitExpr) {
     return emitExpr(argNode, ctx.outerCtx ?? ctx);
   }
 
-  const bid = node.dataset.bindingId;
+  const bid = ctx.bindingIdOf(node);
   if (!bid) throw new Error(`codegen: ir-ident "${name}" has no binding`);
   const decl = ctx.fnById?.get(bid);
   // A named function in value position is a function reference.  Checked
   // before the zero-arg case below, so a `fun() R` value is not mistaken for a
   // call to an `@es` value import.
-  if (decl && callableParts(node.dataset['typeName'])?.kind === 'fun') {
+  if (decl && callableParts(ctx.typeOf(node))?.kind === 'fun') {
     return emitFunRef(decl, ctx);
   }
   if (decl && noParams(decl)) {
-    return ctx.module.call(decl.getAttribute('name'), [], ctx.toType(node.dataset['typeName'] ?? 'void'));
+    return ctx.module.call(decl.getAttribute('name'), [], ctx.toType(ctx.typeOf(node) ?? 'void'));
   }
-  const slot = ctx.locals.get(bid);
-  if (!slot) throw new Error(`codegen: ir-ident "${name}" has no local slot`);
-  return ctx.module.local.get(slot.index, slot.type);
+  const slot = ctx.locals.get(`${bid}:${name}`) ?? ctx.locals.get(bid);
+  if (slot) return ctx.module.local.get(slot.index, slot.type);
+  const global = ctx.globals?.get(bid);
+  if (global) return ctx.module.global.get(global.name, global.type);
+  throw new Error(`codegen: ir-ident "${name}" has no local or global slot`);
 }
 
 function noParams(fn) {
@@ -48,13 +49,10 @@ export function emitBlock(node, ctx, emitExpr) {
   const stmts = [...node.children];
   if (stmts.length === 0) return ctx.module.nop();
 
-  // Last statement is the block's value if the block is non-void.
-  // Fall back to the actual last child's type if the block's own data-type-name
-  // is stale: inferTypes can leave the block untyped when its tail expression
-  // depends on field accesses (typed by stampFieldAccessTypes later) or on
-  // ir-call nodes synthesised by lowerOperators (typed by resolveMethods later).
-  const blockType = node.dataset['typeName']
-    || node.children[node.children.length - 1]?.dataset['typeName'];
+  const inferredType = ctx.typeOf(node);
+  const expectedType = ctx.expectedOf(node)
+    ?? (inferredType === 'null' ? ctx.expectedOf(node.lastElementChild) : null);
+  const blockType = inferredType === 'null' || expectedType === 'void' ? expectedType : inferredType;
   const valueType = blockType && blockType !== 'void'
     ? ctx.toType(blockType)
     : binaryen.none;
@@ -63,10 +61,12 @@ export function emitBlock(node, ctx, emitExpr) {
   for (let i = 0; i < stmts.length; i++) {
     const child = stmts[i];
     const isLast = i === stmts.length - 1;
-    const e = isLast && isNullLiteral(child) && blockType?.startsWith('?')
-      ? emitNullLiteral(child, ctx, blockType)
-      : emitExpr(child, ctx);
-    if (isLast || isVoidStatement(child)) {
+    const e = emitExpr(child, ctx);
+    const childType = ctx.typeOf(child);
+    const childIsVoid = isVoidStatement(child) || !childType || childType === 'void';
+    if (isLast && valueType === binaryen.none && !childIsVoid) {
+      exprs.push(ctx.module.drop(e));
+    } else if (isLast || childIsVoid) {
       exprs.push(e);
     } else {
       // Discard non-tail expression result so the block stays well-typed.
@@ -78,21 +78,12 @@ export function emitBlock(node, ctx, emitExpr) {
 
 export function emitLet(node, ctx, emitExpr) {
   const init = node.children[node.children.length - 1];
-  const typeStr = readDeclaredType(node) ?? init.dataset['typeName'] ?? 'void';
-  const initExpr = isNullLiteral(init) && typeStr.startsWith('?')
-    ? emitNullLiteral(init, ctx, typeStr)
-    : emitExpr(init, ctx);
+  const typeStr = ctx.typeOf(node) ?? ctx.typeOf(init) ?? 'void';
+  const initExpr = emitExpr(init, ctx);
   const idx = ctx.addLocal(typeStr);
   ctx.locals.set(node.id, { index: idx, type: ctx.toType(typeStr) });
   return ctx.module.local.set(idx, initExpr);
 }
-
-// The declared type annotation, if the let has one (e.g. `let x: I32 = …`).
-// Falls back to the canonical reader so all passes agree on the type string.
-function readDeclaredType(letNode) {
-  return typeNodeToStr(firstTypeChild(letNode));
-}
-
 
 export function emitAssign(node, ctx, emitExpr) {
   const [lhs, rhs] = [...node.children];
@@ -102,15 +93,18 @@ export function emitAssign(node, ctx, emitExpr) {
   // Index/slice writes are already desugared to T.set_index calls by
   // lowerOperators, so they hit the ir-call path — not this branch.
   if (lhs.localName === 'ir-field-access') {
-    return emitFieldSet(node, ctx);
+    return emitFieldSet(node, ctx, emitExpr);
   }
 
   if (lhs.localName !== 'ir-ident') {
     throw new Error(`codegen: assignment to <${lhs.localName}> not supported`);
   }
-  const slot = ctx.locals.get(lhs.dataset.bindingId);
-  if (!slot) throw new Error(`codegen: assign to unknown binding "${lhs.getAttribute('name')}"`);
-  return ctx.module.local.set(slot.index, emitExpr(rhs, ctx));
+  const bindingId = ctx.bindingIdOf(lhs);
+  const slot = ctx.locals.get(bindingId);
+  if (slot) return ctx.module.local.set(slot.index, emitExpr(rhs, ctx));
+  const global = ctx.globals?.get(bindingId);
+  if (global) return ctx.module.global.set(global.name, emitExpr(rhs, ctx));
+  throw new Error(`codegen: assign to unknown binding "${lhs.getAttribute('name')}"`);
 }
 
 export function emitRefTest(node, ctx, emitExpr) {

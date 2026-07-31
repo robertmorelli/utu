@@ -98,8 +98,6 @@ export const T = Object.freeze({
   CAPTURE:        'ir-capture',         // |i| capture in for
 
   CLOSURE:        'ir-closure',         // cl(x) { ... } literal
-  CLOSURE_ENV:    'ir-closure-env',     // free variables captured by a closure
-  CLOSURE_CAP:    'ir-closure-cap',     // one captured binding (snapshot | shared)
   MAKE_CLOSURE:   'ir-make-closure',    // lifted closure + its environment
   CLOSURE_DECAY:  'ir-closure-decay',   // fun(...) coerced to cl(...)
   AWAIT:          'ir-await',           // await promise

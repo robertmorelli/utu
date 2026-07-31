@@ -1,4 +1,4 @@
-import { typeEntryDecl } from './link-type-decls.js';
+import { typeEntryDecl } from './type-entries.js';
 import { callableParts, unwrapNullable, isNullable } from './type-strings.js';
 
 export {
@@ -11,6 +11,11 @@ export function unifyTypes(a, b) {
   if (!a) return b ?? null;
   if (!b) return a;
   if (a === b) return a;
+  // A bare null branch adopts the nullable form of the other branch. This is
+  // what lets `if flag { value } else { null }` infer `?T` without requiring
+  // the legacy `T.null` spelling.
+  if (a === 'null' && b !== 'null') return isNullable(b) ? b : `?${b}`;
+  if (b === 'null' && a !== 'null') return isNullable(a) ? a : `?${a}`;
   if (isNullable(a) && unwrapNullable(a) === b) return a;
   if (isNullable(b) && unwrapNullable(b) === a) return b;
   return null;
@@ -41,6 +46,13 @@ export function isAssignable(actual, expected, ctx = {}) {
   const expectedDecl = typeEntryDecl(ctx.typeIndex?.get(expected));
   if (actualDecl?.localName === 'ir-variant' && expectedDecl?.localName === 'ir-enum') {
     return actualDecl.parentElement === expectedDecl;
+  }
+  if (expectedDecl?.localName === 'ir-proto') {
+    const implementor = actualDecl?.localName === 'ir-variant' ? actualDecl.parentElement : actualDecl;
+    const implementations = implementor?.querySelector(':scope > ir-impl-list');
+    const names = new Set((implementations?.getAttribute('impls') ?? '').split(',').map(name => name.trim()).filter(Boolean));
+    for (const ref of implementations?.querySelectorAll('ir-type-ref') ?? []) names.add(ref.getAttribute('name'));
+    return names.has(expected);
   }
   return false;
 }

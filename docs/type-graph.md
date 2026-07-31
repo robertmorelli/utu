@@ -193,8 +193,8 @@ utu keeps this set deliberately tiny:
 
 **Coercion never selects an overload.** Resolve the overload from the
 receiver's actual type first, then coerce arguments to the resolved signature.
-utu has overloaded operators but not overload *sets* — `resolve-methods.js`
-keys them `operator:I32.add` with exactly one candidate per (type, operation) —
+utu has overloaded operators but not overload *sets* — `type-graph.js`
+resolves exactly one candidate per (type, operation) —
 and this rule is what keeps it that way.
 
 ## Relationship to the nominal/representation split
@@ -207,12 +207,25 @@ land.
 
 ## Where this is enforced
 
-- **Graph construction** — the inference passes, which stamp `data-type-name`,
-  `data-type-expect`, `data-expect-from`, and `data-expect-via` on IR nodes.
-  The IR *is* the graph; there is no side structure.
-- **Flood** — the worklist that replaces the fixed-iteration
-  operator/method lowering loop in `compiler.js`.
-- **Compare** — `validate-analysis.js`, which reads both vertices rather than
-  re-deriving expectations per diagnostic.
-- **Blame** — `diagnostics.js`, which follows `data-expect-from` instead of
-  requiring each call site to author `relatedNodes` by hand.
+- **Graph construction** — `type-graph.js` creates explicit actual/expected
+  slots, propagation rules, transforms, and comparison modes for every IR
+  value, including declaration-supplied and semantic expectations.
+- **Contextual rewrite planning** — `planContextualRewrites` derives literal,
+  closure, and implicit-struct changes from expectations without changing IR;
+  `applyContextualRewrites` applies that explicit plan before the next flood.
+- **Flood** — `solveTypeGraph` propagates actual types with one dependency
+  worklist and no iteration limit.
+- **Compare** — `checkTypeGraph` is the sole compatibility pass. Confluence,
+  nullable-domain checks, and ordinary assignment use explicit modes. Failed
+  transforms such as non-callable calls and invalid awaits are graph facts too.
+- **Coercions** — successful non-identity comparisons produce explicit plans;
+  representation-changing plans are materialized by lowering passes.
+- **Queries and invalidation** — consumers use canonical actual, expected,
+  binding, call, field, origin, and dependency-invalidation queries.
+- **Projection** — solving changes graph slots, not semantic DOM attributes.
+  At explicit compatibility boundaries, `projectTypeGraph` stamps settled facts as
+  `data-type-name`, `data-expect`, `data-expect-from`, and `data-expect-site`
+  for legacy tooling. Normal codegen reads the retained backend plan directly;
+  DOM attributes remain the compact public projection for standalone pass users.
+- **Blame** — mismatches walk actual rules back to their seed and expectation
+  edges back to the declaration that imposed them.

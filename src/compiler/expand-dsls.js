@@ -71,8 +71,8 @@ function buildCall(doc, node, site, helperName, inlineArgs) {
 }
 
 function cloneForSite(node, site) {
-  const clone = node.cloneNode(true);
-  restampSubtree(clone, site.originFile);
+  const clone = site.doc.importNode?.(node, true) ?? node.cloneNode(true);
+  restampSubtree(clone, site.originFile, site.doc);
   rebaseSubtreeRanges(clone, site);
   return clone;
 }
@@ -96,7 +96,7 @@ function rebaseSubtreeRanges(root, site) {
 }
 
 function replaceRoot(node, site, kind) {
-  node.id = site.id ?? `n${nextNodeId()}`;
+  node.id = site.id ?? `n${nextNodeId(node.ownerDocument)}`;
   node.dataset.row ??= site.dataset.row;
   node.dataset.col ??= site.dataset.col;
   node.dataset.endRow ??= site.dataset.endRow;
@@ -120,6 +120,7 @@ function rebase(start, end, base) {
 
 function siteInfo(node, root) {
   return {
+    doc: root.ownerDocument,
     base: num(node.dataset.bodyStart, num(node.dataset.start)),
     innerBase: num(node.dataset.bodyInnerStart, num(node.dataset.start)),
     limit: (node.getAttribute('body') ?? '').length,

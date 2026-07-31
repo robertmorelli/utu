@@ -144,7 +144,9 @@ export function treeToIR(tree, source, sourceFileOrCreateDoc = '', maybeCreateDo
   const createDoc = typeof sourceFileOrCreateDoc === 'function' ? sourceFileOrCreateDoc : maybeCreateDoc;
   const sourceFile = (typeof sourceFileOrCreateDoc === 'string' ? sourceFileOrCreateDoc : '') || '<memory>';
   const doc  = createDoc();
+  resetNodeIds(doc);
   doc.__utuSourceFile = sourceFile;
+  doc.__utuSourceText = source;
   if (options.collectAnalysisTokens) {
     doc[ANALYSIS_TOKENS] = collectAnalysisTokens(tree.rootNode, sourceFile);
   }

@@ -1,0 +1,5 @@
+export main() I32 {
+    let scale: I32 = 7;
+    let multiply: cl(I32) I32 = cl(value) { value * scale; };
+    multiply(6);
+}

@@ -3,10 +3,14 @@
 import { stamp, el, text, namedChildren, append, walkChildren } from './parse-helpers.js';
 import { T } from './ir-tags.js';
 
-export function walkIfExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.IF, doc), n);
+function walkContainer(tag, n, doc, source, dispatch) {
+  const node = stamp(el(tag, doc), n);
   append(node, walkChildren(n, doc, source, dispatch));
   return node;
+}
+
+export function walkIfExpr(n, doc, source, dispatch) {
+  return walkContainer(T.IF, n, doc, source, dispatch);
 }
 
 export function walkWhileExpr(n, doc, source, dispatch) {
@@ -67,12 +71,7 @@ export function walkCapture(n, doc, source, dispatch) {
 }
 
 export function walkMatchExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.MATCH, doc), n);
-  for (const child of namedChildren(n)) {
-    const ir = dispatch(child, doc, source);
-    if (ir) node.appendChild(ir);
-  }
-  return node;
+  return walkContainer(T.MATCH, n, doc, source, dispatch);
 }
 
 export function walkMatchArm(n, doc, source, dispatch) {
@@ -93,12 +92,7 @@ export function walkDefaultArm(n, doc, source, dispatch) {
 }
 
 export function walkAltExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.ALT, doc), n);
-  for (const child of namedChildren(n)) {
-    const ir = dispatch(child, doc, source);
-    if (ir) node.appendChild(ir);
-  }
-  return node;
+  return walkContainer(T.ALT, n, doc, source, dispatch);
 }
 
 export function walkAltArm(n, doc, source, dispatch) {
@@ -136,7 +130,12 @@ export function walkPromoteExpr(n, doc, source, dispatch) {
     i++;
   }
   if (children[i]) {
-    node.appendChild(walkDefaultArm(children[i], doc, source, dispatch));
+    // promote's grammar stores the fallback expression directly (unlike
+    // match_default/alt_default, which have a wrapper syntax node).
+    const fallback = stamp(el(T.DEFAULT_ARM, doc), children[i]);
+    const value = dispatch(children[i], doc, source);
+    if (value) fallback.appendChild(value);
+    node.appendChild(fallback);
   }
   return node;
 }
@@ -157,11 +156,6 @@ export function walkBlockExpr(n, doc, source, dispatch) {
 }
 
 export function walkBlock(n, doc, source, dispatch) {
-  const node = stamp(el(T.BLOCK, doc), n);
-  for (const child of namedChildren(n)) {
-    const ir = dispatch(child, doc, source);
-    if (ir) node.appendChild(ir);
-  }
-  return node;
+  return walkContainer(T.BLOCK, n, doc, source, dispatch);
 }
 

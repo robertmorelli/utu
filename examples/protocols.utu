@@ -31,19 +31,28 @@ fn P[Oval].perimeter |self| () F32 {
 }
 
 fn P[Line].perimeter |self| () F32 {
-    ((self.x2 - self.x)^2.0 + (self.y2 - self.y)^2.0)^0.5;
+    let dx: F32 = self.x2 - self.x;
+    let dy: F32 = self.y2 - self.y;
+    F32.sqrt(dx * dx + dy * dy);
 }
 
 fn perimeter_sum(l: Array[P]) F32 {
     let s: F32 = 0.0;
-    for (0..<l.len) |i| {
+    for (0..<l.len()) |i| {
         s = s + l[i].perimeter();
     };
     s;
 }
 
-fn main() F32 {
-    let my_ps: Array[P] = Array.new_default(3);
+export main() F32 {
+    let my_ps: Array[P] = Array[P].new_default(3);
+
+
+
+
+
+
+
     my_ps[0] = Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 };
     my_ps[1] = Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 };
     my_ps[2] = Circle { x: 0.0, y: 0.0, r: 0.0 };

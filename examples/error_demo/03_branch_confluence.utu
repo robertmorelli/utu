@@ -1,0 +1,14 @@
+// ERROR DEMO: incompatible branch values
+//
+// The first branch establishes I32 as the expression type. The else branch
+// produces Bool, so the diagnostic should connect both branch declarations.
+
+fn branch_blame_demo(use_number: Bool) I32 {
+    if use_number {
+        let number: I32 = 42;
+        number;
+    } else {
+        let flag: Bool = false;
+        flag;
+    };
+}

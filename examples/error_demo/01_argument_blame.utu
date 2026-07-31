@@ -1,0 +1,15 @@
+// ERROR DEMO: argument type mismatch
+//
+// The diagnostic should point at `local_count`, then trace both sides:
+//   actual I32   <- the local declaration
+//   expected I64 <- the parameter declaration
+
+fn store_count(count: I64) I64 {
+    count;
+}
+
+fn argument_blame_demo() I32 {
+    let local_count: I32 = 7;
+    store_count(local_count);
+    0;
+}

@@ -8,14 +8,15 @@ import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
 
 export function lowerPipe(doc, { debugAssertions = false } = {}) {
   const root = doc?.body?.firstChild;
-  if (!root) return;
+  if (root) lowerPipesIn(root);
+  if (debugAssertions && root?.querySelector('ir-pipe')) {
+    throw new Error('lower pipe: found ir-pipe after lowering');
+  }
+}
 
+export function lowerPipesIn(root) {
   for (const pipe of [...root.querySelectorAll('ir-pipe')].reverse()) {
     pipe.replaceWith(lowerOnePipe(pipe));
-  }
-
-  if (debugAssertions && root.querySelector('ir-pipe')) {
-    throw new Error('lower pipe: found ir-pipe after lowering');
   }
 }
 

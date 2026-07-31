@@ -1,4 +1,4 @@
-import { nodeRef } from './diagnostics.js';
+import { diagnosticFacts, nodeRef } from './diagnostics.js';
 
 export function collectAnalysisDiagnostics(doc) {
   const root = doc?.body?.firstChild;
@@ -33,20 +33,26 @@ export function collectAnalysisDiagnostics(doc) {
     }
   }
 
+  const facts = diagnosticFacts(doc);
   for (const node of root.querySelectorAll('[data-error-kind]')) {
-    const data = parseJson(node.dataset.errorData);
-    diagnostics.push({
+    if (!facts.has(node.id)) facts.set(node.id, {
+      node,
       kind: node.dataset.errorKind,
-      severity: 'error',
       message: node.dataset.errorMessage ?? node.dataset.errorKind,
-      primary: nodeRef(node),
-      context: nearestDiagnosticContext(node),
-      related: data?.related ?? [],
-      notes: [],
-      fixes: [],
-      data,
+      data: parseJson(node.dataset.errorData) ?? {},
     });
   }
+  for (const { node, kind, message, data } of facts.values()) diagnostics.push({
+    kind,
+    severity: 'error',
+    message,
+    primary: nodeRef(node),
+    context: nearestDiagnosticContext(node),
+    related: data.related ?? [],
+    notes: [],
+    fixes: [],
+    data,
+  });
 
   return diagnostics;
 }

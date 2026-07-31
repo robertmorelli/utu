@@ -1,5 +1,6 @@
 
 export function emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr) {
+  if (opNode.localName.startsWith('ir-array-') && ctx.requirements) ctx.requirements.conservativeSweep = true;
   switch (opNode.localName) {
     case 'ir-array-new':   return emitArrayNew(argNodes, ctx, emitExpr);
     case 'ir-array-get':   return emitArrayGet(argNodes, ctx, emitExpr);
@@ -13,7 +14,7 @@ export function emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr) {
 function emitArrayNew([lenNode, fillNode], ctx, emitExpr) {
   if (!lenNode) throw new Error('codegen: ir-array-new missing length');
   const info = arrayInfoFromCall(ctx);
-  if (fillNode) return ctx.module.array.new(info.heapType, emitExpr(fillNode, ctx), emitExpr(lenNode, ctx));
+  if (fillNode) return ctx.module.array.new(info.heapType, emitExpr(lenNode, ctx), emitExpr(fillNode, ctx));
   return ctx.module.array.new_default(info.heapType, emitExpr(lenNode, ctx));
 }
 
@@ -46,9 +47,10 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
   if (!selfNode || !startNode || !endNode) throw new Error('codegen: ir-array-slice missing self/start/end');
   const m = ctx.module;
   const info = arrayInfoFromNode(selfNode, ctx);
-  const selfSlot = ctx.addLocal(selfNode.dataset['typeName'] ?? '');
-  const startTypeName = startNode.dataset['typeName'] ?? 'I32';
-  const endTypeName = endNode.dataset['typeName'] ?? 'I32';
+  const selfTypeName = ctx.typeOf(selfNode) ?? '';
+  const selfSlot = ctx.addLocal(selfTypeName);
+  const startTypeName = ctx.typeOf(startNode) ?? 'I32';
+  const endTypeName = ctx.typeOf(endNode) ?? 'I32';
   const lenTypeName = startTypeName;
   const startType = ctx.toType(startTypeName);
   const endType = ctx.toType(endTypeName);
@@ -61,7 +63,7 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
   const startSlot = ctx.addLocal(startTypeName);
   const endSlot = ctx.addLocal(endTypeName);
   const lenSlot = ctx.addLocal(lenTypeName);
-  const outSlot = ctx.addLocal(selfNode.dataset['typeName'] ?? '');
+  const outSlot = ctx.addLocal(selfTypeName);
 
   return m.block(
     null,
@@ -96,18 +98,18 @@ function castArrayRef(node, ctx, emitExpr) {
 function arrayInfoFromCall(ctx) {
   const call = ctx.currentCall;
   const callee = call?.firstElementChild;
-  const t = call?.dataset['typeName'] ?? callee?.dataset['typeName'] ?? '';
+  const t = ctx.typeOf(call) ?? ctx.typeOf(callee) ?? '';
   return arrayInfoFromType(t, ctx);
 }
 
 function arrayInfoFromNode(node, ctx) {
-  return arrayInfoFromType(node.dataset['typeName'] ?? '', ctx);
+  return arrayInfoFromType(ctx.typeOf(node) ?? '', ctx);
 }
 
 function arrayInfoFromType(typeName, ctx) {
   const name = typeName.startsWith('?') ? typeName.slice(1) : typeName;
   const info = ctx.structTypes.get(name);
-  if (!info || info.kind !== 'array') {
+  if (!info || info.kind !== 'wasm-array') {
     throw new Error(`codegen: expected array type, got "${typeName}"`);
   }
   return info;

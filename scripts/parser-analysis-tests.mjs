@@ -1,3 +1,7 @@
+import {
+  actualType, buildGraph, buildModuleGraph, inferTypes, linkTypeDecls,
+  refreshProgramIndex, resolveBindings, resolveMethods,
+} from '../src/index.js';
 import { withTempUtu } from './test-harness.mjs';
 
 export function registerParserAnalysisTests({ test, assert, assertEq, assertNoErrors, makeCompiler }) {
@@ -10,6 +14,19 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     const fn = doc.querySelector('ir-fn');
     assert(fn, 'expected ir-fn');
     assertEq(fn.getAttribute('name'), 'add');
+  });
+
+  test('compatibility: legacy graph and semantic pass facades remain usable', async ({ compiler }) => {
+    assertEq(buildGraph, buildModuleGraph, 'buildGraph should alias buildModuleGraph');
+    const doc = compiler.parseSource(`export lib { fn id(a: I32) I32 { a } }`);
+    refreshProgramIndex(doc);
+    const typeIndex = linkTypeDecls(doc);
+    resolveBindings(doc);
+    const inferred = inferTypes(doc, typeIndex);
+    assert(inferred.slots.size > 0, 'inferTypes should return the canonical graph');
+    assertEq(actualType(inferred, doc.querySelector('ir-param[name="a"]')), 'I32');
+    const resolved = resolveMethods(doc, typeIndex);
+    assert(resolved.slots.size > 0, 'resolveMethods should return the canonical graph');
   });
 
   test('parse: struct declaration', async ({ compiler }) => {
@@ -168,13 +185,26 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     });
   });
 
+  test('analysis: parse errors short-circuit lowerings without compiler crashes', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    await withTempUtu(ROOT, 'analysis_parse_short_circuit.utu', `
+      export main() I32 { let broken: I32 = ; }
+    `, async (file) => {
+      const { doc, artifacts } = await compiler.analyzeFile(file);
+      assert(doc.body.firstChild?.dataset.error === 'parse-error', 'parse-error summary should remain visible to compileFile consumers');
+      assert(artifacts.diagnostics.some(d => d.kind === 'parse-error'), JSON.stringify(artifacts.diagnostics));
+    });
+  });
+
   test('analysis: analyzeFile returns structured diagnostics', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'analysis_diag.utu', `export lib { fn bad() I32 { missing_name; } }`, async (file) => {
-      const { doc, artifacts } = await compiler.analyzeFile(file);
+      const { doc, artifacts, graphs } = await compiler.analyzeFile(file);
       assert(doc, 'expected analysis doc');
       assert(artifacts, 'expected artifacts');
       assert(artifacts.diagnostics.some(d => d.kind === 'unknown-variable'), 'expected unknown-variable diagnostic');
+      assert([...graphs.diagnostics.facts.values()].some(fact => fact.kind === 'unknown-variable'),
+        'expected retained diagnostic blame');
     });
   });
 
@@ -233,8 +263,10 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
         }
       }
     `, async (file) => {
-      const doc = await compiler.compileFile(file);
+      const { doc, graphs } = await compiler.analyzeFile(file);
       assertNoErrors(doc);
+      assert(graphs.elaboration.edges.some(edge => edge.kind === 'inline-module-instantiation'), 'expected retained instantiation blame');
+      assert(graphs.elaboration.edges.some(edge => edge.kind === 'substitutes'), 'expected retained substitution blame');
       const typeDef = doc.querySelector('ir-type-def[name="Array__I32"]');
       assert(typeDef, 'expected ir-type-def[name="Array__I32"] after inline instantiation');
       const wasmArr = typeDef.querySelector('ir-wasm-array');
@@ -320,8 +352,13 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
         }
       }
     `, async (file) => {
-      const { doc } = await compiler.analyzeFile(file);
+      const { doc, graphs } = await compiler.analyzeFile(file);
       const root = doc.body.firstChild;
+      const graphCaptures = [...graphs.scope.captures.values()]
+        .map(captures => [...captures.keys()].sort().join(','));
+      assert(graphCaptures.includes('a,n'), 'scope graph must retain closure captures');
+      assertEq(graphCaptures.filter(names => names === 'm').length, 2, 'scope graph must retain transitive captures');
+      assert(!root.querySelector('ir-closure-env, ir-closure-cap'), 'capture facts must not be duplicated in IR');
       const envs = [...root.querySelectorAll('ir-struct[name^="__ClosureEnv"]')].map(env => ({
         name: env.getAttribute('name'),
         fields: [...env.querySelectorAll(':scope > ir-field')].map(f => f.getAttribute('name')).sort(),
@@ -431,6 +468,19 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     });
   });
 
+  test('analysis: benchmark setup bindings are visible inside measure', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    await withTempUtu(ROOT, 'analysis_bench_scope.utu', `
+      bench "counter" {
+        let total: I32 = 0;
+        measure { total += 1; }
+      }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      assertEq(artifacts.diagnostics.length, 0, JSON.stringify(artifacts.diagnostics.map(d => d.message)));
+    });
+  });
+
   test('analysis: numeric literals adopt the type their context declares', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     await withTempUtu(ROOT, 'analysis_literal_context.utu', `
@@ -463,6 +513,42 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
         artifacts.diagnostics.some(d => d.kind === 'type-mismatch'),
         'an int literal must not adopt Bool just because they share a representation',
       );
+    });
+  });
+
+  test('analysis: protocol implementors are assignable to protocol values', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    await withTempUtu(ROOT, 'analysis_protocol_assignability.utu', `
+      proto P:
+        | value() I32
+      struct Line[P]:
+        | x : I32
+      fn accept(value: P) I32 { 1; }
+      export main() I32 { accept(Line { x: 3 }); }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      assert(!artifacts.diagnostics.some(d => d.kind === 'type-mismatch'), JSON.stringify(artifacts.diagnostics));
+    });
+  });
+
+  test('analysis: non-constant globals are diagnosed before codegen', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    await withTempUtu(ROOT, 'analysis_invalid_global_init.utu', `
+      let value: I32 = 40 + 2;
+      export main() I32 { value; }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      assert(artifacts.diagnostics.some(d => d.kind === 'invalid-global-initializer'), JSON.stringify(artifacts.diagnostics));
+    });
+  });
+
+  test('analysis: break outside a loop is diagnosed before codegen', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    await withTempUtu(ROOT, 'analysis_invalid_break.utu', `
+      export main() I32 { break; 1; }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      assert(artifacts.diagnostics.some(d => d.kind === 'invalid-break'), JSON.stringify(artifacts.diagnostics));
     });
   });
 
@@ -562,6 +648,60 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     });
   });
 
+  test('type graph: contextual typing and checking share one rule set', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    await withTempUtu(ROOT, 'analysis_type_graph_regressions.utu', `
+      struct Pt:
+        | x : I32
+      fn consume(p: Pt) I32 { p.x; }
+      fn invoke(f: fun(I32) I32) I32 { f(true); }
+      fn wrong(x: Bool) Bool { x; }
+      export lib {
+        fn explicit_return() I32 { return 1; }
+        fn bad_assert() I32 { assert 1; 0; }
+        fn closure_assignment() I32 {
+          let f: cl(I32) I32 = cl(x) { x; };
+          f = cl(y) { y; };
+          f(1);
+        }
+        fn implicit_argument() I32 { consume(&{ x: 1 }); }
+        fn bad_decay() I32 { let f: cl(I32) I32 = wrong; 0; }
+      }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      const mismatches = artifacts.diagnostics.filter(d => d.kind === 'type-mismatch');
+      assertEq(mismatches.length, 3, JSON.stringify(mismatches.map(d => d.message)));
+      for (const text of ['expected I32, got Bool', 'expected Bool, got I32', 'expected cl(I32) I32, got fun(Bool) Bool']) {
+        assert(mismatches.some(d => d.message.includes(text)), `missing ${text}`);
+      }
+    });
+  });
+
+  test('type graph: failed transforms and dependency invalidation are explicit', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    await withTempUtu(ROOT, 'analysis_graph_failures.utu', `
+      export lib {
+        fn bad_call(x: I32) I32 { x(); 0; }
+        fn bad_await(x: I32) I32 { await x; }
+      }
+    `, async (file) => {
+      const { artifacts } = await compiler.analyzeFile(file);
+      assert(artifacts.diagnostics.some(d => d.kind === 'not-callable'), 'missing not-callable graph failure');
+      assert(artifacts.diagnostics.some(d => d.kind === 'invalid-await'), 'missing invalid-await graph failure');
+    });
+
+    const { buildTypeGraph, invalidateTypeGraph, solveTypeGraph } = await import('../src/compiler/type-graph.js');
+    const { linkTypeDecls } = await import('../src/compiler/link-type-decls.js');
+    const { resolveBindings } = await import('../src/compiler/resolve-bindings.js');
+    const doc = compiler.parseSource('fn identity(x: I32) I32 { x; }', 'graph-invalidation.utu');
+    const index = linkTypeDecls(doc);
+    resolveBindings(doc);
+    const graph = solveTypeGraph(buildTypeGraph(doc, index));
+    const param = doc.querySelector('ir-param[name="x"]');
+    const use = doc.querySelector('ir-ident[name="x"]');
+    assert(invalidateTypeGraph(graph, [param]).has(use), 'binding change must invalidate identifier use');
+  });
+
   test('graphs: binding, expectation and provenance edges are readable back', async ({ ROOT }) => {
     const { extractGraphs, countByKind } = await import('../src/compiler/graph-view.js');
     const { renderGraphHtml } = await import('../src/compiler/graph-html.js');
@@ -576,12 +716,25 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
       }
     `;
     await withTempUtu(ROOT, 'analysis_graphs.utu', source, async (file) => {
-      const { doc } = await compiler.analyzeFile(file);
+      const { doc, graphs, snapshot } = await compiler.analyzeFile(file);
       const { nodes, edges } = extractGraphs(doc);
       const counts = countByKind(edges);
       assert(counts.binding > 0, 'expected binding edges');
       assert(counts.expectation > 0, 'expected expectation edges');
       assert(nodes.size > 0, 'expected nodes');
+      for (const name of [
+        'modules', 'elaboration', 'program', 'scope', 'types', 'calls', 'controlFlow',
+        'layout', 'declarations', 'diagnostics', 'ranges', 'backend',
+      ]) {
+        assert(graphs[name], `missing retained ${name} graph`);
+        assert(snapshot.graphs[name] === graphs[name], `snapshot must retain ${name} graph`);
+      }
+      assert(Array.isArray(graphs.modules.imports), 'expected retained import edges');
+      assert(graphs.elaboration.nodes.size > 0, 'expected declaration elaboration facts');
+      assert(graphs.scope.scopes.size > 0, 'expected explicit scopes');
+      assert(graphs.calls.edges.length > 0, 'expected call edges');
+      assert(graphs.controlFlow.edges.length > 0, 'expected control-flow edges');
+      assert(graphs.layout.nodes.has('Pt'), 'expected Pt layout node');
 
       // Every edge must name nodes that exist — the visualiser draws them.
       for (const edge of edges) {
@@ -593,6 +746,44 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
       assert(!/src=|href=|@import/.test(html), 'the page must be self-contained');
       assert(html.includes('class="edge k-expectation"'), 'expected expectation edges drawn');
     });
+  });
+
+  test('graphs: final revisions, runtime plans, snapshots, and document ids are canonical', async ({ ROOT, parser }) => {
+    const { createCompiler, retainGraph } = await import('../src/index.js');
+    const source = `
+      fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+      export lib { fn run(x: I32) I32 { apply(cl(n) { n; }, x); } }
+    `;
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    await withTempUtu(ROOT, 'canonical_graphs.utu', source, async (file) => {
+      const { doc, graphs, snapshot } = await compiler.analyzeFile(file);
+      const revision = graphs.program.revision;
+      for (const name of ['scope', 'types', 'calls', 'controlFlow']) {
+        assertEq(graphs[name].programRevision, revision, `${name} graph is stale`);
+      }
+      assertEq(graphs.backend.programRevision, revision, 'backend plan is stale');
+      assert(graphs.calls.targets.size > 0, 'calls must retain canonical targets');
+      assert(graphs.backend.callTargets.size > 0, 'backend must retain canonical call targets');
+      assert(graphs.backend.runtime.closures.new, 'closure runtime must come from the backend plan');
+      assert(Object.isFrozen(snapshot.graphs), 'snapshot graph-set view must be frozen');
+      retainGraph(doc, 'afterSnapshot', { kind: 'test' });
+      assert(!snapshot.graphs.afterSnapshot, 'snapshot graph-set must not change after creation');
+    });
+
+    const files = new Map([['a.utu', 'fn a() I32 { 1; }'], ['b.utu', 'fn b() I32 { 2; }']]);
+    const concurrent = createCompiler({
+      parser,
+      target: 'analysis',
+      readFile: async path => { await new Promise(resolve => setTimeout(resolve, path === 'a.utu' ? 2 : 0)); return files.get(path); },
+      resolvePath: (_, path) => path,
+    });
+    const [a, b] = await Promise.all([concurrent.compileFile('a.utu'), concurrent.compileFile('b.utu')]);
+    assertEq(a.body.firstChild.id, 'n0', 'first concurrent document must own its allocator');
+    assertEq(b.body.firstChild.id, 'n0', 'second concurrent document must own its allocator');
+    for (const doc of [a, b]) {
+      const ids = [...doc.querySelectorAll('[id]')].map(node => node.id);
+      assertEq(new Set(ids).size, ids.length, 'compiled document contains duplicate node ids');
+    }
   });
 
   test('analysis: closure CI example analyses cleanly', async ({ ROOT }) => {

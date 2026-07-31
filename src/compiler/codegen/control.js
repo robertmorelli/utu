@@ -4,6 +4,7 @@
 //
 //   ir-if         →  wasm `if/else`
 //   ir-while      →  wasm `loop` + `br_if`
+//   ir-for        →  wasm locals + `loop` + range comparison
 //   ir-return     →  wasm `return`
 //   ir-break      →  wasm `br` to the enclosing while-block
 //   ir-match      →  wasm `br_table`           (literal scalar dispatch)
@@ -16,7 +17,6 @@
 // ir-alt reaching this file is a residual unsupported case.
 
 import { binaryen } from './types.js';
-import { emitNullLiteral, isNullLiteral } from './null-literals.js';
 
 // ── if / else ────────────────────────────────────────────────────────────────
 //
@@ -42,9 +42,10 @@ export function emitIf(node, ctx, emitExpr) {
 //       (br $cnt)))
 export function emitWhile(node, ctx, emitExpr) {
   const [cond, body] = [...node.children];
-  const m   = ctx.module;
-  const brk = '__while_brk';
-  const cnt = '__while_cnt';
+  const m = ctx.module;
+  const label = ctx.controlLabelIndex = (ctx.controlLabelIndex ?? 0) + 1;
+  const brk = `__while_brk_${label}`;
+  const cnt = `__while_cnt_${label}`;
 
   // Push the labels so a nested ir-break can find them.
   ctx.loops ??= [];
@@ -59,13 +60,81 @@ export function emitWhile(node, ctx, emitExpr) {
   }
 }
 
+export function emitFor(node, ctx, emitExpr) {
+  const sources = [...node.querySelectorAll(':scope > ir-for-source')];
+  const capture = node.querySelector(':scope > ir-capture');
+  const body = node.querySelector(':scope > ir-block');
+  const names = (capture?.getAttribute('names') ?? '').split(',').filter(Boolean);
+  if (!sources.length || (names.length && names.length !== sources.length) || !body) {
+    throw new Error('codegen: for requires either no captures or one capture for each range source');
+  }
+
+  const m = ctx.module;
+  const ranges = sources.map((source, index) => {
+    const [start, end] = [...source.children];
+    const typeName = ctx.typeOf(start) ?? ctx.typeOf(end);
+    if (!['I32', 'U32', 'I64', 'U64'].includes(typeName)) {
+      throw new Error(`codegen: for range type ${JSON.stringify(typeName)} is not supported (expected an integer scalar)`);
+    }
+    const type = ctx.toType(typeName);
+    const cursorIndex = ctx.addLocal(typeName);
+    const endIndex = ctx.addLocal(typeName);
+    if (capture && names[index]) ctx.locals.set(`${capture.id}:${names[index]}`, { index: cursorIndex, type });
+    if (capture && sources.length === 1) ctx.locals.set(capture.id, { index: cursorIndex, type });
+    return {
+      source, start, end, typeName, type, cursorIndex, endIndex,
+      width: typeName.endsWith('64') ? 'i64' : 'i32',
+      unsigned: typeName.startsWith('U'),
+      inclusive: source.getAttribute('op') === '...',
+    };
+  });
+
+  const label = ctx.controlLabelIndex = (ctx.controlLabelIndex ?? 0) + 1;
+  const brk = `__for_brk_${label}`;
+  const cnt = `__for_cnt_${label}`;
+  const cursor = range => m.local.get(range.cursorIndex, range.type);
+  const bound = range => m.local.get(range.endIndex, range.type);
+  const condition = range => {
+    const compare = range.inclusive
+      ? (range.unsigned ? 'le_u' : 'le_s')
+      : (range.unsigned ? 'lt_u' : 'lt_s');
+    return m[range.width][compare](cursor(range), bound(range));
+  };
+
+  ctx.loops ??= [];
+  ctx.loops.push({ brk, cnt });
+  try {
+    const bodyExpr = emitExpr(body, ctx);
+    const exits = ranges.map(range => m.br(brk, m.i32.eqz(condition(range))));
+    // A zip loop ends when any inclusive source reaches its bound. Exiting
+    // before increment also prevents MAX_VALUE from wrapping forever.
+    const inclusiveExits = ranges.filter(range => range.inclusive)
+      .map(range => m.br(brk, m[range.width].eq(cursor(range), bound(range))));
+    const increments = ranges.map(range => m.local.set(range.cursorIndex,
+      m[range.width].add(cursor(range), m[range.width].const(range.width === 'i64' ? 1n : 1))));
+    const loop = m.loop(cnt, m.block(null, [
+      ...exits,
+      bodyExpr,
+      ...inclusiveExits,
+      ...increments,
+      m.br(cnt),
+    ], binaryen.none));
+    return m.block(brk, [
+      ...ranges.flatMap(range => [
+        m.local.set(range.cursorIndex, emitExpr(range.start, ctx)),
+        m.local.set(range.endIndex, emitExpr(range.end, ctx)),
+      ]),
+      loop,
+    ], binaryen.none);
+  } finally {
+    ctx.loops.pop();
+  }
+}
+
 // ── return / break ──────────────────────────────────────────────────────────
 
 export function emitReturn(node, ctx, emitExpr) {
   const child = node.children[0];
-  if (child && isNullLiteral(child) && ctx.currentReturnType?.startsWith('?')) {
-    return ctx.module.return(emitNullLiteral(child, ctx, ctx.currentReturnType));
-  }
   return ctx.module.return(child ? emitExpr(child, ctx) : undefined);
 }
 
@@ -106,14 +175,14 @@ export function emitMatch(node, ctx, emitExpr) {
   const scrut   = node.children[0];
   const arms    = [...node.querySelectorAll(':scope > ir-match-arm')];
   const defArm  = node.querySelector(':scope > ir-default-arm');
-  const retType = ctx.toType(node.dataset['typeName'] ?? 'void');
+  const retType = ctx.toType(ctx.typeOf(node) ?? 'void');
 
   if (arms.length === 0) {
     return defArm ? emitExpr(armBody(defArm), ctx) : m.unreachable();
   }
 
   // Sort arms by pattern value; check density.
-  const scrutTypeName = scrut.dataset['typeName'] ?? '';
+  const scrutTypeName = ctx.typeOf(scrut) ?? '';
   const ns = ctx.scalarNamespaceOf(scrutTypeName);
   const sorted = arms
     .map(a => ({ arm: a, pat: parseMatchLiteral(a.getAttribute('pattern'), ns) }))
@@ -166,7 +235,7 @@ function emitMatchTable(m, ctx, scrut, sorted, defArm, min, retType, emitExpr) {
 // if/else fallback for sparse patterns.
 function emitMatchChain(m, ctx, scrut, sorted, defArm, retType, emitExpr) {
   // Cache the scrutinee in a local so each comparison reads it without re-running side effects.
-  const scrutTypeName = scrut.dataset['typeName'];
+  const scrutTypeName = ctx.typeOf(scrut);
   if (!scrutTypeName) throw new Error('codegen: match scrutinee has no type');
   const scrutType = ctx.toType(scrutTypeName);
   const slot = ctx.addLocal(scrutTypeName);
@@ -216,7 +285,7 @@ function emitMatchChain(m, ctx, scrut, sorted, defArm, retType, emitExpr) {
 
 export function emitAlt(node, ctx, emitExpr) {
   const scrutinee = node.firstElementChild;
-  const scrutType = scrutinee?.dataset['typeName'] ?? '';
+  const scrutType = ctx.typeOf(scrutinee) ?? '';
   throw new Error(
     `codegen: residual ir-alt over <${scrutType}> reached backend — ` +
     `supported rec-alt should have been lowered earlier; remaining cases are bound rec-alt or tag-alt`
@@ -225,7 +294,7 @@ export function emitAlt(node, ctx, emitExpr) {
 
 export function emitPromote(node, ctx, emitExpr) {
   const scrutinee = node.firstElementChild;
-  const scrutType = scrutinee?.dataset['typeName'] ?? '';
+  const scrutType = ctx.typeOf(scrutinee) ?? '';
   throw new Error(
     `codegen: residual ir-promote over <${scrutType}> reached backend — ` +
     'supported promote should have been lowered earlier'
@@ -245,7 +314,8 @@ function parseMatchLiteral(s, ns) {
 }
 
 function parseIntLiteral(s) {
-  if (s == null) return 0n;
+  if (s == null || s === 'false') return 0n;
+  if (s === 'true') return 1n;
   const neg = s.startsWith('-');
   const body = neg ? s.slice(1) : s;
   const value = BigInt(body);

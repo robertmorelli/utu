@@ -19,7 +19,7 @@
 
 import { binaryen, declaredTypeStr } from './types.js';
 import { callableParts } from '../type-strings.js';
-import { closureCallImport } from '../lower-closures.js';
+import { closureCallImport } from '../closure-abi.js';
 import { unwrapNullable } from '../type-strings.js';
 import { paramsOf } from '../ir-helpers.js';
 
@@ -52,7 +52,7 @@ export function createSignatureTypes() {
  * Callable types are structural — they have no declaration to register from —
  * so they are discovered off the stamped `data-type-name` values instead.
  */
-export function registerCallableTypes(root, structTypes, toType, signatureRefType) {
+export function registerCallableTypes(root, structTypes, toType, signatureRefType, plan = null) {
   const ensure = (typeStr) => {
     if (!typeStr) return;
     const name = unwrapNullable(typeStr);
@@ -82,13 +82,14 @@ export function registerCallableTypes(root, structTypes, toType, signatureRefTyp
     });
   };
 
-  for (const node of root.querySelectorAll('[data-type-name]')) ensure(node.dataset['typeName']);
+  if (plan) for (const type of plan.nodeTypes.values()) ensure(type);
+  else for (const node of root.querySelectorAll('[data-type-name]')) ensure(node.dataset['typeName']);
   for (const ref of root.querySelectorAll('ir-type-ref[name]')) ensure(ref.getAttribute('name'));
 }
 
 /** Declare the host imports the program uses, before any body that calls them. */
 export function installClosureImports(m, root, ctx) {
-  const runtime = readRuntimeSpec(root);
+  const runtime = ctx.backendPlan?.runtime.closures ?? readRuntimeSpec(root);
   if (runtime.new) {
     // `fn` is a plain funcref so the host can call it directly; `env` is anyref
     // so any environment struct passes through unexamined. A null environment
@@ -98,14 +99,15 @@ export function installClosureImports(m, root, ctx) {
       binaryen.createType([binaryen.funcref, binaryen.anyref]), binaryen.externref,
     );
   }
-  for (const type of readPromiseSpec(root).awaits ?? []) {
+  const promises = ctx.backendPlan?.runtime.promises ?? readPromiseSpec(root);
+  for (const type of promises.awaits ?? []) {
     // (promise: externref) -> T, wrapped host-side in WebAssembly.Suspending.
     m.addFunctionImport(
       `__utu_await_${sanitizeType(type)}`, CLOSURE_MODULE, `await_${sanitizeType(type)}`,
       binaryen.createType([binaryen.externref]), ctx.toType(type),
     );
   }
-  for (const field of readPromiseSpec(root).ops ?? []) {
+  for (const field of promises.ops ?? []) {
     // (promise: externref, callback: externref) -> void
     m.addFunctionImport(
       `__utu_${field}`, CLOSURE_MODULE, field,
@@ -136,7 +138,7 @@ export function sanitizeType(type) {
 
 /** `await p` → a call to the Suspending-wrapped host import for p's value type. */
 export function emitAwait(node, ctx, emitExpr) {
-  const value = node.dataset['typeName'];
+  const value = ctx.typeOf(node);
   if (!value) throw new Error('codegen: ir-await has no value type');
   return ctx.module.call(
     `__utu_await_${sanitizeType(value)}`,
@@ -158,16 +160,13 @@ function readRuntimeSpec(root) {
     spec = null;
   }
   if (!spec) return { new: false, calls: [] };
-
   const wanted = new Set(spec.calls ?? []);
   const calls = new Map();
   for (const call of root.querySelectorAll('ir-call')) {
-    const parts = callableParts(call.firstElementChild?.dataset?.['typeName']);
+    const parts = callableParts(call.firstElementChild?.dataset?.typeName);
     if (parts?.kind !== 'cl') continue;
     const field = closureCallImport(parts);
-    if (wanted.has(field) && !calls.has(field)) {
-      calls.set(field, { field, params: parts.params, result: parts.ret });
-    }
+    if (wanted.has(field)) calls.set(field, { field, params: parts.params, result: parts.ret });
   }
   return { new: Boolean(spec.new), calls: [...calls.values()] };
 }
@@ -234,7 +233,7 @@ function funcRef(name, ctx) {
   // directly drops the nullable wrapper, and binaryen rejects a ref.func whose
   // declared signature does not match the function exactly.
   const params = paramsOf(decl)
-    .map(param => ctx.toType(declaredTypeStr(param) ?? param.dataset?.['typeName'] ?? 'void'));
+    .map(param => ctx.toType(declaredTypeStr(param) ?? ctx.typeOf(param) ?? 'void'));
   const result = ctx.toType(declaredTypeStr(decl) ?? 'void');
   return ctx.module.ref.func(name, ctx.signatureRefType(params, result));
 }

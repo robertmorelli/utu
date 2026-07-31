@@ -41,6 +41,7 @@ async function main() {
   if (buildGrammar) await generateParser();
   await generatePlatformSources();
   await bundlePackage();
+  await bundleVscodeExtension();
 }
 
 // ── Parser (parser.c + wasm) ──────────────────────────────────────────────────
@@ -155,6 +156,37 @@ async function bundlePackage() {
     },
     plugins: [embeddedWasmPlugin(), hostNeutralDependencyPlugin(), nodeBranchStubPlugin()],
   });
+}
+
+async function bundleVscodeExtension() {
+  const entry = path.join(ROOT, 'src', 'vscode', 'extension.js');
+  const shared = {
+    entryPoints: [entry],
+    bundle: true,
+    platform: 'neutral',
+    target: 'es2022',
+    minify: true,
+    sourcemap: false,
+    legalComments: 'none',
+    external: ['vscode'],
+  };
+  await Promise.all([
+    build({
+      ...shared,
+      outfile: path.join(DIST_DIR, 'node', 'extension.cjs'),
+      format: 'cjs',
+      platform: 'node',
+    }),
+    build({
+      ...shared,
+      outfile: path.join(DIST_DIR, 'web', 'extension.cjs'),
+      format: 'cjs',
+      platform: 'browser',
+    }),
+  ]);
+  // VS Code's web worker extension host currently loads browser entries as
+  // CommonJS even when its surrounding test/workbench uses the ESM loader.
+  await fs.writeFile(path.join(DIST_DIR, 'web', 'package.json'), '{"type":"commonjs"}\n');
 }
 
 function embeddedWasmPlugin() {

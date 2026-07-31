@@ -1,31 +1,179 @@
 {
-  "name": "utu",
+  "name": "utu-vscode",
+  "displayName": "UTU",
   "version": "0.1.0",
-  "description": "Compiler for the Utu language — tree-sitter frontend, HTML IR, WasmGC backend.",
+  "description": "UTU language support and compiler — tree-sitter frontend, HTML IR, and WasmGC backend.",
+  "publisher": "robertmorelli",
   "author": "Robert Morelli",
   "license": "MIT",
+  "icon": "utu.png",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robertmorelli/utu.git"
+  },
+  "bugs": {
+    "url": "https://github.com/robertmorelli/utu/issues"
+  },
+  "homepage": "https://github.com/robertmorelli/utu#readme",
   "type": "module",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "utu",
+    "wasm",
+    "wasmgc",
+    "tree-sitter"
+  ],
+  "main": "./dist/node/extension.cjs",
+  "browser": "./dist/web/extension.cjs",
   "exports": {
     ".": "./dist/utu.js"
   },
+  "activationEvents": [
+    "onLanguage:utu",
+    "workspaceContains:**/*.utu"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "utu",
+        "aliases": ["UTU", "utu"],
+        "extensions": [".utu"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "utu",
+        "scopeName": "source.utu",
+        "path": "./jsondata/utu.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.inline.javascript": "javascript"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "utu.compileCurrentFile",
+        "title": "UTU: Compile Current File",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.runMain",
+        "title": "UTU: Run Main",
+        "category": "UTU",
+        "enablement": "utu.hasRunnableMain"
+      },
+      {
+        "command": "utu.showGeneratedWat",
+        "title": "UTU: Show Generated WAT",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.showSyntaxTree",
+        "title": "UTU: Show Syntax Tree",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.showCompilerIR",
+        "title": "UTU: Show Compiler IR",
+        "category": "UTU"
+      },
+      {
+        "command": "utu.showSemanticXray",
+        "title": "UTU: Open Semantic X-Ray",
+        "category": "UTU",
+        "icon": "$(inspect)"
+      },
+      {
+        "command": "utu.showCompilerGraphs",
+        "title": "UTU: Explore Compiler Graphs",
+        "category": "UTU",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "utu.runMain",
+          "when": "editorLangId == utu",
+          "group": "navigation"
+        },
+        {
+          "command": "utu.showSemanticXray",
+          "when": "editorLangId == utu",
+          "group": "navigation@10"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "utu.showSemanticXray",
+          "when": "editorLangId == utu",
+          "group": "navigation@10"
+        },
+        {
+          "command": "utu.showCompilerGraphs",
+          "when": "editorLangId == utu",
+          "group": "navigation@11"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "UTU",
+      "properties": {
+        "utu.validation.mode": {
+          "type": "string",
+          "enum": ["onType", "onSave", "off"],
+          "default": "onType",
+          "markdownDescription": "Controls when UTU compiler diagnostics run."
+        },
+        "utu.inlayHints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show compiler-derived inferred types, coercions, closure captures, and effects."
+        }
+      }
+    }
+  },
   "files": [
     "dist/utu.js",
+    "dist/node/extension.cjs",
+    "dist/web/extension.cjs",
+    "dist/web/package.json",
+    "jsondata/utu.tmLanguage.json",
+    "language-configuration.json",
     "PRINCIPLES.md",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "utu.png"
   ],
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "check": "bun ./cli/utu.mjs check",
     "test:bundle": "bun ./scripts/bundle-smoke-test.mjs",
-    "test": "bun ./scripts/run-tests.mjs --both-debug-modes"
+    "test:vscode": "node ./scripts/test-vscode-extension.mjs",
+    "test": "bun ./scripts/run-tests.mjs --both-debug-modes && node ./scripts/test-vscode-extension.mjs",
+    "package:vscode": "bun run build && vsce package --out dist/utu-vscode.vsix",
+    "bench:tiny": "bun ./scripts/benchmark-rust-vs-utu.mjs",
+    "bench:kernels": "bun ./scripts/benchmark-suite.mjs",
+    "bench:deltablue": "bun ./scripts/benchmark-deltablue.mjs",
+    "bench:engines": "bun ./scripts/benchmark-wasmgc-engines.mjs",
+    "bench:suite": "bun ./scripts/benchmark-all.mjs"
   },
   "dependencies": {},
   "devDependencies": {
+    "@vscode/test-web": "^0.0.80",
+    "@vscode/vsce": "^3.7.1",
     "binaryen": "^131.0.0",
     "esbuild": "^0.27.4",
     "linkedom": "^0.18.12",
     "tree-sitter-cli": "^0.26.7",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2",
     "web-tree-sitter": "^0.26.7"
   }
 }

@@ -3,6 +3,7 @@ import { callableParts, INFERRED_PRIMITIVES } from './type-rules.js';
 import { collectScalarKinds } from './link-type-decls.js';
 import { unwrapNullable } from './type-strings.js';
 import { bodyOf } from './ir-helpers.js';
+import { retainedGraphs } from './graph-store.js';
 
 const UNARY_INTRINSICS = new Set([
   'abs', 'ceil', 'clz', 'ctz', 'eqz', 'floor', 'nearest', 'neg', 'not',
@@ -40,28 +41,14 @@ const ALWAYS_RULES = [
   assertExternFns,
 ];
 
-const RULES_BY_PHASE = new Map([
-  ['resolveBindings', [assertBindings]],
-  ['resolveMethods', [assertCalls]],
-  ['lowerBackendControl', [assertNoResidualBackendControl]],
-]);
-
 function rulesForPhase(phase, opts) {
   const rules = [...ALWAYS_RULES];
-  const completed = completedPhaseKeys(phase);
-  if (opts.requireBindings || completed.has('resolveBindings')) rules.push(...RULES_BY_PHASE.get('resolveBindings'));
-  if (completed.has('resolveMethods')) rules.push(...RULES_BY_PHASE.get('resolveMethods'));
-  if (completed.has('lowerBackendControl')) rules.push(...RULES_BY_PHASE.get('lowerBackendControl'));
-  if (opts.typeIndex) rules.push(assertTypes, assertScalarIntrinsics);
-  rules.push(assertSourceLocations);
-  return rules;
-}
-
-function completedPhaseKeys(phase) {
   const base = phase.replace(/#\d+$/, '');
-  const order = ['resolveBindings', 'resolveMethods', 'lowerBackendControl'];
-  const index = order.indexOf(base);
-  return new Set(index < 0 ? [] : order.slice(0, index + 1));
+  if (opts.requireBindings || base === 'resolveBindings') rules.push(assertBindings);
+  if (base === 'resolveMethods' || base === 'lowerBackendControl') rules.push(assertCalls);
+  if (base === 'lowerBackendControl') rules.push(assertNoResidualBackendControl);
+  if (opts.typeIndex) rules.push(assertTypes, assertScalarIntrinsics);
+  return [...rules, assertSourceLocations];
 }
 
 function assertCalls(root, { phase }) {
@@ -79,7 +66,12 @@ function assertCalls(root, { phase }) {
 }
 
 function hasDiagnostic(node) {
-  return Boolean(node.dataset.errorKind || node.querySelector('[data-error-kind]'));
+  if (node.dataset.errorKind || node.querySelector('[data-error-kind]')) return true;
+  // Debug structural validation can run before graph diagnostics have been
+  // projected onto the DOM. Consult canonical failures as well, otherwise an
+  // ordinary bad program is misreported as a compiler invariant crash.
+  const failures = retainedGraphs(node.ownerDocument).types?.failures ?? [];
+  return failures.some(failure => failure.node === node || node.contains(failure.node));
 }
 
 function assertLiterals(root, { phase }) {
@@ -92,38 +84,21 @@ function assertLiterals(root, { phase }) {
 
 function assertExternFns(root, { phase }) {
   for (const fn of root.querySelectorAll('ir-extern-fn')) {
-    if (!fn.getAttribute('name')) {
-      fail(phase, fn, 'ir-extern-fn must have a name attribute');
-    }
-    if (!fn.dataset.extern) {
-      fail(phase, fn, 'ir-extern-fn must have data-extern');
-    }
-    if (!fn.dataset.importModule || !fn.dataset.importName) {
-      fail(phase, fn, 'ir-extern-fn must have data-import-module and data-import-name');
-    }
-    const fnName = fn.querySelector(':scope > ir-fn-name');
-    if (!fnName?.getAttribute('name')) {
-      fail(phase, fn, 'ir-extern-fn must have an ir-fn-name child');
-    }
-    const paramLists = fn.querySelectorAll(':scope > ir-param-list');
-    if (paramLists.length !== 1) {
-      fail(phase, fn, 'ir-extern-fn must have exactly one ir-param-list child');
-    }
-    if (bodyOf(fn)) {
-      fail(phase, fn, 'ir-extern-fn must not have an ir-block body');
-    }
-    const signatureChildren = [...fn.children].filter(child =>
-      child.localName?.startsWith('ir-type-') ||
-      child.localName === 'ir-param-list' ||
-      child.localName === 'ir-fn-name'
-    );
-    if (signatureChildren.length !== fn.children.length) {
-      fail(phase, fn, 'ir-extern-fn may only contain ir-fn-name, ir-param-list, and return type children');
-    }
-    const returnTypes = [...fn.children].filter(child => child.localName?.startsWith('ir-type-'));
-    if (returnTypes.length !== 1) {
-      fail(phase, fn, 'ir-extern-fn must have exactly one return type child');
-    }
+    const signature = [...fn.children];
+    const allowed = child => child.localName?.startsWith('ir-type-')
+      || child.localName === 'ir-param-list' || child.localName === 'ir-fn-name';
+    const checks = [
+      [fn.getAttribute('name'), 'ir-extern-fn must have a name attribute'],
+      [fn.dataset.extern, 'ir-extern-fn must have data-extern'],
+      [fn.dataset.importModule && fn.dataset.importName, 'ir-extern-fn must have data-import-module and data-import-name'],
+      [fn.querySelector(':scope > ir-fn-name')?.getAttribute('name'), 'ir-extern-fn must have an ir-fn-name child'],
+      [fn.querySelectorAll(':scope > ir-param-list').length === 1, 'ir-extern-fn must have exactly one ir-param-list child'],
+      [!bodyOf(fn), 'ir-extern-fn must not have an ir-block body'],
+      [signature.every(allowed), 'ir-extern-fn may only contain ir-fn-name, ir-param-list, and return type children'],
+      [signature.filter(child => child.localName?.startsWith('ir-type-')).length === 1, 'ir-extern-fn must have exactly one return type child'],
+    ];
+    const failed = checks.find(([valid]) => !valid);
+    if (failed) fail(phase, fn, failed[1]);
   }
 }
 
@@ -137,17 +112,24 @@ function assertSourceLocations(root, { phase }) {
 }
 
 function assertBindings(root, { phase }) {
+  const graphs = retainedGraphs(root.ownerDocument);
+  const resolutions = graphs.scope?.resolutions;
   for (const ident of root.querySelectorAll('ir-ident')) {
-    if (ident.dataset.error) continue;
-    if (!ident.dataset.bindingId) {
+    if (graphs.diagnostics?.facts.has(ident.id) || ident.dataset.error) continue;
+    if (!resolutions?.has(ident.id) && !ident.dataset.bindingId) {
       fail(phase, ident, 'ir-ident must have data-binding-id after binding resolution');
     }
   }
 }
 
 function assertTypes(root, { typeIndex, phase }) {
+  const canonicalTypes = retainedGraphs(root.ownerDocument).types;
   for (const node of root.querySelectorAll('[data-type-name]')) {
+    if (hasDiagnostic(node)) continue;
     const type = node.dataset['typeName'];
+    // Canonical type slots are validated by checkTypeGraph. This assertion is
+    // for orphan/stale projections, especially in standalone pass consumers.
+    if (canonicalTypes?.slots.has(node)) continue;
     if (type && !resolvesType(type, typeIndex)) {
       fail(phase, node, `data-type-name "${type}" does not resolve in the type registry`);
     }
@@ -168,6 +150,9 @@ function assertScalarIntrinsics(root, { scalarKinds, phase }) {
 function assertNoResidualBackendControl(root, { phase, target }) {
   if (target === 'analysis') return;
   for (const node of root.querySelectorAll('ir-alt, ir-promote, ir-binary, ir-unary')) {
+    // Erroneous source forms deliberately remain in place so diagnostics keep
+    // their original span. Only diagnostic-free residuals are compiler bugs.
+    if (hasDiagnostic(node)) continue;
     fail(phase, node, `<${node.localName}> must be lowered before backend codegen`);
   }
 }

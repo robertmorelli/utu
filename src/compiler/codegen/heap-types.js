@@ -17,6 +17,8 @@ import {
 } from './types.js';
 import { callableParts } from '../type-strings.js';
 import { unwrapNullable } from '../type-strings.js';
+import { buildLayoutGraph } from '../semantic-graphs.js';
+import { retainedGraphs } from '../graph-store.js';
 
 export function buildHeapTypes(root, typeIndex) {
   const directTypes = collectDirectTypes(typeIndex);
@@ -30,7 +32,9 @@ export function buildHeapTypes(root, typeIndex) {
       .filter(([, info]) => info.scalarFamily != null)
       .map(([name, info]) => [name, info.scalarFamily]),
   );
-  const entries = collectBuilderEntries(typeIndex);
+  const retained = retainedGraphs(root.ownerDocument).layout;
+  const layout = retained?.typeIndex === typeIndex ? retained : buildLayoutGraph(typeIndex);
+  const entries = [...layout.nodes.values()].map(({ entry }, slot) => ({ ...entry, slot }));
   const registry = new Map(directTypes);
   if (entries.length === 0) return registry;
 
@@ -39,11 +43,12 @@ export function buildHeapTypes(root, typeIndex) {
 
   for (const entry of entries) {
     if (entry.kind === 'wasm-array') {
-      tb.setArrayType(entry.slot, {
-        type: builderValueType(entry.arrayElem, tb, slotByName, directRefKinds, directScalarKinds),
-        packedType: binaryen.notPacked,
-        mutable: entry.arrayMutable,
-      });
+      tb.setArrayType(
+        entry.slot,
+        builderValueType(entry.arrayElem, tb, slotByName, directRefKinds, directScalarKinds),
+        binaryen.notPacked,
+        entry.arrayMutable,
+      );
       continue;
     }
     tb.setStructType(
@@ -63,9 +68,7 @@ export function buildHeapTypes(root, typeIndex) {
     tb.setSubType(entry.slot, tb.getTempHeapType(superSlot));
   }
 
-  if (entries.some((entry) => referencesHeapType(entry, slotByName, directScalarKinds))) {
-    tb.createRecGroup(0, entries.length);
-  }
+  if (layout.recursive) tb.createRecGroup(0, entries.length);
 
   const heapTypes = tb.buildAndDispose();
 
@@ -97,6 +100,17 @@ export function buildHeapTypes(root, typeIndex) {
 function collectDirectTypes(typeIndex) {
   const refs = new Map();
   for (const [name, entry] of typeIndex) {
+    if (entry.decl?.localName === 'ir-proto') {
+      refs.set(name, {
+        ...entry,
+        heapType: null,
+        refBinaryen: 'anyref',
+        refType: binaryen.anyref,
+        nullableRefType: binaryen.anyref,
+        fieldIndex: new Map(),
+      });
+      continue;
+    }
     if (entry.kind === 'wasm-scalar') {
       refs.set(name, {
         ...entry,
@@ -118,45 +132,6 @@ function collectDirectTypes(typeIndex) {
     }
   }
   return refs;
-}
-
-function collectBuilderEntries(typeIndex) {
-  const entries = [];
-  let slot = 0;
-
-  for (const entry of typeIndex.values()) {
-    if (entry.kind === 'wasm-gc-struct') {
-      entries.push({ ...entry, slot: slot++ });
-      continue;
-    }
-
-    if (entry.kind === 'wasm-gc-enum') {
-      entries.push({ ...entry, slot: slot++ });
-      for (const variantName of entry.variantNames ?? []) {
-        const variantEntry = typeIndex.get(variantName);
-        if (!variantEntry) continue;
-        entries.push({ ...variantEntry, slot: slot++ });
-      }
-      continue;
-    }
-
-    if (entry.kind !== 'wasm-array') continue;
-    entries.push({ ...entry, slot: slot++ });
-  }
-
-  return entries;
-}
-
-function referencesHeapType(entry, slotByName, directScalarKinds) {
-  if (entry.arrayElem && isHeapTypeName(entry.arrayElem, slotByName, directScalarKinds)) return true;
-  return !!entry.fields?.some((field) => isHeapTypeName(field.type, slotByName, directScalarKinds));
-}
-
-function isHeapTypeName(typeStr, slotByName, directScalarKinds) {
-  if (!typeStr) return false;
-  const name = unwrapNullable(typeStr);
-  if (directScalarKinds.has(name) || name === 'void') return false;
-  return slotByName.has(name);
 }
 
 function builderValueType(typeStr, tb, slotByName, directRefKinds, directScalarKinds) {

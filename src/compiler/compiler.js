@@ -27,34 +27,40 @@
 // utu language already loaded.  The caller is responsible for initialisation
 // because source-tree development may choose its own wasm loading mechanism.
 
-import { treeToIR, createIRDocument, resetNodeIds, restampSubtree } from './parse.js';
-import { buildGraph } from './build-graph.js';
+import { treeToIR, createIRDocument, restampSubtree } from './parse.js';
+import { buildModuleGraph } from './build-graph.js';
 import { bringTargetToTopLevel } from './bring-target-to-top-level.js';
 import { checkModuleVariance } from './check-module-variance.js';
-import { lowerImplicitStructInit } from './lower-implicit-struct-init.js';
 import { lowerClosures } from './lower-closures.js';
-import { applyLiteralTypes } from './apply-literal-types.js';
+import { checkTypeGraph, projectTypeGraph, settleTypeGraph } from './type-graph.js';
 import { lowerPipe } from './lower-pipe.js';
 import { inlineImports } from './inline-imports.js';
 import { instantiateModules } from './instantiate-modules.js';
 import { hoistModules } from './hoist-modules.js';
 import { linkTypeDecls } from './link-type-decls.js';
 import { resolveBindings } from './resolve-bindings.js';
-import { inferTypes } from './infer-types.js';
 import { lowerOperators } from './lower-operators.js';
-import { resolveMethods, stampFieldAccessTypes } from './resolve-methods.js';
 import { expandDsls } from './expand-dsls.js';
 import { lowerBackendControl } from './lower-backend-control.js';
 import { validateAnalysis } from './validate-analysis.js';
-import { recordExpectations } from './record-expectations.js';
 import { createStandardDsls } from './standard-dsls.js';
 import { PLATFORM_SOURCES } from './platform-sources.generated.js';
 import { stampOriginFile } from './ir-helpers.js';
 import { createExplainabilityArtifacts, pushDiagnostic } from './explainability.js';
+import { diagnosticFacts } from './diagnostics.js';
 import { collectAnalysisDiagnostics } from './collect-analysis-diagnostics.js';
 import { createAnalysisSnapshot } from './analysis-snapshot.js';
+import { ANALYSIS_TOKENS } from './analysis-tokens.js';
 import { collectPreludeModules } from './prelude.js';
 import { validateIrStructure } from './validate-ir-structure.js';
+import { buildElaborationGraph } from './elaboration-graph.js';
+import { refreshProgramIndex } from './program-index.js';
+import { rebuildSemanticGraphs } from './semantic-analysis.js';
+import { buildBackendPlan, sealBackendPlan } from './backend-plan.js';
+import { projectGraphs } from './project-graphs.js';
+import {
+  buildCallGraph, buildLayoutGraph, buildTypeDeclarationGraph, retainGraph, retainedGraphs,
+} from './semantic-graphs.js';
 import {
   TREE_SITTER_UTU_WASM_BASE64,
   WEB_TREE_SITTER_WASM_BASE64,
@@ -89,8 +95,8 @@ import {
  *   Parse a source string directly into IR (no file I/O).
  * @property {(filePath: string) => Promise<Document>} compileFile
  *   Read a file via the injected `readFile` and compile it to IR.
- * @property {(filePath: string) => Promise<{ doc: Document | null, artifacts: ReturnType<typeof createExplainabilityArtifacts>, snapshot: ReturnType<typeof createAnalysisSnapshot> }>} analyzeFile
- *   Compile a file into IR plus structured explainability artifacts and query snapshot.
+ * @property {(filePath: string) => Promise<{ doc: Document | null, artifacts: ReturnType<typeof createExplainabilityArtifacts>, snapshot: ReturnType<typeof createAnalysisSnapshot>, graphs: object }>} analyzeFile
+ *   Compile a file into IR plus diagnostics, query snapshot, and retained semantic graphs.
  */
 
 /**
@@ -114,7 +120,6 @@ export function createCompiler(env) {
    * No module resolution — useful for single-file tooling (e.g. diagnostics).
    */
   function parseSource(source, filePath = '') {
-    resetNodeIds();
     const tree   = parser.parse(source);
     const ir     = treeToIR(tree, source, filePath, createDocument, { collectAnalysisTokens: target === 'analysis' });
     const root   = ir.body.firstChild;
@@ -122,6 +127,7 @@ export function createCompiler(env) {
       root.setAttribute('data-file', filePath);
       stampOriginFile(root, filePath);
     }
+    projectGraphs(ir);
     return ir;
   }
 
@@ -139,8 +145,9 @@ export function createCompiler(env) {
     try {
       const doc = await compileFileInternal(filePath);
       for (const diagnostic of collectAnalysisDiagnostics(doc)) pushDiagnostic(artifacts, diagnostic);
+      const graphs = retainedGraphs(doc);
       const snapshot = createAnalysisSnapshot(doc, artifacts);
-      return { doc, artifacts, snapshot };
+      return { doc, artifacts, snapshot, graphs };
     } catch (error) {
       if (error?.diagnostic) pushDiagnostic(artifacts, error.diagnostic);
       const snapshot = createAnalysisSnapshot(null, artifacts);
@@ -149,8 +156,7 @@ export function createCompiler(env) {
   }
 
   async function compileFileInternal(filePath) {
-    resetNodeIds();
-    const { graph, order } = await buildGraph(filePath, {
+    const { graph, order, imports } = await buildModuleGraph(filePath, {
       parser,
       readFile,
       resolvePath,
@@ -160,11 +166,25 @@ export function createCompiler(env) {
       debugAssertions,
       collectAnalysisTokens: target === 'analysis',
     });
-    debugAssert(graph.get(filePath), 'buildGraph');
+    debugAssert(graph.get(filePath), 'buildModuleGraph');
     bringTargetToTopLevel(graph.get(filePath), { target, filePath, debugAssertions });
     debugAssert(graph.get(filePath), 'bringTargetToTopLevel');
     const doc = inlineImports(graph, order, { debugAssertions });
+    doc.__utuSourceTexts = new Map([...graph].map(([file, sourceDoc]) => [file, sourceDoc.__utuSourceText ?? '']));
+    if (target === 'analysis') {
+      doc[ANALYSIS_TOKENS] = [...graph.values()].flatMap(sourceDoc => sourceDoc[ANALYSIS_TOKENS] ?? []);
+    }
+    retainGraph(doc, 'modules', { kind: 'module', files: new Map(graph), order: [...order], imports });
     debugAssert(doc, 'inlineImports');
+
+    // A recovered parse tree is intentionally incomplete. Running module
+    // instantiation/hoisting over it can manufacture duplicate declarations
+    // or trigger invariants that hide the actionable syntax diagnostics.
+    if (doc.querySelector('[data-parse-errors], [data-error-kind="parse-error"], [data-error="parse-error"]')) {
+      const root = doc.body.firstChild;
+      if (root && !root.dataset.error) root.dataset.error = 'parse-error';
+      return doc;
+    }
 
     // ── Prelude injection ─────────────────────────────────────────────────────
     // Prepend standard modules (I32, U32, …, Array) that are not already
@@ -178,10 +198,11 @@ export function createCompiler(env) {
         if (!src) continue;
         const preludeTree = parser.parse(src);
         const preludeDoc  = treeToIR(preludeTree, src, stdPath, createDocument, { collectAnalysisTokens: false });
+        doc.__utuSourceTexts?.set(stdPath, src);
         const child = preludeDoc.body.firstChild?.querySelector(`:scope > ir-module[name="${modName}"]`);
         if (!child) continue;
-        const clone = child.cloneNode(true);
-        restampSubtree(clone, stdPath);
+        const clone = doc.importNode?.(child, true) ?? child.cloneNode(true);
+        restampSubtree(clone, stdPath, doc);
         clone.dataset.synthetic = 'true';
         clone.dataset.rewritePass = 'compiler-prelude';
         clone.dataset.rewriteKind = 'prelude-module';
@@ -192,68 +213,72 @@ export function createCompiler(env) {
     }
     debugAssert(doc, 'prelude');
 
-    checkModuleVariance(doc);
+    const elaboration = retainGraph(doc, 'elaboration', buildElaborationGraph(doc));
+    checkModuleVariance(doc, elaboration);
     debugAssert(doc, 'checkModuleVariance');
-    instantiateModules(doc, { debugAssertions });
+    instantiateModules(doc, { debugAssertions, graph: elaboration });
     debugAssert(doc, 'instantiateModules');
+    // Elaboration errors can intentionally leave unresolved requests behind.
+    // Stop before binding/type passes turn a user-facing arity error into an
+    // invariant failure; analyzeFile will collect the stamped diagnostic.
+    if (diagnosticFacts(doc).size > 0) return doc;
     lowerPipe(doc, { debugAssertions });
     debugAssert(doc, 'lowerPipe');
-    hoistModules(doc, { debugAssertions });
+    hoistModules(doc, { debugAssertions, graph: elaboration });
     debugAssert(doc, 'hoistModules');
-    lowerImplicitStructInit(doc, { debugAssertions });
-    debugAssert(doc, 'lowerImplicitStructInit');
     expandDsls(doc, { dsls: dslRegistry, debugAssertions });
     debugAssert(doc, 'expandDsls');
+    refreshProgramIndex(doc);
     // Analysis passes
-    let typeIndex = linkTypeDecls(doc);
+    let typeIndex = linkTypeDecls(doc, elaboration);
     debugAssert(doc, 'linkTypeDecls', { typeIndex });
-    resolveBindings(doc);
+    const scopeGraph = resolveBindings(doc);
+    retainGraph(doc, 'scope', scopeGraph);
+    const retainedCaptures = new Map(scopeGraph.captures);
     debugAssert(doc, 'resolveBindings', { typeIndex, requireBindings: true });
-    // Numeric literals take the type their context declares before inference
-    // runs, because that type feeds every enclosing expression.
-    applyLiteralTypes(doc, typeIndex);
-    debugAssert(doc, 'applyLiteralTypes', { typeIndex, requireBindings: true });
-    inferTypes(doc, typeIndex);
-    debugAssert(doc, 'inferTypes', { typeIndex, requireBindings: true });
-    // Closure conversion consumes the capture sets recorded by resolveBindings
-    // and the parameter types filled in by inferTypes, so it runs after both.
-    // It introduces one environment struct per closure, so the registry is
-    // rebuilt before any later pass reads a type from it.
-    if (lowerClosures(doc, typeIndex)) {
-      typeIndex = linkTypeDecls(doc);
-      debugAssert(doc, 'lowerClosures', { typeIndex, requireBindings: true });
+    // Build contexts first. Literals, closures, and implicit struct literals
+    // consume them; then one worklist propagates actual types to a fixed point.
+    let typeGraph = retainGraph(doc, 'types', settleTypeGraph(doc, typeIndex));
+    retainGraph(doc, 'calls', buildCallGraph(doc.body.firstChild, typeGraph));
+    projectTypeGraph(typeGraph); // explicit compatibility boundary for typed lowerings
+    debugAssert(doc, 'solveTypeGraph', { typeIndex, requireBindings: true });
+
+    // Closure and operator lowering invalidate structure, scope, and resolution
+    // facts. They consume this settled graph, then the complete semantic set is
+    // rebuilt below rather than transferring hidden attributes across phases.
+    if (lowerClosures(doc, typeIndex, typeGraph)) {
+      typeIndex = linkTypeDecls(doc, elaboration);
+      debugAssert(doc, 'lowerClosures', { typeIndex });
     }
-    // Stamp field-access types early so operator overload dispatch in
-    // lowerOperators can read `data-type-name` off operands like `p.x`.
-    // resolveMethods re-runs the same loop later — idempotent because each
-    // node short-circuits once it already has data-type-name.
-    stampFieldAccessTypes(doc, typeIndex);
-    debugAssert(doc, 'stampFieldAccessTypes', { typeIndex, requireBindings: true });
-    let converged = false;
-    for (let i = 0; i < 8; i++) {
-      const before = doc.body.firstChild?.innerHTML ?? '';
-      lowerOperators(doc);
-      debugAssert(doc, `lowerOperators#${i + 1}`, { typeIndex, requireBindings: true });
-      resolveMethods(doc, typeIndex);
-      debugAssert(doc, `resolveMethods#${i + 1}`, { typeIndex, requireBindings: true });
-      const after = doc.body.firstChild?.innerHTML ?? '';
-      if (after === before) {
-        converged = true;
-        break;
-      }
-    }
-    if (!converged) {
-      throw new Error('compiler: operator/method lowering did not converge after 8 iterations');
-    }
-    // Record the binding graph's expectation edges before validating, so the
-    // comparison and its blame both read from the graph rather than
-    // re-deriving the context at each diagnostic site.
-    recordExpectations(doc, typeIndex);
-    debugAssert(doc, 'recordExpectations', { typeIndex, requireBindings: true });
+    lowerOperators(doc, typeGraph);
+
+    let semantic = rebuildSemanticGraphs(doc, typeIndex, { captures: retainedCaptures });
+    let typedProgram = semantic.program;
+    typeGraph = semantic.types;
+    elaboration.typeIndex = typeIndex;
+    elaboration.layout = retainGraph(doc, 'layout', buildLayoutGraph(typeIndex));
+    elaboration.declarations = retainGraph(doc, 'declarations', buildTypeDeclarationGraph(typeIndex));
+
+    projectTypeGraph(typeGraph); // typed validation and backend-control compatibility boundary
+    checkTypeGraph(typeGraph);
+    debugAssert(doc, 'checkTypeGraph', { typeIndex, requireBindings: true });
     validateAnalysis(doc, typeIndex);
     debugAssert(doc, 'validateAnalysis', { typeIndex, requireBindings: true });
-    lowerBackendControl(doc, typeIndex, { target });
+
+    // Backend control lowering is another destructive boundary. Normal builds
+    // receive a fresh canonical graph set for the lowered program; analysis
+    // builds retain the checked surface graph unchanged.
+    const backendChanged = lowerBackendControl(doc, typeIndex, { target });
     debugAssert(doc, 'lowerBackendControl', { typeIndex, requireBindings: true, target });
+    if (backendChanged) {
+      semantic = rebuildSemanticGraphs(doc, typeIndex, { captures: retainedCaptures });
+      typedProgram = semantic.program;
+      typeGraph = semantic.types;
+    }
+
+    const backendPlan = retainGraph(doc, 'backend', buildBackendPlan(doc, typeIndex, typedProgram));
+    projectGraphs(doc);
+    sealBackendPlan(backendPlan);
     return doc;
   }
 

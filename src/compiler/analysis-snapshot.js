@@ -6,6 +6,8 @@
 
 import { ANALYSIS_TOKENS } from './analysis-tokens.js';
 import { buildRangeIndex, queryRangeIndex, smallestRangeAt } from './range-index.js';
+import { retainGraph, retainedGraphs } from './graph-store.js';
+import { createAnalysisQueries } from './analysis-queries.js';
 
 /**
  * Create an immutable analysis snapshot from a compiled IR document and the
@@ -16,12 +18,19 @@ import { buildRangeIndex, queryRangeIndex, smallestRangeAt } from './range-index
  */
 export function createAnalysisSnapshot(doc, artifacts = {}) {
   const diagnostics = Object.freeze([...(artifacts.diagnostics ?? [])]);
-  const entries = collectRangeEntries(doc, diagnostics);
+  const entries = collectRangeEntries(doc, diagnostics).map(entry => Object.freeze(entry));
   const index = buildRangeIndex(entries);
+  if (doc) retainGraph(doc, 'ranges', { kind: 'source-ranges', entries, index });
+  const graphs = Object.freeze({ ...retainedGraphs(doc) });
+  const rangeQuery = (file, start, end, opts) => queryRangeIndex(index, file, start, end, opts);
+  const queries = createAnalysisQueries(doc, graphs, rangeQuery,
+    (file, start, end) => sourceSnippet(doc, rangeQuery, file, start, end));
 
   return Object.freeze({
     entries: Object.freeze(entries),
     diagnostics,
+    graphs,
+    ...queries,
 
     ranges(file, start, end, opts = {}) {
       return queryRangeIndex(index, file, start, end, opts);
@@ -48,6 +57,33 @@ export function collectRangeEntries(doc, diagnostics = []) {
   collectDomEntries(doc, entries);
   collectDiagnosticEntries(diagnostics, entries);
   return entries;
+}
+
+function sourceSnippet(doc, rangeQuery, file, start, end) {
+  const source = doc?.__utuSourceTexts?.get(file)
+    ?? (doc?.__utuSourceFile === file ? doc.__utuSourceText : null);
+  if (typeof source !== 'string' || !Number.isFinite(start)) return null;
+  const lineStart = source.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+  // A reference may cover an entire function or generated declaration. The
+  // inspector needs the source line containing its start, not the full range.
+  const newline = source.indexOf('\n', start);
+  const lineEnd = newline < 0 ? source.length : newline;
+  const text = source.slice(lineStart, lineEnd);
+  const tokens = rangeQuery(file, lineStart, Math.max(lineStart + 1, lineEnd))
+    .filter(entry => entry.kind === 'syntax' || entry.kind === 'semantic')
+    .map(entry => ({
+      start: Math.max(0, entry.start - lineStart),
+      end: Math.min(text.length, entry.end - lineStart),
+      role: entry.role,
+      semantic: entry.kind === 'semantic',
+    })).filter(token => token.end > token.start);
+  return Object.freeze({
+    text,
+    line: source.slice(0, lineStart).split('\n').length,
+    focusStart: Math.max(0, Math.min(text.length, start - lineStart)),
+    focusEnd: Math.max(0, Math.min(text.length, (end ?? start) - lineStart)),
+    tokens: Object.freeze(tokens),
+  });
 }
 
 function collectSyntaxEntries(doc, entries) {
@@ -85,22 +121,17 @@ function collectSemanticSubranges(node, entries) {
     if (role) entries.push({ file, start: nameStart, end: nameEnd, kind: 'semantic', role, tag: node.tagName.toLowerCase(), name: node.getAttribute?.('name') || 'main' });
   }
 
-  const labelStart = numberValue(node.dataset?.labelStart);
-  const labelEnd = numberValue(node.dataset?.labelEnd);
-  if (labelStart != null && labelEnd != null) {
-    entries.push({ file, start: labelStart, end: labelEnd, kind: 'semantic', role: 'string', tag: node.tagName.toLowerCase(), name: node.getAttribute?.('label') || '' });
-  }
-
-  const methodStart = numberValue(node.dataset?.methodStart);
-  const methodEnd = numberValue(node.dataset?.methodEnd);
-  if (methodStart != null && methodEnd != null && node.dataset?.fnId) {
-    entries.push({ file, start: methodStart, end: methodEnd, kind: 'semantic', role: 'function', tag: node.tagName.toLowerCase(), name: node.getAttribute?.('method') || '' });
-  }
-
-  const fieldStart = numberValue(node.dataset?.fieldStart);
-  const fieldEnd = numberValue(node.dataset?.fieldEnd);
-  if (fieldStart != null && fieldEnd != null && node.dataset?.resolvedAs === 'method') {
-    entries.push({ file, start: fieldStart, end: fieldEnd, kind: 'semantic', role: 'function', tag: node.tagName.toLowerCase(), name: node.getAttribute?.('field') || '' });
+  for (const [key, role, attribute, include] of [
+    ['label', 'string', 'label', true],
+    ['method', 'function', 'method', Boolean(node.dataset?.fnId)],
+    ['field', 'function', 'field', node.dataset?.resolvedAs === 'method'],
+  ]) {
+    const start = numberValue(node.dataset?.[`${key}Start`]);
+    const end = numberValue(node.dataset?.[`${key}End`]);
+    if (include && start != null && end != null) entries.push({
+      file, start, end, kind: 'semantic', role, tag: node.tagName.toLowerCase(),
+      name: node.getAttribute?.(attribute) || '',
+    });
   }
 }
 

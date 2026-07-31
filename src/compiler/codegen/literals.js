@@ -8,7 +8,7 @@ import { emitNullLiteral } from './null-literals.js';
 export function emitLit(node, ctx) {
   const kind = node.getAttribute('kind');
   const raw  = node.getAttribute('value') ?? node.textContent ?? '';
-  const type = node.dataset['typeName'] ?? '';
+  const type = ctx.typeOf(node) ?? '';
   const m = ctx.module;
 
   // String / null literals don't go through a numeric namespace.
@@ -16,7 +16,7 @@ export function emitLit(node, ctx) {
     return emitStringLiteral(node, ctx);
   }
   if (kind === 'null' || type === 'null') {
-    return emitNullLiteral(node, ctx, type);
+    return emitNullLiteral(node, ctx);
   }
 
   // Pick the binaryen numeric namespace from the stdlib-built scalar registry.

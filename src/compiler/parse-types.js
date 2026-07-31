@@ -42,6 +42,23 @@ function walkQualifiedTypeRef(n, doc, source, dispatch) {
   return node;
 }
 
+function walkInlineModuleTypePath(n, doc, source, dispatch) {
+  const children = namedChildren(n);
+  const node = stamp(el(T.TYPE_QUALIFIED, doc), n);
+  node.setAttribute('raw', text(n));
+  if (children[2]) node.setAttribute('type-name', text(children[2]));
+
+  const inst = stamp(el(T.TYPE_INST, doc), n);
+  if (children[0]) inst.setAttribute('module', text(children[0]));
+  if (children[0] && children[1]) inst.setAttribute('raw', `${text(children[0])}${text(children[1])}`);
+  if (children[1]) {
+    const args = dispatch(children[1], doc, source);
+    if (args) inst.appendChild(args);
+  }
+  node.appendChild(inst);
+  return node;
+}
+
 function walkInstModuleRef(n, doc, source, dispatch) {
   const node = stamp(el(T.TYPE_INST, doc), n);
   node.setAttribute('raw', text(n));
@@ -95,6 +112,7 @@ export const walkers = {
   'ref_type':               walkRefType,
   'type_ident':             walkTypeIdent,
   'qualified_type_ref':     walkQualifiedTypeRef,
+  'inline_module_type_path': walkInlineModuleTypePath,
   'instantiated_module_ref': walkInstModuleRef,
   'func_type':              walkFuncType,
   'closure_type':           walkClosureType,

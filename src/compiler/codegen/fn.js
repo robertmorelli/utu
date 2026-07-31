@@ -35,7 +35,8 @@ export function emitFn(fn, ctx) {
   const selfParam = selfParamOf(fn);
 
   if (selfParam) {
-    const recvType = fn.querySelector(':scope > ir-fn-name')?.getAttribute('receiver');
+    const recvType = ctx.typeOf(selfParam)
+      ?? fn.querySelector(':scope > ir-fn-name')?.getAttribute('receiver');
     if (!recvType) throw new Error(`codegen: ir-self-param in "${name}" has no receiver type`);
     const tId = ctx.toType(recvType);
     locals.set(selfParam.id, { index: paramTypes.length, type: tId });
@@ -58,7 +59,6 @@ export function emitFn(fn, ctx) {
   const fnCtx = {
     ...ctx,
     locals,
-    currentReturnType: fnReturnType(fn),
     debugExprs: [],
     addLocal(typeStr) {
       const tId = ctx.toType(typeStr);

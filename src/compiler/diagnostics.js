@@ -1,16 +1,29 @@
+import { retainGraph, retainedGraphs } from './graph-store.js';
+
 export const DIAGNOSTIC_KINDS = {
   PARSE_ERROR: 'parse-error',
   IMPORT_CYCLE: 'import-cycle',
   UNKNOWN_IMPORT: 'unknown-import',
   ENTRY_SURFACE_CONFLICT: 'entry-surface-conflict',
   MODULE_VARIANCE: 'module-variance',
+  INVALID_MODULE_ARITY: 'invalid-module-arity',
+  DUPLICATE_DECLARATION: 'duplicate-declaration',
+  NON_DEFAULTABLE_TYPE: 'non-defaultable-type',
+  INVALID_NULLABLE_TYPE: 'invalid-nullable-type',
+  INTEGER_LITERAL_OUT_OF_RANGE: 'integer-literal-out-of-range',
   UNKNOWN_TYPE: 'unknown-type',
   UNKNOWN_VARIABLE: 'unknown-variable',
   UNKNOWN_FIELD: 'unknown-field',
   UNKNOWN_METHOD: 'unknown-method',
+  UNKNOWN_OPERATOR: 'unknown-operator',
+  NOT_CALLABLE: 'not-callable',
+  INVALID_AWAIT: 'invalid-await',
   WRONG_ARITY: 'wrong-arity',
   TYPE_MISMATCH: 'type-mismatch',
   INVALID_ASSIGNMENT_TARGET: 'invalid-assignment-target',
+  INVALID_BREAK: 'invalid-break',
+  INVALID_GLOBAL_INITIALIZER: 'invalid-global-initializer',
+  INVALID_FOR_SOURCE: 'invalid-for-source',
   ASSIGNMENT_TO_IMMUTABLE: 'assignment-to-immutable',
   NULLABLE_ACCESS: 'nullable-access',
   MISSING_FIELD: 'missing-field',
@@ -24,12 +37,20 @@ export const DIAGNOSTIC_KINDS = {
 
 export function stampDiagnostic(node, kind, message, extra = {}) {
   if (!node?.dataset) return node;
-  node.dataset.error = kind;
-  node.dataset.errorKind = kind;
-  node.dataset.errorMessage = message;
   const normalized = normalizeDiagnosticExtra(extra, { kind, message });
-  if (Object.keys(normalized).length) node.dataset.errorData = JSON.stringify(normalized);
+  diagnosticFacts(node.ownerDocument).set(node.id, { node, kind, message, data: normalized });
   return node;
+}
+
+export function diagnosticFacts(doc) {
+  const graphs = retainedGraphs(doc);
+  return graphs.diagnostics?.facts ?? diagnosticGraph(doc).facts;
+}
+
+function diagnosticGraph(doc) {
+  return retainGraph(doc, 'diagnostics', {
+    kind: 'diagnostic', facts: new Map(), suspects: new Map(),
+  });
 }
 
 export function suspect(node, label = '') {
@@ -39,10 +60,10 @@ export function suspect(node, label = '') {
 
 export function stampSuspectedInvolvement(node, label = '', extra = {}) {
   if (!node?.dataset) return node;
-  const current = parseJsonArray(node.dataset.errorSuspects);
+  const graph = retainedGraphs(node.ownerDocument).diagnostics ?? diagnosticGraph(node.ownerDocument);
+  const current = graph.suspects.get(node.id) ?? [];
   current.push({ label, ...extra });
-  node.dataset.errorSuspect = 'true';
-  node.dataset.errorSuspects = JSON.stringify(current);
+  graph.suspects.set(node.id, current);
   return node;
 }
 
@@ -59,16 +80,6 @@ function normalizeDiagnosticExtra(extra, diagnostic) {
     delete out.relatedNodes;
   }
   return out;
-}
-
-function parseJsonArray(text) {
-  if (!text) return [];
-  try {
-    const value = JSON.parse(text);
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
 }
 
 export function compilerError(kind, message, node, extra = {}) {
