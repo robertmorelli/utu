@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserShadowRootEventMap {
+    let get_slotchange: fun(Externref) Externref = @es/\ (self) => self["slotchange"] \/;
+    let set_slotchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["slotchange"] = value; } \/;
+}

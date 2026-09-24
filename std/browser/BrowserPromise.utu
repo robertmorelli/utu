@@ -1,0 +1,37 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPromise {
+    let get_symbol_toStringTag: fun(Externref) Str = @es/\ (self) => self[Symbol.toStringTag] \/;
+    let call_catch: fun(Externref) Externref = @es/\ (self) => self["catch"]() \/;
+    let call_catch_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["catch"](p0) \/;
+    let call_catch_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["catch"](...args) \/;
+    let call_finally: fun(Externref) Externref = @es/\ (self) => self["finally"]() \/;
+    let call_finally_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["finally"](p0) \/;
+    let call_finally_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["finally"](...args) \/;
+    let call_then: fun(Externref) Externref = @es/\ (self) => self["then"]() \/;
+    let call_then_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["then"](p0) \/;
+    let call_then_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["then"](p0,p1) \/;
+    let call_then_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["then"](...args) \/;
+    let new_instance: fun(cl(cl(Externref) void, Externref) void) Externref = @es/\ (p0) => new globalThis["Promise"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Promise"](...args) \/;
+    let static_get_symbol_species: fun() Externref = @es/\ () => globalThis["Promise"][Symbol.species] \/;
+    let static_call_all: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["all"](p0) \/;
+    let static_call_all_overload2: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["all"](p0) \/;
+    let static_call_all_js: fun(Externref) Externref = @es/\ (args) => globalThis["Promise"]["all"](...args) \/;
+    let static_call_allSettled: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["allSettled"](p0) \/;
+    let static_call_allSettled_overload2: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["allSettled"](p0) \/;
+    let static_call_allSettled_js: fun(Externref) Externref = @es/\ (args) => globalThis["Promise"]["allSettled"](...args) \/;
+    let static_call_any: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["any"](p0) \/;
+    let static_call_any_overload2: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["any"](p0) \/;
+    let static_call_any_js: fun(Externref) Externref = @es/\ (args) => globalThis["Promise"]["any"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Promise"]["prototype"] \/;
+    let static_call_race: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["race"](p0) \/;
+    let static_call_race_overload2: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["race"](p0) \/;
+    let static_call_race_js: fun(Externref) Externref = @es/\ (args) => globalThis["Promise"]["race"](...args) \/;
+    let static_call_reject: fun() Externref = @es/\ () => globalThis["Promise"]["reject"]() \/;
+    let static_call_reject_arity1: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["reject"](p0) \/;
+    let static_call_reject_js: fun(Externref) Externref = @es/\ (args) => globalThis["Promise"]["reject"](...args) \/;
+    let static_call_resolve: fun() Externref = @es/\ () => globalThis["Promise"]["resolve"]() \/;
+    let static_call_resolve_overload2: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["resolve"](p0) \/;
+    let static_call_resolve_overload3: fun(Externref) Externref = @es/\ (p0) => globalThis["Promise"]["resolve"](p0) \/;
+    let static_call_resolve_js: fun(Externref) Externref = @es/\ (args) => globalThis["Promise"]["resolve"](...args) \/;
+}

@@ -1,0 +1,31 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserHeaders {
+    let call_symbol_iterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.iterator]() \/;
+    let call_symbol_iterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.iterator](...args) \/;
+    let call_append: fun(Externref, Str, Str) void = @es/\ (self,p0,p1) => self["append"](p0,p1) \/;
+    let call_append_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["append"](...args) \/;
+    let call_delete: fun(Externref, Str) void = @es/\ (self,p0) => self["delete"](p0) \/;
+    let call_delete_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["delete"](...args) \/;
+    let call_entries: fun(Externref) Externref = @es/\ (self) => self["entries"]() \/;
+    let call_entries_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["entries"](...args) \/;
+    let call_forEach: fun(Externref, cl(Str, Str, Externref) void) void = @es/\ (self,p0) => self["forEach"](p0) \/;
+    let call_forEach_arity2: fun(Externref, cl(Str, Str, Externref) void, Externref) void = @es/\ (self,p0,p1) => self["forEach"](p0,p1) \/;
+    let call_forEach_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["forEach"](...args) \/;
+    let call_get: fun(Externref, Str) Externref = @es/\ (self,p0) => self["get"](p0) \/;
+    let call_get_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["get"](...args) \/;
+    let call_getSetCookie: fun(Externref) Externref = @es/\ (self) => self["getSetCookie"]() \/;
+    let call_getSetCookie_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getSetCookie"](...args) \/;
+    let call_has: fun(Externref, Str) Bool = @es/\ (self,p0) => (self["has"](p0)) ? 1 : 0 \/;
+    let call_has_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["has"](...args) \/;
+    let call_keys: fun(Externref) Externref = @es/\ (self) => self["keys"]() \/;
+    let call_keys_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["keys"](...args) \/;
+    let call_set: fun(Externref, Str, Str) void = @es/\ (self,p0,p1) => self["set"](p0,p1) \/;
+    let call_set_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["set"](...args) \/;
+    let call_values: fun(Externref) Externref = @es/\ (self) => self["values"]() \/;
+    let call_values_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["values"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["Headers"]() \/;
+    let new_instance_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["Headers"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Headers"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Headers"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["Headers"]["prototype"] = value; } \/;
+}

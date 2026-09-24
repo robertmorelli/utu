@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPaymentCurrencyAmount {
+    let get_currency: fun(Externref) Str = @es/\ (self) => self["currency"] \/;
+    let set_currency: fun(Externref, Str) void = @es/\ (self,value) => { self["currency"] = value; } \/;
+    let get_value: fun(Externref) Str = @es/\ (self) => self["value"] \/;
+    let set_value: fun(Externref, Str) void = @es/\ (self,value) => { self["value"] = value; } \/;
+}

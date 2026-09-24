@@ -1,0 +1,36 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIDBIndex {
+    let call_count: fun(Externref) Externref = @es/\ (self) => self["count"]() \/;
+    let call_count_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["count"](p0) \/;
+    let call_count_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["count"](...args) \/;
+    let call_get: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["get"](p0) \/;
+    let call_get_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["get"](...args) \/;
+    let call_getAll: fun(Externref) Externref = @es/\ (self) => self["getAll"]() \/;
+    let call_getAll_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getAll"](p0) \/;
+    let call_getAll_arity2: fun(Externref, Externref, F64) Externref = @es/\ (self,p0,p1) => self["getAll"](p0,p1) \/;
+    let call_getAll_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getAll"](...args) \/;
+    let call_getAllKeys: fun(Externref) Externref = @es/\ (self) => self["getAllKeys"]() \/;
+    let call_getAllKeys_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getAllKeys"](p0) \/;
+    let call_getAllKeys_arity2: fun(Externref, Externref, F64) Externref = @es/\ (self,p0,p1) => self["getAllKeys"](p0,p1) \/;
+    let call_getAllKeys_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getAllKeys"](...args) \/;
+    let call_getKey: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getKey"](p0) \/;
+    let call_getKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getKey"](...args) \/;
+    let get_keyPath: fun(Externref) Externref = @es/\ (self) => self["keyPath"] \/;
+    let get_multiEntry: fun(Externref) Bool = @es/\ (self) => (self["multiEntry"]) ? 1 : 0 \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_objectStore: fun(Externref) Externref = @es/\ (self) => self["objectStore"] \/;
+    let call_openCursor: fun(Externref) Externref = @es/\ (self) => self["openCursor"]() \/;
+    let call_openCursor_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["openCursor"](p0) \/;
+    let call_openCursor_arity2: fun(Externref, Externref, Str) Externref = @es/\ (self,p0,p1) => self["openCursor"](p0,p1) \/;
+    let call_openCursor_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["openCursor"](...args) \/;
+    let call_openKeyCursor: fun(Externref) Externref = @es/\ (self) => self["openKeyCursor"]() \/;
+    let call_openKeyCursor_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["openKeyCursor"](p0) \/;
+    let call_openKeyCursor_arity2: fun(Externref, Externref, Str) Externref = @es/\ (self,p0,p1) => self["openKeyCursor"](p0,p1) \/;
+    let call_openKeyCursor_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["openKeyCursor"](...args) \/;
+    let get_unique: fun(Externref) Bool = @es/\ (self) => (self["unique"]) ? 1 : 0 \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["IDBIndex"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["IDBIndex"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["IDBIndex"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["IDBIndex"]["prototype"] = value; } \/;
+}

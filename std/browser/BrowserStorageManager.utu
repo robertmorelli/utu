@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserStorageManager {
+    let call_estimate: fun(Externref) Externref = @es/\ (self) => self["estimate"]() \/;
+    let call_estimate_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["estimate"](...args) \/;
+    let call_getDirectory: fun(Externref) Externref = @es/\ (self) => self["getDirectory"]() \/;
+    let call_getDirectory_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getDirectory"](...args) \/;
+    let call_persist: fun(Externref) Externref = @es/\ (self) => self["persist"]() \/;
+    let call_persist_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["persist"](...args) \/;
+    let call_persisted: fun(Externref) Externref = @es/\ (self) => self["persisted"]() \/;
+    let call_persisted_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["persisted"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["StorageManager"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["StorageManager"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["StorageManager"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["StorageManager"]["prototype"] = value; } \/;
+}

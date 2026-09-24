@@ -1,0 +1,10 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGamepadButton {
+    let get_pressed: fun(Externref) Bool = @es/\ (self) => (self["pressed"]) ? 1 : 0 \/;
+    let get_touched: fun(Externref) Bool = @es/\ (self) => (self["touched"]) ? 1 : 0 \/;
+    let get_value: fun(Externref) F64 = @es/\ (self) => self["value"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["GamepadButton"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["GamepadButton"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["GamepadButton"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["GamepadButton"]["prototype"] = value; } \/;
+}

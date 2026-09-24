@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGetHTMLOptions {
+    let get_serializableShadowRoots: fun(Externref) Externref = @es/\ (self) => self["serializableShadowRoots"] \/;
+    let set_serializableShadowRoots: fun(Externref, Externref) void = @es/\ (self,value) => { self["serializableShadowRoots"] = value; } \/;
+    let get_shadowRoots: fun(Externref) Externref = @es/\ (self) => self["shadowRoots"] \/;
+    let set_shadowRoots: fun(Externref, Externref) void = @es/\ (self,value) => { self["shadowRoots"] = value; } \/;
+}

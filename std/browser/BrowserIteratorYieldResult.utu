@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIteratorYieldResult {
+    let get_done: fun(Externref) Externref = @es/\ (self) => self["done"] \/;
+    let set_done: fun(Externref, Externref) void = @es/\ (self,value) => { self["done"] = value; } \/;
+    let get_value: fun(Externref) Externref = @es/\ (self) => self["value"] \/;
+    let set_value: fun(Externref, Externref) void = @es/\ (self,value) => { self["value"] = value; } \/;
+}

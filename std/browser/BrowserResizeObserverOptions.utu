@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserResizeObserverOptions {
+    let get_box: fun(Externref) Externref = @es/\ (self) => self["box"] \/;
+    let set_box: fun(Externref, Externref) void = @es/\ (self,value) => { self["box"] = value; } \/;
+}

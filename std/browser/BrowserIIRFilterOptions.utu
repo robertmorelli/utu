@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIIRFilterOptions {
+    let get_channelCount: fun(Externref) Externref = @es/\ (self) => self["channelCount"] \/;
+    let set_channelCount: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCount"] = value; } \/;
+    let get_channelCountMode: fun(Externref) Externref = @es/\ (self) => self["channelCountMode"] \/;
+    let set_channelCountMode: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCountMode"] = value; } \/;
+    let get_channelInterpretation: fun(Externref) Externref = @es/\ (self) => self["channelInterpretation"] \/;
+    let set_channelInterpretation: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelInterpretation"] = value; } \/;
+    let get_feedback: fun(Externref) Externref = @es/\ (self) => self["feedback"] \/;
+    let set_feedback: fun(Externref, Externref) void = @es/\ (self,value) => { self["feedback"] = value; } \/;
+    let get_feedforward: fun(Externref) Externref = @es/\ (self) => self["feedforward"] \/;
+    let set_feedforward: fun(Externref, Externref) void = @es/\ (self,value) => { self["feedforward"] = value; } \/;
+}

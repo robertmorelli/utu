@@ -1,0 +1,4 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGURIReference {
+    let get_href: fun(Externref) Externref = @es/\ (self) => self["href"] \/;
+}

@@ -1,0 +1,30 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFileSystemDirectoryEntry {
+    let call_createReader: fun(Externref) Externref = @es/\ (self) => self["createReader"]() \/;
+    let call_createReader_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createReader"](...args) \/;
+    let get_filesystem: fun(Externref) Externref = @es/\ (self) => self["filesystem"] \/;
+    let get_fullPath: fun(Externref) Str = @es/\ (self) => self["fullPath"] \/;
+    let call_getDirectory: fun(Externref) void = @es/\ (self) => self["getDirectory"]() \/;
+    let call_getDirectory_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["getDirectory"](p0) \/;
+    let call_getDirectory_arity2: fun(Externref, Externref, Externref) void = @es/\ (self,p0,p1) => self["getDirectory"](p0,p1) \/;
+    let call_getDirectory_arity3: fun(Externref, Externref, Externref, cl(Externref) void) void = @es/\ (self,p0,p1,p2) => self["getDirectory"](p0,p1,p2) \/;
+    let call_getDirectory_arity4: fun(Externref, Externref, Externref, cl(Externref) void, cl(Externref) void) void = @es/\ (self,p0,p1,p2,p3) => self["getDirectory"](p0,p1,p2,p3) \/;
+    let call_getDirectory_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getDirectory"](...args) \/;
+    let call_getFile: fun(Externref) void = @es/\ (self) => self["getFile"]() \/;
+    let call_getFile_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["getFile"](p0) \/;
+    let call_getFile_arity2: fun(Externref, Externref, Externref) void = @es/\ (self,p0,p1) => self["getFile"](p0,p1) \/;
+    let call_getFile_arity3: fun(Externref, Externref, Externref, cl(Externref) void) void = @es/\ (self,p0,p1,p2) => self["getFile"](p0,p1,p2) \/;
+    let call_getFile_arity4: fun(Externref, Externref, Externref, cl(Externref) void, cl(Externref) void) void = @es/\ (self,p0,p1,p2,p3) => self["getFile"](p0,p1,p2,p3) \/;
+    let call_getFile_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getFile"](...args) \/;
+    let call_getParent: fun(Externref) void = @es/\ (self) => self["getParent"]() \/;
+    let call_getParent_arity1: fun(Externref, cl(Externref) void) void = @es/\ (self,p0) => self["getParent"](p0) \/;
+    let call_getParent_arity2: fun(Externref, cl(Externref) void, cl(Externref) void) void = @es/\ (self,p0,p1) => self["getParent"](p0,p1) \/;
+    let call_getParent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getParent"](...args) \/;
+    let get_isDirectory: fun(Externref) Bool = @es/\ (self) => (self["isDirectory"]) ? 1 : 0 \/;
+    let get_isFile: fun(Externref) Bool = @es/\ (self) => (self["isFile"]) ? 1 : 0 \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["FileSystemDirectoryEntry"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["FileSystemDirectoryEntry"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["FileSystemDirectoryEntry"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["FileSystemDirectoryEntry"]["prototype"] = value; } \/;
+}

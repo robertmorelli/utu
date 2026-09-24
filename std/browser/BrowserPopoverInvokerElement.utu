@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPopoverInvokerElement {
+    let get_popoverTargetAction: fun(Externref) Str = @es/\ (self) => self["popoverTargetAction"] \/;
+    let set_popoverTargetAction: fun(Externref, Str) void = @es/\ (self,value) => { self["popoverTargetAction"] = value; } \/;
+    let get_popoverTargetElement: fun(Externref) Externref = @es/\ (self) => self["popoverTargetElement"] \/;
+    let set_popoverTargetElement: fun(Externref, Externref) void = @es/\ (self,value) => { self["popoverTargetElement"] = value; } \/;
+}

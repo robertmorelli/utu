@@ -1,0 +1,37 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaKeySession {
+    let call_addEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addEventListener"](...args) \/;
+    let call_close: fun(Externref) Externref = @es/\ (self) => self["close"]() \/;
+    let call_close_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["close"](...args) \/;
+    let get_closed: fun(Externref) Externref = @es/\ (self) => self["closed"] \/;
+    let call_dispatchEvent: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["dispatchEvent"](p0)) ? 1 : 0 \/;
+    let call_dispatchEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dispatchEvent"](...args) \/;
+    let get_expiration: fun(Externref) F64 = @es/\ (self) => self["expiration"] \/;
+    let call_generateRequest: fun(Externref, Str, Externref) Externref = @es/\ (self,p0,p1) => self["generateRequest"](p0,p1) \/;
+    let call_generateRequest_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["generateRequest"](...args) \/;
+    let get_keyStatuses: fun(Externref) Externref = @es/\ (self) => self["keyStatuses"] \/;
+    let call_load: fun(Externref, Str) Externref = @es/\ (self,p0) => self["load"](p0) \/;
+    let call_load_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["load"](...args) \/;
+    let get_onkeystatuseschange: fun(Externref) Externref = @es/\ (self) => self["onkeystatuseschange"] \/;
+    let set_onkeystatuseschange: fun(Externref, Externref) void = @es/\ (self,value) => { self["onkeystatuseschange"] = value; } \/;
+    let get_onmessage: fun(Externref) Externref = @es/\ (self) => self["onmessage"] \/;
+    let set_onmessage: fun(Externref, Externref) void = @es/\ (self,value) => { self["onmessage"] = value; } \/;
+    let call_remove: fun(Externref) Externref = @es/\ (self) => self["remove"]() \/;
+    let call_remove_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["remove"](...args) \/;
+    let call_removeEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeEventListener"](...args) \/;
+    let get_sessionId: fun(Externref) Str = @es/\ (self) => self["sessionId"] \/;
+    let call_update: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["update"](p0) \/;
+    let call_update_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["update"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["MediaKeySession"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["MediaKeySession"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["MediaKeySession"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["MediaKeySession"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioDataCopyToOptions {
+    let get_format: fun(Externref) Externref = @es/\ (self) => self["format"] \/;
+    let set_format: fun(Externref, Externref) void = @es/\ (self,value) => { self["format"] = value; } \/;
+    let get_frameCount: fun(Externref) Externref = @es/\ (self) => self["frameCount"] \/;
+    let set_frameCount: fun(Externref, Externref) void = @es/\ (self,value) => { self["frameCount"] = value; } \/;
+    let get_frameOffset: fun(Externref) Externref = @es/\ (self) => self["frameOffset"] \/;
+    let set_frameOffset: fun(Externref, Externref) void = @es/\ (self,value) => { self["frameOffset"] = value; } \/;
+    let get_planeIndex: fun(Externref) F64 = @es/\ (self) => self["planeIndex"] \/;
+    let set_planeIndex: fun(Externref, F64) void = @es/\ (self,value) => { self["planeIndex"] = value; } \/;
+}

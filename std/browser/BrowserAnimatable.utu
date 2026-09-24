@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAnimatable {
+    let call_animate: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["animate"](p0) \/;
+    let call_animate_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["animate"](p0,p1) \/;
+    let call_animate_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["animate"](...args) \/;
+    let call_getAnimations: fun(Externref) Externref = @es/\ (self) => self["getAnimations"]() \/;
+    let call_getAnimations_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getAnimations"](p0) \/;
+    let call_getAnimations_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getAnimations"](...args) \/;
+}

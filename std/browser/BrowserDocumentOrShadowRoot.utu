@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDocumentOrShadowRoot {
+    let get_activeElement: fun(Externref) Externref = @es/\ (self) => self["activeElement"] \/;
+    let get_adoptedStyleSheets: fun(Externref) Externref = @es/\ (self) => self["adoptedStyleSheets"] \/;
+    let set_adoptedStyleSheets: fun(Externref, Externref) void = @es/\ (self,value) => { self["adoptedStyleSheets"] = value; } \/;
+    let call_elementFromPoint: fun(Externref, F64, F64) Externref = @es/\ (self,p0,p1) => self["elementFromPoint"](p0,p1) \/;
+    let call_elementFromPoint_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["elementFromPoint"](...args) \/;
+    let call_elementsFromPoint: fun(Externref, F64, F64) Externref = @es/\ (self,p0,p1) => self["elementsFromPoint"](p0,p1) \/;
+    let call_elementsFromPoint_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["elementsFromPoint"](...args) \/;
+    let get_fullscreenElement: fun(Externref) Externref = @es/\ (self) => self["fullscreenElement"] \/;
+    let call_getAnimations: fun(Externref) Externref = @es/\ (self) => self["getAnimations"]() \/;
+    let call_getAnimations_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getAnimations"](...args) \/;
+    let get_pictureInPictureElement: fun(Externref) Externref = @es/\ (self) => self["pictureInPictureElement"] \/;
+    let get_pointerLockElement: fun(Externref) Externref = @es/\ (self) => self["pointerLockElement"] \/;
+    let get_styleSheets: fun(Externref) Externref = @es/\ (self) => self["styleSheets"] \/;
+}

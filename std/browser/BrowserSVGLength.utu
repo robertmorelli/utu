@@ -1,0 +1,40 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGLength {
+    let get_SVG_LENGTHTYPE_CM: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_CM"] \/;
+    let get_SVG_LENGTHTYPE_EMS: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_EMS"] \/;
+    let get_SVG_LENGTHTYPE_EXS: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_EXS"] \/;
+    let get_SVG_LENGTHTYPE_IN: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_IN"] \/;
+    let get_SVG_LENGTHTYPE_MM: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_MM"] \/;
+    let get_SVG_LENGTHTYPE_NUMBER: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_NUMBER"] \/;
+    let get_SVG_LENGTHTYPE_PC: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_PC"] \/;
+    let get_SVG_LENGTHTYPE_PERCENTAGE: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_PERCENTAGE"] \/;
+    let get_SVG_LENGTHTYPE_PT: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_PT"] \/;
+    let get_SVG_LENGTHTYPE_PX: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_PX"] \/;
+    let get_SVG_LENGTHTYPE_UNKNOWN: fun(Externref) F64 = @es/\ (self) => self["SVG_LENGTHTYPE_UNKNOWN"] \/;
+    let call_convertToSpecifiedUnits: fun(Externref, F64) void = @es/\ (self,p0) => self["convertToSpecifiedUnits"](p0) \/;
+    let call_convertToSpecifiedUnits_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["convertToSpecifiedUnits"](...args) \/;
+    let call_newValueSpecifiedUnits: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["newValueSpecifiedUnits"](p0,p1) \/;
+    let call_newValueSpecifiedUnits_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["newValueSpecifiedUnits"](...args) \/;
+    let get_unitType: fun(Externref) F64 = @es/\ (self) => self["unitType"] \/;
+    let get_value: fun(Externref) F64 = @es/\ (self) => self["value"] \/;
+    let set_value: fun(Externref, F64) void = @es/\ (self,value) => { self["value"] = value; } \/;
+    let get_valueAsString: fun(Externref) Str = @es/\ (self) => self["valueAsString"] \/;
+    let set_valueAsString: fun(Externref, Str) void = @es/\ (self,value) => { self["valueAsString"] = value; } \/;
+    let get_valueInSpecifiedUnits: fun(Externref) F64 = @es/\ (self) => self["valueInSpecifiedUnits"] \/;
+    let set_valueInSpecifiedUnits: fun(Externref, F64) void = @es/\ (self,value) => { self["valueInSpecifiedUnits"] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGLength"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGLength"](...args) \/;
+    let static_get_SVG_LENGTHTYPE_CM: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_CM"] \/;
+    let static_get_SVG_LENGTHTYPE_EMS: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_EMS"] \/;
+    let static_get_SVG_LENGTHTYPE_EXS: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_EXS"] \/;
+    let static_get_SVG_LENGTHTYPE_IN: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_IN"] \/;
+    let static_get_SVG_LENGTHTYPE_MM: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_MM"] \/;
+    let static_get_SVG_LENGTHTYPE_NUMBER: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_NUMBER"] \/;
+    let static_get_SVG_LENGTHTYPE_PC: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_PC"] \/;
+    let static_get_SVG_LENGTHTYPE_PERCENTAGE: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_PERCENTAGE"] \/;
+    let static_get_SVG_LENGTHTYPE_PT: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_PT"] \/;
+    let static_get_SVG_LENGTHTYPE_PX: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_PX"] \/;
+    let static_get_SVG_LENGTHTYPE_UNKNOWN: fun() F64 = @es/\ () => globalThis["SVGLength"]["SVG_LENGTHTYPE_UNKNOWN"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGLength"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGLength"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTransformer {
+    let get_flush: fun(Externref) Externref = @es/\ (self) => self["flush"] \/;
+    let set_flush: fun(Externref, Externref) void = @es/\ (self,value) => { self["flush"] = value; } \/;
+    let get_readableType: fun(Externref) Externref = @es/\ (self) => self["readableType"] \/;
+    let set_readableType: fun(Externref, Externref) void = @es/\ (self,value) => { self["readableType"] = value; } \/;
+    let get_start: fun(Externref) Externref = @es/\ (self) => self["start"] \/;
+    let set_start: fun(Externref, Externref) void = @es/\ (self,value) => { self["start"] = value; } \/;
+    let get_transform: fun(Externref) Externref = @es/\ (self) => self["transform"] \/;
+    let set_transform: fun(Externref, Externref) void = @es/\ (self,value) => { self["transform"] = value; } \/;
+    let get_writableType: fun(Externref) Externref = @es/\ (self) => self["writableType"] \/;
+    let set_writableType: fun(Externref, Externref) void = @es/\ (self,value) => { self["writableType"] = value; } \/;
+}

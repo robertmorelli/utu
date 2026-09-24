@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFileSystemFileHandle {
+    let call_createWritable: fun(Externref) Externref = @es/\ (self) => self["createWritable"]() \/;
+    let call_createWritable_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["createWritable"](p0) \/;
+    let call_createWritable_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createWritable"](...args) \/;
+    let call_getFile: fun(Externref) Externref = @es/\ (self) => self["getFile"]() \/;
+    let call_getFile_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getFile"](...args) \/;
+    let call_isSameEntry: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["isSameEntry"](p0) \/;
+    let call_isSameEntry_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["isSameEntry"](...args) \/;
+    let get_kind: fun(Externref) Str = @es/\ (self) => self["kind"] \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["FileSystemFileHandle"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["FileSystemFileHandle"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["FileSystemFileHandle"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["FileSystemFileHandle"]["prototype"] = value; } \/;
+}

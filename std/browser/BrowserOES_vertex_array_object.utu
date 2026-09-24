@@ -1,0 +1,12 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserOES_vertex_array_object {
+    let get_VERTEX_ARRAY_BINDING_OES: fun(Externref) F64 = @es/\ (self) => self["VERTEX_ARRAY_BINDING_OES"] \/;
+    let call_bindVertexArrayOES: fun(Externref, Externref) void = @es/\ (self,p0) => self["bindVertexArrayOES"](p0) \/;
+    let call_bindVertexArrayOES_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["bindVertexArrayOES"](...args) \/;
+    let call_createVertexArrayOES: fun(Externref) Externref = @es/\ (self) => self["createVertexArrayOES"]() \/;
+    let call_createVertexArrayOES_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createVertexArrayOES"](...args) \/;
+    let call_deleteVertexArrayOES: fun(Externref, Externref) void = @es/\ (self,p0) => self["deleteVertexArrayOES"](p0) \/;
+    let call_deleteVertexArrayOES_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["deleteVertexArrayOES"](...args) \/;
+    let call_isVertexArrayOES: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["isVertexArrayOES"](p0)) ? 1 : 0 \/;
+    let call_isVertexArrayOES_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["isVertexArrayOES"](...args) \/;
+}

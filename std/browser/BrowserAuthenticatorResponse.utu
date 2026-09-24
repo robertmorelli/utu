@@ -1,0 +1,8 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAuthenticatorResponse {
+    let get_clientDataJSON: fun(Externref) Externref = @es/\ (self) => self["clientDataJSON"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["AuthenticatorResponse"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["AuthenticatorResponse"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["AuthenticatorResponse"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["AuthenticatorResponse"]["prototype"] = value; } \/;
+}

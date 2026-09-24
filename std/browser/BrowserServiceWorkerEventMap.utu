@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserServiceWorkerEventMap {
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_statechange: fun(Externref) Externref = @es/\ (self) => self["statechange"] \/;
+    let set_statechange: fun(Externref, Externref) void = @es/\ (self,value) => { self["statechange"] = value; } \/;
+}

@@ -1,0 +1,20 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWritableStreamDefaultWriter {
+    let call_abort: fun(Externref) Externref = @es/\ (self) => self["abort"]() \/;
+    let call_abort_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["abort"](p0) \/;
+    let call_abort_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["abort"](...args) \/;
+    let call_close: fun(Externref) Externref = @es/\ (self) => self["close"]() \/;
+    let call_close_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["close"](...args) \/;
+    let get_closed: fun(Externref) Externref = @es/\ (self) => self["closed"] \/;
+    let get_desiredSize: fun(Externref) Externref = @es/\ (self) => self["desiredSize"] \/;
+    let get_ready: fun(Externref) Externref = @es/\ (self) => self["ready"] \/;
+    let call_releaseLock: fun(Externref) void = @es/\ (self) => self["releaseLock"]() \/;
+    let call_releaseLock_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["releaseLock"](...args) \/;
+    let call_write: fun(Externref) Externref = @es/\ (self) => self["write"]() \/;
+    let call_write_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["write"](p0) \/;
+    let call_write_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["write"](...args) \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["WritableStreamDefaultWriter"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["WritableStreamDefaultWriter"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["WritableStreamDefaultWriter"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["WritableStreamDefaultWriter"]["prototype"] = value; } \/;
+}

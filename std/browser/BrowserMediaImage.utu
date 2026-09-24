@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaImage {
+    let get_sizes: fun(Externref) Externref = @es/\ (self) => self["sizes"] \/;
+    let set_sizes: fun(Externref, Externref) void = @es/\ (self,value) => { self["sizes"] = value; } \/;
+    let get_src: fun(Externref) Str = @es/\ (self) => self["src"] \/;
+    let set_src: fun(Externref, Str) void = @es/\ (self,value) => { self["src"] = value; } \/;
+    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

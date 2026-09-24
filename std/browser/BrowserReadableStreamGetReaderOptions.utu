@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserReadableStreamGetReaderOptions {
+    let get_mode: fun(Externref) Externref = @es/\ (self) => self["mode"] \/;
+    let set_mode: fun(Externref, Externref) void = @es/\ (self,value) => { self["mode"] = value; } \/;
+}

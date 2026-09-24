@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNonElementParentNode {
+    let call_getElementById: fun(Externref, Str) Externref = @es/\ (self,p0) => self["getElementById"](p0) \/;
+    let call_getElementById_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getElementById"](...args) \/;
+}

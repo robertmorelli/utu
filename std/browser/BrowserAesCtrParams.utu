@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAesCtrParams {
+    let get_counter: fun(Externref) Externref = @es/\ (self) => self["counter"] \/;
+    let set_counter: fun(Externref, Externref) void = @es/\ (self,value) => { self["counter"] = value; } \/;
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let set_length: fun(Externref, F64) void = @es/\ (self,value) => { self["length"] = value; } \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+}

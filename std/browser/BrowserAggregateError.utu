@@ -1,0 +1,20 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAggregateError {
+    let get_cause: fun(Externref) Externref = @es/\ (self) => self["cause"] \/;
+    let set_cause: fun(Externref, Externref) void = @es/\ (self,value) => { self["cause"] = value; } \/;
+    let get_errors: fun(Externref) Externref = @es/\ (self) => self["errors"] \/;
+    let set_errors: fun(Externref, Externref) void = @es/\ (self,value) => { self["errors"] = value; } \/;
+    let get_message: fun(Externref) Str = @es/\ (self) => self["message"] \/;
+    let set_message: fun(Externref, Str) void = @es/\ (self,value) => { self["message"] = value; } \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_stack: fun(Externref) Externref = @es/\ (self) => self["stack"] \/;
+    let set_stack: fun(Externref, Externref) void = @es/\ (self,value) => { self["stack"] = value; } \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["AggregateError"](p0) \/;
+    let new_instance_arity2: fun(Externref, Str) Externref = @es/\ (p0,p1) => new globalThis["AggregateError"](p0,p1) \/;
+    let new_instance_overload2: fun(Externref) Externref = @es/\ (p0) => new globalThis["AggregateError"](p0) \/;
+    let new_instance_overload2_arity2: fun(Externref, Str) Externref = @es/\ (p0,p1) => new globalThis["AggregateError"](p0,p1) \/;
+    let new_instance_overload2_arity3: fun(Externref, Str, Externref) Externref = @es/\ (p0,p1,p2) => new globalThis["AggregateError"](p0,p1,p2) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["AggregateError"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["AggregateError"]["prototype"] \/;
+}

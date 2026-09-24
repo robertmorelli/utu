@@ -1,0 +1,24 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserBlob {
+    let call_arrayBuffer: fun(Externref) Externref = @es/\ (self) => self["arrayBuffer"]() \/;
+    let call_arrayBuffer_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["arrayBuffer"](...args) \/;
+    let call_bytes: fun(Externref) Externref = @es/\ (self) => self["bytes"]() \/;
+    let call_bytes_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["bytes"](...args) \/;
+    let get_size: fun(Externref) F64 = @es/\ (self) => self["size"] \/;
+    let call_slice: fun(Externref) Externref = @es/\ (self) => self["slice"]() \/;
+    let call_slice_arity1: fun(Externref, F64) Externref = @es/\ (self,p0) => self["slice"](p0) \/;
+    let call_slice_arity2: fun(Externref, F64, F64) Externref = @es/\ (self,p0,p1) => self["slice"](p0,p1) \/;
+    let call_slice_arity3: fun(Externref, F64, F64, Str) Externref = @es/\ (self,p0,p1,p2) => self["slice"](p0,p1,p2) \/;
+    let call_slice_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["slice"](...args) \/;
+    let call_stream: fun(Externref) Externref = @es/\ (self) => self["stream"]() \/;
+    let call_stream_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["stream"](...args) \/;
+    let call_text: fun(Externref) Externref = @es/\ (self) => self["text"]() \/;
+    let call_text_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["text"](...args) \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["Blob"]() \/;
+    let new_instance_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["Blob"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["Blob"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Blob"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Blob"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["Blob"]["prototype"] = value; } \/;
+}

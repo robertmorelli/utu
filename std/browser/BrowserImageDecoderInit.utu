@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImageDecoderInit {
+    let get_colorSpaceConversion: fun(Externref) Externref = @es/\ (self) => self["colorSpaceConversion"] \/;
+    let set_colorSpaceConversion: fun(Externref, Externref) void = @es/\ (self,value) => { self["colorSpaceConversion"] = value; } \/;
+    let get_data: fun(Externref) Externref = @es/\ (self) => self["data"] \/;
+    let set_data: fun(Externref, Externref) void = @es/\ (self,value) => { self["data"] = value; } \/;
+    let get_desiredHeight: fun(Externref) Externref = @es/\ (self) => self["desiredHeight"] \/;
+    let set_desiredHeight: fun(Externref, Externref) void = @es/\ (self,value) => { self["desiredHeight"] = value; } \/;
+    let get_desiredWidth: fun(Externref) Externref = @es/\ (self) => self["desiredWidth"] \/;
+    let set_desiredWidth: fun(Externref, Externref) void = @es/\ (self,value) => { self["desiredWidth"] = value; } \/;
+    let get_preferAnimation: fun(Externref) Externref = @es/\ (self) => self["preferAnimation"] \/;
+    let set_preferAnimation: fun(Externref, Externref) void = @es/\ (self,value) => { self["preferAnimation"] = value; } \/;
+    let get_transfer: fun(Externref) Externref = @es/\ (self) => self["transfer"] \/;
+    let set_transfer: fun(Externref, Externref) void = @es/\ (self,value) => { self["transfer"] = value; } \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Str) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

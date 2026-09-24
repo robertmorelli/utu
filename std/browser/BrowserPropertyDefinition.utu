@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPropertyDefinition {
+    let get_inherits: fun(Externref) Bool = @es/\ (self) => (self["inherits"]) ? 1 : 0 \/;
+    let set_inherits: fun(Externref, Bool) void = @es/\ (self,value) => { self["inherits"] = !!value; } \/;
+    let get_initialValue: fun(Externref) Externref = @es/\ (self) => self["initialValue"] \/;
+    let set_initialValue: fun(Externref, Externref) void = @es/\ (self,value) => { self["initialValue"] = value; } \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_syntax: fun(Externref) Externref = @es/\ (self) => self["syntax"] \/;
+    let set_syntax: fun(Externref, Externref) void = @es/\ (self,value) => { self["syntax"] = value; } \/;
+}

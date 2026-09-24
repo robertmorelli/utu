@@ -1,0 +1,23 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserXSLTProcessor {
+    let call_clearParameters: fun(Externref) void = @es/\ (self) => self["clearParameters"]() \/;
+    let call_clearParameters_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clearParameters"](...args) \/;
+    let call_getParameter: fun(Externref, Externref, Str) Externref = @es/\ (self,p0,p1) => self["getParameter"](p0,p1) \/;
+    let call_getParameter_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getParameter"](...args) \/;
+    let call_importStylesheet: fun(Externref, Externref) void = @es/\ (self,p0) => self["importStylesheet"](p0) \/;
+    let call_importStylesheet_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["importStylesheet"](...args) \/;
+    let call_removeParameter: fun(Externref, Externref, Str) void = @es/\ (self,p0,p1) => self["removeParameter"](p0,p1) \/;
+    let call_removeParameter_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeParameter"](...args) \/;
+    let call_reset: fun(Externref) void = @es/\ (self) => self["reset"]() \/;
+    let call_reset_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["reset"](...args) \/;
+    let call_setParameter: fun(Externref, Externref, Str, Externref) void = @es/\ (self,p0,p1,p2) => self["setParameter"](p0,p1,p2) \/;
+    let call_setParameter_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setParameter"](...args) \/;
+    let call_transformToDocument: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["transformToDocument"](p0) \/;
+    let call_transformToDocument_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["transformToDocument"](...args) \/;
+    let call_transformToFragment: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["transformToFragment"](p0,p1) \/;
+    let call_transformToFragment_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["transformToFragment"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["XSLTProcessor"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["XSLTProcessor"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["XSLTProcessor"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["XSLTProcessor"]["prototype"] = value; } \/;
+}

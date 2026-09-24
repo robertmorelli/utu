@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCanvasGradient {
+    let call_addColorStop: fun(Externref, F64, Str) void = @es/\ (self,p0,p1) => self["addColorStop"](p0,p1) \/;
+    let call_addColorStop_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addColorStop"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CanvasGradient"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CanvasGradient"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CanvasGradient"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CanvasGradient"]["prototype"] = value; } \/;
+}

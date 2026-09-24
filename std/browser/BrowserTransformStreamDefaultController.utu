@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTransformStreamDefaultController {
+    let get_desiredSize: fun(Externref) Externref = @es/\ (self) => self["desiredSize"] \/;
+    let call_enqueue: fun(Externref) void = @es/\ (self) => self["enqueue"]() \/;
+    let call_enqueue_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["enqueue"](p0) \/;
+    let call_enqueue_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["enqueue"](...args) \/;
+    let call_error: fun(Externref) void = @es/\ (self) => self["error"]() \/;
+    let call_error_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["error"](p0) \/;
+    let call_error_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["error"](...args) \/;
+    let call_terminate: fun(Externref) void = @es/\ (self) => self["terminate"]() \/;
+    let call_terminate_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["terminate"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["TransformStreamDefaultController"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["TransformStreamDefaultController"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["TransformStreamDefaultController"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["TransformStreamDefaultController"]["prototype"] = value; } \/;
+}

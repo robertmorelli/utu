@@ -1,0 +1,52 @@
+name: TypeScript ABI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bindings:
+    name: Bindings (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - name: Verify generated browser sources
+        run: |
+          bun run bindings:browser
+          bun run build
+          git diff --exit-code -- std/browser src/compiler/platform-sources.generated.js
+      - name: Node ABI coverage
+        run: node scripts/dts-abi-tests.mjs
+      - name: Bun ABI coverage
+        run: bun scripts/dts-abi-tests.mjs
+      - name: Install test browser
+        run: bunx playwright install --with-deps chromium
+      - name: Worker portability and browser app
+        run: |
+          node scripts/test-dts-portability.mjs
+          node scripts/test-dts-browser.mjs
+      - name: Save measured output and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-demo-${{ matrix.os }}
+          path: |
+            dist/browser-board/sizes.json
+            dist/browser-board/*.png

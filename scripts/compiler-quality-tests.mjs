@@ -107,6 +107,23 @@ export function registerCompilerQualityTests({ test, assert, assertEq, assertThr
     assertEq(Buffer.from(dead).toString('hex'), Buffer.from(lean).toString('hex'));
   });
 
+  test('compiler: module host bindings coexist with intrinsic type methods', async ({ ROOT }) => {
+    const { instance } = await compile(ROOT, String.raw`
+      mod Host { let twice: fun(F64) F64 = @es/\ n => n * 2 \/; }
+      export lib { fn run() F64 { Host.twice(F64.sqrt(441.0)); } }
+    `, 'quality-module-host.utu');
+    assertEq(instance.exports.run(), 42);
+  });
+
+  test('compiler: void functions discard value tails while preserving side effects', async ({ ROOT }) => {
+    const { instance } = await compile(ROOT, `
+      struct Cell: | value: I32
+      fn update(cell: Cell) void { cell.value = 42; cell.value; }
+      export lib { fn run() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; } }
+    `, 'quality-void-tail.utu');
+    assertEq(instance.exports.run(), 42);
+  });
+
   // Failure injection exercises native resource ownership, where a thrown
   // optimizer/emitter previously leaked a Binaryen module in long-lived IDEs.
   for (const phase of ['construction', 'validation', 'optimization', 'binary', 'text']) {

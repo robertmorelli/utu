@@ -1,0 +1,37 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserServiceWorkerContainer {
+    let call_addEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addEventListener"](...args) \/;
+    let get_controller: fun(Externref) Externref = @es/\ (self) => self["controller"] \/;
+    let call_dispatchEvent: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["dispatchEvent"](p0)) ? 1 : 0 \/;
+    let call_dispatchEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dispatchEvent"](...args) \/;
+    let call_getRegistration: fun(Externref) Externref = @es/\ (self) => self["getRegistration"]() \/;
+    let call_getRegistration_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getRegistration"](p0) \/;
+    let call_getRegistration_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getRegistration"](...args) \/;
+    let call_getRegistrations: fun(Externref) Externref = @es/\ (self) => self["getRegistrations"]() \/;
+    let call_getRegistrations_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getRegistrations"](...args) \/;
+    let get_oncontrollerchange: fun(Externref) Externref = @es/\ (self) => self["oncontrollerchange"] \/;
+    let set_oncontrollerchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["oncontrollerchange"] = value; } \/;
+    let get_onmessage: fun(Externref) Externref = @es/\ (self) => self["onmessage"] \/;
+    let set_onmessage: fun(Externref, Externref) void = @es/\ (self,value) => { self["onmessage"] = value; } \/;
+    let get_onmessageerror: fun(Externref) Externref = @es/\ (self) => self["onmessageerror"] \/;
+    let set_onmessageerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["onmessageerror"] = value; } \/;
+    let get_ready: fun(Externref) Externref = @es/\ (self) => self["ready"] \/;
+    let call_register: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["register"](p0) \/;
+    let call_register_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["register"](p0,p1) \/;
+    let call_register_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["register"](...args) \/;
+    let call_removeEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeEventListener"](...args) \/;
+    let call_startMessages: fun(Externref) void = @es/\ (self) => self["startMessages"]() \/;
+    let call_startMessages_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["startMessages"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["ServiceWorkerContainer"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["ServiceWorkerContainer"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["ServiceWorkerContainer"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["ServiceWorkerContainer"]["prototype"] = value; } \/;
+}

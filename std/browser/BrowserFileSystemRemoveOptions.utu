@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFileSystemRemoveOptions {
+    let get_recursive: fun(Externref) Externref = @es/\ (self) => self["recursive"] \/;
+    let set_recursive: fun(Externref, Externref) void = @es/\ (self,value) => { self["recursive"] = value; } \/;
+}

@@ -1,0 +1,10 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGAnimatedBoolean {
+    let get_animVal: fun(Externref) Bool = @es/\ (self) => (self["animVal"]) ? 1 : 0 \/;
+    let get_baseVal: fun(Externref) Bool = @es/\ (self) => (self["baseVal"]) ? 1 : 0 \/;
+    let set_baseVal: fun(Externref, Bool) void = @es/\ (self,value) => { self["baseVal"] = !!value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGAnimatedBoolean"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGAnimatedBoolean"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGAnimatedBoolean"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGAnimatedBoolean"]["prototype"] = value; } \/;
+}

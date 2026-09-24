@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDOMQuadInit {
+    let get_p1: fun(Externref) Externref = @es/\ (self) => self["p1"] \/;
+    let set_p1: fun(Externref, Externref) void = @es/\ (self,value) => { self["p1"] = value; } \/;
+    let get_p2: fun(Externref) Externref = @es/\ (self) => self["p2"] \/;
+    let set_p2: fun(Externref, Externref) void = @es/\ (self,value) => { self["p2"] = value; } \/;
+    let get_p3: fun(Externref) Externref = @es/\ (self) => self["p3"] \/;
+    let set_p3: fun(Externref, Externref) void = @es/\ (self,value) => { self["p3"] = value; } \/;
+    let get_p4: fun(Externref) Externref = @es/\ (self) => self["p4"] \/;
+    let set_p4: fun(Externref, Externref) void = @es/\ (self,value) => { self["p4"] = value; } \/;
+}

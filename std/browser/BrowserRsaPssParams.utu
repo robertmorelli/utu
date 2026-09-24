@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRsaPssParams {
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_saltLength: fun(Externref) F64 = @es/\ (self) => self["saltLength"] \/;
+    let set_saltLength: fun(Externref, F64) void = @es/\ (self,value) => { self["saltLength"] = value; } \/;
+}

@@ -1,0 +1,24 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserHTMLOptionsCollection {
+    let call_symbol_iterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.iterator]() \/;
+    let call_symbol_iterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.iterator](...args) \/;
+    let call_add: fun(Externref, Externref) void = @es/\ (self,p0) => self["add"](p0) \/;
+    let call_add_arity2: fun(Externref, Externref, Externref) void = @es/\ (self,p0,p1) => self["add"](p0,p1) \/;
+    let call_add_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["add"](...args) \/;
+    let call_item: fun(Externref, F64) Externref = @es/\ (self,p0) => self["item"](p0) \/;
+    let call_item_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["item"](...args) \/;
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let set_length: fun(Externref, F64) void = @es/\ (self,value) => { self["length"] = value; } \/;
+    let call_namedItem: fun(Externref, Str) Externref = @es/\ (self,p0) => self["namedItem"](p0) \/;
+    let call_namedItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["namedItem"](...args) \/;
+    let call_remove: fun(Externref, F64) void = @es/\ (self,p0) => self["remove"](p0) \/;
+    let call_remove_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["remove"](...args) \/;
+    let get_selectedIndex: fun(Externref) F64 = @es/\ (self) => self["selectedIndex"] \/;
+    let set_selectedIndex: fun(Externref, F64) void = @es/\ (self,value) => { self["selectedIndex"] = value; } \/;
+    let get_index: fun(Externref, F64) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, F64, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["HTMLOptionsCollection"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["HTMLOptionsCollection"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["HTMLOptionsCollection"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["HTMLOptionsCollection"]["prototype"] = value; } \/;
+}

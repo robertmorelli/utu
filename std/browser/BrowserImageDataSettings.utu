@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImageDataSettings {
+    let get_colorSpace: fun(Externref) Externref = @es/\ (self) => self["colorSpace"] \/;
+    let set_colorSpace: fun(Externref, Externref) void = @es/\ (self,value) => { self["colorSpace"] = value; } \/;
+}

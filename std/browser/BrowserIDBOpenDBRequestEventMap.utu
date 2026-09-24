@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIDBOpenDBRequestEventMap {
+    let get_blocked: fun(Externref) Externref = @es/\ (self) => self["blocked"] \/;
+    let set_blocked: fun(Externref, Externref) void = @es/\ (self,value) => { self["blocked"] = value; } \/;
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_success: fun(Externref) Externref = @es/\ (self) => self["success"] \/;
+    let set_success: fun(Externref, Externref) void = @es/\ (self,value) => { self["success"] = value; } \/;
+    let get_upgradeneeded: fun(Externref) Externref = @es/\ (self) => self["upgradeneeded"] \/;
+    let set_upgradeneeded: fun(Externref, Externref) void = @es/\ (self,value) => { self["upgradeneeded"] = value; } \/;
+}

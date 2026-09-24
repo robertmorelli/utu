@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEncodedVideoChunk {
+    let get_byteLength: fun(Externref) F64 = @es/\ (self) => self["byteLength"] \/;
+    let call_copyTo: fun(Externref, Externref) void = @es/\ (self,p0) => self["copyTo"](p0) \/;
+    let call_copyTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["copyTo"](...args) \/;
+    let get_duration: fun(Externref) Externref = @es/\ (self) => self["duration"] \/;
+    let get_timestamp: fun(Externref) F64 = @es/\ (self) => self["timestamp"] \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["EncodedVideoChunk"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["EncodedVideoChunk"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["EncodedVideoChunk"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["EncodedVideoChunk"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSKeywordValue {
+    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
+    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
+    let get_value: fun(Externref) Str = @es/\ (self) => self["value"] \/;
+    let set_value: fun(Externref, Str) void = @es/\ (self,value) => { self["value"] = value; } \/;
+    let new_instance: fun(Str) Externref = @es/\ (p0) => new globalThis["CSSKeywordValue"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CSSKeywordValue"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CSSKeywordValue"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CSSKeywordValue"]["prototype"] = value; } \/;
+}

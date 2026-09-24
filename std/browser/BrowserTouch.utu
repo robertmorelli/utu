@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTouch {
+    let get_clientX: fun(Externref) F64 = @es/\ (self) => self["clientX"] \/;
+    let get_clientY: fun(Externref) F64 = @es/\ (self) => self["clientY"] \/;
+    let get_force: fun(Externref) F64 = @es/\ (self) => self["force"] \/;
+    let get_identifier: fun(Externref) F64 = @es/\ (self) => self["identifier"] \/;
+    let get_pageX: fun(Externref) F64 = @es/\ (self) => self["pageX"] \/;
+    let get_pageY: fun(Externref) F64 = @es/\ (self) => self["pageY"] \/;
+    let get_radiusX: fun(Externref) F64 = @es/\ (self) => self["radiusX"] \/;
+    let get_radiusY: fun(Externref) F64 = @es/\ (self) => self["radiusY"] \/;
+    let get_rotationAngle: fun(Externref) F64 = @es/\ (self) => self["rotationAngle"] \/;
+    let get_screenX: fun(Externref) F64 = @es/\ (self) => self["screenX"] \/;
+    let get_screenY: fun(Externref) F64 = @es/\ (self) => self["screenY"] \/;
+    let get_target: fun(Externref) Externref = @es/\ (self) => self["target"] \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["Touch"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Touch"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Touch"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["Touch"]["prototype"] = value; } \/;
+}

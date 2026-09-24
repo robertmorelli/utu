@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGBoundingBoxOptions {
+    let get_clipped: fun(Externref) Externref = @es/\ (self) => self["clipped"] \/;
+    let set_clipped: fun(Externref, Externref) void = @es/\ (self,value) => { self["clipped"] = value; } \/;
+    let get_fill: fun(Externref) Externref = @es/\ (self) => self["fill"] \/;
+    let set_fill: fun(Externref, Externref) void = @es/\ (self,value) => { self["fill"] = value; } \/;
+    let get_markers: fun(Externref) Externref = @es/\ (self) => self["markers"] \/;
+    let set_markers: fun(Externref, Externref) void = @es/\ (self,value) => { self["markers"] = value; } \/;
+    let get_stroke: fun(Externref) Externref = @es/\ (self) => self["stroke"] \/;
+    let set_stroke: fun(Externref, Externref) void = @es/\ (self,value) => { self["stroke"] = value; } \/;
+}

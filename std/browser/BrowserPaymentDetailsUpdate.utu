@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPaymentDetailsUpdate {
+    let get_displayItems: fun(Externref) Externref = @es/\ (self) => self["displayItems"] \/;
+    let set_displayItems: fun(Externref, Externref) void = @es/\ (self,value) => { self["displayItems"] = value; } \/;
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_modifiers: fun(Externref) Externref = @es/\ (self) => self["modifiers"] \/;
+    let set_modifiers: fun(Externref, Externref) void = @es/\ (self,value) => { self["modifiers"] = value; } \/;
+    let get_paymentMethodErrors: fun(Externref) Externref = @es/\ (self) => self["paymentMethodErrors"] \/;
+    let set_paymentMethodErrors: fun(Externref, Externref) void = @es/\ (self,value) => { self["paymentMethodErrors"] = value; } \/;
+    let get_shippingAddressErrors: fun(Externref) Externref = @es/\ (self) => self["shippingAddressErrors"] \/;
+    let set_shippingAddressErrors: fun(Externref, Externref) void = @es/\ (self,value) => { self["shippingAddressErrors"] = value; } \/;
+    let get_shippingOptions: fun(Externref) Externref = @es/\ (self) => self["shippingOptions"] \/;
+    let set_shippingOptions: fun(Externref, Externref) void = @es/\ (self,value) => { self["shippingOptions"] = value; } \/;
+    let get_total: fun(Externref) Externref = @es/\ (self) => self["total"] \/;
+    let set_total: fun(Externref, Externref) void = @es/\ (self,value) => { self["total"] = value; } \/;
+}

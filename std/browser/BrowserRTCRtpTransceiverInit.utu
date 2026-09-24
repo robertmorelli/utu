@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpTransceiverInit {
+    let get_direction: fun(Externref) Externref = @es/\ (self) => self["direction"] \/;
+    let set_direction: fun(Externref, Externref) void = @es/\ (self,value) => { self["direction"] = value; } \/;
+    let get_sendEncodings: fun(Externref) Externref = @es/\ (self) => self["sendEncodings"] \/;
+    let set_sendEncodings: fun(Externref, Externref) void = @es/\ (self,value) => { self["sendEncodings"] = value; } \/;
+    let get_streams: fun(Externref) Externref = @es/\ (self) => self["streams"] \/;
+    let set_streams: fun(Externref, Externref) void = @es/\ (self,value) => { self["streams"] = value; } \/;
+}

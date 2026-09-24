@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserUserActivation {
+    let get_hasBeenActive: fun(Externref) Bool = @es/\ (self) => (self["hasBeenActive"]) ? 1 : 0 \/;
+    let get_isActive: fun(Externref) Bool = @es/\ (self) => (self["isActive"]) ? 1 : 0 \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["UserActivation"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["UserActivation"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["UserActivation"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["UserActivation"]["prototype"] = value; } \/;
+}

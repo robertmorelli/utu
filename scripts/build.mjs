@@ -113,25 +113,21 @@ function sourceLiteral(source) {
 }
 
 async function loadStdEntries() {
-  let dirents = [];
-  try {
-    dirents = await fs.readdir(STD_DIR, { withFileTypes: true });
-  } catch (error) {
-    if (error?.code === 'ENOENT') return [];
-    throw error;
-  }
-
-  const files = dirents
-    .filter(dirent => dirent.isFile() && dirent.name.endsWith('.utu'))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
   const entries = [];
-  for (const file of files) {
-    const name = path.basename(file.name, '.utu');
-    const key = `std:${name}`;
-    const source = await fs.readFile(path.join(STD_DIR, file.name), 'utf8');
-    entries.push({ key, source });
+  const keys = new Set();
+  async function visit(directory) {
+    const dirents = await fs.readdir(directory, { withFileTypes: true });
+    for (const file of dirents.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+      const fullPath = path.join(directory, file.name);
+      if (file.isDirectory()) { await visit(fullPath); continue; }
+      if (!file.isFile() || !file.name.endsWith('.utu')) continue;
+      const key = `std:${path.basename(file.name, '.utu')}`;
+      if (keys.has(key)) throw new Error(`build: duplicate stdlib key ${key}`);
+      keys.add(key);
+      entries.push({ key, source: await fs.readFile(fullPath, 'utf8') });
+    }
   }
+  await visit(STD_DIR);
   return entries;
 }
 
@@ -253,7 +249,7 @@ function nodeBranchStubPlugin() {
     setup(buildApi) {
       // Both bare and `node:`-prefixed spellings — binaryen switched to the
       // prefixed form, and an unmatched one fails the bundle outright.
-      buildApi.onResolve({ filter: /^(node:)?(module|fs|fs\/promises|path|url)$/ }, ({ path: importPath }) => ({
+      buildApi.onResolve({ filter: /^(node:)?(module|fs|fs\/promises|path|url|os)$/ }, ({ path: importPath }) => ({
         path: importPath.replace(/^node:/, ''),
         namespace: 'utu-node-stub',
       }));

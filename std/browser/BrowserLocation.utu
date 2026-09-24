@@ -1,0 +1,33 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserLocation {
+    let get_ancestorOrigins: fun(Externref) Externref = @es/\ (self) => self["ancestorOrigins"] \/;
+    let call_assign: fun(Externref, Externref) void = @es/\ (self,p0) => self["assign"](p0) \/;
+    let call_assign_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["assign"](...args) \/;
+    let get_hash: fun(Externref) Str = @es/\ (self) => self["hash"] \/;
+    let set_hash: fun(Externref, Str) void = @es/\ (self,value) => { self["hash"] = value; } \/;
+    let get_host: fun(Externref) Str = @es/\ (self) => self["host"] \/;
+    let set_host: fun(Externref, Str) void = @es/\ (self,value) => { self["host"] = value; } \/;
+    let get_hostname: fun(Externref) Str = @es/\ (self) => self["hostname"] \/;
+    let set_hostname: fun(Externref, Str) void = @es/\ (self,value) => { self["hostname"] = value; } \/;
+    let get_href: fun(Externref) Str = @es/\ (self) => self["href"] \/;
+    let set_href: fun(Externref, Str) void = @es/\ (self,value) => { self["href"] = value; } \/;
+    let get_origin: fun(Externref) Str = @es/\ (self) => self["origin"] \/;
+    let get_pathname: fun(Externref) Str = @es/\ (self) => self["pathname"] \/;
+    let set_pathname: fun(Externref, Str) void = @es/\ (self,value) => { self["pathname"] = value; } \/;
+    let get_port: fun(Externref) Str = @es/\ (self) => self["port"] \/;
+    let set_port: fun(Externref, Str) void = @es/\ (self,value) => { self["port"] = value; } \/;
+    let get_protocol: fun(Externref) Str = @es/\ (self) => self["protocol"] \/;
+    let set_protocol: fun(Externref, Str) void = @es/\ (self,value) => { self["protocol"] = value; } \/;
+    let call_reload: fun(Externref) void = @es/\ (self) => self["reload"]() \/;
+    let call_reload_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["reload"](...args) \/;
+    let call_replace: fun(Externref, Externref) void = @es/\ (self,p0) => self["replace"](p0) \/;
+    let call_replace_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["replace"](...args) \/;
+    let get_search: fun(Externref) Str = @es/\ (self) => self["search"] \/;
+    let set_search: fun(Externref, Str) void = @es/\ (self,value) => { self["search"] = value; } \/;
+    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
+    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["Location"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Location"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Location"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["Location"]["prototype"] = value; } \/;
+}

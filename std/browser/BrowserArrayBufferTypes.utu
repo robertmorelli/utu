@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserArrayBufferTypes {
+    let get_ArrayBuffer: fun(Externref) Externref = @es/\ (self) => self["ArrayBuffer"] \/;
+    let set_ArrayBuffer: fun(Externref, Externref) void = @es/\ (self,value) => { self["ArrayBuffer"] = value; } \/;
+    let get_SharedArrayBuffer: fun(Externref) Externref = @es/\ (self) => self["SharedArrayBuffer"] \/;
+    let set_SharedArrayBuffer: fun(Externref, Externref) void = @es/\ (self,value) => { self["SharedArrayBuffer"] = value; } \/;
+}

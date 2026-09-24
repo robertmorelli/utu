@@ -1,0 +1,36 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_WebAssembly {
+    let call_CompileError: fun() Externref = @es/\ () => globalThis["WebAssembly"]["CompileError"]() \/;
+    let call_CompileError_arity1: fun(Str) Externref = @es/\ (p0) => globalThis["WebAssembly"]["CompileError"](p0) \/;
+    let call_CompileError_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["CompileError"](...args) \/;
+    let get_Global: fun() Externref = @es/\ () => globalThis["WebAssembly"]["Global"] \/;
+    let set_Global: fun(Externref) void = @es/\ (value) => { globalThis["WebAssembly"]["Global"] = value; } \/;
+    let get_Instance: fun() Externref = @es/\ () => globalThis["WebAssembly"]["Instance"] \/;
+    let set_Instance: fun(Externref) void = @es/\ (value) => { globalThis["WebAssembly"]["Instance"] = value; } \/;
+    let call_LinkError: fun() Externref = @es/\ () => globalThis["WebAssembly"]["LinkError"]() \/;
+    let call_LinkError_arity1: fun(Str) Externref = @es/\ (p0) => globalThis["WebAssembly"]["LinkError"](p0) \/;
+    let call_LinkError_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["LinkError"](...args) \/;
+    let get_Memory: fun() Externref = @es/\ () => globalThis["WebAssembly"]["Memory"] \/;
+    let set_Memory: fun(Externref) void = @es/\ (value) => { globalThis["WebAssembly"]["Memory"] = value; } \/;
+    let get_Module: fun() Externref = @es/\ () => globalThis["WebAssembly"]["Module"] \/;
+    let set_Module: fun(Externref) void = @es/\ (value) => { globalThis["WebAssembly"]["Module"] = value; } \/;
+    let call_RuntimeError: fun() Externref = @es/\ () => globalThis["WebAssembly"]["RuntimeError"]() \/;
+    let call_RuntimeError_arity1: fun(Str) Externref = @es/\ (p0) => globalThis["WebAssembly"]["RuntimeError"](p0) \/;
+    let call_RuntimeError_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["RuntimeError"](...args) \/;
+    let get_Table: fun() Externref = @es/\ () => globalThis["WebAssembly"]["Table"] \/;
+    let set_Table: fun(Externref) void = @es/\ (value) => { globalThis["WebAssembly"]["Table"] = value; } \/;
+    let call_compile: fun(Externref) Externref = @es/\ (p0) => globalThis["WebAssembly"]["compile"](p0) \/;
+    let call_compile_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["compile"](...args) \/;
+    let call_compileStreaming: fun(Externref) Externref = @es/\ (p0) => globalThis["WebAssembly"]["compileStreaming"](p0) \/;
+    let call_compileStreaming_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["compileStreaming"](...args) \/;
+    let call_instantiate: fun(Externref) Externref = @es/\ (p0) => globalThis["WebAssembly"]["instantiate"](p0) \/;
+    let call_instantiate_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => globalThis["WebAssembly"]["instantiate"](p0,p1) \/;
+    let call_instantiate_overload2: fun(Externref) Externref = @es/\ (p0) => globalThis["WebAssembly"]["instantiate"](p0) \/;
+    let call_instantiate_overload2_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => globalThis["WebAssembly"]["instantiate"](p0,p1) \/;
+    let call_instantiate_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["instantiate"](...args) \/;
+    let call_instantiateStreaming: fun(Externref) Externref = @es/\ (p0) => globalThis["WebAssembly"]["instantiateStreaming"](p0) \/;
+    let call_instantiateStreaming_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => globalThis["WebAssembly"]["instantiateStreaming"](p0,p1) \/;
+    let call_instantiateStreaming_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["instantiateStreaming"](...args) \/;
+    let call_validate: fun(Externref) Bool = @es/\ (p0) => (globalThis["WebAssembly"]["validate"](p0)) ? 1 : 0 \/;
+    let call_validate_js: fun(Externref) Externref = @es/\ (args) => globalThis["WebAssembly"]["validate"](...args) \/;
+}

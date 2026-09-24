@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserStartViewTransitionOptions {
+    let get_types: fun(Externref) Externref = @es/\ (self) => self["types"] \/;
+    let set_types: fun(Externref, Externref) void = @es/\ (self,value) => { self["types"] = value; } \/;
+    let get_update: fun(Externref) Externref = @es/\ (self) => self["update"] \/;
+    let set_update: fun(Externref, Externref) void = @es/\ (self,value) => { self["update"] = value; } \/;
+}

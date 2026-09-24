@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAnimationFrameProvider {
+    let call_cancelAnimationFrame: fun(Externref, F64) void = @es/\ (self,p0) => self["cancelAnimationFrame"](p0) \/;
+    let call_cancelAnimationFrame_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["cancelAnimationFrame"](...args) \/;
+    let call_requestAnimationFrame: fun(Externref, cl(F64) void) F64 = @es/\ (self,p0) => self["requestAnimationFrame"](p0) \/;
+    let call_requestAnimationFrame_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["requestAnimationFrame"](...args) \/;
+}

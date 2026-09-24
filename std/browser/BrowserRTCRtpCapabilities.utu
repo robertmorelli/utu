@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpCapabilities {
+    let get_codecs: fun(Externref) Externref = @es/\ (self) => self["codecs"] \/;
+    let set_codecs: fun(Externref, Externref) void = @es/\ (self,value) => { self["codecs"] = value; } \/;
+    let get_headerExtensions: fun(Externref) Externref = @es/\ (self) => self["headerExtensions"] \/;
+    let set_headerExtensions: fun(Externref, Externref) void = @es/\ (self,value) => { self["headerExtensions"] = value; } \/;
+}

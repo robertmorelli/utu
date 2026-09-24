@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPictureInPictureWindowEventMap {
+    let get_resize: fun(Externref) Externref = @es/\ (self) => self["resize"] \/;
+    let set_resize: fun(Externref, Externref) void = @es/\ (self,value) => { self["resize"] = value; } \/;
+}

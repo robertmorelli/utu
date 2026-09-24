@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserBaseAudioContextEventMap {
+    let get_statechange: fun(Externref) Externref = @es/\ (self) => self["statechange"] \/;
+    let set_statechange: fun(Externref, Externref) void = @es/\ (self,value) => { self["statechange"] = value; } \/;
+}

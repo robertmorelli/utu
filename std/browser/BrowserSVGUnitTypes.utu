@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGUnitTypes {
+    let get_SVG_UNIT_TYPE_OBJECTBOUNDINGBOX: fun(Externref) F64 = @es/\ (self) => self["SVG_UNIT_TYPE_OBJECTBOUNDINGBOX"] \/;
+    let get_SVG_UNIT_TYPE_UNKNOWN: fun(Externref) F64 = @es/\ (self) => self["SVG_UNIT_TYPE_UNKNOWN"] \/;
+    let get_SVG_UNIT_TYPE_USERSPACEONUSE: fun(Externref) F64 = @es/\ (self) => self["SVG_UNIT_TYPE_USERSPACEONUSE"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGUnitTypes"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGUnitTypes"](...args) \/;
+    let static_get_SVG_UNIT_TYPE_OBJECTBOUNDINGBOX: fun() F64 = @es/\ () => globalThis["SVGUnitTypes"]["SVG_UNIT_TYPE_OBJECTBOUNDINGBOX"] \/;
+    let static_get_SVG_UNIT_TYPE_UNKNOWN: fun() F64 = @es/\ () => globalThis["SVGUnitTypes"]["SVG_UNIT_TYPE_UNKNOWN"] \/;
+    let static_get_SVG_UNIT_TYPE_USERSPACEONUSE: fun() F64 = @es/\ () => globalThis["SVGUnitTypes"]["SVG_UNIT_TYPE_USERSPACEONUSE"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGUnitTypes"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGUnitTypes"]["prototype"] = value; } \/;
+}

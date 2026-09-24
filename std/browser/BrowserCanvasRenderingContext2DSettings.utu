@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCanvasRenderingContext2DSettings {
+    let get_alpha: fun(Externref) Externref = @es/\ (self) => self["alpha"] \/;
+    let set_alpha: fun(Externref, Externref) void = @es/\ (self,value) => { self["alpha"] = value; } \/;
+    let get_colorSpace: fun(Externref) Externref = @es/\ (self) => self["colorSpace"] \/;
+    let set_colorSpace: fun(Externref, Externref) void = @es/\ (self,value) => { self["colorSpace"] = value; } \/;
+    let get_desynchronized: fun(Externref) Externref = @es/\ (self) => self["desynchronized"] \/;
+    let set_desynchronized: fun(Externref, Externref) void = @es/\ (self,value) => { self["desynchronized"] = value; } \/;
+    let get_willReadFrequently: fun(Externref) Externref = @es/\ (self) => self["willReadFrequently"] \/;
+    let set_willReadFrequently: fun(Externref, Externref) void = @es/\ (self,value) => { self["willReadFrequently"] = value; } \/;
+}

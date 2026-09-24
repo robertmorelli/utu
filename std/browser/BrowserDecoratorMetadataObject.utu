@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDecoratorMetadataObject {
+    let get_index: fun(Externref, Str) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, Str, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+    let get_index1: fun(Externref, F64) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index1: fun(Externref, F64, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+    let get_index2: fun(Externref, Externref) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index2: fun(Externref, Externref, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+}

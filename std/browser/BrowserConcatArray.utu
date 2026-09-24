@@ -1,0 +1,12 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserConcatArray {
+    let call_join: fun(Externref) Str = @es/\ (self) => self["join"]() \/;
+    let call_join_arity1: fun(Externref, Str) Str = @es/\ (self,p0) => self["join"](p0) \/;
+    let call_join_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["join"](...args) \/;
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let call_slice: fun(Externref) Externref = @es/\ (self) => self["slice"]() \/;
+    let call_slice_arity1: fun(Externref, F64) Externref = @es/\ (self,p0) => self["slice"](p0) \/;
+    let call_slice_arity2: fun(Externref, F64, F64) Externref = @es/\ (self,p0,p1) => self["slice"](p0,p1) \/;
+    let call_slice_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["slice"](...args) \/;
+    let get_index: fun(Externref, F64) Externref = @es/\ (self,key) => self[key] \/;
+}

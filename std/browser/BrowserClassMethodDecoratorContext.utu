@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserClassMethodDecoratorContext {
+    let get_access: fun(Externref) Externref = @es/\ (self) => self["access"] \/;
+    let call_addInitializer: fun(Externref, Externref) void = @es/\ (self,p0) => self["addInitializer"](p0) \/;
+    let call_addInitializer_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addInitializer"](...args) \/;
+    let get_kind: fun(Externref) Str = @es/\ (self) => self["kind"] \/;
+    let get_metadata: fun(Externref) Externref = @es/\ (self) => self["metadata"] \/;
+    let get_name: fun(Externref) Externref = @es/\ (self) => self["name"] \/;
+    let get_private: fun(Externref) Bool = @es/\ (self) => (self["private"]) ? 1 : 0 \/;
+    let get_static: fun(Externref) Bool = @es/\ (self) => (self["static"]) ? 1 : 0 \/;
+}

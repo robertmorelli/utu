@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpSendParameters {
+    let get_codecs: fun(Externref) Externref = @es/\ (self) => self["codecs"] \/;
+    let set_codecs: fun(Externref, Externref) void = @es/\ (self,value) => { self["codecs"] = value; } \/;
+    let get_degradationPreference: fun(Externref) Externref = @es/\ (self) => self["degradationPreference"] \/;
+    let set_degradationPreference: fun(Externref, Externref) void = @es/\ (self,value) => { self["degradationPreference"] = value; } \/;
+    let get_encodings: fun(Externref) Externref = @es/\ (self) => self["encodings"] \/;
+    let set_encodings: fun(Externref, Externref) void = @es/\ (self,value) => { self["encodings"] = value; } \/;
+    let get_headerExtensions: fun(Externref) Externref = @es/\ (self) => self["headerExtensions"] \/;
+    let set_headerExtensions: fun(Externref, Externref) void = @es/\ (self,value) => { self["headerExtensions"] = value; } \/;
+    let get_rtcp: fun(Externref) Externref = @es/\ (self) => self["rtcp"] \/;
+    let set_rtcp: fun(Externref, Externref) void = @es/\ (self,value) => { self["rtcp"] = value; } \/;
+    let get_transactionId: fun(Externref) Str = @es/\ (self) => self["transactionId"] \/;
+    let set_transactionId: fun(Externref, Str) void = @es/\ (self,value) => { self["transactionId"] = value; } \/;
+}

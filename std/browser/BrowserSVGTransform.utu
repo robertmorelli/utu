@@ -1,0 +1,37 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGTransform {
+    let get_SVG_TRANSFORM_MATRIX: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_MATRIX"] \/;
+    let get_SVG_TRANSFORM_ROTATE: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_ROTATE"] \/;
+    let get_SVG_TRANSFORM_SCALE: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_SCALE"] \/;
+    let get_SVG_TRANSFORM_SKEWX: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_SKEWX"] \/;
+    let get_SVG_TRANSFORM_SKEWY: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_SKEWY"] \/;
+    let get_SVG_TRANSFORM_TRANSLATE: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_TRANSLATE"] \/;
+    let get_SVG_TRANSFORM_UNKNOWN: fun(Externref) F64 = @es/\ (self) => self["SVG_TRANSFORM_UNKNOWN"] \/;
+    let get_angle: fun(Externref) F64 = @es/\ (self) => self["angle"] \/;
+    let get_matrix: fun(Externref) Externref = @es/\ (self) => self["matrix"] \/;
+    let call_setMatrix: fun(Externref) void = @es/\ (self) => self["setMatrix"]() \/;
+    let call_setMatrix_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["setMatrix"](p0) \/;
+    let call_setMatrix_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setMatrix"](...args) \/;
+    let call_setRotate: fun(Externref, F64, F64, F64) void = @es/\ (self,p0,p1,p2) => self["setRotate"](p0,p1,p2) \/;
+    let call_setRotate_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setRotate"](...args) \/;
+    let call_setScale: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["setScale"](p0,p1) \/;
+    let call_setScale_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setScale"](...args) \/;
+    let call_setSkewX: fun(Externref, F64) void = @es/\ (self,p0) => self["setSkewX"](p0) \/;
+    let call_setSkewX_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setSkewX"](...args) \/;
+    let call_setSkewY: fun(Externref, F64) void = @es/\ (self,p0) => self["setSkewY"](p0) \/;
+    let call_setSkewY_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setSkewY"](...args) \/;
+    let call_setTranslate: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["setTranslate"](p0,p1) \/;
+    let call_setTranslate_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setTranslate"](...args) \/;
+    let get_type: fun(Externref) F64 = @es/\ (self) => self["type"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGTransform"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGTransform"](...args) \/;
+    let static_get_SVG_TRANSFORM_MATRIX: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_MATRIX"] \/;
+    let static_get_SVG_TRANSFORM_ROTATE: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_ROTATE"] \/;
+    let static_get_SVG_TRANSFORM_SCALE: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_SCALE"] \/;
+    let static_get_SVG_TRANSFORM_SKEWX: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_SKEWX"] \/;
+    let static_get_SVG_TRANSFORM_SKEWY: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_SKEWY"] \/;
+    let static_get_SVG_TRANSFORM_TRANSLATE: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_TRANSLATE"] \/;
+    let static_get_SVG_TRANSFORM_UNKNOWN: fun() F64 = @es/\ () => globalThis["SVGTransform"]["SVG_TRANSFORM_UNKNOWN"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGTransform"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGTransform"]["prototype"] = value; } \/;
+}

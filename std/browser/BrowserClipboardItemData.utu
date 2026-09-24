@@ -1,0 +1,14 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserClipboardItemData {
+    let get_symbol_toStringTag: fun(Externref) Str = @es/\ (self) => self[Symbol.toStringTag] \/;
+    let call_catch: fun(Externref) Externref = @es/\ (self) => self["catch"]() \/;
+    let call_catch_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["catch"](p0) \/;
+    let call_catch_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["catch"](...args) \/;
+    let call_finally: fun(Externref) Externref = @es/\ (self) => self["finally"]() \/;
+    let call_finally_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["finally"](p0) \/;
+    let call_finally_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["finally"](...args) \/;
+    let call_then: fun(Externref) Externref = @es/\ (self) => self["then"]() \/;
+    let call_then_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["then"](p0) \/;
+    let call_then_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["then"](p0,p1) \/;
+    let call_then_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["then"](...args) \/;
+}

@@ -1,0 +1,41 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEventSource {
+    let get_CLOSED: fun(Externref) F64 = @es/\ (self) => self["CLOSED"] \/;
+    let get_CONNECTING: fun(Externref) F64 = @es/\ (self) => self["CONNECTING"] \/;
+    let get_OPEN: fun(Externref) F64 = @es/\ (self) => self["OPEN"] \/;
+    let call_addEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_overload3: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_overload3_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addEventListener"](...args) \/;
+    let call_close: fun(Externref) void = @es/\ (self) => self["close"]() \/;
+    let call_close_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["close"](...args) \/;
+    let call_dispatchEvent: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["dispatchEvent"](p0)) ? 1 : 0 \/;
+    let call_dispatchEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dispatchEvent"](...args) \/;
+    let get_onerror: fun(Externref) Externref = @es/\ (self) => self["onerror"] \/;
+    let set_onerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["onerror"] = value; } \/;
+    let get_onmessage: fun(Externref) Externref = @es/\ (self) => self["onmessage"] \/;
+    let set_onmessage: fun(Externref, Externref) void = @es/\ (self,value) => { self["onmessage"] = value; } \/;
+    let get_onopen: fun(Externref) Externref = @es/\ (self) => self["onopen"] \/;
+    let set_onopen: fun(Externref, Externref) void = @es/\ (self,value) => { self["onopen"] = value; } \/;
+    let get_readyState: fun(Externref) F64 = @es/\ (self) => self["readyState"] \/;
+    let call_removeEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_overload3: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_overload3_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeEventListener"](...args) \/;
+    let get_url: fun(Externref) Str = @es/\ (self) => self["url"] \/;
+    let get_withCredentials: fun(Externref) Bool = @es/\ (self) => (self["withCredentials"]) ? 1 : 0 \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["EventSource"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["EventSource"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["EventSource"](...args) \/;
+    let static_get_CLOSED: fun() F64 = @es/\ () => globalThis["EventSource"]["CLOSED"] \/;
+    let static_get_CONNECTING: fun() F64 = @es/\ () => globalThis["EventSource"]["CONNECTING"] \/;
+    let static_get_OPEN: fun() F64 = @es/\ () => globalThis["EventSource"]["OPEN"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["EventSource"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["EventSource"]["prototype"] = value; } \/;
+}

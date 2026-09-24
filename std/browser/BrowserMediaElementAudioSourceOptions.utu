@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaElementAudioSourceOptions {
+    let get_mediaElement: fun(Externref) Externref = @es/\ (self) => self["mediaElement"] \/;
+    let set_mediaElement: fun(Externref, Externref) void = @es/\ (self,value) => { self["mediaElement"] = value; } \/;
+}

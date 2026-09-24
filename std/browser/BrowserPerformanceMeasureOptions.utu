@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPerformanceMeasureOptions {
+    let get_detail: fun(Externref) Externref = @es/\ (self) => self["detail"] \/;
+    let set_detail: fun(Externref, Externref) void = @es/\ (self,value) => { self["detail"] = value; } \/;
+    let get_duration: fun(Externref) Externref = @es/\ (self) => self["duration"] \/;
+    let set_duration: fun(Externref, Externref) void = @es/\ (self,value) => { self["duration"] = value; } \/;
+    let get_end: fun(Externref) Externref = @es/\ (self) => self["end"] \/;
+    let set_end: fun(Externref, Externref) void = @es/\ (self,value) => { self["end"] = value; } \/;
+    let get_start: fun(Externref) Externref = @es/\ (self) => self["start"] \/;
+    let set_start: fun(Externref, Externref) void = @es/\ (self,value) => { self["start"] = value; } \/;
+}

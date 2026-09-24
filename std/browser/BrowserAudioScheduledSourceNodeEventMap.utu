@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioScheduledSourceNodeEventMap {
+    let get_ended: fun(Externref) Externref = @es/\ (self) => self["ended"] \/;
+    let set_ended: fun(Externref, Externref) void = @es/\ (self,value) => { self["ended"] = value; } \/;
+}

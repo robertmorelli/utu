@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEXT_sRGB {
+    let get_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT: fun(Externref) F64 = @es/\ (self) => self["FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT"] \/;
+    let get_SRGB8_ALPHA8_EXT: fun(Externref) F64 = @es/\ (self) => self["SRGB8_ALPHA8_EXT"] \/;
+    let get_SRGB_ALPHA_EXT: fun(Externref) F64 = @es/\ (self) => self["SRGB_ALPHA_EXT"] \/;
+    let get_SRGB_EXT: fun(Externref) F64 = @es/\ (self) => self["SRGB_EXT"] \/;
+}

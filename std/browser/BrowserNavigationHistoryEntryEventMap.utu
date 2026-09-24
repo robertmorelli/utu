@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNavigationHistoryEntryEventMap {
+    let get_dispose: fun(Externref) Externref = @es/\ (self) => self["dispose"] \/;
+    let set_dispose: fun(Externref, Externref) void = @es/\ (self,value) => { self["dispose"] = value; } \/;
+}

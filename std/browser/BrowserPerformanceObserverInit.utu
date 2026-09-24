@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPerformanceObserverInit {
+    let get_buffered: fun(Externref) Externref = @es/\ (self) => self["buffered"] \/;
+    let set_buffered: fun(Externref, Externref) void = @es/\ (self,value) => { self["buffered"] = value; } \/;
+    let get_entryTypes: fun(Externref) Externref = @es/\ (self) => self["entryTypes"] \/;
+    let set_entryTypes: fun(Externref, Externref) void = @es/\ (self,value) => { self["entryTypes"] = value; } \/;
+    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

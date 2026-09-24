@@ -1,0 +1,21 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFontFaceDescriptors {
+    let get_ascentOverride: fun(Externref) Externref = @es/\ (self) => self["ascentOverride"] \/;
+    let set_ascentOverride: fun(Externref, Externref) void = @es/\ (self,value) => { self["ascentOverride"] = value; } \/;
+    let get_descentOverride: fun(Externref) Externref = @es/\ (self) => self["descentOverride"] \/;
+    let set_descentOverride: fun(Externref, Externref) void = @es/\ (self,value) => { self["descentOverride"] = value; } \/;
+    let get_display: fun(Externref) Externref = @es/\ (self) => self["display"] \/;
+    let set_display: fun(Externref, Externref) void = @es/\ (self,value) => { self["display"] = value; } \/;
+    let get_featureSettings: fun(Externref) Externref = @es/\ (self) => self["featureSettings"] \/;
+    let set_featureSettings: fun(Externref, Externref) void = @es/\ (self,value) => { self["featureSettings"] = value; } \/;
+    let get_lineGapOverride: fun(Externref) Externref = @es/\ (self) => self["lineGapOverride"] \/;
+    let set_lineGapOverride: fun(Externref, Externref) void = @es/\ (self,value) => { self["lineGapOverride"] = value; } \/;
+    let get_stretch: fun(Externref) Externref = @es/\ (self) => self["stretch"] \/;
+    let set_stretch: fun(Externref, Externref) void = @es/\ (self,value) => { self["stretch"] = value; } \/;
+    let get_style: fun(Externref) Externref = @es/\ (self) => self["style"] \/;
+    let set_style: fun(Externref, Externref) void = @es/\ (self,value) => { self["style"] = value; } \/;
+    let get_unicodeRange: fun(Externref) Externref = @es/\ (self) => self["unicodeRange"] \/;
+    let set_unicodeRange: fun(Externref, Externref) void = @es/\ (self,value) => { self["unicodeRange"] = value; } \/;
+    let get_weight: fun(Externref) Externref = @es/\ (self) => self["weight"] \/;
+    let set_weight: fun(Externref, Externref) void = @es/\ (self,value) => { self["weight"] = value; } \/;
+}

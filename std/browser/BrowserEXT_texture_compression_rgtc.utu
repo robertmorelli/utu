@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEXT_texture_compression_rgtc {
+    let get_COMPRESSED_RED_GREEN_RGTC2_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_RED_GREEN_RGTC2_EXT"] \/;
+    let get_COMPRESSED_RED_RGTC1_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_RED_RGTC1_EXT"] \/;
+    let get_COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT"] \/;
+    let get_COMPRESSED_SIGNED_RED_RGTC1_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_SIGNED_RED_RGTC1_EXT"] \/;
+}

@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPaymentValidationErrors {
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_payer: fun(Externref) Externref = @es/\ (self) => self["payer"] \/;
+    let set_payer: fun(Externref, Externref) void = @es/\ (self,value) => { self["payer"] = value; } \/;
+    let get_shippingAddress: fun(Externref) Externref = @es/\ (self) => self["shippingAddress"] \/;
+    let set_shippingAddress: fun(Externref, Externref) void = @es/\ (self,value) => { self["shippingAddress"] = value; } \/;
+}

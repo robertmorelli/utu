@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPerformanceObserverCallback {
+    let invoke: fun(Externref, Externref, Externref) void = @es/\ (self,p0,p1) => self(p0,p1) \/;
+    let invoke_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self(...args) \/;
+}

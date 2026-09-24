@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPaymentMethodData {
+    let get_data: fun(Externref) Externref = @es/\ (self) => self["data"] \/;
+    let set_data: fun(Externref, Externref) void = @es/\ (self,value) => { self["data"] = value; } \/;
+    let get_supportedMethods: fun(Externref) Str = @es/\ (self) => self["supportedMethods"] \/;
+    let set_supportedMethods: fun(Externref, Str) void = @es/\ (self,value) => { self["supportedMethods"] = value; } \/;
+}

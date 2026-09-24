@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserOpusEncoderConfig {
+    let get_complexity: fun(Externref) Externref = @es/\ (self) => self["complexity"] \/;
+    let set_complexity: fun(Externref, Externref) void = @es/\ (self,value) => { self["complexity"] = value; } \/;
+    let get_format: fun(Externref) Externref = @es/\ (self) => self["format"] \/;
+    let set_format: fun(Externref, Externref) void = @es/\ (self,value) => { self["format"] = value; } \/;
+    let get_frameDuration: fun(Externref) Externref = @es/\ (self) => self["frameDuration"] \/;
+    let set_frameDuration: fun(Externref, Externref) void = @es/\ (self,value) => { self["frameDuration"] = value; } \/;
+    let get_packetlossperc: fun(Externref) Externref = @es/\ (self) => self["packetlossperc"] \/;
+    let set_packetlossperc: fun(Externref, Externref) void = @es/\ (self,value) => { self["packetlossperc"] = value; } \/;
+    let get_usedtx: fun(Externref) Externref = @es/\ (self) => self["usedtx"] \/;
+    let set_usedtx: fun(Externref, Externref) void = @es/\ (self,value) => { self["usedtx"] = value; } \/;
+    let get_useinbandfec: fun(Externref) Externref = @es/\ (self) => self["useinbandfec"] \/;
+    let set_useinbandfec: fun(Externref, Externref) void = @es/\ (self,value) => { self["useinbandfec"] = value; } \/;
+}

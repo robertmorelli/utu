@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNonDocumentTypeChildNode {
+    let get_nextElementSibling: fun(Externref) Externref = @es/\ (self) => self["nextElementSibling"] \/;
+    let get_previousElementSibling: fun(Externref) Externref = @es/\ (self) => self["previousElementSibling"] \/;
+}

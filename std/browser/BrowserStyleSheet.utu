@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserStyleSheet {
+    let get_disabled: fun(Externref) Bool = @es/\ (self) => (self["disabled"]) ? 1 : 0 \/;
+    let set_disabled: fun(Externref, Bool) void = @es/\ (self,value) => { self["disabled"] = !!value; } \/;
+    let get_href: fun(Externref) Externref = @es/\ (self) => self["href"] \/;
+    let get_media: fun(Externref) Externref = @es/\ (self) => self["media"] \/;
+    let set_media: fun(Externref, Externref) void = @es/\ (self,value) => { self["media"] = value; } \/;
+    let get_ownerNode: fun(Externref) Externref = @es/\ (self) => self["ownerNode"] \/;
+    let get_parentStyleSheet: fun(Externref) Externref = @es/\ (self) => self["parentStyleSheet"] \/;
+    let get_title: fun(Externref) Externref = @es/\ (self) => self["title"] \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["StyleSheet"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["StyleSheet"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["StyleSheet"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["StyleSheet"]["prototype"] = value; } \/;
+}

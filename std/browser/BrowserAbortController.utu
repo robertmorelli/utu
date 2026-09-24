@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAbortController {
+    let call_abort: fun(Externref) void = @es/\ (self) => self["abort"]() \/;
+    let call_abort_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["abort"](p0) \/;
+    let call_abort_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["abort"](...args) \/;
+    let get_signal: fun(Externref) Externref = @es/\ (self) => self["signal"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["AbortController"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["AbortController"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["AbortController"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["AbortController"]["prototype"] = value; } \/;
+}

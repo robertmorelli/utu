@@ -1,0 +1,18 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNodeIterator {
+    let call_detach: fun(Externref) void = @es/\ (self) => self["detach"]() \/;
+    let call_detach_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["detach"](...args) \/;
+    let get_filter: fun(Externref) Externref = @es/\ (self) => self["filter"] \/;
+    let call_nextNode: fun(Externref) Externref = @es/\ (self) => self["nextNode"]() \/;
+    let call_nextNode_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["nextNode"](...args) \/;
+    let get_pointerBeforeReferenceNode: fun(Externref) Bool = @es/\ (self) => (self["pointerBeforeReferenceNode"]) ? 1 : 0 \/;
+    let call_previousNode: fun(Externref) Externref = @es/\ (self) => self["previousNode"]() \/;
+    let call_previousNode_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["previousNode"](...args) \/;
+    let get_referenceNode: fun(Externref) Externref = @es/\ (self) => self["referenceNode"] \/;
+    let get_root: fun(Externref) Externref = @es/\ (self) => self["root"] \/;
+    let get_whatToShow: fun(Externref) F64 = @es/\ (self) => self["whatToShow"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["NodeIterator"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["NodeIterator"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["NodeIterator"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["NodeIterator"]["prototype"] = value; } \/;
+}

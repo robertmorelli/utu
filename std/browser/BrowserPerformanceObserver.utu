@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPerformanceObserver {
+    let call_disconnect: fun(Externref) void = @es/\ (self) => self["disconnect"]() \/;
+    let call_disconnect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["disconnect"](...args) \/;
+    let call_observe: fun(Externref) void = @es/\ (self) => self["observe"]() \/;
+    let call_observe_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["observe"](p0) \/;
+    let call_observe_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["observe"](...args) \/;
+    let call_takeRecords: fun(Externref) Externref = @es/\ (self) => self["takeRecords"]() \/;
+    let call_takeRecords_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["takeRecords"](...args) \/;
+    let new_instance: fun(cl(Externref, Externref) void) Externref = @es/\ (p0) => new globalThis["PerformanceObserver"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["PerformanceObserver"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["PerformanceObserver"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["PerformanceObserver"]["prototype"] = value; } \/;
+    let static_get_supportedEntryTypes: fun() Externref = @es/\ () => globalThis["PerformanceObserver"]["supportedEntryTypes"] \/;
+}

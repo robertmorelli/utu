@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDynamicsCompressorOptions {
+    let get_attack: fun(Externref) Externref = @es/\ (self) => self["attack"] \/;
+    let set_attack: fun(Externref, Externref) void = @es/\ (self,value) => { self["attack"] = value; } \/;
+    let get_channelCount: fun(Externref) Externref = @es/\ (self) => self["channelCount"] \/;
+    let set_channelCount: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCount"] = value; } \/;
+    let get_channelCountMode: fun(Externref) Externref = @es/\ (self) => self["channelCountMode"] \/;
+    let set_channelCountMode: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCountMode"] = value; } \/;
+    let get_channelInterpretation: fun(Externref) Externref = @es/\ (self) => self["channelInterpretation"] \/;
+    let set_channelInterpretation: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelInterpretation"] = value; } \/;
+    let get_knee: fun(Externref) Externref = @es/\ (self) => self["knee"] \/;
+    let set_knee: fun(Externref, Externref) void = @es/\ (self,value) => { self["knee"] = value; } \/;
+    let get_ratio: fun(Externref) Externref = @es/\ (self) => self["ratio"] \/;
+    let set_ratio: fun(Externref, Externref) void = @es/\ (self,value) => { self["ratio"] = value; } \/;
+    let get_release: fun(Externref) Externref = @es/\ (self) => self["release"] \/;
+    let set_release: fun(Externref, Externref) void = @es/\ (self,value) => { self["release"] = value; } \/;
+    let get_threshold: fun(Externref) Externref = @es/\ (self) => self["threshold"] \/;
+    let set_threshold: fun(Externref, Externref) void = @es/\ (self,value) => { self["threshold"] = value; } \/;
+}

@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCryptoKey {
+    let get_algorithm: fun(Externref) Externref = @es/\ (self) => self["algorithm"] \/;
+    let get_extractable: fun(Externref) Bool = @es/\ (self) => (self["extractable"]) ? 1 : 0 \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let get_usages: fun(Externref) Externref = @es/\ (self) => self["usages"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CryptoKey"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CryptoKey"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CryptoKey"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CryptoKey"]["prototype"] = value; } \/;
+}

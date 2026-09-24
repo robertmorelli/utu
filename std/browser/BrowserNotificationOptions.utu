@@ -1,0 +1,21 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNotificationOptions {
+    let get_badge: fun(Externref) Externref = @es/\ (self) => self["badge"] \/;
+    let set_badge: fun(Externref, Externref) void = @es/\ (self,value) => { self["badge"] = value; } \/;
+    let get_body: fun(Externref) Externref = @es/\ (self) => self["body"] \/;
+    let set_body: fun(Externref, Externref) void = @es/\ (self,value) => { self["body"] = value; } \/;
+    let get_data: fun(Externref) Externref = @es/\ (self) => self["data"] \/;
+    let set_data: fun(Externref, Externref) void = @es/\ (self,value) => { self["data"] = value; } \/;
+    let get_dir: fun(Externref) Externref = @es/\ (self) => self["dir"] \/;
+    let set_dir: fun(Externref, Externref) void = @es/\ (self,value) => { self["dir"] = value; } \/;
+    let get_icon: fun(Externref) Externref = @es/\ (self) => self["icon"] \/;
+    let set_icon: fun(Externref, Externref) void = @es/\ (self,value) => { self["icon"] = value; } \/;
+    let get_lang: fun(Externref) Externref = @es/\ (self) => self["lang"] \/;
+    let set_lang: fun(Externref, Externref) void = @es/\ (self,value) => { self["lang"] = value; } \/;
+    let get_requireInteraction: fun(Externref) Externref = @es/\ (self) => self["requireInteraction"] \/;
+    let set_requireInteraction: fun(Externref, Externref) void = @es/\ (self,value) => { self["requireInteraction"] = value; } \/;
+    let get_silent: fun(Externref) Externref = @es/\ (self) => self["silent"] \/;
+    let set_silent: fun(Externref, Externref) void = @es/\ (self,value) => { self["silent"] = value; } \/;
+    let get_tag: fun(Externref) Externref = @es/\ (self) => self["tag"] \/;
+    let set_tag: fun(Externref, Externref) void = @es/\ (self,value) => { self["tag"] = value; } \/;
+}

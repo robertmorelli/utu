@@ -1,0 +1,22 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSRotate {
+    let get_angle: fun(Externref) Externref = @es/\ (self) => self["angle"] \/;
+    let set_angle: fun(Externref, Externref) void = @es/\ (self,value) => { self["angle"] = value; } \/;
+    let get_is2D: fun(Externref) Bool = @es/\ (self) => (self["is2D"]) ? 1 : 0 \/;
+    let set_is2D: fun(Externref, Bool) void = @es/\ (self,value) => { self["is2D"] = !!value; } \/;
+    let call_toMatrix: fun(Externref) Externref = @es/\ (self) => self["toMatrix"]() \/;
+    let call_toMatrix_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toMatrix"](...args) \/;
+    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
+    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
+    let get_x: fun(Externref) Externref = @es/\ (self) => self["x"] \/;
+    let set_x: fun(Externref, Externref) void = @es/\ (self,value) => { self["x"] = value; } \/;
+    let get_y: fun(Externref) Externref = @es/\ (self) => self["y"] \/;
+    let set_y: fun(Externref, Externref) void = @es/\ (self,value) => { self["y"] = value; } \/;
+    let get_z: fun(Externref) Externref = @es/\ (self) => self["z"] \/;
+    let set_z: fun(Externref, Externref) void = @es/\ (self,value) => { self["z"] = value; } \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["CSSRotate"](p0) \/;
+    let new_instance_overload2: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (p0,p1,p2,p3) => new globalThis["CSSRotate"](p0,p1,p2,p3) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CSSRotate"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CSSRotate"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CSSRotate"]["prototype"] = value; } \/;
+}

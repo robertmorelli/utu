@@ -70,7 +70,11 @@ export function emitFn(fn, ctx) {
 
   // ── Body ──────────────────────────────────────────────────────────────────
   const body = bodyOf(fn);
-  const bodyExpr = body ? emitExpr(body, fnCtx) : m.nop();
+  let bodyExpr = body ? emitExpr(body, fnCtx) : m.nop();
+  const bodyType = binaryen.getExpressionType(bodyExpr);
+  if (retType === binaryen.none && bodyType !== binaryen.none && bodyType !== binaryen.unreachable) {
+    bodyExpr = m.drop(bodyExpr);
+  }
 
   const funcRef = m.addFunction(
     name,

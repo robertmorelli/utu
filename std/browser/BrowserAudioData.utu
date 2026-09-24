@@ -1,0 +1,21 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioData {
+    let call_allocationSize: fun(Externref, Externref) F64 = @es/\ (self,p0) => self["allocationSize"](p0) \/;
+    let call_allocationSize_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["allocationSize"](...args) \/;
+    let call_clone: fun(Externref) Externref = @es/\ (self) => self["clone"]() \/;
+    let call_clone_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clone"](...args) \/;
+    let call_close: fun(Externref) void = @es/\ (self) => self["close"]() \/;
+    let call_close_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["close"](...args) \/;
+    let call_copyTo: fun(Externref, Externref, Externref) void = @es/\ (self,p0,p1) => self["copyTo"](p0,p1) \/;
+    let call_copyTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["copyTo"](...args) \/;
+    let get_duration: fun(Externref) F64 = @es/\ (self) => self["duration"] \/;
+    let get_format: fun(Externref) Externref = @es/\ (self) => self["format"] \/;
+    let get_numberOfChannels: fun(Externref) F64 = @es/\ (self) => self["numberOfChannels"] \/;
+    let get_numberOfFrames: fun(Externref) F64 = @es/\ (self) => self["numberOfFrames"] \/;
+    let get_sampleRate: fun(Externref) F64 = @es/\ (self) => self["sampleRate"] \/;
+    let get_timestamp: fun(Externref) F64 = @es/\ (self) => self["timestamp"] \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["AudioData"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["AudioData"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["AudioData"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["AudioData"]["prototype"] = value; } \/;
+}

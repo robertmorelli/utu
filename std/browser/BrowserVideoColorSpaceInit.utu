@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserVideoColorSpaceInit {
+    let get_fullRange: fun(Externref) Externref = @es/\ (self) => self["fullRange"] \/;
+    let set_fullRange: fun(Externref, Externref) void = @es/\ (self,value) => { self["fullRange"] = value; } \/;
+    let get_matrix: fun(Externref) Externref = @es/\ (self) => self["matrix"] \/;
+    let set_matrix: fun(Externref, Externref) void = @es/\ (self,value) => { self["matrix"] = value; } \/;
+    let get_primaries: fun(Externref) Externref = @es/\ (self) => self["primaries"] \/;
+    let set_primaries: fun(Externref, Externref) void = @es/\ (self,value) => { self["primaries"] = value; } \/;
+    let get_transfer: fun(Externref) Externref = @es/\ (self) => self["transfer"] \/;
+    let set_transfer: fun(Externref, Externref) void = @es/\ (self,value) => { self["transfer"] = value; } \/;
+}

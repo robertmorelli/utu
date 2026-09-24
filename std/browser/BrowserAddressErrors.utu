@@ -1,0 +1,23 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAddressErrors {
+    let get_addressLine: fun(Externref) Externref = @es/\ (self) => self["addressLine"] \/;
+    let set_addressLine: fun(Externref, Externref) void = @es/\ (self,value) => { self["addressLine"] = value; } \/;
+    let get_city: fun(Externref) Externref = @es/\ (self) => self["city"] \/;
+    let set_city: fun(Externref, Externref) void = @es/\ (self,value) => { self["city"] = value; } \/;
+    let get_country: fun(Externref) Externref = @es/\ (self) => self["country"] \/;
+    let set_country: fun(Externref, Externref) void = @es/\ (self,value) => { self["country"] = value; } \/;
+    let get_dependentLocality: fun(Externref) Externref = @es/\ (self) => self["dependentLocality"] \/;
+    let set_dependentLocality: fun(Externref, Externref) void = @es/\ (self,value) => { self["dependentLocality"] = value; } \/;
+    let get_organization: fun(Externref) Externref = @es/\ (self) => self["organization"] \/;
+    let set_organization: fun(Externref, Externref) void = @es/\ (self,value) => { self["organization"] = value; } \/;
+    let get_phone: fun(Externref) Externref = @es/\ (self) => self["phone"] \/;
+    let set_phone: fun(Externref, Externref) void = @es/\ (self,value) => { self["phone"] = value; } \/;
+    let get_postalCode: fun(Externref) Externref = @es/\ (self) => self["postalCode"] \/;
+    let set_postalCode: fun(Externref, Externref) void = @es/\ (self,value) => { self["postalCode"] = value; } \/;
+    let get_recipient: fun(Externref) Externref = @es/\ (self) => self["recipient"] \/;
+    let set_recipient: fun(Externref, Externref) void = @es/\ (self,value) => { self["recipient"] = value; } \/;
+    let get_region: fun(Externref) Externref = @es/\ (self) => self["region"] \/;
+    let set_region: fun(Externref, Externref) void = @es/\ (self,value) => { self["region"] = value; } \/;
+    let get_sortingCode: fun(Externref) Externref = @es/\ (self) => self["sortingCode"] \/;
+    let set_sortingCode: fun(Externref, Externref) void = @es/\ (self,value) => { self["sortingCode"] = value; } \/;
+}

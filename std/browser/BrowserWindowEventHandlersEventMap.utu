@@ -1,0 +1,43 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWindowEventHandlersEventMap {
+    let get_afterprint: fun(Externref) Externref = @es/\ (self) => self["afterprint"] \/;
+    let set_afterprint: fun(Externref, Externref) void = @es/\ (self,value) => { self["afterprint"] = value; } \/;
+    let get_beforeprint: fun(Externref) Externref = @es/\ (self) => self["beforeprint"] \/;
+    let set_beforeprint: fun(Externref, Externref) void = @es/\ (self,value) => { self["beforeprint"] = value; } \/;
+    let get_beforeunload: fun(Externref) Externref = @es/\ (self) => self["beforeunload"] \/;
+    let set_beforeunload: fun(Externref, Externref) void = @es/\ (self,value) => { self["beforeunload"] = value; } \/;
+    let get_gamepadconnected: fun(Externref) Externref = @es/\ (self) => self["gamepadconnected"] \/;
+    let set_gamepadconnected: fun(Externref, Externref) void = @es/\ (self,value) => { self["gamepadconnected"] = value; } \/;
+    let get_gamepaddisconnected: fun(Externref) Externref = @es/\ (self) => self["gamepaddisconnected"] \/;
+    let set_gamepaddisconnected: fun(Externref, Externref) void = @es/\ (self,value) => { self["gamepaddisconnected"] = value; } \/;
+    let get_hashchange: fun(Externref) Externref = @es/\ (self) => self["hashchange"] \/;
+    let set_hashchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["hashchange"] = value; } \/;
+    let get_languagechange: fun(Externref) Externref = @es/\ (self) => self["languagechange"] \/;
+    let set_languagechange: fun(Externref, Externref) void = @es/\ (self,value) => { self["languagechange"] = value; } \/;
+    let get_message: fun(Externref) Externref = @es/\ (self) => self["message"] \/;
+    let set_message: fun(Externref, Externref) void = @es/\ (self,value) => { self["message"] = value; } \/;
+    let get_messageerror: fun(Externref) Externref = @es/\ (self) => self["messageerror"] \/;
+    let set_messageerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["messageerror"] = value; } \/;
+    let get_offline: fun(Externref) Externref = @es/\ (self) => self["offline"] \/;
+    let set_offline: fun(Externref, Externref) void = @es/\ (self,value) => { self["offline"] = value; } \/;
+    let get_online: fun(Externref) Externref = @es/\ (self) => self["online"] \/;
+    let set_online: fun(Externref, Externref) void = @es/\ (self,value) => { self["online"] = value; } \/;
+    let get_pagehide: fun(Externref) Externref = @es/\ (self) => self["pagehide"] \/;
+    let set_pagehide: fun(Externref, Externref) void = @es/\ (self,value) => { self["pagehide"] = value; } \/;
+    let get_pagereveal: fun(Externref) Externref = @es/\ (self) => self["pagereveal"] \/;
+    let set_pagereveal: fun(Externref, Externref) void = @es/\ (self,value) => { self["pagereveal"] = value; } \/;
+    let get_pageshow: fun(Externref) Externref = @es/\ (self) => self["pageshow"] \/;
+    let set_pageshow: fun(Externref, Externref) void = @es/\ (self,value) => { self["pageshow"] = value; } \/;
+    let get_pageswap: fun(Externref) Externref = @es/\ (self) => self["pageswap"] \/;
+    let set_pageswap: fun(Externref, Externref) void = @es/\ (self,value) => { self["pageswap"] = value; } \/;
+    let get_popstate: fun(Externref) Externref = @es/\ (self) => self["popstate"] \/;
+    let set_popstate: fun(Externref, Externref) void = @es/\ (self,value) => { self["popstate"] = value; } \/;
+    let get_rejectionhandled: fun(Externref) Externref = @es/\ (self) => self["rejectionhandled"] \/;
+    let set_rejectionhandled: fun(Externref, Externref) void = @es/\ (self,value) => { self["rejectionhandled"] = value; } \/;
+    let get_storage: fun(Externref) Externref = @es/\ (self) => self["storage"] \/;
+    let set_storage: fun(Externref, Externref) void = @es/\ (self,value) => { self["storage"] = value; } \/;
+    let get_unhandledrejection: fun(Externref) Externref = @es/\ (self) => self["unhandledrejection"] \/;
+    let set_unhandledrejection: fun(Externref, Externref) void = @es/\ (self,value) => { self["unhandledrejection"] = value; } \/;
+    let get_unload: fun(Externref) Externref = @es/\ (self) => self["unload"] \/;
+    let set_unload: fun(Externref, Externref) void = @es/\ (self,value) => { self["unload"] = value; } \/;
+}

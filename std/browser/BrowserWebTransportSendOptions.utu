@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWebTransportSendOptions {
+    let get_sendOrder: fun(Externref) Externref = @es/\ (self) => self["sendOrder"] \/;
+    let set_sendOrder: fun(Externref, Externref) void = @es/\ (self,value) => { self["sendOrder"] = value; } \/;
+}

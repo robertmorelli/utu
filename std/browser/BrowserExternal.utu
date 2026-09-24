@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserExternal {
+    let call_AddSearchProvider: fun(Externref) void = @es/\ (self) => self["AddSearchProvider"]() \/;
+    let call_AddSearchProvider_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["AddSearchProvider"](...args) \/;
+    let call_IsSearchProviderInstalled: fun(Externref) void = @es/\ (self) => self["IsSearchProviderInstalled"]() \/;
+    let call_IsSearchProviderInstalled_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["IsSearchProviderInstalled"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["External"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["External"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["External"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["External"]["prototype"] = value; } \/;
+}

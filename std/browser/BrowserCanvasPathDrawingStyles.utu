@@ -1,0 +1,18 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCanvasPathDrawingStyles {
+    let call_getLineDash: fun(Externref) Externref = @es/\ (self) => self["getLineDash"]() \/;
+    let call_getLineDash_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getLineDash"](...args) \/;
+    let get_lineCap: fun(Externref) Str = @es/\ (self) => self["lineCap"] \/;
+    let set_lineCap: fun(Externref, Str) void = @es/\ (self,value) => { self["lineCap"] = value; } \/;
+    let get_lineDashOffset: fun(Externref) F64 = @es/\ (self) => self["lineDashOffset"] \/;
+    let set_lineDashOffset: fun(Externref, F64) void = @es/\ (self,value) => { self["lineDashOffset"] = value; } \/;
+    let get_lineJoin: fun(Externref) Str = @es/\ (self) => self["lineJoin"] \/;
+    let set_lineJoin: fun(Externref, Str) void = @es/\ (self,value) => { self["lineJoin"] = value; } \/;
+    let get_lineWidth: fun(Externref) F64 = @es/\ (self) => self["lineWidth"] \/;
+    let set_lineWidth: fun(Externref, F64) void = @es/\ (self,value) => { self["lineWidth"] = value; } \/;
+    let get_miterLimit: fun(Externref) F64 = @es/\ (self) => self["miterLimit"] \/;
+    let set_miterLimit: fun(Externref, F64) void = @es/\ (self,value) => { self["miterLimit"] = value; } \/;
+    let call_setLineDash: fun(Externref, Externref) void = @es/\ (self,p0) => self["setLineDash"](p0) \/;
+    let call_setLineDash_overload2: fun(Externref, Externref) void = @es/\ (self,p0) => self["setLineDash"](p0) \/;
+    let call_setLineDash_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setLineDash"](...args) \/;
+}

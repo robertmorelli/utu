@@ -125,7 +125,7 @@ export async function activate(context) {
     throwOnDiagnostics(analysis.artifacts.diagnostics);
     const { buildImportObject, emitBinary, instantiateLowered } = await loadUtu();
     const binary = emitBinary(analysis.doc);
-    const { instance } = await instantiateLowered(binary, buildImportObject(analysis.doc));
+    const { instance } = await instantiateLowered(binary, await buildImportObject(analysis.doc));
     if (typeof instance.exports.main !== 'function') {
       throw new Error('The active file does not export main().');
     }

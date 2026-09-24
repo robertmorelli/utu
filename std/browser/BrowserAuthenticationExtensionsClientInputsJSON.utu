@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAuthenticationExtensionsClientInputsJSON {
+    let get_appid: fun(Externref) Externref = @es/\ (self) => self["appid"] \/;
+    let set_appid: fun(Externref, Externref) void = @es/\ (self,value) => { self["appid"] = value; } \/;
+    let get_credProps: fun(Externref) Externref = @es/\ (self) => self["credProps"] \/;
+    let set_credProps: fun(Externref, Externref) void = @es/\ (self,value) => { self["credProps"] = value; } \/;
+    let get_largeBlob: fun(Externref) Externref = @es/\ (self) => self["largeBlob"] \/;
+    let set_largeBlob: fun(Externref, Externref) void = @es/\ (self,value) => { self["largeBlob"] = value; } \/;
+    let get_prf: fun(Externref) Externref = @es/\ (self) => self["prf"] \/;
+    let set_prf: fun(Externref, Externref) void = @es/\ (self,value) => { self["prf"] = value; } \/;
+}

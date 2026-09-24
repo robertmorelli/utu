@@ -222,7 +222,15 @@ export function emitBinary(doc, { artifacts = null, stringMode = 'lowered', sour
   try {
     validateModule(m, '');
     if (stringMode === 'lowered' && MODULE_REQUIREMENTS.get(m)?.strings) {
-      m.runPasses(['string-lowering-magic-imports']);
+      // String lowering changes the ABI itself. Binaryen otherwise protects
+      // "public" GC types, including closure environments exposed through
+      // closure_new's funcref, and leaves stringref fields behind. Let this
+      // representation pass rewrite the whole module, then restore the normal
+      // optimizer's world assumptions before any dead-code/type optimization.
+      const previousClosedWorld = binaryen.getClosedWorld();
+      binaryen.setClosedWorld(true);
+      try { m.runPasses(['string-lowering-magic-imports']); }
+      finally { binaryen.setClosedWorld(previousClosedWorld); }
       // The lowering removes every stringref instruction. Leaving the proposal
       // enabled makes later optimization conservatively preserve shapes that a
       // reparsed lowered binary can shrink further.

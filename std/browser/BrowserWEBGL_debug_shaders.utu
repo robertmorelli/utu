@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWEBGL_debug_shaders {
+    let call_getTranslatedShaderSource: fun(Externref, Externref) Str = @es/\ (self,p0) => self["getTranslatedShaderSource"](p0) \/;
+    let call_getTranslatedShaderSource_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getTranslatedShaderSource"](...args) \/;
+}

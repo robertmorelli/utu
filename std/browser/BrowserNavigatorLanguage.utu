@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNavigatorLanguage {
+    let get_language: fun(Externref) Str = @es/\ (self) => self["language"] \/;
+    let get_languages: fun(Externref) Externref = @es/\ (self) => self["languages"] \/;
+}

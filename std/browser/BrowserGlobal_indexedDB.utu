@@ -1,0 +1,12 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_indexedDB {
+    let call_cmp: fun(Externref, Externref) F64 = @es/\ (p0,p1) => globalThis["indexedDB"]["cmp"](p0,p1) \/;
+    let call_cmp_js: fun(Externref) Externref = @es/\ (args) => globalThis["indexedDB"]["cmp"](...args) \/;
+    let call_databases: fun() Externref = @es/\ () => globalThis["indexedDB"]["databases"]() \/;
+    let call_databases_js: fun(Externref) Externref = @es/\ (args) => globalThis["indexedDB"]["databases"](...args) \/;
+    let call_deleteDatabase: fun(Str) Externref = @es/\ (p0) => globalThis["indexedDB"]["deleteDatabase"](p0) \/;
+    let call_deleteDatabase_js: fun(Externref) Externref = @es/\ (args) => globalThis["indexedDB"]["deleteDatabase"](...args) \/;
+    let call_open: fun(Str) Externref = @es/\ (p0) => globalThis["indexedDB"]["open"](p0) \/;
+    let call_open_arity2: fun(Str, F64) Externref = @es/\ (p0,p1) => globalThis["indexedDB"]["open"](p0,p1) \/;
+    let call_open_js: fun(Externref) Externref = @es/\ (args) => globalThis["indexedDB"]["open"](...args) \/;
+}

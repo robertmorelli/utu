@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserITextWriter {
+    let call_Close: fun(Externref) void = @es/\ (self) => self["Close"]() \/;
+    let call_Close_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["Close"](...args) \/;
+    let call_Write: fun(Externref, Str) void = @es/\ (self,p0) => self["Write"](p0) \/;
+    let call_Write_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["Write"](...args) \/;
+    let call_WriteLine: fun(Externref, Str) void = @es/\ (self,p0) => self["WriteLine"](p0) \/;
+    let call_WriteLine_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["WriteLine"](...args) \/;
+}

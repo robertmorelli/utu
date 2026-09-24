@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPerformanceNavigation {
+    let get_TYPE_BACK_FORWARD: fun(Externref) F64 = @es/\ (self) => self["TYPE_BACK_FORWARD"] \/;
+    let get_TYPE_NAVIGATE: fun(Externref) F64 = @es/\ (self) => self["TYPE_NAVIGATE"] \/;
+    let get_TYPE_RELOAD: fun(Externref) F64 = @es/\ (self) => self["TYPE_RELOAD"] \/;
+    let get_TYPE_RESERVED: fun(Externref) F64 = @es/\ (self) => self["TYPE_RESERVED"] \/;
+    let get_redirectCount: fun(Externref) F64 = @es/\ (self) => self["redirectCount"] \/;
+    let call_toJSON: fun(Externref) Externref = @es/\ (self) => self["toJSON"]() \/;
+    let call_toJSON_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toJSON"](...args) \/;
+    let get_type: fun(Externref) F64 = @es/\ (self) => self["type"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["PerformanceNavigation"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["PerformanceNavigation"](...args) \/;
+    let static_get_TYPE_BACK_FORWARD: fun() F64 = @es/\ () => globalThis["PerformanceNavigation"]["TYPE_BACK_FORWARD"] \/;
+    let static_get_TYPE_NAVIGATE: fun() F64 = @es/\ () => globalThis["PerformanceNavigation"]["TYPE_NAVIGATE"] \/;
+    let static_get_TYPE_RELOAD: fun() F64 = @es/\ () => globalThis["PerformanceNavigation"]["TYPE_RELOAD"] \/;
+    let static_get_TYPE_RESERVED: fun() F64 = @es/\ () => globalThis["PerformanceNavigation"]["TYPE_RESERVED"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["PerformanceNavigation"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["PerformanceNavigation"]["prototype"] = value; } \/;
+}

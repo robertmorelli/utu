@@ -1,0 +1,38 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSKeyframesRule {
+    let get_CHARSET_RULE: fun(Externref) F64 = @es/\ (self) => self["CHARSET_RULE"] \/;
+    let get_COUNTER_STYLE_RULE: fun(Externref) F64 = @es/\ (self) => self["COUNTER_STYLE_RULE"] \/;
+    let get_FONT_FACE_RULE: fun(Externref) F64 = @es/\ (self) => self["FONT_FACE_RULE"] \/;
+    let get_FONT_FEATURE_VALUES_RULE: fun(Externref) F64 = @es/\ (self) => self["FONT_FEATURE_VALUES_RULE"] \/;
+    let get_IMPORT_RULE: fun(Externref) F64 = @es/\ (self) => self["IMPORT_RULE"] \/;
+    let get_KEYFRAMES_RULE: fun(Externref) F64 = @es/\ (self) => self["KEYFRAMES_RULE"] \/;
+    let get_KEYFRAME_RULE: fun(Externref) F64 = @es/\ (self) => self["KEYFRAME_RULE"] \/;
+    let get_MEDIA_RULE: fun(Externref) F64 = @es/\ (self) => self["MEDIA_RULE"] \/;
+    let get_NAMESPACE_RULE: fun(Externref) F64 = @es/\ (self) => self["NAMESPACE_RULE"] \/;
+    let get_PAGE_RULE: fun(Externref) F64 = @es/\ (self) => self["PAGE_RULE"] \/;
+    let get_STYLE_RULE: fun(Externref) F64 = @es/\ (self) => self["STYLE_RULE"] \/;
+    let get_SUPPORTS_RULE: fun(Externref) F64 = @es/\ (self) => self["SUPPORTS_RULE"] \/;
+    let call_symbol_iterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.iterator]() \/;
+    let call_symbol_iterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.iterator](...args) \/;
+    let call_appendRule: fun(Externref, Str) void = @es/\ (self,p0) => self["appendRule"](p0) \/;
+    let call_appendRule_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["appendRule"](...args) \/;
+    let get_cssRules: fun(Externref) Externref = @es/\ (self) => self["cssRules"] \/;
+    let get_cssText: fun(Externref) Str = @es/\ (self) => self["cssText"] \/;
+    let set_cssText: fun(Externref, Str) void = @es/\ (self,value) => { self["cssText"] = value; } \/;
+    let call_deleteRule: fun(Externref, Str) void = @es/\ (self,p0) => self["deleteRule"](p0) \/;
+    let call_deleteRule_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["deleteRule"](...args) \/;
+    let call_findRule: fun(Externref, Str) Externref = @es/\ (self,p0) => self["findRule"](p0) \/;
+    let call_findRule_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["findRule"](...args) \/;
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_parentRule: fun(Externref) Externref = @es/\ (self) => self["parentRule"] \/;
+    let get_parentStyleSheet: fun(Externref) Externref = @es/\ (self) => self["parentStyleSheet"] \/;
+    let get_type: fun(Externref) F64 = @es/\ (self) => self["type"] \/;
+    let get_index: fun(Externref, F64) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, F64, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CSSKeyframesRule"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CSSKeyframesRule"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CSSKeyframesRule"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CSSKeyframesRule"]["prototype"] = value; } \/;
+}

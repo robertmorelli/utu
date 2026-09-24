@@ -1,0 +1,41 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWindowOrWorkerGlobalScope {
+    let call_atob: fun(Externref, Str) Str = @es/\ (self,p0) => self["atob"](p0) \/;
+    let call_atob_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["atob"](...args) \/;
+    let call_btoa: fun(Externref, Str) Str = @es/\ (self,p0) => self["btoa"](p0) \/;
+    let call_btoa_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["btoa"](...args) \/;
+    let get_caches: fun(Externref) Externref = @es/\ (self) => self["caches"] \/;
+    let call_clearInterval: fun(Externref, Externref) void = @es/\ (self,p0) => self["clearInterval"](p0) \/;
+    let call_clearInterval_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clearInterval"](...args) \/;
+    let call_clearTimeout: fun(Externref, Externref) void = @es/\ (self,p0) => self["clearTimeout"](p0) \/;
+    let call_clearTimeout_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clearTimeout"](...args) \/;
+    let call_createImageBitmap: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["createImageBitmap"](p0) \/;
+    let call_createImageBitmap_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["createImageBitmap"](p0,p1) \/;
+    let call_createImageBitmap_overload2: fun(Externref, Externref, F64, F64, F64, F64) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["createImageBitmap"](p0,p1,p2,p3,p4) \/;
+    let call_createImageBitmap_overload2_arity6: fun(Externref, Externref, F64, F64, F64, F64, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4,p5) => self["createImageBitmap"](p0,p1,p2,p3,p4,p5) \/;
+    let call_createImageBitmap_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createImageBitmap"](...args) \/;
+    let get_crossOriginIsolated: fun(Externref) Bool = @es/\ (self) => (self["crossOriginIsolated"]) ? 1 : 0 \/;
+    let get_crypto: fun(Externref) Externref = @es/\ (self) => self["crypto"] \/;
+    let call_fetch: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["fetch"](p0) \/;
+    let call_fetch_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["fetch"](p0,p1) \/;
+    let call_fetch_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["fetch"](...args) \/;
+    let get_indexedDB: fun(Externref) Externref = @es/\ (self) => self["indexedDB"] \/;
+    let get_isSecureContext: fun(Externref) Bool = @es/\ (self) => (self["isSecureContext"]) ? 1 : 0 \/;
+    let get_origin: fun(Externref) Str = @es/\ (self) => self["origin"] \/;
+    let get_performance: fun(Externref) Externref = @es/\ (self) => self["performance"] \/;
+    let call_queueMicrotask: fun(Externref, cl() void) void = @es/\ (self,p0) => self["queueMicrotask"](p0) \/;
+    let call_queueMicrotask_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["queueMicrotask"](...args) \/;
+    let call_reportError: fun(Externref, Externref) void = @es/\ (self,p0) => self["reportError"](p0) \/;
+    let call_reportError_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["reportError"](...args) \/;
+    let call_setInterval: fun(Externref, Externref) F64 = @es/\ (self,p0) => self["setInterval"](p0) \/;
+    let call_setInterval_arity2: fun(Externref, Externref, F64) F64 = @es/\ (self,p0,p1) => self["setInterval"](p0,p1) \/;
+    let call_setInterval_arity3: fun(Externref, Externref, F64, Externref) F64 = @es/\ (self,p0,p1,p2) => self["setInterval"](p0,p1,...p2) \/;
+    let call_setInterval_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setInterval"](...args) \/;
+    let call_setTimeout: fun(Externref, Externref) F64 = @es/\ (self,p0) => self["setTimeout"](p0) \/;
+    let call_setTimeout_arity2: fun(Externref, Externref, F64) F64 = @es/\ (self,p0,p1) => self["setTimeout"](p0,p1) \/;
+    let call_setTimeout_arity3: fun(Externref, Externref, F64, Externref) F64 = @es/\ (self,p0,p1,p2) => self["setTimeout"](p0,p1,...p2) \/;
+    let call_setTimeout_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setTimeout"](...args) \/;
+    let call_structuredClone: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["structuredClone"](p0) \/;
+    let call_structuredClone_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["structuredClone"](p0,p1) \/;
+    let call_structuredClone_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["structuredClone"](...args) \/;
+}

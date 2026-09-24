@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPaymentRequestEventMap {
+    let get_paymentmethodchange: fun(Externref) Externref = @es/\ (self) => self["paymentmethodchange"] \/;
+    let set_paymentmethodchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["paymentmethodchange"] = value; } \/;
+    let get_shippingaddresschange: fun(Externref) Externref = @es/\ (self) => self["shippingaddresschange"] \/;
+    let set_shippingaddresschange: fun(Externref, Externref) void = @es/\ (self,value) => { self["shippingaddresschange"] = value; } \/;
+    let get_shippingoptionchange: fun(Externref) Externref = @es/\ (self) => self["shippingoptionchange"] \/;
+    let set_shippingoptionchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["shippingoptionchange"] = value; } \/;
+}

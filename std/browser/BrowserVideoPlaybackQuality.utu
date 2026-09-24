@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserVideoPlaybackQuality {
+    let get_corruptedVideoFrames: fun(Externref) F64 = @es/\ (self) => self["corruptedVideoFrames"] \/;
+    let get_creationTime: fun(Externref) F64 = @es/\ (self) => self["creationTime"] \/;
+    let get_droppedVideoFrames: fun(Externref) F64 = @es/\ (self) => self["droppedVideoFrames"] \/;
+    let get_totalVideoFrames: fun(Externref) F64 = @es/\ (self) => self["totalVideoFrames"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["VideoPlaybackQuality"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["VideoPlaybackQuality"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["VideoPlaybackQuality"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["VideoPlaybackQuality"]["prototype"] = value; } \/;
+}

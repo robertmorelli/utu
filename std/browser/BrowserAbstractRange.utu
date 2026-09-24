@@ -1,0 +1,12 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAbstractRange {
+    let get_collapsed: fun(Externref) Bool = @es/\ (self) => (self["collapsed"]) ? 1 : 0 \/;
+    let get_endContainer: fun(Externref) Externref = @es/\ (self) => self["endContainer"] \/;
+    let get_endOffset: fun(Externref) F64 = @es/\ (self) => self["endOffset"] \/;
+    let get_startContainer: fun(Externref) Externref = @es/\ (self) => self["startContainer"] \/;
+    let get_startOffset: fun(Externref) F64 = @es/\ (self) => self["startOffset"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["AbstractRange"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["AbstractRange"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["AbstractRange"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["AbstractRange"]["prototype"] = value; } \/;
+}

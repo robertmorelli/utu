@@ -1,0 +1,18 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserVBArray {
+    let call_dimensions: fun(Externref) F64 = @es/\ (self) => self["dimensions"]() \/;
+    let call_dimensions_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dimensions"](...args) \/;
+    let call_getItem: fun(Externref, F64) Externref = @es/\ (self,p0) => self["getItem"](p0) \/;
+    let call_getItem_arity2: fun(Externref, F64, Externref) Externref = @es/\ (self,p0,p1) => self["getItem"](p0,...p1) \/;
+    let call_getItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getItem"](...args) \/;
+    let call_lbound: fun(Externref) F64 = @es/\ (self) => self["lbound"]() \/;
+    let call_lbound_arity1: fun(Externref, F64) F64 = @es/\ (self,p0) => self["lbound"](p0) \/;
+    let call_lbound_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["lbound"](...args) \/;
+    let call_toArray: fun(Externref) Externref = @es/\ (self) => self["toArray"]() \/;
+    let call_toArray_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toArray"](...args) \/;
+    let call_ubound: fun(Externref) F64 = @es/\ (self) => self["ubound"]() \/;
+    let call_ubound_arity1: fun(Externref, F64) F64 = @es/\ (self,p0) => self["ubound"](p0) \/;
+    let call_ubound_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["ubound"](...args) \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["VBArray"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["VBArray"](...args) \/;
+}

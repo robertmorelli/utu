@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserProxy {
+    let new_instance: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["Proxy"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Proxy"](...args) \/;
+    let static_call_revocable: fun(Externref, Externref) Externref = @es/\ (p0,p1) => globalThis["Proxy"]["revocable"](p0,p1) \/;
+    let static_call_revocable_js: fun(Externref) Externref = @es/\ (args) => globalThis["Proxy"]["revocable"](...args) \/;
+}

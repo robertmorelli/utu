@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaStreamConstraints {
+    let get_audio: fun(Externref) Externref = @es/\ (self) => self["audio"] \/;
+    let set_audio: fun(Externref, Externref) void = @es/\ (self,value) => { self["audio"] = value; } \/;
+    let get_peerIdentity: fun(Externref) Externref = @es/\ (self) => self["peerIdentity"] \/;
+    let set_peerIdentity: fun(Externref, Externref) void = @es/\ (self,value) => { self["peerIdentity"] = value; } \/;
+    let get_preferCurrentTab: fun(Externref) Externref = @es/\ (self) => self["preferCurrentTab"] \/;
+    let set_preferCurrentTab: fun(Externref, Externref) void = @es/\ (self,value) => { self["preferCurrentTab"] = value; } \/;
+    let get_video: fun(Externref) Externref = @es/\ (self) => self["video"] \/;
+    let set_video: fun(Externref, Externref) void = @es/\ (self,value) => { self["video"] = value; } \/;
+}

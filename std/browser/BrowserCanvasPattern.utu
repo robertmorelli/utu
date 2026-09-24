@@ -1,0 +1,10 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCanvasPattern {
+    let call_setTransform: fun(Externref) void = @es/\ (self) => self["setTransform"]() \/;
+    let call_setTransform_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["setTransform"](p0) \/;
+    let call_setTransform_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setTransform"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CanvasPattern"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CanvasPattern"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CanvasPattern"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CanvasPattern"]["prototype"] = value; } \/;
+}

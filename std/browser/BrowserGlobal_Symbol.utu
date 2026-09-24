@@ -1,0 +1,21 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_Symbol {
+    let get_asyncIterator: fun() Externref = @es/\ () => globalThis["Symbol"]["asyncIterator"] \/;
+    let call_for: fun(Str) Externref = @es/\ (p0) => globalThis["Symbol"]["for"](p0) \/;
+    let call_for_js: fun(Externref) Externref = @es/\ (args) => globalThis["Symbol"]["for"](...args) \/;
+    let get_hasInstance: fun() Externref = @es/\ () => globalThis["Symbol"]["hasInstance"] \/;
+    let get_isConcatSpreadable: fun() Externref = @es/\ () => globalThis["Symbol"]["isConcatSpreadable"] \/;
+    let get_iterator: fun() Externref = @es/\ () => globalThis["Symbol"]["iterator"] \/;
+    let call_keyFor: fun(Externref) Externref = @es/\ (p0) => globalThis["Symbol"]["keyFor"](p0) \/;
+    let call_keyFor_js: fun(Externref) Externref = @es/\ (args) => globalThis["Symbol"]["keyFor"](...args) \/;
+    let get_match: fun() Externref = @es/\ () => globalThis["Symbol"]["match"] \/;
+    let get_matchAll: fun() Externref = @es/\ () => globalThis["Symbol"]["matchAll"] \/;
+    let get_prototype: fun() Externref = @es/\ () => globalThis["Symbol"]["prototype"] \/;
+    let get_replace: fun() Externref = @es/\ () => globalThis["Symbol"]["replace"] \/;
+    let get_search: fun() Externref = @es/\ () => globalThis["Symbol"]["search"] \/;
+    let get_species: fun() Externref = @es/\ () => globalThis["Symbol"]["species"] \/;
+    let get_split: fun() Externref = @es/\ () => globalThis["Symbol"]["split"] \/;
+    let get_toPrimitive: fun() Externref = @es/\ () => globalThis["Symbol"]["toPrimitive"] \/;
+    let get_toStringTag: fun() Externref = @es/\ () => globalThis["Symbol"]["toStringTag"] \/;
+    let get_unscopables: fun() Externref = @es/\ () => globalThis["Symbol"]["unscopables"] \/;
+}

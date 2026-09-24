@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSNumericType {
+    let get_angle: fun(Externref) Externref = @es/\ (self) => self["angle"] \/;
+    let set_angle: fun(Externref, Externref) void = @es/\ (self,value) => { self["angle"] = value; } \/;
+    let get_flex: fun(Externref) Externref = @es/\ (self) => self["flex"] \/;
+    let set_flex: fun(Externref, Externref) void = @es/\ (self,value) => { self["flex"] = value; } \/;
+    let get_frequency: fun(Externref) Externref = @es/\ (self) => self["frequency"] \/;
+    let set_frequency: fun(Externref, Externref) void = @es/\ (self,value) => { self["frequency"] = value; } \/;
+    let get_length: fun(Externref) Externref = @es/\ (self) => self["length"] \/;
+    let set_length: fun(Externref, Externref) void = @es/\ (self,value) => { self["length"] = value; } \/;
+    let get_percent: fun(Externref) Externref = @es/\ (self) => self["percent"] \/;
+    let set_percent: fun(Externref, Externref) void = @es/\ (self,value) => { self["percent"] = value; } \/;
+    let get_percentHint: fun(Externref) Externref = @es/\ (self) => self["percentHint"] \/;
+    let set_percentHint: fun(Externref, Externref) void = @es/\ (self,value) => { self["percentHint"] = value; } \/;
+    let get_resolution: fun(Externref) Externref = @es/\ (self) => self["resolution"] \/;
+    let set_resolution: fun(Externref, Externref) void = @es/\ (self,value) => { self["resolution"] = value; } \/;
+    let get_time: fun(Externref) Externref = @es/\ (self) => self["time"] \/;
+    let set_time: fun(Externref, Externref) void = @es/\ (self,value) => { self["time"] = value; } \/;
+}

@@ -1,0 +1,39 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGPreserveAspectRatio {
+    let get_SVG_MEETORSLICE_MEET: fun(Externref) F64 = @es/\ (self) => self["SVG_MEETORSLICE_MEET"] \/;
+    let get_SVG_MEETORSLICE_SLICE: fun(Externref) F64 = @es/\ (self) => self["SVG_MEETORSLICE_SLICE"] \/;
+    let get_SVG_MEETORSLICE_UNKNOWN: fun(Externref) F64 = @es/\ (self) => self["SVG_MEETORSLICE_UNKNOWN"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_NONE: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_NONE"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_UNKNOWN: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_UNKNOWN"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMAXYMAX: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMAXYMAX"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMAXYMID: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMAXYMID"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMAXYMIN: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMAXYMIN"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMIDYMAX: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMIDYMAX"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMIDYMID: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMIDYMID"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMIDYMIN: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMIDYMIN"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMINYMAX: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMINYMAX"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMINYMID: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMINYMID"] \/;
+    let get_SVG_PRESERVEASPECTRATIO_XMINYMIN: fun(Externref) F64 = @es/\ (self) => self["SVG_PRESERVEASPECTRATIO_XMINYMIN"] \/;
+    let get_align: fun(Externref) F64 = @es/\ (self) => self["align"] \/;
+    let set_align: fun(Externref, F64) void = @es/\ (self,value) => { self["align"] = value; } \/;
+    let get_meetOrSlice: fun(Externref) F64 = @es/\ (self) => self["meetOrSlice"] \/;
+    let set_meetOrSlice: fun(Externref, F64) void = @es/\ (self,value) => { self["meetOrSlice"] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGPreserveAspectRatio"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGPreserveAspectRatio"](...args) \/;
+    let static_get_SVG_MEETORSLICE_MEET: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_MEETORSLICE_MEET"] \/;
+    let static_get_SVG_MEETORSLICE_SLICE: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_MEETORSLICE_SLICE"] \/;
+    let static_get_SVG_MEETORSLICE_UNKNOWN: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_MEETORSLICE_UNKNOWN"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_NONE: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_NONE"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_UNKNOWN: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_UNKNOWN"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMAXYMAX: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMAXYMAX"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMAXYMID: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMAXYMID"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMAXYMIN: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMAXYMIN"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMIDYMAX: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMIDYMAX"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMIDYMID: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMIDYMID"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMIDYMIN: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMIDYMIN"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMINYMAX: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMINYMAX"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMINYMID: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMINYMID"] \/;
+    let static_get_SVG_PRESERVEASPECTRATIO_XMINYMIN: fun() F64 = @es/\ () => globalThis["SVGPreserveAspectRatio"]["SVG_PRESERVEASPECTRATIO_XMINYMIN"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGPreserveAspectRatio"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGPreserveAspectRatio"]["prototype"] = value; } \/;
+}

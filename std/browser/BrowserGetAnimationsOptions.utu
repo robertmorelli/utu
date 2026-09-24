@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGetAnimationsOptions {
+    let get_subtree: fun(Externref) Externref = @es/\ (self) => self["subtree"] \/;
+    let set_subtree: fun(Externref, Externref) void = @es/\ (self,value) => { self["subtree"] = value; } \/;
+}

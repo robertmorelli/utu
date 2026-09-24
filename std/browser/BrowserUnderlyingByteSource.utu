@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserUnderlyingByteSource {
+    let get_autoAllocateChunkSize: fun(Externref) Externref = @es/\ (self) => self["autoAllocateChunkSize"] \/;
+    let set_autoAllocateChunkSize: fun(Externref, Externref) void = @es/\ (self,value) => { self["autoAllocateChunkSize"] = value; } \/;
+    let get_cancel: fun(Externref) Externref = @es/\ (self) => self["cancel"] \/;
+    let set_cancel: fun(Externref, Externref) void = @es/\ (self,value) => { self["cancel"] = value; } \/;
+    let get_pull: fun(Externref) Externref = @es/\ (self) => self["pull"] \/;
+    let set_pull: fun(Externref, Externref) void = @es/\ (self,value) => { self["pull"] = value; } \/;
+    let get_start: fun(Externref) Externref = @es/\ (self) => self["start"] \/;
+    let set_start: fun(Externref, Externref) void = @es/\ (self,value) => { self["start"] = value; } \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Str) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

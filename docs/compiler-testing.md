@@ -42,3 +42,16 @@ kept its required JavaScript representation. Test both when the ABI matters.
 These checks establish concrete behavior; they do not claim universal engine
 support or globally minimal output. Preserve conservative optimizer exclusions
 unless a regression demonstrates that removing them is sound.
+
+## TypeScript ABI experiment
+
+`bun run test:bindings` runs declaration/runtime coverage, the in-memory browser
+Worker linker check, and the browser demo. Run `bun scripts/dts-abi-tests.mjs` as
+well to exercise JavaScriptCore. See [the ABI guide](typescript-abi.md) for test
+dependencies and scope. Compiler regressions also cover module host bindings
+beside intrinsic methods, and value-returning expressions in void functions.
+
+The TypeScript ABI workflow runs the declaration suites on Node and Bun on Linux
+and macOS, checks regeneration against the committed corpus, then exercises the
+Worker and demo in Chromium. It saves size measurements and screenshots as CI
+artifacts. Local checks do not substitute for a successful remote workflow run.

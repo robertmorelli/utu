@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_sessionStorage {
+    let call_clear: fun() void = @es/\ () => globalThis["sessionStorage"]["clear"]() \/;
+    let call_clear_js: fun(Externref) Externref = @es/\ (args) => globalThis["sessionStorage"]["clear"](...args) \/;
+    let call_getItem: fun(Str) Externref = @es/\ (p0) => globalThis["sessionStorage"]["getItem"](p0) \/;
+    let call_getItem_js: fun(Externref) Externref = @es/\ (args) => globalThis["sessionStorage"]["getItem"](...args) \/;
+    let call_key: fun(F64) Externref = @es/\ (p0) => globalThis["sessionStorage"]["key"](p0) \/;
+    let call_key_js: fun(Externref) Externref = @es/\ (args) => globalThis["sessionStorage"]["key"](...args) \/;
+    let get_length: fun() F64 = @es/\ () => globalThis["sessionStorage"]["length"] \/;
+    let call_removeItem: fun(Str) void = @es/\ (p0) => globalThis["sessionStorage"]["removeItem"](p0) \/;
+    let call_removeItem_js: fun(Externref) Externref = @es/\ (args) => globalThis["sessionStorage"]["removeItem"](...args) \/;
+    let call_setItem: fun(Str, Str) void = @es/\ (p0,p1) => globalThis["sessionStorage"]["setItem"](p0,p1) \/;
+    let call_setItem_js: fun(Externref) Externref = @es/\ (args) => globalThis["sessionStorage"]["setItem"](...args) \/;
+    let get_index: fun(Str) Externref = @es/\ (key) => globalThis["sessionStorage"][key] \/;
+    let set_index: fun(Str, Externref) void = @es/\ (key,value) => { globalThis["sessionStorage"][key] = value; } \/;
+}

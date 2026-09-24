@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAuthenticatorSelectionCriteria {
+    let get_authenticatorAttachment: fun(Externref) Externref = @es/\ (self) => self["authenticatorAttachment"] \/;
+    let set_authenticatorAttachment: fun(Externref, Externref) void = @es/\ (self,value) => { self["authenticatorAttachment"] = value; } \/;
+    let get_requireResidentKey: fun(Externref) Externref = @es/\ (self) => self["requireResidentKey"] \/;
+    let set_requireResidentKey: fun(Externref, Externref) void = @es/\ (self,value) => { self["requireResidentKey"] = value; } \/;
+    let get_residentKey: fun(Externref) Externref = @es/\ (self) => self["residentKey"] \/;
+    let set_residentKey: fun(Externref, Externref) void = @es/\ (self,value) => { self["residentKey"] = value; } \/;
+    let get_userVerification: fun(Externref) Externref = @es/\ (self) => self["userVerification"] \/;
+    let set_userVerification: fun(Externref, Externref) void = @es/\ (self,value) => { self["userVerification"] = value; } \/;
+}

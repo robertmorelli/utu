@@ -1,0 +1,23 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpReceiver {
+    let call_getContributingSources: fun(Externref) Externref = @es/\ (self) => self["getContributingSources"]() \/;
+    let call_getContributingSources_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getContributingSources"](...args) \/;
+    let call_getParameters: fun(Externref) Externref = @es/\ (self) => self["getParameters"]() \/;
+    let call_getParameters_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getParameters"](...args) \/;
+    let call_getStats: fun(Externref) Externref = @es/\ (self) => self["getStats"]() \/;
+    let call_getStats_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getStats"](...args) \/;
+    let call_getSynchronizationSources: fun(Externref) Externref = @es/\ (self) => self["getSynchronizationSources"]() \/;
+    let call_getSynchronizationSources_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getSynchronizationSources"](...args) \/;
+    let get_jitterBufferTarget: fun(Externref) Externref = @es/\ (self) => self["jitterBufferTarget"] \/;
+    let set_jitterBufferTarget: fun(Externref, Externref) void = @es/\ (self,value) => { self["jitterBufferTarget"] = value; } \/;
+    let get_track: fun(Externref) Externref = @es/\ (self) => self["track"] \/;
+    let get_transform: fun(Externref) Externref = @es/\ (self) => self["transform"] \/;
+    let set_transform: fun(Externref, Externref) void = @es/\ (self,value) => { self["transform"] = value; } \/;
+    let get_transport: fun(Externref) Externref = @es/\ (self) => self["transport"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["RTCRtpReceiver"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["RTCRtpReceiver"](...args) \/;
+    let static_call_getCapabilities: fun(Str) Externref = @es/\ (p0) => globalThis["RTCRtpReceiver"]["getCapabilities"](p0) \/;
+    let static_call_getCapabilities_js: fun(Externref) Externref = @es/\ (args) => globalThis["RTCRtpReceiver"]["getCapabilities"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["RTCRtpReceiver"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["RTCRtpReceiver"]["prototype"] = value; } \/;
+}

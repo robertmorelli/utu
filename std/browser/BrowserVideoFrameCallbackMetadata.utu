@@ -1,0 +1,23 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserVideoFrameCallbackMetadata {
+    let get_captureTime: fun(Externref) Externref = @es/\ (self) => self["captureTime"] \/;
+    let set_captureTime: fun(Externref, Externref) void = @es/\ (self,value) => { self["captureTime"] = value; } \/;
+    let get_expectedDisplayTime: fun(Externref) F64 = @es/\ (self) => self["expectedDisplayTime"] \/;
+    let set_expectedDisplayTime: fun(Externref, F64) void = @es/\ (self,value) => { self["expectedDisplayTime"] = value; } \/;
+    let get_height: fun(Externref) F64 = @es/\ (self) => self["height"] \/;
+    let set_height: fun(Externref, F64) void = @es/\ (self,value) => { self["height"] = value; } \/;
+    let get_mediaTime: fun(Externref) F64 = @es/\ (self) => self["mediaTime"] \/;
+    let set_mediaTime: fun(Externref, F64) void = @es/\ (self,value) => { self["mediaTime"] = value; } \/;
+    let get_presentationTime: fun(Externref) F64 = @es/\ (self) => self["presentationTime"] \/;
+    let set_presentationTime: fun(Externref, F64) void = @es/\ (self,value) => { self["presentationTime"] = value; } \/;
+    let get_presentedFrames: fun(Externref) F64 = @es/\ (self) => self["presentedFrames"] \/;
+    let set_presentedFrames: fun(Externref, F64) void = @es/\ (self,value) => { self["presentedFrames"] = value; } \/;
+    let get_processingDuration: fun(Externref) Externref = @es/\ (self) => self["processingDuration"] \/;
+    let set_processingDuration: fun(Externref, Externref) void = @es/\ (self,value) => { self["processingDuration"] = value; } \/;
+    let get_receiveTime: fun(Externref) Externref = @es/\ (self) => self["receiveTime"] \/;
+    let set_receiveTime: fun(Externref, Externref) void = @es/\ (self,value) => { self["receiveTime"] = value; } \/;
+    let get_rtpTimestamp: fun(Externref) Externref = @es/\ (self) => self["rtpTimestamp"] \/;
+    let set_rtpTimestamp: fun(Externref, Externref) void = @es/\ (self,value) => { self["rtpTimestamp"] = value; } \/;
+    let get_width: fun(Externref) F64 = @es/\ (self) => self["width"] \/;
+    let set_width: fun(Externref, F64) void = @es/\ (self,value) => { self["width"] = value; } \/;
+}

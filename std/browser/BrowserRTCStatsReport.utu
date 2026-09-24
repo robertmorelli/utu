@@ -1,0 +1,23 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCStatsReport {
+    let call_symbol_iterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.iterator]() \/;
+    let call_symbol_iterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.iterator](...args) \/;
+    let call_entries: fun(Externref) Externref = @es/\ (self) => self["entries"]() \/;
+    let call_entries_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["entries"](...args) \/;
+    let call_forEach: fun(Externref, cl(Externref, Str, Externref) void) void = @es/\ (self,p0) => self["forEach"](p0) \/;
+    let call_forEach_arity2: fun(Externref, cl(Externref, Str, Externref) void, Externref) void = @es/\ (self,p0,p1) => self["forEach"](p0,p1) \/;
+    let call_forEach_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["forEach"](...args) \/;
+    let call_get: fun(Externref, Str) Externref = @es/\ (self,p0) => self["get"](p0) \/;
+    let call_get_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["get"](...args) \/;
+    let call_has: fun(Externref, Str) Bool = @es/\ (self,p0) => (self["has"](p0)) ? 1 : 0 \/;
+    let call_has_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["has"](...args) \/;
+    let call_keys: fun(Externref) Externref = @es/\ (self) => self["keys"]() \/;
+    let call_keys_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["keys"](...args) \/;
+    let get_size: fun(Externref) F64 = @es/\ (self) => self["size"] \/;
+    let call_values: fun(Externref) Externref = @es/\ (self) => self["values"]() \/;
+    let call_values_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["values"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["RTCStatsReport"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["RTCStatsReport"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["RTCStatsReport"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["RTCStatsReport"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGAnimatedNumberList {
+    let get_animVal: fun(Externref) Externref = @es/\ (self) => self["animVal"] \/;
+    let get_baseVal: fun(Externref) Externref = @es/\ (self) => self["baseVal"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGAnimatedNumberList"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGAnimatedNumberList"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGAnimatedNumberList"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGAnimatedNumberList"]["prototype"] = value; } \/;
+}

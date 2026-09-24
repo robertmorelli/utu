@@ -1,0 +1,46 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSubtleCrypto {
+    let call_decrypt: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2) => self["decrypt"](p0,p1,p2) \/;
+    let call_decrypt_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["decrypt"](...args) \/;
+    let call_deriveBits: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["deriveBits"](p0,p1) \/;
+    let call_deriveBits_arity3: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2) => self["deriveBits"](p0,p1,p2) \/;
+    let call_deriveBits_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["deriveBits"](...args) \/;
+    let call_deriveKey: fun(Externref, Externref, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["deriveKey"](p0,p1,p2,!!p3,p4) \/;
+    let call_deriveKey_overload2: fun(Externref, Externref, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["deriveKey"](p0,p1,p2,!!p3,p4) \/;
+    let call_deriveKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["deriveKey"](...args) \/;
+    let call_digest: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["digest"](p0,p1) \/;
+    let call_digest_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["digest"](...args) \/;
+    let call_encrypt: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2) => self["encrypt"](p0,p1,p2) \/;
+    let call_encrypt_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["encrypt"](...args) \/;
+    let call_exportKey: fun(Externref, Str, Externref) Externref = @es/\ (self,p0,p1) => self["exportKey"](p0,p1) \/;
+    let call_exportKey_overload2: fun(Externref, Str, Externref) Externref = @es/\ (self,p0,p1) => self["exportKey"](p0,p1) \/;
+    let call_exportKey_overload3: fun(Externref, Str, Externref) Externref = @es/\ (self,p0,p1) => self["exportKey"](p0,p1) \/;
+    let call_exportKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["exportKey"](...args) \/;
+    let call_generateKey: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload2: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload3: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload4: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload5: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload6: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload7: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_overload8: fun(Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2) => self["generateKey"](p0,!!p1,p2) \/;
+    let call_generateKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["generateKey"](...args) \/;
+    let call_importKey: fun(Externref, Str, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["importKey"](p0,p1,p2,!!p3,p4) \/;
+    let call_importKey_overload2: fun(Externref, Str, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["importKey"](p0,p1,p2,!!p3,p4) \/;
+    let call_importKey_overload3: fun(Externref, Str, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["importKey"](p0,p1,p2,!!p3,p4) \/;
+    let call_importKey_overload4: fun(Externref, Str, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["importKey"](p0,p1,p2,!!p3,p4) \/;
+    let call_importKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["importKey"](...args) \/;
+    let call_sign: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2) => self["sign"](p0,p1,p2) \/;
+    let call_sign_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["sign"](...args) \/;
+    let call_unwrapKey: fun(Externref, Str, Externref, Externref, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4,p5,p6) => self["unwrapKey"](p0,p1,p2,p3,p4,!!p5,p6) \/;
+    let call_unwrapKey_overload2: fun(Externref, Str, Externref, Externref, Externref, Externref, Bool, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4,p5,p6) => self["unwrapKey"](p0,p1,p2,p3,p4,!!p5,p6) \/;
+    let call_unwrapKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["unwrapKey"](...args) \/;
+    let call_verify: fun(Externref, Externref, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2,p3) => self["verify"](p0,p1,p2,p3) \/;
+    let call_verify_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["verify"](...args) \/;
+    let call_wrapKey: fun(Externref, Str, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2,p3) => self["wrapKey"](p0,p1,p2,p3) \/;
+    let call_wrapKey_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["wrapKey"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SubtleCrypto"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SubtleCrypto"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SubtleCrypto"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SubtleCrypto"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIntersectionObserver {
+    let call_disconnect: fun(Externref) void = @es/\ (self) => self["disconnect"]() \/;
+    let call_disconnect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["disconnect"](...args) \/;
+    let call_observe: fun(Externref, Externref) void = @es/\ (self,p0) => self["observe"](p0) \/;
+    let call_observe_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["observe"](...args) \/;
+    let get_root: fun(Externref) Externref = @es/\ (self) => self["root"] \/;
+    let get_rootMargin: fun(Externref) Str = @es/\ (self) => self["rootMargin"] \/;
+    let call_takeRecords: fun(Externref) Externref = @es/\ (self) => self["takeRecords"]() \/;
+    let call_takeRecords_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["takeRecords"](...args) \/;
+    let get_thresholds: fun(Externref) Externref = @es/\ (self) => self["thresholds"] \/;
+    let call_unobserve: fun(Externref, Externref) void = @es/\ (self,p0) => self["unobserve"](p0) \/;
+    let call_unobserve_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["unobserve"](...args) \/;
+    let new_instance: fun(cl(Externref, Externref) void) Externref = @es/\ (p0) => new globalThis["IntersectionObserver"](p0) \/;
+    let new_instance_arity2: fun(cl(Externref, Externref) void, Externref) Externref = @es/\ (p0,p1) => new globalThis["IntersectionObserver"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["IntersectionObserver"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["IntersectionObserver"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["IntersectionObserver"]["prototype"] = value; } \/;
+}

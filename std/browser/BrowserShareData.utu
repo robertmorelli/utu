@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserShareData {
+    let get_files: fun(Externref) Externref = @es/\ (self) => self["files"] \/;
+    let set_files: fun(Externref, Externref) void = @es/\ (self,value) => { self["files"] = value; } \/;
+    let get_text: fun(Externref) Externref = @es/\ (self) => self["text"] \/;
+    let set_text: fun(Externref, Externref) void = @es/\ (self,value) => { self["text"] = value; } \/;
+    let get_title: fun(Externref) Externref = @es/\ (self) => self["title"] \/;
+    let set_title: fun(Externref, Externref) void = @es/\ (self,value) => { self["title"] = value; } \/;
+    let get_url: fun(Externref) Externref = @es/\ (self) => self["url"] \/;
+    let set_url: fun(Externref, Externref) void = @es/\ (self,value) => { self["url"] = value; } \/;
+}

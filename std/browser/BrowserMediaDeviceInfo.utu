@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaDeviceInfo {
+    let get_deviceId: fun(Externref) Str = @es/\ (self) => self["deviceId"] \/;
+    let get_groupId: fun(Externref) Str = @es/\ (self) => self["groupId"] \/;
+    let get_kind: fun(Externref) Str = @es/\ (self) => self["kind"] \/;
+    let get_label: fun(Externref) Str = @es/\ (self) => self["label"] \/;
+    let call_toJSON: fun(Externref) Externref = @es/\ (self) => self["toJSON"]() \/;
+    let call_toJSON_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toJSON"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["MediaDeviceInfo"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["MediaDeviceInfo"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["MediaDeviceInfo"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["MediaDeviceInfo"]["prototype"] = value; } \/;
+}

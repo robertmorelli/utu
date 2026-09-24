@@ -1,0 +1,4 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserKHR_parallel_shader_compile {
+    let get_COMPLETION_STATUS_KHR: fun(Externref) F64 = @es/\ (self) => self["COMPLETION_STATUS_KHR"] \/;
+}

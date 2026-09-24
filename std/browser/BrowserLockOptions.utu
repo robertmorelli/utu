@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserLockOptions {
+    let get_ifAvailable: fun(Externref) Externref = @es/\ (self) => self["ifAvailable"] \/;
+    let set_ifAvailable: fun(Externref, Externref) void = @es/\ (self,value) => { self["ifAvailable"] = value; } \/;
+    let get_mode: fun(Externref) Externref = @es/\ (self) => self["mode"] \/;
+    let set_mode: fun(Externref, Externref) void = @es/\ (self,value) => { self["mode"] = value; } \/;
+    let get_signal: fun(Externref) Externref = @es/\ (self) => self["signal"] \/;
+    let set_signal: fun(Externref, Externref) void = @es/\ (self,value) => { self["signal"] = value; } \/;
+    let get_steal: fun(Externref) Externref = @es/\ (self) => self["steal"] \/;
+    let set_steal: fun(Externref, Externref) void = @es/\ (self,value) => { self["steal"] = value; } \/;
+}

@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserOscillatorOptions {
+    let get_channelCount: fun(Externref) Externref = @es/\ (self) => self["channelCount"] \/;
+    let set_channelCount: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCount"] = value; } \/;
+    let get_channelCountMode: fun(Externref) Externref = @es/\ (self) => self["channelCountMode"] \/;
+    let set_channelCountMode: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCountMode"] = value; } \/;
+    let get_channelInterpretation: fun(Externref) Externref = @es/\ (self) => self["channelInterpretation"] \/;
+    let set_channelInterpretation: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelInterpretation"] = value; } \/;
+    let get_detune: fun(Externref) Externref = @es/\ (self) => self["detune"] \/;
+    let set_detune: fun(Externref, Externref) void = @es/\ (self,value) => { self["detune"] = value; } \/;
+    let get_frequency: fun(Externref) Externref = @es/\ (self) => self["frequency"] \/;
+    let set_frequency: fun(Externref, Externref) void = @es/\ (self,value) => { self["frequency"] = value; } \/;
+    let get_periodicWave: fun(Externref) Externref = @es/\ (self) => self["periodicWave"] \/;
+    let set_periodicWave: fun(Externref, Externref) void = @es/\ (self,value) => { self["periodicWave"] = value; } \/;
+    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

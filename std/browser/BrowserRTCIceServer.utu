@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCIceServer {
+    let get_credential: fun(Externref) Externref = @es/\ (self) => self["credential"] \/;
+    let set_credential: fun(Externref, Externref) void = @es/\ (self,value) => { self["credential"] = value; } \/;
+    let get_urls: fun(Externref) Externref = @es/\ (self) => self["urls"] \/;
+    let set_urls: fun(Externref, Externref) void = @es/\ (self,value) => { self["urls"] = value; } \/;
+    let get_username: fun(Externref) Externref = @es/\ (self) => self["username"] \/;
+    let set_username: fun(Externref, Externref) void = @es/\ (self,value) => { self["username"] = value; } \/;
+}

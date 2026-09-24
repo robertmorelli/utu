@@ -1,0 +1,26 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTreeWalker {
+    let get_currentNode: fun(Externref) Externref = @es/\ (self) => self["currentNode"] \/;
+    let set_currentNode: fun(Externref, Externref) void = @es/\ (self,value) => { self["currentNode"] = value; } \/;
+    let get_filter: fun(Externref) Externref = @es/\ (self) => self["filter"] \/;
+    let call_firstChild: fun(Externref) Externref = @es/\ (self) => self["firstChild"]() \/;
+    let call_firstChild_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["firstChild"](...args) \/;
+    let call_lastChild: fun(Externref) Externref = @es/\ (self) => self["lastChild"]() \/;
+    let call_lastChild_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["lastChild"](...args) \/;
+    let call_nextNode: fun(Externref) Externref = @es/\ (self) => self["nextNode"]() \/;
+    let call_nextNode_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["nextNode"](...args) \/;
+    let call_nextSibling: fun(Externref) Externref = @es/\ (self) => self["nextSibling"]() \/;
+    let call_nextSibling_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["nextSibling"](...args) \/;
+    let call_parentNode: fun(Externref) Externref = @es/\ (self) => self["parentNode"]() \/;
+    let call_parentNode_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["parentNode"](...args) \/;
+    let call_previousNode: fun(Externref) Externref = @es/\ (self) => self["previousNode"]() \/;
+    let call_previousNode_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["previousNode"](...args) \/;
+    let call_previousSibling: fun(Externref) Externref = @es/\ (self) => self["previousSibling"]() \/;
+    let call_previousSibling_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["previousSibling"](...args) \/;
+    let get_root: fun(Externref) Externref = @es/\ (self) => self["root"] \/;
+    let get_whatToShow: fun(Externref) F64 = @es/\ (self) => self["whatToShow"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["TreeWalker"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["TreeWalker"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["TreeWalker"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["TreeWalker"]["prototype"] = value; } \/;
+}

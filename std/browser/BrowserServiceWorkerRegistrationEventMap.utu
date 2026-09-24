@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserServiceWorkerRegistrationEventMap {
+    let get_updatefound: fun(Externref) Externref = @es/\ (self) => self["updatefound"] \/;
+    let set_updatefound: fun(Externref, Externref) void = @es/\ (self,value) => { self["updatefound"] = value; } \/;
+}

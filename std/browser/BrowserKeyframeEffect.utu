@@ -1,0 +1,28 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserKeyframeEffect {
+    let get_composite: fun(Externref) Str = @es/\ (self) => self["composite"] \/;
+    let set_composite: fun(Externref, Str) void = @es/\ (self,value) => { self["composite"] = value; } \/;
+    let call_getComputedTiming: fun(Externref) Externref = @es/\ (self) => self["getComputedTiming"]() \/;
+    let call_getComputedTiming_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getComputedTiming"](...args) \/;
+    let call_getKeyframes: fun(Externref) Externref = @es/\ (self) => self["getKeyframes"]() \/;
+    let call_getKeyframes_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getKeyframes"](...args) \/;
+    let call_getTiming: fun(Externref) Externref = @es/\ (self) => self["getTiming"]() \/;
+    let call_getTiming_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getTiming"](...args) \/;
+    let get_iterationComposite: fun(Externref) Str = @es/\ (self) => self["iterationComposite"] \/;
+    let set_iterationComposite: fun(Externref, Str) void = @es/\ (self,value) => { self["iterationComposite"] = value; } \/;
+    let get_pseudoElement: fun(Externref) Externref = @es/\ (self) => self["pseudoElement"] \/;
+    let set_pseudoElement: fun(Externref, Externref) void = @es/\ (self,value) => { self["pseudoElement"] = value; } \/;
+    let call_setKeyframes: fun(Externref, Externref) void = @es/\ (self,p0) => self["setKeyframes"](p0) \/;
+    let call_setKeyframes_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setKeyframes"](...args) \/;
+    let get_target: fun(Externref) Externref = @es/\ (self) => self["target"] \/;
+    let set_target: fun(Externref, Externref) void = @es/\ (self,value) => { self["target"] = value; } \/;
+    let call_updateTiming: fun(Externref) void = @es/\ (self) => self["updateTiming"]() \/;
+    let call_updateTiming_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["updateTiming"](p0) \/;
+    let call_updateTiming_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["updateTiming"](...args) \/;
+    let new_instance: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["KeyframeEffect"](p0,p1) \/;
+    let new_instance_arity3: fun(Externref, Externref, Externref) Externref = @es/\ (p0,p1,p2) => new globalThis["KeyframeEffect"](p0,p1,p2) \/;
+    let new_instance_overload2: fun(Externref) Externref = @es/\ (p0) => new globalThis["KeyframeEffect"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["KeyframeEffect"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["KeyframeEffect"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["KeyframeEffect"]["prototype"] = value; } \/;
+}

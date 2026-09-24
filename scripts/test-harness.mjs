@@ -69,7 +69,7 @@ export async function compileAndInstantiate({ ROOT, name, source, makeCompiler, 
   return withTempUtu(ROOT, name, source, async (file) => {
     const doc = await compiler.compileFile(file);
     assertNoErrors(doc);
-    const { instance } = await instantiateLowered(emitBinary(doc), mergeImports(buildImportObject(doc), imports));
+    const { instance } = await instantiateLowered(emitBinary(doc), mergeImports(await buildImportObject(doc), imports));
     return { doc, instance };
   });
 }

@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpCodec {
+    let get_channels: fun(Externref) Externref = @es/\ (self) => self["channels"] \/;
+    let set_channels: fun(Externref, Externref) void = @es/\ (self,value) => { self["channels"] = value; } \/;
+    let get_clockRate: fun(Externref) F64 = @es/\ (self) => self["clockRate"] \/;
+    let set_clockRate: fun(Externref, F64) void = @es/\ (self,value) => { self["clockRate"] = value; } \/;
+    let get_mimeType: fun(Externref) Str = @es/\ (self) => self["mimeType"] \/;
+    let set_mimeType: fun(Externref, Str) void = @es/\ (self,value) => { self["mimeType"] = value; } \/;
+    let get_sdpFmtpLine: fun(Externref) Externref = @es/\ (self) => self["sdpFmtpLine"] \/;
+    let set_sdpFmtpLine: fun(Externref, Externref) void = @es/\ (self,value) => { self["sdpFmtpLine"] = value; } \/;
+}

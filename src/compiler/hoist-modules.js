@@ -107,15 +107,25 @@ function rewriteExternalModuleReferences(root, module, moduleName, renamings) {
   // Lowercase module free calls parse as an ordinary field access (`M.fn`).
   // Turn only known free members into identifiers; value field access remains
   // untouched and is resolved later from its receiver type.
-  const freeNames = new Set([...module.querySelectorAll(':scope > ir-fn > ir-fn-name[kind="free"]')]
-    .map(node => node.getAttribute('name')).filter(Boolean));
-  for (const field of [...root.querySelectorAll('ir-field-access')]) {
-    if (module.contains(field) || !freeNames.has(field.getAttribute('field'))) continue;
+  const globalNames = new Set([...module.querySelectorAll(':scope > ir-global')]
+    .map(node => node.getAttribute('name')));
+  const freeNames = new Set([
+    ...[...module.querySelectorAll(':scope > ir-fn > ir-fn-name[kind="free"]')]
+      .map(node => node.getAttribute('name')),
+    ...globalNames,
+  ].filter(Boolean));
+  for (const field of [...root.querySelectorAll('ir-field-access, ir-type-member')]) {
+    const isTypeMember = field.localName === 'ir-type-member';
+    const member = field.getAttribute(isTypeMember ? 'method' : 'field');
+    // Free functions on type modules retain their method-resolution path,
+    // including intrinsic inlining. Only globals need this extra rewrite.
+    if (isTypeMember && !globalNames.has(member)) continue;
+    if (module.contains(field) || !freeNames.has(member)) continue;
     const base = field.firstElementChild;
-    if (base?.localName !== 'ir-ident' || base.getAttribute('name') !== moduleName) continue;
+    if (!['ir-ident', 'ir-type-ref'].includes(base?.localName) || base.getAttribute('name') !== moduleName) continue;
     const ident = replaceNodeMeta(field.ownerDocument.createElement('ir-ident'), field,
       'hoist-modules', 'module-free-member');
-    ident.setAttribute('name', renamings.get(field.getAttribute('field')));
+    ident.setAttribute('name', renamings.get(member));
     field.replaceWith(ident);
   }
 }

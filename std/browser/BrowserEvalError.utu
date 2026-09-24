@@ -1,0 +1,23 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEvalError {
+    let get_cause: fun(Externref) Externref = @es/\ (self) => self["cause"] \/;
+    let set_cause: fun(Externref, Externref) void = @es/\ (self,value) => { self["cause"] = value; } \/;
+    let get_message: fun(Externref) Str = @es/\ (self) => self["message"] \/;
+    let set_message: fun(Externref, Str) void = @es/\ (self,value) => { self["message"] = value; } \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_stack: fun(Externref) Externref = @es/\ (self) => self["stack"] \/;
+    let set_stack: fun(Externref, Externref) void = @es/\ (self,value) => { self["stack"] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["EvalError"]() \/;
+    let new_instance_arity1: fun(Str) Externref = @es/\ (p0) => new globalThis["EvalError"](p0) \/;
+    let new_instance_overload2: fun() Externref = @es/\ () => new globalThis["EvalError"]() \/;
+    let new_instance_overload2_arity1: fun(Str) Externref = @es/\ (p0) => new globalThis["EvalError"](p0) \/;
+    let new_instance_overload2_arity2: fun(Str, Externref) Externref = @es/\ (p0,p1) => new globalThis["EvalError"](p0,p1) \/;
+    let new_instance_overload3: fun() Externref = @es/\ () => new globalThis["EvalError"]() \/;
+    let new_instance_overload3_arity1: fun(Str) Externref = @es/\ (p0) => new globalThis["EvalError"](p0) \/;
+    let new_instance_overload4: fun() Externref = @es/\ () => new globalThis["EvalError"]() \/;
+    let new_instance_overload4_arity1: fun(Str) Externref = @es/\ (p0) => new globalThis["EvalError"](p0) \/;
+    let new_instance_overload4_arity2: fun(Str, Externref) Externref = @es/\ (p0,p1) => new globalThis["EvalError"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["EvalError"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["EvalError"]["prototype"] \/;
+}

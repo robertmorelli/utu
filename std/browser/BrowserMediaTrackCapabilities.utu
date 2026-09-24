@@ -1,0 +1,33 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaTrackCapabilities {
+    let get_aspectRatio: fun(Externref) Externref = @es/\ (self) => self["aspectRatio"] \/;
+    let set_aspectRatio: fun(Externref, Externref) void = @es/\ (self,value) => { self["aspectRatio"] = value; } \/;
+    let get_autoGainControl: fun(Externref) Externref = @es/\ (self) => self["autoGainControl"] \/;
+    let set_autoGainControl: fun(Externref, Externref) void = @es/\ (self,value) => { self["autoGainControl"] = value; } \/;
+    let get_backgroundBlur: fun(Externref) Externref = @es/\ (self) => self["backgroundBlur"] \/;
+    let set_backgroundBlur: fun(Externref, Externref) void = @es/\ (self,value) => { self["backgroundBlur"] = value; } \/;
+    let get_channelCount: fun(Externref) Externref = @es/\ (self) => self["channelCount"] \/;
+    let set_channelCount: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCount"] = value; } \/;
+    let get_deviceId: fun(Externref) Externref = @es/\ (self) => self["deviceId"] \/;
+    let set_deviceId: fun(Externref, Externref) void = @es/\ (self,value) => { self["deviceId"] = value; } \/;
+    let get_displaySurface: fun(Externref) Externref = @es/\ (self) => self["displaySurface"] \/;
+    let set_displaySurface: fun(Externref, Externref) void = @es/\ (self,value) => { self["displaySurface"] = value; } \/;
+    let get_echoCancellation: fun(Externref) Externref = @es/\ (self) => self["echoCancellation"] \/;
+    let set_echoCancellation: fun(Externref, Externref) void = @es/\ (self,value) => { self["echoCancellation"] = value; } \/;
+    let get_facingMode: fun(Externref) Externref = @es/\ (self) => self["facingMode"] \/;
+    let set_facingMode: fun(Externref, Externref) void = @es/\ (self,value) => { self["facingMode"] = value; } \/;
+    let get_frameRate: fun(Externref) Externref = @es/\ (self) => self["frameRate"] \/;
+    let set_frameRate: fun(Externref, Externref) void = @es/\ (self,value) => { self["frameRate"] = value; } \/;
+    let get_groupId: fun(Externref) Externref = @es/\ (self) => self["groupId"] \/;
+    let set_groupId: fun(Externref, Externref) void = @es/\ (self,value) => { self["groupId"] = value; } \/;
+    let get_height: fun(Externref) Externref = @es/\ (self) => self["height"] \/;
+    let set_height: fun(Externref, Externref) void = @es/\ (self,value) => { self["height"] = value; } \/;
+    let get_noiseSuppression: fun(Externref) Externref = @es/\ (self) => self["noiseSuppression"] \/;
+    let set_noiseSuppression: fun(Externref, Externref) void = @es/\ (self,value) => { self["noiseSuppression"] = value; } \/;
+    let get_sampleRate: fun(Externref) Externref = @es/\ (self) => self["sampleRate"] \/;
+    let set_sampleRate: fun(Externref, Externref) void = @es/\ (self,value) => { self["sampleRate"] = value; } \/;
+    let get_sampleSize: fun(Externref) Externref = @es/\ (self) => self["sampleSize"] \/;
+    let set_sampleSize: fun(Externref, Externref) void = @es/\ (self,value) => { self["sampleSize"] = value; } \/;
+    let get_width: fun(Externref) Externref = @es/\ (self) => self["width"] \/;
+    let set_width: fun(Externref, Externref) void = @es/\ (self,value) => { self["width"] = value; } \/;
+}

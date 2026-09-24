@@ -1,0 +1,4 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNavigatorAutomationInformation {
+    let get_webdriver: fun(Externref) Bool = @es/\ (self) => (self["webdriver"]) ? 1 : 0 \/;
+}

@@ -1,0 +1,38 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserXPathResult {
+    let get_ANY_TYPE: fun(Externref) F64 = @es/\ (self) => self["ANY_TYPE"] \/;
+    let get_ANY_UNORDERED_NODE_TYPE: fun(Externref) F64 = @es/\ (self) => self["ANY_UNORDERED_NODE_TYPE"] \/;
+    let get_BOOLEAN_TYPE: fun(Externref) F64 = @es/\ (self) => self["BOOLEAN_TYPE"] \/;
+    let get_FIRST_ORDERED_NODE_TYPE: fun(Externref) F64 = @es/\ (self) => self["FIRST_ORDERED_NODE_TYPE"] \/;
+    let get_NUMBER_TYPE: fun(Externref) F64 = @es/\ (self) => self["NUMBER_TYPE"] \/;
+    let get_ORDERED_NODE_ITERATOR_TYPE: fun(Externref) F64 = @es/\ (self) => self["ORDERED_NODE_ITERATOR_TYPE"] \/;
+    let get_ORDERED_NODE_SNAPSHOT_TYPE: fun(Externref) F64 = @es/\ (self) => self["ORDERED_NODE_SNAPSHOT_TYPE"] \/;
+    let get_STRING_TYPE: fun(Externref) F64 = @es/\ (self) => self["STRING_TYPE"] \/;
+    let get_UNORDERED_NODE_ITERATOR_TYPE: fun(Externref) F64 = @es/\ (self) => self["UNORDERED_NODE_ITERATOR_TYPE"] \/;
+    let get_UNORDERED_NODE_SNAPSHOT_TYPE: fun(Externref) F64 = @es/\ (self) => self["UNORDERED_NODE_SNAPSHOT_TYPE"] \/;
+    let get_booleanValue: fun(Externref) Bool = @es/\ (self) => (self["booleanValue"]) ? 1 : 0 \/;
+    let get_invalidIteratorState: fun(Externref) Bool = @es/\ (self) => (self["invalidIteratorState"]) ? 1 : 0 \/;
+    let call_iterateNext: fun(Externref) Externref = @es/\ (self) => self["iterateNext"]() \/;
+    let call_iterateNext_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["iterateNext"](...args) \/;
+    let get_numberValue: fun(Externref) F64 = @es/\ (self) => self["numberValue"] \/;
+    let get_resultType: fun(Externref) F64 = @es/\ (self) => self["resultType"] \/;
+    let get_singleNodeValue: fun(Externref) Externref = @es/\ (self) => self["singleNodeValue"] \/;
+    let call_snapshotItem: fun(Externref, F64) Externref = @es/\ (self,p0) => self["snapshotItem"](p0) \/;
+    let call_snapshotItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["snapshotItem"](...args) \/;
+    let get_snapshotLength: fun(Externref) F64 = @es/\ (self) => self["snapshotLength"] \/;
+    let get_stringValue: fun(Externref) Str = @es/\ (self) => self["stringValue"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["XPathResult"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["XPathResult"](...args) \/;
+    let static_get_ANY_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["ANY_TYPE"] \/;
+    let static_get_ANY_UNORDERED_NODE_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["ANY_UNORDERED_NODE_TYPE"] \/;
+    let static_get_BOOLEAN_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["BOOLEAN_TYPE"] \/;
+    let static_get_FIRST_ORDERED_NODE_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["FIRST_ORDERED_NODE_TYPE"] \/;
+    let static_get_NUMBER_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["NUMBER_TYPE"] \/;
+    let static_get_ORDERED_NODE_ITERATOR_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["ORDERED_NODE_ITERATOR_TYPE"] \/;
+    let static_get_ORDERED_NODE_SNAPSHOT_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["ORDERED_NODE_SNAPSHOT_TYPE"] \/;
+    let static_get_STRING_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["STRING_TYPE"] \/;
+    let static_get_UNORDERED_NODE_ITERATOR_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["UNORDERED_NODE_ITERATOR_TYPE"] \/;
+    let static_get_UNORDERED_NODE_SNAPSHOT_TYPE: fun() F64 = @es/\ () => globalThis["XPathResult"]["UNORDERED_NODE_SNAPSHOT_TYPE"] \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["XPathResult"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["XPathResult"]["prototype"] = value; } \/;
+}

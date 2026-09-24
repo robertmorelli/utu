@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFileSystem {
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let get_root: fun(Externref) Externref = @es/\ (self) => self["root"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["FileSystem"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["FileSystem"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["FileSystem"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["FileSystem"]["prototype"] = value; } \/;
+}

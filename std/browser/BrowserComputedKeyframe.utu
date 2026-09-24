@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserComputedKeyframe {
+    let get_composite: fun(Externref) Str = @es/\ (self) => self["composite"] \/;
+    let set_composite: fun(Externref, Str) void = @es/\ (self,value) => { self["composite"] = value; } \/;
+    let get_computedOffset: fun(Externref) F64 = @es/\ (self) => self["computedOffset"] \/;
+    let set_computedOffset: fun(Externref, F64) void = @es/\ (self,value) => { self["computedOffset"] = value; } \/;
+    let get_easing: fun(Externref) Str = @es/\ (self) => self["easing"] \/;
+    let set_easing: fun(Externref, Str) void = @es/\ (self,value) => { self["easing"] = value; } \/;
+    let get_offset: fun(Externref) Externref = @es/\ (self) => self["offset"] \/;
+    let set_offset: fun(Externref, Externref) void = @es/\ (self,value) => { self["offset"] = value; } \/;
+    let get_index: fun(Externref, Str) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, Str, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+}

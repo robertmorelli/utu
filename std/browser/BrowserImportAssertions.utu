@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImportAssertions {
+    let get_index: fun(Externref, Str) Str = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, Str, Str) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+}

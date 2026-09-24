@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserOVR_multiview2 {
+    let get_FRAMEBUFFER_ATTACHMENT_TEXTURE_BASE_VIEW_INDEX_OVR: fun(Externref) F64 = @es/\ (self) => self["FRAMEBUFFER_ATTACHMENT_TEXTURE_BASE_VIEW_INDEX_OVR"] \/;
+    let get_FRAMEBUFFER_ATTACHMENT_TEXTURE_NUM_VIEWS_OVR: fun(Externref) F64 = @es/\ (self) => self["FRAMEBUFFER_ATTACHMENT_TEXTURE_NUM_VIEWS_OVR"] \/;
+    let get_FRAMEBUFFER_INCOMPLETE_VIEW_TARGETS_OVR: fun(Externref) F64 = @es/\ (self) => self["FRAMEBUFFER_INCOMPLETE_VIEW_TARGETS_OVR"] \/;
+    let get_MAX_VIEWS_OVR: fun(Externref) F64 = @es/\ (self) => self["MAX_VIEWS_OVR"] \/;
+    let call_framebufferTextureMultiviewOVR: fun(Externref, F64, F64, Externref, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4,p5) => self["framebufferTextureMultiviewOVR"](p0,p1,p2,p3,p4,p5) \/;
+    let call_framebufferTextureMultiviewOVR_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["framebufferTextureMultiviewOVR"](...args) \/;
+}

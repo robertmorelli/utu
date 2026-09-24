@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioDecoderEventMap {
+    let get_dequeue: fun(Externref) Externref = @es/\ (self) => self["dequeue"] \/;
+    let set_dequeue: fun(Externref, Externref) void = @es/\ (self,value) => { self["dequeue"] = value; } \/;
+}

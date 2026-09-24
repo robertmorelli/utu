@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCLocalIceCandidateInit {
+    let get_candidate: fun(Externref) Externref = @es/\ (self) => self["candidate"] \/;
+    let set_candidate: fun(Externref, Externref) void = @es/\ (self,value) => { self["candidate"] = value; } \/;
+    let get_sdpMLineIndex: fun(Externref) Externref = @es/\ (self) => self["sdpMLineIndex"] \/;
+    let set_sdpMLineIndex: fun(Externref, Externref) void = @es/\ (self,value) => { self["sdpMLineIndex"] = value; } \/;
+    let get_sdpMid: fun(Externref) Externref = @es/\ (self) => self["sdpMid"] \/;
+    let set_sdpMid: fun(Externref, Externref) void = @es/\ (self,value) => { self["sdpMid"] = value; } \/;
+    let get_usernameFragment: fun(Externref) Externref = @es/\ (self) => self["usernameFragment"] \/;
+    let set_usernameFragment: fun(Externref, Externref) void = @es/\ (self,value) => { self["usernameFragment"] = value; } \/;
+}

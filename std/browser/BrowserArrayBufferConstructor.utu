@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserArrayBufferConstructor {
+    let get_symbol_species: fun(Externref) Externref = @es/\ (self) => self[Symbol.species] \/;
+    let call_isView: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["isView"](p0)) ? 1 : 0 \/;
+    let call_isView_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["isView"](...args) \/;
+    let get_prototype: fun(Externref) Externref = @es/\ (self) => self["prototype"] \/;
+}

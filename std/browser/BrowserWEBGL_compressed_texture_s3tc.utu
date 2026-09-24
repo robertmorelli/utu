@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWEBGL_compressed_texture_s3tc {
+    let get_COMPRESSED_RGBA_S3TC_DXT1_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_RGBA_S3TC_DXT1_EXT"] \/;
+    let get_COMPRESSED_RGBA_S3TC_DXT3_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_RGBA_S3TC_DXT3_EXT"] \/;
+    let get_COMPRESSED_RGBA_S3TC_DXT5_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_RGBA_S3TC_DXT5_EXT"] \/;
+    let get_COMPRESSED_RGB_S3TC_DXT1_EXT: fun(Externref) F64 = @es/\ (self) => self["COMPRESSED_RGB_S3TC_DXT1_EXT"] \/;
+}

@@ -1,0 +1,10 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserANGLE_instanced_arrays {
+    let get_VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE: fun(Externref) F64 = @es/\ (self) => self["VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE"] \/;
+    let call_drawArraysInstancedANGLE: fun(Externref, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3) => self["drawArraysInstancedANGLE"](p0,p1,p2,p3) \/;
+    let call_drawArraysInstancedANGLE_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["drawArraysInstancedANGLE"](...args) \/;
+    let call_drawElementsInstancedANGLE: fun(Externref, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4) => self["drawElementsInstancedANGLE"](p0,p1,p2,p3,p4) \/;
+    let call_drawElementsInstancedANGLE_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["drawElementsInstancedANGLE"](...args) \/;
+    let call_vertexAttribDivisorANGLE: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["vertexAttribDivisorANGLE"](p0,p1) \/;
+    let call_vertexAttribDivisorANGLE_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["vertexAttribDivisorANGLE"](...args) \/;
+}

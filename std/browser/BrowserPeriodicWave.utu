@@ -1,0 +1,8 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPeriodicWave {
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["PeriodicWave"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["PeriodicWave"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["PeriodicWave"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["PeriodicWave"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["PeriodicWave"]["prototype"] = value; } \/;
+}

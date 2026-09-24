@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMimeType {
+    let get_description: fun(Externref) Str = @es/\ (self) => self["description"] \/;
+    let get_enabledPlugin: fun(Externref) Externref = @es/\ (self) => self["enabledPlugin"] \/;
+    let get_suffixes: fun(Externref) Str = @es/\ (self) => self["suffixes"] \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["MimeType"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["MimeType"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["MimeType"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["MimeType"]["prototype"] = value; } \/;
+}

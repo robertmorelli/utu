@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserScrollToOptions {
+    let get_behavior: fun(Externref) Externref = @es/\ (self) => self["behavior"] \/;
+    let set_behavior: fun(Externref, Externref) void = @es/\ (self,value) => { self["behavior"] = value; } \/;
+    let get_left: fun(Externref) Externref = @es/\ (self) => self["left"] \/;
+    let set_left: fun(Externref, Externref) void = @es/\ (self,value) => { self["left"] = value; } \/;
+    let get_top: fun(Externref) Externref = @es/\ (self) => self["top"] \/;
+    let set_top: fun(Externref, Externref) void = @es/\ (self,value) => { self["top"] = value; } \/;
+}

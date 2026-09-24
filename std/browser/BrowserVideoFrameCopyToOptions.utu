@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserVideoFrameCopyToOptions {
+    let get_colorSpace: fun(Externref) Externref = @es/\ (self) => self["colorSpace"] \/;
+    let set_colorSpace: fun(Externref, Externref) void = @es/\ (self,value) => { self["colorSpace"] = value; } \/;
+    let get_format: fun(Externref) Externref = @es/\ (self) => self["format"] \/;
+    let set_format: fun(Externref, Externref) void = @es/\ (self,value) => { self["format"] = value; } \/;
+    let get_layout: fun(Externref) Externref = @es/\ (self) => self["layout"] \/;
+    let set_layout: fun(Externref, Externref) void = @es/\ (self,value) => { self["layout"] = value; } \/;
+    let get_rect: fun(Externref) Externref = @es/\ (self) => self["rect"] \/;
+    let set_rect: fun(Externref, Externref) void = @es/\ (self,value) => { self["rect"] = value; } \/;
+}

@@ -1,0 +1,33 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTouchInit {
+    let get_altitudeAngle: fun(Externref) Externref = @es/\ (self) => self["altitudeAngle"] \/;
+    let set_altitudeAngle: fun(Externref, Externref) void = @es/\ (self,value) => { self["altitudeAngle"] = value; } \/;
+    let get_azimuthAngle: fun(Externref) Externref = @es/\ (self) => self["azimuthAngle"] \/;
+    let set_azimuthAngle: fun(Externref, Externref) void = @es/\ (self,value) => { self["azimuthAngle"] = value; } \/;
+    let get_clientX: fun(Externref) Externref = @es/\ (self) => self["clientX"] \/;
+    let set_clientX: fun(Externref, Externref) void = @es/\ (self,value) => { self["clientX"] = value; } \/;
+    let get_clientY: fun(Externref) Externref = @es/\ (self) => self["clientY"] \/;
+    let set_clientY: fun(Externref, Externref) void = @es/\ (self,value) => { self["clientY"] = value; } \/;
+    let get_force: fun(Externref) Externref = @es/\ (self) => self["force"] \/;
+    let set_force: fun(Externref, Externref) void = @es/\ (self,value) => { self["force"] = value; } \/;
+    let get_identifier: fun(Externref) F64 = @es/\ (self) => self["identifier"] \/;
+    let set_identifier: fun(Externref, F64) void = @es/\ (self,value) => { self["identifier"] = value; } \/;
+    let get_pageX: fun(Externref) Externref = @es/\ (self) => self["pageX"] \/;
+    let set_pageX: fun(Externref, Externref) void = @es/\ (self,value) => { self["pageX"] = value; } \/;
+    let get_pageY: fun(Externref) Externref = @es/\ (self) => self["pageY"] \/;
+    let set_pageY: fun(Externref, Externref) void = @es/\ (self,value) => { self["pageY"] = value; } \/;
+    let get_radiusX: fun(Externref) Externref = @es/\ (self) => self["radiusX"] \/;
+    let set_radiusX: fun(Externref, Externref) void = @es/\ (self,value) => { self["radiusX"] = value; } \/;
+    let get_radiusY: fun(Externref) Externref = @es/\ (self) => self["radiusY"] \/;
+    let set_radiusY: fun(Externref, Externref) void = @es/\ (self,value) => { self["radiusY"] = value; } \/;
+    let get_rotationAngle: fun(Externref) Externref = @es/\ (self) => self["rotationAngle"] \/;
+    let set_rotationAngle: fun(Externref, Externref) void = @es/\ (self,value) => { self["rotationAngle"] = value; } \/;
+    let get_screenX: fun(Externref) Externref = @es/\ (self) => self["screenX"] \/;
+    let set_screenX: fun(Externref, Externref) void = @es/\ (self,value) => { self["screenX"] = value; } \/;
+    let get_screenY: fun(Externref) Externref = @es/\ (self) => self["screenY"] \/;
+    let set_screenY: fun(Externref, Externref) void = @es/\ (self,value) => { self["screenY"] = value; } \/;
+    let get_target: fun(Externref) Externref = @es/\ (self) => self["target"] \/;
+    let set_target: fun(Externref, Externref) void = @es/\ (self,value) => { self["target"] = value; } \/;
+    let get_touchType: fun(Externref) Externref = @es/\ (self) => self["touchType"] \/;
+    let set_touchType: fun(Externref, Externref) void = @es/\ (self,value) => { self["touchType"] = value; } \/;
+}

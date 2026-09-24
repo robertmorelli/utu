@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCanvasImageData {
+    let call_createImageData: fun(Externref, F64, F64) Externref = @es/\ (self,p0,p1) => self["createImageData"](p0,p1) \/;
+    let call_createImageData_arity3: fun(Externref, F64, F64, Externref) Externref = @es/\ (self,p0,p1,p2) => self["createImageData"](p0,p1,p2) \/;
+    let call_createImageData_overload2: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["createImageData"](p0) \/;
+    let call_createImageData_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createImageData"](...args) \/;
+    let call_getImageData: fun(Externref, F64, F64, F64, F64) Externref = @es/\ (self,p0,p1,p2,p3) => self["getImageData"](p0,p1,p2,p3) \/;
+    let call_getImageData_arity5: fun(Externref, F64, F64, F64, F64, Externref) Externref = @es/\ (self,p0,p1,p2,p3,p4) => self["getImageData"](p0,p1,p2,p3,p4) \/;
+    let call_getImageData_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getImageData"](...args) \/;
+    let call_putImageData: fun(Externref, Externref, F64, F64) void = @es/\ (self,p0,p1,p2) => self["putImageData"](p0,p1,p2) \/;
+    let call_putImageData_overload2: fun(Externref, Externref, F64, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4,p5,p6) => self["putImageData"](p0,p1,p2,p3,p4,p5,p6) \/;
+    let call_putImageData_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["putImageData"](...args) \/;
+}

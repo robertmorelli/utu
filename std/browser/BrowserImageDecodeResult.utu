@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImageDecodeResult {
+    let get_complete: fun(Externref) Bool = @es/\ (self) => (self["complete"]) ? 1 : 0 \/;
+    let set_complete: fun(Externref, Bool) void = @es/\ (self,value) => { self["complete"] = !!value; } \/;
+    let get_image: fun(Externref) Externref = @es/\ (self) => self["image"] \/;
+    let set_image: fun(Externref, Externref) void = @es/\ (self,value) => { self["image"] = value; } \/;
+}

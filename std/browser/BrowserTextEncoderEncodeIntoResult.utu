@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTextEncoderEncodeIntoResult {
+    let get_read: fun(Externref) F64 = @es/\ (self) => self["read"] \/;
+    let set_read: fun(Externref, F64) void = @es/\ (self,value) => { self["read"] = value; } \/;
+    let get_written: fun(Externref) F64 = @es/\ (self) => self["written"] \/;
+    let set_written: fun(Externref, F64) void = @es/\ (self,value) => { self["written"] = value; } \/;
+}

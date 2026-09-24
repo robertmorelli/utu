@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCErrorInit {
+    let get_errorDetail: fun(Externref) Str = @es/\ (self) => self["errorDetail"] \/;
+    let set_errorDetail: fun(Externref, Str) void = @es/\ (self,value) => { self["errorDetail"] = value; } \/;
+    let get_httpRequestStatusCode: fun(Externref) Externref = @es/\ (self) => self["httpRequestStatusCode"] \/;
+    let set_httpRequestStatusCode: fun(Externref, Externref) void = @es/\ (self,value) => { self["httpRequestStatusCode"] = value; } \/;
+    let get_receivedAlert: fun(Externref) Externref = @es/\ (self) => self["receivedAlert"] \/;
+    let set_receivedAlert: fun(Externref, Externref) void = @es/\ (self,value) => { self["receivedAlert"] = value; } \/;
+    let get_sctpCauseCode: fun(Externref) Externref = @es/\ (self) => self["sctpCauseCode"] \/;
+    let set_sctpCauseCode: fun(Externref, Externref) void = @es/\ (self,value) => { self["sctpCauseCode"] = value; } \/;
+    let get_sdpLineNumber: fun(Externref) Externref = @es/\ (self) => self["sdpLineNumber"] \/;
+    let set_sdpLineNumber: fun(Externref, Externref) void = @es/\ (self,value) => { self["sdpLineNumber"] = value; } \/;
+    let get_sentAlert: fun(Externref) Externref = @es/\ (self) => self["sentAlert"] \/;
+    let set_sentAlert: fun(Externref, Externref) void = @es/\ (self,value) => { self["sentAlert"] = value; } \/;
+}

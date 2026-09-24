@@ -1,0 +1,33 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserBigIntToLocaleStringOptions {
+    let get_compactDisplay: fun(Externref) Externref = @es/\ (self) => self["compactDisplay"] \/;
+    let set_compactDisplay: fun(Externref, Externref) void = @es/\ (self,value) => { self["compactDisplay"] = value; } \/;
+    let get_currency: fun(Externref) Externref = @es/\ (self) => self["currency"] \/;
+    let set_currency: fun(Externref, Externref) void = @es/\ (self,value) => { self["currency"] = value; } \/;
+    let get_currencyDisplay: fun(Externref) Externref = @es/\ (self) => self["currencyDisplay"] \/;
+    let set_currencyDisplay: fun(Externref, Externref) void = @es/\ (self,value) => { self["currencyDisplay"] = value; } \/;
+    let get_localeMatcher: fun(Externref) Externref = @es/\ (self) => self["localeMatcher"] \/;
+    let set_localeMatcher: fun(Externref, Externref) void = @es/\ (self,value) => { self["localeMatcher"] = value; } \/;
+    let get_maximumFractionDigits: fun(Externref) Externref = @es/\ (self) => self["maximumFractionDigits"] \/;
+    let set_maximumFractionDigits: fun(Externref, Externref) void = @es/\ (self,value) => { self["maximumFractionDigits"] = value; } \/;
+    let get_maximumSignificantDigits: fun(Externref) Externref = @es/\ (self) => self["maximumSignificantDigits"] \/;
+    let set_maximumSignificantDigits: fun(Externref, Externref) void = @es/\ (self,value) => { self["maximumSignificantDigits"] = value; } \/;
+    let get_minimumFractionDigits: fun(Externref) Externref = @es/\ (self) => self["minimumFractionDigits"] \/;
+    let set_minimumFractionDigits: fun(Externref, Externref) void = @es/\ (self,value) => { self["minimumFractionDigits"] = value; } \/;
+    let get_minimumIntegerDigits: fun(Externref) Externref = @es/\ (self) => self["minimumIntegerDigits"] \/;
+    let set_minimumIntegerDigits: fun(Externref, Externref) void = @es/\ (self,value) => { self["minimumIntegerDigits"] = value; } \/;
+    let get_minimumSignificantDigits: fun(Externref) Externref = @es/\ (self) => self["minimumSignificantDigits"] \/;
+    let set_minimumSignificantDigits: fun(Externref, Externref) void = @es/\ (self,value) => { self["minimumSignificantDigits"] = value; } \/;
+    let get_notation: fun(Externref) Externref = @es/\ (self) => self["notation"] \/;
+    let set_notation: fun(Externref, Externref) void = @es/\ (self,value) => { self["notation"] = value; } \/;
+    let get_numberingSystem: fun(Externref) Externref = @es/\ (self) => self["numberingSystem"] \/;
+    let set_numberingSystem: fun(Externref, Externref) void = @es/\ (self,value) => { self["numberingSystem"] = value; } \/;
+    let get_style: fun(Externref) Externref = @es/\ (self) => self["style"] \/;
+    let set_style: fun(Externref, Externref) void = @es/\ (self,value) => { self["style"] = value; } \/;
+    let get_unit: fun(Externref) Externref = @es/\ (self) => self["unit"] \/;
+    let set_unit: fun(Externref, Externref) void = @es/\ (self,value) => { self["unit"] = value; } \/;
+    let get_unitDisplay: fun(Externref) Externref = @es/\ (self) => self["unitDisplay"] \/;
+    let set_unitDisplay: fun(Externref, Externref) void = @es/\ (self,value) => { self["unitDisplay"] = value; } \/;
+    let get_useGrouping: fun(Externref) Externref = @es/\ (self) => self["useGrouping"] \/;
+    let set_useGrouping: fun(Externref, Externref) void = @es/\ (self,value) => { self["useGrouping"] = value; } \/;
+}

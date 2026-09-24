@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSourceBufferEventMap {
+    let get_abort: fun(Externref) Externref = @es/\ (self) => self["abort"] \/;
+    let set_abort: fun(Externref, Externref) void = @es/\ (self,value) => { self["abort"] = value; } \/;
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_update: fun(Externref) Externref = @es/\ (self) => self["update"] \/;
+    let set_update: fun(Externref, Externref) void = @es/\ (self,value) => { self["update"] = value; } \/;
+    let get_updateend: fun(Externref) Externref = @es/\ (self) => self["updateend"] \/;
+    let set_updateend: fun(Externref, Externref) void = @es/\ (self,value) => { self["updateend"] = value; } \/;
+    let get_updatestart: fun(Externref) Externref = @es/\ (self) => self["updatestart"] \/;
+    let set_updatestart: fun(Externref, Externref) void = @es/\ (self,value) => { self["updatestart"] = value; } \/;
+}

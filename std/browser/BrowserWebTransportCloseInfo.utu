@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWebTransportCloseInfo {
+    let get_closeCode: fun(Externref) Externref = @es/\ (self) => self["closeCode"] \/;
+    let set_closeCode: fun(Externref, Externref) void = @es/\ (self,value) => { self["closeCode"] = value; } \/;
+    let get_reason: fun(Externref) Externref = @es/\ (self) => self["reason"] \/;
+    let set_reason: fun(Externref, Externref) void = @es/\ (self,value) => { self["reason"] = value; } \/;
+}

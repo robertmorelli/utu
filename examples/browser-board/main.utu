@@ -1,0 +1,118 @@
+using Browser from std:Browser;
+using BrowserDocument from std:BrowserDocument;
+using BrowserHTMLElement from std:BrowserHTMLElement;
+using BrowserHTMLInputElement from std:BrowserHTMLInputElement;
+using BrowserEvent from std:BrowserEvent;
+using BrowserStorage from std:BrowserStorage;
+using BrowserGlobal_JSON from std:BrowserGlobal_JSON;
+using BrowserNodeList from std:BrowserNodeList;
+using JS from std:JS;
+
+struct Task:
+    | done: Bool
+
+fn element(document: Externref, tag: Str, class_name: Str, label: Str) Externref {
+    let node: Externref = BrowserDocument.call_createElement(document, tag);
+    BrowserHTMLElement.call_setAttribute(node, "class", class_name);
+    BrowserHTMLElement.set_textContent(node, label);
+    node;
+}
+
+fn save(document: Externref) void {
+    let rows: Externref = BrowserDocument.call_querySelectorAll(document, ".task");
+    let data: Externref = JS.array();
+    let index: F64 = 0.0;
+    while (index < BrowserNodeList.get_length(rows)) {
+        let row: Externref = BrowserNodeList.call_item(rows, index);
+        let text: Externref = BrowserHTMLElement.call_querySelector(row, ".task-label");
+        let item: Externref = JS.object();
+        JS.set(item, "label", JS.string(BrowserHTMLElement.get_textContent(text)));
+        JS.set(item, "done", JS.boolean(BrowserHTMLElement.get_className(row) == "task done"));
+        JS.push(data, item);
+        index = index + 1.0;
+    };
+    BrowserStorage.call_setItem(Browser.get_localStorage(), "utu-focus-v1", BrowserGlobal_JSON.call_stringify(data));
+}
+
+fn paint(task: Task, row: Externref, toggle: Externref) void {
+    if task.done {
+        BrowserHTMLElement.call_setAttribute(row, "class", "task done");
+        BrowserHTMLElement.set_textContent(toggle, "✓");
+        BrowserHTMLElement.call_setAttribute(toggle, "aria-label", "Reopen task");
+    } else {
+        BrowserHTMLElement.call_setAttribute(row, "class", "task");
+        BrowserHTMLElement.set_textContent(toggle, "○");
+        BrowserHTMLElement.call_setAttribute(toggle, "aria-label", "Complete task");
+    };
+}
+
+fn add_task(document: Externref, list: Externref, label: Str, initial_done: Bool) void {
+    if label.len() > 0 {
+        let task: Task = Task { done: initial_done };
+        let row: Externref = element(document, "li", "task", "");
+        let toggle: Externref = element(document, "button", "toggle", "○");
+        BrowserHTMLElement.call_setAttribute(toggle, "aria-label", "Complete task");
+        let text: Externref = element(document, "span", "task-label", label);
+        let remove: Externref = element(document, "button", "remove", "×");
+        BrowserHTMLElement.call_setAttribute(remove, "aria-label", "Delete task");
+        BrowserHTMLElement.call_appendChild(row, toggle);
+        BrowserHTMLElement.call_appendChild(row, text);
+        BrowserHTMLElement.call_appendChild(row, remove);
+        BrowserHTMLElement.call_appendChild(list, row);
+        paint(task, row, toggle);
+        BrowserHTMLElement.call_addEventListener(toggle, "click", JS.event_listener(cl(event) {
+            task.done = not task.done;
+            paint(task, row, toggle);
+            save(document);
+        }));
+        BrowserHTMLElement.call_addEventListener(remove, "click", JS.event_listener(cl(event) {
+            BrowserHTMLElement.call_remove(row);
+            save(document);
+        }));
+    };
+}
+
+export main() void {
+    let document: Externref = Browser.get_document();
+    let body: Externref = BrowserDocument.get_body(document);
+    let app: Externref = element(document, "main", "app", "");
+    BrowserHTMLElement.call_appendChild(body, app);
+    BrowserHTMLElement.call_appendChild(app, element(document, "p", "eyebrow", "UTU / BROWSER ABI EXPERIMENT"));
+    BrowserHTMLElement.call_appendChild(app, element(document, "h1", "title", "A little more focus."));
+    BrowserHTMLElement.call_appendChild(app, element(document, "p", "subtitle", "Make room for what matters. One task at a time."));
+    let panel: Externref = element(document, "section", "panel", "");
+    BrowserHTMLElement.call_appendChild(app, panel);
+    let form: Externref = element(document, "form", "new-task", "");
+    let input: Externref = element(document, "input", "task-input", "");
+    BrowserHTMLElement.call_setAttribute(input, "placeholder", "What would you like to do?");
+    BrowserHTMLElement.call_setAttribute(input, "aria-label", "New task");
+    BrowserHTMLElement.call_setAttribute(input, "maxlength", "200");
+    let submit: Externref = element(document, "button", "add", "Add task ↗");
+    BrowserHTMLElement.call_setAttribute(submit, "type", "submit");
+    BrowserHTMLElement.call_appendChild(form, input);
+    BrowserHTMLElement.call_appendChild(form, submit);
+    BrowserHTMLElement.call_appendChild(panel, form);
+    let list: Externref = element(document, "ul", "tasks", "");
+    BrowserHTMLElement.call_appendChild(panel, list);
+    let stored: Externref = BrowserStorage.call_getItem(Browser.get_localStorage(), "utu-focus-v1");
+    if JS.is_nullish(stored) {
+        add_task(document, list, "Build something small and useful", false);
+        add_task(document, list, "Take a proper screen break", false);
+        add_task(document, list, "Try the browser ABI from UTU", false);
+    } else {
+        let data: Externref = BrowserGlobal_JSON.call_parse(JS.as_string(stored));
+        let index: F64 = 0.0;
+        while (index < JS.length(data)) {
+            let item: Externref = JS.at(data, index);
+            add_task(document, list, JS.as_string(JS.get(item, "label")), JS.as_boolean(JS.get(item, "done")));
+            index = index + 1.0;
+        };
+    };
+    BrowserHTMLElement.call_addEventListener(form, "submit", JS.event_listener(cl(event) {
+        BrowserEvent.call_preventDefault(event);
+        add_task(document, list, BrowserHTMLInputElement.get_value(input), false);
+        save(document);
+        BrowserHTMLInputElement.set_value(input, "");
+    }));
+    BrowserHTMLElement.call_appendChild(app, element(document, "p", "footnote", "DOM creation, events, state, and local storage are written in UTU. Browser calls come from generated .d.ts bindings."));
+}

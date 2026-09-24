@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPbkdf2Params {
+    let get_hash: fun(Externref) Externref = @es/\ (self) => self["hash"] \/;
+    let set_hash: fun(Externref, Externref) void = @es/\ (self,value) => { self["hash"] = value; } \/;
+    let get_iterations: fun(Externref) F64 = @es/\ (self) => self["iterations"] \/;
+    let set_iterations: fun(Externref, F64) void = @es/\ (self,value) => { self["iterations"] = value; } \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_salt: fun(Externref) Externref = @es/\ (self) => self["salt"] \/;
+    let set_salt: fun(Externref, Externref) void = @es/\ (self,value) => { self["salt"] = value; } \/;
+}

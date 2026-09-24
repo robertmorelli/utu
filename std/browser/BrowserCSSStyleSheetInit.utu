@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSStyleSheetInit {
+    let get_baseURL: fun(Externref) Externref = @es/\ (self) => self["baseURL"] \/;
+    let set_baseURL: fun(Externref, Externref) void = @es/\ (self,value) => { self["baseURL"] = value; } \/;
+    let get_disabled: fun(Externref) Externref = @es/\ (self) => self["disabled"] \/;
+    let set_disabled: fun(Externref, Externref) void = @es/\ (self,value) => { self["disabled"] = value; } \/;
+    let get_media: fun(Externref) Externref = @es/\ (self) => self["media"] \/;
+    let set_media: fun(Externref, Externref) void = @es/\ (self,value) => { self["media"] = value; } \/;
+}

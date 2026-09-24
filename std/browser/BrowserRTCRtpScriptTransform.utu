@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpScriptTransform {
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["RTCRtpScriptTransform"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["RTCRtpScriptTransform"](p0,p1) \/;
+    let new_instance_arity3: fun(Externref, Externref, Externref) Externref = @es/\ (p0,p1,p2) => new globalThis["RTCRtpScriptTransform"](p0,p1,p2) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["RTCRtpScriptTransform"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["RTCRtpScriptTransform"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["RTCRtpScriptTransform"]["prototype"] = value; } \/;
+}

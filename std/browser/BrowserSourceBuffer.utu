@@ -1,0 +1,47 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSourceBuffer {
+    let call_abort: fun(Externref) void = @es/\ (self) => self["abort"]() \/;
+    let call_abort_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["abort"](...args) \/;
+    let call_addEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addEventListener"](...args) \/;
+    let call_appendBuffer: fun(Externref, Externref) void = @es/\ (self,p0) => self["appendBuffer"](p0) \/;
+    let call_appendBuffer_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["appendBuffer"](...args) \/;
+    let get_appendWindowEnd: fun(Externref) F64 = @es/\ (self) => self["appendWindowEnd"] \/;
+    let set_appendWindowEnd: fun(Externref, F64) void = @es/\ (self,value) => { self["appendWindowEnd"] = value; } \/;
+    let get_appendWindowStart: fun(Externref) F64 = @es/\ (self) => self["appendWindowStart"] \/;
+    let set_appendWindowStart: fun(Externref, F64) void = @es/\ (self,value) => { self["appendWindowStart"] = value; } \/;
+    let get_buffered: fun(Externref) Externref = @es/\ (self) => self["buffered"] \/;
+    let call_changeType: fun(Externref, Str) void = @es/\ (self,p0) => self["changeType"](p0) \/;
+    let call_changeType_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["changeType"](...args) \/;
+    let call_dispatchEvent: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["dispatchEvent"](p0)) ? 1 : 0 \/;
+    let call_dispatchEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dispatchEvent"](...args) \/;
+    let get_mode: fun(Externref) Str = @es/\ (self) => self["mode"] \/;
+    let set_mode: fun(Externref, Str) void = @es/\ (self,value) => { self["mode"] = value; } \/;
+    let get_onabort: fun(Externref) Externref = @es/\ (self) => self["onabort"] \/;
+    let set_onabort: fun(Externref, Externref) void = @es/\ (self,value) => { self["onabort"] = value; } \/;
+    let get_onerror: fun(Externref) Externref = @es/\ (self) => self["onerror"] \/;
+    let set_onerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["onerror"] = value; } \/;
+    let get_onupdate: fun(Externref) Externref = @es/\ (self) => self["onupdate"] \/;
+    let set_onupdate: fun(Externref, Externref) void = @es/\ (self,value) => { self["onupdate"] = value; } \/;
+    let get_onupdateend: fun(Externref) Externref = @es/\ (self) => self["onupdateend"] \/;
+    let set_onupdateend: fun(Externref, Externref) void = @es/\ (self,value) => { self["onupdateend"] = value; } \/;
+    let get_onupdatestart: fun(Externref) Externref = @es/\ (self) => self["onupdatestart"] \/;
+    let set_onupdatestart: fun(Externref, Externref) void = @es/\ (self,value) => { self["onupdatestart"] = value; } \/;
+    let call_remove: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["remove"](p0,p1) \/;
+    let call_remove_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["remove"](...args) \/;
+    let call_removeEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeEventListener"](...args) \/;
+    let get_timestampOffset: fun(Externref) F64 = @es/\ (self) => self["timestampOffset"] \/;
+    let set_timestampOffset: fun(Externref, F64) void = @es/\ (self,value) => { self["timestampOffset"] = value; } \/;
+    let get_updating: fun(Externref) Bool = @es/\ (self) => (self["updating"]) ? 1 : 0 \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SourceBuffer"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SourceBuffer"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SourceBuffer"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SourceBuffer"]["prototype"] = value; } \/;
+}

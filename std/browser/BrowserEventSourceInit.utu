@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEventSourceInit {
+    let get_withCredentials: fun(Externref) Externref = @es/\ (self) => self["withCredentials"] \/;
+    let set_withCredentials: fun(Externref, Externref) void = @es/\ (self,value) => { self["withCredentials"] = value; } \/;
+}

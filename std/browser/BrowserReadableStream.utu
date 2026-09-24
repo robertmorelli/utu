@@ -1,0 +1,36 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserReadableStream {
+    let call_symbol_asyncIterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.asyncIterator]() \/;
+    let call_symbol_asyncIterator_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self[Symbol.asyncIterator](p0) \/;
+    let call_symbol_asyncIterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.asyncIterator](...args) \/;
+    let call_cancel: fun(Externref) Externref = @es/\ (self) => self["cancel"]() \/;
+    let call_cancel_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["cancel"](p0) \/;
+    let call_cancel_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["cancel"](...args) \/;
+    let call_getReader: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getReader"](p0) \/;
+    let call_getReader_overload2: fun(Externref) Externref = @es/\ (self) => self["getReader"]() \/;
+    let call_getReader_overload3: fun(Externref) Externref = @es/\ (self) => self["getReader"]() \/;
+    let call_getReader_overload3_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getReader"](p0) \/;
+    let call_getReader_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getReader"](...args) \/;
+    let get_locked: fun(Externref) Bool = @es/\ (self) => (self["locked"]) ? 1 : 0 \/;
+    let call_pipeThrough: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["pipeThrough"](p0) \/;
+    let call_pipeThrough_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["pipeThrough"](p0,p1) \/;
+    let call_pipeThrough_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["pipeThrough"](...args) \/;
+    let call_pipeTo: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["pipeTo"](p0) \/;
+    let call_pipeTo_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["pipeTo"](p0,p1) \/;
+    let call_pipeTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["pipeTo"](...args) \/;
+    let call_tee: fun(Externref) Externref = @es/\ (self) => self["tee"]() \/;
+    let call_tee_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["tee"](...args) \/;
+    let call_values: fun(Externref) Externref = @es/\ (self) => self["values"]() \/;
+    let call_values_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["values"](p0) \/;
+    let call_values_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["values"](...args) \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["ReadableStream"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["ReadableStream"](p0,p1) \/;
+    let new_instance_overload2: fun(Externref) Externref = @es/\ (p0) => new globalThis["ReadableStream"](p0) \/;
+    let new_instance_overload2_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["ReadableStream"](p0,p1) \/;
+    let new_instance_overload3: fun() Externref = @es/\ () => new globalThis["ReadableStream"]() \/;
+    let new_instance_overload3_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["ReadableStream"](p0) \/;
+    let new_instance_overload3_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["ReadableStream"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["ReadableStream"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["ReadableStream"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["ReadableStream"]["prototype"] = value; } \/;
+}

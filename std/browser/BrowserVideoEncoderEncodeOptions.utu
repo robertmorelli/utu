@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserVideoEncoderEncodeOptions {
+    let get_avc: fun(Externref) Externref = @es/\ (self) => self["avc"] \/;
+    let set_avc: fun(Externref, Externref) void = @es/\ (self,value) => { self["avc"] = value; } \/;
+    let get_keyFrame: fun(Externref) Externref = @es/\ (self) => self["keyFrame"] \/;
+    let set_keyFrame: fun(Externref, Externref) void = @es/\ (self,value) => { self["keyFrame"] = value; } \/;
+}

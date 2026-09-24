@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSpeechSynthesisUtteranceEventMap {
+    let get_boundary: fun(Externref) Externref = @es/\ (self) => self["boundary"] \/;
+    let set_boundary: fun(Externref, Externref) void = @es/\ (self,value) => { self["boundary"] = value; } \/;
+    let get_end: fun(Externref) Externref = @es/\ (self) => self["end"] \/;
+    let set_end: fun(Externref, Externref) void = @es/\ (self,value) => { self["end"] = value; } \/;
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_mark: fun(Externref) Externref = @es/\ (self) => self["mark"] \/;
+    let set_mark: fun(Externref, Externref) void = @es/\ (self,value) => { self["mark"] = value; } \/;
+    let get_pause: fun(Externref) Externref = @es/\ (self) => self["pause"] \/;
+    let set_pause: fun(Externref, Externref) void = @es/\ (self,value) => { self["pause"] = value; } \/;
+    let get_resume: fun(Externref) Externref = @es/\ (self) => self["resume"] \/;
+    let set_resume: fun(Externref, Externref) void = @es/\ (self,value) => { self["resume"] = value; } \/;
+    let get_start: fun(Externref) Externref = @es/\ (self) => self["start"] \/;
+    let set_start: fun(Externref, Externref) void = @es/\ (self,value) => { self["start"] = value; } \/;
+}

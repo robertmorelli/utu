@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserStringConstructor {
+    let call_fromCharCode: fun(Externref) Str = @es/\ (self) => self["fromCharCode"]() \/;
+    let call_fromCharCode_arity1: fun(Externref, Externref) Str = @es/\ (self,p0) => self["fromCharCode"](...p0) \/;
+    let call_fromCharCode_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["fromCharCode"](...args) \/;
+    let call_fromCodePoint: fun(Externref) Str = @es/\ (self) => self["fromCodePoint"]() \/;
+    let call_fromCodePoint_arity1: fun(Externref, Externref) Str = @es/\ (self,p0) => self["fromCodePoint"](...p0) \/;
+    let call_fromCodePoint_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["fromCodePoint"](...args) \/;
+    let get_prototype: fun(Externref) Externref = @es/\ (self) => self["prototype"] \/;
+    let call_raw: fun(Externref, Externref) Str = @es/\ (self,p0) => self["raw"](p0) \/;
+    let call_raw_arity2: fun(Externref, Externref, Externref) Str = @es/\ (self,p0,p1) => self["raw"](p0,...p1) \/;
+    let call_raw_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["raw"](...args) \/;
+    let invoke: fun(Externref) Str = @es/\ (self) => self() \/;
+    let invoke_arity1: fun(Externref, Externref) Str = @es/\ (self,p0) => self(p0) \/;
+    let invoke_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self(...args) \/;
+}

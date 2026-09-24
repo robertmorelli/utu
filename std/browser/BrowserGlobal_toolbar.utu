@@ -1,0 +1,4 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_toolbar {
+    let get_visible: fun() Bool = @es/\ () => (globalThis["toolbar"]["visible"]) ? 1 : 0 \/;
+}

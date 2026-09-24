@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioDecoderConfig {
+    let get_codec: fun(Externref) Str = @es/\ (self) => self["codec"] \/;
+    let set_codec: fun(Externref, Str) void = @es/\ (self,value) => { self["codec"] = value; } \/;
+    let get_description: fun(Externref) Externref = @es/\ (self) => self["description"] \/;
+    let set_description: fun(Externref, Externref) void = @es/\ (self,value) => { self["description"] = value; } \/;
+    let get_numberOfChannels: fun(Externref) F64 = @es/\ (self) => self["numberOfChannels"] \/;
+    let set_numberOfChannels: fun(Externref, F64) void = @es/\ (self,value) => { self["numberOfChannels"] = value; } \/;
+    let get_sampleRate: fun(Externref) F64 = @es/\ (self) => self["sampleRate"] \/;
+    let set_sampleRate: fun(Externref, F64) void = @es/\ (self,value) => { self["sampleRate"] = value; } \/;
+}

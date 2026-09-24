@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCryptoKeyPair {
+    let get_privateKey: fun(Externref) Externref = @es/\ (self) => self["privateKey"] \/;
+    let set_privateKey: fun(Externref, Externref) void = @es/\ (self,value) => { self["privateKey"] = value; } \/;
+    let get_publicKey: fun(Externref) Externref = @es/\ (self) => self["publicKey"] \/;
+    let set_publicKey: fun(Externref, Externref) void = @es/\ (self,value) => { self["publicKey"] = value; } \/;
+}

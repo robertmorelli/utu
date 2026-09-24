@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDeviceMotionEventInit {
+    let get_acceleration: fun(Externref) Externref = @es/\ (self) => self["acceleration"] \/;
+    let set_acceleration: fun(Externref, Externref) void = @es/\ (self,value) => { self["acceleration"] = value; } \/;
+    let get_accelerationIncludingGravity: fun(Externref) Externref = @es/\ (self) => self["accelerationIncludingGravity"] \/;
+    let set_accelerationIncludingGravity: fun(Externref, Externref) void = @es/\ (self,value) => { self["accelerationIncludingGravity"] = value; } \/;
+    let get_bubbles: fun(Externref) Externref = @es/\ (self) => self["bubbles"] \/;
+    let set_bubbles: fun(Externref, Externref) void = @es/\ (self,value) => { self["bubbles"] = value; } \/;
+    let get_cancelable: fun(Externref) Externref = @es/\ (self) => self["cancelable"] \/;
+    let set_cancelable: fun(Externref, Externref) void = @es/\ (self,value) => { self["cancelable"] = value; } \/;
+    let get_composed: fun(Externref) Externref = @es/\ (self) => self["composed"] \/;
+    let set_composed: fun(Externref, Externref) void = @es/\ (self,value) => { self["composed"] = value; } \/;
+    let get_interval: fun(Externref) Externref = @es/\ (self) => self["interval"] \/;
+    let set_interval: fun(Externref, Externref) void = @es/\ (self,value) => { self["interval"] = value; } \/;
+    let get_rotationRate: fun(Externref) Externref = @es/\ (self) => self["rotationRate"] \/;
+    let set_rotationRate: fun(Externref, Externref) void = @es/\ (self,value) => { self["rotationRate"] = value; } \/;
+}

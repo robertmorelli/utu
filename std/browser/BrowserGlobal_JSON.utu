@@ -1,0 +1,14 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_JSON {
+    let get_symbol_toStringTag: fun() Str = @es/\ () => globalThis["JSON"][Symbol.toStringTag] \/;
+    let call_parse: fun(Str) Externref = @es/\ (p0) => globalThis["JSON"]["parse"](p0) \/;
+    let call_parse_arity2: fun(Str, Externref) Externref = @es/\ (p0,p1) => globalThis["JSON"]["parse"](p0,p1) \/;
+    let call_parse_js: fun(Externref) Externref = @es/\ (args) => globalThis["JSON"]["parse"](...args) \/;
+    let call_stringify: fun(Externref) Str = @es/\ (p0) => globalThis["JSON"]["stringify"](p0) \/;
+    let call_stringify_arity2: fun(Externref, Externref) Str = @es/\ (p0,p1) => globalThis["JSON"]["stringify"](p0,p1) \/;
+    let call_stringify_arity3: fun(Externref, Externref, Externref) Str = @es/\ (p0,p1,p2) => globalThis["JSON"]["stringify"](p0,p1,p2) \/;
+    let call_stringify_overload2: fun(Externref) Str = @es/\ (p0) => globalThis["JSON"]["stringify"](p0) \/;
+    let call_stringify_overload2_arity2: fun(Externref, Externref) Str = @es/\ (p0,p1) => globalThis["JSON"]["stringify"](p0,p1) \/;
+    let call_stringify_overload2_arity3: fun(Externref, Externref, Externref) Str = @es/\ (p0,p1,p2) => globalThis["JSON"]["stringify"](p0,p1,p2) \/;
+    let call_stringify_js: fun(Externref) Externref = @es/\ (args) => globalThis["JSON"]["stringify"](...args) \/;
+}

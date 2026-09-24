@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCookieInit {
+    let get_domain: fun(Externref) Externref = @es/\ (self) => self["domain"] \/;
+    let set_domain: fun(Externref, Externref) void = @es/\ (self,value) => { self["domain"] = value; } \/;
+    let get_expires: fun(Externref) Externref = @es/\ (self) => self["expires"] \/;
+    let set_expires: fun(Externref, Externref) void = @es/\ (self,value) => { self["expires"] = value; } \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
+    let get_partitioned: fun(Externref) Externref = @es/\ (self) => self["partitioned"] \/;
+    let set_partitioned: fun(Externref, Externref) void = @es/\ (self,value) => { self["partitioned"] = value; } \/;
+    let get_path: fun(Externref) Externref = @es/\ (self) => self["path"] \/;
+    let set_path: fun(Externref, Externref) void = @es/\ (self,value) => { self["path"] = value; } \/;
+    let get_sameSite: fun(Externref) Externref = @es/\ (self) => self["sameSite"] \/;
+    let set_sameSite: fun(Externref, Externref) void = @es/\ (self,value) => { self["sameSite"] = value; } \/;
+    let get_value: fun(Externref) Str = @es/\ (self) => self["value"] \/;
+    let set_value: fun(Externref, Str) void = @es/\ (self,value) => { self["value"] = value; } \/;
+}

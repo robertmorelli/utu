@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImageDecodeOptions {
+    let get_completeFramesOnly: fun(Externref) Externref = @es/\ (self) => self["completeFramesOnly"] \/;
+    let set_completeFramesOnly: fun(Externref, Externref) void = @es/\ (self,value) => { self["completeFramesOnly"] = value; } \/;
+    let get_frameIndex: fun(Externref) Externref = @es/\ (self) => self["frameIndex"] \/;
+    let set_frameIndex: fun(Externref, Externref) void = @es/\ (self,value) => { self["frameIndex"] = value; } \/;
+}

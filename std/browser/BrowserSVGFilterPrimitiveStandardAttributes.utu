@@ -1,0 +1,8 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGFilterPrimitiveStandardAttributes {
+    let get_height: fun(Externref) Externref = @es/\ (self) => self["height"] \/;
+    let get_result: fun(Externref) Externref = @es/\ (self) => self["result"] \/;
+    let get_width: fun(Externref) Externref = @es/\ (self) => self["width"] \/;
+    let get_x: fun(Externref) Externref = @es/\ (self) => self["x"] \/;
+    let get_y: fun(Externref) Externref = @es/\ (self) => self["y"] \/;
+}

@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPaymentDetailsModifier {
+    let get_additionalDisplayItems: fun(Externref) Externref = @es/\ (self) => self["additionalDisplayItems"] \/;
+    let set_additionalDisplayItems: fun(Externref, Externref) void = @es/\ (self,value) => { self["additionalDisplayItems"] = value; } \/;
+    let get_data: fun(Externref) Externref = @es/\ (self) => self["data"] \/;
+    let set_data: fun(Externref, Externref) void = @es/\ (self,value) => { self["data"] = value; } \/;
+    let get_supportedMethods: fun(Externref) Str = @es/\ (self) => self["supportedMethods"] \/;
+    let set_supportedMethods: fun(Externref, Str) void = @es/\ (self,value) => { self["supportedMethods"] = value; } \/;
+    let get_total: fun(Externref) Externref = @es/\ (self) => self["total"] \/;
+    let set_total: fun(Externref, Externref) void = @es/\ (self,value) => { self["total"] = value; } \/;
+}

@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPermissions {
+    let call_query: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["query"](p0) \/;
+    let call_query_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["query"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["Permissions"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Permissions"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Permissions"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["Permissions"]["prototype"] = value; } \/;
+}

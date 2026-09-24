@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserViewTransitionUpdateCallback {
+    let invoke: fun(Externref) Externref = @es/\ (self) => self() \/;
+    let invoke_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self(...args) \/;
+}

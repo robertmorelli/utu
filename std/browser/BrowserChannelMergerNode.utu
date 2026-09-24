@@ -1,0 +1,39 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserChannelMergerNode {
+    let call_addEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addEventListener"](...args) \/;
+    let get_channelCount: fun(Externref) F64 = @es/\ (self) => self["channelCount"] \/;
+    let set_channelCount: fun(Externref, F64) void = @es/\ (self,value) => { self["channelCount"] = value; } \/;
+    let get_channelCountMode: fun(Externref) Str = @es/\ (self) => self["channelCountMode"] \/;
+    let set_channelCountMode: fun(Externref, Str) void = @es/\ (self,value) => { self["channelCountMode"] = value; } \/;
+    let get_channelInterpretation: fun(Externref) Str = @es/\ (self) => self["channelInterpretation"] \/;
+    let set_channelInterpretation: fun(Externref, Str) void = @es/\ (self,value) => { self["channelInterpretation"] = value; } \/;
+    let call_connect: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["connect"](p0) \/;
+    let call_connect_arity2: fun(Externref, Externref, F64) Externref = @es/\ (self,p0,p1) => self["connect"](p0,p1) \/;
+    let call_connect_arity3: fun(Externref, Externref, F64, F64) Externref = @es/\ (self,p0,p1,p2) => self["connect"](p0,p1,p2) \/;
+    let call_connect_overload2: fun(Externref, Externref) void = @es/\ (self,p0) => self["connect"](p0) \/;
+    let call_connect_overload2_arity2: fun(Externref, Externref, F64) void = @es/\ (self,p0,p1) => self["connect"](p0,p1) \/;
+    let call_connect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["connect"](...args) \/;
+    let get_context: fun(Externref) Externref = @es/\ (self) => self["context"] \/;
+    let call_disconnect: fun(Externref) void = @es/\ (self) => self["disconnect"]() \/;
+    let call_disconnect_overload2: fun(Externref, F64) void = @es/\ (self,p0) => self["disconnect"](p0) \/;
+    let call_disconnect_overload3: fun(Externref, Externref) void = @es/\ (self,p0) => self["disconnect"](p0) \/;
+    let call_disconnect_overload4: fun(Externref, Externref, F64) void = @es/\ (self,p0,p1) => self["disconnect"](p0,p1) \/;
+    let call_disconnect_overload5: fun(Externref, Externref, F64, F64) void = @es/\ (self,p0,p1,p2) => self["disconnect"](p0,p1,p2) \/;
+    let call_disconnect_overload6: fun(Externref, Externref) void = @es/\ (self,p0) => self["disconnect"](p0) \/;
+    let call_disconnect_overload7: fun(Externref, Externref, F64) void = @es/\ (self,p0,p1) => self["disconnect"](p0,p1) \/;
+    let call_disconnect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["disconnect"](...args) \/;
+    let call_dispatchEvent: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["dispatchEvent"](p0)) ? 1 : 0 \/;
+    let call_dispatchEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dispatchEvent"](...args) \/;
+    let get_numberOfInputs: fun(Externref) F64 = @es/\ (self) => self["numberOfInputs"] \/;
+    let get_numberOfOutputs: fun(Externref) F64 = @es/\ (self) => self["numberOfOutputs"] \/;
+    let call_removeEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeEventListener"](...args) \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["ChannelMergerNode"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["ChannelMergerNode"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["ChannelMergerNode"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["ChannelMergerNode"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["ChannelMergerNode"]["prototype"] = value; } \/;
+}

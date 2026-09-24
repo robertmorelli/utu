@@ -1,0 +1,33 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserXMLHttpRequestEventTarget {
+    let call_addEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["addEventListener"](p0,p1) \/;
+    let call_addEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["addEventListener"](p0,p1,p2) \/;
+    let call_addEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addEventListener"](...args) \/;
+    let call_dispatchEvent: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["dispatchEvent"](p0)) ? 1 : 0 \/;
+    let call_dispatchEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["dispatchEvent"](...args) \/;
+    let get_onabort: fun(Externref) Externref = @es/\ (self) => self["onabort"] \/;
+    let set_onabort: fun(Externref, Externref) void = @es/\ (self,value) => { self["onabort"] = value; } \/;
+    let get_onerror: fun(Externref) Externref = @es/\ (self) => self["onerror"] \/;
+    let set_onerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["onerror"] = value; } \/;
+    let get_onload: fun(Externref) Externref = @es/\ (self) => self["onload"] \/;
+    let set_onload: fun(Externref, Externref) void = @es/\ (self,value) => { self["onload"] = value; } \/;
+    let get_onloadend: fun(Externref) Externref = @es/\ (self) => self["onloadend"] \/;
+    let set_onloadend: fun(Externref, Externref) void = @es/\ (self,value) => { self["onloadend"] = value; } \/;
+    let get_onloadstart: fun(Externref) Externref = @es/\ (self) => self["onloadstart"] \/;
+    let set_onloadstart: fun(Externref, Externref) void = @es/\ (self,value) => { self["onloadstart"] = value; } \/;
+    let get_onprogress: fun(Externref) Externref = @es/\ (self) => self["onprogress"] \/;
+    let set_onprogress: fun(Externref, Externref) void = @es/\ (self,value) => { self["onprogress"] = value; } \/;
+    let get_ontimeout: fun(Externref) Externref = @es/\ (self) => self["ontimeout"] \/;
+    let set_ontimeout: fun(Externref, Externref) void = @es/\ (self,value) => { self["ontimeout"] = value; } \/;
+    let call_removeEventListener: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_overload2: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["removeEventListener"](p0,p1) \/;
+    let call_removeEventListener_overload2_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["removeEventListener"](p0,p1,p2) \/;
+    let call_removeEventListener_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeEventListener"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["XMLHttpRequestEventTarget"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["XMLHttpRequestEventTarget"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["XMLHttpRequestEventTarget"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["XMLHttpRequestEventTarget"]["prototype"] = value; } \/;
+}

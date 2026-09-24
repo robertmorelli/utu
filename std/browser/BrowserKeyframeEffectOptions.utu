@@ -1,0 +1,27 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserKeyframeEffectOptions {
+    let get_composite: fun(Externref) Externref = @es/\ (self) => self["composite"] \/;
+    let set_composite: fun(Externref, Externref) void = @es/\ (self,value) => { self["composite"] = value; } \/;
+    let get_delay: fun(Externref) Externref = @es/\ (self) => self["delay"] \/;
+    let set_delay: fun(Externref, Externref) void = @es/\ (self,value) => { self["delay"] = value; } \/;
+    let get_direction: fun(Externref) Externref = @es/\ (self) => self["direction"] \/;
+    let set_direction: fun(Externref, Externref) void = @es/\ (self,value) => { self["direction"] = value; } \/;
+    let get_duration: fun(Externref) Externref = @es/\ (self) => self["duration"] \/;
+    let set_duration: fun(Externref, Externref) void = @es/\ (self,value) => { self["duration"] = value; } \/;
+    let get_easing: fun(Externref) Externref = @es/\ (self) => self["easing"] \/;
+    let set_easing: fun(Externref, Externref) void = @es/\ (self,value) => { self["easing"] = value; } \/;
+    let get_endDelay: fun(Externref) Externref = @es/\ (self) => self["endDelay"] \/;
+    let set_endDelay: fun(Externref, Externref) void = @es/\ (self,value) => { self["endDelay"] = value; } \/;
+    let get_fill: fun(Externref) Externref = @es/\ (self) => self["fill"] \/;
+    let set_fill: fun(Externref, Externref) void = @es/\ (self,value) => { self["fill"] = value; } \/;
+    let get_iterationComposite: fun(Externref) Externref = @es/\ (self) => self["iterationComposite"] \/;
+    let set_iterationComposite: fun(Externref, Externref) void = @es/\ (self,value) => { self["iterationComposite"] = value; } \/;
+    let get_iterationStart: fun(Externref) Externref = @es/\ (self) => self["iterationStart"] \/;
+    let set_iterationStart: fun(Externref, Externref) void = @es/\ (self,value) => { self["iterationStart"] = value; } \/;
+    let get_iterations: fun(Externref) Externref = @es/\ (self) => self["iterations"] \/;
+    let set_iterations: fun(Externref, Externref) void = @es/\ (self,value) => { self["iterations"] = value; } \/;
+    let get_playbackRate: fun(Externref) Externref = @es/\ (self) => self["playbackRate"] \/;
+    let set_playbackRate: fun(Externref, Externref) void = @es/\ (self,value) => { self["playbackRate"] = value; } \/;
+    let get_pseudoElement: fun(Externref) Externref = @es/\ (self) => self["pseudoElement"] \/;
+    let set_pseudoElement: fun(Externref, Externref) void = @es/\ (self,value) => { self["pseudoElement"] = value; } \/;
+}

@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_NodeFilter {
+    let get_FILTER_ACCEPT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["FILTER_ACCEPT"] \/;
+    let get_FILTER_REJECT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["FILTER_REJECT"] \/;
+    let get_FILTER_SKIP: fun() F64 = @es/\ () => globalThis["NodeFilter"]["FILTER_SKIP"] \/;
+    let get_SHOW_ALL: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_ALL"] \/;
+    let get_SHOW_ATTRIBUTE: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_ATTRIBUTE"] \/;
+    let get_SHOW_CDATA_SECTION: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_CDATA_SECTION"] \/;
+    let get_SHOW_COMMENT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_COMMENT"] \/;
+    let get_SHOW_DOCUMENT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_DOCUMENT"] \/;
+    let get_SHOW_DOCUMENT_FRAGMENT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_DOCUMENT_FRAGMENT"] \/;
+    let get_SHOW_DOCUMENT_TYPE: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_DOCUMENT_TYPE"] \/;
+    let get_SHOW_ELEMENT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_ELEMENT"] \/;
+    let get_SHOW_ENTITY: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_ENTITY"] \/;
+    let get_SHOW_ENTITY_REFERENCE: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_ENTITY_REFERENCE"] \/;
+    let get_SHOW_NOTATION: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_NOTATION"] \/;
+    let get_SHOW_PROCESSING_INSTRUCTION: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_PROCESSING_INSTRUCTION"] \/;
+    let get_SHOW_TEXT: fun() F64 = @es/\ () => globalThis["NodeFilter"]["SHOW_TEXT"] \/;
+}

@@ -1,0 +1,26 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNamedNodeMap {
+    let call_symbol_iterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.iterator]() \/;
+    let call_symbol_iterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.iterator](...args) \/;
+    let call_getNamedItem: fun(Externref, Str) Externref = @es/\ (self,p0) => self["getNamedItem"](p0) \/;
+    let call_getNamedItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getNamedItem"](...args) \/;
+    let call_getNamedItemNS: fun(Externref, Externref, Str) Externref = @es/\ (self,p0,p1) => self["getNamedItemNS"](p0,p1) \/;
+    let call_getNamedItemNS_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getNamedItemNS"](...args) \/;
+    let call_item: fun(Externref, F64) Externref = @es/\ (self,p0) => self["item"](p0) \/;
+    let call_item_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["item"](...args) \/;
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let call_removeNamedItem: fun(Externref, Str) Externref = @es/\ (self,p0) => self["removeNamedItem"](p0) \/;
+    let call_removeNamedItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeNamedItem"](...args) \/;
+    let call_removeNamedItemNS: fun(Externref, Externref, Str) Externref = @es/\ (self,p0,p1) => self["removeNamedItemNS"](p0,p1) \/;
+    let call_removeNamedItemNS_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeNamedItemNS"](...args) \/;
+    let call_setNamedItem: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["setNamedItem"](p0) \/;
+    let call_setNamedItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setNamedItem"](...args) \/;
+    let call_setNamedItemNS: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["setNamedItemNS"](p0) \/;
+    let call_setNamedItemNS_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setNamedItemNS"](...args) \/;
+    let get_index: fun(Externref, F64) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, F64, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["NamedNodeMap"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["NamedNodeMap"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["NamedNodeMap"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["NamedNodeMap"]["prototype"] = value; } \/;
+}

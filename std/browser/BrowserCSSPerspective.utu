@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSPerspective {
+    let get_is2D: fun(Externref) Bool = @es/\ (self) => (self["is2D"]) ? 1 : 0 \/;
+    let set_is2D: fun(Externref, Bool) void = @es/\ (self,value) => { self["is2D"] = !!value; } \/;
+    let get_length: fun(Externref) Externref = @es/\ (self) => self["length"] \/;
+    let set_length: fun(Externref, Externref) void = @es/\ (self,value) => { self["length"] = value; } \/;
+    let call_toMatrix: fun(Externref) Externref = @es/\ (self) => self["toMatrix"]() \/;
+    let call_toMatrix_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toMatrix"](...args) \/;
+    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
+    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["CSSPerspective"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CSSPerspective"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CSSPerspective"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CSSPerspective"]["prototype"] = value; } \/;
+}

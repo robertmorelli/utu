@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTextStreamBase {
+    let call_Close: fun(Externref) void = @es/\ (self) => self["Close"]() \/;
+    let call_Close_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["Close"](...args) \/;
+    let get_Column: fun(Externref) F64 = @es/\ (self) => self["Column"] \/;
+    let set_Column: fun(Externref, F64) void = @es/\ (self,value) => { self["Column"] = value; } \/;
+    let get_Line: fun(Externref) F64 = @es/\ (self) => self["Line"] \/;
+    let set_Line: fun(Externref, F64) void = @es/\ (self,value) => { self["Line"] = value; } \/;
+}

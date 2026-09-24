@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCaretPosition {
+    let call_getClientRect: fun(Externref) Externref = @es/\ (self) => self["getClientRect"]() \/;
+    let call_getClientRect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getClientRect"](...args) \/;
+    let get_offset: fun(Externref) F64 = @es/\ (self) => self["offset"] \/;
+    let get_offsetNode: fun(Externref) Externref = @es/\ (self) => self["offsetNode"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CaretPosition"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CaretPosition"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CaretPosition"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CaretPosition"]["prototype"] = value; } \/;
+}

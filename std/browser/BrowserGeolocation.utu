@@ -1,0 +1,17 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGeolocation {
+    let call_clearWatch: fun(Externref, F64) void = @es/\ (self,p0) => self["clearWatch"](p0) \/;
+    let call_clearWatch_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clearWatch"](...args) \/;
+    let call_getCurrentPosition: fun(Externref, cl(Externref) void) void = @es/\ (self,p0) => self["getCurrentPosition"](p0) \/;
+    let call_getCurrentPosition_arity2: fun(Externref, cl(Externref) void, Externref) void = @es/\ (self,p0,p1) => self["getCurrentPosition"](p0,p1) \/;
+    let call_getCurrentPosition_arity3: fun(Externref, cl(Externref) void, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["getCurrentPosition"](p0,p1,p2) \/;
+    let call_getCurrentPosition_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getCurrentPosition"](...args) \/;
+    let call_watchPosition: fun(Externref, cl(Externref) void) F64 = @es/\ (self,p0) => self["watchPosition"](p0) \/;
+    let call_watchPosition_arity2: fun(Externref, cl(Externref) void, Externref) F64 = @es/\ (self,p0,p1) => self["watchPosition"](p0,p1) \/;
+    let call_watchPosition_arity3: fun(Externref, cl(Externref) void, Externref, Externref) F64 = @es/\ (self,p0,p1,p2) => self["watchPosition"](p0,p1,p2) \/;
+    let call_watchPosition_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["watchPosition"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["Geolocation"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Geolocation"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Geolocation"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["Geolocation"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWEBGL_lose_context {
+    let call_loseContext: fun(Externref) void = @es/\ (self) => self["loseContext"]() \/;
+    let call_loseContext_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["loseContext"](...args) \/;
+    let call_restoreContext: fun(Externref) void = @es/\ (self) => self["restoreContext"]() \/;
+    let call_restoreContext_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["restoreContext"](...args) \/;
+}

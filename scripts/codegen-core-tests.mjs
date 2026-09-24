@@ -520,6 +520,74 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.sum(3, 4), 7);
   });
 
+  // `@es` bodies are evaluated as exports of a generated ES module, which is the
+  // only scope where `import` and top-level `await` are legal. Under the old
+  // `new Function` evaluation this program could not be expressed at all. A
+  // `node:` builtin stands in for an npm package so the test needs no fixture.
+  test('codegen: @es import pulls a real module into a wasm import', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'es_module_import.utu',
+      source: `
+        let join: fun(Str, Str) Str = @es/\\ (await import('node:path')).join \\/;
+        let sep: Str = @es/\\ (await import('node:path')).sep \\/;
+        export lib {
+          fn joined() Str { join("a", "b"); }
+          fn separator() Str { sep; }
+        }
+      `,
+    });
+    assertEq(instance.exports.joined(), 'a/b');
+    assertEq(instance.exports.separator(), '/');
+  });
+
+  // The preferred spelling: leading `import` declarations are hoisted to the top
+  // of the generated glue module. A named import is what lets a bundler shake
+  // unused members out of the package — the `(await import('pkg')).x` form pulls
+  // in the whole namespace instead. See IMPORTANT_MINIFICATION_INFO.md.
+  test('codegen: @es hoists leading import declarations out of the body', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({
+      ROOT,
+      makeCompiler,
+      assertNoErrors,
+      name: 'es_named_import.utu',
+      source: `
+        let join: fun(Str, Str) Str =
+            @es/\\ import { join } from 'node:path'; (a, b) => join(a, b) \\/;
+        let sep: Str = @es/\\ import { sep } from 'node:path'; sep \\/;
+        export lib {
+          fn joined() Str { join("a", "b"); }
+          fn separator() Str { sep; }
+        }
+      `,
+    });
+    assertEq(instance.exports.joined(), 'a/b');
+    assertEq(instance.exports.separator(), '/');
+  });
+
+  // Codegen already drops unused `@es` bindings from the wasm; this pins that the
+  // glue module drops them too, so a dead binding costs no bytes and loads no
+  // package at runtime.
+  test('codegen: unused @es bindings are dropped from the glue module', async () => {
+    const { glueModuleSource, liveGlueFields } = await import('../src/runtime/host-imports.js');
+    const spec = {
+      es: {
+        __es_0: `import { basename } from 'node:path'; (p) => basename(p)`,
+        __es_1: `import { extname } from 'node:path'; (p) => extname(p)`,
+      },
+    };
+    const all = glueModuleSource(spec);
+    assert(all.includes('__es_0') && all.includes('__es_1'), 'unfiltered glue should carry both');
+
+    const kept = glueModuleSource(spec, new Set(['__es_0']));
+    assert(kept.includes('__es_0'), 'live binding must survive');
+    assert(!kept.includes('__es_1'), 'dead binding must be dropped from the glue');
+    assertEq(glueModuleSource(spec, new Set()), '');
+    assert(typeof liveGlueFields === 'function', 'liveGlueFields should be exported');
+  });
+
   test('codegen: @es string import composes with lowered strings', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({
       ROOT,
@@ -740,7 +808,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     `, async (file) => {
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-      const { instance } = await instantiateLowered(emitBinary(doc), buildImportObject(doc));
+      const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
       // The test target exports each `test` block so a host runner can call it.
       assert(typeof instance.exports.__test_0 === 'function', 'expected test blocks to be exported');
       instance.exports.__test_0();
@@ -830,7 +898,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       const file = path.join(ROOT, 'examples', 'working', name);
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-      const { instance } = await instantiateLowered(emitBinary(doc), buildImportObject(doc));
+      const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
       assertEq(await instance.exports.main(), value, `${name} returned the wrong result`);
     }
     const entries = (await fs.readdir(path.join(ROOT, 'examples', 'working')))

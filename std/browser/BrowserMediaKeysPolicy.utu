@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMediaKeysPolicy {
+    let get_minHdcpVersion: fun(Externref) Externref = @es/\ (self) => self["minHdcpVersion"] \/;
+    let set_minHdcpVersion: fun(Externref, Externref) void = @es/\ (self,value) => { self["minHdcpVersion"] = value; } \/;
+}

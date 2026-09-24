@@ -1,0 +1,33 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSecurityPolicyViolationEventInit {
+    let get_blockedURI: fun(Externref) Externref = @es/\ (self) => self["blockedURI"] \/;
+    let set_blockedURI: fun(Externref, Externref) void = @es/\ (self,value) => { self["blockedURI"] = value; } \/;
+    let get_bubbles: fun(Externref) Externref = @es/\ (self) => self["bubbles"] \/;
+    let set_bubbles: fun(Externref, Externref) void = @es/\ (self,value) => { self["bubbles"] = value; } \/;
+    let get_cancelable: fun(Externref) Externref = @es/\ (self) => self["cancelable"] \/;
+    let set_cancelable: fun(Externref, Externref) void = @es/\ (self,value) => { self["cancelable"] = value; } \/;
+    let get_columnNumber: fun(Externref) Externref = @es/\ (self) => self["columnNumber"] \/;
+    let set_columnNumber: fun(Externref, Externref) void = @es/\ (self,value) => { self["columnNumber"] = value; } \/;
+    let get_composed: fun(Externref) Externref = @es/\ (self) => self["composed"] \/;
+    let set_composed: fun(Externref, Externref) void = @es/\ (self,value) => { self["composed"] = value; } \/;
+    let get_disposition: fun(Externref) Externref = @es/\ (self) => self["disposition"] \/;
+    let set_disposition: fun(Externref, Externref) void = @es/\ (self,value) => { self["disposition"] = value; } \/;
+    let get_documentURI: fun(Externref) Externref = @es/\ (self) => self["documentURI"] \/;
+    let set_documentURI: fun(Externref, Externref) void = @es/\ (self,value) => { self["documentURI"] = value; } \/;
+    let get_effectiveDirective: fun(Externref) Externref = @es/\ (self) => self["effectiveDirective"] \/;
+    let set_effectiveDirective: fun(Externref, Externref) void = @es/\ (self,value) => { self["effectiveDirective"] = value; } \/;
+    let get_lineNumber: fun(Externref) Externref = @es/\ (self) => self["lineNumber"] \/;
+    let set_lineNumber: fun(Externref, Externref) void = @es/\ (self,value) => { self["lineNumber"] = value; } \/;
+    let get_originalPolicy: fun(Externref) Externref = @es/\ (self) => self["originalPolicy"] \/;
+    let set_originalPolicy: fun(Externref, Externref) void = @es/\ (self,value) => { self["originalPolicy"] = value; } \/;
+    let get_referrer: fun(Externref) Externref = @es/\ (self) => self["referrer"] \/;
+    let set_referrer: fun(Externref, Externref) void = @es/\ (self,value) => { self["referrer"] = value; } \/;
+    let get_sample: fun(Externref) Externref = @es/\ (self) => self["sample"] \/;
+    let set_sample: fun(Externref, Externref) void = @es/\ (self,value) => { self["sample"] = value; } \/;
+    let get_sourceFile: fun(Externref) Externref = @es/\ (self) => self["sourceFile"] \/;
+    let set_sourceFile: fun(Externref, Externref) void = @es/\ (self,value) => { self["sourceFile"] = value; } \/;
+    let get_statusCode: fun(Externref) Externref = @es/\ (self) => self["statusCode"] \/;
+    let set_statusCode: fun(Externref, Externref) void = @es/\ (self,value) => { self["statusCode"] = value; } \/;
+    let get_violatedDirective: fun(Externref) Externref = @es/\ (self) => self["violatedDirective"] \/;
+    let set_violatedDirective: fun(Externref, Externref) void = @es/\ (self,value) => { self["violatedDirective"] = value; } \/;
+}

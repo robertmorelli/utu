@@ -1,0 +1,27 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGLengthList {
+    let call_symbol_iterator: fun(Externref) Externref = @es/\ (self) => self[Symbol.iterator]() \/;
+    let call_symbol_iterator_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.iterator](...args) \/;
+    let call_appendItem: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["appendItem"](p0) \/;
+    let call_appendItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["appendItem"](...args) \/;
+    let call_clear: fun(Externref) void = @es/\ (self) => self["clear"]() \/;
+    let call_clear_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clear"](...args) \/;
+    let call_getItem: fun(Externref, F64) Externref = @es/\ (self,p0) => self["getItem"](p0) \/;
+    let call_getItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getItem"](...args) \/;
+    let call_initialize: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["initialize"](p0) \/;
+    let call_initialize_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["initialize"](...args) \/;
+    let call_insertItemBefore: fun(Externref, Externref, F64) Externref = @es/\ (self,p0,p1) => self["insertItemBefore"](p0,p1) \/;
+    let call_insertItemBefore_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["insertItemBefore"](...args) \/;
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let get_numberOfItems: fun(Externref) F64 = @es/\ (self) => self["numberOfItems"] \/;
+    let call_removeItem: fun(Externref, F64) Externref = @es/\ (self,p0) => self["removeItem"](p0) \/;
+    let call_removeItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["removeItem"](...args) \/;
+    let call_replaceItem: fun(Externref, Externref, F64) Externref = @es/\ (self,p0,p1) => self["replaceItem"](p0,p1) \/;
+    let call_replaceItem_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["replaceItem"](...args) \/;
+    let get_index: fun(Externref, F64) Externref = @es/\ (self,key) => self[key] \/;
+    let set_index: fun(Externref, F64, Externref) void = @es/\ (self,key,value) => { self[key] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGLengthList"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGLengthList"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGLengthList"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGLengthList"]["prototype"] = value; } \/;
+}

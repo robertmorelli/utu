@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCOfferOptions {
+    let get_iceRestart: fun(Externref) Externref = @es/\ (self) => self["iceRestart"] \/;
+    let set_iceRestart: fun(Externref, Externref) void = @es/\ (self,value) => { self["iceRestart"] = value; } \/;
+    let get_offerToReceiveAudio: fun(Externref) Externref = @es/\ (self) => self["offerToReceiveAudio"] \/;
+    let set_offerToReceiveAudio: fun(Externref, Externref) void = @es/\ (self,value) => { self["offerToReceiveAudio"] = value; } \/;
+    let get_offerToReceiveVideo: fun(Externref) Externref = @es/\ (self) => self["offerToReceiveVideo"] \/;
+    let set_offerToReceiveVideo: fun(Externref, Externref) void = @es/\ (self,value) => { self["offerToReceiveVideo"] = value; } \/;
+}

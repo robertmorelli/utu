@@ -1,0 +1,24 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDOMRectReadOnly {
+    let get_bottom: fun(Externref) F64 = @es/\ (self) => self["bottom"] \/;
+    let get_height: fun(Externref) F64 = @es/\ (self) => self["height"] \/;
+    let get_left: fun(Externref) F64 = @es/\ (self) => self["left"] \/;
+    let get_right: fun(Externref) F64 = @es/\ (self) => self["right"] \/;
+    let call_toJSON: fun(Externref) Externref = @es/\ (self) => self["toJSON"]() \/;
+    let call_toJSON_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toJSON"](...args) \/;
+    let get_top: fun(Externref) F64 = @es/\ (self) => self["top"] \/;
+    let get_width: fun(Externref) F64 = @es/\ (self) => self["width"] \/;
+    let get_x: fun(Externref) F64 = @es/\ (self) => self["x"] \/;
+    let get_y: fun(Externref) F64 = @es/\ (self) => self["y"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["DOMRectReadOnly"]() \/;
+    let new_instance_arity1: fun(F64) Externref = @es/\ (p0) => new globalThis["DOMRectReadOnly"](p0) \/;
+    let new_instance_arity2: fun(F64, F64) Externref = @es/\ (p0,p1) => new globalThis["DOMRectReadOnly"](p0,p1) \/;
+    let new_instance_arity3: fun(F64, F64, F64) Externref = @es/\ (p0,p1,p2) => new globalThis["DOMRectReadOnly"](p0,p1,p2) \/;
+    let new_instance_arity4: fun(F64, F64, F64, F64) Externref = @es/\ (p0,p1,p2,p3) => new globalThis["DOMRectReadOnly"](p0,p1,p2,p3) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["DOMRectReadOnly"](...args) \/;
+    let static_call_fromRect: fun() Externref = @es/\ () => globalThis["DOMRectReadOnly"]["fromRect"]() \/;
+    let static_call_fromRect_arity1: fun(Externref) Externref = @es/\ (p0) => globalThis["DOMRectReadOnly"]["fromRect"](p0) \/;
+    let static_call_fromRect_js: fun(Externref) Externref = @es/\ (args) => globalThis["DOMRectReadOnly"]["fromRect"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["DOMRectReadOnly"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["DOMRectReadOnly"]["prototype"] = value; } \/;
+}

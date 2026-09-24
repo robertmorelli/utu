@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImportCallOptions {
+    let get_assert: fun(Externref) Externref = @es/\ (self) => self["assert"] \/;
+    let set_assert: fun(Externref, Externref) void = @es/\ (self,value) => { self["assert"] = value; } \/;
+    let get_with: fun(Externref) Externref = @es/\ (self) => self["with"] \/;
+    let set_with: fun(Externref, Externref) void = @es/\ (self,value) => { self["with"] = value; } \/;
+}

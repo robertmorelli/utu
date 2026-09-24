@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGFitToViewBox {
+    let get_preserveAspectRatio: fun(Externref) Externref = @es/\ (self) => self["preserveAspectRatio"] \/;
+    let get_viewBox: fun(Externref) Externref = @es/\ (self) => self["viewBox"] \/;
+}

@@ -1,0 +1,13 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioConfiguration {
+    let get_bitrate: fun(Externref) Externref = @es/\ (self) => self["bitrate"] \/;
+    let set_bitrate: fun(Externref, Externref) void = @es/\ (self,value) => { self["bitrate"] = value; } \/;
+    let get_channels: fun(Externref) Externref = @es/\ (self) => self["channels"] \/;
+    let set_channels: fun(Externref, Externref) void = @es/\ (self,value) => { self["channels"] = value; } \/;
+    let get_contentType: fun(Externref) Str = @es/\ (self) => self["contentType"] \/;
+    let set_contentType: fun(Externref, Str) void = @es/\ (self,value) => { self["contentType"] = value; } \/;
+    let get_samplerate: fun(Externref) Externref = @es/\ (self) => self["samplerate"] \/;
+    let set_samplerate: fun(Externref, Externref) void = @es/\ (self,value) => { self["samplerate"] = value; } \/;
+    let get_spatialRendering: fun(Externref) Externref = @es/\ (self) => self["spatialRendering"] \/;
+    let set_spatialRendering: fun(Externref, Externref) void = @es/\ (self,value) => { self["spatialRendering"] = value; } \/;
+}

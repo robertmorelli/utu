@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWeakSet {
+    let get_symbol_toStringTag: fun(Externref) Str = @es/\ (self) => self[Symbol.toStringTag] \/;
+    let call_add: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["add"](p0) \/;
+    let call_add_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["add"](...args) \/;
+    let call_delete: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["delete"](p0)) ? 1 : 0 \/;
+    let call_delete_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["delete"](...args) \/;
+    let call_has: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["has"](p0)) ? 1 : 0 \/;
+    let call_has_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["has"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["WeakSet"]() \/;
+    let new_instance_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["WeakSet"](p0) \/;
+    let new_instance_overload2: fun(Externref) Externref = @es/\ (p0) => new globalThis["WeakSet"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["WeakSet"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["WeakSet"]["prototype"] \/;
+}

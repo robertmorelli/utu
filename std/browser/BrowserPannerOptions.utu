@@ -1,0 +1,37 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPannerOptions {
+    let get_channelCount: fun(Externref) Externref = @es/\ (self) => self["channelCount"] \/;
+    let set_channelCount: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCount"] = value; } \/;
+    let get_channelCountMode: fun(Externref) Externref = @es/\ (self) => self["channelCountMode"] \/;
+    let set_channelCountMode: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelCountMode"] = value; } \/;
+    let get_channelInterpretation: fun(Externref) Externref = @es/\ (self) => self["channelInterpretation"] \/;
+    let set_channelInterpretation: fun(Externref, Externref) void = @es/\ (self,value) => { self["channelInterpretation"] = value; } \/;
+    let get_coneInnerAngle: fun(Externref) Externref = @es/\ (self) => self["coneInnerAngle"] \/;
+    let set_coneInnerAngle: fun(Externref, Externref) void = @es/\ (self,value) => { self["coneInnerAngle"] = value; } \/;
+    let get_coneOuterAngle: fun(Externref) Externref = @es/\ (self) => self["coneOuterAngle"] \/;
+    let set_coneOuterAngle: fun(Externref, Externref) void = @es/\ (self,value) => { self["coneOuterAngle"] = value; } \/;
+    let get_coneOuterGain: fun(Externref) Externref = @es/\ (self) => self["coneOuterGain"] \/;
+    let set_coneOuterGain: fun(Externref, Externref) void = @es/\ (self,value) => { self["coneOuterGain"] = value; } \/;
+    let get_distanceModel: fun(Externref) Externref = @es/\ (self) => self["distanceModel"] \/;
+    let set_distanceModel: fun(Externref, Externref) void = @es/\ (self,value) => { self["distanceModel"] = value; } \/;
+    let get_maxDistance: fun(Externref) Externref = @es/\ (self) => self["maxDistance"] \/;
+    let set_maxDistance: fun(Externref, Externref) void = @es/\ (self,value) => { self["maxDistance"] = value; } \/;
+    let get_orientationX: fun(Externref) Externref = @es/\ (self) => self["orientationX"] \/;
+    let set_orientationX: fun(Externref, Externref) void = @es/\ (self,value) => { self["orientationX"] = value; } \/;
+    let get_orientationY: fun(Externref) Externref = @es/\ (self) => self["orientationY"] \/;
+    let set_orientationY: fun(Externref, Externref) void = @es/\ (self,value) => { self["orientationY"] = value; } \/;
+    let get_orientationZ: fun(Externref) Externref = @es/\ (self) => self["orientationZ"] \/;
+    let set_orientationZ: fun(Externref, Externref) void = @es/\ (self,value) => { self["orientationZ"] = value; } \/;
+    let get_panningModel: fun(Externref) Externref = @es/\ (self) => self["panningModel"] \/;
+    let set_panningModel: fun(Externref, Externref) void = @es/\ (self,value) => { self["panningModel"] = value; } \/;
+    let get_positionX: fun(Externref) Externref = @es/\ (self) => self["positionX"] \/;
+    let set_positionX: fun(Externref, Externref) void = @es/\ (self,value) => { self["positionX"] = value; } \/;
+    let get_positionY: fun(Externref) Externref = @es/\ (self) => self["positionY"] \/;
+    let set_positionY: fun(Externref, Externref) void = @es/\ (self,value) => { self["positionY"] = value; } \/;
+    let get_positionZ: fun(Externref) Externref = @es/\ (self) => self["positionZ"] \/;
+    let set_positionZ: fun(Externref, Externref) void = @es/\ (self,value) => { self["positionZ"] = value; } \/;
+    let get_refDistance: fun(Externref) Externref = @es/\ (self) => self["refDistance"] \/;
+    let set_refDistance: fun(Externref, Externref) void = @es/\ (self,value) => { self["refDistance"] = value; } \/;
+    let get_rolloffFactor: fun(Externref) Externref = @es/\ (self) => self["rolloffFactor"] \/;
+    let set_rolloffFactor: fun(Externref, Externref) void = @es/\ (self,value) => { self["rolloffFactor"] = value; } \/;
+}

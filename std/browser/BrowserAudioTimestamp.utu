@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioTimestamp {
+    let get_contextTime: fun(Externref) Externref = @es/\ (self) => self["contextTime"] \/;
+    let set_contextTime: fun(Externref, Externref) void = @es/\ (self,value) => { self["contextTime"] = value; } \/;
+    let get_performanceTime: fun(Externref) Externref = @es/\ (self) => self["performanceTime"] \/;
+    let set_performanceTime: fun(Externref, Externref) void = @es/\ (self,value) => { self["performanceTime"] = value; } \/;
+}

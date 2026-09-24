@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserKeySystemTrackConfiguration {
+    let get_robustness: fun(Externref) Externref = @es/\ (self) => self["robustness"] \/;
+    let set_robustness: fun(Externref, Externref) void = @es/\ (self,value) => { self["robustness"] = value; } \/;
+}

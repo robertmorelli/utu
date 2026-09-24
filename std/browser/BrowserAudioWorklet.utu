@@ -1,0 +1,10 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAudioWorklet {
+    let call_addModule: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["addModule"](p0) \/;
+    let call_addModule_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["addModule"](p0,p1) \/;
+    let call_addModule_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["addModule"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["AudioWorklet"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["AudioWorklet"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["AudioWorklet"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["AudioWorklet"]["prototype"] = value; } \/;
+}

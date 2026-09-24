@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNotificationEventMap {
+    let get_click: fun(Externref) Externref = @es/\ (self) => self["click"] \/;
+    let set_click: fun(Externref, Externref) void = @es/\ (self,value) => { self["click"] = value; } \/;
+    let get_close: fun(Externref) Externref = @es/\ (self) => self["close"] \/;
+    let set_close: fun(Externref, Externref) void = @es/\ (self,value) => { self["close"] = value; } \/;
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_show: fun(Externref) Externref = @es/\ (self) => self["show"] \/;
+    let set_show: fun(Externref, Externref) void = @es/\ (self,value) => { self["show"] = value; } \/;
+}

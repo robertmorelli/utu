@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserTextMetrics {
+    let get_actualBoundingBoxAscent: fun(Externref) F64 = @es/\ (self) => self["actualBoundingBoxAscent"] \/;
+    let get_actualBoundingBoxDescent: fun(Externref) F64 = @es/\ (self) => self["actualBoundingBoxDescent"] \/;
+    let get_actualBoundingBoxLeft: fun(Externref) F64 = @es/\ (self) => self["actualBoundingBoxLeft"] \/;
+    let get_actualBoundingBoxRight: fun(Externref) F64 = @es/\ (self) => self["actualBoundingBoxRight"] \/;
+    let get_alphabeticBaseline: fun(Externref) F64 = @es/\ (self) => self["alphabeticBaseline"] \/;
+    let get_emHeightAscent: fun(Externref) F64 = @es/\ (self) => self["emHeightAscent"] \/;
+    let get_emHeightDescent: fun(Externref) F64 = @es/\ (self) => self["emHeightDescent"] \/;
+    let get_fontBoundingBoxAscent: fun(Externref) F64 = @es/\ (self) => self["fontBoundingBoxAscent"] \/;
+    let get_fontBoundingBoxDescent: fun(Externref) F64 = @es/\ (self) => self["fontBoundingBoxDescent"] \/;
+    let get_hangingBaseline: fun(Externref) F64 = @es/\ (self) => self["hangingBaseline"] \/;
+    let get_ideographicBaseline: fun(Externref) F64 = @es/\ (self) => self["ideographicBaseline"] \/;
+    let get_width: fun(Externref) F64 = @es/\ (self) => self["width"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["TextMetrics"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["TextMetrics"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["TextMetrics"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["TextMetrics"]["prototype"] = value; } \/;
+}

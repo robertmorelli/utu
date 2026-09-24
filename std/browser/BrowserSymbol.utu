@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSymbol {
+    let call_symbol_toPrimitive: fun(Externref, Str) Externref = @es/\ (self,p0) => self[Symbol.toPrimitive](p0) \/;
+    let call_symbol_toPrimitive_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self[Symbol.toPrimitive](...args) \/;
+    let get_symbol_toStringTag: fun(Externref) Str = @es/\ (self) => self[Symbol.toStringTag] \/;
+    let get_description: fun(Externref) Externref = @es/\ (self) => self["description"] \/;
+    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
+    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
+    let call_valueOf: fun(Externref) Externref = @es/\ (self) => self["valueOf"]() \/;
+    let call_valueOf_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["valueOf"](...args) \/;
+}

@@ -1,0 +1,43 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_Atomics {
+    let get_symbol_toStringTag: fun() Str = @es/\ () => globalThis["Atomics"][Symbol.toStringTag] \/;
+    let call_add: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["add"](p0,p1,p2) \/;
+    let call_add_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["add"](p0,p1,p2) \/;
+    let call_add_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["add"](...args) \/;
+    let call_and: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["and"](p0,p1,p2) \/;
+    let call_and_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["and"](p0,p1,p2) \/;
+    let call_and_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["and"](...args) \/;
+    let call_compareExchange: fun(Externref, F64, F64, F64) F64 = @es/\ (p0,p1,p2,p3) => globalThis["Atomics"]["compareExchange"](p0,p1,p2,p3) \/;
+    let call_compareExchange_overload2: fun(Externref, F64, Externref, Externref) Externref = @es/\ (p0,p1,p2,p3) => globalThis["Atomics"]["compareExchange"](p0,p1,p2,p3) \/;
+    let call_compareExchange_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["compareExchange"](...args) \/;
+    let call_exchange: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["exchange"](p0,p1,p2) \/;
+    let call_exchange_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["exchange"](p0,p1,p2) \/;
+    let call_exchange_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["exchange"](...args) \/;
+    let call_isLockFree: fun(F64) Bool = @es/\ (p0) => (globalThis["Atomics"]["isLockFree"](p0)) ? 1 : 0 \/;
+    let call_isLockFree_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["isLockFree"](...args) \/;
+    let call_load: fun(Externref, F64) F64 = @es/\ (p0,p1) => globalThis["Atomics"]["load"](p0,p1) \/;
+    let call_load_overload2: fun(Externref, F64) Externref = @es/\ (p0,p1) => globalThis["Atomics"]["load"](p0,p1) \/;
+    let call_load_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["load"](...args) \/;
+    let call_notify: fun(Externref, F64) F64 = @es/\ (p0,p1) => globalThis["Atomics"]["notify"](p0,p1) \/;
+    let call_notify_arity3: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["notify"](p0,p1,p2) \/;
+    let call_notify_overload2: fun(Externref, F64) F64 = @es/\ (p0,p1) => globalThis["Atomics"]["notify"](p0,p1) \/;
+    let call_notify_overload2_arity3: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["notify"](p0,p1,p2) \/;
+    let call_notify_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["notify"](...args) \/;
+    let call_or: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["or"](p0,p1,p2) \/;
+    let call_or_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["or"](p0,p1,p2) \/;
+    let call_or_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["or"](...args) \/;
+    let call_store: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["store"](p0,p1,p2) \/;
+    let call_store_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["store"](p0,p1,p2) \/;
+    let call_store_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["store"](...args) \/;
+    let call_sub: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["sub"](p0,p1,p2) \/;
+    let call_sub_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["sub"](p0,p1,p2) \/;
+    let call_sub_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["sub"](...args) \/;
+    let call_wait: fun(Externref, F64, F64) Str = @es/\ (p0,p1,p2) => globalThis["Atomics"]["wait"](p0,p1,p2) \/;
+    let call_wait_arity4: fun(Externref, F64, F64, F64) Str = @es/\ (p0,p1,p2,p3) => globalThis["Atomics"]["wait"](p0,p1,p2,p3) \/;
+    let call_wait_overload2: fun(Externref, F64, Externref) Str = @es/\ (p0,p1,p2) => globalThis["Atomics"]["wait"](p0,p1,p2) \/;
+    let call_wait_overload2_arity4: fun(Externref, F64, Externref, F64) Str = @es/\ (p0,p1,p2,p3) => globalThis["Atomics"]["wait"](p0,p1,p2,p3) \/;
+    let call_wait_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["wait"](...args) \/;
+    let call_xor: fun(Externref, F64, F64) F64 = @es/\ (p0,p1,p2) => globalThis["Atomics"]["xor"](p0,p1,p2) \/;
+    let call_xor_overload2: fun(Externref, F64, Externref) Externref = @es/\ (p0,p1,p2) => globalThis["Atomics"]["xor"](p0,p1,p2) \/;
+    let call_xor_js: fun(Externref) Externref = @es/\ (args) => globalThis["Atomics"]["xor"](...args) \/;
+}

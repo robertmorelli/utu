@@ -1,0 +1,8 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_BigInt {
+    let call_asIntN: fun(F64, Externref) Externref = @es/\ (p0,p1) => globalThis["BigInt"]["asIntN"](p0,p1) \/;
+    let call_asIntN_js: fun(Externref) Externref = @es/\ (args) => globalThis["BigInt"]["asIntN"](...args) \/;
+    let call_asUintN: fun(F64, Externref) Externref = @es/\ (p0,p1) => globalThis["BigInt"]["asUintN"](p0,p1) \/;
+    let call_asUintN_js: fun(Externref) Externref = @es/\ (args) => globalThis["BigInt"]["asUintN"](...args) \/;
+    let get_prototype: fun() Externref = @es/\ () => globalThis["BigInt"]["prototype"] \/;
+}

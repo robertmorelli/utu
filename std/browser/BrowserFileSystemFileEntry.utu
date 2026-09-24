@@ -1,0 +1,19 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFileSystemFileEntry {
+    let call_file: fun(Externref, cl(Externref) void) void = @es/\ (self,p0) => self["file"](p0) \/;
+    let call_file_arity2: fun(Externref, cl(Externref) void, cl(Externref) void) void = @es/\ (self,p0,p1) => self["file"](p0,p1) \/;
+    let call_file_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["file"](...args) \/;
+    let get_filesystem: fun(Externref) Externref = @es/\ (self) => self["filesystem"] \/;
+    let get_fullPath: fun(Externref) Str = @es/\ (self) => self["fullPath"] \/;
+    let call_getParent: fun(Externref) void = @es/\ (self) => self["getParent"]() \/;
+    let call_getParent_arity1: fun(Externref, cl(Externref) void) void = @es/\ (self,p0) => self["getParent"](p0) \/;
+    let call_getParent_arity2: fun(Externref, cl(Externref) void, cl(Externref) void) void = @es/\ (self,p0,p1) => self["getParent"](p0,p1) \/;
+    let call_getParent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getParent"](...args) \/;
+    let get_isDirectory: fun(Externref) Bool = @es/\ (self) => (self["isDirectory"]) ? 1 : 0 \/;
+    let get_isFile: fun(Externref) Bool = @es/\ (self) => (self["isFile"]) ? 1 : 0 \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["FileSystemFileEntry"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["FileSystemFileEntry"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["FileSystemFileEntry"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["FileSystemFileEntry"]["prototype"] = value; } \/;
+}

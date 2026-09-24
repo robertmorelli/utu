@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIDBObjectStoreParameters {
+    let get_autoIncrement: fun(Externref) Externref = @es/\ (self) => self["autoIncrement"] \/;
+    let set_autoIncrement: fun(Externref, Externref) void = @es/\ (self,value) => { self["autoIncrement"] = value; } \/;
+    let get_keyPath: fun(Externref) Externref = @es/\ (self) => self["keyPath"] \/;
+    let set_keyPath: fun(Externref, Externref) void = @es/\ (self,value) => { self["keyPath"] = value; } \/;
+}

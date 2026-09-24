@@ -1,0 +1,41 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCTransportStats {
+    let get_bytesReceived: fun(Externref) Externref = @es/\ (self) => self["bytesReceived"] \/;
+    let set_bytesReceived: fun(Externref, Externref) void = @es/\ (self,value) => { self["bytesReceived"] = value; } \/;
+    let get_bytesSent: fun(Externref) Externref = @es/\ (self) => self["bytesSent"] \/;
+    let set_bytesSent: fun(Externref, Externref) void = @es/\ (self,value) => { self["bytesSent"] = value; } \/;
+    let get_dtlsCipher: fun(Externref) Externref = @es/\ (self) => self["dtlsCipher"] \/;
+    let set_dtlsCipher: fun(Externref, Externref) void = @es/\ (self,value) => { self["dtlsCipher"] = value; } \/;
+    let get_dtlsRole: fun(Externref) Externref = @es/\ (self) => self["dtlsRole"] \/;
+    let set_dtlsRole: fun(Externref, Externref) void = @es/\ (self,value) => { self["dtlsRole"] = value; } \/;
+    let get_dtlsState: fun(Externref) Str = @es/\ (self) => self["dtlsState"] \/;
+    let set_dtlsState: fun(Externref, Str) void = @es/\ (self,value) => { self["dtlsState"] = value; } \/;
+    let get_iceLocalUsernameFragment: fun(Externref) Externref = @es/\ (self) => self["iceLocalUsernameFragment"] \/;
+    let set_iceLocalUsernameFragment: fun(Externref, Externref) void = @es/\ (self,value) => { self["iceLocalUsernameFragment"] = value; } \/;
+    let get_iceRole: fun(Externref) Externref = @es/\ (self) => self["iceRole"] \/;
+    let set_iceRole: fun(Externref, Externref) void = @es/\ (self,value) => { self["iceRole"] = value; } \/;
+    let get_iceState: fun(Externref) Externref = @es/\ (self) => self["iceState"] \/;
+    let set_iceState: fun(Externref, Externref) void = @es/\ (self,value) => { self["iceState"] = value; } \/;
+    let get_id: fun(Externref) Str = @es/\ (self) => self["id"] \/;
+    let set_id: fun(Externref, Str) void = @es/\ (self,value) => { self["id"] = value; } \/;
+    let get_localCertificateId: fun(Externref) Externref = @es/\ (self) => self["localCertificateId"] \/;
+    let set_localCertificateId: fun(Externref, Externref) void = @es/\ (self,value) => { self["localCertificateId"] = value; } \/;
+    let get_packetsReceived: fun(Externref) Externref = @es/\ (self) => self["packetsReceived"] \/;
+    let set_packetsReceived: fun(Externref, Externref) void = @es/\ (self,value) => { self["packetsReceived"] = value; } \/;
+    let get_packetsSent: fun(Externref) Externref = @es/\ (self) => self["packetsSent"] \/;
+    let set_packetsSent: fun(Externref, Externref) void = @es/\ (self,value) => { self["packetsSent"] = value; } \/;
+    let get_remoteCertificateId: fun(Externref) Externref = @es/\ (self) => self["remoteCertificateId"] \/;
+    let set_remoteCertificateId: fun(Externref, Externref) void = @es/\ (self,value) => { self["remoteCertificateId"] = value; } \/;
+    let get_selectedCandidatePairChanges: fun(Externref) Externref = @es/\ (self) => self["selectedCandidatePairChanges"] \/;
+    let set_selectedCandidatePairChanges: fun(Externref, Externref) void = @es/\ (self,value) => { self["selectedCandidatePairChanges"] = value; } \/;
+    let get_selectedCandidatePairId: fun(Externref) Externref = @es/\ (self) => self["selectedCandidatePairId"] \/;
+    let set_selectedCandidatePairId: fun(Externref, Externref) void = @es/\ (self,value) => { self["selectedCandidatePairId"] = value; } \/;
+    let get_srtpCipher: fun(Externref) Externref = @es/\ (self) => self["srtpCipher"] \/;
+    let set_srtpCipher: fun(Externref, Externref) void = @es/\ (self,value) => { self["srtpCipher"] = value; } \/;
+    let get_timestamp: fun(Externref) F64 = @es/\ (self) => self["timestamp"] \/;
+    let set_timestamp: fun(Externref, F64) void = @es/\ (self,value) => { self["timestamp"] = value; } \/;
+    let get_tlsVersion: fun(Externref) Externref = @es/\ (self) => self["tlsVersion"] \/;
+    let set_tlsVersion: fun(Externref, Externref) void = @es/\ (self,value) => { self["tlsVersion"] = value; } \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Str) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

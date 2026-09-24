@@ -1,0 +1,27 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSVGPoint {
+    let call_matrixTransform: fun(Externref) Externref = @es/\ (self) => self["matrixTransform"]() \/;
+    let call_matrixTransform_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["matrixTransform"](p0) \/;
+    let call_matrixTransform_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["matrixTransform"](...args) \/;
+    let call_toJSON: fun(Externref) Externref = @es/\ (self) => self["toJSON"]() \/;
+    let call_toJSON_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toJSON"](...args) \/;
+    let get_w: fun(Externref) F64 = @es/\ (self) => self["w"] \/;
+    let set_w: fun(Externref, F64) void = @es/\ (self,value) => { self["w"] = value; } \/;
+    let get_x: fun(Externref) F64 = @es/\ (self) => self["x"] \/;
+    let set_x: fun(Externref, F64) void = @es/\ (self,value) => { self["x"] = value; } \/;
+    let get_y: fun(Externref) F64 = @es/\ (self) => self["y"] \/;
+    let set_y: fun(Externref, F64) void = @es/\ (self,value) => { self["y"] = value; } \/;
+    let get_z: fun(Externref) F64 = @es/\ (self) => self["z"] \/;
+    let set_z: fun(Externref, F64) void = @es/\ (self,value) => { self["z"] = value; } \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGPoint"]() \/;
+    let new_instance_arity1: fun(F64) Externref = @es/\ (p0) => new globalThis["SVGPoint"](p0) \/;
+    let new_instance_arity2: fun(F64, F64) Externref = @es/\ (p0,p1) => new globalThis["SVGPoint"](p0,p1) \/;
+    let new_instance_arity3: fun(F64, F64, F64) Externref = @es/\ (p0,p1,p2) => new globalThis["SVGPoint"](p0,p1,p2) \/;
+    let new_instance_arity4: fun(F64, F64, F64, F64) Externref = @es/\ (p0,p1,p2,p3) => new globalThis["SVGPoint"](p0,p1,p2,p3) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGPoint"](...args) \/;
+    let static_call_fromPoint: fun() Externref = @es/\ () => globalThis["SVGPoint"]["fromPoint"]() \/;
+    let static_call_fromPoint_arity1: fun(Externref) Externref = @es/\ (p0) => globalThis["SVGPoint"]["fromPoint"](p0) \/;
+    let static_call_fromPoint_js: fun(Externref) Externref = @es/\ (args) => globalThis["SVGPoint"]["fromPoint"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGPoint"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGPoint"]["prototype"] = value; } \/;
+}

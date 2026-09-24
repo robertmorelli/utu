@@ -1,0 +1,14 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIntersectionObserverEntry {
+    let get_boundingClientRect: fun(Externref) Externref = @es/\ (self) => self["boundingClientRect"] \/;
+    let get_intersectionRatio: fun(Externref) F64 = @es/\ (self) => self["intersectionRatio"] \/;
+    let get_intersectionRect: fun(Externref) Externref = @es/\ (self) => self["intersectionRect"] \/;
+    let get_isIntersecting: fun(Externref) Bool = @es/\ (self) => (self["isIntersecting"]) ? 1 : 0 \/;
+    let get_rootBounds: fun(Externref) Externref = @es/\ (self) => self["rootBounds"] \/;
+    let get_target: fun(Externref) Externref = @es/\ (self) => self["target"] \/;
+    let get_time: fun(Externref) F64 = @es/\ (self) => self["time"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["IntersectionObserverEntry"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["IntersectionObserverEntry"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["IntersectionObserverEntry"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["IntersectionObserverEntry"]["prototype"] = value; } \/;
+}

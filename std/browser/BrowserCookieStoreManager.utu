@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCookieStoreManager {
+    let call_getSubscriptions: fun(Externref) Externref = @es/\ (self) => self["getSubscriptions"]() \/;
+    let call_getSubscriptions_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getSubscriptions"](...args) \/;
+    let call_subscribe: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["subscribe"](p0) \/;
+    let call_subscribe_overload2: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["subscribe"](p0) \/;
+    let call_subscribe_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["subscribe"](...args) \/;
+    let call_unsubscribe: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["unsubscribe"](p0) \/;
+    let call_unsubscribe_overload2: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["unsubscribe"](p0) \/;
+    let call_unsubscribe_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["unsubscribe"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CookieStoreManager"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CookieStoreManager"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CookieStoreManager"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CookieStoreManager"]["prototype"] = value; } \/;
+}

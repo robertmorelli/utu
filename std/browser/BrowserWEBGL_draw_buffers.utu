@@ -1,0 +1,40 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWEBGL_draw_buffers {
+    let get_COLOR_ATTACHMENT0_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT0_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT10_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT10_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT11_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT11_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT12_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT12_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT13_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT13_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT14_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT14_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT15_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT15_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT1_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT1_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT2_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT2_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT3_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT3_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT4_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT4_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT5_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT5_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT6_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT6_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT7_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT7_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT8_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT8_WEBGL"] \/;
+    let get_COLOR_ATTACHMENT9_WEBGL: fun(Externref) F64 = @es/\ (self) => self["COLOR_ATTACHMENT9_WEBGL"] \/;
+    let get_DRAW_BUFFER0_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER0_WEBGL"] \/;
+    let get_DRAW_BUFFER10_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER10_WEBGL"] \/;
+    let get_DRAW_BUFFER11_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER11_WEBGL"] \/;
+    let get_DRAW_BUFFER12_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER12_WEBGL"] \/;
+    let get_DRAW_BUFFER13_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER13_WEBGL"] \/;
+    let get_DRAW_BUFFER14_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER14_WEBGL"] \/;
+    let get_DRAW_BUFFER15_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER15_WEBGL"] \/;
+    let get_DRAW_BUFFER1_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER1_WEBGL"] \/;
+    let get_DRAW_BUFFER2_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER2_WEBGL"] \/;
+    let get_DRAW_BUFFER3_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER3_WEBGL"] \/;
+    let get_DRAW_BUFFER4_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER4_WEBGL"] \/;
+    let get_DRAW_BUFFER5_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER5_WEBGL"] \/;
+    let get_DRAW_BUFFER6_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER6_WEBGL"] \/;
+    let get_DRAW_BUFFER7_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER7_WEBGL"] \/;
+    let get_DRAW_BUFFER8_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER8_WEBGL"] \/;
+    let get_DRAW_BUFFER9_WEBGL: fun(Externref) F64 = @es/\ (self) => self["DRAW_BUFFER9_WEBGL"] \/;
+    let get_MAX_COLOR_ATTACHMENTS_WEBGL: fun(Externref) F64 = @es/\ (self) => self["MAX_COLOR_ATTACHMENTS_WEBGL"] \/;
+    let get_MAX_DRAW_BUFFERS_WEBGL: fun(Externref) F64 = @es/\ (self) => self["MAX_DRAW_BUFFERS_WEBGL"] \/;
+    let call_drawBuffersWEBGL: fun(Externref, Externref) void = @es/\ (self,p0) => self["drawBuffersWEBGL"](p0) \/;
+    let call_drawBuffersWEBGL_overload2: fun(Externref, Externref) void = @es/\ (self,p0) => self["drawBuffersWEBGL"](p0) \/;
+    let call_drawBuffersWEBGL_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["drawBuffersWEBGL"](...args) \/;
+}

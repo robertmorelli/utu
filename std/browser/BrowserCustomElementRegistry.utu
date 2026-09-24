@@ -1,0 +1,18 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCustomElementRegistry {
+    let call_define: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["define"](p0,p1) \/;
+    let call_define_arity3: fun(Externref, Str, Externref, Externref) void = @es/\ (self,p0,p1,p2) => self["define"](p0,p1,p2) \/;
+    let call_define_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["define"](...args) \/;
+    let call_get: fun(Externref, Str) Externref = @es/\ (self,p0) => self["get"](p0) \/;
+    let call_get_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["get"](...args) \/;
+    let call_getName: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["getName"](p0) \/;
+    let call_getName_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getName"](...args) \/;
+    let call_upgrade: fun(Externref, Externref) void = @es/\ (self,p0) => self["upgrade"](p0) \/;
+    let call_upgrade_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["upgrade"](...args) \/;
+    let call_whenDefined: fun(Externref, Str) Externref = @es/\ (self,p0) => self["whenDefined"](p0) \/;
+    let call_whenDefined_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["whenDefined"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CustomElementRegistry"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CustomElementRegistry"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CustomElementRegistry"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CustomElementRegistry"]["prototype"] = value; } \/;
+}

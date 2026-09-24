@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIDBIndexParameters {
+    let get_multiEntry: fun(Externref) Externref = @es/\ (self) => self["multiEntry"] \/;
+    let set_multiEntry: fun(Externref, Externref) void = @es/\ (self,value) => { self["multiEntry"] = value; } \/;
+    let get_unique: fun(Externref) Externref = @es/\ (self) => self["unique"] \/;
+    let set_unique: fun(Externref, Externref) void = @es/\ (self,value) => { self["unique"] = value; } \/;
+}

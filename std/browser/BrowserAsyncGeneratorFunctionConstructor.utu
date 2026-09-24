@@ -1,0 +1,11 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAsyncGeneratorFunctionConstructor {
+    let get_length: fun(Externref) F64 = @es/\ (self) => self["length"] \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let call_prototype: fun(Externref) Externref = @es/\ (self) => self["prototype"]() \/;
+    let call_prototype_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["prototype"](...p0) \/;
+    let call_prototype_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["prototype"](...args) \/;
+    let invoke: fun(Externref) Externref = @es/\ (self) => self() \/;
+    let invoke_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self(...p0) \/;
+    let invoke_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self(...args) \/;
+}

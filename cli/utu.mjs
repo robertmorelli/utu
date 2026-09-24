@@ -1,11 +1,12 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'bun';
+import { spawnSync } from 'node:child_process';
 import { createCompiler, initParser, formatDiagnostics, emitBinary, renderHighlightedSource } from '../src/index.js';
+import { glueModuleSource, liveGlueFields, runtimeIsEmpty } from '../src/runtime/host-imports.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -143,41 +144,73 @@ async function buildExe(compiler, file, args) {
   const wasm = emitBinary(doc);
   const root = doc.body.firstChild;
   const importSpec = JSON.parse(root?.dataset?.dslImportsJs || '{}');
-  const closureSpec = JSON.parse(root?.dataset?.closureRuntime || 'null');
-  const runner = runnerSource(wasm, importSpec, closureSpec);
-  const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'utu-cli-')), 'runner.mjs');
-  await fs.writeFile(tmp, runner);
+  const declaredClosures = JSON.parse(root?.dataset?.closureRuntime || 'null');
+  // Build inside the project when it has dependencies, so `bun build` resolves
+  // an `@es` body's bare specifiers exactly as the project's own source would
+  // and bundles the result into the executable. Projects without dependencies
+  // build in a temp directory as before.
+  const dir = await buildDirectory();
+  // Only bindings the binary actually imports reach the glue, so a declared but
+  // unused `@es` body costs neither bytes nor a package load.
+  const live = await liveGlueFields(wasm);
+  const glue = glueModuleSource(importSpec, live);
+  const fields = Object.fromEntries(Object.entries(importSpec).map(([module, bindings]) =>
+    [module, Object.fromEntries(Object.keys(bindings).filter(name => live.has(name)).map(name => [name, '']))]));
+  const closureSpec = { new: !!declaredClosures?.new && live.has('closure_new'),
+    calls: (declaredClosures?.calls ?? []).filter(name => live.has(name)) };
+  if (glue) await fs.writeFile(path.join(dir, 'glue.mjs'), glue);
+  const tmp = path.join(dir, 'runner.mjs');
+  await fs.writeFile(tmp, runnerSource(wasm, fields, closureSpec, Boolean(glue)));
 
-  const result = spawnSync(['bun', 'build', tmp, '--compile', '--outfile', out], {
+  const result = spawnSync('bun', ['build', tmp, '--compile', '--outfile', out], {
     cwd: process.cwd(),
-    stdout: 'inherit',
-    stderr: 'inherit',
+    stdio: 'inherit',
   });
-  if (result.exitCode !== 0) process.exit(result.exitCode);
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
   console.error(`wrote ${out}`);
+}
+
+/** Choose a directory `bun build` can resolve the glue module's imports from. */
+async function buildDirectory() {
+  const nested = path.join(process.cwd(), 'node_modules', '.utu');
+  try {
+    await fs.access(path.join(process.cwd(), 'node_modules'));
+    await fs.mkdir(nested, { recursive: true });
+    return nested;
+  } catch {
+    return await fs.mkdtemp(path.join(os.tmpdir(), 'utu-cli-'));
+  }
 }
 
 // The launcher is standalone generated source compiled by `bun build --compile`.
 // It imports the runtime by absolute path rather than reimplementing it — that
 // module is dependency-free, so bundling it pulls in nothing else, and the exe
 // cannot drift from what `buildImportObject` does.
-function runnerSource(wasm, importSpec, closureSpec) {
-  const runtime = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
+//
+// The `@es` glue is a sibling module rather than inline source: a static import
+// is what lets `bun build` see an `@es` body's npm dependencies and bundle them
+// into the executable.
+// Only the pieces the program uses are imported, so a binary that needs no
+// closures and no promises carries none of that runtime.
+function runnerSource(wasm, importSpec, closureSpec, hasGlue) {
+  const runtime = JSON.stringify(path.join(ROOT, 'src', 'runtime', 'host-imports.js'));
+  const needsRuntime = !runtimeIsEmpty(closureSpec, null);
+  const parts = [
+    hasGlue && `import { importObjectFromGlue } from ${runtime};`,
+    hasGlue && `import * as glue from './glue.mjs';`,
+    needsRuntime && `import { closureImports } from ${runtime};`,
+  ].filter(Boolean);
   return `#!/usr/bin/env bun
-import { utuRuntimeImports } from ${JSON.stringify(runtime)};
+${parts.join('\n')}
 const wasmBase64 = ${JSON.stringify(Buffer.from(wasm).toString('base64'))};
-const importSpec = ${JSON.stringify(importSpec)};
-const closureSpec = ${JSON.stringify(closureSpec)};
 const bytes = Uint8Array.from(atob(wasmBase64), c => c.charCodeAt(0));
-const imports = {};
-for (const [module, fields] of Object.entries(importSpec)) {
-  imports[module] = {};
-  for (const [field, body] of Object.entries(fields ?? {})) {
-    const value = new Function('return (' + body + ');')();
-    imports[module][field] = typeof value === 'function' ? value : () => value;
-  }
-}
-Object.assign(imports.utu ??= {}, utuRuntimeImports(closureSpec));
+${hasGlue
+    ? `const imports = importObjectFromGlue(${JSON.stringify(importSpec)}, glue);`
+    : 'const imports = {};'}
+${needsRuntime
+    ? `imports.utu = closureImports(${JSON.stringify(closureSpec)});`
+    : ''}
 const compiled = await WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" });
 const instance = await WebAssembly.instantiate(compiled, imports);
 if (typeof instance.exports.main === 'function') {

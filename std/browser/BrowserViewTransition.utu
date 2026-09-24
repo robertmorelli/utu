@@ -1,0 +1,14 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserViewTransition {
+    let get_finished: fun(Externref) Externref = @es/\ (self) => self["finished"] \/;
+    let get_ready: fun(Externref) Externref = @es/\ (self) => self["ready"] \/;
+    let call_skipTransition: fun(Externref) void = @es/\ (self) => self["skipTransition"]() \/;
+    let call_skipTransition_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["skipTransition"](...args) \/;
+    let get_types: fun(Externref) Externref = @es/\ (self) => self["types"] \/;
+    let set_types: fun(Externref, Externref) void = @es/\ (self,value) => { self["types"] = value; } \/;
+    let get_updateCallbackDone: fun(Externref) Externref = @es/\ (self) => self["updateCallbackDone"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["ViewTransition"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["ViewTransition"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["ViewTransition"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["ViewTransition"]["prototype"] = value; } \/;
+}

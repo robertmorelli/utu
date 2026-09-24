@@ -1,0 +1,12 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserNavigatorID {
+    let get_appCodeName: fun(Externref) Str = @es/\ (self) => self["appCodeName"] \/;
+    let get_appName: fun(Externref) Str = @es/\ (self) => self["appName"] \/;
+    let get_appVersion: fun(Externref) Str = @es/\ (self) => self["appVersion"] \/;
+    let get_platform: fun(Externref) Str = @es/\ (self) => self["platform"] \/;
+    let get_product: fun(Externref) Str = @es/\ (self) => self["product"] \/;
+    let get_productSub: fun(Externref) Str = @es/\ (self) => self["productSub"] \/;
+    let get_userAgent: fun(Externref) Str = @es/\ (self) => self["userAgent"] \/;
+    let get_vendor: fun(Externref) Str = @es/\ (self) => self["vendor"] \/;
+    let get_vendorSub: fun(Externref) Str = @es/\ (self) => self["vendorSub"] \/;
+}

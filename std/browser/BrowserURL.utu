@@ -1,0 +1,44 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserURL {
+    let get_hash: fun(Externref) Str = @es/\ (self) => self["hash"] \/;
+    let set_hash: fun(Externref, Str) void = @es/\ (self,value) => { self["hash"] = value; } \/;
+    let get_host: fun(Externref) Str = @es/\ (self) => self["host"] \/;
+    let set_host: fun(Externref, Str) void = @es/\ (self,value) => { self["host"] = value; } \/;
+    let get_hostname: fun(Externref) Str = @es/\ (self) => self["hostname"] \/;
+    let set_hostname: fun(Externref, Str) void = @es/\ (self,value) => { self["hostname"] = value; } \/;
+    let get_href: fun(Externref) Str = @es/\ (self) => self["href"] \/;
+    let set_href: fun(Externref, Str) void = @es/\ (self,value) => { self["href"] = value; } \/;
+    let get_origin: fun(Externref) Str = @es/\ (self) => self["origin"] \/;
+    let get_password: fun(Externref) Str = @es/\ (self) => self["password"] \/;
+    let set_password: fun(Externref, Str) void = @es/\ (self,value) => { self["password"] = value; } \/;
+    let get_pathname: fun(Externref) Str = @es/\ (self) => self["pathname"] \/;
+    let set_pathname: fun(Externref, Str) void = @es/\ (self,value) => { self["pathname"] = value; } \/;
+    let get_port: fun(Externref) Str = @es/\ (self) => self["port"] \/;
+    let set_port: fun(Externref, Str) void = @es/\ (self,value) => { self["port"] = value; } \/;
+    let get_protocol: fun(Externref) Str = @es/\ (self) => self["protocol"] \/;
+    let set_protocol: fun(Externref, Str) void = @es/\ (self,value) => { self["protocol"] = value; } \/;
+    let get_search: fun(Externref) Str = @es/\ (self) => self["search"] \/;
+    let set_search: fun(Externref, Str) void = @es/\ (self,value) => { self["search"] = value; } \/;
+    let get_searchParams: fun(Externref) Externref = @es/\ (self) => self["searchParams"] \/;
+    let call_toJSON: fun(Externref) Str = @es/\ (self) => self["toJSON"]() \/;
+    let call_toJSON_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toJSON"](...args) \/;
+    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
+    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
+    let get_username: fun(Externref) Str = @es/\ (self) => self["username"] \/;
+    let set_username: fun(Externref, Str) void = @es/\ (self,value) => { self["username"] = value; } \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["URL"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["URL"](p0,p1) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["URL"](...args) \/;
+    let static_call_canParse: fun(Externref) Bool = @es/\ (p0) => (globalThis["URL"]["canParse"](p0)) ? 1 : 0 \/;
+    let static_call_canParse_arity2: fun(Externref, Externref) Bool = @es/\ (p0,p1) => (globalThis["URL"]["canParse"](p0,p1)) ? 1 : 0 \/;
+    let static_call_canParse_js: fun(Externref) Externref = @es/\ (args) => globalThis["URL"]["canParse"](...args) \/;
+    let static_call_createObjectURL: fun(Externref) Str = @es/\ (p0) => globalThis["URL"]["createObjectURL"](p0) \/;
+    let static_call_createObjectURL_js: fun(Externref) Externref = @es/\ (args) => globalThis["URL"]["createObjectURL"](...args) \/;
+    let static_call_parse: fun(Externref) Externref = @es/\ (p0) => globalThis["URL"]["parse"](p0) \/;
+    let static_call_parse_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => globalThis["URL"]["parse"](p0,p1) \/;
+    let static_call_parse_js: fun(Externref) Externref = @es/\ (args) => globalThis["URL"]["parse"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["URL"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["URL"]["prototype"] = value; } \/;
+    let static_call_revokeObjectURL: fun(Str) void = @es/\ (p0) => globalThis["URL"]["revokeObjectURL"](p0) \/;
+    let static_call_revokeObjectURL_js: fun(Externref) Externref = @es/\ (args) => globalThis["URL"]["revokeObjectURL"](...args) \/;
+}

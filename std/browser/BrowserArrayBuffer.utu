@@ -1,0 +1,16 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserArrayBuffer {
+    let get_symbol_toStringTag: fun(Externref) Str = @es/\ (self) => self[Symbol.toStringTag] \/;
+    let get_byteLength: fun(Externref) F64 = @es/\ (self) => self["byteLength"] \/;
+    let call_slice: fun(Externref) Externref = @es/\ (self) => self["slice"]() \/;
+    let call_slice_arity1: fun(Externref, F64) Externref = @es/\ (self,p0) => self["slice"](p0) \/;
+    let call_slice_arity2: fun(Externref, F64, F64) Externref = @es/\ (self,p0,p1) => self["slice"](p0,p1) \/;
+    let call_slice_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["slice"](...args) \/;
+    let new_instance: fun(F64) Externref = @es/\ (p0) => new globalThis["ArrayBuffer"](p0) \/;
+    let new_instance_overload2: fun() Externref = @es/\ () => new globalThis["ArrayBuffer"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["ArrayBuffer"](...args) \/;
+    let static_get_symbol_species: fun() Externref = @es/\ () => globalThis["ArrayBuffer"][Symbol.species] \/;
+    let static_call_isView: fun(Externref) Bool = @es/\ (p0) => (globalThis["ArrayBuffer"]["isView"](p0)) ? 1 : 0 \/;
+    let static_call_isView_js: fun(Externref) Externref = @es/\ (args) => globalThis["ArrayBuffer"]["isView"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["ArrayBuffer"]["prototype"] \/;
+}

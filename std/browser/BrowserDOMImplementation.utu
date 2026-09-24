@@ -1,0 +1,18 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDOMImplementation {
+    let call_createDocument: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["createDocument"](p0,p1) \/;
+    let call_createDocument_arity3: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (self,p0,p1,p2) => self["createDocument"](p0,p1,p2) \/;
+    let call_createDocument_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createDocument"](...args) \/;
+    let call_createDocumentType: fun(Externref, Str, Str, Str) Externref = @es/\ (self,p0,p1,p2) => self["createDocumentType"](p0,p1,p2) \/;
+    let call_createDocumentType_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createDocumentType"](...args) \/;
+    let call_createHTMLDocument: fun(Externref) Externref = @es/\ (self) => self["createHTMLDocument"]() \/;
+    let call_createHTMLDocument_arity1: fun(Externref, Str) Externref = @es/\ (self,p0) => self["createHTMLDocument"](p0) \/;
+    let call_createHTMLDocument_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["createHTMLDocument"](...args) \/;
+    let call_hasFeature: fun(Externref) Bool = @es/\ (self) => (self["hasFeature"]()) ? 1 : 0 \/;
+    let call_hasFeature_arity1: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self["hasFeature"](...p0)) ? 1 : 0 \/;
+    let call_hasFeature_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["hasFeature"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["DOMImplementation"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["DOMImplementation"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["DOMImplementation"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["DOMImplementation"]["prototype"] = value; } \/;
+}

@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserImageBitmapOptions {
+    let get_colorSpaceConversion: fun(Externref) Externref = @es/\ (self) => self["colorSpaceConversion"] \/;
+    let set_colorSpaceConversion: fun(Externref, Externref) void = @es/\ (self,value) => { self["colorSpaceConversion"] = value; } \/;
+    let get_imageOrientation: fun(Externref) Externref = @es/\ (self) => self["imageOrientation"] \/;
+    let set_imageOrientation: fun(Externref, Externref) void = @es/\ (self,value) => { self["imageOrientation"] = value; } \/;
+    let get_premultiplyAlpha: fun(Externref) Externref = @es/\ (self) => self["premultiplyAlpha"] \/;
+    let set_premultiplyAlpha: fun(Externref, Externref) void = @es/\ (self,value) => { self["premultiplyAlpha"] = value; } \/;
+    let get_resizeHeight: fun(Externref) Externref = @es/\ (self) => self["resizeHeight"] \/;
+    let set_resizeHeight: fun(Externref, Externref) void = @es/\ (self,value) => { self["resizeHeight"] = value; } \/;
+    let get_resizeQuality: fun(Externref) Externref = @es/\ (self) => self["resizeQuality"] \/;
+    let set_resizeQuality: fun(Externref, Externref) void = @es/\ (self,value) => { self["resizeQuality"] = value; } \/;
+    let get_resizeWidth: fun(Externref) Externref = @es/\ (self) => self["resizeWidth"] \/;
+    let set_resizeWidth: fun(Externref, Externref) void = @es/\ (self,value) => { self["resizeWidth"] = value; } \/;
+}

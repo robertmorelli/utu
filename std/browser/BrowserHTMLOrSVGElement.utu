@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserHTMLOrSVGElement {
+    let get_autofocus: fun(Externref) Bool = @es/\ (self) => (self["autofocus"]) ? 1 : 0 \/;
+    let set_autofocus: fun(Externref, Bool) void = @es/\ (self,value) => { self["autofocus"] = !!value; } \/;
+    let call_blur: fun(Externref) void = @es/\ (self) => self["blur"]() \/;
+    let call_blur_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["blur"](...args) \/;
+    let get_dataset: fun(Externref) Externref = @es/\ (self) => self["dataset"] \/;
+    let call_focus: fun(Externref) void = @es/\ (self) => self["focus"]() \/;
+    let call_focus_arity1: fun(Externref, Externref) void = @es/\ (self,p0) => self["focus"](p0) \/;
+    let call_focus_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["focus"](...args) \/;
+    let get_nonce: fun(Externref) Externref = @es/\ (self) => self["nonce"] \/;
+    let set_nonce: fun(Externref, Externref) void = @es/\ (self,value) => { self["nonce"] = value; } \/;
+    let get_tabIndex: fun(Externref) F64 = @es/\ (self) => self["tabIndex"] \/;
+    let set_tabIndex: fun(Externref, F64) void = @es/\ (self,value) => { self["tabIndex"] = value; } \/;
+}

@@ -1,0 +1,28 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCanvasPath {
+    let call_arc: fun(Externref, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4) => self["arc"](p0,p1,p2,p3,p4) \/;
+    let call_arc_arity6: fun(Externref, F64, F64, F64, F64, F64, Bool) void = @es/\ (self,p0,p1,p2,p3,p4,p5) => self["arc"](p0,p1,p2,p3,p4,!!p5) \/;
+    let call_arc_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["arc"](...args) \/;
+    let call_arcTo: fun(Externref, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4) => self["arcTo"](p0,p1,p2,p3,p4) \/;
+    let call_arcTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["arcTo"](...args) \/;
+    let call_bezierCurveTo: fun(Externref, F64, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4,p5) => self["bezierCurveTo"](p0,p1,p2,p3,p4,p5) \/;
+    let call_bezierCurveTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["bezierCurveTo"](...args) \/;
+    let call_closePath: fun(Externref) void = @es/\ (self) => self["closePath"]() \/;
+    let call_closePath_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["closePath"](...args) \/;
+    let call_ellipse: fun(Externref, F64, F64, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4,p5,p6) => self["ellipse"](p0,p1,p2,p3,p4,p5,p6) \/;
+    let call_ellipse_arity8: fun(Externref, F64, F64, F64, F64, F64, F64, F64, Bool) void = @es/\ (self,p0,p1,p2,p3,p4,p5,p6,p7) => self["ellipse"](p0,p1,p2,p3,p4,p5,p6,!!p7) \/;
+    let call_ellipse_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["ellipse"](...args) \/;
+    let call_lineTo: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["lineTo"](p0,p1) \/;
+    let call_lineTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["lineTo"](...args) \/;
+    let call_moveTo: fun(Externref, F64, F64) void = @es/\ (self,p0,p1) => self["moveTo"](p0,p1) \/;
+    let call_moveTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["moveTo"](...args) \/;
+    let call_quadraticCurveTo: fun(Externref, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3) => self["quadraticCurveTo"](p0,p1,p2,p3) \/;
+    let call_quadraticCurveTo_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["quadraticCurveTo"](...args) \/;
+    let call_rect: fun(Externref, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3) => self["rect"](p0,p1,p2,p3) \/;
+    let call_rect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["rect"](...args) \/;
+    let call_roundRect: fun(Externref, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3) => self["roundRect"](p0,p1,p2,p3) \/;
+    let call_roundRect_arity5: fun(Externref, F64, F64, F64, F64, Externref) void = @es/\ (self,p0,p1,p2,p3,p4) => self["roundRect"](p0,p1,p2,p3,p4) \/;
+    let call_roundRect_overload2: fun(Externref, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3) => self["roundRect"](p0,p1,p2,p3) \/;
+    let call_roundRect_overload2_arity5: fun(Externref, F64, F64, F64, F64, Externref) void = @es/\ (self,p0,p1,p2,p3,p4) => self["roundRect"](p0,p1,p2,p3,p4) \/;
+    let call_roundRect_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["roundRect"](...args) \/;
+}

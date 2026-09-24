@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserIDBTransactionOptions {
+    let get_durability: fun(Externref) Externref = @es/\ (self) => self["durability"] \/;
+    let set_durability: fun(Externref, Externref) void = @es/\ (self,value) => { self["durability"] = value; } \/;
+}

@@ -1,0 +1,12 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSpeechSynthesisVoice {
+    let get_default: fun(Externref) Bool = @es/\ (self) => (self["default"]) ? 1 : 0 \/;
+    let get_lang: fun(Externref) Str = @es/\ (self) => self["lang"] \/;
+    let get_localService: fun(Externref) Bool = @es/\ (self) => (self["localService"]) ? 1 : 0 \/;
+    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
+    let get_voiceURI: fun(Externref) Str = @es/\ (self) => self["voiceURI"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["SpeechSynthesisVoice"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SpeechSynthesisVoice"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SpeechSynthesisVoice"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SpeechSynthesisVoice"]["prototype"] = value; } \/;
+}

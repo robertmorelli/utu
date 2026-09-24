@@ -1,0 +1,25 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDOMQuad {
+    let call_getBounds: fun(Externref) Externref = @es/\ (self) => self["getBounds"]() \/;
+    let call_getBounds_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getBounds"](...args) \/;
+    let get_p1: fun(Externref) Externref = @es/\ (self) => self["p1"] \/;
+    let get_p2: fun(Externref) Externref = @es/\ (self) => self["p2"] \/;
+    let get_p3: fun(Externref) Externref = @es/\ (self) => self["p3"] \/;
+    let get_p4: fun(Externref) Externref = @es/\ (self) => self["p4"] \/;
+    let call_toJSON: fun(Externref) Externref = @es/\ (self) => self["toJSON"]() \/;
+    let call_toJSON_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toJSON"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["DOMQuad"]() \/;
+    let new_instance_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["DOMQuad"](p0) \/;
+    let new_instance_arity2: fun(Externref, Externref) Externref = @es/\ (p0,p1) => new globalThis["DOMQuad"](p0,p1) \/;
+    let new_instance_arity3: fun(Externref, Externref, Externref) Externref = @es/\ (p0,p1,p2) => new globalThis["DOMQuad"](p0,p1,p2) \/;
+    let new_instance_arity4: fun(Externref, Externref, Externref, Externref) Externref = @es/\ (p0,p1,p2,p3) => new globalThis["DOMQuad"](p0,p1,p2,p3) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["DOMQuad"](...args) \/;
+    let static_call_fromQuad: fun() Externref = @es/\ () => globalThis["DOMQuad"]["fromQuad"]() \/;
+    let static_call_fromQuad_arity1: fun(Externref) Externref = @es/\ (p0) => globalThis["DOMQuad"]["fromQuad"](p0) \/;
+    let static_call_fromQuad_js: fun(Externref) Externref = @es/\ (args) => globalThis["DOMQuad"]["fromQuad"](...args) \/;
+    let static_call_fromRect: fun() Externref = @es/\ () => globalThis["DOMQuad"]["fromRect"]() \/;
+    let static_call_fromRect_arity1: fun(Externref) Externref = @es/\ (p0) => globalThis["DOMQuad"]["fromRect"](p0) \/;
+    let static_call_fromRect_js: fun(Externref) Externref = @es/\ (args) => globalThis["DOMQuad"]["fromRect"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["DOMQuad"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["DOMQuad"]["prototype"] = value; } \/;
+}

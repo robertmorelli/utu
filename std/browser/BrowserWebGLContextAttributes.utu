@@ -1,0 +1,21 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserWebGLContextAttributes {
+    let get_alpha: fun(Externref) Externref = @es/\ (self) => self["alpha"] \/;
+    let set_alpha: fun(Externref, Externref) void = @es/\ (self,value) => { self["alpha"] = value; } \/;
+    let get_antialias: fun(Externref) Externref = @es/\ (self) => self["antialias"] \/;
+    let set_antialias: fun(Externref, Externref) void = @es/\ (self,value) => { self["antialias"] = value; } \/;
+    let get_depth: fun(Externref) Externref = @es/\ (self) => self["depth"] \/;
+    let set_depth: fun(Externref, Externref) void = @es/\ (self,value) => { self["depth"] = value; } \/;
+    let get_desynchronized: fun(Externref) Externref = @es/\ (self) => self["desynchronized"] \/;
+    let set_desynchronized: fun(Externref, Externref) void = @es/\ (self,value) => { self["desynchronized"] = value; } \/;
+    let get_failIfMajorPerformanceCaveat: fun(Externref) Externref = @es/\ (self) => self["failIfMajorPerformanceCaveat"] \/;
+    let set_failIfMajorPerformanceCaveat: fun(Externref, Externref) void = @es/\ (self,value) => { self["failIfMajorPerformanceCaveat"] = value; } \/;
+    let get_powerPreference: fun(Externref) Externref = @es/\ (self) => self["powerPreference"] \/;
+    let set_powerPreference: fun(Externref, Externref) void = @es/\ (self,value) => { self["powerPreference"] = value; } \/;
+    let get_premultipliedAlpha: fun(Externref) Externref = @es/\ (self) => self["premultipliedAlpha"] \/;
+    let set_premultipliedAlpha: fun(Externref, Externref) void = @es/\ (self,value) => { self["premultipliedAlpha"] = value; } \/;
+    let get_preserveDrawingBuffer: fun(Externref) Externref = @es/\ (self) => self["preserveDrawingBuffer"] \/;
+    let set_preserveDrawingBuffer: fun(Externref, Externref) void = @es/\ (self,value) => { self["preserveDrawingBuffer"] = value; } \/;
+    let get_stencil: fun(Externref) Externref = @es/\ (self) => self["stencil"] \/;
+    let set_stencil: fun(Externref, Externref) void = @es/\ (self,value) => { self["stencil"] = value; } \/;
+}

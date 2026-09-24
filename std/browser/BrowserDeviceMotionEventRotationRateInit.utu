@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserDeviceMotionEventRotationRateInit {
+    let get_alpha: fun(Externref) Externref = @es/\ (self) => self["alpha"] \/;
+    let set_alpha: fun(Externref, Externref) void = @es/\ (self,value) => { self["alpha"] = value; } \/;
+    let get_beta: fun(Externref) Externref = @es/\ (self) => self["beta"] \/;
+    let set_beta: fun(Externref, Externref) void = @es/\ (self,value) => { self["beta"] = value; } \/;
+    let get_gamma: fun(Externref) Externref = @es/\ (self) => self["gamma"] \/;
+    let set_gamma: fun(Externref, Externref) void = @es/\ (self,value) => { self["gamma"] = value; } \/;
+}

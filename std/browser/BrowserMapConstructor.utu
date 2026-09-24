@@ -1,0 +1,5 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserMapConstructor {
+    let get_symbol_species: fun(Externref) Externref = @es/\ (self) => self[Symbol.species] \/;
+    let get_prototype: fun(Externref) Externref = @es/\ (self) => self["prototype"] \/;
+}

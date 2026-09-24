@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserSourceBufferListEventMap {
+    let get_addsourcebuffer: fun(Externref) Externref = @es/\ (self) => self["addsourcebuffer"] \/;
+    let set_addsourcebuffer: fun(Externref, Externref) void = @es/\ (self,value) => { self["addsourcebuffer"] = value; } \/;
+    let get_removesourcebuffer: fun(Externref) Externref = @es/\ (self) => self["removesourcebuffer"] \/;
+    let set_removesourcebuffer: fun(Externref, Externref) void = @es/\ (self,value) => { self["removesourcebuffer"] = value; } \/;
+}

@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserAnimationEventMap {
+    let get_cancel: fun(Externref) Externref = @es/\ (self) => self["cancel"] \/;
+    let set_cancel: fun(Externref, Externref) void = @es/\ (self,value) => { self["cancel"] = value; } \/;
+    let get_finish: fun(Externref) Externref = @es/\ (self) => self["finish"] \/;
+    let set_finish: fun(Externref, Externref) void = @es/\ (self,value) => { self["finish"] = value; } \/;
+    let get_remove: fun(Externref) Externref = @es/\ (self) => self["remove"] \/;
+    let set_remove: fun(Externref, Externref) void = @es/\ (self,value) => { self["remove"] = value; } \/;
+}

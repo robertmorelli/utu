@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserFileReaderEventMap {
+    let get_abort: fun(Externref) Externref = @es/\ (self) => self["abort"] \/;
+    let set_abort: fun(Externref, Externref) void = @es/\ (self,value) => { self["abort"] = value; } \/;
+    let get_error: fun(Externref) Externref = @es/\ (self) => self["error"] \/;
+    let set_error: fun(Externref, Externref) void = @es/\ (self,value) => { self["error"] = value; } \/;
+    let get_load: fun(Externref) Externref = @es/\ (self) => self["load"] \/;
+    let set_load: fun(Externref, Externref) void = @es/\ (self,value) => { self["load"] = value; } \/;
+    let get_loadend: fun(Externref) Externref = @es/\ (self) => self["loadend"] \/;
+    let set_loadend: fun(Externref, Externref) void = @es/\ (self,value) => { self["loadend"] = value; } \/;
+    let get_loadstart: fun(Externref) Externref = @es/\ (self) => self["loadstart"] \/;
+    let set_loadstart: fun(Externref, Externref) void = @es/\ (self,value) => { self["loadstart"] = value; } \/;
+    let get_progress: fun(Externref) Externref = @es/\ (self) => self["progress"] \/;
+    let set_progress: fun(Externref, Externref) void = @es/\ (self,value) => { self["progress"] = value; } \/;
+}

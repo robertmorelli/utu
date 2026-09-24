@@ -1,0 +1,26 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserCSSFontFeatureValuesRule {
+    let get_CHARSET_RULE: fun(Externref) F64 = @es/\ (self) => self["CHARSET_RULE"] \/;
+    let get_COUNTER_STYLE_RULE: fun(Externref) F64 = @es/\ (self) => self["COUNTER_STYLE_RULE"] \/;
+    let get_FONT_FACE_RULE: fun(Externref) F64 = @es/\ (self) => self["FONT_FACE_RULE"] \/;
+    let get_FONT_FEATURE_VALUES_RULE: fun(Externref) F64 = @es/\ (self) => self["FONT_FEATURE_VALUES_RULE"] \/;
+    let get_IMPORT_RULE: fun(Externref) F64 = @es/\ (self) => self["IMPORT_RULE"] \/;
+    let get_KEYFRAMES_RULE: fun(Externref) F64 = @es/\ (self) => self["KEYFRAMES_RULE"] \/;
+    let get_KEYFRAME_RULE: fun(Externref) F64 = @es/\ (self) => self["KEYFRAME_RULE"] \/;
+    let get_MEDIA_RULE: fun(Externref) F64 = @es/\ (self) => self["MEDIA_RULE"] \/;
+    let get_NAMESPACE_RULE: fun(Externref) F64 = @es/\ (self) => self["NAMESPACE_RULE"] \/;
+    let get_PAGE_RULE: fun(Externref) F64 = @es/\ (self) => self["PAGE_RULE"] \/;
+    let get_STYLE_RULE: fun(Externref) F64 = @es/\ (self) => self["STYLE_RULE"] \/;
+    let get_SUPPORTS_RULE: fun(Externref) F64 = @es/\ (self) => self["SUPPORTS_RULE"] \/;
+    let get_cssText: fun(Externref) Str = @es/\ (self) => self["cssText"] \/;
+    let set_cssText: fun(Externref, Str) void = @es/\ (self,value) => { self["cssText"] = value; } \/;
+    let get_fontFamily: fun(Externref) Str = @es/\ (self) => self["fontFamily"] \/;
+    let set_fontFamily: fun(Externref, Str) void = @es/\ (self,value) => { self["fontFamily"] = value; } \/;
+    let get_parentRule: fun(Externref) Externref = @es/\ (self) => self["parentRule"] \/;
+    let get_parentStyleSheet: fun(Externref) Externref = @es/\ (self) => self["parentStyleSheet"] \/;
+    let get_type: fun(Externref) F64 = @es/\ (self) => self["type"] \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["CSSFontFeatureValuesRule"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CSSFontFeatureValuesRule"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CSSFontFeatureValuesRule"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CSSFontFeatureValuesRule"]["prototype"] = value; } \/;
+}

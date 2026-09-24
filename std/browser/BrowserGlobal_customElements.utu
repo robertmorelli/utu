@@ -1,0 +1,14 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserGlobal_customElements {
+    let call_define: fun(Str, Externref) void = @es/\ (p0,p1) => globalThis["customElements"]["define"](p0,p1) \/;
+    let call_define_arity3: fun(Str, Externref, Externref) void = @es/\ (p0,p1,p2) => globalThis["customElements"]["define"](p0,p1,p2) \/;
+    let call_define_js: fun(Externref) Externref = @es/\ (args) => globalThis["customElements"]["define"](...args) \/;
+    let call_get: fun(Str) Externref = @es/\ (p0) => globalThis["customElements"]["get"](p0) \/;
+    let call_get_js: fun(Externref) Externref = @es/\ (args) => globalThis["customElements"]["get"](...args) \/;
+    let call_getName: fun(Externref) Externref = @es/\ (p0) => globalThis["customElements"]["getName"](p0) \/;
+    let call_getName_js: fun(Externref) Externref = @es/\ (args) => globalThis["customElements"]["getName"](...args) \/;
+    let call_upgrade: fun(Externref) void = @es/\ (p0) => globalThis["customElements"]["upgrade"](p0) \/;
+    let call_upgrade_js: fun(Externref) Externref = @es/\ (args) => globalThis["customElements"]["upgrade"](...args) \/;
+    let call_whenDefined: fun(Str) Externref = @es/\ (p0) => globalThis["customElements"]["whenDefined"](p0) \/;
+    let call_whenDefined_js: fun(Externref) Externref = @es/\ (args) => globalThis["customElements"]["whenDefined"](...args) \/;
+}

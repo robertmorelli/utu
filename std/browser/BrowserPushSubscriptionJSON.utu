@@ -1,0 +1,9 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPushSubscriptionJSON {
+    let get_endpoint: fun(Externref) Externref = @es/\ (self) => self["endpoint"] \/;
+    let set_endpoint: fun(Externref, Externref) void = @es/\ (self,value) => { self["endpoint"] = value; } \/;
+    let get_expirationTime: fun(Externref) Externref = @es/\ (self) => self["expirationTime"] \/;
+    let set_expirationTime: fun(Externref, Externref) void = @es/\ (self,value) => { self["expirationTime"] = value; } \/;
+    let get_keys: fun(Externref) Externref = @es/\ (self) => self["keys"] \/;
+    let set_keys: fun(Externref, Externref) void = @es/\ (self,value) => { self["keys"] = value; } \/;
+}

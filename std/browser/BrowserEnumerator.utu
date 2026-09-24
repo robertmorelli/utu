@@ -1,0 +1,15 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserEnumerator {
+    let call_atEnd: fun(Externref) Bool = @es/\ (self) => (self["atEnd"]()) ? 1 : 0 \/;
+    let call_atEnd_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["atEnd"](...args) \/;
+    let call_item: fun(Externref) Externref = @es/\ (self) => self["item"]() \/;
+    let call_item_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["item"](...args) \/;
+    let call_moveFirst: fun(Externref) void = @es/\ (self) => self["moveFirst"]() \/;
+    let call_moveFirst_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["moveFirst"](...args) \/;
+    let call_moveNext: fun(Externref) void = @es/\ (self) => self["moveNext"]() \/;
+    let call_moveNext_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["moveNext"](...args) \/;
+    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["Enumerator"](p0) \/;
+    let new_instance_overload2: fun(Externref) Externref = @es/\ (p0) => new globalThis["Enumerator"](p0) \/;
+    let new_instance_overload3: fun(Externref) Externref = @es/\ (p0) => new globalThis["Enumerator"](p0) \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Enumerator"](...args) \/;
+}

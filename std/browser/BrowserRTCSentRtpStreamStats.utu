@@ -1,0 +1,21 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCSentRtpStreamStats {
+    let get_bytesSent: fun(Externref) Externref = @es/\ (self) => self["bytesSent"] \/;
+    let set_bytesSent: fun(Externref, Externref) void = @es/\ (self,value) => { self["bytesSent"] = value; } \/;
+    let get_codecId: fun(Externref) Externref = @es/\ (self) => self["codecId"] \/;
+    let set_codecId: fun(Externref, Externref) void = @es/\ (self,value) => { self["codecId"] = value; } \/;
+    let get_id: fun(Externref) Str = @es/\ (self) => self["id"] \/;
+    let set_id: fun(Externref, Str) void = @es/\ (self,value) => { self["id"] = value; } \/;
+    let get_kind: fun(Externref) Str = @es/\ (self) => self["kind"] \/;
+    let set_kind: fun(Externref, Str) void = @es/\ (self,value) => { self["kind"] = value; } \/;
+    let get_packetsSent: fun(Externref) Externref = @es/\ (self) => self["packetsSent"] \/;
+    let set_packetsSent: fun(Externref, Externref) void = @es/\ (self,value) => { self["packetsSent"] = value; } \/;
+    let get_ssrc: fun(Externref) F64 = @es/\ (self) => self["ssrc"] \/;
+    let set_ssrc: fun(Externref, F64) void = @es/\ (self,value) => { self["ssrc"] = value; } \/;
+    let get_timestamp: fun(Externref) F64 = @es/\ (self) => self["timestamp"] \/;
+    let set_timestamp: fun(Externref, F64) void = @es/\ (self,value) => { self["timestamp"] = value; } \/;
+    let get_transportId: fun(Externref) Externref = @es/\ (self) => self["transportId"] \/;
+    let set_transportId: fun(Externref, Externref) void = @es/\ (self,value) => { self["transportId"] = value; } \/;
+    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
+    let set_type: fun(Externref, Str) void = @es/\ (self,value) => { self["type"] = value; } \/;
+}

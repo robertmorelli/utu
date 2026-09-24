@@ -1,0 +1,18 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserRTCRtpTransceiver {
+    let get_currentDirection: fun(Externref) Externref = @es/\ (self) => self["currentDirection"] \/;
+    let get_direction: fun(Externref) Str = @es/\ (self) => self["direction"] \/;
+    let set_direction: fun(Externref, Str) void = @es/\ (self,value) => { self["direction"] = value; } \/;
+    let get_mid: fun(Externref) Externref = @es/\ (self) => self["mid"] \/;
+    let get_receiver: fun(Externref) Externref = @es/\ (self) => self["receiver"] \/;
+    let get_sender: fun(Externref) Externref = @es/\ (self) => self["sender"] \/;
+    let call_setCodecPreferences: fun(Externref, Externref) void = @es/\ (self,p0) => self["setCodecPreferences"](p0) \/;
+    let call_setCodecPreferences_overload2: fun(Externref, Externref) void = @es/\ (self,p0) => self["setCodecPreferences"](p0) \/;
+    let call_setCodecPreferences_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setCodecPreferences"](...args) \/;
+    let call_stop: fun(Externref) void = @es/\ (self) => self["stop"]() \/;
+    let call_stop_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["stop"](...args) \/;
+    let new_instance: fun() Externref = @es/\ () => new globalThis["RTCRtpTransceiver"]() \/;
+    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["RTCRtpTransceiver"](...args) \/;
+    let static_get_prototype: fun() Externref = @es/\ () => globalThis["RTCRtpTransceiver"]["prototype"] \/;
+    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["RTCRtpTransceiver"]["prototype"] = value; } \/;
+}

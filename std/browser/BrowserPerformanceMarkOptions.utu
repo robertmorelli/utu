@@ -1,0 +1,7 @@
+// Generated from TypeScript 5.9.3; regenerate, do not edit.
+mod BrowserPerformanceMarkOptions {
+    let get_detail: fun(Externref) Externref = @es/\ (self) => self["detail"] \/;
+    let set_detail: fun(Externref, Externref) void = @es/\ (self,value) => { self["detail"] = value; } \/;
+    let get_startTime: fun(Externref) Externref = @es/\ (self) => self["startTime"] \/;
+    let set_startTime: fun(Externref, Externref) void = @es/\ (self,value) => { self["startTime"] = value; } \/;
+}
