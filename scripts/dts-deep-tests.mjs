@@ -302,8 +302,17 @@ try {
     assert.equal(exports.json(), '[1,"two",true,{"n":3}]');
     const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().to_f64(); }`);
     assert.equal(native.dates(), 4);
+    // A literal given to JavaScript, or used through JS array members, is a JS array.
+    const host = await runBrowser(`
+      fn direct() Str { Browser.JSON.stringify([1, 2]); }
+      fn bound() Str { let xs = [3, 1, 2]; xs.sort(); Browser.JSON.stringify(xs); }
+      fn pushed() F64 { let items = []; items.push("a"); items.push("b"); items.length; }
+      fn logged() F64 { let xs = [1, 2]; Browser.console.debug(xs); xs[1]; }
+    `);
+    assert.equal(host.direct(), '[1,2]'); assert.equal(host.bound(), '[1,2,3]');
+    assert.equal(host.pushed(), 2); assert.equal(host.logged(), 2);
     assert.equal(exports.from(), 7); assert.equal(exports.blob(), 11); assert.equal(exports.set(), 2);
-    const doc = await compile('using Browser from std:Browser; export main() void { let t = []; }');
+    const doc = await compile('using Browser from std:Browser; export main() void { let t = [Browser.document, 1]; }');
     assert([...doc.querySelectorAll('[data-error]')].some(n => /array literal needs a known type/.test(n.dataset.errorMessage ?? '')));
   });
   await test('package declarations accept DOM values, records, tuples, closures and awaited results', async () => {

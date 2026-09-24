@@ -13,7 +13,15 @@
    numeric neighbour (`[x, 2]` with `x: F64` is `Array[F64]`), `null` makes
    the element nullable (`[p, null]` is `Array[?P]`), and arrays nest
    (`[[1, 2], [3]]`). Host values work too: `[new JS.Date(0)]` is a native
-   array of `JS.Date`. Only an empty `[]` needs an annotation.
+   array of `JS.Date`.
+4. An unannotated `let` bound to a literal waits for its first use: passed
+   to JavaScript, or used through a JS array member native arrays lack
+   (`push`, `length`, `join`, `sort`, …), it is a JS array; passed where an
+   `Array[T]` is expected, or assigned one, an empty `[]` becomes that type.
+   An empty `[]` nothing constrains holds nothing, so it is `Array[I32]`.
+
+A native Wasm array is opaque to JavaScript, so an array literal never reaches
+a JS slot as one: `JSON.stringify([1, 2])` receives a real JS array.
 
 Generic module instances are created before types are known. When typing
 finds an array literal whose element type has no `Array[T]` instance yet, the

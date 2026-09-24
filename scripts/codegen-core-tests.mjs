@@ -773,11 +773,15 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         fn structs() I32 { let p = P { v: 5 }; let ps = [p, P { v: 6 }, null]; promote ps[1] { |q| => q.v + ps.len(), ~> 0, }; }
         fn nested() I32 { let grid = [[1, 2], [3, 4, 5]]; grid[1][2] + grid.len(); }
         fn strings() I32 { let names = ["a", "bb"]; names[1].len(); }
+        fn empty() I32 { let none = []; none.len(); }
+        fn from_use() F64 { let xs = []; let t = 0.0; let ys = sum(xs); xs = [1.5, 2.5]; xs[1] + ys; }
       }
+      fn sum(xs: Array[F64]) F64 { let t = 0.0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
     ` });
     const e = instance.exports;
     assertEq(e.literals(), 36); assertEq(e.floats(), 3); assertEq(e.locals(), 5);
     assertEq(e.structs(), 9); assertEq(e.nested(), 7); assertEq(e.strings(), 2);
+    assertEq(e.empty(), 0); assertEq(e.from_use(), 2.5);
   });
 
   test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {

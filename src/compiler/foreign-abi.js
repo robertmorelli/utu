@@ -86,6 +86,14 @@ function argumentRef(abi, index, type) {
 }
 const isClosure = (graph, arg) => arg?.localName === 'ir-closure' || callableParts(graph.slots.get(arg)?.actual)?.kind === 'cl';
 const isRecord = arg => arg?.localName === 'ir-struct-init' && arg.getAttribute('implicit') === 'true';
+/** `[...]`, or a `let` bound to one without an annotation, whose representation context decides. */
+function untypedArray(graph, arg) {
+  const literal = arg?.localName === 'ir-array-lit' ? arg : null;
+  const declaration = arg?.localName === 'ir-ident' ? graph.scopeGraph?.resolutions.get(arg.id) : null;
+  const bound = declaration?.localName === 'ir-let' && declaration.children.length === 1 ? declaration.lastElementChild : null;
+  const array = literal ?? (bound?.localName === 'ir-array-lit' ? bound : null);
+  return !!array && (!array.getAttribute('type-name') || !!graph.typeIndex?.get(array.getAttribute('type-name'))?.foreign);
+}
 /** The element a JS array must hold to satisfy an array, array-like, or iterable declaration. */
 function elementOf(abi, index, ref, seen = new Set()) {
   const desc = abi.describe(index, ref);
@@ -205,6 +213,8 @@ export function accept(graph, index, ref, arg, bindings = {}) {
   if (ref?.parameter !== undefined) ref = ref.constraint ?? 'any';
   if (dynamicRefs.has(ref)) {
     if (type === 'null') return `?${abi.type(index, 'any', graph)}`;
+    // An array literal given to JS becomes a JS array, never an opaque Wasm array.
+    if (untypedArray(graph, arg)) return abi.type(index, 'any', graph);
     return type && type !== 'unknown' && !/\bunknown\b/.test(type) ? type : abi.type(index, 'any', graph);
   }
   const desc = abi.describe(index, ref);

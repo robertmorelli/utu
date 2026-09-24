@@ -35,6 +35,8 @@ const KINDS = { int: 'I32', float: 'F64', string: 'Str', 'string-multi': 'Str', 
 
 /** The default element type of a literal-only array, or null. */
 export function literalArrayElement(node) {
+  // An unconstrained `[]` holds nothing, so its element type is unobservable.
+  if (!node.children.length) return 'I32';
   const kinds = new Set([...node.children].map(child => child.localName === 'ir-lit' ? KINDS[child.getAttribute('kind')] : null));
   if (!kinds.size || kinds.has(undefined) || kinds.has(null)) return null;
   if (kinds.size === 1) return [...kinds][0];

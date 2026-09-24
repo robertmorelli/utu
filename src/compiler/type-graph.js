@@ -89,7 +89,7 @@ export function planContextualRewrites(graph) {
     }
     // `[a, b]` adopts a native `Array[T]` or a declared host array type from context.
     const arrayContext = graph.typeIndex?.get(unwrapNullable(expected));
-    if (value?.localName === 'ir-array-lit' && !value.getAttribute('type-name')
+    if (value?.localName === 'ir-array-lit' && !value.getAttribute('type-name') && !assignsOpenArray(graph, value)
         && (arrayContext?.foreign || arrayContext?.kind === 'wasm-array')) {
       rewrites.push({ kind: 'array-type', node: value, type: unwrapNullable(expected), edge });
       continue;
@@ -119,11 +119,62 @@ export function planContextualRewrites(graph) {
     // closure binding takes its parameter types from its first contextual use.
     const binding = value?.localName === 'ir-ident' ? bindingOf(graph, value) : null;
     const bound = binding?.localName === 'ir-let' && !declaredTypeStr(binding) ? binding.lastElementChild : null;
+    // `let xs = [...]` takes its array type from the first place `xs` needs one:
+    // a declaration slot makes it a JS array, a native context an `Array[T]`.
+    if (isUntypedArray(bound) && (arrayContext?.foreign || arrayContext?.kind === 'wasm-array' && isOpenArray(bound))) {
+      rewrites.push({ kind: 'array-type', node: bound, type: unwrapNullable(expected), edge });
+    }
+    // …or from an array assigned to it: `xs = [1.5, 2.5]`.
+    const assignment = value?.parentElement?.localName === 'ir-assign' && value.parentElement.lastElementChild === value ? value.parentElement : null;
+    const target = assignment?.firstElementChild?.localName === 'ir-ident' ? bindingOf(graph, assignment.firstElementChild) : null;
+    const initial = target?.localName === 'ir-let' && !declaredTypeStr(target) ? target.lastElementChild : null;
+    const assigned = actual(graph, value);
+    if (isOpenArray(initial) && assigned && graph.typeIndex?.get(assigned)?.kind === 'wasm-array') {
+      rewrites.push({ kind: 'array-type', node: initial, type: assigned, edge });
+    }
     if (bound?.localName === 'ir-closure' && paramsOf(bound).some(p => !firstTypeChild(p) && !p.dataset.typeName)) {
       rewrites.push({ kind: 'closure-context', node: bound, type: expected, edge });
     }
   }
+  // `let items = []; items.push(x)`: a member native arrays lack (`push`,
+  // `length`, `join`, …) means a JS array.
+  for (const access of nodesOf(graph, 'ir-field-access')) {
+    const base = access.firstElementChild;
+    const declaration = base?.localName === 'ir-ident' ? bindingOf(graph, base) : null;
+    const init = declaration?.localName === 'ir-let' && !declaredTypeStr(declaration) ? declaration.lastElementChild : null;
+    const native = actual(graph, base);
+    if (!isUntypedArray(init) || !native || graph.nativeMember(native, access.getAttribute('field'))) continue;
+    const host = hostArrayType(graph);
+    if (host) rewrites.push({ kind: 'array-type', node: init, type: host });
+  }
   return rewrites;
+}
+
+/** The host `Array<any>` type, when declarations that include it are loaded. */
+function hostArrayType(graph) {
+  const abi = graph.doc.__utuForeign;
+  for (const [index, schema] of abi?.schemas.entries() ?? []) {
+    const ref = Object.hasOwn(schema.names, 'Array') ? schema.names.Array : schema.types.findIndex(type => type?.lib === 'Array');
+    if (ref !== -1) return abi.type(index, abi.written(index, ref), graph);
+  }
+  return null;
+}
+
+/** `xs = [...]` where `xs` was declared `let xs = []`: the open array adopts this value's type instead. */
+function assignsOpenArray(graph, value) {
+  const assignment = value.parentElement?.localName === 'ir-assign' && value.parentElement.lastElementChild === value ? value.parentElement : null;
+  const target = assignment?.firstElementChild?.localName === 'ir-ident' ? bindingOf(graph, assignment.firstElementChild) : null;
+  return target?.localName === 'ir-let' && !declaredTypeStr(target) && isOpenArray(target.lastElementChild);
+}
+
+/** An array literal whose representation is still decided by context. */
+function isUntypedArray(node) {
+  return node?.localName === 'ir-array-lit' && !node.getAttribute('type-name');
+}
+
+/** An empty, untyped `[]` whose element type is still open. */
+function isOpenArray(node) {
+  return node?.localName === 'ir-array-lit' && !node.children.length && !node.getAttribute('type-name');
 }
 
 /** Untyped literals that are operands of an operator tree, not nested in calls or indexes. */
@@ -145,6 +196,8 @@ export function applyContextualRewrites(graph, rewrites) {
       rewrite.node.dataset.loweredImplicitStructInit = 'true';
       graph.changed = true;
     } else if (rewrite.kind === 'array-type') {
+      // The first context decides; a conflicting later use is then a type error.
+      if (rewrite.node.getAttribute('type-name')) continue;
       rewrite.node.setAttribute('type-name', rewrite.type);
       graph.changed = true;
     } else if (rewrite.kind === 'literal-type') {
