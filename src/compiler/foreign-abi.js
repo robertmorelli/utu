@@ -79,6 +79,7 @@ function resultType(graph, index, ref, node) {
   return type;
 }
 const typeofNames = { F64: 'number', Str: 'string', Bool: 'boolean' };
+const typedArrays = /^(Int8|Uint8|Uint8Clamped|Int16|Uint16|Int32|Uint32|Float16|Float32|Float64|BigInt64|BigUint64)Array$/;
 function argumentRef(abi, index, type) {
   const foreign = abi.values.get(type);
   return foreign ? foreign.index === index ? foreign.ref : { external: foreign } : type;
@@ -290,8 +291,11 @@ export function foreignActual(graph, node) {
       return null;
     }
     const params = args.map(arg => accept(graph, value.index, element, arg));
+    const items = `[${params.map((t, i) => jsInput(`p${i}`, t)).join(',')}]`;
+    // A typed-array slot (`Float64Array`) receives that typed array, not a plain Array.
+    const typed = typedArrays.test(desc.lib ?? '') ? desc.lib : null;
     return save({ kind: 'array', result: name, params, args,
-      body: `(${params.map((_, i) => `p${i}`).join(',')}) => [${params.map((t, i) => jsInput(`p${i}`, t)).join(',')}]` });
+      body: `(${params.map((_, i) => `p${i}`).join(',')}) => ${typed ? `new globalThis.${typed}(${items})` : items}` });
   }
   if (['ir-field-access', 'ir-type-member'].includes(node.localName)) {
     const m = member(graph, node);
@@ -303,7 +307,7 @@ export function foreignActual(graph, node) {
     }
     if (m.desc.constants && Object.hasOwn(m.desc.constants, m.key)) {
       const value = m.desc.constants[m.key];
-      return save({ kind: 'constant', result: typeof value === 'string' ? 'Str' : 'F64', params: [], args: [], body: `() => ${json(value)}` });
+      return save({ kind: 'constant', result: typeof value === 'string' ? 'Str' : 'F64', value, params: [], args: [] });
     }
     const ref = m.prop?.type ?? 'any';
     const result = resultType(graph, m.index, ref, node);

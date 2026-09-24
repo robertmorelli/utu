@@ -55,6 +55,8 @@ export function lowerForeignOperations(graph, buildExternFn) {
     if (!op) continue;
     if (['get', 'index'].includes(op.kind) && node === node.parentElement?.firstElementChild
         && ['ir-call', 'ir-assign'].includes(node.parentElement.localName)) continue;
+    // `Pkg.Shape.Square` folds to a literal; the enum object is never read.
+    if (node === node.parentElement?.firstElementChild && graph.slots.get(node.parentElement)?.foreign?.kind === 'constant') continue;
     plans.push([node, op]);
   }
   // Host references share one Wasm representation, so parameters are erased to
@@ -79,6 +81,10 @@ export function lowerForeignOperations(graph, buildExternFn) {
   };
   // Descendants move into the replacement calls before their parents consume them.
   for (const [node, op] of plans.reverse()) {
+    if (op.kind === 'constant') {
+      replacements.set(node, foldConstant(doc, node, op));
+      continue;
+    }
     const name = intern(op, node);
     const call = replaceNodeMeta(doc.createElement('ir-call'), node, 'foreign-abi', op.kind);
     precise(call, op);
@@ -97,6 +103,17 @@ export function lowerForeignOperations(graph, buildExternFn) {
   root.dataset.dslWasmImports = json(wasmImports);
   root.dataset.dslOutputFiles = json(outputFiles);
   return plans.length > 0 || narrowed;
+}
+
+/** Declared enum members are compile-time literals, not host reads. */
+function foldConstant(doc, node, op) {
+  const literal = replaceNodeMeta(doc.createElement('ir-lit'), node, 'foreign-abi', 'constant');
+  const text = op.result === 'Str' ? json(op.value) : Number.isInteger(op.value) ? `${op.value}.0` : String(op.value);
+  literal.setAttribute('kind', op.result === 'Str' ? 'string' : 'float');
+  literal.setAttribute('value', text);
+  literal.setAttribute('type-name', op.result);
+  node.replaceWith(literal);
+  return literal;
 }
 
 /**

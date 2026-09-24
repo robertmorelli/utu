@@ -54,6 +54,8 @@ Declaration shapes map onto ordinary UTU syntax:
 | `const t = e.target as HTMLInputElement` | `alt e.target { Browser.HTMLInputElement \|t\| => ..., ~> ..., }` |
 | `m.get(k) ?? fallback` (`V \| undefined`) | `promote m.get(k) { \|v\| => ..., ~> fallback, }` |
 | `"abc".toUpperCase()`, `n.toFixed(2)` | same: `Str` and `F64` use declared `String` and `Number` members |
+| `Shape.Square` (any `enum`, const or not) | same: folds to a literal, with no import or host read |
+| `mean(new Float64Array([2, 4]))` | `Geom.mean(.{ 2.0, 4.0 })`: typed-array slots receive that typed array |
 
 Records (`&{...}`) and tuples (`.{...}`) take their shape from the declaration
 slot they are passed to and become real JS objects and arrays, including when
@@ -115,6 +117,18 @@ TypeScript development dependency; consuming the ABI JSON needs no TypeScript
 installation. The implementation package must remain resolvable to the bundler
 or runtime. Local implementation modules can use absolute paths. Relative JS
 module specifiers resolve from generated glue, not the declaration file.
+
+Rust crates work the same way through wasm-bindgen's declarations:
+
+```sh
+wasm-pack build --target nodejs --out-dir pkg
+node tools/dts/cli.mjs --input pkg/geom.d.ts --module ./pkg/geom.js --prefix Geom --out bindings
+```
+
+Constructors, getters and setters, `&mut self` methods, `Option<T>` results,
+`Vec<f64>` parameters and results, enums, and `js_sys::Function` callbacks map to
+ordinary UTU syntax (see `scripts/fixtures/rust-geom`). Rust memory is still
+managed by wasm-bindgen: call `free()` when an object is no longer needed.
 
 The host-neutral linker accepts an injected TypeScript API and Program. Its
 source of truth is the checker's resolved symbols, including reexports,
@@ -221,7 +235,8 @@ Coverage includes declared classes, nested objects/namespaces, const enums,
 symbol keys, nullable and undefined results, inferred locals, typed records,
 tuples, unions, overloads, generic inference and constraints, callbacks,
 `alt` narrowing, `String`/`Number` members, promises, cross-package DOM
-identity, alias/file imports, and diagnostics. Real-package tests cover
+identity, enums, typed arrays, a wasm-bindgen Rust crate, alias/file imports,
+and diagnostics. Real-package tests cover
 nanoid, mitt, node:path, CommonJS, and Floating UI. Browser tests exercise live
 DOM behavior and storage across reloads. The array benchmark builds with Node
 but performs all warmups and timings in d8; select it with `D8_BIN` if necessary.

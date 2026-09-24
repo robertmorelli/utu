@@ -369,6 +369,43 @@ try {
     assert.throws(() => exports.failure(), /fixture failure/);
     assert.equal(exports.namespace(), 42); assert.equal(exports.constant(), 42);
   });
+  await test('enum members of every kind are literals with no host read', async () => {
+    const { exports, glue } = await run(`
+      fn number() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }
+      fn text() Str { Fixture.Tone.Warm; }
+    `);
+    assert.equal(exports.number(), 42); assert.equal(exports.text(), 'warm');
+    assert.equal(glue, '', 'enum members must not become imports');
+  });
+  await test('a Rust crate links through its wasm-bindgen declarations', async () => {
+    const pkg = path.join(ROOT, 'scripts/fixtures/rust-geom/pkg');
+    const geom = linkFiles({ files: [path.join(pkg, 'geom.d.ts')], prefix: 'Geom', moduleSpecifier: path.join(pkg, 'geom.js') });
+    const { exports, glue } = await run(`
+      fn hello() Str { Geom.greet("UTU"); }
+      fn parsed(text: Str) F64 { promote Geom.parse_number(text) { |n| => n, ~> -1.0, }; }
+      fn average() F64 { Geom.mean(.{ 2.0, 4.0, 9.0 }); }
+      fn polygon() F64 {
+        let p = new Geom.Polygon(4.0, 2.5);
+        p.label = "square";
+        let grown = p.scale(2.0);
+        let square = if p.kind() == Geom.Shape.Square { 100.0; } else { 0.0; };
+        let result = grown + p.perimeter + p.vertices().length + square;
+        p.free();
+        result;
+      }
+      fn steps() F64 {
+        let seen = new Geom.Polygon(0.0, 0.0);
+        Geom.each_step(3.0, cl(i: F64) void { seen.scale(1.0); });
+        seen.free();
+        3.0;
+      }
+    `, geom);
+    assert.equal(exports.hello(), 'Hello, UTU!');
+    assert.equal(exports.parsed(' 2.5 '), 2.5); assert.equal(exports.parsed('nope'), -1);
+    assert.equal(exports.average(), 5); assert.equal(exports.polygon(), 144); assert.equal(exports.steps(), 3);
+    assert.match(glue, /new globalThis\.Float64Array\(\[p0,p1,p2\]\)/);
+    assert(!/"Shape"/.test(glue), 'enum members fold to literals');
+  });
   await test('closures whose first parameter is `this` receive the JS receiver', async () => {
     const { exports } = await run(`
       fn label() Str { Fixture.arbitrary(cl(this, first) Str { this.label; }); }

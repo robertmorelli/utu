@@ -33,6 +33,7 @@ export declare function arbitrary(callback: (this: Options, ...args: unknown[]) 
 export declare function booleanCallback(callback: (value: boolean) => boolean): boolean;
 export declare function identity(value: unknown): unknown;
 export declare const enum ConstMode { First = 20, Second = 22 }
+export declare enum Tone { Warm = "warm", Cool = "cool" }
 export declare namespace Util {
   const label: string;
   function scale(n: number): number;

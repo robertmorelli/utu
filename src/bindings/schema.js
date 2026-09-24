@@ -76,7 +76,8 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
     if (type.isClassOrInterface?.() && origins.length && origins.every(d => d.getSourceFile().hasNoDefaultLib)) {
       node.lib = checker.getFullyQualifiedName(type.symbol);
     }
-    if (type.symbol?.flags & ts.SymbolFlags.ConstEnum) {
+    // Every enum member is a declared constant, whether or not the enum is `const`.
+    if (type.symbol?.flags & ts.SymbolFlags.Enum) {
       node.constants = Object.create(null);
       for (const declaration of type.symbol.declarations ?? []) for (const member of declaration.members ?? []) {
         const value = checker.getConstantValue(member);

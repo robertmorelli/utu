@@ -20,6 +20,7 @@ export default name=>`Hello ${name}`;
 export const arbitrary = callback => callback.call({label:'receiver',count:42}, 1, 'two', true);
 export const booleanCallback = callback => { const value=callback(false); if(typeof value!=='boolean') throw Error('callback boolean ABI'); return value; };
 export const identity = value => value;
+export const Tone = { Warm: 'warm', Cool: 'cool' };
 export const Util = {label:'namespace',scale:n=>n*2,Nested:{answer:42}};
 
 export const dictionary = { answer: 42 };
