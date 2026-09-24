@@ -38,6 +38,7 @@ export const negativeDiagnosticCases = [
   ['orelse receiver must be nullable', `export lib { fn bad() I32 { 1 orelse 2; } }`, 'type-mismatch', 'Type mismatch: expected nullable, got I32'],
   ['orelse fallback type mismatch', `${PRELUDE} export lib { fn bad(p: ?Point) Point { p orelse false; } }`, 'type-mismatch', 'Type mismatch: expected Point, got Bool'],
   ['assign type mismatch', `export lib { fn bad() I32 { let x: I32 = 0; x = true; x; } }`, 'type-mismatch', 'Type mismatch: expected I32, got Bool'],
+  ['downstream errors fold under their cause', `export lib { fn bad() void { let a = 1 + "x"; let b: F64 = a; let c: Str = a; } }`, 'type-mismatch', 'Type mismatch: expected I32, got Str (+2 caused by this)'],
   ['field assign type mismatch', `${PRELUDE} export lib { fn bad(p: Point) I32 { p.x = false; p.x; } }`, 'type-mismatch', 'Type mismatch: expected I32, got Bool'],
   ['struct init missing field', `${PRELUDE} export lib { fn bad() Point { Point { x: 1 }; } }`, 'missing-field', "Missing field 'y' for Point"],
   ['struct init duplicate field', `${PRELUDE} export lib { fn bad() Point { Point { x: 1, x: 2, y: 3 }; } }`, 'duplicate-field', "Duplicate field 'x'"],
