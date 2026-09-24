@@ -459,7 +459,8 @@ try {
       }`);
     assert(!worker.querySelector('[data-error]'), worker.querySelector('[data-error]')?.dataset.errorMessage);
     const glue = Object.values(JSON.parse(worker.body.firstChild.dataset.dslImportsJs).es).join('\n');
-    assert.match(glue, /globalThis\["postMessage"\]/); assert.match(glue, /globalThis\["importScripts"\]/);
+    // -Oz shares global calls: `postMessage` and `importScripts` both go through `globalThis[k](…)`.
+    assert.match(glue, /\(k,p0\) => globalThis\[k\]\(p0\)/);
   });
   await test('keyof over an index signature accepts any key (mitt handlers need no annotation)', async () => {
     const output = linkFiles({ files: [path.join(ROOT, 'node_modules/mitt/index.d.ts')], prefix: 'Mitt', moduleSpecifier: 'mitt' });

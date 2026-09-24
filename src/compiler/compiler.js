@@ -82,6 +82,7 @@ import {
  *   Reads the UTF-8 contents of a file at the given path.
  *   The implementation is host-specific (fs, vscode.workspace.fs, fetch, …).
  * @property {(path: string, fromPath: string) => string} resolvePath
+ * @property {'size' | 'speed'} [optimize] -Oz (default) shares host-call imports and shrinks; -O3 specializes them
  * @property {(specifier: string, request: { prefix: string, from: string }) => Promise<object>} [resolvePackage]
  *   Link `using X from "npm:pkg"` / `"node:mod"` to a declaration graph. Node
  *   hosts can use tools/dts/packages.mjs; other hosts inject their own.
@@ -115,7 +116,7 @@ import {
  * @returns {Compiler}
  */
 export function createCompiler(env) {
-  const { parser, readFile, resolvePath, resolvePackage = null, stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
+  const { parser, readFile, resolvePath, resolvePackage = null, optimize = 'size', stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
 
   if (!parser)      throw new Error('createCompiler: `parser` is required');
   if (!readFile)    throw new Error('createCompiler: `readFile` is required');
@@ -189,6 +190,8 @@ export function createCompiler(env) {
     bringTargetToTopLevel(graph.get(filePath), { target, filePath, debugAssertions });
     debugAssert(graph.get(filePath), 'bringTargetToTopLevel');
     const doc = inlineImports(graph, order, { debugAssertions });
+    // -Oz ('size', the default) or -O3 ('speed'): read by host-call lowering and emitBinary.
+    if (doc.body.firstChild) doc.body.firstChild.dataset.optimize = optimize;
     doc.__utuForeign = foreignABI;
     doc.__utuSourceTexts = new Map([...graph].map(([file, sourceDoc]) => [file, sourceDoc.__utuSourceText ?? '']));
     if (target === 'analysis') {

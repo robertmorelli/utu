@@ -257,6 +257,21 @@ replacing the former 1,490 expanded source modules. Standard `DecompressionStrea
 shared; demand, type identities, and inference state are private to a compilation.
 The catalog is not decompressed when the program does not import the browser.
 
+Builds optimize for size (`-Oz`, the default) or speed (`-O3`); pass
+`createCompiler({ optimize: 'speed' })`, `-O3` to the CLI's `build-exe`, or
+`optimize: 'speed'` to `tools/dts/build-app.mjs`. Under `-Oz`, plain property
+reads and writes, method calls, and global reads share one import per shape,
+such as `(self,k) => self[k]`, with the name passed from Wasm as a string
+constant; JS string builtins make those constants free. Under `-O3`, each name
+keeps its own import, so every JavaScript access site stays monomorphic, and
+Binaryen skips its shrinking pass. Named package imports are never shared,
+because bundlers need them for tree shaking.
+
+| App | `-Oz` total gzip | `-O3` total gzip |
+|---|---:|---:|
+| browser task board | 2,572 B | 2,640 B |
+| Pantry dashboard | 4,867 B | 5,198 B |
+
 Only used operations become Wasm imports and live JavaScript. Host references
 share one Wasm representation, so operations that differ only in declaration
 types share one import (`el.append(a, b)` is one import for every element type).

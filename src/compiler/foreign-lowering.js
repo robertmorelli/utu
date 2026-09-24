@@ -27,10 +27,30 @@ export function foreignAssignment(graph, node) {
   const assignment = operator === 'xor=' ? `${access} = !!${access} !== !!${input}`
     : `${access} ${{ 'and=': '&&=', 'or=': '||=' }[operator] ?? operator} ${input}`;
   return { kind: 'set', result: 'void', params: [...getter.params, type], args: [...getter.args, value],
+    key: getter.kind === 'get' ? getter.key : undefined, root: getter.root, prologue: getter.prologue ?? '',
     body: `${getter.prologue ?? ''}(${getter.kind === 'index' ? 'self,key,' : getter.root ? '' : 'self,'}value) => { ${assignment}; }` };
 }
 
 /** Lower resolved operations only; declarations and unused members produce no code. */
+/**
+ * Size-optimized builds (-Oz) share one import per operation shape:
+ * `el.value` and `el.textContent` both call `(self,k) => self[k]`, with the
+ * name passed from Wasm as a string constant, which JS string builtins make
+ * free. Speed builds (-O3) keep one import per name, so each JS access site
+ * stays monomorphic. Named package imports are never shared: bundlers need
+ * them to tree-shake.
+ */
+function shareKey(op) {
+  if (!op.key || op.prologue || !['get', 'set', 'call'].includes(op.kind)) return null;
+  const named = `${op.root ? 'globalThis' : 'self'}[${json(op.key)}]`;
+  if (op.body.split(named).length !== 2) return null;
+  const body = op.body.replace(named, op.root ? 'globalThis[k]' : 'self[k]');
+  return op.root
+    ? { at: 0, body: body.replace(/^\(\)/, '(k)').replace(/^\((?!k\))/, '(k,') }
+    : { at: 1, body: body.replace(/^\(self/, '(self,k') };
+}
+const insertAt = (list, at, item) => [...list.slice(0, at), item, ...list.slice(at)];
+
 export function lowerForeignOperations(graph, buildExternFn) {
   if (!graph.doc.__utuForeign) return false;
   const doc = graph.doc, root = doc.body.firstChild;
@@ -86,10 +106,19 @@ export function lowerForeignOperations(graph, buildExternFn) {
     return name;
   };
   // Descendants move into the replacement calls before their parents consume them.
-  for (const [node, op] of plans.reverse()) {
+  const shared = root.dataset.optimize !== 'speed';
+  for (let [node, op] of plans.reverse()) {
     if (op.kind === 'constant') {
       replacements.set(node, foldConstant(doc, node, op));
       continue;
+    }
+    const key = shared ? shareKey(op) : null;
+    if (key) {
+      const literal = createSyntheticNode(doc, 'ir-lit', node, 'foreign-abi', 'shared-key');
+      literal.setAttribute('kind', 'string');
+      literal.setAttribute('value', json(op.key));
+      literal.setAttribute('type-name', 'Str');
+      op = { ...op, body: key.body, params: insertAt(op.params, key.at, 'Str'), args: insertAt(op.args, key.at, literal) };
     }
     const name = intern(op, node);
     const call = replaceNodeMeta(doc.createElement('ir-call'), node, 'foreign-abi', op.kind);

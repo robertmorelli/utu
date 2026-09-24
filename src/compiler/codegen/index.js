@@ -242,7 +242,7 @@ export function emitBinary(doc, { artifacts = null, stringMode = 'lowered', sour
     // and maximum shrink level. utu's niche is compact shipped Wasm; exposing
     // an accidentally unoptimized emission path would make size and performance
     // depend on the caller rather than the language.
-    optimizeForDistribution(m);
+    optimizeForDistribution(m, doc.body.firstChild?.dataset.optimize === 'speed' ? 'speed' : 'size');
 
     // Feature lowerings deliberately install a complete runtime ABI. The full
     // optimizer normally removes it; this explicit sweep pins that behavior for
@@ -262,16 +262,17 @@ export function emitBinary(doc, { artifacts = null, stringMode = 'lowered', sour
   }
 }
 
-function optimizeForDistribution(module) {
+function optimizeForDistribution(module, goal) {
   const previousOptimize = binaryen.getOptimizeLevel();
   const previousShrink = binaryen.getShrinkLevel();
   binaryen.setOptimizeLevel(3);
-  binaryen.setShrinkLevel(2);
+  binaryen.setShrinkLevel(goal === 'speed' ? 0 : 2);
   try {
     module.optimize();
-    // Binaryen's speed-maximal pipeline can retain shapes that a dedicated
+    // -Oz: Binaryen's speed-maximal pipeline can retain shapes that a dedicated
     // -Oz pipeline makes smaller even when shrink level was already 2. Run the
     // compression pipeline to a second fixed point after -O3 has done its work.
+    if (goal === 'speed') return;
     binaryen.setOptimizeLevel(2);
     module.optimize();
   } finally {

@@ -25,9 +25,9 @@ async function test(name, run) {
 }
 const fixtureModule = path.join(ROOT, 'scripts/fixtures/dts/targets.mjs');
 const link = (file, prefix, moduleSpecifier) => linkFiles({ files: [path.join(ROOT, file)], prefix, moduleSpecifier });
-async function compile(source, abis = []) {
+async function compile(source, abis = [], optimize = 'size') {
   const stdlib = new Map([...PLATFORM_SOURCES, ...abis.map(abi => [`std:${abi.prefix}`, async () => ({ source: `mod ${abi.prefix} {}`, abi })])]);
-  const compiler = createCompiler({ parser, target: 'normal', stdlib, debugAssertions: true,
+  const compiler = createCompiler({ parser, target: 'normal', stdlib, optimize, debugAssertions: true,
     readFile: async () => source, resolvePath: (_, relative) => relative });
   const doc = await compiler.compileFile('/dts-test.utu');
   const errors = [...doc.querySelectorAll('[data-error]')].map(n => n.dataset.errorMessage ?? n.dataset.error);
@@ -159,9 +159,26 @@ try {
       let document = Browser.document;
       let div = document.createElement("div"); let input = document.createElement("input"); let span = document.createElement("span");
       div.append(input, span); input.append(span, div); document.body.append(div, input);
-    } }`);
+    } }`, [], 'speed');
     assert.equal((glue.match(/\.append\(|\["append"\]\(/g) ?? []).length, 1, glue);
     assert(doc.querySelectorAll('ir-call[data-foreign-result]').length > 3, 'call sites keep precise declaration types');
+  });
+  await test('-Oz shares one import per host operation shape; -O3 specializes each name', async () => {
+    const source = `using Browser from std:Browser; export lib { fn run() void {
+      let input = Browser.document.createElement("input");
+      input.value = "a"; input.placeholder = "b"; input.title = input.value + input.placeholder;
+    } }`;
+    const glueFor = async optimize => {
+      const compiler = createCompiler({ parser, target: 'normal', optimize, readFile: async () => source, resolvePath: (_, r) => r });
+      const doc = await compiler.compileFile('/modes.utu');
+      assert(!doc.querySelector('[data-error]'), doc.querySelector('[data-error]')?.dataset.errorMessage);
+      const wasm = emitBinary(doc);
+      return glueModuleSource(JSON.parse(doc.body.firstChild.dataset.dslImportsJs), await liveGlueFields(wasm));
+    };
+    const size = await glueFor('size'), speed = await glueFor('speed');
+    assert.match(size, /self\[k\] = value/); assert.doesNotMatch(size, /"placeholder"/);
+    assert.match(speed, /self\["placeholder"\] = value/); assert.match(speed, /self\["value"\] = value/);
+    assert(size.length < speed.length, 'sharing makes the glue smaller');
   });
   await test('dead @es imports never execute', async () => {
     const compiler = createCompiler({ parser, target: 'normal', resolvePath: (_, r) => r,
@@ -184,7 +201,7 @@ try {
       ['/left.utu', 'using Browser |B| from std:Browser; mod left { fn run() Bool { B.isFinite(42.0); } }'],
       ['/right.utu', 'using Browser from std:Browser; mod right { fn run() Bool { Browser.isNaN(0.0 / 0.0); } }'],
     ]);
-    const compiler = createCompiler({ parser, target: 'normal', readFile: async file => files.get(file),
+    const compiler = createCompiler({ parser, target: 'normal', optimize: 'speed', readFile: async file => files.get(file),
       resolvePath: (from, relative) => path.posix.resolve(path.posix.dirname(from), relative) });
     const doc = await compiler.compileFile('/main.utu');
     assert(!doc.querySelector('[data-error]'), doc.querySelector('[data-error]')?.dataset.errorMessage);
@@ -201,8 +218,10 @@ try {
       readFile: async () => 'using Browser from std:Browser; export main() void { Browser.not_a_browser_api(); Browser.document.notAMethod(); }' });
     const doc = await compiler.compileFile('/unknown.utu');
     const messages = [...doc.querySelectorAll('[data-error]')].map(n => n.dataset.errorMessage);
-    assert(messages.includes("Unknown foreign member 'Browser.not_a_browser_api'"), messages.join('\n'));
-    assert(messages.includes("Unknown foreign member 'Browser.Document.notAMethod'"), messages.join('\n'));
+    // Each call-site consequence folds under its unknown member.
+    assert(messages.includes("Unknown foreign member 'Browser.not_a_browser_api' (+1 caused by this)"), messages.join('\n'));
+    assert(messages.includes("Unknown foreign member 'Browser.Document.notAMethod' (+1 caused by this)"), messages.join('\n'));
+    assert.equal(messages.length, 2);
   });
   await test('closures capture host strings without unlowered public GC types', async () => {
     const binaryen = (await import('binaryen')).default;

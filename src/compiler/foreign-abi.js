@@ -472,6 +472,7 @@ export function foreignActual(graph, node) {
     const names = args.map((_, i) => `p${i}`);
     const invocation = `${constructors ? 'new ' : ''}${indexed ? 'self[key]' : m ? m.access : 'self'}(${names.map((n, i) => jsArgument(graph, value.index, abi.bind(value.index, slotOf(i), bindings), args[i], n, params[i])).join(',')})`;
     return save({ kind: 'call', result, expected: params, args: [...receiver, ...args], params: [...receiverTypes, ...params],
+      key: indexed ? undefined : m?.key, root: m?.root, prologue: m?.prologue ?? '',
       body: `${m?.prologue ?? ''}(${[...(indexed ? ['self', 'key'] : receiver.length ? ['self'] : []), ...names].join(',')}) => ${jsOutput(invocation, result, graph.slots.get(node).foreignChecked)}` });
   }
   return null;

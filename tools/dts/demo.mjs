@@ -7,7 +7,8 @@ import { buildBrowserApp } from './build-app.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const outDir = path.join(root, 'dist/browser-board');
-const report = await buildBrowserApp({ entry: path.join(root, 'examples/browser-board/main.utu'), outDir });
+const optimize = process.argv.includes('-O3') ? 'speed' : 'size';
+const report = await buildBrowserApp({ entry: path.join(root, 'examples/browser-board/main.utu'), outDir, optimize });
 for (const file of ['index.html', 'style.css']) {
   await fs.copyFile(path.join(root, 'examples/browser-board', file), path.join(outDir, file));
 }

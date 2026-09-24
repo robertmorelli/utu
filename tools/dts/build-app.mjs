@@ -11,11 +11,11 @@ import { nodePackageResolver } from './packages.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** Package any UTU main as browser Wasm + minimal generated JS, with no app glue. */
-export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser }) {
+export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size' }) {
   const parser = suppliedParser ?? await initParser({ wasmDir: `${ROOT}/` });
   const started = performance.now();
   try {
-    const compiler = createCompiler({ parser, target: 'normal', ...(stdlib ? { stdlib } : {}),
+    const compiler = createCompiler({ parser, target: 'normal', optimize, ...(stdlib ? { stdlib } : {}),
       readFile: file => fs.readFile(file, 'utf8'), resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
       resolvePackage: nodePackageResolver({ root: path.dirname(path.resolve(entry)) }) });
     const doc = await compiler.compileFile(path.resolve(entry));

@@ -31,7 +31,8 @@ async function main() {
   }
 
   const file = path.resolve(process.cwd(), fileArg);
-  const compiler = await makeCompiler(command === 'build-exe' ? 'normal' : 'analysis');
+  const optimize = flags.has('-O3') ? 'speed' : 'size';
+  const compiler = await makeCompiler(command === 'build-exe' ? 'normal' : 'analysis', optimize);
 
   if (command === 'check') {
     await checkFile(compiler, file);
@@ -62,11 +63,12 @@ async function main() {
   usage(1);
 }
 
-async function makeCompiler(target = 'analysis') {
+async function makeCompiler(target = 'analysis', optimize = 'size') {
   const parser = await initParser({ wasmDir: `${ROOT}/` });
   return createCompiler({
     parser,
     target,
+    optimize,
     readFile: (file) => fs.readFile(file, 'utf8'),
     resolvePath: (fromFile, importPath) => path.resolve(path.dirname(fromFile), importPath),
     resolvePackage: lazyPackageResolver(),
@@ -275,7 +277,7 @@ function usage(code) {
   bun cli/utu.mjs display:modules <file.utu> [--noln]
   bun cli/utu.mjs display:exports <file.utu> [--noln]
   bun cli/utu.mjs display:debug <file.utu>
-  bun cli/utu.mjs build-exe <file.utu> [-o out]`);
+  bun cli/utu.mjs build-exe <file.utu> [-o out] [-Oz | -O3]   (-Oz: smallest, default; -O3: fastest)`);
   process.exit(code);
 }
 
