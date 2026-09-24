@@ -101,6 +101,8 @@ function utf8ByteLength(raw) {
 }
 
 function decodeStringLiteral(raw) {
+  // Multiline literals: each line's text after `\\`, joined by newlines.
+  if (/^\s*\\\\/.test(raw)) return raw.split('\n').map(line => line.replace(/^\s*\\\\/, '')).join('\n');
   try {
     return JSON.parse(raw);
   } catch {

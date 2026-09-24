@@ -51,6 +51,12 @@ export function lowerForeignOperations(graph, buildExternFn) {
     if (boxed && contextualType(graph, node) === boxed) {
       plans.push([node, { kind: 'unbox', result: boxed, params: [slot.actual], args: [node], body: `(value) => ${jsOutput('value', boxed)}` }]);
     }
+    // A dynamic host value held in a local or parameter, used where UTU needs a
+    // primitive, is checked and converted where it is used (`name + "!"`).
+    const wanted = node.localName === 'ir-ident' && graph.typeIndex.get(slot.actual ?? '')?.foreignDynamic ? contextualType(graph, node) : null;
+    if (wanted && wanted !== 'void' && !boxed) {
+      plans.push([node, { kind: 'unbox', result: wanted, params: [slot.actual], args: [node], body: `(value) => ${jsOutput('value', wanted, true)}` }]);
+    }
     let op = node.localName === 'ir-assign' ? foreignAssignment(graph, node) : slot.foreign;
     if (!op) continue;
     if (['get', 'index'].includes(op.kind) && node === node.parentElement?.firstElementChild

@@ -16,7 +16,7 @@ import { buildProgramIndex, nodesOf } from './program-index.js';
 import { reportTypeGraphDiagnostics } from './type-graph-diagnostics.js';
 
 const VOID_NODES = new Set([
-  'ir-assign', 'ir-while', 'ir-for', 'ir-return', 'ir-break', 'ir-assert', 'ir-fatal',
+  'ir-assign', 'ir-while', 'ir-for', 'ir-return', 'ir-break', 'ir-assert',
 ]);
 const MEMBER_OPERATIONS = new Map([['ir-index', 'get_index'], ['ir-slice', 'get_slice']]);
 
@@ -136,26 +136,46 @@ export function planContextualRewrites(graph) {
       rewrites.push({ kind: 'closure-context', node: bound, type: expected, edge });
     }
   }
+  // `16 + x * 40` with `x: F64`: an untyped literal operand adopts its sibling's type.
+  for (const binary of nodesOf(graph, 'ir-binary')) {
+    const [left, right] = [...binary.children];
+    for (const [literal, other] of [[left, right], [right, left]]) {
+      if (literal?.localName !== 'ir-lit' || literal.getAttribute('type-name')) continue;
+      const wanted = actual(graph, other);
+      // Adopting the literal's own default is a no-op, and could pin a still-provisional type.
+      if (wanted && wanted !== graph.literalDefaults.get(literal.getAttribute('kind'))
+          && adopters.get(literal.getAttribute('kind'))?.has(wanted)) rewrites.push({ kind: 'literal-type', node: literal, type: wanted });
+    }
+  }
   // `let items = []; items.push(x)`: a member native arrays lack (`push`,
   // `length`, `join`, …) means a JS array.
   for (const access of nodesOf(graph, 'ir-field-access')) {
     const base = access.firstElementChild;
     const declaration = base?.localName === 'ir-ident' ? bindingOf(graph, base) : null;
-    const init = declaration?.localName === 'ir-let' && !declaredTypeStr(declaration) ? declaration.lastElementChild : null;
+    const init = base?.localName === 'ir-array-lit' ? base
+      : declaration?.localName === 'ir-let' && !declaredTypeStr(declaration) ? declaration.lastElementChild : null;
     const native = actual(graph, base);
     if (!isUntypedArray(init) || !native || graph.nativeMember(native, access.getAttribute('field'))) continue;
-    const host = hostArrayType(graph);
+    const host = hostArrayType(graph, arrayElementType(init, child => actual(graph, child)));
     if (host) rewrites.push({ kind: 'array-type', node: init, type: host });
   }
   return rewrites;
 }
 
-/** The host `Array<any>` type, when declarations that include it are loaded. */
-function hostArrayType(graph) {
+/**
+ * The host `Array<T>` type for a literal becoming a JS array, when declarations
+ * that include it are loaded. Primitive and host elements keep their type
+ * (`["a", "b"]` is `Str[]`); anything else is `any[]`.
+ */
+function hostArrayType(graph, element = null) {
   const abi = graph.doc.__utuForeign;
   for (const [index, schema] of abi?.schemas.entries() ?? []) {
     const ref = Object.hasOwn(schema.names, 'Array') ? schema.names.Array : schema.types.findIndex(type => type?.lib === 'Array');
-    if (ref !== -1) return abi.type(index, abi.written(index, ref), graph);
+    if (ref === -1) continue;
+    const foreign = element && abi.values.get(element);
+    const argument = ['Str', 'F64', 'Bool'].includes(element) ? element
+      : foreign ? foreign.index === index ? foreign.ref : { external: foreign } : 'any';
+    return abi.type(index, { template: ref, arguments: [argument] }, graph);
   }
   return null;
 }
@@ -269,6 +289,12 @@ export function checkTypeGraph(graph) {
 }
 
 export const actualType = (graph, node) => actual(graph, node);
+/** The type a declaration binds its name to (a `promote` binds the unwrapped value, not its own result). */
+export function declarationType(graph, decl) {
+  if (decl?.localName === 'ir-promote') return unwrapNullable(actual(graph, decl.firstElementChild) ?? '') || null;
+  if (decl?.localName === 'ir-alt-arm') return decl.getAttribute('variant');
+  return actual(graph, decl);
+}
 /** Compatibility-only query for projected DOM IR without a retained graph. */
 export const projectedActualType = node => node?.dataset?.typeName ?? null;
 export const expectedTypes = (graph, node) =>
@@ -325,6 +351,12 @@ function setActual(graph, node, type, source) {
 }
 
 function rule(graph, node, deps, read, source) {
+  // An assigned value may take its type from the assignment target's declared
+  // slot (a host property), so it is re-read when the target resolves.
+  const assignment = node.parentElement?.localName === 'ir-assign' && node.parentElement.lastElementChild === node ? node.parentElement : null;
+  if (assignment) deps = [...deps, assignment.firstElementChild];
+  // An operand may take its type from the other operand (`item.price * 2`).
+  if (node.parentElement?.localName === 'ir-binary') deps = [...deps, ...[...node.parentElement.children].filter(c => c !== node)];
   const value = { node, deps: deps.filter(Boolean), read, source };
   graph.rules.push(value);
   graph.slots.get(node).rule = value;
@@ -385,7 +417,7 @@ function addActualRule(graph, node) {
     case 'ir-unary':
       return rule(graph, node, [one], () => operatorResult(graph, node, read(one), UNARY_OP_FN), 'operator');
     case 'ir-binary':
-      return rule(graph, node, children, () => operatorResult(graph, node, read(one), BINARY_OP_FN), 'operator');
+      return rule(graph, node, children, () => foreignActual(graph, node) ?? operatorResult(graph, node, read(one), BINARY_OP_FN), 'operator');
     case 'ir-if': {
       const then = children[1];
       const otherwise = children[2];
@@ -406,6 +438,9 @@ function addActualRule(graph, node) {
     }
     case 'ir-else':
       return rule(graph, node, [one], () => read(one) && unwrapNullable(read(one)), 'unwrap-nullable');
+    case 'ir-fatal':
+      // Never returns, so it fits any context: `lookup(id) orelse fatal`.
+      return fixed('never', 'fatal');
     case 'ir-call': {
       const callee = node.firstElementChild;
       return rule(graph, node, [...children, callee?.firstElementChild, ...node.querySelector(':scope > ir-arg-list')?.children ?? []], () => callResult(graph, node), 'return-of');
@@ -773,6 +808,11 @@ function addExpectations(graph, node) {
     expect(graph, node.firstElementChild, () => 'nullable', 'promote', node, 'nullable',
       () => 'promote requires a nullable value');
   }
+  if (tag === 'ir-for-source') {
+    // Both bounds of a range share one integer type.
+    const [start, end] = [...node.children];
+    expect(graph, end, () => actual(graph, start), 'range', start, 'assign', () => 'range bounds must have the same type');
+  }
   if (tag === 'ir-else') {
     const [value, fallback] = [...node.children];
     expect(graph, value, () => 'nullable', 'orelse', node, 'nullable', () => 'orelse requires a nullable value');
@@ -955,7 +995,7 @@ function collectFailures(graph) {
 
 function knownType(graph, type) {
   const name = unwrapNullable(type);
-  if (name === '&' || name === 'nullable' || name === 'unknown') return true;
+  if (name === '&' || name === 'nullable' || name === 'unknown' || name === 'never') return true;
   const callable = callableParts(name);
   if (callable) return [...callable.params, callable.ret]
     .every(part => part === 'void' || knownType(graph, part));

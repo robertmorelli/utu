@@ -46,6 +46,7 @@ jobs:
         run: |
           node scripts/test-dts-portability.mjs
           node scripts/test-dts-browser.mjs
+          node scripts/test-browser-pantry.mjs
       - name: Save measured output and screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,3 +55,4 @@ jobs:
           path: |
             dist/browser-board/sizes.json
             dist/browser-board/*.png
+            dist/browser-pantry/*.png

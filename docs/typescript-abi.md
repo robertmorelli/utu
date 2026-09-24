@@ -47,7 +47,9 @@ both calling and construction. A constructor-only value can also be called
 directly, such as `Package.Counter(2.0)`.
 
 The [browser task board](../examples/browser-board/main.utu) uses this interface
-for DOM construction, events, JSON, arrays, and persistent storage. It contains
+for DOM construction, events, JSON, arrays, and persistent storage. The
+[Pantry dashboard](../examples/browser-pantry/README.md) exercises much more of
+the platform and lists the friction it found. It contains
 no `@es`, application JavaScript, or helper modules.
 
 ## Writing against declarations
@@ -90,6 +92,21 @@ nullable.
 Native UTU members take precedence on `Str` and `F64` (`s.len()` and
 `s.slice(0, 4)` use `I32`). Declared `String`/`Number` members are used only for
 names UTU does not define, and only when an ABI declaring them is imported.
+
+A generic parameter that only the result mentions takes the expected type,
+within its constraint, as in TypeScript:
+`let input: ?Browser.HTMLInputElement = document.querySelector("#search")`.
+Host values compare by identity with `==` and `!=` (JavaScript's `===`).
+Declared interfaces are structural: a `Set` is an `Iterable`.
+
+Dynamic values (`any`, parsed JSON) follow JavaScript where UTU needs a
+primitive: arithmetic and orderings between two dynamic values are numeric,
+`+` takes its context, a dynamic value reaching a `Str`, `F64`, or `Bool`
+position (or a union's primitive member) is converted with a `typeof` check,
+and a UTU-only method such as `json.length.to_i32()` reads its receiver as that
+primitive. `any` absorbs unions (`any | undefined` is `any`), and a dynamic
+value is nullable as the subject of `promote` or `orelse`. A closure passed to
+a dynamic slot receives dynamic arguments.
 
 ## Identity and inference
 

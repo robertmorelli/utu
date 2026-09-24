@@ -1,0 +1,10 @@
+[
+  { "id": "apple", "name": "Honeycrisp apples", "category": "Produce", "price": 1.25, "quantity": 12 },
+  { "id": "milk", "name": "Oat milk", "category": "Dairy", "price": 3.49, "quantity": 2 },
+  { "id": "bread", "name": "Sourdough loaf", "category": "Bakery", "price": 6.5, "quantity": 1 },
+  { "id": "rice", "name": "Basmati rice", "category": "Pantry", "price": 8.99, "quantity": 3 },
+  { "id": "yogurt", "name": "Greek yogurt", "category": "Dairy", "price": 4.29, "quantity": 4 },
+  { "id": "spinach", "name": "Baby spinach", "category": "Produce", "price": 2.99, "quantity": 1 },
+  { "id": "oats", "name": "Rolled oats", "category": "Pantry", "price": 4.75, "quantity": 2 },
+  { "id": "bagel", "name": "Sesame bagels", "category": "Bakery", "price": 5.25, "quantity": 6 }
+]

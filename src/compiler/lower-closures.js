@@ -27,7 +27,7 @@
 // and before the type registry is finalised, since it introduces new structs.
 
 import { bodyOf, createSyntheticNode, firstTypeChild, replaceTypedNode, typeNodeToStr } from './ir-helpers.js';
-import { actualType, planCoercions } from './type-graph.js';
+import { declarationType, planCoercions } from './type-graph.js';
 import { callableParts } from './type-rules.js';
 import { T } from './ir-tags.js';
 import { retainedGraphs } from './graph-store.js';
@@ -110,7 +110,7 @@ function liftClosure(closure, root, index, typeIndex, graph, scopeGraph) {
 
 function readCaptures(closure, typeIndex, graph, scopeGraph) {
   return [...(scopeGraph?.captures.get(closure.id) ?? [])].map(([name, decl]) => {
-    const type = actualType(graph, decl) ?? 'unknown';
+    const type = declarationType(graph, decl) ?? 'unknown';
     // Value types live on the wasm stack, so capturing one necessarily copies
     // it. Which types those are comes from the registry, not a list here — a
     // scalar added to the stdlib would otherwise be silently misclassified as

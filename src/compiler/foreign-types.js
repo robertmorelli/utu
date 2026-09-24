@@ -36,6 +36,8 @@ export class ForeignABI {
     if (ref?.keys !== undefined) return 'Str';
     const desc = this.describe(index, ref);
     if (desc.union) {
+      // `any` absorbs a union, as in TypeScript: `any | undefined` is `any`.
+      if (desc.union.some(r => ['any', 'unknown'].includes(this.resolve(index, r)))) return this.type(index, 'any', graph);
       const members = desc.union.filter(r => r !== 'never');
       // `null` and `undefined` are both absence; boundary results normalize to null.
       const present = members.filter(r => r !== 'null' && r !== 'undefined');
@@ -70,7 +72,7 @@ export class ForeignABI {
       const repr = createSyntheticNode(doc, 'ir-wasm-ref', site, 'foreign-abi', 'foreign-representation');
       repr.setAttribute('type-repr', 'wasm-externref'); decl.appendChild(repr);
       entry = { typeName: name, typeRepr: 'wasm-externref', kind: 'wasm-ref', refBinaryen: 'externref', decl,
-        foreign: this.values.get(name), fields: [] };
+        foreign: this.values.get(name), fields: [], abi: this };
       this.entries.set(name, entry);
       const ref = entry.foreign.ref;
       if (ref?.template !== undefined && /^Promise(?:<|$)/.test(this.describe(entry.foreign.index, ref.template).name ?? '')) {
@@ -129,6 +131,36 @@ export class ForeignABI {
     if (Array.isArray(ref)) return ref.map(r => this.canonical(index, r));
     return Object.fromEntries(Object.entries(ref).map(([k, v]) => [k, k === 'bindings'
       ? Object.fromEntries(Object.entries(v).map(([p, r]) => [p, this.canonical(index, r)])) : this.canonical(index, v)]));
+  }
+  /**
+   * Declared interfaces are structural, as in TypeScript: a value whose type
+   * has every required member of an interface satisfies it (`Set` is an
+   * `Iterable`). Member names are compared; their types come from the source.
+   */
+  structurally(source, target) {
+    const key = `${source}\0${target}`;
+    this.structural ??= new Map();
+    if (this.structural.has(key)) return this.structural.get(key);
+    this.structural.set(key, false);
+    const from = this.values.get(source), to = this.values.get(target);
+    const wanted = to && this.describe(to.index, to.ref);
+    const required = Object.entries(wanted?.properties ?? {}).filter(([, prop]) => !prop.optional).map(([name]) => name);
+    let result = false;
+    if (from && wanted && !wanted.union && !wanted.dynamic && required.length && !wanted.calls?.length && !wanted.constructors?.length) {
+      const members = new Set(), seen = new Set(), pending = [from];
+      while (pending.length) {
+        const next = pending.pop();
+        const desc = this.describe(next.index, next.ref);
+        const id = JSON.stringify(this.canonical(next.index, next.ref));
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const name of Object.keys(desc.properties ?? {})) members.add(name);
+        for (const base of desc.bases ?? []) pending.push({ index: next.index, ref: base });
+      }
+      result = required.every(name => members.has(name));
+    }
+    this.structural.set(key, result);
+    return result;
   }
   /** A readable declaration type with its generic arguments, such as `Map<Str, F64>` or `Str[]`. */
   display(index, ref, depth = 0) {

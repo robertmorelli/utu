@@ -70,7 +70,7 @@ export function assertRefBinaryenName(name) {
 export function makeTypeMapper(structTypes) {
   return function toType(typeStr) {
     if (!typeStr) return binaryen.none;
-    if (typeStr === 'void') return binaryen.none;
+    if (typeStr === 'void' || typeStr === 'never') return binaryen.none;
 
     // Nullable prefix: "?Foo" — strip and use the nullable ref form.
     let nullable = false;

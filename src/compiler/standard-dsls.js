@@ -1,3 +1,4 @@
+import { callableParts } from './type-strings.js';
 import { DOMParser } from 'linkedom/worker';
 import { parseToIR } from './parse.js';
 import { T } from './ir-tags.js';
@@ -162,6 +163,12 @@ export function buildTypeRef(doc, site, type) {
     return nullable;
   }
   if (type === 'void') return createSyntheticNode(doc, T.TYPE_VOID, site, 'expand-dsls', 'dsl-es-type');
+  const callable = callableParts(type);
+  if (callable) {
+    const node = createSyntheticNode(doc, callable.kind === 'cl' ? T.TYPE_CL : T.TYPE_FN, site, 'expand-dsls', 'dsl-es-type');
+    for (const part of [...callable.params, callable.ret]) node.appendChild(buildTypeRef(doc, site, part));
+    return node;
+  }
   const node = createSyntheticNode(doc, T.TYPE_REF, site, 'expand-dsls', 'dsl-es-type');
   node.setAttribute('name', type);
   return node;

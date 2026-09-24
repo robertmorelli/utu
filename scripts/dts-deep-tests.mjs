@@ -489,6 +489,40 @@ try {
     assert.equal(instance.exports.counted(), 1);
     assert.equal(instance.exports.nested(), 'outer caught');
   });
+  await test('web friction: dynamic JSON arithmetic, host equality, structural iterables and contextual returns', async () => {
+    const exports = await runBrowser(`
+      fn total() F64 {
+        let text =
+          \\\\[{"price": 2, "n": 3}, {"price": 1.5, "n": 2}]
+        ;
+        let items = Browser.JSON.parse(text);
+        items.sort(cl(a, b) F64 { if a.price > b.price { a.price - b.price; } else { b.n - a.n; }; });
+        items.reduce(cl(sum, item) F64 { sum + item.price * item.n; }, 0);
+      }
+      fn count() I32 { let ids = Browser.JSON.parse("[4,5,6]"); let t = 0; for (0..<ids.length.to_i32()) |i| { t += i; }; t; }
+      fn same() Bool { let a = new Browser.EventTarget(); let b = a; a == b and a != new Browser.EventTarget(); }
+      fn from_set() Str { let s = new Browser.Set(); s.add("x"); s.add("y"); Browser.Array.from(s).join(""); }
+      fn chips() Str { let out = []; ["a", "b"].forEach(cl(name) void { out.push(name + "!"); }); out.join(","); }
+      fn dataset() Str {
+        let text =
+          \\\\{"id": "z"}
+        ;
+        let item = Browser.JSON.parse(text);
+        let map = new Browser.Map();
+        map.set("k", item.id);
+        map.get("k");
+      }
+    `);
+    assert.equal(exports.total(), 9); assert.equal(exports.count(), 3); assert.equal(exports.same(), 1);
+    assert.equal(exports.from_set(), 'xy'); assert.equal(exports.chips(), 'a!,b!'); assert.equal(exports.dataset(), 'z');
+    const typed = await compile(`using Browser from std:Browser; export main() void {
+      let input: ?Browser.HTMLInputElement = Browser.document.querySelector("#q");
+      promote input { |i| => i.value = "x", ~> {}, };
+      let wrong: ?Browser.Date = Browser.document.querySelector("#q");
+    }`);
+    const messages = [...typed.querySelectorAll('[data-error]')].map(n => n.dataset.errorMessage);
+    assert.deepEqual(messages, ['Type mismatch: expected ?Browser.Date, got ?Browser.Element']);
+  });
   await test('closures whose first parameter is `this` receive the JS receiver', async () => {
     const { exports } = await run(`
       fn label() Str { Fixture.arbitrary(cl(this, first) Str { this.label; }); }

@@ -11,6 +11,9 @@ export function unifyTypes(a, b) {
   if (!a) return b ?? null;
   if (!b) return a;
   if (a === b) return a;
+  // `never` (a branch that cannot return) takes the other branch's type.
+  if (a === 'never') return b;
+  if (b === 'never') return a;
   // A bare null branch adopts the nullable form of the other branch. This is
   // what lets `if flag { value } else { null }` infer `?T` without requiring
   // the legacy `T.null` spelling.
@@ -28,7 +31,7 @@ function sameSignature(a, b) {
 }
 
 export function isAssignable(actual, expected, ctx = {}) {
-  if (actual === expected) return true;
+  if (actual === expected || actual === 'never') return true;
   if (isNullable(expected) && actual === unwrapNullable(expected)) return true;
   if (actual === 'null' && isNullable(expected)) return true;
 
@@ -56,6 +59,7 @@ export function isAssignable(actual, expected, ctx = {}) {
     if (source?.foreignTemplate && source.foreignTemplate === target.foreignTemplate
       && target.foreignArguments.every((arg, i) => arg === source.foreignArguments[i]
         || ctx.typeIndex.get(unwrapNullable(arg))?.foreignDynamic)) return true;
+    if (source?.foreign && target.abi?.structurally(unwrapNullable(actual), unwrapNullable(expected))) return true;
     if (target.foreignUnion?.some(member => member !== unwrapNullable(expected)
       && isAssignable(unwrapNullable(actual), member, ctx))) return true;
   }

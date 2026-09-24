@@ -133,10 +133,12 @@ function walkScoped(node, parent, graph, binding, declaration) {
 function walkNode(node, scope, graph) {
   switch (node.localName) {
     case 'ir-let': {
-      // Walk the init expression first (RHS can't see the name being bound)
+      // Walk the init expression first (RHS can't see the name being bound),
+      // except a closure, which may call itself: `let tick = cl() { … tick … }`.
       const init = node.lastElementChild;
+      if (init?.localName === 'ir-closure') declare(graph, scope, node.getAttribute('name'), node);
       if (init) walkNode(init, scope, graph);
-      declare(graph, scope, node.getAttribute('name'), node);
+      if (init?.localName !== 'ir-closure') declare(graph, scope, node.getAttribute('name'), node);
       return;
     }
     case 'ir-ident': {

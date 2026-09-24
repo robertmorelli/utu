@@ -46,12 +46,18 @@ export function boxMutatedCaptures(doc, scopeGraph, typeGraph) {
     closures.some(c => c.contains(write) && !c.contains(decl))
     || order.get(write) > order.get(closure)
     || sharedLoop(closure, write, decl));
-  const boxed = [...captures.keys()].filter(decl => (writes.get(decl) ?? []).some(write => afterCapture(decl, write)));
+  const recursive = decl => decl.localName === 'ir-let' && decl.lastElementChild?.localName === 'ir-closure'
+    && [...captures.get(decl)].some(closure => decl.contains(closure));
+  const boxed = [...captures.keys()].filter(decl => recursive(decl) || (writes.get(decl) ?? []).some(write => afterCapture(decl, write)));
 
   const cells = new Map();
   for (const decl of boxed) {
     const type = typeGraph.slots.get(decl)?.actual;
     if (!type || type === 'void' || type === 'unknown') continue;
+    if (recursive(decl)) {
+      boxRecursiveClosure(doc, root, cells, decl, type, references.get(decl));
+      continue;
+    }
     const cell = cellType(doc, root, cells, type, decl);
     const name = decl.localName === 'ir-let' ? decl.getAttribute('name') : boxParameter(doc, decl, cell);
     if (decl.localName === 'ir-let') {
@@ -71,6 +77,43 @@ export function boxMutatedCaptures(doc, scopeGraph, typeGraph) {
     }
   }
   return cells.size > 0;
+}
+
+/**
+ * `let tick = cl() { … tick … }` captures `tick` before it exists. The cell
+ * starts empty, receives the closure right after, and every read asserts the
+ * closure is present:
+ *   let tick = Cell { value: null }; tick.value = cl() { … tick.value! … };
+ */
+function boxRecursiveClosure(doc, root, cells, decl, type, references) {
+  const cell = cellType(doc, root, cells, `?${type}`, decl);
+  const closure = decl.lastElementChild;
+  const empty = createSyntheticNode(doc, 'ir-lit', decl, 'box-captures', 'cell-empty');
+  empty.setAttribute('kind', 'null');
+  empty.setAttribute('value', 'null');
+  if (decl.children.length > 1) decl.firstElementChild.replaceWith(buildTypeRef(doc, decl, cell));
+  const init = cellInit(doc, decl, cell, null);
+  closure.replaceWith(init);
+  init.firstElementChild.appendChild(empty);
+  const store = createSyntheticNode(doc, 'ir-assign', decl, 'box-captures', 'cell-store');
+  store.setAttribute('op', '=');
+  store.append(cellValue(doc, decl, decl.getAttribute('name')), closure);
+  decl.after(store);
+  for (const ident of references) {
+    const present = createSyntheticNode(doc, 'ir-ref-cast', ident, 'box-captures', 'cell-present');
+    present.setAttribute('type-name', type);
+    ident.replaceWith(present);
+    present.appendChild(cellValue(doc, ident, decl.getAttribute('name')));
+  }
+}
+
+function cellValue(doc, site, name) {
+  const field = createSyntheticNode(doc, 'ir-field-access', site, 'box-captures', 'cell-value');
+  field.setAttribute('field', 'value');
+  const ref = createSyntheticNode(doc, 'ir-ident', site, 'box-captures', 'cell-ref');
+  ref.setAttribute('name', name);
+  field.appendChild(ref);
+  return field;
 }
 
 /** A loop that encloses both, but not the declaration, runs the write after a capture. */

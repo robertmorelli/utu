@@ -163,7 +163,7 @@
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "bindings:browser": "node ./tools/dts/cli.mjs --browser",
-    "test:bindings": "node ./scripts/dts-abi-tests.mjs && node ./scripts/dts-deep-tests.mjs && node ./scripts/test-dts-portability.mjs && node ./scripts/test-dts-browser.mjs",
+    "test:bindings": "node ./scripts/dts-abi-tests.mjs && node ./scripts/dts-deep-tests.mjs && node ./scripts/test-dts-portability.mjs && node ./scripts/test-dts-browser.mjs && node ./scripts/test-browser-pantry.mjs",
     "bench:js-arrays": "node ./scripts/benchmark-js-arrays.mjs",
     "demo:build": "node ./tools/dts/demo.mjs",
     "demo:serve": "node ./tools/dts/demo.mjs --serve",

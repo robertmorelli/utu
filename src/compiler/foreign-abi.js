@@ -45,15 +45,36 @@ export function contextualType(graph, node) {
     if (type && primitive.has(type)) return type;
   }
   const parent = node.parentElement;
+  // `json.length.to_i32()`: a UTU method JS values lack reads the receiver as that primitive.
+  if (parent?.localName === 'ir-field-access' && parent.firstElementChild === node) {
+    const member = parent.getAttribute('field');
+    const native = ['F64', 'Str', 'Bool'].find(owner => graph.nativeMember?.(owner, member));
+    if (native) return native;
+  }
+  // The value of `target.prop = value` reads the declared slot directly: the
+  // expectation edge is not a dependency, so it may not be known yet.
+  if (parent?.localName === 'ir-assign' && parent.lastElementChild === node) {
+    const getter = graph.slots.get(parent.firstElementChild)?.foreign;
+    if (getter?.index !== undefined && ['get', 'index'].includes(getter.kind)) {
+      const type = unwrapNullable(accept(graph, getter.index, getter.prop?.type ?? 'any', node));
+      if (primitive.has(type) && type !== 'void') return type;
+    }
+  }
   if (parent?.localName === 'ir-binary') {
     const other = node === parent.firstElementChild ? parent.lastElementChild : parent.firstElementChild;
     const type = graph.slots.get(other)?.actual;
-    if (primitive.has(type)) return type;
+    if (primitive.has(type) && type !== 'void') return type;
+    // Two dynamic operands follow JavaScript: `-` `*` `/` `%` and orderings are
+    // numeric; `+` takes the surrounding context, else is numeric too.
+    const op = parent.getAttribute('op');
+    if (!graph.typeIndex.get(type ?? '')?.foreignDynamic || ['==', '!=', 'and', 'or', 'xor'].includes(op)) return null;
+    return op === '+' ? contextualType(graph, parent) ?? 'F64' : 'F64';
   }
   if (parent && (['ir-promote-arm', 'ir-default-arm', 'ir-match-arm', 'ir-alt-arm'].includes(parent.localName)
       || parent.localName === 'ir-block' && parent.lastElementChild === node)) return contextualType(graph, parent);
   // Arms share the construct's context; its subject does not.
-  if (parent && ['ir-promote', 'ir-match', 'ir-alt'].includes(parent.localName) && node !== parent.firstElementChild) return contextualType(graph, parent);
+  if (parent && ['ir-promote', 'ir-match', 'ir-alt', 'ir-if', 'ir-try'].includes(parent.localName)
+      && (node !== parent.firstElementChild || parent.localName === 'ir-try')) return contextualType(graph, parent);
   return null;
 }
 /**
@@ -61,6 +82,13 @@ export function contextualType(graph, node) {
  * for; the boundary checks the host value's `typeof` before converting.
  */
 function resultType(graph, index, ref, node) {
+  const type = contextualResult(graph, index, ref, node);
+  // A dynamic value may be absent: as `promote`'s or `orelse`'s subject it is nullable.
+  const parent = node.parentElement;
+  const subject = parent?.firstElementChild === node && ['ir-promote', 'ir-else'].includes(parent.localName);
+  return subject && graph.typeIndex.get(type)?.foreignDynamic ? `?${type}` : type;
+}
+function contextualResult(graph, index, ref, node) {
   const abi = graph.doc.__utuForeign;
   ref = abi.resolve(index, ref);
   const slot = graph.slots.get(node);
@@ -70,6 +98,12 @@ function resultType(graph, index, ref, node) {
     return wanted ?? abi.type(index, 'any', graph);
   }
   const type = abi.type(index, ref, graph);
+  // A union `any` absorbed (`V | undefined` with V = any) is dynamic too.
+  if (graph.typeIndex.get(type)?.foreignDynamic) {
+    const wanted = contextualType(graph, node);
+    if (wanted && wanted !== 'void') { slot.foreignChecked = true; return wanted; }
+    return type;
+  }
   const union = abi.describe(index, ref).union;
   const wanted = union && !type.startsWith('?') && contextualType(graph, node);
   if (wanted && wanted !== 'void' && union.some(member => abi.type(index, member) === wanted)) {
@@ -164,6 +198,29 @@ function unify(graph, index, ref, arg, bindings) {
   }
 }
 
+/**
+ * A type parameter only the result mentions takes the type its context expects,
+ * as in TypeScript: `let input: ?Browser.HTMLInputElement = document.querySelector("#q")`
+ * binds `querySelector<E extends Element>`'s E. The constraint still applies.
+ */
+function bindFromContext(graph, index, ref, node, bindings) {
+  const abi = graph.doc.__utuForeign;
+  const resolved = abi.resolve(index, ref);
+  const parameters = resolved?.parameter !== undefined ? [resolved]
+    : abi.describe(index, resolved ?? 'any').union?.filter(member => member?.parameter !== undefined) ?? [];
+  const open = parameters.filter(parameter => !Object.hasOwn(bindings, parameter.parameter));
+  if (!open.length) return;
+  const expected = (graph.slots.get(node)?.expected ?? []).map(edge => edge.read()).filter(Boolean)
+    .map(type => type.replace(/^\?/, '')).find(type => graph.typeIndex.get(type)?.foreign);
+  if (!expected) return;
+  for (const parameter of open) {
+    const constraint = abi.resolve(index, abi.bind(index, parameter.constraint ?? 'any', bindings));
+    if (dynamicRefs.has(constraint) || isAssignable(expected, abi.type(index, constraint, graph), { typeIndex: graph.typeIndex })) {
+      bindings[parameter.parameter] = argumentRef(abi, index, expected);
+    }
+  }
+}
+
 /** A JS callback type: arity follows the UTU closure because JS ignores extra arguments. */
 function callbackType(graph, index, ref, arg) {
   const abi = graph.doc.__utuForeign;
@@ -215,6 +272,12 @@ export function accept(graph, index, ref, arg, bindings = {}) {
     if (type === 'null') return `?${abi.type(index, 'any', graph)}`;
     // An array literal given to JS becomes a JS array, never an opaque Wasm array.
     if (untypedArray(graph, arg)) return abi.type(index, 'any', graph);
+    // A closure given to a dynamic slot receives dynamic arguments, as in TypeScript.
+    const closure = closureOf(graph, arg);
+    if (closure) {
+      const params = paramsOf(closure).map(param => param.firstElementChild ? graph.slots.get(param)?.actual ?? 'unknown' : abi.type(index, 'any', graph));
+      return `cl(${params.join(', ')}) ${callableParts(type)?.ret ?? 'void'}`;
+    }
     return type && type !== 'unknown' && !/\bunknown\b/.test(type) ? type : abi.type(index, 'any', graph);
   }
   const desc = abi.describe(index, ref);
@@ -231,11 +294,14 @@ export function accept(graph, index, ref, arg, bindings = {}) {
         return !d.calls?.length && [...arg.children].every(f => Object.hasOwn(d.properties ?? {}, f.getAttribute('field')) || d.dynamic || d.indexes?.length);
       }) : null;
     if (pick !== undefined && pick !== null) return wrap(accept(graph, index, pick, arg, bindings));
-    // An untyped integer literal adopts a numeric member (`offset(8)` for `number | Options`).
+    // An untyped integer literal adopts a numeric member (`offset(8)` for `number | Options`);
+    // a dynamic value meets a primitive member and is checked where it is read.
     const intLiteral = arg?.localName === 'ir-lit' && arg.getAttribute('kind') === 'int' && !arg.getAttribute('type-name');
+    const dynamic = graph.typeIndex.get((type ?? '').replace(/^\?/, ''))?.foreignDynamic;
     for (const member of members) {
       const t = wrap(accept(graph, index, member, arg, bindings));
       if (intLiteral && unwrapNullable(t) === 'F64') return t;
+      if (dynamic && primitive.has(unwrapNullable(t)) && t !== 'void') return unwrapNullable(t);
       if (type && isAssignable(type, t, ctx)) return type;
     }
     if (members.length === 1) return wrap(accept(graph, index, members[0], arg, bindings));
@@ -291,6 +357,15 @@ export function foreignActual(graph, node) {
     }
     return save({ kind: 'object', result: name, params, args,
       body: `(${params.map((_, i) => `p${i}`).join(',')}) => ({${fields.map((f, i) => `[${json(f.getAttribute('field'))}]:${jsArgument(graph, value.index, slots[i], args[i], `p${i}`, params[i])}`).join(',')}})` });
+  }
+  if (node.localName === 'ir-binary' && ['==', '!='].includes(node.getAttribute('op'))) {
+    // Host references compare by identity, like JavaScript's `===`.
+    const [left, right] = [...node.children];
+    const host = side => graph.typeIndex.get((read(side) ?? '').replace(/^\?/, ''))?.foreign || read(side) === 'null';
+    if (!host(left) || !host(right) || read(left) === 'null' && read(right) === 'null') return null;
+    const same = node.getAttribute('op') === '==' ? '===' : '!==';
+    return save({ kind: 'call', result: 'Bool', expected: [read(left), read(right)], params: [read(left), read(right)], args: [left, right],
+      body: `(a,b) => ${jsOutput(`a ${same} b`, 'Bool')}` });
   }
   if (node.localName === 'ir-array-lit') {
     const name = node.getAttribute('type-name');
@@ -390,6 +465,7 @@ export function foreignActual(graph, node) {
     const bindings = {};
     args.forEach((arg, i) => unify(graph, value.index, slotOf(i), arg, bindings));
     const params = args.map((arg, i) => accept(graph, value.index, slotOf(i), arg, bindings));
+    bindFromContext(graph, value.index, sig?.result, node, bindings);
     const result = resultType(graph, value.index, abi.bind(value.index, sig?.result ?? 'any', bindings), node);
     const receiver = indexed ? indexed.args : m ? m.root ? [] : [m.base] : [callee];
     const receiverTypes = indexed ? indexed.params : m ? m.root ? [] : [m.owner] : [read(callee)];

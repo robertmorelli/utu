@@ -784,6 +784,41 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(e.empty(), 0); assertEq(e.from_use(), 2.5);
   });
 
+  test('codegen: recursive closures, captured promote bindings, orelse fatal and loop bodies with values', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'web_friction.utu', source: `
+      struct P:
+        | v: I32
+      fn find(ok: Bool) ?P { if ok { P { v: 7 }; } else { null; }; }
+      fn keep(p: P) P { p; }
+      export lib {
+        fn factorial(n: I32) I32 { let fact = cl(k: I32) I32 { if k <= 1 { 1; } else { k * fact(k - 1); }; }; fact(n); }
+        fn countdown() I32 { let calls = 0; let tick = cl(k: I32) void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
+        fn captured() I32 { promote find(true) { |p| => { let read = cl() I32 { p.v; }; read(); }, ~> 0, }; }
+        fn required() I32 { let p = find(true) orelse fatal; p.v; }
+        fn scaled(i: I32) F64 { let y = 16 + i.to_f64() * 40; y + 14; }
+        fn loop_values() I32 { let last = P { v: 0 }; for (0..<3) |i| { keep(last); }; while (last.v < 2) { last.v += 1; keep(last); }; last.v; }
+      }
+    ` });
+    const e = instance.exports;
+    assertEq(e.factorial(5), 120); assertEq(e.countdown(), 5); assertEq(e.captured(), 7);
+    assertEq(e.required(), 7); assertEq(e.scaled(2), 110); assertEq(e.loop_values(), 2);
+  });
+
+  test('codegen: multiline string literals drop their line markers', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'multiline_strings.utu', source: [
+      'export lib {',
+      '  fn text() Str {',
+      '    let s =',
+      '      \\\\{"quoted": true}',
+      '      \\\\second line',
+      '    ;',
+      '    s;',
+      '  }',
+      '}',
+    ].join('\n') });
+    assertEq(instance.exports.text(), '{"quoted": true}\nsecond line');
+  });
+
   test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {
     const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pantry</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <div>
+        <p class="eyebrow">UTU / WEB PLATFORM</p>
+        <h1>Pantry</h1>
+      </div>
+      <p class="total"><span id="total-value">$0.00</span> on hand</p>
+    </header>
+    <section class="controls">
+      <input id="search" type="search" placeholder="Search items  ( / )" aria-label="Search items">
+      <select id="sort" aria-label="Sort items">
+        <option value="name">Name</option>
+        <option value="price">Price</option>
+        <option value="quantity">Quantity</option>
+      </select>
+    </section>
+    <nav id="chips" class="chips" aria-label="Categories"></nav>
+    <section class="layout">
+      <ul id="items" class="items" aria-live="polite"></ul>
+      <aside class="side">
+        <canvas id="chart" width="320" height="180" aria-label="Items per category"></canvas>
+        <form id="add" class="add" novalidate>
+          <input name="name" placeholder="Item name" required minlength="2" aria-label="Item name">
+          <input name="price" type="number" min="0" step="0.01" placeholder="Price" required aria-label="Price">
+          <select name="category" aria-label="Category">
+            <option>Produce</option><option>Dairy</option><option>Bakery</option><option>Pantry</option>
+          </select>
+          <button type="submit">Add item</button>
+          <p id="form-error" class="error" role="alert"></p>
+        </form>
+      </aside>
+    </section>
+    <footer id="status" class="status"></footer>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

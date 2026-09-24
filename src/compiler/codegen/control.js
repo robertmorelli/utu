@@ -75,6 +75,12 @@ export function emitCaught(m) {
   return binaryen._BinaryenPop(m.ptr, binaryen.externref);
 }
 
+/** A loop body is a statement: whatever value its last expression has is dropped. */
+function discardValue(m, expr) {
+  const type = binaryen.getExpressionType(expr);
+  return type === binaryen.none || type === binaryen.unreachable ? expr : m.drop(expr);
+}
+
 // ── while ───────────────────────────────────────────────────────────────────
 //
 // IR:  <ir-while><cond/><body/></ir-while>
@@ -96,7 +102,7 @@ export function emitWhile(node, ctx, emitExpr) {
   ctx.loops.push({ brk, cnt });
   try {
     const exitIfFalse = m.br(brk, m.i32.eqz(emitExpr(cond, ctx)));
-    const bodyExpr    = emitExpr(body, ctx);
+    const bodyExpr    = discardValue(m, emitExpr(body, ctx));
     const loop = m.loop(cnt, m.block(null, [exitIfFalse, bodyExpr, m.br(cnt)], binaryen.none));
     return m.block(brk, [loop], binaryen.none);
   } finally {
@@ -148,7 +154,7 @@ export function emitFor(node, ctx, emitExpr) {
   ctx.loops ??= [];
   ctx.loops.push({ brk, cnt });
   try {
-    const bodyExpr = emitExpr(body, ctx);
+    const bodyExpr = discardValue(m, emitExpr(body, ctx));
     const exits = ranges.map(range => m.br(brk, m.i32.eqz(condition(range))));
     // A zip loop ends when any inclusive source reaches its bound. Exiting
     // before increment also prevents MAX_VALUE from wrapping forever.
