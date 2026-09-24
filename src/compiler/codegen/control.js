@@ -24,11 +24,21 @@ import { binaryen } from './types.js';
 // Wasm: (if (result T) cond then else)
 export function emitIf(node, ctx, emitExpr) {
   const [cond, thenBlock, elseBranch] = [...node.children];
-  return ctx.module.if(
-    emitExpr(cond, ctx),
-    emitExpr(thenBlock, ctx),
-    elseBranch ? emitExpr(elseBranch, ctx) : undefined,
-  );
+  const m = ctx.module;
+  let thenExpr = emitExpr(thenBlock, ctx);
+  let elseExpr = elseBranch ? emitExpr(elseBranch, ctx) : undefined;
+  // Branches whose values cannot meet (a value vs. none, or unrelated scalars)
+  // are statements: their values are discarded rather than merged.
+  const type = expr => binaryen.getExpressionType(expr);
+  const valued = expr => ![binaryen.none, binaryen.unreachable].includes(type(expr));
+  const scalar = expr => [binaryen.i32, binaryen.i64, binaryen.f32, binaryen.f64, binaryen.v128].includes(type(expr));
+  const discard = expr => valued(expr) ? m.drop(expr) : expr;
+  if (!elseExpr) thenExpr = discard(thenExpr);
+  else if (valued(thenExpr) !== valued(elseExpr) && type(thenExpr) !== binaryen.unreachable && type(elseExpr) !== binaryen.unreachable
+    || valued(thenExpr) && valued(elseExpr) && type(thenExpr) !== type(elseExpr) && (scalar(thenExpr) || scalar(elseExpr))) {
+    thenExpr = discard(thenExpr); elseExpr = discard(elseExpr);
+  }
+  return m.if(emitExpr(cond, ctx), thenExpr, elseExpr);
 }
 
 // ── while ───────────────────────────────────────────────────────────────────

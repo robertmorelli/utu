@@ -96,7 +96,7 @@ export function installClosureImports(m, root, ctx) {
     // marks a decayed `fun`, which takes no environment argument.
     m.addFunctionImport(
       CLOSURE_NEW, CLOSURE_MODULE, 'closure_new',
-      binaryen.createType([binaryen.funcref, binaryen.anyref]), binaryen.externref,
+      binaryen.createType([binaryen.funcref, binaryen.anyref, binaryen.i32]), binaryen.externref,
     );
   }
   const promises = ctx.backendPlan?.runtime.promises ?? readPromiseSpec(root);
@@ -180,7 +180,7 @@ export function emitMakeClosure(node, ctx, emitExpr) {
   if (!env) throw new Error('codegen: ir-make-closure is missing its environment');
   return ctx.module.call(
     CLOSURE_NEW,
-    [funcRef(fnName, ctx), emitExpr(env, ctx)],
+    [funcRef(fnName, ctx), emitExpr(env, ctx), ctx.module.i32.const(callableParts(node.dataset.typeName)?.ret === 'Bool' ? 1 : 0)],
     binaryen.externref,
   );
 }
@@ -191,7 +191,7 @@ export function emitClosureDecay(node, ctx, emitExpr) {
   if (!inner) throw new Error('codegen: ir-closure-decay has no operand');
   return ctx.module.call(
     CLOSURE_NEW,
-    [emitExpr(inner, ctx), ctx.module.ref.null(binaryen.anyref)],
+    [emitExpr(inner, ctx), ctx.module.ref.null(binaryen.anyref), ctx.module.i32.const(callableParts(node.dataset.typeName)?.ret === 'Bool' ? 1 : 0)],
     binaryen.externref,
   );
 }

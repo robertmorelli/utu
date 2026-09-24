@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRsaOtherPrimesInfo {
-    let get_d: fun(Externref) Externref = @es/\ (self) => self["d"] \/;
-    let set_d: fun(Externref, Externref) void = @es/\ (self,value) => { self["d"] = value; } \/;
-    let get_r: fun(Externref) Externref = @es/\ (self) => self["r"] \/;
-    let set_r: fun(Externref, Externref) void = @es/\ (self,value) => { self["r"] = value; } \/;
-    let get_t: fun(Externref) Externref = @es/\ (self) => self["t"] \/;
-    let set_t: fun(Externref, Externref) void = @es/\ (self,value) => { self["t"] = value; } \/;
-}

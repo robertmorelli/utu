@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEXT_blend_minmax {
-    let get_MAX_EXT: fun(Externref) F64 = @es/\ (self) => self["MAX_EXT"] \/;
-    let get_MIN_EXT: fun(Externref) F64 = @es/\ (self) => self["MIN_EXT"] \/;
-}

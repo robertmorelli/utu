@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaKeySessionEventMap {
-    let get_keystatuseschange: fun(Externref) Externref = @es/\ (self) => self["keystatuseschange"] \/;
-    let set_keystatuseschange: fun(Externref, Externref) void = @es/\ (self,value) => { self["keystatuseschange"] = value; } \/;
-    let get_message: fun(Externref) Externref = @es/\ (self) => self["message"] \/;
-    let set_message: fun(Externref, Externref) void = @es/\ (self,value) => { self["message"] = value; } \/;
-}

@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserVarDate {
-    let new_instance: fun() Externref = @es/\ () => new globalThis["VarDate"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["VarDate"](...args) \/;
-}

@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCanvasImageSmoothing {
-    let get_imageSmoothingEnabled: fun(Externref) Bool = @es/\ (self) => (self["imageSmoothingEnabled"]) ? 1 : 0 \/;
-    let set_imageSmoothingEnabled: fun(Externref, Bool) void = @es/\ (self,value) => { self["imageSmoothingEnabled"] = !!value; } \/;
-    let get_imageSmoothingQuality: fun(Externref) Str = @es/\ (self) => self["imageSmoothingQuality"] \/;
-    let set_imageSmoothingQuality: fun(Externref, Str) void = @es/\ (self,value) => { self["imageSmoothingQuality"] = value; } \/;
-}

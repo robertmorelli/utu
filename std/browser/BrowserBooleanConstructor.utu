@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserBooleanConstructor {
-    let get_prototype: fun(Externref) Externref = @es/\ (self) => self["prototype"] \/;
-    let invoke: fun(Externref) Bool = @es/\ (self) => (self()) ? 1 : 0 \/;
-    let invoke_arity1: fun(Externref, Externref) Bool = @es/\ (self,p0) => (self(p0)) ? 1 : 0 \/;
-    let invoke_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self(...args) \/;
-}

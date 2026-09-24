@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserLockManagerSnapshot {
-    let get_held: fun(Externref) Externref = @es/\ (self) => self["held"] \/;
-    let set_held: fun(Externref, Externref) void = @es/\ (self,value) => { self["held"] = value; } \/;
-    let get_pending: fun(Externref) Externref = @es/\ (self) => self["pending"] \/;
-    let set_pending: fun(Externref, Externref) void = @es/\ (self,value) => { self["pending"] = value; } \/;
-}

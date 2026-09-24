@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserFileSystemFlags {
-    let get_create: fun(Externref) Externref = @es/\ (self) => self["create"] \/;
-    let set_create: fun(Externref, Externref) void = @es/\ (self,value) => { self["create"] = value; } \/;
-    let get_exclusive: fun(Externref) Externref = @es/\ (self) => self["exclusive"] \/;
-    let set_exclusive: fun(Externref, Externref) void = @es/\ (self,value) => { self["exclusive"] = value; } \/;
-}

@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserAudioContextOptions {
-    let get_latencyHint: fun(Externref) Externref = @es/\ (self) => self["latencyHint"] \/;
-    let set_latencyHint: fun(Externref, Externref) void = @es/\ (self,value) => { self["latencyHint"] = value; } \/;
-    let get_sampleRate: fun(Externref) Externref = @es/\ (self) => self["sampleRate"] \/;
-    let set_sampleRate: fun(Externref, Externref) void = @es/\ (self,value) => { self["sampleRate"] = value; } \/;
-}

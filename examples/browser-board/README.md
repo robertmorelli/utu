@@ -24,9 +24,17 @@ node scripts/test-dts-browser.mjs
 The test builds the app, adds/completes/deletes tasks, checks persistence after a
 reload, checks that user input remains literal text, verifies mobile width, and
 writes desktop/mobile screenshots and measured code sizes to `dist/browser-board`.
-It also times 200 inserts plus 203 toggles with persistence and enforces a 6 KB
+It also exercises 200 inserts plus 203 toggles with persistence and enforces a 6 KB
 gzip budget for the combined Wasm and JS. HTML/CSS are not included in that code
 budget. Local storage is expected to be available and contain this app's JSON.
 
 See [the ABI design and limitations](../../docs/typescript-abi.md) for the type
 mapping, universal callback bridge, package tests, and compiler/app size tradeoff.
+
+The app imports one lazy `Browser` module and uses declaration-derived types,
+inferred locals, ordinary properties and methods, indexed values, and contextual
+closures for events and `forEach`. Saved tasks are plain `&{ label, done }`
+records passed straight to `JSON.stringify`, `classList.toggle` receives a UTU
+`Bool`, and variadic `append` takes several elements at once. Missing storage
+values use `promote`. There are no generated accessor names or helper modules
+in the application.

@@ -1,0 +1,104 @@
+/** Serialize the checker's resolved declaration graph, without imposing TS source semantics. */
+export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifier }) {
+  const types = [], ids = new Map(), pending = [], constraining = new Set();
+  function ref(type) {
+    if (!type) return 'any';
+    const f = type.flags;
+    if (f & ts.TypeFlags.Void) return 'void';
+    if (f & ts.TypeFlags.Never) return 'never';
+    if (f & ts.TypeFlags.Null) return 'null';
+    if (f & ts.TypeFlags.Undefined) return 'undefined';
+    if (f & ts.TypeFlags.Any) return 'any';
+    if (f & ts.TypeFlags.Unknown) return 'unknown';
+    if (f & ts.TypeFlags.StringLike) return type.isStringLiteral() ? { literal: type.value, base: 'Str' } : 'Str';
+    if (f & ts.TypeFlags.NumberLike) return type.isNumberLiteral() ? { literal: type.value, base: 'F64' } : 'F64';
+    if (f & ts.TypeFlags.BooleanLike) return 'Bool';
+    if (f & ts.TypeFlags.BigIntLike) return 'bigint';
+    if (f & ts.TypeFlags.UniqueESSymbol) return { symbol: type.symbol?.name ?? 'symbol' };
+    if (f & ts.TypeFlags.ESSymbolLike) return 'symbol';
+    if (f & ts.TypeFlags.IndexedAccess) return { indexed: ref(type.objectType), key: ref(type.indexType) };
+    if (f & ts.TypeFlags.Index) return { keys: ref(type.type) };
+    if (f & ts.TypeFlags.TypeParameter) {
+      // The declared constraint keeps relations such as `S extends T`; F-bounded
+      // constraints (`T extends Foo<T>`) stop at the recursive mention.
+      const name = type.symbol?.name ?? 'T';
+      if (constraining.has(type)) return { parameter: name };
+      constraining.add(type);
+      try {
+        const declaration = type.symbol?.declarations?.find(ts.isTypeParameterDeclaration);
+        const node = declaration && ts.getEffectiveConstraintOfTypeParameter(declaration);
+        const declared = node ? checker.getTypeFromTypeNode(node) : checker.getBaseConstraintOfType(type);
+        return { parameter: name, constraint: declared ? ref(declared) : 'any' };
+      } finally { constraining.delete(type); }
+    }
+    if (type.objectFlags & ts.ObjectFlags.Reference && type.target && type.target !== type) {
+      return { template: ref(type.target), arguments: checker.getTypeArguments(type).map(ref) };
+    }
+    if (ids.has(type)) return ids.get(type);
+    const id = types.length;
+    ids.set(type, id); types.push(null); pending.push(type);
+    return id;
+  }
+  const at = symbol => checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration ?? symbol.declarations?.[0]);
+  function signature(sig) {
+    return {
+      params: sig.parameters.map(p => ({ name: p.name, type: ref(at(p)), optional: !!(p.flags & ts.SymbolFlags.Optional) || !!p.valueDeclaration?.questionToken,
+        rest: !!p.valueDeclaration?.dotDotDotToken })),
+      result: ref(checker.getReturnTypeOfSignature(sig)),
+      ...(sig.thisParameter ? { receiver: ref(at(sig.thisParameter)) } : {}),
+    };
+  }
+  const exports = Object.create(null), names = Object.create(null), mutableGlobals = [];
+  for (const [name, symbol] of [...symbols].sort(([a], [b]) => a.localeCompare(b))) {
+    if (symbol.flags & ts.SymbolFlags.Type) names[name] = ref(checker.getDeclaredTypeOfSymbol(symbol));
+    if (symbol.flags & ts.SymbolFlags.Value) {
+      exports[name] = ref(at(symbol));
+      const decl = symbol.valueDeclaration;
+      if (!moduleSpecifier && decl && ts.isVariableDeclaration(decl) && !(decl.parent.flags & ts.NodeFlags.Const)) mutableGlobals.push(name);
+    }
+  }
+  for (let i = 0; i < pending.length; i++) {
+    if (i > 100000) throw new Error('Declaration graph exceeds 100,000 types; refusing to silently erase types');
+    const type = pending[i];
+    const node = { name: checker.typeToString(type), properties: Object.create(null) };
+    types[ids.get(type)] = node;
+    if (type.isUnion()) { node.union = type.types.map(ref); continue; }
+    const args = type.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(type) : [];
+    if (checker.isArrayType(type) || checker.isTupleType(type)) node.element = ref(checker.getIndexTypeOfType(type, ts.IndexKind.Number));
+    if (type.target && type.target !== type && args.length) {
+      node.template = ref(type.target);
+      node.arguments = args.map(ref);
+    }
+    if (args.length) node.parameters = args.map(t => t.symbol?.name ?? 'T');
+    if (type.isClassOrInterface?.()) node.bases = (checker.getBaseTypes(type) ?? []).map(ref);
+    // Standard-library declarations (lib.dom, lib.es*) are one identity across every ABI.
+    const origins = type.symbol?.declarations ?? [];
+    if (type.isClassOrInterface?.() && origins.length && origins.every(d => d.getSourceFile().hasNoDefaultLib)) {
+      node.lib = checker.getFullyQualifiedName(type.symbol);
+    }
+    if (type.symbol?.flags & ts.SymbolFlags.ConstEnum) {
+      node.constants = Object.create(null);
+      for (const declaration of type.symbol.declarations ?? []) for (const member of declaration.members ?? []) {
+        const value = checker.getConstantValue(member);
+        if (value !== undefined) node.constants[member.name.text] = value;
+      }
+    }
+    node.calls = type.getCallSignatures().map(signature);
+    node.constructors = type.getConstructSignatures().map(signature);
+    node.indexes = checker.getIndexInfosOfType(type).map(info => ({ key: ref(info.keyType), type: ref(info.type), readonly: info.isReadonly }));
+    for (const prop of checker.getPropertiesOfType(type)) {
+      const declarations = prop.declarations ?? [];
+      if (declarations.some(d => d.name && ts.isPrivateIdentifier(d.name) || d.modifiers?.some(m => [ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword].includes(m.kind)))) continue;
+      let key = prop.name;
+      if (key.startsWith('__@')) {
+        const computed = declarations.find(d => d.name && ts.isComputedPropertyName(d.name))?.name.expression;
+        if (computed && ts.isPropertyAccessExpression(computed) && computed.expression.getText() === 'Symbol') key = `@@${computed.name.text}`;
+        else if (computed && ts.isIdentifier(computed)) key = `@@${checker.getSymbolAtLocation(computed)?.name ?? computed.text}`;
+        else continue;
+      }
+      node.properties[key] = { type: ref(at(prop)), optional: !!(prop.flags & ts.SymbolFlags.Optional), readonly: declarations.some(d => d.modifiers?.some(m => m.kind === ts.SyntaxKind.ReadonlyKeyword))
+        || !!(prop.flags & ts.SymbolFlags.GetAccessor) && !(prop.flags & ts.SymbolFlags.SetAccessor) };
+    }
+  }
+  return { version: 1, prefix, moduleSpecifier, exports, names, mutableGlobals, types };
+}

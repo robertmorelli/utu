@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserGenericTransformStream {
-    let get_readable: fun(Externref) Externref = @es/\ (self) => self["readable"] \/;
-    let get_writable: fun(Externref) Externref = @es/\ (self) => self["writable"] \/;
-}

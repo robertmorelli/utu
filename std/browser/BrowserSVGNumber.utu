@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserSVGNumber {
-    let get_value: fun(Externref) F64 = @es/\ (self) => self["value"] \/;
-    let set_value: fun(Externref, F64) void = @es/\ (self,value) => { self["value"] = value; } \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["SVGNumber"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["SVGNumber"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["SVGNumber"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["SVGNumber"]["prototype"] = value; } \/;
-}

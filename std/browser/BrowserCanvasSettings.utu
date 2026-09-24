@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCanvasSettings {
-    let call_getContextAttributes: fun(Externref) Externref = @es/\ (self) => self["getContextAttributes"]() \/;
-    let call_getContextAttributes_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["getContextAttributes"](...args) \/;
-}

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserDOMParser {
-    let call_parseFromString: fun(Externref, Str, Str) Externref = @es/\ (self,p0,p1) => self["parseFromString"](p0,p1) \/;
-    let call_parseFromString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["parseFromString"](...args) \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["DOMParser"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["DOMParser"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["DOMParser"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["DOMParser"]["prototype"] = value; } \/;
-}

@@ -90,6 +90,7 @@ export const T = Object.freeze({
   FATAL:          'ir-fatal',           // fatal
 
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }
+  TUPLE:          'ir-tuple',           // .{a, b} — a host array in declaration context
   FIELD_INIT:     'ir-field-init',      // field: expr inside struct init
   ASSERT:         'ir-assert',          // assert cond
   DSL:            'ir-dsl',             // @name/\ body \/

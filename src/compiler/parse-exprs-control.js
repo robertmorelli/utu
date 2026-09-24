@@ -99,7 +99,7 @@ export function walkAltArm(n, doc, source, dispatch) {
   const node = stamp(el(T.ALT_ARM, doc), n);
   const children = namedChildren(n);
   let i = 0;
-  if (children[i] && children[i].type === 'type_ident') {
+  if (children[i] && (children[i].type === 'type_ident' || children[i].type === 'qualified_type_ref')) {
     node.setAttribute('variant', text(children[i]));
     i++;
   }

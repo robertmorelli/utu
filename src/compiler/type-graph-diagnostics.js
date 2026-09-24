@@ -17,6 +17,7 @@ export function reportTypeGraphDiagnostics(graph, operations) {
     actual, actualOrigin, collectFailures, compatible, edgeSource,
     planCoercions, valueForDiagnostic,
   } = operations;
+  const display = text => text.replace(/Foreign\d+T\d+/g, name => graph.typeIndex.get(name)?.decl?.dataset.displayName ?? name);
   const ctx = { typeIndex: graph.typeIndex };
   planCoercions(graph);
   for (const edge of graph.expectations) {
@@ -33,13 +34,13 @@ export function reportTypeGraphDiagnostics(graph, operations) {
       related.push({ node: origin, label: `actual type ${actualType} comes from here` });
     }
     stampDiagnostic(primary, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
-      `Type mismatch: expected ${expected}, got ${actualType}`, {
+      display(`Type mismatch: expected ${expected}, got ${actualType}`), {
         expected, actual: actualType, site: edge.site, relatedNodes: related,
       });
   }
   collectFailures(graph);
   for (const failure of graph.failures) {
-    stampDiagnostic(failure.node, failure.kind, failure.message, failure.data);
+    stampDiagnostic(failure.node, failure.kind, display(failure.message), failure.data);
   }
   return graph;
 }

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCacheQueryOptions {
-    let get_ignoreMethod: fun(Externref) Externref = @es/\ (self) => self["ignoreMethod"] \/;
-    let set_ignoreMethod: fun(Externref, Externref) void = @es/\ (self,value) => { self["ignoreMethod"] = value; } \/;
-    let get_ignoreSearch: fun(Externref) Externref = @es/\ (self) => self["ignoreSearch"] \/;
-    let set_ignoreSearch: fun(Externref, Externref) void = @es/\ (self,value) => { self["ignoreSearch"] = value; } \/;
-    let get_ignoreVary: fun(Externref) Externref = @es/\ (self) => self["ignoreVary"] \/;
-    let set_ignoreVary: fun(Externref, Externref) void = @es/\ (self,value) => { self["ignoreVary"] = value; } \/;
-}

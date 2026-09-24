@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEcKeyImportParams {
-    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
-    let get_namedCurve: fun(Externref) Str = @es/\ (self) => self["namedCurve"] \/;
-    let set_namedCurve: fun(Externref, Str) void = @es/\ (self,value) => { self["namedCurve"] = value; } \/;
-}

@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserFileSystemCreateWritableOptions {
-    let get_keepExistingData: fun(Externref) Externref = @es/\ (self) => self["keepExistingData"] \/;
-    let set_keepExistingData: fun(Externref, Externref) void = @es/\ (self,value) => { self["keepExistingData"] = value; } \/;
-}

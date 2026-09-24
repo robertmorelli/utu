@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPeriodicWaveOptions {
-    let get_disableNormalization: fun(Externref) Externref = @es/\ (self) => self["disableNormalization"] \/;
-    let set_disableNormalization: fun(Externref, Externref) void = @es/\ (self,value) => { self["disableNormalization"] = value; } \/;
-    let get_imag: fun(Externref) Externref = @es/\ (self) => self["imag"] \/;
-    let set_imag: fun(Externref, Externref) void = @es/\ (self,value) => { self["imag"] = value; } \/;
-    let get_real: fun(Externref) Externref = @es/\ (self) => self["real"] \/;
-    let set_real: fun(Externref, Externref) void = @es/\ (self,value) => { self["real"] = value; } \/;
-}

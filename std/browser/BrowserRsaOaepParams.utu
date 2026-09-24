@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRsaOaepParams {
-    let get_label: fun(Externref) Externref = @es/\ (self) => self["label"] \/;
-    let set_label: fun(Externref, Externref) void = @es/\ (self,value) => { self["label"] = value; } \/;
-    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
-}

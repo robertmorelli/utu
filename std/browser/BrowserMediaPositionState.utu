@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaPositionState {
-    let get_duration: fun(Externref) Externref = @es/\ (self) => self["duration"] \/;
-    let set_duration: fun(Externref, Externref) void = @es/\ (self,value) => { self["duration"] = value; } \/;
-    let get_playbackRate: fun(Externref) Externref = @es/\ (self) => self["playbackRate"] \/;
-    let set_playbackRate: fun(Externref, Externref) void = @es/\ (self,value) => { self["playbackRate"] = value; } \/;
-    let get_position: fun(Externref) Externref = @es/\ (self) => self["position"] \/;
-    let set_position: fun(Externref, Externref) void = @es/\ (self,value) => { self["position"] = value; } \/;
-}

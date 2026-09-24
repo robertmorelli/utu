@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCanvasDrawImage {
-    let call_drawImage: fun(Externref, Externref, F64, F64) void = @es/\ (self,p0,p1,p2) => self["drawImage"](p0,p1,p2) \/;
-    let call_drawImage_overload2: fun(Externref, Externref, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4) => self["drawImage"](p0,p1,p2,p3,p4) \/;
-    let call_drawImage_overload3: fun(Externref, Externref, F64, F64, F64, F64, F64, F64, F64, F64) void = @es/\ (self,p0,p1,p2,p3,p4,p5,p6,p7,p8) => self["drawImage"](p0,p1,p2,p3,p4,p5,p6,p7,p8) \/;
-    let call_drawImage_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["drawImage"](...args) \/;
-}

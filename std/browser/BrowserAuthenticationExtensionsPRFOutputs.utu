@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserAuthenticationExtensionsPRFOutputs {
-    let get_enabled: fun(Externref) Externref = @es/\ (self) => self["enabled"] \/;
-    let set_enabled: fun(Externref, Externref) void = @es/\ (self,value) => { self["enabled"] = value; } \/;
-    let get_results: fun(Externref) Externref = @es/\ (self) => self["results"] \/;
-    let set_results: fun(Externref, Externref) void = @es/\ (self,value) => { self["results"] = value; } \/;
-}

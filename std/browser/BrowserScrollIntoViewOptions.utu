@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserScrollIntoViewOptions {
-    let get_behavior: fun(Externref) Externref = @es/\ (self) => self["behavior"] \/;
-    let set_behavior: fun(Externref, Externref) void = @es/\ (self,value) => { self["behavior"] = value; } \/;
-    let get_block: fun(Externref) Externref = @es/\ (self) => self["block"] \/;
-    let set_block: fun(Externref, Externref) void = @es/\ (self,value) => { self["block"] = value; } \/;
-    let get_inline: fun(Externref) Externref = @es/\ (self) => self["inline"] \/;
-    let set_inline: fun(Externref, Externref) void = @es/\ (self,value) => { self["inline"] = value; } \/;
-}

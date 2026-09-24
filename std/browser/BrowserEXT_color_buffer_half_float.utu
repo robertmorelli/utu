@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEXT_color_buffer_half_float {
-    let get_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE_EXT: fun(Externref) F64 = @es/\ (self) => self["FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE_EXT"] \/;
-    let get_RGB16F_EXT: fun(Externref) F64 = @es/\ (self) => self["RGB16F_EXT"] \/;
-    let get_RGBA16F_EXT: fun(Externref) F64 = @es/\ (self) => self["RGBA16F_EXT"] \/;
-    let get_UNSIGNED_NORMALIZED_EXT: fun(Externref) F64 = @es/\ (self) => self["UNSIGNED_NORMALIZED_EXT"] \/;
-}

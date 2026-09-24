@@ -1,8 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserNavigatorPlugins {
-    let call_javaEnabled: fun(Externref) Bool = @es/\ (self) => (self["javaEnabled"]()) ? 1 : 0 \/;
-    let call_javaEnabled_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["javaEnabled"](...args) \/;
-    let get_mimeTypes: fun(Externref) Externref = @es/\ (self) => self["mimeTypes"] \/;
-    let get_pdfViewerEnabled: fun(Externref) Bool = @es/\ (self) => (self["pdfViewerEnabled"]) ? 1 : 0 \/;
-    let get_plugins: fun(Externref) Externref = @es/\ (self) => self["plugins"] \/;
-}

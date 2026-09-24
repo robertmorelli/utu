@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEventListenerOptions {
-    let get_capture: fun(Externref) Externref = @es/\ (self) => self["capture"] \/;
-    let set_capture: fun(Externref, Externref) void = @es/\ (self,value) => { self["capture"] = value; } \/;
-}

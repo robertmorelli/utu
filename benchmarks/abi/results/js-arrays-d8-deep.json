@@ -1,0 +1,140 @@
+{
+  "engine": "V8 version 15.3.12",
+  "flags": [],
+  "platform": "darwin",
+  "arch": "arm64",
+  "methodology": "15 rotating-order samples after 10 warmup rounds. Same JS arrays and sums; setup/compilation excluded. Median and p10/p90 nanoseconds per element. Batch makes one crossing per entire sum.",
+  "wasmBytes": 384,
+  "wasmGzip": 266,
+  "liveGlueBytes": 598,
+  "checksum": -18513600,
+  "rows": [
+    {
+      "length": 32,
+      "rounds": 8192,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.6217956542966998,
+          "p10": 0.5950927734373057,
+          "p90": 0.7209777832030981,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.5989074707032742,
+          "p10": 0.5760192871094149,
+          "p90": 0.7171630859374549,
+          "relativeToJS": 0.9631901840495911
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 8.724212646484506,
+          "p10": 8.56018066406239,
+          "p90": 9.01031494140623,
+          "relativeToJS": 14.030674846629932
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 38.43688964843715,
+          "p10": 37.36877441406247,
+          "p90": 38.61999511718759,
+          "relativeToJS": 61.81595092026225
+        },
+        "utuCallback": {
+          "medianNsPerElement": 34.45434570312493,
+          "p10": 33.39004516601579,
+          "p90": 34.88922119140631,
+          "relativeToJS": 55.411042944800776
+        },
+        "utuBatch": {
+          "medianNsPerElement": 1.121520996093684,
+          "p10": 1.0681152343748959,
+          "p90": 1.2817382812498317,
+          "relativeToJS": 1.8036809815954942
+        }
+      }
+    },
+    {
+      "length": 4096,
+      "rounds": 64,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.7324218750000278,
+          "p10": 0.7133483886719201,
+          "p90": 0.785827636718816,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.740051269531531,
+          "p10": 0.7286071777344929,
+          "p90": 0.759124755859205,
+          "relativeToJS": 1.010416666667012
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 6.530761718749958,
+          "p10": 6.4544677734375275,
+          "p90": 6.5841674804687464,
+          "relativeToJS": 8.916666666666272
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 37.109374999999815,
+          "p10": 36.78894042968709,
+          "p90": 37.78457641601595,
+          "relativeToJS": 50.6666666666645
+        },
+        "utuCallback": {
+          "medianNsPerElement": 31.177520751953132,
+          "p10": 30.73120117187472,
+          "p90": 31.73828124999976,
+          "relativeToJS": 42.56770833333173
+        },
+        "utuBatch": {
+          "medianNsPerElement": 0.7362365722655626,
+          "p10": 0.7286071777340593,
+          "p90": 0.7667541503907083,
+          "relativeToJS": 1.00520833333321
+        }
+      }
+    },
+    {
+      "length": 65536,
+      "rounds": 4,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.7286071777344929,
+          "p10": 0.7209777832034234,
+          "p90": 0.7400512695310973,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.7324218750000278,
+          "p10": 0.7247924804689582,
+          "p90": 0.7591247558596387,
+          "relativeToJS": 1.0052356020941162
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 6.591796874999383,
+          "p10": 6.427764892577917,
+          "p90": 6.801605224609868,
+          "relativeToJS": 9.047120418845857
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 37.204742431640355,
+          "p10": 36.411285400390035,
+          "p90": 37.89901733398417,
+          "relativeToJS": 51.062827225122255
+        },
+        "utuCallback": {
+          "medianNsPerElement": 30.78079223632884,
+          "p10": 30.418395996093494,
+          "p90": 31.322479248046925,
+          "relativeToJS": 42.24607329842346
+        },
+        "utuBatch": {
+          "medianNsPerElement": 0.7286071777344929,
+          "p10": 0.7133483886723537,
+          "p90": 0.7591247558596387,
+          "relativeToJS": 1
+        }
+      }
+    }
+  ],
+  "bindingArchitecture": "deep declaration graph; indexed and callback paths use native member syntax"
+}

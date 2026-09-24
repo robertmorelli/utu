@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserFontFaceSetEventMap {
-    let get_loading: fun(Externref) Externref = @es/\ (self) => self["loading"] \/;
-    let set_loading: fun(Externref, Externref) void = @es/\ (self,value) => { self["loading"] = value; } \/;
-    let get_loadingdone: fun(Externref) Externref = @es/\ (self) => self["loadingdone"] \/;
-    let set_loadingdone: fun(Externref, Externref) void = @es/\ (self,value) => { self["loadingdone"] = value; } \/;
-    let get_loadingerror: fun(Externref) Externref = @es/\ (self) => self["loadingerror"] \/;
-    let set_loadingerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["loadingerror"] = value; } \/;
-}

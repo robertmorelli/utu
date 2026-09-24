@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserWEBGL_debug_renderer_info {
-    let get_UNMASKED_RENDERER_WEBGL: fun(Externref) F64 = @es/\ (self) => self["UNMASKED_RENDERER_WEBGL"] \/;
-    let get_UNMASKED_VENDOR_WEBGL: fun(Externref) F64 = @es/\ (self) => self["UNMASKED_VENDOR_WEBGL"] \/;
-}

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserDeviceMotionEventAccelerationInit {
-    let get_x: fun(Externref) Externref = @es/\ (self) => self["x"] \/;
-    let set_x: fun(Externref, Externref) void = @es/\ (self,value) => { self["x"] = value; } \/;
-    let get_y: fun(Externref) Externref = @es/\ (self) => self["y"] \/;
-    let set_y: fun(Externref, Externref) void = @es/\ (self,value) => { self["y"] = value; } \/;
-    let get_z: fun(Externref) Externref = @es/\ (self) => self["z"] \/;
-    let set_z: fun(Externref, Externref) void = @es/\ (self,value) => { self["z"] = value; } \/;
-}

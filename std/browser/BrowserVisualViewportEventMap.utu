@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserVisualViewportEventMap {
-    let get_resize: fun(Externref) Externref = @es/\ (self) => self["resize"] \/;
-    let set_resize: fun(Externref, Externref) void = @es/\ (self,value) => { self["resize"] = value; } \/;
-    let get_scroll: fun(Externref) Externref = @es/\ (self) => self["scroll"] \/;
-    let set_scroll: fun(Externref, Externref) void = @es/\ (self,value) => { self["scroll"] = value; } \/;
-}

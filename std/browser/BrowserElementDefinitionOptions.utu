@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserElementDefinitionOptions {
-    let get_extends: fun(Externref) Externref = @es/\ (self) => self["extends"] \/;
-    let set_extends: fun(Externref, Externref) void = @es/\ (self,value) => { self["extends"] = value; } \/;
-}

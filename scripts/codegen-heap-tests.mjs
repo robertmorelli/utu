@@ -178,6 +178,21 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.from_let(), 7);
   });
 
+  test('codegen: branches that cannot meet are statements and a trailing let yields nothing', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_statement_branches.utu', source: `
+      struct Point:
+        | x : F64
+      export lib {
+        fn branch(flag: Bool) F64 { if flag { 1.0; } else { }; 2.0; }
+        fn option(p: ?Point) void { promote p { |v| => v.x, ~> {}, }; }
+        fn binding() void { let unused: F64 = 3.0; }
+      }
+    ` });
+    assertEq(instance.exports.branch(1), 2);
+    instance.exports.option(null);
+    instance.exports.binding();
+  });
+
   test('codegen: bare null in an if branch adopts the nullable return type', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_branch.utu', source: `
       struct Counter:
@@ -196,6 +211,30 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     ` });
     assertEq(instance.exports.read(true), 9);
     assertEq(instance.exports.read(false), 4);
+  });
+
+  test('codegen: nested promote lowers inner arms before cloning outer arms', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_nested_promote.utu', source: `
+      struct Box:
+        | n : I32
+      export lib {
+        fn read(outer: Bool, inner: Bool) I32 {
+          let a: ?Box = if outer { Box { n: 7 }; } else { null; };
+          let b: ?Box = if inner { Box { n: 3 }; } else { null; };
+          promote a {
+            |x| => promote b {
+              |y| => x.n + y.n,
+              ~> x.n,
+            },
+            ~> 0,
+          };
+        }
+      }
+    ` });
+    assertEq(instance.exports.read(true, true), 10);
+    assertEq(instance.exports.read(true, false), 7);
+    assertEq(instance.exports.read(false, true), 0);
+    assertEq(instance.exports.read(false, false), 0);
   });
 
   test('codegen: promote preserves a literal false fallback', async ({ ROOT }) => {

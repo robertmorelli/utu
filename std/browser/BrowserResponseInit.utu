@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserResponseInit {
-    let get_headers: fun(Externref) Externref = @es/\ (self) => self["headers"] \/;
-    let set_headers: fun(Externref, Externref) void = @es/\ (self,value) => { self["headers"] = value; } \/;
-    let get_status: fun(Externref) Externref = @es/\ (self) => self["status"] \/;
-    let set_status: fun(Externref, Externref) void = @es/\ (self,value) => { self["status"] = value; } \/;
-    let get_statusText: fun(Externref) Externref = @es/\ (self) => self["statusText"] \/;
-    let set_statusText: fun(Externref, Externref) void = @es/\ (self,value) => { self["statusText"] = value; } \/;
-}

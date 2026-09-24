@@ -42,3 +42,7 @@ export interface Case { upper: string; }
 export interface CASE { loud: string; }
 
 export declare const dictionary: Dictionary;
+
+export declare function optionalText(present: boolean): string | null;
+
+export declare function optionalNumber(present: boolean): number | null;

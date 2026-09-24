@@ -1,8 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserBarProp {
-    let get_visible: fun(Externref) Bool = @es/\ (self) => (self["visible"]) ? 1 : 0 \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["BarProp"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["BarProp"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["BarProp"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["BarProp"]["prototype"] = value; } \/;
-}

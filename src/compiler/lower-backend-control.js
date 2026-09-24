@@ -9,14 +9,12 @@ export function lowerBackendControl(doc, typeIndex, { target = 'normal' } = {}) 
   if (!root) return false;
   let changed = false;
 
-  for (const promote of [...root.querySelectorAll('ir-promote')]) {
-    const lowered = lowerPromote(promote);
-    if (lowered) { replaceTypedNode(promote, lowered); changed = true; }
-  }
-
-  for (const alt of [...root.querySelectorAll('ir-alt')]) {
-    const lowered = lowerAlt(alt, typeIndex);
-    if (lowered) { replaceTypedNode(alt, lowered); changed = true; }
+  // Parents clone their arms, so lower descendants before replacing parents.
+  // Use one traversal for both forms, including mixed alt/promote nesting.
+  for (const node of [...root.querySelectorAll('ir-promote, ir-alt')].reverse()) {
+    const lowered = node.localName === 'ir-promote'
+      ? lowerPromote(node) : lowerAlt(node, typeIndex);
+    if (lowered) { replaceTypedNode(node, lowered); changed = true; }
   }
   return changed;
 }
@@ -55,7 +53,18 @@ function lowerPromote(node) {
   const thenArm = node.querySelector(':scope > ir-promote-arm');
   const defaultArm = node.querySelector(':scope > ir-default-arm');
   const scrutType = scrutinee?.dataset['typeName'] ?? '';
-  if (!scrutinee || !thenArm || !scrutType.startsWith('?')) return null;
+  if (!scrutinee || !thenArm) return null;
+  if (!scrutType.startsWith('?')) {
+    // Already diagnosed ("promote requires a nullable value"); keep the IR
+    // well-formed by binding the value and taking the present arm.
+    const block = lowerSubjectBlock(node, scrutinee);
+    const body = wrapBody(node, cloneBody(thenArm));
+    const binding = node.getAttribute('binding');
+    if (binding && node.id) body.insertBefore(makeBindingLet(node, block.subjectLet, block.subjectName, binding, node.id, scrutType,
+      makeBoundIdent(block.subjectLet, block.subjectName)), body.firstChild);
+    block.node.appendChild(body);
+    return block.node;
+  }
 
   const block = lowerSubjectBlock(node, scrutinee);
   const thenBody = lowerPromoteBody(node, block.subjectLet, block.subjectName, thenArm);

@@ -1,0 +1,134 @@
+{
+  "engine": "Chromium 151.0.7922.34",
+  "platform": "darwin",
+  "arch": "arm64",
+  "checksum": -18513600,
+  "rows": [
+    {
+      "length": 32,
+      "rounds": 8192,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.7629396350239404,
+          "p10": 0.3814693627646193,
+          "p90": 1.1444089977885596,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.7629396350239404,
+          "p10": 0.7629387255292386,
+          "p90": 1.1444089977885596,
+          "relativeToJS": 1
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 10.29968279908644,
+          "p10": 10.299681889591739,
+          "p90": 10.681153071345761,
+          "relativeToJS": 13.499997019768472
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 46.92077618528856,
+          "p10": 46.53930591302924,
+          "p90": 47.6837158203125,
+          "relativeToJS": 61.49998509884236
+        },
+        "utuCallback": {
+          "medianNsPerElement": 41.19873028685106,
+          "p10": 40.43579065182712,
+          "p90": 41.58020055911038,
+          "relativeToJS": 53.999986886981276
+        },
+        "utuBatch": {
+          "medianNsPerElement": 1.1444089977885596,
+          "p10": 0.7629396350239404,
+          "p90": 1.5258792700478807,
+          "relativeToJS": 1.4999994039536944
+        }
+      }
+    },
+    {
+      "length": 4096,
+      "rounds": 64,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 1.1444089977885596,
+          "p10": 0.7629396350239404,
+          "p90": 1.1444099072832614,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 1.1444089977885596,
+          "p10": 0.7629387255292386,
+          "p90": 1.1444099072832614,
+          "relativeToJS": 1
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 8.01086389401462,
+          "p10": 7.62939453125,
+          "p90": 8.39233416627394,
+          "relativeToJS": 7.000000794728724
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 44.63195818971144,
+          "p10": 44.63195818971144,
+          "p90": 45.01342755247606,
+          "relativeToJS": 39.00000635782979
+        },
+        "utuCallback": {
+          "medianNsPerElement": 38.52844201901462,
+          "p10": 37.76550329348538,
+          "p90": 38.90991229127394,
+          "relativeToJS": 33.66667169994858
+        },
+        "utuBatch": {
+          "medianNsPerElement": 1.1444089977885596,
+          "p10": 0.7629387255292386,
+          "p90": 1.1444099072832614,
+          "relativeToJS": 1
+        }
+      }
+    },
+    {
+      "length": 65536,
+      "rounds": 4,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.7629396350239404,
+          "p10": 0.7629387255292386,
+          "p90": 1.1444089977885596,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.7629396350239404,
+          "p10": 0.7629396350239404,
+          "p90": 1.1444099072832614,
+          "relativeToJS": 1
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 8.01086389401462,
+          "p10": 7.62939453125,
+          "p90": 8.39233416627394,
+          "relativeToJS": 10.499997019768472
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 44.25048791745212,
+          "p10": 42.72460864740424,
+          "p90": 45.39489691524068,
+          "relativeToJS": 57.999985694888665
+        },
+        "utuCallback": {
+          "medianNsPerElement": 38.52844201901462,
+          "p10": 38.14697265625,
+          "p90": 38.90991229127394,
+          "relativeToJS": 50.49998748302758
+        },
+        "utuBatch": {
+          "medianNsPerElement": 0.7629396350239404,
+          "p10": 0.7629387255292386,
+          "p90": 1.1444099072832614,
+          "relativeToJS": 1
+        }
+      }
+    }
+  ]
+}

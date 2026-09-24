@@ -74,8 +74,10 @@ export function awaitImports(promiseSpec, utu = {}) {
 export function closureImports(closureSpec, utu = {}) {
   if (!closureSpec) return utu;
   if (closureSpec.new) {
-    utu.closure_new = (fn, env) =>
-      (env == null ? (...args) => fn(...args) : (...args) => fn(env, ...args));
+    utu.closure_new = (fn, env, booleanResult) => {
+      const invoke = env == null ? (...args) => fn(...args) : (...args) => fn(env, ...args);
+      return booleanResult ? (...args) => !!invoke(...args) : invoke;
+    };
   }
   const apply = (closure, ...args) => closure(...args);
   for (const field of closureSpec.calls ?? []) utu[field] = apply;

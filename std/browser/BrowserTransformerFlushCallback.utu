@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserTransformerFlushCallback {
-    let invoke: fun(Externref, Externref) Externref = @es/\ (self,p0) => self(p0) \/;
-    let invoke_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self(...args) \/;
-}

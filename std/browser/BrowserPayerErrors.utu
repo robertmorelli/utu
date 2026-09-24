@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPayerErrors {
-    let get_email: fun(Externref) Externref = @es/\ (self) => self["email"] \/;
-    let set_email: fun(Externref, Externref) void = @es/\ (self,value) => { self["email"] = value; } \/;
-    let get_name: fun(Externref) Externref = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Externref) void = @es/\ (self,value) => { self["name"] = value; } \/;
-    let get_phone: fun(Externref) Externref = @es/\ (self) => self["phone"] \/;
-    let set_phone: fun(Externref, Externref) void = @es/\ (self,value) => { self["phone"] = value; } \/;
-}

@@ -27,15 +27,19 @@ jobs:
         with:
           node-version: 24
       - run: bun install --frozen-lockfile
-      - name: Verify generated browser sources
+      - name: Verify generated browser declarations
         run: |
           bun run bindings:browser
           bun run build
-          git diff --exit-code -- std/browser src/compiler/platform-sources.generated.js
+          git diff --exit-code -- src/bindings/browser-catalog.generated.js src/compiler/platform-sources.generated.js
       - name: Node ABI coverage
-        run: node scripts/dts-abi-tests.mjs
+        run: |
+          node scripts/dts-abi-tests.mjs
+          node scripts/dts-deep-tests.mjs
       - name: Bun ABI coverage
-        run: bun scripts/dts-abi-tests.mjs
+        run: |
+          bun scripts/dts-abi-tests.mjs
+          bun scripts/dts-deep-tests.mjs
       - name: Install test browser
         run: bunx playwright install --with-deps chromium
       - name: Worker portability and browser app

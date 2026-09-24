@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserStyleMedia {
-    let call_matchMedium: fun(Externref, Str) Bool = @es/\ (self,p0) => (self["matchMedium"](p0)) ? 1 : 0 \/;
-    let call_matchMedium_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["matchMedium"](...args) \/;
-    let get_type: fun(Externref) Str = @es/\ (self) => self["type"] \/;
-    let set_type: fun(Externref, Str) void = @es/\ (self,value) => { self["type"] = value; } \/;
-}

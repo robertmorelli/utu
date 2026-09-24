@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserElementEventMap {
-    let get_fullscreenchange: fun(Externref) Externref = @es/\ (self) => self["fullscreenchange"] \/;
-    let set_fullscreenchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["fullscreenchange"] = value; } \/;
-    let get_fullscreenerror: fun(Externref) Externref = @es/\ (self) => self["fullscreenerror"] \/;
-    let set_fullscreenerror: fun(Externref, Externref) void = @es/\ (self,value) => { self["fullscreenerror"] = value; } \/;
-}

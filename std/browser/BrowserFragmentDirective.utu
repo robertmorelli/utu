@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserFragmentDirective {
-    let new_instance: fun() Externref = @es/\ () => new globalThis["FragmentDirective"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["FragmentDirective"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["FragmentDirective"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["FragmentDirective"]["prototype"] = value; } \/;
-}

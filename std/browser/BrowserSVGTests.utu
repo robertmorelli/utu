@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserSVGTests {
-    let get_requiredExtensions: fun(Externref) Externref = @es/\ (self) => self["requiredExtensions"] \/;
-    let get_systemLanguage: fun(Externref) Externref = @es/\ (self) => self["systemLanguage"] \/;
-}

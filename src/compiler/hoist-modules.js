@@ -72,7 +72,7 @@ function retainSourceDisplayNames(module, moduleDisplayName) {
   }
 }
 
-function hasLexicalShadow(ident, name) {
+export function hasLexicalShadow(ident, name) {
   const fn = ident.closest('ir-fn, ir-closure');
   if (fn?.querySelector(`:scope > ir-param-list > ir-param[name="${name}"], :scope > ir-self-param[name="${name}"]`)) return true;
   for (let node = ident.parentElement; node && node !== fn; node = node.parentElement) {
@@ -102,6 +102,21 @@ function rewriteExternalModuleReferences(root, module, moduleName, renamings) {
       'hoist-modules', 'qualified-type');
     ref.setAttribute('name', name);
     qualified.replaceWith(ref);
+  }
+
+  // Capitalized foreign members are valid expressions. When that grammar form
+  // names a native module type, preserve the existing static-method semantics.
+  const typeNames = new Set([...module.querySelectorAll(':scope > ir-struct, :scope > ir-enum, :scope > ir-type-def')]
+    .map(node => node.getAttribute('name')));
+  for (const access of [...root.querySelectorAll('ir-field-access')]) {
+    if (access.firstElementChild?.getAttribute('name') !== moduleName || !typeNames.has(access.getAttribute('field'))) continue;
+    const parent = access.parentElement;
+    if (parent?.localName !== 'ir-field-access' || parent.firstElementChild !== access) continue;
+    const member = replaceNodeMeta(root.ownerDocument.createElement('ir-type-member'), parent, 'hoist-modules', 'qualified-member');
+    member.setAttribute('method', parent.getAttribute('field'));
+    const type = replaceNodeMeta(root.ownerDocument.createElement('ir-type-ref'), access, 'hoist-modules', 'qualified-type');
+    type.setAttribute('name', renamings.get(access.getAttribute('field')));
+    member.appendChild(type); parent.replaceWith(member);
   }
 
   // Lowercase module free calls parse as an ordinary field access (`M.fn`).

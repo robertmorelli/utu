@@ -1,8 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserVideoEncoderInit {
-    let call_error: fun(Externref, Externref) void = @es/\ (self,p0) => self["error"](p0) \/;
-    let call_error_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["error"](...args) \/;
-    let call_output: fun(Externref, Externref) void = @es/\ (self,p0) => self["output"](p0) \/;
-    let call_output_arity2: fun(Externref, Externref, Externref) void = @es/\ (self,p0,p1) => self["output"](p0,p1) \/;
-    let call_output_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["output"](...args) \/;
-}

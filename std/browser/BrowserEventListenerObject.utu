@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEventListenerObject {
-    let call_handleEvent: fun(Externref, Externref) void = @es/\ (self,p0) => self["handleEvent"](p0) \/;
-    let call_handleEvent_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["handleEvent"](...args) \/;
-}

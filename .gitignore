@@ -50,3 +50,6 @@ codex.yml
 .vscode-test-web/
 .tmp
 .tmp/*
+
+# hand-written FFI binding experiments
+hand_written_bindings

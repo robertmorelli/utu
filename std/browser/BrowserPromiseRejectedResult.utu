@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPromiseRejectedResult {
-    let get_reason: fun(Externref) Externref = @es/\ (self) => self["reason"] \/;
-    let set_reason: fun(Externref, Externref) void = @es/\ (self,value) => { self["reason"] = value; } \/;
-    let get_status: fun(Externref) Str = @es/\ (self) => self["status"] \/;
-    let set_status: fun(Externref, Str) void = @es/\ (self,value) => { self["status"] = value; } \/;
-}

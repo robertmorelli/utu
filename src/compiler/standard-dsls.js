@@ -112,7 +112,7 @@ function signatureFromType(typeNode) {
   return { isFunction: false, params: [], result: typeNodeToStr(typeNode) };
 }
 
-function buildExternFn(doc, site, name, sig, importName) {
+export function buildExternFn(doc, site, name, sig, importName) {
   const fn = createSyntheticNode(doc, T.EXTERN_FN, site, 'expand-dsls', 'dsl-es-extern');
   fn.setAttribute('name', name);
   fn.dataset.extern = 'es';
@@ -155,7 +155,12 @@ function buildValueWrapper(doc, site, name, resultType, call) {
   return fn;
 }
 
-function buildTypeRef(doc, site, type) {
+export function buildTypeRef(doc, site, type) {
+  if (type.startsWith('?')) {
+    const nullable = createSyntheticNode(doc, T.TYPE_NULLABLE, site, 'expand-dsls', 'dsl-es-type');
+    nullable.appendChild(buildTypeRef(doc, site, type.slice(1)));
+    return nullable;
+  }
   if (type === 'void') return createSyntheticNode(doc, T.TYPE_VOID, site, 'expand-dsls', 'dsl-es-type');
   const node = createSyntheticNode(doc, T.TYPE_REF, site, 'expand-dsls', 'dsl-es-type');
   node.setAttribute('name', type);

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserTextTrackListEventMap {
-    let get_addtrack: fun(Externref) Externref = @es/\ (self) => self["addtrack"] \/;
-    let set_addtrack: fun(Externref, Externref) void = @es/\ (self,value) => { self["addtrack"] = value; } \/;
-    let get_change: fun(Externref) Externref = @es/\ (self) => self["change"] \/;
-    let set_change: fun(Externref, Externref) void = @es/\ (self,value) => { self["change"] = value; } \/;
-    let get_removetrack: fun(Externref) Externref = @es/\ (self) => self["removetrack"] \/;
-    let set_removetrack: fun(Externref, Externref) void = @es/\ (self,value) => { self["removetrack"] = value; } \/;
-}

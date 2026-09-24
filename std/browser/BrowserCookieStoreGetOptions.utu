@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCookieStoreGetOptions {
-    let get_name: fun(Externref) Externref = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Externref) void = @es/\ (self,value) => { self["name"] = value; } \/;
-    let get_url: fun(Externref) Externref = @es/\ (self) => self["url"] \/;
-    let set_url: fun(Externref, Externref) void = @es/\ (self,value) => { self["url"] = value; } \/;
-}

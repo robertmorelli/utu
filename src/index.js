@@ -1,6 +1,6 @@
 // Public API for the Utu compiler.
 
-export { generateBindingsFromProgram } from './bindings/generate.js';
+export { linkDeclarations } from './bindings/link.js';
 
 import {
   glueIsEmpty, glueModuleSource, importObjectFromEval, importObjectFromGlue,

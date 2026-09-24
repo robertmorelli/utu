@@ -1,118 +1,99 @@
 using Browser from std:Browser;
-using BrowserDocument from std:BrowserDocument;
-using BrowserHTMLElement from std:BrowserHTMLElement;
-using BrowserHTMLInputElement from std:BrowserHTMLInputElement;
-using BrowserEvent from std:BrowserEvent;
-using BrowserStorage from std:BrowserStorage;
-using BrowserGlobal_JSON from std:BrowserGlobal_JSON;
-using BrowserNodeList from std:BrowserNodeList;
-using JS from std:JS;
 
 struct Task:
     | done: Bool
 
-fn element(document: Externref, tag: Str, class_name: Str, label: Str) Externref {
-    let node: Externref = BrowserDocument.call_createElement(document, tag);
-    BrowserHTMLElement.call_setAttribute(node, "class", class_name);
-    BrowserHTMLElement.set_textContent(node, label);
+fn element(document: Browser.Document, tag: Str, class_name: Str, label: Str) Browser.HTMLElement {
+    let node = document.createElement(tag);
+    node.className = class_name;
+    node.textContent = label;
     node;
 }
 
-fn save(document: Externref) void {
-    let rows: Externref = BrowserDocument.call_querySelectorAll(document, ".task");
-    let data: Externref = JS.array();
-    let index: F64 = 0.0;
-    while (index < BrowserNodeList.get_length(rows)) {
-        let row: Externref = BrowserNodeList.call_item(rows, index);
-        let text: Externref = BrowserHTMLElement.call_querySelector(row, ".task-label");
-        let item: Externref = JS.object();
-        JS.set(item, "label", JS.string(BrowserHTMLElement.get_textContent(text)));
-        JS.set(item, "done", JS.boolean(BrowserHTMLElement.get_className(row) == "task done"));
-        JS.push(data, item);
-        index = index + 1.0;
-    };
-    BrowserStorage.call_setItem(Browser.get_localStorage(), "utu-focus-v1", BrowserGlobal_JSON.call_stringify(data));
+fn save(document: Browser.Document) void {
+    let data = Browser.Array();
+    document.querySelectorAll(".task").forEach(cl(row) void {
+        promote row.querySelector(".task-label") {
+            |text| => data.push(&{ label: text.textContent, done: row.classList.contains("done") }),
+            ~> {},
+        };
+    });
+    Browser.localStorage.setItem("utu-focus-v1", Browser.JSON.stringify(data));
 }
 
-fn paint(task: Task, row: Externref, toggle: Externref) void {
-    if task.done {
-        BrowserHTMLElement.call_setAttribute(row, "class", "task done");
-        BrowserHTMLElement.set_textContent(toggle, "✓");
-        BrowserHTMLElement.call_setAttribute(toggle, "aria-label", "Reopen task");
-    } else {
-        BrowserHTMLElement.call_setAttribute(row, "class", "task");
-        BrowserHTMLElement.set_textContent(toggle, "○");
-        BrowserHTMLElement.call_setAttribute(toggle, "aria-label", "Complete task");
-    };
+fn paint(task: Task, row: Browser.HTMLElement, toggle: Browser.HTMLElement) void {
+    row.classList.toggle("done", task.done);
+    toggle.textContent = if task.done { "✓"; } else { "○"; };
+    toggle.setAttribute("aria-label", if task.done { "Reopen task"; } else { "Complete task"; });
 }
 
-fn add_task(document: Externref, list: Externref, label: Str, initial_done: Bool) void {
+fn add_task(document: Browser.Document, list: Browser.HTMLElement, label: Str, initial_done: Bool) void {
     if label.len() > 0 {
         let task: Task = Task { done: initial_done };
-        let row: Externref = element(document, "li", "task", "");
-        let toggle: Externref = element(document, "button", "toggle", "○");
-        BrowserHTMLElement.call_setAttribute(toggle, "aria-label", "Complete task");
-        let text: Externref = element(document, "span", "task-label", label);
-        let remove: Externref = element(document, "button", "remove", "×");
-        BrowserHTMLElement.call_setAttribute(remove, "aria-label", "Delete task");
-        BrowserHTMLElement.call_appendChild(row, toggle);
-        BrowserHTMLElement.call_appendChild(row, text);
-        BrowserHTMLElement.call_appendChild(row, remove);
-        BrowserHTMLElement.call_appendChild(list, row);
+        let row = element(document, "li", "task", "");
+        let toggle = element(document, "button", "toggle", "○");
+        let text = element(document, "span", "task-label", label);
+        let remove = element(document, "button", "remove", "×");
+        remove.setAttribute("aria-label", "Delete task");
+        row.append(toggle, text, remove);
+        list.appendChild(row);
         paint(task, row, toggle);
-        BrowserHTMLElement.call_addEventListener(toggle, "click", JS.event_listener(cl(event) {
+        toggle.addEventListener("click", cl(event) void {
             task.done = not task.done;
             paint(task, row, toggle);
             save(document);
-        }));
-        BrowserHTMLElement.call_addEventListener(remove, "click", JS.event_listener(cl(event) {
-            BrowserHTMLElement.call_remove(row);
+        });
+        remove.addEventListener("click", cl(event) void {
+            row.remove();
             save(document);
-        }));
+        });
     };
 }
 
 export main() void {
-    let document: Externref = Browser.get_document();
-    let body: Externref = BrowserDocument.get_body(document);
-    let app: Externref = element(document, "main", "app", "");
-    BrowserHTMLElement.call_appendChild(body, app);
-    BrowserHTMLElement.call_appendChild(app, element(document, "p", "eyebrow", "UTU / BROWSER ABI EXPERIMENT"));
-    BrowserHTMLElement.call_appendChild(app, element(document, "h1", "title", "A little more focus."));
-    BrowserHTMLElement.call_appendChild(app, element(document, "p", "subtitle", "Make room for what matters. One task at a time."));
-    let panel: Externref = element(document, "section", "panel", "");
-    BrowserHTMLElement.call_appendChild(app, panel);
-    let form: Externref = element(document, "form", "new-task", "");
-    let input: Externref = element(document, "input", "task-input", "");
-    BrowserHTMLElement.call_setAttribute(input, "placeholder", "What would you like to do?");
-    BrowserHTMLElement.call_setAttribute(input, "aria-label", "New task");
-    BrowserHTMLElement.call_setAttribute(input, "maxlength", "200");
-    let submit: Externref = element(document, "button", "add", "Add task ↗");
-    BrowserHTMLElement.call_setAttribute(submit, "type", "submit");
-    BrowserHTMLElement.call_appendChild(form, input);
-    BrowserHTMLElement.call_appendChild(form, submit);
-    BrowserHTMLElement.call_appendChild(panel, form);
-    let list: Externref = element(document, "ul", "tasks", "");
-    BrowserHTMLElement.call_appendChild(panel, list);
-    let stored: Externref = BrowserStorage.call_getItem(Browser.get_localStorage(), "utu-focus-v1");
-    if JS.is_nullish(stored) {
-        add_task(document, list, "Build something small and useful", false);
-        add_task(document, list, "Take a proper screen break", false);
-        add_task(document, list, "Try the browser ABI from UTU", false);
-    } else {
-        let data: Externref = BrowserGlobal_JSON.call_parse(JS.as_string(stored));
-        let index: F64 = 0.0;
-        while (index < JS.length(data)) {
-            let item: Externref = JS.at(data, index);
-            add_task(document, list, JS.as_string(JS.get(item, "label")), JS.as_boolean(JS.get(item, "done")));
-            index = index + 1.0;
-        };
+    let document = Browser.document;
+    let app = element(document, "main", "app", "");
+    document.body.appendChild(app);
+    app.append(
+        element(document, "p", "eyebrow", "UTU / BROWSER ABI EXPERIMENT"),
+        element(document, "h1", "title", "A little more focus."),
+        element(document, "p", "subtitle", "Make room for what matters. One task at a time."),
+    );
+    let panel = element(document, "section", "panel", "");
+    app.appendChild(panel);
+    let form = element(document, "form", "new-task", "");
+    let input = document.createElement("input");
+    input.className = "task-input";
+    input.placeholder = "What would you like to do?";
+    input.maxLength = 200.0;
+    input.setAttribute("aria-label", "New task");
+    let submit = element(document, "button", "add", "Add task ↗");
+    submit.setAttribute("type", "submit");
+    form.append(input, submit);
+    let list = element(document, "ul", "tasks", "");
+    panel.append(form, list);
+    promote Browser.localStorage.getItem("utu-focus-v1") {
+        |stored| => {
+            let data = Browser.JSON.parse(stored);
+            let count: F64 = data.length;
+            let index: F64 = 0.0;
+            while (index < count) {
+                let item = data[index];
+                add_task(document, list, item.label, item.done);
+                index = index + 1.0;
+            };
+        },
+        ~> {
+            add_task(document, list, "Build something small and useful", false);
+            add_task(document, list, "Take a proper screen break", false);
+            add_task(document, list, "Try the browser ABI from UTU", false);
+        },
     };
-    BrowserHTMLElement.call_addEventListener(form, "submit", JS.event_listener(cl(event) {
-        BrowserEvent.call_preventDefault(event);
-        add_task(document, list, BrowserHTMLInputElement.get_value(input), false);
+    form.addEventListener("submit", cl(event) void {
+        event.preventDefault();
+        add_task(document, list, input.value, false);
         save(document);
-        BrowserHTMLInputElement.set_value(input, "");
-    }));
-    BrowserHTMLElement.call_appendChild(app, element(document, "p", "footnote", "DOM creation, events, state, and local storage are written in UTU. Browser calls come from generated .d.ts bindings."));
+        input.value = "";
+    });
+    app.appendChild(element(document, "p", "footnote", "DOM creation, events, state, and local storage are written in UTU. Browser calls come from generated .d.ts bindings."));
 }

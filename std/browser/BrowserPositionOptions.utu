@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPositionOptions {
-    let get_enableHighAccuracy: fun(Externref) Externref = @es/\ (self) => self["enableHighAccuracy"] \/;
-    let set_enableHighAccuracy: fun(Externref, Externref) void = @es/\ (self,value) => { self["enableHighAccuracy"] = value; } \/;
-    let get_maximumAge: fun(Externref) Externref = @es/\ (self) => self["maximumAge"] \/;
-    let set_maximumAge: fun(Externref, Externref) void = @es/\ (self,value) => { self["maximumAge"] = value; } \/;
-    let get_timeout: fun(Externref) Externref = @es/\ (self) => self["timeout"] \/;
-    let set_timeout: fun(Externref, Externref) void = @es/\ (self,value) => { self["timeout"] = value; } \/;
-}

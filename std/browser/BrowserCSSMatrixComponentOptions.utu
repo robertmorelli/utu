@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCSSMatrixComponentOptions {
-    let get_is2D: fun(Externref) Externref = @es/\ (self) => self["is2D"] \/;
-    let set_is2D: fun(Externref, Externref) void = @es/\ (self,value) => { self["is2D"] = value; } \/;
-}

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserFilePropertyBag {
-    let get_endings: fun(Externref) Externref = @es/\ (self) => self["endings"] \/;
-    let set_endings: fun(Externref, Externref) void = @es/\ (self,value) => { self["endings"] = value; } \/;
-    let get_lastModified: fun(Externref) Externref = @es/\ (self) => self["lastModified"] \/;
-    let set_lastModified: fun(Externref, Externref) void = @es/\ (self,value) => { self["lastModified"] = value; } \/;
-    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
-    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
-}

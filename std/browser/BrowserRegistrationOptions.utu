@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRegistrationOptions {
-    let get_scope: fun(Externref) Externref = @es/\ (self) => self["scope"] \/;
-    let set_scope: fun(Externref, Externref) void = @es/\ (self,value) => { self["scope"] = value; } \/;
-    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
-    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
-    let get_updateViaCache: fun(Externref) Externref = @es/\ (self) => self["updateViaCache"] \/;
-    let set_updateViaCache: fun(Externref, Externref) void = @es/\ (self,value) => { self["updateViaCache"] = value; } \/;
-}

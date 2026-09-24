@@ -1,0 +1,139 @@
+{
+  "engine": "V8 version 15.3.12",
+  "flags": [],
+  "platform": "darwin",
+  "arch": "arm64",
+  "methodology": "15 rotating-order samples after 10 warmup rounds. Same JS arrays and sums; setup/compilation excluded. Median and p10/p90 nanoseconds per element. Batch makes one crossing per entire sum.",
+  "wasmBytes": 364,
+  "wasmGzip": 256,
+  "liveGlueBytes": 571,
+  "checksum": -18513600,
+  "rows": [
+    {
+      "length": 32,
+      "rounds": 8192,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.7629394531251734,
+          "p10": 0.7591247558594219,
+          "p90": 0.9307861328126076,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.7438659667970658,
+          "p10": 0.7438659667966321,
+          "p90": 0.8964538574219271,
+          "relativeToJS": 0.9750000000000285
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 10.787963867187402,
+          "p10": 10.665893554687687,
+          "p90": 11.024475097656415,
+          "relativeToJS": 14.139999999996657
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 47.76000976562493,
+          "p10": 47.348022460937635,
+          "p90": 48.98071289062491,
+          "relativeToJS": 62.59999999998568
+        },
+        "utuCallback": {
+          "medianNsPerElement": 37.84942626953135,
+          "p10": 37.53662109374991,
+          "p90": 38.16986083984364,
+          "relativeToJS": 49.60999999998885
+        },
+        "utuBatch": {
+          "medianNsPerElement": 1.3885498046876248,
+          "p10": 1.3847351074216565,
+          "p90": 1.499176025390736,
+          "relativeToJS": 1.8199999999997498
+        }
+      }
+    },
+    {
+      "length": 4096,
+      "rounds": 64,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.9346008300781423,
+          "p10": 0.9307861328130412,
+          "p90": 0.9765624999998924,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.9384155273441108,
+          "p10": 0.9384155273432435,
+          "p90": 0.9422302246096457,
+          "relativeToJS": 1.0040816326534288
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 8.255004882812452,
+          "p10": 8.239746093749446,
+          "p90": 8.312225341797209,
+          "relativeToJS": 8.832653061224274
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 47.32894897460996,
+          "p10": 47.13439941406248,
+          "p90": 47.55020141601531,
+          "relativeToJS": 50.6408163265303
+        },
+        "utuCallback": {
+          "medianNsPerElement": 34.980773925781094,
+          "p10": 34.84725952148434,
+          "p90": 35.17532348632814,
+          "relativeToJS": 37.42857142857057
+        },
+        "utuBatch": {
+          "medianNsPerElement": 0.9384155273441108,
+          "p10": 0.9384155273432435,
+          "p90": 1.0070800781246045,
+          "relativeToJS": 1.0040816326534288
+        }
+      }
+    },
+    {
+      "length": 65536,
+      "rounds": 4,
+      "timings": {
+        "javascript": {
+          "medianNsPerElement": 0.9384155273441108,
+          "p10": 0.9346008300777087,
+          "p90": 0.9460449218751804,
+          "relativeToJS": 1
+        },
+        "javascriptReduce": {
+          "medianNsPerElement": 0.9384155273432435,
+          "p10": 0.9384155273432435,
+          "p90": 0.9498596191407152,
+          "relativeToJS": 0.9999999999990757
+        },
+        "utuIndexed": {
+          "medianNsPerElement": 8.270263671874591,
+          "p10": 8.247375488281381,
+          "p90": 8.358001708984492,
+          "relativeToJS": 8.813008130077478
+        },
+        "utuGeneric": {
+          "medianNsPerElement": 47.04666137695258,
+          "p10": 44.1093444824214,
+          "p90": 47.21450805664045,
+          "relativeToJS": 50.134146341443554
+        },
+        "utuCallback": {
+          "medianNsPerElement": 34.896850585938026,
+          "p10": 34.68704223632841,
+          "p90": 34.96551513671939,
+          "relativeToJS": 37.18699186990496
+        },
+        "utuBatch": {
+          "medianNsPerElement": 0.934600830078576,
+          "p10": 0.9346008300777087,
+          "p90": 0.9422302246087783,
+          "relativeToJS": 0.9959349593496911
+        }
+      }
+    }
+  ]
+}

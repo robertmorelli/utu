@@ -2,7 +2,7 @@
   "name": "utu-vscode",
   "displayName": "UTU",
   "version": "0.1.0",
-  "description": "UTU language support and compiler — tree-sitter frontend, HTML IR, and WasmGC backend.",
+  "description": "UTU language support and compiler \u2014 tree-sitter frontend, HTML IR, and WasmGC backend.",
   "publisher": "robertmorelli",
   "author": "Robert Morelli",
   "license": "MIT",
@@ -41,8 +41,13 @@
     "languages": [
       {
         "id": "utu",
-        "aliases": ["UTU", "utu"],
-        "extensions": [".utu"],
+        "aliases": [
+          "UTU",
+          "utu"
+        ],
+        "extensions": [
+          ".utu"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -127,7 +132,11 @@
       "properties": {
         "utu.validation.mode": {
           "type": "string",
-          "enum": ["onType", "onSave", "off"],
+          "enum": [
+            "onType",
+            "onSave",
+            "off"
+          ],
           "default": "onType",
           "markdownDescription": "Controls when UTU compiler diagnostics run."
         },
@@ -154,7 +163,8 @@
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "bindings:browser": "node ./tools/dts/cli.mjs --browser",
-    "test:bindings": "node ./scripts/dts-abi-tests.mjs && node ./scripts/test-dts-portability.mjs && node ./scripts/test-dts-browser.mjs",
+    "test:bindings": "node ./scripts/dts-abi-tests.mjs && node ./scripts/dts-deep-tests.mjs && node ./scripts/test-dts-portability.mjs && node ./scripts/test-dts-browser.mjs",
+    "bench:js-arrays": "node ./scripts/benchmark-js-arrays.mjs",
     "demo:build": "node ./tools/dts/demo.mjs",
     "demo:serve": "node ./tools/dts/demo.mjs --serve",
     "check": "bun ./cli/utu.mjs check",

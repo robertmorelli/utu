@@ -57,6 +57,10 @@ export function linkTypeDecls(doc, graph = null) {
     }
   }
 
+  if (doc.__utuForeign) {
+    for (const name of doc.__utuForeign.values.keys()) doc.__utuForeign.entry(name, doc, index);
+  }
+
   // ── 2. Resolve ir-type-ref nodes ──────────────────────────────────────────
   for (const ref of root.querySelectorAll('ir-type-ref')) {
     const name = ref.getAttribute('name');

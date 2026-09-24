@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaSourceEventMap {
-    let get_sourceclose: fun(Externref) Externref = @es/\ (self) => self["sourceclose"] \/;
-    let set_sourceclose: fun(Externref, Externref) void = @es/\ (self,value) => { self["sourceclose"] = value; } \/;
-    let get_sourceended: fun(Externref) Externref = @es/\ (self) => self["sourceended"] \/;
-    let set_sourceended: fun(Externref, Externref) void = @es/\ (self,value) => { self["sourceended"] = value; } \/;
-    let get_sourceopen: fun(Externref) Externref = @es/\ (self) => self["sourceopen"] \/;
-    let set_sourceopen: fun(Externref, Externref) void = @es/\ (self,value) => { self["sourceopen"] = value; } \/;
-}

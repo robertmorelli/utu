@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPromiseLike {
-    let call_then: fun(Externref) Externref = @es/\ (self) => self["then"]() \/;
-    let call_then_arity1: fun(Externref, Externref) Externref = @es/\ (self,p0) => self["then"](p0) \/;
-    let call_then_arity2: fun(Externref, Externref, Externref) Externref = @es/\ (self,p0,p1) => self["then"](p0,p1) \/;
-    let call_then_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["then"](...args) \/;
-}

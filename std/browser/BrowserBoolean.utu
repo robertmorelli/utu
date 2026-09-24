@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserBoolean {
-    let call_valueOf: fun(Externref) Bool = @es/\ (self) => (self["valueOf"]()) ? 1 : 0 \/;
-    let call_valueOf_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["valueOf"](...args) \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["Boolean"]() \/;
-    let new_instance_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["Boolean"](p0) \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Boolean"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["Boolean"]["prototype"] \/;
-}

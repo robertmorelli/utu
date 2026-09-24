@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserClipboardItemOptions {
-    let get_presentationStyle: fun(Externref) Externref = @es/\ (self) => self["presentationStyle"] \/;
-    let set_presentationStyle: fun(Externref, Externref) void = @es/\ (self,value) => { self["presentationStyle"] = value; } \/;
-}

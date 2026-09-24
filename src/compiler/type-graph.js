@@ -1,3 +1,5 @@
+import { foreignActual } from './foreign-abi.js';
+import { foreignAssignmentType } from './foreign-lowering.js';
 // type-graph.js — build, solve, then check the program's type graph
 
 import {
@@ -49,6 +51,7 @@ export function buildTypeGraph(doc, typeIndex) {
     byKind: programIndex.byKind, nodesByKind: programIndex.byKind,
     scopeGraph: retained.scope, slots: new Map(), rules: [], expectations: [],
     failures: [], coercions: [], changed: false,
+    nativeMember: (owner, member) => memberFn(graph, owner, member),
   };
   if (!root) return graph;
 
@@ -83,6 +86,11 @@ export function planContextualRewrites(graph) {
       rewrites.push({ kind: 'implicit-struct', node: value, type: unwrapNullable(expected), edge });
       continue;
     }
+    if (value?.localName === 'ir-tuple' && !value.getAttribute('type-name')
+        && graph.typeIndex?.get(unwrapNullable(expected))?.foreign) {
+      rewrites.push({ kind: 'tuple-type', node: value, type: unwrapNullable(expected), edge });
+      continue;
+    }
     if (value?.localName === 'ir-lit' && !value.getAttribute('type-name')) {
       const wanted = unwrapNullable(expected);
       if (adopters.get(value.getAttribute('kind'))?.has(wanted)) {
@@ -104,6 +112,13 @@ export function planContextualRewrites(graph) {
     if (value?.localName === 'ir-closure') {
       rewrites.push({ kind: 'closure-context', node: value, type: expected, edge });
     }
+    // `let handler = cl(event) {...}; target.on("x", handler)` — an untyped
+    // closure binding takes its parameter types from its first contextual use.
+    const binding = value?.localName === 'ir-ident' ? bindingOf(graph, value) : null;
+    const bound = binding?.localName === 'ir-let' && !declaredTypeStr(binding) ? binding.lastElementChild : null;
+    if (bound?.localName === 'ir-closure' && paramsOf(bound).some(p => !firstTypeChild(p) && !p.dataset.typeName)) {
+      rewrites.push({ kind: 'closure-context', node: bound, type: expected, edge });
+    }
   }
   return rewrites;
 }
@@ -116,6 +131,9 @@ export function applyContextualRewrites(graph, rewrites) {
       rewrite.node.setAttribute('type-name', rewrite.type);
       rewrite.node.removeAttribute('implicit');
       rewrite.node.dataset.loweredImplicitStructInit = 'true';
+      graph.changed = true;
+    } else if (rewrite.kind === 'tuple-type') {
+      rewrite.node.setAttribute('type-name', rewrite.type);
       graph.changed = true;
     } else if (rewrite.kind === 'literal-type') {
       rewrite.node.setAttribute('type-name', rewrite.type);
@@ -266,7 +284,7 @@ function addActualRule(graph, node) {
   const fixed = (type, source) => rule(graph, node, [], () => type, source);
   if (VOID_NODES.has(node.localName)) return fixed('void', node.localName.slice(3));
   const member = MEMBER_OPERATIONS.get(node.localName);
-  if (member) return rule(graph, node, [one], () => memberResult(graph, node, read(one), member), 'return-of');
+  if (member) return rule(graph, node, children, () => foreignActual(graph, node) ?? memberResult(graph, node, read(one), member), 'return-of');
 
   switch (node.localName) {
     case 'ir-lit': {
@@ -281,7 +299,7 @@ function addActualRule(graph, node) {
       return;
     }
     case 'ir-let': case 'ir-global':
-      return fixed(declaredTypeStr(node) ?? node.dataset.typeName, 'declared');
+      return rule(graph, node, [two], () => declaredTypeStr(node) ?? read(two), 'binding-value');
     case 'ir-self-param': {
       const name = node.closest('ir-fn')?.querySelector(':scope > ir-fn-name');
       const implementation = name?.querySelector(':scope > ir-type-args')?.firstElementChild;
@@ -295,6 +313,8 @@ function addActualRule(graph, node) {
       return;
     case 'ir-block': case 'ir-paren': {
       const value = node.localName === 'ir-block' ? two : one;
+      // A binding statement produces no value, even though the binding has a type.
+      if (node.localName === 'ir-block' && (!value || value.localName === 'ir-let')) return fixed('void', 'tail');
       return rule(graph, node, [value], () => read(value), node.localName === 'ir-block' ? 'tail' : 'identity');
     }
     case 'ir-unary':
@@ -305,25 +325,25 @@ function addActualRule(graph, node) {
       const then = children[1];
       const otherwise = children[2];
       if (!otherwise) return fixed('void', 'one-arm-if');
-      return rule(graph, node, [then, otherwise], () => unifyTypes(read(then), read(otherwise)), 'confluence');
+      return rule(graph, node, [then, otherwise], () => confluence(graph, node, [read(then), read(otherwise)]), 'confluence');
     }
     case 'ir-match': case 'ir-alt': {
       const bodies = [...node.children]
         .filter(child => /-arm$/.test(child.localName))
         .map(arm => arm.lastElementChild).filter(Boolean);
       return rule(graph, node, bodies,
-        () => bodies.map(read).reduce((type, next) => unifyTypes(type, next), null), 'confluence');
+        () => confluence(graph, node, bodies.map(read)), 'confluence');
     }
     case 'ir-promote': {
       const arm = node.querySelector(':scope > ir-promote-arm')?.lastElementChild;
       const fallback = node.querySelector(':scope > ir-default-arm')?.lastElementChild;
-      return rule(graph, node, [arm, fallback], () => unifyTypes(read(arm), read(fallback)), 'confluence');
+      return rule(graph, node, [arm, fallback].filter(Boolean), () => confluence(graph, node, [arm, fallback].filter(Boolean).map(read)), 'confluence');
     }
     case 'ir-else':
       return rule(graph, node, [one], () => read(one) && unwrapNullable(read(one)), 'unwrap-nullable');
     case 'ir-call': {
       const callee = node.firstElementChild;
-      return rule(graph, node, [...children, callee?.firstElementChild], () => callResult(graph, node), 'return-of');
+      return rule(graph, node, [...children, callee?.firstElementChild, ...node.querySelector(':scope > ir-arg-list')?.children ?? []], () => callResult(graph, node), 'return-of');
     }
     case 'ir-await':
       return rule(graph, node, [one], () => awaitedType(read(one), graph), 'awaited-type');
@@ -332,10 +352,14 @@ function addActualRule(graph, node) {
       const deps = [body, ...paramsOf(node)];
       return rule(graph, node, deps, () => closureType(graph, node, body), 'closure');
     }
+    case 'ir-type-member':
+      return rule(graph, node, [one], () => foreignActual(graph, node), 'foreign-member');
     case 'ir-field-access':
-      return rule(graph, node, [one], () => fieldActual(graph, node, read(one)), 'field-of');
+      return rule(graph, node, [one], () => foreignActual(graph, node) ?? fieldActual(graph, node, read(one)), 'field-of');
     case 'ir-struct-init':
-      return fixed(node.getAttribute('type-name'), 'struct-init');
+      return rule(graph, node, children.map(c => c.firstElementChild), () => foreignActual(graph, node) ?? node.getAttribute('type-name'), 'struct-init');
+    case 'ir-tuple':
+      return rule(graph, node, children, () => foreignActual(graph, node), 'tuple');
     case 'ir-null-ref':
       return fixed(node.getAttribute('type-name') ? `?${node.getAttribute('type-name')}` : 'null', 'null');
     case 'ir-ref-test': case 'ir-ref-is-null':
@@ -386,6 +410,9 @@ function operatorResult(graph, node, operandType, names) {
 }
 
 function callResult(graph, call) {
+  if (call.dataset.foreignResult) return call.dataset.foreignResult;
+  const foreign = foreignActual(graph, call);
+  if (foreign) return foreign;
   const fn = resolveCall(graph, call);
   if (fn) return fnReturnType(fn);
   const protocol = resolveProtocolCall(graph, call);
@@ -496,9 +523,13 @@ function collectOperationFailures(graph) {
   }
 
   for (const call of nodesOf(graph, 'ir-call')) {
+    if (call.dataset.foreignError) {
+      fail(graph, call, DIAGNOSTIC_KINDS.TYPE_MISMATCH, call.dataset.foreignError, {});
+      continue;
+    }
     checkArity(graph, call);
     const callee = call.firstElementChild;
-    if (resolvedFunction(graph, call) || graph.slots.get(call)?.protocolCall
+    if (graph.slots.get(call)?.foreign || resolvedFunction(graph, call) || graph.slots.get(call)?.protocolCall
       || callableParts(actual(graph, callee))) continue;
     if (callee?.localName !== 'ir-field-access' && callee?.localName !== 'ir-type-member') continue;
     const recv = callee.firstElementChild;
@@ -515,6 +546,7 @@ function collectOperationFailures(graph) {
 }
 
 function checkArity(graph, call) {
+  if (graph.slots.get(call)?.foreign) return;
   const fn = resolvedFunction(graph, call);
   const callee = call.firstElementChild;
   const protocol = graph.slots.get(call)?.protocolCall ?? resolveProtocolCall(graph, call);
@@ -603,13 +635,19 @@ function addExpectations(graph, node) {
   }
   if (tag === 'ir-assign') {
     const [target, value] = [...node.children];
-    expect(graph, value, () => actual(graph, target), 'assign', () => declaredSource(graph, target), 'assign');
+    expect(graph, value, () => foreignAssignmentType(graph, node) ?? actual(graph, target), 'assign', () => declaredSource(graph, target), 'assign');
   }
   if (tag === 'ir-call') {
     const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
     args.forEach((arg, index) => expect(graph, arg,
       () => callParameter(graph, node, args, index)?.type,
       'argument', () => callParameter(graph, node, args, index)?.source ?? node.firstElementChild, 'assign'));
+  }
+  if (tag === 'ir-struct-init' || tag === 'ir-tuple') {
+    // Host records and arrays give each element the declaration's context.
+    const values = tag === 'ir-tuple' ? [...node.children] : [...node.children].map(field => field.firstElementChild);
+    values.forEach((value, index) => expect(graph, value, () => graph.slots.get(node)?.foreign?.params[index],
+      'field', node, 'assign'));
   }
   if (tag === 'ir-struct-init') {
     const entry = graph.typeIndex?.get(node.getAttribute('type-name'));
@@ -630,6 +668,10 @@ function addExpectations(graph, node) {
   if (tag === 'ir-match' || tag === 'ir-alt' || tag === 'ir-promote') {
     addConfluence(graph, node, [...node.children]
       .filter(child => /-arm$/.test(child.localName)).map(arm => arm.lastElementChild));
+  }
+  if (tag === 'ir-promote') {
+    expect(graph, node.firstElementChild, () => 'nullable', 'promote', node, 'nullable',
+      () => 'promote requires a nullable value');
   }
   if (tag === 'ir-else') {
     const [value, fallback] = [...node.children];
@@ -667,6 +709,9 @@ function declaredSource(graph, node) {
 }
 
 function callParameter(graph, call, args, index) {
+  const foreign = graph.slots.get(call)?.foreign;
+  if (foreign) return { type: foreign.expected[index], source: call };
+  if (call.dataset.foreignParams) return { type: JSON.parse(call.dataset.foreignParams)[index], source: call };
   const fn = resolvedFunction(graph, call);
   if (!fn) {
     const protocol = graph.slots.get(call)?.protocolCall;
@@ -727,8 +772,23 @@ function addConfluence(graph, owner, values) {
   }
 }
 
+/**
+ * Branch types meet at a common type. Host-boxed numbers meet their primitive.
+ * In statement position, branches that cannot meet are void and their values
+ * are discarded; in value position the branch mismatch is reported.
+ */
+function confluence(graph, node, types) {
+  const meet = list => list.reduce((type, next) => unifyTypes(type, next), null);
+  const unboxed = type => graph.doc.__utuForeign?.values.get(unwrapNullable(type ?? ''))?.ref?.boxed ?? type;
+  const unified = meet(types) ?? (types.some(t => unboxed(t) !== t) ? meet(types.map(unboxed)) : null);
+  if (unified || !types.length || !types.every(Boolean)) return unified;
+  const used = graph.slots.get(node)?.expected.some(edge => { const type = edge.read(); return type && type !== 'void'; });
+  return used ? null : 'void';
+}
+
 function compatible(mode, actualType, expected, ctx) {
   if (mode === 'nullable') return actualType.startsWith('?');
+  if (mode === 'unify' && expected === 'void') return true;
   if (mode === 'unify') return actualType === 'null' || expected === 'null'
     || isAssignable(actualType, expected, ctx) || isAssignable(expected, actualType, ctx);
   return isAssignable(actualType, expected, ctx);
@@ -738,8 +798,10 @@ function coercionKind(from, to, ctx) {
   if (from === to || !isAssignable(from, to, ctx)) return null;
   const a = callableParts(from);
   const b = callableParts(to);
+  if (a?.kind === 'cl' && b?.kind === 'cl') return 'closure-widen';
   if (a?.kind === 'fun' && b?.kind === 'cl') return 'fun-to-cl';
   if (to.startsWith('?')) return 'nullable-widen';
+  if (ctx.typeIndex?.get(to)?.typeRepr === 'wasm-externref') return 'externref-widen';
   return 'variant-to-enum';
 }
 
@@ -749,9 +811,22 @@ function collectFailures(graph) {
   // can become stale across module hoisting. Report those as diagnostics too
   // instead of letting debug assertions or codegen crash on an unknown name.
   for (const [node, typeSlot] of graph.slots) {
+    if (node.dataset.foreignError) fail(graph, node, DIAGNOSTIC_KINDS.TYPE_MISMATCH, node.dataset.foreignError, {});
     const type = typeSlot.actual;
     if (type && !knownType(graph, type)) {
       fail(graph, node, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown inferred type '${type}'`, { type });
+    }
+  }
+  for (const tuple of nodesOf(graph, 'ir-tuple')) {
+    if (!actual(graph, tuple) && !tuple.dataset.foreignError) fail(graph, tuple, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+      'A tuple literal needs a declared host array type, such as a parameter typed `T[]`', {});
+  }
+  for (const closure of nodesOf(graph, 'ir-closure')) {
+    for (const param of paramsOf(closure)) {
+      if (declaredTypeStr(param) || actual(graph, param)) continue;
+      fail(graph, param, DIAGNOSTIC_KINDS.UNKNOWN_TYPE,
+        `Cannot infer the type of closure parameter '${param.getAttribute('name')}'; annotate it or pass the closure where its type is known`,
+        { parameter: param.getAttribute('name') });
     }
   }
   for (const node of nodesOf(graph, 'ir-await')) {

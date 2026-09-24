@@ -1,6 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserArrayBufferView {
-    let get_buffer: fun(Externref) Externref = @es/\ (self) => self["buffer"] \/;
-    let get_byteLength: fun(Externref) F64 = @es/\ (self) => self["byteLength"] \/;
-    let get_byteOffset: fun(Externref) F64 = @es/\ (self) => self["byteOffset"] \/;
-}

@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserQueuingStrategyInit {
-    let get_highWaterMark: fun(Externref) F64 = @es/\ (self) => self["highWaterMark"] \/;
-    let set_highWaterMark: fun(Externref, F64) void = @es/\ (self,value) => { self["highWaterMark"] = value; } \/;
-}

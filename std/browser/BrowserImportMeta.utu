@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserImportMeta {
-    let call_resolve: fun(Externref, Str) Str = @es/\ (self,p0) => self["resolve"](p0) \/;
-    let call_resolve_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["resolve"](...args) \/;
-    let get_url: fun(Externref) Str = @es/\ (self) => self["url"] \/;
-    let set_url: fun(Externref, Str) void = @es/\ (self,value) => { self["url"] = value; } \/;
-}

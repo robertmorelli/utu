@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserIdleRequestOptions {
-    let get_timeout: fun(Externref) Externref = @es/\ (self) => self["timeout"] \/;
-    let set_timeout: fun(Externref, Externref) void = @es/\ (self,value) => { self["timeout"] = value; } \/;
-}

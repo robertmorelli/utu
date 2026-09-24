@@ -18,6 +18,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.index_expr,
         $.slice_expr,
         $.call_expr,
+        $.new_expr,
         $.if_expr,
         $.promote_expr,
         $.match_expr,
@@ -64,6 +65,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
     tuple_expr: ($) =>
       seq('.', '{', $._expr, repeat(seq(',', $._expr)), optional(','), '}'),
 
+    new_expr: ($) => prec.right(15, seq('new', $._expr, '(', optional($.arg_list), ')')),
+
     call_expr: ($) => prec.left(14, seq($._expr, '(', optional($.arg_list), ')')),
 
     // TypeIdent.method or Module[T].method
@@ -71,7 +74,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
       prec.left(14, seq(
         choice($.instantiated_module_ref, $.inline_module_type_path, $.qualified_type_ref, $.type_ident),
         '.',
-        $.identifier,
+        choice($.identifier, $.type_ident),
       )),
 
     // T1.null — null reference for type T1
@@ -82,7 +85,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.module_name, $.module_type_arg_list, '.', $.identifier, '(', optional($.arg_list), ')',
       )),
 
-    field_expr: ($) => prec.left(14, seq($._expr, '.', $.identifier)),
+    field_expr: ($) => prec.left(14, seq($._expr, '.', choice($.identifier, $.type_ident))),
 
     // a[i]
     index_expr: ($) => prec.left(14, seq($._expr, '[', $._expr, ']')),
@@ -137,9 +140,11 @@ exports.buildExpressionRules = function buildExpressionRules() {
         optional(','),
       ),
 
+    global_member_expr: ($) => prec.left(14, seq($.type_ident, '.', choice($.identifier, $.type_ident))),
+
     assign_expr: ($) =>
       prec.right(0, seq(
-        choice($.identifier, $.field_expr, $.index_expr),
+        choice($.identifier, $.field_expr, $.index_expr, alias($.global_member_expr, $.type_member_expr)),
         choice('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', 'and=', 'or=', 'xor='),
         $._expr,
       )),
@@ -165,7 +170,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // alt on enum variants; ~> is the default arm
     alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), optional($.alt_default), '}'),
-    alt_arm: ($) => seq($.type_ident, optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
+    alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref), optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
     alt_default: ($) => seq('~>', $._expr, ','),
 
     for_expr: ($) => seq('for', '(', $.for_sources, ')', optional($.capture), $.block),
@@ -180,7 +185,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
     break_expr: (_) => 'break',
     return_expr: ($) => prec.right(seq('return', optional($._expr))),
 
-    bind_expr: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
+    bind_expr: ($) => seq('let', $.identifier, optional(seq(':', $._type)), '=', $._expr),
 
     // Explicit struct init: T1 { field: expr, ... }
     struct_init: ($) =>

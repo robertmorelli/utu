@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserSVGAnimatedPoints {
-    let get_animatedPoints: fun(Externref) Externref = @es/\ (self) => self["animatedPoints"] \/;
-    let get_points: fun(Externref) Externref = @es/\ (self) => self["points"] \/;
-}

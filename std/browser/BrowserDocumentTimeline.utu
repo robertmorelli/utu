@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserDocumentTimeline {
-    let get_currentTime: fun(Externref) Externref = @es/\ (self) => self["currentTime"] \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["DocumentTimeline"]() \/;
-    let new_instance_arity1: fun(Externref) Externref = @es/\ (p0) => new globalThis["DocumentTimeline"](p0) \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["DocumentTimeline"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["DocumentTimeline"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["DocumentTimeline"]["prototype"] = value; } \/;
-}

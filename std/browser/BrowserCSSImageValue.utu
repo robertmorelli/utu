@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCSSImageValue {
-    let call_toString: fun(Externref) Str = @es/\ (self) => self["toString"]() \/;
-    let call_toString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["toString"](...args) \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["CSSImageValue"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CSSImageValue"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CSSImageValue"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CSSImageValue"]["prototype"] = value; } \/;
-}

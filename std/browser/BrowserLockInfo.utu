@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserLockInfo {
-    let get_clientId: fun(Externref) Externref = @es/\ (self) => self["clientId"] \/;
-    let set_clientId: fun(Externref, Externref) void = @es/\ (self,value) => { self["clientId"] = value; } \/;
-    let get_mode: fun(Externref) Externref = @es/\ (self) => self["mode"] \/;
-    let set_mode: fun(Externref, Externref) void = @es/\ (self,value) => { self["mode"] = value; } \/;
-    let get_name: fun(Externref) Externref = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Externref) void = @es/\ (self,value) => { self["name"] = value; } \/;
-}

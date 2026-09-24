@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserVideoEncoderSupport {
-    let get_config: fun(Externref) Externref = @es/\ (self) => self["config"] \/;
-    let set_config: fun(Externref, Externref) void = @es/\ (self,value) => { self["config"] = value; } \/;
-    let get_supported: fun(Externref) Externref = @es/\ (self) => self["supported"] \/;
-    let set_supported: fun(Externref, Externref) void = @es/\ (self,value) => { self["supported"] = value; } \/;
-}

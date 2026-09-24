@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRemotePlaybackEventMap {
-    let get_connect: fun(Externref) Externref = @es/\ (self) => self["connect"] \/;
-    let set_connect: fun(Externref, Externref) void = @es/\ (self,value) => { self["connect"] = value; } \/;
-    let get_connecting: fun(Externref) Externref = @es/\ (self) => self["connecting"] \/;
-    let set_connecting: fun(Externref, Externref) void = @es/\ (self,value) => { self["connecting"] = value; } \/;
-    let get_disconnect: fun(Externref) Externref = @es/\ (self) => self["disconnect"] \/;
-    let set_disconnect: fun(Externref, Externref) void = @es/\ (self,value) => { self["disconnect"] = value; } \/;
-}

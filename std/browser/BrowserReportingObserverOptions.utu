@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserReportingObserverOptions {
-    let get_buffered: fun(Externref) Externref = @es/\ (self) => self["buffered"] \/;
-    let set_buffered: fun(Externref, Externref) void = @es/\ (self,value) => { self["buffered"] = value; } \/;
-    let get_types: fun(Externref) Externref = @es/\ (self) => self["types"] \/;
-    let set_types: fun(Externref, Externref) void = @es/\ (self,value) => { self["types"] = value; } \/;
-}

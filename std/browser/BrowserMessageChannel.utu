@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMessageChannel {
-    let get_port1: fun(Externref) Externref = @es/\ (self) => self["port1"] \/;
-    let get_port2: fun(Externref) Externref = @es/\ (self) => self["port2"] \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["MessageChannel"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["MessageChannel"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["MessageChannel"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["MessageChannel"]["prototype"] = value; } \/;
-}

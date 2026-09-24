@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCompressionStream {
-    let get_readable: fun(Externref) Externref = @es/\ (self) => self["readable"] \/;
-    let get_writable: fun(Externref) Externref = @es/\ (self) => self["writable"] \/;
-    let new_instance: fun(Str) Externref = @es/\ (p0) => new globalThis["CompressionStream"](p0) \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["CompressionStream"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["CompressionStream"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["CompressionStream"]["prototype"] = value; } \/;
-}

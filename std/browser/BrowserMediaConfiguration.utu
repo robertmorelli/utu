@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaConfiguration {
-    let get_audio: fun(Externref) Externref = @es/\ (self) => self["audio"] \/;
-    let set_audio: fun(Externref, Externref) void = @es/\ (self,value) => { self["audio"] = value; } \/;
-    let get_video: fun(Externref) Externref = @es/\ (self) => self["video"] \/;
-    let set_video: fun(Externref, Externref) void = @es/\ (self,value) => { self["video"] = value; } \/;
-}

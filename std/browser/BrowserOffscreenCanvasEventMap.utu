@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserOffscreenCanvasEventMap {
-    let get_contextlost: fun(Externref) Externref = @es/\ (self) => self["contextlost"] \/;
-    let set_contextlost: fun(Externref, Externref) void = @es/\ (self,value) => { self["contextlost"] = value; } \/;
-    let get_contextrestored: fun(Externref) Externref = @es/\ (self) => self["contextrestored"] \/;
-    let set_contextrestored: fun(Externref, Externref) void = @es/\ (self,value) => { self["contextrestored"] = value; } \/;
-}

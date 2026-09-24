@@ -1,6 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserAudio {
-    let new_instance: fun() Externref = @es/\ () => new globalThis["Audio"]() \/;
-    let new_instance_arity1: fun(Str) Externref = @es/\ (p0) => new globalThis["Audio"](p0) \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["Audio"](...args) \/;
-}

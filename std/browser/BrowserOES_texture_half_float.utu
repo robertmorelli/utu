@@ -1,4 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserOES_texture_half_float {
-    let get_HALF_FLOAT_OES: fun(Externref) F64 = @es/\ (self) => self["HALF_FLOAT_OES"] \/;
-}

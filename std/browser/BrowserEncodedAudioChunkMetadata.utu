@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEncodedAudioChunkMetadata {
-    let get_decoderConfig: fun(Externref) Externref = @es/\ (self) => self["decoderConfig"] \/;
-    let set_decoderConfig: fun(Externref, Externref) void = @es/\ (self,value) => { self["decoderConfig"] = value; } \/;
-}

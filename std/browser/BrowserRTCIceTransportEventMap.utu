@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRTCIceTransportEventMap {
-    let get_gatheringstatechange: fun(Externref) Externref = @es/\ (self) => self["gatheringstatechange"] \/;
-    let set_gatheringstatechange: fun(Externref, Externref) void = @es/\ (self,value) => { self["gatheringstatechange"] = value; } \/;
-    let get_selectedcandidatepairchange: fun(Externref) Externref = @es/\ (self) => self["selectedcandidatepairchange"] \/;
-    let set_selectedcandidatepairchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["selectedcandidatepairchange"] = value; } \/;
-    let get_statechange: fun(Externref) Externref = @es/\ (self) => self["statechange"] \/;
-    let set_statechange: fun(Externref, Externref) void = @es/\ (self,value) => { self["statechange"] = value; } \/;
-}

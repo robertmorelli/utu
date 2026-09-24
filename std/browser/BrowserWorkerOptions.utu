@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserWorkerOptions {
-    let get_credentials: fun(Externref) Externref = @es/\ (self) => self["credentials"] \/;
-    let set_credentials: fun(Externref, Externref) void = @es/\ (self,value) => { self["credentials"] = value; } \/;
-    let get_name: fun(Externref) Externref = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Externref) void = @es/\ (self,value) => { self["name"] = value; } \/;
-    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
-    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
-}

@@ -1,3 +1,6 @@
+import { ForeignABI, prepareForeignImports } from './foreign-types.js';
+import { lowerForeignOperations } from './foreign-lowering.js';
+import { buildExternFn } from './standard-dsls.js';
 // compiler.js — Compiler factory with dependency injection
 //
 // The compiler is created via `createCompiler(env)` where `env` carries all
@@ -45,9 +48,9 @@ import { lowerBackendControl } from './lower-backend-control.js';
 import { validateAnalysis } from './validate-analysis.js';
 import { createStandardDsls } from './standard-dsls.js';
 import { PLATFORM_SOURCES } from './platform-sources.generated.js';
-import { stampOriginFile } from './ir-helpers.js';
+import { paramsOf, stampOriginFile } from './ir-helpers.js';
 import { createExplainabilityArtifacts, pushDiagnostic } from './explainability.js';
-import { diagnosticFacts } from './diagnostics.js';
+import { diagnosticFacts, DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { collectAnalysisDiagnostics } from './collect-analysis-diagnostics.js';
 import { createAnalysisSnapshot } from './analysis-snapshot.js';
 import { ANALYSIS_TOKENS } from './analysis-tokens.js';
@@ -155,7 +158,7 @@ export function createCompiler(env) {
   }
 
   async function compileFileInternal(filePath) {
-    const { graph, order, imports } = await buildModuleGraph(filePath, {
+    const { graph, order, imports, foreign } = await buildModuleGraph(filePath, {
       parser,
       readFile,
       resolvePath,
@@ -165,10 +168,13 @@ export function createCompiler(env) {
       debugAssertions,
       collectAnalysisTokens: target === 'analysis',
     });
+    const foreignABI = foreign.size ? new ForeignABI(foreign) : null;
+    if (foreignABI) prepareForeignImports(graph, imports, foreignABI);
     debugAssert(graph.get(filePath), 'buildModuleGraph');
     bringTargetToTopLevel(graph.get(filePath), { target, filePath, debugAssertions });
     debugAssert(graph.get(filePath), 'bringTargetToTopLevel');
     const doc = inlineImports(graph, order, { debugAssertions });
+    doc.__utuForeign = foreignABI;
     doc.__utuSourceTexts = new Map([...graph].map(([file, sourceDoc]) => [file, sourceDoc.__utuSourceText ?? '']));
     if (target === 'analysis') {
       doc[ANALYSIS_TOKENS] = [...graph.values()].flatMap(sourceDoc => sourceDoc[ANALYSIS_TOKENS] ?? []);
@@ -241,6 +247,25 @@ export function createCompiler(env) {
     projectTypeGraph(typeGraph); // explicit compatibility boundary for typed lowerings
     debugAssert(doc, 'solveTypeGraph', { typeIndex, requireBindings: true });
 
+    if (lowerForeignOperations(typeGraph, buildExternFn)) {
+      refreshProgramIndex(doc);
+      typeIndex = linkTypeDecls(doc, elaboration);
+      retainGraph(doc, 'scope', resolveBindings(doc));
+      typeGraph = retainGraph(doc, 'types', settleTypeGraph(doc, typeIndex));
+      projectTypeGraph(typeGraph);
+    }
+
+    // A closure parameter with no annotation and no context has no representation.
+    // Report it before closure conversion needs one.
+    const untyped = [...doc.querySelectorAll('ir-closure')].flatMap(paramsOf)
+      .filter(param => !param.querySelector(':scope > [name], :scope > *') && !typeGraph.slots.get(param)?.actual);
+    for (const param of untyped) {
+      stampDiagnostic(param, DIAGNOSTIC_KINDS.UNKNOWN_TYPE,
+        `Cannot infer the type of closure parameter '${param.getAttribute('name')}'; annotate it or pass the closure where its type is known`,
+        { parameter: param.getAttribute('name') });
+    }
+    if (untyped.length) { projectGraphs(doc); return doc; }
+
     // Closure and operator lowering invalidate structure, scope, and resolution
     // facts. They consume this settled graph, then the complete semantic set is
     // rebuilt below rather than transferring hidden attributes across phases.
@@ -262,6 +287,10 @@ export function createCompiler(env) {
     debugAssert(doc, 'checkTypeGraph', { typeIndex, requireBindings: true });
     validateAnalysis(doc, typeIndex);
     debugAssert(doc, 'validateAnalysis', { typeIndex, requireBindings: true });
+
+    // Lowering an ill-typed program would detach the nodes that carry its
+    // diagnostics; report them against the checked program instead.
+    if (target !== 'analysis' && diagnosticFacts(doc).size > 0) { projectGraphs(doc); return doc; }
 
     // Backend control lowering is another destructive boundary. Normal builds
     // receive a fresh canonical graph set for the lowered program; analysis

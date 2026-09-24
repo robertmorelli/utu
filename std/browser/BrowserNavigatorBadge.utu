@@ -1,8 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserNavigatorBadge {
-    let call_clearAppBadge: fun(Externref) Externref = @es/\ (self) => self["clearAppBadge"]() \/;
-    let call_clearAppBadge_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["clearAppBadge"](...args) \/;
-    let call_setAppBadge: fun(Externref) Externref = @es/\ (self) => self["setAppBadge"]() \/;
-    let call_setAppBadge_arity1: fun(Externref, F64) Externref = @es/\ (self,p0) => self["setAppBadge"](p0) \/;
-    let call_setAppBadge_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setAppBadge"](...args) \/;
-}

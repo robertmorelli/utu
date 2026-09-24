@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPaymentResponseEventMap {
-    let get_payerdetailchange: fun(Externref) Externref = @es/\ (self) => self["payerdetailchange"] \/;
-    let set_payerdetailchange: fun(Externref, Externref) void = @es/\ (self,value) => { self["payerdetailchange"] = value; } \/;
-}

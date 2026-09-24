@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserEcdhKeyDeriveParams {
-    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
-    let get_public: fun(Externref) Externref = @es/\ (self) => self["public"] \/;
-    let set_public: fun(Externref, Externref) void = @es/\ (self,value) => { self["public"] = value; } \/;
-}

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaSettingsRange {
-    let get_max: fun(Externref) Externref = @es/\ (self) => self["max"] \/;
-    let set_max: fun(Externref, Externref) void = @es/\ (self,value) => { self["max"] = value; } \/;
-    let get_min: fun(Externref) Externref = @es/\ (self) => self["min"] \/;
-    let set_min: fun(Externref, Externref) void = @es/\ (self,value) => { self["min"] = value; } \/;
-    let get_step: fun(Externref) Externref = @es/\ (self) => self["step"] \/;
-    let set_step: fun(Externref, Externref) void = @es/\ (self,value) => { self["step"] = value; } \/;
-}

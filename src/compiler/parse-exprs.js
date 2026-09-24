@@ -13,7 +13,7 @@ import {
 } from './parse-exprs-control.js';
 import {
   walkAssertExpr, walkAwaitExpr, walkBindExpr, walkBreakExpr, walkClosureExpr, walkDslExpr,
-  walkFatalExpr, walkFieldInit, walkReturnExpr, walkStructInit,
+  walkFatalExpr, walkFieldInit, walkReturnExpr, walkStructInit, walkTupleExpr,
 } from './parse-exprs-statements.js';
 
 export const walkers = {
@@ -25,6 +25,11 @@ export const walkers = {
   'assign_expr':                 walkAssignExpr,
   'else_expr':                   walkElseExpr,
   'pipe_expr':                   walkPipeExpr,
+  'new_expr': (n, doc, source, dispatch) => {
+    const node = walkCallExpr(n, doc, source, dispatch);
+    node.setAttribute('construct', 'true');
+    return node;
+  },
   'call_expr':                   walkCallExpr,
   'type_member_expr':            walkTypeMemberExpr,
   'promoted_module_call_expr':   walkModCallExpr,
@@ -45,6 +50,7 @@ export const walkers = {
   'break_expr':                  walkBreakExpr,
   'fatal_expr':                  walkFatalExpr,
   'assert_expr':                 walkAssertExpr,
+  'tuple_expr':                  walkTupleExpr,
   'struct_init':                 (n, doc, source, dispatch) => walkStructInit(n, doc, source, dispatch, false),
   'implicit_struct_init':        (n, doc, source, dispatch) => walkStructInit(n, doc, source, dispatch, true),
   'closure_expr':                walkClosureExpr,

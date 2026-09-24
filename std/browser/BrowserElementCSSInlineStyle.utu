@@ -1,6 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserElementCSSInlineStyle {
-    let get_attributeStyleMap: fun(Externref) Externref = @es/\ (self) => self["attributeStyleMap"] \/;
-    let get_style: fun(Externref) Externref = @es/\ (self) => self["style"] \/;
-    let set_style: fun(Externref, Externref) void = @es/\ (self,value) => { self["style"] = value; } \/;
-}

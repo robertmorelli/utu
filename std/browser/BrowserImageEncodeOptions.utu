@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserImageEncodeOptions {
-    let get_quality: fun(Externref) Externref = @es/\ (self) => self["quality"] \/;
-    let set_quality: fun(Externref, Externref) void = @es/\ (self,value) => { self["quality"] = value; } \/;
-    let get_type: fun(Externref) Externref = @es/\ (self) => self["type"] \/;
-    let set_type: fun(Externref, Externref) void = @es/\ (self,value) => { self["type"] = value; } \/;
-}

@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserOfflineAudioContextEventMap {
-    let get_complete: fun(Externref) Externref = @es/\ (self) => self["complete"] \/;
-    let set_complete: fun(Externref, Externref) void = @es/\ (self,value) => { self["complete"] = value; } \/;
-    let get_statechange: fun(Externref) Externref = @es/\ (self) => self["statechange"] \/;
-    let set_statechange: fun(Externref, Externref) void = @es/\ (self,value) => { self["statechange"] = value; } \/;
-}

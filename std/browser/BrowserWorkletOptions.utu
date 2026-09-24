@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserWorkletOptions {
-    let get_credentials: fun(Externref) Externref = @es/\ (self) => self["credentials"] \/;
-    let set_credentials: fun(Externref, Externref) void = @es/\ (self,value) => { self["credentials"] = value; } \/;
-}

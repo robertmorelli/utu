@@ -18,7 +18,7 @@ import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
  *   readFile    — (path: string) => Promise<string>
  *   resolvePath — (fromFile: string, importPath: string) => string
  *                 resolves a relative import path to an absolute key
- *   stdlib      — Map<string, string>  platform URI → utu source
+ *   stdlib      — Map<string, string | Function>  platform URI → utu source
  *                 e.g. "std:Array" → "<source>". Defaults to empty map.
  * @returns {Promise<{ graph: Map<string, Document>, order: string[], imports: Array<object> }>}
  *   graph — filePath → linkedom Document (ir-source-file at body.firstChild)
@@ -31,6 +31,8 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
   /** @type {string[]} */
   const order = [];
   const imports = [];
+  const lazy = new Map();
+  const foreign = new Map();
   // DFS colouring: undefined = unvisited, 'active' = on stack, 'done' = finished
   /** @type {Map<string, 'active' | 'done'>} */
   const color = new Map();
@@ -43,6 +45,14 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
     color.set(filePath, 'active');
     // Check visitation before I/O: diamond imports read and parse a file once.
     source ??= await readFile(filePath);
+    if (filePath.endsWith('.abi.json')) {
+      const abi = JSON.parse(source);
+      if (abi.version !== 1 || !Array.isArray(abi.types) || !abi.exports || !abi.names || !/^[A-Z][A-Za-z0-9_]*$/.test(abi.prefix)) {
+        throw new Error(`Invalid declaration ABI: ${filePath}`);
+      }
+      foreign.set(filePath, abi);
+      source = `mod ${abi.prefix} {}`;
+    }
     const doc    = parseToIR(parser, source, filePath, createDocument, { collectAnalysisTokens });
     // Every ir-source-file needs data-file so cloned nodes can trace back to
     // their origin. This is the one place we know the canonical path.
@@ -78,7 +88,11 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
               importKind: 'platform',
             });
           }
-          await visitSource(abs, stdlib.get(abs));
+          const source = stdlib.get(abs);
+          if (typeof source === 'function') {
+            lazy.set(abs, source);
+            await visitSource(abs, '');
+          } else await visitSource(abs, source);
         } else {
           await visitSource(abs);
         }
@@ -90,8 +104,18 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
   }
 
   await visitSource(entryPath);
+  for (const [filePath, generate] of lazy) {
+    const generated = await generate({ documents: graph, imports });
+    const source = typeof generated === "string" ? generated : generated.source;
+    if (generated.abi) foreign.set(filePath, generated.abi);
+    const doc = parseToIR(parser, source, filePath, createDocument, { collectAnalysisTokens });
+    doc.body.firstChild.dataset.file = filePath;
+    stampOriginFile(doc.body.firstChild, filePath);
+    if (doc.querySelector('ir-using')) throw new Error(`Lazy platform source ${filePath} must be self-contained`);
+    graph.set(filePath, doc);
+  }
   if (debugAssertions) assertBuildGraph(graph, order);
-  return { graph, order, imports };
+  return { graph, order, imports, foreign };
 }
 
 // Historical public name retained for standalone consumers.

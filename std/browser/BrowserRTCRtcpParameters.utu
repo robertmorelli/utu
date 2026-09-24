@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRTCRtcpParameters {
-    let get_cname: fun(Externref) Externref = @es/\ (self) => self["cname"] \/;
-    let set_cname: fun(Externref, Externref) void = @es/\ (self,value) => { self["cname"] = value; } \/;
-    let get_reducedSize: fun(Externref) Externref = @es/\ (self) => self["reducedSize"] \/;
-    let set_reducedSize: fun(Externref, Externref) void = @es/\ (self,value) => { self["reducedSize"] = value; } \/;
-}

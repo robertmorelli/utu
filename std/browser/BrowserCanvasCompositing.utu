@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserCanvasCompositing {
-    let get_globalAlpha: fun(Externref) F64 = @es/\ (self) => self["globalAlpha"] \/;
-    let set_globalAlpha: fun(Externref, F64) void = @es/\ (self,value) => { self["globalAlpha"] = value; } \/;
-    let get_globalCompositeOperation: fun(Externref) Str = @es/\ (self) => self["globalCompositeOperation"] \/;
-    let set_globalCompositeOperation: fun(Externref, Str) void = @es/\ (self,value) => { self["globalCompositeOperation"] = value; } \/;
-}

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserNavigatorLogin {
-    let call_setStatus: fun(Externref, Str) Externref = @es/\ (self,p0) => self["setStatus"](p0) \/;
-    let call_setStatus_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["setStatus"](...args) \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["NavigatorLogin"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["NavigatorLogin"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["NavigatorLogin"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["NavigatorLogin"]["prototype"] = value; } \/;
-}

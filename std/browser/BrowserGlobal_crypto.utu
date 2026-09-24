@@ -1,8 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserGlobal_crypto {
-    let call_getRandomValues: fun(Externref) Externref = @es/\ (p0) => globalThis["crypto"]["getRandomValues"](p0) \/;
-    let call_getRandomValues_js: fun(Externref) Externref = @es/\ (args) => globalThis["crypto"]["getRandomValues"](...args) \/;
-    let call_randomUUID: fun() Str = @es/\ () => globalThis["crypto"]["randomUUID"]() \/;
-    let call_randomUUID_js: fun(Externref) Externref = @es/\ (args) => globalThis["crypto"]["randomUUID"](...args) \/;
-    let get_subtle: fun() Externref = @es/\ () => globalThis["crypto"]["subtle"] \/;
-}

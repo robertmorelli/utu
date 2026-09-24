@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPushSubscriptionOptionsInit {
-    let get_applicationServerKey: fun(Externref) Externref = @es/\ (self) => self["applicationServerKey"] \/;
-    let set_applicationServerKey: fun(Externref, Externref) void = @es/\ (self,value) => { self["applicationServerKey"] = value; } \/;
-    let get_userVisibleOnly: fun(Externref) Externref = @es/\ (self) => self["userVisibleOnly"] \/;
-    let set_userVisibleOnly: fun(Externref, Externref) void = @es/\ (self,value) => { self["userVisibleOnly"] = value; } \/;
-}

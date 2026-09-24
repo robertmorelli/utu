@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserWeakRef {
-    let get_symbol_toStringTag: fun(Externref) Str = @es/\ (self) => self[Symbol.toStringTag] \/;
-    let call_deref: fun(Externref) Externref = @es/\ (self) => self["deref"]() \/;
-    let call_deref_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["deref"](...args) \/;
-    let new_instance: fun(Externref) Externref = @es/\ (p0) => new globalThis["WeakRef"](p0) \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["WeakRef"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["WeakRef"]["prototype"] \/;
-}

@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRsaKeyAlgorithm {
-    let get_modulusLength: fun(Externref) F64 = @es/\ (self) => self["modulusLength"] \/;
-    let set_modulusLength: fun(Externref, F64) void = @es/\ (self,value) => { self["modulusLength"] = value; } \/;
-    let get_name: fun(Externref) Str = @es/\ (self) => self["name"] \/;
-    let set_name: fun(Externref, Str) void = @es/\ (self,value) => { self["name"] = value; } \/;
-    let get_publicExponent: fun(Externref) Externref = @es/\ (self) => self["publicExponent"] \/;
-    let set_publicExponent: fun(Externref, Externref) void = @es/\ (self,value) => { self["publicExponent"] = value; } \/;
-}

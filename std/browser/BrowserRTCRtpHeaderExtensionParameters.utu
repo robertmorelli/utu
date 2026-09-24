@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRTCRtpHeaderExtensionParameters {
-    let get_encrypted: fun(Externref) Externref = @es/\ (self) => self["encrypted"] \/;
-    let set_encrypted: fun(Externref, Externref) void = @es/\ (self,value) => { self["encrypted"] = value; } \/;
-    let get_id: fun(Externref) F64 = @es/\ (self) => self["id"] \/;
-    let set_id: fun(Externref, F64) void = @es/\ (self,value) => { self["id"] = value; } \/;
-    let get_uri: fun(Externref) Str = @es/\ (self) => self["uri"] \/;
-    let set_uri: fun(Externref, Str) void = @es/\ (self,value) => { self["uri"] = value; } \/;
-}

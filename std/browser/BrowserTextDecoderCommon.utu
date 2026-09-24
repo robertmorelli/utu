@@ -1,6 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserTextDecoderCommon {
-    let get_encoding: fun(Externref) Str = @es/\ (self) => self["encoding"] \/;
-    let get_fatal: fun(Externref) Bool = @es/\ (self) => (self["fatal"]) ? 1 : 0 \/;
-    let get_ignoreBOM: fun(Externref) Bool = @es/\ (self) => (self["ignoreBOM"]) ? 1 : 0 \/;
-}

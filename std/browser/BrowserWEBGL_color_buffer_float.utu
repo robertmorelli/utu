@@ -1,6 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserWEBGL_color_buffer_float {
-    let get_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE_EXT: fun(Externref) F64 = @es/\ (self) => self["FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE_EXT"] \/;
-    let get_RGBA32F_EXT: fun(Externref) F64 = @es/\ (self) => self["RGBA32F_EXT"] \/;
-    let get_UNSIGNED_NORMALIZED_EXT: fun(Externref) F64 = @es/\ (self) => self["UNSIGNED_NORMALIZED_EXT"] \/;
-}

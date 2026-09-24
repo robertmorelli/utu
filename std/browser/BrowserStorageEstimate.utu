@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserStorageEstimate {
-    let get_quota: fun(Externref) Externref = @es/\ (self) => self["quota"] \/;
-    let set_quota: fun(Externref, Externref) void = @es/\ (self,value) => { self["quota"] = value; } \/;
-    let get_usage: fun(Externref) Externref = @es/\ (self) => self["usage"] \/;
-    let set_usage: fun(Externref, Externref) void = @es/\ (self,value) => { self["usage"] = value; } \/;
-}

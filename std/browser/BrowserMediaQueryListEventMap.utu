@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaQueryListEventMap {
-    let get_change: fun(Externref) Externref = @es/\ (self) => self["change"] \/;
-    let set_change: fun(Externref, Externref) void = @es/\ (self,value) => { self["change"] = value; } \/;
-}

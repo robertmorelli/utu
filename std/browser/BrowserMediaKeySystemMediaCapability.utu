@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserMediaKeySystemMediaCapability {
-    let get_contentType: fun(Externref) Externref = @es/\ (self) => self["contentType"] \/;
-    let set_contentType: fun(Externref, Externref) void = @es/\ (self,value) => { self["contentType"] = value; } \/;
-    let get_encryptionScheme: fun(Externref) Externref = @es/\ (self) => self["encryptionScheme"] \/;
-    let set_encryptionScheme: fun(Externref, Externref) void = @es/\ (self,value) => { self["encryptionScheme"] = value; } \/;
-    let get_robustness: fun(Externref) Externref = @es/\ (self) => self["robustness"] \/;
-    let set_robustness: fun(Externref, Externref) void = @es/\ (self,value) => { self["robustness"] = value; } \/;
-}

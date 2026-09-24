@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserNavigatorContentUtils {
-    let call_registerProtocolHandler: fun(Externref, Str, Externref) void = @es/\ (self,p0,p1) => self["registerProtocolHandler"](p0,p1) \/;
-    let call_registerProtocolHandler_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["registerProtocolHandler"](...args) \/;
-}

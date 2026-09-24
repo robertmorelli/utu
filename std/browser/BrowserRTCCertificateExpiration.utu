@@ -1,5 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRTCCertificateExpiration {
-    let get_expires: fun(Externref) Externref = @es/\ (self) => self["expires"] \/;
-    let set_expires: fun(Externref, Externref) void = @es/\ (self,value) => { self["expires"] = value; } \/;
-}

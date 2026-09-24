@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserXMLSerializer {
-    let call_serializeToString: fun(Externref, Externref) Str = @es/\ (self,p0) => self["serializeToString"](p0) \/;
-    let call_serializeToString_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["serializeToString"](...args) \/;
-    let new_instance: fun() Externref = @es/\ () => new globalThis["XMLSerializer"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["XMLSerializer"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["XMLSerializer"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["XMLSerializer"]["prototype"] = value; } \/;
-}

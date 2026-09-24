@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserWebGLBuffer {
-    let new_instance: fun() Externref = @es/\ () => new globalThis["WebGLBuffer"]() \/;
-    let new_instance_js: fun(Externref) Externref = @es/\ (args) => new globalThis["WebGLBuffer"](...args) \/;
-    let static_get_prototype: fun() Externref = @es/\ () => globalThis["WebGLBuffer"]["prototype"] \/;
-    let static_set_prototype: fun(Externref) void = @es/\ (value) => { globalThis["WebGLBuffer"]["prototype"] = value; } \/;
-}

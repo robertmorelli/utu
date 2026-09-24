@@ -23,3 +23,7 @@ export const identity = value => value;
 export const Util = {label:'namespace',scale:n=>n*2,Nested:{answer:42}};
 
 export const dictionary = { answer: 42 };
+
+export const optionalText = present => present ? 'present' : null;
+
+export const optionalNumber = present => present ? 42 : null;

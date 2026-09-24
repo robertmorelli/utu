@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserClassAccessorDecoratorTarget {
-    let call_get: fun(Externref) Externref = @es/\ (self) => self["get"]() \/;
-    let call_get_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["get"](...args) \/;
-    let call_set: fun(Externref, Externref) void = @es/\ (self,p0) => self["set"](p0) \/;
-    let call_set_js: fun(Externref, Externref) Externref = @es/\ (self,args) => self["set"](...args) \/;
-}

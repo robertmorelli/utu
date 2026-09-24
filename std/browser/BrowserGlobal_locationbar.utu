@@ -1,4 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserGlobal_locationbar {
-    let get_visible: fun() Bool = @es/\ () => (globalThis["locationbar"]["visible"]) ? 1 : 0 \/;
-}

@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserNavigationPreloadState {
-    let get_enabled: fun(Externref) Externref = @es/\ (self) => self["enabled"] \/;
-    let set_enabled: fun(Externref, Externref) void = @es/\ (self,value) => { self["enabled"] = value; } \/;
-    let get_headerValue: fun(Externref) Externref = @es/\ (self) => self["headerValue"] \/;
-    let set_headerValue: fun(Externref, Externref) void = @es/\ (self,value) => { self["headerValue"] = value; } \/;
-}

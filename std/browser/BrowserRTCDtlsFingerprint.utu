@@ -1,7 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserRTCDtlsFingerprint {
-    let get_algorithm: fun(Externref) Externref = @es/\ (self) => self["algorithm"] \/;
-    let set_algorithm: fun(Externref, Externref) void = @es/\ (self,value) => { self["algorithm"] = value; } \/;
-    let get_value: fun(Externref) Externref = @es/\ (self) => self["value"] \/;
-    let set_value: fun(Externref, Externref) void = @es/\ (self,value) => { self["value"] = value; } \/;
-}

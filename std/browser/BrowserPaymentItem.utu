@@ -1,9 +1,0 @@
-// Generated from TypeScript 5.9.3; regenerate, do not edit.
-mod BrowserPaymentItem {
-    let get_amount: fun(Externref) Externref = @es/\ (self) => self["amount"] \/;
-    let set_amount: fun(Externref, Externref) void = @es/\ (self,value) => { self["amount"] = value; } \/;
-    let get_label: fun(Externref) Str = @es/\ (self) => self["label"] \/;
-    let set_label: fun(Externref, Str) void = @es/\ (self,value) => { self["label"] = value; } \/;
-    let get_pending: fun(Externref) Externref = @es/\ (self) => self["pending"] \/;
-    let set_pending: fun(Externref, Externref) void = @es/\ (self,value) => { self["pending"] = value; } \/;
-}
