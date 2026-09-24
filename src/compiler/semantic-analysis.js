@@ -14,7 +14,7 @@ import { settleTypeGraph } from './type-graph.js';
  * @typedef {Object} SemanticGraphSet
  * @property {ReturnType<typeof refreshProgramIndex>} program
  * @property {ReturnType<typeof resolveBindings>} scope
- * @property {ReturnType<typeof buildTypeGraph>} types
+ * @property {ReturnType<typeof settleTypeGraph>} types
  * @property {ReturnType<typeof buildCallGraph>} calls
  * @property {ReturnType<typeof buildControlFlowGraph>} controlFlow
  */

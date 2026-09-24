@@ -130,6 +130,21 @@ function walkSyntaxDiagnostics(node, acc) {
 // ── Public entry point ───────────────────────────────────────────────────────
 
 /**
+ * Parse into owned IR and release the temporary native CST on every exit.
+ * All syntax/token/diagnostic facts are copied before deletion. treeToIR itself
+ * borrows its tree so callers doing incremental parsing retain ownership.
+ */
+export function parseToIR(parser, source, ...options) {
+  const tree = parser.parse(source);
+  if (!tree) throw new Error('parse: parser returned no syntax tree');
+  try {
+    return treeToIR(tree, source, ...options);
+  } finally {
+    tree.delete();
+  }
+}
+
+/**
  * Convert a tree-sitter parse tree into an IR document.
  *
  * @param {import('web-tree-sitter').Tree} tree

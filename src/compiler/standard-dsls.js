@@ -1,5 +1,5 @@
 import { DOMParser } from 'linkedom/worker';
-import { treeToIR } from './parse.js';
+import { parseToIR } from './parse.js';
 import { T } from './ir-tags.js';
 import { createSyntheticNode, firstTypeChild, typeNodeToStr } from './ir-helpers.js';
 
@@ -14,7 +14,7 @@ export function createStandardDsls({ parser, createDocument }) {
         const inner = stripDslDelims(body);
         const prefix = 'fn __dsl() void { ';
         const src = `${prefix}${inner}; }`;
-        const doc = treeToIR(parser.parse(src), src, createDocument);
+        const doc = parseToIR(parser, src, createDocument);
         const expr = doc.body.firstChild?.querySelector(':scope > ir-fn > ir-block')?.firstElementChild;
         if (!expr) throw new Error('standard dsls (utu): could not parse DSL body as expression');
         localizeRanges(expr, prefix.length);

@@ -27,7 +27,7 @@
 // utu language already loaded.  The caller is responsible for initialisation
 // because source-tree development may choose its own wasm loading mechanism.
 
-import { treeToIR, createIRDocument, restampSubtree } from './parse.js';
+import { parseToIR, createIRDocument, restampSubtree } from './parse.js';
 import { buildModuleGraph } from './build-graph.js';
 import { bringTargetToTopLevel } from './bring-target-to-top-level.js';
 import { checkModuleVariance } from './check-module-variance.js';
@@ -120,8 +120,7 @@ export function createCompiler(env) {
    * No module resolution — useful for single-file tooling (e.g. diagnostics).
    */
   function parseSource(source, filePath = '') {
-    const tree   = parser.parse(source);
-    const ir     = treeToIR(tree, source, filePath, createDocument, { collectAnalysisTokens: target === 'analysis' });
+    const ir     = parseToIR(parser, source, filePath, createDocument, { collectAnalysisTokens: target === 'analysis' });
     const root   = ir.body.firstChild;
     if (root && filePath) {
       root.setAttribute('data-file', filePath);
@@ -196,8 +195,7 @@ export function createCompiler(env) {
         if (mergedRoot.querySelector(`ir-module[name="${modName}"]`)) continue;
         const src = stdlib.get(stdPath);
         if (!src) continue;
-        const preludeTree = parser.parse(src);
-        const preludeDoc  = treeToIR(preludeTree, src, stdPath, createDocument, { collectAnalysisTokens: false });
+        const preludeDoc  = parseToIR(parser, src, stdPath, createDocument, { collectAnalysisTokens: false });
         doc.__utuSourceTexts?.set(stdPath, src);
         const child = preludeDoc.body.firstChild?.querySelector(`:scope > ir-module[name="${modName}"]`);
         if (!child) continue;
@@ -327,11 +325,15 @@ export async function initParser({ wasmDir } = {}) {
     await Parser.init({ wasmBinary: webTreeSitterWasm });
   }
 
+  const lang = await Language.load(languageInput);
   const parser = new Parser();
-  const lang   = await Language.load(languageInput);
-  parser.setLanguage(lang);
-
-  return parser;
+  try {
+    parser.setLanguage(lang);
+    return parser;
+  } catch (error) {
+    parser.delete();
+    throw error;
+  }
 }
 
 function decodeEmbeddedWasm(base64, name) {

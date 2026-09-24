@@ -1,9 +1,9 @@
-// Immutable per-file interval treap for source range queries.
+// Static per-file balanced interval tree for source range queries.
 //
 // Ranges are half-open: [start, end). Entries are plain objects with at least:
 //   { file: string, start: number, end: number, kind?: string, id?: string }
 //
-// The treap is an internal index. It is not a public data model.
+// The tree is an internal index. It is not a public data model.
 
 /**
  * @typedef {Object} RangeEntry
@@ -14,10 +14,9 @@
  * @property {string} [id]
  */
 
-class TreapNode {
-  constructor(entry, priority, left = null, right = null) {
+class RangeNode {
+  constructor(entry, left = null, right = null) {
     this.entry = entry;
-    this.priority = priority;
     this.left = left;
     this.right = right;
     this.maxEnd = Math.max(
@@ -29,20 +28,25 @@ class TreapNode {
 }
 
 /**
- * Build one immutable interval treap per file.
+ * Build one balanced interval tree per file in O(n log n) time.
+ * Bulk construction guarantees logarithmic depth even for duplicate ranges;
+ * hash-priority insertion could degenerate into a chain on identical keys.
+ * Empty and invalid ranges are excluded. Entries must not change afterward.
  *
  * @param {Iterable<RangeEntry>} entries
- * @returns {Map<string, TreapNode | null>}
+ * @returns {Map<string, RangeNode | null>}
  */
 export function buildRangeIndex(entries) {
-  const roots = new Map();
-
+  const files = new Map();
   for (const entry of entries) {
     if (!isUsableRange(entry)) continue;
-    const file = entry.file;
-    const priority = priorityFor(entry);
-    const root = roots.get(file) ?? null;
-    roots.set(file, insert(root, new TreapNode(entry, priority)));
+    if (!files.has(entry.file)) files.set(entry.file, []);
+    files.get(entry.file).push(entry);
+  }
+  const roots = new Map();
+  for (const [file, ranges] of files) {
+    ranges.sort(compareEntries);
+    roots.set(file, buildBalanced(ranges, 0, ranges.length));
   }
 
   return roots;
@@ -52,7 +56,7 @@ export function buildRangeIndex(entries) {
  * Query all entries in `file` that overlap [start, end).
  * Point queries can pass end = start + 1.
  *
- * @param {Map<string, TreapNode | null>} index
+ * @param {Map<string, RangeNode | null>} index
  * @param {string} file
  * @param {number} start
  * @param {number} end
@@ -73,7 +77,7 @@ export function queryRangeIndex(index, file, start, end, opts = {}) {
  * Return the smallest range containing offset, optionally filtered by kind.
  * Ties are broken by earlier start, then stable entry ordering.
  *
- * @param {Map<string, TreapNode | null>} index
+ * @param {Map<string, RangeNode | null>} index
  * @param {string} file
  * @param {number} offset
  * @param {{ kind?: string }} [opts]
@@ -85,7 +89,6 @@ export function smallestRangeAt(index, file, offset, opts = {}) {
 
   const hits = [];
   queryPoint(root, offset, opts.kind, hits);
-  hits.sort(compareEntries);
   let best = null;
   for (const hit of hits) {
     if (!best) {
@@ -101,21 +104,14 @@ export function smallestRangeAt(index, file, offset, opts = {}) {
   return best;
 }
 
-function insert(root, node) {
-  if (!root) return node;
-
-  const cmp = compareEntries(node.entry, root.entry);
-  if (cmp < 0) {
-    const left = insert(root.left, node);
-    const next = withChildren(root, left, root.right);
-    if (left.priority < next.priority) return rotateRight(next);
-    return next;
-  }
-
-  const right = insert(root.right, node);
-  const next = withChildren(root, root.left, right);
-  if (right.priority < next.priority) return rotateLeft(next);
-  return next;
+function buildBalanced(entries, start, end) {
+  if (start === end) return null;
+  const middle = start + Math.floor((end - start) / 2);
+  return new RangeNode(
+    entries[middle],
+    buildBalanced(entries, start, middle),
+    buildBalanced(entries, middle + 1, end),
+  );
 }
 
 function queryOverlaps(node, start, end, kind, out) {
@@ -154,58 +150,22 @@ function queryPoint(node, offset, kind, out) {
   }
 }
 
-function rotateRight(root) {
-  const pivot = root.left;
-  const moved = withChildren(root, pivot.right, root.right);
-  return withChildren(pivot, pivot.left, moved);
-}
-
-function rotateLeft(root) {
-  const pivot = root.right;
-  const moved = withChildren(root, root.left, pivot.left);
-  return withChildren(pivot, moved, pivot.right);
-}
-
-function withChildren(node, left, right) {
-  if (node.left === left && node.right === right) return node;
-  return new TreapNode(node.entry, node.priority, left, right);
-}
-
 function isUsableRange(entry) {
   return entry
     && typeof entry.file === 'string'
     && Number.isFinite(entry.start)
     && Number.isFinite(entry.end)
     && entry.start >= 0
-    && entry.end >= entry.start;
+    && entry.end > entry.start;
 }
 
 function compareEntries(a, b) {
   return (a.start - b.start)
     || (a.end - b.end)
     || compareStrings(a.kind, b.kind)
-    || compareStrings(a.id, b.id)
-    || compareStrings(stableEntryKey(a), stableEntryKey(b));
+    || compareStrings(a.id, b.id);
 }
 
 function compareStrings(a = '', b = '') {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function priorityFor(entry) {
-  return hash32(stableEntryKey(entry));
-}
-
-function stableEntryKey(entry) {
-  return `${entry.file}\u0000${entry.start}\u0000${entry.end}\u0000${entry.kind ?? ''}\u0000${entry.id ?? ''}`;
-}
-
-// FNV-1a 32-bit hash. Deterministic priority beats Math.random for tests.
-function hash32(input) {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
 }

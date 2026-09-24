@@ -53,3 +53,37 @@ consumes the plan. Semantic analysis never imports a lowering pass.
 - [Type graph](type-graph.md)
 - [Import and module reachability](import-reachability.md)
 - [Historical migration notes](history/)
+
+## Resource ownership
+
+`parseToIR` owns the temporary tree-sitter tree and releases it in `finally`,
+including when document creation or conversion fails. The resulting DOM,
+diagnostics, and analysis tokens contain copied facts. The public `treeToIR`
+function borrows its input tree and leaves its lifetime to the caller, which
+supports incremental parsing. Compiler-created parser trees use the owned path
+for source files, preludes, and embedded UTU DSLs.
+
+`buildModule` transfers a Binaryen module to its caller only on success. Failed
+construction disposes it. `emitBinary` and `emitText` own the returned module and
+always dispose it, including failures in validation, optimization, emission, or
+artifact reporting. Optimization temporarily changes Binaryen's global settings
+and restores them on both success and failure. Invalid output modes fail before
+allocating a module.
+
+## Source indexes and imports
+
+Source ranges are indexed per file in a static balanced interval tree, built by
+sorting and midpoint partitioning. Construction is O(n log n), storage is O(n),
+and tree depth is O(log n), including duplicate keys. Empty and invalid intervals
+are excluded; queries use half-open intervals and deterministic tie-breaking.
+The index has no incremental-update API, so persistent insertion and randomized
+balancing machinery are unnecessary.
+
+The source-module graph checks DFS visitation before reading a file. A diamond
+import reads and parses its shared dependency once; encountering an active node
+reports an import cycle before attempting another read. Imports still retain
+all individual edges for diagnostics.
+
+See [closure lowering](closure-lowering.md) for capture semantics and the fixed
+JavaScript ABI, and [compiler verification](compiler-testing.md) for test commands
+and regression contracts.

@@ -3,6 +3,7 @@
 // Usage: bun ./scripts/run-tests.mjs [--no-debug-assertions] [--both-debug-modes]
 
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { initParser } from '../src/index.js';
 import {
@@ -13,6 +14,9 @@ import {
   createCompilerEnv,
   makeCompiler as makeCompilerBase,
 } from './test-harness.mjs';
+import { registerParserLifecycleTests } from './parser-lifecycle-tests.mjs';
+import { registerRangeIndexTests } from './range-index-tests.mjs';
+import { registerCompilerQualityTests } from './compiler-quality-tests.mjs';
 import { registerAdversarialCompilerTests } from './adversarial-compiler-tests.mjs';
 import { registerCodegenCoreTests } from './codegen-core-tests.mjs';
 import { registerCodegenHeapTests } from './codegen-heap-tests.mjs';
@@ -44,6 +48,9 @@ const suiteContext = {
   makeCompiler,
 };
 
+registerParserLifecycleTests(suiteContext);
+registerRangeIndexTests(suiteContext);
+registerCompilerQualityTests(suiteContext);
 registerParserAnalysisTests(suiteContext);
 registerIrStructureTests({ test, assertThrows });
 registerCodegenCoreTests(suiteContext);
@@ -78,9 +85,11 @@ async function main() {
 
 if (BOTH_DEBUG_MODES) {
   const script = fileURLToPath(import.meta.url);
-  const debug = Bun.spawnSync(['bun', script], { cwd: ROOT, stdout: 'inherit', stderr: 'inherit' });
-  const release = Bun.spawnSync(['bun', script, '--no-debug-assertions'], { cwd: ROOT, stdout: 'inherit', stderr: 'inherit' });
-  process.exit(debug.exitCode || release.exitCode);
+  for (const flags of [[], ['--no-debug-assertions']]) {
+    const child = spawnSync(process.execPath, [script, ...flags], { cwd: ROOT, stdio: 'inherit' });
+    if (child.error) throw child.error;
+    if (child.status !== 0) process.exit(child.status ?? 1);
+  }
 } else {
   main().catch(err => { console.error(err); process.exit(1); });
 }

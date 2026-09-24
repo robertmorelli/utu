@@ -33,11 +33,9 @@ import { T } from './ir-tags.js';
 import { retainedGraphs } from './graph-store.js';
 export { closureCallImport } from './closure-abi.js';
 
-const ENV_PARAM = '__env';
-
 /**
  * @param {Document} doc
- * @returns {boolean} whether any closure was lifted
+ * @returns {boolean} whether literals or function-to-closure coercions changed the IR
  */
 export function lowerClosures(doc, typeIndex, graph) {
   const root = doc.body.firstChild;
@@ -45,14 +43,15 @@ export function lowerClosures(doc, typeIndex, graph) {
   const scopeGraph = retainedGraphs(doc).scope;
 
   if (!graph.coercions.length) planCoercions(graph);
-  insertDecays(graph);
+  let changed = insertDecays(graph);
+  const closures = closurePostorder(root);
+  if (closures.length === 0) return changed;
+  const names = new Set([...root.querySelectorAll('[name]')].map(node => node.getAttribute('name')));
   let index = 0;
-  let changed = false;
-  // Innermost-first: pick a closure that contains no other closure.
-  for (;;) {
-    const closure = [...root.querySelectorAll('ir-closure')]
-      .find(node => !node.querySelector('ir-closure'));
-    if (!closure) break;
+  // Snapshot postorder once. Repeatedly querying the entire growing program
+  // made independent closures quadratic; parents must still follow children.
+  for (const closure of closures) {
+    while (names.has(`__ClosureEnv${index}`) || names.has(`__closure${index}`)) index++;
     liftClosure(closure, root, index++, typeIndex, graph, scopeGraph);
     changed = true;
   }
@@ -69,13 +68,15 @@ export function lowerClosures(doc, typeIndex, graph) {
 // Sites come directly from the graph's expectation edges.
 
 function insertDecays(graph) {
+  let changed = false;
   for (const coercion of graph.coercions) {
-    if (coercion.kind === 'fun-to-cl') decayInto(coercion.node, coercion.to);
+    if (coercion.kind === 'fun-to-cl') changed = decayInto(coercion.node, coercion.to) || changed;
   }
+  return changed;
 }
 
 function decayInto(node, expectedType) {
-  if (!node || !expectedType) return;
+  if (!node || !expectedType) return false;
 
   const doc = node.ownerDocument;
   const decay = createSyntheticNode(doc, T.CLOSURE_DECAY, node, 'lower-closures', 'closure-decay');
@@ -91,6 +92,7 @@ function decayInto(node, expectedType) {
        child = parent, parent = parent.parentElement) {
     parent.dataset['typeName'] = expectedType;
   }
+  return true;
 }
 
 function liftClosure(closure, root, index, typeIndex, graph, scopeGraph) {
@@ -153,7 +155,10 @@ function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
   // so their binding ids stay valid for identifiers already resolved to them.
   const params = createSyntheticNode(doc, T.PARAM_LIST, closure, 'lower-closures', 'closure-lifted-params');
   const envParam = createSyntheticNode(doc, T.PARAM, closure, 'lower-closures', 'closure-env-param');
-  envParam.setAttribute('name', ENV_PARAM);
+  const occupied = new Set([...closure.querySelectorAll('[name]')].map(node => node.getAttribute('name')));
+  let envName = '__env';
+  for (let suffix = 0; occupied.has(envName); suffix++) envName = `__env${suffix}`;
+  envParam.setAttribute('name', envName);
   envParam.appendChild(buildTypeNode(doc, closure, envType));
   params.appendChild(envParam);
 
@@ -173,7 +178,7 @@ function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
 
   const body = bodyOf(closure);
   if (body) {
-    rewriteCaptureReads(body, captures, envParam, doc, closure, scopeGraph);
+    rewriteCaptureReads(body, captures, envParam, doc, scopeGraph);
     fn.appendChild(body);
   }
   return fn;
@@ -209,7 +214,7 @@ function buildMakeClosure(doc, closure, fnName, envType, captures) {
  * binding id rather than by name so a shadowed inner binding of the same name
  * is left alone.
  */
-function rewriteCaptureReads(body, captures, envParam, doc, site, scopeGraph) {
+function rewriteCaptureReads(body, captures, envParam, doc, scopeGraph) {
   if (captures.length === 0) return;
   const byBinding = new Map(captures.map(capture => [capture.bindingId, capture]));
 
@@ -224,10 +229,10 @@ function rewriteCaptureReads(body, captures, envParam, doc, site, scopeGraph) {
     if (capture.type !== 'unknown') access.dataset['typeName'] = capture.type;
 
     const receiver = createSyntheticNode(doc, T.IDENT, ident, 'lower-closures', 'closure-env-receiver');
-    receiver.setAttribute('name', ENV_PARAM);
+    receiver.setAttribute('name', envParam.getAttribute('name'));
     receiver.dataset.bindingId = envParam.id;
     receiver.dataset.bindingKind = 'ir-param';
-    receiver.dataset.bindingName = ENV_PARAM;
+    receiver.dataset.bindingName = envParam.getAttribute('name');
     receiver.dataset['typeName'] = access.dataset.fieldOwnerName;
 
     access.appendChild(receiver);
@@ -236,6 +241,23 @@ function rewriteCaptureReads(body, captures, envParam, doc, site, scopeGraph) {
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
+
+function closurePostorder(root) {
+  const result = [];
+  const stack = [[root, false]];
+  while (stack.length) {
+    const [node, visited] = stack.pop();
+    if (visited) {
+      if (node.localName === T.CLOSURE) result.push(node);
+      continue;
+    }
+    stack.push([node, true]);
+    for (let child = node.lastElementChild; child; child = child.previousElementSibling) {
+      stack.push([child, false]);
+    }
+  }
+  return result;
+}
 
 function closureReturnType(closure) {
   const declared = typeNodeToStr(firstTypeChild(closure));
@@ -247,9 +269,8 @@ function closureReturnType(closure) {
 
 /**
  * Build a type node for a type string. Named types become an `ir-type-ref`;
- * anything structural (callable, nullable) has no single-node spelling here, so
- * the string is carried on `data-type-name` and read back by `declaredTypeStr`'s
- * fallback.
+ * structural types use their canonical type string as the reference name.
+ * This is internal IR, not a source-level declaration spelling.
  */
 function buildTypeNode(doc, site, typeStr) {
   if (typeStr === 'void') {

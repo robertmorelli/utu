@@ -40,6 +40,17 @@ const MODULE_REQUIREMENTS = new WeakMap();
  */
 export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
   const m = new binaryen.Module();
+  try {
+    populateModule(m, doc, { artifacts, sourceMap });
+    return m;
+  } catch (error) {
+    // Ownership transfers to the caller only after construction succeeds.
+    m.dispose();
+    throw error;
+  }
+}
+
+function populateModule(m, doc, { artifacts, sourceMap }) {
   // GC + ReferenceTypes are required so addStructType / struct.new validate.
   // SIMD128 is required for the stdlib v128/m128 surface.
   // MutableGlobals + BulkMemory stay on for the existing scalar-side features.
@@ -53,7 +64,7 @@ export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
   );
 
   const root = doc.body.firstChild;
-  if (!root) return m;
+  if (!root) return;
 
   // Compiled documents have one authoritative backend plan. Standalone pass
   // users may still supply an analysed DOM without one, but a stale plan is
@@ -153,7 +164,6 @@ export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
   }
 
   MODULE_REQUIREMENTS.set(m, requirements);
-  return m;
 }
 
 function requiresConservativeSweep(functions, plan, typeIndex) {
@@ -205,54 +215,43 @@ function readDslWasmImports(root) {
  * @returns {Uint8Array | { binary: Uint8Array, sourceMap: string }}
  */
 export function emitBinary(doc, { artifacts = null, stringMode = 'lowered', sourceMap = false } = {}) {
-  const m = buildModule(doc, { artifacts, sourceMap });
-  if (!m.validate()) {
-    const text = m.emitText();
-    m.dispose();
-    throw new Error(`codegen: binaryen validation failed\n${text}`);
-  }
-  if (stringMode === 'lowered' && MODULE_REQUIREMENTS.get(m)?.strings) {
-    m.runPasses(['string-lowering-magic-imports']);
-    // The lowering removes every stringref instruction. Leaving the proposal
-    // enabled makes later optimization conservatively preserve shapes that a
-    // reparsed lowered binary can shrink further.
-    m.setFeatures(m.getFeatures() & ~binaryen.Features.Strings);
-  } else if (stringMode !== 'native' && stringMode !== 'lowered') {
-    m.dispose();
+  if (stringMode !== 'native' && stringMode !== 'lowered') {
     throw new Error(`codegen: unknown stringMode ${JSON.stringify(stringMode)} (expected 'lowered' | 'native')`);
   }
-  // Production output always receives Binaryen's maximum optimization level
-  // and maximum shrink level. utu's niche is compact shipped Wasm; exposing
-  // an accidentally unoptimized emission path would make size and performance
-  // depend on the caller rather than the language.
-  optimizeForDistribution(m);
+  const m = buildModule(doc, { artifacts, sourceMap });
+  try {
+    validateModule(m, '');
+    if (stringMode === 'lowered' && MODULE_REQUIREMENTS.get(m)?.strings) {
+      m.runPasses(['string-lowering-magic-imports']);
+      // The lowering removes every stringref instruction. Leaving the proposal
+      // enabled makes later optimization conservatively preserve shapes that a
+      // reparsed lowered binary can shrink further.
+      m.setFeatures(m.getFeatures() & ~binaryen.Features.Strings);
+    }
+    // Production output always receives Binaryen's maximum optimization level
+    // and maximum shrink level. utu's niche is compact shipped Wasm; exposing
+    // an accidentally unoptimized emission path would make size and performance
+    // depend on the caller rather than the language.
+    optimizeForDistribution(m);
 
-  // Feature lowerings deliberately install a complete runtime ABI. The full
-  // optimizer normally removes it; this explicit sweep pins that behavior for
-  // simple scalar/string modules. See docs/import-reachability.md for the
-  // conservative mixed-GC exception.
-  if (!MODULE_REQUIREMENTS.get(m)?.conservativeSweep) {
-    m.runPasses(['remove-unused-module-elements']);
-  }
-  if (!m.validate()) {
-    const text = m.emitText();
+    // Feature lowerings deliberately install a complete runtime ABI. The full
+    // optimizer normally removes it; this explicit sweep pins that behavior for
+    // simple scalar/string modules. See docs/import-reachability.md for the
+    // conservative mixed-GC exception.
+    if (!MODULE_REQUIREMENTS.get(m)?.conservativeSweep) {
+      m.runPasses(['remove-unused-module-elements']);
+    }
+    validateModule(m, ' after feature lowering and module sweep');
+    const sourceMapUrl = sourceMap ? (sourceMap === true ? 'module.wasm.map' : sourceMap) : undefined;
+    const emitted = sourceMap ? m.emitBinary(sourceMapUrl) : m.emitBinary();
+    const binary = sourceMap ? emitted.binary : emitted;
+    noteBinarySize(artifacts, doc.body.firstChild, binary.length);
+    return sourceMap ? { binary, sourceMap: emitted.sourceMap } : binary;
+  } finally {
     m.dispose();
-    throw new Error(`codegen: binaryen validation failed after feature lowering and module sweep\n${text}`);
   }
-  const sourceMapUrl = sourceMap ? (sourceMap === true ? 'module.wasm.map' : sourceMap) : undefined;
-  const emitted = sourceMap ? m.emitBinary(sourceMapUrl) : m.emitBinary();
-  const binary = sourceMap ? emitted.binary : emitted;
-  noteBinarySize(artifacts, doc.body.firstChild, binary.length);
-  m.dispose();
-  return sourceMap ? { binary, sourceMap: emitted.sourceMap } : binary;
 }
 
-/**
- * Compile-time options that callers must pass to WebAssembly.compile (or
- * WebAssembly.compileStreaming) when running a binary produced with the
- * default stringMode='lowered'. Re-exported so test harnesses and embedders
- * stay in sync with the lowering pass we run above.
- */
 function optimizeForDistribution(module) {
   const previousOptimize = binaryen.getOptimizeLevel();
   const previousShrink = binaryen.getShrinkLevel();
@@ -271,8 +270,14 @@ function optimizeForDistribution(module) {
   }
 }
 
+/**
+ * Compile-time options that callers must pass to WebAssembly.compile (or
+ * WebAssembly.compileStreaming) when running a binary produced with the
+ * default stringMode='lowered'. Re-exported so test harnesses and embedders
+ * stay in sync with the lowering pass we run above.
+ */
 export const JS_STRING_BUILTINS_COMPILE_OPTIONS = Object.freeze({
-  builtins: ['js-string'],
+  builtins: Object.freeze(['js-string']),
   importedStringConstants: "'",
 });
 
@@ -296,9 +301,17 @@ export async function instantiateLowered(bytes, importObject = {}) {
  */
 export function emitText(doc, { artifacts = null } = {}) {
   const m = buildModule(doc, { artifacts });
-  const text = m.emitText();
-  m.dispose();
-  return text;
+  try {
+    return m.emitText();
+  } finally {
+    m.dispose();
+  }
+}
+
+function validateModule(module, phase) {
+  if (!module.validate()) {
+    throw new Error(`codegen: binaryen validation failed${phase}\n${module.emitText()}`);
+  }
 }
 
 function createDebugInfo(module) {

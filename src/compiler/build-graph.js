@@ -6,7 +6,7 @@
 // Returns the complete file graph and a topologically sorted order
 // (dependencies before dependents). Throws on import cycles.
 
-import { treeToIR, createIRDocument } from './parse.js';
+import { parseToIR, createIRDocument } from './parse.js';
 import { clipFileIRTree } from './clip-file-ir-tree.js';
 import { stampOriginFile } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
@@ -35,19 +35,15 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
   /** @type {Map<string, 'active' | 'done'>} */
   const color = new Map();
 
-  async function visit(filePath) {
-    return visitSource(filePath, await readFile(filePath));
-  }
-
   async function visitSource(filePath, source) {
     const c = color.get(filePath);
     if (c === 'done')   return;
     if (c === 'active') throw compilerError(DIAGNOSTIC_KINDS.IMPORT_CYCLE, `Import cycle detected at: ${filePath}`);
 
     color.set(filePath, 'active');
-
-    const tree   = parser.parse(source);
-    const doc    = treeToIR(tree, source, filePath, createDocument, { collectAnalysisTokens });
+    // Check visitation before I/O: diamond imports read and parse a file once.
+    source ??= await readFile(filePath);
+    const doc    = parseToIR(parser, source, filePath, createDocument, { collectAnalysisTokens });
     // Every ir-source-file needs data-file so cloned nodes can trace back to
     // their origin. This is the one place we know the canonical path.
     const fileRoot = doc.body.firstChild;
@@ -84,7 +80,7 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
           }
           await visitSource(abs, stdlib.get(abs));
         } else {
-          await visit(abs);
+          await visitSource(abs);
         }
       }
     }
@@ -93,7 +89,7 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
     order.push(filePath); // post-order → topological (deps before dependents)
   }
 
-  await visit(entryPath);
+  await visitSource(entryPath);
   if (debugAssertions) assertBuildGraph(graph, order);
   return { graph, order, imports };
 }
