@@ -1,6 +1,7 @@
 import { ForeignABI, prepareForeignImports } from './foreign-types.js';
 import { lowerForeignOperations } from './foreign-lowering.js';
 import { boxMutatedCaptures } from './box-captures.js';
+import { lowerOptionalChains } from './lower-optional-chains.js';
 import { missingArrayElements, nameArrayElements, requestLiteralArrayTypes } from './array-literal-defaults.js';
 import { buildExternFn } from './standard-dsls.js';
 // compiler.js — Compiler factory with dependency injection
@@ -243,6 +244,7 @@ export function createCompiler(env) {
     // invariant failure; analyzeFile will collect the stamped diagnostic.
     if (diagnosticFacts(doc).size > 0) return doc;
     lowerPipe(doc, { debugAssertions });
+    lowerOptionalChains(doc);
     debugAssert(doc, 'lowerPipe');
     hoistModules(doc, { debugAssertions, graph: elaboration });
     debugAssert(doc, 'hoistModules');

@@ -618,6 +618,7 @@ function isTypeNamespace(graph, node) {
 function collectOperationFailures(graph) {
   for (const field of nodesOf(graph, 'ir-field-access')) {
     const owner = actual(graph, field.firstElementChild);
+    if (field.dataset.optionalChainRejected) continue;
     if (owner?.startsWith('?')) {
       fail(graph, field, DIAGNOSTIC_KINDS.NULLABLE_ACCESS,
         `Cannot access field '${field.getAttribute('field')}' on nullable ${owner}`,

@@ -161,6 +161,7 @@ function assertNoResidualBackendControl(root, { phase, target }) {
 
 function resolvesType(type, typeIndex) {
   const name = unwrapNullable(type);
+  if (name === 'never') return true; // the type of `fatal`, which never produces a value
   // Callable types are structural, not registry entries: `fun(I32) Bool` names
   // no declaration.  Validate their components instead.
   const callable = callableParts(name);

@@ -819,6 +819,39 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.text(), '{"quoted": true}\nsecond line');
   });
 
+  test('syntax: ?. statements run only when every link of the chain is present', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'optional_chains.utu', source: `
+      struct P:
+        | v: I32
+        | next: ?P
+      fn find(ok: Bool) ?P { if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
+      fn bump(p: P) void { p.v += 1; }
+      export lib {
+        fn run() I32 {
+          let p = find(true);
+          let q = find(false);
+          p?.v = 10;
+          q?.v = 5;
+          p?.next?.v = 7;
+          p?.next?.next?.v = 99;
+          p?.next?.v += 100;
+          promote p { |x| => { bump(x); x.v + (x.next orelse fatal).v; }, ~> 0, };
+        }
+      }
+    ` });
+    assertEq(instance.exports.run(), 118);
+    for (const body of ['let x = p?.v;', 'take(p?.v);', 'p?.v;']) {
+      const doc = await (await makeCompiler({ ROOT, target: 'normal' })).compileFile(await (async () => {
+        const fs = await import('node:fs/promises'); const path = await import('node:path');
+        const file = path.join(ROOT, '.tmp', 'optional_rejected.utu');
+        await fs.mkdir(path.dirname(file), { recursive: true });
+        await fs.writeFile(file, `struct P:\n  | v: I32\nfn take(v: I32) I32 { v; }\nfn g(p: ?P) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }`);
+        return file;
+      })());
+      assert([...doc.querySelectorAll('[data-error]')].some(n => /only allowed in statements/.test(n.dataset.errorMessage ?? '')), body);
+    }
+  });
+
   test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {
     const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });

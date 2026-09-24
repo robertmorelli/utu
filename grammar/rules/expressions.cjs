@@ -16,6 +16,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.type_member_expr,
         $.null_expr,
         $.field_expr,
+        $.optional_field_expr,
         $.index_expr,
         $.slice_expr,
         $.call_expr,
@@ -92,6 +93,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
       )),
 
     field_expr: ($) => prec.left(14, seq($._expr, '.', choice($.identifier, $.type_ident))),
+    // a?.b — only in statements: the statement runs when `a` is present
+    optional_field_expr: ($) => prec.left(14, seq($._expr, '?.', choice($.identifier, $.type_ident))),
 
     // a[i]
     index_expr: ($) => prec.left(14, seq($._expr, '[', $._expr, ']')),
@@ -150,7 +153,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     assign_expr: ($) =>
       prec.right(0, seq(
-        choice($.identifier, $.field_expr, $.index_expr, alias($.global_member_expr, $.type_member_expr)),
+        choice($.identifier, $.field_expr, $.optional_field_expr, $.index_expr, alias($.global_member_expr, $.type_member_expr)),
         choice('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', 'and=', 'or=', 'xor='),
         $._expr,
       )),

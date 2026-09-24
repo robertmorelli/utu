@@ -173,8 +173,16 @@ export function walkModCallExpr(n, doc, source, dispatch) {
   return node;
 }
 
+export function walkOptionalFieldExpr(n, doc, source, dispatch) {
+  return walkMember(T.OPTIONAL_FIELD, n, doc, source, dispatch);
+}
+
 export function walkFieldExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.FIELD_ACCESS, doc), n);
+  return walkMember(T.FIELD_ACCESS, n, doc, source, dispatch);
+}
+
+function walkMember(tag, n, doc, source, dispatch) {
+  const node = stamp(el(tag, doc), n);
   const children = namedChildren(n);
   if (children[0]) node.appendChild(dispatch(children[0], doc, source));
   if (children[1]) {

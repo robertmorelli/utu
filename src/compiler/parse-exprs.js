@@ -2,7 +2,7 @@
 
 import {
   walkArgList, walkAssignExpr, walkBinaryExpr, walkCallExpr, walkElseExpr,
-  walkFieldExpr, walkIdentifier, walkIndexExpr, walkLiteral, walkModCallExpr,
+  walkFieldExpr, walkOptionalFieldExpr, walkIdentifier, walkIndexExpr, walkLiteral, walkModCallExpr,
   walkNullExpr, walkParenExpr, walkPipeExpr, walkSliceExpr, walkTypeMemberExpr,
   walkUnaryExpr,
 } from './parse-exprs-basic.js';
@@ -34,6 +34,7 @@ export const walkers = {
   'type_member_expr':            walkTypeMemberExpr,
   'promoted_module_call_expr':   walkModCallExpr,
   'field_expr':                  walkFieldExpr,
+  'optional_field_expr':         walkOptionalFieldExpr,
   'index_expr':                  walkIndexExpr,
   'slice_expr':                  walkSliceExpr,
   'null_expr':                   walkNullExpr,

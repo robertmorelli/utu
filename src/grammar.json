@@ -1700,6 +1700,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "optional_field_expr"
+        },
+        {
+          "type": "SYMBOL",
           "name": "index_expr"
         },
         {
@@ -2242,6 +2246,36 @@
           {
             "type": "STRING",
             "value": "."
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "type_ident"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "optional_field_expr": {
+      "type": "PREC_LEFT",
+      "value": 14,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "_expr"
+          },
+          {
+            "type": "STRING",
+            "value": "?."
           },
           {
             "type": "CHOICE",
@@ -3028,6 +3062,10 @@
               {
                 "type": "SYMBOL",
                 "name": "field_expr"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "optional_field_expr"
               },
               {
                 "type": "SYMBOL",
