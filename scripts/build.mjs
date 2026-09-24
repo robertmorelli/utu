@@ -77,7 +77,7 @@ async function generatePlatformSources() {
     '// Generated platform source registry.',
     '// Run `bun run build` to refresh from std/*.utu.',
     '',
-    "import { browserSource, jsSource } from '../bindings/browser.js';",
+    "import { browserSource, jsSource, webSource, workerSource } from '../bindings/browser.js';",
     "const IR_WASM_PREFIX = 'ir-' + 'wasm-';",
     '',
     'export const PLATFORM_SOURCES = new Map([',
@@ -85,6 +85,8 @@ async function generatePlatformSources() {
     ']);',
     "PLATFORM_SOURCES.set('std:Browser', browserSource);",
     "PLATFORM_SOURCES.set('std:JS', jsSource);",
+    "PLATFORM_SOURCES.set('std:Web', webSource);",
+    "PLATFORM_SOURCES.set('std:Worker', workerSource);",
     '',
   ];
   await fs.writeFile(OUT_FILE, lines.join('\n'));

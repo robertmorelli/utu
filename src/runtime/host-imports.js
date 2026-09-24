@@ -84,6 +84,12 @@ export function closureImports(closureSpec, utu = {}) {
   return utu;
 }
 
+/** `try`/`catch` catches host exceptions through the engine's JS exception tag. */
+export function exceptionImports(utu = {}) {
+  utu.js_tag = WebAssembly.JSTag;
+  return utu;
+}
+
 /**
  * Build the whole `utu` import namespace from the stamped specs.
  *

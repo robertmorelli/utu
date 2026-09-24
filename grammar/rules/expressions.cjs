@@ -22,6 +22,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.new_expr,
         $.if_expr,
         $.promote_expr,
+        $.try_expr,
         $.match_expr,
         $.alt_expr,
         $.block_expr,
@@ -167,6 +168,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
         optional(seq('~>', $._expr, ',')),
         '}',
       ),
+
+    // try { ... } catch |e| { ... } — catches exceptions thrown by the host
+    try_expr: ($) => seq('try', $.block, 'catch', optional(seq('|', $.identifier, '|')), $.block),
 
     // match on scalars; ~> is the default arm
     match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), optional($.match_default), '}'),

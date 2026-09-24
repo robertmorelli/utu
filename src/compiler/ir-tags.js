@@ -91,6 +91,8 @@ export const T = Object.freeze({
 
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }
   TUPLE:          'ir-tuple',           // .{a, b} — reserved; not yet supported
+  TRY:            'ir-try',             // try { body } catch { handler }
+  CAUGHT:         'ir-caught',          // the caught host value, first in a handler
   ARRAY_LIT:      'ir-array-lit',       // [a, b] — WasmGC array, or JS array in declaration context
   FIELD_INIT:     'ir-field-init',      // field: expr inside struct init
   ASSERT:         'ir-assert',          // assert cond

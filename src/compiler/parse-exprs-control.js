@@ -13,6 +13,26 @@ export function walkIfExpr(n, doc, source, dispatch) {
   return walkContainer(T.IF, n, doc, source, dispatch);
 }
 
+/**
+ * `try { a } catch |e| { b }` → <ir-try><block a/><block b/></ir-try>. The
+ * binding becomes `let e = <ir-caught/>` at the top of the handler, so it is
+ * an ordinary local for every later pass.
+ */
+export function walkTryExpr(n, doc, source, dispatch) {
+  const node = stamp(el(T.TRY, doc), n);
+  const children = namedChildren(n);
+  const [body, handler] = children.filter(child => child.type === 'block').map(child => dispatch(child, doc, source));
+  const binding = children.find(child => child.type === 'identifier');
+  if (binding) {
+    const let_ = stamp(el(T.LET, doc), binding);
+    let_.setAttribute('name', text(binding));
+    let_.appendChild(stamp(el(T.CAUGHT, doc), binding));
+    handler.insertBefore(let_, handler.firstChild);
+  }
+  node.append(body, handler);
+  return node;
+}
+
 export function walkWhileExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.WHILE, doc), n);
   const children = namedChildren(n);

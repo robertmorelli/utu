@@ -20,9 +20,17 @@ if (args.includes('--browser')) {
   const files = ['lib.dom.d.ts', 'lib.dom.iterable.d.ts', 'lib.dom.asynciterable.d.ts'].map(f => path.join(lib, f));
   const abi = linkFiles({ files, prefix: 'Browser', includeStandardLibrary: true });
   const bytes = gzipSync(JSON.stringify(abi), { level: 9 });
+  // Worker globals conflict with lib.dom, so they are linked as their own program over ES only.
+  const workerFiles = ['lib.webworker.d.ts', 'lib.webworker.iterable.d.ts', 'lib.webworker.asynciterable.d.ts', 'lib.webworker.importscripts.d.ts']
+    .map(f => path.join(lib, f));
+  const worker = linkFiles({ files: workerFiles, prefix: 'Worker', includeStandardLibrary: true, compilerOptions: { lib: ['lib.es2022.d.ts'] } });
+  const workerBytes = gzipSync(JSON.stringify(worker), { level: 9 });
   await fs.writeFile(path.join(ROOT, 'src/bindings/browser-catalog.generated.js'),
-    `// Generated declaration graph. Regenerate with bun run bindings:browser.\nexport const BROWSER_ABI_GZIP = ${JSON.stringify(bytes.toString('base64'))};\n`);
-  console.log(JSON.stringify({ declarationTypes: abi.types.length, compressedBytes: bytes.length }));
+    `// Generated declaration graphs. Regenerate with bun run bindings:browser.\n`
+    + `export const BROWSER_ABI_GZIP = ${JSON.stringify(bytes.toString('base64'))};\n`
+    + `export const WORKER_ABI_GZIP = ${JSON.stringify(workerBytes.toString('base64'))};\n`);
+  console.log(JSON.stringify({ declarationTypes: abi.types.length, compressedBytes: bytes.length,
+    workerTypes: worker.types.length, workerCompressedBytes: workerBytes.length }));
 } else {
   const input = option('--input');
   if (!input) throw new Error('usage: node tools/dts/cli.mjs --browser | --input file.d.ts --module package --prefix Name --out directory');

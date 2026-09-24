@@ -1,6 +1,6 @@
 import { foreignActual } from './foreign-abi.js';
 import { foreignAssignmentType } from './foreign-lowering.js';
-import { literalArrayElement } from './array-literal-defaults.js';
+import { arrayElementType, literalArrayElement } from './array-literal-defaults.js';
 // type-graph.js — build, solve, then check the program's type graph
 
 import {
@@ -370,6 +370,13 @@ function addActualRule(graph, node) {
       return rule(graph, node, [one], () => foreignActual(graph, node) ?? fieldActual(graph, node, read(one)), 'field-of');
     case 'ir-struct-init':
       return rule(graph, node, children.map(c => c.firstElementChild), () => foreignActual(graph, node) ?? node.getAttribute('type-name'), 'struct-init');
+    case 'ir-try': {
+      const [body, handler] = children;
+      return rule(graph, node, [body, handler], () => confluence(graph, node, [read(body), read(handler)]), 'confluence');
+    }
+    case 'ir-caught':
+      // Whatever the host threw: a dynamic host value (`e.message`), or opaque without declarations.
+      return fixed(graph.doc.__utuForeign?.type(0, 'any', graph) ?? 'Externref', 'caught');
     case 'ir-array-lit':
       return rule(graph, node, children, () => foreignActual(graph, node) ?? nativeArrayType(graph, node), 'array-literal');
     case 'ir-null-ref':
@@ -594,15 +601,17 @@ function clearDiagnostic(node) {
 function arrayElementContext(graph, node) {
   const named = node.getAttribute('type-name');
   if (named) return graph.typeIndex?.get(named)?.arrayElem;
-  return literalArrayElement(node) === 'F64' ? 'F64' : undefined;
+  // Integer literals and `null` follow their neighbours: `[x, 2]` with `x: F64`, `[p, null]`.
+  const element = literalArrayElement(node) ?? arrayElementType(node, child => actual(graph, child));
+  const adapts = [...node.children].some(c => c.localName === 'ir-lit' && ['int', 'null'].includes(c.getAttribute('kind')));
+  return element && element !== 'I32' && adapts ? element : undefined;
 }
 
 /** A native array literal's type: its context, or the `Array[T]` matching its elements. */
 function nativeArrayType(graph, node) {
   const named = node.getAttribute('type-name');
   if (named) return graph.typeIndex?.get(named)?.kind === 'wasm-array' ? named : null;
-  const elements = [...new Set([...node.children].map(child => actual(graph, child)))];
-  const element = literalArrayElement(node) ?? (elements.length === 1 ? elements[0] : null);
+  const element = literalArrayElement(node) ?? arrayElementType(node, child => actual(graph, child));
   if (!element) return null;
   for (const [name, entry] of graph.typeIndex ?? []) {
     if (entry.kind === 'wasm-array' && entry.arrayElem === element) return name;
@@ -702,6 +711,7 @@ function addExpectations(graph, node) {
       () => name === 'assert' ? 'assert condition must be Bool' : `${name} condition must be Bool`);
   }
   if (tag === 'ir-if') addConfluence(graph, node, [...node.children].slice(1));
+  if (tag === 'ir-try') addConfluence(graph, node, [...node.children]);
   if (tag === 'ir-match' || tag === 'ir-alt' || tag === 'ir-promote') {
     addConfluence(graph, node, [...node.children]
       .filter(child => /-arm$/.test(child.localName)).map(arm => arm.lastElementChild));

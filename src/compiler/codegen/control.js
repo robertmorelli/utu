@@ -41,6 +41,40 @@ export function emitIf(node, ctx, emitExpr) {
   return m.if(emitExpr(cond, ctx), thenExpr, elseExpr);
 }
 
+// ── try / catch ─────────────────────────────────────────────────────────────
+//
+// IR:   <ir-try><body/><handler/></ir-try>, the handler optionally starting
+//       with `let e = <ir-caught/>`
+// Wasm: (try (do body) (catch $js_tag handler)), where $js_tag is the host's
+//       WebAssembly.JSTag imported as utu.js_tag and <ir-caught/> is its pop.
+export const JS_TAG = '__utu_js_tag';
+const tagged = new WeakSet();
+
+export function emitTry(node, ctx, emitExpr) {
+  const m = ctx.module;
+  if (!tagged.has(m)) {
+    m.addTagImport(JS_TAG, 'utu', 'js_tag', binaryen.externref, binaryen.none);
+    tagged.add(m);
+  }
+  const [body, handler] = [...node.children];
+  let bodyExpr = emitExpr(body, ctx);
+  let handlerExpr = emitExpr(handler, ctx);
+  // An unnamed exception is still on the stack and must be popped.
+  if (!handler.querySelector(':scope > ir-let > ir-caught')) {
+    handlerExpr = m.block(null, [m.drop(emitCaught(m)), handlerExpr], binaryen.getExpressionType(handlerExpr));
+  }
+  const type = expr => binaryen.getExpressionType(expr);
+  if (ctx.typeOf(node) === 'void' || !ctx.typeOf(node)) {
+    if (![binaryen.none, binaryen.unreachable].includes(type(bodyExpr))) bodyExpr = m.drop(bodyExpr);
+    if (![binaryen.none, binaryen.unreachable].includes(type(handlerExpr))) handlerExpr = m.drop(handlerExpr);
+  }
+  return m.try(null, bodyExpr, [JS_TAG], [handlerExpr], null);
+}
+
+export function emitCaught(m) {
+  return binaryen._BinaryenPop(m.ptr, binaryen.externref);
+}
+
 // ── while ───────────────────────────────────────────────────────────────────
 //
 // IR:  <ir-while><cond/><body/></ir-while>

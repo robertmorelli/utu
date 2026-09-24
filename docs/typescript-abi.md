@@ -22,10 +22,19 @@ export main() void {
 }
 ```
 
-One import provides the browser and standard JavaScript declarations.
-`std:JS` provides only the ECMAScript standard library (`Array`, `Map`, `Set`,
-`JSON`, `Math`, `Promise`, `Date`, …) for any JavaScript host; it is a view of
-the same graph, so its types are the browser's types. Generic declared types
+One import provides the browser and standard JavaScript declarations. Other
+hosts import only what they have:
+
+| Module | Contents | Runs on |
+|---|---|---|
+| `std:JS` | ECMAScript: `Array`, `Map`, `Set`, `JSON`, `Math`, `Promise`, `Date`, `RegExp`, `Intl`, … | any JS host |
+| `std:Web` | the common web APIs (WinterTC): `fetch`, `Request`/`Response`, `URL`, `TextEncoder`, streams, `AbortController`, `Blob`, `crypto`, `console`, timers, `structuredClone`, `WebAssembly`, events | Node, Bun, Deno, browsers, workers |
+| `std:Browser` | all of the above plus the DOM | browser pages |
+| `std:Worker` | a worker's global scope: `self`, `postMessage`, `importScripts`, service-worker types | web workers |
+
+`std:JS` and `std:Web` are views of the browser graph, and every module shares
+standard-library identities: a `Web.Response` is a `Worker.Response` is a
+`Browser.Response`. Generic declared types
 written bare, such as `Browser.Map`, mean any instantiation. Local
 `let` types can be inferred. Literal overloads preserve useful return types:
 `createElement("input")` returns `HTMLInputElement`, including its `value`
@@ -187,6 +196,18 @@ Numbers cross as `F64`, strings as `Str`, and booleans as actual JS booleans.
 Closures remain JS functions and preserve identity; boolean-returning closures
 produce JS booleans. Function pointers remain UTU-internal. Contextual callbacks
 derive parameter types from declarations, including DOM event maps.
+
+Host exceptions are caught with `try`:
+
+```utu
+let parsed = try { JS.JSON.parse(text); } catch |e| { Browser.console.warn(e.message); null; };
+```
+
+`try { … } catch |e| { … }` is an expression whose branches meet like `if`.
+`e` is the thrown JavaScript value, so its members are available; the binding
+is optional. It lowers to one Wasm `try` that catches on the host's
+`WebAssembly.JSTag`. Wasm traps (`fatal`, a failed `assert`, a null
+dereference) are not exceptions and are never caught.
 
 Reading a dynamic value (`any`, `unknown`, or a primitive union such as
 `string | number`) where UTU expects `F64`, `Str`, or `Bool` converts it at the

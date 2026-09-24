@@ -9,7 +9,7 @@ import {
 import {
   walkAltArm, walkAltExpr, walkBlock, walkBlockExpr, walkCapture,
   walkDefaultArm, walkForExpr, walkForSource, walkIfExpr, walkMatchArm,
-  walkMatchExpr, walkPromoteExpr, walkWhileExpr,
+  walkMatchExpr, walkPromoteExpr, walkTryExpr, walkWhileExpr,
 } from './parse-exprs-control.js';
 import {
   walkAssertExpr, walkAwaitExpr, walkBindExpr, walkBreakExpr, walkClosureExpr, walkDslExpr,
@@ -38,6 +38,7 @@ export const walkers = {
   'slice_expr':                  walkSliceExpr,
   'null_expr':                   walkNullExpr,
   'if_expr':                     walkIfExpr,
+  'try_expr':                    walkTryExpr,
   'while_expr':                  walkWhileExpr,
   'for_expr':                    walkForExpr,
   'match_expr':                  walkMatchExpr,

@@ -42,6 +42,7 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
     if (glue) lines.push(`import * as glue from ${JSON.stringify(gluePath)};`, `import { importObjectFromGlue } from ${runtime};`, `const imports = importObjectFromGlue(${JSON.stringify(fields)}, glue);`);
     else lines.push('const imports = {};');
     if (closures.new || closures.calls.length) lines.push(`import { closureImports } from ${runtime};`, `imports.utu = closureImports(${JSON.stringify(closures)}, imports.utu);`);
+    if (live.has('js_tag')) lines.push(`import { exceptionImports } from ${runtime};`, 'imports.utu = exceptionImports(imports.utu);');
     if (promises.ops.length) lines.push(`import { promiseImports } from ${runtime};`, `imports.utu = promiseImports(${JSON.stringify(promises)}, imports.utu);`);
     if (promises.awaits.length) lines.push(`import { awaitImports } from ${runtime};`, `imports.utu = awaitImports(${JSON.stringify(promises)}, imports.utu);`);
     lines.push(`const module = await WebAssembly.compileStreaming(fetch(new URL('./app.wasm', import.meta.url)), {builtins:['js-string'],importedStringConstants:"'"});`,

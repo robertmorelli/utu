@@ -3,7 +3,7 @@
 import { emitRefIntrinsic, emitScalarIntrinsic, matchScalarIntrinsic } from './intrinsics.js';
 import {
   emitIf, emitWhile, emitFor, emitReturn, emitBreak,
-  emitMatch, emitAlt, emitPromote, emitAssert, emitFatal,
+  emitMatch, emitAlt, emitPromote, emitAssert, emitFatal, emitTry, emitCaught,
 } from './control.js';
 import { emitStructInit, emitFieldGet, emitNullRef } from './structs.js';
 import { emitLit } from './literals.js';
@@ -58,6 +58,8 @@ export function emitExpr(node, ctx) {
     case 'ir-promote':       expr = emitPromote(node, ctx, emitExpr); break;
     case 'ir-struct-init':   expr = emitStructInit(node, ctx, emitExpr); break;
     case 'ir-array-lit':     expr = emitArrayLiteral(node, ctx, emitExpr); break;
+    case 'ir-try':           expr = emitTry(node, ctx, emitExpr); break;
+    case 'ir-caught':        expr = emitCaught(ctx.module); break;
     case 'ir-field-access':  expr = emitFieldGet(node, ctx, emitExpr); break;
     case 'ir-null-ref':      expr = emitNullRef(node, ctx); break;
     case 'ir-ref-test':      expr = emitRefTest(node, ctx, emitExpr); break;

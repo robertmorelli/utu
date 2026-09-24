@@ -300,8 +300,10 @@ try {
       fn set() F64 { let s = new Browser.Set(["a", "b", "a"]); s.size; }
     `);
     assert.equal(exports.json(), '[1,"two",true,{"n":3}]');
+    const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().to_f64(); }`);
+    assert.equal(native.dates(), 4);
     assert.equal(exports.from(), 7); assert.equal(exports.blob(), 11); assert.equal(exports.set(), 2);
-    const doc = await compile('using Browser from std:Browser; export main() void { let d = Browser.document; let t = [d, d]; }');
+    const doc = await compile('using Browser from std:Browser; export main() void { let t = []; }');
     assert([...doc.querySelectorAll('[data-error]')].some(n => /array literal needs a known type/.test(n.dataset.errorMessage ?? '')));
   });
   await test('package declarations accept DOM values, records, tuples, closures and awaited results', async () => {
@@ -421,6 +423,35 @@ try {
       export lib { fn run() F64 { let m: Browser.Map = new JS.Map(); m.size; } }`);
     assert(!both.querySelector('[data-error]'), both.querySelector('[data-error]')?.dataset.errorMessage);
   });
+  await test('std:Web runs the common web APIs on any JS runtime; std:Worker types worker globals', async () => {
+    const doc = await compile(`using Web from std:Web; export lib {
+      fn url() Str { let u = new Web.URL("https://utu.dev/a?q=1"); u.searchParams.set("q", "2"); u.href; }
+      fn bytes() F64 { let encoded = new Web.TextEncoder().encode("héllo"); encoded.length; }
+      fn base64() Str { Web.atob(Web.btoa("utu")); }
+      fn uuid() F64 { Web.crypto.randomUUID().length; }
+      fn aborted() Bool { let c = new Web.AbortController(); c.abort(); c.signal.aborted; }
+      fn body() Str { await new Web.Response("from a Response").text(); }
+    }`);
+    assert(!doc.querySelector('[data-error]'), doc.querySelector('[data-error]')?.dataset.errorMessage);
+    const wasm = emitBinary(doc);
+    const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
+    const exports = typeof WebAssembly.promising === 'function' ? promisifyExports(instance, readRuntimeSpec(doc.body.firstChild, 'promiseRuntime')) : instance.exports;
+    assert.equal(exports.url(), 'https://utu.dev/a?q=2'); assert.equal(exports.bytes(), 6);
+    assert.equal(exports.base64(), 'utu'); assert.equal(exports.uuid(), 36); assert.equal(exports.aborted(), 1);
+    if (typeof WebAssembly.Suspending === 'function') assert.equal(await exports.body(), 'from a Response');
+    const dom = await compile('using Web from std:Web; export main() void { Web.document.title = "x"; }');
+    assert([...dom.querySelectorAll('[data-error]')].some(n => n.dataset.errorMessage === "Unknown foreign member 'Web.document'"));
+    const worker = await compile(`using Worker from std:Worker; using Web from std:Web;
+      fn reply(response: Web.Response) void { Worker.postMessage(response.status); }
+      export main() void {
+        Worker.self.onmessage = cl(event) void { Worker.postMessage(event.data); };
+        Worker.importScripts("helper.js");
+        reply(new Worker.Response("ok"));
+      }`);
+    assert(!worker.querySelector('[data-error]'), worker.querySelector('[data-error]')?.dataset.errorMessage);
+    const glue = Object.values(JSON.parse(worker.body.firstChild.dataset.dslImportsJs).es).join('\n');
+    assert.match(glue, /globalThis\["postMessage"\]/); assert.match(glue, /globalThis\["importScripts"\]/);
+  });
   await test('keyof over an index signature accepts any key (mitt handlers need no annotation)', async () => {
     const output = linkFiles({ files: [path.join(ROOT, 'node_modules/mitt/index.d.ts')], prefix: 'Mitt', moduleSpecifier: 'mitt' });
     const { exports } = await run(`fn run() F64 {
@@ -431,6 +462,23 @@ try {
       total;
     }`, output);
     assert.equal(exports.run(), 5);
+  });
+  await test('try/catch catches host exceptions as values, nests, and yields a result', async () => {
+    const doc = await compile(`using JS from std:JS; export lib {
+      fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { e.name; }; }
+      fn counted() F64 { let failures = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; failures; }
+      fn nested() Str {
+        try { try { JS.JSON.parse("{"); "inner ok"; } catch |inner| { JS.JSON.parse("]"); "inner caught"; }; }
+        catch |outer| { "outer caught"; };
+      }
+    }`);
+    assert(!doc.querySelector('[data-error]'), doc.querySelector('[data-error]')?.dataset.errorMessage);
+    const wasm = emitBinary(doc);
+    const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
+    assert.equal(instance.exports.message('[1,2]'), '[1,2]');
+    assert.equal(instance.exports.message('{'), 'SyntaxError');
+    assert.equal(instance.exports.counted(), 1);
+    assert.equal(instance.exports.nested(), 'outer caught');
   });
   await test('closures whose first parameter is `this` receive the JS receiver', async () => {
     const { exports } = await run(`

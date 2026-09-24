@@ -1,7 +1,7 @@
 import { ForeignABI, prepareForeignImports } from './foreign-types.js';
 import { lowerForeignOperations } from './foreign-lowering.js';
 import { boxMutatedCaptures } from './box-captures.js';
-import { requestLiteralArrayTypes } from './array-literal-defaults.js';
+import { missingArrayElements, nameArrayElements, requestLiteralArrayTypes } from './array-literal-defaults.js';
 import { buildExternFn } from './standard-dsls.js';
 // compiler.js — Compiler factory with dependency injection
 //
@@ -162,7 +162,7 @@ export function createCompiler(env) {
     }
   }
 
-  async function compileFileInternal(filePath) {
+  async function compileFileInternal(filePath, arrayElements = []) {
     const { graph, order, imports, foreign } = await buildModuleGraph(filePath, {
       parser,
       readFile,
@@ -177,7 +177,9 @@ export function createCompiler(env) {
     // Str and F64 are JS strings and numbers: programs using declarations get the
     // standard String/Number members even when their packages never mention them.
     const hasString = abi => Object.hasOwn(abi.names, 'String') || abi.types.some(type => type?.lib === 'String');
-    if (foreign.size && ![...foreign.values()].some(hasString) && typeof stdlib.get('std:JS') === 'function') {
+    // A caught exception is a host value too: `catch |e| { e.message }` needs the JS declarations.
+    const catches = [...graph.values()].some(sourceDoc => sourceDoc.querySelector('ir-caught'));
+    if ((foreign.size || catches) && ![...foreign.values()].some(hasString) && typeof stdlib.get('std:JS') === 'function') {
       foreign.set('std:JS', (await stdlib.get('std:JS')()).abi);
     }
     const foreignABI = foreign.size ? new ForeignABI(foreign) : null;
@@ -229,7 +231,7 @@ export function createCompiler(env) {
     }
     debugAssert(doc, 'prelude');
 
-    const arrayDefaults = requestLiteralArrayTypes(doc);
+    const arrayDefaults = requestLiteralArrayTypes(doc, nameArrayElements(arrayElements, foreignABI));
     const elaboration = retainGraph(doc, 'elaboration', buildElaborationGraph(doc));
     checkModuleVariance(doc, elaboration);
     debugAssert(doc, 'checkModuleVariance');
@@ -257,6 +259,11 @@ export function createCompiler(env) {
     // Build contexts first. Literals, closures, and implicit struct literals
     // consume them; then one worklist propagates actual types to a fixed point.
     let typeGraph = retainGraph(doc, 'types', settleTypeGraph(doc, typeIndex));
+    // `let xs = [a, b]` needs an `Array[T]` instance chosen before typing:
+    // request the element types typing discovered and compile once more.
+    const requested = new Set(arrayElements.map(request => JSON.stringify(request)));
+    const missingArrays = missingArrayElements(doc, typeGraph).filter(request => !requested.has(JSON.stringify(request)));
+    if (missingArrays.length) return compileFileInternal(filePath, [...arrayElements, ...missingArrays]);
     retainGraph(doc, 'calls', buildCallGraph(doc.body.firstChild, typeGraph));
     projectTypeGraph(typeGraph); // explicit compatibility boundary for typed lowerings
     debugAssert(doc, 'solveTypeGraph', { typeIndex, requireBindings: true });

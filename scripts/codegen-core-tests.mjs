@@ -761,6 +761,25 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.run(), 14); assertEq(instance.exports.single(), 4); assertEq(instance.exports.still_int(), 5);
   });
 
+  test('codegen: array literals are array.new_fixed with inferred or declared element types', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'array_literals.utu', source: `
+      struct P:
+        | v: I32
+      fn total(xs: Array[I32]) I32 { let t = 0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
+      export lib {
+        fn literals() I32 { let xs = [1, 2, 3]; total(xs) + total([10, 20]); }
+        fn floats() F64 { let x = 1.5; let mixed = [x, 2]; let typed: Array[F64] = [1, 2.5]; mixed[1] + typed[0]; }
+        fn locals() I32 { let a = 4; let xs = [a, a, 1]; xs[0] + xs[2]; }
+        fn structs() I32 { let p = P { v: 5 }; let ps = [p, P { v: 6 }, null]; promote ps[1] { |q| => q.v + ps.len(), ~> 0, }; }
+        fn nested() I32 { let grid = [[1, 2], [3, 4, 5]]; grid[1][2] + grid.len(); }
+        fn strings() I32 { let names = ["a", "bb"]; names[1].len(); }
+      }
+    ` });
+    const e = instance.exports;
+    assertEq(e.literals(), 36); assertEq(e.floats(), 3); assertEq(e.locals(), 5);
+    assertEq(e.structs(), 9); assertEq(e.nested(), 7); assertEq(e.strings(), 2);
+  });
+
   test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {
     const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });

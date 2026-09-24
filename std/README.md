@@ -8,7 +8,10 @@ types, properties, and methods directly; only the operations a program uses emit
 boundary code.
 
 `std:JS` is the ECMAScript subset of the same graph (`Array`, `Map`, `JSON`,
-`Math`, `Promise`, …) for any JavaScript host, without the DOM.
+`Math`, `Promise`, …) and `std:Web` the web APIs every modern runtime shares
+(`fetch`, `URL`, streams, `crypto`, timers, …). `std:Worker` is a web worker's
+global scope, linked from `lib.webworker`. See the table in
+[the declaration guide](../docs/typescript-abi.md).
 
 Numbers convert explicitly with one instruction each: `i.to_f64()`,
 `f.to_i32()`, `n.to_i64()`, `x.to_f32()`, and so on. Float-to-integer
