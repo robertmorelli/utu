@@ -6,6 +6,7 @@ import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { initParser, createCompiler, emitBinary } from '../../src/index.js';
 import { glueModuleSource, liveGlueFields } from '../../src/runtime/host-imports.js';
+import { nodePackageResolver } from './packages.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -15,7 +16,8 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
   const started = performance.now();
   try {
     const compiler = createCompiler({ parser, target: 'normal', ...(stdlib ? { stdlib } : {}),
-      readFile: file => fs.readFile(file, 'utf8'), resolvePath: (from, relative) => path.resolve(path.dirname(from), relative) });
+      readFile: file => fs.readFile(file, 'utf8'), resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
+      resolvePackage: nodePackageResolver({ root: path.dirname(path.resolve(entry)) }) });
     const doc = await compiler.compileFile(path.resolve(entry));
     const errors = [...doc.querySelectorAll('[data-error]')];
     if (errors.length) throw new Error(errors.slice(0, 10).map(n => n.dataset.errorMessage ?? n.dataset.error).join('\n'));

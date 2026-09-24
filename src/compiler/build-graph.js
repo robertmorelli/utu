@@ -25,7 +25,7 @@ import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
  *   order — topological order, dependencies before dependents
  *   imports — normalized source import edges with blame nodes
  */
-export async function buildModuleGraph(entryPath, { parser, readFile, resolvePath, stdlib = new Map(), createDocument = createIRDocument, target = 'analysis', debugAssertions = false, collectAnalysisTokens = target === 'analysis' }) {
+export async function buildModuleGraph(entryPath, { parser, readFile, resolvePath, resolvePackage = null, stdlib = new Map(), createDocument = createIRDocument, target = 'analysis', debugAssertions = false, collectAnalysisTokens = target === 'analysis' }) {
   /** @type {Map<string, Document>} */
   const graph = new Map();
   /** @type {string[]} */
@@ -74,6 +74,21 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
     if (root) {
       for (const u of [...root.querySelectorAll('ir-using[from]')]) {
         const raw = u.getAttribute('from');
+        // `"npm:pkg"` and `"node:mod"` link a package's declarations through the host.
+        if (/^npm:/.test(raw) || /^node:/.test(raw) && !stdlib.has(raw)) {
+          imports.push({ from: filePath, to: raw, node: u, raw, kind: 'package' });
+          if (!foreign.has(raw)) {
+            if (!resolvePackage) throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT,
+              `Package import "${raw}" needs a host package resolver`, u, { importPath: raw, importKind: 'package' });
+            try {
+              foreign.set(raw, await resolvePackage(raw, { prefix: u.getAttribute('module'), from: filePath }));
+            } catch (error) {
+              throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT, error.message, u, { importPath: raw, importKind: 'package' });
+            }
+          }
+          await visitSource(raw, `mod ${foreign.get(raw).prefix} {}`);
+          continue;
+        }
         // Platform URIs (e.g. std:Array, node:fs) are looked up in the stdlib
         // registry and kept as-is (the URI is the canonical key). Relative and
         // absolute file paths go through resolvePath as before.

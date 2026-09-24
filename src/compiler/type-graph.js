@@ -1,5 +1,6 @@
 import { foreignActual } from './foreign-abi.js';
 import { foreignAssignmentType } from './foreign-lowering.js';
+import { literalArrayElement } from './array-literal-defaults.js';
 // type-graph.js — build, solve, then check the program's type graph
 
 import {
@@ -86,9 +87,11 @@ export function planContextualRewrites(graph) {
       rewrites.push({ kind: 'implicit-struct', node: value, type: unwrapNullable(expected), edge });
       continue;
     }
-    if (value?.localName === 'ir-tuple' && !value.getAttribute('type-name')
-        && graph.typeIndex?.get(unwrapNullable(expected))?.foreign) {
-      rewrites.push({ kind: 'tuple-type', node: value, type: unwrapNullable(expected), edge });
+    // `[a, b]` adopts a native `Array[T]` or a declared host array type from context.
+    const arrayContext = graph.typeIndex?.get(unwrapNullable(expected));
+    if (value?.localName === 'ir-array-lit' && !value.getAttribute('type-name')
+        && (arrayContext?.foreign || arrayContext?.kind === 'wasm-array')) {
+      rewrites.push({ kind: 'array-type', node: value, type: unwrapNullable(expected), edge });
       continue;
     }
     if (value?.localName === 'ir-lit' && !value.getAttribute('type-name')) {
@@ -103,7 +106,7 @@ export function planContextualRewrites(graph) {
     // literal before the surrounding F32 expectation can participate.
     if (value?.matches?.('ir-binary, ir-unary')) {
       const wanted = unwrapNullable(expected);
-      for (const literal of value.querySelectorAll('ir-lit:not([type-name])')) {
+      for (const literal of operandLiterals(value)) {
         if (adopters.get(literal.getAttribute('kind'))?.has(wanted)) {
           rewrites.push({ kind: 'literal-type', node: literal, type: wanted, edge });
         }
@@ -123,6 +126,15 @@ export function planContextualRewrites(graph) {
   return rewrites;
 }
 
+/** Untyped literals that are operands of an operator tree, not nested in calls or indexes. */
+function operandLiterals(node, found = []) {
+  for (const child of node.children) {
+    if (child.localName === 'ir-lit' && !child.getAttribute('type-name')) found.push(child);
+    else if (child.matches('ir-binary, ir-unary, ir-paren')) operandLiterals(child, found);
+  }
+  return found;
+}
+
 /** Apply a contextual rewrite plan, reporting structural/type-seed changes. */
 export function applyContextualRewrites(graph, rewrites) {
   graph.changed = false;
@@ -132,7 +144,7 @@ export function applyContextualRewrites(graph, rewrites) {
       rewrite.node.removeAttribute('implicit');
       rewrite.node.dataset.loweredImplicitStructInit = 'true';
       graph.changed = true;
-    } else if (rewrite.kind === 'tuple-type') {
+    } else if (rewrite.kind === 'array-type') {
       rewrite.node.setAttribute('type-name', rewrite.type);
       graph.changed = true;
     } else if (rewrite.kind === 'literal-type') {
@@ -358,8 +370,8 @@ function addActualRule(graph, node) {
       return rule(graph, node, [one], () => foreignActual(graph, node) ?? fieldActual(graph, node, read(one)), 'field-of');
     case 'ir-struct-init':
       return rule(graph, node, children.map(c => c.firstElementChild), () => foreignActual(graph, node) ?? node.getAttribute('type-name'), 'struct-init');
-    case 'ir-tuple':
-      return rule(graph, node, children, () => foreignActual(graph, node), 'tuple');
+    case 'ir-array-lit':
+      return rule(graph, node, children, () => foreignActual(graph, node) ?? nativeArrayType(graph, node), 'array-literal');
     case 'ir-null-ref':
       return fixed(node.getAttribute('type-name') ? `?${node.getAttribute('type-name')}` : 'null', 'null');
     case 'ir-ref-test': case 'ir-ref-is-null':
@@ -574,6 +586,30 @@ function clearDiagnostic(node) {
   for (const key of ['error', 'errorKind', 'errorMessage', 'errorData']) delete node.dataset[key];
 }
 
+/**
+ * Element context for a native array literal. A declared array type always
+ * provides one; an inferred type only turns `[1, 2.5]` into F64, so a later
+ * declaration context can still claim the literal.
+ */
+function arrayElementContext(graph, node) {
+  const named = node.getAttribute('type-name');
+  if (named) return graph.typeIndex?.get(named)?.arrayElem;
+  return literalArrayElement(node) === 'F64' ? 'F64' : undefined;
+}
+
+/** A native array literal's type: its context, or the `Array[T]` matching its elements. */
+function nativeArrayType(graph, node) {
+  const named = node.getAttribute('type-name');
+  if (named) return graph.typeIndex?.get(named)?.kind === 'wasm-array' ? named : null;
+  const elements = [...new Set([...node.children].map(child => actual(graph, child)))];
+  const element = literalArrayElement(node) ?? (elements.length === 1 ? elements[0] : null);
+  if (!element) return null;
+  for (const [name, entry] of graph.typeIndex ?? []) {
+    if (entry.kind === 'wasm-array' && entry.arrayElem === element) return name;
+  }
+  return null;
+}
+
 function closureType(graph, closure, body) {
   const params = paramsOf(closure).map(param => declaredTypeStr(param) ?? actual(graph, param) ?? 'unknown');
   const ret = typeNodeToStr(firstTypeChild(closure)) ?? actual(graph, body) ?? 'void';
@@ -643,10 +679,11 @@ function addExpectations(graph, node) {
       () => callParameter(graph, node, args, index)?.type,
       'argument', () => callParameter(graph, node, args, index)?.source ?? node.firstElementChild, 'assign'));
   }
-  if (tag === 'ir-struct-init' || tag === 'ir-tuple') {
-    // Host records and arrays give each element the declaration's context.
-    const values = tag === 'ir-tuple' ? [...node.children] : [...node.children].map(field => field.firstElementChild);
-    values.forEach((value, index) => expect(graph, value, () => graph.slots.get(node)?.foreign?.params[index],
+  if (tag === 'ir-struct-init' || tag === 'ir-array-lit') {
+    // Records and arrays give each element their declared context.
+    const values = tag === 'ir-array-lit' ? [...node.children] : [...node.children].map(field => field.firstElementChild);
+    values.forEach((value, index) => expect(graph, value, () => graph.slots.get(node)?.foreign?.params[index]
+      ?? (tag === 'ir-array-lit' ? arrayElementContext(graph, node) : undefined),
       'field', node, 'assign'));
   }
   if (tag === 'ir-struct-init') {
@@ -818,8 +855,11 @@ function collectFailures(graph) {
     }
   }
   for (const tuple of nodesOf(graph, 'ir-tuple')) {
-    if (!actual(graph, tuple) && !tuple.dataset.foreignError) fail(graph, tuple, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
-      'A tuple literal needs a declared host array type, such as a parameter typed `T[]`', {});
+    fail(graph, tuple, DIAGNOSTIC_KINDS.TYPE_MISMATCH, 'Tuple literals are not supported yet; use [a, b] for arrays', {});
+  }
+  for (const array of nodesOf(graph, 'ir-array-lit')) {
+    if (!actual(graph, array) && !graph.slots.get(array)?.foreignError) fail(graph, array, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+      'An array literal needs a known type: annotate it (`let xs: Array[I32] = [1, 2]`) or pass it where an array is expected', {});
   }
   for (const closure of nodesOf(graph, 'ir-closure')) {
     for (const param of paramsOf(closure)) {

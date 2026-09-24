@@ -292,17 +292,17 @@ try {
       assert.equal(exports.target(), 'typed');
     });
   });
-  await test('tuple literals become JS arrays for array, array-like, iterable and dynamic slots', async () => {
+  await test('array literals become JS arrays for array, array-like, iterable and dynamic slots', async () => {
     const exports = await runBrowser(`
-      fn json() Str { Browser.JSON.stringify(.{1.0, "two", true, &{ n: 3.0 }}); }
-      fn from() F64 { let values = Browser.Array.from(.{1.0, 2.0, 4.0}); values[2.0] + values.length; }
-      fn blob() F64 { let b = new Browser.Blob(.{"hello ", "world"}, &{ type: "text/plain" }); b.size; }
-      fn set() F64 { let s = new Browser.Set(.{"a", "b", "a"}); s.size; }
+      fn json() Str { Browser.JSON.stringify([1, "two", true, &{ n: 3 }]); }
+      fn from() F64 { let values = Browser.Array.from([1.0, 2.0, 4.0]); values[2.0] + values.length; }
+      fn blob() F64 { let b = new Browser.Blob(["hello ", "world"], &{ type: "text/plain" }); b.size; }
+      fn set() F64 { let s = new Browser.Set(["a", "b", "a"]); s.size; }
     `);
     assert.equal(exports.json(), '[1,"two",true,{"n":3}]');
     assert.equal(exports.from(), 7); assert.equal(exports.blob(), 11); assert.equal(exports.set(), 2);
-    const doc = await compile('using Browser from std:Browser; export main() void { let t = .{1.0, 2.0}; }');
-    assert([...doc.querySelectorAll('[data-error]')].some(n => /tuple literal needs a declared host array type/.test(n.dataset.errorMessage ?? '')));
+    const doc = await compile('using Browser from std:Browser; export main() void { let d = Browser.document; let t = [d, d]; }');
+    assert([...doc.querySelectorAll('[data-error]')].some(n => /array literal needs a known type/.test(n.dataset.errorMessage ?? '')));
   });
   await test('package declarations accept DOM values, records, tuples, closures and awaited results', async () => {
     const output = linkFiles({ files: [path.join(ROOT, 'node_modules/@floating-ui/dom/dist/floating-ui.dom.d.ts')], prefix: 'Floating', moduleSpecifier: '@floating-ui/dom' });
@@ -312,7 +312,7 @@ try {
         let button = Browser.document.createElement("button");
         let tip = Browser.document.createElement("div");
         let pos = await Floating.computePosition(button, tip, &{ placement: "top",
-          middleware: .{ Floating.offset(8.0), Floating.flip(), Floating.shift(&{ padding: 5.0 }) } });
+          middleware: [Floating.offset(8), Floating.flip(), Floating.shift(&{ padding: 5 })] });
         tip.style.left = pos.x.toString() + "px";
         let cleanup = Floating.autoUpdate(button, tip, cl() void {});
         cleanup();
@@ -383,7 +383,7 @@ try {
     const { exports, glue } = await run(`
       fn hello() Str { Geom.greet("UTU"); }
       fn parsed(text: Str) F64 { promote Geom.parse_number(text) { |n| => n, ~> -1.0, }; }
-      fn average() F64 { Geom.mean(.{ 2.0, 4.0, 9.0 }); }
+      fn average() F64 { Geom.mean([2, 4, 9]); }
       fn polygon() F64 {
         let p = new Geom.Polygon(4.0, 2.5);
         p.label = "square";
@@ -405,6 +405,32 @@ try {
     assert.equal(exports.average(), 5); assert.equal(exports.polygon(), 144); assert.equal(exports.steps(), 3);
     assert.match(glue, /new globalThis\.Float64Array\(\[p0,p1,p2\]\)/);
     assert(!/"Shape"/.test(glue), 'enum members fold to literals');
+  });
+  await test('std:JS is the ECMAScript library alone, sharing the browser\'s standard types', async () => {
+    const doc = await compile(`using JS from std:JS; export lib { fn run() Str {
+      let m = new JS.Map(); m.set("a", 1); let d = new JS.Date(0);
+      JS.JSON.stringify([JS.Math.max(1, 5), m.size, d.getUTCFullYear(), "x".padStart(3, "-")]);
+    } }`);
+    assert(!doc.querySelector('[data-error]'), doc.querySelector('[data-error]')?.dataset.errorMessage);
+    const wasm = emitBinary(doc);
+    const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
+    assert.equal(instance.exports.run(), '[5,1,1970,"--x"]');
+    const dom = await compile('using JS from std:JS; export main() void { JS.document.title = "x"; }');
+    assert([...dom.querySelectorAll('[data-error]')].some(n => n.dataset.errorMessage === "Unknown foreign member 'JS.document'"));
+    const both = await compile(`using JS from std:JS; using Browser from std:Browser;
+      export lib { fn run() F64 { let m: Browser.Map = new JS.Map(); m.size; } }`);
+    assert(!both.querySelector('[data-error]'), both.querySelector('[data-error]')?.dataset.errorMessage);
+  });
+  await test('keyof over an index signature accepts any key (mitt handlers need no annotation)', async () => {
+    const output = linkFiles({ files: [path.join(ROOT, 'node_modules/mitt/index.d.ts')], prefix: 'Mitt', moduleSpecifier: 'mitt' });
+    const { exports } = await run(`fn run() F64 {
+      let emitter = Mitt.default();
+      let total = 0.0;
+      emitter.on("add", cl(value: F64) void { total = total + value; });
+      emitter.emit("add", 2); emitter.emit("add", 3);
+      total;
+    }`, output);
+    assert.equal(exports.run(), 5);
   });
   await test('closures whose first parameter is `this` receive the JS receiver', async () => {
     const { exports } = await run(`

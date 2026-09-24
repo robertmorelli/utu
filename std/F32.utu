@@ -23,4 +23,11 @@ mod F32 {
     fn nearest(x: &) & { @ir/\ <ir-f32-nearest><ir-ident name="x"/></ir-f32-nearest> \/; }
     fn min(a: &, b: &) & { @ir/\ <ir-f32-min><ir-ident name="a"/><ir-ident name="b"/></ir-f32-min> \/; }
     fn max(a: &, b: &) & { @ir/\ <ir-f32-max><ir-ident name="a"/><ir-ident name="b"/></ir-f32-max> \/; }
+
+    // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
+    fn &.to_f64 |self| () F64 { @ir/\ <ir-f64-promote><ir-ident name="self"/></ir-f64-promote> \/; }
+    fn &.to_i32 |self| () I32 { @ir/\ <ir-i32-trunc-s-sat-f32><ir-ident name="self"/></ir-i32-trunc-s-sat-f32> \/; }
+    fn &.to_u32 |self| () U32 { @ir/\ <ir-u32-trunc-u-sat-f32><ir-ident name="self"/></ir-u32-trunc-u-sat-f32> \/; }
+    fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-trunc-s-sat-f32><ir-ident name="self"/></ir-i64-trunc-s-sat-f32> \/; }
+    fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-trunc-u-sat-f32><ir-ident name="self"/></ir-u64-trunc-u-sat-f32> \/; }
 }

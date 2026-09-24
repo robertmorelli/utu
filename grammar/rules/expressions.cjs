@@ -5,6 +5,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.literal,
         $.identifier,
         $.tuple_expr,
+        $.array_expr,
         $.paren_expr,
         $.assert_expr,
         $.unary_expr,
@@ -60,6 +61,10 @@ exports.buildExpressionRules = function buildExpressionRules() {
     closure_param: ($) => seq($.identifier, optional(seq(':', $._type))),
 
     paren_expr: ($) => seq('(', $._expr, ')'),
+
+    // [a, b, c] — a WasmGC array, or a JS array where a declaration expects one
+    array_expr: ($) =>
+      seq('[', optional(seq($._expr, repeat(seq(',', $._expr)), optional(','))), ']'),
 
     // .{a, b, c}
     tuple_expr: ($) =>

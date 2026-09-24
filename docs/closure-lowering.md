@@ -19,9 +19,15 @@ facts is a no-op when no literals or coercions remain.
 
 Each literal becomes an environment struct, a lifted top-level function, and an
 `ir-make-closure` expression at the original evaluation point. Captures are
-matched by declaration identity, not spelling. Scalars are copied snapshots;
-GC references share their referents, but later rebinding does not change the
-captured reference. Captures are evaluated at construction, not invocation.
+matched by declaration identity, not spelling. Captures are evaluated at
+construction and copied into the environment; GC references share their
+referents.
+
+A captured variable that is reassigned after it could have been captured
+(inside any closure, later in its scope, or in a loop enclosing the closure) is
+first rewritten by `box-captures.js` into a one-field struct cell: `x` becomes
+`x.value`, and every closure shares the cell. Variables never reassigned after
+capture stay plain copies, so the common case costs nothing.
 
 The pass snapshots closures in iterative postorder. Children are lifted before
 parents, preserving the generated capture reads needed for transitive captures.

@@ -15,3 +15,18 @@ export function loadBrowserABI() {
 export async function browserSource() {
   return { source: 'mod Browser {}', abi: await loadBrowserABI() };
 }
+
+let jsPromise;
+/**
+ * `std:JS` — the ECMAScript standard library alone (Array, Map, JSON, Math,
+ * Promise, …), for any JS host. A filtered view of the browser graph: no
+ * second catalog, and its standard types are the browser's types.
+ */
+export function jsSource() {
+  return jsPromise ??= loadBrowserABI().then(abi => {
+    const keep = new Set(abi.ecmascript ?? []);
+    const pick = table => Object.fromEntries(Object.entries(table).filter(([name]) => keep.has(name)));
+    return { source: 'mod JS {}', abi: { ...abi, prefix: 'JS', exports: pick(abi.exports), names: pick(abi.names),
+      mutableGlobals: abi.mutableGlobals.filter(name => keep.has(name)) } };
+  }).catch(error => { jsPromise = undefined; throw error; });
+}

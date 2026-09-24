@@ -48,8 +48,12 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
       ...(sig.thisParameter ? { receiver: ref(at(sig.thisParameter)) } : {}),
     };
   }
-  const exports = Object.create(null), names = Object.create(null), mutableGlobals = [];
+  const exports = Object.create(null), names = Object.create(null), mutableGlobals = [], ecmascript = [];
+  // Names the ECMAScript libraries (lib.es*.d.ts) declare and no host library (lib.dom, lib.webworker) touches.
+  const files = symbol => (symbol.declarations ?? []).map(d => d.getSourceFile().fileName.split(/[\\/]/).at(-1));
+  const esOnly = symbol => files(symbol).some(f => /^lib\.es/.test(f)) && !files(symbol).some(f => /^lib\.(dom|webworker)/.test(f));
   for (const [name, symbol] of [...symbols].sort(([a], [b]) => a.localeCompare(b))) {
+    if (esOnly(symbol)) ecmascript.push(name);
     if (symbol.flags & ts.SymbolFlags.Type) names[name] = ref(checker.getDeclaredTypeOfSymbol(symbol));
     if (symbol.flags & ts.SymbolFlags.Value) {
       exports[name] = ref(at(symbol));
@@ -101,5 +105,5 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
         || !!(prop.flags & ts.SymbolFlags.GetAccessor) && !(prop.flags & ts.SymbolFlags.SetAccessor) };
     }
   }
-  return { version: 1, prefix, moduleSpecifier, exports, names, mutableGlobals, types };
+  return { version: 1, prefix, moduleSpecifier, exports, names, mutableGlobals, types, ...(ecmascript.length ? { ecmascript } : {}) };
 }

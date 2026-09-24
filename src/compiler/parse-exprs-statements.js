@@ -105,7 +105,15 @@ export function walkStructInit(n, doc, source, dispatch, implicit) {
 }
 
 export function walkTupleExpr(n, doc, source, dispatch) {
-  const node = stamp(el(T.TUPLE, doc), n);
+  return walkSequence(el(T.TUPLE, doc), n, doc, source, dispatch);
+}
+
+export function walkArrayExpr(n, doc, source, dispatch) {
+  return walkSequence(el(T.ARRAY_LIT, doc), n, doc, source, dispatch);
+}
+
+function walkSequence(node, n, doc, source, dispatch) {
+  stamp(node, n);
   for (const child of namedChildren(n)) {
     const value = dispatch(child, doc, source);
     if (value) node.appendChild(value);

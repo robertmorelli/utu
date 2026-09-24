@@ -52,6 +52,10 @@ export function isAssignable(actual, expected, ctx = {}) {
     if (host && (target.foreignDynamic || source?.foreignDynamic)) return true;
     if (target.foreignTop === 'function' && closure) return true;
     if (target.foreignTop === 'object' && (source?.foreign || closure)) return true;
+    // `Map<Str, F64>` is a `Map<any, any>`: `any` arguments accept any instantiation.
+    if (source?.foreignTemplate && source.foreignTemplate === target.foreignTemplate
+      && target.foreignArguments.every((arg, i) => arg === source.foreignArguments[i]
+        || ctx.typeIndex.get(unwrapNullable(arg))?.foreignDynamic)) return true;
     if (target.foreignUnion?.some(member => member !== unwrapNullable(expected)
       && isAssignable(unwrapNullable(actual), member, ctx))) return true;
   }

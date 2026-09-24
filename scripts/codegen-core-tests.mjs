@@ -691,7 +691,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.decayed(4), 8, 'a fun decays to a cl with an empty environment');
   });
 
-  test('codegen: scalars are snapshot and GC references are shared', async ({ ROOT }) => {
+  test('codegen: closures observe reassigned captures; untouched captures stay copies', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({
       ROOT,
       makeCompiler,
@@ -709,13 +709,68 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
             c.n = 5;
             read();
           }
+          fn counter() I32 {
+            let count: I32 = 0;
+            let bump = cl() void { count = count + 1; };
+            bump(); bump(); bump();
+            count;
+          }
+          fn loop_capture() I32 {
+            let i: I32 = 0;
+            let last = cl() I32 { i; };
+            while (i < 4) { i = i + 1; };
+            last();
+          }
         }
       `,
     });
-    // 100, not 999 — the scalar was copied into the environment when the
-    // closure was built.  5, not 1 — the Counter is shared, so a mutation
-    // through it is visible.
-    assertEq(instance.exports.capture_modes(), 105);
+    // 999, not 100: base is reassigned after capture, so it lives in a shared
+    // cell. 5, not 1: the Counter reference is shared as always.
+    assertEq(instance.exports.capture_modes(), 1004);
+    assertEq(instance.exports.counter(), 3);
+    assertEq(instance.exports.loop_capture(), 4);
+  });
+
+  test('stdlib: numeric conversions are single instructions with saturating float → int', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'stdlib_conversions.utu', source: `
+      export lib {
+        fn widen(i: I32) F64 { i.to_f64(); }
+        fn narrow(f: F64) I32 { f.to_i32(); }
+        fn unsigned(f: F64) F64 { f.to_u32().to_f64(); }
+        fn wide(i: I32) F64 { i.to_i64().to_f64(); }
+        fn single(f: F64) F64 { f.to_f32().to_f64(); }
+        fn wrap(n: F64) I32 { n.to_i64().to_i32(); }
+      }
+    ` });
+    const e = instance.exports;
+    assertEq(e.widen(-7), -7); assertEq(e.narrow(2.9), 2); assertEq(e.narrow(-2.9), -2);
+    assertEq(e.narrow(NaN), 0); assertEq(e.narrow(1e20), 2147483647);
+    assertEq(e.unsigned(-1.5), 0); assertEq(e.wide(-3), -3);
+    assertEq(e.single(0.1), Math.fround(0.1)); assertEq(e.wrap(4294967297), 1);
+  });
+
+  test('typing: integer literals adopt float types from context', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'int_literal_floats.utu', source: `
+      fn half(x: F64) F64 { x / 2; }
+      export lib {
+        fn run() F64 { let a: F64 = 3; let b = 1.5; half(10) + a + 2 * b + b * 2; }
+        fn single() F32 { let x: F32 = 4; x; }
+        fn still_int() I32 { let n = 5; n; }
+      }
+    ` });
+    assertEq(instance.exports.run(), 14); assertEq(instance.exports.single(), 4); assertEq(instance.exports.still_int(), 5);
+  });
+
+  test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {
+    const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
+    const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });
+    const before = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_early_write.utu',
+      source: `export lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }` });
+    assertEq(plain.instance.exports.run(), 7);
+    assertEq(before.instance.exports.run(), 7);
+    for (const { doc } of [plain, before]) {
+      assert(!doc.querySelector('ir-struct[name^="__Cell"]'), 'no cell type for a capture that is never reassigned afterwards');
+    }
   });
 
   test('codegen: fun decays to cl in every declared-type position', async ({ ROOT }) => {

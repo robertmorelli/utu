@@ -118,10 +118,13 @@ function emitScalar(node, intr, args, ctx) {
   if (intr.namespace === 'v128' && ctx.requirements) ctx.requirements.conservativeSweep = true;
   if (intr.kind === 'v128' && intr.op === 'const') return emitV128Const(node, ctx.module);
   const space = ctx.module[intr.namespace];
-  const fn = space?.[intr.op];
+  // Conversions are nested by source type in binaryen: convert_s_i32 → convert_s.i32.
+  const split = intr.op.lastIndexOf('_');
+  const holder = typeof space?.[intr.op] === 'function' ? space : space?.[intr.op.slice(0, split)];
+  const fn = holder === space ? space?.[intr.op] : holder?.[intr.op.slice(split + 1)];
   if (typeof fn !== 'function') throw new Error(
     `codegen: binaryen has no ${intr.namespace}.${intr.op} for tag <${node.localName}>`);
-  return fn.call(space, ...args);
+  return fn.call(holder, ...args);
 }
 
 export function emitRefIntrinsic(opNode, ctx, emitExpr) {

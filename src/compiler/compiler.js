@@ -1,5 +1,7 @@
 import { ForeignABI, prepareForeignImports } from './foreign-types.js';
 import { lowerForeignOperations } from './foreign-lowering.js';
+import { boxMutatedCaptures } from './box-captures.js';
+import { requestLiteralArrayTypes } from './array-literal-defaults.js';
 import { buildExternFn } from './standard-dsls.js';
 // compiler.js — Compiler factory with dependency injection
 //
@@ -79,6 +81,9 @@ import {
  *   Reads the UTF-8 contents of a file at the given path.
  *   The implementation is host-specific (fs, vscode.workspace.fs, fetch, …).
  * @property {(path: string, fromPath: string) => string} resolvePath
+ * @property {(specifier: string, request: { prefix: string, from: string }) => Promise<object>} [resolvePackage]
+ *   Link `using X from "npm:pkg"` / `"node:mod"` to a declaration graph. Node
+ *   hosts can use tools/dts/packages.mjs; other hosts inject their own.
  *   Resolves a relative import path to an absolute file key.
  * @property {() => Document} [createDocument]
  *   Document factory for DI. Defaults to linkedom's createIRDocument.
@@ -109,7 +114,7 @@ import {
  * @returns {Compiler}
  */
 export function createCompiler(env) {
-  const { parser, readFile, resolvePath, stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
+  const { parser, readFile, resolvePath, resolvePackage = null, stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
 
   if (!parser)      throw new Error('createCompiler: `parser` is required');
   if (!readFile)    throw new Error('createCompiler: `readFile` is required');
@@ -162,12 +167,19 @@ export function createCompiler(env) {
       parser,
       readFile,
       resolvePath,
+      resolvePackage,
       stdlib,
       createDocument,
       target,
       debugAssertions,
       collectAnalysisTokens: target === 'analysis',
     });
+    // Str and F64 are JS strings and numbers: programs using declarations get the
+    // standard String/Number members even when their packages never mention them.
+    const hasString = abi => Object.hasOwn(abi.names, 'String') || abi.types.some(type => type?.lib === 'String');
+    if (foreign.size && ![...foreign.values()].some(hasString) && typeof stdlib.get('std:JS') === 'function') {
+      foreign.set('std:JS', (await stdlib.get('std:JS')()).abi);
+    }
     const foreignABI = foreign.size ? new ForeignABI(foreign) : null;
     if (foreignABI) prepareForeignImports(graph, imports, foreignABI);
     debugAssert(graph.get(filePath), 'buildModuleGraph');
@@ -217,10 +229,12 @@ export function createCompiler(env) {
     }
     debugAssert(doc, 'prelude');
 
+    const arrayDefaults = requestLiteralArrayTypes(doc);
     const elaboration = retainGraph(doc, 'elaboration', buildElaborationGraph(doc));
     checkModuleVariance(doc, elaboration);
     debugAssert(doc, 'checkModuleVariance');
     instantiateModules(doc, { debugAssertions, graph: elaboration });
+    arrayDefaults?.remove();
     debugAssert(doc, 'instantiateModules');
     // Elaboration errors can intentionally leave unresolved requests behind.
     // Stop before binding/type passes turn a user-facing arity error into an
@@ -248,6 +262,15 @@ export function createCompiler(env) {
     debugAssert(doc, 'solveTypeGraph', { typeIndex, requireBindings: true });
 
     if (lowerForeignOperations(typeGraph, buildExternFn)) {
+      refreshProgramIndex(doc);
+      typeIndex = linkTypeDecls(doc, elaboration);
+      retainGraph(doc, 'scope', resolveBindings(doc));
+      typeGraph = retainGraph(doc, 'types', settleTypeGraph(doc, typeIndex));
+      projectTypeGraph(typeGraph);
+    }
+
+    // Captured variables reassigned after capture become shared cells.
+    if (boxMutatedCaptures(doc, retainedGraphs(doc).scope, typeGraph)) {
       refreshProgramIndex(doc);
       typeIndex = linkTypeDecls(doc, elaboration);
       retainGraph(doc, 'scope', resolveBindings(doc));

@@ -12,6 +12,8 @@ const UNARY_INTRINSICS = new Set([
 ]);
 
 const TERNARY_INTRINSICS = new Set(['bitselect']);
+// Numeric conversions: convert_s_i32, trunc_u_sat_f64, extend_s, wrap, promote, demote.
+const CONVERSION_OP = /^(convert|trunc_[su]|extend_[su]|wrap|promote|demote)/;
 const NULLARY_INTRINSICS = new Set(['const']);
 
 /**
@@ -173,7 +175,7 @@ function resolvesType(type, typeIndex) {
 function scalarIntrinsicArity(op) {
   if (NULLARY_INTRINSICS.has(op)) return 0;
   if (TERNARY_INTRINSICS.has(op)) return 3;
-  if (UNARY_INTRINSICS.has(op)) return 1;
+  if (UNARY_INTRINSICS.has(op) || CONVERSION_OP.test(op)) return 1;
   return 2;
 }
 

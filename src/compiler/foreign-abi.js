@@ -1,4 +1,4 @@
-import { callableParts, isNullable } from './type-strings.js';
+import { callableParts, isNullable, unwrapNullable } from './type-strings.js';
 import { isAssignable } from './type-rules.js';
 import { paramsOf } from './ir-helpers.js';
 const primitive = new Set(['Str', 'F64', 'Bool', 'void']);
@@ -117,8 +117,8 @@ const unbound = ref => !!ref && typeof ref === 'object' && (ref.parameter !== un
 /** Infer generic bindings from an argument, including a callback's return type. */
 function unify(graph, index, ref, arg, bindings) {
   const abi = graph.doc.__utuForeign;
-  if (arg.localName === 'ir-tuple') {
-    // `.{1.0, 2.0}` for `ArrayLike<T>` binds T when every element agrees.
+  if (arg.localName === 'ir-array-lit') {
+    // `[1.0, 2.0]` for `ArrayLike<T>` binds T when every element agrees.
     const element = elementOf(abi, index, abi.bind(index, ref, bindings));
     const types = [...new Set([...arg.children].map(child => graph.slots.get(child)?.actual))];
     if (element?.parameter !== undefined && types.length === 1 && types[0] && !Object.hasOwn(bindings, element.parameter)) {
@@ -214,15 +214,18 @@ export function accept(graph, index, ref, arg, bindings = {}) {
     const nullable = members.length !== desc.union.length;
     const wrap = t => nullable && !t.startsWith('?') && (type === 'null' || isNullable(type ?? '')) ? `?${t}` : t;
     if (type === 'null' && nullable) return abi.type(index, ref, graph);
-    const pick = arg?.localName === 'ir-tuple' ? members.find(r => elementOf(abi, index, r) !== undefined)
+    const pick = arg?.localName === 'ir-array-lit' ? members.find(r => elementOf(abi, index, r) !== undefined)
       : isClosure(graph, arg) ? members.find(r => abi.describe(index, r).calls?.length || abi.describe(index, r).name === 'Function')
       : isRecord(arg) ? members.find(r => {
         const d = abi.describe(index, r);
         return !d.calls?.length && [...arg.children].every(f => Object.hasOwn(d.properties ?? {}, f.getAttribute('field')) || d.dynamic || d.indexes?.length);
       }) : null;
     if (pick !== undefined && pick !== null) return wrap(accept(graph, index, pick, arg, bindings));
+    // An untyped integer literal adopts a numeric member (`offset(8)` for `number | Options`).
+    const intLiteral = arg?.localName === 'ir-lit' && arg.getAttribute('kind') === 'int' && !arg.getAttribute('type-name');
     for (const member of members) {
       const t = wrap(accept(graph, index, member, arg, bindings));
+      if (intLiteral && unwrapNullable(t) === 'F64') return t;
       if (type && isAssignable(type, t, ctx)) return type;
     }
     if (members.length === 1) return wrap(accept(graph, index, members[0], arg, bindings));
@@ -279,7 +282,7 @@ export function foreignActual(graph, node) {
     return save({ kind: 'object', result: name, params, args,
       body: `(${params.map((_, i) => `p${i}`).join(',')}) => ({${fields.map((f, i) => `[${json(f.getAttribute('field'))}]:${jsArgument(graph, value.index, slots[i], args[i], `p${i}`, params[i])}`).join(',')}})` });
   }
-  if (node.localName === 'ir-tuple') {
+  if (node.localName === 'ir-array-lit') {
     const name = node.getAttribute('type-name');
     const value = abi.values.get(name);
     if (!value) return null;
@@ -349,14 +352,19 @@ export function foreignActual(graph, node) {
         if (constraint?.keys !== undefined || literals?.length) {
           if (arg.getAttribute('kind') !== 'string') return n - 100;
           const key = JSON.parse(arg.getAttribute('value'));
-          const accepts = constraint?.keys !== undefined
-            ? Object.hasOwn(abi.describe(value.index, constraint.keys).properties ?? {}, key)
+          const keyed = constraint?.keys !== undefined ? abi.describe(value.index, constraint.keys) : null;
+          // `keyof T` admits T's named properties, or any string when T has a string index signature.
+          const accepts = keyed
+            ? Object.hasOwn(keyed.properties ?? {}, key) || keyed.dynamic
+              || !!keyed.indexes?.some(info => abi.type(value.index, info.key) === 'Str')
             : literals.some(r => r.literal === key);
           return n + (accepts ? 5 : -100);
         }
       }
       if (p.type?.literal !== undefined) return n + (arg.getAttribute('value') === json(p.type.literal) ? 10 : -10);
       const slot = p.rest ? abi.describe(value.index, p.type).element ?? 'any' : p.type;
+      // `[...]` belongs in an array-like slot, whatever it would default to natively.
+      if (arg.localName === 'ir-array-lit') return n + (elementOf(abi, value.index, slot) !== undefined ? 3 : -100);
       return n + (read(arg) && isAssignable(read(arg), accept(graph, value.index, slot, arg), { typeIndex: graph.typeIndex }) ? 2 : 0);
     }, 0);
     candidates.sort((a, b) => score(b) - score(a));

@@ -14,7 +14,7 @@ import {
 import { emitCall, emitOrElse } from './calls.js';
 import { emitAwait, emitClosureDecay, emitMakeClosure } from './closures.js';
 import { emitStringIntrinsic } from './strings.js';
-import { emitArrayIntrinsic } from './arrays.js';
+import { emitArrayIntrinsic, emitArrayLiteral } from './arrays.js';
 
 export function emitExpr(node, ctx) {
   if (!node) return ctx.module.nop();
@@ -57,6 +57,7 @@ export function emitExpr(node, ctx) {
     case 'ir-alt':           expr = emitAlt(node, ctx, emitExpr); break;
     case 'ir-promote':       expr = emitPromote(node, ctx, emitExpr); break;
     case 'ir-struct-init':   expr = emitStructInit(node, ctx, emitExpr); break;
+    case 'ir-array-lit':     expr = emitArrayLiteral(node, ctx, emitExpr); break;
     case 'ir-field-access':  expr = emitFieldGet(node, ctx, emitExpr); break;
     case 'ir-null-ref':      expr = emitNullRef(node, ctx); break;
     case 'ir-ref-test':      expr = emitRefTest(node, ctx, emitExpr); break;

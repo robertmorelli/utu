@@ -22,7 +22,11 @@ export main() void {
 }
 ```
 
-One import provides the browser and standard JavaScript declarations. Local
+One import provides the browser and standard JavaScript declarations.
+`std:JS` provides only the ECMAScript standard library (`Array`, `Map`, `Set`,
+`JSON`, `Math`, `Promise`, `Date`, …) for any JavaScript host; it is a view of
+the same graph, so its types are the browser's types. Generic declared types
+written bare, such as `Browser.Map`, mean any instantiation. Local
 `let` types can be inferred. Literal overloads preserve useful return types:
 `createElement("input")` returns `HTMLInputElement`, including its `value`
 property. Named parameters can use types such as `Browser.Document` and
@@ -46,28 +50,23 @@ Declaration shapes map onto ordinary UTU syntax:
 | `ctx.fillStyle = "red"` (`string \| CanvasGradient \| CanvasPattern`) | same: union slots accept any member |
 | `el.append("text", span)` (`...(string \| Node)[]`) | same: subtypes are accepted |
 | `el.dataset.role = "x"` (string index signature) | same |
-| `setTimeout(() => {...}, 100)` (`TimerHandler`) | `Browser.setTimeout(cl() void {...}, 100.0)` |
+| `setTimeout(() => {...}, 100)` (`TimerHandler`) | `Browser.setTimeout(cl() void {...}, 100)` |
 | `list.forEach(el => el.remove())` | `list.forEach(cl(el) void { el.remove(); })`: fewer parameters than declared are fine |
 | `xs.map(s => s.toUpperCase())` | `xs.map(cl(s) Str { s.toUpperCase(); })`: `U` is inferred from the closure |
-| `new Blob(["a", "b"], { type })` | `new Browser.Blob(.{"a", "b"}, &{ type: "text/plain" })` |
+| `new Blob(["a", "b"], { type })` | `new Browser.Blob(["a", "b"], &{ type: "text/plain" })` |
 | `el.addEventListener("x", f, { once: true })` | same shape, with `&{ once: true }` |
 | `const t = e.target as HTMLInputElement` | `alt e.target { Browser.HTMLInputElement \|t\| => ..., ~> ..., }` |
 | `m.get(k) ?? fallback` (`V \| undefined`) | `promote m.get(k) { \|v\| => ..., ~> fallback, }` |
 | `"abc".toUpperCase()`, `n.toFixed(2)` | same: `Str` and `F64` use declared `String` and `Number` members |
 | `Shape.Square` (any `enum`, const or not) | same: folds to a literal, with no import or host read |
-| `mean(new Float64Array([2, 4]))` | `Geom.mean(.{ 2.0, 4.0 })`: typed-array slots receive that typed array |
+| `mean(new Float64Array([2, 4]))` | `Geom.mean([2, 4])`: typed-array slots receive that typed array |
 
-Records (`&{...}`) and tuples (`.{...}`) take their shape from the declaration
+Records (`&{...}`) and arrays (`[...]`) take their shape from the declaration
 slot they are passed to and become real JS objects and arrays, including when
-nested. Tuples satisfy arrays, `ArrayLike<T>`, `Iterable<T>`, and `any`, and
-bind `T` when every element has the same type. A tuple with no declaration
-context is an error.
-
-A closure whose first parameter is named `this` receives the JavaScript
-receiver, typed by the declaration's `this:` parameter (or `any`):
-`button.addEventListener("click", cl(this, event) void { this.disabled = true; })`.
-Annotating a closure parameter narrows a dynamic declaration slot, so
-`cl(value: F64)` accepts a callback declared `(value: unknown) => void`.
+nested. Array literals satisfy arrays, typed arrays, `ArrayLike<T>`,
+`Iterable<T>`, and `any`, and bind `T` when every element has the same type.
+Without a declaration slot, `[...]` is a native WasmGC `Array[T]` (see the
+language notes in `docs/arrays.md`).
 
 Closures take parameter types from the slot they reach: an argument, a record
 field, an assigned property such as `button.onclick`, or the first use of a
@@ -100,23 +99,45 @@ package's `Promise<T>` is the same type as the browser's.
 Diagnostics use declaration names, such as `expected Browser.Node, got Str`,
 `got Browser.Str[]`, and `Unknown foreign member 'Fixture.Counter.missing'`.
 
-## Link another package
+## Import a package
+
+```utu
+using Nano from "npm:nanoid";
+using Floating from "npm:@floating-ui/dom";
+using Path from "node:path";
+
+export main() void {
+    let id = Nano.nanoid(8);
+    let file = Path.join("out", id, "report.txt");
+}
+```
+
+`"npm:pkg"` (including scoped packages and subpaths) and `"node:mod"` import a
+package's declarations directly. TypeScript's own module resolution finds them:
+`types` and `exports` conditions, `@types/*` packages, and Node's ambient
+`node:*` modules. Members of an `export =` module are importable by name, so
+`Path.join` works as `import { join } from "node:path"` does. The glue imports
+the same specifier, so the package must be resolvable by the bundler or runtime.
+
+The compiler itself never touches a file system or TypeScript. The host passes
+`createCompiler({ resolvePackage })`:
+
+- `tools/dts/packages.mjs` resolves from `node_modules` for Node and Bun, and
+  caches each linked graph in `node_modules/.utu/abi` until a declaration file
+  changes. The CLI and `tools/dts/build-app.mjs` use it automatically.
+- `src/bindings/packages.js` is the host-neutral resolver behind it. It takes
+  the TypeScript API and synchronous file callbacks, so a browser Worker can
+  supply an in-memory file system (for example, packages fetched from a CDN).
+
+## Link a declaration file
 
 ```sh
-node tools/dts/cli.mjs --input node_modules/nanoid/index.d.ts \
-  --module nanoid --prefix Nano --out bindings
+node tools/dts/cli.mjs --input path/to/api.d.ts --module ./api.js --prefix Api --out bindings
 ```
 
 ```utu
-using Nano from "./bindings/Nano.abi.json";
-export main() Str { Nano.nanoid(12.0); }
+using Api from "./bindings/Api.abi.json";
 ```
-
-The CLI writes one portable declaration graph. Linking uses the pinned
-TypeScript development dependency; consuming the ABI JSON needs no TypeScript
-installation. The implementation package must remain resolvable to the bundler
-or runtime. Local implementation modules can use absolute paths. Relative JS
-module specifiers resolve from generated glue, not the declaration file.
 
 Rust crates work the same way through wasm-bindgen's declarations:
 
@@ -214,7 +235,6 @@ operation. Ergonomic syntax does not remove that cost.
 
 ## Remaining limits
 
-- UTU numeric literals keep UTU's rules: `F64` slots take `100.0`, not `100`.
 - A callback receives at most as many arguments as its closure declares; an
   unbounded `...args` list is not collected into one value.
 - A type the checker could not resolve arrives as a host value. Narrow it with

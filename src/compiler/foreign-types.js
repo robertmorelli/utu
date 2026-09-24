@@ -81,6 +81,11 @@ export class ForeignABI {
       entry.foreignBases = (desc.bases ?? []).map(ref => this.type(entry.foreign.index, ref));
       for (const parent of entry.foreignBases) this.entry(parent, doc, index);
       entry.foreignDynamic = !!desc.dynamic;
+      // Instances of one generic declaration, for `any`-argument assignability.
+      if (ref?.template !== undefined) {
+        entry.foreignTemplate = JSON.stringify(this.canonical(entry.foreign.index, ref.template));
+        entry.foreignArguments = ref.arguments.map(arg => this.type(entry.foreign.index, arg));
+      }
       // `Function`, `object`, `Object` and `{}` are structural tops in TypeScript.
       entry.foreignTop = desc.name === 'Function' ? 'function'
         : ['object', 'Object', '{}'].includes(desc.name) ? 'object' : null;
@@ -106,6 +111,11 @@ export class ForeignABI {
       return this.bind(index, target, bindings);
     }
     return { name: ref?.boxed ?? (typeof ref === 'string' ? ref : undefined), dynamic: ['any', 'unknown'].includes(ref) };
+  }
+  /** A type as written in UTU source: a bare generic (`Browser.Map`) is its `any` instantiation. */
+  written(index, ref) {
+    const parameters = typeof ref === 'number' ? this.schemas[index].types[ref]?.parameters : null;
+    return parameters?.length ? { template: ref, arguments: parameters.map(() => 'any') } : ref;
   }
   /** An identity key: standard-library types are shared by name, everything else is per ABI. */
   canonical(index, ref) {
@@ -247,7 +257,7 @@ export function prepareForeignImports(documents, imports, abi) {
       const name = node.getAttribute('type-name');
       if (!Object.hasOwn(schema.names, name)) continue;
       const ref = replaceNodeMeta(doc.createElement('ir-type-ref'), node, 'foreign-abi', 'foreign-type-name');
-      ref.setAttribute('name', abi.type(index, schema.names[name])); node.replaceWith(ref);
+      ref.setAttribute('name', abi.type(index, abi.written(index, schema.names[name]))); node.replaceWith(ref);
     }
   }
 }

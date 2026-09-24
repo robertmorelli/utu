@@ -118,3 +118,10 @@ function arrayInfoFromType(typeName, ctx) {
 function elementBinaryenType(info, ctx) {
   return ctx.toType(info.elem ?? '');
 }
+
+/** `[a, b, c]` with a native array type: one `array.new_fixed`. */
+export function emitArrayLiteral(node, ctx, emitExpr) {
+  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
+  const info = arrayInfoFromNode(node, ctx);
+  return ctx.module.array.new_fixed(info.heapType, [...node.children].map(child => emitExpr(child, ctx)));
+}

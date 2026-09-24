@@ -12,6 +12,9 @@
 // defaulting to I32 and then failing.  The default only applies when nothing
 // better is known.
 //
+// An int literal may also adopt F32/F64 where context asks for a float
+// (`fillRect(0, 0, 10, 10)`); it still defaults to I32 on its own.
+//
 // This list is nominal, not representational: `Bool` is a wasm i32 like `I32`
 // is, but it is not in `adopts` for int, so `takes_bool(1)` is still an error.
 // Sharing a representation must never make two types interchangeable — see
@@ -20,7 +23,7 @@
 mod LiteralDefaults {
     type LiteralDefaults = @ir/\
       <ir-literal-defaults>
-        <ir-default kind="int" type-name="I32" adopts="I32 U32 I64 U64 M32 M64"/>
+        <ir-default kind="int" type-name="I32" adopts="I32 U32 I64 U64 M32 M64 F32 F64"/>
         <ir-default kind="float" type-name="F64" adopts="F32 F64"/>
         <ir-default kind="bool" type-name="Bool"/>
         <ir-default kind="string" type-name="Str"/>

@@ -1,5 +1,8 @@
 import { declarationSchema } from './schema.js';
 
+/** Bump when linking or the schema changes, so cached declaration graphs are rebuilt. */
+export const LINK_REVISION = 2;
+
 /**
  * Host-neutral declaration linker. The caller supplies a TypeScript API and a
  * Program, which may use an entirely in-memory CompilerHost in a Worker. No
@@ -32,6 +35,17 @@ export function linkDeclarations(ts, program, { files, prefix, moduleSpecifier =
       if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
       if (!moduleSymbol && !symbol.declarations?.some(d => roots.includes(d.getSourceFile()))) continue;
       symbols.set(publicName, symbol);
+      // `export = value` also offers the value's members by name, as TypeScript's
+      // `import { join } from "node:path"` does; a merged namespace offers its types.
+      if (publicName === 'default') {
+        const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+        const members = declaration && symbol.flags & ts.SymbolFlags.Value
+          ? checker.getPropertiesOfType(checker.getTypeOfSymbolAtLocation(symbol, declaration)) : [];
+        const types = symbol.flags & ts.SymbolFlags.Namespace ? checker.getExportsOfModule(symbol) : [];
+        for (const member of [...types, ...members]) {
+          if (member.name !== 'default' && !symbols.has(member.name)) symbols.set(member.name, member);
+        }
+      }
     }
   }
   return declarationSchema(ts, checker, symbols, { prefix, moduleSpecifier });

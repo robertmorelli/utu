@@ -69,7 +69,17 @@ async function makeCompiler(target = 'analysis') {
     target,
     readFile: (file) => fs.readFile(file, 'utf8'),
     resolvePath: (fromFile, importPath) => path.resolve(path.dirname(fromFile), importPath),
+    resolvePackage: lazyPackageResolver(),
   });
+}
+
+// TypeScript is only needed when a program imports "npm:…" or "node:…".
+function lazyPackageResolver() {
+  let resolver;
+  return async (specifier, request) => {
+    resolver ??= (await import('../tools/dts/packages.mjs')).nodePackageResolver({ root: process.cwd() });
+    return resolver(specifier, request);
+  };
 }
 
 async function checkFile(compiler, file) {

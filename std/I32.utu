@@ -29,4 +29,10 @@ mod I32 {
     fn clz(x: &) & { @ir/\ <ir-i32-clz><ir-ident name="x"/></ir-i32-clz> \/; }
     fn ctz(x: &) & { @ir/\ <ir-i32-ctz><ir-ident name="x"/></ir-i32-ctz> \/; }
     fn popcnt(x: &) & { @ir/\ <ir-i32-popcnt><ir-ident name="x"/></ir-i32-popcnt> \/; }
+
+    // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
+    fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-extend-s><ir-ident name="self"/></ir-i64-extend-s> \/; }
+    fn &.to_u32 |self| () U32 { @ir/\ <ir-u32-or><ir-ident name="self"/><ir-lit kind="int" type-name="U32" value="0"/></ir-u32-or> \/; }
+    fn &.to_f32 |self| () F32 { @ir/\ <ir-f32-convert-s-i32><ir-ident name="self"/></ir-f32-convert-s-i32> \/; }
+    fn &.to_f64 |self| () F64 { @ir/\ <ir-f64-convert-s-i32><ir-ident name="self"/></ir-f64-convert-s-i32> \/; }
 }

@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import ts from 'typescript';
 import { build } from 'esbuild';
 import { linkFiles } from '../tools/dts/link.mjs';
+import { nodePackageResolver } from '../tools/dts/packages.mjs';
+import { createPackageResolver } from '../src/bindings/packages.js';
 import { linkDeclarations, initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject } from '../src/index.js';
 import { PLATFORM_SOURCES } from '../src/compiler/platform-sources.generated.js';
 import { glueModuleSource, liveGlueFields } from '../src/runtime/host-imports.js';
@@ -71,6 +73,48 @@ try {
     const wasm = emitBinary(doc);
     const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
     assert.equal(instance.exports.run(), 42);
+  });
+  await test('"npm:" and "node:" imports link packages from node_modules and cache them', async () => {
+    const cacheDir = path.join(ROOT, '.tmp/package-cache');
+    await fs.rm(cacheDir, { recursive: true, force: true });
+    const resolvePackage = nodePackageResolver({ root: ROOT, cacheDir });
+    const source = `using Nano from "npm:nanoid"; using Path from "node:path"; using Floating from "npm:@floating-ui/dom";
+      export lib {
+        fn id() F64 { Nano.nanoid(9).length; }
+        fn file() Str { Path.join("a", "b.txt"); }
+        fn middleware() Str { Floating.offset(4).name; }
+      }`;
+    const compiler = createCompiler({ parser, target: 'normal', resolvePackage, readFile: async () => source, resolvePath: (_, r) => r });
+    for (let round = 0; round < 2; round++) {
+      const doc = await compiler.compileFile('/packages.utu');
+      assert(!doc.querySelector('[data-error]'), doc.querySelector('[data-error]')?.dataset.errorMessage);
+      const wasm = emitBinary(doc);
+      const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
+      assert.equal(instance.exports.id(), 9);
+      assert.equal(instance.exports.file(), path.join('a', 'b.txt'));
+      assert.equal(instance.exports.middleware(), 'offset');
+    }
+    assert.equal((await fs.readdir(cacheDir)).length, 3, 'one cached declaration graph per package');
+    const missing = createCompiler({ parser, target: 'normal', resolvePackage, resolvePath: (_, r) => r,
+      readFile: async () => 'using Nope from "npm:utu-no-such-package"; export main() void {}' });
+    await assert.rejects(missing.compileFile('/missing.utu'), /Cannot find package "utu-no-such-package"/);
+    const unresolved = createCompiler({ parser, target: 'normal', resolvePath: (_, r) => r,
+      readFile: async () => 'using Nano from "npm:nanoid"; export main() void {}' });
+    await assert.rejects(unresolved.compileFile('/unresolved.utu'), /needs a host package resolver/);
+  });
+  await test('package resolution runs over an in-memory file system', () => {
+    const files = new Map([
+      ['/app/node_modules/greet/package.json', JSON.stringify({ name: 'greet', exports: { '.': { types: './types/index.d.ts', default: './index.js' } } })],
+      ['/app/node_modules/greet/types/index.d.ts', 'export declare function greet(name: string): string;'],
+    ]);
+    const directories = new Set(['/app', '/app/node_modules', '/app/node_modules/greet', '/app/node_modules/greet/types']);
+    const resolve = createPackageResolver({ ts, root: '/app', libDir: '/lib', libraries: [], fs: {
+      readFile: name => files.get(name), fileExists: name => files.has(name), directoryExists: name => directories.has(name),
+    } });
+    const { abi, files: read } = resolve('npm:greet', { prefix: 'Greet' });
+    assert.equal(abi.moduleSpecifier, 'greet');
+    assert.equal(abi.types[abi.exports.greet].calls[0].result, 'Str');
+    assert.deepEqual(read, ['/app/node_modules/greet/types/index.d.ts']);
   });
   const fixture = link('scripts/fixtures/dts/targets.d.ts', 'Fixture', fixtureModule);
   await test('portable Wasm import scanning matches host reflection and rejects truncation', async () => {

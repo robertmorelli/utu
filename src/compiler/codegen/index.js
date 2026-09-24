@@ -57,6 +57,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
   m.setFeatures(
     binaryen.Features.MutableGlobals |
     binaryen.Features.BulkMemory |
+    binaryen.Features.NontrappingFPToInt |
     binaryen.Features.GC |
     binaryen.Features.ReferenceTypes |
     binaryen.Features.Strings |

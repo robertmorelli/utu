@@ -77,13 +77,14 @@ async function generatePlatformSources() {
     '// Generated platform source registry.',
     '// Run `bun run build` to refresh from std/*.utu.',
     '',
-    "import { browserSource } from '../bindings/browser.js';",
+    "import { browserSource, jsSource } from '../bindings/browser.js';",
     "const IR_WASM_PREFIX = 'ir-' + 'wasm-';",
     '',
     'export const PLATFORM_SOURCES = new Map([',
     ...entries.map(({ key, source }) => `  [${JSON.stringify(key)}, ${sourceLiteral(source)}],`),
     ']);',
     "PLATFORM_SOURCES.set('std:Browser', browserSource);",
+    "PLATFORM_SOURCES.set('std:JS', jsSource);",
     '',
   ];
   await fs.writeFile(OUT_FILE, lines.join('\n'));

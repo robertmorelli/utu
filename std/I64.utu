@@ -24,4 +24,10 @@ mod I64 {
     //   bnot a = a xor 0xFFFFFFFFFFFFFFFF (-1)
     fn &:neg  |a| & { @ir/\ <ir-i64-sub><ir-lit kind="int" type-name="I64" value="0"/><ir-ident name="a"/></ir-i64-sub> \/; }
     fn &:bnot |a| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I64" value="-1"/></ir-i64-xor> \/; }
+
+    // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
+    fn &.to_i32 |self| () I32 { @ir/\ <ir-i32-wrap><ir-ident name="self"/></ir-i32-wrap> \/; }
+    fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-or><ir-ident name="self"/><ir-lit kind="int" type-name="U64" value="0"/></ir-u64-or> \/; }
+    fn &.to_f32 |self| () F32 { @ir/\ <ir-f32-convert-s-i64><ir-ident name="self"/></ir-f32-convert-s-i64> \/; }
+    fn &.to_f64 |self| () F64 { @ir/\ <ir-f64-convert-s-i64><ir-ident name="self"/></ir-f64-convert-s-i64> \/; }
 }
