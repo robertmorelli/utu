@@ -99,7 +99,15 @@ export class ForeignABI {
     index?.set(name, entry);
     return entry;
   }
+  /** The declaration a reference denotes. Schemas are immutable, so results are memoized. */
   describe(index, ref) {
+    const key = typeof ref === 'object' && ref !== null ? `${index}:${JSON.stringify(ref)}` : `${index}:${ref}`;
+    this.described ??= new Map();
+    let desc = this.described.get(key);
+    if (desc === undefined) this.described.set(key, desc = this.describeUncached(index, ref));
+    return desc;
+  }
+  describeUncached(index, ref) {
     if (ref?.external) return this.describe(ref.external.index, ref.external.ref);
     ref = this.resolve(index, ref);
     if (ref?.parameter) return this.describe(index, ref.constraint ?? 'any');

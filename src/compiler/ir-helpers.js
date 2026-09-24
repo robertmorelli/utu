@@ -87,19 +87,33 @@ export function fnSignatureType(fn) {
 // keeps the IR shape knowledge in one place: if a declaration ever gains a
 // second block or a wrapped parameter list, one edit covers every reader.
 
+// These run in the solver's inner loops, so they walk children directly
+// instead of evaluating `:scope >` selectors.
+const childNamed = (node, name) => {
+  for (let child = node?.firstElementChild; child; child = child.nextElementSibling) {
+    if (child.localName === name) return child;
+  }
+  return null;
+};
+
 /** Declared parameters of an ir-fn, ir-extern-fn, ir-export-main, or ir-closure. */
 export function paramsOf(node) {
-  return [...(node?.querySelectorAll(':scope > ir-param-list > ir-param') ?? [])];
+  const list = childNamed(node, 'ir-param-list');
+  const params = [];
+  for (let child = list?.firstElementChild; child; child = child.nextElementSibling) {
+    if (child.localName === 'ir-param') params.push(child);
+  }
+  return params;
 }
 
 /** The body block of a declaration, or null. */
 export function bodyOf(node) {
-  return node?.querySelector(':scope > ir-block') ?? null;
+  return childNamed(node, 'ir-block');
 }
 
 /** The `|self|` parameter of a method, or null. */
 export function selfParamOf(node) {
-  return node?.querySelector(':scope > ir-self-param') ?? null;
+  return childNamed(node, 'ir-self-param');
 }
 
 /** Whether `node` is a function declaration — utu's own, or an `@es` import. */

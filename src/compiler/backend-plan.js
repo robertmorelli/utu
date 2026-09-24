@@ -97,14 +97,34 @@ export function buildBackendPlan(doc, typeIndex, program = null) {
   };
 }
 
+/**
+ * Mark the plan as matching its document. Where the DOM supports it, a
+ * MutationObserver records later edits instead of serializing the whole IR
+ * now and again before code generation.
+ */
 export function sealBackendPlan(plan) {
-  if (plan?.doc) plan.fingerprint = backendFingerprint(plan.doc);
+  if (!plan?.doc) return plan;
+  plan.observer?.disconnect();
+  const Observer = plan.doc.defaultView?.MutationObserver;
+  if (Observer) {
+    plan.observer = new Observer(() => {});
+    plan.observer.observe(plan.doc.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    plan.fingerprint = 'observed';
+  } else {
+    plan.fingerprint = backendFingerprint(plan.doc);
+  }
   return plan;
 }
 
 export function ensureBackendPlan(doc, plan) {
-  if (!plan || !plan.fingerprint || plan.fingerprint === backendFingerprint(doc)) return plan;
-  return rebuildBackendPlan(doc);
+  if (!plan || !plan.fingerprint) return plan;
+  if (plan.observer) {
+    // Code generation's own bookkeeping on the root (sizes, facts) is not an edit.
+    const root = doc.body.firstChild;
+    const edits = plan.observer.takeRecords().filter(record => !(record.type === 'attributes' && record.target === root));
+    return edits.length ? rebuildBackendPlan(doc) : plan;
+  }
+  return plan.fingerprint === backendFingerprint(doc) ? plan : rebuildBackendPlan(doc);
 }
 
 /** Re-analyse a deliberately edited compiled document before code generation. */

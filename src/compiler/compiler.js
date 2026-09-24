@@ -215,14 +215,9 @@ export function createCompiler(env) {
     // they appear as the earliest declarations and are visible to all passes.
     const mergedRoot = doc.body.firstChild;
     if (mergedRoot) {
-      for (const { module: modName, path: stdPath } of [...preludeModules].reverse()) {
+      for (const { module: modName, path: stdPath, element: child } of [...preludeModules].reverse()) {
         if (mergedRoot.querySelector(`ir-module[name="${modName}"]`)) continue;
-        const src = stdlib.get(stdPath);
-        if (!src) continue;
-        const preludeDoc  = parseToIR(parser, src, stdPath, createDocument, { collectAnalysisTokens: false });
-        doc.__utuSourceTexts?.set(stdPath, src);
-        const child = preludeDoc.body.firstChild?.querySelector(`:scope > ir-module[name="${modName}"]`);
-        if (!child) continue;
+        doc.__utuSourceTexts?.set(stdPath, stdlib.get(stdPath));
         const clone = doc.importNode?.(child, true) ?? child.cloneNode(true);
         restampSubtree(clone, stdPath, doc);
         clone.dataset.synthetic = 'true';
