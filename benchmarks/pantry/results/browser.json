@@ -1,0 +1,38 @@
+{
+  "engine": "Chromium (Playwright headless)",
+  "rounds": 12,
+  "bytes": {
+    "UTU -Oz": {
+      "raw": 12362,
+      "gzip": 4867,
+      "brotli": 4121
+    },
+    "UTU -O3": {
+      "raw": 14693,
+      "gzip": 5198,
+      "brotli": 4340
+    },
+    "JavaScript": {
+      "raw": 3871,
+      "gzip": 1756,
+      "brotli": 1506
+    }
+  },
+  "browser": {
+    "UTU -Oz": {
+      "load": 43.9,
+      "render": 101.3,
+      "scale": 1354.5
+    },
+    "UTU -O3": {
+      "load": 42.5,
+      "render": 96.7,
+      "scale": 1302
+    },
+    "JavaScript": {
+      "load": 41.2,
+      "render": 85.8,
+      "scale": 1255.1
+    }
+  }
+}

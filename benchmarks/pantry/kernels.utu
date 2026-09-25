@@ -1,0 +1,52 @@
+using JS from std:JS;
+
+// ── 1. The dashboard's data work on JS objects (render() without the DOM) ──
+export lib {
+    fn analyze(items: JS.Array, category: Str, query: Str) F64 {
+        let visible = items.filter(cl(item) Bool {
+            (category == "All" or item.category == category) and item.name.toLowerCase().includes(query);
+        });
+        visible.sort(cl(a, b) F64 { a.price - b.price; });
+        let total = items.reduce(cl(sum, item) F64 { sum + item.price * item.quantity; }, 0);
+        total + visible.length;
+    }
+
+    // ── 2. The same shape of work on native data ──
+    fn native(n: I32) F64 {
+        let blank = Item { price: 0.0, quantity: 0.0, category: 0 };
+        let items = Array[Item].new(n, blank);
+        let seed = 12345;
+        for (0..<n) |i| {
+            seed = (seed * 1103515245 + 12345) % 2147483647;
+            if seed < 0 { seed = -seed; };
+            items[i] = Item { price: (seed % 1000).to_f64() / 100.0, quantity: (seed % 13).to_f64(), category: seed % 4 };
+        };
+        let kept = Array[Item].new(n, blank);
+        let count = 0;
+        for (0..<n) |i| {
+            let item = items[i];
+            if item.category == 1 or item.price > 5.0 { kept[count] = item; count += 1; };
+        };
+        // Insertion sort by price, as a stand-in for a comparator sort.
+        for (1..<count) |i| {
+            let current = kept[i];
+            // `and` evaluates both operands, so the bound check guards the read explicitly.
+            let j = i - 1;
+            let moving = true;
+            while (moving) {
+                if j < 0 { moving = false; }
+                else if kept[j].price > current.price { kept[j + 1] = kept[j]; j -= 1; }
+                else { moving = false; };
+            };
+            kept[j + 1] = current;
+        };
+        let total = 0.0;
+        for (0..<n) |i| { let item = items[i]; total += item.price * item.quantity; };
+        total + count.to_f64() + kept[0].price;
+    }
+}
+
+struct Item:
+    | price: F64
+    | quantity: F64
+    | category: I32

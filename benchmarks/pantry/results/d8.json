@@ -1,0 +1,47 @@
+{
+  "engine": "V8 version 15.3.12",
+  "results": {
+    "analyze 8 items": {
+      "JavaScript": {
+        "microsecondsPerCall": 0.182,
+        "relativeToJavaScript": 1
+      },
+      "UTU -O3": {
+        "microsecondsPerCall": 1.774,
+        "relativeToJavaScript": 9.73
+      },
+      "UTU -Oz": {
+        "microsecondsPerCall": 2.215,
+        "relativeToJavaScript": 12.15
+      }
+    },
+    "analyze 1000 items": {
+      "JavaScript": {
+        "microsecondsPerCall": 47.789,
+        "relativeToJavaScript": 1
+      },
+      "UTU -O3": {
+        "microsecondsPerCall": 241.922,
+        "relativeToJavaScript": 5.06
+      },
+      "UTU -Oz": {
+        "microsecondsPerCall": 310.812,
+        "relativeToJavaScript": 6.5
+      }
+    },
+    "native 2000 items": {
+      "JavaScript": {
+        "microsecondsPerCall": 617.625,
+        "relativeToJavaScript": 1
+      },
+      "UTU -O3": {
+        "microsecondsPerCall": 462.875,
+        "relativeToJavaScript": 0.75
+      },
+      "UTU -Oz": {
+        "microsecondsPerCall": 463.375,
+        "relativeToJavaScript": 0.75
+      }
+    }
+  }
+}
