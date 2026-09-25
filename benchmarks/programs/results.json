@@ -1,0 +1,104 @@
+{
+  "V8 (d8)": {
+    "scalar recurrence": {
+      "JavaScript": 1.5549999999999997,
+      "UTU": 1.553999999999995
+    },
+    "strings: tiny chunks": {
+      "JavaScript": 30.49599999999998,
+      "UTU": 30.891000000000076
+    },
+    "strings: medium chunks": {
+      "JavaScript": 7.685999999999922,
+      "UTU": 7.7590000000000146
+    },
+    "strings: large chunks": {
+      "JavaScript": 0.25900000000001455,
+      "UTU": 0.27099999999995816
+    },
+    "source analyzer": {
+      "JavaScript": 10.095000000000027,
+      "UTU": 9.57300000000032
+    },
+    "prime sieve": {
+      "JavaScript": 0.2039999999997235,
+      "UTU": 0.2230000000004111
+    },
+    "DeltaBlue chain": {
+      "JavaScript": 80.67700000000013,
+      "UTU": 14.884000000000015
+    },
+    "DeltaBlue projection": {
+      "JavaScript": 166.97699999999986,
+      "UTU": 65.84100000000035
+    }
+  },
+  "SpiderMonkey": {
+    "scalar recurrence": {
+      "JavaScript": 1.607177734375,
+      "UTU": 1.614990234375
+    },
+    "strings: tiny chunks": {
+      "JavaScript": 50.3291015625,
+      "UTU": 53.219970703125
+    },
+    "strings: medium chunks": {
+      "JavaScript": 12.739990234375,
+      "UTU": 13.0888671875
+    },
+    "strings: large chunks": {
+      "JavaScript": 0.378173828125,
+      "UTU": 0.406982421875
+    },
+    "source analyzer": {
+      "JavaScript": 7.755859375,
+      "UTU": 20.1708984375
+    },
+    "prime sieve": {
+      "JavaScript": 0.23095703125,
+      "UTU": 0.2041015625
+    },
+    "DeltaBlue chain": {
+      "JavaScript": 182.10498046875,
+      "UTU": 45.173095703125
+    },
+    "DeltaBlue projection": {
+      "JavaScript": 307.365966796875,
+      "UTU": 122.849853515625
+    }
+  },
+  "JavaScriptCore": {
+    "scalar recurrence": {
+      "JavaScript": 1.8399999999999963,
+      "UTU": 1.5799999999999983
+    },
+    "strings: tiny chunks": {
+      "JavaScript": 34.219999999999914,
+      "UTU": 34.080000000000155
+    },
+    "strings: medium chunks": {
+      "JavaScript": 7.959999999999809,
+      "UTU": 8.120000000000118
+    },
+    "strings: large chunks": {
+      "JavaScript": 0.2599999999999909,
+      "UTU": 0.2599999999999909
+    },
+    "source analyzer": {
+      "JavaScript": 4.7199999999998,
+      "UTU": 18.259999999999764
+    },
+    "prime sieve": {
+      "JavaScript": 0.15999999999985448,
+      "UTU": 0.2600000000002183
+    },
+    "DeltaBlue chain": {
+      "JavaScript": 52.07999999999993,
+      "UTU": 79.02000000000044
+    },
+    "DeltaBlue projection": {
+      "JavaScript": 98.81999999999971,
+      "UTU": 151.36000000000058
+    }
+  }
+}
