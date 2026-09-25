@@ -145,8 +145,14 @@ export function createCompiler(env) {
    * Returns a flat IR document with no modules, no usings, no type params.
    */
   async function compileFile(filePath) {
-    const { doc } = await analyzeFile(filePath);
-    return doc;
+    // Builds need the document, not the editor's analysis snapshot; failures
+    // still go through analyzeFile so they carry diagnostics.
+    try {
+      return await compileFileInternal(filePath);
+    } catch {
+      const { doc } = await analyzeFile(filePath);
+      return doc;
+    }
   }
 
   async function analyzeFile(filePath) {

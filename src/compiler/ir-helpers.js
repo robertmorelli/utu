@@ -142,37 +142,38 @@ export function directCalleeDecl(call, doc) {
  * lowering passes that fabricate new IR nodes — without this, errors would
  * point at the wrong place (or worse, nowhere).
  */
-const SPAN_KEYS = ['start', 'end', 'originFile', 'row', 'col', 'endRow', 'endCol', 'sourceFile'];
+// These run for every synthesized node, so they use attribute names directly:
+// linkedom's `dataset` converts camelCase names through a regex on each access.
+const SPAN_ATTRIBUTES = ['data-start', 'data-end', 'data-origin-file', 'data-row', 'data-col',
+  'data-end-row', 'data-end-col', 'data-source-file'];
 
 export function copySpan(to, from) {
-  for (const key of SPAN_KEYS) {
-    if (from?.dataset?.[key] != null) to.dataset[key] = from.dataset[key];
+  if (!from?.getAttribute) return to;
+  for (const name of SPAN_ATTRIBUTES) {
+    const value = from.getAttribute(name);
+    if (value != null) to.setAttribute(name, value);
   }
   return to;
 }
 
-export function inheritSourceLoc(to, from) {
-  return copySpan(to, from);
-}
-
 export function sourceId(node) {
-  return node?.dataset?.originId ?? node?.id ?? '';
+  return node?.getAttribute?.('data-origin-id') ?? node?.id ?? '';
 }
 
 export function copyDiagnosticMeta(to, from) {
   copySpan(to, from);
   const originId = sourceId(from);
-  if (originId) to.dataset.originId = originId;
+  if (originId) to.setAttribute('data-origin-id', originId);
   return to;
 }
 
 function stampRewrite(node, from, pass, kind) {
   copyDiagnosticMeta(node, from);
-  node.dataset.synthetic = 'true';
-  node.dataset.rewritePass = pass;
-  if (kind) node.dataset.rewriteKind = kind;
+  node.setAttribute('data-synthetic', 'true');
+  node.setAttribute('data-rewrite-pass', pass);
+  if (kind) node.setAttribute('data-rewrite-kind', kind);
   const source = sourceId(from);
-  if (source) node.dataset.rewriteOf = source;
+  if (source) node.setAttribute('data-rewrite-of', source);
   return node;
 }
 

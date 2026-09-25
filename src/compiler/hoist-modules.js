@@ -7,12 +7,36 @@ import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 export function hoistModules(doc, { debugAssertions = false, graph = null } = {}) {
   const root = doc.body.firstChild;
   if (!root) return;
-  for (const module of [...root.querySelectorAll('ir-module')]) hoistModule(module, root, graph);
+  const references = indexModuleReferences(root);
+  for (const module of [...root.querySelectorAll('ir-module')]) hoistModule(module, root, graph, references);
   diagnoseDuplicateDeclarations(root);
   if (debugAssertions) assertHoistModules(doc);
 }
 
-export function hoistModule(module, root, graph = null) {
+/**
+ * References to module members from anywhere in the program, by the module
+ * name they mention. Built once per pass, so hoisting each module visits only
+ * its own references rather than rescanning the whole program.
+ */
+function indexModuleReferences(root) {
+  const byModule = new Map();
+  const add = (name, node) => {
+    if (!name) return;
+    if (!byModule.has(name)) byModule.set(name, []);
+    byModule.get(name).push(node);
+  };
+  for (const qualified of root.querySelectorAll('ir-type-qualified')) add(qualifiedOwner(qualified), qualified);
+  for (const access of root.querySelectorAll('ir-field-access, ir-type-member')) add(access.firstElementChild?.getAttribute('name'), access);
+  return byModule;
+}
+
+function qualifiedOwner(qualified) {
+  return qualified.firstElementChild?.getAttribute('name')
+    ?? qualified.firstElementChild?.getAttribute('module')
+    ?? qualified.getAttribute('raw')?.split('.').slice(0, -1).join('.');
+}
+
+export function hoistModule(module, root, graph = null, references = indexModuleReferences(root)) {
   const moduleName = module.getAttribute('name');
   const moduleDisplayName = module.dataset.displayName ?? moduleName;
   retainSourceDisplayNames(module, moduleDisplayName);
@@ -22,7 +46,7 @@ export function hoistModule(module, root, graph = null) {
       return [name, moduleMemberName(moduleName, name)];
     }));
 
-  rewriteExternalModuleReferences(root, module, moduleName, renamings);
+  rewriteExternalModuleReferences(root, module, moduleName, renamings, references.get(moduleName) ?? []);
 
   for (const self of [...module.querySelectorAll('ir-type-self')]) {
     const ref = replaceNodeMeta(module.ownerDocument.createElement('ir-type-ref'), self, 'hoist-modules', 'type-self');
@@ -85,16 +109,13 @@ export function hasLexicalShadow(ident, name) {
   return false;
 }
 
-function rewriteExternalModuleReferences(root, module, moduleName, renamings) {
+function rewriteExternalModuleReferences(root, module, moduleName, renamings, references) {
+  const live = tag => references.filter(node => node.localName === tag && node.isConnected);
   // `M.Type` is represented as ir-type-qualified until the module's concrete
   // declarations are known. Resolve it while that module is still present;
   // leaving it for linkTypeDecls loses the namespace after hoisting.
-  for (const qualified of [...root.querySelectorAll('ir-type-qualified')]) {
-    if (module.contains(qualified)) continue;
-    const owner = qualified.firstElementChild?.getAttribute('name')
-      ?? qualified.firstElementChild?.getAttribute('module')
-      ?? qualified.getAttribute('raw')?.split('.').slice(0, -1).join('.');
-    if (owner !== moduleName) continue;
+  for (const qualified of live('ir-type-qualified')) {
+    if (module.contains(qualified) || qualifiedOwner(qualified) !== moduleName) continue;
     const member = qualified.getAttribute('type-name');
     const name = renamings.get(member);
     if (!name) continue;
@@ -108,7 +129,7 @@ function rewriteExternalModuleReferences(root, module, moduleName, renamings) {
   // names a native module type, preserve the existing static-method semantics.
   const typeNames = new Set([...module.querySelectorAll(':scope > ir-struct, :scope > ir-enum, :scope > ir-type-def')]
     .map(node => node.getAttribute('name')));
-  for (const access of [...root.querySelectorAll('ir-field-access')]) {
+  for (const access of live('ir-field-access')) {
     if (access.firstElementChild?.getAttribute('name') !== moduleName || !typeNames.has(access.getAttribute('field'))) continue;
     const parent = access.parentElement;
     if (parent?.localName !== 'ir-field-access' || parent.firstElementChild !== access) continue;
@@ -129,7 +150,7 @@ function rewriteExternalModuleReferences(root, module, moduleName, renamings) {
       .map(node => node.getAttribute('name')),
     ...globalNames,
   ].filter(Boolean));
-  for (const field of [...root.querySelectorAll('ir-field-access, ir-type-member')]) {
+  for (const field of references.filter(node => node.isConnected && (node.localName === 'ir-field-access' || node.localName === 'ir-type-member'))) {
     const isTypeMember = field.localName === 'ir-type-member';
     const member = field.getAttribute(isTypeMember ? 'method' : 'field');
     // Free functions on type modules retain their method-resolution path,

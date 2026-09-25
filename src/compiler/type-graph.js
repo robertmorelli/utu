@@ -67,11 +67,14 @@ export function buildTypeGraph(doc, typeIndex) {
 }
 
 export function settleTypeGraph(doc, typeIndex) {
+  // Build and solve once; each round of contextual rewrites (literal types,
+  // closure parameters, record and array types) then re-solves only the rules
+  // of the nodes it changed and their dependents.
+  const graph = solveTypeGraph(buildTypeGraph(doc, typeIndex));
   for (;;) {
-    const graph = solveTypeGraph(buildTypeGraph(doc, typeIndex));
-    const rewrites = planContextualRewrites(graph);
-    applyContextualRewrites(graph, rewrites);
+    applyContextualRewrites(graph, planContextualRewrites(graph));
     if (!graph.changed) { planCoercions(graph); return graph; }
+    propagate(graph, [...graph.touched].map(node => graph.slots.get(node)?.rule).filter(Boolean));
   }
 }
 
@@ -209,20 +212,22 @@ function operandLiterals(node, found = []) {
 /** Apply a contextual rewrite plan, reporting structural/type-seed changes. */
 export function applyContextualRewrites(graph, rewrites) {
   graph.changed = false;
+  graph.touched = new Set();
+  const touch = node => { graph.touched.add(node); graph.changed = true; };
   for (const rewrite of rewrites) {
     if (rewrite.kind === 'implicit-struct') {
       rewrite.node.setAttribute('type-name', rewrite.type);
       rewrite.node.removeAttribute('implicit');
       rewrite.node.dataset.loweredImplicitStructInit = 'true';
-      graph.changed = true;
+      touch(rewrite.node);
     } else if (rewrite.kind === 'array-type') {
       // The first context decides; a conflicting later use is then a type error.
       if (rewrite.node.getAttribute('type-name')) continue;
       rewrite.node.setAttribute('type-name', rewrite.type);
-      graph.changed = true;
+      touch(rewrite.node);
     } else if (rewrite.kind === 'literal-type') {
       rewrite.node.setAttribute('type-name', rewrite.type);
-      graph.changed = true;
+      touch(rewrite.node);
     } else if (rewrite.kind === 'closure-context') {
       seedClosure(graph, rewrite.node, rewrite.type, edgeSource(rewrite.edge));
     }
@@ -246,7 +251,13 @@ export function solveTypeGraph(graph) {
     }
   });
 
-  const queue = [...graph.rules];
+  propagate(graph, graph.rules);
+  return graph;
+}
+
+/** Run `rules`, then every rule depending on a node whose type changed, to a fixed point. */
+function propagate(graph, rules) {
+  const queue = [...rules];
   const queued = new Set(queue);
   for (let i = 0; i < queue.length; i++) {
     const rule = queue[i];
@@ -254,11 +265,10 @@ export function solveTypeGraph(graph) {
     const type = rule.read();
     if (!type || actual(graph, rule.node) === type) continue;
     setActual(graph, rule.node, type, rule.source);
-    for (const next of dependents.get(rule.node) ?? []) {
+    for (const next of graph.dependents.get(rule.node) ?? []) {
       if (!queued.has(next)) { queue.push(next); queued.add(next); }
     }
   }
-  return graph;
 }
 
 export function projectTypeGraph(graph) {
@@ -385,16 +395,15 @@ function addActualRule(graph, node) {
 
   switch (node.localName) {
     case 'ir-lit': {
+      // Read lazily: contextual rewrites retype literals between solver rounds.
       const kind = node.getAttribute('kind');
-      return fixed(node.getAttribute('type-name') ?? graph.literalDefaults.get(kind) ?? kind, 'literal');
+      return rule(graph, node, [], () => node.getAttribute('type-name') ?? graph.literalDefaults.get(kind) ?? kind, 'literal');
     }
     case 'ir-ident':
       return rule(graph, node, [bindingDependency(graph, node)], () => bindingActual(graph, node), 'binding');
-    case 'ir-param': {
-      const type = declaredTypeStr(node) ?? node.dataset.typeName;
-      if (type) graph.slots.get(node).actual = type;
-      return;
-    }
+    case 'ir-param':
+      // Closure parameters may be seeded from context between solver rounds.
+      return rule(graph, node, [], () => declaredTypeStr(node) ?? node.dataset.typeName ?? null, 'parameter');
     case 'ir-let': case 'ir-global':
       return rule(graph, node, [two], () => declaredTypeStr(node) ?? read(two), 'binding-value');
     case 'ir-self-param': {
@@ -720,7 +729,7 @@ function seedClosure(graph, closure, expectedType, source) {
   paramsOf(closure).forEach((param, i) => {
     if (!firstTypeChild(param) && !param.dataset.typeName && expected.params[i]) {
       param.dataset.typeName = expected.params[i];
-      graph.slots.get(param).actual = expected.params[i];
+      graph.touched?.add(param);
       graph.changed = true;
     }
   });
@@ -785,10 +794,16 @@ function addExpectations(graph, node) {
       'field', node, 'assign'));
   }
   if (tag === 'ir-struct-init') {
-    const entry = graph.typeIndex?.get(node.getAttribute('type-name'));
+    // Read lazily: an implicit `&{…}` learns its type between solver rounds.
+    const info = field => {
+      const entry = graph.typeIndex?.get(node.getAttribute('type-name'));
+      return { entry, field: entry?.fields?.find(item => item.name === field.getAttribute('field')) };
+    };
     for (const field of node.querySelectorAll(':scope > ir-field-init')) {
-      const info = entry?.fields?.find(item => item.name === field.getAttribute('field'));
-      if (info) expect(graph, field.firstElementChild, () => info.type, 'field', fieldDecl(entry, info.name), 'assign');
+      expect(graph, field.firstElementChild, () => info(field).field?.type, 'field', () => {
+        const { entry, field: found } = info(field);
+        return found ? fieldDecl(entry, found.name) : node;
+      }, 'assign');
     }
   }
   if (tag === 'ir-fn' || tag === 'ir-export-main' || tag === 'ir-closure') {
