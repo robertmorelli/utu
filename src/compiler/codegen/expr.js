@@ -33,6 +33,8 @@ export function emitExpr(node, ctx) {
 
   switch (node.localName) {
     case 'ir-lit':           expr = emitLit(node, ctx); break;
+    case 'ir-tuple':         expr = ctx.module.tuple.make([...node.children].map(child => emitExpr(child, ctx))); break;
+    case 'ir-tuple-get':     expr = ctx.module.tuple.extract(emitExpr(node.firstElementChild, ctx), Number(node.getAttribute('index'))); break;
     case 'ir-ident':         expr = emitIdent(node, ctx, emitExpr); break;
     case 'ir-paren':         expr = emitExpr(node.children[0], ctx); break;
     case 'ir-block':         expr = emitBlock(node, ctx, emitExpr); break;

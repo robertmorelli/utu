@@ -22,6 +22,7 @@
 //
 // Returns the index map so later passes can reuse it without re-querying.
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { tupleParts } from './type-strings.js';
 import { firstTypeChild, typeNodeToStr } from './ir-helpers.js';
 import { callableParts, isCallableType, SOURCE_PRIMITIVES } from './type-rules.js';
 export { typeEntryDecl } from './type-entries.js';
@@ -72,6 +73,12 @@ export function linkTypeDecls(doc, graph = null) {
     if (isCallableType(name)) {
       ref.dataset['typeName'] = name;
       ref.dataset['typeRepr'] = callableParts(name).kind === 'fun' ? 'wasm-i32' : 'wasm-externref';
+      continue;
+    }
+    // Tuples are structural too: `.{I32, F64}` is a multi-value result.
+    if (tupleParts(name)) {
+      ref.dataset['typeName'] = name;
+      ref.dataset['typeRepr'] = 'wasm-tuple';
       continue;
     }
     const entry = index.get(name);

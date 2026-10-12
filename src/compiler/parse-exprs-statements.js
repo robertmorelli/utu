@@ -6,6 +6,15 @@ import { T } from './ir-tags.js';
 export function walkBindExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.LET, doc), n);
   const children = namedChildren(n);
+  // `let .{a, b} = value`: lowerTuples turns the names into one let each.
+  if (children[0]?.type === 'tuple_pattern') {
+    node.setAttribute('names', namedChildren(children[0]).map(text).join(','));
+    for (const child of children.slice(1)) {
+      const ir = dispatch(child, doc, source);
+      if (ir) node.appendChild(ir);
+    }
+    return node;
+  }
   if (children[0]) {
     node.setAttribute('name', text(children[0]));
     node.dataset.nameStart = String(children[0].startIndex);

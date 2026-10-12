@@ -20,6 +20,7 @@
 // garbage.
 
 import binaryen from 'binaryen';
+import { tupleParts } from '../type-strings.js';
 import { typeNodeToStr, fnReturnType, declaredTypeStr } from '../ir-helpers.js';
 import { WASM_REF_BINARYEN_TYPES, WASM_SCALAR_FAMILIES } from '../link-type-decls.js';
 
@@ -71,6 +72,9 @@ export function makeTypeMapper(structTypes) {
   return function toType(typeStr) {
     if (!typeStr) return binaryen.none;
     if (typeStr === 'void' || typeStr === 'never') return binaryen.none;
+    // A tuple is a wasm multi-value type.
+    const tuple = tupleParts(typeStr);
+    if (tuple) return binaryen.createType(tuple.map(toType));
 
     // Nullable prefix: "?Foo" — strip and use the nullable ref form.
     let nullable = false;

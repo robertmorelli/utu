@@ -233,7 +233,12 @@ exports.buildExpressionRules = function buildExpressionRules() {
     yield_expr: ($) => prec.right(seq('yield', $._expr)),
     return_expr: ($) => prec.right(seq('return', optional($._expr))),
 
-    bind_expr: ($) => seq('let', $.identifier, optional(seq(':', $._type)), '=', $._expr),
+    bind_expr: ($) => choice(
+      seq('let', $.identifier, optional(seq(':', $._type)), '=', $._expr),
+      // let .{node, ty} = f(); takes a tuple apart.
+      seq('let', $.tuple_pattern, '=', $._expr),
+    ),
+    tuple_pattern: ($) => seq('.', '{', $.identifier, repeat(seq(',', $.identifier)), optional(','), '}'),
 
     // Explicit struct init: T1 { field: expr, ... }
     struct_init: ($) =>

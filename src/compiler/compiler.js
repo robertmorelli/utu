@@ -6,6 +6,7 @@ import { lowerForArrays } from './lower-for-arrays.js';
 import { lowerGenerators } from './lower-generators.js';
 import { lowerMems } from './lower-mems.js';
 import { lowerDistinctTypes, lowerIntEnums } from './lower-int-enums.js';
+import { lowerTuples } from './lower-tuples.js';
 import { ForeignABI, prepareForeignImports } from './foreign-types.js';
 import { lowerForeignOperations } from './foreign-lowering.js';
 import { boxMutatedCaptures } from './box-captures.js';
@@ -266,6 +267,7 @@ export function createCompiler(env) {
     }
     debugAssert(doc, 'prelude');
 
+    lowerTuples(doc);
     lowerDistinctTypes(doc, parser, createDocument);
     lowerIntEnums(doc, parser, createDocument);
     await lowerMems(doc, parser, createDocument, { readBinaryFile, resolvePath, evaluateComptime });

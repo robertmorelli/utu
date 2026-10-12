@@ -59,6 +59,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
     binaryen.Features.MutableGlobals |
     binaryen.Features.BulkMemory |
     binaryen.Features.MultiMemory |
+    binaryen.Features.Multivalue |
     binaryen.Features.NontrappingFPToInt |
     binaryen.Features.ExceptionHandling |
     binaryen.Features.GC |

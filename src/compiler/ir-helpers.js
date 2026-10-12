@@ -40,6 +40,10 @@ export function typeNodeToStr(typeNode) {
       const inner = typeNodeToStr(typeNode.children[0]);
       return inner ? `?${inner}` : null;
     }
+    case 'ir-type-tuple': {
+      const parts = [...typeNode.children].map(typeNodeToStr);
+      return parts.every(Boolean) ? `.{${parts.join(', ')}}` : null;
+    }
     default: return null;
   }
 }
@@ -55,6 +59,10 @@ export function sourceTypeStr(typeNode) {
   if (typeNode.localName === 'ir-type-nullable') {
     const inner = sourceTypeStr(typeNode.firstElementChild);
     return inner ? `?${inner}` : null;
+  }
+  if (typeNode.localName === 'ir-type-tuple') {
+    const parts = [...typeNode.children].map(sourceTypeStr);
+    return parts.every(Boolean) ? `.{${parts.join(', ')}}` : null;
   }
   if (typeNode.localName === 'ir-type-inst') {
     const args = [...(typeNode.querySelector(':scope > ir-type-args')?.children ?? [])].map(sourceTypeStr);

@@ -79,7 +79,17 @@ export function callableTypeStr(kind, params, ret) {
   return `${kind}(${params.join(', ')}) ${ret || 'void'}`;
 }
 
-/** Split a comma-separated type list, ignoring commas nested in `()` or `[]`. */
+/** `.{I32, F64}` → `['I32', 'F64']`, else null. */
+export function tupleParts(typeStr) {
+  if (typeof typeStr !== 'string' || !typeStr.startsWith('.{') || !typeStr.endsWith('}')) return null;
+  return splitTypeList(typeStr.slice(2, -1));
+}
+
+export function tupleTypeStr(parts) {
+  return `.{${parts.join(', ')}}`;
+}
+
+/** Split a comma-separated type list, ignoring commas nested in `()`, `[]`, or `{}`. */
 export function splitTypeList(text) {
   if (!text) return [];
   const out = [];
@@ -87,8 +97,8 @@ export function splitTypeList(text) {
   let start = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === '(' || ch === '[') depth++;
-    else if (ch === ')' || ch === ']') depth--;
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') depth--;
     else if (ch === ',' && depth === 0) { out.push(text.slice(start, i).trim()); start = i + 1; }
   }
   out.push(text.slice(start).trim());

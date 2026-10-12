@@ -98,7 +98,9 @@ export const T = Object.freeze({
   PRUNE:          'ir-prune',           // prune: skip a recursive generator's subtree (expanded before typing)
 
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }
-  TUPLE:          'ir-tuple',           // .{a, b} — reserved; not yet supported
+  TUPLE:          'ir-tuple',           // .{a, b} — several values, as a function result
+  TUPLE_GET:      'ir-tuple-get',       // element `index` of a tuple (from let .{a, b} = …)
+  TYPE_TUPLE:     'ir-type-tuple',      // .{A, B}
   OPTIONAL_FIELD: 'ir-optional-field',  // a?.b — rewritten to promote before elaboration
   TRY:            'ir-try',             // try { body } catch { handler }
   CAUGHT:         'ir-caught',          // the caught host value, first in a handler

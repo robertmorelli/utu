@@ -184,6 +184,25 @@ Scalars (`I32`, `F32`, etc.) provide built-in operator implementations via their
 
 ---
 
+## Multiple results (tuples)
+
+A function returns several values with a tuple type, and a caller takes them
+apart with `let .{…}`:
+
+```
+fn divmod(a: I32, b: I32) .{I32, I32} {
+    .{a / b, a % b};
+}
+let .{q, r} = divmod(17, 5);
+```
+
+Tuples are wasm multi-value results: no allocation, no boxing. A tuple type is
+only a function (or `fun`) result. Tuples cannot be parameters, struct fields,
+array elements, nested in another tuple, or returned by a `cl` (a JS
+function). `let .{…}` names every value.
+
+---
+
 ## Function pointers and closures
 
 Two callable types, deliberately distinct — and the distinction is

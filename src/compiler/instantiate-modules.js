@@ -326,6 +326,7 @@ function typeNodeToMangledText(node) {
     return [keyword, ...params, 'to', result].join('_');
   }
   if (node.localName === 'ir-type-nullable') return `opt_${typeNodeToMangledText(node.firstElementChild)}`;
+  if (node.localName === 'ir-type-tuple') return ['tuple', ...[...node.children].map(typeNodeToMangledText), 'end'].join('_');
   if (node.localName === 'ir-type-inst') {
     const mod = node.getAttribute('module') ?? '';
     const args = typeArgChildren(node).map(typeNodeToMangledText);
@@ -353,6 +354,7 @@ function typeNodeToDisplayText(node) {
     case 'ir-type-void': return 'void';
     case 'ir-type-fn':
     case 'ir-type-cl': return typeNodeToStr(node);
+    case 'ir-type-tuple': return `.{${[...node.children].map(typeNodeToDisplayText).join(', ')}}`;
     default: return node.dataset.displayName ?? node.getAttribute('name') ?? node.localName;
   }
 }
@@ -375,6 +377,7 @@ function typeNodeToText(node) {
     // Canonical spelling, as type strings elsewhere use (`cl(I32) I32`).
     case 'ir-type-fn':
     case 'ir-type-cl':       return typeNodeToStr(node);
+    case 'ir-type-tuple':    return `.{${[...node.children].map(typeNodeToText).join(', ')}}`;
     default:                 return node.getAttribute('name') ?? node.localName;
   }
 }

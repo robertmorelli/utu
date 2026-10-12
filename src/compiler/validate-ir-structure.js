@@ -1,7 +1,7 @@
 import { matchScalarIntrinsic } from './codegen/intrinsics.js';
 import { callableParts, INFERRED_PRIMITIVES } from './type-rules.js';
 import { collectScalarKinds } from './link-type-decls.js';
-import { unwrapNullable } from './type-strings.js';
+import { tupleParts, unwrapNullable } from './type-strings.js';
 import { bodyOf } from './ir-helpers.js';
 import { retainedGraphs } from './graph-store.js';
 
@@ -169,6 +169,9 @@ function resolvesType(type, typeIndex) {
     return [...callable.params, callable.ret]
       .every(part => part === 'void' || resolvesType(part, typeIndex));
   }
+  // So are tuples: `.{I32, F64}`.
+  const tuple = tupleParts(name);
+  if (tuple) return tuple.every(part => resolvesType(part, typeIndex));
   return INFERRED_PRIMITIVES.has(name) || typeIndex.has(name);
 }
 

@@ -27,6 +27,7 @@ export function validateAnalysis(doc, typeIndex) {
   validateIntegerLiterals(root, ctx.program);
   validateArrayDefaultConstruction(root, typeIndex, ctx.program);
   validateFunctionReferenceStorage(root, ctx.program);
+  validateTuples(root);
   validateMatchPatterns(root, ctx);
   validateExhaustiveAltsAndMatches(root, ctx);
   validateRecursiveStructs(doc, typeIndex);
@@ -388,6 +389,30 @@ function validateExhaustiveAltsAndMatches(root, ctx) {
  * cannot build a struct field or array element of that type. Report it during
  * analysis, where `utu check` and the editor see it, with the working spelling.
  */
+/**
+ * Tuples are wasm multi-value results: a function's (or closure's) result
+ * type, taken apart with `let .{a, b} = …`. They are never stored, nested, or
+ * passed as one argument, so they never reach the heap.
+ */
+function validateTuples(root) {
+  const report = (node, message) => stampDiagnostic(node, DIAGNOSTIC_KINDS.TYPE_MISMATCH, message, {});
+  for (const type of root.querySelectorAll('ir-type-tuple')) {
+    const parent = type.parentElement;
+    const result = parent?.localName === 'ir-fn'
+      || (parent?.localName === 'ir-type-fn' && parent.lastElementChild === type);
+    if (parent?.localName === 'ir-type-tuple') report(type, 'A tuple cannot hold another tuple');
+    else if (['ir-closure', 'ir-type-cl'].includes(parent?.localName)) {
+      report(type, 'A closure is a JS function and cannot return a tuple; use a fn or fun');
+    }
+    else if (!result) report(type, 'A tuple type is only a function result: `fn f() .{I32, F64}`; take it apart with `let .{a, b} = f();`');
+  }
+  for (const array of root.querySelectorAll('ir-array-lit')) {
+    if ([...array.children].some(child => child.dataset.typeName?.startsWith('.{'))) {
+      report(array, 'Tuples cannot be stored in arrays; take them apart with `let .{a, b} = …` first');
+    }
+  }
+}
+
 function validateFunctionReferenceStorage(root, program) {
   const report = (node, type, where) => stampDiagnostic(node, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
     `${type} cannot be stored in ${where} yet; use ${'cl' + type.slice('fun'.length)} instead (a fun converts to it)`,

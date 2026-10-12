@@ -4,7 +4,10 @@ exports.buildTypeRules = function buildTypeRules() {
   return {
     _type: ($) => choice($.nullable_type, $._base_type),
     nullable_type: ($) => seq('?', $._base_type),
-    _base_type: ($) => choice($.ref_type, $.func_type, $.closure_type, $.paren_type, $.promoted_type),
+    _base_type: ($) => choice($.ref_type, $.func_type, $.closure_type, $.paren_type, $.promoted_type, $.tuple_type),
+    // .{I32, Tag} — several values at once, as a function's result. Tuples
+    // live in locals and wasm results only; they are never stored.
+    tuple_type: ($) => seq('.', '{', $._type, repeat(seq(',', $._type)), optional(','), '}'),
     ref_type: ($) =>
       choice(
         typeName($),

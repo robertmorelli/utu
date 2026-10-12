@@ -867,6 +867,83 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }
   });
 
+  test('tuples: functions return several values in wasm multi-value results', async ({ ROOT }) => {
+    const source = `
+      struct P:
+          | x: I32
+      fn divmod(a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }
+      fn pick(flag: Bool) .{I64, F64} {
+          if flag { .{1, 2.5}; } else { .{3, 4.5}; };
+      }
+      fn early(n: I32) .{I32, Bool} {
+          if n < 0 { return .{0, false}; };
+          .{n * 2, true};
+      }
+      fn mixed(n: I32) .{P, Str, I32} { .{P { x: n }, "hi", n + 1}; }
+      fn forward(n: I32) .{P, Str, I32} { mixed(n); }
+      fn fib(n: I32) .{I32, I32} {
+          if n == 0 { return .{0, 1}; };
+          let .{a, b} = fib(n - 1);
+          .{b, a + b};
+      }
+      fn swap(a: I32, b: I32) .{I32, I32} { .{b, a}; }
+      export lib {
+          fn scalars() I32 {
+              let .{q, r} = divmod(17, 5);
+              let .{big, half} = pick(false);
+              q * 1000 + r * 100 + big.to_i32() * 10 + half.to_i32();
+          }
+          fn returns() I32 {
+              let .{twice, ok} = early(21);
+              let .{zero, bad} = early(-1);
+              twice * 100 + zero + (if ok and not bad { 1; } else { 0; });
+          }
+          fn refs() I32 {
+              let .{p, s, m} = forward(41);
+              p.x * 1000 + s.len() * 100 + m;
+          }
+          fn recursive() I32 {
+              let .{a, b} = fib(20);
+              a;
+          }
+          fn pointer() I32 {
+              let k: fun(I32, I32) .{I32, I32} = swap;
+              let .{x, y} = k(1, 2);
+              x * 10 + y;
+          }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `tuples_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      assertEq(e.scalars(), 3234, `scalars at ${optimize}`);
+      assertEq(e.returns(), 4201, `early returns at ${optimize}`);
+      assertEq(e.refs(), 41242, `references at ${optimize}`);
+      assertEq(e.recursive(), 6765, `recursion at ${optimize}`);
+      assertEq(e.pointer(), 21, `fun references at ${optimize}`);
+    }
+  });
+
+  test('tuples: misuse is diagnosed', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    const f = 'fn f() .{I32, I32} { .{1, 2}; }\n';
+    const cases = [
+      [`${f}export main() I32 { let .{a, b, c} = f(); a; }`, 'This tuple has 2 values'],
+      [`${f}export main() I32 { let .{a} = f(); a; }`, 'This tuple has 2 values'],
+      ['export main() I32 { let .{a, b} = 5; a; }', 'let .{…} takes apart a tuple, but this value is I32'],
+      [`${f}export main() I32 { let xs = [f(), f()]; 1; }`, 'Tuples cannot be stored in arrays'],
+      ['fn f() .{I32, .{I32, I32}} { .{1, .{2, 3}}; }\nexport main() I32 { 1; }', 'A tuple cannot hold another tuple'],
+      ['fn f(t: .{I32, I32}) I32 { 1; }\nexport main() I32 { 1; }', 'A tuple type is only a function result'],
+      ['struct S:\n    | t: .{I32, I32}\nexport main() I32 { 1; }', 'A tuple type is only a function result'],
+      ['export main() I32 { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { .{a, a}; }; 1; }', 'cannot return a tuple'],
+      ['fn f() .{I32, I32} { .{1, 2.5}; }\nexport main() I32 { 1; }', 'expected I32, got F64'],
+    ];
+    for (const [source, message] of cases) {
+      const errors = await errorsOf(compiler, ROOT, source);
+      assert(errors.some(e => e.message.includes(message)), `${source}\n  got ${describe(errors)}`);
+    }
+  });
+
   test('mem: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [

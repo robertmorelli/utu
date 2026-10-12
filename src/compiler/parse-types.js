@@ -103,6 +103,15 @@ function walkPromotedType(n, doc, source, dispatch) {
   return stamp(el(T.TYPE_SELF, doc), n);
 }
 
+function walkTupleType(n, doc, source, dispatch) {
+  const node = stamp(el(T.TYPE_TUPLE, doc), n);
+  for (const child of namedChildren(n)) {
+    const ir = dispatch(child, doc, source);
+    if (ir) node.appendChild(ir);
+  }
+  return node;
+}
+
 function walkVoidType(n, doc, source, dispatch) {
   return stamp(el(T.TYPE_VOID, doc), n);
 }
@@ -118,4 +127,5 @@ export const walkers = {
   'closure_type':           walkClosureType,
   'promoted_type':          walkPromotedType,
   'void_type':              walkVoidType,
+  'tuple_type':             walkTupleType,
 };

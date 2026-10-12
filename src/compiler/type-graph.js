@@ -12,6 +12,7 @@ import { BINARY_OP_FN, UNARY_OP_FN } from './operator-specs.js';
 import { callableParts, callableTypeStr, INFERRED_PRIMITIVES, isAssignable, unifyTypes, unwrapNullable } from './type-rules.js';
 import { isInstanceOf, moduleArgsOf } from './module-names.js';
 import { retainedGraphs } from './graph-store.js';
+import { tupleParts, tupleTypeStr } from './type-strings.js';
 import { buildProgramIndex, nodesOf } from './program-index.js';
 import { reportTypeGraphDiagnostics } from './type-graph-diagnostics.js';
 
@@ -382,6 +383,15 @@ function expect(graph, value, read, site, source, mode, label) {
   graph.slots.get(value)?.expected.push(edge);
 }
 
+/** The first type this node is expected to have, if any. */
+function expectedType(graph, node) {
+  for (const edge of graph.slots.get(node)?.expected ?? []) {
+    const type = edge.read();
+    if (type) return type;
+  }
+  return null;
+}
+
 function edgeSource(edge) {
   return typeof edge.source === 'function' ? edge.source() : edge.source;
 }
@@ -437,6 +447,17 @@ function addActualRule(graph, node) {
       return rule(graph, node, [one], () => operatorResult(graph, node, read(one), UNARY_OP_FN), 'operator');
     case 'ir-binary':
       return rule(graph, node, children, () => foreignActual(graph, node) ?? operatorResult(graph, node, read(one), BINARY_OP_FN), 'operator');
+    case 'ir-tuple':
+      return rule(graph, node, children, () => {
+        const parts = children.map(read);
+        return parts.every(Boolean) ? tupleTypeStr(parts) : null;
+      }, 'tuple');
+    case 'ir-tuple-get':
+      // A mismatched let .{…} is reported once, at element 0; its names get no type.
+      return rule(graph, node, [one], () => {
+        const parts = tupleParts(read(one));
+        return parts?.length === Number(node.getAttribute('count')) ? parts[Number(node.getAttribute('index'))] : null;
+      }, 'tuple-element');
     case 'ir-if': {
       const then = children[1];
       const otherwise = children[2];
@@ -806,6 +827,11 @@ function addExpectations(graph, node) {
       () => callParameter(graph, node, args, index)?.type,
       'argument', () => callParameter(graph, node, args, index)?.source ?? node.firstElementChild, 'assign'));
   }
+  if (tag === 'ir-tuple') {
+    // A tuple gives each element its part of the tuple it is expected to be.
+    [...node.children].forEach((value, index) => expect(graph, value,
+      () => tupleParts(expectedType(graph, node))?.[index], 'field', node, 'assign'));
+  }
   if (tag === 'ir-struct-init' || tag === 'ir-array-lit') {
     // Records and arrays give each element their declared context.
     const values = tag === 'ir-array-lit' ? [...node.children] : [...node.children].map(field => field.firstElementChild);
@@ -954,7 +980,8 @@ function addConfluence(graph, owner, values) {
       // leave a literal branch to default before a block branch has a type.
       const context = graph.slots.get(owner)?.expected?.map(edge => edge.read())
         .find(type => type && type !== 'null' && type !== 'void' && type !== 'nullable');
-      if (context && LITERAL_CONTEXT.has(context)) return context;
+      // A tuple context reaches inside the branches' tuples the same way.
+      if (context && (LITERAL_CONTEXT.has(context) || tupleParts(context))) return context;
       const unified = actual(graph, owner) ?? actual(graph, first);
       if (unified !== 'null') return unified;
       return graph.slots.get(owner)?.expected?.map(edge => edge.read()).find(type => type && type !== 'null') ?? unified;
@@ -967,7 +994,8 @@ function addConfluence(graph, owner, values) {
     while (value?.localName === 'ir-block' || value?.localName === 'ir-paren') value = value.lastElementChild;
     value = returnedValue(value);
     if (value?.localName === 'ir-unary' && value.getAttribute('op') === '-') value = value.firstElementChild;
-    if (value?.localName === 'ir-lit' && ['null', 'int', 'float'].includes(value.getAttribute('kind'))) {
+    if (value?.localName === 'ir-lit' && ['null', 'int', 'float'].includes(value.getAttribute('kind'))
+        || value?.localName === 'ir-tuple') {
       expect(graph, value, readUnified, 'confluence', first, 'unify', message);
     }
   }
@@ -1023,8 +1051,18 @@ function collectFailures(graph) {
       fail(graph, node, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown inferred type '${type}'`, { type });
     }
   }
-  for (const tuple of nodesOf(graph, 'ir-tuple')) {
-    fail(graph, tuple, DIAGNOSTIC_KINDS.TYPE_MISMATCH, 'Tuple literals are not supported yet; use [a, b] for arrays', {});
+  // `let .{a, b} = value` names every value of a tuple.
+  for (const get of nodesOf(graph, 'ir-tuple-get')) {
+    if (get.getAttribute('index') !== '0') continue;
+    const type = actual(graph, get.firstElementChild);
+    const parts = tupleParts(type);
+    const count = Number(get.getAttribute('count'));
+    if (type && !parts) {
+      fail(graph, get, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `let .{…} takes apart a tuple, but this value is ${type}`, { actual: type });
+    } else if (parts && parts.length !== count) {
+      fail(graph, get, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+        `This tuple has ${parts.length} values (${type}); name each one in let .{…}`, { actual: type });
+    }
   }
   for (const array of nodesOf(graph, 'ir-array-lit')) {
     if (!actual(graph, array) && !graph.slots.get(array)?.foreignError) fail(graph, array, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
@@ -1074,6 +1112,8 @@ function knownType(graph, type) {
   const callable = callableParts(name);
   if (callable) return [...callable.params, callable.ret]
     .every(part => part === 'void' || knownType(graph, part));
+  const tuple = tupleParts(name);
+  if (tuple) return tuple.every(part => knownType(graph, part));
   return INFERRED_PRIMITIVES.has(name) || graph.typeIndex?.has(name);
 }
 
@@ -1082,6 +1122,8 @@ function unknownTypeNames(graph, type) {
   const name = unwrapNullable(type);
   const callable = callableParts(name);
   if (callable) return [...callable.params, callable.ret].filter(part => part !== 'void').flatMap(part => unknownTypeNames(graph, part));
+  const tuple = tupleParts(name);
+  if (tuple) return tuple.flatMap(part => unknownTypeNames(graph, part));
   return knownType(graph, name) ? [] : [name];
 }
 
