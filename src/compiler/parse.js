@@ -147,17 +147,13 @@ function walkSyntaxDiagnostics(node, acc) {
  * borrows its tree so callers doing incremental parsing retain ownership.
  *
  * utu's own parser (syntax/parser.js) builds the same tree for a valid
- * program without calls into wasm; tree-sitter parses the rest, whose error
- * recovery reports the syntax errors, and analysis builds, which need its
- * tokens for highlighting.
+ * program without calls into wasm; tree-sitter parses the rest, so that its
+ * error recovery reports the syntax errors.
  */
 export function parseToIR(parser, source, ...options) {
-  const settings = options.find(option => typeof option === 'object' && option !== null) ?? {};
-  if (!settings.collectAnalysisTokens) {
-    const own = parseSyntax(source);
-    if (own && globalThis.process?.env?.UTU_PARSER_CHECK) checkAgainstTreeSitter(parser, source, own);
-    if (own) return treeToIR(own, source, ...options);
-  }
+  const own = parseSyntax(source);
+  if (own && globalThis.process?.env?.UTU_PARSER_CHECK) checkAgainstTreeSitter(parser, source, own);
+  if (own) return treeToIR(own, source, ...options);
   const tree = parser.parse(source);
   if (!tree) throw new Error('parse: parser returned no syntax tree');
   try {
