@@ -1,0 +1,618 @@
+using Browser from std:Browser;
+
+fn number(value: I32) Str {
+    value.to_f64().toString();
+}
+
+fn money(cents: I32) Str {
+    "$" + (cents.to_f64() / 100.0).toFixed(2);
+}
+
+fn node(id: Str) Browser.HTMLElement {
+    Browser.document.getElementById(id) orelse fatal;
+}
+
+fn restore_focus(id: Str) void {
+    promote Browser.document.getElementById(id) {
+        |element| => element.focus(), ~> {
+        },
+    };
+}
+
+fn persist(key: Str,
+value: Str) void {
+    try {
+        Browser.localStorage.setItem(key, value);
+    } catch {
+        node("notice").textContent = "Storage is unavailable. Your changes will last for this session.";
+    };
+}
+
+struct Stop:
+    | id: Str
+    | title: Str
+    | day: I32
+    | cost: I32
+    | done: Bool
+
+struct Trip:
+    | stops: Array[Stop]
+    | day: Str
+
+fn save(state: Trip) void {
+    let data = Browser.Array();
+    state.stops each |s| {
+        data.push(&{
+            id: s.id,
+            title: s.title,
+            day: s.day,
+            cost: s.cost,
+            done: s.done
+        });
+    };
+    persist("wayfarer-v1", Browser.JSON.stringify(data));
+}
+
+fn refresh(state: Trip) void {
+    save(state);
+}
+
+fn itinerary(state: Trip) Browser.HTMLElement {
+    let total = state.stops map |stop| {
+        stop.cost.to_f64();
+    } sum;
+    let done = state.stops count_where |stop| {
+        stop.done;
+    };
+    let visible = state.stops filter |stop| {
+        state.day == "all" or number(stop.day) == state.day;
+    }
+    sort(Stop)|a, b| {
+        a.day<b.day;
+    };
+    @wutu/\
+    section {
+        <id = "itinerary";
+        display:grid;
+        gap:1.25rem;
+        div {
+            display:grid;
+            grid-template-columns:repeat(3, 1fr);
+            gap:0.75rem;
+            article {
+                padding:1.2rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:0.8rem;
+                p.eyebrow {
+                    "STOPS";
+                }
+                strong {
+                    font-size:2rem;
+                    = number(state.stops.len());
+                }
+            }
+            article {
+                padding:1.2rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:0.8rem;
+                p.eyebrow {
+                    "VISITED";
+                }
+                strong {
+                    font-size:2rem;
+                    = number(done);
+                }
+            }
+            article {
+                padding:1.2rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:0.8rem;
+                p.eyebrow {
+                    "PLAN COST";
+                }
+                strong {
+                    <id = "trip-total";
+                    font-size:clamp(1.2rem, 3vw, 2rem);
+                    = "$" + (total / 100.0).toFixed(2);
+                }
+            }
+        }
+        p.muted {
+            <role = "status";
+            = number(visible.len());
+            " stops in this view. Costs are your own estimates.";
+        }
+        for $[visible] |stop| key $[stop.id] {
+            article.stop {
+                display:grid;
+                grid-template-columns:auto 1fr auto;
+                gap:1rem;
+                align-items:center;
+                padding:1.5rem;
+                border:1px solid var(--line);
+                border-radius:0.8rem;
+                background:var(--panel);
+                @media (width < 32rem) {
+                    grid-template-columns: auto 1fr;
+                }
+                span {
+                    font:700 0.8rem system-ui, sans-serif;
+                    border:1px solid var(--accent);
+                    color:var(--accent);
+                    padding:0.7rem;
+                    border-radius:50%;
+                    "D";
+                    = number(stop.day);
+                }
+                div {
+                    display:grid;
+                    gap:0.5rem;
+                    h3 {
+                        font-size:1.15rem;
+                        = stop.title;
+                    }
+                    p.muted {
+                        = money(stop.cost);
+                        " planned";
+                    }
+                }
+                div {
+                    display:flex;
+                    gap:0.5rem;
+                    flex-wrap:wrap;
+                    @media (width < 32rem) {
+                        grid-column: 2;
+                    }
+                    button {
+                        <id = $["stop-" + stop.id];
+                        <aria-pressed = $[if stop.done { "true"; } else { "false"; }];
+                        = if stop.done {
+                            "Visited ✓";
+                        }
+                        else {
+                            "Mark visited";
+                        };
+                        on click {
+                            stop.done = not stop.done;
+                            refresh(state);
+                            restore_focus("stop-" + stop.id);
+                        };
+                    }
+                    button {
+                        <aria-label = $["Remove " + stop.title];
+                        "×";
+                        on click {
+                            state.stops = state.stops filter |s| {
+                                s.id != stop.id;
+                            }
+                            collect(Stop);
+                            refresh(state);
+                            restore_focus("place");
+                        };
+                    }
+                }
+            }
+        }
+        if $[visible.len() == 0] {
+            p.empty {
+                "A little room for serendipity. Add your first stop for this day.";
+            }
+        }
+    }
+    \/;
+}
+
+export main() void {
+    let state = Trip {
+        day: "all",
+        stops: [Stop {
+            id: "walk",
+            title: "Sunrise on the coastal trail",
+            day: 1,
+            cost: 0,
+            done: false
+        },
+        Stop {
+            id: "lunch",
+            title: "Lunch by the harbor",
+            day: 1,
+            cost: 2800,
+            done: false
+        },
+        Stop {
+            id: "garden",
+            title: "An afternoon at the gardens",
+            day: 2,
+            cost: 1800,
+            done: false
+        },
+        Stop {
+            id: "market",
+            title: "A slow morning at the market",
+            day: 3,
+            cost: 2500,
+            done: false
+        }
+        ]
+    };
+    try {
+        promote Browser.localStorage.getItem("wayfarer-v1") {
+            |saved|=> {
+                let data = Browser.JSON.parse(saved);
+                let length: F64 = data.length;
+                let i: F64 = 0.0;
+                let stops: Array[Stop] = [];
+                while(i<length) {
+                    let row = data[i];
+                    let day: F64 = row.day;
+                    let cost: F64 = row.cost;
+                    stops = stops chain([Stop {
+                        id: row.id,
+                        title: row.title,
+                        day: day.to_i32(),
+                        cost: cost.to_i32(),
+                        done: row.done
+                    }
+                    ]) collect(Stop);
+                    i += 1.0;
+                };
+                state.stops = stops;
+            },
+            ~> {
+            },
+        };
+    } catch {
+    };
+    let app = @wutu/\
+    @reactive;
+    @document {
+        :root {
+            --bg: oklch(19% 0.04 245);
+            --ink: oklch(96% 0.015 230);
+            --accent: oklch(79% 0.13 175);
+            --panel: oklch(25% 0.04 245);
+            --muted: oklch(76% 0.035 235);
+            --line: oklch(37% 0.035 245);
+            --on-accent: oklch(19% 0.04 245);
+            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+        }
+        button, input, select, textarea {
+            font: inherit;
+        }
+        button, a, input, select, textarea {
+            touch-action: manipulation;
+        }
+        button {
+            cursor: pointer;
+        }
+        a {
+            color: inherit;
+            text-underline-offset: 0.25em;
+        }
+        h1, h2, h3, p {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        button, input, select, textarea {
+            border: 1px solid var(--line);
+            border-radius: 0.6rem;
+            padding: 0.75rem 1rem;
+            background: var(--panel);
+            color: var(--ink);
+            min-inline-size: 0;
+        }
+        button:hover {
+            border-color: var(--accent);
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 650;
+        }
+        .primary {
+            background: var(--accent);
+            color: var(--on-accent);
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+        .muted {
+            color: var(--muted);
+        }
+        .eyebrow {
+            font: 700 0.75rem system-ui, sans-serif;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+        .toolbar {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .toolbar label {
+            flex: 1 1 10rem;
+        }
+        .empty {
+            padding: 2rem;
+            border: 1px dashed var(--line);
+            color: var(--muted);
+        }
+        .site-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding-block: 1.25rem;
+            border-block-end: 1px solid var(--line);
+            font: 650 0.8rem system-ui, sans-serif;
+        }
+        .site-nav nav {
+            display: flex;
+            gap: 1.25rem;
+        }
+        .site-footer {
+            border-block-start: 1px solid var(--line);
+            padding-block: 1.5rem;
+            color: var(--muted);
+            font: 0.8rem system-ui, sans-serif;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        @media print {
+            .site-nav, .site-footer, form, .toolbar, button {
+                display: none;
+            }
+            body {
+                background: white;
+                color: black;
+            }
+        }
+    }
+    main {
+        max-inline-size:78rem;
+        margin-inline:auto;
+        padding-inline:clamp(1.2rem, 5vw, 4rem);
+        display:grid;
+        gap:2.5rem;
+        header.site-nav {
+            a {
+                <href = "./";
+                "↗ WAYFARER / GO SOMEWHERE";
+            }
+            nav {
+                a {
+                    <href = "../";
+                    "All five sites";
+                }
+                a {
+                    <href = "source.html";
+                    "View Utu source ↗";
+                }
+            }
+        }
+        section {
+            display:grid;
+            grid-template-columns:1.5fr 1fr;
+            align-items:center;
+            gap:2rem;
+            padding-block:2rem;
+            @media (width < 45rem) {
+                grid-template-columns: 1fr;
+            }
+            div {
+                display:grid;
+                gap:1.25rem;
+                p.eyebrow {
+                    color:var(--accent);
+                    "THREE DAYS. A DIFFERENT PACE.";
+                }
+                h1 {
+                    font-size:clamp(3rem, 7vw, 6rem);
+                    line-height:1;
+                    letter-spacing:-0.065em;
+                    font-weight:550;
+                    "Take the";
+                    br {
+                    }
+                    span {
+                        color:var(--accent);
+                        "scenic route.";
+                    }
+                }
+                p.muted {
+                    max-inline-size:32rem;
+                    line-height:1.75;
+                    "Turn a loose idea into a weekend worth remembering. Map out your days, keep an eye on costs, and leave some room to wander.";
+                }
+            }
+            div {
+                <aria-hidden = "true";
+                aspect-ratio:1.2;
+                border:1px solid var(--line);
+                border-radius:1.5rem;
+                background:repeating-radial-gradient(ellipse at 80% 30%, transparent 0 1rem, var(--line) 1.05rem 1.1rem, transparent 1.15rem 2rem);
+                display:grid;
+                align-content:end;
+                gap:0.4rem;
+                padding:2rem;
+                p.eyebrow {
+                    "YOUR NEXT CHAPTER";
+                }
+                strong {
+                    font-size:3rem;
+                    "THE COAST";
+                }
+                p.muted {
+                    "A weekend, your way.";
+                }
+            }
+        }
+        div {
+            display:grid;
+            grid-template-columns:minmax(0, 1.8fr) minmax(16rem, 1fr);
+            gap:2rem;
+            align-items:start;
+            @media (width < 55rem) {
+                grid-template-columns: 1fr;
+            }
+            section {
+                display:grid;
+                gap:1.5rem;
+                div.toolbar {
+                    h2 {
+                        "Your itinerary";
+                    }
+                    label {
+                        "Day";
+                        select as day_filter {
+                            <aria-label = "Day";
+                            option {
+                                <value = "all";
+                                "Every day";
+                            }
+                            option {
+                                <value = "1";
+                                "Day 1";
+                            }
+                            option {
+                                <value = "2";
+                                "Day 2";
+                            }
+                            option {
+                                <value = "3";
+                                "Day 3";
+                            }
+                            on change {
+                                state.day = day_filter.value;
+                            };
+                        }
+                    }
+                }
+                = itinerary(state);
+            }
+            aside {
+                display:grid;
+                gap:1.5rem;
+                padding:1.5rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:1rem;
+                p.eyebrow {
+                    color:var(--accent);
+                    "MAKE IT YOURS";
+                }
+                h2 {
+                    "Add a stop";
+                }
+                form as form {
+                    display:grid;
+                    gap:1rem;
+                    label {
+                        "Place or activity";
+                        input as place {
+                            <id = "place";
+                            <required = "";
+                            <maxlength = "160";
+                            <placeholder = "A place worth a detour";
+                        }
+                    }
+                    label {
+                        "Which day?";
+                        select as day {
+                            <aria-label = "Which day?";
+                            option {
+                                <value = "1";
+                                "Day 1";
+                            }
+                            option {
+                                <value = "2";
+                                "Day 2";
+                            }
+                            option {
+                                <value = "3";
+                                "Day 3";
+                            }
+                        }
+                    }
+                    label {
+                        "Estimated cost ($)";
+                        input as cost {
+                            <type = "number";
+                            <min = "0";
+                            <max = "100000";
+                            <step = "1";
+                            <required = "";
+                            <value = "0";
+                        }
+                    }
+                    button.primary {
+                        <type = "submit";
+                        "Add to the journey ↗";
+                    }
+                    on submit {
+                        event.preventDefault();
+                        if place.value.trim().len()>0 {
+                            let d = if day.value == "1" {
+                                1;
+                            }
+                            else {
+                                if day.value == "2" {
+                                    2;
+                                }
+                                else {
+                                    3;
+                                };
+                            };
+                            state.stops = state.stops chain([Stop {
+                                id: Browser.crypto.randomUUID(),
+                                title: place.value.trim(),
+                                day: d,
+                                cost: (cost.valueAsNumber * 100.0).to_i32(),
+                                done: false
+                            }
+                            ]) collect(Stop);
+                            refresh(state);
+                            form.reset();
+                            place.focus();
+                        };
+                    };
+                }
+            }
+        }
+        footer.site-footer {
+            p {
+                "A personal itinerary notebook. Sample stops are illustrative, not bookings.";
+            }
+            p {
+                <id = "notice";
+                <role = "status";
+                "Saved on this device. No account needed.";
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

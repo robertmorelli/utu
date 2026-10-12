@@ -19,7 +19,14 @@ export function walkFnDecl(n, doc, source, dispatch) {
       case 'return_type': {
         // Tree-sitter wraps the actual return type in a return_type node; unwrap it.
         const inner = namedChildren(child)[0];
-        if (inner) node.appendChild(dispatch(inner, doc, source));
+        if (inner?.type === 'yield_type') {
+          // A generator: its type child is the element type it yields.
+          node.dataset.generator = 'true';
+          const element = namedChildren(inner)[0];
+          if (element) node.appendChild(dispatch(element, doc, source));
+        } else if (inner) {
+          node.appendChild(dispatch(inner, doc, source));
+        }
         break;
       }
       case 'void_type': {

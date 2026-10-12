@@ -1,3 +1,4 @@
+import {stencilCss} from './css-stencil.js';
 import { callableParts } from './type-strings.js';
 import { DOMParser } from 'linkedom/worker';
 import { parseToIR } from './parse.js';
@@ -8,6 +9,17 @@ export function createStandardDsls({ parser, createDocument }) {
   return {
     // @wat is first-class but not yet implemented.
     // Return null so expand-dsls skips the node rather than throwing.
+    css: {
+      expand({body}) {
+        const css=stencilCss(stripDslDelims(body));
+        // No '/' may appear in the embedded literal: "*/" before an escaped
+        // newline would otherwise spell the /\ delimiter (`*/\n`).
+        const literal=JSON.stringify(css).replaceAll('/','\\u002f');
+        const src=`fn __css() Str {let value:fun() Str=@es/\\ ()=>${literal} \\/;value();}`;
+        const doc=parseToIR(parser,src,createDocument);
+        return {node:doc.querySelector('ir-fn > ir-block')};
+      },
+    },
     es:  { expand: expandEsDsl, allowResidual: true },
     wat: { expand() { return null; } },
     utu: {
@@ -62,7 +74,7 @@ function expandEsDsl({ doc, node, body, freshName }) {
   if (!sig) return null;
 
   const importName = freshName('__es');
-  const publicName = sig.isFunction ? bindingName : importName;
+  const publicName = sig.isFunction && binding.localName === T.GLOBAL ? bindingName : importName;
   const extern = buildExternFn(doc, node, publicName, sig, importName);
   const bodyText = stripDslDelims(body);
   const result = {
@@ -94,7 +106,7 @@ function expandEsDsl({ doc, node, body, freshName }) {
   return {
     ...result,
     globals: [{ key: importName, node: extern }],
-    node: call,
+    node: sig.isFunction ? call.firstElementChild : call,
   };
 }
 

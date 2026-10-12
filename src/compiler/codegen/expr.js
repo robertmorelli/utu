@@ -2,7 +2,7 @@
 
 import { emitRefIntrinsic, emitScalarIntrinsic, matchScalarIntrinsic } from './intrinsics.js';
 import {
-  emitIf, emitWhile, emitFor, emitReturn, emitBreak,
+  emitIf, emitWhile, emitFor, emitReturn, emitBreak, emitContinue, emitLoopMatch,
   emitMatch, emitAlt, emitPromote, emitAssert, emitFatal, emitTry, emitCaught,
 } from './control.js';
 import { emitStructInit, emitFieldGet, emitNullRef } from './structs.js';
@@ -53,7 +53,9 @@ export function emitExpr(node, ctx) {
     case 'ir-for':           expr = emitFor(node, ctx, emitExpr); break;
     case 'ir-return':        expr = emitReturn(node, ctx, emitExpr); break;
     case 'ir-break':         expr = emitBreak(node, ctx, emitExpr); break;
+    case 'ir-continue':      expr = emitContinue(node, ctx, emitExpr); break;
     case 'ir-match':         expr = emitMatch(node, ctx, emitExpr); break;
+    case 'ir-loop-match':    expr = emitLoopMatch(node, ctx, emitExpr); break;
     case 'ir-alt':           expr = emitAlt(node, ctx, emitExpr); break;
     case 'ir-promote':       expr = emitPromote(node, ctx, emitExpr); break;
     case 'ir-struct-init':   expr = emitStructInit(node, ctx, emitExpr); break;

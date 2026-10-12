@@ -1,3 +1,9 @@
+import { expandStored } from './stored.js';
+import { expandJson } from './json.js';
+import { expandWutu } from './wutu.js';
+import { lowerIterators } from './lower-iterators.js';
+import { lowerForArrays } from './lower-for-arrays.js';
+import { lowerGenerators } from './lower-generators.js';
 import { ForeignABI, prepareForeignImports } from './foreign-types.js';
 import { lowerForeignOperations } from './foreign-lowering.js';
 import { boxMutatedCaptures } from './box-captures.js';
@@ -191,11 +197,26 @@ export function createCompiler(env) {
       foreign.set('std:JS', (await stdlib.get('std:JS')()).abi);
     }
     const foreignABI = foreign.size ? new ForeignABI(foreign) : null;
+    // Any reactive template switches every template to the reconciler, so
+    // components can join reactive views.
+    const reactiveProject = [...graph.values()].some(sourceDoc => [...sourceDoc.querySelectorAll('ir-dsl')]
+      .some(site => /@(?:reactive|island)/.test(site.getAttribute('body') ?? '')));
+    for (const sourceDoc of graph.values()) {
+      expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, reactiveProject, expandTemplates: !dsls.wutu });
+    }
     if (foreignABI) prepareForeignImports(graph, imports, foreignABI);
     debugAssert(graph.get(filePath), 'buildModuleGraph');
     bringTargetToTopLevel(graph.get(filePath), { target, filePath, debugAssertions });
     debugAssert(graph.get(filePath), 'bringTargetToTopLevel');
-    const doc = inlineImports(graph, order, { debugAssertions });
+    // Syntax errors in an imported file are reported as such. Inlining its
+    // recovered tree would only produce misleading follow-on diagnostics.
+    const importedParseErrors = [...graph]
+      .filter(([file, sourceDoc]) => file !== filePath && sourceDoc.body.firstChild?.dataset.parseErrors)
+      .map(([file, sourceDoc]) => ({ file, errors: JSON.parse(sourceDoc.body.firstChild.dataset.parseErrors) }));
+    const doc = importedParseErrors.length ? graph.get(filePath) : inlineImports(graph, order, { debugAssertions });
+    if (importedParseErrors.length && doc.body.firstChild) {
+      doc.body.firstChild.dataset.importedParseErrors = JSON.stringify(importedParseErrors);
+    }
     // -Oz ('size', the default) or -O3 ('speed'): read by host-call lowering and emitBinary.
     if (doc.body.firstChild) doc.body.firstChild.dataset.optimize = optimize;
     doc.__utuForeign = foreignABI;
@@ -209,7 +230,7 @@ export function createCompiler(env) {
     // A recovered parse tree is intentionally incomplete. Running module
     // instantiation/hoisting over it can manufacture duplicate declarations
     // or trigger invariants that hide the actionable syntax diagnostics.
-    if (doc.querySelector('[data-parse-errors], [data-error-kind="parse-error"], [data-error="parse-error"]')) {
+    if (doc.querySelector('[data-parse-errors], [data-imported-parse-errors], [data-error-kind="parse-error"], [data-error="parse-error"]')) {
       const root = doc.body.firstChild;
       if (root && !root.dataset.error) root.dataset.error = 'parse-error';
       return doc;
@@ -236,6 +257,9 @@ export function createCompiler(env) {
     }
     debugAssert(doc, 'prelude');
 
+    lowerGenerators(doc, parser, createDocument);
+    lowerForArrays(doc, parser, createDocument);
+    lowerIterators(doc, parser, createDocument);
     const arrayDefaults = requestLiteralArrayTypes(doc, nameArrayElements(arrayElements, foreignABI));
     const elaboration = retainGraph(doc, 'elaboration', buildElaborationGraph(doc));
     checkModuleVariance(doc, elaboration);
@@ -351,6 +375,27 @@ export function createCompiler(env) {
   }
 
   return { parseSource, compileFile, analyzeFile };
+}
+
+const SOURCE_DSLS = new Set(['utu', 'css', 'wutu', 'stored', 'json']);
+const MAX_DSL_ROUNDS = 100;
+
+/**
+ * Expand the built-in source DSLs. They can produce one another (Wutu inside
+ * Utu inside Wutu), so expansion repeats until a round introduces nothing new.
+ */
+function expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, reactiveProject, expandTemplates }) {
+  const pending = () => [...sourceDoc.querySelectorAll('ir-dsl')].filter(site => SOURCE_DSLS.has(site.getAttribute('name')));
+  for (let round = 0; round < MAX_DSL_ROUNDS; round++) {
+    const before = pending();
+    if (!before.length) return;
+    expandDsls(sourceDoc, { dsls: { utu: standardDsls.utu, css: standardDsls.css } });
+    expandStored(sourceDoc, parser, createDocument);
+    expandJson(sourceDoc, parser, createDocument);
+    if (expandTemplates) expandWutu(sourceDoc, parser, createDocument, reactiveProject);
+    if (pending().every(site => before.includes(site))) return;
+  }
+  throw new Error('Recursive DSL expansion limit exceeded');
 }
 
 // ── Parser initialisation helper ─────────────────────────────────────────────

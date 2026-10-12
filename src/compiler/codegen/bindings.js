@@ -1,6 +1,7 @@
 // codegen/bindings.js — locals, blocks, lets, and assignments
 
 import { binaryen } from './types.js';
+import { nextLabel } from './labels.js';
 import { emitFieldSet } from './structs.js';
 import { emitFunRef } from './closures.js';
 import { paramsOf, selfParamOf } from '../ir-helpers.js';
@@ -57,23 +58,63 @@ export function emitBlock(node, ctx, emitExpr) {
     ? ctx.toType(blockType)
     : binaryen.none;
 
+  // A compiler-generated block may be the target of breaks (generators). It
+  // joins the loop stack as a break-only target that plain break/continue skip.
+  const breakLabel = node.dataset.breakLabel;
+  // Unique per emission: unrolled loops emit the same block more than once.
+  const target = breakLabel ? `__block_${breakLabel}_${nextLabel(ctx)}` : null;
+  if (breakLabel) (ctx.loops ??= []).push({ brk: target, label: breakLabel, block: true });
+  // `defer` registers code for every exit of this block; see emitDeferred.
+  const frame = { deferred: [], loopDepth: ctx.loops?.length ?? 0 };
+  (ctx.defers ??= []).push(frame);
   const exprs = [];
-  for (let i = 0; i < stmts.length; i++) {
-    const child = stmts[i];
-    const isLast = i === stmts.length - 1;
-    const e = emitExpr(child, ctx);
-    const childType = ctx.typeOf(child);
-    const childIsVoid = isVoidStatement(child) || !childType || childType === 'void';
-    if (isLast && valueType === binaryen.none && !childIsVoid) {
-      exprs.push(ctx.module.drop(e));
-    } else if (isLast || childIsVoid) {
-      exprs.push(e);
-    } else {
-      // Discard non-tail expression result so the block stays well-typed.
-      exprs.push(ctx.module.drop(e));
+  try {
+    for (let i = 0; i < stmts.length; i++) {
+      const child = stmts[i];
+      if (child.localName === 'ir-defer') {
+        if (child.firstElementChild) frame.deferred.push(child.firstElementChild);
+        continue;
+      }
+      const isLast = i === stmts.length - 1;
+      const e = emitExpr(child, ctx);
+      const childType = ctx.typeOf(child);
+      const childIsVoid = isVoidStatement(child) || !childType || childType === 'void';
+      // Discard non-tail results (and a tail result in a void block) so the
+      // block stays well-typed.
+      const keep = isLast ? valueType !== binaryen.none || childIsVoid : childIsVoid;
+      exprs.push(keep ? e : ctx.module.drop(e));
+    }
+    if (frame.deferred.length) {
+      // Falling off the end runs this block's deferred code after its value.
+      if (valueType !== binaryen.none && exprs.length) {
+        const slot = ctx.addLocal(blockType);
+        exprs.push(ctx.module.local.set(slot, exprs.pop()), ...emitDeferred(ctx, [frame], emitExpr), ctx.module.local.get(slot, valueType));
+      } else {
+        exprs.push(...emitDeferred(ctx, [frame], emitExpr));
+      }
+    }
+  } finally {
+    ctx.defers.pop();
+    if (breakLabel) ctx.loops.pop();
+  }
+  if (!exprs.length && !target) return ctx.module.nop();
+  return ctx.module.block(target, exprs, valueType);
+}
+
+/**
+ * Statements for the deferred code of `frames`, innermost frame first and,
+ * within a frame, last-registered first. Values are discarded.
+ */
+export function emitDeferred(ctx, frames, emitExpr) {
+  const out = [];
+  for (const frame of [...frames].reverse()) {
+    for (const node of [...frame.deferred].reverse()) {
+      const expr = emitExpr(node, ctx);
+      const type = binaryen.getExpressionType(expr);
+      out.push(type === binaryen.none || type === binaryen.unreachable ? expr : ctx.module.drop(expr));
     }
   }
-  return ctx.module.block(null, exprs, valueType);
+  return out;
 }
 
 export function emitLet(node, ctx, emitExpr) {

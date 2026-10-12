@@ -1,0 +1,141 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Plant:
+| id: Str
+| name: Str
+| watered: Str
+| interval: I32
+struct GroveState:
+| date: Str
+| plants: Array[Plant]
+fn today() Str {
+    let date:fun() Str=@es/\ ()=>{const date=new Date();return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');} \/;
+    date();
+}
+fn days(start:Str,end:Str) I32 {
+    let difference:fun(Str,Str) I32=@es/\ (start,end)=>Math.round((Date.parse(end+'T12:00:00Z')-Date.parse(start+'T12:00:00Z'))/86400000)||0 \/;
+    difference(start,end);
+}
+fn workspace(state: GroveState) Browser.HTMLElement {
+    @wutu/\
+    @island "grove-workspace";
+    section.workspace {
+        label.panel {
+            "Planning date";
+            input {
+                <type = "date";
+                bind:value = state.date;
+            }
+        }
+        if $[state.date.len()!=10] {
+            p {
+                <role = "status";
+                "Choose a date to continue.";
+            }
+        }
+        div.grid {
+            for $[state.plants] |plant| key $[plant.id] {
+                article.panel.stack {
+                    p.eyebrow {
+                        = if days(plant.watered,state.date)>=plant.interval {
+                            "CHECK THE SOIL";
+                        }
+                        else {
+                            "RESTING EASY";
+                        };
+                    }
+                    h2 {
+                        = plant.name;
+                    }
+                    p.muted {
+                        = "Last watered "+plant.watered;
+                    }
+                    p {
+                        = "Check roughly every "+wutu.number(plant.interval)+" days. Let the soil guide you.";
+                    }
+                    button.primary {
+                        <disabled = $[state.date.len()!=10];
+                        <aria-label = $["Watered "+plant.name];
+                        "Watered today ✓";
+                        on click {
+                            plant.watered=state.date;
+                            wutu.save("grove-v2");
+                        };
+                    }
+                }
+            }
+        }
+        p.muted {
+            "Intervals are reminders, not automatic watering instructions. Light, soil, pot size, and seasons change what plants need.";
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        GroveState "grove-v2" manual
+        GroveState {
+            date:today(),
+            plants:[Plant {
+                id:"fern",
+                name:"Boston fern",
+                watered:today(),
+                interval:3
+            },Plant {
+                id:"pothos",
+                name:"Golden pothos",
+                watered:today(),
+                interval:7
+            },Plant {
+                id:"rubber",
+                name:"Rubber plant",
+                watered:today(),
+                interval:10
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "grove";
+        nav {
+            strong {
+                "GROVE / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "A little attention. A greener room.";
+            }
+            p.muted {
+                "Keep watering notes for the plants that make your space feel alive. Pick a day to see what may need attention.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

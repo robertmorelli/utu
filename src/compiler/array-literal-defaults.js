@@ -22,13 +22,23 @@ const flexible = child => child.localName === 'ir-lit' && child.getAttribute('ki
 export function arrayElementType(node, actual) {
   const children = [...node.children];
   if (!children.length) return null;
-  const fixed = children.filter(child => !flexible(child)).map(actual);
+  const fixed = children.filter(child => !flexible(child)).map(actual).map(type => type && storableElement(type));
   if (fixed.some(type => !type)) return null;
   if (!fixed.length) return 'I32';
   const joined = fixed.reduce((type, next) => type === null ? null : unifyTypes(type, next), fixed[0]);
   if (!joined || joined === 'null') return null;
   if (children.some(flexible) && !NUMERIC.has(unwrapNullable(joined))) return null;
   return joined;
+}
+
+/**
+ * A function reference has no representation inside a heap array, so arrays
+ * of `fun` values hold the equivalent closure: `[inc, dbl]` is
+ * `Array[cl(I32) I32]`, and each element converts on the way in.
+ */
+export function storableElement(type) {
+  if (type.startsWith('?fun(')) return '?cl' + type.slice('?fun'.length);
+  return type.startsWith('fun(') ? 'cl' + type.slice('fun'.length) : type;
 }
 
 const KINDS = { int: 'I32', float: 'F64', string: 'Str', 'string-multi': 'Str', bool: 'Bool' };

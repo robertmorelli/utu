@@ -477,8 +477,11 @@ T1.method(a)
 // if / else
 if cond { ... } else { ... }
 
-// match (on scalars)
+// match (on scalars: integers, floats, Bool)
+// Patterns are literals of the scrutinee's type; numeric patterns may be
+// negative. Out-of-range, wrong-kind, and duplicate patterns are errors.
 match expr {
+    -1 => ...,
     0 => ...,
     1 => ...,
       ~> ...,
@@ -500,7 +503,44 @@ promote expr {
 // for / while (for loop captures are always I64) (support labels)
 for (0 ... 10) |i| { ... }     // inclusive
 for (0 ..< 10) |i| { ... }     // exclusive
+for (xs) |x| { ... }           // each element of an array (evaluated once)
+for (xs, 0 ..< n) |x, i| { ... } // zipped sources stop at the shortest
 while (cond) { ... }
+break                          // leave the innermost loop
+continue                       // next iteration of the innermost loop
+
+// loop match: a state machine with computed-goto dispatch (Zig's labeled switch)
+loop match state {
+    0 => { ...; continue 1; },     // re-dispatch on the new state
+    1 => { ...; break; },          // leave the loop
+    ~> { ... },                    // an arm that finishes also leaves
+};
+// Each `continue <state>` site has its own dispatch: a direct branch for a
+// constant later state, otherwise a br_table at that site, so every transition
+// is predicted separately. Order arms so hot transitions point forward; -O3
+// emits the arms twice so that nearly every edge is forward. Plain `continue`
+// inside a loop match is an error (name the next state); `break` leaves it.
+// Measurements: benchmarks/control-flow/README.md.
+
+// generators: `yield T` as the return type; consumed by for / await for
+fn squares(n: I32) yield I32 {
+    for (0 ..< n) |i| { yield i * i; };
+}
+for (squares(10)) |x| { ... };
+await for (ticks()) |t| { ... };   // the generator body may `await`
+// The body expands inline at the consuming loop: in the loop body, `break`
+// ends the generation and `continue` resumes after the current yield; in the
+// generator, `return;` ends it. Generators are not values (they cannot be
+// stored or passed) and cannot recurse; both are compile-time errors.
+
+// defer: run when the enclosing block exits — by reaching its end, return,
+// break, or continue — in reverse order of registration. A block's value and
+// a return value are computed first. Deferred code cannot itself return,
+// break, or continue out of the block. It does not run on traps.
+{
+    defer close(handle);
+    use(handle);
+}
 
 // bind (let)
 let x: I32 = expr

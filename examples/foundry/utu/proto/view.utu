@@ -1,0 +1,51 @@
+using Browser from std:Browser;
+using sim from "../sim.utu";
+
+mod view {
+    struct Ui:
+        | w: sim.World
+        | speed: I32
+        | selected: I32
+
+    fn hud(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "hud";
+        header.hud {
+            span.hud-title { "FOUNDRY"; }
+            span { = "tick " + ui.w.tick.to_str(); }
+            span { = "power " + ui.w.satisfaction.to_str(); }
+            button {
+                <class = $[if ui.speed == 0 { "active"; } else { ""; }];
+                "Pause";
+                on click { ui.speed = 0; };
+            }
+            button {
+                <class = $[if ui.speed == 1 { "active"; } else { ""; }];
+                "1×";
+                on click { ui.speed = 1; };
+            }
+        }
+        \/;
+    }
+
+    fn panel(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "inspector";
+        aside.inspector {
+            if $[ui.selected > 0] {
+                section.panel {
+                    div.panel-head { h3 { = "Entity " + ui.selected.to_str(); } }
+                    div.panel-body {
+                        div.row {
+                            span { "Progress"; }
+                            div.bar { i { width: $[(sim.get_progress(ui.w, ui.selected)).to_str() + "%"]; } }
+                        }
+                    }
+                }
+            } else {
+                p.muted { "Select a machine."; }
+            }
+        }
+        \/;
+    }
+}

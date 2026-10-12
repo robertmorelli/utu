@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { build } from 'esbuild';
-import { initParser, createCompiler, emitBinary } from '../../src/index.js';
+import { initParser, createCompiler, emitBinary, formatDiagnostics } from '../../src/index.js';
 import { glueModuleSource, liveGlueFields } from '../../src/runtime/host-imports.js';
 import { nodePackageResolver } from './packages.mjs';
 
@@ -20,7 +20,10 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
       resolvePackage: nodePackageResolver({ root: path.dirname(path.resolve(entry)) }) });
     const doc = await compiler.compileFile(path.resolve(entry));
     const errors = [...doc.querySelectorAll('[data-error]')];
-    if (errors.length) throw new Error(errors.slice(0, 10).map(n => n.dataset.errorMessage ?? n.dataset.error).join('\n'));
+    if (errors.length) {
+      const { artifacts, snapshot } = await compiler.analyzeFile(path.resolve(entry));
+      throw Object.assign(new Error(describeErrorNodes(errors)), { artifacts, snapshot });
+    }
     const wasm = emitBinary(doc);
     const live = await liveGlueFields(wasm);
     const root = doc.body.firstChild;
@@ -45,11 +48,11 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
     if (live.has('js_tag')) lines.push(`import { exceptionImports } from ${runtime};`, 'imports.utu = exceptionImports(imports.utu);');
     if (promises.ops.length) lines.push(`import { promiseImports } from ${runtime};`, `imports.utu = promiseImports(${JSON.stringify(promises)}, imports.utu);`);
     if (promises.awaits.length) lines.push(`import { awaitImports } from ${runtime};`, `imports.utu = awaitImports(${JSON.stringify(promises)}, imports.utu);`);
-    lines.push(`const module = await WebAssembly.compileStreaming(fetch(new URL('./app.wasm', import.meta.url)), {builtins:['js-string'],importedStringConstants:"'"});`,
+    lines.push('try {', `const module = await WebAssembly.compileStreaming(fetch(new URL('./app.wasm', import.meta.url)), {builtins:['js-string'],importedStringConstants:"'"});`,
       'const instance = await WebAssembly.instantiate(module, imports);');
-    if (promises.asyncExports.length) lines.push(`import { promisifyExports } from ${runtime};`, `const exports = promisifyExports(instance, ${JSON.stringify(promises)});`);
+    if (promises.asyncExports.length) {lines.unshift(`import { promisifyExports } from ${runtime};`);lines.push(`const exports = promisifyExports(instance, ${JSON.stringify(promises)});`);}
     else lines.push('const exports = instance.exports;');
-    lines.push('await exports.main?.();');
+    lines.push('document.querySelectorAll("[data-utu-static]").forEach(n=>n.remove());', 'await exports.main?.();', 'document.documentElement.setAttribute("data-utu-ready","");', '} catch(error) { document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error); }');
     await build({ stdin: { contents: lines.join('\n'), resolveDir: ROOT, sourcefile: 'generated-loader.mjs', loader: 'js' },
       outfile: path.join(outDir, 'app.js'), bundle: true, minify: true, format: 'esm', platform: 'browser', target: 'es2022', legalComments: 'none' });
     // The intermediate module is not a deployed asset.
@@ -61,9 +64,26 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
     report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key]]));
     await fs.writeFile(path.join(outDir, 'sizes.json'), JSON.stringify(report, null, 2) + '\n');
     return report;
+  } catch (error) {
+    // Warnings alone never fail a build, so only report when an error is present.
+    const diagnostics = error.artifacts?.diagnostics ?? [];
+    if (diagnostics.some(d => d.severity !== 'warning')) {
+      throw new Error(await formatDiagnostics(diagnostics, { readFile: file => fs.readFile(file, 'utf8'), snapshot: error.snapshot, color: false }));
+    }
+    throw error;
   } finally {
     if (!suppliedParser) parser.delete();
   }
+}
+
+/** Fallback when no structured diagnostic exists: name each error and where it is. */
+function describeErrorNodes(nodes) {
+  const lines = nodes.slice(0, 20).map(node => {
+    const { file, originFile, row, col } = node.dataset;
+    const where = (file ?? originFile) && row ? `${file ?? originFile}:${row}:${col ?? 1}: ` : '';
+    return `  ${where}${node.dataset.errorMessage ?? node.dataset.error}`;
+  });
+  return ['Compilation failed:', ...lines].join('\n');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

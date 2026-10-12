@@ -1,0 +1,52 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { chromium, webkit } from 'playwright';
+import { buildBrowserApp } from '../tools/dts/build-app.mjs';
+const out = path.resolve('dist/wutu-garden');
+const report = await buildBrowserApp({entry:path.resolve('examples/wutu-garden/main.utu'),outDir:out});
+await fs.copyFile('examples/wutu-garden/index.html',path.join(out,'index.html'));
+const server = http.createServer(async(req,res)=>{
+  const name = new URL(req.url,'http://local').pathname.slice(1)||'index.html';
+  if(!['index.html','app.js','app.wasm'].includes(name)) {res.writeHead(404).end();return;}
+  res.setHeader('Content-Type',name.endsWith('.wasm')?'application/wasm':name.endsWith('.js')?'text/javascript':'text/html');
+  res.end(await fs.readFile(path.join(out,name)));
+});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const engine = process.argv.includes('--webkit') ? webkit : chromium;
+const browser = await engine.launch({headless:true});
+try {
+  const page = await browser.newPage({viewport:{width:1280,height:960}});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(`http://127.0.0.1:${server.address().port}`);
+  await page.locator('.plant').nth(3).waitFor();
+  assert.equal(await page.locator('style').count(),3,'styles installed once per component');
+  await page.getByRole('button',{name:'Mark as watered'}).first().click();
+  assert.equal(await page.getByRole('button',{name:'Watered today ✓'}).count(),1);
+  await page.getByLabel('Find your plants').fill('MON');
+  assert.equal(await page.locator('.plant').count(),1);
+  assert.equal(await page.locator('.plant h2').textContent(),'Monstera');
+  assert.equal(await page.getByRole('button',{name:'Watered today ✓'}).count(),1,'shared state survives rerender');
+  await page.getByLabel('Find your plants').fill('nothing');
+  assert.equal(await page.locator('.plant').count(),0);
+  await page.getByLabel('Find your plants').fill('');
+  assert.equal(await page.locator('.plant').count(),4);
+  assert.equal(await page.locator('style').count(),3);
+  await page.getByLabel('Arrange by').selectOption('frequency');
+  assert.equal(await page.locator('.plant h2').first().textContent(),'Peace lily');
+  await page.reload();
+  await page.locator('.plant').nth(3).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Watered today ✓'}).count(),1,'watering state persists across reload');
+  await page.evaluate(()=>localStorage.setItem('wutu-plant-Monstera','2000-01-01'));
+  await page.reload();
+  await page.locator('.plant').nth(3).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Watered today ✓'}).count(),0,'old watering dates reset on reload');
+  await page.screenshot({path:path.join(out,'desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no mobile horizontal overflow');
+  await page.screenshot({path:path.join(out,'mobile.png'),fullPage:true});
+  assert.deepEqual(errors,[]);
+  assert.ok(report.total.gzip<6000,`site exceeded 6 KB gzip budget: ${report.total.gzip}`);
+  console.log(`Wutu ${engine.name()} interaction + responsive + size checks passed`,report.total);
+} finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

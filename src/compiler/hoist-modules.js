@@ -27,6 +27,8 @@ function indexModuleReferences(root) {
   };
   for (const qualified of root.querySelectorAll('ir-type-qualified')) add(qualifiedOwner(qualified), qualified);
   for (const access of root.querySelectorAll('ir-field-access, ir-type-member')) add(access.firstElementChild?.getAttribute('name'), access);
+  // `M.Type { … }` and other nodes naming a module's type directly.
+  for (const node of root.querySelectorAll('[type-name*="."]')) add(node.getAttribute('type-name').split('.').slice(0, -1).join('.'), node);
   return byModule;
 }
 
@@ -34,6 +36,17 @@ function qualifiedOwner(qualified) {
   return qualified.firstElementChild?.getAttribute('name')
     ?? qualified.firstElementChild?.getAttribute('module')
     ?? qualified.getAttribute('raw')?.split('.').slice(0, -1).join('.');
+}
+
+/**
+ * Rewrite references to `module`'s members inside `subtree` to their hoisted
+ * names, for code that arrives after `module` itself was hoisted.
+ */
+export function rewriteReferencesTo(module, subtree) {
+  const moduleName = module.getAttribute('name');
+  const renamings = new Map([...module.querySelectorAll(':scope > [name]')]
+    .map(node => [node.getAttribute('name'), moduleMemberName(moduleName, node.getAttribute('name'))]));
+  rewriteExternalModuleReferences(subtree, module, moduleName, renamings, indexModuleReferences(subtree).get(moduleName) ?? []);
 }
 
 export function hoistModule(module, root, graph = null, references = indexModuleReferences(root)) {
@@ -101,6 +114,10 @@ export function hasLexicalShadow(ident, name) {
   if (fn?.querySelector(`:scope > ir-param-list > ir-param[name="${name}"], :scope > ir-self-param[name="${name}"]`)) return true;
   for (let node = ident.parentElement; node && node !== fn; node = node.parentElement) {
     if (node.localName !== 'ir-block') continue;
+    if (['ir-iterator', 'ir-for'].includes(node.parentElement?.localName)) {
+      const names = node.parentElement.querySelector(':scope > ir-capture')?.getAttribute('names')?.split(',') ?? [];
+      if (names.includes(name)) return true;
+    }
     for (const child of node.children) {
       if (child === ident || child.contains(ident)) break;
       if (child.localName === 'ir-let' && child.getAttribute('name') === name) return true;
@@ -111,6 +128,12 @@ export function hasLexicalShadow(ident, name) {
 
 function rewriteExternalModuleReferences(root, module, moduleName, renamings, references) {
   const live = tag => references.filter(node => node.localName === tag && node.isConnected);
+  for (const node of references) {
+    const typeName = node.getAttribute?.('type-name');
+    if (!typeName?.startsWith(`${moduleName}.`) || !node.isConnected || module.contains(node)) continue;
+    const renamed = renamings.get(typeName.slice(moduleName.length + 1));
+    if (renamed) node.setAttribute('type-name', renamed);
+  }
   // `M.Type` is represented as ir-type-qualified until the module's concrete
   // declarations are known. Resolve it while that module is still present;
   // leaving it for linkTypeDecls loses the namespace after hoisting.

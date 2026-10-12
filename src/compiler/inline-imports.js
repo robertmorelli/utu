@@ -11,8 +11,9 @@
 // After this pass every module referenced across files is physically present
 // in the entry file. No `from` attributes remain anywhere.
 
+import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { restampSubtree } from './parse.js';
-import { hoistModule } from './hoist-modules.js';
+import { hoistModule, rewriteReferencesTo } from './hoist-modules.js';
 import { lowerPipesIn } from './lower-pipe.js';
 
 /**
@@ -40,17 +41,34 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
 
       // Find the exported module by name in the target file.
       const srcModule = targetRoot.querySelector(`ir-module[name="${moduleName}"]`);
-      if (!srcModule) throw new Error(
-        `Module '${moduleName}' not found in '${targetPath}' (imported by '${filePath}')`
-      );
+      if (!srcModule) {
+        // A file with syntax errors may have lost the module; the parse
+        // errors are the real diagnostic and are reported after inlining.
+        if (targetRoot.dataset.parseErrors) continue;
+        const available = [...targetRoot.querySelectorAll(':scope > ir-module')].map(m => m.getAttribute('name'));
+        const hint = available.length ? `it defines ${available.map(name => `'${name}'`).join(', ')}` : 'it defines no modules';
+        throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT,
+          `Module '${moduleName}' not found in '${targetPath}'; ${hint}`, using,
+          { importPath: targetPath, importKind: 'module' });
+      }
 
       // Imported modules close over their file's own module imports. Carry the
       // already-inlined support modules and within-file usings with the public
       // module; cloning only srcModule leaves aliases inside it unbound.
+      // A module may already be here, or already hoisted into the flat
+      // namespace (then no ir-module remains), when two imports share it.
+      const inlined = root.__inlinedModules ??= new Set();
+      const alreadyHoisted = [];
       for (const support of [...targetRoot.children]) {
         if (support === srcModule || !['ir-module', 'ir-using'].includes(support.localName)) continue;
+        if (support.localName === 'ir-module' && inlined.has(support.getAttribute('name'))
+          && !root.querySelector(`:scope > ir-module[name="${support.getAttribute('name')}"]`)) {
+          alreadyHoisted.push(support);
+          continue;
+        }
         if (support.localName === 'ir-module'
           && root.querySelector(`:scope > ir-module[name="${support.getAttribute('name')}"]`)) continue;
+        if (support.localName === 'ir-module') inlined.add(support.getAttribute('name'));
         if (support.localName === 'ir-using' && hasEquivalentUsing(root, support)) continue;
         using.parentNode.insertBefore(cloneImportedNode(doc, support, targetPath, 'import-support'), using);
       }
@@ -59,6 +77,10 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
       // record which file the ranges belong to for source-location resolution.
       const clone = cloneImportedNode(doc, srcModule, targetPath, 'imported-module');
       using.parentNode.insertBefore(clone, using);
+      // The module's references to support modules this file already hoisted
+      // point at the flat names that hoisting gave their members.
+      for (const support of alreadyHoisted) rewriteReferencesTo(support, clone);
+      if (!using.getAttribute('alias') && !using.querySelector(':scope > ir-type-args')) inlined.add(moduleName);
 
       // Aliased/generic imports remain templates for elaboration. Bare imports
       // materialize directly into the flat declaration namespace.
@@ -76,6 +98,19 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
 
   // Entry file is last in topological order.
   const doc = graph.get(order[order.length - 1]);
+  // The entry's own plain modules materialize now, like the modules it
+  // imports, so generic instantiation inside them (Array[Member]) sees their
+  // types. Generic modules and modules a `using` aliases stay templates.
+  const entryRoot = doc?.body.firstChild;
+  if (entryRoot) {
+    const aliased = new Set([...entryRoot.querySelectorAll('ir-using')].map(using => using.getAttribute('module')));
+    for (const module of [...entryRoot.querySelectorAll(':scope > ir-module')]) {
+      if (module.dataset.rewritePass === 'inline-imports' || aliased.has(module.getAttribute('name'))) continue;
+      if (module.querySelector(':scope > ir-module-params')) continue;
+      lowerPipesIn(module);
+      hoistModule(module, entryRoot);
+    }
+  }
   if (debugAssertions) assertInlineImports(doc);
   return doc;
 }

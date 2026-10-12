@@ -104,6 +104,8 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
 
   const ctx = {
     module: m,
+    // -O3 trades bytes for speed in a few lowerings (loop match arm copies).
+    optimize: doc.body.firstChild?.dataset.optimize === 'speed' ? 'speed' : 'size',
     fnById,
     fnByName,
     structTypes,
@@ -160,12 +162,51 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
   for (const fn of plan?.exports ?? root.querySelectorAll(':scope > ir-fn[data-export]')) {
     const name = fn.getAttribute('name');
     if (name) {
-      m.addFunctionExport(name, name);
+      m.addFunctionExport(exportOpaque(m, name), name);
       noteExport(artifacts, fn, name, fn.dataset.export ?? 'unknown');
     }
   }
 
   MODULE_REQUIREMENTS.set(m, requirements);
+}
+
+/**
+ * utu structs and arrays cross the JS boundary as opaque handles. An export
+ * whose signature mentions them gets a wrapper taking and returning externref
+ * (the same JS-visible object), so no GC type becomes part of the module's
+ * public interface. Public types keep their exact fields, which would stop
+ * string lowering from rewriting their Str fields and leave the module invalid.
+ * Returns the name of the function to export.
+ */
+function exportOpaque(m, name) {
+  const info = binaryen.getFunctionInfo(m.getFunction(name));
+  const params = binaryen.expandType(info.params);
+  const opaque = type => {
+    if (!binaryen._BinaryenTypeIsNullable(type) && binaryen.expandType(type).length !== 1) return false;
+    const heap = binaryen._BinaryenTypeGetHeapType(type);
+    if (!heap) return false;
+    return binaryen._BinaryenHeapTypeIsSubType(heap, binaryen._BinaryenHeapTypeAny())
+      && !binaryen._BinaryenHeapTypeIsSubType(heap, binaryen._BinaryenHeapTypeString());
+  };
+  const isRef = type => binaryen.expandType(type).length === 1 && type !== binaryen.none
+    && ![binaryen.i32, binaryen.i64, binaryen.f32, binaryen.f64, binaryen.v128].includes(type);
+  const wrap = type => isRef(type) && opaque(type);
+  if (!params.some(wrap) && !wrap(info.results)) return name;
+  // binaryen.js's any.convert_extern()/extern.convert_any() return the opcode
+  // rather than an expression, so build ref.as through the C API.
+  const refAs = (op, value) => binaryen._BinaryenRefAs(m.ptr, op, value);
+  const args = params.map((type, i) => (wrap(type)
+    ? m.ref.cast(refAs(binaryen.RefAsAnyConvertExtern, m.local.get(i, binaryen.externref)), type)
+    : m.local.get(i, type)));
+  let body = m.call(name, args, info.results);
+  let result = info.results;
+  if (wrap(info.results)) {
+    body = refAs(binaryen.RefAsExternConvertAny, body);
+    result = binaryen.externref;
+  }
+  const wrapper = `__export_${name}`;
+  m.addFunction(wrapper, binaryen.createType(params.map(type => (wrap(type) ? binaryen.externref : type))), result, [], body);
+  return wrapper;
 }
 
 function requiresConservativeSweep(functions, plan, typeIndex) {

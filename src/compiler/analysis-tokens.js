@@ -97,6 +97,10 @@ const KEYWORD_TOKENS = new Set([
   'export', 'main', 'let', 'fn', 'fun', 'struct', 'enum', 'proto', 'using', 'from',
   'test', 'bench', 'if', 'else', 'while', 'for', 'match', 'alt', 'promote',
   'return', 'break', 'fatal', 'assert', 'not',
+  'map', 'filter', 'flat_map', 'skip', 'take', 'skip_while', 'take_while',
+  'scan', 'group_by', 'distinct_by', 'partition', 'batched', 'windows', 'min_by', 'max_by', 'first_where', 'reduce', 'bisect',
+  'zip', 'chain', 'repeat', 'fold', 'each', 'collect', 'sort', 'sum', 'product',
+  'count', 'count_where', 'any', 'all', 'first_index', 'last_index',
 ]);
 
 const OPERATOR_TOKENS = new Set([

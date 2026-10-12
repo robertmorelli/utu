@@ -20,24 +20,61 @@ export function lowerOperators(doc, typeGraph = null) {
     const spec = operatorSpec(node, typeGraph);
     if (!spec) continue;
     if (isOperandless(spec.owner)) continue;
-    replaceTypedNode(node, buildCall(node, spec));
+    replaceTypedNode(node, isShortCircuit(node, spec) ? buildShortCircuit(node) : buildCall(node, spec));
     changed = true;
   }
   return Boolean(changed);
 }
 
+// `a and b` / `a or b` on Bool evaluate b only when it decides the result,
+// so `i < n and s[i] == c` is a safe guard. They lower to conditionals:
+//   a and b  →  if a { b } else { false }
+//   a or b   →  if a { true } else { b }
+function isShortCircuit(node, spec) {
+  return node.localName === 'ir-binary' && spec.owner === 'Bool' && ['and', 'or'].includes(node.getAttribute('op'));
+}
+
+function buildShortCircuit(node) {
+  const doc = node.ownerDocument;
+  const [left, right] = [...node.children];
+  const branch = (value) => {
+    const block = createSyntheticNode(doc, 'ir-block', node, 'lower-operators', 'short-circuit-branch');
+    block.appendChild(value);
+    block.dataset.typeName = 'Bool';
+    return block;
+  };
+  const constant = (value) => {
+    const literal = createSyntheticNode(doc, 'ir-lit', node, 'lower-operators', 'short-circuit-constant');
+    literal.setAttribute('kind', 'bool');
+    literal.setAttribute('value', value);
+    literal.setAttribute('type-name', 'Bool');
+    literal.dataset.typeName = 'Bool';
+    return literal;
+  };
+  const conditional = createSyntheticNode(doc, 'ir-if', node, 'lower-operators', 'short-circuit');
+  const and = node.getAttribute('op') === 'and';
+  conditional.append(left, branch(and ? right : constant('true')), branch(and ? constant('false') : right));
+  conditional.dataset.typeName = 'Bool';
+  return conditional;
+}
+
+// `a op= b` becomes `a = a op b`. Only the target is duplicated; the value
+// moves into the new expression, so compound assignments nested inside it
+// (`h += { while (…) { i += 1; }; … }`) are still lowered. Innermost first,
+// so nothing is rewritten after it has been copied.
 function lowerCompounds(root) {
   let changed = false;
-  for (const assign of root.querySelectorAll('ir-assign')) {
+  for (const assign of [...root.querySelectorAll('ir-assign')].reverse()) {
     const op = COMPOUND_OP[assign.getAttribute('op') ?? '='];
     if (!op) continue;
     const [lhs, rhs] = [...assign.children];
     if (!lhs || !rhs) continue;
     const binary = createSyntheticNode(assign.ownerDocument, 'ir-binary', assign, 'lower-operators', 'compound-binary');
     binary.setAttribute('op', op);
-    for (const value of [lhs, rhs]) binary.appendChild(cloneGraphSubtree(value));
+    binary.appendChild(cloneGraphSubtree(lhs));
     assign.setAttribute('op', '=');
     replaceTypedNode(rhs, binary);
+    binary.appendChild(rhs);
     changed = true;
   }
   return changed;
@@ -78,7 +115,7 @@ function operatorSpec(node, graph) {
   return null;
 }
 
-function buildCall(site, { owner, method, syntax, args }) {
+function buildCall(site, { owner, method, syntax, args, label }) {
   const doc = site.ownerDocument;
   const call = doc.createElement('ir-call');
   const callee = createSyntheticNode(doc, 'ir-type-member', site, 'lower-operators', `${syntax}-callee`);
@@ -87,6 +124,8 @@ function buildCall(site, { owner, method, syntax, args }) {
 
   call.dataset.operatorName = method;
   call.dataset.operatorReceiverName = owner;
+  if (label) call.dataset.operatorSymbol = label;
+  if (site.dataset.forArrayAccess) call.dataset.forArrayAccess = site.dataset.forArrayAccess;
   if (site.dataset.typeName) call.dataset.typeName = site.dataset.typeName;
 
   callee.setAttribute('method', method);

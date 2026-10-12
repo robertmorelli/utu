@@ -3,13 +3,25 @@ import { nextNodeId, restampSubtree } from './parse.js';
 import { collectDslArtifacts, createDslArtifactState, stampDslArtifacts } from './collect-dsl-artifacts.js';
 import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
 
+const MAX_EXPANSIONS = 10000;
+
 export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
   const root = doc?.body?.firstChild;
   if (!root) return doc;
 
   let nextId = 0;
   const artifacts = createDslArtifactState();
-  for (const node of [...root.querySelectorAll(T.DSL)]) {
+  // A replacement may itself contain DSL literals (DSLs nested in DSLs), so
+  // expansion drains a worklist instead of one snapshot of the tree.
+  const queue = [...root.querySelectorAll(T.DSL)];
+  const enqueueNested = (replacement) => {
+    queue.push(...replacement.querySelectorAll(T.DSL));
+    if (replacement.localName === T.DSL) queue.push(replacement);
+  };
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    const node = queue[cursor];
+    if (!root.contains(node)) continue;
+    if (cursor >= MAX_EXPANSIONS) throw new Error('Recursive DSL expansion limit exceeded');
     const name = node.getAttribute('name');
     const plugin = name ? dsls[name] : null;
     if (!plugin) continue;
@@ -32,10 +44,13 @@ export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
       const target = result.replace.target ?? node;
       const replacement = replaceRoot(cloneForSite(result.replace.node, site), target, result.replace.kind ?? 'dsl-replacement');
       target.replaceWith(replacement);
+      enqueueNested(replacement);
       continue;
     }
     if (result.node) {
-      node.replaceWith(replaceRoot(cloneForSite(result.node, site), node, 'direct-node'));
+      const replacement = replaceRoot(cloneForSite(result.node, site), node, 'direct-node');
+      node.replaceWith(replacement);
+      enqueueNested(replacement);
       continue;
     }
     if (!result.fn) continue;
@@ -133,7 +148,7 @@ function siteInfo(node, root) {
 }
 
 function assertExpanded(root, dsls) {
-  for (const node of [...root.querySelectorAll(T.DSL)]) {
+  for (const node of root.querySelectorAll(T.DSL)) {
     const name = node.getAttribute('name');
     if (name && dsls[name] && !dsls[name].allowResidual) throw new Error(`expand dsls: registered DSL '${name}' survived expansion`);
   }

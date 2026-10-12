@@ -46,6 +46,12 @@ function rewriteExportMain(node, doc) {
 
 function rewriteExportLib(node) {
   for (const child of [...node.children]) {
+    // A recovered parse error moves out unchanged so the parse-error check
+    // after inlining still sees it and reports the syntax diagnostic.
+    if (isRecoveredSyntax(child)) {
+      node.parentNode.insertBefore(child, node);
+      continue;
+    }
     if (child.localName !== 'ir-fn') {
       throw new Error(`bring target: export lib only supports functions, found ${child.localName}`);
     }
@@ -53,6 +59,13 @@ function rewriteExportLib(node) {
     node.parentNode.insertBefore(child, node);
   }
   node.remove();
+}
+
+function isRecoveredSyntax(node) {
+  return node.localName === 'ir-unknown'
+    || node.dataset.error === 'parse-error'
+    || node.dataset.errorKind === 'parse-error'
+    || node.querySelector('[data-error="parse-error"], [data-error-kind="parse-error"]') != null;
 }
 
 function rewriteBlockDecl(node, doc, name, role) {

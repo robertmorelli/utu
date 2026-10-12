@@ -1,4 +1,4 @@
-import { cloneGraphSubtree, createSyntheticNode, replaceNodeMeta, sourceId } from './ir-helpers.js';
+import { cloneGraphSubtree, createSyntheticNode, replaceNodeMeta, sourceId, typeNodeToStr } from './ir-helpers.js';
 import { instantiatedModuleName, recordInstantiation } from './module-names.js';
 import { hoistModule } from './hoist-modules.js';
 import { lowerPipesIn } from './lower-pipe.js';
@@ -97,35 +97,35 @@ export function instantiateModules(doc, { debugAssertions = false, graph = null 
   // This handles `Array[I32]` used directly in types and expressions without
   // a prior explicit `using Array[I32] |Alias|`.
 
-  // First pass: collect unique (moduleName, concreteTypeNodes[]) combos.
-  const inlineInsts = new Map(); // mangled name → { moduleName, typeArgEls }
-  for (const node of requests('ir-type-inst', 'ir-mod-call')) {
-    const spec = inlineSpec(node);
-    const source = spec && findModule(spec.moduleName);
-    if (!spec || !source?.querySelector('ir-module-params')) continue;
-    if (!validModuleArity(node, source, spec.typeArgEls)) continue;
-    if (!inlineInsts.has(spec.mangled)) inlineInsts.set(spec.mangled, { ...spec, site: node });
-  }
-
-  // Second pass: instantiate each unique combo (skip if already exists from sweep 1).
-  for (const [mangled, { moduleName, typeArgEls, site }] of inlineInsts) {
-    if (findModule(mangled)) continue;
-    const srcModule = findModule(moduleName);
-    if (!srcModule) {
-      graph?.fail(site, 'unknown-module', `Module '${moduleName}' not found`, { module: moduleName });
-      throw new Error(`Module '${moduleName}' not found during inline instantiation`);
+  // Only specialize concrete requests. Requests such as Array[T] inside
+  // a template must wait until the enclosing module has substituted T.
+  // Materialization can introduce further requests, so drain a worklist.
+  const inTemplate = node => Boolean(node.closest('ir-module')?.querySelector(':scope > ir-module-params'));
+  const visited = new Set();
+  for (;;) {
+    const pending = requests('ir-type-inst', 'ir-mod-call').filter(node => !inTemplate(node) && !visited.has(node.id));
+    if (!pending.length) break;
+    for (const node of pending) {
+      visited.add(node.id);
+      const spec = inlineSpec(node);
+      const source = spec && findModule(spec.moduleName);
+      if (!spec || !source?.querySelector(':scope > ir-module-params')) continue;
+      if (!validModuleArity(node, source, spec.typeArgEls)) continue;
+      if (findModule(spec.mangled) || hasConcreteDecl(root, spec.mangled)) continue;
+      if (visited.size > 4096) throw new Error('Module specialization did not converge (more than 4096 requests)');
+      const clone = materializeModule(source, node, root, graph, {
+        from: spec.moduleName, as: spec.mangled, args: spec.typeArgEls,
+        kind: 'inline-module-instantiation', record: true,
+      });
+      root.insertBefore(clone, root.firstChild);
+      lowerPipesIn(clone);
+      hoistModule(clone, root, graph);
     }
-    const clone = materializeModule(srcModule, site, root, graph, {
-      from: moduleName, as: mangled, args: typeArgEls,
-      kind: 'inline-module-instantiation', record: true,
-    });
-    root.insertBefore(clone, root.firstChild);
-    lowerPipesIn(clone);
-    hoistModule(clone, root, graph);
   }
 
-  // Third pass: rewrite inline type and call requests to their concrete names.
+  // Rewrite inline type and call requests to their concrete names.
   for (const node of requests('ir-type-inst', 'ir-mod-call')) {
+    if (inTemplate(node)) continue;
     const spec = inlineSpec(node);
     if (!spec || (!findModule(spec.mangled) && !hasConcreteDecl(root, spec.mangled))) continue;
     if (node.localName === 'ir-type-inst') rewriteInlineType(node, spec.mangled);
@@ -240,11 +240,10 @@ function rewriteInlineCall(node, type) {
   callee.setAttribute('method', method ?? '');
   for (const key of ['methodStart', 'methodEnd']) if (node.dataset[key]) callee.dataset[key] = node.dataset[key];
   call.appendChild(callee);
-  const args = node.querySelector('ir-arg-list');
-  if (args) {
-    const clone = cloneGraphSubtree(args);
-    call.appendChild(clone);
-  }
+  // Move (not clone) the arguments: they may hold further mod-call requests
+  // that this sweep still has to rewrite, e.g. M[I32].f(M[I32].g(x)).
+  const args = node.querySelector(':scope > ir-arg-list');
+  if (args) call.appendChild(args);
   node.replaceWith(call);
 }
 
@@ -312,9 +311,27 @@ function substituteTypeParams(node, paramNames, concreteTypes, graph = null) {
 }
 
 // The naming convention lives in module-names.js; this only supplies the
-// argument spellings.
+// argument spellings, which must stay identifier-safe.
 function mangleName(moduleName, typeArgEls) {
-  return instantiatedModuleName(moduleName, typeArgEls.map(typeNodeToText));
+  return instantiatedModuleName(moduleName, typeArgEls.map(typeNodeToMangledText));
+}
+
+// `cl(I32, Str) Bool` → `cl_I32_Str_to_Bool`: a type name, not a type expression.
+function typeNodeToMangledText(node) {
+  if (node.localName === 'ir-type-fn' || node.localName === 'ir-type-cl') {
+    const children = [...node.children];
+    const params = children.slice(0, -1).map(typeNodeToMangledText);
+    const result = children.at(-1) ? typeNodeToMangledText(children.at(-1)) : 'void';
+    const keyword = node.localName === 'ir-type-cl' ? 'cl' : 'fun';
+    return [keyword, ...params, 'to', result].join('_');
+  }
+  if (node.localName === 'ir-type-nullable') return `opt_${typeNodeToMangledText(node.firstElementChild)}`;
+  if (node.localName === 'ir-type-inst') {
+    const mod = node.getAttribute('module') ?? '';
+    const args = typeArgChildren(node).map(typeNodeToMangledText);
+    return args.length ? instantiatedModuleName(mod, args) : mod;
+  }
+  return typeNodeToText(node);
 }
 
 // Extract the module name from an ir-mod-call node's first identifier-like child.
@@ -334,6 +351,8 @@ function typeNodeToDisplayText(node) {
     }
     case 'ir-type-nullable': return `?${typeNodeToDisplayText(node.firstElementChild)}`;
     case 'ir-type-void': return 'void';
+    case 'ir-type-fn':
+    case 'ir-type-cl': return typeNodeToStr(node);
     default: return node.dataset.displayName ?? node.getAttribute('name') ?? node.localName;
   }
 }
@@ -353,6 +372,9 @@ function typeNodeToText(node) {
     }
     case 'ir-type-nullable': return `?${typeNodeToText(node.firstElementChild)}`;
     case 'ir-type-void':     return 'void';
+    // Canonical spelling, as type strings elsewhere use (`cl(I32) I32`).
+    case 'ir-type-fn':
+    case 'ir-type-cl':       return typeNodeToStr(node);
     default:                 return node.getAttribute('name') ?? node.localName;
   }
 }

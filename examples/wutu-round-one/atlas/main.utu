@@ -1,0 +1,157 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Place:
+| id: Str
+| name: Str
+| region: Str
+| note: Str
+| saved: Bool
+struct AtlasState:
+| region: Str
+| places: Array[Place]
+fn workspace(state: AtlasState) Browser.HTMLElement {
+    @wutu/\
+    @island "atlas-workspace";
+    section.workspace {
+        div.bar {
+            h2 {
+                "Your field notes";
+            }
+            label {
+                "Landscape";
+                select {
+                    bind:value = state.region;
+                    option {
+                        "All";
+                    }
+                    option {
+                        "Coast";
+                    }
+                    option {
+                        "Mountains";
+                    }
+                    option {
+                        "City";
+                    }
+                }
+            }
+        }
+        div.grid {
+            for $[state.places filter |place| {state.region == "All" or state.region == place.region;}] |place| key $[place.id] {
+                article.panel.stack {
+                    p.eyebrow {
+                        = place.region;
+                    }
+                    h2 {
+                        = place.name;
+                    }
+                    p.muted {
+                        = place.note;
+                    }
+                    button {
+                        <aria-pressed = $[if place.saved {"true";} else {"false";}];
+                        = if place.saved {
+                            "Saved ✓";
+                        }
+                        else {
+                            "Save this place";
+                        };
+                        on click {
+                            place.saved = not place.saved;
+                            wutu.save("atlas-v2");
+                        };
+                    }
+                    = @utu/\ @wutu/\ small { "Room for a slower day."; } \/ \/;
+                }
+            }
+        }
+        p {
+            <role = "status";
+            = wutu.number(state.places count_where |p| {
+                p.saved;
+            }) + " places saved";
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        AtlasState "atlas-v2" manual
+        AtlasState {
+            region: "All",
+            places: [
+            Place {
+                id:"coast",
+                name:"The quiet coast",
+                region:"Coast",
+                note:"Walk the headland at sunrise. Leave the afternoon open.",
+                saved:false
+            },
+            Place {
+                id:"mountain",
+                name:"A cabin above the clouds",
+                region:"Mountains",
+                note:"A long trail, a short packing list, and no morning alarm.",
+                saved:false
+            },
+            Place {
+                id:"city",
+                name:"A weekend of small streets",
+                region:"City",
+                note:"Book one museum. Find the rest by walking.",
+                saved:false
+            },
+            Place {
+                id:"island",
+                name:"The last ferry",
+                region:"Coast",
+                note:"Bring a book and stay until the harbor lights come on.",
+                saved:false
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "atlas";
+        nav {
+            strong {
+                "ATLAS / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "Go somewhere that stays with you.";
+            }
+            p.muted {
+                "A personal shortlist for your next unhurried trip. Filter by landscape, save a place, and keep the details close.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

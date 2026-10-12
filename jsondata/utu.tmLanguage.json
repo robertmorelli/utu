@@ -9,6 +9,9 @@
       "include": "#testBench"
     },
     {
+      "include": "#wutu"
+    },
+    {
       "include": "#jsgen"
     },
     {
@@ -231,8 +234,12 @@
     "keywords": {
       "patterns": [
         {
+          "name": "keyword.control.iterator.utu",
+          "match": "\\b(?:map|filter|flat_map|scan|group_by|distinct_by|partition|batched|windows|min_by|max_by|first_where|reduce|bisect|skip|take|skip_while|take_while|zip|chain|repeat|fold|each|collect|sort|sum|product|count|count_where|any|all|first_index|last_index)\\b"
+        },
+        {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|alt|for|while|break|return|let|export|lib|fn|using|from|get|set|struct|enum|type|proto|test|bench|measure|assert|and(?!\\=)|or(?!\\=)|not|void|mod|rec|promote|tag|in|out)\\b"
+          "match": "\\b(?:if|else|match|alt|for|while|loop|break|continue|defer|yield|return|let|export|lib|fn|using|from|get|set|struct|enum|type|proto|test|bench|measure|assert|and(?!\\=)|or(?!\\=)|not|void|mod|rec|promote|tag|in|out)\\b"
         },
         {
           "name": "constant.language.boolean.utu",
@@ -302,7 +309,7 @@
       "patterns": [
         {
           "name": "support.function.call.utu",
-          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|while\\b|break\\b|return\\b|let\\b|export\\b|lib\\b|fn\\b|using\\b|from\\b|get\\b|set\\b|struct\\b|enum\\b|type\\b|proto\\b|test\\b|bench\\b|measure\\b|assert\\b|and\\b|or\\b|not\\b|void\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|while\\b|loop\\b|break\\b|continue\\b|defer\\b|yield\\b|return\\b|let\\b|export\\b|lib\\b|fn\\b|using\\b|from\\b|get\\b|set\\b|struct\\b|enum\\b|type\\b|proto\\b|test\\b|bench\\b|measure\\b|assert\\b|and\\b|or\\b|not\\b|void\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
           "captures": {
             "1": {
               "name": "entity.name.function.utu"
@@ -316,6 +323,73 @@
         {
           "name": "keyword.operator.utu",
           "match": "and=|or=|>>>=|>>=|<<=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|-o|=>|\\.\\.\\.|\\.\\.<|#|\\\\|==|!=|<=|>=|>>>|<<|>>|[-+*/%&^|=<>;]"
+        }
+      ]
+    },
+    "wutu": {
+      "patterns": [
+        {
+          "name": "meta.embedded.wutu",
+          "begin": "(@wutu)(\\s*/\\\\)",
+          "end": "\\\\/",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.function.dsl.utu"
+            },
+            "2": {
+              "name": "punctuation.section.embedded.begin.utu"
+            }
+          },
+          "patterns": [
+            {
+              "name": "comment.line.number-sign.wutu",
+              "match": "^\\s*#\\s.*$"
+            },
+            {
+              "match": "@(?:reactive|document)\\b",
+              "name": "keyword.control.wutu"
+            },
+            {
+              "match": "\\bbind:(?:value|checked|number)\\b",
+              "name": "entity.other.attribute-name.wutu"
+            },
+            {
+              "begin": "\\$\\[",
+              "end": "\\]",
+              "name": "meta.embedded.expression.utu",
+              "patterns": [
+                {
+                  "include": "source.utu"
+                }
+              ]
+            },
+            {
+              "name": "string.quoted.double.wutu",
+              "begin": "\"",
+              "end": "\"",
+              "patterns": []
+            },
+            {
+              "match": "@[\\w-]+(?=\\s*=)",
+              "name": "entity.other.attribute-name.event.wutu"
+            },
+            {
+              "match": "<\\.?[\\w-]+",
+              "name": "entity.other.attribute-name.wutu"
+            },
+            {
+              "match": "\\b(?:as|if|else|for|key|on)\\b",
+              "name": "keyword.control.wutu"
+            },
+            {
+              "match": "[-\\w]+(?=\\s*:)",
+              "name": "support.type.property-name.css"
+            },
+            {
+              "match": "[.#][\\w-]+",
+              "name": "entity.other.attribute-name.class.css"
+            }
+          ]
         }
       ]
     }

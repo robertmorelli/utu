@@ -81,6 +81,18 @@ export function walkBreakExpr(n, doc, source, dispatch) {
   return stamp(el(T.BREAK, doc), n);
 }
 
+export function walkContinueExpr(n, doc, source, dispatch) {
+  return walkOptionalOperand(T.CONTINUE, n, doc, source, dispatch);
+}
+
+export function walkDeferExpr(n, doc, source, dispatch) {
+  return walkOptionalOperand(T.DEFER, n, doc, source, dispatch);
+}
+
+export function walkYieldExpr(n, doc, source, dispatch) {
+  return walkOptionalOperand(T.YIELD, n, doc, source, dispatch);
+}
+
 export function walkFatalExpr(n, doc, source, dispatch) {
   return stamp(el(T.FATAL, doc), n);
 }

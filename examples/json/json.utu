@@ -1,0 +1,193 @@
+// A validating JSON parser (RFC 8259) written as one `loop match` state
+// machine. Each `continue <state>;` compiles to its own dispatch — a direct
+// branch when the target is a constant later state, otherwise a br_table at
+// that site — so the branch predictor learns every transition separately,
+// like computed goto in a C interpreter.
+//
+// States are laid out in source order: the common path (value → string /
+// number → after-value) points forward, which is the cheapest edge in wasm.
+//
+// parse(text) returns the number of JSON values, or -(offset + 1) at the
+// first error. depth(text) returns the deepest nesting of arrays/objects.
+
+struct Stack:
+    | kinds: Array[I32]
+    | size: I32
+
+struct Stats:
+    | values: I32
+    | depth: I32
+    | error: I32
+
+let object_kind: I32 = 1;
+let array_kind: I32 = 2;
+
+fn push(stack: Stack, kind: I32) void {
+    if stack.size == stack.kinds.len() {
+        let grown = Array[I32].new(stack.size * 2, 0);
+        for (0..<stack.size) |k| { grown[k] = stack.kinds[k]; };
+        stack.kinds = grown;
+    };
+    stack.kinds[stack.size] = kind;
+    stack.size += 1;
+}
+
+fn top(stack: Stack) I32 {
+    if stack.size == 0 { 0; } else { stack.kinds[stack.size - 1]; };
+}
+
+fn is_space(c: I32) Bool {
+    c == 32 or c == 10 or c == 13 or c == 9;
+}
+
+fn is_digit(c: I32) Bool {
+    c >= 48 and c <= 57;
+}
+
+fn is_hex(c: I32) Bool {
+    is_digit(c) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70);
+}
+
+// Does `text` contain `word` at `at`?
+fn matches(text: Str, at: I32, word: Str) Bool {
+    if at + word.len() > text.len() { return false; };
+    for (0..<word.len()) |k| { if text[at + k] != word[k] { return false; }; };
+    true;
+}
+
+fn analyze(text: Str) Stats {
+    let stats = Stats { values: 0, depth: 0, error: -1 };
+    let stack = Stack { kinds: Array[I32].new(16, 0), size: 0 };
+    let n = text.len();
+    let i = 0;
+    let in_key = false;
+
+    loop match 0 {
+        // 0: a value is expected.
+        0 => {
+            while (i < n and is_space(text[i])) { i += 1; };
+            if i >= n { stats.error = i; break; };
+            let c = text[i];
+            stats.values += 1;
+            if c == 34 { i += 1; in_key = false; continue 3; };
+            if c == 45 or is_digit(c) { continue 5; };
+            if c == 123 {
+                i += 1;
+                push(stack, object_kind);
+                if stack.size > stats.depth { stats.depth = stack.size; };
+                continue 1;
+            };
+            if c == 91 {
+                i += 1;
+                push(stack, array_kind);
+                if stack.size > stats.depth { stats.depth = stack.size; };
+                continue 2;
+            };
+            if matches(text, i, "true") { i += 4; continue 6; };
+            if matches(text, i, "false") { i += 5; continue 6; };
+            if matches(text, i, "null") { i += 4; continue 6; };
+            stats.error = i;
+            break;
+        },
+        // 1: just after `{`: a key or `}`.
+        1 => {
+            while (i < n and is_space(text[i])) { i += 1; };
+            if i < n and text[i] == 125 { i += 1; stack.size -= 1; continue 6; };
+            if i < n and text[i] == 34 { i += 1; in_key = true; continue 3; };
+            stats.error = i;
+            break;
+        },
+        // 2: just after `[`: a value or `]`.
+        2 => {
+            while (i < n and is_space(text[i])) { i += 1; };
+            if i < n and text[i] == 93 { i += 1; stack.size -= 1; continue 6; };
+            continue 0;
+        },
+        // 3: inside a string (the opening quote is consumed).
+        3 => {
+            let bad = false;
+            let closed = false;
+            while (i < n) {
+                let c = text[i];
+                i += 1;
+                if c == 34 { closed = true; break; };
+                if c < 32 { bad = true; break; };
+                if c == 92 {
+                    if i >= n { bad = true; break; };
+                    let e = text[i];
+                    i += 1;
+                    if e == 117 {
+                        if i + 4 > n { bad = true; break; };
+                        if not (is_hex(text[i]) and is_hex(text[i + 1]) and is_hex(text[i + 2]) and is_hex(text[i + 3])) { bad = true; break; };
+                        i += 4;
+                    } else if not (e == 34 or e == 92 or e == 47 or e == 98 or e == 102 or e == 110 or e == 114 or e == 116) {
+                        bad = true;
+                        break;
+                    };
+                };
+            };
+            if bad or not closed { stats.error = i - 1; break; };
+            if in_key { continue 4; };
+            continue 6;
+        },
+        // 4: after a key: `:` then a value.
+        4 => {
+            while (i < n and is_space(text[i])) { i += 1; };
+            if i >= n or text[i] != 58 { stats.error = i; break; };
+            i += 1;
+            continue 0;
+        },
+        // 5: a number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+        5 => {
+            if text[i] == 45 { i += 1; };
+            if i >= n or not is_digit(text[i]) { stats.error = i; break; };
+            if text[i] == 48 { i += 1; } else { while (i < n and is_digit(text[i])) { i += 1; }; };
+            if i < n and text[i] == 46 {
+                i += 1;
+                if i >= n or not is_digit(text[i]) { stats.error = i; break; };
+                while (i < n and is_digit(text[i])) { i += 1; };
+            };
+            if i < n and (text[i] == 101 or text[i] == 69) {
+                i += 1;
+                if i < n and (text[i] == 43 or text[i] == 45) { i += 1; };
+                if i >= n or not is_digit(text[i]) { stats.error = i; break; };
+                while (i < n and is_digit(text[i])) { i += 1; };
+            };
+            continue 6;
+        },
+        // 6: after a value: `,` / closer / end of input.
+        6 => {
+            while (i < n and is_space(text[i])) { i += 1; };
+            let kind = top(stack);
+            if kind == 0 {
+                if i != n { stats.error = i; };
+                break;
+            };
+            if i >= n { stats.error = i; break; };
+            let c = text[i];
+            i += 1;
+            if kind == object_kind and c == 125 { stack.size -= 1; continue 6; };
+            if kind == array_kind and c == 93 { stack.size -= 1; continue 6; };
+            if c != 44 { stats.error = i - 1; break; };
+            if kind == array_kind { continue 0; };
+            while (i < n and is_space(text[i])) { i += 1; };
+            if i >= n or text[i] != 34 { stats.error = i; break; };
+            i += 1;
+            in_key = true;
+            continue 3;
+        },
+        ~> {},
+    };
+    stats;
+}
+
+export lib {
+    fn parse(text: Str) I32 {
+        let stats = analyze(text);
+        if stats.error >= 0 { -(stats.error + 1); } else { stats.values; };
+    }
+
+    fn depth(text: Str) I32 {
+        analyze(text).depth;
+    }
+}

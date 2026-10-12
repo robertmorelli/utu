@@ -37,18 +37,32 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
   /** @type {Map<string, 'active' | 'done'>} */
   const color = new Map();
 
-  async function visitSource(filePath, source) {
+  // `via` is the importing `using` node and its spelling; problems reading an
+  // import are reported there. A missing entry file is the host's to report.
+  async function visitSource(filePath, source, via = null) {
     const c = color.get(filePath);
     if (c === 'done')   return;
-    if (c === 'active') throw compilerError(DIAGNOSTIC_KINDS.IMPORT_CYCLE, `Import cycle detected at: ${filePath}`);
+    if (c === 'active') throw compilerError(DIAGNOSTIC_KINDS.IMPORT_CYCLE, `Import cycle detected at: ${filePath}`, via?.node);
 
     color.set(filePath, 'active');
     // Check visitation before I/O: diamond imports read and parse a file once.
-    source ??= await readFile(filePath);
+    if (source == null) {
+      try {
+        source = await readFile(filePath);
+      } catch (error) {
+        if (!via) throw error;
+        const reason = error.code === 'ENOENT' ? 'file not found' : error.message;
+        throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT, `Cannot import "${via.raw}": ${reason} (${filePath})`, via.node, {
+          importPath: filePath,
+          importKind: 'file',
+        });
+      }
+    }
     if (filePath.endsWith('.abi.json')) {
-      const abi = JSON.parse(source);
-      if (abi.version !== 1 || !Array.isArray(abi.types) || !abi.exports || !abi.names || !/^[A-Z][A-Za-z0-9_]*$/.test(abi.prefix)) {
-        throw new Error(`Invalid declaration ABI: ${filePath}`);
+      let abi = null;
+      try { abi = JSON.parse(source); } catch { /* reported below */ }
+      if (abi?.version !== 1 || !Array.isArray(abi.types) || !abi.exports || !abi.names || !/^[A-Z][A-Za-z0-9_]*$/.test(abi.prefix)) {
+        throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT, `Invalid declaration ABI: ${filePath}`, via?.node, { importPath: filePath, importKind: 'file' });
       }
       foreign.set(filePath, abi);
       source = `mod ${abi.prefix} {}`;
@@ -109,7 +123,7 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
             await visitSource(abs, '');
           } else await visitSource(abs, source);
         } else {
-          await visitSource(abs);
+          await visitSource(abs, undefined, { node: u, raw });
         }
       }
     }

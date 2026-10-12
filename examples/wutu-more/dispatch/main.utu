@@ -1,0 +1,383 @@
+using Browser from std:Browser;
+
+struct Card:
+    | id: Str
+    | title: Str
+    | category: Str
+    | stage: Str
+
+struct Board:
+    | query: Str
+    | draft: Str
+    | category: Str
+    | cards: Array[Card]
+
+fn focus_after_render(id: Str) void {
+    let frame = Browser.requestAnimationFrame(cl(time) void {
+        promote Browser.document.getElementById(id) {
+            |element| => element.focus(),
+            ~> {},
+        };
+    });
+}
+
+fn count(state: Board, stage: Str) Str {
+    let n = state.cards count_where |card| { card.stage == stage; };
+    n.to_f64().toString();
+}
+
+fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
+    @wutu/\
+    section.lane {
+        <aria-label = $[label];
+        background:var(--well);
+        padding:1rem;
+        border-radius:0.8rem;
+        display:grid;
+        gap:1rem;
+        align-content:start;
+        min-block-size:22rem;
+        header.bar {
+            h2 {
+                = label;
+            }
+            span.count {
+                = count(state, stage);
+            }
+        }
+        for $[state.cards filter |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()); }] |card| key $[card.id] {
+            article.card.stack {
+                background:var(--card);
+                padding:1.2rem;
+                border:1px solid var(--line);
+                border-radius:0.5rem;
+                box-shadow:0 3px 0 var(--line);
+                p.eyebrow {
+                    color:var(--muted);
+                    = card.category;
+                }
+                h3 {
+                    font-size:1.15rem;
+                    = card.title;
+                }
+                div.bar {
+                    button {
+                        <id = $["move-" + card.id];
+                        <aria-label = $["Move " + card.title];
+                        = if next == "doing" {
+                            "Start →";
+                        }
+                        else {
+                            if next == "done" {
+                                "Complete ✓";
+                            }
+                            else {
+                                "Reopen ↺";
+                            };
+                        };
+                        on click {
+                            card.stage = next;
+                            focus_after_render("move-" + card.id);
+                        };
+                    }
+                    button {
+                        <aria-label = $["Delete " + card.title];
+                        "×";
+                        on click {
+                            state.cards = state.cards filter |item| {
+                                item.id != card.id;
+                            }
+                            collect(Card);
+                            focus_after_render("new-card");
+                        };
+                    }
+                }
+            }
+        }
+        if $[(state.cards count_where |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()); }) == 0] {
+            p.muted {
+                padding:1rem;
+                "Nothing here. A little breathing room.";
+            }
+        }
+    }
+    \/;
+}
+
+export main() void {
+    let state = @stored/\
+        Board "dispatch-v1" Board {
+            query: "", draft: "", category: "Design",
+            cards: [
+                Card { id: "1", title: "Sketch the welcome screen", category: "Design", stage: "todo" },
+                Card { id: "2", title: "Write the first-run checklist", category: "Writing", stage: "todo" },
+                Card { id: "3", title: "Build the component library", category: "Development", stage: "doing" },
+                Card { id: "4", title: "Talk to five early users", category: "Research", stage: "done" }
+            ]
+        }
+    \/;
+    state.cards = state.cards filter |card| {
+        card.title.trim().len() > 0 and (card.stage == "todo" or card.stage == "doing" or card.stage == "done");
+    } collect(Card);
+    let app = @wutu/\
+    @reactive;
+    @document {
+        :root {
+            --paper:#faf9f5;
+            --ink:#252922;
+            --muted:#5e655a;
+            --accent:#dce784;
+            --on:#252922;
+            --card:#fff;
+            --well:#efefe8;
+            --line:#d7dbcf;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+            margin: 0;
+            background: var(--paper);
+            color: var(--ink);
+            font: 16px/1.55 system-ui, sans-serif;
+        }
+        button, input, select {
+            font: inherit;
+        }
+        button, input, select {
+            padding: 0.7rem 0.9rem;
+            border: 1px solid var(--line);
+            border-radius: 0.5rem;
+            color: inherit;
+            background: var(--card);
+            min-inline-size: 0;
+        }
+        button {
+            cursor: pointer;
+        }
+        button:hover {
+            border-color: var(--accent);
+        }
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+        a {
+            color: inherit;
+            text-underline-offset: 0.25em;
+        }
+        h1, h2, h3, p {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        h1 {
+            font-size: clamp(3rem, 7vw, 6rem);
+            line-height: 1.02;
+            letter-spacing: -0.06em;
+        }
+        h2 {
+            font-size: 1.3rem;
+            letter-spacing: -0.025em;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 650;
+        }
+        .eyebrow {
+            font: 700 0.75rem system-ui;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+        .muted {
+            color: var(--muted);
+        }
+        .primary {
+            background: var(--accent);
+            color: var(--on);
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+        .bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .stack {
+            display: grid;
+            gap: 1rem;
+        }
+        .panel {
+            padding: 1.5rem;
+            border: 1px solid var(--line);
+            background: var(--card);
+            border-radius: 0.8rem;
+        }
+        .site-nav {
+            padding-block: 1.4rem;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.85rem;
+        }
+        .site-nav nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+        footer {
+            padding-block: 1.5rem;
+            border-top: 1px solid var(--line);
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        main {
+            max-width: 1320px;
+            margin: auto;
+            padding: 0 clamp(1rem, 4vw, 3rem);
+            display: grid;
+            gap: 2.5rem;
+        }
+        .hero {
+            padding-block: 1.5rem;
+            display: grid;
+            gap: 1.5rem;
+        }
+        .hero p {
+            max-width: 39rem;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            button {
+                transition: background 120ms, border-color 120ms;
+            }
+        }
+    }
+    main {
+        header.site-nav.bar {
+            strong {
+                "DISPATCH / YOUR SMALL STUDIO";
+            }
+            nav {
+                a {
+                    <href = "../";
+                    "More Wutu sites";
+                }
+                a {
+                    <href = "source.html";
+                    "Read the source ↗";
+                }
+            }
+        }
+        section.hero {
+            p.eyebrow {
+                "LESS OVERHEAD. MORE GOOD WORK.";
+            }
+            h1 {
+                "Make room for";
+                br {
+                }
+                "what’s next.";
+            }
+            div.bar {
+                p.muted {
+                    "A small, calm board for the work in front of you. Capture an idea, move it forward, call it done.";
+                }
+                label {
+                    "Find a card";
+                    input {
+                        <type = "search";
+                        <placeholder = "Search this board";
+                        bind:value = state.query;
+                    }
+                }
+            }
+        }
+        form.panel {
+            display:grid;
+            grid-template-columns:1fr 12rem auto;
+            gap:1rem;
+            align-items:end;
+            @media (width < 45rem) {
+                grid-template-columns: 1fr;
+            }
+            label {
+                "What needs doing?";
+                input as title {
+                    <id = "new-card";
+                    <required = "";
+                    <maxlength = "100";
+                    <placeholder = "A small, specific next step";
+                    bind:value = state.draft;
+                }
+            }
+            label {
+                "Discipline";
+                select {
+                    bind:value = state.category;
+                    option {
+                        <value = "Design";
+                        "Design";
+                    }
+                    option {
+                        <value = "Development";
+                        "Development";
+                    }
+                    option {
+                        <value = "Writing";
+                        "Writing";
+                    }
+                    option {
+                        <value = "Research";
+                        "Research";
+                    }
+                }
+            }
+            button.primary {
+                <type = "submit";
+                "Add to the board +";
+            }
+            on submit {
+                if state.draft.trim().len() > 0 {
+                    state.cards = state.cards chain([Card {
+                        id: Browser.crypto.randomUUID(),
+                        title: state.draft.trim(),
+                        category: state.category,
+                        stage: "todo"
+                    }
+                    ]) collect(Card);
+                    state.draft = "";
+                    state.query = "";
+                    title.focus();
+                };
+            };
+        }
+        div {
+            display:grid;
+            grid-template-columns:repeat(3, minmax(0, 1fr));
+            gap:1.25rem;
+            @media (width < 55rem) {
+                grid-template-columns: 1fr;
+            }
+            = lane(state, "todo", "01 / Up next", "doing");
+            = lane(state, "doing", "02 / In progress", "done");
+            = lane(state, "done", "03 / Finished", "todo");
+        }
+        footer.bar {
+            p {
+                "Built in Utu + Wutu. Data stays in this browser.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

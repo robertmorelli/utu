@@ -30,4 +30,10 @@ mod F64 {
     fn &.to_u32 |self| () U32 { @ir/\ <ir-u32-trunc-u-sat-f64><ir-ident name="self"/></ir-u32-trunc-u-sat-f64> \/; }
     fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-trunc-s-sat-f64><ir-ident name="self"/></ir-i64-trunc-s-sat-f64> \/; }
     fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-trunc-u-sat-f64><ir-ident name="self"/></ir-u64-trunc-u-sat-f64> \/; }
+
+    // Decimal text, as JavaScript's String() spells it. Ships only when used.
+    fn &.to_str |self| () Str {
+        let format: fun(F64) Str = @es/\ (v) => String(v) \/;
+        format(self);
+    }
 }

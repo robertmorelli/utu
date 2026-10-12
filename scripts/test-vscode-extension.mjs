@@ -45,6 +45,11 @@ try {
   const document = makeDocument(vscode.Uri.parse('file:///activation.utu'), source);
   globalThis.__utuVscodeStub.textDocuments.push(document);
   const providers = globalThis.__utuVscodeStub.providers;
+  const template=makeDocument(vscode.Uri.parse('file:///format.utu'), 'let node=@wutu/\\ main {button {"Go";}} \\/;');
+  const edits=providers.format.provideDocumentFormattingEdits(template);
+  if(edits.length!==1||!edits[0].newText.includes('\n'))throw Error('Wutu formatter did not provide an edit');
+  const completions=providers.completion.provideCompletionItems(template,template.positionAt(template.getText().indexOf('button')));
+  if(!completions.some(c=>c.label==='bind:value'))throw Error('Wutu completions missing');
   const hover = await providers.hover.provideHover(document, document.positionAt(source.indexOf('x +')));
   if (!hover?.contents?.value?.includes('I32')) throw new Error('semantic hover did not expose the inferred type');
   const definition = await providers.definition.provideDefinition(document, document.positionAt(source.indexOf('x +')));
@@ -157,6 +162,7 @@ const commands = {
 const provider = key => (_selector, value) => { state.providers[key] = value; return new Disposable(() => delete state.providers[key]); };
 const languages = {
   createDiagnosticCollection() { return { set() {}, delete() {}, clear() {}, dispose() {} }; },
+  registerDocumentFormattingEditProvider: provider('format'), registerCompletionItemProvider: provider('completion'),
   registerHoverProvider: provider('hover'), registerDefinitionProvider: provider('definition'), registerReferenceProvider: provider('references'),
   registerInlayHintsProvider: provider('inlays'), registerCallHierarchyProvider: provider('calls'),
   async setTextDocumentLanguage(document) { return document; },

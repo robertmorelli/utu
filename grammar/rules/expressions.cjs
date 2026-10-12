@@ -7,10 +7,12 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.tuple_expr,
         $.array_expr,
         $.paren_expr,
+        $.range_expr,
         $.assert_expr,
         $.unary_expr,
         $.binary_expr,
         $.pipe_expr,
+        $.iterator_expr,
         $.else_expr,
         $.promoted_module_call_expr,
         $.type_member_expr,
@@ -25,11 +27,15 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.promote_expr,
         $.try_expr,
         $.match_expr,
+        $.loop_match_expr,
         $.alt_expr,
         $.block_expr,
         $.for_expr,
         $.while_expr,
         $.break_expr,
+        $.continue_expr,
+        $.defer_expr,
+        $.yield_expr,
         $.return_expr,
         $.bind_expr,
         $.struct_init,
@@ -40,6 +46,24 @@ exports.buildExpressionRules = function buildExpressionRules() {
         alias('fatal', $.fatal_expr),
         $.dsl_expr,
       ),
+
+    // Pipelines bind below arithmetic, above assignment. Parameters are
+    // parenthesized so a capture's | can never be parsed as bitwise-or.
+    iterator_expr: ($) => prec.left(1, seq(
+      field('source', $._expr),
+      choice(
+        seq(field('op', choice('map', 'filter', 'flat_map', 'skip_while', 'take_while', 'each', 'any', 'all', 'count_where', 'first_index', 'last_index')), $.capture, $.block),
+        seq(field('op', choice('fold', 'scan')), '(', field('param', $._expr), ')', $.capture, $.block),
+        seq(field('op', choice('skip', 'take', 'chain', 'repeat')), '(', field('param', $._expr), ')'),
+        seq(field('op', 'zip'), '(', field('param', $._expr), ')', $.capture, $.block),
+        seq(field('op', choice('sort', 'min_by', 'max_by', 'first_where', 'reduce', 'partition')),  '(', field('element', $._type), ')', $.capture, $.block),
+        seq(field('op', 'collect'), '(', field('element', $._type), ')'),
+        seq(field('op', choice('group_by', 'distinct_by')), '(', field('element', $._type), ',', field('key', $._type), ')', $.capture, $.block),
+        seq(field('op', choice('batched', 'windows')), '(', field('element', $._type), ',', field('param', $._expr), ')'),
+        seq(field('op', 'bisect'), $.capture, $.block),
+        field('op', choice('sum', 'fast_sum', 'product', 'count')),
+      ),
+    )),
 
     // await p — suspend until the promise settles, then continue with its value.
     // Binds tighter than any binary operator so `await a + b` is `(await a) + b`,
@@ -63,6 +87,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
     closure_param: ($) => seq($.identifier, optional(seq(':', $._type))),
 
     paren_expr: ($) => seq('(', $._expr, ')'),
+
+    // (a..<b), (a...b): the integers in a range, as an iterator source.
+    range_expr: ($) => seq('(', field('start', $._expr), field('kind', choice('...', '..<')), field('end', $._expr), ')'),
 
     // [a, b, c] — a WasmGC array, or a JS array where a declaration expects one
     array_expr: ($) =>
@@ -179,6 +206,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
     match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), optional($.match_default), '}'),
     match_arm: ($) => seq($.match_lit, '=>', $._expr, ','),
     match_default: ($) => seq('~>', $._expr, ','),
+    // Zig-style switch loop: `continue v` re-dispatches on v, `break` leaves,
+    // and an arm that finishes ends the loop. Lowers to loop + br_table.
+    loop_match_expr: ($) => seq('loop', 'match', $._expr, '{', repeat($.match_arm), optional($.match_default), '}'),
 
     // alt on enum variants; ~> is the default arm
     alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), optional($.alt_default), '}'),
@@ -188,13 +218,18 @@ exports.buildExpressionRules = function buildExpressionRules() {
     for_expr: ($) => seq('for', '(', $.for_sources, ')', optional($.capture), $.block),
     while_expr: ($) => seq('while', '(', optional($._expr), ')', $.block),
     for_sources: ($) => seq($.for_source, repeat(seq(',', $.for_source))),
-    for_source: ($) => prec(1, seq($._expr, choice('...', '..<'), $._expr)),
+    // `a..<b` / `a...b` count; a lone expression iterates an array's elements.
+    for_source: ($) => prec(1, seq($._expr, optional(seq(choice('...', '..<'), $._expr)))),
     capture: ($) => seq('|', $.identifier, repeat(seq(',', $.identifier)), '|'),
 
     block_expr: ($) => prec.right(seq(optional(seq($.identifier, ':')), $.block)),
     block: ($) => seq('{', repeat(seq($._expr, ';')), '}'),
 
     break_expr: (_) => 'break',
+    continue_expr: ($) => prec.right(seq('continue', optional($._expr))),
+    // defer expr — run when the enclosing block exits (end, return, break, continue).
+    defer_expr: ($) => prec.right(seq('defer', $._expr)),
+    yield_expr: ($) => prec.right(seq('yield', $._expr)),
     return_expr: ($) => prec.right(seq('return', optional($._expr))),
 
     bind_expr: ($) => seq('let', $.identifier, optional(seq(':', $._type)), '=', $._expr),
@@ -219,6 +254,5 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // DSL escape: @name/\ raw body \/
     dsl_expr: ($) => seq('@', $.identifier, $.dsl_body),
-    dsl_body: (_) => token(seq('/\\', /([^\\]|\\[^\/])*/, '\\/')),
   };
 };

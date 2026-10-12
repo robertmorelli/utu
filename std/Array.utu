@@ -58,4 +58,16 @@ mod Array[T1] {
     fn &.slice |self| (start: I32, end_: I32) & {
         @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
     }
+
+    // self[at .. at+count) = source[start .. start+count), as one bulk copy.
+    // Overlapping ranges of the same array copy correctly. Out of range traps.
+    fn &.copy_from |self| (at: I32, source: &, start: I32, count: I32) void {
+        @ir/\ <ir-array-copy>
+            <ir-ident name="self"/>
+            <ir-ident name="at"/>
+            <ir-ident name="source"/>
+            <ir-ident name="start"/>
+            <ir-ident name="count"/>
+        </ir-array-copy> \/;
+    }
 }

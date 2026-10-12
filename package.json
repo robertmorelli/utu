@@ -99,6 +99,11 @@
         "title": "UTU: Explore Compiler Graphs",
         "category": "UTU",
         "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "utu.showCssStencil",
+        "title": "UTU: Show CSS Stencil",
+        "category": "UTU"
       }
     ],
     "menus": {
@@ -170,13 +175,25 @@
     "check": "bun ./cli/utu.mjs check",
     "test:bundle": "bun ./scripts/bundle-smoke-test.mjs",
     "test:vscode": "node ./scripts/test-vscode-extension.mjs",
-    "test": "bun ./scripts/run-tests.mjs --both-debug-modes && node ./scripts/test-vscode-extension.mjs",
+    "test": "node ./scripts/test-source-warnings.mjs && node ./scripts/test-query-features.mjs && node ./scripts/test-wutu-stencils.mjs && node ./scripts/test-wutu-cli.mjs && bun ./scripts/run-tests.mjs --both-debug-modes && node ./scripts/test-vscode-extension.mjs",
     "package:vscode": "bun run build && vsce package --out dist/utu-vscode.vsix",
     "bench:tiny": "bun ./scripts/benchmark-rust-vs-utu.mjs",
     "bench:kernels": "bun ./scripts/benchmark-suite.mjs",
     "bench:deltablue": "bun ./scripts/benchmark-deltablue.mjs",
     "bench:engines": "bun ./scripts/benchmark-wasmgc-engines.mjs",
-    "bench:suite": "bun ./scripts/benchmark-all.mjs"
+    "bench:suite": "bun ./scripts/benchmark-all.mjs",
+    "bench:loops": "node ./scripts/benchmark-loops.mjs",
+    "test:wutu": "node ./scripts/test-wutu-browser.mjs",
+    "demo:wutu-five": "node ./scripts/build-wutu-five.mjs",
+    "test:wutu-five": "node ./scripts/build-wutu-five.mjs && node ./scripts/test-wutu-five.mjs && node ./scripts/test-wutu-five.mjs --webkit",
+    "test:source-warnings": "node ./scripts/test-source-warnings.mjs",
+    "test:queries": "node ./scripts/test-query-features.mjs",
+    "wutu": "node ./cli/wutu.mjs",
+    "test:wutu-smooth": "node ./cli/wutu.mjs build examples/wutu-reactive/main.utu --out dist/wutu-reactive && node ./scripts/test-wutu-smooth.mjs && node ./scripts/test-wutu-smooth.mjs --webkit && node ./scripts/test-wutu-static.mjs && node ./scripts/test-wutu-dev.mjs",
+    "demo:wutu-more": "node ./scripts/build-wutu-more.mjs",
+    "test:wutu-more": "node ./scripts/build-wutu-more.mjs && node ./scripts/test-wutu-more.mjs && node ./scripts/test-wutu-more.mjs --webkit",
+    "demo:wutu-rounds": "node scripts/build-wutu-rounds.mjs one && node scripts/build-wutu-rounds.mjs two",
+    "test:wutu-rounds": "node scripts/test-wutu-stencils.mjs && node scripts/test-wutu-runtime.mjs && npm run demo:wutu-rounds && node scripts/test-wutu-rounds.mjs one && node scripts/test-wutu-rounds.mjs one --webkit && node scripts/test-wutu-rounds.mjs two && node scripts/test-wutu-rounds.mjs two --webkit"
   },
   "dependencies": {},
   "devDependencies": {

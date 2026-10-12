@@ -1,0 +1,153 @@
+using Browser from std:Browser;
+using ui from "./ui.utu";
+
+struct Task:
+    | id: Str
+    | title: Str
+    | done: Bool
+
+struct State:
+    | changes: I32
+    | budget: F64
+    | query: Str
+    | draft: Str
+    | tasks: Array[Task]
+
+export main() void {
+    let state = @stored/\
+        State "wutu-smooth-v1" State {
+            changes: 0,
+            budget: 10.0,
+            query: "",
+            draft: "",
+            tasks: [
+                Task { id: "one", title: "Try keyed updates", done: false },
+                Task { id: "two", title: "Make forms pleasant", done: false }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @document {
+        body {
+            margin: 3rem auto;
+            padding: 1rem;
+            max-width: 45rem;
+            font: 1rem system-ui;
+            background: #f7f4ec;
+        }
+        button, input {
+            font: inherit;
+            padding: 0.7rem;
+        }
+    }
+    main {
+        display:grid;
+        gap:1rem;
+        h1 {
+            "A smoother Wutu";
+        }
+        label {
+            "Search";
+            input {
+                <type = "search";
+                bind:value = state.query;
+                on input {
+                    state.changes += 1;
+                };
+            }
+        }
+        p {
+            <id = "changes";
+            = state.changes.to_f64().toString();
+        }
+        label {
+            "Budget";
+            input {
+                <type = "number";
+                bind:number = state.budget;
+            }
+        }
+        p {
+            <id = "budget";
+            = state.budget.toString();
+        }
+        p {
+            <id = "storage";
+            = wutu.storage_error();
+        }
+        ul {
+            for $[state.tasks filter |task| { task.title.includes(state.query); }] |task| key $[task.id] {
+                li {
+                    = ui.badge("Task");
+                    = ui.badge(task.title);
+                    label {
+                        input {
+                            <type = "checkbox";
+                            bind:checked = task.done;
+                        }
+                        = task.title;
+                    }
+                    button {
+                        <aria-label = $["Remove " + task.title];
+                        "Remove";
+                        on click {
+                            state.tasks = state.tasks filter |item| {
+                                item.id != task.id;
+                            }
+                            collect(Task);
+                        };
+                    }
+                }
+            }
+        }
+        form as form {
+            display:flex;
+            gap:1rem;
+            input as field {
+                <aria-label = "New task";
+                <required = "";
+                bind:value = state.draft;
+            }
+            button {
+                <type = "submit";
+                "Add task";
+            }
+            on submit {
+                if state.draft.trim().len() > 0 {
+                    state.tasks = state.tasks chain([ Task {
+                        id: Browser.crypto.randomUUID(),
+                        title: state.draft.trim(),
+                        done: false
+                    }
+                    ]) collect(Task);
+                    state.draft = "";
+                    field.focus();
+                };
+            };
+        }
+        section {
+            input as field {
+                <aria-label = "Independent field";
+            }
+            button {
+                "Focus independent field";
+                on click {
+                    field.focus();
+                };
+            }
+        }
+        button {
+            "Reverse tasks";
+            on click {
+                state.tasks = state.tasks map |task,
+                index| {
+                    state.tasks[state.tasks.len() - 1 - index.to_i64().to_i32()];
+                }
+                collect(Task);
+            };
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

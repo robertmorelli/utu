@@ -101,8 +101,16 @@ function walkUnknown(n, doc, source) {
 // ── Syntax diagnostics ────────────────────────────────────────────────────────
 
 function stampSyntaxDiagnostics(root, cstRoot) {
-  const diagnostics = [];
-  walkSyntaxDiagnostics(cstRoot, diagnostics);
+  const found = [];
+  walkSyntaxDiagnostics(cstRoot, found);
+  // Recovery nests ERROR nodes, so one mistake can surface several times at
+  // the same offset. Report each offset once, preferring "(missing X)".
+  const byStart = new Map();
+  for (const item of found) {
+    const previous = byStart.get(item.start);
+    if (!previous || (item.missing && !previous.missing)) byStart.set(item.start, item);
+  }
+  const diagnostics = [...byStart.values()];
   root.dataset.parseErrorCount = String(diagnostics.length);
   if (diagnostics.length) {
     root.dataset.parseErrors = JSON.stringify(diagnostics);

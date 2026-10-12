@@ -1,0 +1,76 @@
+// An ordered monoid index. combine must be associative and identity neutral.
+// Build O(n), point replacement / half-open range query O(log n), space O(n).
+mod SegmentTree[T] {
+    struct &:
+        | nodes: Array[T]
+        | size: I32
+        | length: I32
+        | identity: T
+
+    fn &.new(values: Array[T], identity: T, combine: fun(T, T) T) & {
+        let size = 1;
+        while (size < values.len()) {
+            if size > 536870911 { fatal; };
+            size *= 2;
+        };
+        let nodes = Array[T].new(size * 2, identity);
+        values each |value, index| {
+            nodes[size + index.to_i64().to_i32()] = value;
+        };
+        let i = size - 1;
+        while (i > 0) {
+            nodes[i] = combine(nodes[i * 2], nodes[i * 2 + 1]);
+            i -= 1;
+        };
+        &{ nodes: nodes, size: size, length: values.len(), identity: identity };
+    }
+
+    fn &.set |self| (index: I32, value: T, combine: fun(T, T) T) void {
+        if index < 0 or index >= self.length { fatal; };
+        let i = self.size + index;
+        self.nodes[i] = value;
+        while (i > 1) {
+            i /= 2;
+            self.nodes[i] = combine(self.nodes[i * 2], self.nodes[i * 2 + 1]);
+        };
+    }
+
+    fn &.query |self| (start: I32, end_: I32, combine: fun(T, T) T) T {
+        if start < 0 or end_ < start or end_ > self.length { fatal; };
+        let left = start + self.size;
+        let right = end_ + self.size;
+        let before = self.identity;
+        let after = self.identity;
+        while (left < right) {
+            if left % 2 == 1 {
+                before = combine(before, self.nodes[left]);
+                left += 1;
+            };
+            if right % 2 == 1 {
+                right -= 1;
+                after = combine(self.nodes[right], after);
+            };
+            left /= 2;
+            right /= 2;
+        };
+        combine(before, after);
+    }
+
+    // First index whose inclusive prefix satisfies a monotone false->true predicate.
+    // Returns length if no prefix satisfies it; requires nonempty-prefix semantics.
+    fn &.first_prefix |self| (matches: fun(T) Bool, combine: fun(T, T) T) I32 {
+        if self.length == 0 or not matches(self.nodes[1]) { return self.length; };
+        let i = 1;
+        let before = self.identity;
+        while (i < self.size) {
+            let candidate = combine(before, self.nodes[i * 2]);
+            if matches(candidate) {
+                i *= 2;
+            } else {
+                before = candidate;
+                i = i * 2 + 1;
+            };
+        };
+        i - self.size;
+    }
+}

@@ -7,6 +7,7 @@ export function emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr) {
     case 'ir-array-set':   return emitArraySet(argNodes, ctx, emitExpr);
     case 'ir-array-len':   return emitArrayLen(argNodes, ctx, emitExpr);
     case 'ir-array-slice': return emitArraySlice(argNodes, ctx, emitExpr);
+    case 'ir-array-copy':  return emitArrayCopy(argNodes, ctx, emitExpr);
     default:               return null;
   }
 }
@@ -72,7 +73,17 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
       m.local.set(startSlot, emitExpr(startNode, ctx)),
       m.local.set(endSlot, emitExpr(endNode, ctx)),
       m.local.set(lenSlot, indexOps.sub(m.local.get(endSlot, endType), m.local.get(startSlot, startType))),
-      m.local.set(outSlot, m.array.new_default(info.heapType, m.local.get(lenSlot, lenType))),
+      // Defaultable elements start zeroed. A struct array has no default
+      // element: empty slices need no fill, nonempty slices fill with their
+      // first element before the bulk copy overwrites it.
+      m.local.set(outSlot, hasDefault(info)
+        ? m.array.new_default(info.heapType, m.local.get(lenSlot, lenType))
+        : m.if(
+          indexOps.eqz(m.local.get(lenSlot, lenType)),
+          m.array.new_fixed(info.heapType, []),
+          m.array.new(info.heapType, m.local.get(lenSlot, lenType),
+            m.array.get(m.local.get(selfSlot, info.refType), m.local.get(startSlot, startType), elementBinaryenType(info, ctx), false)),
+        )),
       m.array.copy(
         m.local.get(outSlot, info.refType),
         zeroConst(m, indexNs),
@@ -84,6 +95,24 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
     ],
     info.refType,
   );
+}
+
+/** `copy_from`: dst[at .. at+count) = src[start .. start+count), one array.copy. */
+function emitArrayCopy([dstNode, atNode, srcNode, startNode, countNode], ctx, emitExpr) {
+  if (!dstNode || !atNode || !srcNode || !startNode || !countNode) throw new Error('codegen: ir-array-copy needs dst/at/src/start/count');
+  return ctx.module.array.copy(
+    castArrayRef(dstNode, ctx, emitExpr), emitExpr(atNode, ctx),
+    castArrayRef(srcNode, ctx, emitExpr), emitExpr(startNode, ctx),
+    emitExpr(countNode, ctx),
+  );
+}
+
+const DEFAULTABLE_ELEMENTS = new Set(['I32', 'U32', 'I64', 'U64', 'F32', 'F64', 'Bool', 'V128', 'M32', 'M64', 'M128']);
+
+/** Scalars and nullable references have a zero value; non-null references do not. */
+function hasDefault(info) {
+  const elem = info.elem ?? '';
+  return DEFAULTABLE_ELEMENTS.has(elem) || elem.startsWith('?');
 }
 
 function zeroConst(m, namespace) {
@@ -102,7 +131,7 @@ function arrayInfoFromCall(ctx) {
   return arrayInfoFromType(t, ctx);
 }
 
-function arrayInfoFromNode(node, ctx) {
+export function arrayInfoFromNode(node, ctx) {
   return arrayInfoFromType(ctx.typeOf(node) ?? '', ctx);
 }
 
@@ -115,7 +144,7 @@ function arrayInfoFromType(typeName, ctx) {
   return info;
 }
 
-function elementBinaryenType(info, ctx) {
+export function elementBinaryenType(info, ctx) {
   return ctx.toType(info.elem ?? '');
 }
 

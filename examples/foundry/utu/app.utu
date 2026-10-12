@@ -1,0 +1,379 @@
+// Foundry in utu + wutu: the entry point, frame loop, map canvas, input, and
+// the benchmark protocol from UI.md.
+using Browser from std:Browser;
+using sim from "./sim.utu";
+using ui from "./ui.utu";
+using style from "./style.utu";
+
+struct Bench:
+    | frames: I32
+    | done: I32
+    | last_time: F64
+    | intervals: Array[F64]
+    | work: Array[F64]
+
+fn tile_px(state: ui.Ui, tile: I32, camera: F64) F64 {
+    (tile.to_f64() - camera) * state.zoom;
+}
+
+fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, height: F64) void {
+    let w = state.w;
+    let zoom = state.zoom;
+    ctx.fillStyle = "#0c0e11";
+    ctx.fillRect(0, 0, width, height);
+    let x0 = sim.imax(0, Browser.Math.floor(state.cam_x).to_i32());
+    let y0 = sim.imax(0, Browser.Math.floor(state.cam_y).to_i32());
+    let x1 = sim.imin(w.width, Browser.Math.ceil(state.cam_x + width / zoom).to_i32() + 1);
+    let y1 = sim.imin(w.height, Browser.Math.ceil(state.cam_y + height / zoom).to_i32() + 1);
+    let glyphs = zoom >= 20.0;
+    if glyphs {
+        ctx.font = "bold 10px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+    };
+    for (y0..<y1) |ty| {
+        for (x0..<x1) |tx| {
+            let px = tile_px(state, tx, state.cam_x);
+            let py = tile_px(state, ty, state.cam_y);
+            let tile = ty * w.width + tx;
+            if w.revealed[(ty >> 3) * w.chunks_x + (tx >> 3)] == 0 {
+                ctx.fillStyle = "#05060a";
+                ctx.fillRect(px, py, zoom, zoom);
+            } else {
+                if w.water[tile] == 1 {
+                    ctx.fillStyle = "#1d4f7a";
+                    ctx.fillRect(px, py, zoom, zoom);
+                } else {
+                    if w.res_kind[tile] >= 0 {
+                        ctx.globalAlpha = 0.35;
+                        ctx.fillStyle = state.item_colors[w.res_kind[tile]];
+                        ctx.fillRect(px, py, zoom, zoom);
+                        ctx.globalAlpha = 1;
+                    };
+                };
+                promote w.grid[tile] {
+                    |e| => draw_entity(state, ctx, e, px, py, glyphs),
+                    ~> {},
+                };
+            };
+        };
+    };
+    draw_overlay(state, ctx);
+}
+
+fn draw_entity(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, e: sim.Entity, px: F64, py: F64, glyphs: Bool) void {
+    let zoom = state.zoom;
+    ctx.fillStyle = if e.cls == 20 and e.signal { "#ffe066"; } else { state.colors[e.machine]; };
+    ctx.fillRect(px + 1, py + 1, zoom - 2, zoom - 2);
+    // Direction tick on the side the entity faces.
+    let half = zoom / 2;
+    let tick = zoom / 5;
+    ctx.fillStyle = "#111111";
+    match e.dir {
+        0 => ctx.fillRect(px + half - 2, py + 1, 4, tick),
+        1 => ctx.fillRect(px + zoom - 1 - tick, py + half - 2, tick, 4),
+        2 => ctx.fillRect(px + half - 2, py + zoom - 1 - tick, 4, tick),
+        ~> ctx.fillRect(px + 1, py + half - 2, tick, 4),
+    };
+    if glyphs {
+        ctx.fillText(state.glyphs[e.machine], px + half, py + half);
+    };
+    if e.busy {
+        ctx.fillStyle = "#4cc38a";
+        ctx.fillRect(px + 2, py + zoom - 4, zoom - 4, 2);
+    };
+    if sim.is_belt_like(e.cls) {
+        let k = 0;
+        while (k < e.belt_n) {
+            let along = e.belt[k + 1].to_f64() / 256.0 * (zoom - 6) + 3;
+            let ix = match e.dir {
+                1 => px + along,
+                3 => px + zoom - along,
+                ~> px + half,
+            };
+            let iy = match e.dir {
+                2 => py + along,
+                0 => py + zoom - along,
+                ~> py + half,
+            };
+            ctx.fillStyle = state.item_colors[e.belt[k]];
+            ctx.fillRect(ix - 3, iy - 3, 6, 6);
+            k += 2;
+        };
+    };
+}
+
+fn draw_overlay(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D) void {
+    let zoom = state.zoom;
+    if sim.inside(state.w, state.hover_x, state.hover_y) and state.tool != ui.tool_none {
+        let ok = state.tool == ui.tool_remove or sim.can_place(state.w, state.tool, state.hover_x, state.hover_y, state.dir);
+        ctx.strokeStyle = if ok { "#4cc38a"; } else { "#e5534b"; };
+        ctx.lineWidth = 2;
+        ctx.strokeRect(tile_px(state, state.hover_x, state.cam_x) + 1, tile_px(state, state.hover_y, state.cam_y) + 1, zoom - 2, zoom - 2);
+    };
+    promote sim.entity(state.w, state.selected) {
+        |e| => {
+            ctx.strokeStyle = "#f0a73a";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(tile_px(state, e.x, state.cam_x), tile_px(state, e.y, state.cam_y), zoom, zoom);
+        },
+        ~> {},
+    };
+}
+
+// One pixel per tile, redrawn every 30 frames.
+fn draw_minimap(state: ui.Ui) void {
+    let canvas: ?Browser.HTMLCanvasElement = Browser.document.querySelector("#minimap");
+    promote canvas {
+        |c| => {
+            promote c.getContext("2d") {
+                |ctx| => {
+                    let w = state.w;
+                    ctx.fillStyle = "#0c0e11";
+                    ctx.fillRect(0, 0, w.width.to_f64(), w.height.to_f64());
+                    for (0..<w.height) |y| {
+                        for (0..<w.width) |x| {
+                            let tile = y * w.width + x;
+                            promote w.grid[tile] {
+                                |e| => {
+                                    ctx.fillStyle = state.colors[e.machine];
+                                    ctx.fillRect(x.to_f64(), y.to_f64(), 1, 1);
+                                },
+                                ~> {
+                                    if w.water[tile] == 1 {
+                                        ctx.fillStyle = "#1d4f7a";
+                                        ctx.fillRect(x.to_f64(), y.to_f64(), 1, 1);
+                                    } else {
+                                        if w.res_kind[tile] >= 0 {
+                                            ctx.fillStyle = state.item_colors[w.res_kind[tile]];
+                                            ctx.fillRect(x.to_f64(), y.to_f64(), 1, 1);
+                                        };
+                                    };
+                                },
+                            };
+                        };
+                    };
+                },
+                ~> {},
+            };
+        },
+        ~> {},
+    };
+}
+
+fn click_tile(state: ui.Ui, x: I32, y: I32) void {
+    if not sim.inside(state.w, x, y) {
+        return;
+    };
+    if state.tool == ui.tool_remove {
+        sim.remove(state.w, x, y);
+        return;
+    };
+    if state.tool >= 0 {
+        let placed = sim.place(state.w, state.tool, x, y, state.dir);
+        return;
+    };
+    state.selected = promote sim.at(state.w, x, y) {
+        |e| => e.id,
+        ~> -1,
+    };
+}
+
+fn pan(state: ui.Ui, dx: F64, dy: F64) void {
+    state.cam_x = Browser.Math.max(-4, Browser.Math.min(state.w.width.to_f64(), state.cam_x + dx));
+    state.cam_y = Browser.Math.max(-4, Browser.Math.min(state.w.height.to_f64(), state.cam_y + dy));
+}
+
+fn param(name: Str) ?Str {
+    new Browser.URL(Browser.location.href).searchParams.get(name);
+}
+
+fn param_int(name: Str, fallback: I32) I32 {
+    promote param(name) {
+        |text| => Browser.parseInt(text, 10).to_i32(),
+        ~> fallback,
+    };
+}
+
+// Pin panels for the first n entities of distinct machine types.
+fn pin_panels(state: ui.Ui, n: I32) void {
+    let seen = Array[I32].new_default(state.w.game.machines.len());
+    let all = state.w.entities;
+    for (0..<all.n) |i| {
+        let e = all.items[i];
+        if state.pinned.len() < n and seen[e.machine] == 0 {
+            seen[e.machine] = 1;
+            state.pinned = state.pinned chain([e.id]) collect(I32);
+        };
+    };
+}
+
+fn percentile(values: Array[F64], fraction: F64) F64 {
+    let sorted = values sort(F64) |a, b| { a < b; };
+    if sorted.len() == 0 { 0.0; } else { sorted[sim.imin(sorted.len() - 1, (sorted.len().to_f64() * fraction).to_i32())]; };
+}
+
+fn average(values: Array[F64]) F64 {
+    if values.len() == 0 { 0.0; } else { (values fold(0.0) |a, v| { a + v; }) / values.len().to_f64(); };
+}
+
+fn report(state: ui.Ui, bench: Bench) void {
+    let text = "{\"frames\":" + bench.done.to_str()
+        + ",\"intervalAvg\":" + average(bench.intervals).toFixed(3)
+        + ",\"intervalP95\":" + percentile(bench.intervals, 0.95).toFixed(3)
+        + ",\"workAvg\":" + average(bench.work).toFixed(3)
+        + ",\"workP95\":" + percentile(bench.work, 0.95).toFixed(3)
+        + ",\"hash\":" + (sim.hash(state.w).to_f64() + (if sim.hash(state.w) < 0 { 4294967296.0; } else { 0.0; })).toString() + "}";
+    let pre = Browser.document.createElement("pre");
+    pre.id = "bench-result";
+    pre.textContent = text;
+    Browser.document.body.append(pre);
+}
+
+fn start(game_text: Str, save_text: Str, starter_text: Str) void {
+    let document = Browser.document;
+    let world = sim.load(game_text, save_text) orelse fatal;
+    let state = ui.new_ui(world, game_text, starter_text);
+    state.speed = param_int("speed", 1);
+    pin_panels(state, param_int("panels", 0));
+    promote param("windows") {
+        |names| => {
+            state.window = names.split(",")[0];
+        },
+        ~> {},
+    };
+    let app = @wutu/\
+    @reactive;
+    @style $[style.sheet()];
+    div.app {
+        = ui.hud(state);
+        = ui.palette(state);
+        main.map {
+            canvas#map as map {
+                on mousedown {
+                    state.drag = true;
+                    state.dragged = false;
+                    state.drag_x = event.offsetX;
+                    state.drag_y = event.offsetY;
+                };
+                on mousemove {
+                    state.hover_x = Browser.Math.floor(state.cam_x + event.offsetX / state.zoom).to_i32();
+                    state.hover_y = Browser.Math.floor(state.cam_y + event.offsetY / state.zoom).to_i32();
+                    if state.drag and (state.tool == ui.tool_none or event.buttons == 2) {
+                        let dx = event.offsetX - state.drag_x;
+                        let dy = event.offsetY - state.drag_y;
+                        if Browser.Math.abs(dx) + Browser.Math.abs(dy) > 3 {
+                            state.dragged = true;
+                        };
+                        if state.dragged {
+                            pan(state, 0.0 - dx / state.zoom, 0.0 - dy / state.zoom);
+                            state.drag_x = event.offsetX;
+                            state.drag_y = event.offsetY;
+                        };
+                    };
+                };
+                on mouseup {
+                    if not state.dragged {
+                        click_tile(state, state.hover_x, state.hover_y);
+                    };
+                    state.drag = false;
+                };
+                on mouseleave {
+                    state.drag = false;
+                    state.hover_x = -1;
+                };
+                on wheel {
+                    event.preventDefault();
+                    let before = state.zoom;
+                    state.zoom = Browser.Math.max(12, Browser.Math.min(48, state.zoom * (if event.deltaY < 0 { 1.15; } else { 0.87; })));
+                    state.cam_x += event.offsetX / before - event.offsetX / state.zoom;
+                    state.cam_y += event.offsetY / before - event.offsetY / state.zoom;
+                };
+                on contextmenu {
+                    event.preventDefault();
+                };
+            }
+        }
+        = ui.inspector(state);
+        = ui.footer(state);
+        = ui.windows(state);
+    }
+    \/;
+    document.body.append(app);
+    document.addEventListener("keydown", cl(event) void {
+        let key = event.key;
+        if key == "r" or key == "R" {
+            state.dir = (state.dir + 1) % 4;
+        } else {
+            if key == "x" or key == "X" {
+                state.tool = ui.tool_remove;
+            } else {
+                if key == "Escape" {
+                    state.tool = ui.tool_none;
+                    state.window = "";
+                } else {
+                    if key == "w" or key == "ArrowUp" { pan(state, 0.0, -2.0); };
+                    if key == "s" or key == "ArrowDown" { pan(state, 0.0, 2.0); };
+                    if key == "a" or key == "ArrowLeft" { pan(state, -2.0, 0.0); };
+                    if key == "d" or key == "ArrowRight" { pan(state, 2.0, 0.0); };
+                    if key == " " { state.speed = if state.speed == 0 { 1; } else { 0; }; };
+                };
+            };
+        };
+        wutu.refresh();
+    });
+    let canvas: ?Browser.HTMLCanvasElement = document.querySelector("#map");
+    let map = canvas orelse fatal;
+    let ctx = map.getContext("2d") orelse fatal;
+    let bench = Bench { frames: param_int("bench", 0), done: 0, last_time: -1.0, intervals: [], work: [] };
+    let frame = cl(time: F64) void {
+        let started = Browser.performance.now();
+        if map.width != map.clientWidth or map.height != map.clientHeight {
+            map.width = map.clientWidth;
+            map.height = map.clientHeight;
+        };
+        for (0..<state.speed) |k| {
+            sim.step(state.w);
+        };
+        ui.sample(state);
+        draw_map(state, ctx, map.width.to_f64(), map.height.to_f64());
+        if state.frame % 30 == 0 {
+            draw_minimap(state);
+        };
+        state.frame += 1;
+        wutu.invalidate("hud");
+        wutu.invalidate("inspector");
+        wutu.invalidate("footer");
+        wutu.invalidate("palette");
+        if state.window.len() > 0 {
+            wutu.invalidate("windows");
+        };
+        if bench.frames > 0 and bench.done < bench.frames {
+            if bench.last_time >= 0.0 {
+                bench.intervals = bench.intervals chain([time - bench.last_time]) collect(F64);
+                bench.work = bench.work chain([Browser.performance.now() - started]) collect(F64);
+                bench.done += 1;
+                if bench.done == bench.frames {
+                    report(state, bench);
+                };
+            };
+            bench.last_time = time;
+        };
+        Browser.requestAnimationFrame(frame);
+    };
+    Browser.requestAnimationFrame(frame);
+}
+
+export main() void {
+    let document = Browser.document;
+    let game = document.getElementById("game") orelse fatal;
+    let starter = document.getElementById("starter") orelse fatal;
+    promote param("save") {
+        |url| => {
+            let response = await Browser.fetch(url);
+            let text = await response.text();
+            start(game.textContent, text, starter.textContent);
+        },
+        ~> start(game.textContent, starter.textContent, starter.textContent),
+    };
+}

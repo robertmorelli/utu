@@ -1,0 +1,147 @@
+using Browser from std:Browser;
+
+struct Plant:
+    | name: Str
+    | days: I32
+    | watered: Bool
+
+fn today() Str { new Browser.Date().toLocaleDateString("en-CA"); }
+
+fn card(plant: Plant) Browser.HTMLElement {
+    @wutu/\
+    article.plant {
+        display: grid;
+        gap: 1rem;
+        padding: 1.5rem;
+        border: 1px solid var(--line);
+        border-radius: 1.25rem;
+        background: var(--card);
+        h2 { font-size: 1.4rem; margin: 0; $[plant.name]; }
+        p { margin: 0; color: var(--muted); "Water every "; $[plant.days.to_f64().toString()]; " days"; }
+        button as toggle {
+            <type="button";
+            <aria-pressed=$[if plant.watered { "true";
+            } else { "false";
+            }];
+            background: var(--green);
+            color: var(--paper);
+            border: 0;
+            border-radius: 0.75rem;
+            padding: 0.85rem 1rem;
+            cursor: pointer;
+            :hover { background: var(--dark); }
+            :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+            $[if plant.watered { "Watered today ✓";
+            } else { "Mark as watered";
+            }];
+            @click=$[cl(event) void {
+                plant.watered = not plant.watered;
+                Browser.localStorage.setItem("wutu-plant-" + plant.name, if plant.watered { today(); } else { ""; });
+                toggle.textContent = if plant.watered { "Watered today ✓"; } else { "Mark as watered"; };
+                toggle.setAttribute("aria-pressed", if plant.watered { "true"; } else { "false"; });
+            }];
+        }
+    }
+    \/;
+}
+
+
+fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLElement {
+    let ordered = if by_frequency { plants sort(Plant) |a, b| { a.days < b.days; }; } else { plants; };
+    let visible = ordered count_where |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); };
+    @wutu/\
+    section#plants {
+        <aria-label="Your plants";
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+        gap: 1rem;
+        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); <role="status"; $[visible.to_f64().toString()]; " plants in your greenhouse"; }
+        for $[ordered filter |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); }] |plant| {
+            $[card(plant)];
+        }
+        if $[visible == 0] {
+            p.empty { grid-column: 1 / -1; padding-block: 2rem; color: var(--muted); "No plants found. Try a different name."; }
+        }
+    }
+    \/;
+}
+
+export main() void {
+    let plants = [Plant { name: "Monstera", days: 7, watered: false }, Plant { name: "Golden pothos", days: 10, watered: false }, Plant { name: "Peace lily", days: 5, watered: false }, Plant { name: "Rubber plant", days: 14, watered: false }];
+    plants each |plant| {
+        promote Browser.localStorage.getItem("wutu-plant-" + plant.name) {
+            |saved| => { plant.watered = saved == today(); },
+            ~> {},
+        };
+    };
+    let grid = listing(plants, "", false);
+    let app = @wutu/\
+    @document {
+        :root { --paper: oklch(97% 0.02 95); --card: oklch(99% 0.01 95); --ink: oklch(28% 0.04 150); --muted: oklch(49% 0.04 150); --green: oklch(43% 0.08 150); --dark: oklch(33% 0.08 150); --accent: oklch(72% 0.12 80); --line: oklch(86% 0.025 110); font-family: system-ui, sans-serif; color: var(--ink); background: var(--paper); }
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        button, input, select { font: inherit; }
+    }
+    main {
+        max-inline-size: 72rem;
+        margin-inline: auto;
+        padding: clamp(1.25rem, 5vw, 4rem);
+        display: grid;
+        gap: 2.5rem;
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-block-end: 1px solid var(--line);
+            padding-block-end: 1.5rem;
+            a { <href="#"; color: var(--ink); text-decoration: none; font-weight: 750; "◒  STILL / GROWING"; }
+            span { color: var(--muted); "A little care, every day."; }
+        }
+        section {
+            display: grid;
+            gap: 1rem;
+            p { margin: 0; color: var(--muted); "YOUR PERSONAL GREENHOUSE"; }
+            h1 { margin: 0; font-size: clamp(3rem, 7vw, 5.5rem); font-weight: 500; letter-spacing: -0.06em; line-height: 1.05; "Good things"; br {} "take tending."; }
+            p { margin: 0; max-inline-size: 35rem; color: var(--muted); line-height: 1.6; "Keep track of the quiet things that make your space feel alive. Find a plant, check its rhythm, and give it a little love."; }
+        }
+        section {
+            display: grid;
+            gap: 1.25rem;
+            <aria-label="Your plants";
+            label { <for="search"; font-weight: 650; "Find your plants"; }
+            input#search as search {
+                <type="search";
+                <placeholder="Search your greenhouse…";
+                padding: 1rem;
+                border: 1px solid var(--line);
+                border-radius: 0.75rem;
+                background: var(--card);
+                color: var(--ink);
+                @input=$[cl(event) void {
+                    let next = listing(plants, search.value, sort.value == "frequency");
+                    grid.replaceWith(next);
+                    grid = next;
+                }];
+            }
+            label { <for="sort"; font-weight: 650; "Arrange by"; }
+            select#sort as sort {
+                padding: 0.75rem;
+                border: 1px solid var(--line);
+                border-radius: 0.75rem;
+                background: var(--card);
+                color: var(--ink);
+                option { <value="original"; "My collection"; }
+                option { <value="frequency"; "Watering frequency"; }
+                @change=$[cl(event) void {
+                    let next = listing(plants, search.value, sort.value == "frequency");
+                    grid.replaceWith(next);
+                    grid = next;
+                }];
+            }
+            $[grid];
+        }
+        footer { color: var(--muted); font-size: 0.85rem; "Grown with Utu. Native Wasm, a little CSS, and room to breathe."; }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

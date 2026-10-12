@@ -5,6 +5,7 @@
 export const T = Object.freeze({
   // ── Source ────────────────────────────────────────────────────────────────
   SOURCE_FILE:    'ir-source-file',
+  ITERATOR:       'ir-iterator',
 
   // ── Top-level declarations ────────────────────────────────────────────────
   MODULE:         'ir-module',
@@ -87,6 +88,10 @@ export const T = Object.freeze({
   LET:            'ir-let',             // let x: T = expr
   RETURN:         'ir-return',          // return expr?
   BREAK:          'ir-break',           // break (with optional label)
+  CONTINUE:       'ir-continue',        // continue [state]: next loop iteration / loop-match dispatch
+  LOOP_MATCH:     'ir-loop-match',      // loop match s { arms } — Zig-style switch loop
+  DEFER:          'ir-defer',           // defer expr: run at enclosing block exit
+  YIELD:          'ir-yield',           // yield expr inside a generator (expanded before typing)
   FATAL:          'ir-fatal',           // fatal
 
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }
@@ -121,7 +126,7 @@ export const T = Object.freeze({
  * stamps it with the declared type of the value being bound.
  */
 export const VOID_STATEMENTS = Object.freeze(new Set([
-  T.LET, T.ASSIGN, T.WHILE, T.FOR, T.RETURN, T.BREAK, T.ASSERT, T.FATAL,
+  T.LET, T.ASSIGN, T.WHILE, T.FOR, T.RETURN, T.BREAK, T.CONTINUE, T.DEFER, T.LOOP_MATCH, T.ASSERT, T.FATAL,
 ]));
 
 export function isVoidStatement(node) {

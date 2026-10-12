@@ -1,0 +1,155 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Stock:
+| id: Str
+| name: Str
+| count: I32
+| target: I32
+struct PantryState:
+| items: Array[Stock]
+fn workspace(state: PantryState) Browser.HTMLElement {
+    @wutu/\
+    @island "pantry-workspace";
+    section.workspace {
+        div.grid {
+            section.stack {
+                h2 {
+                    "On the shelf";
+                }
+                for $[state.items] |item| key $[item.id] {
+                    article.panel.bar {
+                        div {
+                            h3 {
+                                = item.name;
+                            }
+                            p.muted {
+                                = wutu.number(item.count)+" in stock";
+                            }
+                        }
+                        div.bar {
+                            button {
+                                <aria-label = $["Use "+item.name];
+                                <disabled = $[item.count==0];
+                                "−";
+                                on click {
+                                    item.count-=1;
+                                    wutu.save("pantry-v2");
+                                };
+                            }
+                            button {
+                                <aria-label = $["Add "+item.name];
+                                "+";
+                                on click {
+                                    item.count+=1;
+                                    wutu.save("pantry-v2");
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            aside.well.stack {
+                h2 {
+                    "Pick up next time";
+                }
+                for $[state.items filter |item| {item.count<item.target;}] |item| key $[item.id] {
+                    div.panel.bar {
+                        p {
+                            = item.name;
+                        }
+                        strong {
+                            = wutu.number(item.target-item.count);
+                        }
+                    }
+                }
+                button.primary {
+                    "Restock all staples";
+                    on click {
+                        state.items each |item| {
+                            if item.count<item.target {
+                                item.count=item.target;
+                            };
+                        };
+                        wutu.save("pantry-v2");
+                    };
+                }
+                p.muted {
+                    "Target counts are for this household, not a recommended diet.";
+                }
+            }
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        PantryState "pantry-v2" manual
+        PantryState {
+            items:[Stock {
+                id:"beans",
+                name:"White beans",
+                count:2,
+                target:4
+            },Stock {
+                id:"pasta",
+                name:"Pasta",
+                count:3,
+                target:3
+            },Stock {
+                id:"tomatoes",
+                name:"Tinned tomatoes",
+                count:1,
+                target:4
+            },Stock {
+                id:"rice",
+                name:"Rice",
+                count:0,
+                target:2
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "pantry";
+        nav {
+            strong {
+                "PANTRY / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "A little less waste. A better stocked kitchen.";
+            }
+            p.muted {
+                "Keep an honest count of what you have. Your shopping list appears as staples run low.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

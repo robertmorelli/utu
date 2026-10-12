@@ -7,6 +7,8 @@
 //   ir-for        →  wasm locals + `loop` + range comparison
 //   ir-return     →  wasm `return`
 //   ir-break      →  wasm `br` to the enclosing while-block
+//   ir-continue   →  wasm `br` to the loop's next-iteration label
+//   ir-loop-match →  wasm `loop` + `br_table`, state in a local
 //   ir-match      →  wasm `br_table`           (literal scalar dispatch)
 //   ir-alt[tag]   →  wasm `br_table`           (enum-tag dispatch)
 //   ir-alt[rec]   →  wasm `br_on_cast` chain   (subtype dispatch)
@@ -17,6 +19,18 @@
 // ir-alt reaching this file is a residual unsupported case.
 
 import { binaryen } from './types.js';
+import { nextLabel } from './labels.js';
+import { emitDeferred } from './bindings.js';
+
+/** Deferred code of blocks opened inside the loop at `depth` (default: innermost), which a jump leaves. */
+function loopDeferred(ctx, emitExpr, depth = ctx.loops?.length ?? 0) {
+  return emitDeferred(ctx, (ctx.defers ?? []).filter(frame => frame.loopDepth >= depth), emitExpr);
+}
+
+/** Wrap a branch so the deferred statements run first; the branch stays last. */
+function afterDeferred(m, deferred, exit) {
+  return deferred.length ? m.block(null, [...deferred, exit], binaryen.unreachable) : exit;
+}
 
 // ── if / else ────────────────────────────────────────────────────────────────
 //
@@ -91,15 +105,21 @@ function discardValue(m, expr) {
 //       body
 //       (br $cnt)))
 export function emitWhile(node, ctx, emitExpr) {
+  if (!node.dataset.loopLabel) {
+    const counted = countedWhile(node, ctx);
+    if (counted) return emitUnrolledWhile(counted, ctx, emitExpr);
+  }
   const [cond, body] = [...node.children];
   const m = ctx.module;
-  const label = ctx.controlLabelIndex = (ctx.controlLabelIndex ?? 0) + 1;
+  const label = nextLabel(ctx);
   const brk = `__while_brk_${label}`;
   const cnt = `__while_cnt_${label}`;
 
-  // Push the labels so a nested ir-break can find them.
+  // Push the labels so a nested ir-break / ir-continue can find them. In a
+  // while loop, the next iteration starts by re-testing the condition.
   ctx.loops ??= [];
-  ctx.loops.push({ brk, cnt });
+  // A compiler-generated loop may carry a label for targeted breaks (generators).
+  ctx.loops.push({ brk, cnt, next: cnt, label: node.dataset.loopLabel ?? null });
   try {
     const exitIfFalse = m.br(brk, m.i32.eqz(emitExpr(cond, ctx)));
     const bodyExpr    = discardValue(m, emitExpr(body, ctx));
@@ -139,9 +159,11 @@ export function emitFor(node, ctx, emitExpr) {
     };
   });
 
-  const label = ctx.controlLabelIndex = (ctx.controlLabelIndex ?? 0) + 1;
+  const label = nextLabel(ctx);
   const brk = `__for_brk_${label}`;
   const cnt = `__for_cnt_${label}`;
+  // `continue` leaves the body but still runs the bound checks and increments.
+  const next = `__for_next_${label}`;
   const cursor = range => m.local.get(range.cursorIndex, range.type);
   const bound = range => m.local.get(range.endIndex, range.type);
   const condition = range => {
@@ -151,10 +173,12 @@ export function emitFor(node, ctx, emitExpr) {
     return m[range.width][compare](cursor(range), bound(range));
   };
 
+  if (shouldUnroll(node, ranges, body, ctx)) return emitUnrolledFor(ranges[0], body, { brk, cnt, label }, ctx, emitExpr);
+
   ctx.loops ??= [];
-  ctx.loops.push({ brk, cnt });
+  ctx.loops.push({ brk, cnt, next });
   try {
-    const bodyExpr = discardValue(m, emitExpr(body, ctx));
+    const bodyExpr = m.block(next, [discardValue(m, emitExpr(body, ctx))], binaryen.none);
     const exits = ranges.map(range => m.br(brk, m.i32.eqz(condition(range))));
     // A zip loop ends when any inclusive source reaches its bound. Exiting
     // before increment also prevents MAX_VALUE from wrapping forever.
@@ -181,18 +205,319 @@ export function emitFor(node, ctx, emitExpr) {
   }
 }
 
+// ── for, unrolled (-O3) ─────────────────────────────────────────────────────
+//
+// Engines do not unroll wasm loops, and with WasmGC every array.get keeps its
+// bounds check, so the loop's own compare-and-branch is a large share of a
+// small body. At -O3 a counted loop with a small body runs four iterations per
+// trip while at least four remain, then single steps:
+//
+//   (block $brk (loop $cnt
+//     (br_if $brk (i >= end))
+//     (if (end - i >=u 4)
+//       (then step step step step (br $cnt)))   ;; each step: body, i += 1
+//     step (br $cnt)))
+//
+// end - i is exact as an unsigned value whenever i < end. Each copy of the
+// body has its own `continue` label, so continue still skips one element.
+const UNROLL = 4;
+const UNROLL_MAX_BODY_NODES = 64;
+
+// Unrolling pays when loop overhead is a large share of the body. It does
+// not for bodies dominated by allocation or by multiway branching (measured:
+// slicing and Found-promotion bodies got slower on V8).
+const UNROLL_BLOCKERS = 'ir-while, ir-for, ir-loop-match, ir-promote, ir-match, ir-alt, ir-struct-init, ir-array-lit, ir-closure';
+const ALLOCATING_METHODS = new Set(['slice', 'get_slice', 'new', 'new_default', 'copy_from', 'push']);
+
+function shouldUnroll(node, ranges, body, ctx) {
+  return ctx.optimize === 'speed' && ranges.length === 1 && !ranges[0].inclusive && unrollableBody(body);
+}
+
+/** Small, non-allocating, non-looping bodies, where loop overhead matters. */
+function unrollableBody(body) {
+  if (body.querySelector(UNROLL_BLOCKERS)) return false;
+  const allocates = [...body.querySelectorAll('ir-type-member, ir-field-access')]
+    .some(callee => ALLOCATING_METHODS.has(callee.getAttribute('method') ?? callee.getAttribute('field')));
+  return !allocates && body.querySelectorAll('*').length <= UNROLL_MAX_BODY_NODES;
+}
+
+// ── while, unrolled when counted (-O3) ──────────────────────────────────────
+//
+//   while (i < n) { …; i += 1; }
+//
+// where the body leaves i and n alone apart from that final increment, has no
+// `continue`, and declares nothing named i or n. Then n - i iterations remain
+// at the top of every trip, so the body (increment included) can run four
+// times whenever n - i >= 4. i stays the real variable, so its value after the
+// loop is exactly what the plain loop leaves.
+const INTEGER_WIDTH = { I32: 'i32', U32: 'i32', I64: 'i64', U64: 'i64' };
+
+function countedWhile(node, ctx) {
+  if (ctx.optimize !== 'speed') return null;
+  const [cond, body] = [...node.children];
+  if (cond?.localName !== 'ir-call' || cond.dataset.operatorName !== 'lt' || body?.localName !== 'ir-block') return null;
+  const [counter, limit] = [...(cond.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  if (counter?.localName !== 'ir-ident' || limit?.localName !== 'ir-ident') return null;
+  const type = ctx.typeOf(counter);
+  if (!INTEGER_WIDTH[type] || ctx.typeOf(limit) !== type) return null;
+  const names = new Set([counter.getAttribute('name'), limit.getAttribute('name')]);
+  const step = body.lastElementChild;
+  const [target, value] = [...(step?.children ?? [])];
+  const [base, one] = [...(value?.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const increments = step?.localName === 'ir-assign' && target?.localName === 'ir-ident' && target.getAttribute('name') === counter.getAttribute('name')
+    && value?.localName === 'ir-call' && value.dataset.operatorName === 'add'
+    && base?.localName === 'ir-ident' && base.getAttribute('name') === counter.getAttribute('name')
+    && one?.localName === 'ir-lit' && one.getAttribute('value') === '1';
+  if (!increments || !unrollableBody(body)) return null;
+  const touches = [...body.querySelectorAll('ir-assign')].some(assign => assign !== step
+    && assign.firstElementChild?.localName === 'ir-ident' && names.has(assign.firstElementChild.getAttribute('name')));
+  const shadows = [...body.querySelectorAll('ir-let[name]')].some(binding => names.has(binding.getAttribute('name')));
+  if (touches || shadows || body.querySelector('ir-continue, ir-make-closure')) return null;
+  return { cond, body, counter, limit, width: INTEGER_WIDTH[type], unsigned: type.startsWith('U') };
+}
+
+function emitUnrolledWhile(loop, ctx, emitExpr) {
+  const m = ctx.module;
+  const ops = m[loop.width];
+  const label = nextLabel(ctx);
+  const brk = `__while_brk_${label}`, cnt = `__while_cnt_${label}`;
+  ctx.loops ??= [];
+  ctx.loops.push({ brk, cnt, next: cnt, label: null });
+  try {
+    const step = () => discardValue(m, emitExpr(loop.body, ctx));
+    const four = Array.from({ length: UNROLL }, step);
+    const single = step();
+    const remaining = ops.sub(emitExpr(loop.limit, ctx), emitExpr(loop.counter, ctx));
+    const enough = ops.ge_u(remaining, ops.const(loop.width === 'i64' ? BigInt(UNROLL) : UNROLL));
+    return m.block(brk, [m.loop(cnt, m.block(null, [
+      m.br(brk, m.i32.eqz(emitExpr(loop.cond, ctx))),
+      m.if(enough, m.block(null, [...four, m.br(cnt)], binaryen.none)),
+      single,
+      m.br(cnt),
+    ], binaryen.none))], binaryen.none);
+  } finally {
+    ctx.loops.pop();
+  }
+}
+
+function emitUnrolledFor(range, body, { brk, cnt, label }, ctx, emitExpr) {
+  const m = ctx.module;
+  const ops = m[range.width];
+  const cursor = () => m.local.get(range.cursorIndex, range.type);
+  const bound = () => m.local.get(range.endIndex, range.type);
+  const one = range.width === 'i64' ? 1n : 1;
+  const entry = { brk, cnt, next: null };
+  ctx.loops ??= [];
+  ctx.loops.push(entry);
+  let copy = 0;
+  // One iteration: the body (its continue lands at the end of this copy), then i += 1.
+  const step = () => {
+    const next = `__for_next_${label}_${copy++}`;
+    entry.next = next;
+    return [
+      m.block(next, [discardValue(m, emitExpr(body, ctx))], binaryen.none),
+      m.local.set(range.cursorIndex, ops.add(cursor(), ops.const(one))),
+    ];
+  };
+  try {
+    const four = Array.from({ length: UNROLL }, step).flat();
+    const single = step();
+    const remaining = ops.sub(bound(), cursor());
+    const enough = ops.ge_u(remaining, ops.const(range.width === 'i64' ? BigInt(UNROLL) : UNROLL));
+    const loop = m.loop(cnt, m.block(null, [
+      m.br(brk, m.i32.eqz(ops[range.unsigned ? 'lt_u' : 'lt_s'](cursor(), bound()))),
+      m.if(enough, m.block(null, [...four, m.br(cnt)], binaryen.none)),
+      ...single,
+      m.br(cnt),
+    ], binaryen.none));
+    return m.block(brk, [
+      m.local.set(range.cursorIndex, emitExpr(range.start, ctx)),
+      m.local.set(range.endIndex, emitExpr(range.end, ctx)),
+      loop,
+    ], binaryen.none);
+  } finally {
+    ctx.loops.pop();
+  }
+}
+
 // ── return / break ──────────────────────────────────────────────────────────
 
 export function emitReturn(node, ctx, emitExpr) {
+  const m = ctx.module;
   const child = node.children[0];
-  return ctx.module.return(child ? emitExpr(child, ctx) : undefined);
+  const value = child ? emitExpr(child, ctx) : undefined;
+  if (!ctx.defers?.some(frame => frame.deferred.length)) return m.return(value);
+  // The value is computed before deferred code runs, as in other languages.
+  const type = value === undefined ? binaryen.none : binaryen.getExpressionType(value);
+  if (value === undefined || type === binaryen.none || type === binaryen.unreachable) {
+    return afterDeferred(m, [...(value === undefined ? [] : [value]), ...emitDeferred(ctx, ctx.defers, emitExpr)], m.return());
+  }
+  const slot = ctx.addLocal(ctx.typeOf(child));
+  return afterDeferred(m, [m.local.set(slot, value), ...emitDeferred(ctx, ctx.defers, emitExpr)], m.return(m.local.get(slot, type)));
+}
+
+export function emitContinue(node, ctx, emitExpr) {
+  const m = ctx.module;
+  const state = node.firstElementChild;
+  if (state) {
+    // `continue v`: store the next state, then branch back to the dispatch.
+    const depth = ctx.loops?.findLastIndex(loop => loop.state) ?? -1;
+    if (depth < 0) throw new Error('codegen: continue with a state outside a loop match');
+    const target = ctx.loops[depth];
+    const deferred = loopDeferred(ctx, emitExpr, depth + 1);
+    const constant = constantState(state);
+    const jump = target.jump(constant == null ? emitExpr(state, ctx) : null, constant);
+    // The next state is computed (and stored) before deferred code runs.
+    const store = jump.length > 1 ? [jump[0]] : [];
+    return afterDeferred(m, [...store, ...deferred], jump.at(-1));
+  }
+  const depth = ctx.loops?.findLastIndex(loop => !loop.block) ?? -1;
+  if (depth < 0) throw new Error('codegen: continue outside a loop');
+  return afterDeferred(m, loopDeferred(ctx, emitExpr, depth + 1), m.br(ctx.loops[depth].next));
+}
+
+// ── loop match ──────────────────────────────────────────────────────────────
+//
+// IR:  <ir-loop-match><state/><ir-match-arm …/>…[<ir-default-arm/>]</ir-loop-match>
+//
+// Dense integer states lower to threaded dispatch, arms in source order:
+//
+//   (local.set $state init)
+//   (block $exit
+//     (loop $dispatch
+//       (block $default
+//         (block $a1
+//           (block $a0
+//             (br_table $a0 $a1 $default (state - min)))
+//           a0-body (br $exit))
+//         a1-body (br $exit))
+//       default-body))
+//
+// A branch to $aK lands on aK's body. From inside arm k, every later arm's
+// label and $default enclose the code, so:
+//   continue <constant later arm>  → (br $aJ)                        no dispatch
+//   continue <constant earlier arm>→ (local.set) (br $dispatch)
+//   continue <dynamic value>       → (local.set) (br_table …) with direct
+//                                    entries for later arms, $dispatch otherwise
+//   break                          → (br $exit)
+// Each continue site gets its own br_table, so the engine predicts each
+// transition separately (threaded code, like a computed goto), as in Zig's
+// labeled switch. Structured wasm can only branch forward out of blocks or
+// back to a loop header, so a jump to an earlier arm goes through the
+// header's dispatch: order arms so hot transitions point forward. At -O3 the
+// arms are emitted twice so that most of those edges become forward too.
+// Sparse or non-I32 states fall back to the central `match` dispatch.
+export function emitLoopMatch(node, ctx, emitExpr) {
+  const m = ctx.module;
+  const scrutinee = node.firstElementChild;
+  const typeName = ctx.typeOf(scrutinee);
+  if (!typeName) throw new Error('codegen: loop match state has no type');
+  const type = ctx.toType(typeName);
+  const index = ctx.addLocal(typeName);
+  const label = nextLabel(ctx);
+  const exit = `__loop_match_exit_${label}`, dispatch = `__loop_match_dispatch_${label}`;
+  const init = m.local.set(index, emitExpr(scrutinee, ctx));
+  const arms = [...node.querySelectorAll(':scope > ir-match-arm')];
+  const defaultArm = node.querySelector(':scope > ir-default-arm');
+  const ns = ctx.scalarNamespaceOf(typeName);
+  const sorted = arms.map(arm => ({ arm, pattern: parseMatchLiteral(arm.getAttribute('pattern'), ns) }))
+    .sort((a, b) => comparePattern(a.pattern, b.pattern));
+  const min = sorted[0]?.pattern, max = sorted.at(-1)?.pattern;
+  const dense = ns === 'i32' && sorted.length > 0 && typeof min === 'bigint'
+    && max - min + 1n === BigInt(sorted.length) && min >= -0x80000000n && max <= 0x7fffffffn;
+
+  const entry = { brk: exit, cnt: dispatch, next: dispatch, state: { index, type } };
+  ctx.loops ??= [];
+  ctx.loops.push(entry);
+  try {
+    if (!dense) {
+      // Central dispatch: the `match` lowering, reading the state local.
+      const bodies = new Set([...arms, defaultArm].filter(Boolean).map(armBody));
+      const literal = (n) => (ns === 'i64' ? m.i64.const(n) : ns === 'i32' ? m.i32.const(Number(BigInt.asIntN(32, n))) : m[ns].const(Number(n)));
+      entry.jump = (value, constant) => [m.local.set(index, value ?? literal(constant)), m.br(dispatch)];
+      const read = (child, c) => {
+        if (child === scrutinee) return m.local.get(index, type);
+        const expr = emitExpr(child, c);
+        return bodies.has(child) ? discardValue(m, expr) : expr;
+      };
+      return m.block(exit, [init, m.loop(dispatch, discardValue(m, emitMatch(node, ctx, read)))], binaryen.none);
+    }
+
+    // Arms are laid out in source order, so authors can make hot transitions
+    // forward edges; the tables map each state value to its arm's label.
+    // At -O3 the arms are laid out twice (copy 0, then copy 1): from copy 0
+    // every transition is a forward edge into one of the copies, so only
+    // copy 1's backward edges share the loop head's table.
+    const copies = ctx.optimize === 'speed' ? 2 : 1;
+    const layout = arms.map(arm => parseMatchLiteral(arm.getAttribute('pattern'), ns));
+    const labels = Array.from({ length: copies }, (_, c) => arms.map((_, i) => `__loop_match_arm_${label}_${c}_${i}`));
+    const DEFAULT = `__loop_match_default_${label}`;
+    const offset = (value) => (min === 0n ? value : m.i32.sub(value, m.i32.const(Number(min))));
+    const positionOf = (pattern) => layout.indexOf(pattern);
+    const byValue = sorted.map(entry => positionOf(entry.pattern));
+    // Where control is while an arm body is emitted; null while emitting the default arm.
+    let at = null;
+    const direct = (target) => {
+      if (target > at.arm) return labels[at.copy][target];
+      if (at.copy + 1 < copies) return labels[at.copy + 1][target];
+      return null;
+    };
+    entry.jump = (value, constant) => {
+      if (constant != null && at) {
+        const target = positionOf(constant);
+        if (target < 0) return [m.br(DEFAULT)];
+        const label = direct(target);
+        if (label) return [m.br(label)];
+      }
+      const store = m.local.set(index, value ?? m.i32.const(Number(constant)));
+      if (!at) return [store, m.br(dispatch)];
+      const targets = byValue.map(position => direct(position) ?? dispatch);
+      return [store, m.switch(targets, DEFAULT, offset(m.local.get(index, type)))];
+    };
+
+    let chain = m.switch(byValue.map(position => labels[0][position]), DEFAULT, offset(m.local.get(index, type)));
+    for (let copy = 0; copy < copies; copy++) {
+      for (let arm = 0; arm < arms.length; arm++) {
+        at = { copy, arm };
+        const body = discardValue(m, emitExpr(armBody(arms[arm]), ctx));
+        chain = m.block(null, [m.block(labels[copy][arm], [chain], binaryen.none), body, m.br(exit)], binaryen.unreachable);
+      }
+    }
+    at = null;
+    const tail = defaultArm ? discardValue(m, emitExpr(armBody(defaultArm), ctx)) : m.unreachable();
+    const loopBody = m.block(null, [m.block(DEFAULT, [chain], binaryen.none), tail], binaryen.none);
+    return m.block(exit, [init, m.loop(dispatch, loopBody)], binaryen.none);
+  } finally {
+    ctx.loops.pop();
+  }
+}
+
+/** The integer a `continue` state names at compile time, if it is a literal. */
+function constantState(node) {
+  if (node?.localName === 'ir-lit' && node.getAttribute('kind') === 'int') {
+    try { return BigInt(node.getAttribute('value')); } catch { return null; }
+  }
+  // `-1` arrives as a negation call around a literal.
+  if (node?.localName === 'ir-call' && node.dataset.operatorName === 'neg') {
+    const inner = constantState(node.querySelector(':scope > ir-arg-list')?.firstElementChild);
+    return inner == null ? null : -inner;
+  }
+  return null;
 }
 
 export function emitBreak(node, ctx, emitExpr) {
-  const top   = ctx.loops?.[ctx.loops.length - 1];
-  const label = top?.brk ?? '__while_brk';
+  const m = ctx.module;
   const child = node.children[0];
-  return ctx.module.br(label, undefined, child ? emitExpr(child, ctx) : undefined);
+  // A targeted break (from generator expansion) leaves a named loop, running
+  // the deferred code of every block it exits on the way.
+  const target = node.dataset.loopTarget;
+  const depth = target
+    ? ctx.loops?.findLastIndex(loop => loop.label === target)
+    : ctx.loops?.findLastIndex(loop => !loop.block) ?? -1;
+  if (target && depth < 0) throw new Error(`codegen: break target ${target} is not an enclosing loop`);
+  const loop = ctx.loops?.[depth];
+  const exit = m.br(loop?.brk ?? '__while_brk', undefined, child ? emitExpr(child, ctx) : undefined);
+  return afterDeferred(m, loopDeferred(ctx, emitExpr, depth + 1), exit);
 }
 
 // ── match ───────────────────────────────────────────────────────────────────

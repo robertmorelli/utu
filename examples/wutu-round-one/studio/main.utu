@@ -1,0 +1,150 @@
+using List[Work] |work| from std:List;
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Work:
+| id: Str
+| title: Str
+| stage: I32
+struct StudioState:
+| tasks: Array[Work]
+struct Draft:
+| title: Str
+fn studio_form(state: StudioState) Browser.HTMLElement {
+    let draft=Draft {
+        title:""
+    };
+    @wutu/\
+    @island "studio-form";
+    form.panel {
+        label {
+            "Next piece of work";
+            input {
+                <required = "";
+                bind:value = draft.title;
+            }
+        }
+        button.primary {
+            <type = "submit";
+            "Add work";
+        }
+        on submit {
+            if draft.title.trim().len()>0 {
+                state.tasks=work.append(state.tasks, Work {
+                    id:Browser.crypto.randomUUID(),
+                    title:draft.title,
+                    stage:0
+                });
+                draft.title="";
+                wutu.save("studio-v2");
+                wutu.invalidate("studio-workspace");
+            };
+        };
+    }
+    \/;
+}
+fn workspace(state: StudioState) Browser.HTMLElement {
+    @wutu/\
+    @island "studio-workspace";
+    section.workspace {
+        = studio_form(state);
+        div.grid {
+            for $[["Up next","In progress","Finished"]] |name,index| {
+                section.well.stack {
+                    h2 {
+                        = name;
+                    }
+                    for $[state.tasks filter |task| {task.stage==index.to_i64().to_i32();}] |task| key global $[task.id] {
+                        article.panel.stack {
+                            h3 {
+                                = task.title;
+                            }
+                            button {
+                                <aria-label = $["Move "+task.title];
+                                = if task.stage==2 {
+                                    "Reopen ↺";
+                                }
+                                else {
+                                    "Move forward →";
+                                };
+                                on click {
+                                    task.stage=if task.stage==2 {
+                                        0;
+                                    }
+                                    else {
+                                        task.stage+1;
+                                    };
+                                    wutu.save("studio-v2");
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        StudioState "studio-v2" manual
+        StudioState {
+            tasks:[Work {
+                id:"1",
+                title:"Gather references",
+                stage:0
+            },Work {
+                id:"2",
+                title:"Shape the first draft",
+                stage:1
+            },Work {
+                id:"3",
+                title:"Share the direction",
+                stage:2
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "studio";
+        nav {
+            strong {
+                "STUDIO / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "From a first thought to a finished thing.";
+            }
+            p.muted {
+                "A small board for your studio. Keep one piece moving, then make space for the next.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

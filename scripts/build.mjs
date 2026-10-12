@@ -1,3 +1,4 @@
+import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
 // scripts/build.mjs — Utu build script
 //
 // Usage:
@@ -39,6 +40,7 @@ const buildWasm    = args.has('--wasm');
 
 async function main() {
   if (buildGrammar) await generateParser();
+  await syncWutuRuntime();
   await generatePlatformSources();
   await bundlePackage();
   await bundleVscodeExtension();

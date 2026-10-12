@@ -15,7 +15,7 @@ const SITE_LABEL = {
 export function reportTypeGraphDiagnostics(graph, operations) {
   const {
     actual, actualOrigin, collectFailures, compatible, edgeSource,
-    planCoercions, valueForDiagnostic,
+    knownType, planCoercions, valueForDiagnostic,
   } = operations;
   const display = text => text.replace(/Foreign\d+T\d+/g, name => graph.typeIndex.get(name)?.decl?.dataset.displayName ?? name);
   const ctx = { typeIndex: graph.typeIndex };
@@ -25,6 +25,8 @@ export function reportTypeGraphDiagnostics(graph, operations) {
     const expected = edge.read();
     const actualType = actual(graph, edge.value);
     if (!expected || !actualType || compatible(edge.mode, actualType, expected, ctx)) continue;
+    // An unknown type is already its own diagnostic; comparing against it only adds noise.
+    if (!knownType(graph, expected) || !knownType(graph, actualType)) continue;
 
     const primary = valueForDiagnostic(edge.value);
     const label = edge.label?.(expected) ?? (SITE_LABEL[edge.site]?.(expected) ?? `expected ${expected}`);

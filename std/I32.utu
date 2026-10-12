@@ -32,7 +32,14 @@ mod I32 {
 
     // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
     fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-extend-s><ir-ident name="self"/></ir-i64-extend-s> \/; }
+    fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-extend-s><ir-ident name="self"/></ir-u64-extend-s> \/; }
     fn &.to_u32 |self| () U32 { @ir/\ <ir-u32-or><ir-ident name="self"/><ir-lit kind="int" type-name="U32" value="0"/></ir-u32-or> \/; }
     fn &.to_f32 |self| () F32 { @ir/\ <ir-f32-convert-s-i32><ir-ident name="self"/></ir-f32-convert-s-i32> \/; }
     fn &.to_f64 |self| () F64 { @ir/\ <ir-f64-convert-s-i32><ir-ident name="self"/></ir-f64-convert-s-i32> \/; }
+
+    // Decimal text, as JavaScript's String() spells it. Ships only when used.
+    fn &.to_str |self| () Str {
+        let format: fun(I32) Str = @es/\ (v) => String(v) \/;
+        format(self);
+    }
 }

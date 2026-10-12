@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { cssProjection } from '../compiler/css-stencil.js';
+import { formatUtuSource, wutuCompletions } from '../compiler/wutu-tooling.js';
 
 const LANGUAGE_ID = 'utu';
 const DOCUMENT_SELECTOR = Object.freeze({ language: LANGUAGE_ID, scheme: '*' });
@@ -51,12 +53,38 @@ export async function activate(context) {
     }),
     vscode.window.onDidChangeActiveTextEditor(editor => void syncMainContext(editor?.document)),
     vscode.window.onDidChangeTextEditorSelection?.(event => isUtu(event.textEditor.document) && xray.follow(event.textEditor)),
+    vscode.languages.registerDocumentFormattingEditProvider(DOCUMENT_SELECTOR, {
+      provideDocumentFormattingEdits(document) {
+        const source = document.getText();
+        let formatted;
+        try {
+          formatted = formatUtuSource(source);
+        } catch {
+          // Keep incomplete source intact; diagnostics identify the syntax error.
+          return [];
+        }
+        if (source === formatted) return [];
+        const whole = new vscode.Range(document.positionAt(0), document.positionAt(source.length));
+        return [{ range: whole, newText: formatted }];
+      },
+    }),
+    vscode.languages.registerCompletionItemProvider(DOCUMENT_SELECTOR, {
+      provideCompletionItems(document, position) {
+        return wutuCompletions(document.getText(), document.offsetAt(position));
+      },
+    }, '<', ':', '@'),
     vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, semanticHoverProvider(service)),
     vscode.languages.registerDefinitionProvider(DOCUMENT_SELECTOR, definitionProvider(service)),
     vscode.languages.registerReferenceProvider(DOCUMENT_SELECTOR, referenceProvider(service)),
     vscode.languages.registerInlayHintsProvider(DOCUMENT_SELECTOR, inlayHintsProvider(service)),
     vscode.languages.registerCallHierarchyProvider(DOCUMENT_SELECTOR, callHierarchyProvider(service)),
   );
+
+  registerCommand(context, output, 'utu.showCssStencil', async target => {
+    const document = await utuDocument(target);
+    if (!document) return;
+    await revealGenerated(generated, document, 'css', cssProjection(document.getText()), 'css');
+  });
 
   registerCommand(context, output, 'utu.compileCurrentFile', async target => {
     const document = await utuDocument(target);

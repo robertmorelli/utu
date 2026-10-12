@@ -1,0 +1,167 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Book:
+| id: Str
+| title: Str
+| author: Str
+| note: Str
+| finished: Bool
+struct ReadroomState:
+| selected: Str
+| books: Array[Book]
+fn notes(book:Book) Browser.HTMLElement {
+    @wutu/\
+    @island "readroom-notes";
+    section.panel.stack {
+        a {
+            <href = "#/";
+            "← Back to the shelf";
+        }
+        h2 {
+            = book.title;
+        }
+        p.muted {
+            = book.author;
+        }
+        label {
+            "Your notes";
+            textarea {
+                <rows = "10";
+                <placeholder = "A thought worth keeping…";
+                bind:value = book.note;
+                on input {
+                    wutu.save("readroom-v2");
+                };
+            }
+        }
+        p.muted {
+            "Notes save on this device after you pause typing.";
+        }
+    }
+    \/;
+}
+fn workspace(state: ReadroomState) Browser.HTMLElement {
+    @wutu/\
+    @island "readroom-workspace";
+    section.workspace {
+        div.grid {
+            for $[state.books] |book| key $[book.id] {
+                article.panel.stack {
+                    p.eyebrow {
+                        = if book.finished {
+                            "FINISHED";
+                        }
+                        else {
+                            "ON YOUR SHELF";
+                        };
+                    }
+                    h2 {
+                        = book.title;
+                    }
+                    p.muted {
+                        = book.author;
+                    }
+                    a {
+                        <href = "#/notes";
+                        "Open your notes ↗";
+                        on click {
+                            state.selected=book.id;
+                            wutu.save("readroom-v2");
+                        };
+                    }
+                    button {
+                        = if book.finished {
+                            "Read again";
+                        }
+                        else {
+                            "Mark finished";
+                        };
+                        on click {
+                            book.finished=not book.finished;
+                            wutu.save("readroom-v2");
+                        };
+                    }
+                }
+            }
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        ReadroomState "readroom-v2" manual
+        ReadroomState {
+            selected:"one",
+            books:[Book {
+                id:"one",
+                title:"A Field Guide to Getting Lost",
+                author:"Rebecca Solnit",
+                note:"",
+                finished:false
+            },Book {
+                id:"two",
+                title:"Braiding Sweetgrass",
+                author:"Robin Wall Kimmerer",
+                note:"",
+                finished:false
+            },Book {
+                id:"three",
+                title:"The Creative Act",
+                author:"Rick Rubin",
+                note:"",
+                finished:false
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "readroom";
+        nav {
+            strong {
+                "READROOM / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "Read a little. Keep what stays.";
+            }
+            p.muted {
+                "A reading journal with room for a thought, a sentence, or a question. Finish books at your own pace.";
+            }
+        }
+        if $[wutu.route()=="/notes"] {
+            for $[state.books filter |book| {book.id==state.selected;}] |book| {
+                = notes(book);
+            }
+        }
+        else {
+            = workspace(state);
+        }
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

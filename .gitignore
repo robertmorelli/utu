@@ -43,6 +43,8 @@ spec.md
 .npm-cache
 examples/rust_benchmarks/rust_deltablue/target
 examples/rust_benchmarks/rust_deltablue_arena/target
+examples/foundry/rust/target
+examples/foundry/rust/pkg-node
 .emscripten-cache
 codex.json
 codex.yml

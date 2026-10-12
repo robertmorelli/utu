@@ -33,6 +33,16 @@ export function walkParenExpr(n, doc, source, dispatch) {
   return node;
 }
 
+export function walkRangeExpr(n, doc, source, dispatch) {
+  const node = stamp(el('ir-range', doc), n);
+  node.setAttribute('inclusive', String(n.childForFieldName('kind')?.text === '...'));
+  for (const field of ['start', 'end']) {
+    const child = n.childForFieldName(field);
+    if (child) node.appendChild(dispatch(child, doc, source));
+  }
+  return node;
+}
+
 export function walkUnaryExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.UNARY, doc), n);
   const children = namedChildren(n);

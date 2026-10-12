@@ -79,6 +79,9 @@ export function walkForSource(n, doc, source, dispatch) {
     node.setAttribute('op', op);
     node.appendChild(dispatch(lhs, doc, source));
     node.appendChild(dispatch(rhs, doc, source));
+  } else if (children.length === 1) {
+    // A lone expression iterates an array; lower-for-arrays.js expands it.
+    node.appendChild(dispatch(children[0], doc, source));
   }
   return node;
 }
@@ -94,11 +97,16 @@ export function walkMatchExpr(n, doc, source, dispatch) {
   return walkContainer(T.MATCH, n, doc, source, dispatch);
 }
 
+export function walkLoopMatchExpr(n, doc, source, dispatch) {
+  return walkContainer(T.LOOP_MATCH, n, doc, source, dispatch);
+}
+
 export function walkMatchArm(n, doc, source, dispatch) {
   const node = stamp(el(T.MATCH_ARM, doc), n);
   const children = namedChildren(n);
   if (children[0]) {
-    node.setAttribute('pattern', text(children[0]));
+    // `- 1` and `-1` are the same pattern; codegen reads the compact form.
+    node.setAttribute('pattern', text(children[0]).replace(/\s+/g, ''));
   }
   if (children[1]) node.appendChild(dispatch(children[1], doc, source));
   return node;

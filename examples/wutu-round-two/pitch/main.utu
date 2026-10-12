@@ -1,0 +1,179 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Service:
+| id: Str
+| name: Str
+| hours: I32
+| rate: I32
+struct PitchState:
+| client: Str
+| discount: Bool
+| services: Array[Service]
+fn quote(state:PitchState) I32 {
+    let subtotal=state.services map |service| {
+        service.hours*service.rate;
+    }
+    sum;
+    if state.discount {
+        subtotal-subtotal/10;
+    }
+    else {
+        subtotal;
+    };
+}
+fn workspace(state: PitchState) Browser.HTMLElement {
+    @wutu/\
+    @island "pitch-workspace";
+    section.workspace {
+        label.panel {
+            "Prepared for";
+            input {
+                <maxlength = "100";
+                bind:value = state.client;
+                on change {
+                    wutu.save("pitch-v2");
+                };
+            }
+        }
+        for $[state.services] |service| key $[service.id] {
+            article.panel.bar {
+                div {
+                    h2 {
+                        = service.name;
+                    }
+                    p.muted {
+                        = wutu.money(service.rate)+" / hour";
+                    }
+                }
+                div.bar {
+                    button {
+                        <aria-label = $["Fewer "+service.name];
+                        <disabled = $[service.hours==0];
+                        "−";
+                        on click {
+                            service.hours-=1;
+                            wutu.save("pitch-v2");
+                        };
+                    }
+                    strong {
+                        = wutu.number(service.hours)+" hours";
+                    }
+                    button {
+                        <aria-label = $["More "+service.name];
+                        <disabled = $[service.hours==100];
+                        "+";
+                        on click {
+                            service.hours+=1;
+                            wutu.save("pitch-v2");
+                        };
+                    }
+                    strong {
+                        = wutu.money(service.hours*service.rate);
+                    }
+                }
+            }
+        }
+        label.panel.bar {
+            "Returning-client discount / 10%";
+            input {
+                <type = "checkbox";
+                bind:checked = state.discount;
+                on change {
+                    wutu.save("pitch-v2");
+                };
+            }
+        }
+        article.well.bar {
+            div {
+                p.eyebrow {
+                    "ESTIMATE FOR";
+                }
+                h2 {
+                    = state.client;
+                }
+            }
+            strong.big {
+                = wutu.money(quote(state));
+            }
+        }
+        button.primary {
+            "Print estimate";
+            on click {
+                Browser.window.print();
+            };
+        }
+        p.muted {
+            "USD. Estimate only; excludes taxes, expenses, and payment processing.";
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        PitchState "pitch-v2" manual
+        PitchState {
+            client:"A new collaboration",
+            discount:false,
+            services:[Service {
+                id:"strategy",
+                name:"Strategy & direction",
+                hours:6,
+                rate:9000
+            },Service {
+                id:"design",
+                name:"Visual design",
+                hours:12,
+                rate:9500
+            },Service {
+                id:"build",
+                name:"Build & delivery",
+                hours:20,
+                rate:10000
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "pitch";
+        nav {
+            strong {
+                "PITCH / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "A clear scope makes a better start.";
+            }
+            p.muted {
+                "Shape a straightforward project estimate. Adjust the work, include a returning-client discount, and print a quote you can talk through.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

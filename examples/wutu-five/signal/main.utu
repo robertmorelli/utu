@@ -1,0 +1,585 @@
+using Browser from std:Browser;
+
+fn number(value: I32) Str {
+    value.to_f64().toString();
+}
+
+fn money(cents: I32) Str {
+    "$" + (cents.to_f64() / 100.0).toFixed(2);
+}
+
+fn node(id: Str) Browser.HTMLElement {
+    Browser.document.getElementById(id) orelse fatal;
+}
+
+fn restore_focus(id: Str) void {
+    promote Browser.document.getElementById(id) {
+        |element| => element.focus(), ~> {
+        },
+    };
+}
+
+fn persist(key: Str,
+value: Str) void {
+    try {
+        Browser.localStorage.setItem(key, value);
+    } catch {
+        node("notice").textContent = "Storage is unavailable. Your changes will last for this session.";
+    };
+}
+
+struct Session:
+    | id: Str
+    | title: Str
+    | speaker: Str
+    | track: Str
+    | day: I32
+    | hour: I32
+    | saved: Bool
+
+struct Conference:
+    | sessions: Array[Session]
+    | day: Str
+    | track: Str
+    | agenda: Bool
+
+fn matches(session: Session,
+state: Conference) Bool {
+    (state.day == "all" or number(session.day) == state.day) and (state.track == "All tracks" or session.track == state.track) and (not state.agenda or session.saved);
+}
+
+fn calendar(state: Conference) Str {
+    let newline = Browser.String.fromCharCode(13, 10);
+    let text = "BEGIN:VCALENDAR" + newline + "VERSION:2.0" + newline + "PRODID:-//Wutu//Signal//EN" + newline;
+    state.sessions filter |s| {
+        s.saved;
+    }
+    each |s| {
+        let date = if s.day == 1 {
+            "20261022";
+        } else {
+            "20261023";
+        };
+        let hour = if s.hour<10 {
+            "0" + number(s.hour);
+        } else {
+            number(s.hour);
+        };
+        let end = number(s.hour + 1);
+        text += "BEGIN:VEVENT"
+            + newline
+            + "UID:"
+            + s.id
+            + "@signal.wutu"
+            + newline
+            + "DTSTAMP:20261005T000000Z"
+            + newline
+            + "DTSTART:"
+            + date
+            + "T"
+            + hour
+            + "0000Z"
+            + newline
+            + "DTEND:"
+            + date
+            + "T"
+            + end
+            + "0000Z"
+            + newline
+            + "SUMMARY:"
+            + s.title
+            + newline
+            + "END:VEVENT"
+            + newline;
+    };
+    "data:text/calendar;charset=utf-8," + Browser.encodeURIComponent(text + "END:VCALENDAR" + newline);
+}
+
+fn refresh(state: Conference) void {
+}
+
+fn sessions(state: Conference) Browser.HTMLElement {
+    let count = state.sessions count_where |s| {
+        s.saved;
+    };
+    let conflicts = state.sessions filter |s| {
+        s.saved;
+    }
+    count_where |s| {
+        (state.sessions count_where |b| {
+            b.saved and b.day == s.day and b.hour == s.hour;
+        }
+        )>1;
+    };
+    let visible = state.sessions filter |s| {
+        matches(s, state);
+    } collect(Session);
+    @wutu/\
+    section {
+        <id = "sessions";
+        display:grid;
+        gap:1rem;
+        div {
+            display:flex;
+            gap:1rem;
+            align-items:center;
+            justify-content:space-between;
+            flex-wrap:wrap;
+            p {
+                <role = "status";
+                = number(count);
+                " in your agenda · ";
+                = number(visible.len());
+                " sessions shown";
+            }
+            if $[count>0] {
+                a {
+                    <href = $[calendar(state)];
+                    <download = "signal-agenda.ics";
+                    padding:0.8rem 1rem;
+                    border:1px solid var(--accent);
+                    border-radius:0.5rem;
+                    color:var(--accent);
+                    "Download calendar ↓";
+                }
+            }
+        }
+        if $[conflicts>0] {
+            p.conflict {
+                <role = "alert";
+                padding:1rem;
+                border:1px solid var(--accent);
+                color:var(--accent);
+                "Some saved sessions overlap. Choose one session per time slot before exporting.";
+            }
+        }
+        for $[visible] |session| key $[session.id] {
+            article.session {
+                display:grid;
+                grid-template-columns:6rem 1fr auto;
+                gap:1.5rem;
+                padding:1.75rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:0.6rem;
+                align-items:center;
+                @media (width < 42rem) {
+                    grid-template-columns: 1fr;
+                    gap: 1rem;
+                }
+                div {
+                    display:grid;
+                    gap:0.5rem;
+                    p.eyebrow {
+                        color:var(--muted);
+                        "DAY ";
+                        = number(session.day);
+                    }
+                    strong {
+                        font-size:1.5rem;
+                        = number(session.hour);
+                        ":00";
+                    }
+                }
+                div {
+                    display:grid;
+                    gap:0.75rem;
+                    p.eyebrow {
+                        color:var(--accent);
+                        = session.track;
+                    }
+                    h3 {
+                        font-size:1.4rem;
+                        letter-spacing:-0.025em;
+                        = session.title;
+                    }
+                    p.muted {
+                        = session.speaker;
+                        " · 60 minutes";
+                    }
+                }
+                button {
+                    <id = $["session-" + session.id];
+                    <aria-label = $[if session.saved { "Remove " + session.title; } else { "Save " + session.title; }];
+                    <aria-pressed = $[if session.saved { "true"; } else { "false"; }];
+                    = if session.saved {
+                        "Saved ✓";
+                    }
+                    else {
+                        "Save +";
+                    };
+                    on click {
+                        session.saved = not session.saved;
+                        persist("signal-" + session.id, if session.saved {
+                            "yes";
+                        }
+                        else {
+                            "no";
+                        });
+                        refresh(state);
+                        restore_focus("session-" + session.id);
+                    };
+                }
+            }
+        }
+        if $[visible.len() == 0] {
+            p.empty {
+                "No sessions in this view. Explore the full programme and save a few favorites.";
+            }
+        }
+    }
+    \/;
+}
+
+export main() void {
+    let state = Conference {
+        day: "all",
+        track: "All tracks",
+        agenda: false,
+        sessions: [
+        Session {
+            id: "a",
+            title: "Build less. Make it matter.",
+            speaker: "Avery Chen · Opening keynote",
+            track: "Design",
+            day: 1,
+            hour: 9,
+            saved: false
+        },
+        Session {
+            id: "b",
+            title: "The small web is a big idea",
+            speaker: "Sam Rivera",
+            track: "Engineering",
+            day: 1,
+            hour: 11,
+            saved: false
+        },
+        Session {
+            id: "c",
+            title: "Interfaces that feel human",
+            speaker: "Jules Okafor",
+            track: "Design",
+            day: 1,
+            hour: 11,
+            saved: false
+        },
+        Session {
+            id: "d",
+            title: "A compiler in your pocket",
+            speaker: "Morgan Park",
+            track: "Engineering",
+            day: 1,
+            hour: 14,
+            saved: false
+        },
+        Session {
+            id: "e",
+            title: "Communities over audiences",
+            speaker: "Casey Ellis",
+            track: "Community",
+            day: 1,
+            hour: 16,
+            saved: false
+        },
+        Session {
+            id: "f",
+            title: "Designing for the long run",
+            speaker: "Riley Santos",
+            track: "Design",
+            day: 2,
+            hour: 9,
+            saved: false
+        },
+        Session {
+            id: "g",
+            title: "Fast by default",
+            speaker: "Alex Morgan",
+            track: "Engineering",
+            day: 2,
+            hour: 11,
+            saved: false
+        },
+        Session {
+            id: "h",
+            title: "Open source is a team sport",
+            speaker: "Jamie Bell",
+            track: "Community",
+            day: 2,
+            hour: 14,
+            saved: false
+        }
+        ]
+    };
+    state.sessions each |session| {
+        try {
+            promote Browser.localStorage.getItem("signal-" + session.id) {
+                |saved|=> {
+                    session.saved = saved == "yes";
+                },
+                ~> {
+                },
+            };
+        } catch {
+        };
+    };
+    let app = @wutu/\
+    @reactive;
+    @document {
+        :root {
+            --bg: oklch(16% 0.012 260);
+            --ink: oklch(96% 0.01 100);
+            --accent: oklch(88% 0.2 120);
+            --panel: oklch(21% 0.015 260);
+            --muted: oklch(71% 0.02 260);
+            --line: oklch(34% 0.015 260);
+            --on-accent: oklch(16% 0.012 260);
+            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+        }
+        button, input, select, textarea {
+            font: inherit;
+        }
+        button, a, input, select, textarea {
+            touch-action: manipulation;
+        }
+        button {
+            cursor: pointer;
+        }
+        a {
+            color: inherit;
+            text-underline-offset: 0.25em;
+        }
+        h1, h2, h3, p {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        button, input, select, textarea {
+            border: 1px solid var(--line);
+            border-radius: 0.6rem;
+            padding: 0.75rem 1rem;
+            background: var(--panel);
+            color: var(--ink);
+            min-inline-size: 0;
+        }
+        button:hover {
+            border-color: var(--accent);
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 650;
+        }
+        .primary {
+            background: var(--accent);
+            color: var(--on-accent);
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+        .muted {
+            color: var(--muted);
+        }
+        .eyebrow {
+            font: 700 0.75rem system-ui, sans-serif;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+        .toolbar {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .toolbar label {
+            flex: 1 1 10rem;
+        }
+        .empty {
+            padding: 2rem;
+            border: 1px dashed var(--line);
+            color: var(--muted);
+        }
+        .site-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding-block: 1.25rem;
+            border-block-end: 1px solid var(--line);
+            font: 650 0.8rem system-ui, sans-serif;
+        }
+        .site-nav nav {
+            display: flex;
+            gap: 1.25rem;
+        }
+        .site-footer {
+            border-block-start: 1px solid var(--line);
+            padding-block: 1.5rem;
+            color: var(--muted);
+            font: 0.8rem system-ui, sans-serif;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        @media print {
+            .site-nav, .site-footer, form, .toolbar, button {
+                display: none;
+            }
+            body {
+                background: white;
+                color: black;
+            }
+        }
+    }
+    main {
+        max-inline-size:78rem;
+        margin-inline:auto;
+        padding-inline:clamp(1.2rem, 5vw, 4rem);
+        display:grid;
+        gap:2.5rem;
+        header.site-nav {
+            a {
+                <href = "./";
+                "SIGNAL / 26";
+            }
+            nav {
+                a {
+                    <href = "../";
+                    "All five sites";
+                }
+                a {
+                    <href = "source.html";
+                    "View Utu source ↗";
+                }
+            }
+        }
+        section {
+            display:grid;
+            gap:1.5rem;
+            padding-block:2rem;
+            p.eyebrow {
+                color:var(--accent);
+                "22—23 OCTOBER / A SAMPLE CONFERENCE";
+            }
+            h1 {
+                font-size:clamp(4rem, 11vw, 9rem);
+                font-weight:800;
+                line-height:0.9;
+                letter-spacing:-0.08em;
+                "Less noise.";
+                br {
+                }
+                span {
+                    color:var(--accent);
+                    "More signal.";
+                }
+            }
+            div {
+                display:flex;
+                justify-content:space-between;
+                gap:2rem;
+                flex-wrap:wrap;
+                padding-block-start:1.5rem;
+                p.muted {
+                    line-height:1.7;
+                    max-inline-size:32rem;
+                    "Two days for people who care about what they build. Explore the programme, make your own agenda, and take the good ideas with you.";
+                }
+                p.eyebrow {
+                    align-self:end;
+                    "08 SESSIONS / 03 TRACKS / ALL TIMES UTC";
+                }
+            }
+        }
+        div.toolbar {
+            label {
+                "Day";
+                select as day {
+                    <aria-label = "Day";
+                    option {
+                        <value = "all";
+                        "Both days";
+                    }
+                    option {
+                        <value = "1";
+                        "Thursday 22 Oct";
+                    }
+                    option {
+                        <value = "2";
+                        "Friday 23 Oct";
+                    }
+                    on change {
+                        state.day = day.value;
+                        refresh(state);
+                    };
+                }
+            }
+            label {
+                "Track";
+                select as track {
+                    <aria-label = "Track";
+                    option {
+                        "All tracks";
+                    }
+                    option {
+                        "Design";
+                    }
+                    option {
+                        "Engineering";
+                    }
+                    option {
+                        "Community";
+                    }
+                    on change {
+                        state.track = track.value;
+                        refresh(state);
+                    };
+                }
+            }
+            label {
+                display:flex;
+                align-items:center;
+                gap:0.75rem;
+                padding:0.8rem;
+                input as agenda {
+                    <type = "checkbox";
+                    on change {
+                        state.agenda = agenda.checked;
+                        refresh(state);
+                    };
+                }
+                "My agenda only";
+            }
+        }
+        = sessions(state);
+        footer.site-footer {
+            p {
+                "Fictional programme, real agenda tools. Calendar downloads use UTC.";
+            }
+            p {
+                <id = "notice";
+                <role = "status";
+                "Saved on this device. No account needed.";
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

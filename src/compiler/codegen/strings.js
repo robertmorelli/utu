@@ -1,4 +1,6 @@
 import { binaryen } from './types.js';
+import { nextLabel } from './labels.js';
+import { arrayInfoFromNode, elementBinaryenType } from './arrays.js';
 
 export function emitStringLiteral(node, ctx) {
   if (ctx.requirements) ctx.requirements.strings = true;
@@ -37,9 +39,59 @@ export function emitStringIntrinsic(opNode, argNodes, ctx, emitExpr) {
       const strings = stringOps(m);
       return strings.get_wtf16(emitExpr(a, ctx), emitExpr(b, ctx));
     }
+    case 'ir-string-from-code-point':
+      return binaryen._BinaryenStringNew(m.ptr, binaryen.StringNewFromCodePoint, emitExpr(a, ctx), 0, 0);
+    case 'ir-string-from-codes':
+      return emitStringFromCodes(a, b, ctx, emitExpr);
     default:
       return null;
   }
+}
+
+/**
+ * The first `count` UTF-16 code units of an Array[I32] as a string: narrow
+ * them into a 16-bit array, then one string.new_wtf16_array (the
+ * fromCharCodeArray builtin). Builds strings of any length in O(n) without
+ * creating a rope of one-character strings.
+ */
+function emitStringFromCodes(codesNode, countNode, ctx, emitExpr) {
+  const m = ctx.module;
+  const info = arrayInfoFromNode(codesNode, ctx);
+  const units = codeUnitArray(ctx);
+  const source = ctx.addLocal(info.refType), count = ctx.addLocal(binaryen.i32);
+  const narrow = ctx.addLocal(units.refType), i = ctx.addLocal(binaryen.i32);
+  const label = nextLabel(ctx);
+  const done = `__codes_done_${label}`, next = `__codes_next_${label}`;
+  const get = local => m.local.get(local, binaryen.i32);
+  return m.block(null, [
+    m.local.set(source, m.ref.cast(emitExpr(codesNode, ctx), info.refType)),
+    m.local.set(count, emitExpr(countNode, ctx)),
+    m.local.set(narrow, m.array.new_default(units.heapType, get(count))),
+    m.local.set(i, m.i32.const(0)),
+    m.block(done, [m.loop(next, m.block(null, [
+      m.br(done, m.i32.ge_u(get(i), get(count))),
+      m.array.set(m.local.get(narrow, units.refType), get(i),
+        m.array.get(m.local.get(source, info.refType), get(i), elementBinaryenType(info, ctx), false)),
+      m.local.set(i, m.i32.add(get(i), m.i32.const(1))),
+      m.br(next),
+    ], binaryen.none))], binaryen.none),
+    binaryen._BinaryenStringNew(m.ptr, binaryen.StringNewWTF16Array, m.local.get(narrow, units.refType), m.i32.const(0), get(count)),
+  ], binaryen.stringref);
+}
+
+const CODE_UNIT_ARRAYS = new WeakMap();
+
+/** (array (mut i16)), created once per module for string construction. */
+function codeUnitArray(ctx) {
+  let units = CODE_UNIT_ARRAYS.get(ctx.module);
+  if (!units) {
+    const builder = new binaryen.TypeBuilder(1);
+    builder.setArrayType(0, binaryen.i32, binaryen.i16, true);
+    const [heapType] = builder.buildAndDispose();
+    units = { heapType, refType: binaryen.getTypeFromHeapType(heapType, false) };
+    CODE_UNIT_ARRAYS.set(ctx.module, units);
+  }
+  return units;
 }
 
 function stringConst(m, raw) {

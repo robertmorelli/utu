@@ -1,0 +1,68 @@
+// Immutable versions of an ordered monoid index. Point updates share untouched
+// branches, allocating O(log n) new nodes. combine must be pure and associative.
+mod PersistentSegmentTree[T] {
+    struct Node:
+        | value: T
+        | left: ?Node
+        | right: ?Node
+
+    struct &:
+        | root: ?Node
+        | length: I32
+        | identity: T
+
+    fn build(values: Array[T], start: I32, end_: I32, combine: fun(T, T) T) ?Node {
+        if start == end_ { return null; };
+        if end_ - start == 1 {
+            return Node { value: values[start], left: null, right: null };
+        };
+        let mid = start + (end_ - start) / 2;
+        let left = build(values, start, mid, combine) orelse fatal;
+        let right = build(values, mid, end_, combine) orelse fatal;
+        Node { value: combine(left.value, right.value), left: left, right: right };
+    }
+
+    fn &.new(values: Array[T], identity: T, combine: fun(T, T) T) & {
+        &{ root: build(values, 0, values.len(), combine), length: values.len(), identity: identity };
+    }
+
+    fn replace(node: Node, start: I32, end_: I32, index: I32, value: T, combine: fun(T, T) T) Node {
+        if end_ - start == 1 {
+            return Node { value: value, left: null, right: null };
+        };
+        let mid = start + (end_ - start) / 2;
+        let left = node.left orelse fatal;
+        let right = node.right orelse fatal;
+        if index < mid {
+            left = replace(left, start, mid, index, value, combine);
+        } else {
+            right = replace(right, mid, end_, index, value, combine);
+        };
+        Node { value: combine(left.value, right.value), left: left, right: right };
+    }
+
+    fn &.set |self| (index: I32, value: T, combine: fun(T, T) T) & {
+        if index < 0 or index >= self.length { fatal; };
+        &{
+            root: replace(self.root orelse fatal, 0, self.length, index, value, combine),
+            length: self.length,
+            identity: self.identity,
+        };
+    }
+
+    fn range(node: ?Node, start: I32, end_: I32, low: I32, high: I32, identity: T, combine: fun(T, T) T) T {
+        if low >= end_ or high <= start { return identity; };
+        let current = node orelse fatal;
+        if low <= start and end_ <= high { return current.value; };
+        let mid = start + (end_ - start) / 2;
+        combine(
+            range(current.left, start, mid, low, high, identity, combine),
+            range(current.right, mid, end_, low, high, identity, combine)
+        );
+    }
+
+    fn &.query |self| (start: I32, end_: I32, combine: fun(T, T) T) T {
+        if start < 0 or end_ < start or end_ > self.length { fatal; };
+        range(self.root, 0, self.length, start, end_, self.identity, combine);
+    }
+}

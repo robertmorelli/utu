@@ -89,6 +89,7 @@ function flowNode(node, next, ctx, add, link) {
   const id = add(node.id, node);
   if (node.localName === 'ir-return') { link(id, ctx.exit, 'return'); return id; }
   if (node.localName === 'ir-break') { link(id, ctx.breaks.at(-1) ?? next, 'break'); return id; }
+  if (node.localName === 'ir-continue') { link(id, ctx.continues?.at(-1) ?? next, 'continue'); return id; }
   if (node.localName === 'ir-if') {
     for (const branch of [...node.children].slice(1)) {
       const start = branch.localName === 'ir-block' ? flowBlock(branch, next, ctx, add, link) : flowNode(branch, next, ctx, add, link);
@@ -98,7 +99,7 @@ function flowNode(node, next, ctx, add, link) {
     return id;
   }
   if (node.localName === 'ir-while') {
-    const loop = { ...ctx, breaks: [...ctx.breaks, next] };
+    const loop = { ...ctx, breaks: [...ctx.breaks, next], continues: [...(ctx.continues ?? []), id] };
     const body = node.lastElementChild;
     link(id, body ? flowBlock(body, id, loop, add, link) : id, 'loop');
     link(id, next, 'exit');

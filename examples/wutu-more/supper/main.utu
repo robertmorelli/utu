@@ -1,0 +1,376 @@
+using Browser from std:Browser;
+
+struct Ingredient:
+    | id: Str
+    | name: Str
+    | quantity: F64
+    | unit: Str
+    | packed: Bool
+
+struct Kitchen:
+    | servings: F64
+    | ingredients: Array[Ingredient]
+    | step: I32
+
+fn amount(item: Ingredient, servings: F64) Str {
+    (item.quantity * servings / 2.0).toFixed(1) + " " + item.unit;
+}
+
+export main() void {
+    let state = @stored/\
+        Kitchen "supper-v1" Kitchen {
+            servings: 2.0, step: 0,
+            ingredients: [
+                Ingredient { id: "orzo", name: "Orzo", quantity: 180.0, unit: "g", packed: false },
+                Ingredient { id: "peas", name: "Frozen peas", quantity: 150.0, unit: "g", packed: false },
+                Ingredient { id: "stock", name: "Vegetable stock", quantity: 500.0, unit: "ml", packed: false },
+                Ingredient { id: "lemon", name: "Lemon", quantity: 1.0, unit: "whole", packed: false },
+                Ingredient { id: "oil", name: "Olive oil", quantity: 2.0, unit: "tbsp", packed: false },
+                Ingredient { id: "feta", name: "Feta", quantity: 80.0, unit: "g", packed: false }
+            ]
+        }
+    \/;
+    if state.servings < 1.0 or state.servings > 12.0 { state.servings = 2.0; };
+    if state.step < 0 or state.step > 3 { state.step = 0; };
+    let instructions = ["Warm the olive oil in a wide pan over medium heat. Add the orzo and stir for two minutes, until lightly toasted.", "Pour in the stock. Simmer gently for ten minutes, stirring often, until the orzo is nearly tender.", "Stir in the peas and cook for three more minutes. Add a splash of water if the pan looks dry.", "Finish with lemon zest and juice. Crumble over the feta, season to taste, and bring the pan to the table."];
+    let app = @wutu/\
+    @reactive;
+    @document {
+        :root {
+            --paper:#f5efe4;
+            --ink:#352c24;
+            --muted:#706457;
+            --accent:#a23f2d;
+            --on:#fff8ef;
+            --card:#fffaf1;
+            --line:#d8ccba;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+            margin: 0;
+            background: var(--paper);
+            color: var(--ink);
+            font: 16px/1.55 system-ui, sans-serif;
+        }
+        button, input, select {
+            font: inherit;
+        }
+        button, input, select {
+            padding: 0.7rem 0.9rem;
+            border: 1px solid var(--line);
+            border-radius: 0.5rem;
+            color: inherit;
+            background: var(--card);
+            min-inline-size: 0;
+        }
+        button {
+            cursor: pointer;
+        }
+        button:hover {
+            border-color: var(--accent);
+        }
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+        a {
+            color: inherit;
+            text-underline-offset: 0.25em;
+        }
+        h1, h2, h3, p {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        h1 {
+            font-size: clamp(3rem, 7vw, 6rem);
+            line-height: 1.02;
+            letter-spacing: -0.06em;
+        }
+        h2 {
+            font-size: 1.3rem;
+            letter-spacing: -0.025em;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 650;
+        }
+        .eyebrow {
+            font: 700 0.75rem system-ui;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+        .muted {
+            color: var(--muted);
+        }
+        .primary {
+            background: var(--accent);
+            color: var(--on);
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+        .bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .stack {
+            display: grid;
+            gap: 1rem;
+        }
+        .panel {
+            padding: 1.5rem;
+            border: 1px solid var(--line);
+            background: var(--card);
+            border-radius: 0.8rem;
+        }
+        .site-nav {
+            padding-block: 1.4rem;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.85rem;
+        }
+        .site-nav nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+        footer {
+            padding-block: 1.5rem;
+            border-top: 1px solid var(--line);
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        main {
+            max-width: 1320px;
+            margin: auto;
+            padding: 0 clamp(1rem, 4vw, 3rem);
+            display: grid;
+            gap: 2.5rem;
+        }
+        .hero {
+            padding-block: 1.5rem;
+            display: grid;
+            gap: 1.5rem;
+        }
+        .hero p {
+            max-width: 39rem;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            button {
+                transition: background 120ms, border-color 120ms;
+            }
+        }
+    }
+    main {
+        header.site-nav.bar {
+            strong {
+                "SUPPER / A GOOD EVERYDAY TABLE";
+            }
+            nav {
+                a {
+                    <href = "../";
+                    "More Wutu sites";
+                }
+                a {
+                    <href = "source.html";
+                    "Read the source ↗";
+                }
+            }
+        }
+        section.hero {
+            display:grid;
+            grid-template-columns:1.2fr 1fr;
+            align-items:center;
+            gap:3rem;
+            @media (width < 48rem) {
+                grid-template-columns: 1fr;
+            }
+            div.stack {
+                p.eyebrow {
+                    color:var(--accent);
+                    "THE WEEKNIGHT COLLECTION / 001";
+                }
+                h1 {
+                    font-family:Georgia, serif;
+                    font-weight:500;
+                    "A little lemon.";
+                    br {
+                    }
+                    em {
+                        "A lot of comfort.";
+                    }
+                }
+                p.muted {
+                    "One-pan lemon orzo with peas and feta. Bright, creamy, and ready before your evening gets away from you.";
+                }
+                p.eyebrow {
+                    "25 MINUTES  ·  ONE PAN  ·  VEGETARIAN";
+                }
+            }
+            div {
+                <aria-hidden = "true";
+                aspect-ratio:1.15;
+                border-radius:50% 50% 4% 4%;
+                background:#d2d8b5;
+                display:grid;
+                place-items:center;
+                padding:2rem;
+                div {
+                    width:88%;
+                    aspect-ratio:1;
+                    border-radius:50%;
+                    border:1.3rem solid #fffaf1;
+                    box-shadow:0 16px 0 #b8be9d;
+                    background:radial-gradient(circle at 30% 35%, #648247 0 4%, transparent 4.5%), radial-gradient(circle at 65% 65%, #648247 0 5%, transparent 5.5%), radial-gradient(circle at 68% 30%, #688947 0 4%, transparent 4.5%), radial-gradient(circle at 35% 70%, #688947 0 5%, transparent 5.5%), repeating-linear-gradient(35deg, #e2c983 0 8px, #f3dea4 9px 15px);
+                }
+            }
+        }
+        div {
+            display:grid;
+            grid-template-columns:minmax(16rem, 0.9fr) minmax(0, 1.3fr);
+            gap:4rem;
+            @media (width < 48rem) {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            section.stack {
+                div.bar {
+                    h2 {
+                        "Your ingredients";
+                    }
+                    p.muted {
+                        = (state.ingredients count_where |item| {
+                            item.packed;
+                        }).to_f64().toString() + " / 6 ready";
+                    }
+                }
+                div.panel.bar {
+                    span {
+                        "At your table";
+                    }
+                    div.bar {
+                        button {
+                            <aria-label = "Fewer servings";
+                            <disabled = $[state.servings <= 1.0];
+                            "−";
+                            on click {
+                                state.servings -= 1.0;
+                            };
+                        }
+                        strong {
+                            <id = "servings";
+                            = state.servings.toString() + " servings";
+                        }
+                        button {
+                            <aria-label = "More servings";
+                            <disabled = $[state.servings >= 12.0];
+                            "+";
+                            on click {
+                                state.servings += 1.0;
+                            };
+                        }
+                    }
+                }
+                for $[state.ingredients] |item| key $[item.id] {
+                    label.ingredient {
+                        grid-template-columns:auto 1fr auto;
+                        align-items:center;
+                        padding-block:0.9rem;
+                        border-bottom:1px solid var(--line);
+                        font-weight:400;
+                        font-size:1rem;
+                        input {
+                            <type = "checkbox";
+                            bind:checked = item.packed;
+                        }
+                        span {
+                            = item.name;
+                        }
+                        strong {
+                            = amount(item, state.servings);
+                        }
+                    }
+                }
+                button {
+                    "Reset shopping list";
+                    on click {
+                        state.ingredients each |item| {
+                            item.packed = false;
+                        };
+                    };
+                }
+            }
+            section.stack {
+                align-content:start;
+                div.bar {
+                    h2 {
+                        "Let’s cook";
+                    }
+                    span.eyebrow {
+                        = "STEP " + (state.step + 1).to_f64().toString() + " / 4";
+                    }
+                }
+                progress {
+                    <max = "4";
+                    <value = $[(state.step + 1).to_f64().toString()];
+                    width:100%;
+                    accent-color:var(--accent);
+                }
+                article.panel.stack {
+                    min-block-size:17rem;
+                    padding:2rem;
+                    align-content:start;
+                    p {
+                        font:clamp(1.35rem, 3vw, 2rem)/1.45 Georgia, serif;
+                        = instructions[state.step];
+                    }
+                }
+                div.bar {
+                    button {
+                        <disabled = $[state.step == 0];
+                        "Previous step";
+                        on click {
+                            state.step -= 1;
+                        };
+                    }
+                    button.primary {
+                        <disabled = $[state.step == 3];
+                        "Next step →";
+                        on click {
+                            state.step += 1;
+                        };
+                    }
+                }
+                aside.panel.stack {
+                    p.eyebrow {
+                        "MAKE IT YOURS";
+                    }
+                    p.muted {
+                        "Swap feta for a dairy-free crumble, or finish with fresh herbs. Scaling changes ingredient quantities; use a larger pan for a larger table.";
+                    }
+                }
+            }
+        }
+        footer.bar {
+            p {
+                "Built in Utu + Wutu. Data stays in this browser.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

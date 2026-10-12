@@ -15,6 +15,10 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
     const hits = rangeIndex(file, offset, offset + 1, { kind: 'ir' });
     const candidates = hits.map(entry => ({ entry, node: nodeForEntry(entry) })).filter(item => item.node);
     candidates.sort((a, b) => ((a.entry.end - a.entry.start) - (b.entry.end - b.entry.start))
+      // Generated helper types can inherit the entire entry-file range. At
+      // equal spans, prefer source nodes before depth so they cannot steal
+      // hover/call-hierarchy queries from the user's declaration.
+      || (Number(a.node.dataset.synthetic === 'true') - Number(b.node.dataset.synthetic === 'true'))
       || (domDepth(b.node) - domDepth(a.node)));
     if (candidates[0]) return candidates[0].node;
     return null;
@@ -220,6 +224,9 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
   function inlayHintsForFile(file) {
     const hints = [];
     const add = (node, label, kind, tooltip) => {
+      // Compiler-generated code (iterator, loop, and template expansions)
+      // carries its site's range; a hint there would label invisible code.
+      if (node?.dataset?.synthetic === 'true') return;
       const location = ref(node);
       if (location?.file !== file || location.end == null) return;
       hints.push({ position: location.end, label, kind, tooltip, node: location });
@@ -322,6 +329,7 @@ function displayName(node, displayType = value => value) {
     'ir-return': 'return value',
     'ir-if': 'conditional expression',
     'ir-match': 'match expression',
+    'ir-loop-match': 'loop match',
     'ir-alt': 'enum alternative',
     'ir-await': 'awaited value',
   })[node.localName] ?? node.localName?.replace(/^ir-/, '').replace(/-/g, ' ') ?? '';

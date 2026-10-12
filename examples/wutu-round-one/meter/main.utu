@@ -1,0 +1,116 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Habit:
+| id: Str
+| name: Str
+| days: Array[Bool]
+struct MeterState:
+| habits: Array[Habit]
+fn workspace(state: MeterState) Browser.HTMLElement {
+    @wutu/\
+    @island "meter-workspace";
+    section.workspace {
+        for $[state.habits] |habit| key $[habit.id] {
+            article.panel.stack {
+                div.bar {
+                    h2 {
+                        = habit.name;
+                    }
+                    p {
+                        = wutu.number(habit.days count_where |done| {
+                            done;
+                        })+" / 7";
+                    }
+                }
+                div.days {
+                    for $[["M","T","W","T","F","S","S"]] |day,index| {
+                        button {
+                            <aria-label = $[habit.name+" day "+wutu.number(index.to_i64().to_i32()+1)];
+                            <aria-pressed = $[if habit.days[index.to_i64().to_i32()] {"true";} else {"false";}];
+                            = day;
+                            on click {
+                                let i=index.to_i64().to_i32();
+                                habit.days[i]=not habit.days[i];
+                                wutu.save("meter-v2");
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        button {
+            "Start a fresh week";
+            on click {
+                state.habits each |habit| {
+                    habit.days=[false,false,false,false,false,false,false];
+                };
+                wutu.save("meter-v2");
+            };
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        MeterState "meter-v2" manual
+        MeterState {
+            habits:[Habit {
+                id:"walk",
+                name:"Go outside",
+                days:[false,false,false,false,false,false,false]
+            },Habit {
+                id:"read",
+                name:"Read a few pages",
+                days:[false,false,false,false,false,false,false]
+            },Habit {
+                id:"rest",
+                name:"Make time to rest",
+                days:[false,false,false,false,false,false,false]
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "meter";
+        nav {
+            strong {
+                "METER / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "Small promises. Kept a little more often.";
+            }
+            p.muted {
+                "A weekly rhythm you choose yourself. Tap a day, keep your streak in perspective, and start again when you need to.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

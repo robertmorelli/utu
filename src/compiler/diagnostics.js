@@ -2,6 +2,8 @@ import { retainGraph, retainedGraphs } from './graph-store.js';
 
 export const DIAGNOSTIC_KINDS = {
   PARSE_ERROR: 'parse-error',
+  COMPRESSED_SOURCE: 'compressed-source',
+  UNKNOWN_ISLAND: 'unknown-island',
   IMPORT_CYCLE: 'import-cycle',
   UNKNOWN_IMPORT: 'unknown-import',
   ENTRY_SURFACE_CONFLICT: 'entry-surface-conflict',
@@ -33,6 +35,7 @@ export const DIAGNOSTIC_KINDS = {
   IMPLICIT_STRUCT_INIT: 'implicit-struct-init',
   REWRITE_INVARIANT: 'rewrite-invariant',
   INVALID_DSL_USAGE: 'invalid-dsl-usage',
+  INVALID_ITERATOR_USAGE: 'invalid-iterator-usage',
 };
 
 export function stampDiagnostic(node, kind, message, extra = {}) {

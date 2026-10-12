@@ -11,6 +11,7 @@ const options = buildGrammarOptions();
 module.exports = grammar({
   name: 'utu',
   word: options.word,
+  externals: $ => [$.dsl_body],
   extras: options.extras,
   conflicts: options.conflicts,
   rules: {

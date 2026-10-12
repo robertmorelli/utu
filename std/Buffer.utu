@@ -1,0 +1,30 @@
+// Geometrically growing native buffer, including non-defaultable element types.
+mod Buffer[T] {
+    struct &:
+        | values: Array[T]
+        | length: I32
+
+    fn &.new() & {
+        &{ values: [], length: 0 };
+    }
+
+    fn &.push |self| (value: T) void {
+        if self.length == self.values.len() {
+            if self.length > 536870911 { fatal; };
+            let capacity = if self.length == 0 { 8; } else { self.length * 2; };
+            let grown = Array[T].new(capacity, value);
+            let i = 0;
+            while (i < self.length) {
+                grown[i] = self.values[i];
+                i += 1;
+            };
+            self.values = grown;
+        };
+        self.values[self.length] = value;
+        self.length += 1;
+    }
+
+    fn &.finish |self| () Array[T] {
+        self.values.slice(0, self.length);
+    }
+}

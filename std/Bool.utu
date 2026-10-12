@@ -12,4 +12,10 @@ mod Bool {
     fn &:or  |a, b| Bool { @ir/\ <ir-i32-or><ir-ident name="a"/><ir-ident name="b"/></ir-i32-or> \/; }
     fn &:xor |a, b| Bool { @ir/\ <ir-i32-xor><ir-ident name="a"/><ir-ident name="b"/></ir-i32-xor> \/; }
     fn &:not |a| Bool { @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-eqz> \/; }
+
+    // Decimal text, as JavaScript's String() spells it. Ships only when used.
+    fn &.to_str |self| () Str {
+        let format: fun(Bool) Str = @es/\ (v) => (v ? "true" : "false") \/;
+        format(self);
+    }
 }

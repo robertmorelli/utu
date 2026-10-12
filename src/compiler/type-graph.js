@@ -16,8 +16,11 @@ import { buildProgramIndex, nodesOf } from './program-index.js';
 import { reportTypeGraphDiagnostics } from './type-graph-diagnostics.js';
 
 const VOID_NODES = new Set([
-  'ir-assign', 'ir-while', 'ir-for', 'ir-return', 'ir-break', 'ir-assert',
+  'ir-assign', 'ir-while', 'ir-for', 'ir-loop-match', 'ir-defer', 'ir-assert',
 ]);
+// Control transfers never complete, so like `fatal` they fit any context:
+// `if b { return 1; } else { return 2; }` can end an I32 function.
+const DIVERGING_NODES = new Set(['ir-return', 'ir-break', 'ir-continue']);
 const MEMBER_OPERATIONS = new Map([['ir-index', 'get_index'], ['ir-slice', 'get_slice']]);
 
 /**
@@ -294,7 +297,7 @@ export const recordTypeGraph = projectTypeGraph;
 export function checkTypeGraph(graph) {
   return reportTypeGraphDiagnostics(graph, {
     actual, actualOrigin, collectFailures, compatible, edgeSource,
-    planCoercions, valueForDiagnostic,
+    knownType, planCoercions, valueForDiagnostic,
   });
 }
 
@@ -390,6 +393,7 @@ function addActualRule(graph, node) {
   const read = n => actual(graph, n);
   const fixed = (type, source) => rule(graph, node, [], () => type, source);
   if (VOID_NODES.has(node.localName)) return fixed('void', node.localName.slice(3));
+  if (DIVERGING_NODES.has(node.localName)) return fixed('never', node.localName.slice(3));
   const member = MEMBER_OPERATIONS.get(node.localName);
   if (member) return rule(graph, node, children, () => foreignActual(graph, node) ?? memberResult(graph, node, read(one), member), 'return-of');
 
@@ -404,8 +408,14 @@ function addActualRule(graph, node) {
     case 'ir-param':
       // Closure parameters may be seeded from context between solver rounds.
       return rule(graph, node, [], () => declaredTypeStr(node) ?? node.dataset.typeName ?? null, 'parameter');
-    case 'ir-let': case 'ir-global':
-      return rule(graph, node, [two], () => declaredTypeStr(node) ?? read(two), 'binding-value');
+    case 'ir-let': case 'ir-global': {
+      // Iterator identities (0/1) take the element type even for an empty
+      // stream. This is a dependency edge, not speculative evaluation of its
+      // first element, and needs no specialization pass.
+      const element = node.dataset.iteratorElement
+        ? (node.closest('ir-fn, ir-closure') ?? graph.root).querySelector(`ir-let[name="${node.dataset.iteratorElement}"]`) : null;
+      return rule(graph, node, [element ?? two], () => declaredTypeStr(node) ?? read(element ?? two), 'binding-value');
+    }
     case 'ir-self-param': {
       const name = node.closest('ir-fn')?.querySelector(':scope > ir-fn-name');
       const implementation = name?.querySelector(':scope > ir-type-args')?.firstElementChild;
@@ -649,14 +659,19 @@ function collectOperationFailures(graph) {
     if (graph.slots.get(call)?.foreign || resolvedFunction(graph, call) || graph.slots.get(call)?.protocolCall
       || callableParts(actual(graph, callee))) continue;
     if (callee?.localName !== 'ir-field-access' && callee?.localName !== 'ir-type-member') continue;
-    const recv = callee.firstElementChild;
-    const owner = isTypeNamespace(graph, recv) ? recv.getAttribute('name') : actual(graph, recv);
-    if (!owner) continue;
-    const member = callee.getAttribute('field') ?? callee.getAttribute('method');
+    if (call.dataset.forArrayAccess) continue;
     const operator = call.dataset.operatorName;
+    const recv = callee.firstElementChild;
+    // Lowered operators name their receiver type on the call; the callee has no receiver child.
+    const owner = operator
+      ? call.dataset.operatorReceiverName ?? callee.getAttribute('type-name')
+      : isTypeNamespace(graph, recv) ? recv.getAttribute('name') : actual(graph, recv);
+    if (!owner || owner === 'undefined') continue;
+    const member = callee.getAttribute('field') ?? callee.getAttribute('method');
     const kind = operator ? DIAGNOSTIC_KINDS.UNKNOWN_OPERATOR : DIAGNOSTIC_KINDS.UNKNOWN_METHOD;
+    const symbol = call.dataset.operatorSymbol;
     const message = operator
-      ? `Cannot resolve operator '${operator}' for ${owner}`
+      ? `${owner} has no '${symbol ?? operator}' operator${symbol && symbol !== operator ? ` (${owner}.${operator})` : ''}`
       : `Unknown method '${unwrapNullable(owner)}.${member}'`;
     fail(graph, call, kind, message, { method: member, operator, receiverName: owner });
   }
@@ -673,9 +688,11 @@ function checkArity(graph, call) {
   if (!signature) return;
   const expected = signature.length;
   const actualCount = call.querySelector(':scope > ir-arg-list')?.children.length ?? 0;
+  // `T.method(value, args)` passes the receiver explicitly; that extra
+  // argument only exists when the function actually takes `self`.
   const receiverArg = fn && graph.slots.get(call)?.resolution?.resolvedAs === 'static-method'
     && fn.querySelector(':scope > ir-fn-name')?.getAttribute('kind') === 'method'
-    && actualCount === expected + 1;
+    && selfParamOf(fn) && actualCount === expected + 1;
   if (receiverArg || actualCount === expected) return;
   const name = fn?.getAttribute('name') ?? callee?.getAttribute('name');
   fail(graph, call, DIAGNOSTIC_KINDS.WRONG_ARITY,
@@ -701,7 +718,10 @@ function arrayElementContext(graph, node) {
   if (named) return graph.typeIndex?.get(named)?.arrayElem;
   // Integer literals and `null` follow their neighbours: `[x, 2]` with `x: F64`, `[p, null]`.
   const element = literalArrayElement(node) ?? arrayElementType(node, child => actual(graph, child));
-  const adapts = [...node.children].some(c => c.localName === 'ir-lit' && ['int', 'null'].includes(c.getAttribute('kind')));
+  // Elements need context when they adapt to their neighbours, or when a
+  // function reference must convert to the closure the array stores.
+  const adapts = [...node.children].some(c => (c.localName === 'ir-lit' && ['int', 'null'].includes(c.getAttribute('kind')))
+    || actual(graph, c)?.replace(/^\?/, '').startsWith('fun('));
   return element && element !== 'I32' && adapts ? element : undefined;
 }
 
@@ -774,7 +794,7 @@ function addExpectations(graph, node) {
   const tag = node.localName;
   if (tag === 'ir-let' || tag === 'ir-global') {
     const type = declaredTypeStr(node);
-    if (type) expect(graph, node.lastElementChild, () => type, 'binding', firstTypeChild(node) ?? node, 'assign');
+    if (type || node.dataset.iteratorElement) expect(graph, node.lastElementChild, () => type ?? actual(graph, node), 'binding', firstTypeChild(node) ?? node, 'assign');
   }
   if (tag === 'ir-assign') {
     const [target, value] = [...node.children];
@@ -814,6 +834,12 @@ function addExpectations(graph, node) {
     expect(graph, node.firstElementChild, () => 'Bool', 'condition', node, 'assign',
       () => name === 'assert' ? 'assert condition must be Bool' : `${name} condition must be Bool`);
   }
+  if (tag === 'ir-continue' && node.firstElementChild) {
+    // `continue v` re-dispatches its loop match, so v has the state's type.
+    const target = loopMatchTarget(node);
+    if (target) expect(graph, node.firstElementChild, () => actual(graph, target.firstElementChild), 'assign', target.firstElementChild, 'assign',
+      expected => `loop match state is ${expected}`);
+  }
   if (tag === 'ir-if') addConfluence(graph, node, [...node.children].slice(1));
   if (tag === 'ir-try') addConfluence(graph, node, [...node.children]);
   if (tag === 'ir-match' || tag === 'ir-alt' || tag === 'ir-promote') {
@@ -836,6 +862,8 @@ function addExpectations(graph, node) {
   }
 }
 
+const BRANCHING = new Set(['ir-if', 'ir-match', 'ir-alt', 'ir-promote']);
+
 function addReturnExpectations(graph, surface) {
   const type = surface.localName === 'ir-closure'
     ? typeNodeToStr(firstTypeChild(surface)) : fnReturnType(surface);
@@ -844,6 +872,13 @@ function addReturnExpectations(graph, surface) {
   const source = firstTypeChild(surface) ?? surface;
   const tail = returnedValue(body?.lastElementChild);
   if (tail) expect(graph, tail, () => type, 'return', source, 'assign');
+  // A branching expression at the end of nested blocks also learns the return
+  // type, so its literal branches (`else { -1; }`) take it.
+  let inner = tail;
+  while ((inner?.localName === 'ir-block' || inner?.localName === 'ir-paren') && inner.lastElementChild?.localName !== 'ir-let') {
+    inner = returnedValue(inner.lastElementChild);
+  }
+  if (inner && inner !== tail && BRANCHING.has(inner.localName)) expect(graph, inner, () => type, 'return', source, 'assign');
   for (const ret of body?.querySelectorAll('ir-return') ?? []) {
     if (ret !== body.lastElementChild
       && ret.closest('ir-fn, ir-export-main, ir-closure') === surface
@@ -906,11 +941,20 @@ function fieldDecl(entry, name) {
     .find(field => field.getAttribute('name') === name) ?? entry?.decl;
 }
 
+// Numeric context types that branch literals adopt directly.
+const LITERAL_CONTEXT = new Set(['I32', 'U32', 'I64', 'U64', 'F32', 'F64']);
+
 function addConfluence(graph, owner, values) {
   const branches = values.filter(Boolean);
   const first = branches[0];
   for (const branch of branches) {
     const readUnified = () => {
+      // The surrounding context (a return type, an annotated let) decides what
+      // every branch must be. Without it, branches meet each other, which can
+      // leave a literal branch to default before a block branch has a type.
+      const context = graph.slots.get(owner)?.expected?.map(edge => edge.read())
+        .find(type => type && type !== 'null' && type !== 'void' && type !== 'nullable');
+      if (context && LITERAL_CONTEXT.has(context)) return context;
       const unified = actual(graph, owner) ?? actual(graph, first);
       if (unified !== 'null') return unified;
       return graph.slots.get(owner)?.expected?.map(edge => edge.read()).find(type => type && type !== 'null') ?? unified;
@@ -922,7 +966,8 @@ function addConfluence(graph, owner, values) {
     let value = branch;
     while (value?.localName === 'ir-block' || value?.localName === 'ir-paren') value = value.lastElementChild;
     value = returnedValue(value);
-    if (value?.localName === 'ir-lit' && value.getAttribute('kind') === 'null') {
+    if (value?.localName === 'ir-unary' && value.getAttribute('op') === '-') value = value.firstElementChild;
+    if (value?.localName === 'ir-lit' && ['null', 'int', 'float'].includes(value.getAttribute('kind'))) {
       expect(graph, value, readUnified, 'confluence', first, 'unify', message);
     }
   }
@@ -966,10 +1011,15 @@ function collectFailures(graph) {
   // Explicit type references are checked by linkTypeDecls, but inferred types
   // can become stale across module hoisting. Report those as diagnostics too
   // instead of letting debug assertions or codegen crash on an unknown name.
+  // Names already reported where they were written need no second report
+  // on every value whose inferred type mentions them.
+  const reportedUnknown = new Set([...graph.doc.querySelectorAll('ir-type-ref[name]')]
+    .map(ref => ref.getAttribute('name'))
+    .filter(name => !knownType(graph, name)));
   for (const [node, typeSlot] of graph.slots) {
     if (node.dataset.foreignError) fail(graph, node, DIAGNOSTIC_KINDS.TYPE_MISMATCH, node.dataset.foreignError, {});
     const type = typeSlot.actual;
-    if (type && !knownType(graph, type)) {
+    if (type && !knownType(graph, type) && !unknownTypeNames(graph, type).every(name => reportedUnknown.has(name))) {
       fail(graph, node, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown inferred type '${type}'`, { type });
     }
   }
@@ -1009,6 +1059,15 @@ function collectFailures(graph) {
   collectOperationFailures(graph);
 }
 
+/** The loop match a `continue v` re-dispatches: the nearest one in the same function. */
+export function loopMatchTarget(node) {
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    if (parent.localName === 'ir-loop-match') return parent;
+    if (parent.localName === 'ir-closure' || parent.localName === 'ir-fn') return null;
+  }
+  return null;
+}
+
 function knownType(graph, type) {
   const name = unwrapNullable(type);
   if (name === '&' || name === 'nullable' || name === 'unknown' || name === 'never') return true;
@@ -1016,6 +1075,14 @@ function knownType(graph, type) {
   if (callable) return [...callable.params, callable.ret]
     .every(part => part === 'void' || knownType(graph, part));
   return INFERRED_PRIMITIVES.has(name) || graph.typeIndex?.has(name);
+}
+
+/** The unknown base names inside a type string, e.g. `fun(Nope) I32` → ['Nope']. */
+function unknownTypeNames(graph, type) {
+  const name = unwrapNullable(type);
+  const callable = callableParts(name);
+  if (callable) return [...callable.params, callable.ret].filter(part => part !== 'void').flatMap(part => unknownTypeNames(graph, part));
+  return knownType(graph, name) ? [] : [name];
 }
 
 function fail(graph, node, kind, message, data) {
@@ -1070,5 +1137,10 @@ function returnedValue(node) {
 function valueForDiagnostic(node) {
   if (node?.localName === 'ir-block') return valueForDiagnostic(node.lastElementChild);
   if (node?.localName === 'ir-return') return valueForDiagnostic(node.firstElementChild);
+  // Expansion-generated parentheses (Wutu, iterators) wrap user source that
+  // keeps its own range; point at that source rather than the whole template.
+  if (node?.localName === 'ir-paren' && node.dataset.synthetic === 'true' && node.firstElementChild?.dataset.synthetic !== 'true') {
+    return node.firstElementChild;
+  }
   return node;
 }

@@ -1,0 +1,8 @@
+mod Group[K, T] {
+    struct &:
+        | key: K
+        | values: Array[T]
+    fn &.new(key: K) & {
+        &{ key: key, values: [] };
+    }
+}

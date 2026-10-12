@@ -44,6 +44,26 @@ export function typeNodeToStr(typeNode) {
   }
 }
 
+/**
+ * A type as written in source, including generic instantiations such as
+ * `Array[Array[I32]]` and `?Array[I32]`, which `typeNodeToStr` leaves to the
+ * instantiation pass. Syntactic lowerings (iterators, generators, @json,
+ * @stored) run before that pass and print types with this.
+ */
+export function sourceTypeStr(typeNode) {
+  if (!typeNode) return null;
+  if (typeNode.localName === 'ir-type-nullable') {
+    const inner = sourceTypeStr(typeNode.firstElementChild);
+    return inner ? `?${inner}` : null;
+  }
+  if (typeNode.localName === 'ir-type-inst') {
+    const args = [...(typeNode.querySelector(':scope > ir-type-args')?.children ?? [])].map(sourceTypeStr);
+    if (!args.every(Boolean)) return typeNode.getAttribute('raw')?.replace(/\s+/g, '') ?? null;
+    return `${typeNode.getAttribute('module')}[${args.join(', ')}]`;
+  }
+  return typeNodeToStr(typeNode) ?? typeNode.getAttribute('raw')?.replace(/\s+/g, '') ?? null;
+}
+
 /** First `ir-type-*` child of `node`, or null. */
 export function firstTypeChild(node) {
   // Matched by prefix rather than by an explicit list of tags: the list has to

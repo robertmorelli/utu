@@ -1,0 +1,44 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import {chromium,webkit} from 'playwright';
+const root=path.resolve('dist/wutu-five');
+const server=http.createServer(async(req,res)=>{try{let name=decodeURIComponent(new URL(req.url,'http://local').pathname);if(name.endsWith('/'))name+='index.html';const file=path.resolve(root,'.'+name);if(!file.startsWith(root+'/'))throw Error();res.setHeader('Content-Type',file.endsWith('.wasm')?'application/wasm':file.endsWith('.js')?'text/javascript':file.endsWith('.utu')?'text/plain':'text/html');res.end(await fs.readFile(file));}catch{res.writeHead(404).end();}});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const engine=process.argv.includes('--webkit')?webkit:chromium;
+const browser=await engine.launch();
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const visit=async id=>{await page.goto(`http://127.0.0.1:${server.address().port}/${id}/`);await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready'));await page.locator('h1').waitFor();};
+ const shot=async id=>{await page.screenshot({path:path.join(root,id,'desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),id+' mobile overflow');await page.screenshot({path:path.join(root,id,'mobile.png'),fullPage:true});await page.setViewportSize({width:1440,height:1000});};
+ await visit('folio');assert.equal(await page.locator('.book').count(),3);
+ await page.getByRole('button',{name:'Mark finished'}).first().click();
+ await page.getByLabel('Show',{exact:true}).selectOption('finished');assert.equal(await page.locator('.book').count(),2);
+ await page.getByLabel('Show',{exact:true}).selectOption('all');
+ await page.getByLabel('Search the shelf').fill('BRAIDING');assert.equal(await page.locator('.book').count(),1);
+ await page.getByLabel('Search the shelf').fill('');await page.getByLabel('Book title').fill('A <quiet> book');await page.getByLabel('Author',{exact:true}).fill('A Reader');await page.getByRole('button',{name:'Add book'}).click();assert.equal(await page.locator('.book').count(),4);
+ await page.reload();await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready'));await page.locator('.book').nth(3).waitFor();assert.equal(await page.getByRole('button',{name:'Read again'}).count(),2);
+ await page.getByRole('button',{name:'Remove A <quiet> book',exact:true}).click();assert.equal(await page.locator('.book').count(),3);await shot('folio');
+ await visit('juniper');assert.equal(await page.locator('.dish').count(),6);
+ await page.getByRole('button',{name:'Add Garden toast',exact:true}).click();assert.equal(await page.locator('#subtotal').textContent(),'$12.50');
+ await page.getByRole('button',{name:'Add another Garden toast',exact:true}).click();assert.equal(await page.locator('#subtotal').textContent(),'$25.00');
+ await page.getByLabel('Browse').selectOption('Coffee');assert.equal(await page.locator('.dish').count(),2);
+ await page.reload();await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready'));await page.locator('#subtotal').waitFor();assert.equal(await page.locator('#subtotal').textContent(),'$25.00');
+ await page.getByRole('button',{name:'Remove one Garden toast',exact:true}).click();assert.equal(await page.locator('#subtotal').textContent(),'$12.50');await shot('juniper');
+ await page.getByRole('button',{name:'Clear order notes'}).click();assert.equal(await page.locator('#subtotal').textContent(),'$0.00');
+ await visit('wayfarer');await page.getByLabel('Place or activity').fill('Hidden beach');await page.getByLabel('Which day?').selectOption('3');await page.getByLabel('Estimated cost ($)',{exact:true}).fill('15');await page.getByRole('button',{name:'Add to the journey'}).click();
+ await page.getByLabel('Day',{exact:true}).selectOption('3');assert.ok((await page.locator('#itinerary').textContent()).includes('Hidden beach'));await page.getByRole('button',{name:'Mark visited'}).first().click();
+ await page.reload();await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready'));await page.getByText('Hidden beach',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Visited ✓',exact:true}).count(),1);await shot('wayfarer');await page.getByRole('button',{name:'Remove Hidden beach'}).click();
+ await visit('signal');assert.equal(await page.locator('.session').count(),8);
+ const sessions=page.locator('.session');await sessions.nth(1).getByRole('button').click();await sessions.nth(2).getByRole('button').click();assert.equal(await page.locator('.conflict').count(),1);
+ const calendar=decodeURIComponent((await page.getByRole('link',{name:'Download calendar'}).getAttribute('href')).split(',').slice(1).join(','));assert.ok(calendar.includes('BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'));assert.equal((calendar.match(/BEGIN:VEVENT/g)||[]).length,2);assert.ok(!calendar.includes('\\r\\n'));
+ await page.getByLabel('My agenda only').check();assert.equal(await page.locator('.session').count(),2);await page.reload();await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready'));await page.locator('.session').nth(7).waitFor();assert.equal(await page.locator('button[aria-pressed="true"]').count(),2);await shot('signal');
+ await visit('scope');assert.equal(await page.locator('#estimate-total').textContent(),'$4460.00');await page.getByLabel('Work description').fill('QA, "final"');await page.getByLabel('Hours',{exact:true}).fill('2');await page.getByLabel('Hourly rate ($)',{exact:true}).fill('100');await page.getByRole('button',{name:'Add work item',exact:true}).click();assert.equal(await page.locator('#estimate-total').textContent(),'$4660.00');
+ await page.getByRole('button',{name:'Edit QA, "final"',exact:true}).click();await page.getByLabel('Hours',{exact:true}).fill('3');await page.getByRole('button',{name:'Update item',exact:true}).click();assert.equal(await page.locator('#estimate-total').textContent(),'$4760.00');
+ const csv=decodeURIComponent((await page.getByRole('link',{name:'Download estimate as CSV'}).getAttribute('href')).split(',').slice(1).join(','));assert.ok(csv.includes('"QA, ""final""",3,100.00,300.00\r\n'));assert.ok(csv.startsWith('Project,Work,Hours,Rate USD,Amount USD\r\n'));
+ await page.reload();await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready'));await page.locator('#estimate-total').waitFor();assert.equal(await page.locator('#estimate-total').textContent(),'$4760.00');await shot('scope');await page.getByRole('button',{name:'Delete QA, "final"',exact:true}).click();assert.equal(await page.locator('#estimate-total').textContent(),'$4460.00');
+ for(const id of ['folio','juniper','wayfarer','signal','scope']){await page.goto(`http://127.0.0.1:${server.address().port}/${id}/source.html`);assert.equal(await page.locator('pre code').textContent(),await fs.readFile(`examples/wutu-five/${id}/main.utu`,'utf8'));}
+ const reports=JSON.parse(await fs.readFile(path.join(root,'sizes.json'),'utf8'));for(const [id,r]of Object.entries(reports))assert.ok(r.pageGzip<14000,`${id} exceeds 14KB gzip including HTML`);
+ assert.deepEqual(errors,[]);console.log(`${engine.name()}: all five sites passed interactions, persistence, exports, source parity, mobile overflow, and size budgets`);
+}finally{await browser.close();await new Promise(r=>server.close(r));}

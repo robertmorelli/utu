@@ -39,6 +39,17 @@ mod Str {
         @ir/\ <ir-string-get-wtf16><ir-ident name="s"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
     }
 
+    // A one-code-point string.
+    fn from_code_point(code: I32) & {
+        @ir/\ <ir-string-from-code-point><ir-ident name="code"/></ir-string-from-code-point> \/;
+    }
+
+    // The first `count` UTF-16 code units of `codes`, as one string. Build
+    // text in an Array[I32] and convert once, rather than concatenating.
+    fn from_codes(codes: Array[I32], count: I32) & {
+        @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="count"/></ir-string-from-codes> \/;
+    }
+
     // Receiver/index forms mirror Array's surface while preserving the
     // existing static Str.len/slice/get entry points.
     fn &.len |self| () I32 {

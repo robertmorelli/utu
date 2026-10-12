@@ -184,6 +184,8 @@ function strCases() {
     stdCase('Str', 'len', 'std_str_len_non_ascii', '', 'I32', 'Str.len("hé")', [], 2),
     stdCase('Str', 'slice', 'std_str_slice_roundtrip', '', 'I32', 'if Str.slice("hello", 1, 3) == "el" { 1; } else { 0; }', [], 1),
     stdCase('Str', 'get', 'std_str_get', '', 'I32', 'Str.get("hello", 4)', [], 111),
+    stdCase('Str', 'from_code_point', 'std_str_from_code_point', '', 'I32', 'if Str.from_code_point(65) + Str.from_code_point(128512) == "A😀" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'from_codes', 'std_str_from_codes', '', 'I32', 'if Str.from_codes([72, 105, 33, 0], 3) == "Hi!" and Str.from_codes([1], 0) == "" { 1; } else { 0; }', [], 1),
   ];
 }
 

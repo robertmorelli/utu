@@ -1,0 +1,17 @@
+// Keep the user's draft, including empty/invalid text, separate from a number.
+mod NumberField {
+    struct &:
+        | text: Str
+    fn &.new(text: Str) & { &{ text: text }; }
+    fn &.valid |self| (min: F64, max: F64) Bool {
+        let check: fun(Str, F64, F64) Bool = @es/\ (text,min,max)=>text.trim()!==''&&Number.isFinite(Number(text))&&Number(text)>=min&&Number(text)<=max \/;
+        check(self.text,min,max);
+    }
+    fn &.value |self| () F64 {
+        let parse: fun(Str) F64 = @es/\ text=>Number(text) \/;
+        parse(self.text);
+    }
+    fn &.error |self| (min: F64, max: F64) Str {
+        if self.valid(min,max) { ""; } else { "Enter a number within the allowed range."; };
+    }
+}

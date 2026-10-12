@@ -31,6 +31,12 @@ async function main() {
   }
 
   const file = path.resolve(process.cwd(), fileArg);
+  try {
+    await fs.access(file);
+  } catch {
+    console.error(`${fileArg}: file not found`);
+    process.exit(1);
+  }
   const optimize = flags.has('-O3') ? 'speed' : 'size';
   const compiler = await makeCompiler(command === 'build-exe' ? 'normal' : 'analysis', optimize);
 

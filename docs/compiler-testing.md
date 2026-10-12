@@ -34,6 +34,24 @@ counts. Compare equivalent programs within the same run for size regressions.
 - `range-index-tests.mjs`: half-open interval semantics, empty/invalid ranges,
   duplicate-key stress, file/kind filtering, insertion-order independence, and
   seeded comparisons against an independent brute-force oracle.
+- `wutu-tests.mjs`: the Wutu parser (else-if, comments, located syntax errors,
+  seeded mutation fuzzing), formatter round trips, static and reactive
+  rendering against linkedom, template diagnostics, island-name warnings, and
+  `@stored` diagnostics.
+- `wutu-runtime-tests.mjs`: the reconciler driven directly as compiled templates
+  call it: element reuse, keyed and global-key moves, listener replacement,
+  islands and cleanup, timers, styles, and storage conflict handling.
+- `import-diagnostic-tests.mjs`: missing files and modules, syntax errors in
+  imported files, and recovered syntax in `export lib`.
+- `language-regression-tests.mjs`: nested generic-module calls, closure arrays,
+  negative and invalid `match` patterns, operator and unknown-type diagnostics,
+  and one report per syntax-error offset.
+
+`npm test` also runs two browser-free scripts: `test-wutu-stencils.mjs` (CSS
+projection and formatter idempotence over the example sites) and
+`test-wutu-cli.mjs` (format, build diagnostics, and the dev server's serving,
+live-reload events, path guard, and cleanup). The Playwright suites
+(`test:wutu*`) remain separate because they need installed browsers.
 
 Runtime execution tests complement structural checks: a well-shaped IR can
 still miscompile, and successful execution alone does not prove that a closure

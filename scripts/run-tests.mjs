@@ -1,3 +1,4 @@
+import { registerIteratorWutuTests } from './iterator-wutu-tests.mjs';
 // scripts/run-tests.mjs — Utu compiler test runner
 //
 // Usage: bun ./scripts/run-tests.mjs [--no-debug-assertions] [--both-debug-modes]
@@ -25,6 +26,12 @@ import { registerIrStructureTests } from './ir-structure-tests.mjs';
 import { registerNegativeDiagnosticTests } from './negative-diagnostic-tests.mjs';
 import { registerParserAnalysisTests } from './parser-analysis-tests.mjs';
 import { registerStdlibConformanceTests } from './stdlib-conformance-tests.mjs';
+import { registerWutuTests } from './wutu-tests.mjs';
+import { registerWutuRuntimeTests } from './wutu-runtime-tests.mjs';
+import { registerImportDiagnosticTests } from './import-diagnostic-tests.mjs';
+import { registerLanguageRegressionTests } from './language-regression-tests.mjs';
+import { registerIteratorDifferentialTests } from './iterator-differential-tests.mjs';
+import { registerJsonTests } from './json-tests.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BOTH_DEBUG_MODES = process.argv.includes('--both-debug-modes');
@@ -54,11 +61,18 @@ registerCompilerQualityTests(suiteContext);
 registerParserAnalysisTests(suiteContext);
 registerIrStructureTests({ test, assertThrows });
 registerCodegenCoreTests(suiteContext);
+registerIteratorWutuTests(suiteContext);
+registerWutuTests(suiteContext);
+registerWutuRuntimeTests(suiteContext);
 registerStdlibConformanceTests(suiteContext);
 registerCodegenHeapTests(suiteContext);
 registerAdversarialCompilerTests(suiteContext);
 registerExamplesConformanceTests(suiteContext);
 registerNegativeDiagnosticTests({ test, makeCompiler, assert });
+registerImportDiagnosticTests(suiteContext);
+registerLanguageRegressionTests(suiteContext);
+registerIteratorDifferentialTests(suiteContext);
+registerJsonTests(suiteContext);
 
 async function main() {
   const parser = await initParser({ wasmDir: `${ROOT}/` });

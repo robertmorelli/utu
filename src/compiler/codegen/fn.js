@@ -61,7 +61,8 @@ export function emitFn(fn, ctx) {
     locals,
     debugExprs: [],
     addLocal(typeStr) {
-      const tId = ctx.toType(typeStr);
+      // A Utu type name, or a binaryen type for codegen-private locals.
+      const tId = typeof typeStr === 'number' ? typeStr : ctx.toType(typeStr);
       const idx = paramTypes.length + varTypes.length;
       varTypes.push(tId);
       return idx;

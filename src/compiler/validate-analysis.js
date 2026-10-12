@@ -14,7 +14,9 @@ export function validateAnalysis(doc, typeIndex) {
   // are structural and language-domain validations, not type comparisons.
   validateAssignmentTargets(root, retainedGraphs(doc).scope, ctx.program);
   validateBreakTargets(root, ctx.program);
+  validateDefers(root, ctx.program);
   validateForSources(root, ctx.program);
+  validateForArraySources(root, typeIndex);
   validateGlobalInitializers(root, ctx.program);
   validateDuplicateBindings(root, ctx.program);
   validateStructDeclarations(root, ctx.program);
@@ -24,6 +26,8 @@ export function validateAnalysis(doc, typeIndex) {
   validateNullLiterals(root, ctx.program);
   validateIntegerLiterals(root, ctx.program);
   validateArrayDefaultConstruction(root, typeIndex, ctx.program);
+  validateFunctionReferenceStorage(root, ctx.program);
+  validateMatchPatterns(root, ctx);
   validateExhaustiveAltsAndMatches(root, ctx);
   validateRecursiveStructs(doc, typeIndex);
   validateResidualEsDsls(root, ctx.program);
@@ -75,6 +79,19 @@ function validateForSources(root, program) {
   }
 }
 
+/** `for (xs) |x|` needs an array; anything else would fail inside the lowering. */
+function validateForArraySources(root, typeIndex) {
+  for (const binding of root.querySelectorAll('ir-let[data-for-array-source]')) {
+    const value = binding.lastElementChild;
+    const type = value?.dataset.typeName ?? binding.dataset.typeName;
+    if (!type) continue;
+    const entry = typeIndex.get(type.replace(/^\?/, ''));
+    if (entry?.kind === 'wasm-array' || entry?.foreign || entry?.arrayElem) continue;
+    stampDiagnostic(value ?? binding, DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE,
+      `for can only iterate an array, got ${type}; count with a range like 0..<n`, { type });
+  }
+}
+
 function validateGlobalInitializers(root, program) {
   for (const global of program ? nodesOf(program, 'ir-global') : root.querySelectorAll('ir-global')) {
     const init = global.lastElementChild;
@@ -86,16 +103,53 @@ function validateGlobalInitializers(root, program) {
   }
 }
 
+/**
+ * Deferred code runs while its block is already exiting, so it cannot leave
+ * the block itself, and it must belong to a block to have a scope.
+ */
+function validateDefers(root, program) {
+  for (const node of program ? nodesOf(program, 'ir-defer') : root.querySelectorAll('ir-defer')) {
+    if (node.parentElement?.localName !== 'ir-block') {
+      stampDiagnostic(node, DIAGNOSTIC_KINDS.INVALID_BREAK, 'defer must be a statement in a block');
+      continue;
+    }
+    const exit = [...node.querySelectorAll('ir-return, ir-break, ir-continue')].find(inner => {
+      // Exits inside a nested closure or loop of the deferred code stay inside it.
+      for (let parent = inner.parentElement; parent && parent !== node; parent = parent.parentElement) {
+        if (parent.localName === 'ir-closure') return false;
+        if (inner.localName !== 'ir-return' && /^ir-(while|for|loop-match)$/.test(parent.localName)) return false;
+      }
+      return true;
+    });
+    if (exit) {
+      const what = exit.localName.slice(3);
+      stampDiagnostic(exit, DIAGNOSTIC_KINDS.INVALID_BREAK, `${what} cannot appear inside deferred code`);
+    }
+  }
+}
+
 function validateBreakTargets(root, program) {
-  for (const node of program ? nodesOf(program, 'ir-break') : root.querySelectorAll('ir-break')) {
+  for (const node of program ? nodesOf(program, 'ir-break', 'ir-continue') : root.querySelectorAll('ir-break, ir-continue')) {
+    // Compiler-generated breaks name the block or loop they leave.
+    if (node.dataset.loopTarget) continue;
     let parent = node.parentElement;
-    let loop = null;
+    let loop = null, loopMatch = null;
     while (parent) {
-      if (parent.localName === 'ir-while' || parent.localName === 'ir-for') { loop = parent; break; }
+      if (!loop && /^ir-(while|for|loop-match)$/.test(parent.localName)) loop = parent;
+      if (parent.localName === 'ir-loop-match') { loopMatch = parent; break; }
       if (parent.localName === 'ir-fn' || parent.localName === 'ir-closure') break;
       parent = parent.parentElement;
     }
-    if (!loop) stampDiagnostic(node, DIAGNOSTIC_KINDS.INVALID_BREAK, 'break must appear inside a loop');
+    const keyword = node.localName === 'ir-continue' ? 'continue' : 'break';
+    if (node.localName === 'ir-continue' && node.firstElementChild) {
+      if (!loopMatch) stampDiagnostic(node, DIAGNOSTIC_KINDS.INVALID_BREAK, 'continue with a state only works inside loop match');
+      continue;
+    }
+    if (node.localName === 'ir-continue' && loop?.localName === 'ir-loop-match') {
+      stampDiagnostic(node, DIAGNOSTIC_KINDS.INVALID_BREAK, 'continue in a loop match needs the next state: continue <value>');
+      continue;
+    }
+    if (!loop) stampDiagnostic(node, DIAGNOSTIC_KINDS.INVALID_BREAK, `${keyword} must appear inside a loop`);
   }
 }
 
@@ -219,11 +273,14 @@ function validateNullLiterals(root, program) {
   }
 }
 
+const INTEGER_RANGES = {
+  I32: [-(1n << 31n), (1n << 31n) - 1n], U32: [0n, (1n << 32n) - 1n],
+  I64: [-(1n << 63n), (1n << 63n) - 1n], U64: [0n, (1n << 64n) - 1n],
+};
+const FLOAT_TYPES = new Set(['F32', 'F64']);
+
 function validateIntegerLiterals(root, program) {
-  const ranges = {
-    I32: [-(1n << 31n), (1n << 31n) - 1n], U32: [0n, (1n << 32n) - 1n],
-    I64: [-(1n << 63n), (1n << 63n) - 1n], U64: [0n, (1n << 64n) - 1n],
-  };
+  const ranges = INTEGER_RANGES;
   for (const literal of program ? nodesOf(program, 'ir-lit') : root.querySelectorAll('ir-lit')) {
     if (literal.getAttribute('kind') !== 'int' || literal.dataset.originFile?.startsWith('std:')) continue;
     const type = literal.dataset.typeName ?? literal.getAttribute('type-name');
@@ -293,17 +350,19 @@ function validateStructInits(root, typeIndex, program) {
 }
 
 function validateExhaustiveAltsAndMatches(root, ctx) {
-  const nodes = ctx.program ? nodesOf(ctx.program, 'ir-alt', 'ir-match') : root.querySelectorAll('ir-alt, ir-match');
+  const nodes = ctx.program ? nodesOf(ctx.program, 'ir-alt', 'ir-match', 'ir-loop-match') : root.querySelectorAll('ir-alt, ir-match, ir-loop-match');
   for (const node of nodes) {
-    const isMatch = node.localName === 'ir-match';
+    const isMatch = node.localName !== 'ir-alt';
     const armTag = isMatch ? 'ir-match-arm' : 'ir-alt-arm';
     const attribute = isMatch ? 'pattern' : 'variant';
     const seen = new Set();
     for (const arm of node.querySelectorAll(`:scope > ${armTag}`)) {
-      const key = arm.getAttribute(attribute);
+      const spelling = arm.getAttribute(attribute);
+      // `1`, `0x1`, and `0b1` are the same pattern.
+      const key = isMatch ? canonicalPattern(spelling) : spelling;
       if (!key || !seen.has(key)) { if (key) seen.add(key); continue; }
       stampDiagnostic(arm, DIAGNOSTIC_KINDS.DUPLICATE_DECLARATION,
-        `Duplicate ${isMatch ? 'match pattern' : 'alt variant'} '${key}'`, { pattern: key });
+        `Duplicate ${isMatch ? 'match pattern' : 'alt variant'} '${spelling}'`, { pattern: spelling });
     }
     if (hasDefaultArm(node)) continue;
     const type = node.firstElementChild?.dataset['typeName'];
@@ -324,6 +383,84 @@ function validateExhaustiveAltsAndMatches(root, ctx) {
   }
 }
 
+/**
+ * A `fun` reference has no representation inside a heap type yet, so codegen
+ * cannot build a struct field or array element of that type. Report it during
+ * analysis, where `utu check` and the editor see it, with the working spelling.
+ */
+function validateFunctionReferenceStorage(root, program) {
+  const report = (node, type, where) => stampDiagnostic(node, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+    `${type} cannot be stored in ${where} yet; use ${'cl' + type.slice('fun'.length)} instead (a fun converts to it)`,
+    { actual: type });
+  const fields = program ? nodesOf(program, 'ir-field') : root.querySelectorAll('ir-field');
+  for (const field of fields) {
+    const type = declaredTypeStr(field);
+    if (type?.startsWith('fun(')) {
+      report(field.firstElementChild ?? field, type, 'a struct field');
+    }
+  }
+  const arrays = program ? nodesOf(program, 'ir-array-lit') : root.querySelectorAll('ir-array-lit');
+  for (const array of arrays) {
+    const element = [...array.children].map(child => child.dataset.typeName).find(type => type?.startsWith('fun('));
+    if (element && /^Array__fun_/.test(array.dataset.typeName ?? '')) report(array, element, 'an array');
+  }
+}
+
+/**
+ * `match` compares a scalar against literal patterns. Each pattern must be a
+ * value of the scrutinee's type: an in-range integer for integer types, a
+ * number for floats, and true/false for Bool. Anything else used to reach
+ * codegen and either crash it or silently never match.
+ */
+function validateMatchPatterns(root, ctx) {
+  const nodes = ctx.program ? nodesOf(ctx.program, 'ir-match', 'ir-loop-match') : root.querySelectorAll('ir-match, ir-loop-match');
+  for (const node of nodes) {
+    const type = node.firstElementChild?.dataset.typeName;
+    if (!type) continue;
+    const integer = INTEGER_RANGES[type];
+    if (!integer && !FLOAT_TYPES.has(type) && type !== 'Bool') {
+      stampDiagnostic(node.firstElementChild, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+        `match needs an integer, float, or Bool value, got ${type}; use alt for enums or if/else for other values`,
+        { expected: 'scalar', actual: type });
+      continue;
+    }
+    for (const arm of node.querySelectorAll(':scope > ir-match-arm')) {
+      const pattern = arm.getAttribute('pattern');
+      if (!pattern) continue;
+      const problem = matchPatternProblem(pattern, type, integer);
+      if (problem) {
+        stampDiagnostic(arm, DIAGNOSTIC_KINDS.TYPE_MISMATCH, `Pattern ${pattern} ${problem}`,
+          { expected: type, actual: pattern });
+      }
+    }
+  }
+}
+
+function matchPatternProblem(pattern, type, integerRange) {
+  const isBool = pattern === 'true' || pattern === 'false';
+  if (type === 'Bool') return isBool ? null : 'is not a Bool; use true or false';
+  if (isBool) return `cannot match values of type ${type}`;
+  if (FLOAT_TYPES.has(type)) return null;
+  if (/[.eE]/.test(pattern.replace(/^-?0x[0-9a-fA-F]+$/, ''))) return `is not an integer, so it cannot match values of type ${type}`;
+  let value;
+  try {
+    value = pattern.startsWith('-') ? -BigInt(pattern.slice(1)) : BigInt(pattern);
+  } catch {
+    return `is not a valid ${type} literal`;
+  }
+  const [min, max] = integerRange;
+  return value < min || value > max ? `is out of range for ${type} and can never match` : null;
+}
+
+function canonicalPattern(pattern) {
+  if (!pattern || pattern === 'true' || pattern === 'false') return pattern;
+  try {
+    return String(pattern.startsWith('-') ? -BigInt(pattern.slice(1)) : BigInt(pattern));
+  } catch {
+    return String(Number(pattern));
+  }
+}
+
 function hasDefaultArm(node) {
   return Boolean(node.querySelector(':scope > ir-default-arm'));
 }
@@ -338,11 +475,24 @@ function enumVariants(typeName, typeIndex) {
 
 
 
+// A struct is unconstructible only when it reaches itself through non-null
+// struct fields. Nullable fields can hold null, and arrays (Array[Self]) can be
+// empty, so either one ends the chain.
 function validateRecursiveStructs(doc, typeIndex) {
-  const graph = retainedGraphs(doc).declarations;
+  const isStruct = type => typeEntryDecl(typeIndex.get(type))?.localName === 'ir-struct';
+  const direct = name => (typeIndex.get(name)?.fields ?? []).map(field => field.type).filter(isStruct);
+  const reaches = (from, target) => {
+    const seen = new Set();
+    const queue = direct(from);
+    for (let i = 0; i < queue.length; i++) {
+      if (queue[i] === target) return true;
+      if (!seen.has(queue[i])) { seen.add(queue[i]); queue.push(...direct(queue[i])); }
+    }
+    return false;
+  };
   for (const [name, entry] of typeIndex) {
     const decl = typeEntryDecl(entry);
-    if (decl?.localName === 'ir-struct' && graph.reaches(name, name)) {
+    if (decl?.localName === 'ir-struct' && reaches(name, name)) {
       stampDiagnostic(decl, DIAGNOSTIC_KINDS.RECURSIVE_TYPE,
         `Recursive type '${name}' must use a nullable or indirect field`, { type: name });
     }
