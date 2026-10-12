@@ -418,57 +418,13 @@ fn listing(n: I32) I32 {
     at;
 }
 
-// ── Parsing ──────────────────────────────────────────────────────────────────
+// ── Scanning ─────────────────────────────────────────────────────────────────
 //
-// The Zig compiler's precedence-climbing parser (parser_bench_inline_forced):
-// a streaming scanner with one token of lookahead feeds the parser, which
-// builds a flat array of {tag, a, b, token} nodes. A list is a chain of
-// nodes whose `a` is the previous link (0 ends it), as in Zig.
+// The parsers read tokens one at a time from a Scanner, which runs the same
+// DFA as `lex` but stops after each token and keeps its payload: operator
+// code, number bits, or the span of a string or name.
 
-enum(U8) Tag:
-    | Leaf
-    | Unary
-    | Binary
-    | Call
-    | Field
-    | Index
-    | ArrayExpr
-    | Construct
-    | Conditional
-    | Loop
-    | List
-    | Binding
-    | Lvalue
-    | TypeNode
-    | Stmt
-    | Command
-
-mem node_tag: Tag;
-mem node_a: I32;
-mem node_b: I32;
-mem node_token: I32;
-
-// Binding power of a binary operator by its first byte; `!=` is `~`.
-const mem precedence: U8 = @comptime/\ precedence_table() \/;
-
-fn precedence_table() Array[I32] {
-    let table = Array[I32].new(256, 0);
-    table[38] = 1;
-    table[124] = 1;
-    table[60] = 2;
-    table[62] = 2;
-    table[61] = 2;
-    table[126] = 2;
-    table[43] = 3;
-    table[45] = 3;
-    table[42] = 4;
-    table[47] = 4;
-    table[37] = 4;
-    table;
-}
-
-// The scanner's position and the current token; `last` is the token just taken.
-struct Parser:
+struct Scanner:
     | cursor: I32
     | kind: Kind
     | op: I32
@@ -477,50 +433,48 @@ struct Parser:
     | last_hi: I32
     | last_lo: I32
     | pos: I32
-    // Where the 255 sentinel is. Type checking: the last expression's type
-    // and bare name (-1 when it has none), the last list's size and element
-    // type, and the return type of the function being checked.
     | end: I32
-    | expr_type: I32
-    | bare: I32
-    | list_count: I32
-    | list_element: I32
-    | return_type: I32
-    | saw_return: Bool
-    | rgba_image: I32
+
+// `end` is where the 255 sentinel is.
+fn new_scanner(end: I32) Scanner {
+    let s = Scanner { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0, end: end };
+    s.scan();
+    s;
+}
 
 let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('jpl'); } \/;
 
+// A syntax or type error unwinds to `parse` or `check`.
 fn fail() void {
     syntax_error();
 }
 
-// Scan the next token into p.
-fn scan(p: Parser) void {
-    let i = p.cursor;
+// Scan the next token.
+fn Scanner.scan |s| () void {
+    let i = s.cursor;
     let j = i;
     let state = start_state;
     let next = dfa[start_state * 256 + src[j]];
     loop match next {
         0 => {
-            if j != p.end { fail(); };
+            if j != s.end { fail(); };
             if i != j {
-                p.cursor = j;
-                token(p, Kind.from_i32(kind_of[state]), i, j);
+                s.cursor = j;
+                s.token(Kind.from_i32(kind_of[state]), i, j);
             } else {
-                p.kind = Kind.END_OF_FILE;
+                s.kind = Kind.END_OF_FILE;
             };
             break;
         },
         2 => {
-            p.cursor = j;
-            token(p, Kind.from_i32(kind_of[state]), i, j);
+            s.cursor = j;
+            s.token(Kind.from_i32(kind_of[state]), i, j);
             break;
         },
         3 => {
             j += 1;
             i = j;
-            p.cursor = i;
+            s.cursor = i;
             state = start_state;
             next = dfa[start_state * 256 + src[j]];
             continue next;
@@ -534,25 +488,51 @@ fn scan(p: Parser) void {
     };
 }
 
-// Fill in the current token: operator code, number bits, or string span.
-fn token(p: Parser, kind: Kind, i: I32, j: I32) void {
-    p.kind = kind;
+// The token's payload: `!=` is the operator `~`.
+fn Scanner.token |s| (kind: Kind, i: I32, j: I32) void {
+    s.kind = kind;
     if kind == Kind.Invalid { fail(); };
     if kind == Kind.OP {
-        p.op = if src[i] == 33 and j - i == 2 { 126; } else { src[i]; };
+        s.op = if src[i] == 33 and j - i == 2 { 126; } else { src[i]; };
     } else if kind == Kind.INTVAL {
-        set_bits(p, parse_int(i, j));
+        s.set_bits(parse_int(i, j));
     } else if kind == Kind.FLOATVAL {
-        set_bits(p, parse_float(i, j).bits());
+        s.set_bits(parse_float(i, j).bits());
     } else if kind == Kind.STRING or kind == Kind.VARIABLE {
-        p.hi = i;
-        p.lo = j;
+        s.hi = i;
+        s.lo = j;
     };
 }
 
-fn set_bits(p: Parser, bits: I64) void {
-    p.hi = (bits >> 32).to_i32();
-    p.lo = bits.to_i32();
+fn Scanner.set_bits |s| (bits: I64) void {
+    s.hi = (bits >> 32).to_i32();
+    s.lo = bits.to_i32();
+}
+
+fn Scanner.take |s| () Kind {
+    let kind = s.kind;
+    s.last_hi = s.hi;
+    s.last_lo = s.lo;
+    s.scan();
+    s.pos += 1;
+    kind;
+}
+
+fn Scanner.expect |s| (kind: Kind) void {
+    if s.kind != kind { fail(); };
+    s.take();
+}
+
+// The current name, interned.
+fn Scanner.name |s| () I32 {
+    src.intern(s.hi, s.lo);
+}
+
+fn Scanner.expect_name |s| () I32 {
+    if s.kind != Kind.VARIABLE { fail(); };
+    let name = s.name();
+    s.take();
+    name;
 }
 
 // A decimal I64; a value past 2^63 - 1 is a syntax error, as in Zig.
@@ -586,25 +566,37 @@ fn parse_float(i: I32, j: I32) F64 {
     value;
 }
 
-fn peek(p: Parser) Kind {
-    p.kind;
-}
+// ── Nodes ────────────────────────────────────────────────────────────────────
+//
+// A flat array of {tag, a, b, token} nodes, as in Zig. A list is a chain of
+// nodes whose `a` is the previous link (0 ends it). The checker also records
+// each node's type.
 
-fn take(p: Parser) Kind {
-    let kind = p.kind;
-    p.last_hi = p.hi;
-    p.last_lo = p.lo;
-    scan(p);
-    p.pos += 1;
-    kind;
-}
+enum(U8) Tag:
+    | Leaf
+    | Unary
+    | Binary
+    | Call
+    | Field
+    | Index
+    | ArrayExpr
+    | Construct
+    | Conditional
+    | Loop
+    | List
+    | Binding
+    | Lvalue
+    | TypeNode
+    | Stmt
+    | Command
 
-fn expect(p: Parser, kind: Kind) void {
-    if p.kind != kind { fail(); };
-    take(p);
-}
+mem node_tag: Tag;
+mem node_a: I32;
+mem node_b: I32;
+mem node_token: I32;
+mem node_type: I32;
 
-fn add_at(tag: Tag, a: I32, b: I32, at: I32) I32 {
+fn node(tag: Tag, a: I32, b: I32, at: I32) I32 {
     let id = node_tag.len();
     node_tag.push(tag);
     node_a.push(a);
@@ -613,79 +605,114 @@ fn add_at(tag: Tag, a: I32, b: I32, at: I32) I32 {
     id;
 }
 
-fn add(tag: Tag, a: I32, b: I32) I32 {
-    add_at(tag, a, b, 0);
+fn typed_node(tag: Tag, a: I32, b: I32, at: I32, type_id: I32) I32 {
+    node_type.push(type_id);
+    node(tag, a, b, at);
 }
 
-fn expect_string(p: Parser) I32 {
-    let at = p.pos;
-    expect(p, Kind.STRING);
-    add_at(Tag.Leaf, p.last_hi, p.last_lo, at);
+fn reset_nodes() void {
+    node_tag.clear();
+    node_a.clear();
+    node_b.clear();
+    node_token.clear();
+    node_type.clear();
+    node_tag.reserve(src.len());
+    node_a.reserve(src.len());
+    node_b.reserve(src.len());
+    node_token.reserve(src.len());
 }
 
-fn expr_list(p: Parser, close: Kind) I32 {
+// Binding power of a binary operator by its code; 0 is not an operator.
+const mem precedence: U8 = @comptime/\ precedence_table() \/;
+
+fn precedence_table() Array[I32] {
+    let table = Array[I32].new(256, 0);
+    table[38] = 1;
+    table[124] = 1;
+    table[60] = 2;
+    table[62] = 2;
+    table[61] = 2;
+    table[126] = 2;
+    table[43] = 3;
+    table[45] = 3;
+    table[42] = 4;
+    table[47] = 4;
+    table[37] = 4;
+    table;
+}
+
+// ── Parsing ──────────────────────────────────────────────────────────────────
+//
+// The Zig compiler's precedence-climbing parser (parser_bench_inline_forced).
+
+fn string_leaf(s: Scanner) I32 {
+    let at = s.pos;
+    s.expect(Kind.STRING);
+    node(Tag.Leaf, s.last_hi, s.last_lo, at);
+}
+
+fn expr_list(s: Scanner, close: Kind) I32 {
     let list = 0;
-    if p.kind != close {
+    if s.kind != close {
         while (true) {
-            list = add(Tag.List, list, expr(p, 0));
-            if p.kind != Kind.COMMA { break; };
-            take(p);
+            list = node(Tag.List, list, expr(s, 0), 0);
+            if s.kind != Kind.COMMA { break; };
+            s.take();
         };
     };
-    expect(p, close);
+    s.expect(close);
     list;
 }
 
-fn loop_expr(p: Parser, array: Bool, at: I32) I32 {
-    expect(p, Kind.LSQUARE);
+fn loop_expr(s: Scanner, array: Bool, at: I32) I32 {
+    s.expect(Kind.LSQUARE);
     let bindings = 0;
-    if p.kind != Kind.RSQUARE {
+    if s.kind != Kind.RSQUARE {
         while (true) {
-            let name = p.pos;
-            expect(p, Kind.VARIABLE);
-            expect(p, Kind.COLON);
-            let bound = expr(p, 0);
-            bindings = add(Tag.List, bindings, add_at(Tag.Binding, bound, 0, name));
-            if p.kind != Kind.COMMA { break; };
-            take(p);
+            let name = s.pos;
+            s.expect(Kind.VARIABLE);
+            s.expect(Kind.COLON);
+            let bound = expr(s, 0);
+            bindings = node(Tag.List, bindings, node(Tag.Binding, bound, 0, name), 0);
+            if s.kind != Kind.COMMA { break; };
+            s.take();
         };
     };
-    expect(p, Kind.RSQUARE);
-    let body = expr(p, 0);
-    add_at(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at);
+    s.expect(Kind.RSQUARE);
+    let body = expr(s, 0);
+    node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at);
 }
 
-fn prefix(p: Parser) I32 {
-    let at = p.pos;
-    let code = if p.kind == Kind.OP { p.op; } else { 0; };
-    let kind = take(p);
-    match kind {
-        Kind.VARIABLE => add(Tag.Leaf, at, 0),
-        Kind.TRUE => add(Tag.Leaf, at, 0),
-        Kind.FALSE => add(Tag.Leaf, at, 0),
-        Kind.VOID => add(Tag.Leaf, at, 0),
-        Kind.INTVAL => add_at(Tag.Leaf, p.last_hi, p.last_lo, at),
-        Kind.FLOATVAL => add_at(Tag.Leaf, p.last_hi, p.last_lo, at),
+fn prefix(s: Scanner) I32 {
+    let at = s.pos;
+    let code = if s.kind == Kind.OP { s.op; } else { 0; };
+    match s.take() {
+        Kind.VARIABLE => node(Tag.Leaf, at, 0, 0),
+        Kind.TRUE => node(Tag.Leaf, at, 0, 0),
+        Kind.FALSE => node(Tag.Leaf, at, 0, 0),
+        Kind.VOID => node(Tag.Leaf, at, 0, 0),
+        Kind.INTVAL => node(Tag.Leaf, s.last_hi, s.last_lo, at),
+        Kind.FLOATVAL => node(Tag.Leaf, s.last_hi, s.last_lo, at),
         Kind.LPAREN => {
-            let inner = expr(p, 0);
-            expect(p, Kind.RPAREN);
+            let inner = expr(s, 0);
+            s.expect(Kind.RPAREN);
             inner;
         },
-        Kind.LSQUARE => add(Tag.ArrayExpr, expr_list(p, Kind.RSQUARE), 0),
+        Kind.LSQUARE => node(Tag.ArrayExpr, expr_list(s, Kind.RSQUARE), 0, 0),
         Kind.OP => {
             if code != 45 and code != 33 { fail(); };
-            add_at(Tag.Unary, expr(p, 5), 0, at);
+            node(Tag.Unary, expr(s, 5), 0, at);
         },
         Kind.IF => {
-            let condition = expr(p, 0);
-            expect(p, Kind.THEN);
-            let yes = expr(p, 0);
-            expect(p, Kind.ELSE);
-            let no = expr(p, 0);
-            add_at(Tag.Conditional, add(Tag.List, condition, yes), no, at);
+            let condition = expr(s, 0);
+            s.expect(Kind.THEN);
+            let yes = expr(s, 0);
+            s.expect(Kind.ELSE);
+            let no = expr(s, 0);
+            node(Tag.Conditional, node(Tag.List, condition, yes, 0), no, at);
         },
-        Kind.ARRAY => loop_expr(p, true, at),
-        Kind.SUM => loop_expr(p, false, at),
+        Kind.ARRAY => loop_expr(s, true, at),
+        Kind.SUM => loop_expr(s, false, at),
         ~> {
             fail();
             0;
@@ -693,224 +720,207 @@ fn prefix(p: Parser) I32 {
     };
 }
 
-fn expr(p: Parser, min: I32) I32 {
-    let left = prefix(p);
+fn expr(s: Scanner, min: I32) I32 {
+    let left = prefix(s);
     while (true) {
-        let kind = p.kind;
+        let kind = s.kind;
         if kind == Kind.DOT {
             if min > 6 { break; };
-            take(p);
-            let field = p.pos;
-            expect(p, Kind.VARIABLE);
-            left = add_at(Tag.Field, left, 0, field);
+            s.take();
+            let field = s.pos;
+            s.expect(Kind.VARIABLE);
+            left = node(Tag.Field, left, 0, field);
         } else if kind == Kind.LSQUARE {
             if min > 6 { break; };
-            take(p);
-            left = add(Tag.Index, left, expr_list(p, Kind.RSQUARE));
+            s.take();
+            left = node(Tag.Index, left, expr_list(s, Kind.RSQUARE), 0);
         } else if kind == Kind.LPAREN or kind == Kind.LCURLY {
             if min > 6 or node_tag[left] != Tag.Leaf { break; };
-            take(p);
+            s.take();
             left = if kind == Kind.LPAREN {
-                add(Tag.Call, left, expr_list(p, Kind.RPAREN));
+                node(Tag.Call, left, expr_list(s, Kind.RPAREN), 0);
             } else {
-                add(Tag.Construct, left, expr_list(p, Kind.RCURLY));
+                node(Tag.Construct, left, expr_list(s, Kind.RCURLY), 0);
             };
         } else {
             if kind != Kind.OP { break; };
-            let binding = precedence[p.op];
+            let binding = precedence[s.op];
             if binding == 0 or binding < min { break; };
-            let operator = p.pos;
-            take(p);
-            let right = expr(p, binding + 1);
-            left = add_at(Tag.Binary, left, right, operator);
+            let operator = s.pos;
+            s.take();
+            left = node(Tag.Binary, left, expr(s, binding + 1), operator);
         };
     };
     left;
 }
 
-fn type_expr(p: Parser) I32 {
-    let at = p.pos;
-    let kind = take(p);
+fn type_expr(s: Scanner) I32 {
+    let at = s.pos;
+    let kind = s.take();
     if kind != Kind.INT and kind != Kind.FLOAT and kind != Kind.BOOL and kind != Kind.VOID and kind != Kind.VARIABLE {
         fail();
     };
-    let result = add(Tag.TypeNode, at, 0);
-    while (p.kind == Kind.LSQUARE) {
-        take(p);
+    let result = node(Tag.TypeNode, at, 0, 0);
+    while (s.kind == Kind.LSQUARE) {
+        s.take();
         let rank = 1;
-        while (p.kind == Kind.COMMA) {
-            take(p);
+        while (s.kind == Kind.COMMA) {
+            s.take();
             rank += 1;
         };
-        expect(p, Kind.RSQUARE);
-        result = add(Tag.TypeNode, result, rank);
+        s.expect(Kind.RSQUARE);
+        result = node(Tag.TypeNode, result, rank, 0);
     };
     result;
 }
 
-fn expect_type(p: Parser) I32 {
-    expect(p, Kind.COLON);
-    type_expr(p);
+fn annotation(s: Scanner) I32 {
+    s.expect(Kind.COLON);
+    type_expr(s);
 }
 
-fn lvalue(p: Parser, binding: Bool) I32 {
-    let at = p.pos;
-    expect(p, Kind.VARIABLE);
-    let result = add(Tag.Lvalue, at, 0);
-    if p.kind == Kind.LSQUARE {
-        take(p);
-        if p.kind != Kind.RSQUARE {
+fn lvalue(s: Scanner, binding: Bool) I32 {
+    let at = s.pos;
+    s.expect(Kind.VARIABLE);
+    let result = node(Tag.Lvalue, at, 0, 0);
+    if s.kind == Kind.LSQUARE {
+        s.take();
+        if s.kind != Kind.RSQUARE {
             while (true) {
-                let dim = p.pos;
-                expect(p, Kind.VARIABLE);
-                result = add(Tag.Lvalue, result, dim);
-                if p.kind != Kind.COMMA { break; };
-                take(p);
+                let dim = s.pos;
+                s.expect(Kind.VARIABLE);
+                result = node(Tag.Lvalue, result, dim, 0);
+                if s.kind != Kind.COMMA { break; };
+                s.take();
             };
         };
-        expect(p, Kind.RSQUARE);
-    } else if p.kind == Kind.LCURLY {
-        take(p);
-        if p.kind != Kind.RCURLY {
+        s.expect(Kind.RSQUARE);
+    } else if s.kind == Kind.LCURLY {
+        s.take();
+        if s.kind != Kind.RCURLY {
             while (true) {
-                result = add(Tag.Lvalue, result, lvalue(p, binding));
-                if p.kind != Kind.COMMA { break; };
-                take(p);
+                result = node(Tag.Lvalue, result, lvalue(s, binding), 0);
+                if s.kind != Kind.COMMA { break; };
+                s.take();
             };
         };
-        expect(p, Kind.RCURLY);
+        s.expect(Kind.RCURLY);
         return result;
     };
-    if binding { result = add(Tag.Binding, result, expect_type(p)); };
+    if binding { result = node(Tag.Binding, result, annotation(s), 0); };
     result;
 }
 
-fn stmt(p: Parser) I32 {
-    let at = p.pos;
-    let kind = take(p);
+fn stmt(s: Scanner) I32 {
+    let at = s.pos;
+    let result = match s.take() {
+        Kind.LET => {
+            let target = lvalue(s, false);
+            s.expect(Kind.EQUALS);
+            node(Tag.Stmt, target, expr(s, 0), at);
+        },
+        Kind.ASSERT => {
+            let value = expr(s, 0);
+            s.expect(Kind.COMMA);
+            node(Tag.Stmt, value, string_leaf(s), at);
+        },
+        Kind.RETURN => node(Tag.Stmt, expr(s, 0), 0, at),
+        ~> {
+            fail();
+            0;
+        },
+    };
+    s.expect(Kind.NEWLINE);
+    result;
+}
+
+// Every command but `time` ends its line.
+fn command(s: Scanner) I32 {
+    let at = s.pos;
+    let kind = s.take();
+    if kind == Kind.TIME { return node(Tag.Command, command(s), 0, at); };
     let result = match kind {
         Kind.LET => {
-            let lhs = lvalue(p, false);
-            expect(p, Kind.EQUALS);
-            add_at(Tag.Stmt, lhs, expr(p, 0), at);
+            let target = lvalue(s, false);
+            s.expect(Kind.EQUALS);
+            node(Tag.Command, target, expr(s, 0), at);
         },
         Kind.ASSERT => {
-            let value = expr(p, 0);
-            expect(p, Kind.COMMA);
-            add_at(Tag.Stmt, value, expect_string(p), at);
+            let value = expr(s, 0);
+            s.expect(Kind.COMMA);
+            node(Tag.Command, value, string_leaf(s), at);
         },
-        Kind.RETURN => add_at(Tag.Stmt, expr(p, 0), 0, at),
+        Kind.SHOW => node(Tag.Command, expr(s, 0), 0, at),
+        Kind.PRINT => node(Tag.Command, string_leaf(s), 0, at),
+        Kind.READ => {
+            s.expect(Kind.IMAGE);
+            let text = string_leaf(s);
+            s.expect(Kind.TO);
+            node(Tag.Command, text, lvalue(s, false), at);
+        },
+        Kind.WRITE => {
+            s.expect(Kind.IMAGE);
+            let value = expr(s, 0);
+            s.expect(Kind.TO);
+            node(Tag.Command, value, string_leaf(s), at);
+        },
+        Kind.STRUCT => {
+            let name = s.pos;
+            s.expect(Kind.VARIABLE);
+            s.expect(Kind.LCURLY);
+            s.expect(Kind.NEWLINE);
+            let fields = 0;
+            while (s.kind == Kind.VARIABLE) {
+                let field = s.pos;
+                s.take();
+                let field_type = annotation(s);
+                fields = node(Tag.List, fields, node(Tag.Binding, field_type, 0, field), 0);
+                s.expect(Kind.NEWLINE);
+            };
+            s.expect(Kind.RCURLY);
+            node(Tag.Command, node(Tag.List, node(Tag.Leaf, name, 0, 0), fields, 0), 0, at);
+        },
+        Kind.FN => {
+            let name = s.pos;
+            s.expect(Kind.VARIABLE);
+            s.expect(Kind.LPAREN);
+            let bindings = 0;
+            if s.kind != Kind.RPAREN {
+                while (true) {
+                    bindings = node(Tag.List, bindings, lvalue(s, true), 0);
+                    if s.kind != Kind.COMMA { break; };
+                    s.take();
+                };
+            };
+            s.expect(Kind.RPAREN);
+            let result_type = annotation(s);
+            s.expect(Kind.LCURLY);
+            s.expect(Kind.NEWLINE);
+            let body = 0;
+            while (s.kind != Kind.RCURLY) {
+                if s.kind == Kind.END_OF_FILE { fail(); };
+                body = node(Tag.List, body, stmt(s), 0);
+            };
+            s.expect(Kind.RCURLY);
+            let signature = node(Tag.List, node(Tag.List, node(Tag.Leaf, name, 0, 0), bindings, 0), result_type, 0);
+            node(Tag.Command, signature, body, at);
+        },
         ~> {
             fail();
             0;
         },
     };
-    expect(p, Kind.NEWLINE);
+    s.expect(Kind.NEWLINE);
     result;
 }
 
-fn command(p: Parser) I32 {
-    let at = p.pos;
-    let kind = take(p);
-    match kind {
-        Kind.LET => {
-            let lhs = lvalue(p, false);
-            expect(p, Kind.EQUALS);
-            let result = add_at(Tag.Command, lhs, expr(p, 0), at);
-            expect(p, Kind.NEWLINE);
-            result;
-        },
-        Kind.ASSERT => {
-            let value = expr(p, 0);
-            expect(p, Kind.COMMA);
-            let text = expect_string(p);
-            expect(p, Kind.NEWLINE);
-            add_at(Tag.Command, value, text, at);
-        },
-        Kind.SHOW => {
-            let value = expr(p, 0);
-            expect(p, Kind.NEWLINE);
-            add_at(Tag.Command, value, 0, at);
-        },
-        Kind.PRINT => {
-            let text = expect_string(p);
-            expect(p, Kind.NEWLINE);
-            add_at(Tag.Command, text, 0, at);
-        },
-        Kind.TIME => add_at(Tag.Command, command(p), 0, at),
-        Kind.READ => {
-            expect(p, Kind.IMAGE);
-            let text = expect_string(p);
-            expect(p, Kind.TO);
-            let target = lvalue(p, false);
-            expect(p, Kind.NEWLINE);
-            add_at(Tag.Command, text, target, at);
-        },
-        Kind.WRITE => {
-            expect(p, Kind.IMAGE);
-            let value = expr(p, 0);
-            expect(p, Kind.TO);
-            let text = expect_string(p);
-            expect(p, Kind.NEWLINE);
-            add_at(Tag.Command, value, text, at);
-        },
-        Kind.STRUCT => {
-            let name = p.pos;
-            expect(p, Kind.VARIABLE);
-            expect(p, Kind.LCURLY);
-            expect(p, Kind.NEWLINE);
-            let fields = 0;
-            while (p.kind == Kind.VARIABLE) {
-                let field_name = p.pos;
-                take(p);
-                let field_type = expect_type(p);
-                fields = add(Tag.List, fields, add_at(Tag.Binding, field_type, 0, field_name));
-                expect(p, Kind.NEWLINE);
-            };
-            expect(p, Kind.RCURLY);
-            expect(p, Kind.NEWLINE);
-            add_at(Tag.Command, add(Tag.List, add(Tag.Leaf, name, 0), fields), 0, at);
-        },
-        Kind.FN => {
-            let name = p.pos;
-            expect(p, Kind.VARIABLE);
-            expect(p, Kind.LPAREN);
-            let bindings = 0;
-            if p.kind != Kind.RPAREN {
-                while (true) {
-                    bindings = add(Tag.List, bindings, lvalue(p, true));
-                    if p.kind != Kind.COMMA { break; };
-                    take(p);
-                };
-            };
-            expect(p, Kind.RPAREN);
-            let result_type = expect_type(p);
-            expect(p, Kind.LCURLY);
-            expect(p, Kind.NEWLINE);
-            let body = 0;
-            while (p.kind != Kind.RCURLY) {
-                if p.kind == Kind.END_OF_FILE { fail(); };
-                body = add(Tag.List, body, stmt(p));
-            };
-            expect(p, Kind.RCURLY);
-            expect(p, Kind.NEWLINE);
-            let signature = add(Tag.List, add(Tag.List, add(Tag.Leaf, name, 0), bindings), result_type);
-            add_at(Tag.Command, signature, body, at);
-        },
-        ~> {
-            fail();
-            0;
-        },
-    };
-}
-
-fn program(p: Parser) I32 {
+fn program(s: Scanner) I32 {
     let root = 0;
-    while (p.kind != Kind.END_OF_FILE) {
-        if p.kind == Kind.NEWLINE {
-            take(p);
+    while (s.kind != Kind.END_OF_FILE) {
+        if s.kind == Kind.NEWLINE {
+            s.take();
         } else {
-            root = add(Tag.List, root, command(p));
+            root = node(Tag.List, root, command(s), 0);
         };
     };
     root;
@@ -918,36 +928,23 @@ fn program(p: Parser) I32 {
 
 // Parse `src` into the node mems. Returns the token count, or -1 for a syntax error.
 fn parse() I32 {
-    node_tag.clear();
-    node_a.clear();
-    node_b.clear();
-    node_token.clear();
-    node_tag.reserve(src.len());
-    node_a.reserve(src.len());
-    node_b.reserve(src.len());
-    node_token.reserve(src.len());
-    let p = new_parser();
+    reset_nodes();
     try {
-        scan(p);
-        program(p);
-        p.pos;
+        let s = new_scanner(src.len() - 1);
+        program(s);
+        s.pos;
     } catch {
         -1;
     };
 }
 
-fn new_parser() Parser {
-    Parser { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0,
-        end: src.len() - 1, expr_type: 0, bare: -1, list_count: 0, list_element: 0, return_type: 0,
-        saw_return: false, rgba_image: 0 };
-}
-
 // ── Type checking ────────────────────────────────────────────────────────────
 //
 // The Zig compiler's fused parser and type checker (parser_typecheck): every
-// expression is typed as it is parsed. Names are interned; `bound[name]` is
-// the symbol a name refers to, or -1. Types are structural: one id per array
-// element and rank, one per record.
+// expression is typed as it is parsed, and its parse returns
+// .{node, type, bare name}. Names are interned spans of `src`; `bound[name]`
+// is the symbol a name refers to, or -1. Types are structural: one id per
+// array element and rank, one per record.
 
 enum(U8) TypeTag:
     | Invalid
@@ -968,28 +965,40 @@ enum(U8) PatternTag:
     | Dims
     | Fields
 
+// The types every program starts with, in init_env's order.
 let t_void: I32 = 1;
 let t_bool: I32 = 2;
 let t_int: I32 = 3;
 let t_float: I32 = 4;
 let t_rgba: I32 = 5;
+let t_rgba_image: I32 = 7;
 
-mem node_type: I32;
+// No name.
+let unnamed: I32 = -1;
+
 mem bound: I32;
+
 mem sym_tag: SymbolTag;
 mem sym_type: I32;
 mem sym_params_start: I32;
 mem sym_params_len: I32;
+
 mem type_tag: TypeTag;
 mem type_element: I32;
 mem type_rank: I32;
 mem type_fields_start: I32;
 mem type_fields_len: I32;
+
 mem field_name: I32;
 mem field_type: I32;
+
+// Parameter types of functions, as runs of type ids.
 mem fn_types: I32;
+// Names bound in the current function or loop, to unbind when it ends.
 mem locals: I32;
+// Pattern ids of the parameters of the function being declared.
 mem fn_params: I32;
+
 mem pat_tag: PatternTag;
 mem pat_name: I32;
 mem pat_node: I32;
@@ -1002,21 +1011,11 @@ mem pat_dim_start: I32;
 mem pat_dim_count: I32;
 mem dim_names: I32;
 
-fn typed(tag: Tag, a: I32, b: I32, at: I32, type_id: I32) I32 {
-    node_type.push(type_id);
-    add_at(tag, a, b, at);
-}
-
-// Names are interned in place as spans of `src` (src.intern). Builtin names
-// are appended to `src` after the sentinel.
-fn intern_span(p: Parser, start: I32, stop: I32) I32 {
-    src.intern(start, stop);
-}
-
-fn intern_text(p: Parser, text: Str) I32 {
+// Builtin names are appended to `src` after the sentinel, so they intern the same way.
+fn intern_text(text: Str) I32 {
     let start = src.len();
     for (0 ..< text.len()) |k| { src.push(text.get(k)); };
-    intern_span(p, start, src.len());
+    src.intern(start, src.len());
 }
 
 fn symbol_of(name: I32) I32 {
@@ -1042,7 +1041,7 @@ fn bind(name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
     symbol;
 }
 
-fn pop_scope(mark: I32) void {
+fn unbind_to(mark: I32) void {
     while (locals.len() > mark) {
         let name = locals[locals.len() - 1];
         locals.resize(locals.len() - 1);
@@ -1067,16 +1066,24 @@ fn array_type(element: I32, rank: I32) I32 {
     new_type(TypeTag.ArrayType, element, rank, 0, 0);
 }
 
-fn builtin(p: Parser, name: Str, result: I32, first: I32, second: I32) void {
+fn field_type_of(record: I32, name: I32) I32 {
+    let start = type_fields_start[record];
+    for (start ..< start + type_fields_len[record]) |f| {
+        if field_name[f] == name { return field_type[f]; };
+    };
+    0;
+}
+
+fn builtin(name: Str, result: I32, first: I32, second: I32) void {
     let start = fn_types.len();
     fn_types.push(first);
     if second != 0 { fn_types.push(second); };
-    let symbol = bind(intern_text(p, name), SymbolTag.Function, result, false);
+    let symbol = bind(intern_text(name), SymbolTag.Function, result, false);
     sym_params_start[symbol] = start;
     sym_params_len[symbol] = fn_types.len() - start;
 }
 
-fn init_env(p: Parser) void {
+fn reset_env() void {
     src.intern_reset();
     bound.clear();
     sym_tag.clear();
@@ -1104,7 +1111,11 @@ fn init_env(p: Parser) void {
     pat_dim_start.clear();
     pat_dim_count.clear();
     dim_names.clear();
-    node_type.clear();
+}
+
+// The builtin types, records, variables, and functions.
+fn init_env() void {
+    reset_env();
     new_type(TypeTag.Invalid, 0, 0, 0, 0);
     new_type(TypeTag.Void, 0, 0, 0, 0);
     new_type(TypeTag.Bool, 0, 0, 0, 0);
@@ -1112,293 +1123,257 @@ fn init_env(p: Parser) void {
     new_type(TypeTag.Float, 0, 0, 0, 0);
     new_type(TypeTag.Record, 0, 0, 0, 4);
     for (["r", "g", "b", "a"]) |name| {
-        field_name.push(intern_text(p, name));
+        field_name.push(intern_text(name));
         field_type.push(t_float);
     };
-    bind(intern_text(p, "rgba"), SymbolTag.Alias, t_rgba, false);
-    bind(intern_text(p, "argnum"), SymbolTag.Variable, t_int, false);
-    bind(intern_text(p, "args"), SymbolTag.Variable, array_type(t_int, 1), false);
-    p.rgba_image = array_type(t_rgba, 2);
+    bind(intern_text("rgba"), SymbolTag.Alias, t_rgba, false);
+    bind(intern_text("argnum"), SymbolTag.Variable, t_int, false);
+    bind(intern_text("args"), SymbolTag.Variable, array_type(t_int, 1), false);
+    if array_type(t_rgba, 2) != t_rgba_image { fatal; };
     for (["sqrt", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "log"]) |name| {
-        builtin(p, name, t_float, t_float, 0);
+        builtin(name, t_float, t_float, 0);
     };
-    builtin(p, "pow", t_float, t_float, t_float);
-    builtin(p, "atan2", t_float, t_float, t_float);
-    builtin(p, "to_float", t_float, t_int, 0);
-    builtin(p, "to_int", t_int, t_float, 0);
+    builtin("pow", t_float, t_float, t_float);
+    builtin("atan2", t_float, t_float, t_float);
+    builtin("to_float", t_float, t_int, 0);
+    builtin("to_int", t_int, t_float, 0);
 }
 
-fn expect_name(p: Parser) I32 {
-    if p.kind != Kind.VARIABLE { fail(); };
-    let name = intern_span(p, p.hi, p.lo);
-    take(p);
-    name;
+fn typed_string(s: Scanner) I32 {
+    let at = s.pos;
+    s.expect(Kind.STRING);
+    typed_node(Tag.Leaf, s.last_hi, s.last_lo, at, 0);
 }
 
-fn typed_string(p: Parser) I32 {
-    let at = p.pos;
-    expect(p, Kind.STRING);
-    typed(Tag.Leaf, p.last_hi, p.last_lo, at, 0);
-}
-
-// Modes: 0 an array literal (one element type), 1 indices (all Int),
-// 2 arguments (types from fn_types[start ..< start + count]).
-fn typed_list(p: Parser, close: Kind, mode: I32, start: I32, count: I32) I32 {
+// An array literal's elements, which share one type: .{node, count, type}.
+fn typed_elements(s: Scanner) .{I32, I32, I32} {
     let list = 0;
-    let n = 0;
+    let count = 0;
     let element = 0;
-    if p.kind != close {
+    if s.kind != Kind.RSQUARE {
         while (true) {
-            let item = typed_expr(p, 0);
-            let item_type = p.expr_type;
-            if mode == 0 {
-                if n == 0 {
-                    element = item_type;
-                } else if item_type != element { fail(); };
-            } else if mode == 1 {
-                if item_type != t_int { fail(); };
-            } else if n >= count or item_type != fn_types[start + n] { fail(); };
-            list = typed(Tag.List, list, item, 0, 0);
-            n += 1;
-            if p.kind != Kind.COMMA { break; };
-            take(p);
+            let .{item, item_type, _bare} = typed_expr(s, 0);
+            if count == 0 {
+                element = item_type;
+            } else if item_type != element {
+                fail();
+            };
+            list = typed_node(Tag.List, list, item, 0, 0);
+            count += 1;
+            if s.kind != Kind.COMMA { break; };
+            s.take();
         };
     };
-    expect(p, close);
-    if mode == 2 and n != count { fail(); };
-    p.list_count = n;
-    p.list_element = element;
-    list;
+    s.expect(Kind.RSQUARE);
+    .{list, count, element};
 }
 
-// Record construction checks against the record's field types.
-fn typed_fields(p: Parser, record: I32) I32 {
+// Indices, which are Ints: .{node, count}.
+fn typed_indices(s: Scanner) .{I32, I32} {
     let list = 0;
-    let n = 0;
-    let start = type_fields_start[record];
-    let count = type_fields_len[record];
-    if p.kind != Kind.RCURLY {
+    let count = 0;
+    if s.kind != Kind.RSQUARE {
         while (true) {
-            let item = typed_expr(p, 0);
-            if n >= count or p.expr_type != field_type[start + n] { fail(); };
-            list = typed(Tag.List, list, item, 0, 0);
-            n += 1;
-            if p.kind != Kind.COMMA { break; };
-            take(p);
+            let .{item, item_type, _bare} = typed_expr(s, 0);
+            if item_type != t_int { fail(); };
+            list = typed_node(Tag.List, list, item, 0, 0);
+            count += 1;
+            if s.kind != Kind.COMMA { break; };
+            s.take();
         };
     };
-    expect(p, Kind.RCURLY);
+    s.expect(Kind.RSQUARE);
+    .{list, count};
+}
+
+// Arguments or record fields, typed as `expected[start ..< start + count]`
+// (`fn_types` for arguments, `field_type` for fields).
+fn typed_arguments(s: Scanner, close: Kind, fields: Bool, start: I32, count: I32) I32 {
+    let list = 0;
+    let n = 0;
+    if s.kind != close {
+        while (true) {
+            let .{item, item_type, _bare} = typed_expr(s, 0);
+            if n >= count { fail(); };
+            let wanted = if fields { field_type[start + n]; } else { fn_types[start + n]; };
+            if item_type != wanted { fail(); };
+            list = typed_node(Tag.List, list, item, 0, 0);
+            n += 1;
+            if s.kind != Kind.COMMA { break; };
+            s.take();
+        };
+    };
+    s.expect(close);
     if n != count { fail(); };
     list;
 }
 
-fn typed_loop(p: Parser, array: Bool, at: I32) I32 {
-    expect(p, Kind.LSQUARE);
+// `array[i : n, …] body` and `sum[…] body`: .{node, type}.
+fn typed_loop(s: Scanner, array: Bool, at: I32) .{I32, I32} {
+    s.expect(Kind.LSQUARE);
     let mark = locals.len();
     let count = 0;
     let bindings = 0;
-    if p.kind != Kind.RSQUARE {
+    if s.kind != Kind.RSQUARE {
         while (true) {
-            let name_at = p.pos;
-            let name = expect_name(p);
-            expect(p, Kind.COLON);
-            let bound_node = typed_expr(p, 0);
-            if p.expr_type != t_int { fail(); };
+            let name_at = s.pos;
+            let name = s.expect_name();
+            s.expect(Kind.COLON);
+            let .{limit, limit_type, _bare} = typed_expr(s, 0);
+            if limit_type != t_int { fail(); };
             bind(name, SymbolTag.Variable, t_int, true);
-            bindings = typed(Tag.List, bindings, typed(Tag.Binding, bound_node, 0, name_at, t_int), 0, 0);
+            bindings = typed_node(Tag.List, bindings, typed_node(Tag.Binding, limit, 0, name_at, t_int), 0, 0);
             count += 1;
-            if p.kind != Kind.COMMA { break; };
-            take(p);
+            if s.kind != Kind.COMMA { break; };
+            s.take();
         };
     };
-    expect(p, Kind.RSQUARE);
+    s.expect(Kind.RSQUARE);
     if count == 0 { fail(); };
-    let body = typed_expr(p, 0);
-    let body_type = p.expr_type;
+    let .{body, body_type, _bare} = typed_expr(s, 0);
     if not array and body_type != t_int and body_type != t_float { fail(); };
     let result = if array { array_type(body_type, count); } else { body_type; };
-    pop_scope(mark);
-    p.expr_type = result;
-    typed(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at, result);
+    unbind_to(mark);
+    .{typed_node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at, result), result};
 }
 
-fn typed_prefix(p: Parser) I32 {
-    let at = p.pos;
-    let code = if p.kind == Kind.OP { p.op; } else { 0; };
-    let kind = p.kind;
-    let name = if kind == Kind.VARIABLE { intern_span(p, p.hi, p.lo); } else { -1; };
-    take(p);
-    p.bare = -1;
+// A prefix expression: .{node, type, bare name}. A name of a function or
+// type has type 0 (not a value) until it is called or constructed.
+fn typed_prefix(s: Scanner) .{I32, I32, I32} {
+    let at = s.pos;
+    let code = if s.kind == Kind.OP { s.op; } else { 0; };
+    let kind = s.kind;
+    let name = if kind == Kind.VARIABLE { s.name(); } else { unnamed; };
+    s.take();
     match kind {
         Kind.VARIABLE => {
             let symbol = lookup(name);
-            p.expr_type = if sym_tag[symbol] == SymbolTag.Variable { sym_type[symbol]; } else { 0; };
-            p.bare = name;
-            typed(Tag.Leaf, symbol, 0, at, sym_type[symbol]);
+            let value = if sym_tag[symbol] == SymbolTag.Variable { sym_type[symbol]; } else { 0; };
+            .{typed_node(Tag.Leaf, symbol, 0, at, sym_type[symbol]), value, name};
         },
-        Kind.TRUE => {
-            p.expr_type = t_bool;
-            typed(Tag.Leaf, at, 0, at, t_bool);
-        },
-        Kind.FALSE => {
-            p.expr_type = t_bool;
-            typed(Tag.Leaf, at, 0, at, t_bool);
-        },
-        Kind.VOID => {
-            p.expr_type = t_void;
-            typed(Tag.Leaf, at, 0, at, t_void);
-        },
-        Kind.INTVAL => {
-            p.expr_type = t_int;
-            typed(Tag.Leaf, p.last_hi, p.last_lo, at, t_int);
-        },
-        Kind.FLOATVAL => {
-            p.expr_type = t_float;
-            typed(Tag.Leaf, p.last_hi, p.last_lo, at, t_float);
-        },
+        Kind.TRUE => .{typed_node(Tag.Leaf, at, 0, at, t_bool), t_bool, unnamed},
+        Kind.FALSE => .{typed_node(Tag.Leaf, at, 0, at, t_bool), t_bool, unnamed},
+        Kind.VOID => .{typed_node(Tag.Leaf, at, 0, at, t_void), t_void, unnamed},
+        Kind.INTVAL => .{typed_node(Tag.Leaf, s.last_hi, s.last_lo, at, t_int), t_int, unnamed},
+        Kind.FLOATVAL => .{typed_node(Tag.Leaf, s.last_hi, s.last_lo, at, t_float), t_float, unnamed},
         Kind.LPAREN => {
-            let inner = typed_expr(p, 0);
-            expect(p, Kind.RPAREN);
-            p.bare = -1;
-            inner;
+            let .{inner, inner_type, _bare} = typed_expr(s, 0);
+            s.expect(Kind.RPAREN);
+            .{inner, inner_type, unnamed};
         },
         Kind.LSQUARE => {
-            let list = typed_list(p, Kind.RSQUARE, 0, 0, 0);
-            if p.list_count == 0 { fail(); };
-            let array = array_type(p.list_element, 1);
-            p.expr_type = array;
-            typed(Tag.ArrayExpr, list, 0, at, array);
+            let .{list, count, element} = typed_elements(s);
+            if count == 0 { fail(); };
+            let array = array_type(element, 1);
+            .{typed_node(Tag.ArrayExpr, list, 0, at, array), array, unnamed};
         },
         Kind.OP => {
             if code != 45 and code != 33 { fail(); };
-            let right = typed_expr(p, 5);
-            let right_type = p.expr_type;
+            let .{right, right_type, _bare} = typed_expr(s, 5);
             if code == 45 and right_type != t_int and right_type != t_float { fail(); };
             if code == 33 and right_type != t_bool { fail(); };
-            p.expr_type = right_type;
-            p.bare = -1;
-            typed(Tag.Unary, right, 0, at, right_type);
+            .{typed_node(Tag.Unary, right, 0, at, right_type), right_type, unnamed};
         },
         Kind.IF => {
-            let condition = typed_expr(p, 0);
-            let condition_type = p.expr_type;
-            expect(p, Kind.THEN);
-            let yes = typed_expr(p, 0);
-            let yes_type = p.expr_type;
-            expect(p, Kind.ELSE);
-            let no = typed_expr(p, 0);
-            if condition_type != t_bool or yes_type != p.expr_type { fail(); };
-            let pair = typed(Tag.List, condition, yes, 0, 0);
-            p.expr_type = yes_type;
-            p.bare = -1;
-            typed(Tag.Conditional, pair, no, at, yes_type);
+            let .{condition, condition_type, _a} = typed_expr(s, 0);
+            s.expect(Kind.THEN);
+            let .{yes, yes_type, _b} = typed_expr(s, 0);
+            s.expect(Kind.ELSE);
+            let .{no, no_type, _c} = typed_expr(s, 0);
+            if condition_type != t_bool or yes_type != no_type { fail(); };
+            let pair = typed_node(Tag.List, condition, yes, 0, 0);
+            .{typed_node(Tag.Conditional, pair, no, at, yes_type), yes_type, unnamed};
         },
         Kind.ARRAY => {
-            let node = typed_loop(p, true, at);
-            p.bare = -1;
-            node;
+            let .{array, array_type_id} = typed_loop(s, true, at);
+            .{array, array_type_id, unnamed};
         },
         Kind.SUM => {
-            let node = typed_loop(p, false, at);
-            p.bare = -1;
-            node;
+            let .{sum, sum_type} = typed_loop(s, false, at);
+            .{sum, sum_type, unnamed};
         },
         ~> {
             fail();
-            0;
+            .{0, 0, unnamed};
         },
     };
 }
 
-fn field_type_of(record: I32, name: I32) I32 {
-    let start = type_fields_start[record];
-    for (start ..< start + type_fields_len[record]) |f| {
-        if field_name[f] == name { return field_type[f]; };
+// A binary operator's result type for operands of `left` and `right`.
+fn operator_type(code: I32, left: I32, right: I32) I32 {
+    if code == 38 or code == 124 {
+        if left != t_bool or right != t_bool { fail(); };
+        return t_bool;
     };
-    0;
+    if left != right or (left != t_int and left != t_float) { fail(); };
+    let compares = code == 60 or code == 62 or code == 61 or code == 126;
+    if compares { t_bool; } else { left; };
 }
 
-fn typed_expr(p: Parser, min: I32) I32 {
-    let left = typed_prefix(p);
-    let left_type = p.expr_type;
-    let bare = p.bare;
+// An expression whose operators bind at least `min`: .{node, type, bare name}.
+fn typed_expr(s: Scanner, min: I32) .{I32, I32, I32} {
+    let .{left, left_type, bare} = typed_prefix(s);
     while (true) {
-        let kind = p.kind;
+        let kind = s.kind;
         if kind == Kind.DOT {
             if min > 6 { break; };
-            take(p);
-            let name = expect_name(p);
+            s.take();
+            let name = s.expect_name();
             if type_tag[left_type] != TypeTag.Record { fail(); };
             let result = field_type_of(left_type, name);
             if result == 0 { fail(); };
-            left = typed(Tag.Field, left, 0, p.pos - 1, result);
+            left = typed_node(Tag.Field, left, 0, s.pos - 1, result);
             left_type = result;
-            bare = -1;
         } else if kind == Kind.LSQUARE {
             if min > 6 { break; };
-            take(p);
+            s.take();
             if type_tag[left_type] != TypeTag.ArrayType { fail(); };
-            let indices = typed_list(p, Kind.RSQUARE, 1, 0, 0);
-            if p.list_count != type_rank[left_type] { fail(); };
+            let .{indices, count} = typed_indices(s);
+            if count != type_rank[left_type] { fail(); };
             let element = type_element[left_type];
-            left = typed(Tag.Index, left, indices, 0, element);
+            left = typed_node(Tag.Index, left, indices, 0, element);
             left_type = element;
-            bare = -1;
         } else if kind == Kind.LPAREN or kind == Kind.LCURLY {
-            if min > 6 or bare < 0 { break; };
+            if min > 6 or bare == unnamed { break; };
             let symbol = lookup(bare);
-            take(p);
+            s.take();
             if kind == Kind.LPAREN {
                 if sym_tag[symbol] != SymbolTag.Function { fail(); };
-                let args = typed_list(p, Kind.RPAREN, 2, sym_params_start[symbol], sym_params_len[symbol]);
-                left = typed(Tag.Call, left, args, 0, sym_type[symbol]);
+                let args = typed_arguments(s, Kind.RPAREN, false, sym_params_start[symbol], sym_params_len[symbol]);
+                left = typed_node(Tag.Call, left, args, 0, sym_type[symbol]);
             } else {
-                if sym_tag[symbol] != SymbolTag.Alias { fail(); };
                 let record = sym_type[symbol];
-                if type_tag[record] != TypeTag.Record { fail(); };
-                let args = typed_fields(p, record);
-                left = typed(Tag.Construct, left, args, 0, record);
+                if sym_tag[symbol] != SymbolTag.Alias or type_tag[record] != TypeTag.Record { fail(); };
+                let args = typed_arguments(s, Kind.RCURLY, true, type_fields_start[record], type_fields_len[record]);
+                left = typed_node(Tag.Construct, left, args, 0, record);
             };
             left_type = sym_type[symbol];
-            bare = -1;
         } else {
             if kind != Kind.OP { break; };
-            let code = p.op;
+            let code = s.op;
             let binding = precedence[code];
             if binding == 0 or binding < min { break; };
-            let operator = p.pos;
-            take(p);
-            let right = typed_expr(p, binding + 1);
-            let right_type = p.expr_type;
-            let result = 0;
-            if code == 38 or code == 124 {
-                if left_type != t_bool or right_type != t_bool { fail(); };
-                result = t_bool;
-            } else {
-                if left_type != right_type or (left_type != t_int and left_type != t_float) { fail(); };
-                let compares = code == 60 or code == 62 or code == 61 or code == 126;
-                result = if compares { t_bool; } else { left_type; };
-            };
-            left = typed(Tag.Binary, left, right, operator, result);
+            let operator = s.pos;
+            s.take();
+            let .{right, right_type, _bare} = typed_expr(s, binding + 1);
+            let result = operator_type(code, left_type, right_type);
+            left = typed_node(Tag.Binary, left, right, operator, result);
             left_type = result;
-            bare = -1;
         };
+        bare = unnamed;
     };
     if left_type == 0 { fail(); };
-    p.expr_type = left_type;
-    p.bare = bare;
-    left;
+    .{left, left_type, bare};
 }
 
-fn typed_type(p: Parser) I32 {
-    let kind = p.kind;
-    let result = match kind {
+fn typed_type(s: Scanner) I32 {
+    let result = match s.kind {
         Kind.INT => t_int,
         Kind.FLOAT => t_float,
         Kind.BOOL => t_bool,
         Kind.VOID => t_void,
         Kind.VARIABLE => {
-            let symbol = lookup(intern_span(p, p.hi, p.lo));
+            let symbol = lookup(s.name());
             if sym_tag[symbol] != SymbolTag.Alias { fail(); };
             sym_type[symbol];
         },
@@ -1407,28 +1382,31 @@ fn typed_type(p: Parser) I32 {
             0;
         },
     };
-    take(p);
-    while (p.kind == Kind.LSQUARE) {
-        take(p);
+    s.take();
+    while (s.kind == Kind.LSQUARE) {
+        s.take();
         let rank = 1;
-        while (p.kind == Kind.COMMA) {
-            take(p);
+        while (s.kind == Kind.COMMA) {
+            s.take();
             rank += 1;
         };
-        expect(p, Kind.RSQUARE);
+        s.expect(Kind.RSQUARE);
         result = array_type(result, rank);
     };
     result;
 }
 
-fn typed_annotation(p: Parser) I32 {
-    expect(p, Kind.COLON);
-    typed_type(p);
+fn typed_annotation(s: Scanner) I32 {
+    s.expect(Kind.COLON);
+    typed_type(s);
 }
 
-fn pattern(p: Parser, binding: Bool) I32 {
-    let at = p.pos;
-    let name = expect_name(p);
+// A binding target: `x`, `a[i, j]`, or `point{x, y}` (with `: type` on
+// parameters). Returns a pattern id; bind_pattern binds it once the value's
+// type is known.
+fn pattern(s: Scanner, parameter: Bool) I32 {
+    let at = s.pos;
+    let name = s.expect_name();
     let id = pat_tag.len();
     pat_tag.push(PatternTag.Plain);
     pat_name.push(name);
@@ -1440,28 +1418,28 @@ fn pattern(p: Parser, binding: Bool) I32 {
     pat_count.push(0);
     pat_dim_start.push(0);
     pat_dim_count.push(0);
-    let node = typed(Tag.Lvalue, at, 0, at, 0);
-    if p.kind == Kind.LSQUARE {
-        take(p);
+    let target = typed_node(Tag.Lvalue, at, 0, at, 0);
+    if s.kind == Kind.LSQUARE {
+        s.take();
         pat_tag[id] = PatternTag.Dims;
         pat_dim_start[id] = dim_names.len();
-        if p.kind != Kind.RSQUARE {
+        if s.kind != Kind.RSQUARE {
             while (true) {
-                let dim_at = p.pos;
-                dim_names.push(expect_name(p));
+                let dim_at = s.pos;
+                dim_names.push(s.expect_name());
                 pat_dim_count[id] += 1;
-                node = typed(Tag.Lvalue, node, dim_at, at, 0);
-                if p.kind != Kind.COMMA { break; };
-                take(p);
+                target = typed_node(Tag.Lvalue, target, dim_at, at, 0);
+                if s.kind != Kind.COMMA { break; };
+                s.take();
             };
         };
-        expect(p, Kind.RSQUARE);
-    } else if p.kind == Kind.LCURLY {
-        take(p);
+        s.expect(Kind.RSQUARE);
+    } else if s.kind == Kind.LCURLY {
+        s.take();
         pat_tag[id] = PatternTag.Fields;
-        if p.kind != Kind.RCURLY {
+        if s.kind != Kind.RCURLY {
             while (true) {
-                let child = pattern(p, binding);
+                let child = pattern(s, parameter);
                 if pat_first[id] < 0 {
                     pat_first[id] = child;
                 } else {
@@ -1469,21 +1447,21 @@ fn pattern(p: Parser, binding: Bool) I32 {
                 };
                 pat_last[id] = child;
                 pat_count[id] += 1;
-                node = typed(Tag.Lvalue, node, pat_node[child], at, 0);
-                if p.kind != Kind.COMMA { break; };
-                take(p);
+                target = typed_node(Tag.Lvalue, target, pat_node[child], at, 0);
+                if s.kind != Kind.COMMA { break; };
+                s.take();
             };
         };
-        expect(p, Kind.RCURLY);
+        s.expect(Kind.RCURLY);
         let symbol = lookup(name);
         if sym_tag[symbol] != SymbolTag.Alias or type_tag[sym_type[symbol]] != TypeTag.Record { fail(); };
         pat_declared[id] = sym_type[symbol];
     };
-    if binding and pat_tag[id] != PatternTag.Fields {
-        pat_declared[id] = typed_annotation(p);
-        node = typed(Tag.Binding, node, 0, at, pat_declared[id]);
+    if parameter and pat_tag[id] != PatternTag.Fields {
+        pat_declared[id] = typed_annotation(s);
+        target = typed_node(Tag.Binding, target, 0, at, pat_declared[id]);
     };
-    pat_node[id] = node;
+    pat_node[id] = target;
     id;
 }
 
@@ -1510,167 +1488,160 @@ fn bind_pattern(id: I32, expected: I32, local: Bool) void {
     };
 }
 
-fn typed_stmt(p: Parser) I32 {
-    let at = p.pos;
-    let kind = take(p);
-    let result = match kind {
+// `let`, `assert`, or `return` in a function returning `returns`:
+// .{node, whether it returned}.
+fn typed_stmt(s: Scanner, returns: I32) .{I32, Bool} {
+    let at = s.pos;
+    let result = match s.take() {
         Kind.LET => {
-            let pat = pattern(p, false);
-            expect(p, Kind.EQUALS);
-            let value = typed_expr(p, 0);
-            bind_pattern(pat, p.expr_type, true);
-            typed(Tag.Stmt, pat_node[pat], value, at, t_void);
+            let target = pattern(s, false);
+            s.expect(Kind.EQUALS);
+            let .{value, value_type, _bare} = typed_expr(s, 0);
+            bind_pattern(target, value_type, true);
+            .{typed_node(Tag.Stmt, pat_node[target], value, at, t_void), false};
         },
         Kind.ASSERT => {
-            let value = typed_expr(p, 0);
-            if p.expr_type != t_bool { fail(); };
-            expect(p, Kind.COMMA);
-            typed(Tag.Stmt, value, typed_string(p), at, t_void);
+            let .{value, value_type, _bare} = typed_expr(s, 0);
+            if value_type != t_bool { fail(); };
+            s.expect(Kind.COMMA);
+            .{typed_node(Tag.Stmt, value, typed_string(s), at, t_void), false};
         },
         Kind.RETURN => {
-            let value = typed_expr(p, 0);
-            if p.expr_type != p.return_type { fail(); };
-            p.saw_return = true;
-            typed(Tag.Stmt, value, 0, at, t_void);
+            let .{value, value_type, _bare} = typed_expr(s, 0);
+            if value_type != returns { fail(); };
+            .{typed_node(Tag.Stmt, value, 0, at, t_void), true};
         },
         ~> {
             fail();
-            0;
+            .{0, false};
         },
     };
-    expect(p, Kind.NEWLINE);
+    s.expect(Kind.NEWLINE);
     result;
 }
 
-fn typed_command(p: Parser) I32 {
-    let at = p.pos;
-    let kind = take(p);
-    match kind {
+fn typed_struct(s: Scanner, at: I32) I32 {
+    let name = s.expect_name();
+    if symbol_of(name) >= 0 { fail(); };
+    s.expect(Kind.LCURLY);
+    s.expect(Kind.NEWLINE);
+    let start = field_name.len();
+    let fields = 0;
+    while (s.kind == Kind.VARIABLE) {
+        let field_at = s.pos;
+        let field = s.expect_name();
+        for (start ..< field_name.len()) |f| {
+            if field_name[f] == field { fail(); };
+        };
+        let type_id = typed_annotation(s);
+        field_name.push(field);
+        field_type.push(type_id);
+        fields = typed_node(Tag.List, fields, typed_node(Tag.Binding, type_id, 0, field_at, type_id), 0, 0);
+        s.expect(Kind.NEWLINE);
+    };
+    s.expect(Kind.RCURLY);
+    bind(name, SymbolTag.Alias, new_type(TypeTag.Record, 0, 0, start, field_name.len() - start), false);
+    typed_node(Tag.Command, fields, 0, at, t_void);
+}
+
+fn typed_fn(s: Scanner, at: I32) I32 {
+    let name = s.expect_name();
+    if symbol_of(name) >= 0 { fail(); };
+    s.expect(Kind.LPAREN);
+    let first_param = fn_params.len();
+    let params_start = fn_types.len();
+    if s.kind != Kind.RPAREN {
+        while (true) {
+            let param = pattern(s, true);
+            fn_params.push(param);
+            fn_types.push(pat_declared[param]);
+            if s.kind != Kind.COMMA { break; };
+            s.take();
+        };
+    };
+    s.expect(Kind.RPAREN);
+    let returns = typed_annotation(s);
+    let symbol = bind(name, SymbolTag.Function, returns, false);
+    sym_params_start[symbol] = params_start;
+    sym_params_len[symbol] = fn_params.len() - first_param;
+    let mark = locals.len();
+    for (first_param ..< fn_params.len()) |k| {
+        bind_pattern(fn_params[k], pat_declared[fn_params[k]], true);
+    };
+    fn_params.resize(first_param);
+    s.expect(Kind.LCURLY);
+    s.expect(Kind.NEWLINE);
+    let body = 0;
+    let returned = false;
+    while (s.kind != Kind.RCURLY) {
+        if s.kind == Kind.END_OF_FILE { fail(); };
+        let .{statement, did_return} = typed_stmt(s, returns);
+        body = typed_node(Tag.List, body, statement, 0, 0);
+        returned = returned or did_return;
+    };
+    s.expect(Kind.RCURLY);
+    if returns != t_void and not returned { fail(); };
+    unbind_to(mark);
+    typed_node(Tag.Command, body, 0, at, t_void);
+}
+
+// Every command but `time` ends its line.
+fn typed_command(s: Scanner) I32 {
+    let at = s.pos;
+    let kind = s.take();
+    if kind == Kind.TIME { return typed_node(Tag.Command, typed_command(s), 0, at, t_void); };
+    let result = match kind {
         Kind.LET => {
-            let pat = pattern(p, false);
-            expect(p, Kind.EQUALS);
-            let value = typed_expr(p, 0);
-            bind_pattern(pat, p.expr_type, false);
-            expect(p, Kind.NEWLINE);
-            typed(Tag.Command, pat_node[pat], value, at, t_void);
+            let target = pattern(s, false);
+            s.expect(Kind.EQUALS);
+            let .{value, value_type, _bare} = typed_expr(s, 0);
+            bind_pattern(target, value_type, false);
+            typed_node(Tag.Command, pat_node[target], value, at, t_void);
         },
         Kind.ASSERT => {
-            let value = typed_expr(p, 0);
-            if p.expr_type != t_bool { fail(); };
-            expect(p, Kind.COMMA);
-            let text = typed_string(p);
-            expect(p, Kind.NEWLINE);
-            typed(Tag.Command, value, text, at, t_void);
+            let .{value, value_type, _bare} = typed_expr(s, 0);
+            if value_type != t_bool { fail(); };
+            s.expect(Kind.COMMA);
+            typed_node(Tag.Command, value, typed_string(s), at, t_void);
         },
         Kind.SHOW => {
-            let value = typed_expr(p, 0);
-            expect(p, Kind.NEWLINE);
-            typed(Tag.Command, value, 0, at, t_void);
+            let .{value, _type, _bare} = typed_expr(s, 0);
+            typed_node(Tag.Command, value, 0, at, t_void);
         },
-        Kind.PRINT => {
-            let text = typed_string(p);
-            expect(p, Kind.NEWLINE);
-            typed(Tag.Command, text, 0, at, t_void);
-        },
-        Kind.TIME => typed(Tag.Command, typed_command(p), 0, at, t_void),
+        Kind.PRINT => typed_node(Tag.Command, typed_string(s), 0, at, t_void),
         Kind.READ => {
-            expect(p, Kind.IMAGE);
-            let text = typed_string(p);
-            expect(p, Kind.TO);
-            let pat = pattern(p, false);
-            bind_pattern(pat, p.rgba_image, false);
-            expect(p, Kind.NEWLINE);
-            typed(Tag.Command, text, pat_node[pat], at, t_void);
+            s.expect(Kind.IMAGE);
+            let text = typed_string(s);
+            s.expect(Kind.TO);
+            let target = pattern(s, false);
+            bind_pattern(target, t_rgba_image, false);
+            typed_node(Tag.Command, text, pat_node[target], at, t_void);
         },
         Kind.WRITE => {
-            expect(p, Kind.IMAGE);
-            let value = typed_expr(p, 0);
-            if p.expr_type != p.rgba_image { fail(); };
-            expect(p, Kind.TO);
-            let text = typed_string(p);
-            expect(p, Kind.NEWLINE);
-            typed(Tag.Command, value, text, at, t_void);
+            s.expect(Kind.IMAGE);
+            let .{value, value_type, _bare} = typed_expr(s, 0);
+            if value_type != t_rgba_image { fail(); };
+            s.expect(Kind.TO);
+            typed_node(Tag.Command, value, typed_string(s), at, t_void);
         },
-        Kind.STRUCT => {
-            let name = expect_name(p);
-            if symbol_of(name) >= 0 { fail(); };
-            expect(p, Kind.LCURLY);
-            expect(p, Kind.NEWLINE);
-            let start = field_name.len();
-            let fields = 0;
-            while (p.kind == Kind.VARIABLE) {
-                let field_at = p.pos;
-                let field = expect_name(p);
-                for (start ..< field_name.len()) |f| {
-                    if field_name[f] == field { fail(); };
-                };
-                let field_t = typed_annotation(p);
-                field_name.push(field);
-                field_type.push(field_t);
-                fields = typed(Tag.List, fields, typed(Tag.Binding, field_t, 0, field_at, field_t), 0, 0);
-                expect(p, Kind.NEWLINE);
-            };
-            expect(p, Kind.RCURLY);
-            expect(p, Kind.NEWLINE);
-            let record = new_type(TypeTag.Record, 0, 0, start, field_name.len() - start);
-            bind(name, SymbolTag.Alias, record, false);
-            typed(Tag.Command, fields, 0, at, t_void);
-        },
-        Kind.FN => {
-            let name = expect_name(p);
-            if symbol_of(name) >= 0 { fail(); };
-            expect(p, Kind.LPAREN);
-            let first_param = fn_params.len();
-            let params_start = fn_types.len();
-            if p.kind != Kind.RPAREN {
-                while (true) {
-                    let pat = pattern(p, true);
-                    fn_params.push(pat);
-                    fn_types.push(pat_declared[pat]);
-                    if p.kind != Kind.COMMA { break; };
-                    take(p);
-                };
-            };
-            expect(p, Kind.RPAREN);
-            let result_type = typed_annotation(p);
-            let symbol = bind(name, SymbolTag.Function, result_type, false);
-            sym_params_start[symbol] = params_start;
-            sym_params_len[symbol] = fn_params.len() - first_param;
-            let mark = locals.len();
-            for (first_param ..< fn_params.len()) |k| {
-                bind_pattern(fn_params[k], pat_declared[fn_params[k]], true);
-            };
-            fn_params.resize(first_param);
-            p.return_type = result_type;
-            p.saw_return = false;
-            expect(p, Kind.LCURLY);
-            expect(p, Kind.NEWLINE);
-            let body = 0;
-            while (p.kind != Kind.RCURLY) {
-                if p.kind == Kind.END_OF_FILE { fail(); };
-                body = typed(Tag.List, body, typed_stmt(p), 0, 0);
-            };
-            expect(p, Kind.RCURLY);
-            expect(p, Kind.NEWLINE);
-            if result_type != t_void and not p.saw_return { fail(); };
-            pop_scope(mark);
-            p.return_type = 0;
-            typed(Tag.Command, body, 0, at, t_void);
-        },
+        Kind.STRUCT => typed_struct(s, at),
+        Kind.FN => typed_fn(s, at),
         ~> {
             fail();
             0;
         },
     };
+    s.expect(Kind.NEWLINE);
+    result;
 }
 
-fn typed_program(p: Parser) I32 {
+fn typed_program(s: Scanner) I32 {
     let root = 0;
-    while (p.kind != Kind.END_OF_FILE) {
-        if p.kind == Kind.NEWLINE {
-            take(p);
+    while (s.kind != Kind.END_OF_FILE) {
+        if s.kind == Kind.NEWLINE {
+            s.take();
         } else {
-            root = typed(Tag.List, root, typed_command(p), 0, 0);
+            root = typed_node(Tag.List, root, typed_command(s), 0, 0);
         };
     };
     root;
@@ -1679,28 +1650,23 @@ fn typed_program(p: Parser) I32 {
 // Parse and type check `src`. Returns the token count + 1 (as Zig reports
 // it), or -1 for a syntax or type error.
 fn check() I32 {
-    node_tag.clear();
-    node_a.clear();
-    node_b.clear();
-    node_token.clear();
-    node_tag.reserve(src.len());
-    node_a.reserve(src.len());
-    node_b.reserve(src.len());
-    node_token.reserve(src.len());
+    reset_nodes();
     node_type.reserve(src.len());
-    let p = new_parser();
+    let end = src.len() - 1;
     let result = try {
-        init_env(p);
-        scan(p);
-        typed_program(p);
-        p.pos + 1;
+        init_env();
+        let s = new_scanner(end);
+        typed_program(s);
+        s.pos + 1;
     } catch {
         -1;
     };
     // Drop the builtin names init_env appended after the sentinel.
-    src.resize(p.end + 1);
+    src.resize(end + 1);
     result;
 }
+
+// ── The command line ───────────────────────────────────────────────────────────
 
 fn load(path: Str) void {
     src.copy_in(Fs.readFileSync(path));

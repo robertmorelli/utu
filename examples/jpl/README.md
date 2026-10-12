@@ -36,6 +36,8 @@ python3 tests/jpl-typechecker/run.py ./jpl              # and 25 type checker fi
 | 256-entry comptime precedence table | `const mem precedence: U8 = @comptime/\ precedence_table() \/` |
 | `ArrayList(Node)` of `{tag, a, b, token}` | four mems: `node_tag: Tag`, `node_a`, `node_b`, `node_token` |
 | `try` on every call | a syntax or type error throws; `parse` and `check` catch it once |
+| `Expr` structs returned by value | tuples: `let .{node, ty, bare} = typed_expr(s, 0);` (wasm multi-value) |
+| `*Checker` methods | a `Scanner` struct with methods (`s.take()`, `s.expect(…)`); the checker's environment is mems |
 | `StringHashMap` of input slices | names interned in place as spans of `src`, in an open-addressing table in mems |
 | `ArrayList`s of types, fields, symbols, patterns | one mem per column |
 | input with a 255 sentinel | `src.copy_in(Fs.readFileSync(path)); src.push(255);` |
