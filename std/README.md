@@ -21,6 +21,9 @@ adopt a float type from context (`let x: F64 = 1`).
 Regenerate the browser declarations with `bun run bindings:browser`, then build
 with `bun run build`. See [the declaration guide](../docs/typescript-abi.md).
 
+To intern spans of a byte mem without copying them, use the mem's own
+`intern(start, stop)` (see the spec); `std:Interner` is for keys from anywhere.
+
 `std:IntMap` maps `I32` keys to `I32` values (`set`, `get(key, missing)`, `has`,
 `len`). `std:Interner` gives byte strings dense ids in first-seen order: call
 `begin()`, `byte(b)` for each byte (from a mem, an array, or a string), then

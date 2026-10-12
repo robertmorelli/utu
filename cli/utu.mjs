@@ -157,7 +157,8 @@ async function buildExe(compiler, file, args) {
   const { doc, artifacts, snapshot } = await compiler.analyzeFile(file);
   if (artifacts.diagnostics.length) {
     await printDiagnostics(artifacts.diagnostics, snapshot);
-    process.exit(1);
+    // Warnings are reported; only errors stop the build.
+    if (artifacts.diagnostics.some(d => d.severity !== 'warning')) process.exit(1);
   }
 
   const wasm = emitBinary(doc);

@@ -685,6 +685,20 @@ Fs.writeSync(1.0, out.view(0, out.len()));   // a JS.Uint8Array over the element
 A view is a `JS.Uint8Array`, `JS.Float32Array`, and so on for the element kind,
 and stops seeing the memory once the mem grows.
 
+A byte mem (`U8`, `I8`) interns spans of itself in place, without copying:
+
+```
+let id = src.intern(start, stop);   // dense id (0, 1, …) of the bytes src[start ..< stop)
+src.interned();                     // distinct spans so far
+src.interned_start(id);             // where that id's first span starts
+src.interned_size(id);              // and its length
+src.intern_reset();                 // forget every id
+```
+
+The same bytes always get the same id. Ids refer to spans of the mem, so those
+bytes must stay where they are. To intern text that is not in the mem, push it
+first.
+
 A `mem` is not a value: it cannot be stored, passed, or returned, and a local
 or parameter of the same name hides it. Only top-level declarations are
 allowed, because each one is a memory of the module. The host reads and writes

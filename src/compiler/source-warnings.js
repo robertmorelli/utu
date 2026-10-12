@@ -1,5 +1,8 @@
 import { DIAGNOSTIC_KINDS } from './diagnostics.js';
 
+// A branch of an if/else expression holding one expression: `{ value; }`.
+const IF_VALUE_BRANCH = /(?<=\b(?:if\b[^{};]*|else\s*))\{[^{};]*;?\s*\}/g;
+
 // Author-facing source checks. Never inspect generated Wutu/iterator expansions.
 export function compressedSourceWarnings(source, file) {
   const warnings = [];
@@ -26,7 +29,9 @@ export function compressedSourceWarnings(source, file) {
         }
       }
     }
-    const boundaries = (code.match(/[{};]/g) ?? []).length;
+    // An if/else used as a value (`if c { a; } else { b; }`) is one expression,
+    // so its single-expression branches do not count as packed statements.
+    const boundaries = (code.replace(IF_VALUE_BRANCH, ' ').match(/[{};]/g) ?? []).length;
     if (line.length > 160 && code.trim().length > 100 && boundaries >= 5) {
       const col = line.search(/\S/) + 1;
       warnings.push({

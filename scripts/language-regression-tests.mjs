@@ -827,6 +827,46 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }
   });
 
+  test('mem: byte mems intern spans of themselves in place', async ({ ROOT }) => {
+    const source = `
+      mem src: U8 = [102, 111, 111, 32, 98, 97, 114, 32, 102, 111, 111, 32, 98, 97, 122, 32, 98, 97, 114];
+      export lib {
+          fn words() I32 {
+              src.intern_reset();
+              let start = 0;
+              let seen = 0;
+              for (0..<src.len() + 1) |i| {
+                  if i == src.len() or src[i] == 32 {
+                      seen = seen * 10 + src.intern(start, i);
+                      start = i + 1;
+                  };
+              };
+              seen * 1000 + src.interned() * 100 + src.interned_start(2) * 0 + src.interned_size(2);
+          }
+          fn many() I32 {
+              src.intern_reset();
+              let base = src.len();
+              for (0..<5000) |n| {
+                  src.push(n & 255);
+                  src.push(n >> 8);
+              };
+              let bad = 0;
+              for (0..<10000) |n| {
+                  let k = n % 5000;
+                  if src.intern(base + k * 2, base + k * 2 + 2) != k { bad += 1; };
+              };
+              src.resize(base);
+              bad * 100000 + src.interned();
+          }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `mem_intern_${optimize}.utu`, source, optimize);
+      assertEq(instance.exports.words(), 1021303, `words at ${optimize}`);
+      assertEq(instance.exports.many(), 5000, `growth at ${optimize}`);
+    }
+  });
+
   test('mem: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
@@ -834,6 +874,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       ['mem s: U8;\nmem s: U8;\nexport main() I32 { 1; }', 'mem s is declared twice'],
       ['mem s: U8;\nfn s() I32 { 1; }\nexport main() I32 { 1; }', 'mem s has the same name as a top-level function'],
       ['mem s: U8;\nexport main() I32 { s.pop(); 1; }', "mem s has no method 'pop'"],
+      ['mem s: I32;\nexport main() I32 { s.intern(0, 1); }', 'only byte mems (U8, I8) intern spans'],
       ['mem s: U8;\nexport main() I32 { let t = s; 1; }', 'mem s is not a value'],
       ['mem s: U8;\nexport main() I32 { s[0, 1]; 1; }', 'mem s takes one index'],
       ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'expected I32, got F64'],

@@ -14,6 +14,19 @@
 //   name.view(a, b)      a JS typed array over elements [a, b), no copy
 //                        (needs `using JS from std:JS`, under any alias)
 //
+// A byte mem (U8, I8) also interns spans of itself in place:
+//
+//   name.intern(a, b)        a dense id (0, 1, …) for the bytes [a, b); the
+//                            same bytes always get the same id
+//   name.interned()          distinct spans so far
+//   name.interned_start(id)  where that id's first span starts, and
+//   name.interned_size(id)   its length
+//   name.intern_reset()      forget every id
+//
+// The interner is an open-addressing table of FNV-1a hashes in hidden mems
+// (`__name_slots` and so on). It stores spans, not copies: an id's bytes are
+// read back from the mem, so they must stay where they were.
+//
 // A mem that uses copy_in or view is created by the host and imported, so the
 // host functions can reach it. A view stops seeing the memory once it grows.
 //
@@ -46,7 +59,9 @@ export const MEM_KINDS = Object.freeze({
   U8: 'I32', I8: 'I32', U16: 'I32', I16: 'I32',
   I32: 'I32', U32: 'U32', I64: 'I64', U64: 'U64', F32: 'F32', F64: 'F64',
 });
-const METHODS = new Set(['len', 'cap', 'push', 'reserve', 'resize', 'clear', 'copy_in', 'view']);
+const METHODS = new Set(['len', 'cap', 'push', 'reserve', 'resize', 'clear', 'copy_in', 'view',
+  'intern', 'interned', 'interned_start', 'interned_size', 'intern_reset']);
+const INTERN_METHODS = new Set(['intern', 'interned', 'interned_start', 'interned_size', 'intern_reset']);
 const HOST_METHODS = new Set(['copy_in', 'view']);
 const WRITES = new Set(['push', 'reserve', 'resize', 'clear', 'copy_in']);
 const SHIFTS = { U8: 0, I8: 0, U16: 1, I16: 1, I32: 2, U32: 2, I64: 3, U64: 3, F32: 2, F64: 3 };
@@ -114,15 +129,34 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
   for (const access of root.querySelectorAll('ir-call > ir-field-access:first-child')) {
     const mem = mems.get(access.firstElementChild?.getAttribute('name'));
     const method = access.getAttribute('field');
-    if (!mem || !HOST_METHODS.has(method) || shadowed(access, mem.name)) continue;
+    if (!mem || shadowed(access, mem.name)) continue;
+    if (INTERN_METHODS.has(method)) {
+      if (mem.kind !== 'U8' && mem.kind !== 'I8') {
+        throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_METHOD, `mem ${mem.name}.${method}: only byte mems (U8, I8) intern spans`, access);
+      }
+      mem.interner = true;
+      continue;
+    }
+    if (!HOST_METHODS.has(method)) continue;
     mem.host = true;
     if (method === 'view' && !jsName) {
       throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_TYPE,
         `${mem.name}.view() returns a JS.${VIEWS[mem.kind]}; add \`using JS from std:JS;\``, access);
     }
   }
+  // An interning mem gets four hidden I32 mems and the functions that use them.
+  for (const mem of [...mems.values()].filter(mem => mem.interner)) {
+    for (const part of ['slots', 'starts', 'sizes', 'hashes']) {
+      const name = `__${mem.name}_${part}`;
+      mems.set(name, { name, kind: 'I32', value: 'I32', prefix: `__mem_${name}_`, decl: mem.decl, hidden: true });
+    }
+  }
   for (const mem of mems.values()) {
-    const decls = declarationsFromSource(parser, wrappers(mem, jsName), mem.decl, { createDocument });
+    if (mem.hidden) continue;
+    const source = wrappers(mem, jsName) + [...mems.values()]
+      .filter(hidden => hidden.hidden && hidden.decl === mem.decl).map(hidden => wrappers(hidden, jsName)).join('')
+      + (mem.interner ? interner(mem) : '');
+    const decls = declarationsFromSource(parser, source, mem.decl, { createDocument });
     // Foreign type names were resolved before this pass; name the view's
     // typed array the way they were.
     const view = decls.find(decl => decl.getAttribute('name') === `${mem.prefix}view`);
@@ -285,6 +319,60 @@ function bytesToBase64(bytes) {
   let text = '';
   for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(text);
+}
+
+/** The in-place interner of a byte mem, over its hidden mems. */
+function interner({ name, prefix }) {
+  const [slots, starts, sizes, hashes] = ['slots', 'starts', 'sizes', 'hashes'].map(part => `__${name}_${part}`);
+  return `
+fn ${prefix}intern_reset() void {
+    ${slots}.resize(1024);
+    for (0 ..< 1024) |slot| { ${slots}[slot] = 0; };
+    ${starts}.clear();
+    ${sizes}.clear();
+    ${hashes}.clear();
+}
+fn ${prefix}interned() I32 { ${starts}.len(); }
+fn ${prefix}interned_start(id: I32) I32 { ${starts}[id]; }
+fn ${prefix}interned_size(id: I32) I32 { ${sizes}[id]; }
+fn ${prefix}intern_same(a: I32, b: I32, size: I32) Bool {
+    for (0 ..< size) |k| {
+        if ${name}[a + k] != ${name}[b + k] { return false; };
+    };
+    true;
+}
+fn ${prefix}intern_rehash() void {
+    let size = ${slots}.len() * 2;
+    ${slots}.resize(size);
+    for (0 ..< size) |slot| { ${slots}[slot] = 0; };
+    let mask = size - 1;
+    for (0 ..< ${starts}.len()) |id| {
+        let slot = ${hashes}[id] & mask;
+        while (${slots}[slot] != 0) { slot = (slot + 1) & mask; };
+        ${slots}[slot] = id + 1;
+    };
+}
+fn ${prefix}intern(start: I32, stop: I32) I32 {
+    if ${slots}.len() == 0 { ${prefix}intern_reset(); };
+    let hash = -2128831035;
+    for (start ..< stop) |k| { hash = (hash ^ (${name}[k] & 255)) * 16777619; };
+    let size = stop - start;
+    let mask = ${slots}.len() - 1;
+    let slot = hash & mask;
+    while (${slots}[slot] != 0) {
+        let id = ${slots}[slot] - 1;
+        if ${hashes}[id] == hash and ${sizes}[id] == size and ${prefix}intern_same(${starts}[id], start, size) { return id; };
+        slot = (slot + 1) & mask;
+    };
+    let id = ${starts}.len();
+    ${starts}.push(start);
+    ${sizes}.push(size);
+    ${hashes}.push(hash);
+    ${slots}[slot] = id + 1;
+    if (id + 1) * 2 > ${slots}.len() { ${prefix}intern_rehash(); };
+    id;
+}
+`;
 }
 
 function foreignTypeRef(doc, name, site) {

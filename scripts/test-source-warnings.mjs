@@ -10,6 +10,9 @@ assert.equal(warnings.length, 1);
 assert.equal(warnings[0].severity, 'warning');
 assert.equal(warnings[0].primary.row, 2);
 assert.equal(warnings[0].primary.start, 1);
+// If/else expressions are values, however long the line.
+const branches = '    let result = if first_condition_value { first_branch_value; } else if second_condition_value { second_branch_value; } else { third_branch_value_here; };';
+assert.equal(compressedSourceWarnings(branches, 'test.utu').length, 0, branches);
 for (const source of ['// '+dense, '/*\n'+dense+'\n*/', '\\\\'+dense, 'let text = "'+dense+'";', 'export main() I32 { 1; }', dense.replaceAll('; ', ';\n')]) {
  assert.equal(compressedSourceWarnings(source, 'test.utu').length, 0, source);
 }
