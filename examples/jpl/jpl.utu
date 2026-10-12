@@ -477,6 +477,17 @@ struct Parser:
     | last_hi: I32
     | last_lo: I32
     | pos: I32
+    // Where the 255 sentinel is. Type checking: the last expression's type
+    // and bare name (-1 when it has none), the last list's size and element
+    // type, and the return type of the function being checked.
+    | end: I32
+    | expr_type: I32
+    | bare: I32
+    | list_count: I32
+    | list_element: I32
+    | return_type: I32
+    | saw_return: Bool
+    | rgba_image: I32
 
 let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('jpl'); } \/;
 
@@ -492,7 +503,7 @@ fn scan(p: Parser) void {
     let next = dfa[start_state * 256 + src[j]];
     loop match next {
         0 => {
-            if j != src.len() - 1 { fail(); };
+            if j != p.end { fail(); };
             if i != j {
                 p.cursor = j;
                 token(p, Kind.from_i32(kind_of[state]), i, j);
@@ -536,7 +547,7 @@ fn token(p: Parser, kind: Kind, i: I32, j: I32) void {
             if kind == Kind.FLOATVAL {
                 set_bits(p, parse_float(i, j).bits());
             } else {
-                if kind == Kind.STRING {
+                if kind == Kind.STRING or kind == Kind.VARIABLE {
                     p.hi = i;
                     p.lo = j;
                 };
@@ -929,7 +940,7 @@ fn parse() I32 {
     node_a.reserve(src.len());
     node_b.reserve(src.len());
     node_token.reserve(src.len());
-    let p = Parser { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0 };
+    let p = new_parser();
     try {
         scan(p);
         program(p);
@@ -937,6 +948,833 @@ fn parse() I32 {
     } catch {
         -1;
     };
+}
+
+fn new_parser() Parser {
+    Parser { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0,
+        end: src.len() - 1, expr_type: 0, bare: -1, list_count: 0, list_element: 0, return_type: 0,
+        saw_return: false, rgba_image: 0 };
+}
+
+// ── Type checking ────────────────────────────────────────────────────────────
+//
+// The Zig compiler's fused parser and type checker (parser_typecheck): every
+// expression is typed as it is parsed. Names are interned; `bound[name]` is
+// the symbol a name refers to, or -1. Types are structural: one id per array
+// element and rank, one per record.
+
+enum(U8) TypeTag:
+    | Invalid
+    | Void
+    | Bool
+    | Int
+    | Float
+    | Record
+    | ArrayType
+
+enum(U8) SymbolTag:
+    | Variable
+    | Function
+    | Alias
+
+enum(U8) PatternTag:
+    | Plain
+    | Dims
+    | Fields
+
+let t_void: I32 = 1;
+let t_bool: I32 = 2;
+let t_int: I32 = 3;
+let t_float: I32 = 4;
+let t_rgba: I32 = 5;
+
+mem node_type: I32;
+mem bound: I32;
+mem sym_tag: SymbolTag;
+mem sym_type: I32;
+mem sym_params_start: I32;
+mem sym_params_len: I32;
+mem type_tag: TypeTag;
+mem type_element: I32;
+mem type_rank: I32;
+mem type_fields_start: I32;
+mem type_fields_len: I32;
+mem field_name: I32;
+mem field_type: I32;
+mem fn_types: I32;
+mem locals: I32;
+mem fn_params: I32;
+mem pat_tag: PatternTag;
+mem pat_name: I32;
+mem pat_node: I32;
+mem pat_declared: I32;
+mem pat_first: I32;
+mem pat_last: I32;
+mem pat_next: I32;
+mem pat_count: I32;
+mem pat_dim_start: I32;
+mem pat_dim_count: I32;
+mem dim_names: I32;
+
+fn typed(tag: Tag, a: I32, b: I32, at: I32, type_id: I32) I32 {
+    node_type.push(type_id);
+    add_at(tag, a, b, at);
+}
+
+// Names are spans of `src`, interned in place: an open-addressing table of
+// id + 1 (0 empty) over FNV-1a hashes, with each id's span and hash.
+// Builtin names are appended to `src` after the sentinel.
+mem name_table: I32;
+mem ident_start: I32;
+mem ident_length: I32;
+mem ident_hash: I32;
+
+fn intern_span(p: Parser, start: I32, stop: I32) I32 {
+    let hash = -2128831035;
+    for (start ..< stop) |k| { hash = (hash ^ src[k]) * 16777619; };
+    let length = stop - start;
+    let mask = name_table.len() - 1;
+    let slot = hash & mask;
+    while (name_table[slot] != 0) {
+        let id = name_table[slot] - 1;
+        if ident_hash[id] == hash and ident_length[id] == length and same_span(ident_start[id], start, length) {
+            return id;
+        };
+        slot = (slot + 1) & mask;
+    };
+    let id = ident_start.len();
+    ident_start.push(start);
+    ident_length.push(length);
+    ident_hash.push(hash);
+    name_table[slot] = id + 1;
+    if (id + 1) * 2 > name_table.len() { rehash_names(); };
+    id;
+}
+
+fn same_span(a: I32, b: I32, length: I32) Bool {
+    for (0 ..< length) |k| {
+        if src[a + k] != src[b + k] { return false; };
+    };
+    true;
+}
+
+fn rehash_names() void {
+    let size = name_table.len() * 2;
+    name_table.resize(size);
+    for (0 ..< size) |slot| { name_table[slot] = 0; };
+    let mask = size - 1;
+    for (0 ..< ident_start.len()) |id| {
+        let slot = ident_hash[id] & mask;
+        while (name_table[slot] != 0) { slot = (slot + 1) & mask; };
+        name_table[slot] = id + 1;
+    };
+}
+
+fn intern_text(p: Parser, text: Str) I32 {
+    let start = src.len();
+    for (0 ..< text.len()) |k| { src.push(text.get(k)); };
+    intern_span(p, start, src.len());
+}
+
+fn symbol_of(name: I32) I32 {
+    if name < bound.len() { bound[name]; } else { -1; };
+}
+
+fn lookup(name: I32) I32 {
+    let symbol = symbol_of(name);
+    if symbol < 0 { fail(); };
+    symbol;
+}
+
+fn bind(name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
+    if symbol_of(name) >= 0 { fail(); };
+    while (bound.len() <= name) { bound.push(-1); };
+    let symbol = sym_tag.len();
+    sym_tag.push(tag);
+    sym_type.push(type_id);
+    sym_params_start.push(0);
+    sym_params_len.push(0);
+    bound[name] = symbol;
+    if local { locals.push(name); };
+    symbol;
+}
+
+fn pop_scope(mark: I32) void {
+    while (locals.len() > mark) {
+        let name = locals[locals.len() - 1];
+        locals.resize(locals.len() - 1);
+        bound[name] = -1;
+    };
+}
+
+fn new_type(tag: TypeTag, element: I32, rank: I32, start: I32, count: I32) I32 {
+    let id = type_tag.len();
+    type_tag.push(tag);
+    type_element.push(element);
+    type_rank.push(rank);
+    type_fields_start.push(start);
+    type_fields_len.push(count);
+    id;
+}
+
+fn array_type(element: I32, rank: I32) I32 {
+    for (0 ..< type_tag.len()) |t| {
+        if type_tag[t] == TypeTag.ArrayType and type_element[t] == element and type_rank[t] == rank { return t; };
+    };
+    new_type(TypeTag.ArrayType, element, rank, 0, 0);
+}
+
+fn builtin(p: Parser, name: Str, result: I32, first: I32, second: I32) void {
+    let start = fn_types.len();
+    fn_types.push(first);
+    if second != 0 { fn_types.push(second); };
+    let symbol = bind(intern_text(p, name), SymbolTag.Function, result, false);
+    sym_params_start[symbol] = start;
+    sym_params_len[symbol] = fn_types.len() - start;
+}
+
+fn init_env(p: Parser) void {
+    name_table.resize(1024);
+    for (0 ..< 1024) |slot| { name_table[slot] = 0; };
+    ident_start.clear();
+    ident_length.clear();
+    ident_hash.clear();
+    bound.clear();
+    sym_tag.clear();
+    sym_type.clear();
+    sym_params_start.clear();
+    sym_params_len.clear();
+    type_tag.clear();
+    type_element.clear();
+    type_rank.clear();
+    type_fields_start.clear();
+    type_fields_len.clear();
+    field_name.clear();
+    field_type.clear();
+    fn_types.clear();
+    locals.clear();
+    fn_params.clear();
+    pat_tag.clear();
+    pat_name.clear();
+    pat_node.clear();
+    pat_declared.clear();
+    pat_first.clear();
+    pat_last.clear();
+    pat_next.clear();
+    pat_count.clear();
+    pat_dim_start.clear();
+    pat_dim_count.clear();
+    dim_names.clear();
+    node_type.clear();
+    new_type(TypeTag.Invalid, 0, 0, 0, 0);
+    new_type(TypeTag.Void, 0, 0, 0, 0);
+    new_type(TypeTag.Bool, 0, 0, 0, 0);
+    new_type(TypeTag.Int, 0, 0, 0, 0);
+    new_type(TypeTag.Float, 0, 0, 0, 0);
+    new_type(TypeTag.Record, 0, 0, 0, 4);
+    for (["r", "g", "b", "a"]) |name| {
+        field_name.push(intern_text(p, name));
+        field_type.push(t_float);
+    };
+    bind(intern_text(p, "rgba"), SymbolTag.Alias, t_rgba, false);
+    bind(intern_text(p, "argnum"), SymbolTag.Variable, t_int, false);
+    bind(intern_text(p, "args"), SymbolTag.Variable, array_type(t_int, 1), false);
+    p.rgba_image = array_type(t_rgba, 2);
+    for (["sqrt", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "log"]) |name| {
+        builtin(p, name, t_float, t_float, 0);
+    };
+    builtin(p, "pow", t_float, t_float, t_float);
+    builtin(p, "atan2", t_float, t_float, t_float);
+    builtin(p, "to_float", t_float, t_int, 0);
+    builtin(p, "to_int", t_int, t_float, 0);
+}
+
+fn expect_name(p: Parser) I32 {
+    if p.kind != Kind.VARIABLE { fail(); };
+    let name = intern_span(p, p.hi, p.lo);
+    take(p);
+    name;
+}
+
+fn typed_string(p: Parser) I32 {
+    let at = p.pos;
+    expect(p, Kind.STRING);
+    typed(Tag.Leaf, p.last_hi, p.last_lo, at, 0);
+}
+
+// Modes: 0 an array literal (one element type), 1 indices (all Int),
+// 2 arguments (types from fn_types[start ..< start + count]).
+fn typed_list(p: Parser, close: Kind, mode: I32, start: I32, count: I32) I32 {
+    let list = 0;
+    let n = 0;
+    let element = 0;
+    if p.kind != close {
+        while (true) {
+            let item = typed_expr(p, 0);
+            let item_type = p.expr_type;
+            if mode == 0 {
+                if n == 0 {
+                    element = item_type;
+                } else {
+                    if item_type != element { fail(); };
+                };
+            } else {
+                if mode == 1 {
+                    if item_type != t_int { fail(); };
+                } else {
+                    if n >= count or item_type != fn_types[start + n] { fail(); };
+                };
+            };
+            list = typed(Tag.List, list, item, 0, 0);
+            n += 1;
+            if p.kind != Kind.COMMA { break; };
+            take(p);
+        };
+    };
+    expect(p, close);
+    if mode == 2 and n != count { fail(); };
+    p.list_count = n;
+    p.list_element = element;
+    list;
+}
+
+// Record construction checks against the record's field types.
+fn typed_fields(p: Parser, record: I32) I32 {
+    let list = 0;
+    let n = 0;
+    let start = type_fields_start[record];
+    let count = type_fields_len[record];
+    if p.kind != Kind.RCURLY {
+        while (true) {
+            let item = typed_expr(p, 0);
+            if n >= count or p.expr_type != field_type[start + n] { fail(); };
+            list = typed(Tag.List, list, item, 0, 0);
+            n += 1;
+            if p.kind != Kind.COMMA { break; };
+            take(p);
+        };
+    };
+    expect(p, Kind.RCURLY);
+    if n != count { fail(); };
+    list;
+}
+
+fn typed_loop(p: Parser, array: Bool, at: I32) I32 {
+    expect(p, Kind.LSQUARE);
+    let mark = locals.len();
+    let count = 0;
+    let bindings = 0;
+    if p.kind != Kind.RSQUARE {
+        while (true) {
+            let name_at = p.pos;
+            let name = expect_name(p);
+            expect(p, Kind.COLON);
+            let bound_node = typed_expr(p, 0);
+            if p.expr_type != t_int { fail(); };
+            bind(name, SymbolTag.Variable, t_int, true);
+            bindings = typed(Tag.List, bindings, typed(Tag.Binding, bound_node, 0, name_at, t_int), 0, 0);
+            count += 1;
+            if p.kind != Kind.COMMA { break; };
+            take(p);
+        };
+    };
+    expect(p, Kind.RSQUARE);
+    if count == 0 { fail(); };
+    let body = typed_expr(p, 0);
+    let body_type = p.expr_type;
+    if not array and body_type != t_int and body_type != t_float { fail(); };
+    let result = if array { array_type(body_type, count); } else { body_type; };
+    pop_scope(mark);
+    p.expr_type = result;
+    typed(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at, result);
+}
+
+fn typed_prefix(p: Parser) I32 {
+    let at = p.pos;
+    let code = if p.kind == Kind.OP { p.op; } else { 0; };
+    let kind = p.kind;
+    let name = if kind == Kind.VARIABLE { intern_span(p, p.hi, p.lo); } else { -1; };
+    take(p);
+    p.bare = -1;
+    match kind {
+        Kind.VARIABLE => {
+            let symbol = lookup(name);
+            p.expr_type = if sym_tag[symbol] == SymbolTag.Variable { sym_type[symbol]; } else { 0; };
+            p.bare = name;
+            typed(Tag.Leaf, symbol, 0, at, sym_type[symbol]);
+        },
+        Kind.TRUE => {
+            p.expr_type = t_bool;
+            typed(Tag.Leaf, at, 0, at, t_bool);
+        },
+        Kind.FALSE => {
+            p.expr_type = t_bool;
+            typed(Tag.Leaf, at, 0, at, t_bool);
+        },
+        Kind.VOID => {
+            p.expr_type = t_void;
+            typed(Tag.Leaf, at, 0, at, t_void);
+        },
+        Kind.INTVAL => {
+            p.expr_type = t_int;
+            typed(Tag.Leaf, p.last_hi, p.last_lo, at, t_int);
+        },
+        Kind.FLOATVAL => {
+            p.expr_type = t_float;
+            typed(Tag.Leaf, p.last_hi, p.last_lo, at, t_float);
+        },
+        Kind.LPAREN => {
+            let inner = typed_expr(p, 0);
+            expect(p, Kind.RPAREN);
+            p.bare = -1;
+            inner;
+        },
+        Kind.LSQUARE => {
+            let list = typed_list(p, Kind.RSQUARE, 0, 0, 0);
+            if p.list_count == 0 { fail(); };
+            let array = array_type(p.list_element, 1);
+            p.expr_type = array;
+            typed(Tag.ArrayExpr, list, 0, at, array);
+        },
+        Kind.OP => {
+            if code != 45 and code != 33 { fail(); };
+            let right = typed_expr(p, 5);
+            let right_type = p.expr_type;
+            if code == 45 and right_type != t_int and right_type != t_float { fail(); };
+            if code == 33 and right_type != t_bool { fail(); };
+            p.expr_type = right_type;
+            p.bare = -1;
+            typed(Tag.Unary, right, 0, at, right_type);
+        },
+        Kind.IF => {
+            let condition = typed_expr(p, 0);
+            let condition_type = p.expr_type;
+            expect(p, Kind.THEN);
+            let yes = typed_expr(p, 0);
+            let yes_type = p.expr_type;
+            expect(p, Kind.ELSE);
+            let no = typed_expr(p, 0);
+            if condition_type != t_bool or yes_type != p.expr_type { fail(); };
+            let pair = typed(Tag.List, condition, yes, 0, 0);
+            p.expr_type = yes_type;
+            p.bare = -1;
+            typed(Tag.Conditional, pair, no, at, yes_type);
+        },
+        Kind.ARRAY => {
+            let node = typed_loop(p, true, at);
+            p.bare = -1;
+            node;
+        },
+        Kind.SUM => {
+            let node = typed_loop(p, false, at);
+            p.bare = -1;
+            node;
+        },
+        ~> {
+            fail();
+            0;
+        },
+    };
+}
+
+fn field_type_of(record: I32, name: I32) I32 {
+    let start = type_fields_start[record];
+    for (start ..< start + type_fields_len[record]) |f| {
+        if field_name[f] == name { return field_type[f]; };
+    };
+    0;
+}
+
+fn typed_expr(p: Parser, min: I32) I32 {
+    let left = typed_prefix(p);
+    let left_type = p.expr_type;
+    let bare = p.bare;
+    while (true) {
+        let kind = p.kind;
+        if kind == Kind.DOT {
+            if min > 6 { break; };
+            take(p);
+            let name = expect_name(p);
+            if type_tag[left_type] != TypeTag.Record { fail(); };
+            let result = field_type_of(left_type, name);
+            if result == 0 { fail(); };
+            left = typed(Tag.Field, left, 0, p.pos - 1, result);
+            left_type = result;
+            bare = -1;
+        } else {
+            if kind == Kind.LSQUARE {
+                if min > 6 { break; };
+                take(p);
+                if type_tag[left_type] != TypeTag.ArrayType { fail(); };
+                let indices = typed_list(p, Kind.RSQUARE, 1, 0, 0);
+                if p.list_count != type_rank[left_type] { fail(); };
+                let element = type_element[left_type];
+                left = typed(Tag.Index, left, indices, 0, element);
+                left_type = element;
+                bare = -1;
+            } else {
+                if kind == Kind.LPAREN or kind == Kind.LCURLY {
+                    if min > 6 or bare < 0 { break; };
+                    let symbol = lookup(bare);
+                    take(p);
+                    if kind == Kind.LPAREN {
+                        if sym_tag[symbol] != SymbolTag.Function { fail(); };
+                        let args = typed_list(p, Kind.RPAREN, 2, sym_params_start[symbol], sym_params_len[symbol]);
+                        left = typed(Tag.Call, left, args, 0, sym_type[symbol]);
+                    } else {
+                        if sym_tag[symbol] != SymbolTag.Alias { fail(); };
+                        let record = sym_type[symbol];
+                        if type_tag[record] != TypeTag.Record { fail(); };
+                        let args = typed_fields(p, record);
+                        left = typed(Tag.Construct, left, args, 0, record);
+                    };
+                    left_type = sym_type[symbol];
+                    bare = -1;
+                } else {
+                    if kind != Kind.OP { break; };
+                    let code = p.op;
+                    let binding = precedence[code];
+                    if binding == 0 or binding < min { break; };
+                    let operator = p.pos;
+                    take(p);
+                    let right = typed_expr(p, binding + 1);
+                    let right_type = p.expr_type;
+                    let result = 0;
+                    if code == 38 or code == 124 {
+                        if left_type != t_bool or right_type != t_bool { fail(); };
+                        result = t_bool;
+                    } else {
+                        if left_type != right_type or (left_type != t_int and left_type != t_float) { fail(); };
+                        let compares = code == 60 or code == 62 or code == 61 or code == 126;
+                        result = if compares { t_bool; } else { left_type; };
+                    };
+                    left = typed(Tag.Binary, left, right, operator, result);
+                    left_type = result;
+                    bare = -1;
+                };
+            };
+        };
+    };
+    if left_type == 0 { fail(); };
+    p.expr_type = left_type;
+    p.bare = bare;
+    left;
+}
+
+fn typed_type(p: Parser) I32 {
+    let kind = p.kind;
+    let result = match kind {
+        Kind.INT => t_int,
+        Kind.FLOAT => t_float,
+        Kind.BOOL => t_bool,
+        Kind.VOID => t_void,
+        Kind.VARIABLE => {
+            let symbol = lookup(intern_span(p, p.hi, p.lo));
+            if sym_tag[symbol] != SymbolTag.Alias { fail(); };
+            sym_type[symbol];
+        },
+        ~> {
+            fail();
+            0;
+        },
+    };
+    take(p);
+    while (p.kind == Kind.LSQUARE) {
+        take(p);
+        let rank = 1;
+        while (p.kind == Kind.COMMA) {
+            take(p);
+            rank += 1;
+        };
+        expect(p, Kind.RSQUARE);
+        result = array_type(result, rank);
+    };
+    result;
+}
+
+fn typed_annotation(p: Parser) I32 {
+    expect(p, Kind.COLON);
+    typed_type(p);
+}
+
+fn pattern(p: Parser, binding: Bool) I32 {
+    let at = p.pos;
+    let name = expect_name(p);
+    let id = pat_tag.len();
+    pat_tag.push(PatternTag.Plain);
+    pat_name.push(name);
+    pat_node.push(0);
+    pat_declared.push(0);
+    pat_first.push(-1);
+    pat_last.push(-1);
+    pat_next.push(-1);
+    pat_count.push(0);
+    pat_dim_start.push(0);
+    pat_dim_count.push(0);
+    let node = typed(Tag.Lvalue, at, 0, at, 0);
+    if p.kind == Kind.LSQUARE {
+        take(p);
+        pat_tag[id] = PatternTag.Dims;
+        pat_dim_start[id] = dim_names.len();
+        if p.kind != Kind.RSQUARE {
+            while (true) {
+                let dim_at = p.pos;
+                dim_names.push(expect_name(p));
+                pat_dim_count[id] += 1;
+                node = typed(Tag.Lvalue, node, dim_at, at, 0);
+                if p.kind != Kind.COMMA { break; };
+                take(p);
+            };
+        };
+        expect(p, Kind.RSQUARE);
+    } else {
+        if p.kind == Kind.LCURLY {
+            take(p);
+            pat_tag[id] = PatternTag.Fields;
+            if p.kind != Kind.RCURLY {
+                while (true) {
+                    let child = pattern(p, binding);
+                    if pat_first[id] < 0 {
+                        pat_first[id] = child;
+                    } else {
+                        pat_next[pat_last[id]] = child;
+                    };
+                    pat_last[id] = child;
+                    pat_count[id] += 1;
+                    node = typed(Tag.Lvalue, node, pat_node[child], at, 0);
+                    if p.kind != Kind.COMMA { break; };
+                    take(p);
+                };
+            };
+            expect(p, Kind.RCURLY);
+            let symbol = lookup(name);
+            if sym_tag[symbol] != SymbolTag.Alias or type_tag[sym_type[symbol]] != TypeTag.Record { fail(); };
+            pat_declared[id] = sym_type[symbol];
+        };
+    };
+    if binding and pat_tag[id] != PatternTag.Fields {
+        pat_declared[id] = typed_annotation(p);
+        node = typed(Tag.Binding, node, 0, at, pat_declared[id]);
+    };
+    pat_node[id] = node;
+    id;
+}
+
+fn bind_pattern(id: I32, expected: I32, local: Bool) void {
+    if pat_declared[id] != 0 and pat_declared[id] != expected { fail(); };
+    let tag = pat_tag[id];
+    if tag == PatternTag.Plain {
+        bind(pat_name[id], SymbolTag.Variable, expected, local);
+    } else {
+        if tag == PatternTag.Dims {
+            if type_tag[expected] != TypeTag.ArrayType or type_rank[expected] != pat_dim_count[id] { fail(); };
+            bind(pat_name[id], SymbolTag.Variable, expected, local);
+            let start = pat_dim_start[id];
+            for (start ..< start + pat_dim_count[id]) |d| {
+                bind(dim_names[d], SymbolTag.Variable, t_int, local);
+            };
+        } else {
+            if type_tag[expected] != TypeTag.Record or type_fields_len[expected] != pat_count[id] { fail(); };
+            let child = pat_first[id];
+            let start = type_fields_start[expected];
+            for (start ..< start + type_fields_len[expected]) |f| {
+                bind_pattern(child, field_type[f], local);
+                child = pat_next[child];
+            };
+        };
+    };
+}
+
+fn typed_stmt(p: Parser) I32 {
+    let at = p.pos;
+    let kind = take(p);
+    let result = match kind {
+        Kind.LET => {
+            let pat = pattern(p, false);
+            expect(p, Kind.EQUALS);
+            let value = typed_expr(p, 0);
+            bind_pattern(pat, p.expr_type, true);
+            typed(Tag.Stmt, pat_node[pat], value, at, t_void);
+        },
+        Kind.ASSERT => {
+            let value = typed_expr(p, 0);
+            if p.expr_type != t_bool { fail(); };
+            expect(p, Kind.COMMA);
+            typed(Tag.Stmt, value, typed_string(p), at, t_void);
+        },
+        Kind.RETURN => {
+            let value = typed_expr(p, 0);
+            if p.expr_type != p.return_type { fail(); };
+            p.saw_return = true;
+            typed(Tag.Stmt, value, 0, at, t_void);
+        },
+        ~> {
+            fail();
+            0;
+        },
+    };
+    expect(p, Kind.NEWLINE);
+    result;
+}
+
+fn typed_command(p: Parser) I32 {
+    let at = p.pos;
+    let kind = take(p);
+    match kind {
+        Kind.LET => {
+            let pat = pattern(p, false);
+            expect(p, Kind.EQUALS);
+            let value = typed_expr(p, 0);
+            bind_pattern(pat, p.expr_type, false);
+            expect(p, Kind.NEWLINE);
+            typed(Tag.Command, pat_node[pat], value, at, t_void);
+        },
+        Kind.ASSERT => {
+            let value = typed_expr(p, 0);
+            if p.expr_type != t_bool { fail(); };
+            expect(p, Kind.COMMA);
+            let text = typed_string(p);
+            expect(p, Kind.NEWLINE);
+            typed(Tag.Command, value, text, at, t_void);
+        },
+        Kind.SHOW => {
+            let value = typed_expr(p, 0);
+            expect(p, Kind.NEWLINE);
+            typed(Tag.Command, value, 0, at, t_void);
+        },
+        Kind.PRINT => {
+            let text = typed_string(p);
+            expect(p, Kind.NEWLINE);
+            typed(Tag.Command, text, 0, at, t_void);
+        },
+        Kind.TIME => typed(Tag.Command, typed_command(p), 0, at, t_void),
+        Kind.READ => {
+            expect(p, Kind.IMAGE);
+            let text = typed_string(p);
+            expect(p, Kind.TO);
+            let pat = pattern(p, false);
+            bind_pattern(pat, p.rgba_image, false);
+            expect(p, Kind.NEWLINE);
+            typed(Tag.Command, text, pat_node[pat], at, t_void);
+        },
+        Kind.WRITE => {
+            expect(p, Kind.IMAGE);
+            let value = typed_expr(p, 0);
+            if p.expr_type != p.rgba_image { fail(); };
+            expect(p, Kind.TO);
+            let text = typed_string(p);
+            expect(p, Kind.NEWLINE);
+            typed(Tag.Command, value, text, at, t_void);
+        },
+        Kind.STRUCT => {
+            let name = expect_name(p);
+            if symbol_of(name) >= 0 { fail(); };
+            expect(p, Kind.LCURLY);
+            expect(p, Kind.NEWLINE);
+            let start = field_name.len();
+            let fields = 0;
+            while (p.kind == Kind.VARIABLE) {
+                let field_at = p.pos;
+                let field = expect_name(p);
+                for (start ..< field_name.len()) |f| {
+                    if field_name[f] == field { fail(); };
+                };
+                let field_t = typed_annotation(p);
+                field_name.push(field);
+                field_type.push(field_t);
+                fields = typed(Tag.List, fields, typed(Tag.Binding, field_t, 0, field_at, field_t), 0, 0);
+                expect(p, Kind.NEWLINE);
+            };
+            expect(p, Kind.RCURLY);
+            expect(p, Kind.NEWLINE);
+            let record = new_type(TypeTag.Record, 0, 0, start, field_name.len() - start);
+            bind(name, SymbolTag.Alias, record, false);
+            typed(Tag.Command, fields, 0, at, t_void);
+        },
+        Kind.FN => {
+            let name = expect_name(p);
+            if symbol_of(name) >= 0 { fail(); };
+            expect(p, Kind.LPAREN);
+            let first_param = fn_params.len();
+            let params_start = fn_types.len();
+            if p.kind != Kind.RPAREN {
+                while (true) {
+                    let pat = pattern(p, true);
+                    fn_params.push(pat);
+                    fn_types.push(pat_declared[pat]);
+                    if p.kind != Kind.COMMA { break; };
+                    take(p);
+                };
+            };
+            expect(p, Kind.RPAREN);
+            let result_type = typed_annotation(p);
+            let symbol = bind(name, SymbolTag.Function, result_type, false);
+            sym_params_start[symbol] = params_start;
+            sym_params_len[symbol] = fn_params.len() - first_param;
+            let mark = locals.len();
+            for (first_param ..< fn_params.len()) |k| {
+                bind_pattern(fn_params[k], pat_declared[fn_params[k]], true);
+            };
+            fn_params.resize(first_param);
+            p.return_type = result_type;
+            p.saw_return = false;
+            expect(p, Kind.LCURLY);
+            expect(p, Kind.NEWLINE);
+            let body = 0;
+            while (p.kind != Kind.RCURLY) {
+                if p.kind == Kind.END_OF_FILE { fail(); };
+                body = typed(Tag.List, body, typed_stmt(p), 0, 0);
+            };
+            expect(p, Kind.RCURLY);
+            expect(p, Kind.NEWLINE);
+            if result_type != t_void and not p.saw_return { fail(); };
+            pop_scope(mark);
+            p.return_type = 0;
+            typed(Tag.Command, body, 0, at, t_void);
+        },
+        ~> {
+            fail();
+            0;
+        },
+    };
+}
+
+fn typed_program(p: Parser) I32 {
+    let root = 0;
+    while (p.kind != Kind.END_OF_FILE) {
+        if p.kind == Kind.NEWLINE {
+            take(p);
+        } else {
+            root = typed(Tag.List, root, typed_command(p), 0, 0);
+        };
+    };
+    root;
+}
+
+// Parse and type check `src`. Returns the token count + 1 (as Zig reports
+// it), or -1 for a syntax or type error.
+fn check() I32 {
+    node_tag.clear();
+    node_a.clear();
+    node_b.clear();
+    node_token.clear();
+    node_tag.reserve(src.len());
+    node_a.reserve(src.len());
+    node_b.reserve(src.len());
+    node_token.reserve(src.len());
+    node_type.reserve(src.len());
+    let p = new_parser();
+    let result = try {
+        init_env(p);
+        scan(p);
+        typed_program(p);
+        p.pos + 1;
+    } catch {
+        -1;
+    };
+    // Drop the builtin names init_env appended after the sentinel.
+    src.resize(p.end + 1);
+    result;
 }
 
 fn load(path: Str) void {
@@ -966,6 +1804,8 @@ fn time(runs: I32, print: Bool) F64 {
 // jpl <file.jpl> -_       lex only
 // jpl <file.jpl> -p -q    parse only (Zig's parser benchmark)
 // jpl <file.jpl> -s       parse, then print token and node counts
+// jpl <file.jpl> -t -q    parse and type check
+// jpl <file.jpl> -t -s    type check, then print token, node, symbol, and type counts
 // jpl <file.jpl> -bench   in-process medians for lexing, listing, and parsing
 export main() void {
     let args = Process.argv;
@@ -979,16 +1819,28 @@ export main() void {
     if flags == "-bench" {
         let lexing = time(15, false);
         let listing_too = time(15, true);
-        let parsing = time_parse(15);
+        let parsing = time_parse(15, false);
+        let checking = time_parse(15, true);
         let n = lex();
         Web.console.log("lex " + lexing.to_str() + " ms, lex + listing " + listing_too.to_str() + " ms, parse "
-            + parsing.to_str() + " ms, " + n.to_str() + " tokens");
+            + parsing.to_str() + " ms, type check " + checking.to_str() + " ms, " + n.to_str() + " tokens");
         return;
     };
     if flags == "-s" {
         let tokens = parse();
         let text = if tokens < 0 { "Compilation failed\n"; } else { "tokens=" + tokens.to_str() + " nodes=" + node_tag.len().to_str() + "\n"; };
         Fs.writeSync(1.0, text);
+        return;
+    };
+    if flags == "-t-s" or flags == "-s-t" {
+        let tokens = check();
+        let counts = "tokens=" + tokens.to_str() + " nodes=" + node_tag.len().to_str() + " symbols="
+            + sym_tag.len().to_str() + " types=" + type_tag.len().to_str() + "\n";
+        Fs.writeSync(1.0, if tokens < 0 { "Compilation failed\n"; } else { counts; });
+        return;
+    };
+    if flags == "-t-q" or flags == "-q-t" or flags == "-t" {
+        Fs.writeSync(1.0, if check() < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
         return;
     };
     if flags == "-p-q" or flags == "-q-p" or flags == "-p" {
@@ -999,11 +1851,11 @@ export main() void {
     report(n, flags == "-l");
 }
 
-fn time_parse(runs: I32) F64 {
+fn time_parse(runs: I32, types: Bool) F64 {
     let samples = Array[F64].new(runs, 0.0);
     for (0 ..< runs + 3) |r| {
         let begin = Web.performance.now();
-        parse();
+        if types { check(); } else { parse(); };
         if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
     };
     (samples sort(F64) |a, b| { a < b; })[runs / 2];
