@@ -43,14 +43,17 @@ export function buildBackendPlan(doc, typeIndex, program = null) {
   const expectations = new Map();
   const fields = new Map();
   const protocolCalls = new Map();
-  for (const [node, slot] of types?.slots ?? []) {
-    if (node.id && slot.actual && node.localName !== 'ir-fn' && node.localName !== 'ir-extern-fn') {
-      nodeTypes.set(node.id, slot.actual);
-    }
-    const expected = slot.expected?.map(edge => edge.read()).find(Boolean);
-    if (node.id && expected) expectations.set(node.id, expected);
-    if (node.id && slot.field) fields.set(node.id, slot.field);
-    if (node.id && slot.protocolCall) protocolCalls.set(node.id, slot.protocolCall);
+  const facts = types?.facts;
+  for (let r = 0; r < (facts?.nodes.length ?? 0); r++) {
+    const node = facts.nodes[r];
+    const id = node.id;
+    const actual = facts.typeName(r);
+    if (id && actual && node.localName !== 'ir-fn' && node.localName !== 'ir-extern-fn') nodeTypes.set(id, actual);
+    const expected = facts.expected[r].map(edge => edge.read()).find(Boolean);
+    if (id && expected) expectations.set(id, expected);
+    if (id && facts.field[r]) fields.set(id, facts.field[r]);
+    const protocolCall = facts.rareFact(r, 'protocolCall');
+    if (id && protocolCall) protocolCalls.set(id, protocolCall);
   }
   const bindings = new Map([...scope?.resolutions ?? []].map(([id, decl]) => [id, decl.id]));
   const callTargets = new Map([...calls?.targets ?? []].map(([id, decl]) => [id, decl.id]));
