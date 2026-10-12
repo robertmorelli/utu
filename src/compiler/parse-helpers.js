@@ -75,20 +75,20 @@ export function append(parent, children) {
 // Stamp source span and assign a document-unique numeric id on every IR node.
 export function stamp(e, n) {
   const id = `n${nextNodeId(e.ownerDocument)}`;
-  e.setAttribute('id', id);
-  e.setAttribute('data-origin-id', id);
-  e.setAttribute('data-start', n.startIndex);
-  e.setAttribute('data-end', n.endIndex);
+  e.setLowercaseAttribute('id', id);
+  e.setLowercaseAttribute('data-origin-id', id);
+  e.setLowercaseAttribute('data-start', n.startIndex);
+  e.setLowercaseAttribute('data-end', n.endIndex);
   const start = n.startPosition;
   const end = n.endPosition;
-  e.setAttribute('data-row', String(start.row + 1));
-  e.setAttribute('data-col', String(start.column + 1));
-  e.setAttribute('data-end-row', String(end.row + 1));
-  e.setAttribute('data-end-col', String(end.column + 1));
+  e.setLowercaseAttribute('data-row', String(start.row + 1));
+  e.setLowercaseAttribute('data-col', String(start.column + 1));
+  e.setLowercaseAttribute('data-end-row', String(end.row + 1));
+  e.setLowercaseAttribute('data-end-col', String(end.column + 1));
   const sourceFile = e.ownerDocument?.__utuSourceFile;
   if (sourceFile) {
-    e.setAttribute('data-source-file', sourceFile);
-    e.setAttribute('data-origin-file', sourceFile);
+    e.setLowercaseAttribute('data-source-file', sourceFile);
+    e.setLowercaseAttribute('data-origin-file', sourceFile);
   }
   return e;
 }

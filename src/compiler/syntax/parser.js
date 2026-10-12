@@ -94,7 +94,10 @@ function lineStarts(source) {
   return starts;
 }
 
-class Unsupported extends Error {}
+// Thrown to give up on a parse (or an alternative while backtracking). One
+// preallocated instance, not an Error: a stack trace per attempt is costly.
+class Unsupported {}
+const UNSUPPORTED = new Unsupported();
 
 // ── Lexical classes ──────────────────────────────────────────────────────────
 
@@ -105,6 +108,12 @@ const INT = /0x[0-9a-fA-F]+|0b[01]+|[0-9]+/y;
 const STRING = /"(?:[^"\\\n]|\\[^\n])*"/y;
 const PLATFORM_PATH = /[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*/y;
 const SPACE = /\s/;
+
+/** JavaScript's `\s` (what the grammar's extras match), with ASCII answered directly. */
+function isSpace(code, char) {
+  if (code < 128) return code === 32 || (code >= 9 && code <= 13);
+  return SPACE.test(char);
+}
 
 // Punctuation, longest first. `-o` and `?.` are only lexed after an expression.
 const PUNCTUATION = [
@@ -199,14 +208,14 @@ class Parser {
 
   fail() {
     if (this.pos > this.furthest) this.furthest = this.pos;
-    throw new Unsupported();
+    throw UNSUPPORTED;
   }
 
   /** Skip whitespace and comments, remembering each comment once. */
   skip() {
     const source = this.source;
     for (;;) {
-      while (this.pos < source.length && SPACE.test(source[this.pos])) this.pos++;
+      while (this.pos < source.length && isSpace(source.charCodeAt(this.pos), source[this.pos])) this.pos++;
       if (source.startsWith('//', this.pos)) {
         let end = source.indexOf('\n', this.pos);
         if (end < 0) end = source.length;

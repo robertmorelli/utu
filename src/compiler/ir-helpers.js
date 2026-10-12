@@ -243,7 +243,7 @@ export function copySpan(to, from) {
   if (!from?.getAttribute) return to;
   for (const name of SPAN_ATTRIBUTES) {
     const value = from.getAttribute(name);
-    if (value != null) to.setAttribute(name, value);
+    if (value != null) to.setLowercaseAttribute(name, value);
   }
   return to;
 }
@@ -255,17 +255,17 @@ export function sourceId(node) {
 export function copyDiagnosticMeta(to, from) {
   copySpan(to, from);
   const originId = sourceId(from);
-  if (originId) to.setAttribute('data-origin-id', originId);
+  if (originId) to.setLowercaseAttribute('data-origin-id', originId);
   return to;
 }
 
 function stampRewrite(node, from, pass, kind) {
   copyDiagnosticMeta(node, from);
-  node.setAttribute('data-synthetic', 'true');
-  node.setAttribute('data-rewrite-pass', pass);
-  if (kind) node.setAttribute('data-rewrite-kind', kind);
+  node.setLowercaseAttribute('data-synthetic', 'true');
+  node.setLowercaseAttribute('data-rewrite-pass', pass);
+  if (kind) node.setLowercaseAttribute('data-rewrite-kind', kind);
   const source = sourceId(from);
-  if (source) node.setAttribute('data-rewrite-of', source);
+  if (source) node.setLowercaseAttribute('data-rewrite-of', source);
   return node;
 }
 

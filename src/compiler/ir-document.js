@@ -227,7 +227,11 @@ class IRElement extends IRNode {
   }
 
   setAttribute(name, value) {
-    const key = name.toLowerCase();
+    this.setLowercaseAttribute(name.toLowerCase(), value);
+  }
+
+  /** setAttribute for a name already in lowercase (the compiler's own writes). */
+  setLowercaseAttribute(key, value) {
     const text = String(value);
     if (key === 'id') this.ownerDocument.ids.set(text, this);
     this.setAttr(key, text);
