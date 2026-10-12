@@ -39,11 +39,9 @@ import { reportTypeGraphDiagnostics } from './type-graph-diagnostics.js';
  * @property {Array<object>} coercions
  */
 
-/** An array of `size` undefineds with fast elements (`new Array(n)` is a hash table for large n in V8). */
+/** An array of `size` undefineds with fast, packed elements. */
 function denseArray(size) {
-  const array = [];
-  for (let i = 0; i < size; i++) array.push(undefined);
-  return array;
+  return new Array(size).fill(undefined);
 }
 
 /**
@@ -124,12 +122,32 @@ export function settleTypeGraph(doc, typeIndex) {
   // Build and solve once; each round of contextual rewrites (literal types,
   // closure parameters, record and array types) then re-solves only the rules
   // of the nodes it changed and their dependents.
-  const graph = solveTypeGraph(buildTypeGraph(doc, typeIndex));
-  for (;;) {
-    applyContextualRewrites(graph, planContextualRewrites(graph));
-    if (!graph.changed) { planCoercions(graph); return graph; }
-    propagate(graph, [...graph.touched].map(node => graph.slots.get(node)?.rule).filter(Boolean));
+  const graph = buildTypeGraph(doc, typeIndex);
+  // Written types do not change while settling (rewrites set attributes and
+  // parameter types, never type nodes), so each is read off the IR once.
+  graph.declaredTypes = new Map();
+  try {
+    solveTypeGraph(graph);
+    for (;;) {
+      applyContextualRewrites(graph, planContextualRewrites(graph));
+      if (!graph.changed) { planCoercions(graph); return graph; }
+      propagate(graph, [...graph.touched].map(node => graph.slots.get(node)?.rule).filter(Boolean));
+    }
+  } finally {
+    graph.declaredTypes = null;
   }
+}
+
+/** declaredTypeStr(node), remembered while the graph settles. */
+function declared(graph, node) {
+  const cache = graph.declaredTypes;
+  if (!cache || !node) return declaredTypeStr(node);
+  let type = cache.get(node);
+  if (type === undefined) {
+    type = declaredTypeStr(node);
+    cache.set(node, type);
+  }
+  return type;
 }
 
 /** Plan context-dependent IR changes without applying them. */
@@ -482,8 +500,8 @@ class Rule {
       case R.LITERAL: return node.getAttribute('type-name') ?? graph.literalDefaults.get(a) ?? a;
       case R.IDENT: return bindingActual(graph, node);
       // Closure parameters may be seeded from context between solver rounds.
-      case R.PARAM: return declaredTypeStr(node) ?? node.dataset.typeName ?? null;
-      case R.BINDING: return declaredTypeStr(node) ?? actual(graph, a);
+      case R.PARAM: return declared(graph, node) ?? node.getAttribute('data-type-name');
+      case R.BINDING: return declared(graph, node) ?? actual(graph, a);
       case R.VALUE: return actual(graph, a);
       case R.UNARY: return operatorResult(graph, node, actual(graph, a), UNARY_OP_FN);
       case R.BINARY: return foreignActual(graph, node) ?? operatorResult(graph, node, actual(graph, a), BINARY_OP_FN);
@@ -745,7 +763,7 @@ function bindingActual(graph, ident) {
     const source = captureSource(decl);
     return actual(graph, source?.firstElementChild) ?? actual(graph, source?.lastElementChild);
   }
-  return declaredTypeStr(decl) ?? actual(graph, decl);
+  return declared(graph, decl) ?? actual(graph, decl);
 }
 
 function captureSource(decl) {
@@ -1130,17 +1148,18 @@ function declaredSource(graph, node) {
 function callParameter(graph, call, args, index) {
   const foreign = graph.slots.get(call)?.foreign;
   if (foreign) return { type: foreign.expected[index], source: call };
-  if (call.dataset.foreignParams) return { type: JSON.parse(call.dataset.foreignParams)[index], source: call };
+  const foreignParams = call.getAttribute('data-foreign-params');
+  if (foreignParams) return { type: JSON.parse(foreignParams)[index], source: call };
   const fn = resolvedFunction(graph, call);
   if (!fn) {
     const protocol = graph.slots.get(call)?.protocolCall;
     const param = protocol ? paramsOf(protocol.declaration)[index] : null;
-    const type = declaredTypeStr(param)
+    const type = declared(graph, param)
       ?? callableParts(actual(graph, call.firstElementChild))?.params[index];
     return type && { type, source: param ?? call.firstElementChild };
   }
   const params = paramsOf(fn);
-  const receiverType = call.dataset.operatorReceiverName
+  const receiverType = call.getAttribute('data-operator-receiver-name')
     ?? call.firstElementChild?.getAttribute('type-name')
     ?? call.firstElementChild?.querySelector(':scope > ir-type-ref')?.getAttribute('name');
   // Lowered receiver methods carry self as argument zero, while paramsOf
@@ -1152,7 +1171,7 @@ function callParameter(graph, call, args, index) {
   // Operator declarations use inferred `&` parameters with no explicit type
   // children. At a lowered call site those parameters are the concrete
   // receiver type (I64:add, F32:mul, and so on).
-  const type = declaredTypeStr(param) ?? param?.dataset.typeName
+  const type = declared(graph, param) ?? param?.getAttribute('data-type-name')
     ?? (fn.getAttribute('receiver') === '&' ? receiverType : null);
   return type && { type, source: param ?? fn };
 }
