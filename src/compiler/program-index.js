@@ -7,14 +7,19 @@ const REVISIONS = new WeakMap();
 
 export function buildProgramIndex(doc) {
   const root = doc?.body?.firstChild;
-  const all = root ? [root, ...root.querySelectorAll('*')] : [];
+  const all = [];
   const byId = new Map();
   const byKind = new Map();
-  for (const node of all) {
+  // Every element in document order, indexed by id and by kind as it is reached.
+  const visit = node => {
+    all.push(node);
     const id = node.getAttribute('id');
     if (id) byId.set(id, node);
     append(byKind, node.localName, node);
-  }
+    const children = node.childNodes;
+    for (let i = 0; i < children.length; i++) if (children[i].nodeType === 1) visit(children[i]);
+  };
+  if (root) visit(root);
   const functions = new Map(nodesOf({ byKind }, 'ir-fn', 'ir-extern-fn')
     .flatMap(node => functionIndexEntries(node)));
   const surfaces = nodesOf({ byKind }, 'ir-fn', 'ir-export-main', 'ir-test', 'ir-bench')

@@ -83,6 +83,7 @@ class IRNode {
   constructor(document) {
     this.ownerDocument = document;
     this.parentNode = null;
+    this.siblingHint = undefined;
   }
 
   get parentElement() {
@@ -92,12 +93,12 @@ class IRNode {
 
   get nextSibling() {
     const siblings = this.parentNode?.childNodes;
-    return siblings ? siblings[siblings.indexOf(this) + 1] ?? null : null;
+    return siblings ? siblings[indexIn(this, siblings) + 1] ?? null : null;
   }
 
   get previousSibling() {
     const siblings = this.parentNode?.childNodes;
-    return siblings ? siblings[siblings.indexOf(this) - 1] ?? null : null;
+    return siblings ? siblings[indexIn(this, siblings) - 1] ?? null : null;
   }
 
   get isConnected() {
@@ -275,13 +276,13 @@ class IRElement extends IRNode {
   get nextElementSibling() {
     const siblings = this.parentNode?.childNodes;
     if (!siblings) return null;
-    for (let i = siblings.indexOf(this) + 1; i < siblings.length; i++) if (siblings[i].nodeType === ELEMENT) return siblings[i];
+    for (let i = indexIn(this, siblings) + 1; i < siblings.length; i++) if (siblings[i].nodeType === ELEMENT) return siblings[i];
     return null;
   }
   get previousElementSibling() {
     const siblings = this.parentNode?.childNodes;
     if (!siblings) return null;
-    for (let i = siblings.indexOf(this) - 1; i >= 0; i--) if (siblings[i].nodeType === ELEMENT) return siblings[i];
+    for (let i = indexIn(this, siblings) - 1; i >= 0; i--) if (siblings[i].nodeType === ELEMENT) return siblings[i];
     return null;
   }
 
@@ -445,6 +446,18 @@ export function createIRDocument() {
 }
 
 // ── Mutation helpers ─────────────────────────────────────────────────────────
+
+/**
+ * A node's position among `siblings`. Nodes remember where they were last
+ * found, so walking siblings in order costs one comparison per step.
+ */
+function indexIn(node, siblings) {
+  const hint = node.siblingHint;
+  if (hint !== undefined && siblings[hint] === node) return hint;
+  const at = siblings.indexOf(node);
+  node.siblingHint = at;
+  return at;
+}
 
 function isElement(node) {
   return node.nodeType === ELEMENT;
@@ -780,9 +793,8 @@ function elementIndex(scope) {
 
 function buildElementIndex(document) {
   const order = [];
-  const position = [];
-  for (let i = 0; i < document.count; i++) position.push(-1);
-  const end = position.slice();
+  const position = new Int32Array(document.count).fill(-1);
+  const end = new Int32Array(document.count);
   const byTag = new Map();
   let foreign = false;
   const visit = node => {
