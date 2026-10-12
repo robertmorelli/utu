@@ -1,0 +1,465 @@
+// The JPL lexer from CS4470's Zig compiler, in utu.
+//
+// The DFA is built during compilation by `build`, a line-for-line port of the
+// Zig version's comptime StateMachine, and lives in a const mem. Lexing is one
+// table load per byte in a `loop match`, like Zig's labeled switch. Tokens go
+// into three mems; `-l` formats them into a fourth that the host writes out.
+using JS from std:JS;
+using Fs from "node:fs";
+using Process from "node:process";
+using Web from std:Web;
+
+// Token kinds, in the Zig compiler's order. The first four are DFA states.
+enum(U8) Kind:
+    | Start
+    | Accept
+    | Invalid
+    | Ignore
+    | ASSERT
+    | ARRAY
+    | BOOL
+    | ELSE
+    | FALSE
+    | FN
+    | FLOAT
+    | INT
+    | IMAGE
+    | IF
+    | LET
+    | PRINT
+    | RETURN
+    | READ
+    | STRUCT
+    | SHOW
+    | SUM
+    | TO
+    | TIME
+    | TRUE
+    | THEN
+    | VOID
+    | WRITE
+    | VARIABLE
+    | COLON
+    | RPAREN
+    | LPAREN
+    | RCURLY
+    | RSQUARE
+    | LSQUARE
+    | LCURLY
+    | NEWLINE
+    | INTVAL
+    | FLOATVAL
+    | OP
+    | COMMA
+    | EQUALS
+    | STRING
+    | DOT
+    | END_OF_FILE
+
+// States with fixed meanings.
+let error_state: I32 = 0;
+let start_state: I32 = 1;
+let accept_state: I32 = 2;
+let ignore_state: I32 = 3;
+
+// next state = dfa[state * 256 + byte]; kind_of[state] is the token it ends.
+const mem dfa: U8 = @comptime/\ build().tabs \/;
+const mem kind_of: U8 = @comptime/\ build().kinds \/;
+// Token names for -l, and where each starts in `names`.
+const mem names: U8 = @comptime/\ name_bytes() \/;
+const mem name_at: I32 = @comptime/\ name_offsets() \/;
+
+mem src: U8;
+mem starts: I32;
+mem ends: I32;
+mem kinds: Kind;
+mem out: U8;
+
+// ── The state machine, built at compile time ─────────────────────────────────
+
+struct Machine:
+    | tabs: Array[I32]
+    | kinds: Array[I32]
+    | next: I32
+
+// Printable ASCII and newline may appear in source; anything else is an error.
+fn illegal(c: I32) Bool {
+    c != 10 and (c < 32 or c > 126);
+}
+
+fn illegal_in_string(c: I32) Bool {
+    c < 32 or c > 126;
+}
+
+fn set(m: Machine, from: I32, c: I32, to: I32) void {
+    m.tabs[from * 256 + c] = to;
+}
+
+fn get(m: Machine, from: I32, c: I32) I32 {
+    m.tabs[from * 256 + c];
+}
+
+fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
+    for (lo ... hi) |c| { set(m, from, c, to); };
+}
+
+fn restricted(m: Machine, kind: Kind) I32 {
+    let state = m.next;
+    m.next += 1;
+    m.kinds[state] = kind.to_i32();
+    state;
+}
+
+// Ends its token before any legal byte it has no edge for.
+fn permissive(m: Machine, kind: Kind) I32 {
+    let state = restricted(m, kind);
+    for (0 ..< 256) |c| {
+        set(m, state, c, if illegal(c) { error_state; } else { accept_state; });
+    };
+    state;
+}
+
+fn variable_state(m: Machine, var_state: I32) I32 {
+    let state = permissive(m, Kind.VARIABLE);
+    set(m, state, 95, var_state);
+    set_range(m, state, 97, 122, var_state);
+    set_range(m, state, 65, 90, var_state);
+    set_range(m, state, 48, 57, var_state);
+    state;
+}
+
+fn self_legal(m: Machine, state: I32) void {
+    for (0 ..< 256) |c| {
+        if not illegal(c) { set(m, state, c, state); };
+    };
+}
+
+fn invisible(m: Machine) void {
+    let newline = permissive(m, Kind.NEWLINE);
+    let slash = permissive(m, Kind.OP);
+    let block = restricted(m, Kind.Invalid);
+    let line = restricted(m, Kind.Invalid);
+    let leaving = restricted(m, Kind.Invalid);
+    set(m, start_state, 32, ignore_state);
+    set(m, start_state, 10, newline);
+    set(m, newline, 10, newline);
+    set(m, newline, 32, newline);
+    set(m, newline, 47, slash);
+    set(m, start_state, 47, slash);
+    set(m, slash, 47, line);
+    self_legal(m, line);
+    set(m, line, 10, newline);
+    set(m, slash, 42, block);
+    self_legal(m, block);
+    set(m, block, 42, leaving);
+    for (0 ..< 256) |c| {
+        if not illegal(c) { set(m, leaving, c, block); };
+    };
+    set(m, leaving, 47, ignore_state);
+}
+
+fn single(m: Machine, c: I32, kind: Kind) void {
+    set(m, start_state, c, permissive(m, kind));
+}
+
+fn singles(m: Machine) void {
+    single(m, 40, Kind.LPAREN);
+    single(m, 41, Kind.RPAREN);
+    single(m, 123, Kind.LCURLY);
+    single(m, 125, Kind.RCURLY);
+    single(m, 91, Kind.LSQUARE);
+    single(m, 93, Kind.RSQUARE);
+    single(m, 58, Kind.COLON);
+    single(m, 44, Kind.COMMA);
+    single(m, 43, Kind.OP);
+    single(m, 45, Kind.OP);
+    single(m, 42, Kind.OP);
+    single(m, 37, Kind.OP);
+    single(m, 33, Kind.OP);
+    single(m, 60, Kind.OP);
+    single(m, 62, Kind.OP);
+    single(m, 61, Kind.EQUALS);
+}
+
+fn double(m: Machine, a: I32, b: I32) void {
+    let first = get(m, start_state, a);
+    if first == start_state or first == error_state or first == accept_state {
+        first = restricted(m, Kind.Invalid);
+        set(m, start_state, a, first);
+    };
+    let second = get(m, first, b);
+    if second == first or second == error_state or second == accept_state {
+        second = permissive(m, Kind.Invalid);
+        set(m, first, b, second);
+    };
+    m.kinds[second] = Kind.OP.to_i32();
+}
+
+fn doubles(m: Machine) void {
+    double(m, 124, 124);
+    double(m, 38, 38);
+    double(m, 61, 61);
+    double(m, 33, 61);
+    double(m, 62, 61);
+    double(m, 60, 61);
+}
+
+fn variables(m: Machine) I32 {
+    let state = permissive(m, Kind.VARIABLE);
+    set_range(m, start_state, 97, 122, state);
+    set_range(m, start_state, 65, 90, state);
+    set(m, start_state, 95, state);
+    set_range(m, state, 97, 122, state);
+    set_range(m, state, 65, 90, state);
+    set_range(m, state, 48, 57, state);
+    set(m, state, 95, state);
+    state;
+}
+
+// Keywords are paths through the identifier states; each ends in its kind.
+fn keyword(m: Machine, word: Str, kind: Kind, var_state: I32) void {
+    let current = start_state;
+    for (0 ..< word.len()) |k| {
+        let c = word.get(k);
+        let next = get(m, current, c);
+        if next == error_state or next == accept_state or next == current or next == var_state {
+            set(m, current, c, variable_state(m, var_state));
+        };
+        current = get(m, current, c);
+    };
+    m.kinds[current] = kind.to_i32();
+}
+
+fn keywords(m: Machine, var_state: I32) void {
+    let words = ["assert", "array", "bool", "else", "false", "fn", "float", "int", "image", "if", "let",
+        "print", "return", "read", "struct", "show", "sum", "to", "time", "true", "then", "void", "write"];
+    for (words, 0 ..< 23) |word, k| {
+        keyword(m, word, Kind.from_i32(Kind.ASSERT.to_i32() + k), var_state);
+    };
+}
+
+fn numbers(m: Machine) void {
+    let int = permissive(m, Kind.INTVAL);
+    let dot = permissive(m, Kind.DOT);
+    let float = permissive(m, Kind.FLOATVAL);
+    set_range(m, start_state, 48, 57, int);
+    set_range(m, int, 48, 57, int);
+    set(m, start_state, 46, dot);
+    set(m, int, 46, float);
+    set_range(m, dot, 48, 57, float);
+    set_range(m, float, 48, 57, float);
+}
+
+fn strings(m: Machine) void {
+    let open = restricted(m, Kind.Invalid);
+    set(m, start_state, 34, open);
+    let body = restricted(m, Kind.Invalid);
+    for (0 ..< 256) |c| {
+        if not illegal_in_string(c) and c != 34 {
+            set(m, open, c, body);
+            set(m, body, c, body);
+        };
+    };
+    let close = permissive(m, Kind.STRING);
+    set(m, open, 34, close);
+    set(m, body, 34, close);
+}
+
+fn continuations(m: Machine) void {
+    let backslash = restricted(m, Kind.Invalid);
+    set(m, start_state, 92, backslash);
+    set(m, backslash, 10, ignore_state);
+}
+
+fn build() Machine {
+    let m = Machine { tabs: Array[I32].new(256 * 256, 0), kinds: Array[I32].new(256, Kind.Invalid.to_i32()), next: 4 };
+    m.kinds[start_state] = Kind.Start.to_i32();
+    m.kinds[accept_state] = Kind.Accept.to_i32();
+    m.kinds[ignore_state] = Kind.Ignore.to_i32();
+    // Accept and ignore restart the scan from the start state.
+    for (0 ..< 256) |c| {
+        set(m, accept_state, c, start_state);
+        set(m, ignore_state, c, start_state);
+    };
+    invisible(m);
+    singles(m);
+    doubles(m);
+    keywords(m, variables(m));
+    numbers(m);
+    strings(m);
+    continuations(m);
+    m.tabs = m.tabs.slice(0, m.next * 256);
+    m.kinds = m.kinds.slice(0, m.next);
+    m;
+}
+
+fn name_bytes() Array[I32] {
+    let out = Array[I32].new(1024, 0);
+    let n = 0;
+    for (0 ..< Kind.count()) |k| {
+        let name = Kind.name(Kind.from_i32(k));
+        for (0 ..< name.len()) |c| {
+            out[n] = name.get(c);
+            n += 1;
+        };
+    };
+    out.slice(0, n);
+}
+
+fn name_offsets() Array[I32] {
+    let at = Array[I32].new(Kind.count() + 1, 0);
+    for (0 ..< Kind.count()) |k| { at[k + 1] = at[k] + Kind.name(Kind.from_i32(k)).len(); };
+    at;
+}
+
+// ── Lexing ───────────────────────────────────────────────────────────────────
+
+// Lexes `src` (which ends with a 255 sentinel) into starts/ends/kinds.
+// Returns the token count, or -1 at an invalid byte.
+fn lex() I32 {
+    let last = src.len() - 1;
+    starts.resize(src.len() + 1);
+    ends.resize(src.len() + 1);
+    kinds.resize(src.len() + 1);
+    let n = 0;
+    let i = 0;
+    let j = 0;
+    let state = start_state;
+    let failed = false;
+    let next = dfa[start_state * 256 + src[0]];
+    loop match next {
+        0 => {
+            if j != last { failed = true; };
+            break;
+        },
+        2 => {
+            starts[n] = i;
+            ends[n] = j;
+            kinds[n] = Kind.from_i32(kind_of[state]);
+            n += 1;
+            i = j;
+            next = dfa[start_state * 256 + src[j]];
+            continue next;
+        },
+        3 => {
+            j += 1;
+            i = j;
+            next = dfa[start_state * 256 + src[j]];
+            continue next;
+        },
+        ~> {
+            state = next;
+            j += 1;
+            next = dfa[state * 256 + src[j]];
+            continue next;
+        },
+    };
+    if failed { return -1; };
+    if i != j {
+        if kind_of[state] == Kind.Invalid.to_i32() { return -1; };
+        starts[n] = i;
+        ends[n] = j;
+        kinds[n] = Kind.from_i32(kind_of[state]);
+        n += 1;
+        i = j;
+    };
+    starts[n] = i;
+    ends[n] = j;
+    kinds[n] = Kind.END_OF_FILE;
+    n + 1;
+}
+
+// ── Printing ─────────────────────────────────────────────────────────────────
+
+fn emit_bytes(at: I32, text: Str) I32 {
+    for (0 ..< text.len()) |k| { out[at + k] = text.get(k); };
+    at + text.len();
+}
+
+// The token listing, in the Zig compiler's format, into `out`. Returns its length.
+fn listing(n: I32) I32 {
+    out.resize(src.len() * 16 + 64);
+    let at = 0;
+    for (0 ..< n) |t| {
+        let kind = kinds[t];
+        let k = kind.to_i32();
+        for (name_at[k] ..< name_at[k + 1]) |c| {
+            out[at] = names[c];
+            at += 1;
+        };
+        if kind != Kind.NEWLINE and kind != Kind.END_OF_FILE {
+            out[at] = 32;
+            out[at + 1] = 39;
+            at += 2;
+            if kind == Kind.STRING {
+                for (starts[t] ..< ends[t]) |c| {
+                    let b = src[c];
+                    if b == 10 {
+                        out[at] = 92;
+                        out[at + 1] = 110;
+                        at += 2;
+                    } else {
+                        out[at] = b;
+                        at += 1;
+                    };
+                };
+            } else {
+                for (starts[t] ..< ends[t]) |c| {
+                    out[at] = src[c];
+                    at += 1;
+                };
+            };
+            out[at] = 39;
+            at += 1;
+        };
+        out[at] = 10;
+        at += 1;
+    };
+    at;
+}
+
+fn load(path: Str) void {
+    src.copy_in(Fs.readFileSync(path));
+    src.push(255);
+}
+
+fn report(n: I32, print: Bool) void {
+    let at = if n >= 0 and print { listing(n); } else { 0; };
+    at = emit_bytes(at, if n < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
+    Fs.writeSync(1.0, out.view(0, at));
+}
+
+// Median of `runs` timings of lex (and with `print`, of the listing too), in ms.
+fn time(runs: I32, print: Bool) F64 {
+    let samples = Array[F64].new(runs, 0.0);
+    for (0 ..< runs + 3) |r| {
+        let begin = Web.performance.now();
+        let n = lex();
+        if print { listing(n); };
+        if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
+    };
+    (samples sort(F64) |a, b| { a < b; })[runs / 2];
+}
+
+// lexer <file.jpl> -l   token listing, as the Zig compiler prints it
+// lexer <file.jpl> -_   lex only
+// lexer <file.jpl> -bench   in-process medians for lexing and lexing + listing
+export main() void {
+    let args = Process.argv;
+    let file = args[2];
+    let flag = args[3];
+    if file.get(0) == 45 {
+        let swap = file;
+        file = flag;
+        flag = swap;
+    };
+    load(file);
+    if flag == "-bench" {
+        let lexing = time(15, false);
+        let listing_too = time(15, true);
+        Web.console.log("lex " + lexing.to_str() + " ms, lex + listing " + listing_too.to_str() + " ms, " + lex().to_str() + " tokens");
+        return;
+    };
+    let n = lex();
+    report(n, flag == "-l");
+}
