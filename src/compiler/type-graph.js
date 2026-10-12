@@ -16,13 +16,6 @@ import { tupleParts, tupleTypeStr } from './type-strings.js';
 import { buildProgramIndex, nodesOf } from './program-index.js';
 import { reportTypeGraphDiagnostics } from './type-graph-diagnostics.js';
 
-const VOID_NODES = new Set([
-  'ir-assign', 'ir-while', 'ir-for', 'ir-loop-match', 'ir-defer', 'ir-assert',
-]);
-// Control transfers never complete, so like `fatal` they fit any context:
-// `if b { return 1; } else { return 2; }` can end an I32 function.
-const DIVERGING_NODES = new Set(['ir-return', 'ir-break', 'ir-continue']);
-const MEMBER_OPERATIONS = new Map([['ir-index', 'get_index'], ['ir-slice', 'get_slice']]);
 
 /**
  * @typedef {Object} TypeSlot
@@ -107,13 +100,14 @@ export function buildTypeGraph(doc, typeIndex) {
   };
   if (!root) return graph;
 
-  // Each use's declaration, by the use's index: bindingOf is the solver's hottest query.
+  // Each identifier's declaration, by its index: bindingOf is the solver's
+  // hottest query. (Only identifiers are resolved; others ask the scope graph.)
   const resolutions = graph.scopeGraph?.resolutions;
   if (resolutions) {
     const bindings = graph.bindings = denseArray(doc.count);
-    for (const [id, decl] of resolutions) {
-      const node = programIndex.byId.get(id);
-      if (node !== undefined) bindings[node.$] = decl;
+    for (const ident of programIndex.byKind.get('ir-ident') ?? []) {
+      const decl = resolutions.get(ident.id);
+      if (decl !== undefined) bindings[ident.$] = decl;
     }
   }
   for (const node of programIndex.all) graph.slots.set(node, slot(node));
@@ -396,8 +390,10 @@ export const expectedTypes = (graph, node) =>
 export const bindingOf = (graph, node) => {
   if (!graph.scopeGraph) return projectedBindingOf(graph.doc, node);
   if (node == null) return graph.scopeGraph.resolutions.get(undefined) ?? null;
-  // Nodes indexed when the graph was built answer from the array.
-  if (graph.bindings !== undefined && graph.slots.get(node) !== undefined) return graph.bindings[node.$] ?? null;
+  // Identifiers indexed when the graph was built answer from the array.
+  if (graph.bindings !== undefined && node.localName === 'ir-ident' && graph.slots.get(node) !== undefined) {
+    return graph.bindings[node.$] ?? null;
+  }
   return graph.scopeGraph.resolutions.get(node.id) ?? null;
 };
 /** Compatibility-only binding query for projected DOM IR. */
@@ -430,8 +426,11 @@ export function planCoercions(graph) {
   return graph.coercions;
 }
 
+// Most nodes are expected nothing; they share this list until their first edge.
+const NO_EDGES = Object.freeze([]);
+
 function slot(node) {
-  return { node, actual: projectedActualType(node), expected: [], function: null, resolution: null };
+  return { node, actual: node.getAttribute('data-type-name'), expected: NO_EDGES, function: null, resolution: null };
 }
 
 function actual(graph, node) {
@@ -577,7 +576,11 @@ function expect(graph, value, kind, a, b, c, site, source, mode, label) {
   if (!value) return;
   const edge = new Edge(graph, value, kind, a, b, c, site, source, mode, label);
   graph.expectations.push(edge);
-  graph.slots.get(value)?.expected.push(edge);
+  const target = graph.slots.get(value);
+  if (target !== undefined) {
+    if (target.expected === NO_EDGES) target.expected = [edge];
+    else target.expected.push(edge);
+  }
 }
 
 /** A struct literal's field and its declaration, read lazily: an implicit `&{…}` learns its type between solver rounds. */
@@ -600,16 +603,21 @@ function edgeSource(edge) {
 }
 
 function addActualRule(graph, node) {
-  const children = [...(node.children ?? [])];
   const one = node.firstElementChild;
   const two = node.lastElementChild;
+  // A copy: rules keep it, and lowerings edit the live list later.
+  const children = () => [...node.children];
   const fixed = (type, source) => rule(graph, node, [], R.FIXED, type, null, source);
-  if (VOID_NODES.has(node.localName)) return fixed('void', node.localName.slice(3));
-  if (DIVERGING_NODES.has(node.localName)) return fixed('never', node.localName.slice(3));
-  const member = MEMBER_OPERATIONS.get(node.localName);
-  if (member) return rule(graph, node, children, R.MEMBER, one, member, 'return-of');
 
   switch (node.localName) {
+    case 'ir-assign': case 'ir-while': case 'ir-for': case 'ir-loop-match': case 'ir-defer': case 'ir-assert':
+      return fixed('void', node.localName.slice(3));
+    // Control transfers never complete, so like `fatal` they fit any context:
+    // `if b { return 1; } else { return 2; }` can end an I32 function.
+    case 'ir-return': case 'ir-break': case 'ir-continue':
+      return fixed('never', node.localName.slice(3));
+    case 'ir-index': return rule(graph, node, children(), R.MEMBER, one, 'get_index', 'return-of');
+    case 'ir-slice': return rule(graph, node, children(), R.MEMBER, one, 'get_slice', 'return-of');
     case 'ir-lit':
       return rule(graph, node, [], R.LITERAL, node.getAttribute('kind'), null, 'literal');
     case 'ir-ident':
@@ -644,14 +652,17 @@ function addActualRule(graph, node) {
     case 'ir-unary':
       return rule(graph, node, [one], R.UNARY, one, null, 'operator');
     case 'ir-binary':
-      return rule(graph, node, children, R.BINARY, one, null, 'operator');
-    case 'ir-tuple':
-      return rule(graph, node, children, R.TUPLE, children, null, 'tuple');
+      return rule(graph, node, children(), R.BINARY, one, null, 'operator');
+    case 'ir-tuple': {
+      const parts = children();
+      return rule(graph, node, parts, R.TUPLE, parts, null, 'tuple');
+    }
     case 'ir-tuple-get':
       return rule(graph, node, [one], R.TUPLE_GET, one, null, 'tuple-element');
     case 'ir-if': {
-      const then = children[1];
-      const otherwise = children[2];
+      const kids = node.children;
+      const then = kids[1];
+      const otherwise = kids[2];
       if (!otherwise) return fixed('void', 'one-arm-if');
       return rule(graph, node, [then, otherwise], R.CONFLUENCE, [then, otherwise], null, 'confluence');
     }
@@ -674,7 +685,7 @@ function addActualRule(graph, node) {
       return fixed('never', 'fatal');
     case 'ir-call': {
       const callee = node.firstElementChild;
-      return rule(graph, node, [...children, callee?.firstElementChild, ...node.querySelector(':scope > ir-arg-list')?.children ?? []], R.CALL, null, null, 'return-of');
+      return rule(graph, node, [...children(), callee?.firstElementChild, ...node.querySelector(':scope > ir-arg-list')?.children ?? []], R.CALL, null, null, 'return-of');
     }
     case 'ir-await':
       return rule(graph, node, [one], R.AWAIT, one, null, 'awaited-type');
@@ -688,24 +699,26 @@ function addActualRule(graph, node) {
     case 'ir-field-access':
       return rule(graph, node, [one], R.FIELD, one, null, 'field-of');
     case 'ir-struct-init':
-      return rule(graph, node, children.map(c => c.firstElementChild), R.STRUCT, null, null, 'struct-init');
+      return rule(graph, node, children().map(c => c.firstElementChild), R.STRUCT, null, null, 'struct-init');
     case 'ir-try': {
-      const [body, handler] = children;
+      const [body, handler] = node.children;
       return rule(graph, node, [body, handler], R.CONFLUENCE, [body, handler], null, 'confluence');
     }
     case 'ir-caught':
       // Whatever the host threw: a dynamic host value (`e.message`), or opaque without declarations.
       return fixed(graph.doc.__utuForeign?.type(0, 'any', graph) ?? 'Externref', 'caught');
     case 'ir-array-lit':
-      return rule(graph, node, children, R.ARRAY, null, null, 'array-literal');
+      return rule(graph, node, children(), R.ARRAY, null, null, 'array-literal');
     case 'ir-null-ref':
       return fixed(node.getAttribute('type-name') ? `?${node.getAttribute('type-name')}` : 'null', 'null');
     case 'ir-ref-test': case 'ir-ref-is-null':
       return fixed(graph.literalDefaults.get('bool') ?? 'Bool', 'predicate');
     case 'ir-ref-cast':
       return fixed(node.getAttribute('type-name'), 'cast');
-    default:
-      if (node.dataset?.typeName) fixed(node.dataset.typeName, node.dataset.inferenceSource ?? 'existing');
+    default: {
+      const type = node.getAttribute('data-type-name');
+      if (type) fixed(type, node.getAttribute('data-inference-source') ?? 'existing');
+    }
   }
 }
 
