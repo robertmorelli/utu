@@ -16,6 +16,7 @@ import { retainedGraphs } from './graph-store.js';
 import { tupleParts, tupleTypeStr } from './type-strings.js';
 import { buildProgramIndex, nodesOf } from './program-index.js';
 import { reportTypeGraphDiagnostics } from './type-graph-diagnostics.js';
+import { NO_EDGES, TypeFacts } from './fact-store.js';
 
 
 /**
@@ -45,46 +46,6 @@ function denseArray(size) {
   return new Array(size).fill(undefined);
 }
 
-/**
- * The type graph's per-node slots, indexed by each element's dense `$`. It
- * reads like a Map from elements to slots (`get`, `has`, iteration in
- * insertion order), which is how analyses and editor queries consume it.
- */
-class SlotTable {
-  constructor(size) {
-    this.byIndex = denseArray(size);
-    this.order = [];
-  }
-  get(node) {
-    const value = node == null ? undefined : this.byIndex[node.$];
-    // Elements of another document can share an index; the slot names its node.
-    return value !== undefined && value.node === node ? value : undefined;
-  }
-  has(node) {
-    return this.get(node) !== undefined;
-  }
-  set(node, value) {
-    if (!this.has(node)) this.order.push(node);
-    this.byIndex[node.$] = value;
-    return this;
-  }
-  get size() {
-    return this.order.length;
-  }
-  *entries() {
-    for (const node of this.order) yield [node, this.byIndex[node.$]];
-  }
-  keys() {
-    return this.order[Symbol.iterator]();
-  }
-  *values() {
-    for (const node of this.order) yield this.byIndex[node.$];
-  }
-  [Symbol.iterator]() {
-    return this.entries();
-  }
-}
-
 /** @returns {TypeGraph} */
 export function buildTypeGraph(doc, typeIndex) {
   const root = doc?.body?.firstChild;
@@ -93,11 +54,15 @@ export function buildTypeGraph(doc, typeIndex) {
   const graph = {
     doc, root, typeIndex, programIndex, programRevision: programIndex.revision,
     byKind: programIndex.byKind, nodesByKind: programIndex.byKind,
-    scopeGraph: retained.scope, slots: new SlotTable(doc?.count ?? 0), rules: [], expectations: [],
+    scopeGraph: retained.scope, facts: null, slots: null, rules: [], expectations: [],
     failures: [], coercions: [], changed: false,
     nativeMember: (owner, member) => memberFn(graph, owner, member),
   };
+  // One row of facts per node, in document order; `slots` reads them as objects.
+  const facts = graph.facts = new TypeFacts(doc, root ? programIndex.all : []);
+  graph.slots = facts.views();
   if (!root) return graph;
+  for (let r = 0; r < facts.nodes.length; r++) facts.setTypeName(r, facts.nodes[r].getAttribute('data-type-name'));
 
   // Each identifier's declaration, by its index: bindingOf is the solver's
   // hottest query. (Only identifiers are resolved; others ask the scope graph.)
@@ -109,10 +74,9 @@ export function buildTypeGraph(doc, typeIndex) {
       if (decl !== undefined) bindings[ident.$] = decl;
     }
   }
-  for (const node of programIndex.all) graph.slots.set(node, slot(node));
   graph.fnIndex = programIndex.functions;
   graph.literalDefaults = collectLiteralDefaults(graph);
-  for (const node of graph.slots.keys()) {
+  for (const node of facts.nodes) {
     addActualRule(graph, node);
     addExpectations(graph, node);
   }
@@ -132,7 +96,7 @@ export function settleTypeGraph(doc, typeIndex) {
     for (;;) {
       applyContextualRewrites(graph, planContextualRewrites(graph));
       if (!graph.changed) { planCoercions(graph); return graph; }
-      propagate(graph, [...graph.touched].map(node => graph.slots.get(node)?.rule).filter(Boolean));
+      propagate(graph, [...graph.touched].map(node => ruleOf(graph, node)).filter(Boolean));
     }
   } finally {
     graph.declaredTypes = null;
@@ -413,7 +377,7 @@ export const bindingOf = (graph, node) => {
   if (!graph.scopeGraph) return projectedBindingOf(graph.doc, node);
   if (node == null) return graph.scopeGraph.resolutions.get(undefined) ?? null;
   // Identifiers indexed when the graph was built answer from the array.
-  if (graph.bindings !== undefined && node.localName === 'ir-ident' && graph.slots.get(node) !== undefined) {
+  if (graph.bindings !== undefined && node.localName === 'ir-ident' && graph.facts.rowOf(node) >= 0) {
     return graph.bindings[node.$] ?? null;
   }
   return graph.scopeGraph.resolutions.get(node.id) ?? null;
@@ -448,31 +412,47 @@ export function planCoercions(graph) {
   return graph.coercions;
 }
 
-// Most nodes are expected nothing; they share this list until their first edge.
-const NO_EDGES = Object.freeze([]);
 
 const FN = new Set(['ir-fn']);
 const FOR = new Set(['ir-for']);
 const FUNCTION_SCOPES = new Set(['ir-fn', 'ir-closure']);
 const RETURN_SURFACES = new Set(['ir-fn', 'ir-export-main', 'ir-closure']);
 
-function slot(node) {
-  return { node, actual: node.getAttribute('data-type-name'), expected: NO_EDGES, function: null, resolution: null };
-}
-
 function actual(graph, node) {
-  const value = graph.slots.get(node);
-  if (value !== undefined) return value.actual;
+  const r = graph.facts.rowOf(node);
+  if (r >= 0) return graph.facts.typeName(r);
   return projectedActualType(node);
 }
 
 function setActual(graph, node, type, source) {
-  const value = graph.slots.get(node);
-  if (value) {
-    value.actual = type;
-    value.inferenceSource = source;
-    value.project = true;
+  const { facts } = graph;
+  const r = facts.rowOf(node);
+  if (r >= 0) {
+    facts.setTypeName(r, type);
+    facts.source[r] = source;
+    facts.project[r] = 1;
   }
+}
+
+/** The edges expecting something of `node` (shared empty list when none). */
+function expectedOf(graph, node) {
+  const r = graph.facts.rowOf(node);
+  return r >= 0 ? graph.facts.expected[r] : undefined;
+}
+
+function ruleOf(graph, node) {
+  const r = graph.facts.rowOf(node);
+  return r >= 0 ? graph.facts.rule[r] : undefined;
+}
+
+function functionOf(graph, node) {
+  const r = graph.facts.rowOf(node);
+  return r >= 0 ? graph.facts.function[r] : undefined;
+}
+
+function rareFactOf(graph, node, key) {
+  const r = graph.facts.rowOf(node);
+  return r >= 0 ? graph.facts.rareFact(r, key) : undefined;
 }
 
 // ── Rules and expectation edges ──────────────────────────────────────────────
@@ -545,7 +525,7 @@ function rule(graph, node, deps, kind, a, b, source) {
   if (node.parentElement?.localName === 'ir-binary') deps = [...deps, ...[...node.parentElement.children].filter(c => c !== node)];
   const value = new Rule(graph, node, deps.filter(Boolean), kind, a, b, source, graph.rules.length);
   graph.rules.push(value);
-  graph.slots.get(node).rule = value;
+  graph.facts.rule[graph.facts.rowOf(node)] = value;
 }
 
 const E = Object.freeze({
@@ -575,7 +555,7 @@ class Edge {
       case E.ASSIGN: return foreignAssignmentType(graph, a) ?? actual(graph, this.b);
       case E.ARGUMENT: return callParameter(graph, a, this.b, this.c)?.type;
       case E.TUPLE_PART: return tupleParts(expectedType(graph, a))?.[this.c];
-      case E.ELEMENT: return graph.slots.get(a)?.foreign?.params[this.c] ?? (this.b ? arrayElementContext(graph, a) : undefined);
+      case E.ELEMENT: return rareFactOf(graph, a, 'foreign')?.params[this.c] ?? (this.b ? arrayElementContext(graph, a) : undefined);
       case E.FIELD_INIT: return fieldInitInfo(graph, a, this.b).field?.type;
       case E.ACTUAL: return actual(graph, a);
       case E.CONFLUENCE: return unifiedBranchType(graph, a, this.b);
@@ -603,10 +583,11 @@ function expect(graph, value, kind, a, b, c, site, source, mode, label) {
   if (!value) return;
   const edge = new Edge(graph, value, kind, a, b, c, site, source, mode, label);
   graph.expectations.push(edge);
-  const target = graph.slots.get(value);
-  if (target !== undefined) {
-    if (target.expected === NO_EDGES) target.expected = [edge];
-    else target.expected.push(edge);
+  const { facts } = graph;
+  const r = facts.rowOf(value);
+  if (r >= 0) {
+    if (facts.expected[r] === NO_EDGES) facts.expected[r] = [edge];
+    else facts.expected[r].push(edge);
   }
 }
 
@@ -618,7 +599,7 @@ function fieldInitInfo(graph, node, field) {
 
 /** The first type this node is expected to have, if any. */
 function expectedType(graph, node) {
-  for (const edge of graph.slots.get(node)?.expected ?? []) {
+  for (const edge of expectedOf(graph, node) ?? []) {
     const type = edge.read();
     if (type) return type;
   }
@@ -669,7 +650,7 @@ function addActualRule(graph, node) {
       // Function declarations seed identifier uses, but stamping their
       // structural signature would make backend callable-type discovery treat
       // every declaration as a first-class function value.
-      graph.slots.get(node).actual = fnSignatureType(node);
+      graph.facts.setTypeName(graph.facts.rowOf(node), fnSignatureType(node));
       return;
     case 'ir-block': case 'ir-paren': {
       const value = node.localName === 'ir-block' ? two : one;
@@ -801,7 +782,7 @@ function callResult(graph, call) {
 }
 
 function resolveCall(graph, call) {
-  const known = graph.slots.get(call)?.function;
+  const known = functionOf(graph, call);
   const direct = bindingOf(graph, call.firstElementChild);
   const fn = known ?? (isFunctionDecl(direct) ? direct : directCalleeDecl(call, graph.doc)) ?? memberCall(graph, call);
   if (!fn) return null;
@@ -851,8 +832,8 @@ function resolveProtocolCall(graph, call) {
   if (!method) return null;
   const result = typeNodeToStr(firstTypeChild(method)) ?? 'void';
   const fact = { protocol: owner, member, declaration: method, result };
-  graph.slots.get(call).protocolCall = fact;
-  graph.slots.get(callee).protocolCall = fact;
+  graph.facts.setRareFact(graph.facts.rowOf(call), 'protocolCall', fact);
+  graph.facts.setRareFact(graph.facts.rowOf(callee), 'protocolCall', fact);
   setActual(graph, callee, result, 'protocol-return');
   clearDiagnostic(call);
   clearDiagnostic(callee);
@@ -874,10 +855,11 @@ function memberResult(graph, node, owner, member) {
 }
 
 function rememberFunction(graph, node, fn, resolution = null) {
-  const value = graph.slots.get(node);
-  if (!value) return fn;
-  value.function = fn;
-  if (resolution) value.resolution = resolution;
+  const { facts } = graph;
+  const r = facts.rowOf(node);
+  if (r < 0) return fn;
+  facts.function[r] = fn;
+  if (resolution) facts.resolution[r] = resolution;
   return fn;
 }
 
@@ -910,7 +892,7 @@ function collectOperationFailures(graph) {
     }
     checkArity(graph, call);
     const callee = call.firstElementChild;
-    if (graph.slots.get(call)?.foreign || resolvedFunction(graph, call) || graph.slots.get(call)?.protocolCall
+    if (rareFactOf(graph, call, 'foreign') || resolvedFunction(graph, call) || rareFactOf(graph, call, 'protocolCall')
       || callableParts(actual(graph, callee))) continue;
     if (callee?.localName !== 'ir-field-access' && callee?.localName !== 'ir-type-member') continue;
     if (call.getAttribute('data-for-array-access')) continue;
@@ -932,10 +914,10 @@ function collectOperationFailures(graph) {
 }
 
 function checkArity(graph, call) {
-  if (graph.slots.get(call)?.foreign) return;
+  if (rareFactOf(graph, call, 'foreign')) return;
   const fn = resolvedFunction(graph, call);
   const callee = call.firstElementChild;
-  const protocol = graph.slots.get(call)?.protocolCall ?? resolveProtocolCall(graph, call);
+  const protocol = rareFactOf(graph, call, 'protocolCall') ?? resolveProtocolCall(graph, call);
   const signature = fn ? paramsOf(fn)
     : protocol ? paramsOf(protocol.declaration)
     : callableParts(actual(graph, callee))?.params;
@@ -944,7 +926,7 @@ function checkArity(graph, call) {
   const actualCount = argCount(call);
   // `T.method(value, args)` passes the receiver explicitly; that extra
   // argument only exists when the function actually takes `self`.
-  const receiverArg = fn && graph.slots.get(call)?.resolution?.resolvedAs === 'static-method'
+  const receiverArg = fn && graph.facts.resolution[graph.facts.rowOf(call)]?.resolvedAs === 'static-method'
     && fnNameOf(fn)?.getAttribute('kind') === 'method'
     && selfParamOf(fn) && actualCount === expected + 1;
   if (receiverArg || actualCount === expected) return;
@@ -1028,13 +1010,13 @@ function fieldActual(graph, node, owner) {
       && member.getAttribute('name') === fieldName);
     const type = declaredTypeStr(declaration);
     if (!type) return null;
-    graph.slots.get(node).field = { owner: unwrapNullable(owner), type, index: null, declaration };
+    graph.facts.field[graph.facts.rowOf(node)] = { owner: unwrapNullable(owner), type, index: null, declaration };
     return type;
   }
   const index = entry?.fields?.findIndex(field => field.name === fieldName) ?? -1;
   if (index < 0) return null;
   const field = entry.fields[index];
-  const fact = graph.slots.get(node).field = {
+  const fact = graph.facts.field[graph.facts.rowOf(node)] = {
     owner: unwrapNullable(owner), type: field.type, index,
     declaration: fieldDecl(entry, field.name),
   };
@@ -1156,13 +1138,13 @@ function declaredSource(graph, node) {
 }
 
 function callParameter(graph, call, args, index) {
-  const foreign = graph.slots.get(call)?.foreign;
+  const foreign = rareFactOf(graph, call, 'foreign');
   if (foreign) return { type: foreign.expected[index], source: call };
   const foreignParams = call.getAttribute('data-foreign-params');
   if (foreignParams) return { type: JSON.parse(foreignParams)[index], source: call };
   const fn = resolvedFunction(graph, call);
   if (!fn) {
-    const protocol = graph.slots.get(call)?.protocolCall;
+    const protocol = rareFactOf(graph, call, 'protocolCall');
     const param = protocol ? paramsOf(protocol.declaration)[index] : null;
     const type = declared(graph, param)
       ?? callableParts(actual(graph, call.firstElementChild))?.params[index];
@@ -1174,7 +1156,7 @@ function callParameter(graph, call, args, index) {
     ?? childOf(call.firstElementChild, 'ir-type-ref')?.getAttribute('name');
   // Lowered receiver methods carry self as argument zero, while paramsOf
   // intentionally excludes ir-self-param.
-  const offset = graph.slots.get(call)?.resolution?.resolvedAs === 'static-method'
+  const offset = (graph.facts.rowOf(call) >= 0 ? graph.facts.resolution[graph.facts.rowOf(call)] : undefined)?.resolvedAs === 'static-method'
     && selfParamOf(fn) && args.length === params.length + 1 ? 1 : 0;
   if (offset && index === 0) return receiverType && { type: receiverType, source: selfParamOf(fn) };
   const param = params[index - offset];
@@ -1187,7 +1169,7 @@ function callParameter(graph, call, args, index) {
 }
 
 function resolvedFunction(graph, call) {
-  const resolved = graph.slots.get(call)?.function;
+  const resolved = functionOf(graph, call);
   if (isFunctionDecl(resolved)) return resolved;
   const direct = bindingOf(graph, call?.firstElementChild);
   return isFunctionDecl(direct) ? direct : directCalleeDecl(call, graph.doc);
@@ -1223,13 +1205,13 @@ function unifiedBranchType(graph, owner, first) {
   // The surrounding context (a return type, an annotated let) decides what
   // every branch must be. Without it, branches meet each other, which can
   // leave a literal branch to default before a block branch has a type.
-  const context = graph.slots.get(owner)?.expected?.map(edge => edge.read())
+  const context = expectedOf(graph, owner)?.map(edge => edge.read())
     .find(type => type && type !== 'null' && type !== 'void' && type !== 'nullable');
   // A tuple context reaches inside the branches' tuples the same way.
   if (context && (LITERAL_CONTEXT.has(context) || tupleParts(context))) return context;
   const unified = actual(graph, owner) ?? actual(graph, first);
   if (unified !== 'null') return unified;
-  return graph.slots.get(owner)?.expected?.map(edge => edge.read()).find(type => type && type !== 'null') ?? unified;
+  return expectedOf(graph, owner)?.map(edge => edge.read()).find(type => type && type !== 'null') ?? unified;
 }
 
 /**
@@ -1242,7 +1224,7 @@ function confluence(graph, node, types) {
   const unboxed = type => graph.doc.__utuForeign?.values.get(unwrapNullable(type ?? ''))?.ref?.boxed ?? type;
   const unified = meet(types) ?? (types.some(t => unboxed(t) !== t) ? meet(types.map(unboxed)) : null);
   if (unified || !types.length || !types.every(Boolean)) return unified;
-  const used = graph.slots.get(node)?.expected.some(edge => { const type = edge.read(); return type && type !== 'void'; });
+  const used = expectedOf(graph, node)?.some(edge => { const type = edge.read(); return type && type !== 'void'; });
   return used ? null : 'void';
 }
 
@@ -1297,7 +1279,7 @@ function collectFailures(graph) {
     }
   }
   for (const array of nodesOf(graph, 'ir-array-lit')) {
-    if (!actual(graph, array) && !graph.slots.get(array)?.foreignError) fail(graph, array, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+    if (!actual(graph, array) && !rareFactOf(graph, array, 'foreignError')) fail(graph, array, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
       'An array literal needs a known type: annotate it (`let xs: Array[I32] = [1, 2]`) or pass it where an array is expected', {});
   }
   for (const closure of nodesOf(graph, 'ir-closure')) {
@@ -1374,7 +1356,7 @@ function actualOrigin(graph, node, seen = new Set()) {
     const fn = resolvedFunction(graph, node);
     if (fn) return fn;
   }
-  const rule = graph.slots.get(node)?.rule;
+  const rule = ruleOf(graph, node);
   const same = rule?.deps.find(dep => actual(graph, dep) === actual(graph, node));
   return same ? actualOrigin(graph, same, seen) ?? same : null;
 }
