@@ -42,6 +42,37 @@ function camelName(attribute) {
   return name;
 }
 
+// ── Attribute shapes ─────────────────────────────────────────────────────────
+//
+// Elements with the same attribute names, set in the same order, share one
+// Shape (the names and where each one is), as V8's hidden classes do; an
+// element stores only its values. Most IR nodes carry the same dozen spans and
+// provenance attributes, so this is one small array per node instead of a hash
+// map.
+
+class Shape {
+  constructor(names) {
+    this.names = names;
+    this.index = new Map(names.map((name, i) => [name, i]));
+    this.added = new Map();
+    this.removed = new Map();
+  }
+
+  with(name) {
+    let next = this.added.get(name);
+    if (!next) this.added.set(name, next = new Shape([...this.names, name]));
+    return next;
+  }
+
+  without(name) {
+    let next = this.removed.get(name);
+    if (!next) this.removed.set(name, next = new Shape(this.names.filter(other => other !== name)));
+    return next;
+  }
+}
+
+const EMPTY = new Shape([]);
+
 // ── Nodes ─────────────────────────────────────────────────────────────────────
 
 class IRNode {
@@ -117,7 +148,8 @@ class IRElement extends IRNode {
   constructor(document, localName) {
     super(document);
     this.localName = localName;
-    this.attrs = new Map();
+    this.shape = EMPTY;
+    this.values = [];
     this.childNodes = [];
     // Text children are rare; while there are none, childNodes is children.
     this.textChildren = 0;
@@ -129,38 +161,61 @@ class IRElement extends IRNode {
   get nodeName() { return this.tagName; }
 
   // ── Attributes ──
+  /** The value of an attribute already in lowercase, or undefined. */
+  attr(name) {
+    const i = this.shape.index.get(name);
+    return i === undefined ? undefined : this.values[i];
+  }
+
   getAttribute(name) {
-    const value = this.attrs.get(name);
-    if (value !== undefined) return value;
-    const lower = name.toLowerCase();
-    return lower === name ? null : this.attrs.get(lower) ?? null;
+    let i = this.shape.index.get(name);
+    if (i === undefined) {
+      const lower = name.toLowerCase();
+      if (lower === name || (i = this.shape.index.get(lower)) === undefined) return null;
+    }
+    return this.values[i];
   }
 
   setAttribute(name, value) {
-    const key = name.toLowerCase();
+    let key = name;
+    let i = this.shape.index.get(key);
+    if (i === undefined) {
+      key = name.toLowerCase();
+      i = this.shape.index.get(key);
+    }
     const text = String(value);
     if (key === 'id') this.ownerDocument.ids.set(text, this);
-    this.attrs.set(key, text);
+    if (i === undefined) {
+      this.shape = this.shape.with(key);
+      this.values.push(text);
+    } else {
+      this.values[i] = text;
+    }
     mutated(this, 'attributes');
   }
 
   removeAttribute(name) {
-    if (this.attrs.delete(name.toLowerCase())) mutated(this, 'attributes');
+    const key = name.toLowerCase();
+    const i = this.shape.index.get(key);
+    if (i === undefined) return;
+    this.shape = this.shape.without(key);
+    this.values.splice(i, 1);
+    mutated(this, 'attributes');
   }
 
   hasAttribute(name) {
-    return this.attrs.has(name.toLowerCase());
+    return this.shape.index.has(name) || this.shape.index.has(name.toLowerCase());
   }
 
   getAttributeNames() {
-    return [...this.attrs.keys()];
+    return [...this.shape.names];
   }
 
   get attributes() {
-    return [...this.attrs].map(([name, value]) => ({ name, value }));
+    return this.shape.names.map((name, i) => ({ name, value: this.values[i] }));
   }
 
-  get id() { return this.attrs.get('id') ?? ''; }
+  get id() { return this.attr('id') ?? ''; }
   set id(value) { this.setAttribute('id', value); }
 
   get dataset() {
@@ -277,7 +332,7 @@ class IRElement extends IRNode {
 
   get outerHTML() {
     let html = `<${this.localName}`;
-    for (const [name, value] of this.attrs) html += ` ${name}="${escapeAttribute(value)}"`;
+    this.shape.names.forEach((name, i) => { html += ` ${name}="${escapeAttribute(this.values[i])}"`; });
     html += '>';
     for (const child of this.childNodes) html += child.outerHTML;
     return `${html}</${this.localName}>`;
@@ -326,9 +381,9 @@ class IRDocument {
 
   getElementById(id) {
     const hit = this.ids.get(id);
-    if (hit && hit.attrs.get('id') === id && hit.isConnected) return hit;
+    if (hit && hit.attr('id') === id && hit.isConnected) return hit;
     for (const node of walk(this.documentElement)) {
-      if (node.attrs.get('id') === id) {
+      if (node.attr('id') === id) {
         this.ids.set(id, node);
         return node;
       }
@@ -373,8 +428,9 @@ function cloneInto(node, document, deep) {
   if (node.nodeType === TEXT) return new IRText(document, node.data);
   if (node.nodeType !== ELEMENT) throw new Error('ir-document: can only clone elements and text');
   const copy = new IRElement(document, node.localName);
-  for (const [name, value] of node.attrs) copy.attrs.set(name, value);
-  const id = copy.attrs.get('id');
+  copy.shape = node.shape;
+  copy.values = node.values.slice();
+  const id = copy.attr('id');
   if (id !== undefined && !document.ids.has(id)) document.ids.set(id, copy);
   if (deep) {
     for (const child of node.childNodes) {
@@ -387,31 +443,33 @@ function cloneInto(node, document, deep) {
   return copy;
 }
 
+// One handler for every element's dataset; the proxy's target is the element.
+const DATASET = {
+  get(element, property) {
+    return typeof property === 'string' ? element.attr(dataAttribute(property)) : undefined;
+  },
+  set(element, property, value) {
+    element.setAttribute(dataAttribute(property), value);
+    return true;
+  },
+  deleteProperty(element, property) {
+    element.removeAttribute(dataAttribute(property));
+    return true;
+  },
+  has(element, property) {
+    return typeof property === 'string' && element.shape.index.has(dataAttribute(property));
+  },
+  ownKeys(element) {
+    return element.shape.names.filter(name => name.startsWith('data-')).map(camelName);
+  },
+  getOwnPropertyDescriptor(element, property) {
+    const value = typeof property === 'string' ? element.attr(dataAttribute(property)) : undefined;
+    return value === undefined ? undefined : { value, writable: true, enumerable: true, configurable: true };
+  },
+};
+
 function datasetOf(element) {
-  return new Proxy({}, {
-    get(_, property) {
-      if (typeof property !== 'string') return undefined;
-      return element.attrs.get(dataAttribute(property));
-    },
-    set(_, property, value) {
-      element.setAttribute(dataAttribute(property), value);
-      return true;
-    },
-    deleteProperty(_, property) {
-      element.removeAttribute(dataAttribute(property));
-      return true;
-    },
-    has(_, property) {
-      return typeof property === 'string' && element.attrs.has(dataAttribute(property));
-    },
-    ownKeys() {
-      return [...element.attrs.keys()].filter(name => name.startsWith('data-')).map(camelName);
-    },
-    getOwnPropertyDescriptor(_, property) {
-      const value = typeof property === 'string' ? element.attrs.get(dataAttribute(property)) : undefined;
-      return value === undefined ? undefined : { value, writable: true, enumerable: true, configurable: true };
-    },
-  });
+  return new Proxy(element, DATASET);
 }
 
 function escapeAttribute(value) {
@@ -536,7 +594,7 @@ function matchCompound(element, compound, scope) {
   if (compound.tag && element.localName !== compound.tag) return false;
   if (compound.scope && element !== scope) return false;
   for (const { name, op, value } of compound.attributes) {
-    const actual = element.attrs.get(name);
+    const actual = element.attr(name);
     if (actual === undefined) return false;
     if (op === '=' && actual !== value) return false;
     if (op === '^=' && !actual.startsWith(value)) return false;
