@@ -4,7 +4,7 @@ export { linkDeclarations } from './bindings/link.js';
 
 import {
   glueIsEmpty, glueModuleSource, importObjectFromEval, importObjectFromGlue,
-  liveGlueFields, readRuntimeSpec, utuRuntimeImports, exceptionImports,
+  liveGlueFields, readRuntimeSpec, utuRuntimeImports, exceptionImports, memoryImports, memoriesAreHosted,
 } from './runtime/host-imports.js';
 
 export { createCompiler, initParser } from './compiler/compiler.js';
@@ -100,6 +100,8 @@ export async function buildImportObject(doc, options = {}) {
   const imports = glue ? importObjectFromGlue(spec, glue) : importObjectFromEval(spec);
 
   addClosureRuntime(imports, root);
+  const mems = readRuntimeSpec(root, 'mems');
+  if (memoriesAreHosted(mems)) imports.utu = memoryImports(mems, imports.utu ?? {});
   if (live ? live.has('js_tag') : root?.querySelector('ir-try')) imports.utu = exceptionImports(imports.utu ?? {});
   return imports;
 }

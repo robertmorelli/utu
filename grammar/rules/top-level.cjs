@@ -12,6 +12,8 @@ exports.buildTopLevelRules = function buildTopLevelRules() {
         $.fn_decl,
         $.op_decl,
         seq($.global_decl, ';'),
+        seq($.mem_decl, ';'),
+        seq($.distinct_decl, ';'),
         $.export_lib_decl,
         $.export_main_decl,
         $.test_decl,

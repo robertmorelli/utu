@@ -3002,6 +3002,32 @@
     }
   },
   {
+    "type": "distinct_decl",
+    "named": true,
+    "fields": {
+      "base": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_ident",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_ident",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "dsl_expr",
     "named": true,
     "fields": {},
@@ -3210,7 +3236,18 @@
   {
     "type": "enum_decl",
     "named": true,
-    "fields": {},
+    "fields": {
+      "repr": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "type_ident",
+            "named": true
+          }
+        ]
+      }
+    },
     "children": {
       "multiple": true,
       "required": true,
@@ -6065,7 +6102,7 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
@@ -6078,6 +6115,10 @@
         },
         {
           "type": "int_lit",
+          "named": true
+        },
+        {
+          "type": "type_ident",
           "named": true
         }
       ]
@@ -6093,6 +6134,228 @@
       "types": [
         {
           "type": "block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "mem_decl",
+    "named": true,
+    "fields": {
+      "const": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "const",
+            "named": false
+          }
+        ]
+      },
+      "export": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "export",
+            "named": false
+          }
+        ]
+      },
+      "init": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "alt_expr",
+            "named": true
+          },
+          {
+            "type": "array_expr",
+            "named": true
+          },
+          {
+            "type": "assert_expr",
+            "named": true
+          },
+          {
+            "type": "assign_expr",
+            "named": true
+          },
+          {
+            "type": "await_expr",
+            "named": true
+          },
+          {
+            "type": "binary_expr",
+            "named": true
+          },
+          {
+            "type": "bind_expr",
+            "named": true
+          },
+          {
+            "type": "block_expr",
+            "named": true
+          },
+          {
+            "type": "break_expr",
+            "named": true
+          },
+          {
+            "type": "call_expr",
+            "named": true
+          },
+          {
+            "type": "closure_expr",
+            "named": true
+          },
+          {
+            "type": "continue_expr",
+            "named": true
+          },
+          {
+            "type": "defer_expr",
+            "named": true
+          },
+          {
+            "type": "dsl_expr",
+            "named": true
+          },
+          {
+            "type": "else_expr",
+            "named": true
+          },
+          {
+            "type": "fatal_expr",
+            "named": true
+          },
+          {
+            "type": "field_expr",
+            "named": true
+          },
+          {
+            "type": "for_expr",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "if_expr",
+            "named": true
+          },
+          {
+            "type": "implicit_struct_init",
+            "named": true
+          },
+          {
+            "type": "index_expr",
+            "named": true
+          },
+          {
+            "type": "iterator_expr",
+            "named": true
+          },
+          {
+            "type": "literal",
+            "named": true
+          },
+          {
+            "type": "loop_match_expr",
+            "named": true
+          },
+          {
+            "type": "match_expr",
+            "named": true
+          },
+          {
+            "type": "new_expr",
+            "named": true
+          },
+          {
+            "type": "null_expr",
+            "named": true
+          },
+          {
+            "type": "optional_field_expr",
+            "named": true
+          },
+          {
+            "type": "paren_expr",
+            "named": true
+          },
+          {
+            "type": "pipe_expr",
+            "named": true
+          },
+          {
+            "type": "promote_expr",
+            "named": true
+          },
+          {
+            "type": "promoted_module_call_expr",
+            "named": true
+          },
+          {
+            "type": "prune_expr",
+            "named": true
+          },
+          {
+            "type": "range_expr",
+            "named": true
+          },
+          {
+            "type": "return_expr",
+            "named": true
+          },
+          {
+            "type": "slice_expr",
+            "named": true
+          },
+          {
+            "type": "struct_init",
+            "named": true
+          },
+          {
+            "type": "try_expr",
+            "named": true
+          },
+          {
+            "type": "tuple_expr",
+            "named": true
+          },
+          {
+            "type": "type_member_expr",
+            "named": true
+          },
+          {
+            "type": "unary_expr",
+            "named": true
+          },
+          {
+            "type": "while_expr",
+            "named": true
+          },
+          {
+            "type": "yield_expr",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "type_ident",
           "named": true
         }
       ]
@@ -8784,6 +9047,10 @@
           "named": true
         },
         {
+          "type": "distinct_decl",
+          "named": true
+        },
+        {
           "type": "enum_decl",
           "named": true
         },
@@ -8801,6 +9068,10 @@
         },
         {
           "type": "global_decl",
+          "named": true
+        },
+        {
+          "type": "mem_decl",
           "named": true
         },
         {
@@ -9428,7 +9699,22 @@
   {
     "type": "variant",
     "named": true,
-    "fields": {},
+    "fields": {
+      "value": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "-",
+            "named": false
+          },
+          {
+            "type": "int_lit",
+            "named": true
+          }
+        ]
+      }
+    },
     "children": {
       "multiple": true,
       "required": true,
@@ -10095,6 +10381,10 @@
     "extra": true
   },
   {
+    "type": "const",
+    "named": false
+  },
+  {
     "type": "continue",
     "named": false
   },
@@ -10108,6 +10398,10 @@
   },
   {
     "type": "defer",
+    "named": false
+  },
+  {
+    "type": "distinct",
     "named": false
   },
   {
@@ -10244,6 +10538,10 @@
   },
   {
     "type": "measure",
+    "named": false
+  },
+  {
+    "type": "mem",
     "named": false
   },
   {

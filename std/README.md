@@ -20,3 +20,9 @@ adopt a float type from context (`let x: F64 = 1`).
 
 Regenerate the browser declarations with `bun run bindings:browser`, then build
 with `bun run build`. See [the declaration guide](../docs/typescript-abi.md).
+
+`std:IntMap` maps `I32` keys to `I32` values (`set`, `get(key, missing)`, `has`,
+`len`). `std:Interner` gives byte strings dense ids in first-seen order: call
+`begin()`, `byte(b)` for each byte (from a mem, an array, or a string), then
+`finish()`; the same bytes always get the same id. `size`, `byte_at`, and `ascii`
+read a key back.

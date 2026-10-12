@@ -30,6 +30,7 @@ import { linkTypeDecls } from '../link-type-decls.js';
 import { retainedGraphs } from '../graph-store.js';
 import { ensureBackendPlan } from '../backend-plan.js';
 import { unwrapNullable } from '../type-strings.js';
+import { declareMemoryGlobals, moduleWithMemories, readMems } from './memories.js';
 
 const MODULE_REQUIREMENTS = new WeakMap();
 
@@ -39,7 +40,7 @@ const MODULE_REQUIREMENTS = new WeakMap();
  * @returns {object}      a binaryen Module — caller is responsible for dispose()
  */
 export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
-  const m = new binaryen.Module();
+  const m = moduleWithMemories(readMems(doc.body.firstChild));
   try {
     populateModule(m, doc, { artifacts, sourceMap });
     return m;
@@ -57,6 +58,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
   m.setFeatures(
     binaryen.Features.MutableGlobals |
     binaryen.Features.BulkMemory |
+    binaryen.Features.MultiMemory |
     binaryen.Features.NontrappingFPToInt |
     binaryen.Features.ExceptionHandling |
     binaryen.Features.GC |
@@ -131,6 +133,8 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
     const result = toType(spec.result ?? 'void');
     m.addFunctionImport(spec.localName ?? spec.name, spec.module, spec.name, params, result);
   }
+
+  declareMemoryGlobals(m, readMems(root));
 
   // Host closure imports must exist before any body that calls them.
   installClosureImports(m, root, ctx);

@@ -46,7 +46,7 @@ export function matchScalarIntrinsic(localName, scalarRegistry) {
 // emitted by codegen.  Kept here so `isIntrinsicOp` recognises them as
 // wrappers and the caller produces a clear "not yet" error instead of a
 // misleading "unhandled IR node" message from the generic dispatcher.
-const REF_TAG_PREFIXES = ['ir-i31-', 'ir-ref-', 'ir-string-', 'ir-v128-', 'ir-array-'];
+const REF_TAG_PREFIXES = ['ir-i31-', 'ir-ref-', 'ir-string-', 'ir-v128-', 'ir-array-', 'ir-mem-'];
 const EMITTED_REF_OPS = new Set([
   'ir-i31-new', 'ir-i31-get-s', 'ir-i31-get-u', 'ir-ref-eq', 'ir-ref-ne',
   'ir-promise-then', 'ir-promise-catch',

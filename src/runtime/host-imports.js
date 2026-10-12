@@ -84,6 +84,58 @@ export function closureImports(closureSpec, utu = {}) {
   return utu;
 }
 
+// The typed array each mem kind reads as.
+const MEM_ARRAYS = {
+  U8: 'Uint8Array', I8: 'Int8Array', U16: 'Uint16Array', I16: 'Int16Array', I32: 'Int32Array',
+  U32: 'Uint32Array', I64: 'BigInt64Array', U64: 'BigUint64Array', F32: 'Float32Array', F64: 'Float64Array',
+};
+
+/**
+ * Mems the host reads and writes (`copy_in`, `view`). Their memories are
+ * created here and imported by the module, so these functions hold the memory
+ * itself and need no reference to the instance.
+ *
+ *   copy_in(bytes)    copy an ArrayBuffer, a typed array, or a string (as UTF-8)
+ *                     into the mem from element 0; returns the new length
+ *   view(start, end)  a typed array over elements [start, end), sharing memory
+ *
+ * @param {Array<{name: string, kind: string, host?: boolean}>} mems  parsed `data-mems`
+ */
+export function memoryImports(mems, utu = {}) {
+  const PAGE = 65536;
+  for (const { name, kind, host, data } of mems ?? []) {
+    if (!host) continue;
+    // An initialized mem's data segment must fit when the module instantiates.
+    const initial = Math.max(1, Math.ceil((data ? (data.length * 3) / 4 : 0) / PAGE));
+    const memory = new WebAssembly.Memory({ initial, maximum: 65535 });
+    const View = globalThis[MEM_ARRAYS[kind]];
+    const size = View.BYTES_PER_ELEMENT;
+    const fit = bytes => {
+      const pages = Math.ceil(bytes / PAGE) - memory.buffer.byteLength / PAGE;
+      if (pages > 0) memory.grow(pages);
+    };
+    utu[`mem_${name}`] = memory;
+    utu[`mem_copy_in_${name}`] = value => {
+      if (typeof value === 'string') {
+        fit(value.length * 3);
+        return Math.floor(new TextEncoder().encodeInto(value, new Uint8Array(memory.buffer)).written / size);
+      }
+      const bytes = value instanceof ArrayBuffer ? new Uint8Array(value)
+        : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      fit(bytes.byteLength);
+      new Uint8Array(memory.buffer).set(bytes);
+      return Math.floor(bytes.byteLength / size);
+    };
+    utu[`mem_view_${name}`] = (start, end) => new View(memory.buffer, start * size, end - start);
+  }
+  return utu;
+}
+
+/** True when some mem is created by the host. */
+export function memoriesAreHosted(mems) {
+  return (mems ?? []).some(mem => mem.host);
+}
+
 /** `try`/`catch` catches host exceptions through the engine's JS exception tag. */
 export function exceptionImports(utu = {}) {
   utu.js_tag = WebAssembly.JSTag;

@@ -33,6 +33,9 @@ export function walkVariant(n, doc, source, dispatch) {
   const node = stamp(el(T.VARIANT, doc), n);
   const children = namedChildren(n);
   if (children[0]) node.setAttribute('name', text(children[0]));
+  // `= -5` puts both tokens under the field.
+  const value = n.childrenForFieldName('value').map(text).join('');
+  if (value) node.setAttribute('value', value);
   for (const child of children.slice(1)) {
     if (child.type === 'field') {
       node.appendChild(walkField(child, doc, source, dispatch));

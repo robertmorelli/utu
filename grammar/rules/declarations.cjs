@@ -67,12 +67,18 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
       seq(
         optional($.nom_qualifier),
         'enum',
+        // `enum(U8) Tag:` is an integer enum: field-less variants stored as U8.
+        optional(seq('(', field('repr', $.type_ident), ')')),
         choice($.type_ident, $.promoted_type),
         optional($.impl_list),
         ':',
         repeat(seq('|', $.variant)),
       ),
-    variant: ($) => seq($.type_ident, optional(seq('{', optional($.field_list), '}'))),
+    variant: ($) => seq($.type_ident, optional(choice(
+      seq('{', optional($.field_list), '}'),
+      // An integer enum's variant may set its value: `| Eof = 255`.
+      seq('=', field('value', seq(optional('-'), $.int_lit))),
+    ))),
 
     // Functions: fn name self? ( params? ) return_type block
     fn_decl: ($) =>
@@ -98,6 +104,20 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
 
     // Global constant
     global_decl: ($) => seq('let', $.identifier, ':', $._type, '=', $._expr),
+    // `mem name: U8;` declares a resizable array of scalars that is its own
+    // linear memory. `export mem` also exports that memory to the host.
+    // `type NodeId = distinct I32;` is a new type with I32's representation:
+    // a NodeId is not an I32, and converts only through from_i32/to_i32.
+    distinct_decl: ($) => seq('type', field('name', $.type_ident), '=', 'distinct', field('base', $.type_ident)),
+    // `const mem` rejects writes. An initializer fills it when the module is
+    // instantiated: `= [1, 2, 3]`, `= @embed/\ file.bin \/`, or
+    // `= @comptime/\ build() \/`, which runs build() during compilation.
+    mem_decl: ($) => seq(
+      optional(field('export', 'export')),
+      optional(field('const', 'const')),
+      'mem', $.identifier, ':', $.type_ident,
+      optional(seq('=', field('init', $._expr))),
+    ),
 
     // Using: cross-file imports and within-file aliases
     using_decl: ($) =>

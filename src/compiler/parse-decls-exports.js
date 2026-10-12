@@ -35,6 +35,33 @@ export function walkGlobalDecl(n, doc, source, dispatch) {
   return node;
 }
 
+export function walkDistinctDecl(n, doc, source, dispatch) {
+  const node = stamp(el(T.DISTINCT, doc), n);
+  const name = n.childForFieldName('name');
+  const base = n.childForFieldName('base');
+  if (name) {
+    node.setAttribute('name', text(name));
+    stampNameRange(node, name);
+  }
+  if (base) node.setAttribute('base', text(base));
+  return node;
+}
+
+export function walkMemDecl(n, doc, source, dispatch) {
+  const node = stamp(el(T.MEM, doc), n);
+  const [name, kind] = namedChildren(n);
+  if (name) {
+    node.setAttribute('name', text(name));
+    stampNameRange(node, name);
+  }
+  if (kind) node.setAttribute('kind', text(kind));
+  if (n.childForFieldName('export')) node.setAttribute('export', 'true');
+  if (n.childForFieldName('const')) node.setAttribute('const', 'true');
+  const init = n.childForFieldName('init');
+  if (init) node.appendChild(dispatch(init, doc, source));
+  return node;
+}
+
 export function walkExportLibDecl(n, doc, source, dispatch) {
   const node = stamp(el(T.EXPORT_LIB, doc), n);
   append(node, walkChildren(n, doc, source, dispatch));

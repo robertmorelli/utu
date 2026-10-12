@@ -7,6 +7,7 @@ import {
   matchScalarIntrinsic,
 } from './intrinsics.js';
 import { emitClosureCall, emitFunCall } from './closures.js';
+import { emitMemIntrinsic, isMemIntrinsic } from './memories.js';
 import { callableParts } from '../type-rules.js';
 import { typeNodeToStr } from '../ir-helpers.js';
 
@@ -16,7 +17,11 @@ export function emitCall(node, ctx, emitExpr) {
   // Calling a callable *value* rather than a named function.  `fun` is a wasm
   // function reference, so the call stays inside wasm via call_ref; `cl` is a
   // JS function, so the call goes out through a per-signature host import.
-  const calleeParts = callableParts(ctx.typeOf(node.firstElementChild));
+  // A named intrinsic wrapper is inlined even though its name, used as a value,
+  // has a `fun` type: the wrapper itself is never emitted.
+  const named = node.firstElementChild?.localName === 'ir-ident' ? resolveCallTarget(node, ctx) : null;
+  const calleeParts = named && describeIntrinsicWrapper(named, ctx.scalarKinds)
+    ? null : callableParts(ctx.typeOf(node.firstElementChild));
   if (calleeParts) {
     return calleeParts.kind === 'fun'
       ? emitFunCall(node, calleeParts, ctx, emitExpr)
@@ -48,6 +53,7 @@ export function emitCall(node, ctx, emitExpr) {
     ctx.currentCall = node;
     try {
       if (flat) return emitIntrinsic(intr.op, callArgNodes, ctx, emitExpr);
+      if (isMemIntrinsic(intr.op)) return emitMemIntrinsic(intr.op, callArgNodes, ctx, emitExpr);
       // Tree-shaped wrapper: body has real wasm ops combined with literals
       // and placeholders (e.g. neg = <ir-i32-sub><ir-lit 0/><ir-ident a/>).
       // Walk the body via `emitExpr` with the param→callArg substitution

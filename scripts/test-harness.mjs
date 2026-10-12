@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createCompiler, initParser } from '../src/index.js';
+import { nodePackageResolver } from '../tools/dts/packages.mjs';
 
 export function assert(cond, msg) {
   if (!cond) throw new Error(msg ?? 'assertion failed');
@@ -38,7 +39,9 @@ export async function makeCompiler({ ROOT, target, debugAssertions = false }) {
     target,
     debugAssertions,
     readFile: (p) => fs.readFile(p, 'utf8'),
+    readBinaryFile: (p) => fs.readFile(p),
     resolvePath: (from, rel) => path.resolve(path.dirname(from), rel),
+    resolvePackage: nodePackageResolver({ root: ROOT }),
   });
 }
 

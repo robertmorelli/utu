@@ -76,6 +76,7 @@ async function makeCompiler(target = 'analysis', optimize = 'size') {
     target,
     optimize,
     readFile: (file) => fs.readFile(file, 'utf8'),
+    readBinaryFile: (file) => fs.readFile(file),
     resolvePath: (fromFile, importPath) => path.resolve(path.dirname(fromFile), importPath),
     resolvePackage: lazyPackageResolver(),
   });
@@ -163,6 +164,7 @@ async function buildExe(compiler, file, args) {
   const root = doc.body.firstChild;
   const importSpec = JSON.parse(root?.dataset?.dslImportsJs || '{}');
   const declaredClosures = JSON.parse(root?.dataset?.closureRuntime || 'null');
+  const mems = JSON.parse(root?.dataset?.mems || '[]').filter(mem => mem.host);
   // Build inside the project when it has dependencies, so `bun build` resolves
   // an `@es` body's bare specifiers exactly as the project's own source would
   // and bundles the result into the executable. Projects without dependencies
@@ -178,7 +180,7 @@ async function buildExe(compiler, file, args) {
     calls: (declaredClosures?.calls ?? []).filter(name => live.has(name)) };
   if (glue) await fs.writeFile(path.join(dir, 'glue.mjs'), glue);
   const tmp = path.join(dir, 'runner.mjs');
-  await fs.writeFile(tmp, runnerSource(wasm, fields, closureSpec, Boolean(glue)));
+  await fs.writeFile(tmp, runnerSource(wasm, fields, closureSpec, Boolean(glue), mems));
 
   const result = spawnSync('bun', ['build', tmp, '--compile', '--outfile', out], {
     cwd: process.cwd(),
@@ -211,13 +213,14 @@ async function buildDirectory() {
 // into the executable.
 // Only the pieces the program uses are imported, so a binary that needs no
 // closures and no promises carries none of that runtime.
-function runnerSource(wasm, importSpec, closureSpec, hasGlue) {
+function runnerSource(wasm, importSpec, closureSpec, hasGlue, mems = []) {
   const runtime = JSON.stringify(path.join(ROOT, 'src', 'runtime', 'host-imports.js'));
   const needsRuntime = !runtimeIsEmpty(closureSpec, null);
   const parts = [
     hasGlue && `import { importObjectFromGlue } from ${runtime};`,
     hasGlue && `import * as glue from './glue.mjs';`,
     needsRuntime && `import { closureImports } from ${runtime};`,
+    mems.length && `import { memoryImports } from ${runtime};`,
   ].filter(Boolean);
   return `#!/usr/bin/env bun
 ${parts.join('\n')}
@@ -229,6 +232,7 @@ ${hasGlue
 ${needsRuntime
     ? `imports.utu = closureImports(${JSON.stringify(closureSpec)});`
     : ''}
+${mems.length ? `imports.utu = memoryImports(${JSON.stringify(mems)}, imports.utu ?? {});` : ''}
 const compiled = await WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" });
 const instance = await WebAssembly.instantiate(compiled, imports);
 if (typeof instance.exports.main === 'function') {

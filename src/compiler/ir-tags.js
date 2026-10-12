@@ -93,6 +93,8 @@ export const T = Object.freeze({
   DEFER:          'ir-defer',           // defer expr: run at enclosing block exit
   YIELD:          'ir-yield',           // yield expr inside a generator (expanded before typing)
   FATAL:          'ir-fatal',           // fatal
+  DISTINCT:       'ir-distinct',        // type Name = distinct Base (lowered into a scalar module before elaboration)
+  MEM:            'ir-mem',             // mem name: Kind (lowered into wrapper modules before elaboration)
   PRUNE:          'ir-prune',           // prune: skip a recursive generator's subtree (expanded before typing)
 
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }

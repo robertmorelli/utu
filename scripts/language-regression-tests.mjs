@@ -12,6 +12,7 @@ async function instantiateAt(ROOT, name, source, optimize) {
   const compiler = createCompiler({
     parser, target: 'normal', optimize,
     readFile: file => fs.readFile(file, 'utf8'),
+    readBinaryFile: file => fs.readFile(file),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
   });
   return withTempUtu(ROOT, name, source, async (file) => {
@@ -574,6 +575,287 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     `});
     const spec = readRuntimeSpec(doc.body.firstChild, 'promiseRuntime');
     assertEq(await promisifyExports(instance, spec).total(4), 60);
+  });
+
+  test('mem: module-level scalar arrays are linear memories that grow, narrow, and reach the host', async ({ ROOT }) => {
+    const source = `
+      export mem text: U8;
+      mem signed: I8;
+      mem half: U16;
+      mem floats: F32;
+      mem ids: U32;
+      mem wide: I64;
+      fn evens(n: I32) yield I32 { for (0..<n) |i| { if i % 2 == 0 { yield i; }; }; }
+      export lib {
+          fn fill(n: I32) I32 { text.clear(); for (0..<n) |i| { text.push(97 + i % 26); }; text.len(); }
+          fn count(c: I32) I32 { let k = 0; for (0..<text.len()) |i| { if text[i] == c { k += 1; }; }; k; }
+          fn set_len(n: I32) void { text.resize(n); }
+          fn capacity(n: I32) I32 { text.reserve(n); text.cap(); }
+          fn truncate() I32 { text.resize(3); text[0] = 300; text[1] += 10; text[2] = text[text[0] - 44]; text[0] * 10000 + text[1] * 100 + text[2]; }
+          fn sign() I32 { signed.resize(2); signed[0] = 200; signed[1] = -3; signed[0] * 1000 + signed[1]; }
+          fn halves() I32 { half.clear(); half.push(70000); half.push(65535); half[0] * 100000 + half[1]; }
+          fn floaty() F32 { floats.clear(); floats.push(1.25); floats[0] += 2.5; floats[0]; }
+          fn unsigned() U32 { ids.clear(); ids.push(7); ids[0]; }
+          fn big() I64 { wide.resize(4); wide[3] = 1 << 40; wide[3] + wide.len().to_i64(); }
+          fn shadow(text: I32) I32 { let half = text + 1; half; }
+          fn generated() I32 { ids.clear(); for (evens(10)) |e| { ids.push(e.to_u32()); }; ids.len(); }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `mems_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      assertEq(e.fill(100000), 100000, `fill at ${optimize}`);
+      assertEq(e.count(97), 3847, `count at ${optimize}`);
+      assertEq(new TextDecoder().decode(new Uint8Array(e.text.buffer, 0, 5)), 'abcde', `host view at ${optimize}`);
+      const written = new TextEncoder().encodeInto('hello wasm', new Uint8Array(e.text.buffer)).written;
+      e.set_len(written);
+      assertEq(e.count('l'.charCodeAt(0)), 2, `host write at ${optimize}`);
+      assertEq(e.capacity(1 << 20), 1 << 20, `reserve at ${optimize}`);
+      assertEq(e.text.buffer.byteLength, 1 << 20, `memory size at ${optimize}`);
+      assertEq(e.truncate(), 440000 + 11100 + 44, `U8 keeps the low byte at ${optimize}`);
+      assertEq(e.sign(), -56003, `I8 sign-extends at ${optimize}`);
+      assertEq(e.halves(), 446465535, `U16 at ${optimize}`);
+      assertEq(e.floaty(), 3.75, `F32 at ${optimize}`);
+      assertEq(e.unsigned(), 7, `U32 at ${optimize}`);
+      assertEq(e.big(), (1n << 40n) + 4n, `I64 at ${optimize}`);
+      assertEq(e.shadow(4), 5, `locals shadow mems at ${optimize}`);
+      assertEq(e.generated(), 5, `mems inside generator consumers at ${optimize}`);
+    }
+  });
+
+  test('mem: initializers fill memories from literals, files, and @comptime; const rejects writes', async ({ ROOT }) => {
+    const os = await import('node:os');
+    const table = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'utu-embed-')), 'pairs.bin');
+    await fs.writeFile(table, Uint8Array.from([5, 0, 7, 0]));
+    const source = `
+      const mem prec: U8 = [0, 1, 1, 2, 255];
+      mem neg: I16 = [-3, 7];
+      const mem halves: F64 = [0.5, -1.25];
+      const mem wide: U64 = [18446744073709551615];
+      const mem pairs: U16 = @embed/\\ ${table} \\/;
+      const mem squares: I32 = @comptime/\\ make_squares(1000) \\/;
+      const mem dfa: U8 = @comptime/\\ digits() \\/;
+      fn make_squares(n: I32) Array[I32] {
+          let out = Array[I32].new(n, 0);
+          for (0..<n) |i| { out[i] = i * i; };
+          out;
+      }
+      // Four states: digits count up to three, anything else resets.
+      fn digits() Array[I32] {
+          let t = Array[I32].new(4 * 256, 0);
+          for (0..<4) |s| {
+              for (48..<58) |c| { t[s * 256 + c] = if s == 3 { 3; } else { s + 1; }; };
+          };
+          t;
+      }
+      export lib {
+          fn lengths() I32 { prec.len() * 1000 + neg.len() * 100 + squares.len(); }
+          fn literal() I32 { neg[0] -= 1; prec[4] * 1000 + neg[0]; }
+          fn floats() F64 { halves[0] + halves[1]; }
+          fn top() U64 { wide[0]; }
+          fn embedded() I32 { pairs[0] * 10 + pairs[1]; }
+          fn summed() I32 { let s = 0; for (0..<squares.len()) |i| { s += squares[i]; }; s; }
+          fn scan() I32 { let st = 0; for ([49, 50, 51, 120, 57, 57]) |c| { st = dfa[st * 256 + c]; }; st; }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `mem_init_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      assertEq(e.lengths(), 5000 + 200 + 1000, `lengths at ${optimize}`);
+      assertEq(e.literal(), 255000 - 4, `literals at ${optimize}`);
+      assertEq(e.floats(), -0.75, `F64 literals at ${optimize}`);
+      assertEq(BigInt.asUintN(64, e.top()), 2n ** 64n - 1n, `U64 literals at ${optimize}`);
+      assertEq(e.embedded(), 57, `@embed at ${optimize}`);
+      assertEq(e.summed(), 332833500, `@comptime squares at ${optimize}`);
+      assertEq(e.scan(), 2, `@comptime DFA at ${optimize}`);
+    }
+  });
+
+  test('mem: copy_in and view move bytes between mems and JavaScript', async ({ ROOT }) => {
+    const source = `
+      using JS from std:JS;
+      mem text: U8;
+      mem out: U8;
+      mem samples: F32;
+      export lib {
+          fn load(bytes: Externref) I32 { text.copy_in(bytes); text.len(); }
+          fn spaces() I32 { let k = 0; for (0..<text.len()) |i| { if text[i] == 32 { k += 1; }; }; k; }
+          fn shout() JS.Uint8Array {
+              out.resize(text.len());
+              for (0..<text.len()) |i| { let c = text[i]; out[i] = if c >= 97 and c <= 122 { c - 32; } else { c; }; };
+              out.view(0, out.len());
+          }
+          fn floats() JS.Float32Array { samples.clear(); samples.push(1.5); samples.push(-2.0); samples.view(0, 2); }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `mem_host_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      assertEq(e.load('héllo wasm world'), 17, `strings arrive as UTF-8 at ${optimize}`);
+      assertEq(e.spaces(), 2, `copied bytes at ${optimize}`);
+      assertEq(new TextDecoder().decode(e.shout()), 'HéLLO WASM WORLD', `views at ${optimize}`);
+      const big = new Uint8Array(200000).fill(32);
+      assertEq(e.load(big), 200000, `copy_in grows the memory at ${optimize}`);
+      assertEq(e.spaces(), 200000, `large copies at ${optimize}`);
+      assertEq([...e.floats()].join(','), '1.5,-2', `F32 views at ${optimize}`);
+    }
+  });
+
+  test('enums: integer enums store in mems and dispatch through match and loop match', async ({ ROOT }) => {
+    const source = `
+      enum(U8) Tag:
+          | Leaf
+          | Unary
+          | Binary
+          | Eof = 255
+      enum(I8) Sign:
+          | Minus = -1
+          | Zero
+          | Plus
+      mem tags: Tag;
+      fn weight(t: Tag) I32 { match t { Tag.Leaf => 1, Tag.Unary => 10, Tag.Binary => 100, Tag.Eof => 1000, }; }
+      export lib {
+          fn stored() I32 {
+              tags.clear();
+              tags.push(Tag.Binary);
+              tags.push(Tag.Leaf);
+              tags.push(Tag.Eof);
+              let total = 0;
+              for (0..<tags.len()) |i| { total += weight(tags[i]); };
+              total;
+          }
+          fn machine() I32 {
+              let state: Tag = Tag.Leaf;
+              let steps = 0;
+              loop match state {
+                  Tag.Leaf => { steps += 1; continue Tag.Unary; },
+                  Tag.Unary => { steps += 10; let next: Tag = Tag.Binary; continue next; },
+                  Tag.Binary => { steps += 100; break; },
+                  ~> {},
+              };
+              steps;
+          }
+          fn values() I32 { Tag.Eof.to_i32() * 100 + Sign.Minus.to_i32() * 10 + Sign.Plus.to_i32() + Tag.count() * 100000; }
+          fn ordered() Bool { Tag.Leaf < Tag.Eof and Sign.Minus < Sign.Zero and Tag.Unary == Tag.from_i32(1); }
+          fn names() I32 { Tag.name(Tag.Binary).len() * 10 + Tag.name(Tag.from_i32(9)).len(); }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `int_enums_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      assertEq(e.stored(), 1101, `stored at ${optimize}`);
+      assertEq(e.machine(), 111, `loop match at ${optimize}`);
+      assertEq(e.values(), 25500 - 10 + 1 + 400000, `values at ${optimize}`);
+      assertEq(e.ordered(), 1, `ordering at ${optimize}`);
+      assertEq(e.names(), 61, `names at ${optimize}`);
+    }
+  });
+
+  test('distinct: distinct types keep their representation and are not their base', async ({ ROOT }) => {
+    const source = `
+      type NodeId = distinct I32;
+      type Weight = distinct F64;
+      type Big = distinct U64;
+      mem lhs: NodeId;
+      fn child(id: NodeId) NodeId { lhs[id.to_i32()]; }
+      export lib {
+          fn walk() I32 {
+              lhs.clear();
+              lhs.push(NodeId.from_i32(2));
+              lhs.push(NodeId.from_i32(0));
+              lhs.push(NodeId.from_i32(1));
+              child(child(NodeId.from_i32(0))).to_i32();
+          }
+          fn zero() F64 { 1.0 / Weight.from_f64(-0.0).to_f64(); }
+          fn unsigned() Bool { Big.from_u64(1) < Big.from_u64(18446744073709551615); }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `distinct_${optimize}.utu`, source, optimize);
+      assertEq(instance.exports.walk(), 1, `walk at ${optimize}`);
+      assertEq(instance.exports.zero(), -Infinity, `-0 survives at ${optimize}`);
+      assertEq(instance.exports.unsigned(), 1, `unsigned order at ${optimize}`);
+    }
+  });
+
+  test('std: IntMap and Interner', async ({ ROOT }) => {
+    const source = `
+      using IntMap from std:IntMap;
+      using Interner from std:Interner;
+      mem src: U8 = [102, 111, 111, 32, 98, 97, 114, 32, 102, 111, 111, 32, 98, 97, 122, 32, 98, 97, 114];
+      export lib {
+          fn words() I32 {
+              let names = Interner.new();
+              let counts = IntMap.new();
+              let start = 0;
+              let seen = 0;
+              for (0..<src.len() + 1) |i| {
+                  if i == src.len() or src[i] == 32 {
+                      names.begin();
+                      for (start..<i) |k| { names.byte(src[k]); };
+                      let id = names.finish();
+                      seen = seen * 10 + id;
+                      counts.set(id, counts.get(id, 0) + 1);
+                      start = i + 1;
+                  };
+              };
+              let same = if names.ascii(2) == "baz" and names.size(1) == 3 and names.byte_at(1, 2) == 114 { 1; } else { 0; };
+              seen * 1000 + names.len() * 100 + counts.get(0, 0) * 10 + same;
+          }
+          fn many() I32 {
+              let m = IntMap.new();
+              for (0..<100000) |n| { m.set(n * 7919, n); };
+              let bad = 0;
+              for (0..<100000) |n| { if m.get(n * 7919, -1) != n { bad += 1; }; };
+              if m.has(3) { bad += 1; };
+              let ids = Interner.new();
+              for (0..<10000) |n| {
+                  let k = n % 5000;
+                  ids.begin();
+                  ids.byte(k & 255);
+                  ids.byte(k >> 8);
+                  if ids.finish() != k { bad += 1; };
+              };
+              bad * 1000000 + m.len() / 100 + ids.len();
+          }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `std_maps_${optimize}.utu`, source, optimize);
+      assertEq(instance.exports.words(), 1021321, `words at ${optimize}`);
+      assertEq(instance.exports.many(), 1000 + 5000, `growth at ${optimize}`);
+    }
+  });
+
+  test('mem: misuse is diagnosed', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    const cases = [
+      ['mem s: Str;\nexport main() I32 { 1; }', 'a mem holds an integer enum, a distinct type, or one of'],
+      ['mem s: U8;\nmem s: U8;\nexport main() I32 { 1; }', 'mem s is declared twice'],
+      ['mem s: U8;\nfn s() I32 { 1; }\nexport main() I32 { 1; }', 'mem s has the same name as a top-level function'],
+      ['mem s: U8;\nexport main() I32 { s.pop(); 1; }', "mem s has no method 'pop'"],
+      ['mem s: U8;\nexport main() I32 { let t = s; 1; }', 'mem s is not a value'],
+      ['mem s: U8;\nexport main() I32 { s[0, 1]; 1; }', 'mem s takes one index'],
+      ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'expected I32, got F64'],
+      ['const mem s: U8 = [1];\nexport main() I32 { s[0] = 2; 1; }', 'mem s is const; it cannot be written'],
+      ['const mem s: U8 = [1];\nexport main() I32 { s.push(2); 1; }', 'mem s is const; it has no push'],
+      ['mem s: U8 = [256];\nexport main() I32 { 1; }', 'element 0 (256) does not fit in U8'],
+      ['mem s: U8 = [x];\nexport main() I32 { 1; }', 'an initializer list holds number literals'],
+      ['mem s: U8 = @comptime/\\ nope() \\/;\nexport main() I32 { 1; }', "@comptime: Unknown variable 'nope'"],
+      ['mem s: U8 = @embed/\\ missing.bin \\/;\nexport main() I32 { 1; }', '@embed cannot read missing.bin: ENOENT'],
+      ['mem s: U8;\nexport main() I32 { s.view(0, 1); 1; }', 'add `using JS from std:JS;`'],
+      ['enum(U8) T:\n    | A\n    | B\nfn f(t: T) I32 { match t { T.A => 1, }; }\nexport main() I32 { 1; }', "Missing variant 'B' in match over T"],
+      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { match t { T.A => 1, T.C => 2, ~> 3, }; }\nexport main() I32 { 1; }', 'T has no variant C'],
+      ['enum(U8) T:\n    | A = 300\nexport main() I32 { 1; }', 'T.A = 300 does not fit in U8'],
+      ['enum(U8) T:\n    | A = 1\n    | B = 1\nexport main() I32 { 1; }', 'T.B and T.A are both 1'],
+      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { 1; }\nexport main() I32 { f(0); }', 'expected T, got I32'],
+      ['type N = distinct I32;\nfn f(n: N) I32 { 1; }\nexport main() I32 { f(3); }', 'expected N, got I32'],
+      ['type N = distinct Str;\nexport main() I32 { 1; }', 'a distinct type wraps one of'],
+    ];
+    for (const [source, message] of cases) {
+      const errors = await errorsOf(compiler, ROOT, source);
+      assert(errors.some(e => e.message.includes(message)), `${source}\n  got ${describe(errors)}`);
+    }
   });
 
   test('alt: an exhaustive alt without a default arm yields a value', async ({ ROOT }) => {

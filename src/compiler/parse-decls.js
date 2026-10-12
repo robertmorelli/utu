@@ -4,7 +4,7 @@ import { walkModuleDecl, walkUsingDecl } from './parse-decls-modules.js';
 import { walkEnumDecl, walkProtoDecl, walkStructDecl } from './parse-decls-types.js';
 import { walkFnDecl, walkFnName, walkOpDecl } from './parse-decls-functions.js';
 import {
-  walkBenchDecl, walkExportLibDecl, walkExportMainDecl, walkGlobalDecl,
+  walkBenchDecl, walkExportLibDecl, walkExportMainDecl, walkGlobalDecl, walkMemDecl, walkDistinctDecl,
   walkMeasure, walkTestDecl, walkTypeDecl,
 } from './parse-decls-exports.js';
 import {
@@ -25,6 +25,8 @@ export const walkers = {
   'fn_decl':                walkFnDecl,
   'fn_name':                walkFnName,
   'global_decl':            walkGlobalDecl,
+  'mem_decl':               walkMemDecl,
+  'distinct_decl':          walkDistinctDecl,
   'export_lib_decl':        walkExportLibDecl,
   'export_main_decl':       walkExportMainDecl,
   'test_decl':              walkTestDecl,

@@ -149,3 +149,28 @@ about 60 ms; the remaining gap is the item stack itself. It matches
 or beats the same walk in plain JavaScript, is 10× faster than a closure per
 child, and has no depth limit. Recursion stays the faster way to write a visitor;
 the generator buys depth-first order as a loop with `break` and `prune`.
+
+## Memory arrays — accepted (`memories.mjs`)
+
+```utu
+export mem input: U8;
+export mem table: U8;
+for (0 ..< n) |i| { s = table[(s << 8) + input[i]]; if s == 0 { c += 1; }; };
+```
+
+A `mem` is a top-level scalar array that is its own linear memory. The same
+128-state DFA loop over 16 MiB, with the table and input in different places:
+
+| layout | V8 -Oz | V8 -O3 | JSC -Oz | JSC -O3 |
+| --- | --- | --- | --- | --- |
+| **table and input in mems** | 3.26 | **2.10** | 3.29 | **2.98** |
+| table in a GC `Array[I32]` | 6.35 | 3.30 | 3.89 | 4.87 |
+| input read from a JS string (`Str`) | 2.98 | 3.06 | 6.00 | 5.86 |
+| JavaScript over `Uint8Array`s | 3.61 | | 3.91 | |
+
+ns per byte. Memory loads lean on the engine's guard pages instead of an
+explicit bounds check, and bytes stay bytes (a GC `I32` table is 4× the cache
+footprint). A second, third, or tenth memory costs nothing over memory 0 on
+either engine: in a hand-written module, input and table in separate memories
+measured 3.38 vs 3.32 ns/byte on V8 and 3.23 vs 5.77 on JSC. Host strings are
+only competitive on V8, which inlines `charCodeAt`.

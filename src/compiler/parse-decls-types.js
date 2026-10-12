@@ -42,7 +42,10 @@ export function walkProtoDecl(n, doc, source, dispatch) {
 
 export function walkEnumDecl(n, doc, source, dispatch) {
   const node = stamp(el(T.ENUM, doc), n);
+  const repr = n.childForFieldName('repr');
+  if (repr) node.setAttribute('repr', text(repr));
   for (const child of namedChildren(n)) {
+    if (repr && child.id === repr.id) continue;
     switch (child.type) {
       case 'nom_qualifier':   node.appendChild(walkNomQualifier(child, doc, source, dispatch)); break;
       case 'type_ident':      node.setAttribute('name', text(child)); break;

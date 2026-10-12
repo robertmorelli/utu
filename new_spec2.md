@@ -59,6 +59,43 @@ proto P1:
 
 ---
 
+## Integer enums
+
+`enum(Repr) Name:` declares field-less variants that are small integers, stored
+as `Repr` (`U8 I8 U16 I16 I32 U32`). Values count up from 0, or from the previous
+explicit `= n`.
+
+```
+enum(U8) Tag:
+    | Leaf
+    | Unary
+    | Eof = 255
+
+let t: Tag = Tag.Leaf;
+match t { Tag.Leaf => 1, Tag.Unary => 2, Tag.Eof => 3, };   // exhaustive without ~>
+loop match t { Tag.Leaf => { continue Tag.Unary; }, ~> { break; }, };
+t.to_i32();  Tag.from_i32(1);  Tag.count();  Tag.name(t);    // == != < <= > >= compare values
+```
+
+A `Tag` is not an `I32`. Integer enums can be stored in a `mem` and dispatch
+through `match` and `loop match` (`alt` is for enums whose variants carry data).
+
+---
+
+## Distinct types
+
+`type Name = distinct Base;` is a new type with `Base`'s representation and
+comparisons (`I32 U32 I64 U64 F32 F64`). It converts only explicitly:
+
+```
+type NodeId = distinct I32;
+let id = NodeId.from_i32(3);
+id.to_i32();
+mem lhs: NodeId;            // stored as I32
+```
+
+---
+
 ## Structs
 
 ```
@@ -591,6 +628,69 @@ Str.char(n)       // construct single-char string from code point
 I31.get(x)        // I31 ref unbox
 T1.null           // null reference for type T1
 ```
+
+---
+
+## Memory arrays (`mem`)
+
+A top-level `mem` declares a resizable array of scalars that is its own wasm
+linear memory (multi-memory). It is for bulk data that a hot loop reads: source
+bytes, lexer tables, flat IR columns, buffers handed to the host.
+
+```
+mem src: U8;            // one linear memory, starts empty
+mem node_lhs: I32;
+export mem pixels: F32; // also exported to the host as "pixels"
+
+src.push(b);            // append, growing the memory when full
+let c = src[i];         // read: U8/I8/U16/I16 widen to I32
+src[i] = c;             // write: narrow kinds keep the low bits
+src[i] += 1;            // compound assignment evaluates i once
+src.len();  src.cap();  // elements in use / that fit without growing
+src.reserve(n);         // make n elements fit
+src.resize(n);          // reserve(n), then len = n (contents are kept)
+src.clear();            // len = 0
+```
+
+Element kinds: `U8 I8 U16 I16 I32 U32 I64 U64 F32 F64`, an integer enum (stored
+as its declared integer), or a distinct type (stored as its base). Element `i` is at byte
+`i * size` of its own memory, so a read is one load with no base pointer.
+Reads and writes are **not** checked against `len`: an index past the end of the
+memory traps, and anything below it is an ordinary load or store. Memories only
+grow (doubling), up to 4 GiB each.
+
+An initializer fills a mem when the module is instantiated, from a data
+segment, and sets its length:
+
+```
+const mem prec: U8 = [0, 1, 1, 2];                // number literals
+mem props: U16 = @embed/\ tables/props.bin \/;    // a file's bytes, beside the source
+const mem dfa: U8 = @comptime/\ build_dfa() \/;   // runs during compilation
+```
+
+`@comptime` compiles a copy of the entry file (without its exports, tests, and
+other `@comptime` mems), evaluates the expression to an `Array` of the element's
+value type (`Array[I32]` for the narrow kinds), and embeds the result. A
+`const mem` rejects writes, `push`, `reserve`, `resize`, `clear`, and `copy_in`.
+
+The host reaches a mem through two methods; a mem that uses either is created by
+the host and imported:
+
+```
+using JS from std:JS;                  // view() needs it, under any alias
+src.copy_in(Fs.readFileSync(path));    // ArrayBuffer, typed array, or string (UTF-8); len = elements copied
+Fs.writeSync(1.0, out.view(0, out.len()));   // a JS.Uint8Array over the elements, no copy
+```
+
+A view is a `JS.Uint8Array`, `JS.Float32Array`, and so on for the element kind,
+and stops seeing the memory once the mem grows.
+
+A `mem` is not a value: it cannot be stored, passed, or returned, and a local
+or parameter of the same name hides it. Only top-level declarations are
+allowed, because each one is a memory of the module. The host reads and writes
+an `export mem` through its `ArrayBuffer` (for example `TextEncoder.encodeInto`),
+re-creating views after the memory grows. Measurements:
+`benchmarks/control-flow/README.md`.
 
 ---
 

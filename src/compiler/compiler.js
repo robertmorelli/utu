@@ -4,6 +4,8 @@ import { expandWutu } from './wutu.js';
 import { lowerIterators } from './lower-iterators.js';
 import { lowerForArrays } from './lower-for-arrays.js';
 import { lowerGenerators } from './lower-generators.js';
+import { lowerMems } from './lower-mems.js';
+import { lowerDistinctTypes, lowerIntEnums } from './lower-int-enums.js';
 import { ForeignABI, prepareForeignImports } from './foreign-types.js';
 import { lowerForeignOperations } from './foreign-lowering.js';
 import { boxMutatedCaptures } from './box-captures.js';
@@ -59,7 +61,7 @@ import { createStandardDsls } from './standard-dsls.js';
 import { PLATFORM_SOURCES } from './platform-sources.generated.js';
 import { paramsOf, stampOriginFile } from './ir-helpers.js';
 import { createExplainabilityArtifacts, pushDiagnostic } from './explainability.js';
-import { diagnosticFacts, DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
+import { compilerError, diagnosticFacts, DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { collectAnalysisDiagnostics } from './collect-analysis-diagnostics.js';
 import { createAnalysisSnapshot } from './analysis-snapshot.js';
 import { ANALYSIS_TOKENS } from './analysis-tokens.js';
@@ -122,7 +124,7 @@ import {
  * @returns {Compiler}
  */
 export function createCompiler(env) {
-  const { parser, readFile, resolvePath, resolvePackage = null, optimize = 'size', stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
+  const { parser, readFile, resolvePath, resolvePackage = null, readBinaryFile = null, optimize = 'size', stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
 
   if (!parser)      throw new Error('createCompiler: `parser` is required');
   if (!readFile)    throw new Error('createCompiler: `readFile` is required');
@@ -135,6 +137,8 @@ export function createCompiler(env) {
    * Parse a single source string into a phase-1 IR document.
    * No module resolution — useful for single-file tooling (e.g. diagnostics).
    */
+  const comptimeCache = new Map();
+
   function parseSource(source, filePath = '') {
     const ir     = parseToIR(parser, source, filePath, createDocument, { collectAnalysisTokens: target === 'analysis' });
     const root   = ir.body.firstChild;
@@ -217,6 +221,11 @@ export function createCompiler(env) {
     if (importedParseErrors.length && doc.body.firstChild) {
       doc.body.firstChild.dataset.importedParseErrors = JSON.stringify(importedParseErrors);
     }
+    // The entry file's name for std:JS, which mem views are typed with.
+    const jsImport = imports.find(({ from, to }) => from === filePath && to === 'std:JS');
+    if (jsImport && doc.body.firstChild) {
+      doc.body.firstChild.dataset.jsAlias = jsImport.node.getAttribute('alias') ?? jsImport.node.getAttribute('module');
+    }
     // -Oz ('size', the default) or -O3 ('speed'): read by host-call lowering and emitBinary.
     if (doc.body.firstChild) doc.body.firstChild.dataset.optimize = optimize;
     doc.__utuForeign = foreignABI;
@@ -257,6 +266,9 @@ export function createCompiler(env) {
     }
     debugAssert(doc, 'prelude');
 
+    lowerDistinctTypes(doc, parser, createDocument);
+    lowerIntEnums(doc, parser, createDocument);
+    await lowerMems(doc, parser, createDocument, { readBinaryFile, resolvePath, evaluateComptime });
     lowerGenerators(doc, parser, createDocument);
     lowerForArrays(doc, parser, createDocument);
     lowerIterators(doc, parser, createDocument);
@@ -367,6 +379,55 @@ export function createCompiler(env) {
     projectGraphs(doc);
     sealBackendPlan(backendPlan);
     return doc;
+  }
+
+  /**
+   * `@comptime/\ expr \/` initializers: compile `source` (the entry file
+   * trimmed by lowerMems) once, with one export per expression that evaluates
+   * it to an Array, run them, and return each one's elements.
+   */
+  async function evaluateComptime({ file, source, items }) {
+    const key = `${JSON.stringify(items.map(({ expression, valueType }) => [expression, valueType]))}\0${source}`;
+    if (comptimeCache.has(key)) return comptimeCache.get(key);
+    const types = [...new Set(items.map(item => item.valueType))];
+    const program = `${source}
+export lib {
+${items.map(({ expression, valueType }, k) => `    fn __utu_comptime_${k}() Array[${valueType}] { ${expression}; }`).join('\n')}
+${types.map(type => `    fn __utu_comptime_len_${type}(values: Array[${type}]) I32 { values.len(); }
+    fn __utu_comptime_at_${type}(values: Array[${type}], i: I32) ${type} { values[i]; }`).join('\n')}
+}
+`;
+    const virtual = `${file.replace(/\.utu$/, '')}.comptime.utu`;
+    const nested = createCompiler({
+      ...env, target: 'normal', optimize: 'size',
+      readFile: path => (path === virtual ? Promise.resolve(program) : readFile(path)),
+    });
+    const fail = (message, site) => compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, message, site);
+    const { doc: built } = await nested.analyzeFile(virtual)
+      .catch(error => { throw fail(`@comptime: ${error.message}`, items[0].site); });
+    const problems = collectAnalysisDiagnostics(built);
+    if (problems.length) {
+      // The trimmed copy keeps the entry file's line numbers.
+      const row = problems[0].primary?.row;
+      const site = items.find(item => item.site.dataset.row != null && Number(item.site.dataset.row) === row)?.site ?? items[0].site;
+      throw fail(`@comptime: ${problems[0].message}${row != null ? ` (line ${row})` : ''}`, site);
+    }
+    const { emitBinary, buildImportObject, instantiateLowered } = await import('../index.js');
+    const wasm = emitBinary(built);
+    const { instance } = await instantiateLowered(wasm, await buildImportObject(built, { wasm }));
+    const exports = instance.exports;
+    const results = items.map(({ expression, valueType, site }, k) => {
+      try {
+        const values = exports[`__utu_comptime_${k}`]();
+        const count = exports[`__utu_comptime_len_${valueType}`](values);
+        const elements = Array.from({ length: count }, (_, i) => exports[`__utu_comptime_at_${valueType}`](values, i));
+        return valueType === 'U32' ? elements.map(value => value >>> 0) : elements;
+      } catch (error) {
+        throw fail(`@comptime ${expression} failed: ${error.message}`, site);
+      }
+    });
+    comptimeCache.set(key, results);
+    return results;
   }
 
   function debugAssert(doc, phase, opts = {}) {
