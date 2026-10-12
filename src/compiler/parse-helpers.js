@@ -3,7 +3,7 @@
 // Extracted to avoid circular imports between parse.js and its sub-modules.
 // parse.js re-exports these; sub-modules import from here directly.
 
-import { parseHTML } from 'linkedom/worker';
+import { createIRDocument as createDocument } from './ir-document.js';
 
 // ── Document-local node ids ──────────────────────────────────────────────────
 
@@ -43,8 +43,7 @@ export function restampSubtree(root, originFile, destinationDoc = root?.ownerDoc
 // ── Document creation ─────────────────────────────────────────────────────────
 
 export function createIRDocument() {
-  const { document } = parseHTML('<!doctype html><html><body></body></html>');
-  return document;
+  return createDocument();
 }
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────

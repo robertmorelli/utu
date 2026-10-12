@@ -1,6 +1,6 @@
 import {stencilCss} from './css-stencil.js';
 import { callableParts } from './type-strings.js';
-import { DOMParser } from 'linkedom/worker';
+import { parseXmlFragment } from './ir-document.js';
 import { parseToIR } from './parse.js';
 import { T } from './ir-tags.js';
 import { createSyntheticNode, firstTypeChild, typeNodeToStr } from './ir-helpers.js';
@@ -41,18 +41,17 @@ export function createStandardDsls({ parser, createDocument }) {
         // following siblings inside a non-void custom element, producing
         // malformed IR (e.g. an <ir-ident/> swallowed as a child of <ir-lit/>).
         const inner = stripDslDelims(body).trim();
-        const xml = new DOMParser().parseFromString(`<ir-root>${inner}</ir-root>`, 'text/xml');
-        const root = xml.documentElement;
-        if (!root || root.localName !== 'ir-root') {
-          throw new Error('standard dsls (ir): failed to parse IR body');
+        let nodes;
+        try {
+          nodes = parseXmlFragment(inner, doc);
+        } catch (error) {
+          throw new Error(`standard dsls (ir): failed to parse IR body: ${error.message}`);
         }
-        if (root.childElementCount !== 1) {
+        const elements = nodes.filter(node => node.nodeType === 1);
+        if (elements.length !== 1) {
           throw new Error('standard dsls (ir): expected exactly one IR node');
         }
-        // importNode adopts the XML node into the destination HTML document
-        // so it can be grafted in by expand-dsls.
-        const node = doc.importNode(root.firstElementChild, true);
-        return { node };
+        return { node: elements[0] };
       },
     },
   };
