@@ -259,6 +259,7 @@ class IRElement extends IRNode {
   insertBefore(node, reference) {
     if (node.nodeType === DOCUMENT) throw new Error('ir-document: cannot insert a document');
     if (node.parentNode) detach(node);
+    restructured(this);
     const at = reference ? this.childNodes.indexOf(reference) : -1;
     if (at < 0) this.childNodes.push(node);
     else this.childNodes.splice(at, 0, node);
@@ -345,6 +346,13 @@ class IRDocument {
   constructor() {
     // Elements created in this document so far; every element's `$` is below it.
     this.count = 0;
+    // Bumped by every child-list change; the element index is valid for one revision.
+    this.revision = 0;
+    // Elements visited by unindexed queries since the last change. Building the
+    // index costs about one visit per element, so it is built only once the
+    // queries have already paid that much: never more than twice the scans.
+    this.scanned = 0;
+    this.index = null;
     this.ids = new Map();
     this.observers = new Set();
     this.documentElement = new IRElement(this, 'html');
@@ -415,10 +423,18 @@ function asNode(document, value) {
 
 function detach(node) {
   const parent = node.parentNode;
+  restructured(parent);
   const siblings = parent.childNodes;
   siblings.splice(siblings.indexOf(node), 1);
   if (node.nodeType === TEXT) parent.textChildren--;
   node.parentNode = null;
+}
+
+/** A child list changed under `parent`: element positions and tag lists are stale. */
+function restructured(parent) {
+  const document = parent.nodeType === DOCUMENT ? parent : parent.ownerDocument;
+  document.revision++;
+  document.scanned = 0;
 }
 
 /** Record an edit for observers, as a MutationObserver over the document would. */
@@ -652,9 +668,99 @@ function select(scope, compiled, first) {
   const test = compiled.length === 1 && compiled[0].length === 1
     ? simpleTest(compiled[0][0].compound, scope)
     : node => compiled.some(complex => matchComplex(node, complex, complex.length - 1, scope));
-  if (first) return firstMatch(scope, test);
-  collect(scope, out, test);
+  const index = elementIndex(scope);
+  if (index !== null) {
+    const candidates = indexCandidates(index, scope, compiled);
+    for (let i = 0; i < candidates.length; i++) {
+      if (test(candidates[i])) {
+        out.push(candidates[i]);
+        if (first) break;
+      }
+    }
+    return out;
+  }
+  const document = scope.ownerDocument;
+  const counted = node => { document.scanned++; return test(node); };
+  if (first) return firstMatch(scope, document ? counted : test);
+  collect(scope, out, document ? counted : test);
   return out;
+}
+
+// ── Element index ────────────────────────────────────────────────────────────
+//
+// Passes scan the whole program for one kind of node again and again. Once a
+// document has answered two queries without changing structure, it indexes its
+// connected elements: document order, each element's position and the
+// position after its subtree, and the elements of each tag in order. Queries
+// then visit only candidates of the tags they name, within the scope's range.
+
+/** The document's current index if `scope` is in it, else null (and maybe build one). */
+function elementIndex(scope) {
+  const document = scope.ownerDocument;
+  if (!document || scope.nodeType !== ELEMENT) return null;
+  let index = document.index;
+  if (index === null || index.revision !== document.revision) {
+    if (document.scanned < document.count) return null;
+    index = document.index = buildElementIndex(document);
+  }
+  if (index.foreign) return null;
+  const at = index.position[scope.$];
+  return at !== undefined && at >= 0 && index.order[at] === scope ? index : null;
+}
+
+function buildElementIndex(document) {
+  const order = [];
+  const position = [];
+  for (let i = 0; i < document.count; i++) position.push(-1);
+  const end = position.slice();
+  const byTag = new Map();
+  let foreign = false;
+  const visit = node => {
+    // An element adopted from another document has that document's `$`.
+    if (node.ownerDocument !== document) foreign = true;
+    if (foreign) return;
+    position[node.$] = order.length;
+    order.push(node);
+    let list = byTag.get(node.localName);
+    if (list === undefined) byTag.set(node.localName, list = []);
+    list.push(node);
+    const children = node.childNodes;
+    for (let i = 0; i < children.length; i++) if (children[i].nodeType === ELEMENT) visit(children[i]);
+    end[node.$] = order.length;
+  };
+  visit(document.documentElement);
+  return { revision: document.revision, order, position, end, byTag, foreign };
+}
+
+/** Descendants of `scope` that could match `compiled`, in document order. */
+function indexCandidates(index, scope, compiled) {
+  const from = index.position[scope.$] + 1;
+  const to = index.end[scope.$];
+  const tags = [];
+  for (const complex of compiled) {
+    const tag = complex[complex.length - 1].compound.tag;
+    if (tag === null) return index.order.slice(from, to);
+    if (!tags.includes(tag)) tags.push(tag);
+  }
+  if (tags.length === 1) return withinRange(index, index.byTag.get(tags[0]), from, to);
+  const merged = tags.flatMap(tag => withinRange(index, index.byTag.get(tag), from, to));
+  return merged.sort((a, b) => index.position[a.$] - index.position[b.$]);
+}
+
+/** The elements of a tag list whose positions fall in [from, to). */
+function withinRange(index, list, from, to) {
+  if (list === undefined) return [];
+  const { position } = index;
+  let low = 0;
+  let high = list.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (position[list[mid].$] < from) low = mid + 1;
+    else high = mid;
+  }
+  let stop = low;
+  while (stop < list.length && position[list[stop].$] < to) stop++;
+  return low === 0 && stop === list.length ? list.slice() : list.slice(low, stop);
 }
 
 // A lone compound: test only what it names.
