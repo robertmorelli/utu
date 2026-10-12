@@ -293,7 +293,18 @@ export function stampOriginFile(root, originFile) {
 
 export function stampType(node, type, source = '') {
   if (!node || !type) return node;
-  node.dataset['typeName'] = type;
-  if (source) node.dataset['inferenceSource'] = source;
+  setData(node, 'data-type-name', type);
+  if (source) setData(node, 'data-inference-source', source);
   return node;
+}
+
+/** Set a data attribute, skipping the write when it already has that value. */
+export function setData(node, name, value) {
+  const text = String(value);
+  if (node.getAttribute(name) !== text) node.setAttribute(name, text);
+}
+
+/** Set a data attribute only if it has none (`dataset.x ??= value`). */
+export function setDataIfAbsent(node, name, value) {
+  if (node.getAttribute(name) === null) node.setAttribute(name, String(value));
 }

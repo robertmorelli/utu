@@ -5,7 +5,7 @@ import { arrayElementType, literalArrayElement } from './array-literal-defaults.
 
 import {
   bodyOf, declaredTypeStr, directCalleeDecl, firstTypeChild, fnReturnType,
-  fnSignatureType, isFunctionDecl, paramsOf, selfParamOf, sourceId, stampType, typeNodeToStr,
+  fnSignatureType, isFunctionDecl, paramsOf, selfParamOf, setDataIfAbsent, sourceId, stampType, typeNodeToStr,
 } from './ir-helpers.js';
 import { diagnosticFacts, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { BINARY_OP_FN, UNARY_OP_FN } from './operator-specs.js';
@@ -355,13 +355,14 @@ export function projectTypeGraph(graph) {
   }
   for (const edge of graph.expectations) {
     const expected = edge.read();
-    if (!expected || !edge.value?.dataset) continue;
+    const value = edge.value;
+    if (!expected || value?.nodeType !== 1) continue;
     // DOM attributes are the compact public projection of the richer graph.
-    edge.value.dataset.expect ??= expected;
-    edge.value.dataset.expectSite ??= edge.site;
+    setDataIfAbsent(value, 'data-expect', expected);
+    setDataIfAbsent(value, 'data-expect-site', edge.site);
     const source = edgeSource(edge);
     const from = sourceId(source);
-    if (from) edge.value.dataset.expectFrom ??= source.id || from;
+    if (from) setDataIfAbsent(value, 'data-expect-from', source.id || from);
   }
   return graph;
 }
