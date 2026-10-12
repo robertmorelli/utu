@@ -76,11 +76,16 @@ export function buildTypeGraph(doc, typeIndex) {
   }
   graph.fnIndex = programIndex.functions;
   graph.literalDefaults = collectLiteralDefaults(graph);
-  for (const node of facts.nodes) {
-    addActualRule(graph, node);
-    addExpectations(graph, node);
-  }
+  for (const node of facts.nodes) addNodeRules(graph, node);
   return graph;
+}
+
+/** A node's rule and the expectations it places on other nodes (which it owns). */
+function addNodeRules(graph, node) {
+  graph.owner = node;
+  addActualRule(graph, node);
+  addExpectations(graph, node);
+  graph.owner = null;
 }
 
 export function settleTypeGraph(doc, typeIndex) {
@@ -88,11 +93,16 @@ export function settleTypeGraph(doc, typeIndex) {
   // closure parameters, record and array types) then re-solves only the rules
   // of the nodes it changed and their dependents.
   const graph = buildTypeGraph(doc, typeIndex);
+  return settle(graph, graph.rules);
+}
+
+/** Solve from `start` (all rules after a build, the changed ones after a refresh), then settle context. */
+function settle(graph, start) {
   // Written types do not change while settling (rewrites set attributes and
   // parameter types, never type nodes), so each is read off the IR once.
   graph.declaredTypes = new Map();
   try {
-    solveTypeGraph(graph);
+    solveTypeGraph(graph, start);
     for (;;) {
       applyContextualRewrites(graph, planContextualRewrites(graph));
       if (!graph.changed) { planCoercions(graph); return graph; }
@@ -101,6 +111,137 @@ export function settleTypeGraph(doc, typeIndex) {
   } finally {
     graph.declaredTypes = null;
   }
+}
+
+/**
+ * Bring a settled graph up to date after a lowering edited the IR, as if it
+ * were built and settled again from scratch, without redoing what did not
+ * change. `records` are the mutation records of the lowering.
+ *
+ * A node keeps its rule, the expectations it owns, and its facts unless it
+ * is dirty: new, moved, a target (or ancestor, child, or sibling of one) of a
+ * recorded change, or an identifier whose declaration changed. Rules and
+ * expectations are reassembled in document order, as a build would create
+ * them; the solver starts from the dirty nodes' rules and reaches their
+ * dependents; contextual rewrites and coercions run over every edge, as
+ * after a build. Debug builds check the result against a full settle.
+ */
+export function refreshTypeGraph(graph, doc, typeIndex, records) {
+  const retained = retainedGraphs(doc);
+  const programIndex = retained.program ?? buildProgramIndex(doc);
+  const old = graph.facts;
+  const oldBindings = graph.bindings;
+
+  Object.assign(graph, {
+    doc, root: doc.body.firstChild, typeIndex, programIndex, programRevision: programIndex.revision,
+    byKind: programIndex.byKind, nodesByKind: programIndex.byKind, scopeGraph: retained.scope,
+    rules: [], expectations: [], failures: [], coercions: [], changed: false,
+  });
+  const facts = graph.facts = new TypeFacts(doc, programIndex.all);
+  graph.slots = facts.views();
+  const resolutions = graph.scopeGraph?.resolutions;
+  const bindings = graph.bindings = denseArray(doc.count);
+  if (resolutions) {
+    for (const ident of programIndex.byKind.get('ir-ident') ?? []) {
+      const decl = resolutions.get(ident.id);
+      if (decl !== undefined) bindings[ident.$] = decl;
+    }
+  }
+  graph.fnIndex = programIndex.functions;
+  graph.literalDefaults = collectLiteralDefaults(graph);
+
+  const dirty = dirtyNodes(graph, old, oldBindings, records);
+  graph.lastRefresh = { records: records.length, dirty: dirty.size, nodes: facts.nodes.length };
+  const start = [];
+  for (let r = 0; r < facts.nodes.length; r++) {
+    const node = facts.nodes[r];
+    const was = old.rowOf(node);
+    if (dirty.has(node) || was < 0) {
+      facts.setTypeName(r, node.getAttribute('data-type-name'));
+      addNodeRules(graph, node);
+      if (facts.rule[r]) start.push(facts.rule[r]);
+      continue;
+    }
+    facts.copyRow(r, old, was);
+    const rule = old.rule[was];
+    if (rule) {
+      rule.index = graph.rules.length;
+      graph.rules.push(rule);
+      facts.rule[r] = rule;
+    }
+    const owned = old.owned[was];
+    if (owned !== NO_EDGES) facts.owned[r] = owned;
+    for (const edge of owned) {
+      graph.expectations.push(edge);
+      const target = facts.rowOf(edge.value);
+      if (target >= 0) {
+        if (facts.expected[target] === NO_EDGES) facts.expected[target] = [edge];
+        else facts.expected[target].push(edge);
+      }
+    }
+  }
+  return settle(graph, start);
+}
+
+// Rules whose dependencies include their siblings: an assigned value reads
+// its target, an operand the other operand (see rule()).
+const SIBLING_CONTEXT = new Set(['ir-binary', 'ir-assign']);
+
+/**
+ * The nodes whose rules and expectations a refresh must rebuild (see
+ * refreshTypeGraph). A rule or edge reads its node, its children (and a call
+ * its grandchildren), its siblings under an operator or assignment, and,
+ * for owners such as functions and branches, descendants: so a change dirties
+ * the changed node and its ancestors, plus siblings where they are read.
+ */
+function dirtyNodes(graph, old, oldBindings, records) {
+  const dirty = new Set();
+  const inDocument = node => {
+    let top = node;
+    while (top.parentNode) top = top.parentNode;
+    return top === graph.doc;
+  };
+  const withAncestors = node => {
+    for (let at = node; at?.nodeType === 1 && !dirty.has(at); at = at.parentNode) dirty.add(at);
+  };
+  const withSiblings = parent => {
+    if (parent?.nodeType === 1 && SIBLING_CONTEXT.has(parent.localName)) for (const child of parent.children) dirty.add(child);
+  };
+  for (const { type, target } of records) {
+    if (target?.nodeType !== 1 || !inDocument(target)) continue;
+    // Siblings first: withAncestors stops at nodes already marked.
+    if (type === 'childList') withSiblings(target);
+    dirty.delete(target);
+    withAncestors(target);
+  }
+  const { facts } = graph;
+  for (let r = 0; r < facts.nodes.length; r++) {
+    const node = facts.nodes[r];
+    const was = old.rowOf(node);
+    if (was < 0 || old.parents[was] !== node.parentNode) {
+      // New or moved: it, what contains it, and its new (and old) siblings.
+      withSiblings(node.parentNode);
+      dirty.delete(node);
+      withAncestors(node);
+      const from = was < 0 ? null : old.parents[was];
+      if (from?.nodeType === 1 && inDocument(from)) {
+        withSiblings(from);
+        dirty.delete(from);
+        withAncestors(from);
+      }
+      continue;
+    }
+    // Foreign and protocol facts accumulate as rules run (an error recorded
+    // while a receiver's type was still provisional stays); re-derive them.
+    if (old.rare.has(was)) dirty.add(node);
+    if (node.localName === 'ir-ident') {
+      const before = oldBindings?.[node.$] ?? null;
+      const now = graph.bindings[node.$] ?? null;
+      if (before !== now || bindingDependency(graph, node) !== old.rule[was]?.a) dirty.add(node);
+    }
+    if (node.getAttribute('data-iterator-element')) dirty.add(node);
+  }
+  return dirty;
 }
 
 /** declaredTypeStr(node), remembered while the graph settles. */
@@ -301,7 +442,7 @@ class DependentTable {
   }
 }
 
-export function solveTypeGraph(graph) {
+export function solveTypeGraph(graph, start = graph.rules) {
   const dependents = graph.dependents = new DependentTable(graph.doc?.count ?? 0);
   const rules = graph.rules;
   for (let r = 0; r < rules.length; r++) {
@@ -309,7 +450,7 @@ export function solveTypeGraph(graph) {
     for (let d = 0; d < deps.length; d++) dependents.add(deps[d], rules[r]);
   }
 
-  propagate(graph, rules);
+  propagate(graph, start);
   return graph;
 }
 
@@ -582,7 +723,16 @@ class Edge {
 function expect(graph, value, kind, a, b, c, site, source, mode, label) {
   if (!value) return;
   const edge = new Edge(graph, value, kind, a, b, c, site, source, mode, label);
+  // The node whose rules placed it; edges added while settling have none.
+  const owner = edge.owner = graph.owner ?? null;
   graph.expectations.push(edge);
+  if (owner !== null) {
+    const o = graph.facts.rowOf(owner);
+    if (o >= 0) {
+      if (graph.facts.owned[o] === NO_EDGES) graph.facts.owned[o] = [edge];
+      else graph.facts.owned[o].push(edge);
+    }
+  }
   const { facts } = graph;
   const r = facts.rowOf(value);
   if (r >= 0) {
@@ -628,8 +778,10 @@ function addActualRule(graph, node) {
     case 'ir-slice': return rule(graph, node, children(), R.MEMBER, one, 'get_slice', 'return-of');
     case 'ir-lit':
       return rule(graph, node, [], R.LITERAL, node.getAttribute('kind'), null, 'literal');
-    case 'ir-ident':
-      return rule(graph, node, [bindingDependency(graph, node)], R.IDENT, null, null, 'binding');
+    case 'ir-ident': {
+      const dependency = bindingDependency(graph, node);
+      return rule(graph, node, [dependency], R.IDENT, dependency, null, 'binding');
+    }
     case 'ir-param':
       return rule(graph, node, [], R.PARAM, null, null, 'parameter');
     case 'ir-let': case 'ir-global': {

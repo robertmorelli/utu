@@ -70,7 +70,7 @@ import { collectPreludeModules } from './prelude.js';
 import { validateIrStructure } from './validate-ir-structure.js';
 import { buildElaborationGraph } from './elaboration-graph.js';
 import { refreshProgramIndex } from './program-index.js';
-import { rebuildSemanticGraphs } from './semantic-analysis.js';
+import { rebuildSemanticGraphs, refreshSemanticGraphs, watchEdits } from './semantic-analysis.js';
 import { buildBackendPlan, sealBackendPlan } from './backend-plan.js';
 import { projectGraphs } from './project-graphs.js';
 import {
@@ -383,9 +383,11 @@ export function createCompiler(env) {
     if (untyped.length) { projectGraphs(doc); return doc; }
     clock('foreign ops + boxed captures (type graphs 2-3)', doc);
 
-    // Closure and operator lowering invalidate structure, scope, and resolution
-    // facts. They consume this settled graph, then the complete semantic set is
-    // rebuilt below rather than transferring hidden attributes across phases.
+    // Closure and operator lowering edit the program. They consume this
+    // settled graph; the graphs are then brought up to date for what they
+    // changed (refreshSemanticGraphs), and debug builds check that against
+    // a full settle.
+    let edits = watchEdits(doc);
     if (lowerClosures(doc, typeIndex, typeGraph)) {
       typeIndex = linkTypeDecls(doc, elaboration);
       debugAssert(doc, 'lowerClosures', { typeIndex });
@@ -393,9 +395,10 @@ export function createCompiler(env) {
     lowerOperators(doc, typeGraph);
     clock('lowerClosures + lowerOperators', doc);
 
-    let semantic = rebuildSemanticGraphs(doc, typeIndex, { captures: retainedCaptures });
+    let semantic = refreshSemanticGraphs(doc, typeIndex, typeGraph, edits(), { captures: retainedCaptures, check: debugAssertions });
     let typedProgram = semantic.program;
     typeGraph = semantic.types;
+    if (typeGraph.lastRefresh) clock(`  refreshed ${typeGraph.lastRefresh.dirty} of ${typeGraph.lastRefresh.nodes} nodes`, null);
     elaboration.typeIndex = typeIndex;
     elaboration.layout = retainGraph(doc, 'layout', buildLayoutGraph(typeIndex));
     elaboration.declarations = retainGraph(doc, 'declarations', buildTypeDeclarationGraph(typeIndex));
@@ -415,11 +418,13 @@ export function createCompiler(env) {
     // Backend control lowering is another destructive boundary. Normal builds
     // receive a fresh canonical graph set for the lowered program; analysis
     // builds retain the checked surface graph unchanged.
+    edits = watchEdits(doc);
     const backendChanged = lowerBackendControl(doc, typeIndex, { target });
+    const backendEdits = edits();
     debugAssert(doc, 'lowerBackendControl', { typeIndex, requireBindings: true, target });
     clock('lowerBackendControl', doc);
     if (backendChanged) {
-      semantic = rebuildSemanticGraphs(doc, typeIndex, { captures: retainedCaptures });
+      semantic = refreshSemanticGraphs(doc, typeIndex, typeGraph, backendEdits, { captures: retainedCaptures, check: debugAssertions });
       typedProgram = semantic.program;
       typeGraph = semantic.types;
     }
