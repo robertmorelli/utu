@@ -74,7 +74,7 @@ import { rebuildSemanticGraphs, refreshSemanticGraphs, watchEdits } from './sema
 import { buildBackendPlan, sealBackendPlan } from './backend-plan.js';
 import { projectGraphs } from './project-graphs.js';
 import {
-  buildCallGraph, buildLayoutGraph, buildTypeDeclarationGraph, retainGraph, retainedGraphs,
+  buildCallGraph, buildControlFlowGraph, buildLayoutGraph, buildTypeDeclarationGraph, retainGraph, retainedGraphs,
 } from './semantic-graphs.js';
 import {
   TREE_SITTER_UTU_WASM_BASE64,
@@ -383,6 +383,29 @@ export function createCompiler(env) {
     if (untyped.length) { projectGraphs(doc); return doc; }
     clock('foreign ops + boxed captures (type graphs 2-3)', doc);
 
+    // The program as written is checked: diagnostics, the editor's graphs,
+    // and its explain views all describe the surface program (operators are
+    // checked as the calls they will lower to). Analysis stops here, as does
+    // a build with errors.
+    elaboration.typeIndex = typeIndex;
+    elaboration.layout = retainGraph(doc, 'layout', buildLayoutGraph(typeIndex));
+    elaboration.declarations = retainGraph(doc, 'declarations', buildTypeDeclarationGraph(typeIndex));
+    retainGraph(doc, 'calls', buildCallGraph(doc.body.firstChild, typeGraph));
+    retainGraph(doc, 'controlFlow', buildControlFlowGraph(doc.body.firstChild, retainedGraphs(doc).program));
+    projectTypeGraph(typeGraph);
+    checkTypeGraph(typeGraph);
+    debugAssert(doc, 'checkTypeGraph', { typeIndex, requireBindings: true });
+    validateAnalysis(doc, typeIndex);
+    debugAssert(doc, 'validateAnalysis', { typeIndex, requireBindings: true });
+    clock('check + validate', doc);
+    if (target === 'analysis') {
+      const plan = retainGraph(doc, 'backend', buildBackendPlan(doc, typeIndex, retainedGraphs(doc).program));
+      projectGraphs(doc);
+      sealBackendPlan(plan);
+      return doc;
+    }
+    if (diagnosticFacts(doc).size > 0) { projectGraphs(doc); return doc; }
+
     // Closure and operator lowering edit the program. They consume this
     // settled graph; the graphs are then brought up to date for what they
     // changed (refreshSemanticGraphs), and debug builds check that against
@@ -403,17 +426,8 @@ export function createCompiler(env) {
     elaboration.layout = retainGraph(doc, 'layout', buildLayoutGraph(typeIndex));
     elaboration.declarations = retainGraph(doc, 'declarations', buildTypeDeclarationGraph(typeIndex));
 
-    projectTypeGraph(typeGraph); // typed validation and backend-control compatibility boundary
-    checkTypeGraph(typeGraph);
-    debugAssert(doc, 'checkTypeGraph', { typeIndex, requireBindings: true });
-    clock('semantic graphs (type graph 4) + check', doc);
-    validateAnalysis(doc, typeIndex);
-    debugAssert(doc, 'validateAnalysis', { typeIndex, requireBindings: true });
-    clock('validateAnalysis', doc);
-
-    // Lowering an ill-typed program would detach the nodes that carry its
-    // diagnostics; report them against the checked program instead.
-    if (target !== 'analysis' && diagnosticFacts(doc).size > 0) { projectGraphs(doc); return doc; }
+    projectTypeGraph(typeGraph); // backend-control compatibility boundary
+    clock('semantic graphs (type graph 4)', doc);
 
     // Backend control lowering is another destructive boundary. Normal builds
     // receive a fresh canonical graph set for the lowered program; analysis

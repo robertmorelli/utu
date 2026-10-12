@@ -10,7 +10,7 @@ import {
 } from './ir-helpers.js';
 import { diagnosticFacts, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { BINARY_OP_FN, UNARY_OP_FN } from './operator-specs.js';
-import { callableParts, callableTypeStr, INFERRED_PRIMITIVES, isAssignable, unifyTypes, unwrapNullable } from './type-rules.js';
+import { callableParts, callableTypeStr, INFERRED_PRIMITIVES, isAssignable, isOperandless, unifyTypes, unwrapNullable } from './type-rules.js';
 import { isInstanceOf, moduleArgsOf } from './module-names.js';
 import { retainedGraphs } from './graph-store.js';
 import { tupleParts, tupleTypeStr } from './type-strings.js';
@@ -105,7 +105,11 @@ function settle(graph, start) {
     solveTypeGraph(graph, start);
     for (;;) {
       applyContextualRewrites(graph, planContextualRewrites(graph));
-      if (!graph.changed) { planCoercions(graph); return graph; }
+      if (!graph.changed) {
+        planCoercions(graph);
+        addOperandExpectations(graph);
+        return graph;
+      }
       propagate(graph, [...graph.touched].map(node => ruleOf(graph, node)).filter(Boolean));
     }
   } finally {
@@ -545,6 +549,7 @@ export function planCoercions(graph) {
   graph.coercions = [];
   const ctx = { typeIndex: graph.typeIndex };
   for (const edge of graph.expectations) {
+    if (edge.kind === E.OPERAND) continue;
     const from = actual(graph, edge.value);
     const to = edge.read();
     const kind = from && to && coercionKind(from, to, ctx);
@@ -671,7 +676,7 @@ function rule(graph, node, deps, kind, a, b, source) {
 
 const E = Object.freeze({
   CONST: 0, DECLARED: 1, ASSIGN: 2, ARGUMENT: 3, TUPLE_PART: 4, ELEMENT: 5, FIELD_INIT: 6,
-  ACTUAL: 7, CONFLUENCE: 8, UNWRAP: 9,
+  ACTUAL: 7, CONFLUENCE: 8, UNWRAP: 9, OPERAND: 10,
 });
 
 class Edge {
@@ -701,6 +706,7 @@ class Edge {
       case E.ACTUAL: return actual(graph, a);
       case E.CONFLUENCE: return unifiedBranchType(graph, a, this.b);
       case E.UNWRAP: return unwrapNullable(actual(graph, a) ?? '');
+      case E.OPERAND: return operandParameter(graph, a, this.c)?.type;
       default: throw new Error(`type graph: unknown expectation kind ${this.kind}`);
     }
   }
@@ -711,6 +717,7 @@ class Edge {
     switch (this.kind) {
       case E.ASSIGN: return declaredSource(graph, this.b);
       case E.ARGUMENT: return callParameter(graph, a, this.b, this.c)?.source ?? a.firstElementChild;
+      case E.OPERAND: return operandParameter(graph, a, this.c)?.source ?? a;
       case E.FIELD_INIT: {
         const { entry, field } = fieldInitInfo(graph, a, this.b);
         return field ? fieldDecl(entry, field.name) : a;
@@ -1320,6 +1327,67 @@ function callParameter(graph, call, args, index) {
   return type && { type, source: param ?? fn };
 }
 
+/**
+ * The call each operator lowers to expects its operands as its parameters.
+ * Those expectations are added once the graph has settled, so they check
+ * the program and explain it in the editor, but never steer inference: the
+ * types the solver reaches are the ones lowering will see.
+ */
+function addOperandExpectations(graph) {
+  for (const node of nodesOf(graph, 'ir-binary', 'ir-unary', 'ir-index', 'ir-slice')) {
+    const children = node.children;
+    for (let index = 0; index < children.length; index++) {
+      expect(graph, children[index], E.OPERAND, node, null, index, 'argument', null, 'assign');
+    }
+  }
+}
+
+/**
+ * What operator lowering will make of an operator node (lower-operators.js):
+ * null when it leaves the node in place, a short-circuit conditional for
+ * Bool `and`/`or`, or a call to the owner's operator or index method, with
+ * the function that call resolves to (or none). The surface program is
+ * checked as it will be lowered.
+ */
+function loweredOperator(graph, node) {
+  const first = node.firstElementChild;
+  const owner = actual(graph, first) ?? first?.attr?.('data-type-name') ?? actual(graph, node) ?? node.attr('data-type-name');
+  let method;
+  let label;
+  let syntax = 'operator';
+  if (node.localName === 'ir-binary') {
+    label = node.getAttribute('op');
+    method = BINARY_OP_FN[label];
+  } else if (node.localName === 'ir-unary') {
+    label = node.getAttribute('op');
+    method = UNARY_OP_FN[label];
+  } else {
+    syntax = 'method';
+    method = node.localName === 'ir-index' ? 'get_index' : 'get_slice';
+    label = node.localName === 'ir-index' ? '[]' : '[,]';
+  }
+  if (isOperandless(owner)) return null;
+  if (node.localName === 'ir-binary' && owner === 'Bool' && (label === 'and' || label === 'or')) return { shortCircuit: true };
+  const fn = syntax === 'operator' ? graph.fnIndex.get(`${owner}:${method}`) ?? null : memberFn(graph, owner, method);
+  return { owner, method, label, syntax, fn };
+}
+
+/** The parameter an operand will be passed to once its operator is a call (as callParameter). */
+function operandParameter(graph, node, index) {
+  const lowered = loweredOperator(graph, node);
+  const fn = lowered?.fn;
+  if (!fn) return undefined;
+  const params = paramsOf(fn);
+  const count = node.children.length;
+  // The lowered call is a static call: a method taking `self` gets the receiver as argument zero.
+  const offset = selfParamOf(fn) && count === params.length + 1 ? 1 : 0;
+  if (offset && index === 0) return lowered.owner && { type: lowered.owner, source: selfParamOf(fn) };
+  const param = params[index - offset];
+  const type = declared(graph, param) ?? param?.getAttribute('data-type-name')
+    ?? (fn.getAttribute('receiver') === '&' ? lowered.owner : null);
+  return type && { type, source: param ?? fn };
+}
+
 function resolvedFunction(graph, call) {
   const resolved = functionOf(graph, call);
   if (isFunctionDecl(resolved)) return resolved;
@@ -1456,9 +1524,21 @@ function collectFailures(graph) {
     }
   }
   for (const node of nodesOf(graph, 'ir-binary', 'ir-unary', 'ir-index', 'ir-slice')) {
-    const input = actual(graph, node.firstElementChild) ?? 'unknown';
+    const lowered = loweredOperator(graph, node);
+    if (lowered === null) {
+      // Operator lowering leaves it in place: nothing can implement it.
+      const input = actual(graph, node.firstElementChild) ?? 'unknown';
+      fail(graph, node, DIAGNOSTIC_KINDS.UNKNOWN_OPERATOR,
+        `Cannot resolve operator for ${input}`, { operandType: input });
+      continue;
+    }
+    // An array `for` reads its source through an index the for-source check reports.
+    if (lowered.shortCircuit || lowered.fn || !lowered.owner || lowered.owner === 'undefined'
+      || node.getAttribute('data-for-array-access')) continue;
+    const { owner, method, label } = lowered;
     fail(graph, node, DIAGNOSTIC_KINDS.UNKNOWN_OPERATOR,
-      `Cannot resolve operator for ${input}`, { operandType: input });
+      `${owner} has no '${label ?? method}' operator${label && label !== method ? ` (${owner}.${method})` : ''}`,
+      { method, operator: method, receiverName: owner });
   }
   collectOperationFailures(graph);
 }
