@@ -23,7 +23,7 @@
 // closure and is recorded as a capture. Nested closures record the same
 // binding at every level it crosses, because each one has to thread it inward.
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
-import { bodyOf, paramsOf, selfParamOf } from './ir-helpers.js';
+import { bodyOf, childOf, childrenOf, paramsOf, selfParamOf, typeArgsOf } from './ir-helpers.js';
 import { retainGraph, retainedGraphs } from './graph-store.js';
 import { buildProgramIndex, nodesOf } from './program-index.js';
 
@@ -51,7 +51,7 @@ export function resolveBindings(doc) {
     // e.g. `ir-fn[name="Foo.bar"]` is NOT in global scope by "Foo.bar" —
     // Method calls resolve from receiver types in the type graph.
     // Only free functions (kind="free") land here.
-    const fnName = n.querySelector(':scope > ir-fn-name[kind="free"]');
+    const fnName = childrenOf(n, 'ir-fn-name').find(name => name.getAttribute('kind') === 'free');
     const key = fnName ? fnName.getAttribute('name') : n.getAttribute('name');
     if (key) declare(graph, globalScope, key, n);
   }
@@ -73,7 +73,7 @@ export function resolveBindings(doc) {
     const scope = newScope(graph, globalScope, bench);
     for (const child of bench.children) {
       if (child.localName === 'ir-measure') {
-        const body = child.querySelector(':scope > ir-block');
+        const body = childOf(child, 'ir-block');
         if (body) walkBlock(body, scope, graph);
       } else {
         walkNode(child, scope, graph);
@@ -171,10 +171,10 @@ function walkNode(node, scope, graph) {
       return;
     case 'ir-for': {
       // Walk range sources in current scope, then add capture and walk body
-      for (const src of node.querySelectorAll(':scope > ir-for-source')) {
+      for (const src of childrenOf(node, 'ir-for-source')) {
         for (const child of src.children) walkNode(child, scope, graph);
       }
-      const capture = node.querySelector(':scope > ir-capture');
+      const capture = childOf(node, 'ir-capture');
       const body    = bodyOf(node);
       if (body) {
         const forFrame = newScope(graph, scope, node);
@@ -210,14 +210,14 @@ function walkNode(node, scope, graph) {
     }
     case 'ir-type-member': {
       const typeNode = node.firstElementChild;
-      const args = node.querySelector(':scope > ir-arg-list');
+      const args = childOf(node, 'ir-arg-list');
       if (typeNode) walkNode(typeNode, scope, graph);
       if (args) walkNode(args, scope, graph);
       return;
     }
     case 'ir-mod-call': {
-      const typeArgs = node.querySelector(':scope > ir-type-args');
-      const args = node.querySelector(':scope > ir-arg-list');
+      const typeArgs = typeArgsOf(node);
+      const args = childOf(node, 'ir-arg-list');
       if (typeArgs) walkNode(typeArgs, scope, graph);
       if (args) walkNode(args, scope, graph);
       return;

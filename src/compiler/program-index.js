@@ -1,6 +1,6 @@
 // Phase-local structural index. Semantic relationships remain in their own graphs.
 
-import { bodyOf, typeNodeToStr } from './ir-helpers.js';
+import { bodyOf, childrenOf, fnNameOf, typeArgsOf, typeNodeToStr } from './ir-helpers.js';
 import { retainGraph } from './graph-store.js';
 
 const REVISIONS = new WeakMap();
@@ -42,10 +42,10 @@ export function buildProgramIndex(doc) {
     get provenance() {
       return provenance ??= all.filter(node => node.getAttribute('data-rewrite-of')).map(node => ({
         node,
-        sourceId: node.dataset.rewriteOf,
-        source: byId.get(node.dataset.rewriteOf) ?? this.byOrigin.get(node.dataset.rewriteOf)?.[0] ?? null,
-        pass: node.dataset.rewritePass ?? null,
-        rewriteKind: node.dataset.rewriteKind ?? null,
+        sourceId: node.getAttribute('data-rewrite-of'),
+        source: byId.get(node.getAttribute('data-rewrite-of')) ?? this.byOrigin.get(node.getAttribute('data-rewrite-of'))?.[0] ?? null,
+        pass: node.getAttribute('data-rewrite-pass'),
+        rewriteKind: node.getAttribute('data-rewrite-kind'),
       }));
     },
   };
@@ -62,7 +62,9 @@ export function nodesOf(index, ...kinds) {
 
 function surfaceBodies(owner) {
   if (owner.localName === 'ir-bench') {
-    return [...owner.querySelectorAll(':scope > ir-block, :scope > ir-measure > ir-block')];
+    // Its own blocks and its measure's, in document order.
+    return [...owner.children].flatMap(child => child.localName === 'ir-block' ? [child]
+      : child.localName === 'ir-measure' ? childrenOf(child, 'ir-block') : []);
   }
   const body = bodyOf(owner);
   return body ? [body] : [];
@@ -70,8 +72,8 @@ function surfaceBodies(owner) {
 
 function functionIndexEntries(node) {
   const entries = [[node.getAttribute('name'), node]];
-  const name = node.querySelector(':scope > ir-fn-name');
-  const implementation = name?.querySelector(':scope > ir-type-args')?.firstElementChild;
+  const name = fnNameOf(node);
+  const implementation = typeArgsOf(name)?.firstElementChild;
   const type = typeNodeToStr(implementation);
   const method = name?.getAttribute('name');
   if (type && method) entries.push([`${type}.${method}`, node]);

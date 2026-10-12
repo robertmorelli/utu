@@ -77,19 +77,19 @@ export function buildBackendPlan(doc, typeIndex, program = null) {
     functionsById: new Map([...index.functions.values()].filter(fn => fn.id).map(fn => [fn.id, fn])),
     emittableFunctions: (index.byKind.get('ir-fn') ?? []).filter(fn => fn.parentElement === root),
     exports: (index.byKind.get('ir-fn') ?? []).filter(fn =>
-      fn.parentElement === root && (fn.dataset.export != null || fn.hasAttribute('data-export'))),
+      fn.parentElement === root && fn.getAttribute('data-export') !== null),
     runtime,
     typeOf(node) {
-      return nodeTypes.get(node?.id) ?? node?.dataset?.typeName ?? null;
+      return nodeTypes.get(node?.id) ?? node?.getAttribute?.('data-type-name') ?? null;
     },
     expectedOf(node) {
-      return expectations.get(node?.id) ?? node?.dataset?.expect ?? node?.dataset?.expectedType ?? null;
+      return expectations.get(node?.id) ?? node?.getAttribute?.('data-expect') ?? node?.getAttribute?.('data-expected-type') ?? null;
     },
     bindingIdOf(node) {
-      return bindings.get(node?.id) ?? node?.dataset?.bindingId ?? null;
+      return bindings.get(node?.id) ?? node?.getAttribute?.('data-binding-id') ?? null;
     },
     callTargetIdOf(node) {
-      return callTargets.get(node?.id) ?? node?.dataset?.fnId ?? null;
+      return callTargets.get(node?.id) ?? node?.getAttribute?.('data-fn-id') ?? null;
     },
     fieldOf(node) {
       return fields.get(node?.id) ?? null;
@@ -159,10 +159,10 @@ function buildRuntimePlan(program, typeGraph, callGraph) {
     ...(sites.promiseCatch?.length ? ['promise_catch'] : []),
   ];
   const awaits = [...new Set((sites.awaits ?? [])
-    .map(node => typeGraph ? actualType(typeGraph, node) : node.dataset?.typeName)
+    .map(node => typeGraph ? actualType(typeGraph, node) : node.getAttribute('data-type-name'))
     .filter(Boolean))].sort();
   const asyncExports = [...(callGraph?.functions.values() ?? [])]
-    .filter(({ id, node }) => (node.dataset.export != null || node.hasAttribute('data-export'))
+    .filter(({ id, node }) => node.getAttribute('data-export') !== null
       && callGraph.effects.get(id)?.has('await'))
     .map(({ node }) => node.getAttribute('name')).filter(Boolean).sort();
 
@@ -173,7 +173,7 @@ function buildRuntimePlan(program, typeGraph, callGraph) {
       calls: [...closureCalls.values()].sort((a, b) => a.field.localeCompare(b.field)),
     },
     promises: { ops: [...new Set(ops)].sort(), awaits, asyncExports },
-    dslImports: readJson(program.root?.dataset.dslWasmImports, []),
+    dslImports: readJson(program.root?.getAttribute('data-dsl-wasm-imports'), []),
   };
 }
 

@@ -4,6 +4,10 @@ import { unwrapNullable } from './type-strings.js';
 import { actualType, resolvedFunctionOf } from './type-graph.js';
 import { buildProgramIndex } from './program-index.js';
 import { buildDeclarationGraph } from './declaration-graph.js';
+import { closestOf } from './ir-helpers.js';
+
+const SURFACES = new Set(['ir-fn', 'ir-closure', 'ir-export-main', 'ir-test', 'ir-bench']);
+const ARMS = new Set(['ir-match-arm', 'ir-alt-arm', 'ir-promote-arm', 'ir-default-arm']);
 export { retainGraph, retainedGraphs } from './graph-store.js';
 
 export function buildCallGraph(root, typeGraph = null) {
@@ -15,20 +19,21 @@ export function buildCallGraph(root, typeGraph = null) {
     : [...root.querySelectorAll(kinds.join(', '))];
   const surfaces = nodes('ir-fn', 'ir-closure', 'ir-export-main', 'ir-test', 'ir-bench');
   const awaitSites = nodes('ir-await');
+  // A surface awaits directly when it is the innermost surface around an await.
+  const awaiting = new Set(awaitSites.map(node => closestOf(node, SURFACES)));
   for (const fn of surfaces) {
     const id = fn.id;
     if (!id) continue;
     functions.set(id, { id, node: fn, name: fn.getAttribute('name') ?? fn.localName });
     const effects = new Set();
-    if (awaitSites.some(node =>
-      node.closest('ir-fn, ir-closure, ir-export-main, ir-test, ir-bench') === fn)) effects.add('await');
+    if (awaiting.has(fn)) effects.add('await');
     directEffects.set(id, effects);
   }
   for (const call of nodes('ir-call')) {
-    const caller = call.closest('ir-fn, ir-closure, ir-export-main, ir-test, ir-bench');
+    const caller = closestOf(call, SURFACES);
     if (!caller?.id) continue;
     const declaration = typeGraph ? resolvedFunctionOf(typeGraph, call) : null;
-    const callee = declaration?.id ?? call.dataset.fnId ?? null;
+    const callee = declaration?.id ?? call.getAttribute('data-fn-id') ?? null;
     edges.push({ from: caller.id, to: callee, call, declaration, indirect: !callee });
   }
   const effects = new Map([...directEffects].map(([id, set]) => [id, new Set(set)]));
@@ -50,7 +55,7 @@ export function buildCallGraph(root, typeGraph = null) {
   };
   const targets = new Map(edges.filter(edge => edge.declaration).map(edge => [edge.call.id, edge.declaration]));
   const callableTypes = new Map(nodes('ir-call').map(call => [call.id,
-    typeGraph ? actualType(typeGraph, call.firstElementChild) : call.firstElementChild?.dataset?.typeName ?? null]));
+    typeGraph ? actualType(typeGraph, call.firstElementChild) : call.firstElementChild?.getAttribute('data-type-name') ?? null]));
   return {
     kind: 'call', programRevision: typeGraph?.programRevision ?? null,
     functions, edges, effects, sites, targets, callableTypes,
@@ -106,7 +111,7 @@ function flowNode(node, next, ctx, add, link) {
     return id;
   }
   if (/^ir-(match|alt|promote)$/.test(node.localName)) {
-    for (const arm of node.querySelectorAll(':scope > ir-match-arm, :scope > ir-alt-arm, :scope > ir-promote-arm, :scope > ir-default-arm')) {
+    for (const arm of [...node.children].filter(child => ARMS.has(child.localName))) {
       const body = arm.lastElementChild;
       const start = body?.localName === 'ir-block'
         ? flowBlock(body, next, ctx, add, link)
