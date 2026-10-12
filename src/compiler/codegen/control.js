@@ -21,6 +21,7 @@
 import { binaryen } from './types.js';
 import { nextLabel } from './labels.js';
 import { emitDeferred } from './bindings.js';
+import { childOf, childrenOf } from '../ir-helpers.js';
 
 /** Deferred code of blocks opened inside the loop at `depth` (default: innermost), which a jump leaves. */
 function loopDeferred(ctx, emitExpr, depth = ctx.loops?.length ?? 0) {
@@ -131,9 +132,9 @@ export function emitWhile(node, ctx, emitExpr) {
 }
 
 export function emitFor(node, ctx, emitExpr) {
-  const sources = [...node.querySelectorAll(':scope > ir-for-source')];
-  const capture = node.querySelector(':scope > ir-capture');
-  const body = node.querySelector(':scope > ir-block');
+  const sources = [...childrenOf(node, 'ir-for-source')];
+  const capture = childOf(node, 'ir-capture');
+  const body = childOf(node, 'ir-block');
   const names = (capture?.getAttribute('names') ?? '').split(',').filter(Boolean);
   if (!sources.length || (names.length && names.length !== sources.length) || !body) {
     throw new Error('codegen: for requires either no captures or one capture for each range source');
@@ -256,7 +257,7 @@ function countedWhile(node, ctx) {
   if (ctx.optimize !== 'speed') return null;
   const [cond, body] = [...node.children];
   if (cond?.localName !== 'ir-call' || cond.attr('data-operator-name') !== 'lt' || body?.localName !== 'ir-block') return null;
-  const [counter, limit] = [...(cond.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const [counter, limit] = [...(childOf(cond, 'ir-arg-list')?.children ?? [])];
   if (counter?.localName !== 'ir-ident' || limit?.localName !== 'ir-ident') return null;
   const type = ctx.typeOf(counter);
   if (!INTEGER_WIDTH[type] || ctx.typeOf(limit) !== type) return null;
@@ -417,8 +418,8 @@ export function emitLoopMatch(node, ctx, emitExpr) {
   const label = nextLabel(ctx);
   const exit = `__loop_match_exit_${label}`, dispatch = `__loop_match_dispatch_${label}`;
   const init = m.local.set(index, emitExpr(scrutinee, ctx));
-  const arms = [...node.querySelectorAll(':scope > ir-match-arm')];
-  const defaultArm = node.querySelector(':scope > ir-default-arm');
+  const arms = [...childrenOf(node, 'ir-match-arm')];
+  const defaultArm = childOf(node, 'ir-default-arm');
   const ns = ctx.scalarNamespaceOf(typeName);
   const sorted = arms.map(arm => ({ arm, pattern: parseMatchLiteral(arm.getAttribute('pattern'), ns) }))
     .sort((a, b) => comparePattern(a.pattern, b.pattern));
@@ -499,7 +500,7 @@ function constantState(node) {
   }
   // `-1` arrives as a negation call around a literal.
   if (node?.localName === 'ir-call' && node.attr('data-operator-name') === 'neg') {
-    const inner = constantState(node.querySelector(':scope > ir-arg-list')?.firstElementChild);
+    const inner = constantState(childOf(node, 'ir-arg-list')?.firstElementChild);
     return inner == null ? null : -inner;
   }
   return null;
@@ -548,8 +549,8 @@ export function emitBreak(node, ctx, emitExpr) {
 export function emitMatch(node, ctx, emitExpr) {
   const m       = ctx.module;
   const scrut   = node.children[0];
-  const arms    = [...node.querySelectorAll(':scope > ir-match-arm')];
-  const defArm  = node.querySelector(':scope > ir-default-arm');
+  const arms    = [...childrenOf(node, 'ir-match-arm')];
+  const defArm  = childOf(node, 'ir-default-arm');
   const retType = ctx.toType(ctx.typeOf(node) ?? 'void');
 
   if (arms.length === 0) {

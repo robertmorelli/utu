@@ -21,7 +21,7 @@ import { binaryen, declaredTypeStr } from './types.js';
 import { callableParts } from '../type-strings.js';
 import { closureCallImport } from '../closure-abi.js';
 import { unwrapNullable } from '../type-strings.js';
-import { paramsOf } from '../ir-helpers.js';
+import { childOf, paramsOf } from '../ir-helpers.js';
 
 export const CLOSURE_MODULE = 'utu';
 export const CLOSURE_NEW = '__utu_closure_new';
@@ -176,7 +176,7 @@ function readRuntimeSpec(root) {
 /** `cl(x) { … }` → closure_new(ref.func $lifted, env) */
 export function emitMakeClosure(node, ctx, emitExpr) {
   const fnName = node.getAttribute('fn');
-  const env = node.querySelector(':scope > ir-struct-init');
+  const env = childOf(node, 'ir-struct-init');
   if (!env) throw new Error('codegen: ir-make-closure is missing its environment');
   return ctx.module.call(
     CLOSURE_NEW,
@@ -203,7 +203,7 @@ export function emitFunRef(decl, ctx) {
 
 /** Calling a `cl` value goes out through the host. */
 export function emitClosureCall(node, parts, ctx, emitExpr) {
-  const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const args = [...(childOf(node, 'ir-arg-list')?.children ?? [])];
   return ctx.module.call(
     `__utu_${closureCallImport(parts)}`,
     [emitExpr(node.firstElementChild, ctx), ...args.map(arg => emitExpr(arg, ctx))],
@@ -213,7 +213,7 @@ export function emitClosureCall(node, parts, ctx, emitExpr) {
 
 /** Calling a `fun` value stays inside wasm. */
 export function emitFunCall(node, parts, ctx, emitExpr) {
-  const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const args = [...(childOf(node, 'ir-arg-list')?.children ?? [])];
   return ctx.module.call_ref(
     emitExpr(node.firstElementChild, ctx),
     args.map(arg => emitExpr(arg, ctx)),

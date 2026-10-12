@@ -1,4 +1,4 @@
-import { cloneGraphSubtree, createSyntheticNode, replaceNodeMeta, sourceId, typeNodeToStr } from './ir-helpers.js';
+import { childOf, cloneGraphSubtree, createSyntheticNode, replaceNodeMeta, sourceId, typeNodeToStr } from './ir-helpers.js';
 import { instantiatedModuleName, recordInstantiation } from './module-names.js';
 import { hoistModule } from './hoist-modules.js';
 import { lowerPipesIn } from './lower-pipe.js';
@@ -49,7 +49,7 @@ export function instantiateModules(doc, { debugAssertions = false, graph = null 
   for (const using of requests('ir-using')) {
     const moduleName = using.getAttribute('module');
     const alias      = using.getAttribute('alias');
-    const typeArgsEl = using.querySelector(':scope > ir-type-args');
+    const typeArgsEl = childOf(using, 'ir-type-args');
 
     // No module name means the node is malformed — just drop it.
     if (!moduleName) { using.remove(); continue; }
@@ -83,7 +83,7 @@ export function instantiateModules(doc, { debugAssertions = false, graph = null 
         record: Boolean(args),
       });
       root.insertBefore(clone, using);
-      if (!clone.querySelector(':scope > ir-module-params')) {
+      if (!childOf(clone, 'ir-module-params')) {
         lowerPipesIn(clone);
         hoistModule(clone, root, graph);
       }
@@ -157,7 +157,7 @@ function validModuleArity(site, module, args) {
 
 function inlineSpec(node) {
   const moduleName = node.getAttribute('module') ?? namedModuleName(node);
-  const typeArgEls = [...(node.querySelector(':scope > ir-type-args')?.children ?? [])];
+  const typeArgEls = [...(childOf(node, 'ir-type-args')?.children ?? [])];
   return moduleName && typeArgEls.length
     ? { moduleName, typeArgEls, mangled: mangleName(moduleName, typeArgEls) }
     : null;
@@ -242,7 +242,7 @@ function rewriteInlineCall(node, type) {
   call.appendChild(callee);
   // Move (not clone) the arguments: they may hold further mod-call requests
   // that this sweep still has to rewrite, e.g. M[I32].f(M[I32].g(x)).
-  const args = node.querySelector(':scope > ir-arg-list');
+  const args = childOf(node, 'ir-arg-list');
   if (args) call.appendChild(args);
   node.replaceWith(call);
 }
@@ -385,7 +385,7 @@ function typeNodeToText(node) {
 
 /** The type arguments of an ir-type-inst, past the ir-type-args wrapper. */
 function typeArgChildren(node) {
-  const args = node.querySelector(':scope > ir-type-args');
+  const args = childOf(node, 'ir-type-args');
   return [...(args?.children ?? node.children)];
 }
 

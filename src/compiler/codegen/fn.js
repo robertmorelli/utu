@@ -16,7 +16,7 @@
 import { binaryen, fnReturnType, declaredTypeStr } from './types.js';
 import { emitExpr } from './expr.js';
 import { noteFunction } from './explainability.js';
-import { paramsOf, bodyOf, selfParamOf } from '../ir-helpers.js';
+import { bodyOf, childOf, paramsOf, selfParamOf } from '../ir-helpers.js';
 
 /**
  * @param {Element} fn   ir-fn (already analysed)
@@ -36,7 +36,7 @@ export function emitFn(fn, ctx) {
 
   if (selfParam) {
     const recvType = ctx.typeOf(selfParam)
-      ?? fn.querySelector(':scope > ir-fn-name')?.getAttribute('receiver');
+      ?? childOf(fn, 'ir-fn-name')?.getAttribute('receiver');
     if (!recvType) throw new Error(`codegen: ir-self-param in "${name}" has no receiver type`);
     const tId = ctx.toType(recvType);
     locals.set(selfParam.id, { index: paramTypes.length, type: tId });
@@ -94,7 +94,7 @@ export function emitFn(fn, ctx) {
 
 function implicitOperatorParamType(fn) {
   if (fn.getAttribute('kind') !== 'operator') return null;
-  return fn.querySelector(':scope > ir-fn-name')?.getAttribute('receiver') ?? null;
+  return childOf(fn, 'ir-fn-name')?.getAttribute('receiver') ?? null;
 }
 
 function applyDebugLocations(ctx, funcRef) {

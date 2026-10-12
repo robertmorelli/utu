@@ -5,7 +5,7 @@
 // partially mutate state; a valid value is copied field by field into the
 // existing struct, which keeps references held by views current.
 import { expressionFromSource } from './source-expansion.js';
-import { sourceTypeStr } from './ir-helpers.js';
+import { childrenOf, sourceTypeStr } from './ir-helpers.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 
 const SCALAR_TYPES = new Set(['Str', 'Bool', 'I32', 'F64']);
@@ -87,7 +87,7 @@ function expandSite(site, { prefix, structs, parser, createDocument }) {
     if (!node) {
       throw new StoredError(`Unsupported stored type ${type}; use local structs, Array, Str, Bool, I32, or F64`, header.typeOffset, header.type.length);
     }
-    const fields = [...node.querySelectorAll(':scope > ir-field')].map(field => {
+    const fields = [...childrenOf(node, 'ir-field')].map(field => {
       const typeNode = field.firstElementChild;
       return [field.getAttribute('name'), shape(sourceTypeStr(typeNode), [...visiting, type])];
     });

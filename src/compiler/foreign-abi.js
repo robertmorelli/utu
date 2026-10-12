@@ -1,6 +1,6 @@
 import { callableParts, isNullable, unwrapNullable } from './type-strings.js';
 import { isAssignable } from './type-rules.js';
-import { paramsOf } from './ir-helpers.js';
+import { childOf, paramsOf } from './ir-helpers.js';
 const primitive = new Set(['Str', 'F64', 'Bool', 'void']);
 const dynamicRefs = new Set(['any', 'unknown']);
 const absent = new Set(['null', 'undefined', 'never']);
@@ -423,7 +423,7 @@ export function foreignActual(graph, node) {
     const value = m ? { index: m.index, ref: m.prop?.type ?? (m.desc.dynamic ? 'any' : null) } : abi.values.get(read(callee));
     if (!value || value.ref === null) return null;
     const desc = abi.describe(value.index, value.ref);
-    const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
+    const args = [...(childOf(node, 'ir-arg-list')?.children ?? [])];
     const constructors = node.getAttribute('construct') === 'true' || !desc.calls?.length && desc.constructors?.length;
     const signatures = (constructors ? desc.constructors : desc.calls) ?? [];
     const candidates = signatures.filter(sig => args.length >= sig.params.filter(p => !p.optional && !p.rest).length

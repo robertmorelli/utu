@@ -15,6 +15,7 @@ import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { restampSubtree } from './parse.js';
 import { hoistModule, rewriteReferencesTo } from './hoist-modules.js';
 import { lowerPipesIn } from './lower-pipe.js';
+import { childOf, childrenOf } from './ir-helpers.js';
 
 /**
  * @param {Map<string, Document>} graph
@@ -45,7 +46,7 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
         // A file with syntax errors may have lost the module; the parse
         // errors are the real diagnostic and are reported after inlining.
         if (targetRoot.attr('data-parse-errors')) continue;
-        const available = [...targetRoot.querySelectorAll(':scope > ir-module')].map(m => m.getAttribute('name'));
+        const available = [...childrenOf(targetRoot, 'ir-module')].map(m => m.getAttribute('name'));
         const hint = available.length ? `it defines ${available.map(name => `'${name}'`).join(', ')}` : 'it defines no modules';
         throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT,
           `Module '${moduleName}' not found in '${targetPath}'; ${hint}`, using,
@@ -80,14 +81,14 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
       // The module's references to support modules this file already hoisted
       // point at the flat names that hoisting gave their members.
       for (const support of alreadyHoisted) rewriteReferencesTo(support, clone);
-      if (!using.getAttribute('alias') && !using.querySelector(':scope > ir-type-args')) inlined.add(moduleName);
+      if (!using.getAttribute('alias') && !childOf(using, 'ir-type-args')) inlined.add(moduleName);
 
       // Aliased/generic imports remain templates for elaboration. Bare imports
       // materialize directly into the flat declaration namespace.
-      if (using.getAttribute('alias') || using.querySelector(':scope > ir-type-args')) {
+      if (using.getAttribute('alias') || childOf(using, 'ir-type-args')) {
         using.removeAttribute('from');
       } else {
-        if (filePath === order.at(-1) && !clone.querySelector(':scope > ir-module-params')) {
+        if (filePath === order.at(-1) && !childOf(clone, 'ir-module-params')) {
           lowerPipesIn(clone);
           hoistModule(clone, root);
         }
@@ -104,9 +105,9 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
   const entryRoot = doc?.body.firstChild;
   if (entryRoot) {
     const aliased = new Set([...entryRoot.querySelectorAll('ir-using')].map(using => using.getAttribute('module')));
-    for (const module of [...entryRoot.querySelectorAll(':scope > ir-module')]) {
+    for (const module of [...childrenOf(entryRoot, 'ir-module')]) {
       if (module.attr('data-rewrite-pass') === 'inline-imports' || aliased.has(module.getAttribute('name'))) continue;
-      if (module.querySelector(':scope > ir-module-params')) continue;
+      if (childOf(module, 'ir-module-params')) continue;
       lowerPipesIn(module);
       hoistModule(module, entryRoot);
     }
@@ -132,8 +133,8 @@ function hasEquivalentUsing(root, candidate) {
   return [...root.querySelectorAll(':scope > ir-using:not([from])')].some(using =>
     using.getAttribute('module') === module
     && using.getAttribute('alias') === alias
-    && (using.querySelector(':scope > ir-type-args')?.textContent ?? '')
-      === (candidate.querySelector(':scope > ir-type-args')?.textContent ?? ''));
+    && (childOf(using, 'ir-type-args')?.textContent ?? '')
+      === (childOf(candidate, 'ir-type-args')?.textContent ?? ''));
 }
 
 function assertInlineImports(doc) {

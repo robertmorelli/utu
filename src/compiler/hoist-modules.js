@@ -1,6 +1,6 @@
 // Materialize module declarations into the flat source-file namespace.
 
-import { replaceNodeMeta } from './ir-helpers.js';
+import { childOf, childrenOf, replaceNodeMeta } from './ir-helpers.js';
 import { moduleMemberName } from './module-names.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 
@@ -68,7 +68,7 @@ export function hoistModule(module, root, graph = null, references = indexModule
     self.replaceWith(ref);
   }
   const valueNames = new Set([
-    ...[...module.querySelectorAll(':scope > ir-global')].map(node => node.getAttribute('name')),
+    ...[...childrenOf(module, 'ir-global')].map(node => node.getAttribute('name')),
     ...[...module.querySelectorAll(':scope > ir-fn > ir-fn-name[kind="free"]')].map(node => node.getAttribute('name')),
   ]);
   for (const ident of module.querySelectorAll('ir-ident')) {
@@ -96,8 +96,8 @@ function retainSourceDisplayNames(module, moduleDisplayName) {
     const sourceName = declaration.getAttribute('name');
     if (sourceName === '&') declaration.setAttribute('data-display-name', moduleDisplayName);
   }
-  for (const fn of module.querySelectorAll(':scope > ir-fn')) {
-    const name = fn.querySelector(':scope > ir-fn-name');
+  for (const fn of childrenOf(module, 'ir-fn')) {
+    const name = childOf(fn, 'ir-fn-name');
     if (!name) continue;
     const receiver = name.getAttribute('receiver');
     const method = name.getAttribute('name');
@@ -115,7 +115,7 @@ export function hasLexicalShadow(ident, name) {
   for (let node = ident.parentElement; node && node !== fn; node = node.parentElement) {
     if (node.localName !== 'ir-block') continue;
     if (['ir-iterator', 'ir-for'].includes(node.parentElement?.localName)) {
-      const names = node.parentElement.querySelector(':scope > ir-capture')?.getAttribute('names')?.split(',') ?? [];
+      const names = childOf(node.parentElement, 'ir-capture')?.getAttribute('names')?.split(',') ?? [];
       if (names.includes(name)) return true;
     }
     for (const child of node.children) {
@@ -166,7 +166,7 @@ function rewriteExternalModuleReferences(root, module, moduleName, renamings, re
   // Lowercase module free calls parse as an ordinary field access (`M.fn`).
   // Turn only known free members into identifiers; value field access remains
   // untouched and is resolved later from its receiver type.
-  const globalNames = new Set([...module.querySelectorAll(':scope > ir-global')]
+  const globalNames = new Set([...childrenOf(module, 'ir-global')]
     .map(node => node.getAttribute('name')));
   const freeNames = new Set([
     ...[...module.querySelectorAll(':scope > ir-fn > ir-fn-name[kind="free"]')]

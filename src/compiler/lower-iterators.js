@@ -1,6 +1,6 @@
 import { expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
-import { sourceTypeStr } from './ir-helpers.js';
+import { childOf, sourceTypeStr } from './ir-helpers.js';
 
 const terminals = new Set(['fold', 'each', 'any', 'all', 'count_where', 'first_index', 'last_index', 'sum', 'fast_sum', 'product', 'count', 'collect', 'sort', 'group_by', 'distinct_by', 'partition', 'batched', 'windows', 'min_by', 'max_by', 'first_where', 'reduce', 'bisect']);
 
@@ -164,9 +164,9 @@ function lowerPipeline(outer, prefix, parser, createDocument) {
 
   function stageCode(k, value) {
     const node = stages[k], op = node.getAttribute('op');
-    const capture = node.querySelector(':scope > ir-capture');
+    const capture = childOf(node, 'ir-capture');
     const bindings = capture?.getAttribute('names').split(',') ?? [];
-    const body = node.querySelector(':scope > ir-block');
+    const body = childOf(node, 'ir-block');
     const children = [...node.children];
     const param = children[1];
     const counter = name(`n${k}`), ordinal = name(`i${k}`);
@@ -611,13 +611,13 @@ function radixSort({ name, type, array, length, descending, fallback, result }) 
 /** Binary partition search over a materialized array: first index where the predicate is false. */
 function lowerBisect(stages, input, { name, splice, source, splices, outer, parser, createDocument }) {
   if (stages.length !== 1) throw new Error('bisect requires a materialized sorted array; parenthesize a collect or sort first');
-  const node = stages[0], bindings = node.querySelector(':scope > ir-capture').getAttribute('names').split(',');
+  const node = stages[0], bindings = childOf(node, 'ir-capture').getAttribute('names').split(',');
   if (bindings.length < 1 || bindings.length > 2) throw new Error('bisect expects |value, index| (index optional) and a monotone true-prefix predicate');
   const base = name('base'), size = name('size'), half = name('half'), mid = name('mid'), n = name('n');
   // Over a range (a..<b) the values are a + position, and the result is a position.
   const range = input.localName === 'ir-range';
   const start = name('start');
-  const predicate = at => `{ let ${bindings[0]} = ${range ? `${start} + ${at}` : `${source}[${at}]`}; ${bindings[1] ? `let ${bindings[1]} = ${at}.to_u32().to_u64();` : ''} ${splice(node.querySelector(':scope > ir-block'))}; }`;
+  const predicate = at => `{ let ${bindings[0]} = ${range ? `${start} + ${at}` : `${source}[${at}]`}; ${bindings[1] ? `let ${bindings[1]} = ${at}.to_u32().to_u64();` : ''} ${splice(childOf(node, 'ir-block'))}; }`;
   // Branchless search: the answer stays in [base, base + size]. Each probe
   // moves base with a select instead of a data-dependent branch, so random
   // queries cost no mispredictions. The predicate runs about log2(n) + 1 times.

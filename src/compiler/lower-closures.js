@@ -26,7 +26,7 @@
 // This pass must run after resolveBindings (it consumes scope-graph captures)
 // and before the type registry is finalised, since it introduces new structs.
 
-import { bodyOf, createSyntheticNode, firstTypeChild, replaceTypedNode, typeNodeToStr } from './ir-helpers.js';
+import { bodyOf, childOf, createSyntheticNode, firstTypeChild, replaceTypedNode, typeNodeToStr } from './ir-helpers.js';
 import { declarationType, planCoercions } from './type-graph.js';
 import { callableParts } from './type-rules.js';
 import { T } from './ir-tags.js';
@@ -162,7 +162,7 @@ function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
   envParam.appendChild(buildTypeNode(doc, closure, envType));
   params.appendChild(envParam);
 
-  const declared = closure.querySelector(':scope > ir-param-list');
+  const declared = childOf(closure, 'ir-param-list');
   for (const param of [...(declared?.children ?? [])]) {
     // Parameters whose type came from the closure's expectation carry it on
     // data-type-name only.  Materialise a type node so the lifted function is
@@ -225,7 +225,7 @@ function rewriteCaptureReads(body, captures, envParam, doc, scopeGraph) {
 
     const access = createSyntheticNode(doc, T.FIELD_ACCESS, ident, 'lower-closures', 'closure-capture-read');
     access.setAttribute('field', capture.name);
-    access.setAttribute('data-field-owner-name', envParam.querySelector(':scope > ir-type-ref')?.getAttribute('name') ?? '');
+    access.setAttribute('data-field-owner-name', childOf(envParam, 'ir-type-ref')?.getAttribute('name') ?? '');
     if (capture.type !== 'unknown') access.setAttribute('data-type-name', capture.type);
 
     const receiver = createSyntheticNode(doc, T.IDENT, ident, 'lower-closures', 'closure-env-receiver');

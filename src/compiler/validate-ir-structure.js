@@ -2,7 +2,7 @@ import { matchScalarIntrinsic } from './codegen/intrinsics.js';
 import { callableParts, INFERRED_PRIMITIVES } from './type-rules.js';
 import { collectScalarKinds } from './link-type-decls.js';
 import { tupleParts, unwrapNullable } from './type-strings.js';
-import { bodyOf } from './ir-helpers.js';
+import { bodyOf, childOf, childrenOf } from './ir-helpers.js';
 import { retainedGraphs } from './graph-store.js';
 
 const UNARY_INTRINSICS = new Set([
@@ -93,8 +93,8 @@ function assertExternFns(root, { phase }) {
       [fn.getAttribute('name'), 'ir-extern-fn must have a name attribute'],
       [fn.attr('data-extern'), 'ir-extern-fn must have data-extern'],
       [fn.attr('data-import-module') && fn.attr('data-import-name'), 'ir-extern-fn must have data-import-module and data-import-name'],
-      [fn.querySelector(':scope > ir-fn-name')?.getAttribute('name'), 'ir-extern-fn must have an ir-fn-name child'],
-      [fn.querySelectorAll(':scope > ir-param-list').length === 1, 'ir-extern-fn must have exactly one ir-param-list child'],
+      [childOf(fn, 'ir-fn-name')?.getAttribute('name'), 'ir-extern-fn must have an ir-fn-name child'],
+      [childrenOf(fn, 'ir-param-list').length === 1, 'ir-extern-fn must have exactly one ir-param-list child'],
       [!bodyOf(fn), 'ir-extern-fn must not have an ir-block body'],
       [signature.every(allowed), 'ir-extern-fn may only contain ir-fn-name, ir-param-list, and return type children'],
       [signature.filter(child => child.localName?.startsWith('ir-type-')).length === 1, 'ir-extern-fn must have exactly one return type child'],

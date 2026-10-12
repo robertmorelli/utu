@@ -9,7 +9,7 @@ import {
 import { emitClosureCall, emitFunCall } from './closures.js';
 import { emitMemIntrinsic, isMemIntrinsic } from './memories.js';
 import { callableParts } from '../type-rules.js';
-import { typeNodeToStr } from '../ir-helpers.js';
+import { childOf, typeNodeToStr } from '../ir-helpers.js';
 
 // ── Calls ─────────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ export function emitCall(node, ctx, emitExpr) {
   if (!fn) throw new Error('codegen: ir-call has unresolved target');
 
   const callee = node.firstElementChild;
-  const argList = node.querySelector(':scope > ir-arg-list');
+  const argList = childOf(node, 'ir-arg-list');
   const argNodes = argList ? [...argList.children] : [...node.children].slice(1);
   const resolvedAs = ctx.backendPlan?.types?.slots.get(node)?.resolution?.resolvedAs ?? node.attr('data-resolved-as');
   const callArgNodes = callee?.localName === 'ir-field-access' && resolvedAs !== 'static-method'
@@ -74,7 +74,7 @@ function emitProtocolCall(node, protocol, ctx, emitExpr) {
   const callee = node.firstElementChild;
   const receiverNode = callee?.firstElementChild;
   if (!receiverNode) throw new Error('codegen: protocol call has no receiver');
-  const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const args = [...(childOf(node, 'ir-arg-list')?.children ?? [])];
   const receiverType = ctx.toType(protocol.protocol);
   const receiverSlot = ctx.addLocal(protocol.protocol);
   const initializers = [m.local.set(receiverSlot, emitExpr(receiverNode, ctx))];
@@ -87,10 +87,10 @@ function emitProtocolCall(node, protocol, ctx, emitExpr) {
     return { slot, type };
   });
   const implementations = [...new Set(ctx.fnByName.values())].filter(fn => {
-    const name = fn.querySelector(':scope > ir-fn-name');
+    const name = childOf(fn, 'ir-fn-name');
     return name?.getAttribute('receiver') === protocol.protocol
       && name.getAttribute('name') === protocol.member
-      && name.querySelector(':scope > ir-type-args')?.firstElementChild;
+      && childOf(name, 'ir-type-args')?.firstElementChild;
   });
   if (!implementations.length) throw new Error(`codegen: protocol ${protocol.protocol}.${protocol.member} has no implementations`);
 

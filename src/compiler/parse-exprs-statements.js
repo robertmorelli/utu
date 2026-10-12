@@ -2,6 +2,7 @@
 
 import { stamp, el, text, namedChildren, append, walkChildren } from './parse-helpers.js';
 import { T } from './ir-tags.js';
+import { childOf } from './ir-helpers.js';
 
 export function walkBindExpr(n, doc, source, dispatch) {
   const node = stamp(el(T.LET, doc), n);
@@ -65,7 +66,7 @@ export function walkClosureExpr(n, doc, source, dispatch) {
   }
   // An empty parameter list is still a parameter list — downstream passes read
   // it positionally, so synthesise one when the source wrote `cl() { … }`.
-  if (!node.querySelector(':scope > ir-param-list')) {
+  if (!childOf(node, 'ir-param-list')) {
     node.insertBefore(stamp(el(T.PARAM_LIST, doc), n), node.firstChild);
   }
   return node;

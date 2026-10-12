@@ -52,7 +52,7 @@
 import { declarationsFromSource, expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { parseToIR } from './parse.js';
-import { createSyntheticNode } from './ir-helpers.js';
+import { childOf, childrenOf, createSyntheticNode } from './ir-helpers.js';
 
 // Storage kind → the type its elements read as and write from.
 export const MEM_KINDS = Object.freeze({
@@ -80,7 +80,7 @@ const SCOPES = 'ir-fn, ir-closure, ir-export-main, ir-test, ir-bench';
 export async function lowerMems(doc, parser, createDocument, { readBinaryFile = null, resolvePath = null, evaluateComptime = null } = {}) {
   const root = doc.body.firstChild;
   if (!root) return;
-  const decls = [...root.querySelectorAll(':scope > ir-mem')];
+  const decls = [...childrenOf(root, 'ir-mem')];
   if (!decls.length) return;
 
   // Integer enums are stored as their declared repr and read back as the enum.
@@ -212,7 +212,7 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
       if (mem.constant && WRITES.has(method)) {
         throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name} is const; it has no ${method}`, callee);
       }
-      const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
+      const args = [...(childOf(node, 'ir-arg-list')?.children ?? [])];
       replace(node, `${mem.prefix}${method}(${args.map(splice).join(', ')})`, splices);
     }
   }

@@ -4,7 +4,7 @@
 // Works from structured ir-pipe-target (no re-parsing).
 
 import { restampSubtree } from './parse.js';
-import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
+import { childOf, childrenOf, createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
 
 export function lowerPipe(doc, { debugAssertions = false } = {}) {
   const root = doc?.body?.firstChild;
@@ -23,10 +23,10 @@ export function lowerPipesIn(root) {
 function lowerOnePipe(pipe) {
   const doc   = pipe.ownerDocument;
   const value = pipe.firstElementChild;
-  const tgt   = pipe.querySelector(':scope > ir-pipe-target');
+  const tgt   = childOf(pipe, 'ir-pipe-target');
   if (!value || !tgt) throw new Error('lower pipe: malformed ir-pipe');
 
-  const segs = [...tgt.querySelectorAll(':scope > ir-pipe-seg')];
+  const segs = [...childrenOf(tgt, 'ir-pipe-seg')];
   const args = [...tgt.querySelectorAll(':scope > ir-pipe-arg, :scope > ir-pipe-placeholder')];
 
   if (segs.length === 0) throw new Error('lower pipe: empty pipe target');

@@ -1,4 +1,4 @@
-import { cloneGraphSubtree, createSyntheticNode, replaceTypedNode } from './ir-helpers.js';
+import { childOf, childrenOf, cloneGraphSubtree, createSyntheticNode, replaceTypedNode } from './ir-helpers.js';
 
 import { typeEntryDecl } from './link-type-decls.js';
 import { unwrapNullable } from './type-strings.js';
@@ -21,8 +21,8 @@ export function lowerBackendControl(doc, typeIndex, { target = 'normal' } = {}) 
 
 function lowerAlt(alt, typeIndex) {
   const scrutinee = alt.firstElementChild;
-  const arms = [...alt.querySelectorAll(':scope > ir-alt-arm')];
-  const defaultArm = alt.querySelector(':scope > ir-default-arm');
+  const arms = [...childrenOf(alt, 'ir-alt-arm')];
+  const defaultArm = childOf(alt, 'ir-default-arm');
   const scrutType = scrutinee?.attr?.('data-type-name') ?? '';
   if (!scrutinee || !scrutType || arms.length === 0) return null;
 
@@ -43,7 +43,7 @@ function lowerAlt(alt, typeIndex) {
   // checks this), so its last arm needs no test; any other case traps.
   let last = arms.length - 1;
   if (!defaultArm) {
-    const variants = enumDecl?.localName === 'ir-enum' ? enumDecl.querySelectorAll(':scope > ir-variant').length : -1;
+    const variants = enumDecl?.localName === 'ir-enum' ? childrenOf(enumDecl, 'ir-variant').length : -1;
     const resultType = alt.attr('data-type-name');
     if (variants === new Set(arms.map(arm => arm.getAttribute('variant'))).size) {
       tail = lowerArmBody(alt, block.subjectLet, block.subjectName, arms[last--]);
@@ -63,8 +63,8 @@ function lowerAlt(alt, typeIndex) {
 
 function lowerPromote(node) {
   const scrutinee = node.firstElementChild;
-  const thenArm = node.querySelector(':scope > ir-promote-arm');
-  const defaultArm = node.querySelector(':scope > ir-default-arm');
+  const thenArm = childOf(node, 'ir-promote-arm');
+  const defaultArm = childOf(node, 'ir-default-arm');
   const scrutType = scrutinee?.attr?.('data-type-name') ?? '';
   if (!scrutinee || !thenArm) return null;
   if (!scrutType.startsWith('?')) {
@@ -256,7 +256,7 @@ function stampBlockType(block, site, arms, defaultArm) {
 
 function tagValue(typeIndex, enumDecl, arm) {
   const variantDecl = typeEntryDecl(typeIndex.get(arm.getAttribute('variant') ?? ''));
-  const variants = [...enumDecl.querySelectorAll(':scope > ir-variant')];
+  const variants = [...childrenOf(enumDecl, 'ir-variant')];
   return Math.max(0, variants.indexOf(variantDecl));
 }
 

@@ -11,6 +11,7 @@
 // leaf in the codegen dependency graph.
 
 import { binaryen } from './types.js';
+import { childOf } from '../ir-helpers.js';
 
 // ── Emit helpers ─────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ function protocolFieldImplementations(ctx, protocol, fieldName) {
   for (const info of ctx.structTypes.values()) {
     if (info.decl?.localName !== 'ir-struct' && info.decl?.localName !== 'ir-variant') continue;
     const declaration = info.decl.localName === 'ir-variant' ? info.decl.parentElement : info.decl;
-    const protocols = (declaration.querySelector(':scope > ir-impl-list')?.getAttribute('impls') ?? '')
+    const protocols = (childOf(declaration, 'ir-impl-list')?.getAttribute('impls') ?? '')
       .split(',').map(name => name.trim()).filter(Boolean);
     const field = info.fieldIndex?.get(fieldName);
     if (protocols.includes(protocol) && field) out.push({ info, field });

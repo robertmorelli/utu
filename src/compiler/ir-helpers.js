@@ -65,7 +65,7 @@ export function sourceTypeStr(typeNode) {
     return parts.every(Boolean) ? `.{${parts.join(', ')}}` : null;
   }
   if (typeNode.localName === 'ir-type-inst') {
-    const args = [...(typeNode.querySelector(':scope > ir-type-args')?.children ?? [])].map(sourceTypeStr);
+    const args = [...(childOf(typeNode, 'ir-type-args')?.children ?? [])].map(sourceTypeStr);
     if (!args.every(Boolean)) return typeNode.getAttribute('raw')?.replace(/\s+/g, '') ?? null;
     return `${typeNode.getAttribute('module')}[${args.join(', ')}]`;
   }

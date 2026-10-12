@@ -24,7 +24,7 @@
 // were rejected: benchmarks/control-flow/README.md.
 import { expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
-import { paramsOf, sourceTypeStr } from './ir-helpers.js';
+import { childOf, childrenOf, paramsOf, sourceTypeStr } from './ir-helpers.js';
 
 const MAX_EXPANSIONS = 10000;
 const LOOPS = new Set(['ir-while', 'ir-for', 'ir-loop-match']);
@@ -104,7 +104,7 @@ function expansionsAround(node) {
 
 /** The generator call a `for` loop iterates, if its only source is one. */
 function generatorCall(loop, generators) {
-  const sources = [...loop.querySelectorAll(':scope > ir-for-source')];
+  const sources = [...childrenOf(loop, 'ir-for-source')];
   const call = sources.length === 1 && sources[0].children.length === 1 && !sources[0].getAttribute('op') ? sources[0].firstElementChild : null;
   const callee = call?.localName === 'ir-call' ? call.firstElementChild : null;
   return callee?.localName === 'ir-ident' && generators.has(callee.getAttribute('name')) ? call : null;
@@ -132,10 +132,10 @@ function retag(node, tag) {
 function expandLoop(loop, generators, prefix, parser, createDocument) {
   const call = generatorCall(loop, generators);
   const generator = generators.get(call.firstElementChild.getAttribute('name'));
-  const names = (loop.querySelector(':scope > ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
+  const names = (childOf(loop, 'ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
   if (names.length > 1) throw new Error('a generator loop binds one value: for (gen()) |value| { … }');
-  const consumer = loop.querySelector(':scope > ir-block');
-  const args = [...(call.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const consumer = childOf(loop, 'ir-block');
+  const args = [...(childOf(call, 'ir-arg-list')?.children ?? [])];
   const params = paramsOf(generator);
   if (args.length !== params.length) throw new Error(`${generator.getAttribute('name')} expects ${params.length} argument(s), got ${args.length}`);
 
@@ -145,7 +145,7 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
 
   // Rename every binding the generator declares, so its locals and the
   // consumer body (spliced inside it) can never refer to each other by accident.
-  const body = generator.querySelector(':scope > ir-block').cloneNode(true);
+  const body = childOf(generator, 'ir-block').cloneNode(true);
   const declared = new Set([
     ...params.map(param => param.getAttribute('name')),
     ...[...body.querySelectorAll('ir-let[name], ir-param[name]')].map(node => node.getAttribute('name')),
@@ -185,7 +185,7 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
   });
   const code = `{ ${bindings.join(' ')} ${splice(body)}; }`;
   const expanded = expressionFromSource(parser, code, loop, splices, { createDocument });
-  const statements = expanded.querySelector(':scope > ir-block') ?? expanded;
+  const statements = childOf(expanded, 'ir-block') ?? expanded;
   labeledBlock(statements.lastElementChild, whole);
   return expanded;
 }
@@ -222,10 +222,10 @@ function expandRecursiveLoop(loop, generators, recursive, prefix, parser, create
   const call = generatorCall(loop, generators);
   const name = call.firstElementChild.getAttribute('name');
   const generator = generators.get(name);
-  const names = (loop.querySelector(':scope > ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
+  const names = (childOf(loop, 'ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
   if (names.length > 1) throw new Error('a generator loop binds one value: for (gen()) |value| { … }');
-  const consumer = loop.querySelector(':scope > ir-block');
-  const args = [...(call.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const consumer = childOf(loop, 'ir-block');
+  const args = [...(childOf(call, 'ir-arg-list')?.children ?? [])];
   const params = paramsOf(generator);
   if (args.length !== params.length) throw new Error(`${name} expects ${params.length} argument(s), got ${args.length}`);
 
@@ -242,7 +242,7 @@ function expandRecursiveLoop(loop, generators, recursive, prefix, parser, create
   const valArray = shared >= 0 ? `${s}arg${shared}` : `${s}val`;
   const unwrap = shared >= 0 || stored === elementType ? '' : ' orelse fatal';
 
-  const body = generator.querySelector(':scope > ir-block').cloneNode(true);
+  const body = childOf(generator, 'ir-block').cloneNode(true);
   const renamed = renameLocals(body, params, `${prefix}u_`);
   for (const jump of ownJumps(body).filter(node => node.localName === 'ir-return')) {
     if (jump.children.length) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'a generator ends with `return;`, without a value', jump);
@@ -266,7 +266,7 @@ function expandRecursiveLoop(loop, generators, recursive, prefix, parser, create
     if (!isDelegation(inner)) {
       throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, `a recursive generator passes its own values straight through: \`for (${name}(…)) |v| { yield v; }\``, inner);
     }
-    const innerArgs = [...(innerCall.querySelector(':scope > ir-arg-list')?.children ?? [])];
+    const innerArgs = [...(childOf(innerCall, 'ir-arg-list')?.children ?? [])];
     if (innerArgs.length !== params.length) throw new Error(`${name} expects ${params.length} argument(s), got ${innerArgs.length}`);
     const yielded = inner.previousElementSibling;
     const same = params.length === 1 && shared === 0 && yielded?.localName === 'ir-yield'
@@ -360,8 +360,8 @@ function expandRecursiveLoop(loop, generators, recursive, prefix, parser, create
 
 /** `for (gen(…)) |v| { yield v; }`, and nothing else. */
 function isDelegation(loop) {
-  const name = loop.querySelector(':scope > ir-capture')?.getAttribute('names');
-  const elements = [...loop.querySelector(':scope > ir-block').querySelectorAll('*')].filter(node => node.localName !== 'ir-block');
+  const name = childOf(loop, 'ir-capture')?.getAttribute('names');
+  const elements = [...childOf(loop, 'ir-block').querySelectorAll('*')].filter(node => node.localName !== 'ir-block');
   return elements.length === 2 && elements[0].localName === 'ir-yield'
     && elements[1].localName === 'ir-ident' && elements[1].getAttribute('name') === name;
 }

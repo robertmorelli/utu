@@ -1,4 +1,4 @@
-import { declaredTypeStr, fnReturnType, isFunctionDecl, paramsOf } from './ir-helpers.js';
+import { childOf, childrenOf, declaredTypeStr, fnReturnType, isFunctionDecl, paramsOf } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { typeEntryDecl } from './link-type-decls.js';
 import { retainedGraphs } from './graph-store.js';
@@ -57,8 +57,8 @@ function validateAssignmentTargets(root, scopeGraph, program) {
 
 function validateForSources(root, program) {
   for (const loop of program ? nodesOf(program, 'ir-for') : root.querySelectorAll('ir-for')) {
-    const sources = [...loop.querySelectorAll(':scope > ir-for-source')];
-    const capture = loop.querySelector(':scope > ir-capture');
+    const sources = [...childrenOf(loop, 'ir-for-source')];
+    const capture = childOf(loop, 'ir-capture');
     const names = (capture?.getAttribute('names') ?? '').split(',').filter(Boolean);
     if (names.length && names.length !== sources.length) {
       stampDiagnostic(capture, DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE,
@@ -167,7 +167,7 @@ function validateResidualEsDsls(root, program) {
 
 function validateDuplicateBindings(root, program) {
   for (const params of root.querySelectorAll('ir-param-list')) {
-    diagnoseDuplicateNames([...params.querySelectorAll(':scope > ir-param')], 'parameter');
+    diagnoseDuplicateNames([...childrenOf(params, 'ir-param')], 'parameter');
   }
   for (const block of program ? nodesOf(program, 'ir-block') : root.querySelectorAll('ir-block')) {
     diagnoseDuplicateNames([...block.children].filter(child => child.localName === 'ir-let'), 'local binding');
@@ -189,11 +189,11 @@ function diagnoseDuplicateNames(nodes, label) {
 function validateStructDeclarations(root, program) {
   for (const decl of program ? nodesOf(program, 'ir-struct', 'ir-variant', 'ir-enum') : root.querySelectorAll('ir-struct, ir-variant, ir-enum')) {
     if (decl.localName === 'ir-enum') {
-      diagnoseDuplicateNames([...decl.querySelectorAll(':scope > ir-variant')], 'variant');
+      diagnoseDuplicateNames([...childrenOf(decl, 'ir-variant')], 'variant');
       continue;
     }
     const seen = new Set();
-    for (const field of decl.querySelectorAll(':scope > ir-field')) {
+    for (const field of childrenOf(decl, 'ir-field')) {
       const name = field.getAttribute('name');
       if (!name || !seen.has(name)) { if (name) seen.add(name); continue; }
       stampDiagnostic(field, DIAGNOSTIC_KINDS.DUPLICATE_FIELD,
@@ -203,15 +203,15 @@ function validateStructDeclarations(root, program) {
 }
 
 function validateProtocolImplementations(root, program) {
-  const protocols = new Map([...root.querySelectorAll(':scope > ir-proto')]
+  const protocols = new Map([...childrenOf(root, 'ir-proto')]
     .map(proto => [proto.getAttribute('name'), proto]));
-  const functions = [...root.querySelectorAll(':scope > ir-fn')];
-  const implementors = [...root.querySelectorAll(':scope > ir-struct'),
-    ...[...root.querySelectorAll(':scope > ir-enum')].flatMap(type => [...type.querySelectorAll(':scope > ir-variant')])];
+  const functions = [...childrenOf(root, 'ir-fn')];
+  const implementors = [...childrenOf(root, 'ir-struct'),
+    ...[...childrenOf(root, 'ir-enum')].flatMap(type => [...childrenOf(type, 'ir-variant')])];
   for (const type of implementors) {
     const typeName = type.getAttribute('name');
     const declaration = type.localName === 'ir-variant' ? type.parentElement : type;
-    const implemented = (declaration.querySelector(':scope > ir-impl-list')?.getAttribute('impls') ?? '')
+    const implemented = (childOf(declaration, 'ir-impl-list')?.getAttribute('impls') ?? '')
       .split(',').map(name => name.trim()).filter(Boolean);
     for (const protocolName of implemented) {
       const protocol = protocols.get(protocolName);
@@ -221,7 +221,7 @@ function validateProtocolImplementations(root, program) {
         if (!name) continue;
         if (member.localName === 'ir-proto-get' || member.localName === 'ir-proto-set'
           || member.localName === 'ir-proto-get-set') {
-          const field = [...type.querySelectorAll(':scope > ir-field')].find(item => item.getAttribute('name') === name);
+          const field = [...childrenOf(type, 'ir-field')].find(item => item.getAttribute('name') === name);
           if (!field || declaredTypeStr(field) !== declaredTypeStr(member)) {
             stampDiagnostic(type, DIAGNOSTIC_KINDS.UNKNOWN_METHOD,
               `${typeName} does not implement protocol getter '${protocolName}.${name}'`, { protocol: protocolName, member: name });
@@ -230,10 +230,10 @@ function validateProtocolImplementations(root, program) {
         }
         if (member.localName !== 'ir-proto-method') continue;
         const implementation = functions.find(fn => {
-          const fnName = fn.querySelector(':scope > ir-fn-name');
+          const fnName = childOf(fn, 'ir-fn-name');
           return fnName?.getAttribute('receiver') === protocolName
             && fnName.getAttribute('name') === name
-            && fnName.querySelector(':scope > ir-type-args')?.firstElementChild?.getAttribute('name') === typeName;
+            && childOf(fnName, 'ir-type-args')?.firstElementChild?.getAttribute('name') === typeName;
         });
         if (!implementation) {
           stampDiagnostic(type, DIAGNOSTIC_KINDS.UNKNOWN_METHOD,
@@ -291,7 +291,7 @@ function validateIntegerLiterals(root, program) {
     try { value = BigInt(literal.getAttribute('value')); } catch { continue; }
     const call = literal.closest('ir-call');
     const sourceNegation = (type === 'I32' || type === 'I64')
-      && call?.attr?.('data-operator-name') === 'neg' && call.querySelector(':scope > ir-arg-list')?.firstElementChild === literal;
+      && call?.attr?.('data-operator-name') === 'neg' && childOf(call, 'ir-arg-list')?.firstElementChild === literal;
     const comparable = sourceNegation && value >= 0n ? -value : value;
     if (comparable >= range[0] && comparable <= range[1]) continue;
     stampDiagnostic(literal, DIAGNOSTIC_KINDS.INTEGER_LITERAL_OUT_OF_RANGE,
@@ -326,10 +326,10 @@ function validateStructInits(root, typeIndex, program) {
     const typeName = init.getAttribute('type-name');
     const decl = typeEntryDecl(typeIndex.get(typeName));
     if (decl?.localName !== 'ir-struct' && decl?.localName !== 'ir-variant') continue;
-    const fields = new Set([...decl.querySelectorAll(':scope > ir-field')]
+    const fields = new Set([...childrenOf(decl, 'ir-field')]
       .map(field => field.getAttribute('name')).filter(Boolean));
     const seen = new Set();
-    for (const fieldInit of init.querySelectorAll(':scope > ir-field-init')) {
+    for (const fieldInit of childrenOf(init, 'ir-field-init')) {
       const name = fieldInit.getAttribute('field');
       if (seen.has(name)) {
         stampDiagnostic(fieldInit, DIAGNOSTIC_KINDS.DUPLICATE_FIELD, `Duplicate field '${name}'`, { field: name, type: typeName });
@@ -449,7 +449,7 @@ function validateMatchPatterns(root, ctx) {
         { expected: 'scalar', actual: type });
       continue;
     }
-    for (const arm of node.querySelectorAll(':scope > ir-match-arm')) {
+    for (const arm of childrenOf(node, 'ir-match-arm')) {
       const pattern = arm.getAttribute('pattern');
       if (!pattern) continue;
       const problem = matchPatternProblem(pattern, type, integer);
@@ -487,13 +487,13 @@ function canonicalPattern(pattern) {
 }
 
 function hasDefaultArm(node) {
-  return Boolean(node.querySelector(':scope > ir-default-arm'));
+  return Boolean(childOf(node, 'ir-default-arm'));
 }
 
 function enumVariants(typeName, typeIndex) {
   const decl = typeEntryDecl(typeName ? typeIndex.get(typeName) : null);
   if (decl?.localName !== 'ir-enum') return null;
-  return [...decl.querySelectorAll(':scope > ir-variant')]
+  return [...childrenOf(decl, 'ir-variant')]
     .map(variant => variant.getAttribute('name'))
     .filter(Boolean);
 }

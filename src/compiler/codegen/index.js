@@ -31,6 +31,7 @@ import { retainedGraphs } from '../graph-store.js';
 import { ensureBackendPlan } from '../backend-plan.js';
 import { unwrapNullable } from '../type-strings.js';
 import { declareMemoryGlobals, moduleWithMemories, readMems } from './memories.js';
+import { childrenOf } from '../ir-helpers.js';
 
 const MODULE_REQUIREMENTS = new WeakMap();
 
@@ -143,7 +144,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
   // Wasm globals must have constant initializers. Source globals currently
   // support literal scalar/reference constants; reject richer initializers at
   // codegen with a direct error instead of failing later in Binaryen.
-  for (const global of root.querySelectorAll(':scope > ir-global')) {
+  for (const global of childrenOf(root, 'ir-global')) {
     const name = global.getAttribute('name');
     const init = global.lastElementChild;
     const typeName = ctx.typeOf(global) ?? ctx.typeOf(init);
@@ -158,7 +159,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
   }
 
   // Emit user fns (anything top-level that isn't itself an intrinsic wrapper).
-  const emittableFunctions = [...(plan?.emittableFunctions ?? root.querySelectorAll(':scope > ir-fn'))]
+  const emittableFunctions = [...(plan?.emittableFunctions ?? childrenOf(root, 'ir-fn'))]
     .filter(fn => !describeIntrinsicWrapper(fn, scalarKinds));
   requirements.conservativeSweep ||= requiresConservativeSweep(emittableFunctions, plan, typeIndex);
   for (const fn of emittableFunctions) emitFn(fn, ctx);

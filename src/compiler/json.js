@@ -20,7 +20,7 @@
 // its "kind": {"kind": "Circle", "radius": 3}. Types may be recursive through
 // ?T or Array[T].
 import { declarationsFromSource, expressionFromSource } from './source-expansion.js';
-import { sourceTypeStr } from './ir-helpers.js';
+import { childrenOf, sourceTypeStr } from './ir-helpers.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 
 const literal = text => JSON.stringify(text);
@@ -752,7 +752,7 @@ function createProgram(container) {
     },
     // A previous expansion round may already have emitted the runtime or a codec.
     hasRuntime: !!container.querySelector(':scope > ir-struct[name="JsonReader__"]'),
-    existing: new Set([...container.querySelectorAll(':scope > ir-fn')].map(fn => fn.getAttribute('name'))),
+    existing: new Set([...childrenOf(container, 'ir-fn')].map(fn => fn.getAttribute('name'))),
     generated: new Set(),
     functions: [],
   };
@@ -828,9 +828,9 @@ function codecs(program, typeOffset, typeLength) {
     const node = program.declared.get(type);
     if (!node) fail(`@json cannot use ${type}: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64`);
     if (node.querySelector(':scope > ir-type-params, :scope > ir-generic-params')) fail(`@json cannot use generic type ${type}`);
-    const fieldsOf = owner => [...owner.querySelectorAll(':scope > ir-field')].map(field => ({ name: field.getAttribute('name'), type: (sourceTypeStr(field.firstElementChild) ?? '').replace(/\s+/g, '') }));
+    const fieldsOf = owner => [...childrenOf(owner, 'ir-field')].map(field => ({ name: field.getAttribute('name'), type: (sourceTypeStr(field.firstElementChild) ?? '').replace(/\s+/g, '') }));
     if (node.localName === 'ir-struct') return { kind: 'struct', type, fields: fieldsOf(node) };
-    const variants = [...node.querySelectorAll(':scope > ir-variant')].map(variant => ({ name: variant.getAttribute('name'), fields: fieldsOf(variant) }));
+    const variants = [...childrenOf(node, 'ir-variant')].map(variant => ({ name: variant.getAttribute('name'), fields: fieldsOf(variant) }));
     for (const variant of variants) {
       if (variant.fields.some(field => field.name === 'kind')) fail(`${type}.${variant.name} has a field named kind, which @json uses to name the variant`);
     }

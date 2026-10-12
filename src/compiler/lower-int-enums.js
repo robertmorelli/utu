@@ -19,7 +19,7 @@
 // previous explicit `= n`.
 import { declarationsFromSource, expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
-import { createSyntheticNode } from './ir-helpers.js';
+import { childOf, childrenOf, createSyntheticNode } from './ir-helpers.js';
 
 export const INT_ENUM_REPRS = Object.freeze({
   U8: [0, 255], I8: [-128, 127], U16: [0, 65535], I16: [-32768, 32767],
@@ -47,7 +47,7 @@ export function lowerIntEnums(doc, parser, createDocument) {
 
   // Matches first, so their continues still see `Tag.X` and become literals.
   for (const match of [...root.querySelectorAll('ir-match, ir-loop-match')].reverse()) {
-    const arms = [...match.querySelectorAll(':scope > ir-match-arm')];
+    const arms = [...childrenOf(match, 'ir-match-arm')];
     const named = arms.filter(arm => /^[A-Z][A-Za-z0-9_]*\.[A-Z][A-Za-z0-9_]*$/.test(arm.getAttribute('pattern') ?? ''));
     if (!named.length) continue;
     const enumName = named[0].getAttribute('pattern').split('.')[0];
@@ -66,7 +66,7 @@ export function lowerIntEnums(doc, parser, createDocument) {
       covered.add(variant);
       arm.setAttribute('pattern', String(info.values.get(variant)));
     }
-    if (!match.querySelector(':scope > ir-default-arm')) {
+    if (!childOf(match, 'ir-default-arm')) {
       const missing = [...info.values.keys()].filter(name => !covered.has(name));
       if (missing.length) {
         throw compilerError(DIAGNOSTIC_KINDS.NON_EXHAUSTIVE_MATCH, `Missing variant '${missing[0]}' in match over ${enumName}`, match);
@@ -91,7 +91,7 @@ export function lowerIntEnums(doc, parser, createDocument) {
 
   // `Tag.Leaf` anywhere else is that variant's value.
   for (const member of [...root.querySelectorAll('ir-type-member')]) {
-    const owner = member.querySelector(':scope > ir-type-ref')?.getAttribute('name');
+    const owner = childOf(member, 'ir-type-ref')?.getAttribute('name');
     const info = enums.get(owner);
     const variant = member.getAttribute('method');
     if (!info || !info.values.has(variant)) continue;
@@ -120,7 +120,7 @@ function describe(decl) {
   const values = new Map();
   const taken = new Map();
   let next = 0;
-  for (const variant of decl.querySelectorAll(':scope > ir-variant')) {
+  for (const variant of childrenOf(decl, 'ir-variant')) {
     const variantName = variant.getAttribute('name');
     if (variant.querySelector('ir-field')) {
       throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, `${name}.${variantName}: integer enum variants have no fields`, variant);
@@ -145,7 +145,7 @@ function describe(decl) {
 
 function variantOf(node, enumName, info) {
   if (node.localName !== 'ir-type-member') return null;
-  const owner = node.querySelector(':scope > ir-type-ref')?.getAttribute('name');
+  const owner = childOf(node, 'ir-type-ref')?.getAttribute('name');
   const variant = node.getAttribute('method');
   return owner === enumName && info.values.has(variant) ? variant : null;
 }
@@ -184,7 +184,7 @@ const DISTINCT_BASES = {
 export function lowerDistinctTypes(doc, parser, createDocument) {
   const root = doc.body.firstChild;
   if (!root) return;
-  const decls = [...root.querySelectorAll(':scope > ir-distinct')];
+  const decls = [...childrenOf(root, 'ir-distinct')];
   if (!decls.length) return;
   const distinct = {};
   for (const decl of decls) {

@@ -23,7 +23,7 @@
 // Returns the index map so later passes can reuse it without re-querying.
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { tupleParts } from './type-strings.js';
-import { firstTypeChild, typeNodeToStr } from './ir-helpers.js';
+import { childrenOf, firstTypeChild, typeNodeToStr } from './ir-helpers.js';
 import { callableParts, isCallableType, SOURCE_PRIMITIVES } from './type-rules.js';
 export { typeEntryDecl } from './type-entries.js';
 
@@ -48,7 +48,7 @@ export function linkTypeDecls(doc, graph = null) {
       const enumEntry = index.get(name);
       const tagType = enumEntry.tagType;
       const variantNames = [];
-      for (const [tagValue, variant] of [...decl.querySelectorAll(':scope > ir-variant')].entries()) {
+      for (const [tagValue, variant] of [...childrenOf(decl, 'ir-variant')].entries()) {
         const variantName = variant.getAttribute('name');
         variantNames.push(variantName);
         const variantEntry = makeVariantEntry(variantName, variant, name, tagType, tagValue);
@@ -219,7 +219,7 @@ function parseArrayRepr(typeRepr, typeName) {
 }
 
 function collectDeclaredFields(decl) {
-  return [...decl.querySelectorAll(':scope > ir-field')].map((field) => ({
+  return [...childrenOf(decl, 'ir-field')].map((field) => ({
     name: field.getAttribute('name'),
     type: typeNodeToStr(firstTypeChild(field)),
   }));

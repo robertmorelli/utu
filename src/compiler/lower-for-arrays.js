@@ -8,6 +8,7 @@
 // shortest, as counted sources already do; break and continue keep working.
 import { expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
+import { childOf, childrenOf } from './ir-helpers.js';
 
 const isArraySource = source => source.children.length === 1 && !source.getAttribute('op');
 
@@ -17,7 +18,7 @@ export function lowerForArrays(doc, parser, createDocument) {
   // of holding a snapshot that nested loops would fall out of.
   for (;;) {
     const loop = [...doc.querySelectorAll('ir-for')]
-      .find(node => node.closest('ir-source-file') && [...node.querySelectorAll(':scope > ir-for-source')].some(isArraySource));
+      .find(node => node.closest('ir-source-file') && [...childrenOf(node, 'ir-for-source')].some(isArraySource));
     if (!loop) return;
     try {
       loop.replaceWith(rewrite(loop, `__for${serial++}_`, parser, createDocument));
@@ -28,9 +29,9 @@ export function lowerForArrays(doc, parser, createDocument) {
 }
 
 function rewrite(loop, prefix, parser, createDocument) {
-  const sources = [...loop.querySelectorAll(':scope > ir-for-source')];
-  const names = (loop.querySelector(':scope > ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
-  const body = loop.querySelector(':scope > ir-block');
+  const sources = [...childrenOf(loop, 'ir-for-source')];
+  const names = (childOf(loop, 'ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
+  const body = childOf(loop, 'ir-block');
   if (names.length && names.length !== sources.length) {
     throw new Error(`for has ${sources.length} source(s) but ${names.length} capture(s)`);
   }

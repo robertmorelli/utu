@@ -1,6 +1,6 @@
 // Declaration elaboration facts retained across destructive module lowering.
 
-import { sourceId } from './ir-helpers.js';
+import { childOf, sourceId } from './ir-helpers.js';
 
 export function buildElaborationGraph(doc) {
   const root = doc.body.firstChild;
@@ -32,7 +32,7 @@ export function buildElaborationGraph(doc) {
     if (!node?.id) return null;
     let fact = requests.get(node.id);
     if (!fact) {
-      const args = [...(node.querySelector(':scope > ir-type-args')?.children ?? [])];
+      const args = [...(childOf(node, 'ir-type-args')?.children ?? [])];
       fact = {
         node, module: node.getAttribute('module') ?? node.firstElementChild?.getAttribute('name') ?? null,
         alias: node.getAttribute('alias') ?? null, args,
