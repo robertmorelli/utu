@@ -73,6 +73,10 @@ class Shape {
 
 const EMPTY = new Shape([]);
 
+// Attributes kept in element fields rather than shapes, being read far more
+// than any other (ids by every graph keyed on them, types by every analysis).
+const FIELD_NAMES = ['id', 'name', 'type-name', 'data-type-name', 'data-origin-id', 'receiver'];
+
 // ── Nodes ─────────────────────────────────────────────────────────────────────
 
 class IRNode {
@@ -150,6 +154,13 @@ class IRElement extends IRNode {
     // A dense per-document index: analyses keep per-node facts in arrays by `$`.
     this.$ = document.count++;
     this.localName = localName;
+    // The most-read attributes are fields (see FIELD_NAMES); the rest share shapes.
+    this.idValue = undefined;
+    this.nameValue = undefined;
+    this.typeNameValue = undefined;
+    this.dataTypeNameValue = undefined;
+    this.originIdValue = undefined;
+    this.receiverValue = undefined;
     this.shape = EMPTY;
     this.values = [];
     this.childNodes = [];
@@ -165,59 +176,81 @@ class IRElement extends IRNode {
   // ── Attributes ──
   /** The value of an attribute already in lowercase, or undefined. */
   attr(name) {
+    switch (name) {
+      case 'id': return this.idValue;
+      case 'name': return this.nameValue;
+      case 'type-name': return this.typeNameValue;
+      case 'data-type-name': return this.dataTypeNameValue;
+      case 'data-origin-id': return this.originIdValue;
+      case 'receiver': return this.receiverValue;
+    }
     const i = this.shape.index.get(name);
     return i === undefined ? undefined : this.values[i];
   }
 
-  getAttribute(name) {
-    let i = this.shape.index.get(name);
-    if (i === undefined) {
-      const lower = name.toLowerCase();
-      if (lower === name || (i = this.shape.index.get(lower)) === undefined) return null;
+  /** Set a lowercase attribute's value (a string), or remove it (undefined). */
+  setAttr(key, text) {
+    switch (key) {
+      case 'id': this.idValue = text; return;
+      case 'name': this.nameValue = text; return;
+      case 'type-name': this.typeNameValue = text; return;
+      case 'data-type-name': this.dataTypeNameValue = text; return;
+      case 'data-origin-id': this.originIdValue = text; return;
+      case 'receiver': this.receiverValue = text; return;
     }
-    return this.values[i];
-  }
-
-  setAttribute(name, value) {
-    let key = name;
-    let i = this.shape.index.get(key);
-    if (i === undefined) {
-      key = name.toLowerCase();
-      i = this.shape.index.get(key);
-    }
-    const text = String(value);
-    if (key === 'id') this.ownerDocument.ids.set(text, this);
-    if (i === undefined) {
+    const i = this.shape.index.get(key);
+    if (text === undefined) {
+      if (i === undefined) return;
+      this.shape = this.shape.without(key);
+      this.values.splice(i, 1);
+    } else if (i === undefined) {
       this.shape = this.shape.with(key);
       this.values.push(text);
     } else {
       this.values[i] = text;
     }
+  }
+
+  getAttribute(name) {
+    let value = this.attr(name);
+    if (value === undefined) {
+      const lower = name.toLowerCase();
+      if (lower !== name) value = this.attr(lower);
+    }
+    return value ?? null;
+  }
+
+  setAttribute(name, value) {
+    const key = name.toLowerCase();
+    const text = String(value);
+    if (key === 'id') this.ownerDocument.ids.set(text, this);
+    this.setAttr(key, text);
     mutated(this, 'attributes');
   }
 
   removeAttribute(name) {
     const key = name.toLowerCase();
-    const i = this.shape.index.get(key);
-    if (i === undefined) return;
-    this.shape = this.shape.without(key);
-    this.values.splice(i, 1);
+    if (this.attr(key) === undefined) return;
+    this.setAttr(key, undefined);
     mutated(this, 'attributes');
   }
 
   hasAttribute(name) {
-    return this.shape.index.has(name) || this.shape.index.has(name.toLowerCase());
+    return this.getAttribute(name) !== null;
   }
 
   getAttributeNames() {
-    return [...this.shape.names];
+    const names = [];
+    for (const field of FIELD_NAMES) if (this.attr(field) !== undefined) names.push(field);
+    names.push(...this.shape.names);
+    return names;
   }
 
   get attributes() {
-    return this.shape.names.map((name, i) => ({ name, value: this.values[i] }));
+    return this.getAttributeNames().map(name => ({ name, value: this.attr(name) }));
   }
 
-  get id() { return this.attr('id') ?? ''; }
+  get id() { return this.idValue ?? ''; }
   set id(value) { this.setAttribute('id', value); }
 
   get dataset() {
@@ -335,7 +368,7 @@ class IRElement extends IRNode {
 
   get outerHTML() {
     let html = `<${this.localName}`;
-    this.shape.names.forEach((name, i) => { html += ` ${name}="${escapeAttribute(this.values[i])}"`; });
+    for (const name of this.getAttributeNames()) html += ` ${name}="${escapeAttribute(this.attr(name))}"`;
     html += '>';
     for (const child of this.childNodes) html += child.outerHTML;
     return `${html}</${this.localName}>`;
@@ -448,9 +481,15 @@ function cloneInto(node, document, deep) {
   if (node.nodeType === TEXT) return new IRText(document, node.data);
   if (node.nodeType !== ELEMENT) throw new Error('ir-document: can only clone elements and text');
   const copy = new IRElement(document, node.localName);
+  copy.idValue = node.idValue;
+  copy.nameValue = node.nameValue;
+  copy.typeNameValue = node.typeNameValue;
+  copy.dataTypeNameValue = node.dataTypeNameValue;
+  copy.originIdValue = node.originIdValue;
+  copy.receiverValue = node.receiverValue;
   copy.shape = node.shape;
   copy.values = node.values.slice();
-  const id = copy.attr('id');
+  const id = copy.idValue;
   if (id !== undefined && !document.ids.has(id)) document.ids.set(id, copy);
   if (deep) {
     for (const child of node.childNodes) {
@@ -477,10 +516,10 @@ const DATASET = {
     return true;
   },
   has(element, property) {
-    return typeof property === 'string' && element.shape.index.has(dataAttribute(property));
+    return typeof property === 'string' && element.attr(dataAttribute(property)) !== undefined;
   },
   ownKeys(element) {
-    return element.shape.names.filter(name => name.startsWith('data-')).map(camelName);
+    return element.getAttributeNames().filter(name => name.startsWith('data-')).map(camelName);
   },
   getOwnPropertyDescriptor(element, property) {
     const value = typeof property === 'string' ? element.attr(dataAttribute(property)) : undefined;
