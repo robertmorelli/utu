@@ -10,30 +10,39 @@ export function buildProgramIndex(doc) {
   const all = root ? [root, ...root.querySelectorAll('*')] : [];
   const byId = new Map();
   const byKind = new Map();
-  const byName = new Map();
-  const byOrigin = new Map();
   for (const node of all) {
-    if (node.id) byId.set(node.id, node);
+    const id = node.getAttribute('id');
+    if (id) byId.set(id, node);
     append(byKind, node.localName, node);
-    const name = node.getAttribute?.('name');
-    if (name) append(byName, name, node);
-    const origin = node.dataset?.originId;
-    if (origin) append(byOrigin, origin, node);
   }
   const functions = new Map(nodesOf({ byKind }, 'ir-fn', 'ir-extern-fn')
     .flatMap(node => functionIndexEntries(node)));
-  const provenance = all.filter(node => node.dataset?.rewriteOf).map(node => ({
-    node,
-    sourceId: node.dataset.rewriteOf,
-    source: byId.get(node.dataset.rewriteOf) ?? byOrigin.get(node.dataset.rewriteOf)?.[0] ?? null,
-    pass: node.dataset.rewritePass ?? null,
-    rewriteKind: node.dataset.rewriteKind ?? null,
-  }));
   const surfaces = nodesOf({ byKind }, 'ir-fn', 'ir-export-main', 'ir-test', 'ir-bench')
     .flatMap(owner => surfaceBodies(owner).map(body => ({ owner, body })));
+  // Origins and provenance serve editor queries and graph views; build them on first use.
+  let byOrigin, provenance;
   return {
     kind: 'program', doc, revision: REVISIONS.get(doc) ?? 0,
-    root, all, byId, byKind, byName, byOrigin, functions, surfaces, provenance,
+    root, all, byId, byKind, functions, surfaces,
+    get byOrigin() {
+      if (!byOrigin) {
+        byOrigin = new Map();
+        for (const node of all) {
+          const origin = node.getAttribute('data-origin-id');
+          if (origin) append(byOrigin, origin, node);
+        }
+      }
+      return byOrigin;
+    },
+    get provenance() {
+      return provenance ??= all.filter(node => node.getAttribute('data-rewrite-of')).map(node => ({
+        node,
+        sourceId: node.dataset.rewriteOf,
+        source: byId.get(node.dataset.rewriteOf) ?? this.byOrigin.get(node.dataset.rewriteOf)?.[0] ?? null,
+        pass: node.dataset.rewritePass ?? null,
+        rewriteKind: node.dataset.rewriteKind ?? null,
+      }));
+    },
   };
 }
 

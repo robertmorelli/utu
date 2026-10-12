@@ -124,6 +124,24 @@ import {
  * @param {CompilerEnv} env
  * @returns {Compiler}
  */
+/**
+ * With UTU_TIMINGS set, print each pass's time and the element count after
+ * it to stderr. Otherwise a no-op.
+ */
+function passClock(file) {
+  if (!globalThis.process?.env?.UTU_TIMINGS) return () => {};
+  let last = performance.now();
+  const started = last;
+  console.error(`utu timings: ${file}`);
+  return (name, doc) => {
+    const now = performance.now();
+    const elements = doc?.querySelectorAll?.('*').length ?? 0;
+    console.error(`${(now - last).toFixed(1).padStart(9)} ms ${String(elements).padStart(8)} nodes  ${name}`);
+    if (name.startsWith('semantic graphs (type graph 5)')) console.error(`${(now - started).toFixed(1).padStart(9)} ms total`);
+    last = performance.now();
+  };
+}
+
 export function createCompiler(env) {
   const { parser, readFile, resolvePath, resolvePackage = null, readBinaryFile = null, optimize = 'size', stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
 
@@ -186,6 +204,7 @@ export function createCompiler(env) {
   }
 
   async function compileFileInternal(filePath, arrayElements = []) {
+    const clock = passClock(filePath);
     const { graph, order, imports, foreign } = await buildModuleGraph(filePath, {
       parser,
       readFile,
@@ -214,6 +233,7 @@ export function createCompiler(env) {
       expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, reactiveProject, expandTemplates: !dsls.wutu });
     }
     if (foreignABI) prepareForeignImports(graph, imports, foreignABI);
+    clock('buildModuleGraph + DSLs', graph.get(filePath));
     debugAssert(graph.get(filePath), 'buildModuleGraph');
     bringTargetToTopLevel(graph.get(filePath), { target, filePath, debugAssertions });
     debugAssert(graph.get(filePath), 'bringTargetToTopLevel');
@@ -240,6 +260,7 @@ export function createCompiler(env) {
     }
     retainGraph(doc, 'modules', { kind: 'module', files: new Map(graph), order: [...order], imports });
     debugAssert(doc, 'inlineImports');
+    clock('inlineImports', doc);
 
     // A recovered parse tree is intentionally incomplete. Running module
     // instantiation/hoisting over it can manufacture duplicate declarations
@@ -270,21 +291,31 @@ export function createCompiler(env) {
       }
     }
     debugAssert(doc, 'prelude');
+    clock('prelude', doc);
 
     lowerTuples(doc);
+    clock('lowerTuples', doc);
     lowerDistinctTypes(doc, parser, createDocument);
+    clock('lowerDistinctTypes', doc);
     lowerIntEnums(doc, parser, createDocument);
+    clock('lowerIntEnums', doc);
     await lowerMems(doc, parser, createDocument, { readBinaryFile, resolvePath, evaluateComptime });
+    clock('lowerMems', doc);
     lowerGenerators(doc, parser, createDocument);
+    clock('lowerGenerators', doc);
     lowerForArrays(doc, parser, createDocument);
+    clock('lowerForArrays', doc);
     lowerIterators(doc, parser, createDocument);
+    clock('lowerIterators', doc);
     const arrayDefaults = requestLiteralArrayTypes(doc, nameArrayElements(arrayElements, foreignABI));
     const elaboration = retainGraph(doc, 'elaboration', buildElaborationGraph(doc));
     checkModuleVariance(doc, elaboration);
     debugAssert(doc, 'checkModuleVariance');
+    clock('elaboration + variance', doc);
     instantiateModules(doc, { debugAssertions, graph: elaboration });
     arrayDefaults?.remove();
     debugAssert(doc, 'instantiateModules');
+    clock('instantiateModules', doc);
     // Elaboration errors can intentionally leave unresolved requests behind.
     // Stop before binding/type passes turn a user-facing arity error into an
     // invariant failure; analyzeFile will collect the stamped diagnostic.
@@ -292,18 +323,23 @@ export function createCompiler(env) {
     lowerPipe(doc, { debugAssertions });
     lowerOptionalChains(doc);
     debugAssert(doc, 'lowerPipe');
+    clock('lowerPipe + optional chains', doc);
     hoistModules(doc, { debugAssertions, graph: elaboration });
     debugAssert(doc, 'hoistModules');
+    clock('hoistModules', doc);
     expandDsls(doc, { dsls: dslRegistry, debugAssertions });
     debugAssert(doc, 'expandDsls');
+    clock('expandDsls', doc);
     refreshProgramIndex(doc);
     // Analysis passes
     let typeIndex = linkTypeDecls(doc, elaboration);
     debugAssert(doc, 'linkTypeDecls', { typeIndex });
+    clock('programIndex + linkTypeDecls', doc);
     const scopeGraph = resolveBindings(doc);
     retainGraph(doc, 'scope', scopeGraph);
     const retainedCaptures = new Map(scopeGraph.captures);
     debugAssert(doc, 'resolveBindings', { typeIndex, requireBindings: true });
+    clock('resolveBindings', doc);
     // Build contexts first. Literals, closures, and implicit struct literals
     // consume them; then one worklist propagates actual types to a fixed point.
     let typeGraph = retainGraph(doc, 'types', settleTypeGraph(doc, typeIndex));
@@ -315,6 +351,7 @@ export function createCompiler(env) {
     retainGraph(doc, 'calls', buildCallGraph(doc.body.firstChild, typeGraph));
     projectTypeGraph(typeGraph); // explicit compatibility boundary for typed lowerings
     debugAssert(doc, 'solveTypeGraph', { typeIndex, requireBindings: true });
+    clock('type graph 1', doc);
 
     if (lowerForeignOperations(typeGraph, buildExternFn)) {
       refreshProgramIndex(doc);
@@ -343,6 +380,7 @@ export function createCompiler(env) {
         { parameter: param.getAttribute('name') });
     }
     if (untyped.length) { projectGraphs(doc); return doc; }
+    clock('foreign ops + boxed captures (type graphs 2-3)', doc);
 
     // Closure and operator lowering invalidate structure, scope, and resolution
     // facts. They consume this settled graph, then the complete semantic set is
@@ -352,6 +390,7 @@ export function createCompiler(env) {
       debugAssert(doc, 'lowerClosures', { typeIndex });
     }
     lowerOperators(doc, typeGraph);
+    clock('lowerClosures + lowerOperators', doc);
 
     let semantic = rebuildSemanticGraphs(doc, typeIndex, { captures: retainedCaptures });
     let typedProgram = semantic.program;
@@ -363,8 +402,10 @@ export function createCompiler(env) {
     projectTypeGraph(typeGraph); // typed validation and backend-control compatibility boundary
     checkTypeGraph(typeGraph);
     debugAssert(doc, 'checkTypeGraph', { typeIndex, requireBindings: true });
+    clock('semantic graphs (type graph 4) + check', doc);
     validateAnalysis(doc, typeIndex);
     debugAssert(doc, 'validateAnalysis', { typeIndex, requireBindings: true });
+    clock('validateAnalysis', doc);
 
     // Lowering an ill-typed program would detach the nodes that carry its
     // diagnostics; report them against the checked program instead.
@@ -375,6 +416,7 @@ export function createCompiler(env) {
     // builds retain the checked surface graph unchanged.
     const backendChanged = lowerBackendControl(doc, typeIndex, { target });
     debugAssert(doc, 'lowerBackendControl', { typeIndex, requireBindings: true, target });
+    clock('lowerBackendControl', doc);
     if (backendChanged) {
       semantic = rebuildSemanticGraphs(doc, typeIndex, { captures: retainedCaptures });
       typedProgram = semantic.program;
@@ -384,6 +426,7 @@ export function createCompiler(env) {
     const backendPlan = retainGraph(doc, 'backend', buildBackendPlan(doc, typeIndex, typedProgram));
     projectGraphs(doc);
     sealBackendPlan(backendPlan);
+    clock('semantic graphs (type graph 5) + backend plan', doc);
     return doc;
   }
 
@@ -405,7 +448,8 @@ ${types.map(type => `    fn __utu_comptime_len_${type}(values: Array[${type}]) I
 `;
     const virtual = `${file.replace(/\.utu$/, '')}.comptime.utu`;
     const nested = createCompiler({
-      ...env, target: 'normal', optimize: 'size',
+      // Only the values matter: skip Binaryen's optimizer.
+      ...env, target: 'normal', optimize: 'none',
       readFile: path => (path === virtual ? Promise.resolve(program) : readFile(path)),
     });
     const fail = (message, site) => compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, message, site);
