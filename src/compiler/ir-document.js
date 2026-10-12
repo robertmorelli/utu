@@ -355,13 +355,13 @@ class IRElement extends IRNode {
   }
 
   matches(selector) {
-    return compile(selector).some(complex => matchComplex(this, complex, complex.length - 1, null));
+    return compile(selector).predicate(this, null);
   }
 
   closest(selector) {
-    const compiled = compile(selector);
+    const { predicate } = compile(selector);
     for (let node = this; node?.nodeType === ELEMENT; node = node.parentNode) {
-      if (compiled.some(complex => matchComplex(node, complex, complex.length - 1, null))) return node;
+      if (predicate(node, null)) return node;
     }
     return null;
   }
@@ -569,9 +569,77 @@ function compile(selector) {
   let compiled = COMPILED.get(selector);
   if (!compiled) {
     compiled = parseSelectorList(selector);
+    compiled.predicate = listPredicate(compiled);
+    for (const complex of compiled) for (const part of complex) part.predicate = compoundPredicate(part.compound);
     COMPILED.set(selector, compiled);
   }
   return compiled;
+}
+
+// Selectors compile once into predicates `(element, scope) => boolean`, so a
+// scan runs only the checks its selector names.
+
+function listPredicate(list) {
+  const predicates = list.map(complexPredicate);
+  if (predicates.length === 1) return predicates[0];
+  return (element, scope) => {
+    for (let i = 0; i < predicates.length; i++) if (predicates[i](element, scope)) return true;
+    return false;
+  };
+}
+
+// Match right to left: the compound at `index`, then its combinator's context.
+function complexPredicate(complex) {
+  const compounds = complex.map(part => compoundPredicate(part.compound));
+  const last = complex.length - 1;
+  if (last === 0) return compounds[0];
+  const match = (element, index, scope) => {
+    if (!compounds[index](element, scope)) return false;
+    if (index === 0) return true;
+    if (complex[index].combinator === '>') {
+      const parent = element.parentNode;
+      return parent?.nodeType === ELEMENT && match(parent, index - 1, scope);
+    }
+    for (let ancestor = element.parentNode; ancestor?.nodeType === ELEMENT; ancestor = ancestor.parentNode) {
+      if (match(ancestor, index - 1, scope)) return true;
+    }
+    return false;
+  };
+  return (element, scope) => match(element, last, scope);
+}
+
+function compoundPredicate(compound) {
+  const checks = [];
+  if (compound.tag) {
+    const tag = compound.tag;
+    checks.push(element => element.localName === tag);
+  }
+  if (compound.scope) checks.push((element, scope) => element === scope);
+  for (const { name, op, value } of compound.attributes) {
+    if (op === null) checks.push(element => element.attr(name) !== undefined);
+    else if (op === '=') checks.push(element => element.attr(name) === value);
+    else if (op === '^=') checks.push(element => { const actual = element.attr(name); return actual !== undefined && actual.startsWith(value); });
+    else checks.push(element => { const actual = element.attr(name); return actual !== undefined && actual.includes(value); });
+  }
+  if (compound.firstChild) checks.push(element => element.parentNode?.firstElementChild === element);
+  for (const list of compound.not) {
+    const excluded = listPredicate(list);
+    checks.push((element, scope) => !excluded(element, scope));
+  }
+  for (const list of compound.has) {
+    const wanted = listPredicate(list);
+    checks.push(element => walk(element).some(descendant => wanted(descendant, element)));
+  }
+  if (checks.length === 0) return () => true;
+  if (checks.length === 1) return checks[0];
+  if (checks.length === 2) {
+    const [first, second] = checks;
+    return (element, scope) => first(element, scope) && second(element, scope);
+  }
+  return (element, scope) => {
+    for (let i = 0; i < checks.length; i++) if (!checks[i](element, scope)) return false;
+    return true;
+  };
 }
 
 function parseSelectorList(text) {
@@ -654,42 +722,6 @@ function skipSpace(state) {
   return state.text[state.at];
 }
 
-function matchCompound(element, compound, scope) {
-  if (compound.tag && element.localName !== compound.tag) return false;
-  if (compound.scope && element !== scope) return false;
-  for (const { name, op, value } of compound.attributes) {
-    const actual = element.attr(name);
-    if (actual === undefined) return false;
-    if (op === '=' && actual !== value) return false;
-    if (op === '^=' && !actual.startsWith(value)) return false;
-    if (op === '*=' && !actual.includes(value)) return false;
-  }
-  if (compound.firstChild && element.parentNode?.firstElementChild !== element) return false;
-  for (const list of compound.not) {
-    if (list.some(complex => matchComplex(element, complex, complex.length - 1, scope))) return false;
-  }
-  for (const list of compound.has) {
-    const found = walk(element).some(descendant => list.some(complex => matchComplex(descendant, complex, complex.length - 1, element)));
-    if (!found) return false;
-  }
-  return true;
-}
-
-// Match right to left: the compound at `index`, then its combinator's context.
-function matchComplex(element, complex, index, scope) {
-  const { compound, combinator } = complex[index];
-  if (!matchCompound(element, compound, scope)) return false;
-  if (index === 0) return true;
-  if (combinator === '>') {
-    const parent = element.parentNode;
-    return parent?.nodeType === ELEMENT && matchComplex(parent, complex, index - 1, scope);
-  }
-  for (let ancestor = element.parentNode; ancestor?.nodeType === ELEMENT; ancestor = ancestor.parentNode) {
-    if (matchComplex(ancestor, complex, index - 1, scope)) return true;
-  }
-  return false;
-}
-
 function select(scope, compiled, first) {
   const out = [];
   // `:scope > x` (alone or in a list of such) only looks at children.
@@ -697,16 +729,15 @@ function select(scope, compiled, first) {
       && !complex[0].compound.tag && !complex[0].compound.attributes.length)) {
     for (const child of scope.childNodes) {
       if (child.nodeType !== ELEMENT) continue;
-      if (compiled.some(complex => matchCompound(child, complex[1].compound, scope))) {
+      if (compiled.some(complex => complex[1].predicate(child, scope))) {
         out.push(child);
         if (first) break;
       }
     }
     return out;
   }
-  const test = compiled.length === 1 && compiled[0].length === 1
-    ? simpleTest(compiled[0][0].compound, scope)
-    : node => compiled.some(complex => matchComplex(node, complex, complex.length - 1, scope));
+  const { predicate } = compiled;
+  const test = node => predicate(node, scope);
   const index = elementIndex(scope);
   if (index !== null) {
     const candidates = indexCandidates(index, scope, compiled);
@@ -800,15 +831,6 @@ function withinRange(index, list, from, to) {
   let stop = low;
   while (stop < list.length && position[list[stop].$] < to) stop++;
   return low === 0 && stop === list.length ? list.slice() : list.slice(low, stop);
-}
-
-// A lone compound: test only what it names.
-function simpleTest(compound, scope) {
-  const { tag, attributes, not, has, firstChild } = compound;
-  if (!attributes.length && !not.length && !has.length && !firstChild && !compound.scope) {
-    return tag ? node => node.localName === tag : () => true;
-  }
-  return node => matchCompound(node, compound, scope);
 }
 
 function firstMatch(node, test) {
