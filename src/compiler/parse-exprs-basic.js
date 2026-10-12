@@ -49,7 +49,20 @@ export function walkUnaryExpr(n, doc, source, dispatch) {
   const opN = children.find(c => c.type === 'unary_op');
   if (opN) node.setAttribute('op', text(opN));
   const exprN = children.find(c => c.type !== 'unary_op');
-  if (exprN) node.appendChild(dispatch(exprN, doc, source));
+  const operand = exprN ? dispatch(exprN, doc, source) : null;
+  // `-1` and `-1.5` are literals, so they work where only a constant does
+  // (global initializers). Hex and binary spellings stay a negation.
+  if (node.getAttribute('op') === '-' && operand?.localName === 'ir-lit'
+      && ['int', 'float'].includes(operand.getAttribute('kind'))
+      && /^[0-9][0-9_]*(\.[0-9_]+)?([eE][+-]?[0-9]+)?$/.test(operand.getAttribute('value') ?? '')) {
+    const literal = stamp(el(T.LIT, doc), n);
+    for (const attribute of operand.getAttributeNames()) {
+      if (!attribute.startsWith('data-') && attribute !== 'id') literal.setAttribute(attribute, operand.getAttribute(attribute));
+    }
+    literal.setAttribute('value', `-${operand.getAttribute('value')}`);
+    return literal;
+  }
+  if (operand) node.appendChild(operand);
   return node;
 }
 

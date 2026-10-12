@@ -336,7 +336,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
             sim.step(state.w);
         };
         ui.sample(state);
-        draw_map(state, ctx, map.width.to_f64(), map.height.to_f64());
+        draw_map(state, ctx, map.width, map.height);
         if state.frame % 30 == 0 {
             draw_minimap(state);
         };

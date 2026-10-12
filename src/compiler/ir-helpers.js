@@ -151,8 +151,31 @@ export function isFunctionDecl(node) {
 export function directCalleeDecl(call, doc) {
   const callee = call?.firstElementChild;
   if (callee?.localName !== 'ir-ident' || !callee.dataset.bindingId) return null;
-  const decl = doc.getElementById(callee.dataset.bindingId);
+  const decl = elementById(doc, callee.dataset.bindingId);
   return isFunctionDecl(decl) ? decl : null;
+}
+
+const ID_CACHES = new WeakMap();
+
+/**
+ * `doc.getElementById(id)` without its cost: linkedom answers it by walking
+ * the whole document. One walk fills a per-document map; a hit is used only
+ * while the node is still in the document under that id, and a miss falls
+ * back to the walk (and remembers the answer).
+ */
+export function elementById(doc, id) {
+  let cache = ID_CACHES.get(doc);
+  if (!cache) {
+    cache = new Map();
+    const root = doc?.body?.firstChild;
+    for (const node of root ? [root, ...root.querySelectorAll('[id]')] : []) cache.set(node.id, node);
+    ID_CACHES.set(doc, cache);
+  }
+  const hit = cache.get(id);
+  if (hit && hit.id === id && hit.isConnected && hit.ownerDocument === doc) return hit;
+  const found = doc.getElementById(id);
+  if (found) cache.set(id, found);
+  return found;
 }
 
 // ── Span / origin propagation ───────────────────────────────────────────────

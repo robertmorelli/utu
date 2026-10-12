@@ -39,6 +39,7 @@
 import { declarationsFromSource, expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { parseToIR } from './parse.js';
+import { createSyntheticNode } from './ir-helpers.js';
 
 // Storage kind → the type its elements read as and write from.
 export const MEM_KINDS = Object.freeze({
@@ -290,7 +291,7 @@ function foreignTypeRef(doc, name, site) {
   const abi = doc.__utuForeign;
   const index = abi?.paths.get('std:JS');
   if (index === undefined) throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `mem views need std:JS; add \`using JS from std:JS;\``, site);
-  const ref = site.ownerDocument.createElement('ir-type-ref');
+  const ref = createSyntheticNode(site.ownerDocument, 'ir-type-ref', site, 'lower-mems', 'view-type');
   ref.setAttribute('name', abi.type(index, abi.written(index, abi.schemas[index].names[name])));
   return ref;
 }

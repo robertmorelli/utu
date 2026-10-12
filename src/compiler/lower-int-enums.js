@@ -19,6 +19,7 @@
 // previous explicit `= n`.
 import { declarationsFromSource, expressionFromSource } from './source-expansion.js';
 import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
+import { createSyntheticNode } from './ir-helpers.js';
 
 export const INT_ENUM_REPRS = Object.freeze({
   U8: [0, 255], I8: [-128, 127], U16: [0, 65535], I16: [-32768, 32767],
@@ -72,7 +73,7 @@ export function lowerIntEnums(doc, parser, createDocument) {
       }
       // Every variant is named; another value can only come from from_i32.
       const fallback = expressionFromSource(parser, 'fatal', match, new Map(), { createDocument });
-      const arm = match.ownerDocument.createElement('ir-default-arm');
+      const arm = createSyntheticNode(match.ownerDocument, 'ir-default-arm', match, 'lower-int-enums', 'exhaustive-default');
       arm.appendChild(fallback);
       match.appendChild(arm);
     }
