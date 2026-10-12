@@ -116,13 +116,54 @@ export function fnSignatureType(fn) {
 // second block or a wrapped parameter list, one edit covers every reader.
 
 // These run in the solver's inner loops, so they walk children directly
-// instead of evaluating `:scope >` selectors.
-const childNamed = (node, name) => {
-  for (let child = node?.firstElementChild; child; child = child.nextElementSibling) {
-    if (child.localName === name) return child;
-  }
+// instead of evaluating `:scope >` selectors. Each is one column read or a
+// short scan in the utu port.
+
+/** The first child element of `node` with tag `name` (`:scope > name`), or null. */
+export function childOf(node, name) {
+  const children = node?.children;
+  if (!children) return null;
+  for (let i = 0; i < children.length; i++) if (children[i].localName === name) return children[i];
   return null;
-};
+}
+
+/** The child elements of `node` with tag `name`, in order (`:scope > name`). */
+export function childrenOf(node, name) {
+  const found = [];
+  const children = node?.children;
+  if (!children) return found;
+  for (let i = 0; i < children.length; i++) if (children[i].localName === name) found.push(children[i]);
+  return found;
+}
+
+/** The arguments of an ir-call (the children of its ir-arg-list), as a new array. */
+export function argsOf(call) {
+  const list = childOf(call, 'ir-arg-list');
+  return list ? [...list.children] : [];
+}
+
+/** How many arguments an ir-call passes. */
+export function argCount(call) {
+  return childOf(call, 'ir-arg-list')?.children.length ?? 0;
+}
+
+/** The ir-fn-name of a function declaration, or null. */
+export function fnNameOf(fn) {
+  return childOf(fn, 'ir-fn-name');
+}
+
+/** The ir-type-args child of a node (a function name's implementation type, a type instance), or null. */
+export function typeArgsOf(node) {
+  return childOf(node, 'ir-type-args');
+}
+
+/** The nearest ancestor-or-self whose tag is in `tags` (a Set), as `closest('a, b')`. */
+export function closestOf(node, tags) {
+  for (let at = node; at?.nodeType === 1; at = at.parentNode) if (tags.has(at.localName)) return at;
+  return null;
+}
+
+const childNamed = childOf;
 
 /** Declared parameters of an ir-fn, ir-extern-fn, ir-export-main, or ir-closure. */
 export function paramsOf(node) {
