@@ -37,9 +37,9 @@ python3 tests/jpl-typechecker/run.py ./jpl              # and 25 type checker fi
 | `ArrayList(Node)` of `{tag, a, b, token}` | four mems: `node_tag: Tag`, `node_a`, `node_b`, `node_token` |
 | `try` on every call | a syntax or type error throws; `parse` and `check` catch it once |
 | `Expr` structs returned by value | tuples: `let .{node, ty, bare} = typed_expr(s, 0);` (wasm multi-value) |
-| `*Checker` methods | a `Scanner` struct with methods (`s.take()`, `s.expect(…)`); the checker's environment is mems |
+| `*Checker` methods | a `Scanner` struct with methods (`s.take()`, `s.expect(…)`) |
+| `ArrayList`s of symbols, types, fields, patterns | an `Env` of growable GC arrays (`Vec[T]`, indexed like arrays) |
 | `StringHashMap` of input slices | names interned in place as spans of `src`, in an open-addressing table in mems |
-| `ArrayList`s of types, fields, symbols, patterns | one mem per column |
 | input with a 255 sentinel | `src.copy_in(Fs.readFileSync(path)); src.push(255);` |
 | print buffer, one write | `mem out: U8`, then `Fs.writeSync(1.0, out.view(0, at))` |
 
@@ -70,6 +70,17 @@ runtime: an empty input takes 16.4 ms, and a single run executes partly before
 the engine has optimized the loop. For comparison, the two Rust student
 compilers in the Zig repository's benchmark take 61–73 ms to lex, 121–298 ms
 to list, 350–483 ms to parse `t2.jpl`, and 327–458 ms to type check `t3.jpl`.
+
+## Where data lives
+
+Mems hold only the large, hot, append-only data: the source, the token
+arrays, the node columns, and the output (15 memories in all, against JSC's
+limit of 100). The checker's environment is in GC arrays. Moving it there
+cost nothing on V8 and about 9% of type checking on JSC; moving the node
+table to GC arrays as well cost 25–50%, so it stays in mems.
+
+`node examples/jpl/run.mjs` caches the compiled wasm in `node_modules/.utu`,
+so only the first run after a change pays the 20–30 s compile.
 
 Floats parse to an approximate F64 (digit by digit); the node array stores
 those bits, so node payloads can differ from Zig's in the last bit. Token and

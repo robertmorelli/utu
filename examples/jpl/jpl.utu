@@ -418,6 +418,38 @@ fn listing(n: I32) I32 {
     at;
 }
 
+// A growable GC array, indexed like one.
+mod Vec[T] {
+    struct &:
+        | items: Array[T]
+        | len: I32
+
+    fn &.new() & {
+        &{ items: Array[T].new_default(16), len: 0 };
+    }
+    fn &.get_index |self| (i: I32) T {
+        self.items[i];
+    }
+    fn &.set_index |self| (i: I32, v: T) void {
+        self.items[i] = v;
+    }
+    fn &.push |self| (v: T) void {
+        if self.len == self.items.len() {
+            let grown = Array[T].new_default(self.len * 2);
+            grown.copy_from(0, self.items, 0, self.len);
+            self.items = grown;
+        };
+        self.items[self.len] = v;
+        self.len += 1;
+    }
+    fn &.truncate |self| (n: I32) void {
+        self.len = n;
+    }
+    fn &.clear |self| () void {
+        self.len = 0;
+    }
+}
+
 // ── Scanning ─────────────────────────────────────────────────────────────────
 //
 // The parsers read tokens one at a time from a Scanner, which runs the same
@@ -434,10 +466,11 @@ struct Scanner:
     | last_lo: I32
     | pos: I32
     | end: I32
+    | env: Env
 
 // `end` is where the 255 sentinel is.
-fn new_scanner(end: I32) Scanner {
-    let s = Scanner { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0, end: end };
+fn new_scanner(end: I32, env: Env) Scanner {
+    let s = Scanner { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0, end: end, env: env };
     s.scan();
     s;
 }
@@ -930,7 +963,7 @@ fn program(s: Scanner) I32 {
 fn parse() I32 {
     reset_nodes();
     try {
-        let s = new_scanner(src.len() - 1);
+        let s = new_scanner(src.len() - 1, new_env());
         program(s);
         s.pos;
     } catch {
@@ -942,7 +975,7 @@ fn parse() I32 {
 //
 // The Zig compiler's fused parser and type checker (parser_typecheck): every
 // expression is typed as it is parsed, and its parse returns
-// .{node, type, bare name}. Names are interned spans of `src`; `bound[name]`
+// .{node, type, bare name}. Names are interned spans of `src`; `e.bound[name]`
 // is the symbol a name refers to, or -1. Types are structural: one id per
 // array element and rank, one per record.
 
@@ -976,40 +1009,46 @@ let t_rgba_image: I32 = 7;
 // No name.
 let unnamed: I32 = -1;
 
-mem bound: I32;
+// The checker's environment: symbols, types, fields, scopes, and patterns.
+struct Env:
+    | bound: Vec[I32]
+    | sym_tag: Vec[SymbolTag]
+    | sym_type: Vec[I32]
+    | sym_params_start: Vec[I32]
+    | sym_params_len: Vec[I32]
+    | type_tag: Vec[TypeTag]
+    | type_element: Vec[I32]
+    | type_rank: Vec[I32]
+    | type_fields_start: Vec[I32]
+    | type_fields_len: Vec[I32]
+    | field_name: Vec[I32]
+    | field_type: Vec[I32]
+    | fn_types: Vec[I32]
+    | locals: Vec[I32]
+    | fn_params: Vec[I32]
+    | pat_tag: Vec[PatternTag]
+    | pat_name: Vec[I32]
+    | pat_node: Vec[I32]
+    | pat_declared: Vec[I32]
+    | pat_first: Vec[I32]
+    | pat_last: Vec[I32]
+    | pat_next: Vec[I32]
+    | pat_count: Vec[I32]
+    | pat_dim_start: Vec[I32]
+    | pat_dim_count: Vec[I32]
+    | dim_names: Vec[I32]
 
-mem sym_tag: SymbolTag;
-mem sym_type: I32;
-mem sym_params_start: I32;
-mem sym_params_len: I32;
+fn new_env() Env {
+    Env { bound: Vec[I32].new(), sym_tag: Vec[SymbolTag].new(), sym_type: Vec[I32].new(), sym_params_start: Vec[I32].new(), sym_params_len: Vec[I32].new(), type_tag: Vec[TypeTag].new(), type_element: Vec[I32].new(), type_rank: Vec[I32].new(), type_fields_start: Vec[I32].new(), type_fields_len: Vec[I32].new(), field_name: Vec[I32].new(), field_type: Vec[I32].new(), fn_types: Vec[I32].new(), locals: Vec[I32].new(), fn_params: Vec[I32].new(), pat_tag: Vec[PatternTag].new(), pat_name: Vec[I32].new(), pat_node: Vec[I32].new(), pat_declared: Vec[I32].new(), pat_first: Vec[I32].new(), pat_last: Vec[I32].new(), pat_next: Vec[I32].new(), pat_count: Vec[I32].new(), pat_dim_start: Vec[I32].new(), pat_dim_count: Vec[I32].new(), dim_names: Vec[I32].new() };
+}
 
-mem type_tag: TypeTag;
-mem type_element: I32;
-mem type_rank: I32;
-mem type_fields_start: I32;
-mem type_fields_len: I32;
 
-mem field_name: I32;
-mem field_type: I32;
 
-// Parameter types of functions, as runs of type ids.
-mem fn_types: I32;
-// Names bound in the current function or loop, to unbind when it ends.
-mem locals: I32;
-// Pattern ids of the parameters of the function being declared.
-mem fn_params: I32;
 
-mem pat_tag: PatternTag;
-mem pat_name: I32;
-mem pat_node: I32;
-mem pat_declared: I32;
-mem pat_first: I32;
-mem pat_last: I32;
-mem pat_next: I32;
-mem pat_count: I32;
-mem pat_dim_start: I32;
-mem pat_dim_count: I32;
-mem dim_names: I32;
+
+
+// Names e.bound in the current function or loop, to unbind when it ends.
+
 
 // Builtin names are appended to `src` after the sentinel, so they intern the same way.
 fn intern_text(text: Str) I32 {
@@ -1018,128 +1057,129 @@ fn intern_text(text: Str) I32 {
     src.intern(start, src.len());
 }
 
-fn symbol_of(name: I32) I32 {
-    if name < bound.len() { bound[name]; } else { -1; };
+fn symbol_of(e: Env, name: I32) I32 {
+    if name < e.bound.len { e.bound[name]; } else { -1; };
 }
 
-fn lookup(name: I32) I32 {
-    let symbol = symbol_of(name);
+fn lookup(e: Env, name: I32) I32 {
+    let symbol = symbol_of(e, name);
     if symbol < 0 { fail(); };
     symbol;
 }
 
-fn bind(name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
-    if symbol_of(name) >= 0 { fail(); };
-    while (bound.len() <= name) { bound.push(-1); };
-    let symbol = sym_tag.len();
-    sym_tag.push(tag);
-    sym_type.push(type_id);
-    sym_params_start.push(0);
-    sym_params_len.push(0);
-    bound[name] = symbol;
-    if local { locals.push(name); };
+fn bind(e: Env, name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
+    if symbol_of(e, name) >= 0 { fail(); };
+    while (e.bound.len <= name) { e.bound.push(-1); };
+    let symbol = e.sym_tag.len;
+    e.sym_tag.push(tag);
+    e.sym_type.push(type_id);
+    e.sym_params_start.push(0);
+    e.sym_params_len.push(0);
+    e.bound[name] = symbol;
+    if local { e.locals.push(name); };
     symbol;
 }
 
-fn unbind_to(mark: I32) void {
-    while (locals.len() > mark) {
-        let name = locals[locals.len() - 1];
-        locals.resize(locals.len() - 1);
-        bound[name] = -1;
+fn unbind_to(e: Env, mark: I32) void {
+    while (e.locals.len > mark) {
+        let name = e.locals[e.locals.len - 1];
+        e.locals.truncate(e.locals.len - 1);
+        e.bound[name] = -1;
     };
 }
 
-fn new_type(tag: TypeTag, element: I32, rank: I32, start: I32, count: I32) I32 {
-    let id = type_tag.len();
-    type_tag.push(tag);
-    type_element.push(element);
-    type_rank.push(rank);
-    type_fields_start.push(start);
-    type_fields_len.push(count);
+fn new_type(e: Env, tag: TypeTag, element: I32, rank: I32, start: I32, count: I32) I32 {
+    let id = e.type_tag.len;
+    e.type_tag.push(tag);
+    e.type_element.push(element);
+    e.type_rank.push(rank);
+    e.type_fields_start.push(start);
+    e.type_fields_len.push(count);
     id;
 }
 
-fn array_type(element: I32, rank: I32) I32 {
-    for (0 ..< type_tag.len()) |t| {
-        if type_tag[t] == TypeTag.ArrayType and type_element[t] == element and type_rank[t] == rank { return t; };
+fn array_type(e: Env, element: I32, rank: I32) I32 {
+    for (0 ..< e.type_tag.len) |t| {
+        if e.type_tag[t] == TypeTag.ArrayType and e.type_element[t] == element and e.type_rank[t] == rank { return t; };
     };
-    new_type(TypeTag.ArrayType, element, rank, 0, 0);
+    new_type(e, TypeTag.ArrayType, element, rank, 0, 0);
 }
 
-fn field_type_of(record: I32, name: I32) I32 {
-    let start = type_fields_start[record];
-    for (start ..< start + type_fields_len[record]) |f| {
-        if field_name[f] == name { return field_type[f]; };
+fn field_type_of(e: Env, record: I32, name: I32) I32 {
+    let start = e.type_fields_start[record];
+    for (start ..< start + e.type_fields_len[record]) |f| {
+        if e.field_name[f] == name { return e.field_type[f]; };
     };
     0;
 }
 
-fn builtin(name: Str, result: I32, first: I32, second: I32) void {
-    let start = fn_types.len();
-    fn_types.push(first);
-    if second != 0 { fn_types.push(second); };
-    let symbol = bind(intern_text(name), SymbolTag.Function, result, false);
-    sym_params_start[symbol] = start;
-    sym_params_len[symbol] = fn_types.len() - start;
+fn builtin(e: Env, name: Str, result: I32, first: I32, second: I32) void {
+    let start = e.fn_types.len;
+    e.fn_types.push(first);
+    if second != 0 { e.fn_types.push(second); };
+    let symbol = bind(e, intern_text(name), SymbolTag.Function, result, false);
+    e.sym_params_start[symbol] = start;
+    e.sym_params_len[symbol] = e.fn_types.len - start;
 }
 
-fn reset_env() void {
+fn reset_env(e: Env) void {
     src.intern_reset();
-    bound.clear();
-    sym_tag.clear();
-    sym_type.clear();
-    sym_params_start.clear();
-    sym_params_len.clear();
-    type_tag.clear();
-    type_element.clear();
-    type_rank.clear();
-    type_fields_start.clear();
-    type_fields_len.clear();
-    field_name.clear();
-    field_type.clear();
-    fn_types.clear();
-    locals.clear();
-    fn_params.clear();
-    pat_tag.clear();
-    pat_name.clear();
-    pat_node.clear();
-    pat_declared.clear();
-    pat_first.clear();
-    pat_last.clear();
-    pat_next.clear();
-    pat_count.clear();
-    pat_dim_start.clear();
-    pat_dim_count.clear();
-    dim_names.clear();
+    e.bound.clear();
+    e.sym_tag.clear();
+    e.sym_type.clear();
+    e.sym_params_start.clear();
+    e.sym_params_len.clear();
+    e.type_tag.clear();
+    e.type_element.clear();
+    e.type_rank.clear();
+    e.type_fields_start.clear();
+    e.type_fields_len.clear();
+    e.field_name.clear();
+    e.field_type.clear();
+    e.fn_types.clear();
+    e.locals.clear();
+    e.fn_params.clear();
+    e.pat_tag.clear();
+    e.pat_name.clear();
+    e.pat_node.clear();
+    e.pat_declared.clear();
+    e.pat_first.clear();
+    e.pat_last.clear();
+    e.pat_next.clear();
+    e.pat_count.clear();
+    e.pat_dim_start.clear();
+    e.pat_dim_count.clear();
+    e.dim_names.clear();
 }
 
 // The builtin types, records, variables, and functions.
-fn init_env() void {
-    reset_env();
-    new_type(TypeTag.Invalid, 0, 0, 0, 0);
-    new_type(TypeTag.Void, 0, 0, 0, 0);
-    new_type(TypeTag.Bool, 0, 0, 0, 0);
-    new_type(TypeTag.Int, 0, 0, 0, 0);
-    new_type(TypeTag.Float, 0, 0, 0, 0);
-    new_type(TypeTag.Record, 0, 0, 0, 4);
+fn init_env(e: Env) void {
+    reset_env(e);
+    new_type(e, TypeTag.Invalid, 0, 0, 0, 0);
+    new_type(e, TypeTag.Void, 0, 0, 0, 0);
+    new_type(e, TypeTag.Bool, 0, 0, 0, 0);
+    new_type(e, TypeTag.Int, 0, 0, 0, 0);
+    new_type(e, TypeTag.Float, 0, 0, 0, 0);
+    new_type(e, TypeTag.Record, 0, 0, 0, 4);
     for (["r", "g", "b", "a"]) |name| {
-        field_name.push(intern_text(name));
-        field_type.push(t_float);
+        e.field_name.push(intern_text(name));
+        e.field_type.push(t_float);
     };
-    bind(intern_text("rgba"), SymbolTag.Alias, t_rgba, false);
-    bind(intern_text("argnum"), SymbolTag.Variable, t_int, false);
-    bind(intern_text("args"), SymbolTag.Variable, array_type(t_int, 1), false);
-    if array_type(t_rgba, 2) != t_rgba_image { fatal; };
+    bind(e, intern_text("rgba"), SymbolTag.Alias, t_rgba, false);
+    bind(e, intern_text("argnum"), SymbolTag.Variable, t_int, false);
+    bind(e, intern_text("args"), SymbolTag.Variable, array_type(e, t_int, 1), false);
+    if array_type(e, t_rgba, 2) != t_rgba_image { fatal; };
     for (["sqrt", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "log"]) |name| {
-        builtin(name, t_float, t_float, 0);
+        builtin(e, name, t_float, t_float, 0);
     };
-    builtin("pow", t_float, t_float, t_float);
-    builtin("atan2", t_float, t_float, t_float);
-    builtin("to_float", t_float, t_int, 0);
-    builtin("to_int", t_int, t_float, 0);
+    builtin(e, "pow", t_float, t_float, t_float);
+    builtin(e, "atan2", t_float, t_float, t_float);
+    builtin(e, "to_float", t_float, t_int, 0);
+    builtin(e, "to_int", t_int, t_float, 0);
 }
 
 fn typed_string(s: Scanner) I32 {
+    let e = s.env;
     let at = s.pos;
     s.expect(Kind.STRING);
     typed_node(Tag.Leaf, s.last_hi, s.last_lo, at, 0);
@@ -1147,6 +1187,7 @@ fn typed_string(s: Scanner) I32 {
 
 // An array literal's elements, which share one type: .{node, count, type}.
 fn typed_elements(s: Scanner) .{I32, I32, I32} {
+    let e = s.env;
     let list = 0;
     let count = 0;
     let element = 0;
@@ -1170,6 +1211,7 @@ fn typed_elements(s: Scanner) .{I32, I32, I32} {
 
 // Indices, which are Ints: .{node, count}.
 fn typed_indices(s: Scanner) .{I32, I32} {
+    let e = s.env;
     let list = 0;
     let count = 0;
     if s.kind != Kind.RSQUARE {
@@ -1187,15 +1229,16 @@ fn typed_indices(s: Scanner) .{I32, I32} {
 }
 
 // Arguments or record fields, typed as `expected[start ..< start + count]`
-// (`fn_types` for arguments, `field_type` for fields).
+// (`e.fn_types` for arguments, `e.field_type` for fields).
 fn typed_arguments(s: Scanner, close: Kind, fields: Bool, start: I32, count: I32) I32 {
+    let e = s.env;
     let list = 0;
     let n = 0;
     if s.kind != close {
         while (true) {
             let .{item, item_type, _bare} = typed_expr(s, 0);
             if n >= count { fail(); };
-            let wanted = if fields { field_type[start + n]; } else { fn_types[start + n]; };
+            let wanted = if fields { e.field_type[start + n]; } else { e.fn_types[start + n]; };
             if item_type != wanted { fail(); };
             list = typed_node(Tag.List, list, item, 0, 0);
             n += 1;
@@ -1210,8 +1253,9 @@ fn typed_arguments(s: Scanner, close: Kind, fields: Bool, start: I32, count: I32
 
 // `array[i : n, …] body` and `sum[…] body`: .{node, type}.
 fn typed_loop(s: Scanner, array: Bool, at: I32) .{I32, I32} {
+    let e = s.env;
     s.expect(Kind.LSQUARE);
-    let mark = locals.len();
+    let mark = e.locals.len;
     let count = 0;
     let bindings = 0;
     if s.kind != Kind.RSQUARE {
@@ -1221,7 +1265,7 @@ fn typed_loop(s: Scanner, array: Bool, at: I32) .{I32, I32} {
             s.expect(Kind.COLON);
             let .{limit, limit_type, _bare} = typed_expr(s, 0);
             if limit_type != t_int { fail(); };
-            bind(name, SymbolTag.Variable, t_int, true);
+            bind(e, name, SymbolTag.Variable, t_int, true);
             bindings = typed_node(Tag.List, bindings, typed_node(Tag.Binding, limit, 0, name_at, t_int), 0, 0);
             count += 1;
             if s.kind != Kind.COMMA { break; };
@@ -1232,14 +1276,15 @@ fn typed_loop(s: Scanner, array: Bool, at: I32) .{I32, I32} {
     if count == 0 { fail(); };
     let .{body, body_type, _bare} = typed_expr(s, 0);
     if not array and body_type != t_int and body_type != t_float { fail(); };
-    let result = if array { array_type(body_type, count); } else { body_type; };
-    unbind_to(mark);
+    let result = if array { array_type(e, body_type, count); } else { body_type; };
+    unbind_to(e, mark);
     .{typed_node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at, result), result};
 }
 
 // A prefix expression: .{node, type, bare name}. A name of a function or
 // type has type 0 (not a value) until it is called or constructed.
 fn typed_prefix(s: Scanner) .{I32, I32, I32} {
+    let e = s.env;
     let at = s.pos;
     let code = if s.kind == Kind.OP { s.op; } else { 0; };
     let kind = s.kind;
@@ -1247,9 +1292,9 @@ fn typed_prefix(s: Scanner) .{I32, I32, I32} {
     s.take();
     match kind {
         Kind.VARIABLE => {
-            let symbol = lookup(name);
-            let value = if sym_tag[symbol] == SymbolTag.Variable { sym_type[symbol]; } else { 0; };
-            .{typed_node(Tag.Leaf, symbol, 0, at, sym_type[symbol]), value, name};
+            let symbol = lookup(e, name);
+            let value = if e.sym_tag[symbol] == SymbolTag.Variable { e.sym_type[symbol]; } else { 0; };
+            .{typed_node(Tag.Leaf, symbol, 0, at, e.sym_type[symbol]), value, name};
         },
         Kind.TRUE => .{typed_node(Tag.Leaf, at, 0, at, t_bool), t_bool, unnamed},
         Kind.FALSE => .{typed_node(Tag.Leaf, at, 0, at, t_bool), t_bool, unnamed},
@@ -1264,7 +1309,7 @@ fn typed_prefix(s: Scanner) .{I32, I32, I32} {
         Kind.LSQUARE => {
             let .{list, count, element} = typed_elements(s);
             if count == 0 { fail(); };
-            let array = array_type(element, 1);
+            let array = array_type(e, element, 1);
             .{typed_node(Tag.ArrayExpr, list, 0, at, array), array, unnamed};
         },
         Kind.OP => {
@@ -1312,6 +1357,7 @@ fn operator_type(code: I32, left: I32, right: I32) I32 {
 
 // An expression whose operators bind at least `min`: .{node, type, bare name}.
 fn typed_expr(s: Scanner, min: I32) .{I32, I32, I32} {
+    let e = s.env;
     let .{left, left_type, bare} = typed_prefix(s);
     while (true) {
         let kind = s.kind;
@@ -1319,35 +1365,35 @@ fn typed_expr(s: Scanner, min: I32) .{I32, I32, I32} {
             if min > 6 { break; };
             s.take();
             let name = s.expect_name();
-            if type_tag[left_type] != TypeTag.Record { fail(); };
-            let result = field_type_of(left_type, name);
+            if e.type_tag[left_type] != TypeTag.Record { fail(); };
+            let result = field_type_of(e, left_type, name);
             if result == 0 { fail(); };
             left = typed_node(Tag.Field, left, 0, s.pos - 1, result);
             left_type = result;
         } else if kind == Kind.LSQUARE {
             if min > 6 { break; };
             s.take();
-            if type_tag[left_type] != TypeTag.ArrayType { fail(); };
+            if e.type_tag[left_type] != TypeTag.ArrayType { fail(); };
             let .{indices, count} = typed_indices(s);
-            if count != type_rank[left_type] { fail(); };
-            let element = type_element[left_type];
+            if count != e.type_rank[left_type] { fail(); };
+            let element = e.type_element[left_type];
             left = typed_node(Tag.Index, left, indices, 0, element);
             left_type = element;
         } else if kind == Kind.LPAREN or kind == Kind.LCURLY {
             if min > 6 or bare == unnamed { break; };
-            let symbol = lookup(bare);
+            let symbol = lookup(e, bare);
             s.take();
             if kind == Kind.LPAREN {
-                if sym_tag[symbol] != SymbolTag.Function { fail(); };
-                let args = typed_arguments(s, Kind.RPAREN, false, sym_params_start[symbol], sym_params_len[symbol]);
-                left = typed_node(Tag.Call, left, args, 0, sym_type[symbol]);
+                if e.sym_tag[symbol] != SymbolTag.Function { fail(); };
+                let args = typed_arguments(s, Kind.RPAREN, false, e.sym_params_start[symbol], e.sym_params_len[symbol]);
+                left = typed_node(Tag.Call, left, args, 0, e.sym_type[symbol]);
             } else {
-                let record = sym_type[symbol];
-                if sym_tag[symbol] != SymbolTag.Alias or type_tag[record] != TypeTag.Record { fail(); };
-                let args = typed_arguments(s, Kind.RCURLY, true, type_fields_start[record], type_fields_len[record]);
+                let record = e.sym_type[symbol];
+                if e.sym_tag[symbol] != SymbolTag.Alias or e.type_tag[record] != TypeTag.Record { fail(); };
+                let args = typed_arguments(s, Kind.RCURLY, true, e.type_fields_start[record], e.type_fields_len[record]);
                 left = typed_node(Tag.Construct, left, args, 0, record);
             };
-            left_type = sym_type[symbol];
+            left_type = e.sym_type[symbol];
         } else {
             if kind != Kind.OP { break; };
             let code = s.op;
@@ -1367,15 +1413,16 @@ fn typed_expr(s: Scanner, min: I32) .{I32, I32, I32} {
 }
 
 fn typed_type(s: Scanner) I32 {
+    let e = s.env;
     let result = match s.kind {
         Kind.INT => t_int,
         Kind.FLOAT => t_float,
         Kind.BOOL => t_bool,
         Kind.VOID => t_void,
         Kind.VARIABLE => {
-            let symbol = lookup(s.name());
-            if sym_tag[symbol] != SymbolTag.Alias { fail(); };
-            sym_type[symbol];
+            let symbol = lookup(e, s.name());
+            if e.sym_tag[symbol] != SymbolTag.Alias { fail(); };
+            e.sym_type[symbol];
         },
         ~> {
             fail();
@@ -1391,12 +1438,13 @@ fn typed_type(s: Scanner) I32 {
             rank += 1;
         };
         s.expect(Kind.RSQUARE);
-        result = array_type(result, rank);
+        result = array_type(e, result, rank);
     };
     result;
 }
 
 fn typed_annotation(s: Scanner) I32 {
+    let e = s.env;
     s.expect(Kind.COLON);
     typed_type(s);
 }
@@ -1405,29 +1453,30 @@ fn typed_annotation(s: Scanner) I32 {
 // parameters). Returns a pattern id; bind_pattern binds it once the value's
 // type is known.
 fn pattern(s: Scanner, parameter: Bool) I32 {
+    let e = s.env;
     let at = s.pos;
     let name = s.expect_name();
-    let id = pat_tag.len();
-    pat_tag.push(PatternTag.Plain);
-    pat_name.push(name);
-    pat_node.push(0);
-    pat_declared.push(0);
-    pat_first.push(-1);
-    pat_last.push(-1);
-    pat_next.push(-1);
-    pat_count.push(0);
-    pat_dim_start.push(0);
-    pat_dim_count.push(0);
+    let id = e.pat_tag.len;
+    e.pat_tag.push(PatternTag.Plain);
+    e.pat_name.push(name);
+    e.pat_node.push(0);
+    e.pat_declared.push(0);
+    e.pat_first.push(-1);
+    e.pat_last.push(-1);
+    e.pat_next.push(-1);
+    e.pat_count.push(0);
+    e.pat_dim_start.push(0);
+    e.pat_dim_count.push(0);
     let target = typed_node(Tag.Lvalue, at, 0, at, 0);
     if s.kind == Kind.LSQUARE {
         s.take();
-        pat_tag[id] = PatternTag.Dims;
-        pat_dim_start[id] = dim_names.len();
+        e.pat_tag[id] = PatternTag.Dims;
+        e.pat_dim_start[id] = e.dim_names.len;
         if s.kind != Kind.RSQUARE {
             while (true) {
                 let dim_at = s.pos;
-                dim_names.push(s.expect_name());
-                pat_dim_count[id] += 1;
+                e.dim_names.push(s.expect_name());
+                e.pat_dim_count[id] += 1;
                 target = typed_node(Tag.Lvalue, target, dim_at, at, 0);
                 if s.kind != Kind.COMMA { break; };
                 s.take();
@@ -1436,54 +1485,54 @@ fn pattern(s: Scanner, parameter: Bool) I32 {
         s.expect(Kind.RSQUARE);
     } else if s.kind == Kind.LCURLY {
         s.take();
-        pat_tag[id] = PatternTag.Fields;
+        e.pat_tag[id] = PatternTag.Fields;
         if s.kind != Kind.RCURLY {
             while (true) {
                 let child = pattern(s, parameter);
-                if pat_first[id] < 0 {
-                    pat_first[id] = child;
+                if e.pat_first[id] < 0 {
+                    e.pat_first[id] = child;
                 } else {
-                    pat_next[pat_last[id]] = child;
+                    e.pat_next[e.pat_last[id]] = child;
                 };
-                pat_last[id] = child;
-                pat_count[id] += 1;
-                target = typed_node(Tag.Lvalue, target, pat_node[child], at, 0);
+                e.pat_last[id] = child;
+                e.pat_count[id] += 1;
+                target = typed_node(Tag.Lvalue, target, e.pat_node[child], at, 0);
                 if s.kind != Kind.COMMA { break; };
                 s.take();
             };
         };
         s.expect(Kind.RCURLY);
-        let symbol = lookup(name);
-        if sym_tag[symbol] != SymbolTag.Alias or type_tag[sym_type[symbol]] != TypeTag.Record { fail(); };
-        pat_declared[id] = sym_type[symbol];
+        let symbol = lookup(e, name);
+        if e.sym_tag[symbol] != SymbolTag.Alias or e.type_tag[e.sym_type[symbol]] != TypeTag.Record { fail(); };
+        e.pat_declared[id] = e.sym_type[symbol];
     };
-    if parameter and pat_tag[id] != PatternTag.Fields {
-        pat_declared[id] = typed_annotation(s);
-        target = typed_node(Tag.Binding, target, 0, at, pat_declared[id]);
+    if parameter and e.pat_tag[id] != PatternTag.Fields {
+        e.pat_declared[id] = typed_annotation(s);
+        target = typed_node(Tag.Binding, target, 0, at, e.pat_declared[id]);
     };
-    pat_node[id] = target;
+    e.pat_node[id] = target;
     id;
 }
 
-fn bind_pattern(id: I32, expected: I32, local: Bool) void {
-    if pat_declared[id] != 0 and pat_declared[id] != expected { fail(); };
-    let tag = pat_tag[id];
+fn bind_pattern(e: Env, id: I32, expected: I32, local: Bool) void {
+    if e.pat_declared[id] != 0 and e.pat_declared[id] != expected { fail(); };
+    let tag = e.pat_tag[id];
     if tag == PatternTag.Plain {
-        bind(pat_name[id], SymbolTag.Variable, expected, local);
+        bind(e, e.pat_name[id], SymbolTag.Variable, expected, local);
     } else if tag == PatternTag.Dims {
-        if type_tag[expected] != TypeTag.ArrayType or type_rank[expected] != pat_dim_count[id] { fail(); };
-        bind(pat_name[id], SymbolTag.Variable, expected, local);
-        let start = pat_dim_start[id];
-        for (start ..< start + pat_dim_count[id]) |d| {
-            bind(dim_names[d], SymbolTag.Variable, t_int, local);
+        if e.type_tag[expected] != TypeTag.ArrayType or e.type_rank[expected] != e.pat_dim_count[id] { fail(); };
+        bind(e, e.pat_name[id], SymbolTag.Variable, expected, local);
+        let start = e.pat_dim_start[id];
+        for (start ..< start + e.pat_dim_count[id]) |d| {
+            bind(e, e.dim_names[d], SymbolTag.Variable, t_int, local);
         };
     } else {
-        if type_tag[expected] != TypeTag.Record or type_fields_len[expected] != pat_count[id] { fail(); };
-        let child = pat_first[id];
-        let start = type_fields_start[expected];
-        for (start ..< start + type_fields_len[expected]) |f| {
-            bind_pattern(child, field_type[f], local);
-            child = pat_next[child];
+        if e.type_tag[expected] != TypeTag.Record or e.type_fields_len[expected] != e.pat_count[id] { fail(); };
+        let child = e.pat_first[id];
+        let start = e.type_fields_start[expected];
+        for (start ..< start + e.type_fields_len[expected]) |f| {
+            bind_pattern(e, child, e.field_type[f], local);
+            child = e.pat_next[child];
         };
     };
 }
@@ -1491,14 +1540,15 @@ fn bind_pattern(id: I32, expected: I32, local: Bool) void {
 // `let`, `assert`, or `return` in a function returning `returns`:
 // .{node, whether it returned}.
 fn typed_stmt(s: Scanner, returns: I32) .{I32, Bool} {
+    let e = s.env;
     let at = s.pos;
     let result = match s.take() {
         Kind.LET => {
             let target = pattern(s, false);
             s.expect(Kind.EQUALS);
             let .{value, value_type, _bare} = typed_expr(s, 0);
-            bind_pattern(target, value_type, true);
-            .{typed_node(Tag.Stmt, pat_node[target], value, at, t_void), false};
+            bind_pattern(e, target, value_type, true);
+            .{typed_node(Tag.Stmt, e.pat_node[target], value, at, t_void), false};
         },
         Kind.ASSERT => {
             let .{value, value_type, _bare} = typed_expr(s, 0);
@@ -1521,54 +1571,56 @@ fn typed_stmt(s: Scanner, returns: I32) .{I32, Bool} {
 }
 
 fn typed_struct(s: Scanner, at: I32) I32 {
+    let e = s.env;
     let name = s.expect_name();
-    if symbol_of(name) >= 0 { fail(); };
+    if symbol_of(e, name) >= 0 { fail(); };
     s.expect(Kind.LCURLY);
     s.expect(Kind.NEWLINE);
-    let start = field_name.len();
+    let start = e.field_name.len;
     let fields = 0;
     while (s.kind == Kind.VARIABLE) {
         let field_at = s.pos;
         let field = s.expect_name();
-        for (start ..< field_name.len()) |f| {
-            if field_name[f] == field { fail(); };
+        for (start ..< e.field_name.len) |f| {
+            if e.field_name[f] == field { fail(); };
         };
         let type_id = typed_annotation(s);
-        field_name.push(field);
-        field_type.push(type_id);
+        e.field_name.push(field);
+        e.field_type.push(type_id);
         fields = typed_node(Tag.List, fields, typed_node(Tag.Binding, type_id, 0, field_at, type_id), 0, 0);
         s.expect(Kind.NEWLINE);
     };
     s.expect(Kind.RCURLY);
-    bind(name, SymbolTag.Alias, new_type(TypeTag.Record, 0, 0, start, field_name.len() - start), false);
+    bind(e, name, SymbolTag.Alias, new_type(e, TypeTag.Record, 0, 0, start, e.field_name.len - start), false);
     typed_node(Tag.Command, fields, 0, at, t_void);
 }
 
 fn typed_fn(s: Scanner, at: I32) I32 {
+    let e = s.env;
     let name = s.expect_name();
-    if symbol_of(name) >= 0 { fail(); };
+    if symbol_of(e, name) >= 0 { fail(); };
     s.expect(Kind.LPAREN);
-    let first_param = fn_params.len();
-    let params_start = fn_types.len();
+    let first_param = e.fn_params.len;
+    let params_start = e.fn_types.len;
     if s.kind != Kind.RPAREN {
         while (true) {
             let param = pattern(s, true);
-            fn_params.push(param);
-            fn_types.push(pat_declared[param]);
+            e.fn_params.push(param);
+            e.fn_types.push(e.pat_declared[param]);
             if s.kind != Kind.COMMA { break; };
             s.take();
         };
     };
     s.expect(Kind.RPAREN);
     let returns = typed_annotation(s);
-    let symbol = bind(name, SymbolTag.Function, returns, false);
-    sym_params_start[symbol] = params_start;
-    sym_params_len[symbol] = fn_params.len() - first_param;
-    let mark = locals.len();
-    for (first_param ..< fn_params.len()) |k| {
-        bind_pattern(fn_params[k], pat_declared[fn_params[k]], true);
+    let symbol = bind(e, name, SymbolTag.Function, returns, false);
+    e.sym_params_start[symbol] = params_start;
+    e.sym_params_len[symbol] = e.fn_params.len - first_param;
+    let mark = e.locals.len;
+    for (first_param ..< e.fn_params.len) |k| {
+        bind_pattern(e, e.fn_params[k], e.pat_declared[e.fn_params[k]], true);
     };
-    fn_params.resize(first_param);
+    e.fn_params.truncate(first_param);
     s.expect(Kind.LCURLY);
     s.expect(Kind.NEWLINE);
     let body = 0;
@@ -1581,12 +1633,13 @@ fn typed_fn(s: Scanner, at: I32) I32 {
     };
     s.expect(Kind.RCURLY);
     if returns != t_void and not returned { fail(); };
-    unbind_to(mark);
+    unbind_to(e, mark);
     typed_node(Tag.Command, body, 0, at, t_void);
 }
 
 // Every command but `time` ends its line.
 fn typed_command(s: Scanner) I32 {
+    let e = s.env;
     let at = s.pos;
     let kind = s.take();
     if kind == Kind.TIME { return typed_node(Tag.Command, typed_command(s), 0, at, t_void); };
@@ -1595,8 +1648,8 @@ fn typed_command(s: Scanner) I32 {
             let target = pattern(s, false);
             s.expect(Kind.EQUALS);
             let .{value, value_type, _bare} = typed_expr(s, 0);
-            bind_pattern(target, value_type, false);
-            typed_node(Tag.Command, pat_node[target], value, at, t_void);
+            bind_pattern(e, target, value_type, false);
+            typed_node(Tag.Command, e.pat_node[target], value, at, t_void);
         },
         Kind.ASSERT => {
             let .{value, value_type, _bare} = typed_expr(s, 0);
@@ -1614,8 +1667,8 @@ fn typed_command(s: Scanner) I32 {
             let text = typed_string(s);
             s.expect(Kind.TO);
             let target = pattern(s, false);
-            bind_pattern(target, t_rgba_image, false);
-            typed_node(Tag.Command, text, pat_node[target], at, t_void);
+            bind_pattern(e, target, t_rgba_image, false);
+            typed_node(Tag.Command, text, e.pat_node[target], at, t_void);
         },
         Kind.WRITE => {
             s.expect(Kind.IMAGE);
@@ -1636,6 +1689,7 @@ fn typed_command(s: Scanner) I32 {
 }
 
 fn typed_program(s: Scanner) I32 {
+    let e = s.env;
     let root = 0;
     while (s.kind != Kind.END_OF_FILE) {
         if s.kind == Kind.NEWLINE {
@@ -1649,18 +1703,21 @@ fn typed_program(s: Scanner) I32 {
 
 // Parse and type check `src`. Returns the token count + 1 (as Zig reports
 // it), or -1 for a syntax or type error.
-fn check() I32 {
+// Also returns the symbol and type counts, for -s.
+fn check() .{I32, I32, I32} {
     reset_nodes();
     node_type.reserve(src.len());
     let end = src.len() - 1;
-    let result = try {
-        init_env();
-        let s = new_scanner(end);
+    let e = new_env();
+    let tokens = try {
+        init_env(e);
+        let s = new_scanner(end, e);
         typed_program(s);
         s.pos + 1;
     } catch {
         -1;
     };
+    let result = .{tokens, e.sym_tag.len, e.type_tag.len};
     // Drop the builtin names init_env appended after the sentinel.
     src.resize(end + 1);
     result;
@@ -1676,7 +1733,11 @@ fn load(path: Str) void {
 fn report(n: I32, print: Bool) void {
     let at = if n >= 0 and print { listing(n); } else { 0; };
     at = emit_bytes(at, if n < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
-    Fs.writeSync(1.0, out.view(0, at));
+    // A pipe can take less than everything, or nothing yet (EAGAIN under Node).
+    let written = 0;
+    while (written < at) {
+        written += try { Fs.writeSync(1.0, out.view(written, at)).to_i32(); } catch { 0; };
+    };
 }
 
 // Median of `runs` timings of lex (and with `print`, of the listing too), in ms.
@@ -1724,14 +1785,15 @@ export main() void {
         return;
     };
     if flags == "-t-s" or flags == "-s-t" {
-        let tokens = check();
+        let .{tokens, symbols, types} = check();
         let counts = "tokens=" + tokens.to_str() + " nodes=" + node_tag.len().to_str() + " symbols="
-            + sym_tag.len().to_str() + " types=" + type_tag.len().to_str() + "\n";
+            + symbols.to_str() + " types=" + types.to_str() + "\n";
         Fs.writeSync(1.0, if tokens < 0 { "Compilation failed\n"; } else { counts; });
         return;
     };
     if flags == "-t-q" or flags == "-q-t" or flags == "-t" {
-        Fs.writeSync(1.0, if check() < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
+        let .{tokens, _symbols, _types} = check();
+        Fs.writeSync(1.0, if tokens < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
         return;
     };
     if flags == "-p-q" or flags == "-q-p" or flags == "-p" {
@@ -1746,7 +1808,7 @@ fn time_parse(runs: I32, types: Bool) F64 {
     let samples = Array[F64].new(runs, 0.0);
     for (0 ..< runs + 3) |r| {
         let begin = Web.performance.now();
-        if types { check(); } else { parse(); };
+        if types { let .{_t, _s, _y} = check(); } else { parse(); };
         if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
     };
     (samples sort(F64) |a, b| { a < b; })[runs / 2];
