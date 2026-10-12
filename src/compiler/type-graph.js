@@ -46,6 +46,53 @@ const MEMBER_OPERATIONS = new Map([['ir-index', 'get_index'], ['ir-slice', 'get_
  * @property {Array<object>} coercions
  */
 
+/** An array of `size` undefineds with fast elements (`new Array(n)` is a hash table for large n in V8). */
+function denseArray(size) {
+  const array = [];
+  for (let i = 0; i < size; i++) array.push(undefined);
+  return array;
+}
+
+/**
+ * The type graph's per-node slots, indexed by each element's dense `$`. It
+ * reads like a Map from elements to slots (`get`, `has`, iteration in
+ * insertion order), which is how analyses and editor queries consume it.
+ */
+class SlotTable {
+  constructor(size) {
+    this.byIndex = denseArray(size);
+    this.order = [];
+  }
+  get(node) {
+    const value = node == null ? undefined : this.byIndex[node.$];
+    // Elements of another document can share an index; the slot names its node.
+    return value !== undefined && value.node === node ? value : undefined;
+  }
+  has(node) {
+    return this.get(node) !== undefined;
+  }
+  set(node, value) {
+    if (!this.has(node)) this.order.push(node);
+    this.byIndex[node.$] = value;
+    return this;
+  }
+  get size() {
+    return this.order.length;
+  }
+  *entries() {
+    for (const node of this.order) yield [node, this.byIndex[node.$]];
+  }
+  keys() {
+    return this.order[Symbol.iterator]();
+  }
+  *values() {
+    for (const node of this.order) yield this.byIndex[node.$];
+  }
+  [Symbol.iterator]() {
+    return this.entries();
+  }
+}
+
 /** @returns {TypeGraph} */
 export function buildTypeGraph(doc, typeIndex) {
   const root = doc?.body?.firstChild;
@@ -54,12 +101,21 @@ export function buildTypeGraph(doc, typeIndex) {
   const graph = {
     doc, root, typeIndex, programIndex, programRevision: programIndex.revision,
     byKind: programIndex.byKind, nodesByKind: programIndex.byKind,
-    scopeGraph: retained.scope, slots: new Map(), rules: [], expectations: [],
+    scopeGraph: retained.scope, slots: new SlotTable(doc?.count ?? 0), rules: [], expectations: [],
     failures: [], coercions: [], changed: false,
     nativeMember: (owner, member) => memberFn(graph, owner, member),
   };
   if (!root) return graph;
 
+  // Each use's declaration, by the use's index: bindingOf is the solver's hottest query.
+  const resolutions = graph.scopeGraph?.resolutions;
+  if (resolutions) {
+    const bindings = graph.bindings = denseArray(doc.count);
+    for (const [id, decl] of resolutions) {
+      const node = programIndex.byId.get(id);
+      if (node !== undefined) bindings[node.$] = decl;
+    }
+  }
   for (const node of programIndex.all) graph.slots.set(node, slot(node));
   graph.fnIndex = programIndex.functions;
   graph.literalDefaults = collectLiteralDefaults(graph);
@@ -245,32 +301,56 @@ export function actualizeTypeGraph(graph) {
   return graph;
 }
 
-export function solveTypeGraph(graph) {
-  const dependents = graph.dependents = new Map();
-  graph.rules.forEach(rule => {
-    for (const dep of rule.deps) {
-      const list = dependents.get(dep) ?? [];
-      list.push(rule);
-      dependents.set(dep, list);
+/** Rules that read a node, by the node's index. Reads like a Map from nodes to rule lists. */
+class DependentTable {
+  constructor(size) {
+    this.byIndex = denseArray(size);
+    this.nodes = denseArray(size);
+  }
+  get(node) {
+    if (node == null || this.nodes[node.$] !== node) return undefined;
+    return this.byIndex[node.$];
+  }
+  add(node, rule) {
+    const i = node.$;
+    if (this.nodes[i] !== node) {
+      this.nodes[i] = node;
+      this.byIndex[i] = [rule];
+    } else {
+      this.byIndex[i].push(rule);
     }
-  });
+  }
+}
 
-  propagate(graph, graph.rules);
+export function solveTypeGraph(graph) {
+  const dependents = graph.dependents = new DependentTable(graph.doc?.count ?? 0);
+  const rules = graph.rules;
+  for (let r = 0; r < rules.length; r++) {
+    const deps = rules[r].deps;
+    for (let d = 0; d < deps.length; d++) dependents.add(deps[d], rules[r]);
+  }
+
+  propagate(graph, rules);
   return graph;
 }
 
 /** Run `rules`, then every rule depending on a node whose type changed, to a fixed point. */
 function propagate(graph, rules) {
-  const queue = [...rules];
-  const queued = new Set(queue);
+  const queue = rules.slice();
+  // A rule is queued at most once at a time: `queued` holds its position marker.
+  const queued = new Uint8Array(graph.rules.length);
+  for (let i = 0; i < queue.length; i++) queued[queue[i].index] = 1;
   for (let i = 0; i < queue.length; i++) {
     const rule = queue[i];
-    queued.delete(rule);
+    queued[rule.index] = 0;
     const type = rule.read();
     if (!type || actual(graph, rule.node) === type) continue;
     setActual(graph, rule.node, type, rule.source);
-    for (const next of graph.dependents.get(rule.node) ?? []) {
-      if (!queued.has(next)) { queue.push(next); queued.add(next); }
+    const next = graph.dependents.get(rule.node);
+    if (next === undefined) continue;
+    for (let k = 0; k < next.length; k++) {
+      const dependent = next[k];
+      if (!queued[dependent.index]) { queue.push(dependent); queued[dependent.index] = 1; }
     }
   }
 }
@@ -310,12 +390,16 @@ export function declarationType(graph, decl) {
   return actual(graph, decl);
 }
 /** Compatibility-only query for projected DOM IR without a retained graph. */
-export const projectedActualType = node => node?.dataset?.typeName ?? null;
+export const projectedActualType = node => node?.getAttribute?.('data-type-name') ?? null;
 export const expectedTypes = (graph, node) =>
   (graph.slots.get(node)?.expected ?? []).map(edge => edge.read()).filter(Boolean);
-export const bindingOf = (graph, node) => graph.scopeGraph
-  ? graph.scopeGraph.resolutions.get(node?.id) ?? null
-  : projectedBindingOf(graph.doc, node);
+export const bindingOf = (graph, node) => {
+  if (!graph.scopeGraph) return projectedBindingOf(graph.doc, node);
+  if (node == null) return graph.scopeGraph.resolutions.get(undefined) ?? null;
+  // Nodes indexed when the graph was built answer from the array.
+  if (graph.bindings !== undefined && graph.slots.get(node) !== undefined) return graph.bindings[node.$] ?? null;
+  return graph.scopeGraph.resolutions.get(node.id) ?? null;
+};
 /** Compatibility-only binding query for projected DOM IR. */
 export const projectedBindingOf = (doc, node) =>
   node?.dataset.bindingId ? doc?.getElementById(node.dataset.bindingId) : null;
@@ -351,7 +435,8 @@ function slot(node) {
 }
 
 function actual(graph, node) {
-  if (graph.slots.has(node)) return graph.slots.get(node).actual;
+  const value = graph.slots.get(node);
+  if (value !== undefined) return value.actual;
   return projectedActualType(node);
 }
 
@@ -371,7 +456,7 @@ function rule(graph, node, deps, read, source) {
   if (assignment) deps = [...deps, assignment.firstElementChild];
   // An operand may take its type from the other operand (`item.price * 2`).
   if (node.parentElement?.localName === 'ir-binary') deps = [...deps, ...[...node.parentElement.children].filter(c => c !== node)];
-  const value = { node, deps: deps.filter(Boolean), read, source };
+  const value = { node, deps: deps.filter(Boolean), read, source, index: graph.rules.length };
   graph.rules.push(value);
   graph.slots.get(node).rule = value;
 }

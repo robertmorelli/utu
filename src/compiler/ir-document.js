@@ -147,6 +147,8 @@ class IRText extends IRNode {
 class IRElement extends IRNode {
   constructor(document, localName) {
     super(document);
+    // A dense per-document index: analyses keep per-node facts in arrays by `$`.
+    this.$ = document.count++;
     this.localName = localName;
     this.shape = EMPTY;
     this.values = [];
@@ -341,6 +343,8 @@ class IRElement extends IRNode {
 
 class IRDocument {
   constructor() {
+    // Elements created in this document so far; every element's `$` is below it.
+    this.count = 0;
     this.ids = new Map();
     this.observers = new Set();
     this.documentElement = new IRElement(this, 'html');
