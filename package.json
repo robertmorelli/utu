@@ -178,6 +178,7 @@
     "test": "node ./scripts/test-all.mjs",
     "test:fast": "bun ./scripts/run-tests.mjs && node ./scripts/wasm-fingerprints.mjs",
     "fingerprints": "node ./scripts/wasm-fingerprints.mjs",
+    "behavior": "node ./scripts/behavior-fingerprints.mjs",
     "package:vscode": "bun run build && vsce package --out dist/utu-vscode.vsix",
     "bench:tiny": "bun ./scripts/benchmark-rust-vs-utu.mjs",
     "bench:kernels": "bun ./scripts/benchmark-suite.mjs",
