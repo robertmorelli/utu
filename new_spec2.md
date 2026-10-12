@@ -531,7 +531,23 @@ await for (ticks()) |t| { ... };   // the generator body may `await`
 // The body expands inline at the consuming loop: in the loop body, `break`
 // ends the generation and `continue` resumes after the current yield; in the
 // generator, `return;` ends it. Generators are not values (they cannot be
-// stored or passed) and cannot recurse; both are compile-time errors.
+// stored or passed); that is a compile-time error.
+
+// recursive generators: a generator may delegate to itself, and nothing else:
+// `for (walk(c)) |d| { yield d; }`. It runs as one loop over an explicit stack,
+// so values arrive depth-first with no call per node and no depth limit.
+fn walk(n: Node) yield Node {
+    for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; };
+}
+for (walk(root)) |n| {
+    if is_function(n) { prune; };  // do not descend below n
+    ...
+};
+// `prune;` skips the delegations after the current value's yield, up to the
+// next yield of the same call; the rest of the body still runs. One call's
+// body runs to completion before its values reach the consumer, so the
+// generator's own effects happen earlier than inline expansion would order
+// them. Generators that recurse through each other remain an error.
 
 // defer: run when the enclosing block exits — by reaching its end, return,
 // break, or continue — in reverse order of registration. A block's value and

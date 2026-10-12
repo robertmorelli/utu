@@ -93,6 +93,7 @@ export const T = Object.freeze({
   DEFER:          'ir-defer',           // defer expr: run at enclosing block exit
   YIELD:          'ir-yield',           // yield expr inside a generator (expanded before typing)
   FATAL:          'ir-fatal',           // fatal
+  PRUNE:          'ir-prune',           // prune: skip a recursive generator's subtree (expanded before typing)
 
   STRUCT_INIT:    'ir-struct-init',     // T1 { field: expr }
   TUPLE:          'ir-tuple',           // .{a, b} — reserved; not yet supported

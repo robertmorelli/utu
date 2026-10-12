@@ -44,6 +44,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.closure_expr,
         $.await_expr,
         alias('fatal', $.fatal_expr),
+        alias('prune', $.prune_expr),
         $.dsl_expr,
       ),
 

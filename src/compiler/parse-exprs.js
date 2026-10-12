@@ -14,7 +14,7 @@ import {
 } from './parse-exprs-control.js';
 import {
   walkAssertExpr, walkAwaitExpr, walkBindExpr, walkBreakExpr, walkContinueExpr, walkDeferExpr, walkYieldExpr, walkClosureExpr, walkDslExpr,
-  walkFatalExpr, walkFieldInit, walkReturnExpr, walkStructInit, walkTupleExpr, walkArrayExpr,
+  walkFatalExpr, walkPruneExpr, walkFieldInit, walkReturnExpr, walkStructInit, walkTupleExpr, walkArrayExpr,
 } from './parse-exprs-statements.js';
 
 export const walkers = {
@@ -71,6 +71,7 @@ export const walkers = {
   'defer_expr':                  walkDeferExpr,
   'yield_expr':                  walkYieldExpr,
   'fatal_expr':                  walkFatalExpr,
+  'prune_expr':                  walkPruneExpr,
   'assert_expr':                 walkAssertExpr,
   'tuple_expr':                  walkTupleExpr,
   'array_expr':                  walkArrayExpr,

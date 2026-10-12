@@ -107,8 +107,45 @@ than twice the bytes, and it needs a regenerator-style rewrite of control flow
 around every `yield`. Inline expansion is the smallest, and a consumed
 generator compiles to exactly the bytes of the hand-written loop at both -Oz
 and -O3 (where it is unrolled the same way). The trade: generators are
-consumed directly by `for`/`await for` — not stored or passed — and cannot
-recurse. Both are compile-time errors.
+consumed directly by `for`/`await for`, not stored or passed. That is a
+compile-time error. Recursive generators take a different lowering; see below.
 
 Because `await` suspends the wasm stack (JSPI), a generator body may await;
 `await for` is the same expansion, so async generators cost nothing extra.
+
+## Recursive generators — explicit stack (`recursive-generators.mjs`)
+
+```utu
+fn walk(n: Node) yield Node {
+    for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; };
+}
+for (walk(root)) |n| { if is_function(n) { prune; }; ... };
+```
+
+A generator that delegates to itself cannot expand inline, so it runs as one
+loop over an explicit stack of items (values and pending calls) and frames.
+The generator body and the consumer each appear once. A `yield c` followed by
+`for (walk(c))` is a single item, consumed as a value and then run as the call.
+
+An AST-shaped tree of 6.1M nodes (leaves, binary nodes, lists of 2–5) walked
+four ways at -Oz. "Pruned" skips lists of five; "find" stops at 70% of the walk.
+
+| strategy | full V8 | full JSC | pruned V8 | pruned JSC | find V8 | find JSC | module |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **recursive generator** | 59–67 ms | 60–67 ms | 7.8–8.5 ms | 3.9 ms | 37–41 ms | 42 ms | 2,531 B |
+| recursion over a `children` generator | 27–32 ms | 20 ms | 7.5–7.7 ms | 3.3 ms | 21–25 ms | 14 ms | 1,188 B |
+| callback per child (`cl`, tsc's `forEachChild`) | 640–690 ms | 482 ms | 39 ms | 27 ms | — | — | 890 B |
+| JavaScript objects, `forEachChild` | 58–83 ms | 78 ms | 8–11 ms | 5.4 ms | 40–46 ms | 44 ms | — |
+
+Ranges are medians from separate runs (V8 = Node 25.8, JSC = Bun 1.4.2).
+
+The recursive generator is 2× (V8) to 3× (JSC) slower than hand-written
+recursion over a full walk, and within 15% when most of the tree is pruned. Every
+node is written to the item stack and read back, and every array access is
+bounds-checked; recursion keeps the child in a register and its place in the
+call stack. Moving the running frame's cursor into locals, sharing the value and
+argument arrays, and fusing yield-then-delegate items brought it from 77 ms to
+about 60 ms; the remaining gap is the item stack itself. It matches
+or beats the same walk in plain JavaScript, is 10× faster than a closure per
+child, and has no depth limit. Recursion stays the faster way to write a visitor;
+the generator buys depth-first order as a loop with `break` and `prune`.

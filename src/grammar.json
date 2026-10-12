@@ -1833,6 +1833,15 @@
           "value": "fatal_expr"
         },
         {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "prune"
+          },
+          "named": true,
+          "value": "prune_expr"
+        },
+        {
           "type": "SYMBOL",
           "name": "dsl_expr"
         }

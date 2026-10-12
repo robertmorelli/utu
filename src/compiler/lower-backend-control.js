@@ -38,7 +38,20 @@ function lowerAlt(alt, typeIndex) {
   } else {
     condition = arm => makeRefTest(alt, block.subjectLet, block.subjectName, arm.getAttribute('variant'));
   }
-  for (let i = arms.length - 1; i >= 0; i--) {
+  // Without a default arm the chain still needs a final else when the alt has
+  // a value. An alt naming every variant of an enum is exhaustive (validation
+  // checks this), so its last arm needs no test; any other case traps.
+  let last = arms.length - 1;
+  if (!defaultArm) {
+    const variants = enumDecl?.localName === 'ir-enum' ? enumDecl.querySelectorAll(':scope > ir-variant').length : -1;
+    const resultType = alt.dataset['typeName'];
+    if (variants === new Set(arms.map(arm => arm.getAttribute('variant'))).size) {
+      tail = lowerArmBody(alt, block.subjectLet, block.subjectName, arms[last--]);
+    } else if (resultType && resultType !== 'void' && resultType !== 'never') {
+      tail = wrapBody(alt, createSyntheticNode(alt.ownerDocument, 'ir-fatal', alt, 'lower-backend-control', 'alt-unmatched-fatal'));
+    }
+  }
+  for (let i = last; i >= 0; i--) {
     const arm = arms[i];
     const body = lowerArmBody(alt, block.subjectLet, block.subjectName, arm);
     tail = makeIf(arm, condition(arm), body, tail);

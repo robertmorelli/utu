@@ -52,6 +52,11 @@ export function lowerGenerators(doc, parser, createDocument) {
     awaited.replaceWith(loop);
   }
 
+  // A generator that delegates to itself is recursive: it runs on an explicit
+  // stack (expandRecursiveLoop) rather than expanding inline.
+  const recursive = new Set([...generators].filter(([name, fn]) => [...fn.querySelectorAll('ir-for')]
+    .some(loop => generatorCall(loop, generators)?.firstElementChild.getAttribute('name') === name)).map(([name]) => name));
+
   // Consumers outside generators expand first; loops inside a generator body
   // expand once that body has been inlined into a consumer.
   let serial = 0;
@@ -60,13 +65,15 @@ export function lowerGenerators(doc, parser, createDocument) {
       .find(node => generatorCall(node, generators) && !node.closest('ir-fn[data-generator="true"]'));
     if (!loop) break;
     const name = generatorCall(loop, generators).firstElementChild.getAttribute('name');
-    if (expansionsAround(loop).includes(name)) {
+    if (!recursive.has(name) && expansionsAround(loop).includes(name)) {
       throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, `generator ${name} consumes itself; generators expand inline, so they cannot recurse`, loop);
     }
     if (++serial > MAX_EXPANSIONS) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'Generator expansion did not finish', loop);
     let expanded;
     try {
-      expanded = expandLoop(loop, generators, `__gen${serial}_`, parser, createDocument);
+      expanded = recursive.has(name)
+        ? expandRecursiveLoop(loop, generators, recursive, `__gen${serial}_`, parser, createDocument)
+        : expandLoop(loop, generators, `__gen${serial}_`, parser, createDocument);
     } catch (error) {
       throw error.diagnostic ? error : compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, error.message, loop);
     }
@@ -82,6 +89,8 @@ export function lowerGenerators(doc, parser, createDocument) {
     throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, `${callee.getAttribute('name')} is a generator: consume it with \`for (${callee.getAttribute('name')}(…)) |value| { … }\``, call);
   }
   for (const fn of generators.values()) fn.remove();
+  const prune = root.querySelector('ir-prune');
+  if (prune) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself', prune);
 }
 
 /** Names of the generators whose expansions enclose `node`. */
@@ -179,6 +188,195 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
   const statements = expanded.querySelector(':scope > ir-block') ?? expanded;
   labeledBlock(statements.lastElementChild, whole);
   return expanded;
+}
+
+const SCALARS = new Set(['I32', 'U32', 'I64', 'U64', 'M32', 'M64', 'M128', 'F32', 'F64', 'V128', 'Bool']);
+const STACK_START = 16;
+
+// A recursive generator delegates to itself with `for (walk(…)) |v| { yield v; }`.
+// Inlining would never finish, so it runs on an explicit stack instead:
+//
+//   items   one per yield (a value) or delegation (the call's arguments), in
+//           parallel arrays: kind, arg0, arg1, … and val, unless a
+//           parameter has the yield type, in which case values share its array
+//   frames  one per running call: [cursor, end) over its contiguous items; the
+//           running frame's pair lives in locals, the suspended ones in arrays
+//
+//   loop {
+//     take the next item of the running frame (or resume the suspended one)
+//     call  → run the generator body once with its arguments; its yields and
+//             delegations push items, which become a new frame
+//     value → run the consumer body
+//   }
+//
+// A call's body runs to completion before any of its values are consumed, so
+// its effects come before the consumer sees its first value. Values still
+// arrive in depth-first order. The generator body and the consumer body each
+// appear once, whatever the depth. `prune;` in the consumer skips the
+// delegations that follow the current value's yield, up to that call's next yield.
+//
+// Pre-order walks yield a value and then delegate on that same value
+// (`yield c; for (walk(c)) |d| { yield d; };`). That pair is one item: it is
+// consumed as a value and then, unless pruned, runs as the call.
+function expandRecursiveLoop(loop, generators, recursive, prefix, parser, createDocument) {
+  const call = generatorCall(loop, generators);
+  const name = call.firstElementChild.getAttribute('name');
+  const generator = generators.get(name);
+  const names = (loop.querySelector(':scope > ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
+  if (names.length > 1) throw new Error('a generator loop binds one value: for (gen()) |value| { … }');
+  const consumer = loop.querySelector(':scope > ir-block');
+  const args = [...(call.querySelector(':scope > ir-arg-list')?.children ?? [])];
+  const params = paramsOf(generator);
+  if (args.length !== params.length) throw new Error(`${name} expects ${params.length} argument(s), got ${args.length}`);
+
+  const s = `${prefix}s_`;        // scaffolding; generator locals get `${prefix}u_`
+  const whole = `${s}generation`, frameLabel = `${s}frame`, resume = `${s}resume`;
+  const value = names[0] ?? `${s}value`;
+  const elementType = sourceTypeStr([...generator.children].find(child => child.localName.startsWith('ir-type-')));
+  const paramTypes = params.map(param => sourceTypeStr([...param.children].find(child => child.localName.startsWith('ir-type-'))));
+  if (!elementType || paramTypes.some(type => !type)) throw new Error(`${name} needs written types for its parameters and yield`);
+  // Values share a parameter's array when the types agree. Otherwise reference
+  // values are stored nullable, so their array can start empty.
+  const shared = paramTypes.indexOf(elementType);
+  const stored = SCALARS.has(elementType) || elementType.startsWith('?') ? elementType : `?${elementType}`;
+  const valArray = shared >= 0 ? `${s}arg${shared}` : `${s}val`;
+  const unwrap = shared >= 0 || stored === elementType ? '' : ' orelse fatal';
+
+  const body = generator.querySelector(':scope > ir-block').cloneNode(true);
+  const renamed = renameLocals(body, params, `${prefix}u_`);
+  for (const jump of ownJumps(body).filter(node => node.localName === 'ir-return')) {
+    if (jump.children.length) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'a generator ends with `return;`, without a value', jump);
+    retag(jump, 'ir-break').dataset.loopTarget = frameLabel;
+  }
+
+  const splices = new Map();
+  const splice = node => { const key = `${prefix}splice${splices.size}`; splices.set(key, node); return key; };
+  const grow = (top, arrays) => `if (${top} == ${arrays[0][0]}.len()) {
+    ${arrays.map(([array, type, fill]) => `let ${array}_grown: Array[${type}] = Array[${type}]${fill ? `.new(${top} * 2, ${fill})` : `.new_default(${top} * 2)`};
+    ${array}_grown.copy_from(0, ${array}, 0, ${top}); ${array} = ${array}_grown;`).join('\n    ')}
+  };`;
+  const itemArrays = [[`${s}kind`, 'I32'], ...(shared >= 0 ? [] : [[`${s}val`, stored]]), ...paramTypes.map((type, i) => [`${s}arg${i}`, type, `${s}arg${i}[0]`])];
+  const growItems = grow(`${s}top`, itemArrays);
+
+  // Delegations push a call item; every other yield pushes a value item.
+  const VALUE = 0, CALL = 1, VALUE_THEN_CALL = 2;
+  for (const inner of [...body.querySelectorAll('ir-for')]) {
+    const innerCall = generatorCall(inner, generators);
+    if (innerCall?.firstElementChild.getAttribute('name') !== name || !body.contains(inner)) continue;
+    if (!isDelegation(inner)) {
+      throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, `a recursive generator passes its own values straight through: \`for (${name}(…)) |v| { yield v; }\``, inner);
+    }
+    const innerArgs = [...(innerCall.querySelector(':scope > ir-arg-list')?.children ?? [])];
+    if (innerArgs.length !== params.length) throw new Error(`${name} expects ${params.length} argument(s), got ${innerArgs.length}`);
+    const yielded = inner.previousElementSibling;
+    const same = params.length === 1 && shared === 0 && yielded?.localName === 'ir-yield'
+      && yielded.firstElementChild?.localName === 'ir-ident' && innerArgs[0].localName === 'ir-ident'
+      && yielded.firstElementChild.getAttribute('name') === innerArgs[0].getAttribute('name');
+    if (same) yielded.remove();
+    const code = `{ ${innerArgs.map((arg, i) => `let ${s}a${i}: ${paramTypes[i]} = ${splice(arg)};`).join(' ')}
+      ${growItems}
+      ${s}kind[${s}top] = ${same ? VALUE_THEN_CALL : CALL};
+      ${innerArgs.map((_, i) => `${s}arg${i}[${s}top] = ${s}a${i};`).join(' ')}
+      ${s}top += 1; }`;
+    inner.replaceWith(expressionFromSource(parser, code, inner, splices, { createDocument }));
+  }
+  for (const yielded of [...body.querySelectorAll('ir-yield')]) {
+    const produced = yielded.firstElementChild;
+    if (!produced) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'yield needs a value', yielded);
+    const code = `{ let ${s}v: ${elementType} = ${splice(produced)};
+      ${growItems}
+      ${s}kind[${s}top] = ${VALUE}; ${valArray}[${s}top] = ${s}v; ${s}top += 1; }`;
+    yielded.replaceWith(expressionFromSource(parser, code, yielded, splices, { createDocument }));
+  }
+
+  // The consumer appears once. `prune;` belongs to the innermost recursive
+  // generator loop around it.
+  const step = consumer.cloneNode(true);
+  for (const jump of ownJumps(step)) {
+    if (jump.localName === 'ir-break') jump.dataset.loopTarget = whole;
+    else if (jump.localName === 'ir-continue') retag(jump, 'ir-break').dataset.loopTarget = resume;
+  }
+  for (const prune of [...step.querySelectorAll('ir-prune')]) {
+    if (prune.closest('ir-closure') && step.contains(prune.closest('ir-closure'))) {
+      throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'prune cannot appear inside a closure', prune);
+    }
+    let owned = true;
+    for (let parent = prune.parentElement; parent && parent !== step; parent = parent.parentElement) {
+      const nested = parent.localName === 'ir-for' ? generatorCall(parent, generators) : null;
+      if (nested && recursive.has(nested.firstElementChild.getAttribute('name'))) { owned = false; break; }
+    }
+    if (owned) prune.replaceWith(expressionFromSource(parser, `${s}pruned = true`, prune, new Map(), { createDocument }));
+  }
+
+  const roots = args.map((arg, i) => `let ${s}root${i}: ${paramTypes[i]} = ${splice(arg)};`).join('\n');
+  const code = `{
+    ${roots}
+    let ${s}kind: Array[I32] = Array[I32].new(${STACK_START}, ${CALL});
+    ${shared >= 0 ? '' : `let ${s}val: Array[${stored}] = Array[${stored}].new_default(${STACK_START});`}
+    ${paramTypes.map((type, i) => `let ${s}arg${i}: Array[${type}] = Array[${type}].new(${STACK_START}, ${s}root${i});`).join('\n')}
+    let ${s}top: I32 = 1;
+    let ${s}cur: I32 = 0;
+    let ${s}end: I32 = 1;
+    let ${s}fcur: Array[I32] = Array[I32].new_default(${STACK_START});
+    let ${s}fend: Array[I32] = Array[I32].new_default(${STACK_START});
+    let ${s}fsp: I32 = 0;
+    ${splice(labeledBlock(expressionFromSource(parser, `{ while (true) {
+      if (${s}cur == ${s}end) {
+        if (${s}fsp == 0) { break; };
+        ${s}fsp -= 1;
+        ${s}cur = ${s}fcur[${s}fsp];
+        ${s}end = ${s}fend[${s}fsp];
+        ${s}top = ${s}end;
+      } else {
+        let ${s}i: I32 = ${s}cur;
+        ${s}cur = ${s}i + 1;
+        let ${s}k: I32 = ${s}kind[${s}i];
+        let ${s}call: Bool = ${s}k == ${CALL};
+        if (not ${s}call) {
+          let ${value}: ${elementType} = ${valArray}[${s}i]${unwrap};
+          let ${s}pruned: Bool = false;
+          ${splice(labeledBlock(step, resume))};
+          if (${s}pruned) {
+            while (${s}cur < ${s}end and ${s}kind[${s}cur] == ${CALL}) { ${s}cur += 1; };
+          } else {
+            ${s}call = ${s}k == ${VALUE_THEN_CALL};
+          };
+        };
+        if (${s}call) {
+          ${params.map((param, i) => `let ${renamed(param.getAttribute('name'))}: ${paramTypes[i]} = ${s}arg${i}[${s}i];`).join(' ')}
+          let ${s}start: I32 = ${s}top;
+          ${splice(labeledBlock(body, frameLabel))};
+          if (${s}top > ${s}start) {
+            ${grow(`${s}fsp`, [[`${s}fcur`, 'I32'], [`${s}fend`, 'I32']])}
+            ${s}fcur[${s}fsp] = ${s}cur; ${s}fend[${s}fsp] = ${s}end; ${s}fsp += 1;
+            ${s}cur = ${s}start; ${s}end = ${s}top;
+          };
+        };
+      };
+    }; }`, loop, splices, { createDocument }), whole))};
+  }`;
+  return expressionFromSource(parser, code, loop, splices, { createDocument });
+}
+
+/** `for (gen(…)) |v| { yield v; }`, and nothing else. */
+function isDelegation(loop) {
+  const name = loop.querySelector(':scope > ir-capture')?.getAttribute('names');
+  const elements = [...loop.querySelector(':scope > ir-block').querySelectorAll('*')].filter(node => node.localName !== 'ir-block');
+  return elements.length === 2 && elements[0].localName === 'ir-yield'
+    && elements[1].localName === 'ir-ident' && elements[1].getAttribute('name') === name;
+}
+
+/** Prefix every binding `body` declares; returns the renaming for its parameters. */
+function renameLocals(body, params, prefix) {
+  const declared = new Set([
+    ...params.map(param => param.getAttribute('name')),
+    ...[...body.querySelectorAll('ir-let[name], ir-param[name]')].map(node => node.getAttribute('name')),
+    ...[...body.querySelectorAll('ir-capture[names]')].flatMap(node => node.getAttribute('names').split(',')),
+  ].filter(Boolean));
+  const renamed = name => (declared.has(name) ? prefix + name : name);
+  for (const node of body.querySelectorAll('ir-let[name], ir-param[name], ir-ident[name]')) node.setAttribute('name', renamed(node.getAttribute('name')));
+  for (const node of body.querySelectorAll('ir-capture[names]')) node.setAttribute('names', node.getAttribute('names').split(',').map(renamed).join(','));
+  return renamed;
 }
 
 /**

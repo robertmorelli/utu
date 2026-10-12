@@ -97,6 +97,10 @@ export function walkFatalExpr(n, doc, source, dispatch) {
   return stamp(el(T.FATAL, doc), n);
 }
 
+export function walkPruneExpr(n, doc, source, dispatch) {
+  return stamp(el(T.PRUNE, doc), n);
+}
+
 export function walkAssertExpr(n, doc, source, dispatch) {
   return walkOptionalOperand(T.ASSERT, n, doc, source, dispatch);
 }

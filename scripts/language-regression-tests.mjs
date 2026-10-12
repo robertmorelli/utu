@@ -576,12 +576,110 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     assertEq(await promisifyExports(instance, spec).total(4), 60);
   });
 
+  test('alt: an exhaustive alt without a default arm yields a value', async ({ ROOT }) => {
+    const source = `
+      tag enum Node:
+          | Leaf { v: I32 }
+          | Bin { l: I32 }
+          | List { n: I32 }
+      tag enum One:
+          | Only { v: I32 }
+      enum Plain:
+          | A { v: I32 }
+          | B { w: I32 }
+      fn tag_of(n: Node) I32 { alt n { Leaf |x| => x.v, Bin |b| => 7, List |k| => k.n, }; }
+      fn only(o: One) I32 { alt o { Only |x| => x.v, }; }
+      fn plain(p: Plain) I32 { alt p { A |a| => a.v, B |b| => b.w, }; }
+      fn effect(n: Node) I32 { let t = 0; alt n { Leaf |x| => { t = 1; }, Bin |b| => { t = 2; }, List |k| => { t = 3; }, }; t; }
+      export lib {
+          fn tags() I32 { tag_of(Leaf { v: 1 }) + tag_of(Bin { l: 0 }) * 10 + tag_of(List { n: 3 }) * 100; }
+          fn single() I32 { only(Only { v: 4 }); }
+          fn plains() I32 { plain(B { w: 5 }) * 10 + plain(A { v: 6 }); }
+          fn effects() I32 { effect(List { n: 0 }) * 10 + effect(Leaf { v: 0 }); }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `exhaustive_alt_${optimize}.utu`, source, optimize);
+      const expected = { tags: 371, single: 4, plains: 56, effects: 31 };
+      for (const [name, value] of Object.entries(expected)) assertEq(instance.exports[name](), value, `${name} at ${optimize}`);
+    }
+  });
+
+  test('generators: recursive generators walk depth-first on an explicit stack', async ({ ROOT }) => {
+    const source = `
+      tag enum Node:
+          | Leaf { v: I32 }
+          | Bin { l: Node, r: Node }
+          | List { xs: Array[Node] }
+      struct Chain:
+          | v: I32
+          | next: ?Chain
+      struct Log:
+          | v: I32
+      fn children(n: Node) yield Node {
+          alt n {
+              Leaf |x| => {},
+              Bin |b| => { yield b.l; yield b.r; },
+              List |k| => { for (k.xs) |c| { yield c; }; },
+          };
+      }
+      fn walk(n: Node) yield Node { for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; }; }
+      fn post(n: Node) yield Node { for (children(n)) |c| { for (post(c)) |d| { yield d; }; }; yield n; }
+      fn inorder(lo: I32, hi: I32) yield I32 {
+          if hi - lo <= 0 { return; };
+          let mid: I32 = lo + (hi - lo) / 2;
+          for (inorder(lo, mid)) |x| { yield x; };
+          yield mid;
+          for (inorder(mid + 1, hi)) |x| { yield x; };
+      }
+      fn links(c: Chain) yield I32 {
+          yield c.v;
+          promote c.next { |n| => { for (links(n)) |x| { yield x; }; }, ~> {}, };
+      }
+      fn counted(l: Log, n: I32) yield I32 { l.v += 1; if n > 0 { yield n; for (counted(l, n - 1)) |x| { yield x; }; }; }
+      fn value(n: Node) I32 { alt n { Leaf |x| => x.v, ~> 0, }; }
+      fn tag_of(n: Node) I32 { alt n { Leaf |x| => x.v, Bin |b| => 7, List |k| => 8, }; }
+      fn tree() Node {
+          Bin { l: List { xs: [Leaf { v: 1 }, Leaf { v: 2 }, Bin { l: Leaf { v: 3 }, r: Leaf { v: 4 } }] }, r: Leaf { v: 5 } };
+      }
+      export lib {
+          fn preorder() I32 { let s = 0; for (walk(tree())) |n| { s = s * 10 + tag_of(n); }; s; }
+          fn postorder() I32 { let s = 0; for (post(tree())) |n| { s = s * 10 + tag_of(n); }; s; }
+          fn pruned() I32 { let s = 0; for (walk(tree())) |n| { if tag_of(n) == 8 { prune; }; s = s * 10 + tag_of(n); }; s; }
+          fn pruned_inner() I32 { let s = 0; for (walk(tree())) |n| { if tag_of(n) == 7 { prune; }; s = s * 10 + tag_of(n); }; s; }
+          fn broken() I32 { let s = 0; for (walk(tree())) |n| { if value(n) == 3 { break; }; s += value(n); }; s; }
+          fn skipped() I32 { let s = 0; for (walk(tree())) |n| { if value(n) == 2 { continue; }; s += value(n); }; s; }
+          fn sorted(n: I32) I32 { let prev = -1; let ok = 1; for (inorder(0, n)) |x| { if x != prev + 1 { ok = 0; }; prev = x; }; if prev == n - 1 { ok; } else { 0; }; }
+          fn deep(n: I32) I32 {
+              let head = Chain { v: 0, next: null };
+              for (1..<n) |i| { head = Chain { v: 1, next: head }; };
+              let s = 0; for (links(head)) |x| { s += x; }; s;
+          }
+          fn nested() I32 { let s = 0; for (inorder(0, 10)) |a| { for (inorder(0, a)) |b| { s += 1; }; }; s; }
+          fn calls() I32 { let l = Log { v: 0 }; let s = 0; for (counted(l, 4)) |x| { s += x; }; l.v * 100 + s; }
+          fn stopped() I32 { let l = Log { v: 0 }; for (counted(l, 4)) |x| { break; }; l.v; }
+      }
+    `;
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `recursive_generators_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      const expected = { preorder: 8127345, postorder: 12347857, pruned: 85, pruned_inner: 81275, broken: 3, skipped: 13, nested: 45, calls: 510, stopped: 1 };
+      for (const [name, value] of Object.entries(expected)) assertEq(e[name](), value, `${name} at ${optimize}`);
+      for (const n of [0, 1, 2, 7, 1000]) assertEq(e.sorted(n), 1, `sorted(${n}) at ${optimize}`);
+      assertEq(e.deep(200000), 199999, `deep chain at ${optimize}`);
+    }
+  });
+
   test('generators: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
       ['fn f() I32 { yield 1; 1; }\nexport main() I32 { f(); }', 'yield can only appear in a generator'],
       ['fn g() yield I32 { yield 1; }\nexport main() I32 { let x = g(); 1; }', 'g is a generator: consume it with'],
-      ['fn g() yield I32 { for (g()) |x| { yield x; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'cannot recurse'],
+      ['fn a() yield I32 { for (b()) |x| { yield x; }; }\nfn b() yield I32 { for (a()) |x| { yield x; }; }\nexport main() I32 { for (a()) |x| { x; }; 1; }', 'cannot recurse'],
+      ['fn g(n: I32) yield I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nexport main() I32 { for (g(3)) |x| { x; }; 1; }', 'passes its own values straight through'],
+      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x| { prune; }; 1; }', 'prune skips a subtree of a recursive generator'],
+      ['export main() I32 { prune; 1; }', 'prune skips a subtree of a recursive generator'],
+      ['fn g(n: I32) yield I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nexport main() I32 { for (g(3)) |x| { let f = cl() void { prune; }; }; 1; }', 'prune cannot appear inside a closure'],
       ['fn g() yield I32 { return 5; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'ends with `return;`'],
       ['fn g() yield I32 { let f = cl() void { yield 1; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'inside a closure'],
       ['export main() I32 { await for ([1, 2]) |x| { x; }; 1; }', 'await for iterates a generator call'],
