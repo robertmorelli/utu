@@ -238,7 +238,7 @@ function rewriteInlineCall(node, type) {
   const method = [...node.querySelectorAll(':scope > ir-ident, :scope > ir-fn-name')].at(-1)?.getAttribute('name');
   callee.setAttribute('type', type);
   callee.setAttribute('method', method ?? '');
-  for (const key of ['methodStart', 'methodEnd']) if (node.dataset[key]) callee.dataset[key] = node.dataset[key];
+  for (const name of ['data-method-start', 'data-method-end']) if (node.attr(name)) callee.setAttribute(name, node.attr(name));
   call.appendChild(callee);
   // Move (not clone) the arguments: they may hold further mod-call requests
   // that this sweep still has to rewrite, e.g. M[I32].f(M[I32].g(x)).

@@ -1,11 +1,13 @@
 // Parse compiler-generated Utu through the same frontend as user code. Splices
 // retain their original source ranges; generated scaffolding points at its site.
 import { parseToIR, restampSubtree } from './parse.js';
+
+const SPAN_NAMES = ['data-start', 'data-end', 'data-row', 'data-col', 'data-end-row', 'data-end-col'];
 const PREFIX = 'fn __expansion() void { ';
 
 export function expressionFromSource(parser, source, site, splices = new Map(), { sourceStart = null, createDocument } = {}) {
   const parsed = parseToIR(parser, `${PREFIX}${source}; }`, createDocument);
-  if (parsed.querySelector('[data-parse-errors]')) {
+  if (parsed.hasAttributeBelowRoot('data-parse-errors')) {
     throw new Error(sourceStart == null ? 'Invalid expression in syntax expansion'
       : `Invalid Utu interpolation at offset ${sourceStart}: ${source.slice(0, 100)}`);
   }
@@ -20,7 +22,7 @@ export function expressionFromSource(parser, source, site, splices = new Map(), 
     return [low + 1, offset - lines[low] + 1];
   }
   for (const node of [expr, ...expr.querySelectorAll('*')]) {
-    for (const key of ['originFile', 'sourceFile']) if (site.dataset[key] != null) node.dataset[key] = site.dataset[key];
+    for (const name of ['data-origin-file', 'data-source-file']) if (site.attr(name) != null) node.setAttribute(name, site.attr(name));
     if (sourceStart != null) {
       // Utu islands retain exact token spans, including definition/member spans.
       for (const attr of [...node.attributes]) if (/^data-(?:.*-)?(?:start|end)$/.test(attr.name)) {
@@ -34,7 +36,7 @@ export function expressionFromSource(parser, source, site, splices = new Map(), 
       node.setAttribute('data-end-col', endCol);
       node.removeAttribute('data-origin-id');
     } else {
-      for (const key of ['start', 'end', 'row', 'col', 'endRow', 'endCol']) if (site.dataset[key] != null) node.dataset[key] = site.dataset[key];
+      for (const name of SPAN_NAMES) if (site.attr(name) != null) node.setAttribute(name, site.attr(name));
       // Template token offsets have no corresponding spelling in the source.
       for (const attr of [...node.attributes]) if (/^data-.+-(start|end)$/.test(attr.name)) node.removeAttribute(attr.name);
       node.setAttribute('data-origin-id', site.attr('data-origin-id') ?? site.id);
@@ -64,8 +66,8 @@ export function declarationsFromSource(parser, source, site, { createDocument } 
   const root = parsed.body.firstChild;
   return [...root.children].map(declaration => {
     for (const node of [declaration, ...declaration.querySelectorAll('*')]) {
-      for (const key of ['start', 'end', 'row', 'col', 'endRow', 'endCol', 'originFile', 'sourceFile']) {
-        if (site.dataset[key] != null) node.dataset[key] = site.dataset[key];
+      for (const name of [...SPAN_NAMES, 'data-origin-file', 'data-source-file']) {
+        if (site.attr(name) != null) node.setAttribute(name, site.attr(name));
       }
       for (const attr of [...node.attributes]) if (/^data-.+-(start|end)$/.test(attr.name)) node.removeAttribute(attr.name);
       node.setAttribute('data-origin-id', site.attr('data-origin-id') ?? site.id);

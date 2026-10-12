@@ -274,15 +274,16 @@ export function replaceNodeMeta(to, from, pass, kind = '') {
   return stampRewrite(to, from, pass, kind);
 }
 
-const GRAPH_FACT_KEYS = [
-  'typeName', 'expect', 'expectFrom', 'expectSite', 'fnId', 'fnOriginId',
-  'resolvedName', 'resolvedAs', 'fieldIndex', 'fieldDeclId',
-  'error', 'errorKind', 'errorMessage', 'errorData',
+const GRAPH_FACT_ATTRIBUTES = [
+  'data-type-name', 'data-expect', 'data-expect-from', 'data-expect-site', 'data-fn-id', 'data-fn-origin-id',
+  'data-resolved-name', 'data-resolved-as', 'data-field-index', 'data-field-decl-id',
+  'data-error', 'data-error-kind', 'data-error-message', 'data-error-data',
 ];
 
 export function inheritGraphFacts(to, from) {
-  for (const key of GRAPH_FACT_KEYS) {
-    if (from?.dataset?.[key] != null) to.dataset[key] = from.dataset[key];
+  for (const name of GRAPH_FACT_ATTRIBUTES) {
+    const value = from?.attr?.(name);
+    if (value != null) to.setAttribute(name, value);
   }
   const facts = retainedGraphs(from?.ownerDocument).diagnostics?.facts;
   const diagnostic = facts?.get(from?.id);
