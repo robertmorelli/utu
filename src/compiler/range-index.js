@@ -48,7 +48,28 @@ export function buildRangeIndex(entries) {
     ranges.sort(compareEntries);
     roots.set(file, buildBalanced(ranges, 0, ranges.length));
   }
+  // Each file's sorted entries, for the per-kind trees built on demand.
+  roots.sortedByFile = files;
+  roots.kindRoots = new Map();
+  return roots;
+}
 
+/**
+ * The trees holding only entries of `kinds`. Filtering a file's sorted
+ * entries keeps their order, ties included, so a query over these trees
+ * returns exactly the entries of those kinds a full query would, in the
+ * same order, without visiting every overlapping range of other kinds.
+ */
+function rootsForKinds(index, kinds) {
+  const key = kinds.join('|');
+  let roots = index.kindRoots?.get(key);
+  if (roots) return roots;
+  roots = new Map();
+  for (const [file, ranges] of index.sortedByFile ?? []) {
+    const subset = ranges.filter(entry => kinds.includes(entry.kind));
+    roots.set(file, buildBalanced(subset, 0, subset.length));
+  }
+  index.kindRoots?.set(key, roots);
   return roots;
 }
 
@@ -60,15 +81,16 @@ export function buildRangeIndex(entries) {
  * @param {string} file
  * @param {number} start
  * @param {number} end
- * @param {{ kind?: string }} [opts]
+ * @param {{ kind?: string, kinds?: string[] }} [opts]
  * @returns {RangeEntry[]}
  */
 export function queryRangeIndex(index, file, start, end, opts = {}) {
-  const root = index.get(file) ?? null;
+  const kinds = opts.kinds ?? (opts.kind ? [opts.kind] : null);
+  const root = (kinds && index.sortedByFile ? rootsForKinds(index, kinds) : index).get(file) ?? null;
   if (!root || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return [];
 
   const out = [];
-  queryOverlaps(root, start, end, opts.kind, out);
+  queryOverlaps(root, start, end, kinds && index.sortedByFile ? null : opts.kind, out);
   out.sort(compareEntries);
   return out;
 }

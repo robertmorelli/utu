@@ -35,6 +35,12 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
     return compact({ ...location, snippet: snippetAt(location.file, location.start, location.end), ...extra });
   };
   const source = edge => typeof edge?.source === 'function' ? edge.source() : edge?.source;
+
+  // Indexes for queries that would otherwise scan whole graphs each time, so
+  // asking at every node of a program stays linear. Built on first use; each
+  // list keeps the order of the graph it indexes.
+  let indexes = null;
+  const index = () => indexes ??= buildQueryIndexes(program, types, scope, calls);
   const displayType = createTypeDisplay(types?.typeIndex);
   const displayNodeName = node => displayName(node, displayType);
 
@@ -57,7 +63,7 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
       label: typeof edge.label === 'function' ? edge.label(edge.read?.()) : edge.label ?? null,
       source: ref(source(edge)),
     })).filter(item => item.type);
-    const coercions = (types?.coercions ?? []).filter(item => item.node === node).map(item => compact({
+    const coercions = (index().coercions.get(node) ?? []).map(item => compact({
       from: displayType(item.from), to: displayType(item.to), kind: item.kind, site: item.edge?.site ?? null,
     }));
     const backend = graphs.backend;
@@ -137,7 +143,7 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
     let node = start;
     while (node && !seen.has(node)) {
       seen.add(node);
-      const fact = program?.provenance.find(item => item.node === node);
+      const fact = index().provenance.get(node);
       if (!fact) break;
       trace.push(compact({
         pass: fact.pass,
@@ -176,11 +182,10 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
       if (value?.file && value.start != null) found.set(`${value.file}:${value.start}:${value.end}`, value);
     };
     if (includeDeclaration) add(declaration);
-    for (const [id, target] of scope?.resolutions ?? []) if (target === declaration) add(program?.byId.get(id));
-    for (const [node, slot] of types?.slots ?? []) {
-      if (slot.function === declaration || slot.field?.declaration === declaration) add(node);
-    }
-    for (const edge of calls?.edges ?? []) if (edge.declaration === declaration) add(edge.call);
+    const { uses, typedUses, calledFrom } = index();
+    for (const id of uses.get(declaration) ?? []) add(program?.byId.get(id));
+    for (const node of typedUses.get(declaration) ?? []) add(node);
+    for (const call of calledFrom.get(declaration) ?? []) add(call);
     return freezeDto([...found.values()].sort(compareRefs));
   }
 
@@ -355,4 +360,29 @@ function freezeDto(value) {
 
 function compareRefs(a, b) {
   return String(a.file).localeCompare(String(b.file)) || (a.start - b.start) || (a.end - b.end);
+}
+
+/** Reverse indexes over the retained graphs, each list in its graph's order. */
+function buildQueryIndexes(program, types, scope, calls) {
+  const push = (map, key, value) => {
+    const list = map.get(key);
+    if (list) list.push(value);
+    else map.set(key, [value]);
+  };
+  const uses = new Map();
+  for (const [id, target] of scope?.resolutions ?? []) push(uses, target, id);
+  const typedUses = new Map();
+  for (const [node, slot] of types?.slots ?? []) {
+    // A node naming its declaration as both function and field is listed once, as the scan did.
+    if (slot.function) push(typedUses, slot.function, node);
+    const field = slot.field?.declaration;
+    if (field && field !== slot.function) push(typedUses, field, node);
+  }
+  const calledFrom = new Map();
+  for (const edge of calls?.edges ?? []) if (edge.declaration) push(calledFrom, edge.declaration, edge.call);
+  const coercions = new Map();
+  for (const item of types?.coercions ?? []) push(coercions, item.node, item);
+  const provenance = new Map();
+  for (const fact of program?.provenance ?? []) if (!provenance.has(fact.node)) provenance.set(fact.node, fact);
+  return { uses, typedUses, calledFrom, coercions, provenance };
 }

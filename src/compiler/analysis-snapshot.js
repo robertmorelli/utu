@@ -59,6 +59,31 @@ export function collectRangeEntries(doc, diagnostics = []) {
   return entries;
 }
 
+const LINE_STARTS = new WeakMap();
+const SNIPPET_KINDS = ['syntax', 'semantic'];
+
+/** The 1-based line of `offset` in `source` (one of the document's source texts). */
+function lineNumber(doc, file, source, offset) {
+  let perFile = LINE_STARTS.get(doc);
+  if (!perFile) LINE_STARTS.set(doc, perFile = new Map());
+  let starts = perFile.get(file);
+  if (!starts || starts.source !== source) {
+    starts = [0];
+    for (let i = source.indexOf('\n'); i >= 0; i = source.indexOf('\n', i + 1)) starts.push(i + 1);
+    starts.source = source;
+    perFile.set(file, starts);
+  }
+  // Lines starting at or before offset (`slice(0, offset).split('\n').length`).
+  let low = 0;
+  let high = starts.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (starts[mid] <= offset) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
 function sourceSnippet(doc, rangeQuery, file, start, end) {
   const source = doc?.__utuSourceTexts?.get(file)
     ?? (doc?.__utuSourceFile === file ? doc.__utuSourceText : null);
@@ -69,7 +94,7 @@ function sourceSnippet(doc, rangeQuery, file, start, end) {
   const newline = source.indexOf('\n', start);
   const lineEnd = newline < 0 ? source.length : newline;
   const text = source.slice(lineStart, lineEnd);
-  const tokens = rangeQuery(file, lineStart, Math.max(lineStart + 1, lineEnd))
+  const tokens = rangeQuery(file, lineStart, Math.max(lineStart + 1, lineEnd), { kinds: SNIPPET_KINDS })
     .filter(entry => entry.kind === 'syntax' || entry.kind === 'semantic')
     .map(entry => ({
       start: Math.max(0, entry.start - lineStart),
@@ -79,7 +104,7 @@ function sourceSnippet(doc, rangeQuery, file, start, end) {
     })).filter(token => token.end > token.start);
   return Object.freeze({
     text,
-    line: source.slice(0, lineStart).split('\n').length,
+    line: lineNumber(doc, file, source, lineStart),
     focusStart: Math.max(0, Math.min(text.length, start - lineStart)),
     focusEnd: Math.max(0, Math.min(text.length, (end ?? start) - lineStart)),
     tokens: Object.freeze(tokens),
