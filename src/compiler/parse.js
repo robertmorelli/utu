@@ -31,6 +31,7 @@ import { walkers as exprWalkers } from './parse-exprs.js';
 import { walkers as typeWalkers } from './parse-types.js';
 import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { ANALYSIS_TOKENS, collectAnalysisTokens } from './analysis-tokens.js';
+import { parseSyntax } from './syntax/parser.js';
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 // These were previously defined here; now they live in parse-helpers.js.
@@ -144,8 +145,19 @@ function walkSyntaxDiagnostics(node, acc) {
  * Parse into owned IR and release the temporary native CST on every exit.
  * All syntax/token/diagnostic facts are copied before deletion. treeToIR itself
  * borrows its tree so callers doing incremental parsing retain ownership.
+ *
+ * utu's own parser (syntax/parser.js) builds the same tree for a valid
+ * program without calls into wasm; tree-sitter parses the rest, whose error
+ * recovery reports the syntax errors, and analysis builds, which need its
+ * tokens for highlighting.
  */
 export function parseToIR(parser, source, ...options) {
+  const settings = options.find(option => typeof option === 'object' && option !== null) ?? {};
+  if (!settings.collectAnalysisTokens) {
+    const own = parseSyntax(source);
+    if (own && globalThis.process?.env?.UTU_PARSER_CHECK) checkAgainstTreeSitter(parser, source, own);
+    if (own) return treeToIR(own, source, ...options);
+  }
   const tree = parser.parse(source);
   if (!tree) throw new Error('parse: parser returned no syntax tree');
   try {
@@ -153,6 +165,30 @@ export function parseToIR(parser, source, ...options) {
   } finally {
     tree.delete();
   }
+}
+
+/** UTU_PARSER_CHECK: throw if tree-sitter disagrees with utu's parser about `source`. */
+function checkAgainstTreeSitter(parser, source, own) {
+  const tree = parser.parse(source);
+  try {
+    const difference = tree.rootNode.hasError ? 'tree-sitter reports syntax errors' : syntaxDifference(tree.rootNode, own.rootNode);
+    if (difference) throw new Error(`parse: utu's parser disagrees with tree-sitter (${difference}) on:\n${source}`);
+  } finally {
+    tree.delete();
+  }
+}
+
+function syntaxDifference(a, b) {
+  if (a.type !== b.type || a.isNamed !== b.isNamed || a.startIndex !== b.startIndex || a.endIndex !== b.endIndex) {
+    return `${a.type} ${a.startIndex}-${a.endIndex} vs ${b.type} ${b.startIndex}-${b.endIndex}`;
+  }
+  if (a.childCount !== b.childCount) return `${a.type} at ${a.startIndex}: ${a.childCount} vs ${b.childCount} children`;
+  for (let i = 0; i < a.childCount; i++) {
+    if (a.fieldNameForChild(i) !== b.fieldNameForChild(i)) return `${a.type} at ${a.startIndex}: field of child ${i}`;
+    const inner = syntaxDifference(a.child(i), b.child(i));
+    if (inner) return inner;
+  }
+  return null;
 }
 
 /**

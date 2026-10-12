@@ -8,12 +8,17 @@ export function registerParserLifecycleTests({ test, assertEq, assertThrows, ass
       const tree = parser.parse(source);
       return { get rootNode() { return tree.rootNode; }, delete() { deleted++; tree.delete(); } };
     } };
-    const doc = parseToIR(tracked, 'fn answer() I32 { 42; }');
+    // A valid program in a build parses without tree-sitter.
+    parseToIR(tracked, 'fn answer() I32 { 42; }');
+    assertEq(deleted, 0);
+    // Analysis builds (which need its tokens) use tree-sitter, and release its tree.
+    const tokens = { collectAnalysisTokens: true };
+    const doc = parseToIR(tracked, 'fn answer() I32 { 42; }', tokens);
     assertEq(doc.querySelector('ir-lit').getAttribute('value'), '42');
     assertEq(deleted, 1);
-    assertThrows(() => parseToIR(tracked, '', () => { throw new Error('factory failure'); }), 'factory failure');
+    assertThrows(() => parseToIR(tracked, '', () => { throw new Error('factory failure'); }, tokens), 'factory failure');
     assertEq(deleted, 2);
-    assertThrows(() => parseToIR({ parse: () => null }, ''), 'no syntax tree');
+    assertThrows(() => parseToIR({ parse: () => null }, '', tokens), 'no syntax tree');
   });
 
   test('parser: treeToIR leaves borrowed syntax trees alive', ({ parser }) => {
