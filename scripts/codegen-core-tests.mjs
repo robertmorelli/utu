@@ -1,4 +1,5 @@
 import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
+import { testTmp } from './test-harness.mjs';
 
 export function registerCodegenCoreTests({ test, assert, assertEq, assertNoErrors, makeCompiler }) {
   test('codegen: arithmetic + free-fn calls run as wasm', async ({ ROOT }) => {
@@ -843,7 +844,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     for (const body of ['let x = p?.v;', 'take(p?.v);', 'p?.v;']) {
       const doc = await (await makeCompiler({ ROOT, target: 'normal' })).compileFile(await (async () => {
         const fs = await import('node:fs/promises'); const path = await import('node:path');
-        const file = path.join(ROOT, '.tmp', 'optional_rejected.utu');
+        const file = path.join(testTmp(ROOT), 'optional_rejected.utu');
         await fs.mkdir(path.dirname(file), { recursive: true });
         await fs.writeFile(file, `struct P:\n  | v: I32\nfn take(v: I32) I32 { v; }\nfn g(p: ?P) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }`);
         return file;

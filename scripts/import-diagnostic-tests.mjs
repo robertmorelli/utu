@@ -2,10 +2,11 @@
 // errors inside imported files, and recovered syntax in export surfaces.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { testTmp } from './test-harness.mjs';
 
 async function tempDir(ROOT, prefix) {
-  await fs.mkdir(path.join(ROOT, '.tmp'), { recursive: true });
-  return fs.mkdtemp(path.join(ROOT, '.tmp', prefix));
+  await fs.mkdir(path.join(testTmp(ROOT)), { recursive: true });
+  return fs.mkdtemp(path.join(testTmp(ROOT), prefix));
 }
 
 /** Write `files` into a fresh directory under .tmp and analyze `entry`. */

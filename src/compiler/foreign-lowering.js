@@ -106,7 +106,7 @@ export function lowerForeignOperations(graph, buildExternFn) {
     return name;
   };
   // Descendants move into the replacement calls before their parents consume them.
-  const shared = root.dataset.optimize !== 'speed';
+  const shared = root.dataset.optimize === 'size';
   for (let [node, op] of plans.reverse()) {
     if (op.kind === 'constant') {
       replacements.set(node, foldConstant(doc, node, op));

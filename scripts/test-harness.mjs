@@ -3,6 +3,11 @@ import fs from 'node:fs/promises';
 import { createCompiler, initParser } from '../src/index.js';
 import { nodePackageResolver } from '../tools/dts/packages.mjs';
 
+/** This process's scratch directory: test runner workers each get their own. */
+export function testTmp(ROOT) {
+  return path.join(ROOT, '.tmp', process.env.UTU_TEST_WORKER ?? '');
+}
+
 export function assert(cond, msg) {
   if (!cond) throw new Error(msg ?? 'assertion failed');
 }
@@ -32,12 +37,16 @@ export function assertNoErrors(ir) {
   }
 }
 
-export async function makeCompiler({ ROOT, target, debugAssertions = false }) {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
+// Loading the grammar costs more than most tests; one parser serves them all.
+let sharedParser;
+
+export async function makeCompiler({ ROOT, target, debugAssertions = false, optimize = 'size' }) {
+  const parser = await (sharedParser ??= initParser({ wasmDir: `${ROOT}/` }));
   return createCompiler({
     parser,
     target,
     debugAssertions,
+    optimize,
     readFile: (p) => fs.readFile(p, 'utf8'),
     readBinaryFile: (p) => fs.readFile(p),
     resolvePath: (from, rel) => path.resolve(path.dirname(from), rel),
@@ -55,7 +64,7 @@ export function createCompilerEnv({ parser, debugAssertions = false }) {
 }
 
 export async function withTempUtu(ROOT, name, source, run) {
-  const file = path.join(ROOT, '.tmp', name);
+  const file = path.join(testTmp(ROOT), name);
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, source);
   try {

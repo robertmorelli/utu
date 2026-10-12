@@ -2,12 +2,13 @@ import path from 'node:path';
 
 import { negativeDiagnosticCases } from './negative-diagnostic-cases.mjs';
 import { formatDiagnostics } from '../src/index.js';
+import { testTmp } from './test-harness.mjs';
 
 export function registerNegativeDiagnosticTests({ test, makeCompiler, assert }) {
   test('analysis: negative corpus reports specific diagnostics', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const { default: fs } = await import('node:fs/promises');
-    const dir = path.join(ROOT, '.tmp', 'negative-corpus');
+    const dir = path.join(testTmp(ROOT), 'negative-corpus');
     await fs.mkdir(dir, { recursive: true });
 
     try {

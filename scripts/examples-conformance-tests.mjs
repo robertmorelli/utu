@@ -1,39 +1,42 @@
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { emitBinary } from '../src/index.js';
 
-export function registerExamplesConformanceTests({ test, assertNoErrors, makeCompiler }) {
-  test('examples: every .utu file analyses and emits valid Wasm', async ({ ROOT }) => {
-    const files = await utuFiles(path.join(ROOT, 'examples'));
-    const analysis = await makeCompiler({ ROOT, target: 'analysis' });
-    const normal = await makeCompiler({ ROOT, target: 'normal' });
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-    for (const file of files) {
-      const analyzed = await analysis.analyzeFile(file);
+// One test per file, so the runner can spread them across workers. Codegen is
+// validated at -O0; `wasm-fingerprints.mjs --optimized` runs Binaryen's
+// optimizer over every example.
+export function registerExamplesConformanceTests({ test, assertNoErrors, makeCompiler }) {
+  for (const file of utuFiles(path.join(ROOT, 'examples'))) {
+    const name = path.relative(ROOT, file);
+    test(`examples: ${name} analyses and emits valid Wasm`, async ({ ROOT }) => {
+      const analyzed = await (await makeCompiler({ ROOT, target: 'analysis' })).analyzeFile(file);
       try {
         assertNoErrors(analyzed.doc);
       } catch (error) {
-        throw new Error(`${path.relative(ROOT, file)} (analysis): ${error.message}`);
+        throw new Error(`${name} (analysis): ${error.message}`);
       }
 
-      const compiled = await normal.analyzeFile(file);
+      const compiled = await (await makeCompiler({ ROOT, target: 'normal', optimize: 'none' })).analyzeFile(file);
       try {
         assertNoErrors(compiled.doc);
         emitBinary(compiled.doc);
       } catch (error) {
-        throw new Error(`${path.relative(ROOT, file)} (codegen): ${error.message}`);
+        throw new Error(`${name} (codegen): ${error.message}`);
       }
-    }
-  });
+    });
+  }
 }
 
-async function utuFiles(directory) {
+function utuFiles(directory) {
   const out = [];
-  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name);
     // Intentionally-invalid programs used to demonstrate editor diagnostics.
     if (entry.isDirectory() && entry.name === 'error_demo') continue;
-    if (entry.isDirectory()) out.push(...await utuFiles(file));
+    if (entry.isDirectory()) out.push(...utuFiles(file));
     else if (entry.isFile() && entry.name.endsWith('.utu')) out.push(file);
   }
   return out.sort();

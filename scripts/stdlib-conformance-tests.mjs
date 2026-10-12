@@ -1,3 +1,4 @@
+import { testTmp } from './test-harness.mjs';
 const COVERED_STDLIBS = ['I32', 'U32', 'I64', 'U64', 'F32', 'F64', 'M32', 'M64', 'M128', 'Bool', 'Str', 'I31', 'V128'];
 
 export function registerStdlibConformanceTests({ test, makeCompiler, assert, assertEq, assertNoErrors }) {
@@ -20,9 +21,9 @@ export function registerStdlibConformanceTests({ test, makeCompiler, assert, ass
 async function compileCases(ROOT, makeCompiler, assertNoErrors, cases, name, imports = {}) {
   const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
   const compiler = await makeCompiler({ ROOT, target: 'normal' });
-  const tmp = `${ROOT}/.tmp/${name}.utu`;
+  const tmp = `${testTmp(ROOT)}/${name}.utu`;
   const { default: fs } = await import('node:fs/promises');
-  await fs.mkdir(`${ROOT}/.tmp`, { recursive: true });
+  await fs.mkdir(testTmp(ROOT), { recursive: true });
 
   const helpers = [...new Set(cases.flatMap((c) => c.helpers ?? []))].join('\n');
   const functions = cases.map((c) => `      fn ${c.name}(${c.params}) ${c.returnType} { ${c.expr}; }`).join('\n');

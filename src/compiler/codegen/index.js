@@ -284,11 +284,10 @@ export function emitBinary(doc, { artifacts = null, stringMode = 'lowered', sour
       // reparsed lowered binary can shrink further.
       m.setFeatures(m.getFeatures() & ~binaryen.Features.Strings);
     }
-    // Production output always receives Binaryen's maximum optimization level
-    // and maximum shrink level. utu's niche is compact shipped Wasm; exposing
-    // an accidentally unoptimized emission path would make size and performance
-    // depend on the caller rather than the language.
-    optimizeForDistribution(m, doc.body.firstChild?.dataset.optimize === 'speed' ? 'speed' : 'size');
+    // -Oz and -O3 run Binaryen's full pipeline; -O0 skips it, for fast
+    // development builds.
+    const goal = doc.body.firstChild?.dataset.optimize ?? 'size';
+    if (goal !== 'none') optimizeForDistribution(m, goal === 'speed' ? 'speed' : 'size');
 
     // Feature lowerings deliberately install a complete runtime ABI. The full
     // optimizer normally removes it; this explicit sweep pins that behavior for

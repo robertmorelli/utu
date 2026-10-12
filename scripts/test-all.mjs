@@ -1,0 +1,33 @@
+// `bun run test`: the compiler suite in both debug modes, the wasm
+// fingerprints at every optimization level, and the tool tests, all at once. Each command's output prints when it finishes.
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const commands = [
+  ['bun', './scripts/run-tests.mjs', '--both-debug-modes'],
+  ['node', './scripts/wasm-fingerprints.mjs', '--optimized'],
+  ['node', './scripts/test-source-warnings.mjs'],
+  ['node', './scripts/test-query-features.mjs'],
+  ['node', './scripts/test-wutu-stencils.mjs'],
+  ['node', './scripts/test-wutu-cli.mjs'],
+  ['node', './scripts/test-vscode-extension.mjs'],
+];
+
+const started = performance.now();
+const results = await Promise.all(commands.map(([command, ...args]) => new Promise(resolve => {
+  const child = spawn(command, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  child.on('close', code => {
+    const name = args.join(' ');
+    process.stdout.write(`\n── ${name} ${code === 0 ? 'passed' : `FAILED (exit ${code})`}\n${output}`);
+    resolve({ name, code });
+  });
+})));
+const failed = results.filter(result => result.code !== 0);
+const seconds = ((performance.now() - started) / 1000).toFixed(1);
+console.log(`\n${failed.length ? `FAILED: ${failed.map(result => result.name).join(', ')}` : 'all test commands passed'} in ${seconds} s`);
+process.exit(failed.length ? 1 : 0);

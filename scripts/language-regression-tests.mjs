@@ -5,6 +5,7 @@ import path from 'node:path';
 import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
 import { buildImportObject, createCompiler, emitBinary, emitText, initParser, instantiateLowered } from '../src/index.js';
 import { liveGlueFields } from '../src/runtime/host-imports.js';
+import { testTmp } from './test-harness.mjs';
 
 /** Compile and instantiate at an explicit optimize level ('size' = -Oz, 'speed' = -O3). */
 async function instantiateAt(ROOT, name, source, optimize) {
@@ -1287,7 +1288,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   });
 
   test('modules: two files may import the same module, and outside code can build its structs', async ({ ROOT }) => {
-    const dir = path.join(ROOT, '.tmp', 'shared_module');
+    const dir = path.join(testTmp(ROOT), 'shared_module');
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, 'core.utu'), `mod core {
     struct Point:

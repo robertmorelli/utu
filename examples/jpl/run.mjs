@@ -2,7 +2,8 @@
 //
 //   node examples/jpl/run.mjs <file.jpl> -l | -_ | -p -q | -t -q | -bench
 //
-// Compiles jpl.utu at -O3, then calls its `main`, which reads process.argv.
+// Compiles jpl.utu at -O3 (UTU_OPTIMIZE=none|size|speed overrides), then calls
+// its `main`, which reads process.argv.
 // The wasm is cached under node_modules/.utu, keyed by jpl.utu and the
 // compiler's sources, so repeated runs skip the 20–30 s compile.
 // `utu build-exe` makes a standalone Bun executable of the same program.
@@ -15,9 +16,10 @@ import { buildImportObject, instantiateLowered } from '../../src/index.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
 const source = path.join(here, 'jpl.utu');
+const optimize = process.env.UTU_OPTIMIZE ?? 'speed';
 
 async function cacheKey() {
-  const hash = createHash('sha256').update(await fs.readFile(source));
+  const hash = createHash('sha256').update(optimize).update(await fs.readFile(source));
   const files = (await fs.readdir(path.join(root, 'src'), { recursive: true })).filter(file => file.endsWith('.js')).sort();
   for (const file of files) hash.update(file).update(await fs.readFile(path.join(root, 'src', file)));
   return hash.digest('hex').slice(0, 16);
@@ -30,7 +32,7 @@ async function compile() {
   const compiler = createCompiler({
     parser: await initParser({ wasmDir: `${root}/` }),
     target: 'normal',
-    optimize: 'speed',
+    optimize,
     readFile: file => fs.readFile(file, 'utf8'),
     readBinaryFile: file => fs.readFile(file),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),

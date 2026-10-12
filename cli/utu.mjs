@@ -37,7 +37,7 @@ async function main() {
     console.error(`${fileArg}: file not found`);
     process.exit(1);
   }
-  const optimize = flags.has('-O3') ? 'speed' : 'size';
+  const optimize = flags.has('-O3') ? 'speed' : flags.has('-O0') ? 'none' : 'size';
   const compiler = await makeCompiler(command === 'build-exe' ? 'normal' : 'analysis', optimize);
 
   if (command === 'check') {
@@ -294,7 +294,7 @@ function usage(code) {
   bun cli/utu.mjs display:modules <file.utu> [--noln]
   bun cli/utu.mjs display:exports <file.utu> [--noln]
   bun cli/utu.mjs display:debug <file.utu>
-  bun cli/utu.mjs build-exe <file.utu> [-o out] [-Oz | -O3]   (-Oz: smallest, default; -O3: fastest)`);
+  bun cli/utu.mjs build-exe <file.utu> [-o out] [-Oz | -O3 | -O0]   (-Oz: smallest, default; -O3: fastest; -O0: no Binaryen optimizer, fastest build)`);
   process.exit(code);
 }
 

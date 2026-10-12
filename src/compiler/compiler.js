@@ -91,7 +91,7 @@ import {
  *   Reads the UTF-8 contents of a file at the given path.
  *   The implementation is host-specific (fs, vscode.workspace.fs, fetch, …).
  * @property {(path: string, fromPath: string) => string} resolvePath
- * @property {'size' | 'speed'} [optimize] -Oz (default) shares host-call imports and shrinks; -O3 specializes them
+ * @property {'size' | 'speed' | 'none'} [optimize] -Oz (default) shares host-call imports and shrinks; -O3 specializes them; -O0 specializes them and skips Binaryen's optimizer
  * @property {(specifier: string, request: { prefix: string, from: string }) => Promise<object>} [resolvePackage]
  *   Link `using X from "npm:pkg"` / `"node:mod"` to a declaration graph. Node
  *   hosts can use tools/dts/packages.mjs; other hosts inject their own.
