@@ -77,6 +77,9 @@ const EMPTY = new Shape([]);
 // than any other (ids by every graph keyed on them, types by every analysis).
 const FIELD_NAMES = ['id', 'name', 'type-name', 'data-type-name', 'data-origin-id', 'receiver'];
 
+// Attributes the document indexes by holder (see IRDocument.watched).
+const WATCHED_ATTRIBUTES = ['data-parse-errors', 'data-imported-parse-errors', 'data-error-kind', 'data-error'];
+
 // ── Nodes ─────────────────────────────────────────────────────────────────────
 
 class IRNode {
@@ -199,6 +202,8 @@ class IRElement extends IRNode {
       case 'data-origin-id': this.originIdValue = text; return;
       case 'receiver': this.receiverValue = text; return;
     }
+    const watched = this.ownerDocument.watched.get(key);
+    if (watched !== undefined && text !== undefined) watched.add(this);
     const i = this.shape.index.get(key);
     if (text === undefined) {
       if (i === undefined) return;
@@ -292,6 +297,8 @@ class IRElement extends IRNode {
 
   insertBefore(node, reference) {
     if (node.nodeType === DOCUMENT) throw new Error('ir-document: cannot insert a document');
+    // Another document's element is not in this document's watched-attribute sets.
+    if (node.ownerDocument !== this.ownerDocument) this.ownerDocument.adoptedForeign = true;
     if (node.parentNode) detach(node);
     restructured(this);
     const at = reference ? this.childNodes.indexOf(reference) : -1;
@@ -387,6 +394,10 @@ class IRDocument {
     // queries have already paid that much: never more than twice the scans.
     this.scanned = 0;
     this.index = null;
+    // Elements that have ever had one of these attributes (diagnostic markers
+    // a whole-program check looks for), so the check need not scan.
+    this.watched = new Map(WATCHED_ATTRIBUTES.map(name => [name, new Set()]));
+    this.adoptedForeign = false;
     this.ids = new Map();
     this.observers = new Set();
     this.documentElement = new IRElement(this, 'html');
@@ -435,6 +446,27 @@ class IRDocument {
       }
     }
     return null;
+  }
+
+  /**
+   * Whether an element below the root has attribute `name` (with `value`,
+   * if given), for the watched attributes: the same answer as
+   * `querySelector('[name]')` or `[name="value"]`, without scanning.
+   */
+  hasAttributeBelowRoot(name, value = undefined) {
+    const holders = this.watched.get(name);
+    if (holders === undefined || this.adoptedForeign) {
+      return this.querySelector(value === undefined ? `[${name}]` : `[${name}="${value}"]`) !== null;
+    }
+    for (const element of holders) {
+      const actual = element.attr(name);
+      if (actual === undefined || (value !== undefined && actual !== value)) continue;
+      if (element === this.documentElement) continue;
+      let top = element;
+      while (top.parentNode) top = top.parentNode;
+      if (top === this) return true;
+    }
+    return false;
   }
 
   querySelector(selector) { return this.documentElement.querySelector(selector); }
@@ -502,6 +534,7 @@ function cloneInto(node, document, deep) {
   copy.receiverValue = node.receiverValue;
   copy.shape = node.shape;
   copy.values = node.values.slice();
+  for (const [name, holders] of document.watched) if (copy.shape.index.has(name)) holders.add(copy);
   const id = copy.idValue;
   if (id !== undefined && !document.ids.has(id)) document.ids.set(id, copy);
   if (deep) {

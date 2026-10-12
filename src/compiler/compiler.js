@@ -265,7 +265,8 @@ export function createCompiler(env) {
     // A recovered parse tree is intentionally incomplete. Running module
     // instantiation/hoisting over it can manufacture duplicate declarations
     // or trigger invariants that hide the actionable syntax diagnostics.
-    if (doc.querySelector('[data-parse-errors], [data-imported-parse-errors], [data-error-kind="parse-error"], [data-error="parse-error"]')) {
+    if (doc.hasAttributeBelowRoot('data-parse-errors') || doc.hasAttributeBelowRoot('data-imported-parse-errors')
+        || doc.hasAttributeBelowRoot('data-error-kind', 'parse-error') || doc.hasAttributeBelowRoot('data-error', 'parse-error')) {
       const root = doc.body.firstChild;
       if (root && !root.attr('data-error')) root.setAttribute('data-error', 'parse-error');
       return doc;
