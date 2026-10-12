@@ -39,6 +39,9 @@ All of that fits a flat, typed node store.
 
 ### The store
 
+The target data model, for the utu port and the end state in JS (see Status
+for why JS gets there through accessors rather than columns first):
+
 - Nodes are integer ids. Columns in typed arrays: `kind` (an enum),
   `parent`, `firstChild`, `nextSibling`, `start`, `end`, `file`.
 - Strings are interned once (`names`): identifiers, attribute values, file
@@ -53,31 +56,75 @@ All of that fits a flat, typed node store.
 - Per-kind lists (`byKind[kind] → ids`) replace `querySelectorAll('ir-x')`
   and are kept current on insert and remove.
 
-### Migration, without a big bang
+### Status
 
-1. **A DOM-shaped facade over the store.** Implement the subset of the DOM
-   the passes use (`localName`, `getAttribute`/`setAttribute`, `dataset`,
-   `children`, `firstElementChild`, `parentElement`, `closest`,
-   `replaceWith`, `cloneNode`, and the selectors actually written: tag,
-   `:scope >`, `[attr]`, `[attr="v"]`, `*`, comma). Swap linkedom out at
-   `createIRDocument`. Every pass still runs, and the suite must pass.
-   linkedom itself is a large share of today's cost (`getAttributeNode`,
-   `uhyphen`, `DOMEventTarget`), so this step alone should be a large win.
-2. **Facts out of `dataset`.** Move `typeName`, spans, origin, and
-   provenance to typed columns behind the same accessors.
-3. **Hot passes onto the store's API**, by profile: the type graph, module
-   instantiation and hoisting, iterator and mem lowering, codegen. Each
-   pass loses its selectors as it moves.
-4. **Delete the facade.** `@ir` bodies parse straight into store nodes, IR
-   dumps print from the store, and `expressionFromSource` builds store nodes.
+Measured warm, in process, at `-O0` (the machine was also running other
+work, so these are upper bounds):
 
-**Invariant at every step:** the suite passes in both debug modes, and every
-test program and example compiles to byte-identical wasm against the commit
-before the step. A script records `{program → wasm sha256}` once and checks
-it after every change.
+| program | before | now |
+|---|---:|---:|
+| `examples/jpl` (1.8k lines) | 9 s | 0.55 s |
+| `examples/foundry` app | 10 s | 1.9 s |
+| 24k generated lines | 26 s, 5 GB | 3.4 s, 2 GB |
+| `bun run test` (everything) | 10+ min | 41 s |
+| `bun run test:fast` | — | 23 s |
 
-**Targets:** jpl.utu in under 1 s (from 9 s); 24k lines in under 3 s and
-500 MB (from 26 s and 5 GB); foundry in under 2 s (from 10 s).
+Done, each change checked against the invariants below:
+
+1. **linkedom replaced** by `ir-document.js`: the DOM subset the passes use,
+   with attributes in shared shapes (the most-read ones as fields),
+   selectors compiled to predicates, and a lazy per-document element index
+   (document order, subtree ranges, per-tag lists) for repeated scans.
+2. **utu's own parser** (`syntax/parser.js`) builds tree-sitter's exact
+   concrete syntax tree for every valid program; tree-sitter now parses
+   only sources with syntax errors. This is Plan B's first piece, in JS.
+3. **The type graph** keeps per-node facts in arrays by each element's
+   dense index, and its rules and expectation edges are records read by a
+   switch rather than closures.
+4. **Tooling**: `-O0` builds; parallel tests; per-pass timings
+   (`UTU_TIMINGS=1`).
+
+What we learned that changes the plan:
+
+- A columnar attribute store is the wrong first move in JS: IR nodes carry
+  ~17 attributes and are cloned constantly (`expressionFromSource`, module
+  instantiation), so per-attribute columns make every clone scan every
+  column. Columns belong in the utu port, where facts are typed fields.
+- Binaryen's optimizer barely matters for speed (jpl: within noise to +10%),
+  so `-O0` is the development default; `-O3` stays for shipping.
+- The two semantic rebuilds after lowering (operators and closures; alt and
+  promote) are now the largest cost, ~40% of a large build. Each rebuilds
+  the type graph from scratch because lowerings edit the tree.
+
+### The invariants
+
+Every change keeps all of these identical:
+
+- `scripts/wasm-fingerprints.mjs [--optimized]`: the wasm of every program
+  under `examples/` and `benchmarks/` at `-O0`, `-Oz`, and `-O3`.
+- `scripts/behavior-fingerprints.mjs`: for every `.utu` file and the
+  negative corpus, the diagnostics (raw and formatted), the editor's range
+  entries, every editor query (explain, definition, references, call
+  hierarchy, inlay hints) at every node, and the binding, expectation, and
+  provenance graphs, with node ids replaced by stable names.
+- `scripts/syntax-differential.mjs [--fuzz=N] [--keywords]`: utu's parser
+  against tree-sitter on every source and on mutants.
+- The suite, in both debug modes.
+
+### Next
+
+1. **Passes onto node accessors.** Replace selector strings and `dataset`
+   reads in passes with accessors by node kind (`callArgs(call)`,
+   `fnBody(fn)`, …) and attribute fields. This is what the port needs (each
+   accessor becomes a column read in utu) and it removes most of the
+   remaining DOM-layer cost. Hottest first: the type graph, bindings, call
+   and control-flow graphs, the backend plan, then the lowerings.
+2. **Lowerings produce typed nodes.** Once facts are read through
+   accessors, a lowering can record the facts of what it creates (types,
+   bindings, call targets) instead of the compiler re-solving the whole
+   program; debug builds cross-check against a full rebuild.
+3. **Facts out of attributes.** Analyses read graph facts, not projected
+   `data-*` attributes; the projection remains only for the editor views.
 
 ## Plan B: the compiler in utu
 
