@@ -180,7 +180,7 @@ export function emitMakeClosure(node, ctx, emitExpr) {
   if (!env) throw new Error('codegen: ir-make-closure is missing its environment');
   return ctx.module.call(
     CLOSURE_NEW,
-    [funcRef(fnName, ctx), emitExpr(env, ctx), ctx.module.i32.const(callableParts(node.attr('data-type-name'))?.ret === 'Bool' ? 1 : 0)],
+    [funcRef(fnName, ctx), emitExpr(env, ctx), ctx.module.i32.const(callableParts(ctx.typeOf(node))?.ret === 'Bool' ? 1 : 0)],
     binaryen.externref,
   );
 }
@@ -191,7 +191,7 @@ export function emitClosureDecay(node, ctx, emitExpr) {
   if (!inner) throw new Error('codegen: ir-closure-decay has no operand');
   return ctx.module.call(
     CLOSURE_NEW,
-    [emitExpr(inner, ctx), ctx.module.ref.null(binaryen.anyref), ctx.module.i32.const(callableParts(node.attr('data-type-name'))?.ret === 'Bool' ? 1 : 0)],
+    [emitExpr(inner, ctx), ctx.module.ref.null(binaryen.anyref), ctx.module.i32.const(callableParts(ctx.typeOf(node))?.ret === 'Bool' ? 1 : 0)],
     binaryen.externref,
   );
 }

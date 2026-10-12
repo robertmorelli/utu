@@ -37,7 +37,7 @@ export function emitCall(node, ctx, emitExpr) {
   const callee = node.firstElementChild;
   const argList = childOf(node, 'ir-arg-list');
   const argNodes = argList ? [...argList.children] : [...node.children].slice(1);
-  const resolvedAs = ctx.backendPlan?.types?.slots.get(node)?.resolution?.resolvedAs ?? node.attr('data-resolved-as');
+  const resolvedAs = resolutionOf(ctx.backendPlan?.types, node)?.resolvedAs ?? node.attr('data-resolved-as');
   const callArgNodes = callee?.localName === 'ir-field-access' && resolvedAs !== 'static-method'
     ? [callee.firstElementChild, ...argNodes]
     : argNodes;
@@ -162,4 +162,10 @@ export function emitOrElse(node, ctx, emitExpr) {
     ],
     resultType,
   );
+}
+
+/** How the type graph resolved a call (its `resolution` fact), if it analyzed it. */
+function resolutionOf(types, node) {
+  const row = types?.facts?.rowOf(node) ?? -1;
+  return row >= 0 ? types.facts.resolution[row] : undefined;
 }
