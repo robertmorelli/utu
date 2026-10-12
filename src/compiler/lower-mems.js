@@ -126,10 +126,11 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
   }
   // Host methods decide how each memory is created, so find them first.
   const jsName = root.dataset.jsAlias ?? null;
+  let hidden = shadowedUses(root, new Set(mems.keys()));
   for (const access of root.querySelectorAll('ir-call > ir-field-access:first-child')) {
     const mem = mems.get(access.firstElementChild?.getAttribute('name'));
     const method = access.getAttribute('field');
-    if (!mem || shadowed(access, mem.name)) continue;
+    if (!mem || hidden.has(access)) continue;
     if (INTERN_METHODS.has(method)) {
       if (mem.kind !== 'U8' && mem.kind !== 'I8') {
         throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_METHOD, `mem ${mem.name}.${method}: only byte mems (U8, I8) intern spans`, access);
@@ -167,10 +168,12 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
   root.dataset.mems = JSON.stringify([...mems.values()].map(({ name, kind, export: exported, host, data, count }) =>
     ({ name, kind, export: exported, host: Boolean(host), ...(data ? { data, count } : {}) })));
 
+  // The wrappers declared parameters of their own.
+  hidden = shadowedUses(root, new Set(mems.keys()));
   const memOf = ident => {
     if (ident?.localName !== 'ir-ident') return null;
     const mem = mems.get(ident.getAttribute('name'));
-    return mem && !shadowed(ident, mem.name) ? mem : null;
+    return mem && !hidden.has(ident) ? mem : null;
   };
   const replace = (node, code, splices) => node.replaceWith(expressionFromSource(parser, code, node, splices, { createDocument }));
 
@@ -218,6 +221,8 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
     const mem = memOf(slice.firstElementChild);
     if (mem) throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name} takes one index: ${mem.name}[i]`, slice);
   }
+  // Rewriting cloned the operands it spliced in, so mark their uses again.
+  hidden = shadowedUses(root, new Set(mems.keys()));
   for (const ident of root.querySelectorAll('ir-ident')) {
     const mem = memOf(ident);
     if (mem && ident.closest(SCOPES)) {
@@ -392,16 +397,31 @@ function indexOf(node, mem) {
 }
 
 /** A parameter, local, or capture of the same name hides the mem. */
-function shadowed(ident, name) {
-  for (let scope = ident.parentElement; scope; scope = scope.parentElement) {
-    if (scope.matches(SCOPES) && [...scope.querySelectorAll(':scope > ir-param-list > ir-param, :scope > ir-self-param')]
-      .some(param => param.getAttribute('name') === name)) return true;
-    if (scope.localName === 'ir-block' && [...scope.children]
-      .some(child => child.localName === 'ir-let' && child.getAttribute('name') === name)) return true;
-    const captured = scope.querySelector(':scope > ir-capture[names]');
-    if (captured && captured.getAttribute('names').split(',').includes(name)) return true;
+// The identifiers a parameter, let, or capture of the same name hides from a
+// mem: each declaration marks the uses of its name in its scope, once.
+function shadowedUses(root, memNames) {
+  const hidden = new Set();
+  const mark = (scope, name) => {
+    for (const ident of scope.querySelectorAll(`ir-ident[name="${name}"]`)) hidden.add(ident);
+    for (const access of scope.querySelectorAll('ir-field-access')) {
+      if (access.firstElementChild?.getAttribute('name') === name) hidden.add(access);
+    }
+  };
+  for (const param of root.querySelectorAll('ir-param[name], ir-self-param[name]')) {
+    const name = param.getAttribute('name');
+    const owner = param.closest(SCOPES);
+    if (memNames.has(name) && owner) mark(owner, name);
   }
-  return false;
+  for (const binding of root.querySelectorAll('ir-let[name]')) {
+    const name = binding.getAttribute('name');
+    if (memNames.has(name) && binding.parentElement?.localName === 'ir-block') mark(binding.parentElement, name);
+  }
+  for (const capture of root.querySelectorAll('ir-capture[names]')) {
+    for (const name of capture.getAttribute('names').split(',')) {
+      if (memNames.has(name) && capture.parentElement) mark(capture.parentElement, name);
+    }
+  }
+  return hidden;
 }
 
 function wrappers({ name, kind, value, prefix, host }, jsName) {
