@@ -17,7 +17,10 @@ export function projectGraphs(doc) {
   }
   if (graphs.types) {
     projectTypeGraph(graphs.types);
-    for (const [node, slot] of graphs.types.slots) {
+    const { facts } = graphs.types;
+    for (let r = 0; r < facts.nodes.length; r++) {
+      const node = facts.nodes[r];
+      const slot = { function: facts.function[r], resolution: facts.resolution[r], field: facts.field[r] };
       if (node.nodeType !== 1) continue;
       if (slot.function) {
         setData(node, 'data-fn-id', slot.function.id);

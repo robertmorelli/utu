@@ -480,13 +480,20 @@ function propagate(graph, rules) {
 }
 
 export function projectTypeGraph(graph) {
-  for (const [node, value] of graph.slots) {
-    if (value.project && value.actual) stampType(node, value.actual, value.inferenceSource ?? value.rule?.source ?? 'graph');
+  const { facts } = graph;
+  for (let r = 0; r < facts.nodes.length; r++) {
+    if (facts.project[r] !== 1) continue;
+    const type = facts.typeName(r);
+    if (type) stampType(facts.nodes[r], type, facts.source[r] ?? facts.rule[r]?.source ?? 'graph');
   }
   for (const edge of graph.expectations) {
-    const expected = edge.read();
     const value = edge.value;
-    if (!expected || value?.nodeType !== 1) continue;
+    if (value?.nodeType !== 1) continue;
+    // Each attribute is set once: a value that has all three needs nothing.
+    if (value.attr('data-expect') !== undefined && value.attr('data-expect-site') !== undefined
+        && value.attr('data-expect-from') !== undefined) continue;
+    const expected = edge.read();
+    if (!expected) continue;
     // DOM attributes are the compact public projection of the richer graph.
     setDataIfAbsent(value, 'data-expect', expected);
     setDataIfAbsent(value, 'data-expect-site', edge.site);
