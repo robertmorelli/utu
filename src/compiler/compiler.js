@@ -172,8 +172,12 @@ export function createCompiler(env) {
       const doc = await compileFileInternal(filePath);
       for (const diagnostic of collectAnalysisDiagnostics(doc)) pushDiagnostic(artifacts, diagnostic);
       const graphs = retainedGraphs(doc);
-      const snapshot = createAnalysisSnapshot(doc, artifacts);
-      return { doc, artifacts, snapshot, graphs };
+      // Editors read the snapshot right away; builds only to print diagnostics.
+      let snapshot;
+      return {
+        doc, artifacts, graphs,
+        get snapshot() { return snapshot ??= createAnalysisSnapshot(doc, artifacts); },
+      };
     } catch (error) {
       if (error?.diagnostic) pushDiagnostic(artifacts, error.diagnostic);
       const snapshot = createAnalysisSnapshot(null, artifacts);

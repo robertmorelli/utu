@@ -481,15 +481,20 @@ function escapeText(value) {
 }
 
 /** Elements below `root`, in document order. */
-function* walk(root) {
-  const stack = [];
-  for (let i = root.childNodes.length - 1; i >= 0; i--) stack.push(root.childNodes[i]);
-  while (stack.length) {
-    const node = stack.pop();
-    if (node.nodeType !== ELEMENT) continue;
-    yield node;
-    const children = node.childNodes;
-    for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+function walk(root) {
+  const out = [];
+  collect(root, out, null);
+  return out;
+}
+
+// Depth-first, pushing matches as they are reached: document order.
+function collect(node, out, test) {
+  const children = node.childNodes;
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (child.nodeType !== ELEMENT) continue;
+    if (test === null || test(child)) out.push(child);
+    if (child.childNodes.length) collect(child, out, test);
   }
 }
 
@@ -605,7 +610,7 @@ function matchCompound(element, compound, scope) {
     if (list.some(complex => matchComplex(element, complex, complex.length - 1, scope))) return false;
   }
   for (const list of compound.has) {
-    const found = [...walk(element)].some(descendant => list.some(complex => matchComplex(descendant, complex, complex.length - 1, element)));
+    const found = walk(element).some(descendant => list.some(complex => matchComplex(descendant, complex, complex.length - 1, element)));
     if (!found) return false;
   }
   return true;
@@ -627,10 +632,10 @@ function matchComplex(element, complex, index, scope) {
 }
 
 function select(scope, compiled, first) {
+  const out = [];
   // `:scope > x` (alone or in a list of such) only looks at children.
   if (compiled.every(complex => complex.length === 2 && complex[0].compound.scope && complex[1].combinator === '>'
       && !complex[0].compound.tag && !complex[0].compound.attributes.length)) {
-    const out = [];
     for (const child of scope.childNodes) {
       if (child.nodeType !== ELEMENT) continue;
       if (compiled.some(complex => matchCompound(child, complex[1].compound, scope))) {
@@ -640,14 +645,35 @@ function select(scope, compiled, first) {
     }
     return out;
   }
-  const out = [];
-  for (const node of walk(scope)) {
-    if (compiled.some(complex => matchComplex(node, complex, complex.length - 1, scope))) {
-      out.push(node);
-      if (first) break;
+  const test = compiled.length === 1 && compiled[0].length === 1
+    ? simpleTest(compiled[0][0].compound, scope)
+    : node => compiled.some(complex => matchComplex(node, complex, complex.length - 1, scope));
+  if (first) return firstMatch(scope, test);
+  collect(scope, out, test);
+  return out;
+}
+
+// A lone compound: test only what it names.
+function simpleTest(compound, scope) {
+  const { tag, attributes, not, has, firstChild } = compound;
+  if (!attributes.length && !not.length && !has.length && !firstChild && !compound.scope) {
+    return tag ? node => node.localName === tag : () => true;
+  }
+  return node => matchCompound(node, compound, scope);
+}
+
+function firstMatch(node, test) {
+  const children = node.childNodes;
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (child.nodeType !== ELEMENT) continue;
+    if (test(child)) return [child];
+    if (child.childNodes.length) {
+      const found = firstMatch(child, test);
+      if (found.length) return found;
     }
   }
-  return out;
+  return [];
 }
 
 // ── XML fragments (`@ir` bodies) ─────────────────────────────────────────────
