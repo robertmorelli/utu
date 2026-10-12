@@ -74,18 +74,21 @@ export function append(parent, children) {
 
 // Stamp source span and assign a document-unique numeric id on every IR node.
 export function stamp(e, n) {
-  e.id            = `n${nextNodeId(e.ownerDocument)}`;
-  e.dataset.originId = e.id;
-  e.dataset.start = n.startIndex;
-  e.dataset.end   = n.endIndex;
-  e.dataset.row = String(n.startPosition.row + 1);
-  e.dataset.col = String(n.startPosition.column + 1);
-  e.dataset.endRow = String(n.endPosition.row + 1);
-  e.dataset.endCol = String(n.endPosition.column + 1);
+  const id = `n${nextNodeId(e.ownerDocument)}`;
+  e.setAttribute('id', id);
+  e.setAttribute('data-origin-id', id);
+  e.setAttribute('data-start', n.startIndex);
+  e.setAttribute('data-end', n.endIndex);
+  const start = n.startPosition;
+  const end = n.endPosition;
+  e.setAttribute('data-row', String(start.row + 1));
+  e.setAttribute('data-col', String(start.column + 1));
+  e.setAttribute('data-end-row', String(end.row + 1));
+  e.setAttribute('data-end-col', String(end.column + 1));
   const sourceFile = e.ownerDocument?.__utuSourceFile;
   if (sourceFile) {
-    e.dataset.sourceFile = sourceFile;
-    e.dataset.originFile = sourceFile;
+    e.setAttribute('data-source-file', sourceFile);
+    e.setAttribute('data-origin-file', sourceFile);
   }
   return e;
 }

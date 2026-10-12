@@ -449,23 +449,141 @@ function setActual(graph, node, type, source) {
   }
 }
 
-function rule(graph, node, deps, read, source) {
+// ── Rules and expectation edges ──────────────────────────────────────────────
+//
+// A rule computes one node's actual type from other nodes; an edge says what
+// type a value is expected to have. Both are records with a kind, read by a
+// switch, not closures: there are a few per IR node.
+
+const R = Object.freeze({
+  FIXED: 0, MEMBER: 1, LITERAL: 2, IDENT: 3, PARAM: 4, BINDING: 5, VALUE: 6, UNARY: 7, BINARY: 8,
+  TUPLE: 9, TUPLE_GET: 10, CONFLUENCE: 11, UNWRAP: 12, CALL: 13, AWAIT: 14, CLOSURE: 15,
+  TYPE_MEMBER: 16, FIELD: 17, STRUCT: 18, ARRAY: 19,
+});
+
+class Rule {
+  constructor(graph, node, deps, kind, a, b, source, index) {
+    this.graph = graph;
+    this.node = node;
+    this.deps = deps;
+    this.kind = kind;
+    this.a = a;
+    this.b = b;
+    this.source = source;
+    this.index = index;
+  }
+
+  read() {
+    const { graph, node, a } = this;
+    switch (this.kind) {
+      case R.FIXED: return a;
+      case R.MEMBER: return foreignActual(graph, node) ?? memberResult(graph, node, actual(graph, a), this.b);
+      // Read lazily: contextual rewrites retype literals between solver rounds.
+      case R.LITERAL: return node.getAttribute('type-name') ?? graph.literalDefaults.get(a) ?? a;
+      case R.IDENT: return bindingActual(graph, node);
+      // Closure parameters may be seeded from context between solver rounds.
+      case R.PARAM: return declaredTypeStr(node) ?? node.dataset.typeName ?? null;
+      case R.BINDING: return declaredTypeStr(node) ?? actual(graph, a);
+      case R.VALUE: return actual(graph, a);
+      case R.UNARY: return operatorResult(graph, node, actual(graph, a), UNARY_OP_FN);
+      case R.BINARY: return foreignActual(graph, node) ?? operatorResult(graph, node, actual(graph, a), BINARY_OP_FN);
+      case R.TUPLE: {
+        const parts = a.map(child => actual(graph, child));
+        return parts.every(Boolean) ? tupleTypeStr(parts) : null;
+      }
+      case R.TUPLE_GET: {
+        // A mismatched let .{…} is reported once, at element 0; its names get no type.
+        const parts = tupleParts(actual(graph, a));
+        return parts?.length === Number(node.getAttribute('count')) ? parts[Number(node.getAttribute('index'))] : null;
+      }
+      case R.CONFLUENCE: return confluence(graph, node, a.map(child => actual(graph, child)));
+      case R.UNWRAP: return actual(graph, a) && unwrapNullable(actual(graph, a));
+      case R.CALL: return callResult(graph, node);
+      case R.AWAIT: return awaitedType(actual(graph, a), graph);
+      case R.CLOSURE: return closureType(graph, node, a);
+      case R.TYPE_MEMBER: return foreignActual(graph, node);
+      case R.FIELD: return foreignActual(graph, node) ?? fieldActual(graph, node, actual(graph, a));
+      case R.STRUCT: return foreignActual(graph, node) ?? node.getAttribute('type-name');
+      case R.ARRAY: return foreignActual(graph, node) ?? nativeArrayType(graph, node);
+      default: throw new Error(`type graph: unknown rule kind ${this.kind}`);
+    }
+  }
+}
+
+function rule(graph, node, deps, kind, a, b, source) {
   // An assigned value may take its type from the assignment target's declared
   // slot (a host property), so it is re-read when the target resolves.
   const assignment = node.parentElement?.localName === 'ir-assign' && node.parentElement.lastElementChild === node ? node.parentElement : null;
   if (assignment) deps = [...deps, assignment.firstElementChild];
   // An operand may take its type from the other operand (`item.price * 2`).
   if (node.parentElement?.localName === 'ir-binary') deps = [...deps, ...[...node.parentElement.children].filter(c => c !== node)];
-  const value = { node, deps: deps.filter(Boolean), read, source, index: graph.rules.length };
+  const value = new Rule(graph, node, deps.filter(Boolean), kind, a, b, source, graph.rules.length);
   graph.rules.push(value);
   graph.slots.get(node).rule = value;
 }
 
-function expect(graph, value, read, site, source, mode, label) {
+const E = Object.freeze({
+  CONST: 0, DECLARED: 1, ASSIGN: 2, ARGUMENT: 3, TUPLE_PART: 4, ELEMENT: 5, FIELD_INIT: 6,
+  ACTUAL: 7, CONFLUENCE: 8, UNWRAP: 9,
+});
+
+class Edge {
+  constructor(graph, value, kind, a, b, c, site, source, mode, label) {
+    this.graph = graph;
+    this.value = value;
+    this.kind = kind;
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.site = site;
+    this.ownSource = source;
+    this.mode = mode;
+    this.label = label;
+  }
+
+  read() {
+    const { graph, a } = this;
+    switch (this.kind) {
+      case E.CONST: return a;
+      case E.DECLARED: return a ?? actual(graph, this.b);
+      case E.ASSIGN: return foreignAssignmentType(graph, a) ?? actual(graph, this.b);
+      case E.ARGUMENT: return callParameter(graph, a, this.b, this.c)?.type;
+      case E.TUPLE_PART: return tupleParts(expectedType(graph, a))?.[this.c];
+      case E.ELEMENT: return graph.slots.get(a)?.foreign?.params[this.c] ?? (this.b ? arrayElementContext(graph, a) : undefined);
+      case E.FIELD_INIT: return fieldInitInfo(graph, a, this.b).field?.type;
+      case E.ACTUAL: return actual(graph, a);
+      case E.CONFLUENCE: return unifiedBranchType(graph, a, this.b);
+      case E.UNWRAP: return unwrapNullable(actual(graph, a) ?? '');
+      default: throw new Error(`type graph: unknown expectation kind ${this.kind}`);
+    }
+  }
+
+  /** What the expectation comes from; some are only known once calls and fields resolve. */
+  get source() {
+    const { graph, a } = this;
+    switch (this.kind) {
+      case E.ASSIGN: return declaredSource(graph, this.b);
+      case E.ARGUMENT: return callParameter(graph, a, this.b, this.c)?.source ?? a.firstElementChild;
+      case E.FIELD_INIT: {
+        const { entry, field } = fieldInitInfo(graph, a, this.b);
+        return field ? fieldDecl(entry, field.name) : a;
+      }
+      default: return this.ownSource;
+    }
+  }
+}
+
+function expect(graph, value, kind, a, b, c, site, source, mode, label) {
   if (!value) return;
-  const edge = { value, read, site, source, mode, label };
+  const edge = new Edge(graph, value, kind, a, b, c, site, source, mode, label);
   graph.expectations.push(edge);
   graph.slots.get(value)?.expected.push(edge);
+}
+
+/** A struct literal's field and its declaration, read lazily: an implicit `&{…}` learns its type between solver rounds. */
+function fieldInitInfo(graph, node, field) {
+  const entry = graph.typeIndex?.get(node.getAttribute('type-name'));
+  return { entry, field: entry?.fields?.find(item => item.name === field.getAttribute('field')) };
 }
 
 /** The first type this node is expected to have, if any. */
@@ -485,31 +603,26 @@ function addActualRule(graph, node) {
   const children = [...(node.children ?? [])];
   const one = node.firstElementChild;
   const two = node.lastElementChild;
-  const read = n => actual(graph, n);
-  const fixed = (type, source) => rule(graph, node, [], () => type, source);
+  const fixed = (type, source) => rule(graph, node, [], R.FIXED, type, null, source);
   if (VOID_NODES.has(node.localName)) return fixed('void', node.localName.slice(3));
   if (DIVERGING_NODES.has(node.localName)) return fixed('never', node.localName.slice(3));
   const member = MEMBER_OPERATIONS.get(node.localName);
-  if (member) return rule(graph, node, children, () => foreignActual(graph, node) ?? memberResult(graph, node, read(one), member), 'return-of');
+  if (member) return rule(graph, node, children, R.MEMBER, one, member, 'return-of');
 
   switch (node.localName) {
-    case 'ir-lit': {
-      // Read lazily: contextual rewrites retype literals between solver rounds.
-      const kind = node.getAttribute('kind');
-      return rule(graph, node, [], () => node.getAttribute('type-name') ?? graph.literalDefaults.get(kind) ?? kind, 'literal');
-    }
+    case 'ir-lit':
+      return rule(graph, node, [], R.LITERAL, node.getAttribute('kind'), null, 'literal');
     case 'ir-ident':
-      return rule(graph, node, [bindingDependency(graph, node)], () => bindingActual(graph, node), 'binding');
+      return rule(graph, node, [bindingDependency(graph, node)], R.IDENT, null, null, 'binding');
     case 'ir-param':
-      // Closure parameters may be seeded from context between solver rounds.
-      return rule(graph, node, [], () => declaredTypeStr(node) ?? node.dataset.typeName ?? null, 'parameter');
+      return rule(graph, node, [], R.PARAM, null, null, 'parameter');
     case 'ir-let': case 'ir-global': {
       // Iterator identities (0/1) take the element type even for an empty
       // stream. This is a dependency edge, not speculative evaluation of its
       // first element, and needs no specialization pass.
       const element = node.dataset.iteratorElement
         ? (node.closest('ir-fn, ir-closure') ?? graph.root).querySelector(`ir-let[name="${node.dataset.iteratorElement}"]`) : null;
-      return rule(graph, node, [element ?? two], () => declaredTypeStr(node) ?? read(element ?? two), 'binding-value');
+      return rule(graph, node, [element ?? two], R.BINDING, element ?? two, null, 'binding-value');
     }
     case 'ir-self-param': {
       const name = node.closest('ir-fn')?.querySelector(':scope > ir-fn-name');
@@ -526,72 +639,65 @@ function addActualRule(graph, node) {
       const value = node.localName === 'ir-block' ? two : one;
       // A binding statement produces no value, even though the binding has a type.
       if (node.localName === 'ir-block' && (!value || value.localName === 'ir-let')) return fixed('void', 'tail');
-      return rule(graph, node, [value], () => read(value), node.localName === 'ir-block' ? 'tail' : 'identity');
+      return rule(graph, node, [value], R.VALUE, value, null, node.localName === 'ir-block' ? 'tail' : 'identity');
     }
     case 'ir-unary':
-      return rule(graph, node, [one], () => operatorResult(graph, node, read(one), UNARY_OP_FN), 'operator');
+      return rule(graph, node, [one], R.UNARY, one, null, 'operator');
     case 'ir-binary':
-      return rule(graph, node, children, () => foreignActual(graph, node) ?? operatorResult(graph, node, read(one), BINARY_OP_FN), 'operator');
+      return rule(graph, node, children, R.BINARY, one, null, 'operator');
     case 'ir-tuple':
-      return rule(graph, node, children, () => {
-        const parts = children.map(read);
-        return parts.every(Boolean) ? tupleTypeStr(parts) : null;
-      }, 'tuple');
+      return rule(graph, node, children, R.TUPLE, children, null, 'tuple');
     case 'ir-tuple-get':
-      // A mismatched let .{…} is reported once, at element 0; its names get no type.
-      return rule(graph, node, [one], () => {
-        const parts = tupleParts(read(one));
-        return parts?.length === Number(node.getAttribute('count')) ? parts[Number(node.getAttribute('index'))] : null;
-      }, 'tuple-element');
+      return rule(graph, node, [one], R.TUPLE_GET, one, null, 'tuple-element');
     case 'ir-if': {
       const then = children[1];
       const otherwise = children[2];
       if (!otherwise) return fixed('void', 'one-arm-if');
-      return rule(graph, node, [then, otherwise], () => confluence(graph, node, [read(then), read(otherwise)]), 'confluence');
+      return rule(graph, node, [then, otherwise], R.CONFLUENCE, [then, otherwise], null, 'confluence');
     }
     case 'ir-match': case 'ir-alt': {
       const bodies = [...node.children]
         .filter(child => /-arm$/.test(child.localName))
         .map(arm => arm.lastElementChild).filter(Boolean);
-      return rule(graph, node, bodies,
-        () => confluence(graph, node, bodies.map(read)), 'confluence');
+      return rule(graph, node, bodies, R.CONFLUENCE, bodies, null, 'confluence');
     }
     case 'ir-promote': {
       const arm = node.querySelector(':scope > ir-promote-arm')?.lastElementChild;
       const fallback = node.querySelector(':scope > ir-default-arm')?.lastElementChild;
-      return rule(graph, node, [arm, fallback].filter(Boolean), () => confluence(graph, node, [arm, fallback].filter(Boolean).map(read)), 'confluence');
+      const branches = [arm, fallback].filter(Boolean);
+      return rule(graph, node, branches, R.CONFLUENCE, branches, null, 'confluence');
     }
     case 'ir-else':
-      return rule(graph, node, [one], () => read(one) && unwrapNullable(read(one)), 'unwrap-nullable');
+      return rule(graph, node, [one], R.UNWRAP, one, null, 'unwrap-nullable');
     case 'ir-fatal':
       // Never returns, so it fits any context: `lookup(id) orelse fatal`.
       return fixed('never', 'fatal');
     case 'ir-call': {
       const callee = node.firstElementChild;
-      return rule(graph, node, [...children, callee?.firstElementChild, ...node.querySelector(':scope > ir-arg-list')?.children ?? []], () => callResult(graph, node), 'return-of');
+      return rule(graph, node, [...children, callee?.firstElementChild, ...node.querySelector(':scope > ir-arg-list')?.children ?? []], R.CALL, null, null, 'return-of');
     }
     case 'ir-await':
-      return rule(graph, node, [one], () => awaitedType(read(one), graph), 'awaited-type');
+      return rule(graph, node, [one], R.AWAIT, one, null, 'awaited-type');
     case 'ir-closure': {
       const body = bodyOf(node);
       const deps = [body, ...paramsOf(node)];
-      return rule(graph, node, deps, () => closureType(graph, node, body), 'closure');
+      return rule(graph, node, deps, R.CLOSURE, body, null, 'closure');
     }
     case 'ir-type-member':
-      return rule(graph, node, [one], () => foreignActual(graph, node), 'foreign-member');
+      return rule(graph, node, [one], R.TYPE_MEMBER, null, null, 'foreign-member');
     case 'ir-field-access':
-      return rule(graph, node, [one], () => foreignActual(graph, node) ?? fieldActual(graph, node, read(one)), 'field-of');
+      return rule(graph, node, [one], R.FIELD, one, null, 'field-of');
     case 'ir-struct-init':
-      return rule(graph, node, children.map(c => c.firstElementChild), () => foreignActual(graph, node) ?? node.getAttribute('type-name'), 'struct-init');
+      return rule(graph, node, children.map(c => c.firstElementChild), R.STRUCT, null, null, 'struct-init');
     case 'ir-try': {
       const [body, handler] = children;
-      return rule(graph, node, [body, handler], () => confluence(graph, node, [read(body), read(handler)]), 'confluence');
+      return rule(graph, node, [body, handler], R.CONFLUENCE, [body, handler], null, 'confluence');
     }
     case 'ir-caught':
       // Whatever the host threw: a dynamic host value (`e.message`), or opaque without declarations.
       return fixed(graph.doc.__utuForeign?.type(0, 'any', graph) ?? 'Externref', 'caught');
     case 'ir-array-lit':
-      return rule(graph, node, children, () => foreignActual(graph, node) ?? nativeArrayType(graph, node), 'array-literal');
+      return rule(graph, node, children, R.ARRAY, null, null, 'array-literal');
     case 'ir-null-ref':
       return fixed(node.getAttribute('type-name') ? `?${node.getAttribute('type-name')}` : 'null', 'null');
     case 'ir-ref-test': case 'ir-ref-is-null':
@@ -808,10 +914,12 @@ function checkArity(graph, call) {
     });
 }
 
+const DIAGNOSTIC_ATTRIBUTES = ['data-error', 'data-error-kind', 'data-error-message', 'data-error-data'];
+
 function clearDiagnostic(node) {
   if (!node?.dataset) return;
   diagnosticFacts(node.ownerDocument).delete(node.id);
-  for (const key of ['error', 'errorKind', 'errorMessage', 'errorData']) delete node.dataset[key];
+  for (const name of DIAGNOSTIC_ATTRIBUTES) if (node.getAttribute(name) !== null) node.removeAttribute(name);
 }
 
 /**
@@ -862,10 +970,10 @@ function seedClosure(graph, closure, expectedType, source) {
   if (firstTypeChild(closure)) return;
   const body = bodyOf(closure);
   const tail = returnedValue(body?.lastElementChild);
-  if (tail) expect(graph, tail, () => expected.ret, 'return', source ?? closure, 'assign');
+  if (tail) expect(graph, tail, E.CONST, expected.ret, null, null, 'return', source ?? closure, 'assign');
   for (const ret of body?.querySelectorAll('ir-return') ?? []) {
     const value = ret.firstElementChild;
-    if (value && ret !== body.lastElementChild) expect(graph, value, () => expected.ret, 'return', source ?? closure, 'assign');
+    if (value && ret !== body.lastElementChild) expect(graph, value, E.CONST, expected.ret, null, null, 'return', source ?? closure, 'assign');
   }
 }
 
@@ -896,60 +1004,56 @@ function awaitedType(type, graph) {
   return isInstanceOf(entry, 'Promise') ? moduleArgsOf(entry)[0] ?? null : null;
 }
 
+const CONDITION_LABELS = Object.freeze({
+  if: () => 'if condition must be Bool',
+  while: () => 'while condition must be Bool',
+  assert: () => 'assert condition must be Bool',
+});
+const LOOP_STATE_LABEL = expected => `loop match state is ${expected}`;
+const PROMOTE_LABEL = () => 'promote requires a nullable value';
+const RANGE_LABEL = () => 'range bounds must have the same type';
+const ORELSE_LABEL = () => 'orelse requires a nullable value';
+const BRANCH_LABEL = expected => `other branch has type ${expected}`;
+
 function addExpectations(graph, node) {
   const tag = node.localName;
   if (tag === 'ir-let' || tag === 'ir-global') {
     const type = declaredTypeStr(node);
-    if (type || node.dataset.iteratorElement) expect(graph, node.lastElementChild, () => type ?? actual(graph, node), 'binding', firstTypeChild(node) ?? node, 'assign');
+    if (type || node.dataset.iteratorElement) expect(graph, node.lastElementChild, E.DECLARED, type, node, null, 'binding', firstTypeChild(node) ?? node, 'assign');
   }
   if (tag === 'ir-assign') {
     const [target, value] = [...node.children];
-    expect(graph, value, () => foreignAssignmentType(graph, node) ?? actual(graph, target), 'assign', () => declaredSource(graph, target), 'assign');
+    expect(graph, value, E.ASSIGN, node, target, null, 'assign', null, 'assign');
   }
   if (tag === 'ir-call') {
     const args = [...(node.querySelector(':scope > ir-arg-list')?.children ?? [])];
-    args.forEach((arg, index) => expect(graph, arg,
-      () => callParameter(graph, node, args, index)?.type,
-      'argument', () => callParameter(graph, node, args, index)?.source ?? node.firstElementChild, 'assign'));
+    args.forEach((arg, index) => expect(graph, arg, E.ARGUMENT, node, args, index, 'argument', null, 'assign'));
   }
   if (tag === 'ir-tuple') {
     // A tuple gives each element its part of the tuple it is expected to be.
-    [...node.children].forEach((value, index) => expect(graph, value,
-      () => tupleParts(expectedType(graph, node))?.[index], 'field', node, 'assign'));
+    [...node.children].forEach((value, index) => expect(graph, value, E.TUPLE_PART, node, null, index, 'field', node, 'assign'));
   }
   if (tag === 'ir-struct-init' || tag === 'ir-array-lit') {
     // Records and arrays give each element their declared context.
-    const values = tag === 'ir-array-lit' ? [...node.children] : [...node.children].map(field => field.firstElementChild);
-    values.forEach((value, index) => expect(graph, value, () => graph.slots.get(node)?.foreign?.params[index]
-      ?? (tag === 'ir-array-lit' ? arrayElementContext(graph, node) : undefined),
-      'field', node, 'assign'));
+    const array = tag === 'ir-array-lit';
+    const values = array ? [...node.children] : [...node.children].map(field => field.firstElementChild);
+    values.forEach((value, index) => expect(graph, value, E.ELEMENT, node, array, index, 'field', node, 'assign'));
   }
   if (tag === 'ir-struct-init') {
-    // Read lazily: an implicit `&{…}` learns its type between solver rounds.
-    const info = field => {
-      const entry = graph.typeIndex?.get(node.getAttribute('type-name'));
-      return { entry, field: entry?.fields?.find(item => item.name === field.getAttribute('field')) };
-    };
     for (const field of node.querySelectorAll(':scope > ir-field-init')) {
-      expect(graph, field.firstElementChild, () => info(field).field?.type, 'field', () => {
-        const { entry, field: found } = info(field);
-        return found ? fieldDecl(entry, found.name) : node;
-      }, 'assign');
+      expect(graph, field.firstElementChild, E.FIELD_INIT, node, field, null, 'field', null, 'assign');
     }
   }
   if (tag === 'ir-fn' || tag === 'ir-export-main' || tag === 'ir-closure') {
     addReturnExpectations(graph, node);
   }
   if (tag === 'ir-if' || tag === 'ir-while' || tag === 'ir-assert') {
-    const name = tag.slice(3);
-    expect(graph, node.firstElementChild, () => 'Bool', 'condition', node, 'assign',
-      () => name === 'assert' ? 'assert condition must be Bool' : `${name} condition must be Bool`);
+    expect(graph, node.firstElementChild, E.CONST, 'Bool', null, null, 'condition', node, 'assign', CONDITION_LABELS[tag.slice(3)]);
   }
   if (tag === 'ir-continue' && node.firstElementChild) {
     // `continue v` re-dispatches its loop match, so v has the state's type.
     const target = loopMatchTarget(node);
-    if (target) expect(graph, node.firstElementChild, () => actual(graph, target.firstElementChild), 'assign', target.firstElementChild, 'assign',
-      expected => `loop match state is ${expected}`);
+    if (target) expect(graph, node.firstElementChild, E.ACTUAL, target.firstElementChild, null, null, 'assign', target.firstElementChild, 'assign', LOOP_STATE_LABEL);
   }
   if (tag === 'ir-if') addConfluence(graph, node, [...node.children].slice(1));
   if (tag === 'ir-try') addConfluence(graph, node, [...node.children]);
@@ -958,18 +1062,17 @@ function addExpectations(graph, node) {
       .filter(child => /-arm$/.test(child.localName)).map(arm => arm.lastElementChild));
   }
   if (tag === 'ir-promote') {
-    expect(graph, node.firstElementChild, () => 'nullable', 'promote', node, 'nullable',
-      () => 'promote requires a nullable value');
+    expect(graph, node.firstElementChild, E.CONST, 'nullable', null, null, 'promote', node, 'nullable', PROMOTE_LABEL);
   }
   if (tag === 'ir-for-source') {
     // Both bounds of a range share one integer type.
     const [start, end] = [...node.children];
-    expect(graph, end, () => actual(graph, start), 'range', start, 'assign', () => 'range bounds must have the same type');
+    expect(graph, end, E.ACTUAL, start, null, null, 'range', start, 'assign', RANGE_LABEL);
   }
   if (tag === 'ir-else') {
     const [value, fallback] = [...node.children];
-    expect(graph, value, () => 'nullable', 'orelse', node, 'nullable', () => 'orelse requires a nullable value');
-    expect(graph, fallback, () => unwrapNullable(actual(graph, value) ?? ''), 'orelse', value, 'assign');
+    expect(graph, value, E.CONST, 'nullable', null, null, 'orelse', node, 'nullable', ORELSE_LABEL);
+    expect(graph, fallback, E.UNWRAP, value, null, null, 'orelse', value, 'assign');
   }
 }
 
@@ -982,19 +1085,19 @@ function addReturnExpectations(graph, surface) {
   const body = bodyOf(surface);
   const source = firstTypeChild(surface) ?? surface;
   const tail = returnedValue(body?.lastElementChild);
-  if (tail) expect(graph, tail, () => type, 'return', source, 'assign');
+  if (tail) expect(graph, tail, E.CONST, type, null, null, 'return', source, 'assign');
   // A branching expression at the end of nested blocks also learns the return
   // type, so its literal branches (`else { -1; }`) take it.
   let inner = tail;
   while ((inner?.localName === 'ir-block' || inner?.localName === 'ir-paren') && inner.lastElementChild?.localName !== 'ir-let') {
     inner = returnedValue(inner.lastElementChild);
   }
-  if (inner && inner !== tail && BRANCHING.has(inner.localName)) expect(graph, inner, () => type, 'return', source, 'assign');
+  if (inner && inner !== tail && BRANCHING.has(inner.localName)) expect(graph, inner, E.CONST, type, null, null, 'return', source, 'assign');
   for (const ret of body?.querySelectorAll('ir-return') ?? []) {
     if (ret !== body.lastElementChild
       && ret.closest('ir-fn, ir-export-main, ir-closure') === surface
       && ret.firstElementChild) {
-      expect(graph, ret.firstElementChild, () => type, 'return', source, 'assign');
+      expect(graph, ret.firstElementChild, E.CONST, type, null, null, 'return', source, 'assign');
     }
   }
 }
@@ -1059,31 +1162,32 @@ function addConfluence(graph, owner, values) {
   const branches = values.filter(Boolean);
   const first = branches[0];
   for (const branch of branches) {
-    const readUnified = () => {
-      // The surrounding context (a return type, an annotated let) decides what
-      // every branch must be. Without it, branches meet each other, which can
-      // leave a literal branch to default before a block branch has a type.
-      const context = graph.slots.get(owner)?.expected?.map(edge => edge.read())
-        .find(type => type && type !== 'null' && type !== 'void' && type !== 'nullable');
-      // A tuple context reaches inside the branches' tuples the same way.
-      if (context && (LITERAL_CONTEXT.has(context) || tupleParts(context))) return context;
-      const unified = actual(graph, owner) ?? actual(graph, first);
-      if (unified !== 'null') return unified;
-      return graph.slots.get(owner)?.expected?.map(edge => edge.read()).find(type => type && type !== 'null') ?? unified;
-    };
-    const message = expected => `other branch has type ${expected}`;
     // The block needs the unified backend result type, while its returned
     // expression needs the same context to type literals such as bare null.
-    expect(graph, branch, readUnified, 'confluence', first, 'unify', message);
+    expect(graph, branch, E.CONFLUENCE, owner, first, null, 'confluence', first, 'unify', BRANCH_LABEL);
     let value = branch;
     while (value?.localName === 'ir-block' || value?.localName === 'ir-paren') value = value.lastElementChild;
     value = returnedValue(value);
     if (value?.localName === 'ir-unary' && value.getAttribute('op') === '-') value = value.firstElementChild;
     if (value?.localName === 'ir-lit' && ['null', 'int', 'float'].includes(value.getAttribute('kind'))
         || value?.localName === 'ir-tuple') {
-      expect(graph, value, readUnified, 'confluence', first, 'unify', message);
+      expect(graph, value, E.CONFLUENCE, owner, first, null, 'confluence', first, 'unify', BRANCH_LABEL);
     }
   }
+}
+
+/** The type every branch of `owner` must have. */
+function unifiedBranchType(graph, owner, first) {
+  // The surrounding context (a return type, an annotated let) decides what
+  // every branch must be. Without it, branches meet each other, which can
+  // leave a literal branch to default before a block branch has a type.
+  const context = graph.slots.get(owner)?.expected?.map(edge => edge.read())
+    .find(type => type && type !== 'null' && type !== 'void' && type !== 'nullable');
+  // A tuple context reaches inside the branches' tuples the same way.
+  if (context && (LITERAL_CONTEXT.has(context) || tupleParts(context))) return context;
+  const unified = actual(graph, owner) ?? actual(graph, first);
+  if (unified !== 'null') return unified;
+  return graph.slots.get(owner)?.expected?.map(edge => edge.read()).find(type => type && type !== 'null') ?? unified;
 }
 
 /**

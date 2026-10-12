@@ -132,7 +132,10 @@ function walkSyntaxDiagnostics(node, acc) {
       tsType: node.type,
     });
   }
-  for (const child of node.children ?? []) walkSyntaxDiagnostics(child, acc);
+  // Only subtrees containing an ERROR or missing node can report one.
+  for (const child of node.children ?? []) {
+    if (child.hasError || child.isMissing) walkSyntaxDiagnostics(child, acc);
+  }
 }
 
 // ── Public entry point ───────────────────────────────────────────────────────
