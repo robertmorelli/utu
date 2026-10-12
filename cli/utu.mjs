@@ -93,13 +93,14 @@ function lazyPackageResolver() {
 
 async function checkFile(compiler, file) {
   try {
-    const { artifacts, snapshot } = await compiler.analyzeFile(file);
-    await printDiagnostics(artifacts.diagnostics, snapshot);
+    const analysis = await compiler.analyzeFile(file);
+    await printDiagnostics(analysis.artifacts.diagnostics, analysis);
+    const { artifacts } = analysis;
     process.exitCode = artifacts.diagnostics.some(d => d.severity === 'error') ? 1 : 0;
   } catch (error) {
     const diagnostics = error.artifacts?.diagnostics ?? [];
     if (diagnostics.length > 0) {
-      await printDiagnostics(diagnostics, error.snapshot);
+      await printDiagnostics(diagnostics, { snapshot: error.snapshot });
     } else {
       console.error(error?.stack || error?.message || String(error));
     }
@@ -118,9 +119,10 @@ async function displayFile(compiler, file, sectionTags = null, options = {}) {
 
 async function displayDebugFile(compiler, file, options = {}) {
   const source = await fs.readFile(file, 'utf8');
-  const { artifacts, snapshot } = await compiler.analyzeFile(file);
+  const analysis = await compiler.analyzeFile(file);
+  const { artifacts } = analysis;
   if (artifacts.diagnostics.length) {
-    await printDiagnostics(artifacts.diagnostics, snapshot);
+    await printDiagnostics(artifacts.diagnostics, analysis);
     process.exitCode = 1;
     return;
   }
@@ -154,9 +156,10 @@ async function writeGraph(compiler, file, args) {
 async function buildExe(compiler, file, args) {
   const outFlag = args.indexOf('-o') >= 0 ? args.indexOf('-o') : args.indexOf('--out');
   const out = outFlag >= 0 ? path.resolve(args[outFlag + 1]) : path.resolve(path.basename(file, '.utu'));
-  const { doc, artifacts, snapshot } = await compiler.analyzeFile(file);
+  const analysis = await compiler.analyzeFile(file);
+  const { doc, artifacts } = analysis;
   if (artifacts.diagnostics.length) {
-    await printDiagnostics(artifacts.diagnostics, snapshot);
+    await printDiagnostics(artifacts.diagnostics, analysis);
     // Warnings are reported; only errors stop the build.
     if (artifacts.diagnostics.some(d => d.severity !== 'warning')) process.exit(1);
   }
@@ -257,13 +260,14 @@ function renderSource(file, source, snapshot, sectionTags = null, options = {}) 
   if (rendered) console.log(rendered);
 }
 
-async function printDiagnostics(diagnostics, snapshot) {
+/** `source` holds the analysis snapshot, built only if there is something to print. */
+async function printDiagnostics(diagnostics, source) {
   if (!diagnostics?.length) {
     console.log('ok');
     return;
   }
 
-  console.log(await formatDiagnostics(diagnostics, { readFile: (file) => fs.readFile(file, 'utf8'), snapshot }));
+  console.log(await formatDiagnostics(diagnostics, { readFile: (file) => fs.readFile(file, 'utf8'), snapshot: source?.snapshot }));
 }
 
 async function printSourceLine(file, start, end) {
