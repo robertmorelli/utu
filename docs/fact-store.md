@@ -192,6 +192,44 @@ reviewed list of differences, at step 5.
    stops after the solve. Behavior fingerprints re-recorded and reviewed.
 6. **Projection last.** `projectGraphs` runs once, for the editor.
 
+## Status
+
+| step | state |
+|---|---|
+| 1. Type table | done: `type-table.js`; the type-string helpers read it |
+| 2. Columns | done: `fact-store.js` (`TypeFacts`); `graph.slots` is a view |
+| 3. Facts out of attributes | partly: codegen and the backend plan read facts; lowerings still read projected attributes |
+| 4. Contextual types as facts | not started (see below) |
+| 5. Analyze once | done, differently: see below |
+| 6. Projection last | not yet (see below) |
+
+What step 5 became:
+
+- **Builds keep their facts current by refresh** (`refreshTypeGraph`):
+  after a lowering, only dirty nodes get new rules and edges, and the solver
+  starts from them. Debug builds compare every refresh with a full settle;
+  the suite and every `.utu` file in the repository agree, so wasm and
+  diagnostics are unchanged. It is not faster yet: operator lowering dirties
+  ~65% of nodes, and a refresh repeats whole-program work (rewrite rounds
+  and coercions over every edge, program index, scope, call and control-flow
+  graphs).
+- **Analysis checks the program as written and stops** before closure and
+  operator lowering. Operators are checked as the calls they lower to
+  (operand expectations added after settling, so they never steer
+  inference). Builds check at the same point. The 24k-line analysis takes a
+  third of the time it did; the editor's views changed as listed in
+  b5aa179.
+
+What we learned about steps 3, 4, and 6: attributes are state between
+phases, not just a projection. A fresh solve seeds each node's type from
+`data-type-name`, lowerings copy types onto new nodes through attributes,
+and clones carry their originals' projected attributes into the next
+refresh. Removing the intermediate projections therefore needs the
+lowerings to carry facts through what they create and clone (the typed
+builders of section 5), together with a cross-check reference that seeds
+from facts. That rewrite of closure, operator, and alt/promote lowering is
+the remaining work, and it is also what would make refreshes small.
+
 ## Expected effect
 
 - Large builds: the two rebuilds (~40%) and the intermediate projections
