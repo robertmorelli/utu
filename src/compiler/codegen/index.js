@@ -108,7 +108,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
   const ctx = {
     module: m,
     // -O3 trades bytes for speed in a few lowerings (loop match arm copies).
-    optimize: doc.body.firstChild?.dataset.optimize === 'speed' ? 'speed' : 'size',
+    optimize: doc.body.firstChild?.attr?.('data-optimize') === 'speed' ? 'speed' : 'size',
     fnById,
     fnByName,
     structTypes,
@@ -121,10 +121,10 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
     backendPlan: plan,
     requirements,
     globals: new Map(),
-    typeOf: node => plan?.typeOf(node) ?? node?.dataset?.typeName ?? null,
-    expectedOf: node => plan?.expectedOf(node) ?? node?.dataset?.expect ?? node?.dataset?.expectedType ?? null,
-    bindingIdOf: node => plan?.bindingIdOf(node) ?? node?.dataset?.bindingId ?? null,
-    callTargetIdOf: node => plan?.callTargetIdOf(node) ?? node?.dataset?.fnId ?? null,
+    typeOf: node => plan?.typeOf(node) ?? node?.attr?.('data-type-name') ?? null,
+    expectedOf: node => plan?.expectedOf(node) ?? node?.attr?.('data-expect') ?? node?.attr?.('data-expected-type') ?? null,
+    bindingIdOf: node => plan?.bindingIdOf(node) ?? node?.attr?.('data-binding-id') ?? null,
+    callTargetIdOf: node => plan?.callTargetIdOf(node) ?? node?.attr?.('data-fn-id') ?? null,
     fieldOf: node => plan?.fieldOf(node) ?? null,
     debug: sourceMap ? createDebugInfo(m) : null,
   };
@@ -168,7 +168,7 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
     const name = fn.getAttribute('name');
     if (name) {
       m.addFunctionExport(exportOpaque(m, name), name);
-      noteExport(artifacts, fn, name, fn.dataset.export ?? 'unknown');
+      noteExport(artifacts, fn, name, fn.attr('data-export') ?? 'unknown');
     }
   }
 
@@ -217,7 +217,7 @@ function exportOpaque(m, name) {
 function requiresConservativeSweep(functions, plan, typeIndex) {
   for (const fn of functions) {
     for (const node of [fn, ...fn.querySelectorAll('*')]) {
-      const type = plan?.typeOf(node) ?? node.dataset?.typeName;
+      const type = plan?.typeOf(node) ?? node?.attr?.('data-type-name');
       const entry = typeIndex.get(unwrapNullable(type ?? ''));
       if (entry?.kind === 'wasm-array' || /^wasm-gc-/.test(entry?.kind ?? '')
         || entry?.typeRepr === 'wasm-i31' || entry?.scalarFamily === 'v128') return true;
@@ -228,7 +228,7 @@ function requiresConservativeSweep(functions, plan, typeIndex) {
 
 function readDslWasmImports(root) {
   try {
-    return JSON.parse(root.dataset.dslWasmImports || '[]');
+    return JSON.parse(root.attr('data-dsl-wasm-imports') || '[]');
   } catch {
     return [];
   }
@@ -286,7 +286,7 @@ export function emitBinary(doc, { artifacts = null, stringMode = 'lowered', sour
     }
     // -Oz and -O3 run Binaryen's full pipeline; -O0 skips it, for fast
     // development builds.
-    const goal = doc.body.firstChild?.dataset.optimize ?? 'size';
+    const goal = doc.body.firstChild?.attr?.('data-optimize') ?? 'size';
     if (goal !== 'none') optimizeForDistribution(m, goal === 'speed' ? 'speed' : 'size');
 
     // Feature lowerings deliberately install a complete runtime ABI. The full

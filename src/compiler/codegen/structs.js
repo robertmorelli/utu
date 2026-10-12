@@ -203,7 +203,7 @@ function resolvedField(node, info, ctx = null) {
   if (canonical && Number.isInteger(canonical.index)) {
     for (const field of info.fieldIndex.values()) if (field.index === canonical.index) return field;
   }
-  const index = Number(node.dataset.fieldIndex);
+  const index = Number(node.attr('data-field-index'));
   if (Number.isInteger(index)) {
     for (const field of info.fieldIndex.values()) if (field.index === index) return field;
   }

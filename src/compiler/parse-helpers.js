@@ -31,11 +31,11 @@ export function nextNodeId(doc = null) {
 export function restampSubtree(root, originFile, destinationDoc = root?.ownerDocument) {
   if (typeof root?.setAttribute !== 'function') return;
   for (const el of [root, ...root.querySelectorAll('*')]) {
-    if (!el.dataset.originId && el.id) el.dataset.originId = el.id;
+    if (!el.attr('data-origin-id') && el.id) el.setAttribute('data-origin-id', el.id);
     el.id = `n${nextNodeId(destinationDoc)}`;
     if (originFile) {
-      el.dataset.originFile = originFile;
-      el.dataset.sourceFile ??= originFile;
+      el.setAttribute('data-origin-file', originFile);
+      if (el.getAttribute('data-source-file') === null) el.setAttribute('data-source-file', originFile);
     }
   }
 }

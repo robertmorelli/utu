@@ -1,7 +1,7 @@
 // codegen/null-literals.js — context-typed `null` literal emission
 
 export function isNullLiteral(node) {
-  return node?.localName === 'ir-lit' && (node.getAttribute('kind') === 'null' || node.dataset['typeName'] === 'null');
+  return node?.localName === 'ir-lit' && (node.getAttribute('kind') === 'null' || node.attr('data-type-name') === 'null');
 }
 
 export function emitNullLiteral(node, ctx) {

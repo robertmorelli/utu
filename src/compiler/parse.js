@@ -94,7 +94,7 @@ function walkUnknown(n, doc, source) {
       tsType: n.type,
       missing: Boolean(n.isMissing),
     });
-    if (n.isMissing) node.dataset.missing = 'true';
+    if (n.isMissing) node.setAttribute('data-missing', 'true');
   }
   return node;
 }
@@ -112,9 +112,9 @@ function stampSyntaxDiagnostics(root, cstRoot) {
     if (!previous || (item.missing && !previous.missing)) byStart.set(item.start, item);
   }
   const diagnostics = [...byStart.values()];
-  root.dataset.parseErrorCount = String(diagnostics.length);
+  root.setAttribute('data-parse-error-count', String(diagnostics.length));
   if (diagnostics.length) {
-    root.dataset.parseErrors = JSON.stringify(diagnostics);
+    root.setAttribute('data-parse-errors', JSON.stringify(diagnostics));
     stampDiagnostic(root, DIAGNOSTIC_KINDS.PARSE_ERROR, `${diagnostics.length} parse error(s)`);
   }
 }

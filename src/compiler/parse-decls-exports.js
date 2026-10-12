@@ -124,12 +124,12 @@ export function walkMeasure(n, doc, source, dispatch) {
 }
 
 function stampNameRange(node, syntaxNode) {
-  node.dataset.nameStart = String(syntaxNode.startIndex);
-  node.dataset.nameEnd = String(syntaxNode.endIndex);
+  node.setAttribute('data-name-start', String(syntaxNode.startIndex));
+  node.setAttribute('data-name-end', String(syntaxNode.endIndex));
 }
 
 function stampLabelRange(node, syntaxNode) {
-  node.dataset.labelStart = String(syntaxNode.startIndex);
-  node.dataset.labelEnd = String(syntaxNode.endIndex);
+  node.setAttribute('data-label-start', String(syntaxNode.startIndex));
+  node.setAttribute('data-label-end', String(syntaxNode.endIndex));
 }
 

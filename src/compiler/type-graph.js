@@ -420,7 +420,7 @@ export const bindingOf = (graph, node) => {
 };
 /** Compatibility-only binding query for projected DOM IR. */
 export const projectedBindingOf = (doc, node) =>
-  node?.dataset.bindingId ? doc?.getElementById(node.dataset.bindingId) : null;
+  node?.attr?.('data-binding-id') ? doc?.getElementById(node.attr('data-binding-id')) : null;
 export const resolvedFunctionOf = (graph, call) => resolvedFunction(graph, call);
 export const resolvedFieldOf = (graph, node) => graph.slots.get(node)?.field ?? null;
 export const originOf = (graph, node) => actualOrigin(graph, node);

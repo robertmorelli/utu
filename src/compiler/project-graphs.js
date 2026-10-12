@@ -36,23 +36,24 @@ export function projectGraphs(doc) {
   const runtime = graphs.backend?.runtime;
   const root = doc.body.firstChild;
   if (root && runtime) {
-    root.dataset.closureRuntime = JSON.stringify({
+    root.setAttribute('data-closure-runtime', JSON.stringify({
       new: runtime.closures.new,
       calls: runtime.closures.calls.map(call => call.field),
-    });
-    root.dataset.promiseRuntime = JSON.stringify(runtime.promises);
+    }));
+    root.setAttribute('data-promise-runtime', JSON.stringify(runtime.promises));
   }
   for (const { node, kind, message, data } of graphs.diagnostics?.facts.values() ?? []) {
-    if (!node?.dataset) continue;
-    node.dataset.error = node.dataset.errorKind = kind;
-    node.dataset.errorMessage = message;
-    if (Object.keys(data).length) node.dataset.errorData = JSON.stringify(data);
+    if (node?.nodeType !== 1) continue;
+    node.setAttribute('data-error-kind', kind);
+    node.setAttribute('data-error', kind);
+    node.setAttribute('data-error-message', message);
+    if (Object.keys(data).length) node.setAttribute('data-error-data', JSON.stringify(data));
   }
   for (const [id, suspects] of graphs.diagnostics?.suspects ?? []) {
     const node = graphs.program?.byId.get(id) ?? doc.getElementById(id);
-    if (!node?.dataset) continue;
-    node.dataset.errorSuspect = 'true';
-    node.dataset.errorSuspects = JSON.stringify(suspects);
+    if (node?.nodeType !== 1) continue;
+    node.setAttribute('data-error-suspect', 'true');
+    node.setAttribute('data-error-suspects', JSON.stringify(suspects));
   }
   return doc;
 }

@@ -127,9 +127,9 @@ function signatureFromType(typeNode) {
 export function buildExternFn(doc, site, name, sig, importName) {
   const fn = createSyntheticNode(doc, T.EXTERN_FN, site, 'expand-dsls', 'dsl-es-extern');
   fn.setAttribute('name', name);
-  fn.dataset.extern = 'es';
-  fn.dataset.importModule = 'es';
-  fn.dataset.importName = importName;
+  fn.setAttribute('data-extern', 'es');
+  fn.setAttribute('data-import-module', 'es');
+  fn.setAttribute('data-import-name', importName);
   const fnName = createSyntheticNode(doc, T.FN_NAME, site, 'expand-dsls', 'dsl-es-extern-name');
   fnName.setAttribute('name', name);
   fnName.setAttribute('raw', name);
@@ -153,7 +153,7 @@ function buildValueWrapper(doc, site, name, resultType, call) {
   // `let x: I32 = @es/\…\/` imports a *value*, but is represented as a zero-arg
   // function so the import can be called on demand.  Referencing the name must
   // therefore yield the imported value, not a function pointer to the wrapper.
-  fn.dataset.valueAccessor = 'true';
+  fn.setAttribute('data-value-accessor', 'true');
   const fnName = createSyntheticNode(doc, T.FN_NAME, site, 'expand-dsls', 'dsl-es-value-wrapper-name');
   fnName.setAttribute('name', name);
   fnName.setAttribute('raw', name);
@@ -197,7 +197,7 @@ function buildImportCall(doc, site, name) {
 
 function localizeRanges(root, offset) {
   for (const node of [root, ...root.querySelectorAll('*')]) {
-    if (node.dataset.start != null) node.dataset.start = String(Number(node.dataset.start) - offset);
-    if (node.dataset.end != null) node.dataset.end = String(Number(node.dataset.end) - offset);
+    if (node.attr('data-start') != null) node.setAttribute('data-start', String(Number(node.attr('data-start')) - offset));
+    if (node.attr('data-end') != null) node.setAttribute('data-end', String(Number(node.attr('data-end')) - offset));
   }
 }

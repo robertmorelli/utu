@@ -174,8 +174,8 @@ export function walkTypeMemberExpr(n, doc, source, dispatch) {
   if (children.length > 0) {
     const methodNode = children[children.length - 1];
     node.setAttribute('method', text(methodNode));
-    node.dataset.methodStart = String(methodNode.startIndex);
-    node.dataset.methodEnd = String(methodNode.endIndex);
+    node.setAttribute('data-method-start', String(methodNode.startIndex));
+    node.setAttribute('data-method-end', String(methodNode.endIndex));
     for (const child of children.slice(0, -1)) {
       const ir = dispatch(child, doc, source);
       if (ir) node.appendChild(ir);
@@ -189,8 +189,8 @@ export function walkModCallExpr(n, doc, source, dispatch) {
   node.setAttribute('raw', text(n));
   const methodNode = [...namedChildren(n)].reverse().find(child => child.type === 'identifier' || child.type === 'fn_name');
   if (methodNode) {
-    node.dataset.methodStart = String(methodNode.startIndex);
-    node.dataset.methodEnd = String(methodNode.endIndex);
+    node.setAttribute('data-method-start', String(methodNode.startIndex));
+    node.setAttribute('data-method-end', String(methodNode.endIndex));
   }
   append(node, walkChildren(n, doc, source, dispatch));
   return node;
@@ -210,8 +210,8 @@ function walkMember(tag, n, doc, source, dispatch) {
   if (children[0]) node.appendChild(dispatch(children[0], doc, source));
   if (children[1]) {
     node.setAttribute('field', text(children[1]));
-    node.dataset.fieldStart = String(children[1].startIndex);
-    node.dataset.fieldEnd = String(children[1].endIndex);
+    node.setAttribute('data-field-start', String(children[1].startIndex));
+    node.setAttribute('data-field-end', String(children[1].endIndex));
   }
   return node;
 }

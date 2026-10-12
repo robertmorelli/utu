@@ -240,19 +240,19 @@ export function createCompiler(env) {
     // Syntax errors in an imported file are reported as such. Inlining its
     // recovered tree would only produce misleading follow-on diagnostics.
     const importedParseErrors = [...graph]
-      .filter(([file, sourceDoc]) => file !== filePath && sourceDoc.body.firstChild?.dataset.parseErrors)
-      .map(([file, sourceDoc]) => ({ file, errors: JSON.parse(sourceDoc.body.firstChild.dataset.parseErrors) }));
+      .filter(([file, sourceDoc]) => file !== filePath && sourceDoc.body.firstChild?.attr?.('data-parse-errors'))
+      .map(([file, sourceDoc]) => ({ file, errors: JSON.parse(sourceDoc.body.firstChild.attr('data-parse-errors')) }));
     const doc = importedParseErrors.length ? graph.get(filePath) : inlineImports(graph, order, { debugAssertions });
     if (importedParseErrors.length && doc.body.firstChild) {
-      doc.body.firstChild.dataset.importedParseErrors = JSON.stringify(importedParseErrors);
+      doc.body.firstChild.setAttribute('data-imported-parse-errors', JSON.stringify(importedParseErrors));
     }
     // The entry file's name for std:JS, which mem views are typed with.
     const jsImport = imports.find(({ from, to }) => from === filePath && to === 'std:JS');
     if (jsImport && doc.body.firstChild) {
-      doc.body.firstChild.dataset.jsAlias = jsImport.node.getAttribute('alias') ?? jsImport.node.getAttribute('module');
+      doc.body.firstChild.setAttribute('data-js-alias', jsImport.node.getAttribute('alias') ?? jsImport.node.getAttribute('module'));
     }
     // -Oz ('size', the default) or -O3 ('speed'): read by host-call lowering and emitBinary.
-    if (doc.body.firstChild) doc.body.firstChild.dataset.optimize = optimize;
+    if (doc.body.firstChild) doc.body.firstChild.setAttribute('data-optimize', optimize);
     doc.__utuForeign = foreignABI;
     doc.__utuSourceTexts = new Map([...graph].map(([file, sourceDoc]) => [file, sourceDoc.__utuSourceText ?? '']));
     if (target === 'analysis') {
@@ -267,7 +267,7 @@ export function createCompiler(env) {
     // or trigger invariants that hide the actionable syntax diagnostics.
     if (doc.querySelector('[data-parse-errors], [data-imported-parse-errors], [data-error-kind="parse-error"], [data-error="parse-error"]')) {
       const root = doc.body.firstChild;
-      if (root && !root.dataset.error) root.dataset.error = 'parse-error';
+      if (root && !root.attr('data-error')) root.setAttribute('data-error', 'parse-error');
       return doc;
     }
 
@@ -282,11 +282,11 @@ export function createCompiler(env) {
         doc.__utuSourceTexts?.set(stdPath, stdlib.get(stdPath));
         const clone = doc.importNode?.(child, true) ?? child.cloneNode(true);
         restampSubtree(clone, stdPath, doc);
-        clone.dataset.synthetic = 'true';
-        clone.dataset.rewritePass = 'compiler-prelude';
-        clone.dataset.rewriteKind = 'prelude-module';
-        clone.dataset.rewriteOf = child.dataset.originId ?? child.id ?? '';
-        clone.dataset.importedFrom = stdPath;
+        clone.setAttribute('data-synthetic', 'true');
+        clone.setAttribute('data-rewrite-pass', 'compiler-prelude');
+        clone.setAttribute('data-rewrite-kind', 'prelude-module');
+        clone.setAttribute('data-rewrite-of', child.attr('data-origin-id') ?? child.id ?? '');
+        clone.setAttribute('data-imported-from', stdPath);
         mergedRoot.insertBefore(clone, mergedRoot.firstChild);
       }
     }
@@ -459,7 +459,7 @@ ${types.map(type => `    fn __utu_comptime_len_${type}(values: Array[${type}]) I
     if (problems.length) {
       // The trimmed copy keeps the entry file's line numbers.
       const row = problems[0].primary?.row;
-      const site = items.find(item => item.site.dataset.row != null && Number(item.site.dataset.row) === row)?.site ?? items[0].site;
+      const site = items.find(item => item.site.attr('data-row') != null && Number(item.site.attr('data-row')) === row)?.site ?? items[0].site;
       throw fail(`@comptime: ${problems[0].message}${row != null ? ` (line ${row})` : ''}`, site);
     }
     const { emitBinary, buildImportObject, instantiateLowered } = await import('../index.js');

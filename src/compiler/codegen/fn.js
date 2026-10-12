@@ -100,9 +100,9 @@ function implicitOperatorParamType(fn) {
 function applyDebugLocations(ctx, funcRef) {
   if (!ctx.debug || !funcRef) return;
   for (const { node, expr } of ctx.debugExprs) {
-    const fileIndex = ctx.debug.fileIndex(node.dataset.sourceFile);
-    const line = Number(node.dataset.row);
-    const col = Number(node.dataset.col);
+    const fileIndex = ctx.debug.fileIndex(node.attr('data-source-file'));
+    const line = Number(node.attr('data-row'));
+    const col = Number(node.attr('data-col'));
     if (fileIndex == null || !Number.isFinite(line) || !Number.isFinite(col)) continue;
     ctx.module.setDebugLocation(funcRef, expr, fileIndex, line, col);
   }

@@ -44,7 +44,7 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
       if (!srcModule) {
         // A file with syntax errors may have lost the module; the parse
         // errors are the real diagnostic and are reported after inlining.
-        if (targetRoot.dataset.parseErrors) continue;
+        if (targetRoot.attr('data-parse-errors')) continue;
         const available = [...targetRoot.querySelectorAll(':scope > ir-module')].map(m => m.getAttribute('name'));
         const hint = available.length ? `it defines ${available.map(name => `'${name}'`).join(', ')}` : 'it defines no modules';
         throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT,
@@ -105,7 +105,7 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
   if (entryRoot) {
     const aliased = new Set([...entryRoot.querySelectorAll('ir-using')].map(using => using.getAttribute('module')));
     for (const module of [...entryRoot.querySelectorAll(':scope > ir-module')]) {
-      if (module.dataset.rewritePass === 'inline-imports' || aliased.has(module.getAttribute('name'))) continue;
+      if (module.attr('data-rewrite-pass') === 'inline-imports' || aliased.has(module.getAttribute('name'))) continue;
       if (module.querySelector(':scope > ir-module-params')) continue;
       lowerPipesIn(module);
       hoistModule(module, entryRoot);
@@ -118,11 +118,11 @@ export function inlineImports(graph, order, { debugAssertions = false } = {}) {
 function cloneImportedNode(doc, source, targetPath, kind) {
   const clone = doc.importNode?.(source, true) ?? source.cloneNode(true);
   restampSubtree(clone, targetPath, doc);
-  clone.dataset.synthetic = 'true';
-  clone.dataset.rewritePass = 'inline-imports';
-  clone.dataset.rewriteKind = kind;
-  clone.dataset.rewriteOf = source.dataset.originId ?? source.id ?? '';
-  clone.dataset.importedFrom = targetPath;
+  clone.setAttribute('data-synthetic', 'true');
+  clone.setAttribute('data-rewrite-pass', 'inline-imports');
+  clone.setAttribute('data-rewrite-kind', kind);
+  clone.setAttribute('data-rewrite-of', source.attr('data-origin-id') ?? source.id ?? '');
+  clone.setAttribute('data-imported-from', targetPath);
   return clone;
 }
 

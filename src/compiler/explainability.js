@@ -46,37 +46,37 @@ export function pushProfileFact(artifacts, kind, node, extra = {}) {
 export function explainNode(node) {
   return {
     ...nodeRef(node),
-    typeName: node?.dataset?.typeName ?? null,
-    typeRepr: node?.dataset?.typeRepr ?? null,
-    inferenceSource: node?.dataset?.inferenceSource ?? null,
-    expectedType: node?.dataset?.expect ?? null,
-    expectationSourceId: node?.dataset?.expectFrom ?? null,
-    bindingId: node?.dataset?.bindingId ?? null,
-    bindingOriginId: node?.dataset?.bindingOriginId ?? null,
-    resolvesToId: node?.dataset?.resolvesToId ?? null,
-    resolvesToOriginId: node?.dataset?.resolvesToOriginId ?? null,
-    fnId: node?.dataset?.fnId ?? null,
-    fnOriginId: node?.dataset?.fnOriginId ?? null,
-    fieldIndex: node?.dataset?.fieldIndex ?? null,
-    fieldDeclarationId: node?.dataset?.fieldDeclId ?? null,
+    typeName: node?.attr?.('data-type-name') ?? null,
+    typeRepr: node?.attr?.('data-type-repr') ?? null,
+    inferenceSource: node?.attr?.('data-inference-source') ?? null,
+    expectedType: node?.attr?.('data-expect') ?? null,
+    expectationSourceId: node?.attr?.('data-expect-from') ?? null,
+    bindingId: node?.attr?.('data-binding-id') ?? null,
+    bindingOriginId: node?.attr?.('data-binding-origin-id') ?? null,
+    resolvesToId: node?.attr?.('data-resolves-to-id') ?? null,
+    resolvesToOriginId: node?.attr?.('data-resolves-to-origin-id') ?? null,
+    fnId: node?.attr?.('data-fn-id') ?? null,
+    fnOriginId: node?.attr?.('data-fn-origin-id') ?? null,
+    fieldIndex: node?.attr?.('data-field-index') ?? null,
+    fieldDeclarationId: node?.attr?.('data-field-decl-id') ?? null,
   };
 }
 
 export function loweringTrace(node) {
-  if (!node?.dataset) return [];
+  if (node?.nodeType !== 1) return [];
   const trace = [];
   const push = (label, value) => value && trace.push({ label, value });
-  push('originId', node.dataset.originId);
-  push('rewriteOf', node.dataset.rewriteOf);
-  push('rewritePass', node.dataset.rewritePass);
-  push('rewriteKind', node.dataset.rewriteKind);
-  push('importedFrom', node.dataset.importedFrom);
-  push('instantiatedFrom', node.dataset.instantiatedFrom);
-  push('instantiatedAs', node.dataset.instantiatedAs);
+  push('originId', node.attr('data-origin-id'));
+  push('rewriteOf', node.attr('data-rewrite-of'));
+  push('rewritePass', node.attr('data-rewrite-pass'));
+  push('rewriteKind', node.attr('data-rewrite-kind'));
+  push('importedFrom', node.attr('data-imported-from'));
+  push('instantiatedFrom', node.attr('data-instantiated-from'));
+  push('instantiatedAs', node.attr('data-instantiated-as'));
   const substitution = retainedGraphs(node.ownerDocument).elaboration?.edges
     .find(edge => edge.kind === 'substitutes' && edge.from === node.id);
-  push('substitutedTypeParam', node.dataset.substitutedTypeParam ?? substitution?.parameter);
-  push('substitutedFrom', node.dataset.substitutedFrom ?? substitution?.to);
-  push('dslName', node.dataset.dslName);
+  push('substitutedTypeParam', node.attr('data-substituted-type-param') ?? substitution?.parameter);
+  push('substitutedFrom', node.attr('data-substituted-from') ?? substitution?.to);
+  push('dslName', node.attr('data-dsl-name'));
   return trace;
 }

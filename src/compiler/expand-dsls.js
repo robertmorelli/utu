@@ -1,7 +1,7 @@
 import { T } from './ir-tags.js';
 import { nextNodeId, restampSubtree } from './parse.js';
 import { collectDslArtifacts, createDslArtifactState, stampDslArtifacts } from './collect-dsl-artifacts.js';
-import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
+import { createSyntheticNode, replaceNodeMeta, setDataIfAbsent } from './ir-helpers.js';
 
 const MAX_EXPANSIONS = 10000;
 
@@ -57,11 +57,11 @@ export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
     if (result.fn.localName !== T.FN) throw new Error(`expand dsls (${name}): plugin must return ir-fn`);
 
     const helper = cloneForSite(result.fn, site);
-    helper.dataset.synthetic = 'true';
-    helper.dataset.rewritePass = 'expand-dsls';
-    helper.dataset.rewriteKind = 'dsl-helper';
-    helper.dataset.rewriteOf = node.dataset.originId ?? node.id ?? '';
-    helper.dataset.dslName = name;
+    helper.setAttribute('data-synthetic', 'true');
+    helper.setAttribute('data-rewrite-pass', 'expand-dsls');
+    helper.setAttribute('data-rewrite-kind', 'dsl-helper');
+    helper.setAttribute('data-rewrite-of', node.attr('data-origin-id') ?? node.id ?? '');
+    helper.setAttribute('data-dsl-name', name);
     const helperName = helper.getAttribute('name') || helper.querySelector(T.FN_NAME)?.getAttribute('raw');
     if (!helperName) throw new Error(`expand dsls (${name}): helper fn is missing a name`);
 
@@ -95,32 +95,32 @@ function cloneForSite(node, site) {
 function rebaseSubtreeRanges(root, site) {
   for (const node of [root, ...root.querySelectorAll('*')]) {
     if (site.originFile) {
-      node.dataset.originFile = site.originFile;
-      node.dataset.sourceFile = site.originFile;
+      node.setAttribute('data-origin-file', site.originFile);
+      node.setAttribute('data-source-file', site.originFile);
     }
-    node.dataset.row ??= site.row;
-    node.dataset.col ??= site.col;
-    node.dataset.endRow ??= site.endRow;
-    node.dataset.endCol ??= site.endCol;
-    const start = num(node.dataset.start);
-    const end = num(node.dataset.end);
+    setDataIfAbsent(node, 'data-row', site.row);
+    setDataIfAbsent(node, 'data-col', site.col);
+    setDataIfAbsent(node, 'data-end-row', site.endRow);
+    setDataIfAbsent(node, 'data-end-col', site.endCol);
+    const start = num(node.attr('data-start'));
+    const end = num(node.attr('data-end'));
     if (start == null || end == null || end > site.limit) continue;
-    node.dataset.start = String(site.base + start);
-    node.dataset.end = String(site.base + end);
+    node.setAttribute('data-start', String(site.base + start));
+    node.setAttribute('data-end', String(site.base + end));
   }
 }
 
 function replaceRoot(node, site, kind) {
   node.id = site.id ?? `n${nextNodeId(node.ownerDocument)}`;
-  node.dataset.row ??= site.dataset.row;
-  node.dataset.col ??= site.dataset.col;
-  node.dataset.endRow ??= site.dataset.endRow;
-  node.dataset.endCol ??= site.dataset.endCol;
-  node.dataset.sourceFile ??= site.dataset.sourceFile ?? site.dataset.originFile;
-  node.dataset.synthetic = 'true';
-  node.dataset.rewritePass = 'expand-dsls';
-  node.dataset.rewriteKind = kind;
-  node.dataset.rewriteOf = site.dataset.originId ?? site.id ?? '';
+  setDataIfAbsent(node, 'data-row', site.attr('data-row'));
+  setDataIfAbsent(node, 'data-col', site.attr('data-col'));
+  setDataIfAbsent(node, 'data-end-row', site.attr('data-end-row'));
+  setDataIfAbsent(node, 'data-end-col', site.attr('data-end-col'));
+  setDataIfAbsent(node, 'data-source-file', site.attr('data-source-file') ?? site.attr('data-origin-file'));
+  node.setAttribute('data-synthetic', 'true');
+  node.setAttribute('data-rewrite-pass', 'expand-dsls');
+  node.setAttribute('data-rewrite-kind', kind);
+  node.setAttribute('data-rewrite-of', site.attr('data-origin-id') ?? site.id ?? '');
   return node;
 }
 
@@ -136,14 +136,14 @@ function rebase(start, end, base) {
 function siteInfo(node, root) {
   return {
     doc: root.ownerDocument,
-    base: num(node.dataset.bodyStart, num(node.dataset.start)),
-    innerBase: num(node.dataset.bodyInnerStart, num(node.dataset.start)),
+    base: num(node.attr('data-body-start'), num(node.attr('data-start'))),
+    innerBase: num(node.attr('data-body-inner-start'), num(node.attr('data-start'))),
     limit: (node.getAttribute('body') ?? '').length,
-    originFile: node.dataset.originFile ?? root.dataset.file,
-    row: node.dataset.row,
-    col: node.dataset.col,
-    endRow: node.dataset.endRow,
-    endCol: node.dataset.endCol,
+    originFile: node.attr('data-origin-file') ?? root.attr('data-file'),
+    row: node.attr('data-row'),
+    col: node.attr('data-col'),
+    endRow: node.attr('data-end-row'),
+    endCol: node.attr('data-end-col'),
   };
 }
 

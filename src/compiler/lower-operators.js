@@ -40,7 +40,7 @@ function buildShortCircuit(node) {
   const branch = (value) => {
     const block = createSyntheticNode(doc, 'ir-block', node, 'lower-operators', 'short-circuit-branch');
     block.appendChild(value);
-    block.dataset.typeName = 'Bool';
+    block.setAttribute('data-type-name', 'Bool');
     return block;
   };
   const constant = (value) => {
@@ -48,13 +48,13 @@ function buildShortCircuit(node) {
     literal.setAttribute('kind', 'bool');
     literal.setAttribute('value', value);
     literal.setAttribute('type-name', 'Bool');
-    literal.dataset.typeName = 'Bool';
+    literal.setAttribute('data-type-name', 'Bool');
     return literal;
   };
   const conditional = createSyntheticNode(doc, 'ir-if', node, 'lower-operators', 'short-circuit');
   const and = node.getAttribute('op') === 'and';
   conditional.append(left, branch(and ? right : constant('true')), branch(and ? constant('false') : right));
-  conditional.dataset.typeName = 'Bool';
+  conditional.setAttribute('data-type-name', 'Bool');
   return conditional;
 }
 
@@ -86,8 +86,8 @@ function lowerIndexAssignments(root, graph) {
     const [target, value] = [...assign.children];
     if ((assign.getAttribute('op') ?? '=') !== '=' || target?.localName !== 'ir-index') continue;
     const [base, index] = [...target.children];
-    const owner = (graph && actualType(graph, base)) ?? base?.dataset.typeName
-      ?? (graph && actualType(graph, target)) ?? target.dataset.typeName;
+    const owner = (graph && actualType(graph, base)) ?? base?.attr?.('data-type-name')
+      ?? (graph && actualType(graph, target)) ?? target.attr('data-type-name');
     if (!base || isOperandless(owner)) continue;
     replaceTypedNode(assign, buildCall(assign, {
       owner, method: 'set_index', syntax: 'method', args: [base, index, value], label: '[]=',
@@ -100,8 +100,8 @@ function lowerIndexAssignments(root, graph) {
 function operatorSpec(node, graph) {
   const args = [...node.children];
   const first = args[0];
-  const owner = (graph && actualType(graph, first)) ?? first?.dataset.typeName
-    ?? (graph && actualType(graph, node)) ?? node.dataset.typeName;
+  const owner = (graph && actualType(graph, first)) ?? first?.attr?.('data-type-name')
+    ?? (graph && actualType(graph, node)) ?? node.attr('data-type-name');
   if (node.localName === 'ir-binary') {
     const op = node.getAttribute('op');
     return { owner, method: BINARY_OP_FN[op], syntax: 'operator', args, label: op };
@@ -122,11 +122,11 @@ function buildCall(site, { owner, method, syntax, args, label }) {
   const argList = createSyntheticNode(doc, 'ir-arg-list', site, 'lower-operators', `${syntax}-args`);
   replaceNodeMeta(call, site, 'lower-operators', `${syntax}-call`);
 
-  call.dataset.operatorName = method;
-  call.dataset.operatorReceiverName = owner;
-  if (label) call.dataset.operatorSymbol = label;
-  if (site.dataset.forArrayAccess) call.dataset.forArrayAccess = site.dataset.forArrayAccess;
-  if (site.dataset.typeName) call.dataset.typeName = site.dataset.typeName;
+  call.setAttribute('data-operator-name', method);
+  call.setAttribute('data-operator-receiver-name', owner);
+  if (label) call.setAttribute('data-operator-symbol', label);
+  if (site.attr('data-for-array-access')) call.setAttribute('data-for-array-access', site.attr('data-for-array-access'));
+  if (site.attr('data-type-name')) call.setAttribute('data-type-name', site.attr('data-type-name'));
 
   callee.setAttribute('method', method);
   if (syntax === 'operator') {

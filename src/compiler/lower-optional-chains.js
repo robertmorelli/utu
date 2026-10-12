@@ -33,7 +33,7 @@ export function lowerOptionalChains(doc) {
       const field = replaceNodeMeta(doc.createElement('ir-field-access'), node, 'lower-optional-chains', 'rejected');
       field.setAttribute('field', node.getAttribute('field'));
       field.append(...node.childNodes);
-      field.dataset.optionalChainRejected = 'true';
+      field.setAttribute('data-optional-chain-rejected', 'true');
       node.replaceWith(field);
       stampDiagnostic(field, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
         "'?.' is only allowed in statements; use promote or orelse for a value");

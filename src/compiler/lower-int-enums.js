@@ -103,7 +103,7 @@ export function lowerIntEnums(doc, parser, createDocument) {
     const [module] = declarationsFromSource(parser, scalarModule(info), info.decl, { createDocument });
     info.decl.replaceWith(module);
   }
-  root.dataset.intEnums = JSON.stringify(Object.fromEntries([...enums.values()].map(info => [info.name, info.repr])));
+  root.setAttribute('data-int-enums', JSON.stringify(Object.fromEntries([...enums.values()].map(info => [info.name, info.repr]))));
 }
 
 function describe(decl) {
@@ -200,7 +200,7 @@ export function lowerDistinctTypes(doc, parser, createDocument) {
     const [module] = declarationsFromSource(parser, distinctModule(name, base, info), decl, { createDocument });
     decl.replaceWith(module);
   }
-  root.dataset.distinctTypes = JSON.stringify(distinct);
+  root.setAttribute('data-distinct-types', JSON.stringify(distinct));
 }
 
 function distinctModule(name, base, { wasm, repr, sign }) {

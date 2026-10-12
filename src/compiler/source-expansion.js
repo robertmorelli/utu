@@ -26,17 +26,21 @@ export function expressionFromSource(parser, source, site, splices = new Map(), 
       for (const attr of [...node.attributes]) if (/^data-(?:.*-)?(?:start|end)$/.test(attr.name)) {
         node.setAttribute(attr.name, String(Number(attr.value) - PREFIX.length + sourceStart));
       }
-      [node.dataset.row, node.dataset.col] = location(Number(node.dataset.start));
-      [node.dataset.endRow, node.dataset.endCol] = location(Number(node.dataset.end));
-      delete node.dataset.originId;
+      const [row, col] = location(Number(node.attr('data-start')));
+      const [endRow, endCol] = location(Number(node.attr('data-end')));
+      node.setAttribute('data-row', row);
+      node.setAttribute('data-col', col);
+      node.setAttribute('data-end-row', endRow);
+      node.setAttribute('data-end-col', endCol);
+      node.removeAttribute('data-origin-id');
     } else {
       for (const key of ['start', 'end', 'row', 'col', 'endRow', 'endCol']) if (site.dataset[key] != null) node.dataset[key] = site.dataset[key];
       // Template token offsets have no corresponding spelling in the source.
       for (const attr of [...node.attributes]) if (/^data-.+-(start|end)$/.test(attr.name)) node.removeAttribute(attr.name);
-      node.dataset.originId = site.dataset.originId ?? site.id;
-      node.dataset.rewriteOf = site.dataset.originId ?? site.id;
-      node.dataset.synthetic = 'true';
-      node.dataset.rewritePass = 'syntax-expansion';
+      node.setAttribute('data-origin-id', site.attr('data-origin-id') ?? site.id);
+      node.setAttribute('data-rewrite-of', site.attr('data-origin-id') ?? site.id);
+      node.setAttribute('data-synthetic', 'true');
+      node.setAttribute('data-rewrite-pass', 'syntax-expansion');
     }
   }
   for (const ident of [...expr.querySelectorAll('ir-ident')]) {
@@ -44,8 +48,8 @@ export function expressionFromSource(parser, source, site, splices = new Map(), 
     if (value) ident.replaceWith(value.cloneNode(true));
   }
   const result = site.ownerDocument.importNode(expr, true);
-  restampSubtree(result, site.dataset.originFile, site.ownerDocument);
-  if (sourceStart != null) for (const node of [result, ...result.querySelectorAll('*')]) node.dataset.originId = node.id;
+  restampSubtree(result, site.attr('data-origin-file'), site.ownerDocument);
+  if (sourceStart != null) for (const node of [result, ...result.querySelectorAll('*')]) node.setAttribute('data-origin-id', node.id);
   return result;
 }
 
@@ -64,13 +68,13 @@ export function declarationsFromSource(parser, source, site, { createDocument } 
         if (site.dataset[key] != null) node.dataset[key] = site.dataset[key];
       }
       for (const attr of [...node.attributes]) if (/^data-.+-(start|end)$/.test(attr.name)) node.removeAttribute(attr.name);
-      node.dataset.originId = site.dataset.originId ?? site.id;
-      node.dataset.rewriteOf = site.dataset.originId ?? site.id;
-      node.dataset.synthetic = 'true';
-      node.dataset.rewritePass = 'syntax-expansion';
+      node.setAttribute('data-origin-id', site.attr('data-origin-id') ?? site.id);
+      node.setAttribute('data-rewrite-of', site.attr('data-origin-id') ?? site.id);
+      node.setAttribute('data-synthetic', 'true');
+      node.setAttribute('data-rewrite-pass', 'syntax-expansion');
     }
     const result = site.ownerDocument.importNode(declaration, true);
-    restampSubtree(result, site.dataset.originFile, site.ownerDocument);
+    restampSubtree(result, site.attr('data-origin-file'), site.ownerDocument);
     return result;
   });
 }

@@ -111,11 +111,11 @@ function collectDomEntries(doc, entries) {
 }
 
 function collectSemanticSubranges(node, entries) {
-  const file = node.dataset?.originFile || node.dataset?.file;
+  const file = node?.attr?.('data-origin-file') || node?.attr?.('data-file');
   if (!file) return;
 
-  const nameStart = numberValue(node.dataset?.nameStart);
-  const nameEnd = numberValue(node.dataset?.nameEnd);
+  const nameStart = numberValue(node?.attr?.('data-name-start'));
+  const nameEnd = numberValue(node?.attr?.('data-name-end'));
   if (nameStart != null && nameEnd != null) {
     const role = declarationNameRole(node);
     if (role) entries.push({ file, start: nameStart, end: nameEnd, kind: 'semantic', role, tag: node.tagName.toLowerCase(), name: node.getAttribute?.('name') || 'main' });
@@ -123,8 +123,8 @@ function collectSemanticSubranges(node, entries) {
 
   for (const [key, role, attribute, include] of [
     ['label', 'string', 'label', true],
-    ['method', 'function', 'method', Boolean(node.dataset?.fnId)],
-    ['field', 'function', 'field', node.dataset?.resolvedAs === 'method'],
+    ['method', 'function', 'method', Boolean(node?.attr?.('data-fn-id'))],
+    ['field', 'function', 'field', node?.attr?.('data-resolved-as') === 'method'],
   ]) {
     const start = numberValue(node.dataset?.[`${key}Start`]);
     const end = numberValue(node.dataset?.[`${key}End`]);
@@ -139,14 +139,14 @@ function declarationNameRole(node) {
   const tag = node.tagName.toLowerCase();
   if (tag === 'ir-export-main') return 'function';
   if (tag !== 'ir-let' && tag !== 'ir-global') return '';
-  if (node.dataset?.typeName?.startsWith('fun(')) return 'function';
+  if (node?.attr?.('data-type-name')?.startsWith('fun(')) return 'function';
   if (node.querySelector?.(':scope > ir-type-fn')) return 'function';
   if (tag === 'ir-global') return 'constant';
   return 'variable';
 }
 
 function domRangeEntry(node) {
-  const file = node.dataset?.originFile || node.dataset?.file;
+  const file = node?.attr?.('data-origin-file') || node?.attr?.('data-file');
   const start = numberAttr(node, 'start');
   const end = numberAttr(node, 'end');
   if (!file || start == null || end == null) return null;
@@ -156,17 +156,17 @@ function domRangeEntry(node) {
     start,
     end,
     kind: 'ir',
-    id: node.id || node.dataset?.originId || '',
+    id: node.id || node?.attr?.('data-origin-id') || '',
     tag: node.tagName.toLowerCase(),
     role: rangeRole(node),
     name: node.getAttribute?.('name') || '',
-    bindingKind: node.dataset?.bindingKind || '',
-    bindingName: node.dataset?.bindingName || '',
+    bindingKind: node?.attr?.('data-binding-kind') || '',
+    bindingName: node?.attr?.('data-binding-name') || '',
     literalKind: node.getAttribute?.('kind') || '',
-    originId: node.dataset?.originId || '',
-    rewriteOf: node.dataset?.rewriteOf || '',
-    rewritePass: node.dataset?.rewritePass || '',
-    rewriteKind: node.dataset?.rewriteKind || '',
+    originId: node?.attr?.('data-origin-id') || '',
+    rewriteOf: node?.attr?.('data-rewrite-of') || '',
+    rewritePass: node?.attr?.('data-rewrite-pass') || '',
+    rewriteKind: node?.attr?.('data-rewrite-kind') || '',
   };
 }
 
@@ -179,7 +179,7 @@ function rangeRole(node) {
   if (tag === 'ir-null-ref') return 'constant.builtin';
   if (tag === 'ir-field-access') return 'property';
   if (tag === 'ir-ident') {
-    const bindingKind = node.dataset?.bindingKind || '';
+    const bindingKind = node?.attr?.('data-binding-kind') || '';
     if (bindingKind === 'ir-fn' || bindingKind === 'ir-extern-fn') return 'function';
     if (bindingKind === 'ir-global') return 'constant';
     return 'variable';
@@ -194,18 +194,18 @@ function literalRole(kind) {
 }
 
 function collectSuspectedInvolvement(node, entries) {
-  if (node.dataset?.errorSuspect !== 'true') return;
-  const file = node.dataset?.originFile || node.dataset?.file;
+  if (node?.attr?.('data-error-suspect') !== 'true') return;
+  const file = node?.attr?.('data-origin-file') || node?.attr?.('data-file');
   const start = numberAttr(node, 'start');
   const end = numberAttr(node, 'end');
   if (!file || start == null || end == null) return;
-  const suspects = parseJsonArray(node.dataset.errorSuspects);
+  const suspects = parseJsonArray(node.attr('data-error-suspects'));
   entries.push({
     file,
     start,
     end,
     kind: 'diagnostic-suspect',
-    id: `suspect:${node.id || node.dataset?.originId || ''}`,
+    id: `suspect:${node.id || node?.attr?.('data-origin-id') || ''}`,
     tag: node.tagName.toLowerCase(),
     role: 'diagnostic-suspect',
     message: suspects.map(item => item.label).filter(Boolean).join('; '),

@@ -65,8 +65,8 @@ function validateForSources(root, program) {
         `for has ${sources.length} range source(s) but ${names.length} capture(s)`);
       continue;
     }
-    const types = sources.map(source => source.firstElementChild?.dataset.typeName
-      ?? source.lastElementChild?.dataset.typeName).filter(Boolean);
+    const types = sources.map(source => source.firstElementChild?.attr?.('data-type-name')
+      ?? source.lastElementChild?.attr?.('data-type-name')).filter(Boolean);
     const invalid = types.find(type => !['I32', 'U32', 'I64', 'U64'].includes(type));
     if (invalid) {
       stampDiagnostic(loop, DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE,
@@ -84,7 +84,7 @@ function validateForSources(root, program) {
 function validateForArraySources(root, typeIndex) {
   for (const binding of root.querySelectorAll('ir-let[data-for-array-source]')) {
     const value = binding.lastElementChild;
-    const type = value?.dataset.typeName ?? binding.dataset.typeName;
+    const type = value?.attr?.('data-type-name') ?? binding.attr('data-type-name');
     if (!type) continue;
     const entry = typeIndex.get(type.replace(/^\?/, ''));
     if (entry?.kind === 'wasm-array' || entry?.foreign || entry?.arrayElem) continue;
@@ -132,7 +132,7 @@ function validateDefers(root, program) {
 function validateBreakTargets(root, program) {
   for (const node of program ? nodesOf(program, 'ir-break', 'ir-continue') : root.querySelectorAll('ir-break, ir-continue')) {
     // Compiler-generated breaks name the block or loop they leave.
-    if (node.dataset.loopTarget) continue;
+    if (node.attr('data-loop-target')) continue;
     let parent = node.parentElement;
     let loop = null, loopMatch = null;
     while (parent) {
@@ -267,7 +267,7 @@ function validateNullableTypes(root, typeIndex, program) {
 function validateNullLiterals(root, program) {
   for (const literal of program ? nodesOf(program, 'ir-lit') : root.querySelectorAll('ir-lit')) {
     if (literal.getAttribute('kind') !== 'null') continue;
-    const expected = literal.dataset.expect ?? literal.dataset.expectedType;
+    const expected = literal.attr('data-expect') ?? literal.attr('data-expected-type');
     if (expected?.startsWith('?')) continue;
     stampDiagnostic(literal, DIAGNOSTIC_KINDS.INVALID_NULLABLE_TYPE,
       'Bare null requires a nullable type context');
@@ -283,15 +283,15 @@ const FLOAT_TYPES = new Set(['F32', 'F64']);
 function validateIntegerLiterals(root, program) {
   const ranges = INTEGER_RANGES;
   for (const literal of program ? nodesOf(program, 'ir-lit') : root.querySelectorAll('ir-lit')) {
-    if (literal.getAttribute('kind') !== 'int' || literal.dataset.originFile?.startsWith('std:')) continue;
-    const type = literal.dataset.typeName ?? literal.getAttribute('type-name');
+    if (literal.getAttribute('kind') !== 'int' || literal.attr('data-origin-file')?.startsWith('std:')) continue;
+    const type = literal.attr('data-type-name') ?? literal.getAttribute('type-name');
     const range = ranges[type];
     if (!range) continue;
     let value;
     try { value = BigInt(literal.getAttribute('value')); } catch { continue; }
     const call = literal.closest('ir-call');
     const sourceNegation = (type === 'I32' || type === 'I64')
-      && call?.dataset.operatorName === 'neg' && call.querySelector(':scope > ir-arg-list')?.firstElementChild === literal;
+      && call?.attr?.('data-operator-name') === 'neg' && call.querySelector(':scope > ir-arg-list')?.firstElementChild === literal;
     const comparable = sourceNegation && value >= 0n ? -value : value;
     if (comparable >= range[0] && comparable <= range[1]) continue;
     stampDiagnostic(literal, DIAGNOSTIC_KINDS.INTEGER_LITERAL_OUT_OF_RANGE,
@@ -303,9 +303,9 @@ function validateIntegerLiterals(root, program) {
 function validateArrayDefaultConstruction(root, typeIndex, program) {
   for (const call of program ? nodesOf(program, 'ir-call') : root.querySelectorAll('ir-call')) {
     const callee = call.firstElementChild;
-    const method = callee?.getAttribute('method') ?? call.dataset.resolvedName?.split('.').at(-1);
+    const method = callee?.getAttribute('method') ?? call.attr('data-resolved-name')?.split('.').at(-1);
     if (method !== 'new_default') continue;
-    const arrayType = callee?.getAttribute('type') ?? callee?.getAttribute('type-name') ?? call.dataset.typeName;
+    const arrayType = callee?.getAttribute('type') ?? callee?.getAttribute('type-name') ?? call.attr('data-type-name');
     const elementType = typeIndex.get(arrayType)?.arrayElem;
     if (!elementType || isDefaultableType(elementType, typeIndex)) continue;
     stampDiagnostic(call, DIAGNOSTIC_KINDS.NON_DEFAULTABLE_TYPE,
@@ -366,7 +366,7 @@ function validateExhaustiveAltsAndMatches(root, ctx) {
         `Duplicate ${isMatch ? 'match pattern' : 'alt variant'} '${spelling}'`, { pattern: spelling });
     }
     if (hasDefaultArm(node)) continue;
-    const type = node.firstElementChild?.dataset['typeName'];
+    const type = node.firstElementChild?.attr?.('data-type-name');
     const cases = type === 'Bool' && isMatch ? ['true', 'false'] : enumVariants(type, ctx.typeIndex);
     if (!cases) {
       if (isMatch) stampDiagnostic(node, DIAGNOSTIC_KINDS.NON_EXHAUSTIVE_MATCH,
@@ -407,7 +407,7 @@ function validateTuples(root) {
     else if (!result) report(type, 'A tuple type is only a function result: `fn f() .{I32, F64}`; take it apart with `let .{a, b} = f();`');
   }
   for (const array of root.querySelectorAll('ir-array-lit')) {
-    if ([...array.children].some(child => child.dataset.typeName?.startsWith('.{'))) {
+    if ([...array.children].some(child => child.attr('data-type-name')?.startsWith('.{'))) {
       report(array, 'Tuples cannot be stored in arrays; take them apart with `let .{a, b} = …` first');
     }
   }
@@ -426,8 +426,8 @@ function validateFunctionReferenceStorage(root, program) {
   }
   const arrays = program ? nodesOf(program, 'ir-array-lit') : root.querySelectorAll('ir-array-lit');
   for (const array of arrays) {
-    const element = [...array.children].map(child => child.dataset.typeName).find(type => type?.startsWith('fun('));
-    if (element && /^Array__fun_/.test(array.dataset.typeName ?? '')) report(array, element, 'an array');
+    const element = [...array.children].map(child => child.attr('data-type-name')).find(type => type?.startsWith('fun('));
+    if (element && /^Array__fun_/.test(array.attr('data-type-name') ?? '')) report(array, element, 'an array');
   }
 }
 
@@ -440,7 +440,7 @@ function validateFunctionReferenceStorage(root, program) {
 function validateMatchPatterns(root, ctx) {
   const nodes = ctx.program ? nodesOf(ctx.program, 'ir-match', 'ir-loop-match') : root.querySelectorAll('ir-match, ir-loop-match');
   for (const node of nodes) {
-    const type = node.firstElementChild?.dataset.typeName;
+    const type = node.firstElementChild?.attr?.('data-type-name');
     if (!type) continue;
     const integer = INTEGER_RANGES[type];
     if (!integer && !FLOAT_TYPES.has(type) && type !== 'Bool') {

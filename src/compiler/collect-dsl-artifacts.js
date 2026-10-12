@@ -1,3 +1,5 @@
+import { setDataIfAbsent } from './ir-helpers.js';
+
 export function createDslArtifactState() {
   return { globalKeys: new Set(), wasmImports: new Map(), outputFiles: new Map() };
 }
@@ -7,10 +9,10 @@ export function collectDslArtifacts(root, state, result, normalize) {
     if (!item?.key || !item?.node || state.globalKeys.has(item.key)) continue;
     state.globalKeys.add(item.key);
     const node = normalize(item.node);
-    node.dataset.synthetic = 'true';
-    node.dataset.rewritePass ??= 'expand-dsls';
-    node.dataset.rewriteKind ??= 'dsl-global';
-    node.dataset.dslArtifactKey = item.key;
+    node.setAttribute('data-synthetic', 'true');
+    setDataIfAbsent(node, 'data-rewrite-pass', 'expand-dsls');
+    setDataIfAbsent(node, 'data-rewrite-kind', 'dsl-global');
+    node.setAttribute('data-dsl-artifact-key', item.key);
     root.insertBefore(node, root.firstChild);
   }
   for (const item of result.wasmImports ?? []) {
@@ -24,8 +26,8 @@ export function collectDslArtifacts(root, state, result, normalize) {
 }
 
 export function stampDslArtifacts(root, state) {
-  root.dataset.dslWasmImports = JSON.stringify([...state.wasmImports].map(([key, spec]) => ({ key, spec })));
-  root.dataset.dslOutputFiles = JSON.stringify([...state.outputFiles].map(([key, file]) => ({ key, ...file })));
+  root.setAttribute('data-dsl-wasm-imports', JSON.stringify([...state.wasmImports].map(([key, spec]) => ({ key, spec }))));
+  root.setAttribute('data-dsl-output-files', JSON.stringify([...state.outputFiles].map(([key, file]) => ({ key, ...file }))));
   const imports = {};
   for (const file of state.outputFiles.values()) {
     const contents = file.contents;
@@ -33,5 +35,5 @@ export function stampDslArtifacts(root, state) {
     imports[contents.module] ??= {};
     imports[contents.module][contents.field] = contents.body;
   }
-  root.dataset.dslImportsJs = JSON.stringify(imports);
+  root.setAttribute('data-dsl-imports-js', JSON.stringify(imports));
 }

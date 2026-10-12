@@ -60,7 +60,7 @@ export function emitBlock(node, ctx, emitExpr) {
 
   // A compiler-generated block may be the target of breaks (generators). It
   // joins the loop stack as a break-only target that plain break/continue skip.
-  const breakLabel = node.dataset.breakLabel;
+  const breakLabel = node.attr('data-break-label');
   // Unique per emission: unrolled loops emit the same block more than once.
   const target = breakLabel ? `__block_${breakLabel}_${nextLabel(ctx)}` : null;
   if (breakLabel) (ctx.loops ??= []).push({ brk: target, label: breakLabel, block: true });

@@ -23,7 +23,7 @@ function lowerAlt(alt, typeIndex) {
   const scrutinee = alt.firstElementChild;
   const arms = [...alt.querySelectorAll(':scope > ir-alt-arm')];
   const defaultArm = alt.querySelector(':scope > ir-default-arm');
-  const scrutType = scrutinee?.dataset['typeName'] ?? '';
+  const scrutType = scrutinee?.attr?.('data-type-name') ?? '';
   if (!scrutinee || !scrutType || arms.length === 0) return null;
 
   const enumDecl = typeEntryDecl(typeIndex.get(scrutType));
@@ -44,7 +44,7 @@ function lowerAlt(alt, typeIndex) {
   let last = arms.length - 1;
   if (!defaultArm) {
     const variants = enumDecl?.localName === 'ir-enum' ? enumDecl.querySelectorAll(':scope > ir-variant').length : -1;
-    const resultType = alt.dataset['typeName'];
+    const resultType = alt.attr('data-type-name');
     if (variants === new Set(arms.map(arm => arm.getAttribute('variant'))).size) {
       tail = lowerArmBody(alt, block.subjectLet, block.subjectName, arms[last--]);
     } else if (resultType && resultType !== 'void' && resultType !== 'never') {
@@ -65,7 +65,7 @@ function lowerPromote(node) {
   const scrutinee = node.firstElementChild;
   const thenArm = node.querySelector(':scope > ir-promote-arm');
   const defaultArm = node.querySelector(':scope > ir-default-arm');
-  const scrutType = scrutinee?.dataset['typeName'] ?? '';
+  const scrutType = scrutinee?.attr?.('data-type-name') ?? '';
   if (!scrutinee || !thenArm) return null;
   if (!scrutType.startsWith('?')) {
     // Already diagnosed ("promote requires a nullable value"); keep the IR
@@ -87,7 +87,7 @@ function lowerPromote(node) {
   ifNode.appendChild(elseBody ?? wrapBody(node, createSyntheticNode(node.ownerDocument, 'ir-fatal', node, 'lower-backend-control', 'promote-null-fatal')));
   ifNode.appendChild(thenBody);
   block.node.appendChild(ifNode);
-  if (node.dataset['typeName']) block.node.dataset['typeName'] = node.dataset['typeName'];
+  if (node.attr('data-type-name')) block.node.setAttribute('data-type-name', node.attr('data-type-name'));
   return block.node;
 }
 
@@ -126,9 +126,9 @@ function lowerSubjectBlock(site, scrutinee) {
   const subjectName = `__ctl_subj_${site.id || 'anon'}`;
   const subjectLet = createSyntheticNode(doc, 'ir-let', site, 'lower-backend-control', 'control-subject');
   const subjectType = createSyntheticNode(doc, 'ir-type-ref', site, 'lower-backend-control', 'control-subject-type');
-  const scrutType = scrutinee.dataset['typeName'] ?? '';
+  const scrutType = scrutinee.attr('data-type-name') ?? '';
   subjectLet.setAttribute('name', subjectName);
-  subjectLet.dataset['typeName'] = scrutType;
+  subjectLet.setAttribute('data-type-name', scrutType);
   subjectType.setAttribute('name', scrutType);
   subjectLet.appendChild(subjectType);
   subjectLet.appendChild(cloneNode(scrutinee));
@@ -141,9 +141,9 @@ function makeBindingLet(site, subjectLet, subjectName, name, id, type, initExpr)
   const letNode = createSyntheticNode(doc, 'ir-let', site, 'lower-backend-control', 'binding-let');
   const typeNode = createSyntheticNode(doc, 'ir-type-ref', site, 'lower-backend-control', 'binding-type');
   letNode.id = id;
-  letNode.dataset.originId = site.dataset.originId ?? id;
+  letNode.setAttribute('data-origin-id', site.attr('data-origin-id') ?? id);
   letNode.setAttribute('name', name);
-  letNode.dataset['typeName'] = type;
+  letNode.setAttribute('data-type-name', type);
   typeNode.setAttribute('name', type);
   letNode.appendChild(typeNode);
   letNode.appendChild(initExpr);
@@ -154,7 +154,7 @@ function makeRefTest(site, subjectLet, subjectName, variant) {
   const doc = site.ownerDocument;
   const test = createSyntheticNode(doc, 'ir-ref-test', site, 'lower-backend-control', 'ref-test');
   test.setAttribute('type-name', variant ?? '');
-  test.dataset['typeName'] = 'Bool';
+  test.setAttribute('data-type-name', 'Bool');
   test.appendChild(makeBoundIdent(subjectLet, subjectName));
   return test;
 }
@@ -162,9 +162,9 @@ function makeRefTest(site, subjectLet, subjectName, variant) {
 function makeRefIsNull(site, subjectLet, subjectName, scrutType) {
   const doc = site.ownerDocument;
   const test = createSyntheticNode(doc, 'ir-ref-is-null', site, 'lower-backend-control', 'ref-is-null');
-  test.dataset['typeName'] = 'Bool';
+  test.setAttribute('data-type-name', 'Bool');
   const ident = makeBoundIdent(subjectLet, subjectName);
-  ident.dataset['typeName'] = scrutType;
+  ident.setAttribute('data-type-name', scrutType);
   test.appendChild(ident);
   return test;
 }
@@ -173,7 +173,7 @@ function makeRefCast(site, subjectLet, subjectName, type) {
   const doc = site.ownerDocument;
   const cast = createSyntheticNode(doc, 'ir-ref-cast', site, 'lower-backend-control', 'ref-cast');
   cast.setAttribute('type-name', type);
-  cast.dataset['typeName'] = type;
+  cast.setAttribute('data-type-name', type);
   cast.appendChild(makeBoundIdent(subjectLet, subjectName));
   return cast;
 }
@@ -181,7 +181,7 @@ function makeRefCast(site, subjectLet, subjectName, type) {
 function makeFieldAccess(site, recv, field, type) {
   const fieldNode = createSyntheticNode(site.ownerDocument, 'ir-field-access', site, 'lower-backend-control', 'field-access');
   fieldNode.setAttribute('field', field);
-  fieldNode.dataset['typeName'] = type;
+  fieldNode.setAttribute('data-type-name', type);
   fieldNode.appendChild(recv);
   return fieldNode;
 }
@@ -198,13 +198,13 @@ function makeEqTest(site, lhs, rhsValue, tagType, eqFn) {
   lit.setAttribute('kind', 'int');
   lit.setAttribute('value', String(rhsValue));
   lit.setAttribute('type-name', tagType);
-  lit.dataset['typeName'] = tagType;
-  call.dataset['typeName'] = 'Bool';
+  lit.setAttribute('data-type-name', tagType);
+  call.setAttribute('data-type-name', 'Bool');
   if (eqFn) {
-    call.dataset.fnId = eqFn.id;
-    call.dataset.fnOriginId = eqFn.dataset.originId ?? eqFn.id;
-    call.dataset.resolvedAs = 'static-method';
-    call.dataset.resolvedName = eqFn.getAttribute('name');
+    call.setAttribute('data-fn-id', eqFn.id);
+    call.setAttribute('data-fn-origin-id', eqFn.attr('data-origin-id') ?? eqFn.id);
+    call.setAttribute('data-resolved-as', 'static-method');
+    call.setAttribute('data-resolved-name', eqFn.getAttribute('name'));
   }
   callee.appendChild(typeRef);
   args.appendChild(lhs);
@@ -215,7 +215,7 @@ function makeEqTest(site, lhs, rhsValue, tagType, eqFn) {
 }
 
 function enumTagType(node) {
-  return node.getAttribute('tag-type') ?? node.dataset.tagType ?? 'I32';
+  return node.getAttribute('tag-type') ?? node.attr('data-tag-type') ?? 'I32';
 }
 
 function makeIf(site, cond, thenBody, elseBody) {
@@ -223,35 +223,35 @@ function makeIf(site, cond, thenBody, elseBody) {
   ifNode.appendChild(cond);
   ifNode.appendChild(thenBody);
   if (elseBody) ifNode.appendChild(elseBody);
-  const t = thenBody.dataset['typeName'] ?? elseBody?.dataset['typeName'];
-  if (t) ifNode.dataset['typeName'] = t;
+  const t = thenBody.attr('data-type-name') ?? elseBody?.attr?.('data-type-name');
+  if (t) ifNode.setAttribute('data-type-name', t);
   return ifNode;
 }
 
 function makeBoundIdent(subjectLet, subjectName) {
   const ident = createSyntheticNode(subjectLet.ownerDocument, 'ir-ident', subjectLet, 'lower-backend-control', 'bound-ident');
   ident.setAttribute('name', subjectName);
-  ident.dataset.bindingId = subjectLet.id;
-  ident.dataset.bindingOriginId = subjectLet.dataset.originId ?? subjectLet.id;
-  ident.dataset.bindingKind = subjectLet.localName;
-  ident.dataset.bindingName = subjectName;
-  ident.dataset['typeName'] = subjectLet.dataset['typeName'] ?? subjectLet.firstElementChild?.getAttribute('name') ?? '';
+  ident.setAttribute('data-binding-id', subjectLet.id);
+  ident.setAttribute('data-binding-origin-id', subjectLet.attr('data-origin-id') ?? subjectLet.id);
+  ident.setAttribute('data-binding-kind', subjectLet.localName);
+  ident.setAttribute('data-binding-name', subjectName);
+  ident.setAttribute('data-type-name', subjectLet.attr('data-type-name') ?? subjectLet.firstElementChild?.getAttribute('name') ?? '');
   return ident;
 }
 
 function wrapBody(site, body) {
   if (body.localName === 'ir-block') return body;
   const block = createSyntheticNode(site.ownerDocument, 'ir-block', body, 'lower-backend-control', 'body-block');
-  if (body.dataset['typeName']) block.dataset['typeName'] = body.dataset['typeName'];
+  if (body.attr('data-type-name')) block.setAttribute('data-type-name', body.attr('data-type-name'));
   block.appendChild(body);
   return block;
 }
 
 function stampBlockType(block, site, arms, defaultArm) {
-  const resultType = site.dataset['typeName']
-    ?? arms[0]?.lastElementChild?.dataset['typeName']
-    ?? defaultArm?.lastElementChild?.dataset['typeName'];
-  if (resultType) block.dataset['typeName'] = resultType;
+  const resultType = site.attr('data-type-name')
+    ?? arms[0]?.lastElementChild?.attr?.('data-type-name')
+    ?? defaultArm?.lastElementChild?.attr?.('data-type-name');
+  if (resultType) block.setAttribute('data-type-name', resultType);
 }
 
 function tagValue(typeIndex, enumDecl, arm) {

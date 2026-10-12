@@ -33,11 +33,11 @@ export function moduleMemberName(moduleName, member) {
  * without parsing the mangled name.
  */
 export function recordInstantiation(node, moduleName, typeArgNames, displayArgNames = typeArgNames) {
-  node.dataset.moduleBase = moduleName;
-  node.dataset.moduleArgs = JSON.stringify(typeArgNames);
+  node.setAttribute('data-module-base', moduleName);
+  node.setAttribute('data-module-args', JSON.stringify(typeArgNames));
   // Preserve the source-level generic spelling. Tooling must never have to
   // reverse the deliberately ambiguous `__` backend name.
-  node.dataset.displayName = `${moduleName}[${displayArgNames.join(', ')}]`;
+  node.setAttribute('data-display-name', `${moduleName}[${displayArgNames.join(', ')}]`);
 }
 
 /**

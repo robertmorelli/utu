@@ -105,7 +105,7 @@ export function fnReturnType(fn) {
  */
 export function fnSignatureType(fn) {
   const params = paramsOf(fn)
-    .map(param => declaredTypeStr(param) ?? param.dataset?.['typeName'] ?? 'unknown');
+    .map(param => declaredTypeStr(param) ?? param?.attr?.('data-type-name') ?? 'unknown');
   return `fun(${params.join(', ')}) ${fnReturnType(fn)}`;
 }
 
@@ -199,8 +199,8 @@ export function isFunctionDecl(node) {
  */
 export function directCalleeDecl(call, doc) {
   const callee = call?.firstElementChild;
-  if (callee?.localName !== 'ir-ident' || !callee.dataset.bindingId) return null;
-  const decl = elementById(doc, callee.dataset.bindingId);
+  if (callee?.localName !== 'ir-ident' || !callee.attr('data-binding-id')) return null;
+  const decl = elementById(doc, callee.attr('data-binding-id'));
   return isFunctionDecl(decl) ? decl : null;
 }
 
@@ -303,7 +303,7 @@ export function cloneGraphSubtree(node) {
   const clone = node.cloneNode(true);
   const originals = [node, ...node.querySelectorAll('*')];
   const copies = [clone, ...clone.querySelectorAll('*')];
-  restampSubtree(clone, node.dataset.originFile);
+  restampSubtree(clone, node.attr('data-origin-file'));
   const graphs = retainedGraphs(node.ownerDocument);
   originals.forEach((original, index) => {
     const copy = copies[index];
@@ -324,8 +324,8 @@ export function createSyntheticNode(doc, tag, from, pass, kind = '') {
 export function stampOriginFile(root, originFile) {
   if (!root || !originFile) return root;
   for (const node of [root, ...root.querySelectorAll('*')]) {
-    node.dataset.originFile ??= originFile;
-    node.dataset.sourceFile ??= originFile;
+    setDataIfAbsent(node, 'data-origin-file', originFile);
+    setDataIfAbsent(node, 'data-source-file', originFile);
   }
   return root;
 }

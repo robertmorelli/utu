@@ -3,7 +3,7 @@
 // Rewrites the retained target surface in the entry file into ordinary
 // top-level declarations with annotations for later codegen.
 
-import { createSyntheticNode, replaceNodeMeta } from './ir-helpers.js';
+import { createSyntheticNode, replaceNodeMeta, setDataIfAbsent } from './ir-helpers.js';
 import { restampSubtree } from './parse.js';
 
 export function bringTargetToTopLevel(doc, { target = 'analysis', filePath = '', debugAssertions = false } = {}) {
@@ -32,7 +32,7 @@ export function bringTargetToTopLevel(doc, { target = 'analysis', filePath = '',
 function rewriteExportMain(node, doc) {
   const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', 'export-main');
   fn.setAttribute('name', 'main');
-  fn.dataset.export = 'main';
+  fn.setAttribute('data-export', 'main');
 
   const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', 'export-main-name');
   fnName.setAttribute('kind', 'free');
@@ -55,7 +55,7 @@ function rewriteExportLib(node) {
     if (child.localName !== 'ir-fn') {
       throw new Error(`bring target: export lib only supports functions, found ${child.localName}`);
     }
-    child.dataset.export = 'wasm';
+    child.setAttribute('data-export', 'wasm');
     node.parentNode.insertBefore(child, node);
   }
   node.remove();
@@ -63,23 +63,23 @@ function rewriteExportLib(node) {
 
 function isRecoveredSyntax(node) {
   return node.localName === 'ir-unknown'
-    || node.dataset.error === 'parse-error'
-    || node.dataset.errorKind === 'parse-error'
+    || node.attr('data-error') === 'parse-error'
+    || node.attr('data-error-kind') === 'parse-error'
     || node.querySelector('[data-error="parse-error"], [data-error-kind="parse-error"]') != null;
 }
 
 function rewriteBlockDecl(node, doc, name, role) {
   const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', role);
   fn.setAttribute('name', name);
-  fn.dataset.role = role;
+  fn.setAttribute('data-role', role);
   // The whole point of the test/bench targets is that the host can run these,
   // so they have to reach the wasm exports.  The description stays on the node
   // for a runner to report against.
-  fn.dataset.export = role;
+  fn.setAttribute('data-export', role);
   if (node.querySelector(':scope > ir-lit[kind="string"]')) {
-    fn.dataset.description = node.querySelector(':scope > ir-lit[kind="string"]').getAttribute('value') ?? '';
+    fn.setAttribute('data-description', node.querySelector(':scope > ir-lit[kind="string"]').getAttribute('value') ?? '');
   }
-  if (node.getAttribute('label')) fn.dataset.label = node.getAttribute('label');
+  if (node.getAttribute('label')) fn.setAttribute('data-label', node.getAttribute('label'));
 
   const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', `${role}-name`);
   fnName.setAttribute('kind', 'free');
@@ -99,8 +99,8 @@ function rewriteBlockDecl(node, doc, name, role) {
 
 function rewriteBenchDecl(node, doc, name) {
   const fn = replaceNodeMeta(doc.createElement('ir-fn'), node, 'bring-target', 'bench');
-  fn.dataset.role = 'bench';
-  if (node.getAttribute('label')) fn.dataset.label = node.getAttribute('label');
+  fn.setAttribute('data-role', 'bench');
+  if (node.getAttribute('label')) fn.setAttribute('data-label', node.getAttribute('label'));
 
   const fnName = createSyntheticNode(doc, 'ir-fn-name', node, 'bring-target', 'bench-name');
   fnName.setAttribute('kind', 'free');
@@ -119,12 +119,12 @@ function rewriteBenchDecl(node, doc, name) {
       continue;
     }
     const measureBlock = child.firstElementChild?.cloneNode(true) ?? createSyntheticNode(doc, 'ir-block', child, 'bring-target', 'bench-measure');
-    if (child.firstElementChild) restampSubtree(measureBlock, child.dataset.originFile);
-    measureBlock.dataset.role = 'measure';
-    measureBlock.dataset.synthetic ??= 'true';
-    measureBlock.dataset.rewritePass ??= 'bring-target';
-    measureBlock.dataset.rewriteKind ??= 'bench-measure';
-    measureBlock.dataset.rewriteOf ??= child.dataset.originId ?? child.id ?? '';
+    if (child.firstElementChild) restampSubtree(measureBlock, child.attr('data-origin-file'));
+    measureBlock.setAttribute('data-role', 'measure');
+    setDataIfAbsent(measureBlock, 'data-synthetic', 'true');
+    setDataIfAbsent(measureBlock, 'data-rewrite-pass', 'bring-target');
+    setDataIfAbsent(measureBlock, 'data-rewrite-kind', 'bench-measure');
+    setDataIfAbsent(measureBlock, 'data-rewrite-of', child.attr('data-origin-id') ?? child.id ?? '');
     block.appendChild(measureBlock);
   }
 

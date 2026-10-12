@@ -39,7 +39,7 @@ export const DIAGNOSTIC_KINDS = {
 };
 
 export function stampDiagnostic(node, kind, message, extra = {}) {
-  if (!node?.dataset) return node;
+  if (node?.nodeType !== 1) return node;
   const normalized = normalizeDiagnosticExtra(extra, { kind, message });
   diagnosticFacts(node.ownerDocument).set(node.id, { node, kind, message, data: normalized });
   return node;
@@ -62,7 +62,7 @@ export function suspect(node, label = '') {
 }
 
 export function stampSuspectedInvolvement(node, label = '', extra = {}) {
-  if (!node?.dataset) return node;
+  if (node?.nodeType !== 1) return node;
   const graph = retainedGraphs(node.ownerDocument).diagnostics ?? diagnosticGraph(node.ownerDocument);
   const current = graph.suspects.get(node.id) ?? [];
   current.push({ label, ...extra });
@@ -104,16 +104,16 @@ export function nodeRef(node) {
   if (!node) return null;
   return {
     id: node.id || null,
-    originId: node.dataset?.originId ?? node.id ?? null,
-    file: node.dataset?.sourceFile ?? node.dataset?.originFile ?? node.dataset?.file ?? null,
-    row: toNum(node.dataset?.row),
-    col: toNum(node.dataset?.col),
-    endRow: toNum(node.dataset?.endRow),
-    endCol: toNum(node.dataset?.endCol),
-    start: toNum(node.dataset?.start),
-    end: toNum(node.dataset?.end),
-    rewritePass: node.dataset?.rewritePass ?? null,
-    rewriteKind: node.dataset?.rewriteKind ?? null,
+    originId: node?.attr?.('data-origin-id') ?? node.id ?? null,
+    file: node?.attr?.('data-source-file') ?? node?.attr?.('data-origin-file') ?? node?.attr?.('data-file') ?? null,
+    row: toNum(node?.attr?.('data-row')),
+    col: toNum(node?.attr?.('data-col')),
+    endRow: toNum(node?.attr?.('data-end-row')),
+    endCol: toNum(node?.attr?.('data-end-col')),
+    start: toNum(node?.attr?.('data-start')),
+    end: toNum(node?.attr?.('data-end')),
+    rewritePass: node?.attr?.('data-rewrite-pass') ?? null,
+    rewriteKind: node?.attr?.('data-rewrite-kind') ?? null,
     name: node.getAttribute?.('name') ?? null,
     localName: node.localName ?? null,
   };

@@ -62,10 +62,10 @@ function rewrite(loop, prefix, parser, createDocument) {
   sources.forEach((source, index) => {
     if (!isArraySource(source)) return;
     const array = `${prefix}src${index}`;
-    lowered.querySelector(`ir-let[name="${array}"]`).dataset.forArraySource = 'true';
+    lowered.querySelector(`ir-let[name="${array}"]`).setAttribute('data-for-array-source', 'true');
     for (const use of lowered.querySelectorAll(`ir-ident[name="${array}"]`)) {
       const access = use.parentElement?.closest('ir-call, ir-index');
-      if (access) access.dataset.forArrayAccess = 'true';
+      if (access) access.setAttribute('data-for-array-access', 'true');
     }
   });
   return lowered;

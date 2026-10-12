@@ -71,14 +71,14 @@ export function linkTypeDecls(doc, graph = null) {
     // type refs from a type string (the @es import signature reader, closure
     // lifting) can produce one here.  Carry the identity and move on.
     if (isCallableType(name)) {
-      ref.dataset['typeName'] = name;
-      ref.dataset['typeRepr'] = callableParts(name).kind === 'fun' ? 'wasm-i32' : 'wasm-externref';
+      ref.setAttribute('data-type-name', name);
+      ref.setAttribute('data-type-repr', callableParts(name).kind === 'fun' ? 'wasm-i32' : 'wasm-externref');
       continue;
     }
     // Tuples are structural too: `.{I32, F64}` is a multi-value result.
     if (tupleParts(name)) {
-      ref.dataset['typeName'] = name;
-      ref.dataset['typeRepr'] = 'wasm-tuple';
+      ref.setAttribute('data-type-name', name);
+      ref.setAttribute('data-type-repr', 'wasm-tuple');
       continue;
     }
     const entry = index.get(name);
@@ -87,11 +87,11 @@ export function linkTypeDecls(doc, graph = null) {
       // Resolution ids are for explainability: they point a type reference at
       // the declaration node that satisfied it. Type identity remains
       // `data-type-name`.
-      ref.dataset.resolvesToId = decl.id;
-      ref.dataset.resolvesToOriginId = decl.dataset.originId ?? decl.id;
-      ref.dataset.resolvesToKind = decl.localName;
-      ref.dataset['typeName'] = entry.typeName;
-      ref.dataset['typeRepr'] = entry.typeRepr;
+      ref.setAttribute('data-resolves-to-id', decl.id);
+      ref.setAttribute('data-resolves-to-origin-id', decl.attr('data-origin-id') ?? decl.id);
+      ref.setAttribute('data-resolves-to-kind', decl.localName);
+      ref.setAttribute('data-type-name', entry.typeName);
+      ref.setAttribute('data-type-repr', entry.typeRepr);
       graph?.edge('type-resolves', ref, decl, { name });
     } else {
       graph?.fail(ref, DIAGNOSTIC_KINDS.UNKNOWN_TYPE, `Unknown type '${name}'`, { name });
@@ -129,14 +129,14 @@ export function collectScalarKinds(entries) {
 
 function makeTypeEntry(typeName, decl) {
   const entry = computeTypeEntry(typeName, decl);
-  decl.dataset['typeName'] = entry.typeName;
-  decl.dataset['typeRepr'] = entry.typeRepr;
+  decl.setAttribute('data-type-name', entry.typeName);
+  decl.setAttribute('data-type-repr', entry.typeRepr);
   // Carry what the instantiation recorded (module-names.js) onto the registry
   // entry, so consumers ask the registry what `Promise__I32` was built from
   // rather than splitting the name apart.
-  if (decl.dataset.moduleBase) {
-    entry.moduleBase = decl.dataset.moduleBase;
-    entry.moduleArgs = decl.dataset.moduleArgs;
+  if (decl.attr('data-module-base')) {
+    entry.moduleBase = decl.attr('data-module-base');
+    entry.moduleArgs = decl.attr('data-module-args');
   }
   return entry;
 }
@@ -152,8 +152,8 @@ function makeVariantEntry(typeName, decl, superName, tagType, tagValue) {
     tagValue,
     fields: [{ name: '__tag', type: tagType }, ...collectDeclaredFields(decl)],
   };
-  decl.dataset['typeName'] = entry.typeName;
-  decl.dataset['typeRepr'] = entry.typeRepr;
+  decl.setAttribute('data-type-name', entry.typeName);
+  decl.setAttribute('data-type-repr', entry.typeRepr);
   return entry;
 }
 
@@ -226,7 +226,7 @@ function collectDeclaredFields(decl) {
 }
 
 function readTagType(decl) {
-  return decl.getAttribute('tag-type') ?? decl.dataset.tagType ?? 'I32';
+  return decl.getAttribute('tag-type') ?? decl.attr('data-tag-type') ?? 'I32';
 }
 
 export const WASM_SCALAR_FAMILIES = new Set(['i32', 'i64', 'f32', 'f64', 'v128']);

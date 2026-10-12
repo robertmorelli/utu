@@ -37,7 +37,7 @@ export function emitCall(node, ctx, emitExpr) {
   const callee = node.firstElementChild;
   const argList = node.querySelector(':scope > ir-arg-list');
   const argNodes = argList ? [...argList.children] : [...node.children].slice(1);
-  const resolvedAs = ctx.backendPlan?.types?.slots.get(node)?.resolution?.resolvedAs ?? node.dataset.resolvedAs;
+  const resolvedAs = ctx.backendPlan?.types?.slots.get(node)?.resolution?.resolvedAs ?? node.attr('data-resolved-as');
   const callArgNodes = callee?.localName === 'ir-field-access' && resolvedAs !== 'static-method'
     ? [callee.firstElementChild, ...argNodes]
     : argNodes;

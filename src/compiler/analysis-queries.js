@@ -18,7 +18,7 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
       // Generated helper types can inherit the entire entry-file range. At
       // equal spans, prefer source nodes before depth so they cannot steal
       // hover/call-hierarchy queries from the user's declaration.
-      || (Number(a.node.dataset.synthetic === 'true') - Number(b.node.dataset.synthetic === 'true'))
+      || (Number(a.node.attr('data-synthetic') === 'true') - Number(b.node.attr('data-synthetic') === 'true'))
       || (domDepth(b.node) - domDepth(a.node)));
     if (candidates[0]) return candidates[0].node;
     return null;
@@ -80,7 +80,7 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
       captures: captures ? [...captures].map(([name, declaration]) => ({ name, declaration: ref(declaration) })) : [],
       loopCapture,
       provenance: provenanceTrace(node),
-      representation: node.dataset?.typeRepr ?? null,
+      representation: node?.attr?.('data-type-repr') ?? null,
       backend: backend ? compact({
         type: displayType(backend.nodeTypes.get(node.id) ?? null),
         expected: displayType(backend.expectations.get(node.id) ?? null),
@@ -226,7 +226,7 @@ export function createAnalysisQueries(doc, graphs, rangeIndex, snippetAt = () =>
     const add = (node, label, kind, tooltip) => {
       // Compiler-generated code (iterator, loop, and template expansions)
       // carries its site's range; a hint there would label invisible code.
-      if (node?.dataset?.synthetic === 'true') return;
+      if (node?.attr?.('data-synthetic') === 'true') return;
       const location = ref(node);
       if (location?.file !== file || location.end == null) return;
       hints.push({ position: location.end, label, kind, tooltip, node: location });
@@ -278,7 +278,7 @@ function createTypeDisplay(typeIndex) {
     if (resolving.has(name)) return name;
     resolving.add(name);
     const entry = typeIndex?.get(name);
-    let value = entry?.decl?.dataset?.displayName ?? name;
+    let value = entry?.decl?.attr?.('data-display-name') ?? name;
     if (value === name && entry?.moduleBase && entry?.moduleArgs) {
       try {
         const args = JSON.parse(entry.moduleArgs);
@@ -306,7 +306,7 @@ function createTypeDisplay(typeIndex) {
 
 function displayName(node, displayType = value => value) {
   if (!node) return '';
-  const named = node.dataset?.displayName
+  const named = node?.attr?.('data-display-name')
     ?? (node.localName === 'ir-capture' ? node.getAttribute?.('names') : null)
     ?? node.getAttribute?.('name')
     ?? node.getAttribute?.('field')

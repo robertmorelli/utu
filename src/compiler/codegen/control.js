@@ -105,7 +105,7 @@ function discardValue(m, expr) {
 //       body
 //       (br $cnt)))
 export function emitWhile(node, ctx, emitExpr) {
-  if (!node.dataset.loopLabel) {
+  if (!node.attr('data-loop-label')) {
     const counted = countedWhile(node, ctx);
     if (counted) return emitUnrolledWhile(counted, ctx, emitExpr);
   }
@@ -119,7 +119,7 @@ export function emitWhile(node, ctx, emitExpr) {
   // while loop, the next iteration starts by re-testing the condition.
   ctx.loops ??= [];
   // A compiler-generated loop may carry a label for targeted breaks (generators).
-  ctx.loops.push({ brk, cnt, next: cnt, label: node.dataset.loopLabel ?? null });
+  ctx.loops.push({ brk, cnt, next: cnt, label: node.attr('data-loop-label') ?? null });
   try {
     const exitIfFalse = m.br(brk, m.i32.eqz(emitExpr(cond, ctx)));
     const bodyExpr    = discardValue(m, emitExpr(body, ctx));
@@ -255,7 +255,7 @@ const INTEGER_WIDTH = { I32: 'i32', U32: 'i32', I64: 'i64', U64: 'i64' };
 function countedWhile(node, ctx) {
   if (ctx.optimize !== 'speed') return null;
   const [cond, body] = [...node.children];
-  if (cond?.localName !== 'ir-call' || cond.dataset.operatorName !== 'lt' || body?.localName !== 'ir-block') return null;
+  if (cond?.localName !== 'ir-call' || cond.attr('data-operator-name') !== 'lt' || body?.localName !== 'ir-block') return null;
   const [counter, limit] = [...(cond.querySelector(':scope > ir-arg-list')?.children ?? [])];
   if (counter?.localName !== 'ir-ident' || limit?.localName !== 'ir-ident') return null;
   const type = ctx.typeOf(counter);
@@ -265,7 +265,7 @@ function countedWhile(node, ctx) {
   const [target, value] = [...(step?.children ?? [])];
   const [base, one] = [...(value?.querySelector(':scope > ir-arg-list')?.children ?? [])];
   const increments = step?.localName === 'ir-assign' && target?.localName === 'ir-ident' && target.getAttribute('name') === counter.getAttribute('name')
-    && value?.localName === 'ir-call' && value.dataset.operatorName === 'add'
+    && value?.localName === 'ir-call' && value.attr('data-operator-name') === 'add'
     && base?.localName === 'ir-ident' && base.getAttribute('name') === counter.getAttribute('name')
     && one?.localName === 'ir-lit' && one.getAttribute('value') === '1';
   if (!increments || !unrollableBody(body)) return null;
@@ -498,7 +498,7 @@ function constantState(node) {
     try { return BigInt(node.getAttribute('value')); } catch { return null; }
   }
   // `-1` arrives as a negation call around a literal.
-  if (node?.localName === 'ir-call' && node.dataset.operatorName === 'neg') {
+  if (node?.localName === 'ir-call' && node.attr('data-operator-name') === 'neg') {
     const inner = constantState(node.querySelector(':scope > ir-arg-list')?.firstElementChild);
     return inner == null ? null : -inner;
   }
@@ -510,7 +510,7 @@ export function emitBreak(node, ctx, emitExpr) {
   const child = node.children[0];
   // A targeted break (from generator expansion) leaves a named loop, running
   // the deferred code of every block it exits on the way.
-  const target = node.dataset.loopTarget;
+  const target = node.attr('data-loop-target');
   const depth = target
     ? ctx.loops?.findLastIndex(loop => loop.label === target)
     : ctx.loops?.findLastIndex(loop => !loop.block) ?? -1;

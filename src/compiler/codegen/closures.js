@@ -83,7 +83,7 @@ export function registerCallableTypes(root, structTypes, toType, signatureRefTyp
   };
 
   if (plan) for (const type of plan.nodeTypes.values()) ensure(type);
-  else for (const node of root.querySelectorAll('[data-type-name]')) ensure(node.dataset['typeName']);
+  else for (const node of root.querySelectorAll('[data-type-name]')) ensure(node.attr('data-type-name'));
   for (const ref of root.querySelectorAll('ir-type-ref[name]')) ensure(ref.getAttribute('name'));
 }
 
@@ -125,7 +125,7 @@ export function installClosureImports(m, root, ctx) {
 
 function readPromiseSpec(root) {
   try {
-    return JSON.parse(root.dataset.promiseRuntime || 'null') ?? {};
+    return JSON.parse(root.attr('data-promise-runtime') || 'null') ?? {};
   } catch {
     return {};
   }
@@ -155,7 +155,7 @@ export function emitAwait(node, ctx, emitExpr) {
 function readRuntimeSpec(root) {
   let spec;
   try {
-    spec = JSON.parse(root.dataset.closureRuntime || 'null');
+    spec = JSON.parse(root.attr('data-closure-runtime') || 'null');
   } catch {
     spec = null;
   }
@@ -163,7 +163,7 @@ function readRuntimeSpec(root) {
   const wanted = new Set(spec.calls ?? []);
   const calls = new Map();
   for (const call of root.querySelectorAll('ir-call')) {
-    const parts = callableParts(call.firstElementChild?.dataset?.typeName);
+    const parts = callableParts(call.firstElementChild?.attr?.('data-type-name'));
     if (parts?.kind !== 'cl') continue;
     const field = closureCallImport(parts);
     if (wanted.has(field)) calls.set(field, { field, params: parts.params, result: parts.ret });
@@ -180,7 +180,7 @@ export function emitMakeClosure(node, ctx, emitExpr) {
   if (!env) throw new Error('codegen: ir-make-closure is missing its environment');
   return ctx.module.call(
     CLOSURE_NEW,
-    [funcRef(fnName, ctx), emitExpr(env, ctx), ctx.module.i32.const(callableParts(node.dataset.typeName)?.ret === 'Bool' ? 1 : 0)],
+    [funcRef(fnName, ctx), emitExpr(env, ctx), ctx.module.i32.const(callableParts(node.attr('data-type-name'))?.ret === 'Bool' ? 1 : 0)],
     binaryen.externref,
   );
 }
@@ -191,7 +191,7 @@ export function emitClosureDecay(node, ctx, emitExpr) {
   if (!inner) throw new Error('codegen: ir-closure-decay has no operand');
   return ctx.module.call(
     CLOSURE_NEW,
-    [emitExpr(inner, ctx), ctx.module.ref.null(binaryen.anyref), ctx.module.i32.const(callableParts(node.dataset.typeName)?.ret === 'Bool' ? 1 : 0)],
+    [emitExpr(inner, ctx), ctx.module.ref.null(binaryen.anyref), ctx.module.i32.const(callableParts(node.attr('data-type-name'))?.ret === 'Bool' ? 1 : 0)],
     binaryen.externref,
   );
 }

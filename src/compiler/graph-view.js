@@ -33,15 +33,15 @@ export function extractGraphs(doc) {
       id: node.id,
       tag: node.localName,
       name: node.getAttribute?.('name') ?? node.getAttribute?.('field') ?? null,
-      type: node.dataset?.['typeName'] ?? null,
-      expect: node.dataset?.expect ?? null,
-      pass: node.dataset?.rewritePass ?? null,
-      file: node.dataset?.sourceFile ?? node.dataset?.originFile ?? node.dataset?.file ?? null,
-      row: toInt(node.dataset?.row),
-      col: toInt(node.dataset?.col),
-      endRow: toInt(node.dataset?.endRow),
-      endCol: toInt(node.dataset?.endCol),
-      error: node.dataset?.errorKind ?? null,
+      type: node?.attr?.('data-type-name') ?? null,
+      expect: node?.attr?.('data-expect') ?? null,
+      pass: node?.attr?.('data-rewrite-pass') ?? null,
+      file: node?.attr?.('data-source-file') ?? node?.attr?.('data-origin-file') ?? node?.attr?.('data-file') ?? null,
+      row: toInt(node?.attr?.('data-row')),
+      col: toInt(node?.attr?.('data-col')),
+      endRow: toInt(node?.attr?.('data-end-row')),
+      endCol: toInt(node?.attr?.('data-end-col')),
+      error: node?.attr?.('data-error-kind') ?? null,
     };
     nodes.set(node.id, entry);
     return entry;
@@ -64,7 +64,7 @@ export function extractGraphs(doc) {
   }
   const provenance = graphs.program?.provenance
     ?? [...root.querySelectorAll('[data-rewrite-of]')].map(node => ({
-      node, source: doc.getElementById(node.dataset.rewriteOf), pass: node.dataset.rewritePass,
+      node, source: doc.getElementById(node.attr('data-rewrite-of')), pass: node.attr('data-rewrite-pass'),
     }));
   for (const fact of provenance) {
     if (fact.source && fact.source !== fact.node) {

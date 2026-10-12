@@ -72,7 +72,7 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
     // their origin. This is the one place we know the canonical path.
     const fileRoot = doc.body.firstChild;
     if (fileRoot) {
-      fileRoot.dataset.file = filePath;
+      fileRoot.setAttribute('data-file', filePath);
       stampOriginFile(fileRoot, filePath);
     }
     clipFileIRTree(doc, {
@@ -138,7 +138,7 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
     const source = typeof generated === "string" ? generated : generated.source;
     if (generated.abi) foreign.set(filePath, generated.abi);
     const doc = parseToIR(parser, source, filePath, createDocument, { collectAnalysisTokens });
-    doc.body.firstChild.dataset.file = filePath;
+    doc.body.firstChild.setAttribute('data-file', filePath);
     stampOriginFile(doc.body.firstChild, filePath);
     if (doc.querySelector('ir-using')) throw new Error(`Lazy platform source ${filePath} must be self-contained`);
     graph.set(filePath, doc);

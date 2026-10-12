@@ -717,15 +717,15 @@ export function expandJson(doc, parser, createDocument) {
 function siteDiagnostic(site, error) {
   if (error.diagnostic) return error;
   if (error.offset == null) return compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, error.message, site);
-  const start = Number(site.dataset.bodyInnerStart) + error.offset;
+  const start = Number(site.attr('data-body-inner-start')) + error.offset;
   const lines = (site.ownerDocument.__utuSourceText ?? '').slice(0, start).split('\n');
   const point = site.cloneNode(false);
-  point.dataset.start = start;
-  point.dataset.end = start + error.length;
-  point.dataset.row = lines.length;
-  point.dataset.col = lines.at(-1).length + 1;
-  point.dataset.endRow = point.dataset.row;
-  point.dataset.endCol = Number(point.dataset.col) + error.length;
+  point.setAttribute('data-start', start);
+  point.setAttribute('data-end', start + error.length);
+  point.setAttribute('data-row', lines.length);
+  point.setAttribute('data-col', lines.at(-1).length + 1);
+  point.setAttribute('data-end-row', point.attr('data-row'));
+  point.setAttribute('data-end-col', Number(point.attr('data-col')) + error.length);
   return compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, error.message, point);
 }
 
@@ -787,7 +787,7 @@ function expandSite(site, program, prefix, parser, createDocument) {
   if (shape.kind === 'scalar' || shape.kind === 'optional') {
     throw new JsonError(`@json ${op} works on a struct, enum, or Array; wrap ${type} in a struct field`, typeStart, type.length);
   }
-  const innerStart = Number(site.dataset.bodyInnerStart);
+  const innerStart = Number(site.attr('data-body-inner-start'));
   const splices = new Map();
   const input = `${prefix}input`;
   try {
@@ -1149,7 +1149,7 @@ function optional(pattern) {
 }
 
 function expandMatch(site, parsed, program, prefix, parser, createDocument) {
-  const innerStart = Number(site.dataset.bodyInnerStart);
+  const innerStart = Number(site.attr('data-body-inner-start'));
   const splices = new Map();
   let serial = 0;
   const fresh = name => `${prefix}${name}${serial++}`;

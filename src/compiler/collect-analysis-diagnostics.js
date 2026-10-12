@@ -7,7 +7,7 @@ export function collectAnalysisDiagnostics(doc) {
 
   const diagnostics = [];
   const sources = doc.__utuSourceTexts ?? new Map([
-    [root.dataset.sourceFile ?? root.dataset.file ?? '', doc.__utuSourceText ?? ''],
+    [root.attr('data-source-file') ?? root.attr('data-file') ?? '', doc.__utuSourceText ?? ''],
   ]);
   for (const [file, source] of sources) {
     if (!/^(std|node|npm):/.test(file)) diagnostics.push(...compressedSourceWarnings(source, file));
@@ -16,11 +16,11 @@ export function collectAnalysisDiagnostics(doc) {
 
   // Syntax errors: the entry file's own, then any from imported files.
   const parseErrorGroups = [];
-  if (root.dataset.parseErrors) {
-    const file = root.dataset.sourceFile ?? root.dataset.originFile ?? root.dataset.file ?? null;
-    parseErrorGroups.push({ file, errors: JSON.parse(root.dataset.parseErrors) });
+  if (root.attr('data-parse-errors')) {
+    const file = root.attr('data-source-file') ?? root.attr('data-origin-file') ?? root.attr('data-file') ?? null;
+    parseErrorGroups.push({ file, errors: JSON.parse(root.attr('data-parse-errors')) });
   }
-  if (root.dataset.importedParseErrors) parseErrorGroups.push(...JSON.parse(root.dataset.importedParseErrors));
+  if (root.attr('data-imported-parse-errors')) parseErrorGroups.push(...JSON.parse(root.attr('data-imported-parse-errors')));
   for (const { file, errors } of parseErrorGroups) {
     for (const item of errors) {
       diagnostics.push({
@@ -35,7 +35,7 @@ export function collectAnalysisDiagnostics(doc) {
           endCol: null,
           start: item.start ?? null,
           end: item.end ?? null,
-          originId: root.dataset.originId ?? root.id ?? null,
+          originId: root.attr('data-origin-id') ?? root.id ?? null,
           rewritePass: null,
           rewriteKind: null,
           name: null,
@@ -52,16 +52,16 @@ export function collectAnalysisDiagnostics(doc) {
   for (const node of root.querySelectorAll('[data-error-kind]')) {
     if (!facts.has(node.id)) facts.set(node.id, {
       node,
-      kind: node.dataset.errorKind,
-      message: node.dataset.errorMessage ?? node.dataset.errorKind,
-      data: parseJson(node.dataset.errorData) ?? {},
+      kind: node.attr('data-error-kind'),
+      message: node.attr('data-error-message') ?? node.attr('data-error-kind'),
+      data: parseJson(node.attr('data-error-data')) ?? {},
     });
   }
   const reportedParseErrors = new Set(diagnostics.filter(d => d.kind === 'parse-error').map(d => d.primary.start));
   for (const { node, kind, message, data } of facts.values()) {
     // A file root's "N parse error(s)" summary, or a recovered node at an
     // offset already listed above, duplicates the syntax errors.
-    if (kind === 'parse-error' && (node.dataset?.parseErrors || reportedParseErrors.has(Number(node.dataset?.start)))) continue;
+    if (kind === 'parse-error' && (node?.attr?.('data-parse-errors') || reportedParseErrors.has(Number(node?.attr?.('data-start'))))) continue;
     diagnostics.push({
       kind,
       severity: 'error',

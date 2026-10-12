@@ -81,16 +81,16 @@ function decayInto(node, expectedType) {
   const doc = node.ownerDocument;
   const decay = createSyntheticNode(doc, T.CLOSURE_DECAY, node, 'lower-closures', 'closure-decay');
   replaceTypedNode(node, decay);
-  decay.dataset['typeName'] = expectedType;
+  decay.setAttribute('data-type-name', expectedType);
   decay.appendChild(node);
 
   // A block's type is its tail's type, and the tail just changed
   // representation — from a function reference to an externref. Without this
   // the enclosing block keeps the pre-decay type and the backend rejects it.
   for (let child = decay, parent = decay.parentElement;
-       parent?.lastElementChild === child && parent.dataset['typeName'];
+       parent?.lastElementChild === child && parent.attr('data-type-name');
        child = parent, parent = parent.parentElement) {
-    parent.dataset['typeName'] = expectedType;
+    parent.setAttribute('data-type-name', expectedType);
   }
   return true;
 }
@@ -133,7 +133,7 @@ function buildEnvStruct(doc, site, envType, captures) {
   for (const capture of captures) {
     const field = createSyntheticNode(doc, T.FIELD, site, 'lower-closures', 'closure-env-field');
     field.setAttribute('name', capture.name);
-    field.dataset.captureMode = capture.mode;
+    field.setAttribute('data-capture-mode', capture.mode);
     field.appendChild(buildTypeNode(doc, site, capture.type));
     struct.appendChild(field);
   }
@@ -143,7 +143,7 @@ function buildEnvStruct(doc, site, envType, captures) {
 function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
   const fn = createSyntheticNode(doc, T.FN, closure, 'lower-closures', 'closure-lifted-fn');
   fn.setAttribute('name', fnName);
-  fn.dataset.closureLifted = 'true';
+  fn.setAttribute('data-closure-lifted', 'true');
 
   const name = createSyntheticNode(doc, T.FN_NAME, closure, 'lower-closures', 'closure-lifted-name');
   name.setAttribute('kind', 'free');
@@ -167,8 +167,8 @@ function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
     // Parameters whose type came from the closure's expectation carry it on
     // data-type-name only.  Materialise a type node so the lifted function is
     // shaped like any other and codegen needs no special case.
-    if (!firstTypeChild(param) && param.dataset['typeName']) {
-      param.appendChild(buildTypeNode(doc, param, param.dataset['typeName']));
+    if (!firstTypeChild(param) && param.attr('data-type-name')) {
+      param.appendChild(buildTypeNode(doc, param, param.attr('data-type-name')));
     }
     params.appendChild(param);
   }
@@ -188,18 +188,18 @@ function buildMakeClosure(doc, closure, fnName, envType, captures) {
   const make = createSyntheticNode(doc, T.MAKE_CLOSURE, closure, 'lower-closures', 'make-closure');
   make.setAttribute('fn', fnName);
   make.setAttribute('env-type', envType);
-  if (closure.dataset['typeName']) make.dataset['typeName'] = closure.dataset['typeName'];
+  if (closure.attr('data-type-name')) make.setAttribute('data-type-name', closure.attr('data-type-name'));
 
   const init = createSyntheticNode(doc, T.STRUCT_INIT, closure, 'lower-closures', 'closure-env-init');
   init.setAttribute('type-name', envType);
-  init.dataset['typeName'] = envType;
+  init.setAttribute('data-type-name', envType);
   for (const capture of captures) {
     const fieldInit = createSyntheticNode(doc, T.FIELD_INIT, closure, 'lower-closures', 'closure-env-init-field');
     fieldInit.setAttribute('field', capture.name);
     const ident = createSyntheticNode(doc, T.IDENT, closure, 'lower-closures', 'closure-env-init-value');
     ident.setAttribute('name', capture.name);
-    ident.dataset.bindingId = capture.bindingId;
-    if (capture.type !== 'unknown') ident.dataset['typeName'] = capture.type;
+    ident.setAttribute('data-binding-id', capture.bindingId);
+    if (capture.type !== 'unknown') ident.setAttribute('data-type-name', capture.type);
     fieldInit.appendChild(ident);
     init.appendChild(fieldInit);
   }
@@ -219,21 +219,21 @@ function rewriteCaptureReads(body, captures, envParam, doc, scopeGraph) {
   const byBinding = new Map(captures.map(capture => [capture.bindingId, capture]));
 
   for (const ident of [...body.querySelectorAll('ir-ident')]) {
-    const bindingId = scopeGraph?.resolutions.get(ident.id)?.id ?? ident.dataset.bindingId;
+    const bindingId = scopeGraph?.resolutions.get(ident.id)?.id ?? ident.attr('data-binding-id');
     const capture = byBinding.get(bindingId);
     if (!capture) continue;
 
     const access = createSyntheticNode(doc, T.FIELD_ACCESS, ident, 'lower-closures', 'closure-capture-read');
     access.setAttribute('field', capture.name);
-    access.dataset.fieldOwnerName = envParam.querySelector(':scope > ir-type-ref')?.getAttribute('name') ?? '';
-    if (capture.type !== 'unknown') access.dataset['typeName'] = capture.type;
+    access.setAttribute('data-field-owner-name', envParam.querySelector(':scope > ir-type-ref')?.getAttribute('name') ?? '');
+    if (capture.type !== 'unknown') access.setAttribute('data-type-name', capture.type);
 
     const receiver = createSyntheticNode(doc, T.IDENT, ident, 'lower-closures', 'closure-env-receiver');
     receiver.setAttribute('name', envParam.getAttribute('name'));
-    receiver.dataset.bindingId = envParam.id;
-    receiver.dataset.bindingKind = 'ir-param';
-    receiver.dataset.bindingName = envParam.getAttribute('name');
-    receiver.dataset['typeName'] = access.dataset.fieldOwnerName;
+    receiver.setAttribute('data-binding-id', envParam.id);
+    receiver.setAttribute('data-binding-kind', 'ir-param');
+    receiver.setAttribute('data-binding-name', envParam.getAttribute('name'));
+    receiver.setAttribute('data-type-name', access.attr('data-field-owner-name'));
 
     access.appendChild(receiver);
     replaceTypedNode(ident, access);
@@ -262,9 +262,9 @@ function closurePostorder(root) {
 function closureReturnType(closure) {
   const declared = typeNodeToStr(firstTypeChild(closure));
   if (declared) return declared;
-  const parts = callableParts(closure.dataset['typeName']);
+  const parts = callableParts(closure.attr('data-type-name'));
   if (parts) return parts.ret;
-  return bodyOf(closure)?.dataset['typeName'] ?? 'void';
+  return bodyOf(closure)?.attr?.('data-type-name') ?? 'void';
 }
 
 /**

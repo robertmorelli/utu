@@ -371,7 +371,7 @@ function lowerPipeline(outer, prefix, parser, createDocument) {
   if (identityElement) {
     for (const accumulator of elementTyped) {
       const binding = expanded.querySelector(`ir-let[name="${accumulator}"]`);
-      if (binding) binding.dataset.iteratorElement = identityElement;
+      if (binding) binding.setAttribute('data-iterator-element', identityElement);
     }
   }
   return expanded;

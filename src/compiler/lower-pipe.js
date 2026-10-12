@@ -32,7 +32,7 @@ function lowerOnePipe(pipe) {
   if (segs.length === 0) throw new Error('lower pipe: empty pipe target');
 
   // Clone helper — re-stamp ids to avoid collisions.
-  const clone = (n) => { const c = n.cloneNode(true); restampSubtree(c, n.dataset.originFile); return c; };
+  const clone = (n) => { const c = n.cloneNode(true); restampSubtree(c, n.attr('data-origin-file')); return c; };
 
   // Build callee from path segments.
   // Single segment: ir-ident or ir-type-ref depending on kind.

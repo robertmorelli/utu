@@ -77,7 +77,7 @@ export function lowerGenerators(doc, parser, createDocument) {
     } catch (error) {
       throw error.diagnostic ? error : compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, error.message, loop);
     }
-    expanded.dataset.generatorExpansion = name;
+    expanded.setAttribute('data-generator-expansion', name);
     loop.replaceWith(expanded);
   }
 
@@ -97,7 +97,7 @@ export function lowerGenerators(doc, parser, createDocument) {
 function expansionsAround(node) {
   const names = [];
   for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-    if (parent.dataset?.generatorExpansion) names.push(parent.dataset.generatorExpansion);
+    if (parent?.attr?.('data-generator-expansion')) names.push(parent.attr('data-generator-expansion'));
   }
   return names;
 }
@@ -158,7 +158,7 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
   // `return;` in the generator ends the generation.
   for (const jump of ownJumps(body).filter(node => node.localName === 'ir-return')) {
     if (jump.children.length) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'a generator ends with `return;`, without a value', jump);
-    retag(jump, 'ir-break').dataset.loopTarget = whole;
+    retag(jump, 'ir-break').setAttribute('data-loop-target', whole);
   }
 
   const splices = new Map();
@@ -169,8 +169,8 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
     const resume = `${prefix}yield${yieldIndex++}`;
     const step = consumer.cloneNode(true);
     for (const jump of ownJumps(step)) {
-      if (jump.localName === 'ir-break') jump.dataset.loopTarget = whole;
-      else if (jump.localName === 'ir-continue') retag(jump, 'ir-break').dataset.loopTarget = resume;
+      if (jump.localName === 'ir-break') jump.setAttribute('data-loop-target', whole);
+      else if (jump.localName === 'ir-continue') retag(jump, 'ir-break').setAttribute('data-loop-target', resume);
     }
     const annotation = elementType ? `: ${elementType}` : '';
     const produced = yielded.firstElementChild;
@@ -246,7 +246,7 @@ function expandRecursiveLoop(loop, generators, recursive, prefix, parser, create
   const renamed = renameLocals(body, params, `${prefix}u_`);
   for (const jump of ownJumps(body).filter(node => node.localName === 'ir-return')) {
     if (jump.children.length) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'a generator ends with `return;`, without a value', jump);
-    retag(jump, 'ir-break').dataset.loopTarget = frameLabel;
+    retag(jump, 'ir-break').setAttribute('data-loop-target', frameLabel);
   }
 
   const splices = new Map();
@@ -293,8 +293,8 @@ function expandRecursiveLoop(loop, generators, recursive, prefix, parser, create
   // generator loop around it.
   const step = consumer.cloneNode(true);
   for (const jump of ownJumps(step)) {
-    if (jump.localName === 'ir-break') jump.dataset.loopTarget = whole;
-    else if (jump.localName === 'ir-continue') retag(jump, 'ir-break').dataset.loopTarget = resume;
+    if (jump.localName === 'ir-break') jump.setAttribute('data-loop-target', whole);
+    else if (jump.localName === 'ir-continue') retag(jump, 'ir-break').setAttribute('data-loop-target', resume);
   }
   for (const prune of [...step.querySelectorAll('ir-prune')]) {
     if (prune.closest('ir-closure') && step.contains(prune.closest('ir-closure'))) {
@@ -386,6 +386,6 @@ function renameLocals(body, params, prefix) {
 function labeledBlock(node, label) {
   const block = node.localName === 'ir-block' && node.children.length === 1 && node.firstElementChild.localName === 'ir-block'
     ? node.firstElementChild : node;
-  block.dataset.breakLabel = label;
+  block.setAttribute('data-break-label', label);
   return node;
 }

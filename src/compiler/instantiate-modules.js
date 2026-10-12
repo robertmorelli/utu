@@ -227,7 +227,7 @@ function rewriteInlineType(node, name) {
   const displayName = typeNodeToDisplayText(node);
   const ref = replaceNodeMeta(node.ownerDocument.createElement('ir-type-ref'), node, 'instantiate-modules', 'inline-type-inst');
   ref.setAttribute('name', name);
-  ref.dataset.displayName = displayName;
+  ref.setAttribute('data-display-name', displayName);
   node.replaceWith(ref);
 }
 
@@ -249,11 +249,12 @@ function rewriteInlineCall(node, type) {
 
 function materializeModule(source, cause, root, graph, { from, as, args, kind, record = false }) {
   const clone = cloneGraphSubtree(source);
-  Object.assign(clone.dataset, {
-    synthetic: 'true', rewritePass: 'instantiate-modules', rewriteKind: kind,
-    rewriteOf: sourceId(source), instantiatedFrom: from,
-  });
-  if (as) clone.dataset.instantiatedAs = as;
+  clone.setAttribute('data-synthetic', 'true');
+  clone.setAttribute('data-rewrite-pass', 'instantiate-modules');
+  clone.setAttribute('data-rewrite-kind', kind);
+  clone.setAttribute('data-rewrite-of', sourceId(source));
+  clone.setAttribute('data-instantiated-from', from);
+  if (as) clone.setAttribute('data-instantiated-as', as);
   if (args) {
     const params = [...clone.querySelectorAll('ir-module-param')].map(node => node.getAttribute('name'));
     substituteTypeParams(clone, params, args, graph);
@@ -344,7 +345,7 @@ function namedModuleName(node) {
 // Produce a short text name for a concrete type node (for DSL body substitution).
 function typeNodeToDisplayText(node) {
   switch (node.localName) {
-    case 'ir-type-ref': return node.dataset.displayName ?? node.getAttribute('name') ?? 'unknown';
+    case 'ir-type-ref': return node.attr('data-display-name') ?? node.getAttribute('name') ?? 'unknown';
     case 'ir-type-inst': {
       const mod = node.getAttribute('module') ?? '';
       const args = typeArgChildren(node).map(typeNodeToDisplayText);
@@ -355,7 +356,7 @@ function typeNodeToDisplayText(node) {
     case 'ir-type-fn':
     case 'ir-type-cl': return typeNodeToStr(node);
     case 'ir-type-tuple': return `.{${[...node.children].map(typeNodeToDisplayText).join(', ')}}`;
-    default: return node.dataset.displayName ?? node.getAttribute('name') ?? node.localName;
+    default: return node.attr('data-display-name') ?? node.getAttribute('name') ?? node.localName;
   }
 }
 

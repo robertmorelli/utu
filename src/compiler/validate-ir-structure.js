@@ -68,7 +68,7 @@ function assertCalls(root, { phase }) {
 }
 
 function hasDiagnostic(node) {
-  if (node.dataset.errorKind || node.querySelector('[data-error-kind]')) return true;
+  if (node.attr('data-error-kind') || node.querySelector('[data-error-kind]')) return true;
   // Debug structural validation can run before graph diagnostics have been
   // projected onto the DOM. Consult canonical failures as well, otherwise an
   // ordinary bad program is misreported as a compiler invariant crash.
@@ -91,8 +91,8 @@ function assertExternFns(root, { phase }) {
       || child.localName === 'ir-param-list' || child.localName === 'ir-fn-name';
     const checks = [
       [fn.getAttribute('name'), 'ir-extern-fn must have a name attribute'],
-      [fn.dataset.extern, 'ir-extern-fn must have data-extern'],
-      [fn.dataset.importModule && fn.dataset.importName, 'ir-extern-fn must have data-import-module and data-import-name'],
+      [fn.attr('data-extern'), 'ir-extern-fn must have data-extern'],
+      [fn.attr('data-import-module') && fn.attr('data-import-name'), 'ir-extern-fn must have data-import-module and data-import-name'],
       [fn.querySelector(':scope > ir-fn-name')?.getAttribute('name'), 'ir-extern-fn must have an ir-fn-name child'],
       [fn.querySelectorAll(':scope > ir-param-list').length === 1, 'ir-extern-fn must have exactly one ir-param-list child'],
       [!bodyOf(fn), 'ir-extern-fn must not have an ir-block body'],
@@ -107,7 +107,7 @@ function assertExternFns(root, { phase }) {
 function assertSourceLocations(root, { phase }) {
   for (const node of [root, ...root.querySelectorAll('*')]) {
     if (!node.localName?.startsWith('ir-')) continue;
-    if (!node.dataset.row || !node.dataset.col || !node.dataset.endRow || !node.dataset.endCol || !node.dataset.sourceFile) {
+    if (!node.attr('data-row') || !node.attr('data-col') || !node.attr('data-end-row') || !node.attr('data-end-col') || !node.attr('data-source-file')) {
       fail(phase, node, 'must have data-row, data-col, data-end-row, data-end-col, and data-source-file');
     }
   }
@@ -117,8 +117,8 @@ function assertBindings(root, { phase }) {
   const graphs = retainedGraphs(root.ownerDocument);
   const resolutions = graphs.scope?.resolutions;
   for (const ident of root.querySelectorAll('ir-ident')) {
-    if (graphs.diagnostics?.facts.has(ident.id) || ident.dataset.error) continue;
-    if (!resolutions?.has(ident.id) && !ident.dataset.bindingId) {
+    if (graphs.diagnostics?.facts.has(ident.id) || ident.attr('data-error')) continue;
+    if (!resolutions?.has(ident.id) && !ident.attr('data-binding-id')) {
       fail(phase, ident, 'ir-ident must have data-binding-id after binding resolution');
     }
   }
@@ -128,7 +128,7 @@ function assertTypes(root, { typeIndex, phase }) {
   const canonicalTypes = retainedGraphs(root.ownerDocument).types;
   for (const node of root.querySelectorAll('[data-type-name]')) {
     if (hasDiagnostic(node)) continue;
-    const type = node.dataset['typeName'];
+    const type = node.attr('data-type-name');
     // Canonical type slots are validated by checkTypeGraph. This assertion is
     // for orphan/stale projections, especially in standalone pass consumers.
     if (canonicalTypes?.slots.has(node)) continue;

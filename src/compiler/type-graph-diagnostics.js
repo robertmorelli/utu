@@ -17,7 +17,7 @@ export function reportTypeGraphDiagnostics(graph, operations) {
     actual, actualOrigin, collectFailures, compatible, edgeSource,
     knownType, planCoercions, valueForDiagnostic,
   } = operations;
-  const display = text => text.replace(/Foreign\d+T\d+/g, name => graph.typeIndex.get(name)?.decl?.dataset.displayName ?? name);
+  const display = text => text.replace(/Foreign\d+T\d+/g, name => graph.typeIndex.get(name)?.decl?.attr?.('data-display-name') ?? name);
   const ctx = { typeIndex: graph.typeIndex };
   planCoercions(graph);
   const reports = [];
@@ -90,7 +90,7 @@ function foldReports(graph, reports) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(i);
   });
-  const position = i => Number(reports[i].node?.dataset?.start ?? Infinity);
+  const position = i => Number(reports[i].node?.attr?.('data-start') ?? Infinity);
   return [...groups.values()].map(members => {
     const causes = members.filter(i => !downstream.has(i));
     const rootIndex = (causes.length ? causes : members).sort((a, b) => position(a) - position(b))[0];

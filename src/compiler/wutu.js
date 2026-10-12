@@ -99,7 +99,7 @@ export function expandWutu(doc, parser, createDocument, reactiveProject = false)
 
 function siteDiagnostic(site, error) {
   if (error.wutuOffset == null) return compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, error.message, site);
-  const offset = Number(site.dataset.bodyInnerStart) + error.wutuOffset;
+  const offset = Number(site.attr('data-body-inner-start')) + error.wutuOffset;
   const point = site.cloneNode(false);
   stampSourceRange(point, offset, offset + 1);
   return compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, error.message, point);
@@ -112,10 +112,14 @@ function stampSourceRange(node, start, end) {
     const lines = source.slice(0, offset).split('\n');
     return [lines.length, lines.at(-1).length + 1];
   };
-  node.dataset.start = start;
-  node.dataset.end = end;
-  [node.dataset.row, node.dataset.col] = position(start);
-  [node.dataset.endRow, node.dataset.endCol] = position(end);
+  node.setAttribute('data-start', start);
+  node.setAttribute('data-end', end);
+  const [row, col] = position(start);
+  const [endRow, endCol] = position(end);
+  node.setAttribute('data-row', row);
+  node.setAttribute('data-col', col);
+  node.setAttribute('data-end-row', endRow);
+  node.setAttribute('data-end-col', endCol);
 }
 
 class SiteExpander {
@@ -125,7 +129,7 @@ class SiteExpander {
     this.createDocument = createDocument;
     this.reconcile = reconcile;
     this.body = site.getAttribute('body');
-    this.innerStart = Number(site.dataset.bodyInnerStart);
+    this.innerStart = Number(site.attr('data-body-inner-start'));
     this.viewHash = hash(this.body);
     do { this.prefix = `__wutu_${counter.serial++}_`; } while (this.body.includes(this.prefix));
     this.nodeCount = 0;
@@ -215,7 +219,7 @@ class SiteExpander {
     for (const ident of [expr, ...expr.querySelectorAll('ir-ident')].filter(n => n.localName === 'ir-ident')) {
       const name = ident.getAttribute('name');
       if (hasLexicalShadow(ident, name)) continue;
-      ident.setAttribute('name', this.resolveAlias(name, owner, Number(ident.dataset.start) - this.innerStart));
+      ident.setAttribute('name', this.resolveAlias(name, owner, Number(ident.attr('data-start')) - this.innerStart));
     }
     this.splices.set(key, expr);
     return key;
@@ -231,7 +235,7 @@ class SiteExpander {
     const expr = expressionFromSource(this.parser, source, this.site, this.splices, { createDocument: this.createDocument });
     const [start, end] = [this.innerStart + range.start, this.innerStart + range.end];
     for (const node of [expr, ...expr.querySelectorAll('*')]) {
-      if (node.dataset.synthetic === 'true') stampSourceRange(node, start, end);
+      if (node.attr('data-synthetic') === 'true') stampSourceRange(node, start, end);
     }
     this.splices.set(key, expr);
     return key;

@@ -11,7 +11,7 @@ export function buildElaborationGraph(doc) {
   const failures = [];
   const add = (node, kind = node.localName) => {
     if (node?.id && !nodes.has(node.id)) nodes.set(node.id, {
-      id: node.id, node, kind, originId: sourceId(node), file: node.dataset.originFile ?? root?.dataset.file ?? '',
+      id: node.id, node, kind, originId: sourceId(node), file: node.attr('data-origin-file') ?? root?.attr?.('data-file') ?? '',
     });
     return node;
   };

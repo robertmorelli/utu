@@ -21,7 +21,7 @@ export function walkFnDecl(n, doc, source, dispatch) {
         const inner = namedChildren(child)[0];
         if (inner?.type === 'yield_type') {
           // A generator: its type child is the element type it yields.
-          node.dataset.generator = 'true';
+          node.setAttribute('data-generator', 'true');
           const element = namedChildren(inner)[0];
           if (element) node.appendChild(dispatch(element, doc, source));
         } else if (inner) {

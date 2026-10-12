@@ -25,7 +25,7 @@ const KINDS = {
 /** The mems that lowerMems recorded on the root, in declaration order. */
 export function readMems(root) {
   try {
-    return JSON.parse(root?.dataset.mems || '[]');
+    return JSON.parse(root?.attr?.('data-mems') || '[]');
   } catch {
     return [];
   }

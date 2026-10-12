@@ -84,7 +84,7 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
   if (!decls.length) return;
 
   // Integer enums are stored as their declared repr and read back as the enum.
-  const intEnums = { ...JSON.parse(root.dataset.intEnums || '{}'), ...JSON.parse(root.dataset.distinctTypes || '{}') };
+  const intEnums = { ...JSON.parse(root.attr('data-int-enums') || '{}'), ...JSON.parse(root.attr('data-distinct-types') || '{}') };
   const mems = new Map();
   for (const decl of decls) {
     const name = decl.getAttribute('name');
@@ -125,7 +125,7 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
     mem.count = bytes.length >> SHIFTS[mem.kind];
   }
   // Host methods decide how each memory is created, so find them first.
-  const jsName = root.dataset.jsAlias ?? null;
+  const jsName = root.attr('data-js-alias') ?? null;
   let hidden = shadowedUses(root, new Set(mems.keys()));
   for (const access of root.querySelectorAll('ir-call > ir-field-access:first-child')) {
     const mem = mems.get(access.firstElementChild?.getAttribute('name'));
@@ -165,8 +165,8 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
       ?.replaceWith(foreignTypeRef(doc, VIEWS[mem.kind], view));
     mem.decl.replaceWith(...decls);
   }
-  root.dataset.mems = JSON.stringify([...mems.values()].map(({ name, kind, export: exported, host, data, count }) =>
-    ({ name, kind, export: exported, host: Boolean(host), ...(data ? { data, count } : {}) })));
+  root.setAttribute('data-mems', JSON.stringify([...mems.values()].map(({ name, kind, export: exported, host, data, count }) =>
+    ({ name, kind, export: exported, host: Boolean(host), ...(data ? { data, count } : {}) }))));
 
   // The wrappers declared parameters of their own.
   hidden = shadowedUses(root, new Set(mems.keys()));
@@ -252,7 +252,7 @@ async function initialValues(mem, init, { doc, readBinaryFile, resolvePath }) {
   const body = dslBody(init);
   if (dsl === 'embed') {
     if (!readBinaryFile || !resolvePath) throw fail('@embed needs a host that can read files');
-    const file = resolvePath(init.dataset.originFile ?? doc.body.firstChild?.dataset.file ?? '', body);
+    const file = resolvePath(init.attr('data-origin-file') ?? doc.body.firstChild?.attr?.('data-file') ?? '', body);
     let bytes;
     try {
       bytes = await readBinaryFile(file);
@@ -271,7 +271,7 @@ function dslBody(dsl) {
 
 /** The entry file without its exports, tests, and @comptime initializers; the caller adds the exports that evaluate them. */
 function comptimeProgram(doc, parser) {
-  const file = doc.body.firstChild.dataset.file ?? '';
+  const file = doc.body.firstChild.attr('data-file') ?? '';
   const text = doc.__utuSourceTexts?.get(file) ?? '';
   // Read the declarations as written: by now exports have been lowered.
   const source = parseToIR(parser, text, file).body.firstChild;
@@ -280,9 +280,9 @@ function comptimeProgram(doc, parser) {
   // which stay declared (empty) because code may use them.
   const cut = [
     ...nodes.filter(node => ['ir-export-main', 'ir-export-lib', 'ir-test', 'ir-bench'].includes(node.localName))
-      .map(node => [Number(node.dataset.start), Number(node.dataset.end)]),
+      .map(node => [Number(node.attr('data-start')), Number(node.attr('data-end'))]),
     ...nodes.filter(node => node.localName === 'ir-mem' && node.firstElementChild?.getAttribute('name') === 'comptime')
-      .map(node => [text.lastIndexOf('=', Number(node.firstElementChild.dataset.start)), Number(node.firstElementChild.dataset.end)]),
+      .map(node => [text.lastIndexOf('=', Number(node.firstElementChild.attr('data-start'))), Number(node.firstElementChild.attr('data-end'))]),
   ].filter(([start, end]) => Number.isFinite(start) && start >= 0 && Number.isFinite(end)).sort((a, b) => b[0] - a[0]);
   // Cut text becomes its newlines, so line numbers still match the entry file.
   let program = text;

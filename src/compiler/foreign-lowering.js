@@ -54,9 +54,9 @@ const insertAt = (list, at, item) => [...list.slice(0, at), item, ...list.slice(
 export function lowerForeignOperations(graph, buildExternFn) {
   if (!graph.doc.__utuForeign) return false;
   const doc = graph.doc, root = doc.body.firstChild;
-  const imports = JSON.parse(root.dataset.dslImportsJs ?? '{}');
-  const wasmImports = JSON.parse(root.dataset.dslWasmImports ?? '[]');
-  const outputFiles = JSON.parse(root.dataset.dslOutputFiles ?? '[]');
+  const imports = JSON.parse(root.attr('data-dsl-imports-js') ?? '{}');
+  const wasmImports = JSON.parse(root.attr('data-dsl-wasm-imports') ?? '[]');
+  const outputFiles = JSON.parse(root.attr('data-dsl-output-files') ?? '[]');
   const interned = new Map();
   // Alt subjects may themselves be foreign operations replaced below.
   const subjects = new Map([...doc.querySelectorAll('ir-alt')].map(alt => [alt, graph.slots.get(alt.firstElementChild)?.actual]));
@@ -64,7 +64,7 @@ export function lowerForeignOperations(graph, buildExternFn) {
   const replacements = new Map();
   for (const [node, slot] of graph.slots) {
     if (slot.foreignError) {
-      node.dataset.foreignError = slot.foreignError;
+      node.setAttribute('data-foreign-error', slot.foreignError);
       stampDiagnostic(node, 'type-mismatch', slot.foreignError);
     }
     const boxed = doc.__utuForeign.values.get(slot.actual)?.ref?.boxed;
@@ -106,7 +106,7 @@ export function lowerForeignOperations(graph, buildExternFn) {
     return name;
   };
   // Descendants move into the replacement calls before their parents consume them.
-  const shared = root.dataset.optimize === 'size';
+  const shared = root.attr('data-optimize') === 'size';
   for (let [node, op] of plans.reverse()) {
     if (op.kind === 'constant') {
       replacements.set(node, foldConstant(doc, node, op));
@@ -123,7 +123,7 @@ export function lowerForeignOperations(graph, buildExternFn) {
     const name = intern(op, node);
     const call = replaceNodeMeta(doc.createElement('ir-call'), node, 'foreign-abi', op.kind);
     precise(call, op);
-    if (node.dataset.foreignError) call.dataset.foreignError = node.dataset.foreignError;
+    if (node.attr('data-foreign-error')) call.setAttribute('data-foreign-error', node.attr('data-foreign-error'));
     const callee = createSyntheticNode(doc, 'ir-ident', node, 'foreign-abi', 'foreign-callee');
     callee.setAttribute('name', name);
     const args = createSyntheticNode(doc, 'ir-arg-list', node, 'foreign-abi', 'foreign-arguments');
@@ -134,9 +134,9 @@ export function lowerForeignOperations(graph, buildExternFn) {
     replacements.set(node, call);
   }
   const narrowed = lowerForeignAlts(graph, intern, subjects);
-  root.dataset.dslImportsJs = json(imports);
-  root.dataset.dslWasmImports = json(wasmImports);
-  root.dataset.dslOutputFiles = json(outputFiles);
+  root.setAttribute('data-dsl-imports-js', json(imports));
+  root.setAttribute('data-dsl-wasm-imports', json(wasmImports));
+  root.setAttribute('data-dsl-output-files', json(outputFiles));
   return plans.length > 0 || narrowed;
 }
 
@@ -156,8 +156,8 @@ function foldConstant(doc, node, op) {
  * the declaration-level signature it was resolved with for checking.
  */
 function precise(call, op) {
-  call.dataset.foreignResult = op.result;
-  call.dataset.foreignParams = json(op.params);
+  call.setAttribute('data-foreign-result', op.result);
+  call.setAttribute('data-foreign-params', json(op.params));
   return call;
 }
 
@@ -173,7 +173,7 @@ function lowerForeignAlts(graph, intern, subjects) {
     const arms = rest.filter(child => child.localName === 'ir-alt-arm');
     const fallback = rest.find(child => child.localName === 'ir-default-arm');
     const subject = subjects.get(alt);
-    const invalid = arms.find(arm => !arm.dataset.foreignClass);
+    const invalid = arms.find(arm => !arm.attr('data-foreign-class'));
     if (invalid || !subject) {
       stampDiagnostic(invalid ?? alt, 'type-mismatch', 'Every arm of an alt over a host value must name a declared class');
       continue;
@@ -185,7 +185,7 @@ function lowerForeignAlts(graph, intern, subjects) {
     binding.append(buildTypeRef(doc, alt, subject), scrutinee);
     let tail = fallback?.lastElementChild ?? createSyntheticNode(doc, 'ir-block', alt, 'foreign-abi', 'alt-no-match');
     for (const arm of arms.reverse()) {
-      const index = Number(arm.dataset.foreignIndex), className = arm.dataset.foreignClass;
+      const index = Number(arm.attr('data-foreign-index')), className = arm.attr('data-foreign-class');
       const schema = abi.schemas[index];
       if (!Object.hasOwn(schema.exports, className)) {
         stampDiagnostic(block, 'type-mismatch', `${schema.prefix}.${className} is only a type; narrowing needs a declared runtime class`);

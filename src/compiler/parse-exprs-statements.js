@@ -17,8 +17,8 @@ export function walkBindExpr(n, doc, source, dispatch) {
   }
   if (children[0]) {
     node.setAttribute('name', text(children[0]));
-    node.dataset.nameStart = String(children[0].startIndex);
-    node.dataset.nameEnd = String(children[0].endIndex);
+    node.setAttribute('data-name-start', String(children[0].startIndex));
+    node.setAttribute('data-name-end', String(children[0].endIndex));
   }
   for (const child of children.slice(1)) {
     const ir = dispatch(child, doc, source);
@@ -163,10 +163,10 @@ export function walkDslExpr(n, doc, source, dispatch) {
   const bodyEndOffset = raw.lastIndexOf('\\/');
   if (bodyOffset >= 0 && bodyEndOffset >= bodyOffset + 2) {
     node.setAttribute('body', raw.slice(bodyOffset, bodyEndOffset + 2));
-    node.dataset.bodyStart = n.startIndex + bodyOffset;
-    node.dataset.bodyEnd = n.startIndex + bodyEndOffset + 2;
-    node.dataset.bodyInnerStart = n.startIndex + bodyOffset + 2;
-    node.dataset.bodyInnerEnd = n.startIndex + bodyEndOffset;
+    node.setAttribute('data-body-start', n.startIndex + bodyOffset);
+    node.setAttribute('data-body-end', n.startIndex + bodyEndOffset + 2);
+    node.setAttribute('data-body-inner-start', n.startIndex + bodyOffset + 2);
+    node.setAttribute('data-body-inner-end', n.startIndex + bodyEndOffset);
   }
   return node;
 }

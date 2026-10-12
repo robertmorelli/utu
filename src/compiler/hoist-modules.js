@@ -51,7 +51,7 @@ export function rewriteReferencesTo(module, subtree) {
 
 export function hoistModule(module, root, graph = null, references = indexModuleReferences(root)) {
   const moduleName = module.getAttribute('name');
-  const moduleDisplayName = module.dataset.displayName ?? moduleName;
+  const moduleDisplayName = module.attr('data-display-name') ?? moduleName;
   retainSourceDisplayNames(module, moduleDisplayName);
   const renamings = new Map([...module.querySelectorAll(':scope > [name]')]
     .map(node => {
@@ -64,7 +64,7 @@ export function hoistModule(module, root, graph = null, references = indexModule
   for (const self of [...module.querySelectorAll('ir-type-self')]) {
     const ref = replaceNodeMeta(module.ownerDocument.createElement('ir-type-ref'), self, 'hoist-modules', 'type-self');
     ref.setAttribute('name', moduleName);
-    ref.dataset.displayName = moduleDisplayName;
+    ref.setAttribute('data-display-name', moduleDisplayName);
     self.replaceWith(ref);
   }
   const valueNames = new Set([
@@ -92,9 +92,9 @@ export function hoistModule(module, root, graph = null, references = indexModule
 
 function retainSourceDisplayNames(module, moduleDisplayName) {
   for (const declaration of module.querySelectorAll(':scope > [name]')) {
-    if (declaration.dataset.displayName) continue;
+    if (declaration.attr('data-display-name')) continue;
     const sourceName = declaration.getAttribute('name');
-    if (sourceName === '&') declaration.dataset.displayName = moduleDisplayName;
+    if (sourceName === '&') declaration.setAttribute('data-display-name', moduleDisplayName);
   }
   for (const fn of module.querySelectorAll(':scope > ir-fn')) {
     const name = fn.querySelector(':scope > ir-fn-name');
@@ -104,8 +104,8 @@ function retainSourceDisplayNames(module, moduleDisplayName) {
     const displayName = receiver === '&' || name.getAttribute('receiver-kind') === 'self'
       ? `${moduleDisplayName}.${method}`
       : receiver ? `${receiver}.${method}` : method;
-    fn.dataset.displayName = displayName;
-    name.dataset.displayName = displayName;
+    fn.setAttribute('data-display-name', displayName);
+    name.setAttribute('data-display-name', displayName);
   }
 }
 
