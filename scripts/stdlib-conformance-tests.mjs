@@ -243,6 +243,8 @@ function floatCases(type, approx = null) {
     ['nearest', callUnary(type, 'nearest', '2.75'), 3],
     ['min', callBinary(type, 'min', '-2.0', '3.0'), -2],
     ['max', callBinary(type, 'max', '-2.0', '3.0'), 3],
+    // Through the bits and back: covers bits() and from_bits.
+    ['from_bits', { params: `a: ${type}`, expr: `${type}.from_bits(a.bits())`, args: [arg(type, '-2.5')] }, -2.5],
   ], approx, type);
 }
 

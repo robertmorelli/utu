@@ -31,6 +31,10 @@ mod F32 {
     fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-trunc-s-sat-f32><ir-ident name="self"/></ir-i64-trunc-s-sat-f32> \/; }
     fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-trunc-u-sat-f32><ir-ident name="self"/></ir-u64-trunc-u-sat-f32> \/; }
 
+    // The IEEE 754 bits, and back.
+    fn &.bits |self| () I32 { @ir/\ <ir-i32-reinterpret><ir-ident name="self"/></ir-i32-reinterpret> \/; }
+    fn from_bits(bits: I32) & { @ir/\ <ir-f32-reinterpret><ir-ident name="bits"/></ir-f32-reinterpret> \/; }
+
     // The shortest decimal that reads back as the same F32 (0.1, not
     // 0.10000000149011612). Ships only when used.
     fn &.to_str |self| () Str {

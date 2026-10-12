@@ -12,8 +12,8 @@ const UNARY_INTRINSICS = new Set([
 ]);
 
 const TERNARY_INTRINSICS = new Set(['bitselect']);
-// Numeric conversions: convert_s_i32, trunc_u_sat_f64, extend_s, wrap, promote, demote.
-const CONVERSION_OP = /^(convert|trunc_[su]|extend_[su]|wrap|promote|demote)/;
+// Numeric conversions: convert_s_i32, trunc_u_sat_f64, extend_s, wrap, promote, demote, reinterpret.
+const CONVERSION_OP = /^(convert|trunc_[su]|extend_[su]|wrap|promote|demote|reinterpret)/;
 const NULLARY_INTRINSICS = new Set(['const']);
 
 /**

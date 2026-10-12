@@ -21,7 +21,7 @@ const compiler = createCompiler({
   resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
   resolvePackage: nodePackageResolver({ root }),
 });
-const doc = await compiler.compileFile(path.join(here, 'lexer.utu'));
+const doc = await compiler.compileFile(path.join(here, 'jpl.utu'));
 const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.dataset.errorMessage ?? node.dataset.error);
 if (errors.length) throw new Error(errors.join('\n'));
 const wasm = emitBinary(doc);

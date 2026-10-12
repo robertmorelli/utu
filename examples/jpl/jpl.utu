@@ -1,0 +1,1010 @@
+// The JPL lexer from CS4470's Zig compiler, in utu.
+//
+// The DFA is built during compilation by `build`, a line-for-line port of the
+// Zig version's comptime StateMachine, and lives in a const mem. Lexing is one
+// table load per byte in a `loop match`, like Zig's labeled switch. Tokens go
+// into three mems; `-l` formats them into a fourth that the host writes out.
+using JS from std:JS;
+using Fs from "node:fs";
+using Process from "node:process";
+using Web from std:Web;
+
+// Token kinds, in the Zig compiler's order. The first four are DFA states.
+enum(U8) Kind:
+    | Start
+    | Accept
+    | Invalid
+    | Ignore
+    | ASSERT
+    | ARRAY
+    | BOOL
+    | ELSE
+    | FALSE
+    | FN
+    | FLOAT
+    | INT
+    | IMAGE
+    | IF
+    | LET
+    | PRINT
+    | RETURN
+    | READ
+    | STRUCT
+    | SHOW
+    | SUM
+    | TO
+    | TIME
+    | TRUE
+    | THEN
+    | VOID
+    | WRITE
+    | VARIABLE
+    | COLON
+    | RPAREN
+    | LPAREN
+    | RCURLY
+    | RSQUARE
+    | LSQUARE
+    | LCURLY
+    | NEWLINE
+    | INTVAL
+    | FLOATVAL
+    | OP
+    | COMMA
+    | EQUALS
+    | STRING
+    | DOT
+    | END_OF_FILE
+
+// States with fixed meanings.
+let error_state: I32 = 0;
+let start_state: I32 = 1;
+let accept_state: I32 = 2;
+let ignore_state: I32 = 3;
+
+// next state = dfa[state * 256 + byte]; kind_of[state] is the token it ends.
+const mem dfa: U8 = @comptime/\ build().tabs \/;
+const mem kind_of: U8 = @comptime/\ build().kinds \/;
+// Token names for -l, and where each starts in `names`.
+const mem names: U8 = @comptime/\ name_bytes() \/;
+const mem name_at: I32 = @comptime/\ name_offsets() \/;
+
+mem src: U8;
+mem starts: I32;
+mem ends: I32;
+mem kinds: Kind;
+mem out: U8;
+
+// ── The state machine, built at compile time ─────────────────────────────────
+
+struct Machine:
+    | tabs: Array[I32]
+    | kinds: Array[I32]
+    | next: I32
+
+// Printable ASCII and newline may appear in source; anything else is an error.
+fn illegal(c: I32) Bool {
+    c != 10 and (c < 32 or c > 126);
+}
+
+fn illegal_in_string(c: I32) Bool {
+    c < 32 or c > 126;
+}
+
+fn set(m: Machine, from: I32, c: I32, to: I32) void {
+    m.tabs[from * 256 + c] = to;
+}
+
+fn get(m: Machine, from: I32, c: I32) I32 {
+    m.tabs[from * 256 + c];
+}
+
+fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
+    for (lo ... hi) |c| { set(m, from, c, to); };
+}
+
+fn restricted(m: Machine, kind: Kind) I32 {
+    let state = m.next;
+    m.next += 1;
+    m.kinds[state] = kind.to_i32();
+    state;
+}
+
+// Ends its token before any legal byte it has no edge for.
+fn permissive(m: Machine, kind: Kind) I32 {
+    let state = restricted(m, kind);
+    for (0 ..< 256) |c| {
+        set(m, state, c, if illegal(c) { error_state; } else { accept_state; });
+    };
+    state;
+}
+
+fn variable_state(m: Machine, var_state: I32) I32 {
+    let state = permissive(m, Kind.VARIABLE);
+    set(m, state, 95, var_state);
+    set_range(m, state, 97, 122, var_state);
+    set_range(m, state, 65, 90, var_state);
+    set_range(m, state, 48, 57, var_state);
+    state;
+}
+
+fn self_legal(m: Machine, state: I32) void {
+    for (0 ..< 256) |c| {
+        if not illegal(c) { set(m, state, c, state); };
+    };
+}
+
+fn invisible(m: Machine) void {
+    let newline = permissive(m, Kind.NEWLINE);
+    let slash = permissive(m, Kind.OP);
+    let block = restricted(m, Kind.Invalid);
+    let line = restricted(m, Kind.Invalid);
+    let leaving = restricted(m, Kind.Invalid);
+    set(m, start_state, 32, ignore_state);
+    set(m, start_state, 10, newline);
+    set(m, newline, 10, newline);
+    set(m, newline, 32, newline);
+    set(m, newline, 47, slash);
+    set(m, start_state, 47, slash);
+    set(m, slash, 47, line);
+    self_legal(m, line);
+    set(m, line, 10, newline);
+    set(m, slash, 42, block);
+    self_legal(m, block);
+    set(m, block, 42, leaving);
+    for (0 ..< 256) |c| {
+        if not illegal(c) { set(m, leaving, c, block); };
+    };
+    set(m, leaving, 47, ignore_state);
+}
+
+fn single(m: Machine, c: I32, kind: Kind) void {
+    set(m, start_state, c, permissive(m, kind));
+}
+
+fn singles(m: Machine) void {
+    single(m, 40, Kind.LPAREN);
+    single(m, 41, Kind.RPAREN);
+    single(m, 123, Kind.LCURLY);
+    single(m, 125, Kind.RCURLY);
+    single(m, 91, Kind.LSQUARE);
+    single(m, 93, Kind.RSQUARE);
+    single(m, 58, Kind.COLON);
+    single(m, 44, Kind.COMMA);
+    single(m, 43, Kind.OP);
+    single(m, 45, Kind.OP);
+    single(m, 42, Kind.OP);
+    single(m, 37, Kind.OP);
+    single(m, 33, Kind.OP);
+    single(m, 60, Kind.OP);
+    single(m, 62, Kind.OP);
+    single(m, 61, Kind.EQUALS);
+}
+
+fn double(m: Machine, a: I32, b: I32) void {
+    let first = get(m, start_state, a);
+    if first == start_state or first == error_state or first == accept_state {
+        first = restricted(m, Kind.Invalid);
+        set(m, start_state, a, first);
+    };
+    let second = get(m, first, b);
+    if second == first or second == error_state or second == accept_state {
+        second = permissive(m, Kind.Invalid);
+        set(m, first, b, second);
+    };
+    m.kinds[second] = Kind.OP.to_i32();
+}
+
+fn doubles(m: Machine) void {
+    double(m, 124, 124);
+    double(m, 38, 38);
+    double(m, 61, 61);
+    double(m, 33, 61);
+    double(m, 62, 61);
+    double(m, 60, 61);
+}
+
+fn variables(m: Machine) I32 {
+    let state = permissive(m, Kind.VARIABLE);
+    set_range(m, start_state, 97, 122, state);
+    set_range(m, start_state, 65, 90, state);
+    set(m, start_state, 95, state);
+    set_range(m, state, 97, 122, state);
+    set_range(m, state, 65, 90, state);
+    set_range(m, state, 48, 57, state);
+    set(m, state, 95, state);
+    state;
+}
+
+// Keywords are paths through the identifier states; each ends in its kind.
+fn keyword(m: Machine, word: Str, kind: Kind, var_state: I32) void {
+    let current = start_state;
+    for (0 ..< word.len()) |k| {
+        let c = word.get(k);
+        let next = get(m, current, c);
+        if next == error_state or next == accept_state or next == current or next == var_state {
+            set(m, current, c, variable_state(m, var_state));
+        };
+        current = get(m, current, c);
+    };
+    m.kinds[current] = kind.to_i32();
+}
+
+fn keywords(m: Machine, var_state: I32) void {
+    let words = ["assert", "array", "bool", "else", "false", "fn", "float", "int", "image", "if", "let",
+        "print", "return", "read", "struct", "show", "sum", "to", "time", "true", "then", "void", "write"];
+    for (words, 0 ..< 23) |word, k| {
+        keyword(m, word, Kind.from_i32(Kind.ASSERT.to_i32() + k), var_state);
+    };
+}
+
+fn numbers(m: Machine) void {
+    let int = permissive(m, Kind.INTVAL);
+    let dot = permissive(m, Kind.DOT);
+    let float = permissive(m, Kind.FLOATVAL);
+    set_range(m, start_state, 48, 57, int);
+    set_range(m, int, 48, 57, int);
+    set(m, start_state, 46, dot);
+    set(m, int, 46, float);
+    set_range(m, dot, 48, 57, float);
+    set_range(m, float, 48, 57, float);
+}
+
+fn strings(m: Machine) void {
+    let open = restricted(m, Kind.Invalid);
+    set(m, start_state, 34, open);
+    let body = restricted(m, Kind.Invalid);
+    for (0 ..< 256) |c| {
+        if not illegal_in_string(c) and c != 34 {
+            set(m, open, c, body);
+            set(m, body, c, body);
+        };
+    };
+    let close = permissive(m, Kind.STRING);
+    set(m, open, 34, close);
+    set(m, body, 34, close);
+}
+
+fn continuations(m: Machine) void {
+    let backslash = restricted(m, Kind.Invalid);
+    set(m, start_state, 92, backslash);
+    set(m, backslash, 10, ignore_state);
+}
+
+fn build() Machine {
+    let m = Machine { tabs: Array[I32].new(256 * 256, 0), kinds: Array[I32].new(256, Kind.Invalid.to_i32()), next: 4 };
+    m.kinds[start_state] = Kind.Start.to_i32();
+    m.kinds[accept_state] = Kind.Accept.to_i32();
+    m.kinds[ignore_state] = Kind.Ignore.to_i32();
+    // Accept and ignore restart the scan from the start state.
+    for (0 ..< 256) |c| {
+        set(m, accept_state, c, start_state);
+        set(m, ignore_state, c, start_state);
+    };
+    invisible(m);
+    singles(m);
+    doubles(m);
+    keywords(m, variables(m));
+    numbers(m);
+    strings(m);
+    continuations(m);
+    m.tabs = m.tabs.slice(0, m.next * 256);
+    m.kinds = m.kinds.slice(0, m.next);
+    m;
+}
+
+fn name_bytes() Array[I32] {
+    let out = Array[I32].new(1024, 0);
+    let n = 0;
+    for (0 ..< Kind.count()) |k| {
+        let name = Kind.name(Kind.from_i32(k));
+        for (0 ..< name.len()) |c| {
+            out[n] = name.get(c);
+            n += 1;
+        };
+    };
+    out.slice(0, n);
+}
+
+fn name_offsets() Array[I32] {
+    let at = Array[I32].new(Kind.count() + 1, 0);
+    for (0 ..< Kind.count()) |k| { at[k + 1] = at[k] + Kind.name(Kind.from_i32(k)).len(); };
+    at;
+}
+
+// ── Lexing ───────────────────────────────────────────────────────────────────
+
+// Lexes `src` (which ends with a 255 sentinel) into starts/ends/kinds.
+// Returns the token count, or -1 at an invalid byte.
+fn lex() I32 {
+    let last = src.len() - 1;
+    starts.resize(src.len() + 1);
+    ends.resize(src.len() + 1);
+    kinds.resize(src.len() + 1);
+    let n = 0;
+    let i = 0;
+    let j = 0;
+    let state = start_state;
+    let failed = false;
+    let next = dfa[start_state * 256 + src[0]];
+    loop match next {
+        0 => {
+            if j != last { failed = true; };
+            break;
+        },
+        2 => {
+            starts[n] = i;
+            ends[n] = j;
+            kinds[n] = Kind.from_i32(kind_of[state]);
+            n += 1;
+            i = j;
+            next = dfa[start_state * 256 + src[j]];
+            continue next;
+        },
+        3 => {
+            j += 1;
+            i = j;
+            next = dfa[start_state * 256 + src[j]];
+            continue next;
+        },
+        ~> {
+            state = next;
+            j += 1;
+            next = dfa[state * 256 + src[j]];
+            continue next;
+        },
+    };
+    if failed { return -1; };
+    if i != j {
+        if kind_of[state] == Kind.Invalid.to_i32() { return -1; };
+        starts[n] = i;
+        ends[n] = j;
+        kinds[n] = Kind.from_i32(kind_of[state]);
+        n += 1;
+        i = j;
+    };
+    starts[n] = i;
+    ends[n] = j;
+    kinds[n] = Kind.END_OF_FILE;
+    n + 1;
+}
+
+// ── Printing ─────────────────────────────────────────────────────────────────
+
+fn emit_bytes(at: I32, text: Str) I32 {
+    for (0 ..< text.len()) |k| { out[at + k] = text.get(k); };
+    at + text.len();
+}
+
+// The token listing, in the Zig compiler's format, into `out`. Returns its length.
+fn listing(n: I32) I32 {
+    out.resize(src.len() * 16 + 64);
+    let at = 0;
+    for (0 ..< n) |t| {
+        let kind = kinds[t];
+        let k = kind.to_i32();
+        for (name_at[k] ..< name_at[k + 1]) |c| {
+            out[at] = names[c];
+            at += 1;
+        };
+        if kind != Kind.NEWLINE and kind != Kind.END_OF_FILE {
+            out[at] = 32;
+            out[at + 1] = 39;
+            at += 2;
+            if kind == Kind.STRING {
+                for (starts[t] ..< ends[t]) |c| {
+                    let b = src[c];
+                    if b == 10 {
+                        out[at] = 92;
+                        out[at + 1] = 110;
+                        at += 2;
+                    } else {
+                        out[at] = b;
+                        at += 1;
+                    };
+                };
+            } else {
+                for (starts[t] ..< ends[t]) |c| {
+                    out[at] = src[c];
+                    at += 1;
+                };
+            };
+            out[at] = 39;
+            at += 1;
+        };
+        out[at] = 10;
+        at += 1;
+    };
+    at;
+}
+
+// ── Parsing ──────────────────────────────────────────────────────────────────
+//
+// The Zig compiler's precedence-climbing parser (parser_bench_inline_forced):
+// a streaming scanner with one token of lookahead feeds the parser, which
+// builds a flat array of {tag, a, b, token} nodes. A list is a chain of
+// nodes whose `a` is the previous link (0 ends it), as in Zig.
+
+enum(U8) Tag:
+    | Leaf
+    | Unary
+    | Binary
+    | Call
+    | Field
+    | Index
+    | ArrayExpr
+    | Construct
+    | Conditional
+    | Loop
+    | List
+    | Binding
+    | Lvalue
+    | TypeNode
+    | Stmt
+    | Command
+
+mem node_tag: Tag;
+mem node_a: I32;
+mem node_b: I32;
+mem node_token: I32;
+
+// Binding power of a binary operator by its first byte; `!=` is `~`.
+const mem precedence: U8 = @comptime/\ precedence_table() \/;
+
+fn precedence_table() Array[I32] {
+    let table = Array[I32].new(256, 0);
+    table[38] = 1;
+    table[124] = 1;
+    table[60] = 2;
+    table[62] = 2;
+    table[61] = 2;
+    table[126] = 2;
+    table[43] = 3;
+    table[45] = 3;
+    table[42] = 4;
+    table[47] = 4;
+    table[37] = 4;
+    table;
+}
+
+// The scanner's position and the current token; `last` is the token just taken.
+struct Parser:
+    | cursor: I32
+    | kind: Kind
+    | op: I32
+    | hi: I32
+    | lo: I32
+    | last_hi: I32
+    | last_lo: I32
+    | pos: I32
+
+let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('jpl'); } \/;
+
+fn fail() void {
+    syntax_error();
+}
+
+// Scan the next token into p.
+fn scan(p: Parser) void {
+    let i = p.cursor;
+    let j = i;
+    let state = start_state;
+    let next = dfa[start_state * 256 + src[j]];
+    loop match next {
+        0 => {
+            if j != src.len() - 1 { fail(); };
+            if i != j {
+                p.cursor = j;
+                token(p, Kind.from_i32(kind_of[state]), i, j);
+            } else {
+                p.kind = Kind.END_OF_FILE;
+            };
+            break;
+        },
+        2 => {
+            p.cursor = j;
+            token(p, Kind.from_i32(kind_of[state]), i, j);
+            break;
+        },
+        3 => {
+            j += 1;
+            i = j;
+            p.cursor = i;
+            state = start_state;
+            next = dfa[start_state * 256 + src[j]];
+            continue next;
+        },
+        ~> {
+            state = next;
+            j += 1;
+            next = dfa[state * 256 + src[j]];
+            continue next;
+        },
+    };
+}
+
+// Fill in the current token: operator code, number bits, or string span.
+fn token(p: Parser, kind: Kind, i: I32, j: I32) void {
+    p.kind = kind;
+    if kind == Kind.Invalid { fail(); };
+    if kind == Kind.OP {
+        p.op = if src[i] == 33 and j - i == 2 { 126; } else { src[i]; };
+    } else {
+        if kind == Kind.INTVAL {
+            set_bits(p, parse_int(i, j));
+        } else {
+            if kind == Kind.FLOATVAL {
+                set_bits(p, parse_float(i, j).bits());
+            } else {
+                if kind == Kind.STRING {
+                    p.hi = i;
+                    p.lo = j;
+                };
+            };
+        };
+    };
+}
+
+fn set_bits(p: Parser, bits: I64) void {
+    p.hi = (bits >> 32).to_i32();
+    p.lo = bits.to_i32();
+}
+
+// A decimal I64; a value past 2^63 - 1 is a syntax error, as in Zig.
+fn parse_int(i: I32, j: I32) I64 {
+    let value: I64 = 0;
+    for (i ..< j) |k| {
+        let digit = (src[k] - 48).to_i64();
+        if value > (9223372036854775807 - digit) / 10 { fail(); };
+        value = value * 10 + digit;
+    };
+    value;
+}
+
+// Digits [. digits]; a value too large for an F64 is a syntax error.
+fn parse_float(i: I32, j: I32) F64 {
+    let value = 0.0;
+    let scale = 1.0;
+    let fraction = false;
+    for (i ..< j) |k| {
+        let c = src[k];
+        if c == 46 {
+            fraction = true;
+        } else {
+            if fraction {
+                scale = scale / 10.0;
+                value += (c - 48).to_f64() * scale;
+            } else {
+                value = value * 10.0 + (c - 48).to_f64();
+            };
+        };
+    };
+    if value > 1.7976931348623157e308 { fail(); };
+    value;
+}
+
+fn peek(p: Parser) Kind {
+    p.kind;
+}
+
+fn take(p: Parser) Kind {
+    let kind = p.kind;
+    p.last_hi = p.hi;
+    p.last_lo = p.lo;
+    scan(p);
+    p.pos += 1;
+    kind;
+}
+
+fn expect(p: Parser, kind: Kind) void {
+    if p.kind != kind { fail(); };
+    take(p);
+}
+
+fn add_at(tag: Tag, a: I32, b: I32, at: I32) I32 {
+    let id = node_tag.len();
+    node_tag.push(tag);
+    node_a.push(a);
+    node_b.push(b);
+    node_token.push(at);
+    id;
+}
+
+fn add(tag: Tag, a: I32, b: I32) I32 {
+    add_at(tag, a, b, 0);
+}
+
+fn expect_string(p: Parser) I32 {
+    let at = p.pos;
+    expect(p, Kind.STRING);
+    add_at(Tag.Leaf, p.last_hi, p.last_lo, at);
+}
+
+fn expr_list(p: Parser, close: Kind) I32 {
+    let list = 0;
+    if p.kind != close {
+        while (true) {
+            list = add(Tag.List, list, expr(p, 0));
+            if p.kind != Kind.COMMA { break; };
+            take(p);
+        };
+    };
+    expect(p, close);
+    list;
+}
+
+fn loop_expr(p: Parser, array: Bool, at: I32) I32 {
+    expect(p, Kind.LSQUARE);
+    let bindings = 0;
+    if p.kind != Kind.RSQUARE {
+        while (true) {
+            let name = p.pos;
+            expect(p, Kind.VARIABLE);
+            expect(p, Kind.COLON);
+            let bound = expr(p, 0);
+            bindings = add(Tag.List, bindings, add_at(Tag.Binding, bound, 0, name));
+            if p.kind != Kind.COMMA { break; };
+            take(p);
+        };
+    };
+    expect(p, Kind.RSQUARE);
+    let body = expr(p, 0);
+    add_at(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at);
+}
+
+fn prefix(p: Parser) I32 {
+    let at = p.pos;
+    let code = if p.kind == Kind.OP { p.op; } else { 0; };
+    let kind = take(p);
+    match kind {
+        Kind.VARIABLE => add(Tag.Leaf, at, 0),
+        Kind.TRUE => add(Tag.Leaf, at, 0),
+        Kind.FALSE => add(Tag.Leaf, at, 0),
+        Kind.VOID => add(Tag.Leaf, at, 0),
+        Kind.INTVAL => add_at(Tag.Leaf, p.last_hi, p.last_lo, at),
+        Kind.FLOATVAL => add_at(Tag.Leaf, p.last_hi, p.last_lo, at),
+        Kind.LPAREN => {
+            let inner = expr(p, 0);
+            expect(p, Kind.RPAREN);
+            inner;
+        },
+        Kind.LSQUARE => add(Tag.ArrayExpr, expr_list(p, Kind.RSQUARE), 0),
+        Kind.OP => {
+            if code != 45 and code != 33 { fail(); };
+            add_at(Tag.Unary, expr(p, 5), 0, at);
+        },
+        Kind.IF => {
+            let condition = expr(p, 0);
+            expect(p, Kind.THEN);
+            let yes = expr(p, 0);
+            expect(p, Kind.ELSE);
+            let no = expr(p, 0);
+            add_at(Tag.Conditional, add(Tag.List, condition, yes), no, at);
+        },
+        Kind.ARRAY => loop_expr(p, true, at),
+        Kind.SUM => loop_expr(p, false, at),
+        ~> {
+            fail();
+            0;
+        },
+    };
+}
+
+fn expr(p: Parser, min: I32) I32 {
+    let left = prefix(p);
+    while (true) {
+        let kind = p.kind;
+        if kind == Kind.DOT {
+            if min > 6 { break; };
+            take(p);
+            let field = p.pos;
+            expect(p, Kind.VARIABLE);
+            left = add_at(Tag.Field, left, 0, field);
+        } else {
+            if kind == Kind.LSQUARE {
+                if min > 6 { break; };
+                take(p);
+                left = add(Tag.Index, left, expr_list(p, Kind.RSQUARE));
+            } else {
+                if kind == Kind.LPAREN or kind == Kind.LCURLY {
+                    if min > 6 or node_tag[left] != Tag.Leaf { break; };
+                    take(p);
+                    left = if kind == Kind.LPAREN {
+                        add(Tag.Call, left, expr_list(p, Kind.RPAREN));
+                    } else {
+                        add(Tag.Construct, left, expr_list(p, Kind.RCURLY));
+                    };
+                } else {
+                    if kind != Kind.OP { break; };
+                    let binding = precedence[p.op];
+                    if binding == 0 or binding < min { break; };
+                    let operator = p.pos;
+                    take(p);
+                    let right = expr(p, binding + 1);
+                    left = add_at(Tag.Binary, left, right, operator);
+                };
+            };
+        };
+    };
+    left;
+}
+
+fn type_expr(p: Parser) I32 {
+    let at = p.pos;
+    let kind = take(p);
+    if kind != Kind.INT and kind != Kind.FLOAT and kind != Kind.BOOL and kind != Kind.VOID and kind != Kind.VARIABLE {
+        fail();
+    };
+    let result = add(Tag.TypeNode, at, 0);
+    while (p.kind == Kind.LSQUARE) {
+        take(p);
+        let rank = 1;
+        while (p.kind == Kind.COMMA) {
+            take(p);
+            rank += 1;
+        };
+        expect(p, Kind.RSQUARE);
+        result = add(Tag.TypeNode, result, rank);
+    };
+    result;
+}
+
+fn expect_type(p: Parser) I32 {
+    expect(p, Kind.COLON);
+    type_expr(p);
+}
+
+fn lvalue(p: Parser, binding: Bool) I32 {
+    let at = p.pos;
+    expect(p, Kind.VARIABLE);
+    let result = add(Tag.Lvalue, at, 0);
+    if p.kind == Kind.LSQUARE {
+        take(p);
+        if p.kind != Kind.RSQUARE {
+            while (true) {
+                let dim = p.pos;
+                expect(p, Kind.VARIABLE);
+                result = add(Tag.Lvalue, result, dim);
+                if p.kind != Kind.COMMA { break; };
+                take(p);
+            };
+        };
+        expect(p, Kind.RSQUARE);
+    } else {
+        if p.kind == Kind.LCURLY {
+            take(p);
+            if p.kind != Kind.RCURLY {
+                while (true) {
+                    result = add(Tag.Lvalue, result, lvalue(p, binding));
+                    if p.kind != Kind.COMMA { break; };
+                    take(p);
+                };
+            };
+            expect(p, Kind.RCURLY);
+            return result;
+        };
+    };
+    if binding { result = add(Tag.Binding, result, expect_type(p)); };
+    result;
+}
+
+fn stmt(p: Parser) I32 {
+    let at = p.pos;
+    let kind = take(p);
+    let result = match kind {
+        Kind.LET => {
+            let lhs = lvalue(p, false);
+            expect(p, Kind.EQUALS);
+            add_at(Tag.Stmt, lhs, expr(p, 0), at);
+        },
+        Kind.ASSERT => {
+            let value = expr(p, 0);
+            expect(p, Kind.COMMA);
+            add_at(Tag.Stmt, value, expect_string(p), at);
+        },
+        Kind.RETURN => add_at(Tag.Stmt, expr(p, 0), 0, at),
+        ~> {
+            fail();
+            0;
+        },
+    };
+    expect(p, Kind.NEWLINE);
+    result;
+}
+
+fn command(p: Parser) I32 {
+    let at = p.pos;
+    let kind = take(p);
+    match kind {
+        Kind.LET => {
+            let lhs = lvalue(p, false);
+            expect(p, Kind.EQUALS);
+            let result = add_at(Tag.Command, lhs, expr(p, 0), at);
+            expect(p, Kind.NEWLINE);
+            result;
+        },
+        Kind.ASSERT => {
+            let value = expr(p, 0);
+            expect(p, Kind.COMMA);
+            let text = expect_string(p);
+            expect(p, Kind.NEWLINE);
+            add_at(Tag.Command, value, text, at);
+        },
+        Kind.SHOW => {
+            let value = expr(p, 0);
+            expect(p, Kind.NEWLINE);
+            add_at(Tag.Command, value, 0, at);
+        },
+        Kind.PRINT => {
+            let text = expect_string(p);
+            expect(p, Kind.NEWLINE);
+            add_at(Tag.Command, text, 0, at);
+        },
+        Kind.TIME => add_at(Tag.Command, command(p), 0, at),
+        Kind.READ => {
+            expect(p, Kind.IMAGE);
+            let text = expect_string(p);
+            expect(p, Kind.TO);
+            let target = lvalue(p, false);
+            expect(p, Kind.NEWLINE);
+            add_at(Tag.Command, text, target, at);
+        },
+        Kind.WRITE => {
+            expect(p, Kind.IMAGE);
+            let value = expr(p, 0);
+            expect(p, Kind.TO);
+            let text = expect_string(p);
+            expect(p, Kind.NEWLINE);
+            add_at(Tag.Command, value, text, at);
+        },
+        Kind.STRUCT => {
+            let name = p.pos;
+            expect(p, Kind.VARIABLE);
+            expect(p, Kind.LCURLY);
+            expect(p, Kind.NEWLINE);
+            let fields = 0;
+            while (p.kind == Kind.VARIABLE) {
+                let field_name = p.pos;
+                take(p);
+                let field_type = expect_type(p);
+                fields = add(Tag.List, fields, add_at(Tag.Binding, field_type, 0, field_name));
+                expect(p, Kind.NEWLINE);
+            };
+            expect(p, Kind.RCURLY);
+            expect(p, Kind.NEWLINE);
+            add_at(Tag.Command, add(Tag.List, add(Tag.Leaf, name, 0), fields), 0, at);
+        },
+        Kind.FN => {
+            let name = p.pos;
+            expect(p, Kind.VARIABLE);
+            expect(p, Kind.LPAREN);
+            let bindings = 0;
+            if p.kind != Kind.RPAREN {
+                while (true) {
+                    bindings = add(Tag.List, bindings, lvalue(p, true));
+                    if p.kind != Kind.COMMA { break; };
+                    take(p);
+                };
+            };
+            expect(p, Kind.RPAREN);
+            let result_type = expect_type(p);
+            expect(p, Kind.LCURLY);
+            expect(p, Kind.NEWLINE);
+            let body = 0;
+            while (p.kind != Kind.RCURLY) {
+                if p.kind == Kind.END_OF_FILE { fail(); };
+                body = add(Tag.List, body, stmt(p));
+            };
+            expect(p, Kind.RCURLY);
+            expect(p, Kind.NEWLINE);
+            let signature = add(Tag.List, add(Tag.List, add(Tag.Leaf, name, 0), bindings), result_type);
+            add_at(Tag.Command, signature, body, at);
+        },
+        ~> {
+            fail();
+            0;
+        },
+    };
+}
+
+fn program(p: Parser) I32 {
+    let root = 0;
+    while (p.kind != Kind.END_OF_FILE) {
+        if p.kind == Kind.NEWLINE {
+            take(p);
+        } else {
+            root = add(Tag.List, root, command(p));
+        };
+    };
+    root;
+}
+
+// Parse `src` into the node mems. Returns the token count, or -1 for a syntax error.
+fn parse() I32 {
+    node_tag.clear();
+    node_a.clear();
+    node_b.clear();
+    node_token.clear();
+    node_tag.reserve(src.len());
+    node_a.reserve(src.len());
+    node_b.reserve(src.len());
+    node_token.reserve(src.len());
+    let p = Parser { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0 };
+    try {
+        scan(p);
+        program(p);
+        p.pos;
+    } catch {
+        -1;
+    };
+}
+
+fn load(path: Str) void {
+    src.copy_in(Fs.readFileSync(path));
+    src.push(255);
+}
+
+fn report(n: I32, print: Bool) void {
+    let at = if n >= 0 and print { listing(n); } else { 0; };
+    at = emit_bytes(at, if n < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
+    Fs.writeSync(1.0, out.view(0, at));
+}
+
+// Median of `runs` timings of lex (and with `print`, of the listing too), in ms.
+fn time(runs: I32, print: Bool) F64 {
+    let samples = Array[F64].new(runs, 0.0);
+    for (0 ..< runs + 3) |r| {
+        let begin = Web.performance.now();
+        let n = lex();
+        if print { listing(n); };
+        if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
+    };
+    (samples sort(F64) |a, b| { a < b; })[runs / 2];
+}
+
+// jpl <file.jpl> -l       token listing, as the Zig compiler prints it
+// jpl <file.jpl> -_       lex only
+// jpl <file.jpl> -p -q    parse only (Zig's parser benchmark)
+// jpl <file.jpl> -s       parse, then print token and node counts
+// jpl <file.jpl> -bench   in-process medians for lexing, listing, and parsing
+export main() void {
+    let args = Process.argv;
+    let file = "";
+    let flags = "";
+    for (2 ..< args.length.to_i32()) |k| {
+        let arg = args[k];
+        if arg.get(0) == 45 { flags = flags + arg; } else { file = arg; };
+    };
+    load(file);
+    if flags == "-bench" {
+        let lexing = time(15, false);
+        let listing_too = time(15, true);
+        let parsing = time_parse(15);
+        let n = lex();
+        Web.console.log("lex " + lexing.to_str() + " ms, lex + listing " + listing_too.to_str() + " ms, parse "
+            + parsing.to_str() + " ms, " + n.to_str() + " tokens");
+        return;
+    };
+    if flags == "-s" {
+        let tokens = parse();
+        let text = if tokens < 0 { "Compilation failed\n"; } else { "tokens=" + tokens.to_str() + " nodes=" + node_tag.len().to_str() + "\n"; };
+        Fs.writeSync(1.0, text);
+        return;
+    };
+    if flags == "-p-q" or flags == "-q-p" or flags == "-p" {
+        Fs.writeSync(1.0, if parse() < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
+        return;
+    };
+    let n = lex();
+    report(n, flags == "-l");
+}
+
+fn time_parse(runs: I32) F64 {
+    let samples = Array[F64].new(runs, 0.0);
+    for (0 ..< runs + 3) |r| {
+        let begin = Web.performance.now();
+        parse();
+        if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
+    };
+    (samples sort(F64) |a, b| { a < b; })[runs / 2];
+}
