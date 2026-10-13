@@ -171,6 +171,17 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
             count += 1;
             c = next_sibling(c);
         };
+    } else if embed_index(decl) >= 0 {
+        // The file's bytes, a whole number of elements.
+        let k = embed_index(decl);
+        if embed_start[k] == -2 { report(Diag.MemEmbed, init, decl_name[decl]); }
+        else if embed_start[k] >= 0 {
+            let n = embed_count[k];
+            let size = 1 << storage_shift(s);
+            if n % size != 0 { report(Diag.MemEmbed, init, decl_name[decl]); };
+            for (0 ..< n) |i| { data_bytes.push(embed_bytes[embed_start[k] + i]); };
+            count = n / size;
+        };
     } else {
         let k = comptime_index(decl);
         if k >= 0 and comptime_start[k] >= 0 {
@@ -224,12 +235,28 @@ fn comptime_index(decl: I32) I32 {
     -1;
 }
 
+// `@embed/\ file \/` mems: the host reads each file (relative to the
+// entry file) and gives its bytes, or says it could not.
+mem embed_mem: I32;
+mem embed_start: I32;   // bytes in embed_bytes; -1 until given, -2 when unreadable
+mem embed_count: I32;
+export mem embed_bytes: U8;
+
+fn embed_index(decl: I32) I32 {
+    for (0 ..< embed_mem.len()) |k| { if embed_mem[k] == decl { return k; }; };
+    -1;
+}
+
 // The @comptime mems of the program, found once names are resolved.
 fn find_comptime_mems() void {
     comptime_mem.clear();
     comptime_start.clear();
     comptime_count.clear();
     comptime_bytes.clear();
+    embed_mem.clear();
+    embed_start.clear();
+    embed_count.clear();
+    embed_bytes.clear();
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
@@ -240,6 +267,11 @@ fn find_comptime_mems() void {
                         comptime_mem.push(node_decl[first_child(item)]);
                         comptime_start.push(-1);
                         comptime_count.push(0);
+                    };
+                    if is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Embed) {
+                        embed_mem.push(node_decl[first_child(item)]);
+                        embed_start.push(-1);
+                        embed_count.push(0);
                     };
                 };
                 item = next_sibling(item);

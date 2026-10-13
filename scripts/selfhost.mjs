@@ -115,6 +115,14 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
     utu.import_bind(i, file);
   }
   files.diagnostics = utu.resolve();
+  // @embed: the files' bytes, read relative to the entry file.
+  for (let k = 0; k < utu.embed_files(); k++) {
+    const rel = new TextDecoder().decode(new Uint8Array(utu.src.buffer, utu.embed_path_start(k), utu.embed_path_end(k) - utu.embed_path_start(k)));
+    let bytes;
+    try { bytes = fs.readFileSync(path.resolve(path.dirname(entry), rel)); } catch { utu.embed_fail(k); continue; }
+    const at = utu.embed_set(k, bytes.length);
+    new Uint8Array(utu.embed_bytes.buffer).set(bytes, at);
+  }
   return files;
 }
 

@@ -1,0 +1,320 @@
+// ── Protocols ────────────────────────────────────────────────────────────────
+//
+// `proto P: | get a: I32 | foo(I32) Str` names what types that list it
+// (`struct T[P]:`) provide: a field for each getter and setter, a function
+// `fn P[T].foo |self| (x: I32) Str` for each method. A P is any of them,
+// an anyref; reading a.x or calling p.foo(…) tests which one it is, in the
+// order the types are declared, as stage 0 does:
+//
+//   r = receiver (args into locals)
+//   if ref.test $T1 r { (T1's field, or P[T1].foo(r, …)) } else if … else { unreachable }
+
+// Whether type declaration `t` lists protocol `proto` (a struct, or an enum for its variants).
+fn implements(t: I32, proto: I32) Bool {
+    let d = if decl_is(t, Decl.Variant) { decl_owner[t]; } else { t; };
+    let list = impl_list_of(d);
+    if list < 0 { return false; };
+    let c = first_child(list);
+    while (c >= 0) {
+        if node_decl[c] == proto { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+fn impl_list_of(d: I32) I32 {
+    if not decl_is(d, Decl.Struct) and not decl_is(d, Decl.Enum) { return -1; };
+    let c = first_child(decl_node[d]);
+    while (c >= 0) {
+        if is_kind(c, Node.Impl_list) { return c; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+// Whether a value of `actual` converts to protocol type `expected`.
+fn converts_to_proto(actual: I32, expected: I32) Bool {
+    let p = ty_decl(expected);
+    if not decl_is(p, Decl.Proto) { return false; };
+    let t = ty_decl(actual);
+    t >= 0 and implements(t, p);
+}
+
+// The struct types (and variants) implementing a protocol, in declaration order.
+fn implementers(proto: I32) I32 {
+    let m = vl_begin();
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Struct) and implements(d, proto) { vl_add(d); };
+        if decl_is(d, Decl.Variant) and implements(d, proto) { vl_add(d); };
+    };
+    vl_end(m);
+}
+
+// The implementations of a protocol method: fn P[T].name, in declaration
+// order, as pairs (function, the type T's declaration).
+fn method_impls(proto: I32, word: I32) I32 {
+    let m = vl_begin();
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Fn) and decl_a[d] == proto and is_kind(decl_node[d], Node.Fn_decl) {
+            let name = first_child(decl_node[d]);
+            if word_of(last_child(name)) == word {
+                let args = next_sibling(first_child(name));
+                if is_kind(args, Node.Module_type_arg_list) {
+                    let t = decl_type(node_decl[name_node(first_child(first_child(args)))], 0);
+                    vl_add(d);
+                    vl_add(ty_decl(t));
+                };
+            };
+        };
+    };
+    vl_end(m);
+}
+
+// The protocol member a word names, or -1.
+fn protocol_member(proto: I32, word: I32) I32 {
+    let d = member(proto, word, Space.Member);
+    if decl_is(d, Decl.ProtoMember) { d; } else { -1; };
+}
+
+// The type of a protocol getter or setter, or a method's result.
+fn proto_member_type(pm: I32) I32 {
+    let node = decl_node[pm];
+    if is_kind(node, Node.Proto_method) { return type_of(last_child(node), 0); };
+    type_of(last_child(node), 0);
+}
+
+// `p.x`: the field x of whichever implementing type p is.
+fn proto_field_get(node: I32, t: I32, name: I32, m: I32, cx: Cx) I32 {
+    let proto = ty_decl(t);
+    let pm = protocol_member(proto, word_of(name));
+    if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
+        report(Diag.UnknownField, name, word_of(name));
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let ft = proto_member_type(pm);
+    let r = new_local(vt_anyref);
+    w_node(Op.LocalSet, vt_none, r, 0, m);
+    let impls = implementers(proto);
+    proto_field_chain(impls, 0, r, word_of(name), ft);
+    w_node(Op.Seq, repr(ft), 0, 0, m);
+    ft;
+}
+
+fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32) void {
+    if i == vl_len[impls] {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let d = vl_item(impls, i);
+    let vt = repr(named(d, 0));
+    let field = member(d, word, Space.Member);
+    let m = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, r, 0);
+    w_node(Op.RefTest, vt_i32, vt_nullable(vt) + 1, 0, mc);
+    let mt = w_mark();
+    let mg = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, r, 0);
+    w_node(Op.RefCast, vt_nullable(vt) + 1, vt_nullable(vt) + 1, 0, mg);
+    w_node(Op.StructGet, repr(ft), vt_heap(vt), decl_a[field], mg);
+    w_node(Op.Seq, repr(ft), 0, 0, mt);
+    let me = w_mark();
+    proto_field_chain(impls, i + 1, r, word, ft);
+    w_node(Op.Seq, repr(ft), 0, 0, me);
+    w_node(Op.If, repr(ft), new_label(), 0, m);
+}
+
+// `p.x = v`: the field x of whichever implementing type p is.
+fn proto_field_set(t: I32, name: I32, value: I32, m: I32, cx: Cx) I32 {
+    let proto = ty_decl(t);
+    let pm = protocol_member(proto, word_of(name));
+    if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
+        report(Diag.UnknownField, name, word_of(name));
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let ft = proto_member_type(pm);
+    let r = new_local(vt_anyref);
+    w_node(Op.LocalSet, vt_none, r, 0, m);
+    let v = new_local(repr(ft));
+    let mv = w_mark();
+    coerce(check_expr(value, ft, cx), ft, value);
+    w_node(Op.LocalSet, vt_none, v, 0, mv);
+    proto_set_chain(implementers(proto), 0, r, v, word_of(name), ft);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+fn proto_set_chain(impls: I32, i: I32, r: I32, v: I32, word: I32, ft: I32) void {
+    if i == vl_len[impls] {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let d = vl_item(impls, i);
+    let vt = repr(named(d, 0));
+    let field = member(d, word, Space.Member);
+    let m = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, r, 0);
+    w_node(Op.RefTest, vt_i32, vt_nullable(vt) + 1, 0, mc);
+    let mt = w_mark();
+    let ms = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, r, 0);
+    w_node(Op.RefCast, vt_nullable(vt) + 1, vt_nullable(vt) + 1, 0, ms);
+    w_leaf(Op.LocalGet, repr(ft), v, 0);
+    w_node(Op.StructSet, vt_none, vt_heap(vt), decl_a[field], ms);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    let me = w_mark();
+    proto_set_chain(impls, i + 1, r, v, word, ft);
+    w_node(Op.Seq, vt_none, 0, 0, me);
+    w_node(Op.If, vt_none, new_label(), 0, m);
+}
+
+// `p.foo(args)`: the receiver is on the stack since `m`.
+fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+    let proto = ty_decl(t);
+    let pm = protocol_member(proto, word_of(name));
+    if pm < 0 or not is_kind(decl_node[pm], Node.Proto_method) {
+        report(Diag.UnknownMethod, name, word_of(name));
+        return finish_error(args, m, cx);
+    };
+    let rt = proto_member_type(pm);
+    let r = new_local(vt_anyref);
+    w_node(Op.LocalSet, vt_none, r, 0, m);
+    // The arguments, against the protocol's parameter types, into locals.
+    let list = next_sibling(first_child(decl_node[pm]));
+    let n = 0;
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    let p = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
+    let locals = Array[I32].new(16, 0);
+    let types = Array[I32].new(16, 0);
+    while (a >= 0 and p >= 0) {
+        let pt = type_of(p, 0);
+        let local = new_local(repr(pt));
+        let ma = w_mark();
+        coerce(check_expr(a, pt, cx), pt, a);
+        w_node(Op.LocalSet, vt_none, local, 0, ma);
+        locals[n] = local;
+        types[n] = pt;
+        n += 1;
+        a = next_sibling(a);
+        p = next_sibling(p);
+    };
+    if a >= 0 or p >= 0 {
+        report(Diag.WrongArity, at, word_of(name));
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    proto_call_chain(method_impls(proto, word_of(name)), 0, r, locals, types, n, rt, cx);
+    w_node(Op.Seq, repr(rt), 0, 0, m);
+    rt;
+}
+
+fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) void {
+    if i * 2 >= vl_len[impls] {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let f = vl_item(impls, i * 2);
+    let d = vl_item(impls, i * 2 + 1);
+    let vt = repr(named(d, 0));
+    let m = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, r, 0);
+    w_node(Op.RefTest, vt_i32, vt_nullable(vt) + 1, 0, mc);
+    let mt = w_mark();
+    let mcall = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, r, 0);
+    w_node(Op.RefCast, vt_nullable(vt) + 1, vt_nullable(vt) + 1, 0, mcall);
+    for (0 ..< n) |k| { w_leaf(Op.LocalGet, repr(types[k]), locals[k], 0); };
+    finish_call(fn_instance(f, 0), mcall, cx);
+    w_node(Op.Seq, repr(rt), 0, 0, mt);
+    let me = w_mark();
+    proto_call_chain(impls, i + 1, r, locals, types, n, rt, cx);
+    w_node(Op.Seq, repr(rt), 0, 0, me);
+    w_node(Op.If, repr(rt), new_label(), 0, m);
+}
+
+// ── Conformance ──
+//
+// Each type that lists a protocol has a field (of the same written type)
+// for each of its getters and setters, and an implementation P[T].m with
+// the method's signature for each of its methods.
+
+fn validate_protocols() void {
+    for (0 ..< decl_kind.len()) |d| {
+        if (decl_is(d, Decl.Struct) or decl_is(d, Decl.Enum)) and is_own_file(file_of_token(node_first[decl_node[d]])) {
+            let list = impl_list_of(d);
+            if list >= 0 {
+                let c = first_child(list);
+                while (c >= 0) {
+                    let proto = node_decl[c];
+                    if decl_is(proto, Decl.Proto) {
+                        if decl_is(d, Decl.Enum) {
+                            let v = first_child(decl_node[d]);
+                            while (v >= 0) {
+                                if is_kind(v, Node.Variant) { conforms(node_decl[first_child(v)], proto); };
+                                v = next_sibling(v);
+                            };
+                        } else {
+                            conforms(d, proto);
+                        };
+                    };
+                    c = next_sibling(c);
+                };
+            };
+        };
+    };
+}
+
+fn conforms(t: I32, proto: I32) void {
+    let c = first_child(decl_node[proto]);
+    while (c >= 0) {
+        if is_kind(c, Node.Proto_member) {
+            let m = first_child(c);
+            let word = word_of(first_child(m));
+            if is_kind(m, Node.Proto_method) {
+                let impls = method_impls(proto, word);
+                let found = -1;
+                let i = 0;
+                while (i < vl_len[impls]) {
+                    if vl_item(impls, i + 1) == t { found = vl_item(impls, i); };
+                    i += 2;
+                };
+                if found < 0 {
+                    report(Diag.ProtoMissing, decl_node[t], word);
+                } else if not same_signature(found, m) {
+                    report(Diag.ProtoSignature, decl_node[found], word);
+                };
+            } else {
+                let field = member(t, word, Space.Member);
+                if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), 0) != type_of(last_child(m), 0) {
+                    report(Diag.ProtoMissing, decl_node[t], word);
+                };
+            };
+        };
+        c = next_sibling(c);
+    };
+}
+
+// Whether an implementation's parameters and result are the method's.
+fn same_signature(f: I32, method: I32) Bool {
+    let list = next_sibling(first_child(method));
+    let params = param_list_of(f);
+    let p = if params >= 0 { first_child(params); } else { -1; };
+    let q = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
+    while (p >= 0 and q >= 0) {
+        if type_of(last_child(p), 0) != type_of(q, 0) { return false; };
+        p = next_sibling(p);
+        q = next_sibling(q);
+    };
+    if p >= 0 or q >= 0 { return false; };
+    let ret = -1;
+    let c = first_child(decl_node[f]);
+    while (c >= 0) {
+        if is_kind(c, Node.Return_type) { ret = c; };
+        c = next_sibling(c);
+    };
+    type_of(ret, 0) == type_of(last_child(method), 0);
+}

@@ -127,10 +127,7 @@ fn check_field_get(node: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_base(node, cx);
     let field = field_of(t, name);
-    if field == -2 {
-        w_stack.resize(m);
-        return unsupported(node);
-    };
+    if field == -2 { return proto_field_get(node, t, name, m, cx); };
     if field < 0 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
@@ -147,8 +144,8 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let t = check_base(target, cx);
     let field = field_of(t, name);
     if field == -2 {
-        w_stack.resize(m);
-        return unsupported(at);
+        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        return proto_field_set(t, name, value, m, cx);
     };
     if field < 0 {
         check_expr(value, -1, cx);

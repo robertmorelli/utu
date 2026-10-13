@@ -153,6 +153,9 @@ enum(U8) Diag:
     | AwaitNotPromise
     | InvalidDefer
     | AwaitForSource
+    | ProtoMissing
+    | ProtoSignature
+    | MemEmbed
 
 mem diag_kind: U8;
 mem diag_node: I32;
@@ -763,7 +766,15 @@ fn register_method(item: I32, w: Walk) void {
     let decl = node_decl[method];
     decl_a[decl] = owner;
     let args = next_sibling(receiver);
-    if is_kind(args, Node.Module_type_arg_list) { walk_types(args, w); };
+    if is_kind(args, Node.Module_type_arg_list) {
+        walk_types(args, w);
+        // `fn P[T].m`: also a method of T, so calls on a T find it.
+        if decl_is(owner, Decl.Proto) {
+            let t = first_child(args);
+            let n = if is_kind(t, Node.Ref_type) { name_node(first_child(t)); } else { name_node(t); };
+            if n >= 0 and node_decl[n] >= 0 { add_member(node_decl[n], word_of(method), Space.Method, decl); };
+        };
+    };
     if owner >= 0 { add_member(owner, word_of(method), Space.Method, decl); };
 }
 

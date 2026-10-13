@@ -366,6 +366,7 @@ fn repr(t: I32) I32 {
     if dk == Decl.IntEnum.to_i32() { return vt_i32; };
     if dk == Decl.Distinct.to_i32() { return repr(decl_type(node_decl[name_node(last_child(decl_node[decl]))], 0)); };
     if dk == Decl.Struct.to_i32() or dk == Decl.Enum.to_i32() or dk == Decl.Variant.to_i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true); };
+    if dk == Decl.Proto.to_i32() { return vt_anyref; };
     vt_i32;
 }
 

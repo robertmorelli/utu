@@ -150,6 +150,10 @@ fn receiver_type(decl: I32, inst: I32) I32 {
     let node = decl_node[decl];
     let r = first_child(if is_kind(node, Node.Fn_decl) { first_child(node); } else { node; });
     let args = next_sibling(r);
+    // `fn P[T].m |self|`: a protocol method of T, so self is a T.
+    if is_kind(node, Node.Fn_decl) and is_kind(args, Node.Module_type_arg_list) and decl_is(owner, Decl.Proto) {
+        return type_of(first_child(args), inst);
+    };
     if is_kind(node, Node.Fn_decl) and is_kind(args, Node.Module_type_arg_list) {
         return named(owner, instance(module_of(owner), type_args(args, inst)));
     };
@@ -296,6 +300,8 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
     if ty_is(actual, Ty.Error) or ty_is(expected, Ty.Error) or ty_is(actual, Ty.Never) { return expected; };
     if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return expected; };
     if is_variant_of(actual, expected) { return expected; };
+    if converts_to_proto(actual, expected) { return expected; };
+    if ty_is(expected, Ty.Nullable) and converts_to_proto(actual, ty_a[expected]) { return expected; };
     let target = if ty_is(expected, Ty.Nullable) { ty_a[expected]; } else { expected; };
     if ty_is(actual, Ty.Fun) and ty_is(target, Ty.Closure) and ty_a[actual] == ty_a[target] and ty_b[actual] == ty_b[target] {
         decay_fun(actual, w_mark() - 1);
@@ -901,7 +907,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         // A method: the receiver is its first argument.
         let rt = check_base(callee, cx);
         if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
-        if decl_is(ty_decl(rt), Decl.Proto) { return unsupported(node); };
+        if decl_is(ty_decl(rt), Decl.Proto) { return proto_call(rt, name, args, m, node, cx); };
         if is_scalar_kind(ty_decl(rt)) {
             let base = scalar_method(ty_decl(rt), word_of(name), m);
             if base >= 0 and args < 0 { return base; };

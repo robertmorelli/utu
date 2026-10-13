@@ -61,6 +61,25 @@ export lib {
         text;
     }
 
+    // @embed: the files the host reads, by the byte span of their path in src.
+    fn embed_files() I32 { embed_mem.len(); }
+
+    fn embed_path_start(k: I32) I32 { dsl_text_start(last_child(decl_node[embed_mem[k]])); }
+
+    fn embed_path_end(k: I32) I32 { dsl_text_end(last_child(decl_node[embed_mem[k]])); }
+
+    // Room for a file's `n` bytes, written by the host at the offset returned in embed_bytes.
+    fn embed_set(k: I32, n: I32) I32 {
+        let at = embed_bytes.len();
+        embed_bytes.resize(at + n);
+        embed_start[k] = at;
+        embed_count[k] = n;
+        at;
+    }
+
+    // The file could not be read.
+    fn embed_fail(k: I32) void { embed_start[k] = -2; }
+
     // The size of each value the host reads: 8 for 64-bit kinds, else 4.
     fn comptime_value_size(k: I32) I32 {
         let s = mem_storage(comptime_mem[k]);

@@ -76,6 +76,7 @@ fn enum_values(decl: I32) void {
 
 fn validate_program() void {
     int_enum_values();
+    validate_protocols();
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
             report(Diag.ParseError, -1, file);
