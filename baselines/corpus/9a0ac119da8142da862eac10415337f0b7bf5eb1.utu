@@ -1,0 +1,51 @@
+// 05 — picocolors. A namespace of same-shaped functions.
+//
+//   interface Colors { red: Formatter; green: Formatter; bold: Formatter; … }
+//   type Formatter = (input: string | number | null | undefined) => string;
+//
+// Every field has the identical type, and TS expresses that with one named
+// alias reused 20 times. Nominally this is fine — `Formatter` becomes one utu
+// type — but each *field* still needs its own binding, because utu cannot read
+// a property off a JS namespace object without a host call.
+//
+// This is the shape where a generated binding file gets long fast: 20 exports,
+// 20 wasm imports, all structurally identical, differing only in the property
+// name baked into the body.
+
+// PAIN: the .d.ts says `red: Formatter` and nothing else, but `red` is the
+// identity function unless stdout is a TTY. A declaration file describes types,
+// never runtime-conditional behaviour, so a generated binding silently inherits
+// environment dependence the type never mentioned. Here the colours are forced
+// on via `createColors(true)` so the test does not depend on the terminal.
+let red: fun(Str) Str =
+    @es/\ ((m) => m.default.createColors(true).red)(await import('picocolors')) \/;
+let green: fun(Str) Str =
+    @es/\ ((m) => m.default.createColors(true).green)(await import('picocolors')) \/;
+let bold: fun(Str) Str =
+    @es/\ ((m) => m.default.createColors(true).bold)(await import('picocolors')) \/;
+let dim: fun(Str) Str =
+    @es/\ ((m) => m.default.createColors(true).dim)(await import('picocolors')) \/;
+
+// PAIN: utu string literals do not interpret `\u{…}` escapes — "\u{1b}[31m" is
+// twelve literal characters, where JS reads five. So an expected value
+// containing a control character cannot be written in utu source at all, and
+// the test has to build it on the JS side.
+let expect_red: Str = @es/\ '\x1b[31mx\x1b[39m' \/;
+let expect_green: Str = @es/\ '\x1b[32mx\x1b[39m' \/;
+
+// `type Formatter` composes by ordinary application — no binding needed for the
+// composition itself, which is the one place this API is pleasant.
+export main() Str {
+    bold(red("error"));
+}
+
+test "each formatter wraps its input in escape codes" {
+    assert red("x") == expect_red;
+    assert green("x") == expect_green;
+}
+
+test "formatters compose without extra bindings" {
+    // Composition wraps the existing escapes in another pair.
+    assert bold(red("e")).len() == red("e").len() + 9;
+    assert dim("y").len() == 10;
+}

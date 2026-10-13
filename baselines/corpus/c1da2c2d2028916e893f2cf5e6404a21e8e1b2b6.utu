@@ -1,0 +1,16 @@
+using Browser from std:Browser;
+struct S:
+    | n: I32
+export main() Browser.HTMLElement {
+    let s = S { n: 1 };
+    @wutu/\
+    @reactive;
+    div {
+        <title = $[42];
+        p { = 7; }
+        button { @click = $[42]; }
+        input { bind:value = s.n; }
+        if $[s.n] { "x"; }
+    }
+    \/;
+}

@@ -1,0 +1,2 @@
+fn g(n: I32) yield I32 { yield n; for (g(n - 1)) |x| { yield x; }; }
+export main() I32 { for (g(3)) |x| { let f = cl() void { prune; }; }; 1; }

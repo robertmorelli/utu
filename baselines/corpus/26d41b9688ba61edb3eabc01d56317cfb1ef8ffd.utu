@@ -1,0 +1,18 @@
+fn add(a: I32, b: I32) I32 {
+    a + b;
+}
+
+test "top-level tests become synthesized exports" {
+    assert add(4, 5) == 9;
+}
+
+test "tests share helpers inside one file" {
+    assert add(-1, 1) == 0;
+}
+
+bench "increment loop" {
+    let total: I32 = 0;
+    measure {
+        total += 1;
+    }
+}

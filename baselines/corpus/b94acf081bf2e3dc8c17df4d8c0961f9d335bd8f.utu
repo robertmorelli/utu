@@ -1,0 +1,85 @@
+// closures.utu — function pointers and closures
+//
+// utu has two callable types, and the difference is representational:
+//
+//   fun(...) R   a function pointer. No environment, no host involvement —
+//                a `fun` call is a call_indirect and never leaves wasm.
+//   cl(...) R    a closure. Always a JS function held as an externref, so it
+//                can be handed to any JS callback with no marshalling.
+//
+// A `fun` converts to a `cl` implicitly (closure decay). The reverse never
+// happens — it would have to discard the environment.
+
+struct Counter:
+    | n : I32
+
+fn double(x: I32) I32 { x * 2; }
+fn triple(x: I32) I32 { x * 3; }
+
+// ── Function pointers ────────────────────────────────────────────────────────
+// `fun` has no literal form: a value comes from naming a declared function.
+
+fn pick_op(big: Bool, x: I32) I32 {
+    let op: fun(I32) I32 = if big { triple; } else { double; };
+    op(x);
+}
+
+// ── Closures ─────────────────────────────────────────────────────────────────
+// Parameter types come from the expectation, so `x` needs no annotation here.
+
+fn scale_by(n: I32) I32 {
+    let scale: cl(I32) I32 = cl(x) { x * n; };
+    scale(10);
+}
+
+// Parameter types may also be written out. `let` always carries a type
+// annotation in utu, so this is redundant there — it matters at sites where no
+// declared type is in reach.
+fn annotated() I32 {
+    let f: cl(I32) I32 = cl(x: I32) I32 { x + 1; };
+    f(41);
+}
+
+// ── Captures ─────────────────────────────────────────────────────────────────
+// Scalars are snapshot: `base` is copied when the closure is built, so the
+// later assignment is not visible to it.
+//
+// GC references are shared: the closure holds the same Counter, so a mutation
+// made through it afterwards *is* visible.
+
+fn capture_modes() I32 {
+    let base: I32 = 100;
+    let c: Counter = Counter { n: 1 };
+
+    let read: cl() I32 = cl() { base + c.n; };
+
+    base = 999;      // not observed — scalars are snapshot
+    c.n = 5;         // observed — the Counter is shared
+
+    read();          // 100 + 5
+}
+
+// Nested closures work: `m` is free in the inner closure, so the outer one
+// captures it too in order to thread it inward.
+fn nested(m: I32) I32 {
+    let outer: cl(I32) I32 = cl(x) {
+        let inner: cl(I32) I32 = cl(y) { y + m; };
+        inner(x);
+    };
+    outer(5);
+}
+
+// ── Decay ────────────────────────────────────────────────────────────────────
+// A named function is accepted wherever a closure is expected.
+
+fn takes_closure(f: cl(I32) I32) I32 {
+    f(21);
+}
+
+fn decay() I32 {
+    takes_closure(double);
+}
+
+export main() I32 {
+    pick_op(true, 2) + scale_by(3) + annotated() + capture_modes() + nested(1) + decay();
+}

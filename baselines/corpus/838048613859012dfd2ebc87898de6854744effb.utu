@@ -1,0 +1,5 @@
+
+      export lib {
+        fn answer() I32 { @ir/\<ir-lit kind="int" type-name="I32" value="42"/>\/; }
+      }
+    

@@ -1,0 +1,3 @@
+struct B:
+    | n: 
+export main() I32 { let b = B { n: 1 }; 1; }

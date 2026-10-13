@@ -1,0 +1,10 @@
+
+      export lib {
+          fn pairs(n: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { x + i.to_i32(); } flat_map |x| { [x, -x * 10]; } fold(0) |a, v| { a * 3 + v; }; }
+          fn empty(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { let ignored: Array[I32] = []; ignored; } count; }
+          fn none(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { []; } count; }
+          fn statements(n: I32) I32 { let xs = Array[I32].new(n, 2); xs flat_map |x| { let y = x * 5; [y, y + 1, y + 2]; } sum; }
+          fn cut(n: I32, k: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { i.to_i32(); } flat_map |x| { [x, x, x]; } take(k) sum; }
+          fn wide(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { [x, x, x, x, x]; } sum; }
+      }
+    

@@ -1,0 +1,43 @@
+// 04 — semver. Options bags, the case everyone points at when arguing for
+// structural typing.
+//
+//   function satisfies(version: string, range: string, options?: RangeOptions): boolean;
+//   interface RangeOptions { loose?: boolean; includePrerelease?: boolean }
+//
+// The interesting result: the options bag is NOT where the pain is. Every field
+// is optional, so the overwhelmingly common call passes nothing, and a binding
+// that omits the parameter entirely is both correct and smaller. Bags only need
+// modelling when a caller actually sets a field — and then a nominal struct
+// with context-typed `&{}` reads exactly like the TS object literal.
+
+let satisfies: fun(Str, Str) Bool =
+    @es/\ ((m) => (v, r) => m.satisfies(v, r) ? 1 : 0)(await import('semver')) \/;
+
+let gt: fun(Str, Str) Bool =
+    @es/\ ((m) => (a, b) => m.gt(a, b) ? 1 : 0)(await import('semver')) \/;
+
+let major: fun(Str) I32 = @es/\ ((m) => (v) => m.major(v))(await import('semver')) \/;
+
+// The one field that actually gets set in practice gets its own binding. Note
+// this is the same shape as the overload problem: a variant per option combo.
+let satisfies_prerelease: fun(Str, Str) Bool =
+    @es/\ ((m) => (v, r) => m.satisfies(v, r, { includePrerelease: true }) ? 1 : 0)(await import('semver')) \/;
+
+export main() Bool {
+    satisfies("1.2.3", "^1.0.0");
+}
+
+test "the no-options call is the common one and needs no bag" {
+    assert satisfies("1.2.3", "^1.0.0");
+    assert satisfies("2.0.0", "^1.0.0") == false;
+}
+
+test "comparisons and extraction" {
+    assert gt("2.0.0", "1.9.9");
+    assert major("4.5.6") == 4;
+}
+
+test "a set option changes behaviour and needs a second binding" {
+    assert satisfies("1.2.3-alpha.1", "^1.0.0") == false;
+    assert satisfies_prerelease("1.2.3-alpha.1", ">=1.0.0-0");
+}

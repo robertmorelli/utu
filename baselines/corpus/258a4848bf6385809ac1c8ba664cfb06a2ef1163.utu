@@ -1,0 +1,2 @@
+fn g() yield I32 { yield "s"; }
+export main() I32 { for (g()) |x| { x; }; 1; }

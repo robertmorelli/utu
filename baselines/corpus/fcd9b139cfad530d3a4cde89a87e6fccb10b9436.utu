@@ -1,0 +1,1 @@
+export lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }

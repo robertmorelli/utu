@@ -1,0 +1,48 @@
+// promises.utu — Promise[T] is a real JavaScript promise
+//
+// `Promise[T]` maps to externref, so a promise from `fetch` is the same object
+// utu passes back, and a promise utu produces is directly awaitable from JS.
+// Nothing is wrapped or marshalled — the same decision as `cl`.
+//
+// Two ways to consume one:
+//
+//   p.then(cl(v) { … })   works on any JS host
+//   await p               straight-line code; needs a JSPI-capable host
+//                         (Chrome 126+, Node 23+, Bun)
+
+let delay: fun(I32, I32) Promise[I32] =
+    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+
+let record: fun(I32) void = @es/\ (v) => { globalThis.__last = v; } \/;
+let last: fun() I32 = @es/\ () => globalThis.__last ?? 0 \/;
+
+// ── Subscribing ──────────────────────────────────────────────────────────────
+// The callback is a `cl`, which is already a JS function, so `.then` hands it
+// straight to the platform. No host support beyond the promise itself.
+
+fn subscribe(n: I32) void {
+    delay(n, 5).then(cl(v) { record(v); });
+}
+
+// ── Awaiting ─────────────────────────────────────────────────────────────────
+// Ordinary straight-line code. The wasm stack suspends at the `await` and
+// resumes when the promise settles — there is no state machine and no callback,
+// and locals stay live across the suspension exactly as they look.
+
+fn total(a: I32, b: I32) I32 {
+    let first: I32 = await delay(a, 5);
+    let second: I32 = await delay(b, 5);
+    first + second;
+}
+
+// Awaiting composes with everything else; nothing about the function is
+// coloured differently because it awaits.
+fn scaled(n: I32) I32 {
+    let base: I32 = await delay(n, 1);
+    if base > 10 { base * 2; } else { base; };
+}
+
+export main() I32 {
+    subscribe(7);
+    total(20, 22) + scaled(6);
+}

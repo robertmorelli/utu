@@ -1,0 +1,9 @@
+
+      struct Point:
+        | x : F64
+      export lib {
+        fn branch(flag: Bool) F64 { if flag { 1.0; } else { }; 2.0; }
+        fn option(p: ?Point) void { promote p { |v| => v.x, ~> {}, }; }
+        fn binding() void { let unused: F64 = 3.0; }
+      }
+    

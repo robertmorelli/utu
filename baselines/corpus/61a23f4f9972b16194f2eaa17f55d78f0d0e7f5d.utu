@@ -1,0 +1,2 @@
+fn f() ?Nope { Nope.null; }
+export main() I32 { 1; }

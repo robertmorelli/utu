@@ -1,0 +1,2 @@
+let g: I32 = 1;
+export lib { fn bad() I32 { g = 2; g; } }

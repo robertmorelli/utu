@@ -1,0 +1,15 @@
+let console_log: fun(Str) void = @es/\console.log\/;
+let wrap: fun(Str) Str = @es/\(value) => `[${value}]`\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
+
+fn greet(name: Str) Str {
+    name -o wrap;
+}
+
+fn main() I64 {
+    3;
+}
+
+test "imports can be called from test mode" {
+    assert str_eq(greet("utu"), "[utu]");
+}

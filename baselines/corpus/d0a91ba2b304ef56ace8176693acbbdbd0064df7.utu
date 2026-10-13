@@ -1,0 +1,113 @@
+// std/Interner.utu — byte strings to dense I32 ids: 0, 1, 2, … in first-seen order.
+//
+//   let names = Interner.new();
+//   names.begin();
+//   for (start ..< end) |i| { names.byte(src[i]); };   // src can be a mem
+//   let id = names.finish();      // the same bytes always get the same id
+//   names.size(id); names.byte_at(id, 0); names.ascii(id);
+//
+// Keys arrive a byte at a time, so they can come from a mem, an array, or a
+// string. The bytes of a new key are kept; a repeated key's are dropped.
+// FNV-1a hashing, linear probing over a power-of-two table at most half full.
+mod Interner {
+    struct &:
+        | bytes: Array[I32]
+        | used: I32
+        | starts: Array[I32]
+        | hashes: Array[I32]
+        | count: I32
+        | table: Array[I32]
+        | start: I32
+        | hash: I32
+
+    fn &.new() & {
+        &{ bytes: Array[I32].new(256, 0), used: 0, starts: Array[I32].new(64, 0), hashes: Array[I32].new(64, 0),
+           count: 0, table: Array[I32].new(64, 0), start: 0, hash: 0 };
+    }
+
+    // Distinct keys so far.
+    fn &.len |self| () I32 {
+        self.count;
+    }
+
+    fn &.begin |self| () void {
+        self.start = self.used;
+        self.hash = -2128831035;
+    }
+
+    fn &.byte |self| (b: I32) void {
+        if self.used == self.bytes.len() {
+            let grown = Array[I32].new(self.used * 2, 0);
+            grown.copy_from(0, self.bytes, 0, self.used);
+            self.bytes = grown;
+        };
+        self.bytes[self.used] = b & 255;
+        self.used += 1;
+        self.hash = (self.hash ^ (b & 255)) * 16777619;
+    }
+
+    // The id of the bytes since begin(), adding them if they are new.
+    fn &.finish |self| () I32 {
+        let mask = self.table.len() - 1;
+        let i = self.hash & mask;
+        let length = self.used - self.start;
+        while (self.table[i] != 0) {
+            let id = self.table[i] - 1;
+            if self.hashes[id] == self.hash and self.same(id, length) {
+                self.used = self.start;
+                return id;
+            };
+            i = (i + 1) & mask;
+        };
+        let id = self.count;
+        if id + 1 == self.starts.len() {
+            let starts = Array[I32].new(self.starts.len() * 2, 0);
+            starts.copy_from(0, self.starts, 0, self.starts.len());
+            self.starts = starts;
+            let hashes = Array[I32].new(self.hashes.len() * 2, 0);
+            hashes.copy_from(0, self.hashes, 0, self.hashes.len());
+            self.hashes = hashes;
+        };
+        self.starts[id] = self.start;
+        self.starts[id + 1] = self.used;
+        self.hashes[id] = self.hash;
+        self.count += 1;
+        self.table[i] = id + 1;
+        if self.count * 2 > self.table.len() { self.rehash(); };
+        id;
+    }
+
+    fn &.same |self| (id: I32, length: I32) Bool {
+        let at = self.starts[id];
+        if self.starts[id + 1] - at != length { return false; };
+        for (0 ..< length) |k| {
+            if self.bytes[at + k] != self.bytes[self.start + k] { return false; };
+        };
+        true;
+    }
+
+    fn &.rehash |self| () void {
+        let table = Array[I32].new(self.table.len() * 2, 0);
+        let mask = table.len() - 1;
+        for (0 ..< self.count) |id| {
+            let i = self.hashes[id] & mask;
+            while (table[i] != 0) { i = (i + 1) & mask; };
+            table[i] = id + 1;
+        };
+        self.table = table;
+    }
+
+    // Byte length of a key.
+    fn &.size |self| (id: I32) I32 {
+        self.starts[id + 1] - self.starts[id];
+    }
+
+    fn &.byte_at |self| (id: I32, k: I32) I32 {
+        self.bytes[self.starts[id] + k];
+    }
+
+    // The key as a string, one character per byte (exact for ASCII).
+    fn &.ascii |self| (id: I32) Str {
+        Str.from_codes(self.bytes.slice(self.starts[id], self.starts[id + 1]), self.size(id));
+    }
+}

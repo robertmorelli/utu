@@ -1,0 +1,11 @@
+
+      export lib {
+          fn signed() Str { let n = -42; n.to_str(); }
+          fn unsigned() Str { let n: U32 = 4294967295; n.to_str(); }
+          fn wide() Str { let n: I64 = -9000000000; n.to_str(); }
+          fn wide_unsigned() Str { let n: U64 = 18446744073709551615; n.to_str(); }
+          fn single() Str { let n: F32 = 0.1; n.to_str(); }
+          fn double() Str { 2.5.to_str(); }
+          fn truth() Str { (1 > 2).to_str(); }
+      }
+    

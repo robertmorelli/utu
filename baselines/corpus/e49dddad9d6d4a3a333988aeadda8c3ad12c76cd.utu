@@ -1,0 +1,17 @@
+
+      struct Point:
+        | x : I32
+        | y : I32
+      struct Line:
+        | start : Point
+        | end : Point
+      export lib {
+        fn dx(ax: I32, ay: I32, bx: I32, by: I32) I32 {
+          let l: Line = Line {
+            start: Point { x: ax, y: ay },
+            end: Point { x: bx, y: by },
+          };
+          l.end.x - l.start.x;
+        }
+      }
+    

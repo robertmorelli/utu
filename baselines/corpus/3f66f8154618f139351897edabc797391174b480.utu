@@ -1,0 +1,4 @@
+using Browser from std:Browser;
+struct S:
+    | t: Str
+export main() Browser.HTMLElement { let s = S { t: "" }; @wutu/\ div { input { bind:value = s.t; } } \/; }

@@ -1,0 +1,17 @@
+
+      mod Pair[T] {
+          struct P:
+              | a: T
+              | b: T
+          fn make(a: T, b: T) P { P { a: a, b: b }; }
+          fn sum(p: P) T { p.a + p.b; }
+      }
+      mod Id[T] {
+          fn id(x: T) T { x; }
+      }
+      export lib {
+          fn pair() I32 { Pair[I32].sum(Pair[I32].make(2, 3)); }
+          fn deep() I32 { Id[I32].id(Id[I32].id(Id[I32].id(4))); }
+          fn floats() F64 { Pair[F64].sum(Pair[F64].make(1.5, Id[F64].id(2.0))); }
+      }
+    

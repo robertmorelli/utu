@@ -1,0 +1,2 @@
+struct Cell: | value : I32
+export lib { fn bad() Cell { Cell { value: 1, extra: 2 }; } }

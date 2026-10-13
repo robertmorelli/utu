@@ -7,7 +7,7 @@
 // or swapped with its neighbour), which mostly exercises the rejection side.
 //
 // With no arguments, checks every .utu file under examples/, benchmarks/,
-// std/, hand_written_bindings/, and .tmp/corpus (sources collected from
+// std/, hand_written_bindings/, and baselines/corpus (sources collected from
 // test runs). Exits 1 on any disagreement.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const show = Number(process.argv.find(arg => arg.startsWith('--show='))?.slice(7) ?? 10);
 const fuzz = Number(process.argv.find(arg => arg.startsWith('--fuzz='))?.slice(7) ?? 0);
 const inputs = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
-const roots = inputs.length ? inputs : ['examples', 'benchmarks', 'std', 'hand_written_bindings', '.tmp/corpus']
+const roots = inputs.length ? inputs : ['examples', 'benchmarks', 'std', 'hand_written_bindings', 'baselines/corpus']
   .map(dir => path.join(ROOT, dir)).filter(dir => fs.existsSync(dir));
 
 function files(entry) {

@@ -1,0 +1,4 @@
+
+        let make: fun(Str) Promise[Str] = @es/\ (u) => Promise.resolve("body:" + u) \/;
+        export lib { fn get(u: Str) Promise[Str] { make(u); } }
+      

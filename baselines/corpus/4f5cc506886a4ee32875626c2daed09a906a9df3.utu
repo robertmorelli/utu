@@ -1,0 +1,17 @@
+
+      struct Box:
+        | n : I32
+      export lib {
+        fn read(outer: Bool, inner: Bool) I32 {
+          let a: ?Box = if outer { Box { n: 7 }; } else { null; };
+          let b: ?Box = if inner { Box { n: 3 }; } else { null; };
+          promote a {
+            |x| => promote b {
+              |y| => x.n + y.n,
+              ~> x.n,
+            },
+            ~> 0,
+          };
+        }
+      }
+    

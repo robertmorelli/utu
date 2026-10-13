@@ -1,0 +1,5158 @@
+{
+ "baselines/corpus/014dbe4c80d1e419548708437bc6b5bc5d5c416b.utu normal": {
+  "calls": {
+   "run": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/014dbe4c80d1e419548708437bc6b5bc5d5c416b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/0203ee6613a5325fc47d7f1462fc7707ba364c6f.utu normal": {
+  "compile": "Error: a generator loop binds one value: for (gen()) |value| { … }"
+ },
+ "baselines/corpus/0203ee6613a5325fc47d7f1462fc7707ba364c6f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/02762875986fa3149f1fa3820327d3debde9acc5.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'createElement')",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/02762875986fa3149f1fa3820327d3debde9acc5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/02ca5a8e0382f7a790d47ee8fa86d9037b5bc5a2.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/02ca5a8e0382f7a790d47ee8fa86d9037b5bc5a2.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/033063ab4a248a185cd4470ef7c5e6e76eabd257.utu normal": {
+  "compile": "Error: @json match needs at least one pattern arm"
+ },
+ "baselines/corpus/033063ab4a248a185cd4470ef7c5e6e76eabd257.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/03862733c8148a2bfdb2f3baf3ab42bdbda6cb1e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/03862733c8148a2bfdb2f3baf3ab42bdbda6cb1e.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/04c4b0af5926a939192d51ad92bae6d63b2c938e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/04c4b0af5926a939192d51ad92bae6d63b2c938e.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/04d7dd53d0f5cd5e0d56fd625ce053b652d9b6c0.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/04d7dd53d0f5cd5e0d56fd625ce053b652d9b6c0.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/05023cacc73995d60598c1f403b9fe8a94a2a8e6.utu normal": {
+  "calls": {
+   "run": {
+    "result": 9,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/05023cacc73995d60598c1f403b9fe8a94a2a8e6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu normal": {
+  "compile": "Error: generator a consumes itself; generators expand inline, so they cannot recurse"
+ },
+ "baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/053e5278dd9db341ae2a1c51339580d709e1abc4.utu normal": {
+  "calls": {
+   "greet": {
+    "result": "hi there",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/053e5278dd9db341ae2a1c51339580d709e1abc4.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/063108d1eea3794be165582ec81399da19f3778d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/063108d1eea3794be165582ec81399da19f3778d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/063bb5aea7d50b30daf42e51989c922c4137f71d.utu normal": {
+  "compile": "Error: @json cannot use Missing: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64"
+ },
+ "baselines/corpus/063bb5aea7d50b30daf42e51989c922c4137f71d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/065a2dcafb9de42537d8f4402cdebf9b25106f56.utu normal": {
+  "compile": "Error: T has no variant C"
+ },
+ "baselines/corpus/065a2dcafb9de42537d8f4402cdebf9b25106f56.utu test": {
+  "compile": "Error: T has no variant C"
+ },
+ "baselines/corpus/073730b978563f1c34c18c4539282f3da973b461.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/073730b978563f1c34c18c4539282f3da973b461.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/07e08ab9073c710ecc7802c81475f889724b820e.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/07e08ab9073c710ecc7802c81475f889724b820e.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/085669870f99609554259256d1ba9a706f5d96de.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/085669870f99609554259256d1ba9a706f5d96de.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/08667123610fb4b702c1e47b0a27294e670c8619.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/08667123610fb4b702c1e47b0a27294e670c8619.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/08fc343b3468c7b794d8c50025ac434e42040bde.utu normal": {
+  "calls": {
+   "greet_len": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/08fc343b3468c7b794d8c50025ac434e42040bde.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/09e6ebe20446e5323e9af828bbb27598f9d36120.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/09e6ebe20446e5323e9af828bbb27598f9d36120.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/0b33943c461be9313d4e261898ba7a76879a3f50.utu normal": {
+  "calls": {
+   "zero_arg": {
+    "result": 99,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/0b33943c461be9313d4e261898ba7a76879a3f50.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/0b4ab960a86050e48de8a07f92383c15381c239a.utu normal": {
+  "calls": {
+   "main": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/0b4ab960a86050e48de8a07f92383c15381c239a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/0cbba9c46fc57329d6d71b3af2a1003a28067927.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/0cbba9c46fc57329d6d71b3af2a1003a28067927.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/0e568600a73dc8d5c990c6d002b1f644d1d612ce.utu normal": {
+  "calls": {
+   "circle": {
+    "result": 7,
+    "printed": []
+   },
+   "rect": {
+    "result": 12,
+    "printed": []
+   },
+   "triangle": {
+    "result": 9,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/0e568600a73dc8d5c990c6d002b1f644d1d612ce.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/0ebb90972d4cce8090630fc28d6ba2e1b25f0cb5.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/0ebb90972d4cce8090630fc28d6ba2e1b25f0cb5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1419f7d207da76b301e988d62175b8b65d1eb822.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1419f7d207da76b301e988d62175b8b65d1eb822.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/14eb6585b66fcbd2b146a3eb2a2083dafea5a4fc.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/14eb6585b66fcbd2b146a3eb2a2083dafea5a4fc.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/152a89555d524b7bc79884fb7c34c94a1cb5622d.utu normal": {
+  "calls": {
+   "spin": {
+    "result": 3,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/152a89555d524b7bc79884fb7c34c94a1cb5622d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/15cf80206d3f96655d0a7e99a0fb06627f920545.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/15cf80206d3f96655d0a7e99a0fb06627f920545.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/16feba558db50b2c47e31e163eca74654dc593cc.utu normal": {
+  "compile": "Error: mem s is const; it cannot be written"
+ },
+ "baselines/corpus/16feba558db50b2c47e31e163eca74654dc593cc.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/179d1a6084d6ace8eb4443be19bcb3194b6834e8.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/179d1a6084d6ace8eb4443be19bcb3194b6834e8.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/17de5499650ecf582f30d01268a91fe16f3f6a57.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/17de5499650ecf582f30d01268a91fe16f3f6a57.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/181f74979ad874696c95634697e658f29dc85fb3.utu normal": {
+  "compile": "Error: unknown attribute hreff on p"
+ },
+ "baselines/corpus/181f74979ad874696c95634697e658f29dc85fb3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/18a5266d3e635d4921006a221c9a25d7aa57a412.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/18a5266d3e635d4921006a221c9a25d7aa57a412.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1922461764596ddd876aaf8ff27f09c70fdbcc0d.utu normal": {
+  "calls": {
+   "circle": {
+    "result": 11,
+    "printed": []
+   },
+   "rect": {
+    "result": 22,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/1922461764596ddd876aaf8ff27f09c70fdbcc0d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/195338277b247a0992070343e813bc0f6514eaae.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/195338277b247a0992070343e813bc0f6514eaae.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1a0dba1b8c746998e8e996a016b6b14f20a8d08e.utu normal": {
+  "compile": "Error: type N = distinct Str: a distinct type wraps one of I32, U32, I64, U64, F32, F64"
+ },
+ "baselines/corpus/1a0dba1b8c746998e8e996a016b6b14f20a8d08e.utu test": {
+  "compile": "Error: type N = distinct Str: a distinct type wraps one of I32, U32, I64, U64, F32, F64"
+ },
+ "baselines/corpus/1b0cdf11505558885a28d66dabb01b383d55baea.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1b0cdf11505558885a28d66dabb01b383d55baea.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1bce8ffb741bc18f07629fafa76dee3714959792.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/1bce8ffb741bc18f07629fafa76dee3714959792.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/1ca2d24b5a5f2885e2400fb1603592a805d5f1ec.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1ca2d24b5a5f2885e2400fb1603592a805d5f1ec.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1ca78f9e20a96304bfb2207f034e258dafe1fb95.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1ca78f9e20a96304bfb2207f034e258dafe1fb95.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1d409c83fb9278f98199ae416d92f49117722816.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1d409c83fb9278f98199ae416d92f49117722816.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu normal": {
+  "calls": {
+   "main": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1dd5e0d0f2230dda7abeb5f435930b7cbbde3333.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/1dd5e0d0f2230dda7abeb5f435930b7cbbde3333.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1e24e09fc39540c2a7e3cebcaa8157510466ad4e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1e24e09fc39540c2a7e3cebcaa8157510466ad4e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1ef0e0275d1864ea4936206ea5f91e6ddb9c73a6.utu normal": {
+  "compile": "Error: prune cannot appear inside a closure"
+ },
+ "baselines/corpus/1ef0e0275d1864ea4936206ea5f91e6ddb9c73a6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/1f78162f9072c60e0369ea08a963a3eda88eaef4.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/1f78162f9072c60e0369ea08a963a3eda88eaef4.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/217f6adc132aa507c420eb73c228ff68628096a9.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/217f6adc132aa507c420eb73c228ff68628096a9.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/2202db89126008e2944fadf60183ad9d65ec942d.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/2202db89126008e2944fadf60183ad9d65ec942d.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/2406b67a9a1bedadd0916bf7d747cbcfeac1f247.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/2406b67a9a1bedadd0916bf7d747cbcfeac1f247.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/250e0a898edab6891a1b09176fc77702f6f9ba7e.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/250e0a898edab6891a1b09176fc77702f6f9ba7e.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   },
+   "__test_5": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/252aa881c130f54d10d5771e9c5034b255099e73.utu normal": {
+  "compile": "Error: Iterator pipeline must end with fold, each, collect(Type), or a scalar terminal; found map"
+ },
+ "baselines/corpus/252aa881c130f54d10d5771e9c5034b255099e73.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/26d41b9688ba61edb3eabc01d56317cfb1ef8ffd.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/26d41b9688ba61edb3eabc01d56317cfb1ef8ffd.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/274c5dd8e06bd065eff54034a8bbd7e088b1dc6a.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/274c5dd8e06bd065eff54034a8bbd7e088b1dc6a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu normal": {
+  "calls": {
+   "main": {
+    "result": 0,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/2808ed975861a6caef565ed510159f095d27cd35.utu normal": {
+  "calls": {
+   "awaited": {
+    "result": 5,
+    "printed": []
+   },
+   "broken": {
+    "result": 46,
+    "printed": []
+   },
+   "deferred": {
+    "result": 100,
+    "printed": []
+   },
+   "early": {
+    "result": 64,
+    "printed": []
+   },
+   "hygiene": {
+    "result": 127,
+    "printed": []
+   },
+   "inner_loops": {
+    "result": 42,
+    "printed": []
+   },
+   "nested": {
+    "result": 318,
+    "printed": []
+   },
+   "once": {
+    "result": 103,
+    "printed": []
+   },
+   "ordered": {
+    "result": 123,
+    "printed": []
+   },
+   "returned": {
+    "result": 10,
+    "printed": []
+   },
+   "skipped": {
+    "result": 143,
+    "printed": []
+   },
+   "structs": {
+    "result": 6,
+    "printed": []
+   },
+   "sum": {
+    "result": 159,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/2808ed975861a6caef565ed510159f095d27cd35.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/281f8d2241770fb7cfd8c65033dccf073345a03f.utu normal": {
+  "calls": {
+   "run": {
+    "result": 12,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/281f8d2241770fb7cfd8c65033dccf073345a03f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/287bb7b1f5b05a7f3e4679f9e21695c239888e84.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/287bb7b1f5b05a7f3e4679f9e21695c239888e84.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/289b1dfd1b6d07d2fc27c430e3598386bfe80241.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/289b1dfd1b6d07d2fc27c430e3598386bfe80241.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/28c9b0d3161abd54e6093577e97176c757362b16.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/28c9b0d3161abd54e6093577e97176c757362b16.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2965b80844afa8a69a849f09782d5e190210582e.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/2965b80844afa8a69a849f09782d5e190210582e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2a9b109e0dfbf3d2b60876ce39b79de6cde63246.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/2a9b109e0dfbf3d2b60876ce39b79de6cde63246.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2c955c8924ff9477781c581913ee0823dab775ae.utu normal": {
+  "compile": "Error: Cannot import \"../sim.utu\": file not found (<root>/baselines/sim.utu)"
+ },
+ "baselines/corpus/2c955c8924ff9477781c581913ee0823dab775ae.utu test": {
+  "compile": "Error: Cannot import \"../sim.utu\": file not found (<root>/baselines/sim.utu)"
+ },
+ "baselines/corpus/2d7fbb04c93342bcb1dcf703cbc3e9b97e214922.utu normal": {
+  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+ },
+ "baselines/corpus/2d7fbb04c93342bcb1dcf703cbc3e9b97e214922.utu test": {
+  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+ },
+ "baselines/corpus/2d906d778959733a2d5aac8bf9a07d22d6776dde.utu normal": {
+  "calls": {
+   "main": {
+    "result": 3,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/2d906d778959733a2d5aac8bf9a07d22d6776dde.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/2dc0ab65492273d7cbb422486282833bc30dd4d0.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/2dc0ab65492273d7cbb422486282833bc30dd4d0.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2ddd76d0ed0b2f10f72c4617a7c0e83d9c980574.utu normal": {
+  "compile": "Error: Cannot import \"./_boxes.utu\": file not found (<root>/baselines/corpus/_boxes.utu)"
+ },
+ "baselines/corpus/2ddd76d0ed0b2f10f72c4617a7c0e83d9c980574.utu test": {
+  "compile": "Error: Cannot import \"./_boxes.utu\": file not found (<root>/baselines/corpus/_boxes.utu)"
+ },
+ "baselines/corpus/2def47a8f2158234984e77b80c0201cfd869c892.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/2def47a8f2158234984e77b80c0201cfd869c892.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2dfcf44154c44678f663200b1986d85e743f54a8.utu normal": {
+  "compile": "Error: s.view() returns a JS.Uint8Array; add `using JS from std:JS;`"
+ },
+ "baselines/corpus/2dfcf44154c44678f663200b1986d85e743f54a8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2ee09deb6a22c20b62ffa639ae3c42b82cf796b4.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/2ee09deb6a22c20b62ffa639ae3c42b82cf796b4.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/2f22369ee92f8e581a49e0768436ab23eaba620b.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/2f22369ee92f8e581a49e0768436ab23eaba620b.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/2f303e7fa3e96d8847380416aa1af6c06263f443.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/2f303e7fa3e96d8847380416aa1af6c06263f443.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3005580afd7d9bd93e4bfb2be272dad63ea51721.utu normal": {
+  "calls": {
+   "main": {
+    "result": 6,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/3005580afd7d9bd93e4bfb2be272dad63ea51721.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3115eddca71f7f7fc41a0808a9962ae6c82e6de7.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/3115eddca71f7f7fc41a0808a9962ae6c82e6de7.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/317785458b671c0c57dd89c92fb3ff230fa64aa2.utu normal": {
+  "calls": {
+   "empty": {
+    "result": 0,
+    "printed": []
+   },
+   "empty_product": {
+    "result": 1,
+    "printed": []
+   },
+   "float_sum": {
+    "result": 8,
+    "printed": []
+   },
+   "floats": {
+    "result": 1.5,
+    "printed": []
+   },
+   "growth": {
+    "result": 2005,
+    "printed": []
+   },
+   "sorted": {
+    "result": 108,
+    "printed": []
+   },
+   "structs": {
+    "result": 3,
+    "printed": []
+   },
+   "wide_sum": {
+    "result": "7n",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/317785458b671c0c57dd89c92fb3ff230fa64aa2.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/318cc7d06871b91068da229e3a180c03b6eee03b.utu normal": {
+  "compile": "Error: prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself"
+ },
+ "baselines/corpus/318cc7d06871b91068da229e3a180c03b6eee03b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/31ee37b29b174c0d211fffebe4c5024ee58cc2be.utu normal": {
+  "calls": {
+   "main": {
+    "result": 7,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/31ee37b29b174c0d211fffebe4c5024ee58cc2be.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/320dd5a981179602da6594dfd671ade5b0c63aff.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/320dd5a981179602da6594dfd671ade5b0c63aff.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/32fbdaff9548f268c0dfed324aa89fd0405cbd1c.utu normal": {
+  "compile": "Error: @json cannot use Missing: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64"
+ },
+ "baselines/corpus/32fbdaff9548f268c0dfed324aa89fd0405cbd1c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3310c158cfa2087a62318981437f2d979cbbfd8b.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "TypeError: self.getItem is not a function",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/3310c158cfa2087a62318981437f2d979cbbfd8b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/333f12471002e694fdd978840b802b0c97c19c56.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/333f12471002e694fdd978840b802b0c97c19c56.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3398c4c5a3db29c9ed478fd2db07b0e0e4e682ba.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/3398c4c5a3db29c9ed478fd2db07b0e0e4e682ba.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/33bc22a4558f23543a81b79e22bebcf003d0bc6f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/33bc22a4558f23543a81b79e22bebcf003d0bc6f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/34818a000d6975174f9ccda61785e8a10d07cde3.utu normal": {
+  "calls": {
+   "from_let": {
+    "result": 7,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/34818a000d6975174f9ccda61785e8a10d07cde3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/35a612845f9c6b2f3c0523b5d7f792e8d50d44f1.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/35a612845f9c6b2f3c0523b5d7f792e8d50d44f1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/38043bac22b8bd22c8462df1cf81f8dae03a0d8a.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/38043bac22b8bd22c8462df1cf81f8dae03a0d8a.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/3c7252654b2804bba026571652a894399cf71228.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/3c7252654b2804bba026571652a894399cf71228.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3d34304de3950320b3c455124450465a14c251d9.utu normal": {
+  "compile": "Error: @json decode needs a text expression after the type"
+ },
+ "baselines/corpus/3d34304de3950320b3c455124450465a14c251d9.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3d82cfd15dc1518044fb6bf4d70c54b5b0f6e105.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/3d82cfd15dc1518044fb6bf4d70c54b5b0f6e105.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/3e7efb34ae580a9791252b7b34dd71a8188483f5.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/3e7efb34ae580a9791252b7b34dd71a8188483f5.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/3ed727b21d690763fc765008cbba4cfdedd0341a.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/3ed727b21d690763fc765008cbba4cfdedd0341a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3f0c1997d517d7457546a946b3aabefcd905362c.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/3f0c1997d517d7457546a946b3aabefcd905362c.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/3f3fc3ffb2e5c18823d4cb0cb3d99b88e8fe2d17.utu normal": {
+  "compile": "Error: yield can only appear in a generator: declare the function with `yield T` as its return type"
+ },
+ "baselines/corpus/3f3fc3ffb2e5c18823d4cb0cb3d99b88e8fe2d17.utu test": {
+  "compile": "Error: yield can only appear in a generator: declare the function with `yield T` as its return type"
+ },
+ "baselines/corpus/3f66f8154618f139351897edabc797391174b480.utu normal": {
+  "compile": "Error: bind requires an @reactive view in this source file"
+ },
+ "baselines/corpus/3f66f8154618f139351897edabc797391174b480.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/3fe8dd8e3b0f21b82affaffab88a42132fda3560.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/3fe8dd8e3b0f21b82affaffab88a42132fda3560.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/40378359c1fcf5d586f99fc5244447a2256ab7a6.utu normal": {
+  "calls": {
+   "run": {
+    "result": 14,
+    "printed": []
+   },
+   "single": {
+    "result": 4,
+    "printed": []
+   },
+   "still_int": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/40378359c1fcf5d586f99fc5244447a2256ab7a6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4039a3082e189bcc66d074a2a304bb4441969b7d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4039a3082e189bcc66d074a2a304bb4441969b7d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/42805086ebdded5222aeb8c7a46d25d163372a84.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/42805086ebdded5222aeb8c7a46d25d163372a84.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/43620e32fb726baa4b06da70d2e1f4013d7d6467.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/43620e32fb726baa4b06da70d2e1f4013d7d6467.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4362eb1fc65f2b31f8bc2ada8cb41d087cf92c76.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/4362eb1fc65f2b31f8bc2ada8cb41d087cf92c76.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/46327454f4a79ab5f2f3ce3e5ede905fc7ab1c10.utu normal": {
+  "calls": {
+   "eaches": {
+    "result": 8,
+    "printed": []
+   },
+   "nested": {
+    "result": 66,
+    "printed": []
+   },
+   "ranges": {
+    "result": 427,
+    "printed": []
+   },
+   "whiles": {
+    "result": 16,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/46327454f4a79ab5f2f3ce3e5ede905fc7ab1c10.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/467780d6560c84cd2d2c8244dc6fd396713eaf2b.utu normal": {
+  "compile": "Error: mem s is const; it has no push"
+ },
+ "baselines/corpus/467780d6560c84cd2d2c8244dc6fd396713eaf2b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/468d92cae4849195775dfadf5aef4636071b6e4b.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/468d92cae4849195775dfadf5aef4636071b6e4b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/472ec8ed5d2996e7b89b005330126e12f16f5d5b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/472ec8ed5d2996e7b89b005330126e12f16f5d5b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4768534649de9f9485311072ae1b9edc7d4fb251.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4768534649de9f9485311072ae1b9edc7d4fb251.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/48289f11f8fe6858bcbfea5cbeefb6c41bdf1f49.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/48289f11f8fe6858bcbfea5cbeefb6c41bdf1f49.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/48486bdd707202c0765b6dfc2a61e2298fab3b65.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/48486bdd707202c0765b6dfc2a61e2298fab3b65.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/48a13da6ec4b3c887f27ed48503da5853f55480d.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/48a13da6ec4b3c887f27ed48503da5853f55480d.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "throws": "RuntimeError: unreachable",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/4b3c14f2c7ce885cfd06414bb66a2197a81839c5.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4b3c14f2c7ce885cfd06414bb66a2197a81839c5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4c120a4cf4e8f423cc44a2b9a06fefe7ee5c9035.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/4c120a4cf4e8f423cc44a2b9a06fefe7ee5c9035.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/4c129bc507fbb892cafd1d6070f5e3520d2bb734.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4c129bc507fbb892cafd1d6070f5e3520d2bb734.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4c96d22434788c99767c27c347950480311c7bcb.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4c96d22434788c99767c27c347950480311c7bcb.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4cdf1abae144503b347baf2855fddccb1ab385ab.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4cdf1abae144503b347baf2855fddccb1ab385ab.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4cf5e2447d40243124feb69a8a08d33f37f6fceb.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4cf5e2447d40243124feb69a8a08d33f37f6fceb.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4dc01d74ad0e9889e6fc5390909b3f193f6a882c.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/4dc01d74ad0e9889e6fc5390909b3f193f6a882c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4e2e51882c7b84989f4f467b92bdc0528da0b8ff.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/4e2e51882c7b84989f4f467b92bdc0528da0b8ff.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "throws": "RuntimeError: unreachable",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/4f2183783faf947eef80533032d114bc7df5c21f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/4f2183783faf947eef80533032d114bc7df5c21f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/4f5cc506886a4ee32875626c2daed09a906a9df3.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/4f5cc506886a4ee32875626c2daed09a906a9df3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/505daef3083248e794b2408614e65e4b3767a9fa.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/505daef3083248e794b2408614e65e4b3767a9fa.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/51001d8392252df239785676a3cfa85b6bb71c60.utu normal": {
+  "calls": {
+   "main": {
+    "result": 10,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/51001d8392252df239785676a3cfa85b6bb71c60.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/51352c723f0f99c8bdcb1d66729e93fbcd392242.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/51352c723f0f99c8bdcb1d66729e93fbcd392242.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/51a157c35974ccaa801e3e2cb7d195a6bdfe6f98.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/51a157c35974ccaa801e3e2cb7d195a6bdfe6f98.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5486af2ca7d386a53acffe658a9d9b8756d656fd.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5486af2ca7d386a53acffe658a9d9b8756d656fd.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/54e1810b301541e910b7d6da9d25655cd3becc6f.utu normal": {
+  "calls": {
+   "first": {
+    "result": 11,
+    "printed": []
+   },
+   "second": {
+    "result": 12,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/54e1810b301541e910b7d6da9d25655cd3becc6f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/54e433751d02912b754b28c45ed72631d2b15807.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/54e433751d02912b754b28c45ed72631d2b15807.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/5560f322900c22d34f7503f60e431afc46762866.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/5560f322900c22d34f7503f60e431afc46762866.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/562f1af8b897b983783d990854b650447817f5c2.utu normal": {
+  "compile": "Error: @comptime: Unknown variable 'nope' (line 4)"
+ },
+ "baselines/corpus/562f1af8b897b983783d990854b650447817f5c2.utu test": {
+  "compile": "Error: @comptime: Unknown variable 'nope' (line 4)"
+ },
+ "baselines/corpus/56850a02338f4f5dd99803472ec88493b8d45475.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/56850a02338f4f5dd99803472ec88493b8d45475.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/57940c7e7d169dd2167180f2d2ab427288c58114.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/57940c7e7d169dd2167180f2d2ab427288c58114.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/57a339eb76334e7f0862fd051b19c9945d235bba.utu normal": {
+  "calls": {
+   "main": {
+    "result": "hello from utu",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/57a339eb76334e7f0862fd051b19c9945d235bba.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/57e8738a9c32bc3d1ec77585033427d012b4b210.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/57e8738a9c32bc3d1ec77585033427d012b4b210.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/57f5b99ad12c5d8596818370bfae411a2dfe66b1.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/57f5b99ad12c5d8596818370bfae411a2dfe66b1.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5877778b67b9c45fd018b0d960e3c50a3b8a12d2.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/5877778b67b9c45fd018b0d960e3c50a3b8a12d2.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/59e21c48e7764a28941013a5327a8b22b5274313.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/59e21c48e7764a28941013a5327a8b22b5274313.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5a01f7d8cdce5dba5be4dbb92dd885a470ab8fe3.utu normal": {
+  "calls": {
+   "control": {
+    "result": 8,
+    "printed": []
+   },
+   "empty": {
+    "result": 7,
+    "printed": []
+   },
+   "indexed": {
+    "result": 80,
+    "printed": []
+   },
+   "mutate": {
+    "result": 30,
+    "printed": []
+   },
+   "nested": {
+    "result": 6,
+    "printed": []
+   },
+   "once": {
+    "result": 1,
+    "printed": []
+   },
+   "sum": {
+    "result": 6,
+    "printed": []
+   },
+   "uncaptured": {
+    "result": 2,
+    "printed": []
+   },
+   "zipped": {
+    "result": 50,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5a01f7d8cdce5dba5be4dbb92dd885a470ab8fe3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5bb359210ceee87ce13cfd2ebb713b5f49d8b014.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5bb359210ceee87ce13cfd2ebb713b5f49d8b014.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5c00621692c695bd43a6b3560043ed20355f83aa.utu normal": {
+  "calls": {
+   "get_lucky": {
+    "result": 41,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5c00621692c695bd43a6b3560043ed20355f83aa.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5cb18108a2f9736e023f1a75a653d2d33ded67c8.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/5cb18108a2f9736e023f1a75a653d2d33ded67c8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5cbfd40d180152f736dd55f5e8cea8d3a565c885.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/5cbfd40d180152f736dd55f5e8cea8d3a565c885.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5d825d2f4c2d5f50169ad603111e2f0a29fbcf24.utu normal": {
+  "calls": {
+   "main": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5d825d2f4c2d5f50169ad603111e2f0a29fbcf24.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5dbd0dffb47ffd56a84a842f1f5db18a0ab5e7e8.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/5dbd0dffb47ffd56a84a842f1f5db18a0ab5e7e8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/5f4c2ceb70b1ea6836967166610bac3331fae1f8.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/5f4c2ceb70b1ea6836967166610bac3331fae1f8.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/5f52b76f3a167df36420c40920c71e0a9273e0d6.utu normal": {
+  "compile": "Error: x is captured twice in this pattern"
+ },
+ "baselines/corpus/5f52b76f3a167df36420c40920c71e0a9273e0d6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/605c2379f41903a159d987de1ce424e092819310.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/605c2379f41903a159d987de1ce424e092819310.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/6098c805f7bbea0400dcbc48cc731f31f3617113.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/6098c805f7bbea0400dcbc48cc731f31f3617113.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/615c98d885a2709d71876e63ed654785e6b27bbf.utu normal": {
+  "calls": {
+   "binding": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/615c98d885a2709d71876e63ed654785e6b27bbf.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/61a23f4f9972b16194f2eaa17f55d78f0d0e7f5d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/61a23f4f9972b16194f2eaa17f55d78f0d0e7f5d.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/623ba9ba9d38a16d254fd55c23339967f72bdda8.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/623ba9ba9d38a16d254fd55c23339967f72bdda8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/6255ba9f6d058ad5bb9a02df4bf89228d46451a1.utu normal": {
+  "calls": {
+   "after_value": {
+    "result": 2100,
+    "printed": []
+   },
+   "binding_at_site": {
+    "result": 1,
+    "printed": []
+   },
+   "break_scope": {
+    "result": 102,
+    "printed": []
+   },
+   "iterator_body": {
+    "result": 6,
+    "printed": []
+   },
+   "loops": {
+    "result": 44,
+    "printed": []
+   },
+   "on_return": {
+    "result": 572,
+    "printed": []
+   },
+   "order": {
+    "result": 921,
+    "printed": []
+   },
+   "return_first": {
+    "result": 399,
+    "printed": []
+   },
+   "scopes": {
+    "result": 21,
+    "printed": []
+   },
+   "void_fn": {
+    "result": 6,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/6255ba9f6d058ad5bb9a02df4bf89228d46451a1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/632b9cfdeac1842c516eff08a91d45cfc32be520.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/632b9cfdeac1842c516eff08a91d45cfc32be520.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/63fa5bf1130dd121cbd64ac5aca10aaeef671b23.utu normal": {
+  "compile": "Error: T.B and T.A are both 1"
+ },
+ "baselines/corpus/63fa5bf1130dd121cbd64ac5aca10aaeef671b23.utu test": {
+  "compile": "Error: T.B and T.A are both 1"
+ },
+ "baselines/corpus/64b1fc87520bb4e23d800e802e87443d5607e4d9.utu normal": {
+  "compile": "Error: @json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`"
+ },
+ "baselines/corpus/64b1fc87520bb4e23d800e802e87443d5607e4d9.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/64ee3b3789ca68f466b4f6a623cb263661b33f3d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/64ee3b3789ca68f466b4f6a623cb263661b33f3d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/65eeb04411f0c492d614be707974be0eff5ca932.utu normal": {
+  "compile": "Error: Ambiguous element alias 'x'; reference it inside its own subtree"
+ },
+ "baselines/corpus/65eeb04411f0c492d614be707974be0eff5ca932.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/68bc7b329ea870629036521f685f8afc6b4e6d87.utu normal": {
+  "calls": {
+   "std_i31_eq": {
+    "result": 1,
+    "printed": []
+   },
+   "std_i31_get_s_sign": {
+    "result": -1073741824,
+    "printed": []
+   },
+   "std_i31_get_u_sign": {
+    "result": 1073741824,
+    "printed": []
+   },
+   "std_i31_ne": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_andnot": {
+    "result": 0,
+    "printed": []
+   },
+   "std_M128_any_true": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_band_any": {
+    "result": 0,
+    "printed": []
+   },
+   "std_M128_bitselect": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_bnot_zero": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_bor_any": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_bxor_zero": {
+    "result": 0,
+    "printed": []
+   },
+   "std_M128_eq_any": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_ne_any": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_ones": {
+    "result": 1,
+    "printed": []
+   },
+   "std_M128_zero": {
+    "result": 0,
+    "printed": []
+   },
+   "std_str_add_eq": {
+    "result": 1,
+    "printed": []
+   },
+   "std_str_add_len": {
+    "result": 3,
+    "printed": []
+   },
+   "std_str_eq": {
+    "result": 1,
+    "printed": []
+   },
+   "std_str_from_code_point": {
+    "result": 1,
+    "printed": []
+   },
+   "std_str_from_codes": {
+    "result": 1,
+    "printed": []
+   },
+   "std_str_get": {
+    "result": 111,
+    "printed": []
+   },
+   "std_str_len": {
+    "result": 5,
+    "printed": []
+   },
+   "std_str_len_non_ascii": {
+    "result": 2,
+    "printed": []
+   },
+   "std_str_ne": {
+    "result": 1,
+    "printed": []
+   },
+   "std_str_slice_roundtrip": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_andnot": {
+    "result": 0,
+    "printed": []
+   },
+   "std_V128_any_true": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_band_any": {
+    "result": 0,
+    "printed": []
+   },
+   "std_V128_bitselect": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_bnot_zero": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_bor_any": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_bxor_zero": {
+    "result": 0,
+    "printed": []
+   },
+   "std_V128_eq_any": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_ne_any": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_ones": {
+    "result": 1,
+    "printed": []
+   },
+   "std_V128_zero": {
+    "result": 0,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/68bc7b329ea870629036521f685f8afc6b4e6d87.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/6a0a5cce5b25f526a52beb7d61d943d04caa547e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/6a0a5cce5b25f526a52beb7d61d943d04caa547e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/6a6ab854dc92e75a6aa22d7e4fb9711621cb8a93.utu normal": {
+  "calls": {
+   "make": {
+    "result": "object",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/6a6ab854dc92e75a6aa22d7e4fb9711621cb8a93.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/6a895d302131ace9c4dfa10e4d9b6887c74fca7e.utu normal": {
+  "calls": {
+   "joined": {
+    "result": "a/b",
+    "printed": []
+   },
+   "separator": {
+    "result": "/",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/6a895d302131ace9c4dfa10e4d9b6887c74fca7e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/6be043fec99d86b09ca7033258526926094d22a6.utu normal": {
+  "calls": {
+   "no_capture": {
+    "result": 3,
+    "printed": []
+   },
+   "zipped": {
+    "result": 36,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/6be043fec99d86b09ca7033258526926094d22a6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/6be2d90168da9e127b21d6f9b2aeeb45ad6f858e.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/6be2d90168da9e127b21d6f9b2aeeb45ad6f858e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/71b4ee6b9ca48ae70fb179ed82beff620407fe5e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/71b4ee6b9ca48ae70fb179ed82beff620407fe5e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/745df5ea434e20b333b4307446ee9a39b911bdef.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/745df5ea434e20b333b4307446ee9a39b911bdef.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/74b727465a38368e151d348c6cad4b2a0880331d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/74b727465a38368e151d348c6cad4b2a0880331d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/7524270ddbfc1234a2bc81aab3dadc2c184f5bf9.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/7524270ddbfc1234a2bc81aab3dadc2c184f5bf9.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/75d4dad3076a2d402f53bde0214b0a0a1bc8b3e0.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/75d4dad3076a2d402f53bde0214b0a0a1bc8b3e0.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/77bbe7961932e48792a8c3f584c73db13413ec98.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/77bbe7961932e48792a8c3f584c73db13413ec98.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/78525b29e4acb419709b3577a7efdf1ab5fc558e.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/78525b29e4acb419709b3577a7efdf1ab5fc558e.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/789c740b66a3c1e9e2b48ba3656de013a8e75ef8.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/789c740b66a3c1e9e2b48ba3656de013a8e75ef8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/78a4efef00b689cfa1e5d94c4777e1b2ee3b2748.utu normal": {
+  "compile": "Error: @stored state must be a struct so updates can apply in place; wrap Str in a struct field"
+ },
+ "baselines/corpus/78a4efef00b689cfa1e5d94c4777e1b2ee3b2748.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/78d77a91cc6f2628e36e0ff8ac39ee7f06bf7c4b.utu normal": {
+  "calls": {
+   "capture_modes": {
+    "result": 1004,
+    "printed": []
+   },
+   "counter": {
+    "result": 3,
+    "printed": []
+   },
+   "loop_capture": {
+    "result": 4,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/78d77a91cc6f2628e36e0ff8ac39ee7f06bf7c4b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/79034340aabb1d210148a992ef82be3afa3552fb.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/79034340aabb1d210148a992ef82be3afa3552fb.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/79fb9c3b3182c5220933430970817192b1edce4c.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/79fb9c3b3182c5220933430970817192b1edce4c.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/7c389e2596c3c5af37d3b73f11059d16eb8fe768.utu normal": {
+  "compile": "Error: Cannot import \"./ui.utu\": file not found (<root>/baselines/corpus/ui.utu)"
+ },
+ "baselines/corpus/7c389e2596c3c5af37d3b73f11059d16eb8fe768.utu test": {
+  "compile": "Error: Cannot import \"./ui.utu\": file not found (<root>/baselines/corpus/ui.utu)"
+ },
+ "baselines/corpus/7c3a1ab1ead710beaa0d078b1508b870554beb95.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/7c3a1ab1ead710beaa0d078b1508b870554beb95.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/7cf9255a4af3ea6a975516038dcc456b18a5ee75.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/7cf9255a4af3ea6a975516038dcc456b18a5ee75.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/7d666c9dfaa3f350dc7a28a41585b0871a247444.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/7d666c9dfaa3f350dc7a28a41585b0871a247444.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/7e00d630b69cb67bcc6a66e6f9c498e907db2c98.utu normal": {
+  "calls": {
+   "run": {
+    "result": 7,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/7e00d630b69cb67bcc6a66e6f9c498e907db2c98.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/7ef01f978417add0242a18bb9abb48918aadbfd4.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/7ef01f978417add0242a18bb9abb48918aadbfd4.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/808258bf48298b69a64c8d2c01f097fad0ecd21f.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/808258bf48298b69a64c8d2c01f097fad0ecd21f.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/80dcbb25c51621e59fdde34e1497a94639ab8845.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/80dcbb25c51621e59fdde34e1497a94639ab8845.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/813c469b016ca38be1d0e2d1bd92fa822ac0514c.utu normal": {
+  "calls": {
+   "annotated": {
+    "result": 101,
+    "printed": []
+   },
+   "folded": {
+    "result": 6,
+    "printed": []
+   },
+   "inferred": {
+    "result": 31,
+    "printed": []
+   },
+   "mixed": {
+    "result": 26,
+    "printed": []
+   },
+   "pointers": {
+    "result": 46,
+    "printed": []
+   },
+   "unannotated": {
+    "result": 46,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/813c469b016ca38be1d0e2d1bd92fa822ac0514c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/82b040e6e142b5488aac5a5f1d1c280c64cec575.utu normal": {
+  "compile": "Error: @json match needs a ~> arm for text that matches no pattern"
+ },
+ "baselines/corpus/82b040e6e142b5488aac5a5f1d1c280c64cec575.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8339935e7661c928b2ef1fb153f7b1b7141aa62c.utu normal": {
+  "calls": {
+   "joined": {
+    "result": "a/b",
+    "printed": []
+   },
+   "separator": {
+    "result": "/",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/8339935e7661c928b2ef1fb153f7b1b7141aa62c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/838048613859012dfd2ebc87898de6854744effb.utu normal": {
+  "calls": {
+   "answer": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/838048613859012dfd2ebc87898de6854744effb.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/839683defe4f203daccf6baa6155b4d9e72d1f2d.utu normal": {
+  "compile": "Error: a recursive generator passes its own values straight through: `for (g(…)) |v| { yield v; }`"
+ },
+ "baselines/corpus/839683defe4f203daccf6baa6155b4d9e72d1f2d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/84c4ccc56bf4e0e1aa2b9861bbe4315c4ed9be75.utu normal": {
+  "calls": {
+   "run": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/84c4ccc56bf4e0e1aa2b9861bbe4315c4ed9be75.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/84da01551e61987c07c555a3d96a7f8ebe59ce69.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/84da01551e61987c07c555a3d96a7f8ebe59ce69.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/878af1db77f70078b86430489e463ee100bfa27b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/878af1db77f70078b86430489e463ee100bfa27b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/87bc3f5df2a0d4c15c3fb251488f8bbf9628f855.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/87bc3f5df2a0d4c15c3fb251488f8bbf9628f855.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/87ee21ba075153699772896b79f673e73b61bea3.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/87ee21ba075153699772896b79f673e73b61bea3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/898215bfc15013b4e9f6cf0b2f4f960d7e2e3e5b.utu normal": {
+  "compile": "Error: mem s.intern: only byte mems (U8, I8) intern spans"
+ },
+ "baselines/corpus/898215bfc15013b4e9f6cf0b2f4f960d7e2e3e5b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8998e4021037f854e6658f00b4627273785581f8.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "Error: ENOENT: no such file or directory, open ''",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/8998e4021037f854e6658f00b4627273785581f8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8c4d243a98602c1df6b0437f6add7512937fa58d.utu normal": {
+  "calls": {
+   "observed": {
+    "result": -1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/8c4d243a98602c1df6b0437f6add7512937fa58d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8c6803965046d7d54f9e74ca3f950e9a7e768f01.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/8c6803965046d7d54f9e74ca3f950e9a7e768f01.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8cd3336530b3b3d840f424b0035ab039b63b76b9.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/8cd3336530b3b3d840f424b0035ab039b63b76b9.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8cfadf16564fd2231e4593150d868f7951504748.utu normal": {
+  "compile": "Error: Field a appears twice in this pattern"
+ },
+ "baselines/corpus/8cfadf16564fd2231e4593150d868f7951504748.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8dcba67f93b15f953532bc53cc22498d8522caf5.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/8dcba67f93b15f953532bc53cc22498d8522caf5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8e2a91539cfae4b017fd8b8314902dabb4d0d63d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/8e2a91539cfae4b017fd8b8314902dabb4d0d63d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/8ea0be4c5f1fa38d3cd8e1449e80fbdd09da2827.utu normal": {
+  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+ },
+ "baselines/corpus/8ea0be4c5f1fa38d3cd8e1449e80fbdd09da2827.utu test": {
+  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+ },
+ "baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu normal": {
+  "compile": "Error: await for iterates a generator call: `await for (ticks()) |t| { … }`"
+ },
+ "baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/909b41960b0d5b04fbf8e50fa9dcc2c14638e728.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/909b41960b0d5b04fbf8e50fa9dcc2c14638e728.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/90b2b584db4170cee56544858b48f31178af96bb.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/90b2b584db4170cee56544858b48f31178af96bb.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   },
+   "__test_5": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/91bfa73ab440e23c35805e570e727ca3a0580202.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/91bfa73ab440e23c35805e570e727ca3a0580202.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/91c7044d8a7e5dd41a6612888aa39061793d29f0.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/91c7044d8a7e5dd41a6612888aa39061793d29f0.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/921408b577dd72260a284594cd6cd1b5075d2d3a.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/921408b577dd72260a284594cd6cd1b5075d2d3a.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/92b666afb43ec3d663806c4afc848c2ca5946155.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/92b666afb43ec3d663806c4afc848c2ca5946155.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/92ba28241cbfc29d796d155432201ab5fe4b2a92.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/92ba28241cbfc29d796d155432201ab5fe4b2a92.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/92bdddcf5c08d35f41d4854afa9e6d2f4e5db40f.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/92bdddcf5c08d35f41d4854afa9e6d2f4e5db40f.utu test": {
+  "calls": {
+   "__test_0": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   },
+   "__test_1": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   },
+   "__test_2": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/92e7abbec91b6b7fdf81206701d46846834ddd61.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/92e7abbec91b6b7fdf81206701d46846834ddd61.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/93a16cd088ec697976cb4a67aa742340281f6a6e.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/93a16cd088ec697976cb4a67aa742340281f6a6e.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/93a71e21b636c09dd17e0e07cedb5c1b7680d7a8.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/93a71e21b636c09dd17e0e07cedb5c1b7680d7a8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9522d7ef0d323ef22347e156ee1fa980694ce032.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/9522d7ef0d323ef22347e156ee1fa980694ce032.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/953c6a160864591bd4ec9206b2e871370f0576a5.utu normal": {
+  "calls": {
+   "run": {
+    "result": 35,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/953c6a160864591bd4ec9206b2e871370f0576a5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/95dfc2ca5fddcca92983d711c298d74dff4fd501.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/95dfc2ca5fddcca92983d711c298d74dff4fd501.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9681368d38553e5dcb6a83e23377242977569f3c.utu normal": {
+  "compile": "Error: Unsupported stored type I64; use local structs, Array, Str, Bool, I32, or F64"
+ },
+ "baselines/corpus/9681368d38553e5dcb6a83e23377242977569f3c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu normal": {
+  "calls": {
+   "main": {
+    "result": 13,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/993c3af8554aee2bc0f7aa1b5bc4a8f330359078.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/993c3af8554aee2bc0f7aa1b5bc4a8f330359078.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/994fde4f85de7869eca75dcfae3314a2de62e7fe.utu normal": {
+  "compile": "Error: map expects 1 value binding(s) and an optional index"
+ },
+ "baselines/corpus/994fde4f85de7869eca75dcfae3314a2de62e7fe.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/99823b590dcbb50fc8e90fc4479377aa55325214.utu normal": {
+  "calls": {
+   "deep": {
+    "result": 4,
+    "printed": []
+   },
+   "floats": {
+    "result": 3.5,
+    "printed": []
+   },
+   "pair": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/99823b590dcbb50fc8e90fc4479377aa55325214.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/999208f2a83d9961a7b2346ee2b5870d3907a143.utu normal": {
+  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+ },
+ "baselines/corpus/999208f2a83d9961a7b2346ee2b5870d3907a143.utu test": {
+  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+ },
+ "baselines/corpus/9a0ac119da8142da862eac10415337f0b7bf5eb1.utu normal": {
+  "calls": {
+   "main": {
+    "result": "\u001b[1m\u001b[31merror\u001b[39m\u001b[22m",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/9a0ac119da8142da862eac10415337f0b7bf5eb1.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/9a2a1855ce27fdc19b9c88f451ce74567873fca3.utu normal": {
+  "calls": {
+   "make": {
+    "result": "object",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/9a2a1855ce27fdc19b9c88f451ce74567873fca3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9a8463e1fc37a1b7d993acb00cf28b619bb757ad.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/9a8463e1fc37a1b7d993acb00cf28b619bb757ad.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9af625a6a3917fcfe4a7112c8415a6853c58652f.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/9af625a6a3917fcfe4a7112c8415a6853c58652f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9bbd8bc527d608e2c3ea2aaa6103a5e0a9909dc8.utu normal": {
+  "compile": "Error: mem s: an initializer list holds number literals; compute other values with @comptime"
+ },
+ "baselines/corpus/9bbd8bc527d608e2c3ea2aaa6103a5e0a9909dc8.utu test": {
+  "compile": "Error: mem s: an initializer list holds number literals; compute other values with @comptime"
+ },
+ "baselines/corpus/9bd9b0bd75a72862bec3db826c7408e8ea3ad323.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/9bd9b0bd75a72862bec3db826c7408e8ea3ad323.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/9c53dfb52f06d81078eecebe3508973d1ac3a845.utu normal": {
+  "calls": {
+   "main": {
+    "result": 0.8048597948298679,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/9c53dfb52f06d81078eecebe3508973d1ac3a845.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9c86d4232d842edd6e8d6fd5b7821297508adf66.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/9c86d4232d842edd6e8d6fd5b7821297508adf66.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/9caea06f5ad605538d12085ebf0def9c5d3e2ef4.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/9caea06f5ad605538d12085ebf0def9c5d3e2ef4.utu test": {
+  "calls": {
+   "__test_0": {
+    "throws": "RuntimeError: unreachable",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/9db525c34b3558c621eed965e0d96bb4eee03a45.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/9db525c34b3558c621eed965e0d96bb4eee03a45.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/9ef501feb3739491839371d5ab955a4378c47ea0.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/9ef501feb3739491839371d5ab955a4378c47ea0.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/9ff5b3e8e925475a0926e1260a766ea4afb58f12.utu normal": {
+  "calls": {
+   "main": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/9ff5b3e8e925475a0926e1260a766ea4afb58f12.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a0a0e131d9736bb1c2a2bf04d37c9ee68cbba596.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a0a0e131d9736bb1c2a2bf04d37c9ee68cbba596.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a13412b10f688d3a9ea496111b3ab4d72ae07793.utu normal": {
+  "calls": {
+   "run": {
+    "result": 8,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a13412b10f688d3a9ea496111b3ab4d72ae07793.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a18b50014f132d1d90feae3cfd4a74339b30c35b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a18b50014f132d1d90feae3cfd4a74339b30c35b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a1b6745378d2c0d0516d2b754396f3684d65962e.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/a1b6745378d2c0d0516d2b754396f3684d65962e.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/a2370c4d90b5a84f39923256aa03315df5a207ba.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a2370c4d90b5a84f39923256aa03315df5a207ba.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a2808d515a5f403602944408f5755d25be8a874e.utu normal": {
+  "calls": {
+   "sum": {
+    "result": 15,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a2808d515a5f403602944408f5755d25be8a874e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a2bb015a40ba0855f1e99fbef6892076df822dac.utu normal": {
+  "calls": {
+   "test_promote": {
+    "result": 0,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a2bb015a40ba0855f1e99fbef6892076df822dac.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a38819f112cc7679aa7a02bdc87fb3e7be6b8343.utu normal": {
+  "calls": {
+   "deep": {
+    "result": 4,
+    "printed": []
+   },
+   "loop_value": {
+    "result": 13,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a38819f112cc7679aa7a02bdc87fb3e7be6b8343.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a41733144d37c9aa1b128adbdaefd195c77bba5f.utu normal": {
+  "compile": "Error: mem s has no method 'pop'; it has len, cap, push, reserve, resize, clear, copy_in, view, intern, interned, interned_start, interned_size, intern_reset"
+ },
+ "baselines/corpus/a41733144d37c9aa1b128adbdaefd195c77bba5f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a49206d206ad84e2cc9ffb202d9b0f5340c9082a.utu normal": {
+  "calls": {
+   "main": {
+    "result": 102,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a49206d206ad84e2cc9ffb202d9b0f5340c9082a.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a4f784b1cc612802561fb412a4be5825f5573ef3.utu normal": {
+  "compile": "Error: Missing variant 'B' in match over T"
+ },
+ "baselines/corpus/a4f784b1cc612802561fb412a4be5825f5573ef3.utu test": {
+  "compile": "Error: Missing variant 'B' in match over T"
+ },
+ "baselines/corpus/a513fcd0fa0913b251b27c14a4ea2a2c967c9533.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a513fcd0fa0913b251b27c14a4ea2a2c967c9533.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a58edb03b2093fe19fd047828bfe3952802a3c2d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a58edb03b2093fe19fd047828bfe3952802a3c2d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a64a37b9e1251ea3bbe7b120ccac04bc5487ceb8.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a64a37b9e1251ea3bbe7b120ccac04bc5487ceb8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a6aee19dad13bb95a15b1c9afbd438e621f5ef0e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a6aee19dad13bb95a15b1c9afbd438e621f5ef0e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a6db1ee917a80e835a5b288cc9f8c2b71d7a6d4d.utu normal": {
+  "calls": {
+   "radius": {
+    "result": 7,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a6db1ee917a80e835a5b288cc9f8c2b71d7a6d4d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a7f0db145b8128f483f870f13f3d8d56c025c84f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a7f0db145b8128f483f870f13f3d8d56c025c84f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a832cdbe7e5f36f5221692f5f3da40c0dd0dc5cd.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/a832cdbe7e5f36f5221692f5f3da40c0dd0dc5cd.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a8c7bc24c03dccc393883c318fffde77903eaf01.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/a8c7bc24c03dccc393883c318fffde77903eaf01.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a91851b910d1d1cb590ba403bd7e345d9c7ed334.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/a91851b910d1d1cb590ba403bd7e345d9c7ed334.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/a93076aa7ec74f50008e3caa2146e57a8c7f5afc.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/a93076aa7ec74f50008e3caa2146e57a8c7f5afc.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/aa5ed85c34cdebb06bc51af1feb4f0190359eb8e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/aa5ed85c34cdebb06bc51af1feb4f0190359eb8e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/aa64d27613e81c462a3c5981579372ad4e9aaeac.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/aa64d27613e81c462a3c5981579372ad4e9aaeac.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ab75d538855209c366fd64f25d6c1ade0c5dfce3.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ab75d538855209c366fd64f25d6c1ade0c5dfce3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/abc0839256dc050b4e8154acfd32185cf6692b85.utu normal": {
+  "calls": {
+   "make_arr": {
+    "result": "object",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/abc0839256dc050b4e8154acfd32185cf6692b85.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ad03b01da23fedcc92e3bdaddc16b9be322c4f5b.utu normal": {
+  "calls": {
+   "run": {
+    "result": 12,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/ad03b01da23fedcc92e3bdaddc16b9be322c4f5b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ad068c847e2f31214b258daa73b2e8dd131d74e5.utu normal": {
+  "compile": "Error: T.A = 300 does not fit in U8"
+ },
+ "baselines/corpus/ad068c847e2f31214b258daa73b2e8dd131d74e5.utu test": {
+  "compile": "Error: T.A = 300 does not fit in U8"
+ },
+ "baselines/corpus/ad4658405c3b665dba7f017e0ecf5d50d3ab4323.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ad4658405c3b665dba7f017e0ecf5d50d3ab4323.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ada6702b69004ba9a04d0242c91a1851f4e6054f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ada6702b69004ba9a04d0242c91a1851f4e6054f.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/aea9df7fad5bf6673ead6122eb24201911b7f19d.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/aea9df7fad5bf6673ead6122eb24201911b7f19d.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/aecf5f2c8c32e637460725548554eebcd6633c08.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/aecf5f2c8c32e637460725548554eebcd6633c08.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/af0c8765b7e81d6eaffdb3469b27e48e24b195fc.utu normal": {
+  "compile": "Error: ?I32 is not supported: only reference types (Str, structs, enums, arrays) can be null"
+ },
+ "baselines/corpus/af0c8765b7e81d6eaffdb3469b27e48e24b195fc.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/af767b17b92986ea7328e5d72e70e2248fdd2c21.utu normal": {
+  "calls": {
+   "answer": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/af767b17b92986ea7328e5d72e70e2248fdd2c21.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/af9522ee1acd5d6799d50188c9611af621e395e3.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/af9522ee1acd5d6799d50188c9611af621e395e3.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/af9d3dfed9907b2974cf17ccbffca3ed29e574bb.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/af9d3dfed9907b2974cf17ccbffca3ed29e574bb.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b1d3aa7ae9ac8db7f724dcf8f6b83e9014205718.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/b1d3aa7ae9ac8db7f724dcf8f6b83e9014205718.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b34e93567128579883fd49dca0c20660d18406fc.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/b34e93567128579883fd49dca0c20660d18406fc.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b431386bd0226ceb604b1ec1d4e4f8d71df9c80e.utu normal": {
+  "compile": "Error: A contains itself; make the recursive field ?A or an Array"
+ },
+ "baselines/corpus/b431386bd0226ceb604b1ec1d4e4f8d71df9c80e.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/b4c7bd394f2cedbe5a5764fbe08c9cf2d918373a.utu normal": {
+  "compile": "Error: mem s has the same name as a top-level function or global"
+ },
+ "baselines/corpus/b4c7bd394f2cedbe5a5764fbe08c9cf2d918373a.utu test": {
+  "compile": "Error: mem s has the same name as a top-level function or global"
+ },
+ "baselines/corpus/b4c862b7cdfd33603878d19a4fc91a329c8d0196.utu normal": {
+  "calls": {
+   "from_assign": {
+    "result": 42,
+    "printed": []
+   },
+   "from_field": {
+    "result": "object",
+    "printed": []
+   },
+   "from_return": {
+    "result": "function",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b4c862b7cdfd33603878d19a4fc91a329c8d0196.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b4c9fa7f06cb55abd426f42e5df18258b0e1e6ef.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b4c9fa7f06cb55abd426f42e5df18258b0e1e6ef.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b4eba6f4d584867b6938574531da8502cf6e2738.utu normal": {
+  "calls": {
+   "answer": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b4eba6f4d584867b6938574531da8502cf6e2738.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b5221022f810d9971534deeca5cea1c8fa94689d.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/b5221022f810d9971534deeca5cea1c8fa94689d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b5318d342726caaaa6b667eb30b8438b682ec430.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/b5318d342726caaaa6b667eb30b8438b682ec430.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b53a6f3724f67a6c591fd0aea8fa1bc5a76bb444.utu normal": {
+  "calls": {
+   "captured": {
+    "result": 7,
+    "printed": []
+   },
+   "countdown": {
+    "result": 5,
+    "printed": []
+   },
+   "loop_values": {
+    "result": 2,
+    "printed": []
+   },
+   "required": {
+    "result": 7,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b53a6f3724f67a6c591fd0aea8fa1bc5a76bb444.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b5a801c9aaaf2a63b281466e860647f4f3fca3ed.utu normal": {
+  "compile": "Error: mem s: @embed cannot read missing.bin: ENOENT"
+ },
+ "baselines/corpus/b5a801c9aaaf2a63b281466e860647f4f3fca3ed.utu test": {
+  "compile": "Error: mem s: @embed cannot read missing.bin: ENOENT"
+ },
+ "baselines/corpus/b74a8afc2fe91565346641d6af674bd28e82b470.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/b74a8afc2fe91565346641d6af674bd28e82b470.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b84da548bab60657ff48ddcbc51b111b3e276c39.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/b84da548bab60657ff48ddcbc51b111b3e276c39.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b94acf081bf2e3dc8c17df4d8c0961f9d335bd8f.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1130,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/b94acf081bf2e3dc8c17df4d8c0961f9d335bd8f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/b9551c2739e2ddf838bec21604ac3ddad5e7cce8.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/b9551c2739e2ddf838bec21604ac3ddad5e7cce8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ba76b5a3a2d735396279327d25c93afbd2f8965e.utu normal": {
+  "compile": "Error: mem s is not a value; use s[i], s[i] = v, or s.len()"
+ },
+ "baselines/corpus/ba76b5a3a2d735396279327d25c93afbd2f8965e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/baa0716dc70a3fefb1a453ff963c64dd506e6909.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/baa0716dc70a3fefb1a453ff963c64dd506e6909.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/bb74dfa07e7f6f5df6ce89af07e19c4f819e0eaf.utu normal": {
+  "calls": {
+   "main": {
+    "result": "utu",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/bb74dfa07e7f6f5df6ce89af07e19c4f819e0eaf.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/bb8dae5a063f472c511efcb530ae69acd60c0734.utu normal": {
+  "compile": "Error: mem s is declared twice"
+ },
+ "baselines/corpus/bb8dae5a063f472c511efcb530ae69acd60c0734.utu test": {
+  "compile": "Error: mem s is declared twice"
+ },
+ "baselines/corpus/bb9a1d5e8797232584cffde78559694be561f5dd.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/bb9a1d5e8797232584cffde78559694be561f5dd.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   },
+   "__test_5": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/bd4a6ee322589b9bc35a6bbf09aae278d86e7795.utu normal": {
+  "calls": {
+   "main": {
+    "result": 10,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/bd4a6ee322589b9bc35a6bbf09aae278d86e7795.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/bde001b9cf46595bcec91bacdffbacf483acc56d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/bde001b9cf46595bcec91bacdffbacf483acc56d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/be72014f1ad4a7789637c14ac361c5d4b4eeefc4.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/be72014f1ad4a7789637c14ac361c5d4b4eeefc4.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/bf24ee8aebc9da647ec84af834e871b0a866e076.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/bf24ee8aebc9da647ec84af834e871b0a866e076.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/bf37ff97923271bd0102ac8a842b19138bde520f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/bf37ff97923271bd0102ac8a842b19138bde520f.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c01a8fbd88bdae555c3dd1465b6f9ddae8334b9b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c01a8fbd88bdae555c3dd1465b6f9ddae8334b9b.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c1da2c2d2028916e893f2cf5e6404a21e8e1b2b6.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c1da2c2d2028916e893f2cf5e6404a21e8e1b2b6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c2094ea519e4323c6d27e1534f7c2031787e6d83.utu normal": {
+  "compile": "Error: E.V has a field named kind, which @json uses to name the variant"
+ },
+ "baselines/corpus/c2094ea519e4323c6d27e1534f7c2031787e6d83.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c23d6199227ece71c4577db08e193be33c57c5a1.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c23d6199227ece71c4577db08e193be33c57c5a1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c351f4992b3824d6d1dd378fcb8e577a98848c6e.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c351f4992b3824d6d1dd378fcb8e577a98848c6e.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c3598316327dd4e24dc8b61b739b6b8048c395f5.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c3598316327dd4e24dc8b61b739b6b8048c395f5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c3d31c1b8bfad9090ede6563156b80d2141f3ea1.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/c3d31c1b8bfad9090ede6563156b80d2141f3ea1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c49dba6213ed8009e151c0db04f87ca1f98bcc1d.utu normal": {
+  "compile": "Error: g is a generator: consume it with `for (g(…)) |value| { … }`"
+ },
+ "baselines/corpus/c49dba6213ed8009e151c0db04f87ca1f98bcc1d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c4da739fdf68a004b2a265ab671efd7dc11476d6.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/c4da739fdf68a004b2a265ab671efd7dc11476d6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c4df773cd9c6c5024acc6291011b3878c79da0e3.utu normal": {
+  "calls": {
+   "ordered": {
+    "result": 123123,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/c4df773cd9c6c5024acc6291011b3878c79da0e3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c521eeef1d793c8202e421687e08c098b6ced832.utu normal": {
+  "calls": {
+   "and_skips": {
+    "result": 0,
+    "printed": []
+   },
+   "both_run": {
+    "result": 2,
+    "printed": []
+   },
+   "or_skips": {
+    "result": 0,
+    "printed": []
+   },
+   "truth": {
+    "result": 1111,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/c521eeef1d793c8202e421687e08c098b6ced832.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c5ae7338a8fe0751773a954d4a0a840d6153cce1.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c5ae7338a8fe0751773a954d4a0a840d6153cce1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c73a8d6bb4aaf81bab4407272abf314070ef3203.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/c73a8d6bb4aaf81bab4407272abf314070ef3203.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c7d2b990617540936420ef282249625e18b43a19.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/c7d2b990617540936420ef282249625e18b43a19.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c81428e0fc9a701d1eca3e665f58ccc1c705ecc6.utu normal": {
+  "compile": "Error: Expected {…}, |name| Type, or a literal in @json pattern"
+ },
+ "baselines/corpus/c81428e0fc9a701d1eca3e665f58ccc1c705ecc6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c814c634efbf46eeab3a6a10cd158ae897b9f820.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/c814c634efbf46eeab3a6a10cd158ae897b9f820.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c8e1d415ad9abc4dbfce511293232732574b5e01.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c8e1d415ad9abc4dbfce511293232732574b5e01.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/c9b9d01b52fcab8470447d275fcfc1f542f0dc93.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/c9b9d01b52fcab8470447d275fcfc1f542f0dc93.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ca02860c00986db4d172e13a52f4b0c99aa7907a.utu normal": {
+  "compile": "Error: mem s takes one index: s[i]"
+ },
+ "baselines/corpus/ca02860c00986db4d172e13a52f4b0c99aa7907a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ca1d9c2e89b94a1e52ceaca3f3479d7c74434a07.utu normal": {
+  "calls": {
+   "run": {
+    "result": 118,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/ca1d9c2e89b94a1e52ceaca3f3479d7c74434a07.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu normal": {
+  "compile": "Error: a generator ends with `return;`, without a value"
+ },
+ "baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/cb5eb0652dbbc5bf672ae9531b9aae97523624c5.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/cb5eb0652dbbc5bf672ae9531b9aae97523624c5.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/cc077a61ccd543fa4ae09a708b63538f00ed0f8b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/cc077a61ccd543fa4ae09a708b63538f00ed0f8b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ce1c256596146c602be4e1c815d13486e114c78a.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/ce1c256596146c602be4e1c815d13486e114c78a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ce5e34eb79111f7555c19f40d7787139e5c4ff18.utu normal": {
+  "compile": "Error: @json decode works on a struct, enum, or Array; wrap I32 in a struct field"
+ },
+ "baselines/corpus/ce5e34eb79111f7555c19f40d7787139e5c4ff18.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/cec0fe413d8f35ddec1ee5c54f01bf917eff788a.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/cec0fe413d8f35ddec1ee5c54f01bf917eff788a.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/cf77bb2ee8176dd6ffbcb37f4339d561f064d8be.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/cf77bb2ee8176dd6ffbcb37f4339d561f064d8be.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d0e40ff72d65155b15149adcfa3c403156cbb7c9.utu normal": {
+  "compile": "Error: yield cannot appear inside a closure; the generator expands into its consumer"
+ },
+ "baselines/corpus/d0e40ff72d65155b15149adcfa3c403156cbb7c9.utu test": {
+  "compile": "Error: yield cannot appear inside a closure; the generator expands into its consumer"
+ },
+ "baselines/corpus/d2f86b64c96b31ae7cdfc6a181f925c0719623d5.utu normal": {
+  "compile": "Error: g expects 1 argument(s), got 0"
+ },
+ "baselines/corpus/d2f86b64c96b31ae7cdfc6a181f925c0719623d5.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d3606ebcf4dc0c6d232deb8fde6072aa428eb81d.utu normal": {
+  "calls": {
+   "main": {
+    "result": 140,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/d3606ebcf4dc0c6d232deb8fde6072aa428eb81d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d39f434cc1a57161f7465a3633fa9445008b573b.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/d39f434cc1a57161f7465a3633fa9445008b573b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d3e969869a60730b1ceb4493d2f0c8d42c69a4fe.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/d3e969869a60730b1ceb4493d2f0c8d42c69a4fe.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d435f6fe29d06e1a921ed2e80d64f5dfd10e88e9.utu normal": {
+  "calls": {
+   "main": {
+    "result": 7200000,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/d435f6fe29d06e1a921ed2e80d64f5dfd10e88e9.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/d443a91d5e62e7fc24782aa04332a760534cfad9.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/d443a91d5e62e7fc24782aa04332a760534cfad9.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/d6733d20c9f1318e40becf133ed1a35d22497aca.utu normal": {
+  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+ },
+ "baselines/corpus/d6733d20c9f1318e40becf133ed1a35d22497aca.utu test": {
+  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+ },
+ "baselines/corpus/d77c6781450ff47e79b9a4a9d239147d30e1ec0b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/d77c6781450ff47e79b9a4a9d239147d30e1ec0b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d8932a6de0a164a686a4d4da45b268bae6819f76.utu normal": {
+  "compile": "Error: mem s: element 0 (256) does not fit in U8"
+ },
+ "baselines/corpus/d8932a6de0a164a686a4d4da45b268bae6819f76.utu test": {
+  "compile": "Error: mem s: element 0 (256) does not fit in U8"
+ },
+ "baselines/corpus/d89746b87e4cdd73d85062bcaca68268388c6bf6.utu normal": {
+  "calls": {
+   "alias_path": {
+    "result": 8,
+    "printed": []
+   },
+   "open_path": {
+    "result": 10,
+    "printed": []
+   },
+   "parameterized": {
+    "result": 7,
+    "printed": []
+   },
+   "plain": {
+    "result": 6,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/d89746b87e4cdd73d85062bcaca68268388c6bf6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/d89c9ca1551a0686f90b3d1080586654ca0c4671.utu normal": {
+  "calls": {
+   "run": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/d89c9ca1551a0686f90b3d1080586654ca0c4671.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/da166f72253028c4aa6aaa052cdcc238f613c298.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/da166f72253028c4aa6aaa052cdcc238f613c298.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/da3a1041c4935d234f02ba359cbde38a9131d0c7.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/da3a1041c4935d234f02ba359cbde38a9131d0c7.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/da60e8a3ce19b88ca572a1b919bf6870d3d0787b.utu normal": {
+  "calls": {
+   "empty": {
+    "result": 0,
+    "printed": []
+   },
+   "floats": {
+    "result": 3,
+    "printed": []
+   },
+   "from_use": {
+    "result": 2.5,
+    "printed": []
+   },
+   "literals": {
+    "result": 36,
+    "printed": []
+   },
+   "locals": {
+    "result": 5,
+    "printed": []
+   },
+   "nested": {
+    "result": 7,
+    "printed": []
+   },
+   "strings": {
+    "result": 2,
+    "printed": []
+   },
+   "structs": {
+    "result": 9,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/da60e8a3ce19b88ca572a1b919bf6870d3d0787b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/db4ed0927b6a752ef36b7f8b9a3b78f77b307589.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/db4ed0927b6a752ef36b7f8b9a3b78f77b307589.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/dcf7dec2a48e194dcd17870c3d160fdd821a8b56.utu normal": {
+  "calls": {
+   "double": {
+    "result": "2.5",
+    "printed": []
+   },
+   "signed": {
+    "result": "-42",
+    "printed": []
+   },
+   "single": {
+    "result": "0.1",
+    "printed": []
+   },
+   "truth": {
+    "result": "false",
+    "printed": []
+   },
+   "unsigned": {
+    "result": "4294967295",
+    "printed": []
+   },
+   "wide": {
+    "result": "-9000000000",
+    "printed": []
+   },
+   "wide_unsigned": {
+    "result": "18446744073709551615",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/dcf7dec2a48e194dcd17870c3d160fdd821a8b56.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/dd31c6846a04ac8ef3e78a6be4ea17957e053e5b.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/dd31c6846a04ac8ef3e78a6be4ea17957e053e5b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/de2e4403241d7db7125d8fd791bc1ea80d450532.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/de2e4403241d7db7125d8fd791bc1ea80d450532.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/df09e1754c6d264f628d37d4e56ec094231e59e8.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/df09e1754c6d264f628d37d4e56ec094231e59e8.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/df4296321611dc9ab1a0173614e0d73f162b4e9d.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/df4296321611dc9ab1a0173614e0d73f162b4e9d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/df83fdcbfd5e902ed5b4af76e29f958ee5a65378.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/df83fdcbfd5e902ed5b4af76e29f958ee5a65378.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/dfab48859b1dbce49e6276b9380649896d85e7e8.utu normal": {
+  "calls": {
+   "loud": {
+    "result": "ok!",
+    "printed": []
+   },
+   "next": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/dfab48859b1dbce49e6276b9380649896d85e7e8.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e2fedc0b4754de2fcea7855adeb379140860ea6b.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/e2fedc0b4754de2fcea7855adeb379140860ea6b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e30c5679e9f2dd0333bd29a9a30cb8ccd38c3ffb.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/e30c5679e9f2dd0333bd29a9a30cb8ccd38c3ffb.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e319acd7b108a10b5ec2dc17b6b0b1a39552eeb3.utu normal": {
+  "calls": {
+   "text": {
+    "result": "{\"quoted\": true}\nsecond line",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/e319acd7b108a10b5ec2dc17b6b0b1a39552eeb3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e358b7a2d670053cc1e446b66fc6dc4726fe375f.utu normal": {
+  "compile": "Error: Cannot import \"./does-not-exist.utu\": file not found (<root>/baselines/corpus/does-not-exist.utu)"
+ },
+ "baselines/corpus/e358b7a2d670053cc1e446b66fc6dc4726fe375f.utu test": {
+  "compile": "Error: Cannot import \"./does-not-exist.utu\": file not found (<root>/baselines/corpus/does-not-exist.utu)"
+ },
+ "baselines/corpus/e361552ecc6e14fcb267702469f9292c9dc97cc1.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/e361552ecc6e14fcb267702469f9292c9dc97cc1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e3df34f358e3b9ee3993572c691c391658f1ce9c.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/e3df34f358e3b9ee3993572c691c391658f1ce9c.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e49dddad9d6d4a3a333988aeadda8c3ad12c76cd.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/e49dddad9d6d4a3a333988aeadda8c3ad12c76cd.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e5b0e291da52be9682b5e52123af5e8cd7169d0e.utu normal": {
+  "calls": {
+   "binding": {
+    "result": 1009,
+    "printed": []
+   },
+   "run": {
+    "result": 71221,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/e5b0e291da52be9682b5e52123af5e8cd7169d0e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/e712d3d4b04974416e3e00c26bba3a3b2b4377d9.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/e712d3d4b04974416e3e00c26bba3a3b2b4377d9.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/e8e292342c4c4e824be5902f531b922be9c65727.utu normal": {
+  "calls": {
+   "absent": {
+    "result": -1,
+    "printed": []
+   },
+   "chain_after_take": {
+    "result": 31,
+    "printed": []
+   },
+   "chain_mixed": {
+    "result": 40,
+    "printed": []
+   },
+   "chained": {
+    "result": 64,
+    "printed": []
+   },
+   "count_": {
+    "result": 2,
+    "printed": []
+   },
+   "empty_all": {
+    "result": 1,
+    "printed": []
+   },
+   "empty_any": {
+    "result": 0,
+    "printed": []
+   },
+   "every": {
+    "result": 1,
+    "printed": []
+   },
+   "first_": {
+    "result": 1,
+    "printed": []
+   },
+   "flattened": {
+    "result": 10,
+    "printed": []
+   },
+   "fused": {
+    "result": 18,
+    "printed": []
+   },
+   "indexes": {
+    "result": "1n",
+    "printed": []
+   },
+   "last_": {
+    "result": 3,
+    "printed": []
+   },
+   "nested": {
+    "result": 6,
+    "printed": []
+   },
+   "no_work": {
+    "result": 0,
+    "printed": []
+   },
+   "once": {
+    "result": 2,
+    "printed": []
+   },
+   "product_": {
+    "result": 24,
+    "printed": []
+   },
+   "repeated": {
+    "result": 9,
+    "printed": []
+   },
+   "take_after_chain": {
+    "result": 1,
+    "printed": []
+   },
+   "while_stages": {
+    "result": 5,
+    "printed": []
+   },
+   "zip_once": {
+    "result": 1,
+    "printed": []
+   },
+   "zipped": {
+    "result": 33,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/e8e292342c4c4e824be5902f531b922be9c65727.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/eab9b924282706c584bfb4ee95a8d8f58bd6b009.utu normal": {
+  "calls": {
+   "main": {
+    "result": 25,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/eab9b924282706c584bfb4ee95a8d8f58bd6b009.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/eaea53ef9eb4fd526379d0437fa2563ca29c8099.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/eaea53ef9eb4fd526379d0437fa2563ca29c8099.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ebf2a57c8a1822855453dfea5332b2b17b9b318f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ebf2a57c8a1822855453dfea5332b2b17b9b318f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ec01a857bf082ecd5436905b7cd53f9b614f656b.utu normal": {
+  "calls": {
+   "run": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/ec01a857bf082ecd5436905b7cd53f9b614f656b.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal": {
+  "emit": "Error: codegen: unsupported type \"Array__I32\" (no stdlib type-def or heap type match)"
+ },
+ "baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/eca23d9fa5adca1836311523e0056ef9701edc0d.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/eca23d9fa5adca1836311523e0056ef9701edc0d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ed3dd29ce758f2b06e80ca3eeb621b21e179787e.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/ed3dd29ce758f2b06e80ca3eeb621b21e179787e.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ed722328934e3556d614dbe9f54ea4486241032e.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/ed722328934e3556d614dbe9f54ea4486241032e.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/ed8b98ccfd2682ccfa470165b8317f78c2bec457.utu normal": {
+  "compile": "Error: mem s stores Str; a mem holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64"
+ },
+ "baselines/corpus/ed8b98ccfd2682ccfa470165b8317f78c2bec457.utu test": {
+  "compile": "Error: mem s stores Str; a mem holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64"
+ },
+ "baselines/corpus/ef59370de1017da92aeea08ad4c4ec93c1f55adf.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ef59370de1017da92aeea08ad4c4ec93c1f55adf.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ef7834238e0a0ac322adf31be4d254d944232865.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/ef7834238e0a0ac322adf31be4d254d944232865.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/efc743078bc0dfae3e1b53e1c2400ccd036246db.utu normal": {
+  "compile": "Error: prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself"
+ },
+ "baselines/corpus/efc743078bc0dfae3e1b53e1c2400ccd036246db.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f08730ddd2300bb12fb4e35ded11e5bd5bec93f6.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/f08730ddd2300bb12fb4e35ded11e5bd5bec93f6.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/f13dfc9c22f2d1c269548a9517c3ec3d2ca0210d.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f13dfc9c22f2d1c269548a9517c3ec3d2ca0210d.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f1e306d203d96cdec09566e998da4fbbfb17f8b4.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f1e306d203d96cdec09566e998da4fbbfb17f8b4.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/f29fbc787ee5e508ee63841c6e904d3819b6a0fe.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/f29fbc787ee5e508ee63841c6e904d3819b6a0fe.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f2ee19976054f19c2f338873209787d97d05314f.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/f2ee19976054f19c2f338873209787d97d05314f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f377fd5f9cf4e7346fd25a92bef46ce02ef980d7.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/f377fd5f9cf4e7346fd25a92bef46ce02ef980d7.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/f38bd9d2fd0edc2be1d1fe044465e7d2d16561e5.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f38bd9d2fd0edc2be1d1fe044465e7d2d16561e5.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/f3e11e3244443e1ce84ede90b75f09ee4ce847d6.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/f3e11e3244443e1ce84ede90b75f09ee4ce847d6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f4eed2d7e302ab93e72b22faa1cb3456954687da.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f4eed2d7e302ab93e72b22faa1cb3456954687da.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f4f9abeafd1e886c841389718794447e9933c8c6.utu normal": {
+  "calls": {
+   "run": {
+    "result": 15,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/f4f9abeafd1e886c841389718794447e9933c8c6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f5d211ce9320dd1834b3c03b93b0bfedd1668298.utu normal": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/f5d211ce9320dd1834b3c03b93b0bfedd1668298.utu test": {
+  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+ },
+ "baselines/corpus/f61335cfaf618f50c4c38bfa993b292a594697ce.utu normal": {
+  "calls": {
+   "run": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/f61335cfaf618f50c4c38bfa993b292a594697ce.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f69d234bbd093e23a7f6a79be1e14d44b6bb2bef.utu normal": {
+  "compile": "Error: The ~> arm must be last in @json match"
+ },
+ "baselines/corpus/f69d234bbd093e23a7f6a79be1e14d44b6bb2bef.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f6a66afba4e80df8aa26fc94e6271a924dc2e151.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/f6a66afba4e80df8aa26fc94e6271a924dc2e151.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f6a937a1b7f949170f1970f263b51fd57820546f.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f6a937a1b7f949170f1970f263b51fd57820546f.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f735cf1cf1352eca768f39e15c06fd95afc90840.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f735cf1cf1352eca768f39e15c06fd95afc90840.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f7634dde2c8f203ea558721b69c5c37b261367a1.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/f7634dde2c8f203ea558721b69c5c37b261367a1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f9339ec4b175266e09825e2d3f285b2e6f4e91d1.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/f9339ec4b175266e09825e2d3f285b2e6f4e91d1.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/f9686c32cc83736b8ce97bbccf66d40da307b825.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/f9686c32cc83736b8ce97bbccf66d40da307b825.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/fa6d1fc9c4a99924d7a71a8738ff9e81670152c3.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/fa6d1fc9c4a99924d7a71a8738ff9e81670152c3.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/fb933e9f1517fa83b0e6850ace0432e060315127.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/fb933e9f1517fa83b0e6850ace0432e060315127.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/fbbbd4557efa65eecfb6eea0ce06717800b96ef6.utu normal": {
+  "compile": "Error: Invalid Utu interpolation at offset 84: 1 +"
+ },
+ "baselines/corpus/fbbbd4557efa65eecfb6eea0ce06717800b96ef6.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/fc958f3ffa6f5217465f5c68fd1febe81ea703f5.utu normal": {
+  "diagnostics": true
+ },
+ "baselines/corpus/fc958f3ffa6f5217465f5c68fd1febe81ea703f5.utu test": {
+  "diagnostics": true
+ },
+ "baselines/corpus/fcd6630948b89737c59153f5c7845107124b3ccf.utu normal": {
+  "calls": {
+   "main": {
+    "result": "usr/local",
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/fcd6630948b89737c59153f5c7845107124b3ccf.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/fcd9b139cfad530d3a4cde89a87e6fccb10b9436.utu normal": {
+  "calls": {
+   "run": {
+    "result": 7,
+    "printed": []
+   }
+  }
+ },
+ "baselines/corpus/fcd9b139cfad530d3a4cde89a87e6fccb10b9436.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/ff2291f32d7cf734cda22161cd94988378db4912.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/ff2291f32d7cf734cda22161cd94988378db4912.utu test": {
+  "calls": {}
+ },
+ "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu normal": {
+  "calls": {}
+ },
+ "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu test": {
+  "calls": {}
+ },
+ "benchmarks/deltablue/deltablue.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/deltablue/deltablue.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "benchmarks/loops/loops.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/loops/loops.utu test": {
+  "calls": {}
+ },
+ "benchmarks/pantry/kernels.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/pantry/kernels.utu test": {
+  "calls": {}
+ },
+ "benchmarks/suite/analyzer.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/suite/analyzer.utu test": {
+  "calls": {}
+ },
+ "benchmarks/suite/scalar.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/suite/scalar.utu test": {
+  "calls": {}
+ },
+ "benchmarks/suite/sieve.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/suite/sieve.utu test": {
+  "calls": {}
+ },
+ "benchmarks/suite/strings.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/suite/strings.utu test": {
+  "calls": {}
+ },
+ "benchmarks/tiny/benchmark.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/tiny/benchmark.utu test": {
+  "calls": {}
+ },
+ "examples/browser-board/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'createElement')",
+    "printed": []
+   }
+  }
+ },
+ "examples/browser-board/main.utu test": {
+  "calls": {}
+ },
+ "examples/browser-pantry/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   }
+  }
+ },
+ "examples/browser-pantry/main.utu test": {
+  "calls": {}
+ },
+ "examples/ci/codegen_alt_fallback.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_alt_fallback.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_arithmetic_locals.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_arithmetic_locals.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_arrays.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_arrays.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_closures.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_closures.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "throws": "RuntimeError: unreachable",
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_composition.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_composition.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_control_flow.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_control_flow.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   },
+   "__test_5": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_globals.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_globals.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_import_values.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_import_values.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_imports_exports.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_imports_exports.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_match.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_match.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_nullable.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_nullable.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_pipes.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_pipes.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_promote.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_promote.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_promote_simple.utu normal": {
+  "calls": {
+   "test_promote": {
+    "result": 0,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_promote_simple.utu test": {
+  "calls": {}
+ },
+ "examples/ci/codegen_protocols.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_protocols.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   },
+   "__test_5": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_scalar_match.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_scalar_match.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_structs.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_structs.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/codegen_test_surface.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/codegen_test_surface.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/node_builtin_imports.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/node_builtin_imports.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/tests_basic.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/tests_basic.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/ci/tests_fail.utu normal": {
+  "calls": {}
+ },
+ "examples/ci/tests_fail.utu test": {
+  "calls": {
+   "__test_0": {
+    "throws": "RuntimeError: unreachable",
+    "printed": []
+   }
+  }
+ },
+ "examples/closures.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1130,
+    "printed": []
+   }
+  }
+ },
+ "examples/closures.utu test": {
+  "calls": {}
+ },
+ "examples/fannkuch.utu normal": {
+  "calls": {
+   "main": {
+    "result": 10,
+    "printed": []
+   }
+  }
+ },
+ "examples/fannkuch.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/float.utu normal": {
+  "calls": {
+   "main": {
+    "result": 0.8048597948298679,
+    "printed": []
+   }
+  }
+ },
+ "examples/float.utu test": {
+  "calls": {}
+ },
+ "examples/foundry/utu/app.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'getElementById')",
+    "printed": []
+   }
+  }
+ },
+ "examples/foundry/utu/app.utu test": {
+  "calls": {}
+ },
+ "examples/foundry/utu/headless.utu normal": {
+  "calls": {}
+ },
+ "examples/foundry/utu/headless.utu test": {
+  "calls": {}
+ },
+ "examples/foundry/utu/proto/app.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'getElementById')",
+    "printed": []
+   }
+  }
+ },
+ "examples/foundry/utu/proto/app.utu test": {
+  "calls": {}
+ },
+ "examples/hello_world.utu normal": {
+  "calls": {
+   "main": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/hello_world.utu test": {
+  "calls": {}
+ },
+ "examples/jpl/jpl.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "Error: ENOENT: no such file or directory, open ''",
+    "printed": []
+   }
+  }
+ },
+ "examples/jpl/jpl.utu test": {
+  "calls": {}
+ },
+ "examples/json/json.utu normal": {
+  "calls": {}
+ },
+ "examples/json/json.utu test": {
+  "calls": {}
+ },
+ "examples/modules/inline_paths.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/inline_paths.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/method_promotion.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/method_promotion.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   },
+   "__test_4": {
+    "result": null,
+    "printed": []
+   },
+   "__test_5": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/multiple_instantiations.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/multiple_instantiations.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/open_constructs.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/open_constructs.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/parameterized_aliases.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/parameterized_aliases.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/plain_modules.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/plain_modules.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   },
+   "__test_3": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/top_level.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/top_level.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/two_params_and_nullable.utu normal": {
+  "calls": {}
+ },
+ "examples/modules/two_params_and_nullable.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/multi_file/tests.utu normal": {
+  "calls": {}
+ },
+ "examples/multi_file/tests.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "examples/promises.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "printed": []
+   }
+  }
+ },
+ "examples/promises.utu test": {
+  "calls": {}
+ },
+ "examples/protocols.utu normal": {
+  "calls": {
+   "main": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "examples/protocols.utu test": {
+  "calls": {}
+ },
+ "examples/queries/indexes.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "examples/queries/indexes.utu test": {
+  "calls": {}
+ },
+ "examples/queries/iterators.utu normal": {
+  "calls": {
+   "main": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "examples/queries/iterators.utu test": {
+  "calls": {}
+ },
+ "examples/working/arrays_and_for.utu normal": {
+  "calls": {
+   "main": {
+    "result": 140,
+    "printed": []
+   }
+  }
+ },
+ "examples/working/arrays_and_for.utu test": {
+  "calls": {}
+ },
+ "examples/working/closures.utu normal": {
+  "calls": {
+   "main": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "examples/working/closures.utu test": {
+  "calls": {}
+ },
+ "examples/working/hello.utu normal": {
+  "calls": {
+   "main": {
+    "result": 42,
+    "printed": []
+   }
+  }
+ },
+ "examples/working/hello.utu test": {
+  "calls": {}
+ },
+ "examples/working/strings.utu normal": {
+  "calls": {
+   "main": {
+    "result": "hello from utu",
+    "printed": []
+   }
+  }
+ },
+ "examples/working/strings.utu test": {
+  "calls": {}
+ },
+ "examples/working/structs.utu normal": {
+  "calls": {
+   "main": {
+    "result": 25,
+    "printed": []
+   }
+  }
+ },
+ "examples/working/structs.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-five/folio/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-five/folio/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-five/juniper/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-five/juniper/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-five/scope/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-five/scope/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-five/signal/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-five/signal/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-five/wayfarer/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-five/wayfarer/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-garden/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "TypeError: self.getItem is not a function",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-garden/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-more/dispatch/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-more/dispatch/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-more/split/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-more/split/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-more/supper/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-more/supper/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-reactive/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-reactive/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-one/atlas/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-one/atlas/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-one/ledger/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-one/ledger/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-one/meter/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-one/meter/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-one/pantry/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-one/pantry/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-one/studio/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-one/studio/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-two/grove/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-two/grove/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-two/pitch/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-two/pitch/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-two/readroom/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-two/readroom/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-two/tempo/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-two/tempo/main.utu test": {
+  "calls": {}
+ },
+ "examples/wutu-round-two/venue/main.utu normal": {
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: addEventListener is not defined",
+    "printed": []
+   }
+  }
+ },
+ "examples/wutu-round-two/venue/main.utu test": {
+  "calls": {}
+ }
+}

@@ -1,0 +1,11 @@
+
+      fn tail_block() I32 { { return 7; }; }
+      fn both(b: Bool) I32 { if b { return 1; } else { return 2; }; }
+      fn mixed(b: Bool) I32 { if b { return 1; } else { 2; }; }
+      fn arms(x: I32) I32 { match x { 0 => return 10, ~> 20, }; }
+      fn bound(b: Bool) I32 { let x = if b { 5; } else { return 9; }; x * 2; }
+      export lib {
+          fn run() I32 { tail_block() * 10000 + (both(true) * 10 + both(false)) * 100 + mixed(false) * 10 + arms(0) / 10; }
+          fn binding() I32 { bound(true) * 100 + bound(false); }
+      }
+    

@@ -1,0 +1,2 @@
+using lib from "./lib.utu";
+export main() I32 { 1; }

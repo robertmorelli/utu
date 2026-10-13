@@ -1,0 +1,9 @@
+
+        let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v * 2) \/;
+        let record: fun(I32) void = @es/\ (v) => { globalThis.__utu_seen = v; } \/;
+        let seen: fun() I32 = @es/\ () => globalThis.__utu_seen ?? -1 \/;
+        export lib {
+          fn subscribe(n: I32) void { later(n).then(cl(v) { record(v); }); }
+          fn observed() I32 { seen(); }
+        }
+      

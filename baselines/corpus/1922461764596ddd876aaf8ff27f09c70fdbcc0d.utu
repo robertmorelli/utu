@@ -1,0 +1,20 @@
+
+        enum Shape:
+          | Circle { radius: I32 }
+          | Rect { width: I32 }
+        export lib {
+          fn classify(shape: Shape) I32 {
+            alt shape {
+              Circle => 11,
+              Rect => 22,
+              ~> 99,
+            };
+          }
+          fn circle() I32 {
+            classify(Circle { radius: 7 });
+          }
+          fn rect() I32 {
+            classify(Rect { width: 4 });
+          }
+        }
+      

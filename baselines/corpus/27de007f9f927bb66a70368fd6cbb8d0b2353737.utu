@@ -1,0 +1,6 @@
+mod shape {
+    fn one() I32 { 1; }
+}
+mod color {
+    fn two() I32 { 2; }
+}

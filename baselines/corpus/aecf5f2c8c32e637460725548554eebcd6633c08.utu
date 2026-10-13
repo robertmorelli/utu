@@ -1,0 +1,4 @@
+struct Box:
+  | x : I32
+fn Box.get |b| () I32 { b.x; }
+export lib { fn bad(b: ?Box) I32 { b.get(); } }

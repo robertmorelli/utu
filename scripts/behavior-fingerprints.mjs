@@ -1,7 +1,7 @@
 // The invariant for everything the compiler shows besides wasm: diagnostics,
 // editor ranges, every editor query at every node, and the graph views.
 //
-//   node scripts/behavior-fingerprints.mjs --record   record .tmp/behavior-fingerprints.json
+//   node scripts/behavior-fingerprints.mjs --record   record baselines/behavior-fingerprints.json
 //   node scripts/behavior-fingerprints.mjs            compare against it
 //   ... --only=substring   just the matching programs
 //   ... --jobs=N           worker threads (default: one per core)
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RECORD = path.join(ROOT, '.tmp', 'behavior-fingerprints.json');
+const RECORD = path.join(ROOT, 'baselines', 'behavior-fingerprints.json');
 const DUMPS = path.join(ROOT, '.tmp', 'behavior');
 
 if (isMainThread) await main();

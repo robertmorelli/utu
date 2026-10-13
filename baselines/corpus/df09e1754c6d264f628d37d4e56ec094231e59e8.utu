@@ -1,0 +1,1 @@
+export lib { 5; fn b() I32 { 2; } }

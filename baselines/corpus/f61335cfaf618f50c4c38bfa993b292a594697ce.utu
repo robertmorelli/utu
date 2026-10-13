@@ -1,0 +1,5 @@
+
+      struct Cell: | value: I32
+      fn update(cell: Cell) void { cell.value = 42; cell.value; }
+      export lib { fn run() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; } }
+    

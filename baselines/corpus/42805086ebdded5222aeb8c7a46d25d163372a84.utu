@@ -1,0 +1,13 @@
+
+      struct Counter:
+        | n : I32
+      export lib {
+        fn has_value(flag: Bool) Bool {
+          let value: ?Counter = if flag { Counter { n: 1 }; } else { null; };
+          promote value {
+            |counter| => true,
+            ~> false,
+          };
+        }
+      }
+    

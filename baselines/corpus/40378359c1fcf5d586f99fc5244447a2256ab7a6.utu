@@ -1,0 +1,8 @@
+
+      fn half(x: F64) F64 { x / 2; }
+      export lib {
+        fn run() F64 { let a: F64 = 3; let b = 1.5; half(10) + a + 2 * b + b * 2; }
+        fn single() F32 { let x: F32 = 4; x; }
+        fn still_int() I32 { let n = 5; n; }
+      }
+    

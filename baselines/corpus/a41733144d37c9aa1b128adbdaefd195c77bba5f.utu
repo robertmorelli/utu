@@ -1,0 +1,2 @@
+mem s: U8;
+export main() I32 { s.pop(); 1; }

@@ -1,0 +1,3 @@
+fn a() yield I32 { for (b()) |x| { yield x; }; }
+fn b() yield I32 { for (a()) |x| { yield x; }; }
+export main() I32 { for (a()) |x| { x; }; 1; }

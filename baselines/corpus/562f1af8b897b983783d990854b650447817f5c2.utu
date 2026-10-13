@@ -1,0 +1,2 @@
+mem s: U8 = @comptime/\ nope() \/;
+export main() I32 { 1; }

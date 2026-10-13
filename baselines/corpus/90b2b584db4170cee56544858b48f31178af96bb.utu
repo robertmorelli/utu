@@ -1,0 +1,2 @@
+struct Cell: | value : I32 | value : F32
+export lib { fn ok() I32 { 1; } }

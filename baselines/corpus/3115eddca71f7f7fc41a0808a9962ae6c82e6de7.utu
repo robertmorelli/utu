@@ -1,0 +1,182 @@
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Seat:
+| name: Str
+| selected: Bool
+struct VenueState:
+| seats: Array[Seat]
+fn workspace(state: VenueState) Browser.HTMLElement {
+    @wutu/\
+    @island "venue-workspace";
+    section.workspace {
+        div.panel.stack {
+            p.eyebrow {
+                "THE LITTLE HALL / FRIDAY EVENING";
+            }
+            h2 {
+                "Choose your seats";
+            }
+            p.well {
+                text-align:center;
+                "STAGE";
+            }
+            div {
+                display:grid;
+                grid-template-columns:repeat(6,minmax(0,1fr));
+                gap:0.6rem;
+                for $[state.seats] |seat| key $[seat.name] {
+                    button {
+                        <aria-label = $["Seat "+seat.name];
+                        <aria-pressed = $[if seat.selected {"true";} else {"false";}];
+                        = seat.name;
+                        on click {
+                            seat.selected=not seat.selected;
+                            wutu.save("venue-v2");
+                        };
+                    }
+                }
+            }
+        }
+        div.grid {
+            article.well.stack {
+                p.eyebrow {
+                    "YOUR GROUP";
+                }
+                strong.big {
+                    = wutu.number(state.seats count_where |seat| {
+                        seat.selected;
+                    })+" seats";
+                }
+            }
+            article.well.stack {
+                p.eyebrow {
+                    "PLANNED COST / $12 A SEAT";
+                }
+                strong.big {
+                    = wutu.money((state.seats count_where |seat| {
+                        seat.selected;
+                    })*1200);
+                }
+            }
+        }
+        button {
+            "Clear seating plan";
+            on click {
+                state.seats each |seat| {
+                    seat.selected=false;
+                };
+                wutu.save("venue-v2");
+            };
+        }
+        p.muted {
+            "A private planning tool. Seats are not reserved and no tickets are purchased.";
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        VenueState "venue-v2" manual
+        VenueState {
+            seats:[Seat {
+                name:"A1",
+                selected:false
+            },Seat {
+                name:"A2",
+                selected:false
+            },Seat {
+                name:"A3",
+                selected:false
+            },Seat {
+                name:"A4",
+                selected:false
+            },Seat {
+                name:"A5",
+                selected:false
+            },Seat {
+                name:"A6",
+                selected:false
+            },Seat {
+                name:"B1",
+                selected:false
+            },Seat {
+                name:"B2",
+                selected:false
+            },Seat {
+                name:"B3",
+                selected:false
+            },Seat {
+                name:"B4",
+                selected:false
+            },Seat {
+                name:"B5",
+                selected:false
+            },Seat {
+                name:"B6",
+                selected:false
+            },Seat {
+                name:"C1",
+                selected:false
+            },Seat {
+                name:"C2",
+                selected:false
+            },Seat {
+                name:"C3",
+                selected:false
+            },Seat {
+                name:"C4",
+                selected:false
+            },Seat {
+                name:"C5",
+                selected:false
+            },Seat {
+                name:"C6",
+                selected:false
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "venue";
+        nav {
+            strong {
+                "VENUE / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "A good seat for everyone.";
+            }
+            p.muted {
+                "Plan a small gathering before you send the invitations. Choose seats, keep a running total, and reset the room when plans change.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

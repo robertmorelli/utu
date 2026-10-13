@@ -1,0 +1,24 @@
+
+      struct Item:
+          | id: I32
+          | price: F64
+
+      export lib {
+          fn describe(text: Str) Str {
+              @json/\ match text {
+                  { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.to_str() + " " + (tier orelse "free"),
+                  { status: "error", message: |message| Str } => "error: " + message,
+                  { items: |items| Array[Item] } => "items " + items.len().to_str() + " " + items[1].price.to_str(),
+                  { "content-type": |kind| Str, retry: true, limit: 2.5, cursor: null } => "literal " + kind,
+                  ~> |error| "no match: " + error,
+              }\/;
+          }
+          fn first_wins(text: Str) I32 {
+              @json/\ match text {
+                  { a: |a| I32 } => 1,
+                  { a: |a| I32, b: |b| I32 } => 2,
+                  ~> 0,
+              }\/;
+          }
+      }
+    

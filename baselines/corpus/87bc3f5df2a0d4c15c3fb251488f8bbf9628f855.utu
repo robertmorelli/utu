@@ -1,0 +1,4 @@
+export lib {
+      fn run(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(7); }
+      fn callback(n: I32) cl(I32) I32 { cl(x) { x + n; }; }
+    }

@@ -1,0 +1,3 @@
+mem s: U8;
+mem s: U8;
+export main() I32 { 1; }

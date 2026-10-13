@@ -1,0 +1,10 @@
+
+      export lib {
+        fn widen(i: I32) F64 { i.to_f64(); }
+        fn narrow(f: F64) I32 { f.to_i32(); }
+        fn unsigned(f: F64) F64 { f.to_u32().to_f64(); }
+        fn wide(i: I32) F64 { i.to_i64().to_f64(); }
+        fn single(f: F64) F64 { f.to_f32().to_f64(); }
+        fn wrap(n: F64) I32 { n.to_i64().to_i32(); }
+      }
+    

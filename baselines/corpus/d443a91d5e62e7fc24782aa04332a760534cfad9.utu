@@ -1,0 +1,4 @@
+proto P: | value() I32
+tag struct Cell[P]: | value : I32
+fn P[Cell].value |self| (extra: I32) I32 { extra; }
+export lib { fn bad(p: P) I32 { p.value(); } }

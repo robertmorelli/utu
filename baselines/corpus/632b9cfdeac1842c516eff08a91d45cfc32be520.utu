@@ -1,0 +1,5 @@
+struct P:
+    | x: I32
+fn P.make() P { P { x: 1 }; }
+fn P.get |self| () I32 { self.x; }
+export main() I32 { let p = P { x: 1 }; P.get(p); }

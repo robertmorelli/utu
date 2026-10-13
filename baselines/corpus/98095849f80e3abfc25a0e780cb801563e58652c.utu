@@ -1,0 +1,21 @@
+
+        proto Score:
+          | score(I32) I32
+        struct Point[Score]:
+          | value : I32
+        tag enum Item[Score]:
+          | Bonus { value: I32 }
+        fn Score[Point].score |self| (bonus: I32) I32 { self.value + bonus; }
+        fn Score[Bonus].score |self| (bonus: I32) I32 { self.value * 2 + bonus; }
+        fn total(values: Array[Score]) I32 {
+          let out: I32 = 0;
+          for (0..<values.len()) |i| { out += values[i].score(1); };
+          out;
+        }
+        export main() I32 {
+          let values: Array[Score] = Array[Score].new_default(2);
+          values[0] = Point { value: 3 };
+          values[1] = Bonus { value: 4 };
+          total(values);
+        }
+      

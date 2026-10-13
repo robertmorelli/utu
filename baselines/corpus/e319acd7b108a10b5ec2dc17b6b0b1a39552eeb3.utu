@@ -1,0 +1,9 @@
+export lib {
+  fn text() Str {
+    let s =
+      \\{"quoted": true}
+      \\second line
+    ;
+    s;
+  }
+}

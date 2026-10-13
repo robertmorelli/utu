@@ -1,0 +1,6 @@
+
+      bench "counter" {
+        let total: I32 = 0;
+        measure { total += 1; }
+      }
+    

@@ -1,11 +1,11 @@
 // The invariant for compiler refactors: every program compiles to the same wasm.
 //
-//   node scripts/wasm-fingerprints.mjs --record        record .tmp/wasm-fingerprints.json
+//   node scripts/wasm-fingerprints.mjs --record        record baselines/wasm-fingerprints.json
 //   node scripts/wasm-fingerprints.mjs                 compare against it
 //   ... --optimized       also check -Oz and -O3 (with the local cleanup)
 //   ... --only=substring  just the matching programs
 //   ... --jobs=N          worker threads (default: one per core)
-//   ... --corpus          also the programs in .tmp/corpus (the syntax corpus)
+//   ... --corpus          also the programs in baselines/corpus (the syntax corpus)
 //
 // Covers every .utu program under examples/ and benchmarks/. The default check
 // hashes -O0 output, which is fast and shows every change the compiler makes;
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RECORD = path.join(ROOT, '.tmp', 'wasm-fingerprints.json');
+const RECORD = path.join(ROOT, 'baselines', 'wasm-fingerprints.json');
 
 if (isMainThread) await main();
 else await worker();
@@ -29,7 +29,7 @@ async function main() {
   const record = process.argv.includes('--record');
   const levels = process.argv.includes('--optimized') ? ['none', 'size', 'speed'] : ['none'];
   const only = flag('only');
-  const corpus = process.argv.includes('--corpus') ? await programs(path.join(ROOT, '.tmp', 'corpus')).catch(() => []) : [];
+  const corpus = process.argv.includes('--corpus') ? await programs(path.join(ROOT, 'baselines', 'corpus')).catch(() => []) : [];
   const files = [...await programs(path.join(ROOT, 'examples')), ...await programs(path.join(ROOT, 'benchmarks')), ...corpus]
     .filter(file => !only || file.includes(only));
   const queue = files.flatMap(file => levels.map(level => ({ file, level })));
@@ -95,7 +95,8 @@ async function worker() {
     } catch (error) {
       value = `throws: ${String(error.message).split('\n')[0]}`;
     }
-    parentPort.postMessage({ key, value });
+    // Paths in messages are relative to the repository, so records are portable.
+    parentPort.postMessage({ key, value: value.split(workerData.ROOT).join('<root>') });
   });
 }
 

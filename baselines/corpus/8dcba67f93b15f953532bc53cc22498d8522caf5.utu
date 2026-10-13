@@ -1,0 +1,4 @@
+using Browser from std:Browser;
+struct S:
+    | n: I32
+export main() void { let s = @stored/\ S "k" validate nope S { n: 1 } \/; }

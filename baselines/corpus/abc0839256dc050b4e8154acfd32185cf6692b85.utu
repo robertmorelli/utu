@@ -1,0 +1,8 @@
+
+      using Array from std:Array;
+      export lib {
+        fn make_arr() Array[I32] {
+          Array[I32].new(10, 0);
+        }
+      }
+    

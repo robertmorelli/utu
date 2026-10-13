@@ -1,0 +1,43 @@
+// 06 — color-name. A package that is pure *data*, not functions.
+//
+//   declare const colors: { [key: string]: [number, number, number] };
+//
+// There is nothing to call. The whole API is an index signature returning a
+// fixed-length tuple. Two things a .d.ts index signature does not tell you:
+// how to enumerate the keys, and that the tuple has exactly three elements.
+//
+// Tuples have no utu equivalent at all. `[number, number, number]` becomes
+// either three accessor bindings or an opaque handle — there is no way to spell
+// "heterogeneous fixed-length sequence" in utu, and no reason to add one.
+
+let red_of: fun(Str) I32 = @es/\ ((m) => (n) => m.default[n][0])(await import('color-name')) \/;
+let green_of: fun(Str) I32 = @es/\ ((m) => (n) => m.default[n][1])(await import('color-name')) \/;
+let blue_of: fun(Str) I32 = @es/\ ((m) => (n) => m.default[n][2])(await import('color-name')) \/;
+
+let has_color: fun(Str) Bool =
+    @es/\ ((m) => (n) => (n in m.default) ? 1 : 0)(await import('color-name')) \/;
+
+// An index signature implies enumeration, but the .d.ts never says so.
+let color_count: I32 = @es/\ Object.keys((await import('color-name')).default).length \/;
+
+export main() I32 {
+    red_of("rebeccapurple");
+}
+
+test "tuple elements need one binding each" {
+    assert red_of("red") == 255;
+    assert green_of("red") == 0;
+    assert blue_of("red") == 0;
+}
+
+test "a named colour decomposes into three host calls" {
+    assert red_of("rebeccapurple") == 102;
+    assert green_of("rebeccapurple") == 51;
+    assert blue_of("rebeccapurple") == 153;
+}
+
+test "index-signature membership and size are hand-written" {
+    assert has_color("teal");
+    assert has_color("notacolor") == false;
+    assert color_count > 100;
+}

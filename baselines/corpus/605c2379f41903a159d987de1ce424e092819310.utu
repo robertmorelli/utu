@@ -1,0 +1,3 @@
+struct Node:
+  | next : Node
+export lib { fn bad() I32 { 0; } }

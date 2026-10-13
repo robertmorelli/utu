@@ -1,0 +1,6 @@
+
+        let lucky: I32 = @es/\41\/;
+        export lib {
+          fn get_lucky() I32 { lucky; }
+        }
+      

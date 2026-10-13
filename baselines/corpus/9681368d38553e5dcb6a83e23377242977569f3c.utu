@@ -1,0 +1,4 @@
+using Browser from std:Browser;
+struct S:
+    | n: I64
+export main() void { let s = @stored/\ S "k" S { n: 1 } \/; }

@@ -1,0 +1,2 @@
+mem s: I32;
+export main() I32 { s.intern(0, 1); }

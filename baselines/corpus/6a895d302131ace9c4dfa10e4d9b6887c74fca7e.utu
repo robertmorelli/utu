@@ -1,0 +1,8 @@
+
+        let join: fun(Str, Str) Str = @es/\ (await import('node:path')).join \/;
+        let sep: Str = @es/\ (await import('node:path')).sep \/;
+        export lib {
+          fn joined() Str { join("a", "b"); }
+          fn separator() Str { sep; }
+        }
+      

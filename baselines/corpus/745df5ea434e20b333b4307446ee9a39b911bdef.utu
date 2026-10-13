@@ -1,0 +1,49 @@
+
+enum Shape:
+    | Circle { r: F64 }
+    | Rect { w: I32, h: I32 }
+    | Dot
+
+enum Color:
+    | Red
+    | Green
+    | Blue
+
+struct Node:
+    | id: I64
+    | label: Str
+    | children: Array[Node]
+    | parent: ?Node
+    | shape: Shape
+    | color: Color
+    | small: F32
+    | big: U32
+    | flags: Array[Bool]
+
+struct Doc:
+    | nodes: Array[Node]
+    | title: ?Str
+
+export lib {
+    fn roundtrip(text: Str) Str {
+        promote @json/\ decode Doc text \/ {
+            |doc| => @json/\ encode Doc doc \/,
+            ~> "invalid: " + @json/\ error Doc text \/,
+        };
+    }
+    fn valid(text: Str) Bool {
+        promote @json/\ decode Doc text \/ {
+            |doc| => true,
+            ~> false,
+        };
+    }
+    fn total_ids(text: Str) I64 {
+        promote @json/\ decode Array[Node] text \/ {
+            |nodes| => {
+                let zero: I64 = 0;
+                nodes fold(zero) |a, n| { a + n.id; };
+            },
+            ~> -1,
+        };
+    }
+}

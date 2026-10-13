@@ -1,0 +1,40 @@
+// std/U32.utu — U32 scalar type module
+mod U32 {
+    type & = @ir/\ <ir-wasm-scalar type-repr="wasm-i32"/> \/
+
+    fn &:add  |a, b| & { @ir/\ <ir-u32-add><ir-ident name="a"/><ir-ident name="b"/></ir-u32-add> \/; }
+    fn &:sub  |a, b| & { @ir/\ <ir-u32-sub><ir-ident name="a"/><ir-ident name="b"/></ir-u32-sub> \/; }
+    fn &:mul  |a, b| & { @ir/\ <ir-u32-mul><ir-ident name="a"/><ir-ident name="b"/></ir-u32-mul> \/; }
+    fn &:div  |a, b| & { @ir/\ <ir-u32-div-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-div-u> \/; }
+    fn &:rem  |a, b| & { @ir/\ <ir-u32-rem-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-rem-u> \/; }
+    fn &:band |a, b| & { @ir/\ <ir-u32-and><ir-ident name="a"/><ir-ident name="b"/></ir-u32-and> \/; }
+    fn &:bor  |a, b| & { @ir/\ <ir-u32-or><ir-ident name="a"/><ir-ident name="b"/></ir-u32-or> \/; }
+    fn &:bxor |a, b| & { @ir/\ <ir-u32-xor><ir-ident name="a"/><ir-ident name="b"/></ir-u32-xor> \/; }
+    fn &:shl  |a, b| & { @ir/\ <ir-u32-shl><ir-ident name="a"/><ir-ident name="b"/></ir-u32-shl> \/; }
+    fn &:shr  |a, b| & { @ir/\ <ir-u32-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-shr-u> \/; }
+    fn &:ushr |a, b| & { @ir/\ <ir-u32-shr-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-shr-u> \/; }
+    fn &:eq   |a, b| Bool { @ir/\ <ir-u32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-u32-eq> \/; }
+    fn &:ne   |a, b| Bool { @ir/\ <ir-u32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-u32-ne> \/; }
+    fn &:lt   |a, b| Bool { @ir/\ <ir-u32-lt-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-lt-u> \/; }
+    fn &:le   |a, b| Bool { @ir/\ <ir-u32-le-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-le-u> \/; }
+    fn &:gt   |a, b| Bool { @ir/\ <ir-u32-gt-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-gt-u> \/; }
+    fn &:ge   |a, b| Bool { @ir/\ <ir-u32-ge-u><ir-ident name="a"/><ir-ident name="b"/></ir-u32-ge-u> \/; }
+    // wasm has no U32.neg / U32.not; express them with real ops.
+    //   neg a  = 0 - a   (well-defined mod 2^32)
+    //   bnot a = a xor 0xFFFFFFFF
+    fn &:neg  |a| & { @ir/\ <ir-u32-sub><ir-lit kind="int" type-name="U32" value="0"/><ir-ident name="a"/></ir-u32-sub> \/; }
+    fn &:bnot |a| & { @ir/\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="U32" value="-1"/></ir-u32-xor> \/; }
+
+    // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
+    fn &.to_i32 |self| () I32 { @ir/\ <ir-i32-or><ir-ident name="self"/><ir-lit kind="int" type-name="I32" value="0"/></ir-i32-or> \/; }
+    fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-extend-u><ir-ident name="self"/></ir-i64-extend-u> \/; }
+    fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-extend-u><ir-ident name="self"/></ir-u64-extend-u> \/; }
+    fn &.to_f32 |self| () F32 { @ir/\ <ir-f32-convert-u-i32><ir-ident name="self"/></ir-f32-convert-u-i32> \/; }
+    fn &.to_f64 |self| () F64 { @ir/\ <ir-f64-convert-u-i32><ir-ident name="self"/></ir-f64-convert-u-i32> \/; }
+
+    // Decimal text, as JavaScript's String() spells it. Ships only when used.
+    fn &.to_str |self| () Str {
+        let format: fun(U32) Str = @es/\ (v) => String(v >>> 0) \/;
+        format(self);
+    }
+}

@@ -1,0 +1,12 @@
+
+      struct Pt:
+        | x : F32
+      fn takes64(v: I64) I64 { v; }
+      fn wide() I64 {
+        let a: I64 = 0;
+        let b: F32 = 1.0;
+        let c: U32 = 7;
+        let p: Pt = Pt { x: 2.0 };
+        takes64(41);
+      }
+    

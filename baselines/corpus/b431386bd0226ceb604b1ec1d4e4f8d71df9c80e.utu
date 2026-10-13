@@ -1,0 +1,3 @@
+struct A:
+    | a: A
+export main() void { let a = @json/\ decode A "{}" \/; }

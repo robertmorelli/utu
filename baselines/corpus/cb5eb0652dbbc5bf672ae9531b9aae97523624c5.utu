@@ -1,0 +1,31 @@
+struct Box:
+    | value : I32
+
+fn maybe_box(flag: Bool) ?Box {
+    if flag { Box { value: 41 }; } else { Box.null; };
+}
+
+fn or_zero(flag: Bool) I32 {
+    let item: Box = maybe_box(flag) orelse Box { value: 0 };
+    item.value;
+}
+
+fn has_box(flag: Bool) Bool {
+    promote maybe_box(flag) {
+        |item| => true,
+        ~> false,
+    };
+}
+
+test "else fallback runs on null" {
+    assert or_zero(false) == 0;
+}
+
+test "else fallback keeps non-null values" {
+    assert or_zero(true) == 41;
+}
+
+test "promote distinguishes nullable results" {
+    assert has_box(true);
+    assert not has_box(false);
+}

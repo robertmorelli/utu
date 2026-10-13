@@ -1,0 +1,1 @@
+export main() I32 { while (true) { defer { while (true) { break; }; }; break; }; 1; }

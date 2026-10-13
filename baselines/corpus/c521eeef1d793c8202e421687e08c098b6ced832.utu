@@ -1,0 +1,19 @@
+
+      struct Counter:
+          | n: I32
+      fn bump(c: Counter, value: Bool) Bool { c.n += 1; value; }
+      export lib {
+          fn and_skips() I32 { let c = Counter { n: 0 }; let x = false and bump(c, true); c.n; }
+          fn or_skips() I32 { let c = Counter { n: 0 }; let x = true or bump(c, true); c.n; }
+          fn both_run() I32 { let c = Counter { n: 0 }; let x = true and bump(c, false); let y = false or bump(c, true); c.n; }
+          fn guard(i: I32) I32 { let s = "ab"; if i < s.len() and s[i] == 98 { 1; } else { 0; }; }
+          fn truth() I32 {
+              let t = 0;
+              if true and true { t += 1; };
+              if not (true and false) { t += 10; };
+              if false or true { t += 100; };
+              if not (false or false) { t += 1000; };
+              t;
+          }
+      }
+    

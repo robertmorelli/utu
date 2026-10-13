@@ -1,0 +1,263 @@
+struct Report:
+    | hash : I32
+    | stride_hash : I32
+    | lines : I32
+    | words : I32
+    | longest : I32
+    | numbers : I32
+    | number_sum : I32
+    | strings : I32
+    | comments : I32
+    | brackets : I32
+    | operators : I32
+    | patterns : I32
+    | histogram : I32
+    | transitions : I32
+
+fn is_space(c: I32) Bool {
+    c == 32 or c == 9 or c == 10 or c == 13;
+}
+
+fn is_digit(c: I32) Bool {
+    c >= 48 and c <= 57;
+}
+
+fn is_lower(c: I32) Bool {
+    c >= 97 and c <= 122;
+}
+
+fn is_upper(c: I32) Bool {
+    c >= 65 and c <= 90;
+}
+
+fn is_alpha(c: I32) Bool {
+    is_lower(c) or is_upper(c) or c == 95;
+}
+
+fn is_word(c: I32) Bool {
+    is_alpha(c) or is_digit(c);
+}
+
+fn mix(hash: I32, value: I32) I32 {
+    (hash ^ value) * 16777619;
+}
+
+fn hash_forward(text: Str) I32 {
+    let hash: I32 = 305419896;
+    for (0..<text.len()) |i| {
+        hash = mix(hash, text[i]);
+    };
+    hash;
+}
+
+fn hash_stride(text: Str) I32 {
+    let hash: I32 = 18652613;
+    let i: I32 = 0;
+    let size: I32 = text.len();
+    while (i < size) {
+        hash = mix(hash, text[i] + i);
+        i += 7;
+    };
+    hash;
+}
+
+fn count_lines(text: Str) I32 {
+    let count: I32 = 1;
+    for (0..<text.len()) |i| {
+        if text[i] == 10 { count += 1; };
+    };
+    count;
+}
+
+fn count_words(text: Str) I32 {
+    let count: I32 = 0;
+    let inside: Bool = false;
+    for (0..<text.len()) |i| {
+        let word: Bool = is_word(text[i]);
+        if word and not inside { count += 1; };
+        inside = word;
+    };
+    count;
+}
+
+fn longest_word(text: Str) I32 {
+    let longest: I32 = 0;
+    let current: I32 = 0;
+    for (0..<text.len()) |i| {
+        if is_word(text[i]) {
+            current += 1;
+            if current > longest { longest = current; };
+        } else {
+            current = 0;
+        };
+    };
+    longest;
+}
+
+fn count_numbers(text: Str) I32 {
+    let count: I32 = 0;
+    let inside: Bool = false;
+    for (0..<text.len()) |i| {
+        let digit: Bool = is_digit(text[i]);
+        if digit and not inside { count += 1; };
+        inside = digit;
+    };
+    count;
+}
+
+fn sum_numbers(text: Str) I32 {
+    let total: I32 = 0;
+    let value: I32 = 0;
+    let inside: Bool = false;
+    for (0..<text.len()) |i| {
+        let c: I32 = text[i];
+        if is_digit(c) {
+            value = value * 10 + c - 48;
+            inside = true;
+        } else {
+            if inside { total += value; };
+            value = 0;
+            inside = false;
+        };
+    };
+    if inside { total += value; };
+    total;
+}
+
+fn count_strings(text: Str) I32 {
+    let count: I32 = 0;
+    let quoted: Bool = false;
+    let escaped: Bool = false;
+    for (0..<text.len()) |i| {
+        let c: I32 = text[i];
+        if quoted {
+            if escaped {
+                escaped = false;
+            } else {
+                if c == 92 { escaped = true; };
+                if c == 34 { quoted = false; };
+            };
+        } else {
+            if c == 34 {
+                quoted = true;
+                count += 1;
+            };
+        };
+    };
+    count;
+}
+
+fn count_comments(text: Str) I32 {
+    let count: I32 = 0;
+    for (0..<text.len() - 1) |i| {
+        let a: I32 = text[i];
+        let b: I32 = text[i + 1];
+        if a == 47 and (b == 47 or b == 42) { count += 1; };
+    };
+    count;
+}
+
+fn bracket_score(text: Str) I32 {
+    let round: I32 = 0;
+    let square: I32 = 0;
+    let curly: I32 = 0;
+    let penalty: I32 = 0;
+    for (0..<text.len()) |i| {
+        let c: I32 = text[i];
+        if c == 40 { round += 1; };
+        if c == 41 { round -= 1; if round < 0 { penalty += 1; round = 0; }; };
+        if c == 91 { square += 1; };
+        if c == 93 { square -= 1; if square < 0 { penalty += 1; square = 0; }; };
+        if c == 123 { curly += 1; };
+        if c == 125 { curly -= 1; if curly < 0 { penalty += 1; curly = 0; }; };
+    };
+    round * 3 + square * 5 + curly * 7 + penalty * 11;
+}
+
+fn count_operators(text: Str) I32 {
+    let count: I32 = 0;
+    for (0..<text.len()) |i| {
+        let c: I32 = text[i];
+        if c == 43 or c == 45 or c == 42 or c == 47 or c == 61 or c == 60 or c == 62 {
+            count += 1;
+        };
+    };
+    count;
+}
+
+fn count_patterns(text: Str) I32 {
+    let count: I32 = 0;
+    for (0..<text.len() - 2) |i| {
+        let a: I32 = text[i];
+        let b: I32 = text[i + 1];
+        let c: I32 = text[i + 2];
+        if a == 108 and b == 101 and c == 116 { count += 3; };
+        if a == 102 and b == 110 and is_space(c) { count += 5; };
+        if a == 105 and b == 102 and is_space(c) { count += 7; };
+        if a == 102 and b == 111 and c == 114 { count += 11; };
+    };
+    count;
+}
+
+fn histogram_score(text: Str) I32 {
+    let bins: Array[I32] = Array[I32].new(128, 0);
+    for (0..<text.len()) |i| {
+        let c: I32 = text[i] & 127;
+        bins[c] += 1;
+    };
+    let score: I32 = 0;
+    for (0..<128) |j| {
+        score = mix(score, bins[j] + j);
+    };
+    score;
+}
+
+fn transition_score(text: Str) I32 {
+    let score: I32 = 0;
+    let previous: I32 = 0;
+    for (0..<text.len()) |i| {
+        let c: I32 = text[i];
+        score += (previous ^ c) * (i & 15);
+        previous = c;
+    };
+    score;
+}
+
+fn finish(report: Report) I32 {
+    let result: I32 = report.hash;
+    result = mix(result, report.stride_hash);
+    result = mix(result, report.lines);
+    result = mix(result, report.words);
+    result = mix(result, report.longest);
+    result = mix(result, report.numbers);
+    result = mix(result, report.number_sum);
+    result = mix(result, report.strings);
+    result = mix(result, report.comments);
+    result = mix(result, report.brackets);
+    result = mix(result, report.operators);
+    result = mix(result, report.patterns);
+    result = mix(result, report.histogram);
+    mix(result, report.transitions);
+}
+
+export lib {
+    fn run(text: Str) I32 {
+        let report: Report = Report {
+            hash: hash_forward(text),
+            stride_hash: hash_stride(text),
+            lines: count_lines(text),
+            words: count_words(text),
+            longest: longest_word(text),
+            numbers: count_numbers(text),
+            number_sum: sum_numbers(text),
+            strings: count_strings(text),
+            comments: count_comments(text),
+            brackets: bracket_score(text),
+            operators: count_operators(text),
+            patterns: count_patterns(text),
+            histogram: histogram_score(text),
+            transitions: transition_score(text),
+        };
+        finish(report);
+    }
+}

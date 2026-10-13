@@ -1,0 +1,1 @@
+export main() void { let a = @json/\ decode Array[Missing] "1" \/; }

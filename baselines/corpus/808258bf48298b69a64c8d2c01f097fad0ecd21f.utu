@@ -1,0 +1,53 @@
+mod bucket[T] {
+    struct Box:
+        | value : T
+
+    fn Box.new(value: T) Box {
+        Box { value: value };
+    }
+
+    fn Box.get |self| () T {
+        self.value;
+    }
+
+    fn id(value: T) T {
+        value;
+    }
+}
+
+using bucket[I32] |ints|;
+using bucket[Bool] |flags|;
+
+fn read_int(box: ints.Box) I32 {
+    box.get();
+}
+
+fn read_flag(box: flags.Box) Bool {
+    box.get();
+}
+
+test "multiple instantiations keep separate qualified types" {
+    let int_box: ints.Box = ints.Box.new(6);
+    let flag_box: flags.Box = flags.Box.new(true);
+    assert read_int(int_box) == 6;
+    assert read_flag(flag_box);
+}
+
+test "inline paths resolve the matching instantiation" {
+    let int_box: bucket[I32].Box = ints.Box.new(4);
+    let flag_box: bucket[Bool].Box = flags.Box.new(false);
+    assert int_box.get() == 4;
+    assert not flag_box.get();
+}
+
+test "free functions resolve through both using aliases" {
+    assert ints.id(8) == 8;
+    assert flags.id(true);
+}
+
+test "multiple instantiations keep their own associated calls" {
+    let int_box: ints.Box = ints.Box.new(12);
+    let flag_box: flags.Box = flags.Box.new(true);
+    assert int_box.get() == 12;
+    assert flag_box.get();
+}

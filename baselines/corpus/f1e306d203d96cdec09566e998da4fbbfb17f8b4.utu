@@ -1,0 +1,40 @@
+mod cell[T] {
+    struct Cell:
+        | value : T
+
+    fn Cell.new(value: T) Cell {
+        Cell { value: value };
+    }
+
+    fn Cell.get |self| () T {
+        self.value;
+    }
+
+    fn wrap(value: T) Cell {
+        Cell.new(value);
+    }
+}
+
+using cell[I32];
+
+fn opened_sum(left: Cell, right: Cell) I32 {
+    left.get() + right.get();
+}
+
+test "open using imports types" {
+    let cell: Cell = Cell.new(3);
+    assert cell.get() == 3;
+}
+
+test "open using imports free functions" {
+    assert wrap(4).get() == 4;
+}
+
+test "open names work in later helper functions" {
+    assert opened_sum(Cell.new(2), Cell.new(5)) == 7;
+}
+
+test "opened associated calls work from values" {
+    let cell: Cell = Cell.new(8);
+    assert cell.get() == 8;
+}

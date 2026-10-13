@@ -1,0 +1,15 @@
+
+      struct Counter:
+        | n : I32
+      export lib {
+        fn maybe(flag: Bool) ?Counter {
+          if flag { Counter { n: 7 }; } else { Counter.null; };
+        }
+        fn unwrap(flag: Bool) I32 {
+          promote maybe(flag) {
+            |c| => c.n,
+            ~> 0,
+          };
+        }
+      }
+    

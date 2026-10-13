@@ -1,0 +1,12 @@
+using Browser from std:Browser;
+
+        fn first() Str { "p{color:red}"; }
+        fn second() Str { "p{color:blue}"; }
+        export main() Browser.HTMLElement {
+          @wutu/\
+          @style $[first()];
+          @style $[second()];
+          div { /* comment */ background: url(https://example.com/a.png); "x"; }
+          \/;
+        }
+      

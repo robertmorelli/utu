@@ -1,0 +1,2 @@
+fn g(n: I32) yield I32 { for (g(n - 1)) |x| { yield x + 1; }; }
+export main() I32 { for (g(3)) |x| { x; }; 1; }

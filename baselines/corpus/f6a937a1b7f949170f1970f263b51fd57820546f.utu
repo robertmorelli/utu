@@ -1,0 +1,20 @@
+using Browser from std:Browser;
+
+          struct Gauge:
+              | pct: I32
+          fn view(g: Gauge) Browser.HTMLElement {
+            @wutu/\ @reactive;
+            div {
+              display: block;
+              width: $[g.pct.to_str() + "%"];
+              --level: $[g.pct.to_str()];
+              span { "gauge"; }
+            }
+            \/;
+          }
+          export lib {
+            fn make(pct: I32) Gauge { Gauge { pct: pct }; }
+            fn render(g: Gauge) Browser.HTMLElement { view(g); }
+            fn set(g: Gauge, pct: I32) void { g.pct = pct; wutu.refresh(); }
+          }
+        

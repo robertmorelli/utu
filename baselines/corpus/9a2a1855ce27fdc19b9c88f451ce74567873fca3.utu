@@ -1,0 +1,7 @@
+
+      struct Cell:
+        | value : I32
+      export lib {
+        fn make() Array[?Cell] { Array[?Cell].new_default(2); }
+      }
+    

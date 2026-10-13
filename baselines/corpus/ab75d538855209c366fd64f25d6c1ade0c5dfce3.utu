@@ -1,0 +1,2 @@
+using Buffer from std:Buffer;
+export main() I32 { let b = Buffer[I32].new(0); b.finish().len(); }

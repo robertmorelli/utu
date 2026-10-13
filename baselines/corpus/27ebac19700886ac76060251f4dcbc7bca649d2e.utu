@@ -1,0 +1,88 @@
+// 10 — node:events. Callbacks and a stateful class instance.
+//
+//   class EventEmitter {
+//     on(event: string, listener: (...args: any[]) => void): this;
+//     emit(event: string, ...args: any[]): boolean;
+//   }
+//
+// Two separate problems, with opposite outcomes.
+//
+// GOOD: `cl` is already a real JS function, so a utu closure can be handed
+// straight to `.on()` with nothing between. Callback-taking APIs — the ones
+// that are usually worst in an FFI — are the second-easiest thing here.
+//
+// BAD: `class` has no utu equivalent. A constructor becomes a factory returning
+// an opaque handle, `this`-returning methods (the fluent `on` returns `this`)
+// lose their chaining, and `...args: any[]` has no representation at all — the
+// binding fixes one arity and that is the arity you get.
+
+mod Emitter {
+    type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
+
+    fn &.on |self| (event: Str, handler: cl(I32) void) void { emitter_on(self, event, handler); }
+    fn &.emit |self| (event: Str, value: I32) Bool { emitter_emit(self, event, value); }
+    fn &.count |self| (event: Str) I32 { emitter_count(self, event); }
+}
+
+// A `new` expression becomes a zero-arg factory.
+let new_emitter: fun() Emitter =
+    @es/\ ((m) => () => new m.EventEmitter())(await import('node:events')) \/;
+
+// The closure arrives already callable — this is genuinely just `e.on(k, f)`.
+let emitter_on: fun(Emitter, Str, cl(I32) void) void = @es/\ (e, k, f) => e.on(k, f) \/;
+
+// PAIN: `emit(event, ...args)` is variadic. This binding is the arity-1 case;
+// arity 0 and 2 would each need their own.
+let emitter_emit: fun(Emitter, Str, I32) Bool = @es/\ (e, k, v) => e.emit(k, v) ? 1 : 0 \/;
+let emitter_count: fun(Emitter, Str) I32 = @es/\ (e, k) => e.listenerCount(k) \/;
+
+export main() I32 {
+    let e: Emitter = new_emitter();
+    e.count("tick");
+}
+
+test "a utu closure is registered directly as a JS listener" {
+    let e: Emitter = new_emitter();
+    e.on("tick", cl(v) { v + 1; });
+    assert e.count("tick") == 1;
+}
+
+// THE SHARPEST TRAP IN THE WHOLE SET.
+//
+// Captured scalars are *snapshot* into the closure environment
+// (src/compiler/lower-closures.js:21), so accumulating into a captured `I32`
+// from a callback silently does nothing — this reads exactly like the JS you
+// would write, compiles clean, fires the listener, and yields 0. Captured GC
+// references are *shared*, so a one-element Array works as a mutable cell.
+//
+// This is documented and intentional, but it collides head-on with the single
+// most common callback idiom in the JS ecosystem, and nothing diagnoses it.
+test "accumulating from a callback needs a GC cell, not a scalar" {
+    let e: Emitter = new_emitter();
+
+    let lost: I32 = 0;
+    e.on("add", cl(v) { lost = lost + v; });
+
+    let cell: Array[I32] = Array[I32].new_default(1);
+    cell[0] = 0;
+    e.on("add", cl(v) { cell[0] = cell[0] + v; });
+
+    e.emit("add", 5);
+    e.emit("add", 7);
+
+    assert lost == 0;      // the scalar capture was snapshot, and the writes vanished
+    assert cell[0] == 12;  // the reference capture was shared
+}
+
+test "two listeners on one event both fire" {
+    let e: Emitter = new_emitter();
+    let cells: Array[I32] = Array[I32].new_default(2);
+    cells[0] = 0;
+    cells[1] = 0;
+    e.on("x", cl(v) { cells[0] = cells[0] + v; });
+    e.on("x", cl(v) { cells[1] = cells[1] + v * 2; });
+    e.emit("x", 3);
+    assert cells[0] == 3;
+    assert cells[1] == 6;
+    assert e.count("x") == 2;
+}

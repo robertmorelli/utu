@@ -1,0 +1,2 @@
+fn f(x: Nope) I32 { 1; }
+export main() I32 { f(2); }

@@ -1,0 +1,28 @@
+using Browser from std:Browser;
+
+        struct Item:
+            | id: Str
+        struct State:
+            | text: Str
+            | items: Array[Item]
+        export main() Browser.HTMLElement {
+          let state = State { text: "start", items: [Item { id: "a" }, Item { id: "b" }] };
+          @wutu/\
+          @reactive;
+          main {
+            input { bind:value = state.text; }
+            p { = state.text; }
+            ul {
+              for $[state.items] |item| key $[item.id] {
+                li { = item.id; }
+              }
+            }
+            button {
+              on click {
+                state.items = [state.items[1], state.items[0]];
+              };
+            }
+          }
+          \/;
+        }
+      

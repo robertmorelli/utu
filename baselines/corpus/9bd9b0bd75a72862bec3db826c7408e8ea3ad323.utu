@@ -1,0 +1,2 @@
+tag enum Choice: | A | A
+export lib { fn ok() I32 { 1; } }

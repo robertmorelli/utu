@@ -1,0 +1,43 @@
+
+        export lib {
+          fn exclusive(n: I32) I32 {
+            let total: I32 = 0;
+            for (0..<n) |i| { total += i; };
+            total;
+          }
+          fn inclusive(n: I32) I32 {
+            let total: I32 = 0;
+            for (0...n) |i| { total += i; };
+            total;
+          }
+          fn first_three(n: I32) I32 {
+            let total: I32 = 0;
+            for (0..<n) |i| {
+              if i == 3 { break; };
+              total += i;
+            };
+            total;
+          }
+          fn wide(end_: I64) I64 {
+            let start: I64 = 0;
+            let total: I64 = 0;
+            for (start..<end_) |i| { total += i; };
+            total;
+          }
+          fn inclusive_u64_max(start: U64) U64 {
+            let total: U64 = 0;
+            for (start...start) |i| { total += 1; };
+            total;
+          }
+          fn zipped() I32 {
+            let total: I32 = 0;
+            for (0..<5, 10..<13) |left, right| { total += left + right; };
+            total;
+          }
+          fn no_capture() I32 {
+            let total: I32 = 0;
+            for (0..<3) { total += 1; };
+            total;
+          }
+        }
+      

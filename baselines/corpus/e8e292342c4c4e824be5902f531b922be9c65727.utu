@@ -1,0 +1,27 @@
+
+      struct Counter: | value: I32
+      export lib {
+        fn fused() I32 { [1,2,3,4,5] map |x| { x*2; } filter |x| {x>4;} skip(1) take(2) fold(0) |a,x| {a+x;}; }
+        fn indexes() U64 { let zero: U64 = 0; [4,5,6,7] filter |x| {x>5;} fold(zero) |a,x,i| {a+i;}; }
+        fn once() I32 { let c = Counter {value:0}; [1,2,3,4] map |x| {c.value+=1;x;} any |x| {x==2;}; c.value; }
+        fn zip_once() I32 { let c=Counter{value:0}; [1,2,3] map |x| {c.value+=1;x;} zip([10]) |a,b| {a+b;} count; c.value; }
+        fn chain_after_take() I32 { [1,2,3] take(1) chain([10,20]) sum; }
+        fn take_after_chain() I32 { [1,2,3] chain([10,20]) take(1) sum; }
+        fn chain_mixed() I32 { [1,2,3] take(0) chain([10,20]) take(1) chain([30]) sum; }
+        fn no_work() I32 { let c = Counter {value:0}; [1,2,3] map |x| {c.value+=1;x;} take(0) count; c.value; }
+        fn while_stages() I32 { [1,2,3,2,1] skip_while |x| {x<3;} take_while |x| {x>1;} sum; }
+        fn flattened() I32 { [[1,2],[3,4]] flat_map |xs| {xs;} sum; }
+        fn zipped() I32 { [1,2,3] zip([10,20]) |a,b| {a+b;} sum; }
+        fn chained() I32 { [1,2] map |x| {x*2;} chain([10,20]) chain([30]) filter |x| {x>2;} sum; }
+        fn repeated() I32 { [1,2] repeat(3) sum; }
+        fn nested() I32 { [1,2] map |x| {[x,x] sum;} sum; }
+        fn every() Bool { [1,2,3] all |x| {x>0;}; }
+        fn empty_all() Bool { [] all |x| {x>0;}; }
+        fn empty_any() Bool { [] any |x| {x>0;}; }
+        fn product_() I32 { [2,3,4] product; }
+        fn count_() I32 { [1,2,3,4] count_where |x| {x%2==0;}; }
+        fn first_() I32 { [1,2,3,2] first_index |x| {x==2;}; }
+        fn last_() I32 { [1,2,3,2] last_index |x| {x==2;}; }
+        fn absent() I32 { [] first_index |x| {true;}; }
+      }
+    

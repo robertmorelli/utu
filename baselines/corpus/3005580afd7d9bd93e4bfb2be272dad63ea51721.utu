@@ -1,0 +1,1 @@
+export main() I32 { let xs = [1, 2]; let s = 0; for (xs) |x| { s += x; }; xs each |y| { s += y; }; s; }

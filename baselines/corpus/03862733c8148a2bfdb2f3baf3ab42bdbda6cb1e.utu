@@ -1,0 +1,1 @@
+export lib { fn bad() I32 { let x: I32 = 1; (x + 1) = 2; x; } }

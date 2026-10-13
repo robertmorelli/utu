@@ -1,0 +1,190 @@
+using Buffer from std:Buffer;
+
+// Static priority search tree: minimum y at each node, balanced x partitions.
+// Coordinates are copied at construction. Query results are caller-supplied IDs.
+mod Spatial {
+    struct Point:
+        | x: F64
+        | y: F64
+        | id: I32
+
+    // Keep squared distances finite, including the difference of two coordinates.
+    fn check_coordinate(value: F64) void {
+        if value != value or F64.abs(value) > 1.0e150 { fatal; };
+    }
+
+    fn point(x: F64, y: F64, id: I32) Point {
+        Point { x: x, y: y, id: id };
+    }
+
+    struct Node:
+        | point: Point
+        | left: ?Node
+        | right: ?Node
+        | min_x: F64
+        | max_x: F64
+        | min_y: F64
+        | max_y: F64
+
+    struct &:
+        | root: ?Node
+
+    fn build(points: Array[Point]) ?Node {
+        if points.len() == 0 { return null; };
+        let best = 0;
+        let max_y = points[0].y;
+        let i = 1;
+        while (i < points.len()) {
+            if points[i].y < points[best].y { best = i; };
+            if points[i].y > max_y { max_y = points[i].y; };
+            i += 1;
+        };
+        let rest = points filter |point, index| {
+            index.to_i64().to_i32() != best;
+        } collect(Point);
+        let mid = rest.len() / 2;
+        Node {
+            point: points[best],
+            left: build(rest.slice(0, mid)),
+            right: build(rest.slice(mid, rest.len())),
+            min_x: points[0].x,
+            max_x: points[points.len() - 1].x,
+            min_y: points[best].y,
+            max_y: max_y
+        };
+    }
+
+    fn &.new(points: Array[Point]) & {
+        let copied = points map |point| {
+            check_coordinate(point.x);
+            check_coordinate(point.y);
+            Point { x: point.x, y: point.y, id: point.id };
+        } sort(Point) |a, b| {
+            a.x < b.x or (a.x == b.x and a.id < b.id);
+        };
+        &{ root: build(copied) };
+    }
+
+    fn rectangle(node: ?Node, min_x: F64, max_x: F64, min_y: F64, max_y: F64, out: Buffer[I32]) void {
+        promote node {
+            |current| => {
+                if current.max_x < min_x or current.min_x > max_x
+                    or current.max_y < min_y or current.min_y > max_y { return; };
+                let point = current.point;
+                if point.x >= min_x and point.x <= max_x and point.y >= min_y and point.y <= max_y {
+                    out.push(point.id);
+                };
+                rectangle(current.left, min_x, max_x, min_y, max_y, out);
+                rectangle(current.right, min_x, max_x, min_y, max_y, out);
+            },
+            ~> {},
+        };
+    }
+
+    fn &.within |self| (min_x: F64, max_x: F64, min_y: F64, max_y: F64) Array[I32] {
+        check_coordinate(min_x);
+        check_coordinate(max_x);
+        check_coordinate(min_y);
+        check_coordinate(max_y);
+        if min_x > max_x or min_y > max_y { fatal; };
+        let out = Buffer[I32].new();
+        rectangle(self.root, min_x, max_x, min_y, max_y, out);
+        out.finish();
+    }
+
+    // Three-sided reporting: inclusive x interval, y <= ceiling.
+    fn below_node(node: ?Node, min_x: F64, max_x: F64, ceiling: F64, out: Buffer[I32]) void {
+        promote node {
+            |current| => {
+                if current.max_x < min_x or current.min_x > max_x or current.min_y > ceiling { return; };
+                if current.point.x >= min_x and current.point.x <= max_x {
+                    out.push(current.point.id);
+                };
+                below_node(current.left, min_x, max_x, ceiling, out);
+                below_node(current.right, min_x, max_x, ceiling, out);
+            },
+            ~> {},
+        };
+    }
+
+    fn &.below |self| (min_x: F64, max_x: F64, ceiling: F64) Array[I32] {
+        check_coordinate(min_x);
+        check_coordinate(max_x);
+        check_coordinate(ceiling);
+        if min_x > max_x { fatal; };
+        let out = Buffer[I32].new();
+        below_node(self.root, min_x, max_x, ceiling, out);
+        out.finish();
+    }
+
+    fn box_distance(node: Node, x: F64, y: F64) F64 {
+        let dx = if x < node.min_x { node.min_x - x; } else {
+            if x > node.max_x { x - node.max_x; } else { 0.0; };
+        };
+        let dy = if y < node.min_y { node.min_y - y; } else {
+            if y > node.max_y { y - node.max_y; } else { 0.0; };
+        };
+        dx * dx + dy * dy;
+    }
+
+    fn radius_node(node: ?Node, x: F64, y: F64, squared: F64, out: Buffer[I32]) void {
+        promote node {
+            |current| => {
+                if box_distance(current, x, y) > squared { return; };
+                let dx = current.point.x - x;
+                let dy = current.point.y - y;
+                if dx * dx + dy * dy <= squared { out.push(current.point.id); };
+                radius_node(current.left, x, y, squared, out);
+                radius_node(current.right, x, y, squared, out);
+            },
+            ~> {},
+        };
+    }
+
+    fn &.radius |self| (x: F64, y: F64, radius: F64) Array[I32] {
+        check_coordinate(x);
+        check_coordinate(y);
+        check_coordinate(radius);
+        if radius < 0.0 { fatal; };
+        let out = Buffer[I32].new();
+        radius_node(self.root, x, y, radius * radius, out);
+        out.finish();
+    }
+
+    struct Nearest:
+        | id: I32
+        | squared: F64
+
+    fn nearest_node(node: ?Node, x: F64, y: F64, best: Nearest) void {
+        promote node {
+            |current| => {
+                if box_distance(current, x, y) > best.squared { return; };
+                let dx = current.point.x - x;
+                let dy = current.point.y - y;
+                let squared = dx * dx + dy * dy;
+                if squared < best.squared or (squared == best.squared and current.point.id < best.id) {
+                    best.id = current.point.id;
+                    best.squared = squared;
+                };
+                nearest_node(current.left, x, y, best);
+                nearest_node(current.right, x, y, best);
+            },
+            ~> {},
+        };
+    }
+
+    fn &.nearest |self| (x: F64, y: F64) ?Found[I32] {
+        check_coordinate(x);
+        check_coordinate(y);
+        promote self.root {
+            |root| => {
+                let dx = root.point.x - x;
+                let dy = root.point.y - y;
+                let best = Nearest { id: root.point.id, squared: dx * dx + dy * dy };
+                nearest_node(root, x, y, best);
+                Found[I32].new(best.id);
+            },
+            ~> null,
+        };
+    }
+}

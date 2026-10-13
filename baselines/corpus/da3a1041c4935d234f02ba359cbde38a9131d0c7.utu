@@ -1,0 +1,3 @@
+fn inc(n: I32) I32 { n + 1; }
+      export lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; f(n); } }
+    

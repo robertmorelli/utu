@@ -1,0 +1,2 @@
+mem s: U8;
+export main() I32 { s.view(0, 1); 1; }

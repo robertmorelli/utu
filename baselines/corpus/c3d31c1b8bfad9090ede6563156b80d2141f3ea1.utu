@@ -1,0 +1,6 @@
+
+        let add: fun(I32, I32) I32 = @es/\(a, b) => a + b\/;
+        export lib {
+          fn sum(a: I32, b: I32) I32 { add(a, b); }
+        }
+      

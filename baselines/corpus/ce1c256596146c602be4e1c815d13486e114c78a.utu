@@ -1,0 +1,14 @@
+
+      enum Shape:
+        | Circle { radius: I32 }
+        | Rect { width: I32, height: I32 }
+        | Triangle { base: I32, height: I32, skew: I32 }
+      export lib {
+        fn classify(shape: Shape) I32 {
+          alt shape {
+            Circle => 7,
+            ~> 0,
+          };
+        }
+      }
+    

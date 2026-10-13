@@ -1,0 +1,9 @@
+
+  struct Point:
+    | x : I32
+    | y : I32
+  struct Label:
+    | text : Str
+  fn add(a: I32, b: I32) I32 { a + b; }
+  fn takes_bool(b: Bool) Bool { b; }
+ export lib { fn bad() Point { Point { x: 1, x: 2, y: 3 }; } }

@@ -1,0 +1,12 @@
+
+      struct Counter:
+        | n : I32
+      export lib {
+        fn bump_twice(start: I32) I32 {
+          let c: Counter = Counter { n: start };
+          c.n = c.n + 1;
+          c.n = c.n + 1;
+          c.n;
+        }
+      }
+    

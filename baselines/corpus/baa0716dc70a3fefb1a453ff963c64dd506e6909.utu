@@ -1,0 +1,9 @@
+
+        let js_call2: fun(cl(I32, I32) I32, I32, I32) I32 = @es/\ (f, a, b) => f(a, b) \/;
+        export lib {
+          fn run(a: I32, b: I32) I32 {
+            let f: cl(I32, I32) I32 = cl(x, y) { x + y; };
+            js_call2(f, a, b);
+          }
+        }
+      

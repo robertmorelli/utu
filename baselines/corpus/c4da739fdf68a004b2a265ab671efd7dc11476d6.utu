@@ -1,0 +1,7 @@
+
+      export lib {
+        fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }
+        fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }
+        fn mid(x: I32) I32 { x -o clamp(0, &, 10); }
+      }
+    

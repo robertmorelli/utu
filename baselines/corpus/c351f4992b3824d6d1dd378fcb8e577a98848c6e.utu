@@ -1,0 +1,2 @@
+fn f(t: .{I32, I32}) I32 { 1; }
+export main() I32 { 1; }

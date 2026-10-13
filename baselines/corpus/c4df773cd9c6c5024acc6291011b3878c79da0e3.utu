@@ -1,0 +1,15 @@
+
+      struct Log:
+          | v: I32
+      export lib {
+          fn fused(n: I32) I32 { let xs = Array[I32].new(n, 3); (xs map |x, i| { x - i.to_i32(); } collect(I32)) filter |x| { x > 0; } sum; }
+          fn twice(n: I32) I32 { let xs = Array[I32].new(n, 1); ((xs map |x| { x + 1; } collect(I32)) map |x| { x * 10; } collect(I32)) sum; }
+          fn cut(n: I32) I32 { let xs = Array[I32].new(n, 2); (xs map |x| { x * x; } collect(I32)) take(2) sum; }
+          fn ordered() I32 {
+              let log = Log { v: 0 };
+              let xs = [1, 2, 3];
+              let total = (xs map |x| { log.v = log.v * 10 + x; x; } collect(I32)) map |x| { log.v = log.v * 10 + x; x; } sum;
+              log.v;
+          }
+      }
+    

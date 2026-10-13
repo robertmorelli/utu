@@ -1,0 +1,4 @@
+
+        struct Cell: | value : I32
+        export lib { fn bad() Array[Cell] { Array[Cell].new_default(1); } }
+      

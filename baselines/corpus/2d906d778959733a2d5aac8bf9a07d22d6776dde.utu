@@ -1,0 +1,51 @@
+// 03 — base64-js. Binary data across the boundary.
+//
+//   function byteLength(b64: string): number;
+//   function toByteArray(b64: string): Uint8Array;
+//   function fromByteArray(bytes: Uint8Array): string;
+//
+// `Uint8Array` has no utu equivalent that is *also* the JS object — utu's
+// Array[U32] is a WasmGC array, a completely different representation. So the
+// binding either copies element by element or keeps the Uint8Array opaque as an
+// Externref. Opaque is what a mechanical ingester would produce, and it means
+// every read costs an extra host call.
+
+let byte_length: fun(Str) I32 =
+    @es/\ ((m) => (s) => m.byteLength(s))(await import('base64-js')) \/;
+
+// Stays opaque: this IS a Uint8Array, utu just cannot look inside it.
+let to_bytes: fun(Str) Externref =
+    @es/\ ((m) => (s) => m.toByteArray(s))(await import('base64-js')) \/;
+
+let from_bytes: fun(Externref) Str =
+    @es/\ ((m) => (a) => m.fromByteArray(a))(await import('base64-js')) \/;
+
+// PAIN: indexing an opaque array needs a hand-written accessor per operation.
+// A .d.ts says `Uint8Array`; it does not say "and here is how to index it".
+let byte_at: fun(Externref, I32) I32 = @es/\ (a, i) => a[i] \/;
+let byte_count: fun(Externref) I32 = @es/\ (a) => a.length \/;
+
+export main() I32 {
+    byte_length("AAAA");
+}
+
+test "scalar results are free" {
+    assert byte_length("AAAA") == 3;
+}
+
+test "a Uint8Array round-trips as an opaque handle" {
+    let bytes: Externref = to_bytes("aGk=");
+    assert byte_count(bytes) == 2;
+    assert byte_at(bytes, 0) == 104;
+    assert byte_at(bytes, 1) == 105;
+    assert from_bytes(bytes) == "aGk=";
+}
+
+test "summing bytes costs one host call per element" {
+    let bytes: Externref = to_bytes("AAECAwQ=");
+    let total: I32 = 0;
+    for (0..<byte_count(bytes)) |i| {
+        total = total + byte_at(bytes, i);
+    };
+    assert total == 10;
+}

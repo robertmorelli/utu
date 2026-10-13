@@ -1,0 +1,16 @@
+
+      struct P:
+        | v: I32
+      fn total(xs: Array[I32]) I32 { let t = 0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
+      export lib {
+        fn literals() I32 { let xs = [1, 2, 3]; total(xs) + total([10, 20]); }
+        fn floats() F64 { let x = 1.5; let mixed = [x, 2]; let typed: Array[F64] = [1, 2.5]; mixed[1] + typed[0]; }
+        fn locals() I32 { let a = 4; let xs = [a, a, 1]; xs[0] + xs[2]; }
+        fn structs() I32 { let p = P { v: 5 }; let ps = [p, P { v: 6 }, null]; promote ps[1] { |q| => q.v + ps.len(), ~> 0, }; }
+        fn nested() I32 { let grid = [[1, 2], [3, 4, 5]]; grid[1][2] + grid.len(); }
+        fn strings() I32 { let names = ["a", "bb"]; names[1].len(); }
+        fn empty() I32 { let none = []; none.len(); }
+        fn from_use() F64 { let xs = []; let t = 0.0; let ys = sum(xs); xs = [1.5, 2.5]; xs[1] + ys; }
+      }
+      fn sum(xs: Array[F64]) F64 { let t = 0.0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
+    

@@ -1,0 +1,1 @@
+export main() I32 { match true { 1 => 1, ~> 0, }; }

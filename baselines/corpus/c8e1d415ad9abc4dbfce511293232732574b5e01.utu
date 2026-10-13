@@ -1,0 +1,7 @@
+
+      export lib {
+        fn double(x: I32) I32 { x * 2; }
+        fn ok() I32 { let c: cl(I32) I32 = double; 1; }
+        fn bad() I32 { let g: fun(I32) I32 = cl(x) { x * 2; }; 1; }
+      }
+    

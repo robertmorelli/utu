@@ -1,0 +1,61 @@
+// 08 — minimatch. The real structural test: can a utu struct BE a JS object?
+//
+//   function minimatch(target: string, pattern: string, options?: MinimatchOptions): boolean;
+//   interface MinimatchOptions { nocase?: boolean; dot?: boolean; matchBase?: boolean; … }
+//
+// Answer: no, and this is the single most important finding in the set.
+//
+// A utu struct is a WasmGC struct. A JS object is a host object. They are
+// different `type-repr`s, so a struct can never be *passed* to JS — it has to
+// be rebuilt field by field on the JS side. The options bag below is a real utu
+// struct with real nominal typing and real `&{}` construction, and the binding
+// still has to destructure it into positional arguments and reassemble the
+// object in JS.
+//
+// This is why nominal-vs-structural is somewhat beside the point at the FFI
+// boundary: even with full structural typing, the struct still could not cross.
+// The wall is representational, not nominal.
+
+struct Opts:
+    | nocase : Bool
+    | dot : Bool
+    | match_base : Bool
+
+// Note what the binding signature looks like: the struct is *flattened*. Adding
+// a field to Opts means editing this line, the `@es` body, and every call.
+let match_with: fun(Str, Str, Bool, Bool, Bool) Bool =
+    @es/\ ((m) => (t, p, nocase, dot, matchBase) =>
+        m.minimatch(t, p, { nocase: !!nocase, dot: !!dot, matchBase: !!matchBase }) ? 1 : 0
+    )(await import('minimatch')) \/;
+
+// The pleasant part: the flattening can be hidden behind one utu function, so
+// callers still get the nominal struct and `&{}` construction.
+fn matches(target: Str, pattern: Str, o: Opts) Bool {
+    match_with(target, pattern, o.nocase, o.dot, o.match_base);
+}
+
+let match_default: fun(Str, Str) Bool =
+    @es/\ ((m) => (t, p) => m.minimatch(t, p) ? 1 : 0)(await import('minimatch')) \/;
+
+export main() Bool {
+    match_default("src/a.js", "src/*.js");
+}
+
+test "the no-options call needs no bag at all" {
+    assert match_default("src/a.js", "src/*.js");
+    assert match_default("src/a.ts", "src/*.js") == false;
+}
+
+test "a context-typed &{} reads like the TS object literal" {
+    let o: Opts = &{ nocase: true, dot: false, match_base: false };
+    assert matches("SRC/A.JS", "src/*.js", o);
+    assert match_default("SRC/A.JS", "src/*.js") == false;
+}
+
+test "options actually reach minimatch through the flattening" {
+    let dotted: Opts = &{ nocase: false, dot: true, match_base: false };
+    assert matches(".hidden", "*", dotted);
+
+    let base: Opts = &{ nocase: false, dot: false, match_base: true };
+    assert matches("a/b/c.js", "*.js", base);
+}

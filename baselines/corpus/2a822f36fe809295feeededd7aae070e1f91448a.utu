@@ -1,0 +1,11 @@
+fn fail_now() void {
+    fatal;
+}
+
+fn assert_even(x: I32) void {
+    assert x % 2 == 0;
+}
+
+fn main() void {
+    assert_even(4);
+}

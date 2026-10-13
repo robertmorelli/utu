@@ -1,0 +1,213 @@
+using Browser from std:Browser;
+
+fn money(value: F64) Str {
+    let format = new Browser.Intl.NumberFormat("en-US", &{ style: "currency", currency: "USD" });
+    format.format(value);
+}
+
+fn load_favorites() Browser.Set {
+    let saved = new Browser.Set();
+    promote Browser.localStorage.getItem("pantry-favorites") {
+        |text| => {
+            let ids = Browser.JSON.parse(text);
+            for (0..<ids.length.to_i32()) |i| { saved.add(ids[i]); };
+        },
+        ~> {},
+    };
+    saved;
+}
+
+fn save_favorites(favorites: Browser.Set) void {
+    Browser.localStorage.setItem("pantry-favorites", Browser.JSON.stringify(Browser.Array.from(favorites)));
+}
+
+fn draw_chart(canvas: Browser.HTMLCanvasElement, items: Browser.Array) void {
+    promote canvas.getContext("2d") {
+        |ctx| => {
+            let categories = ["Produce", "Dairy", "Bakery", "Pantry"];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = "12px system-ui";
+            for (0..<categories.len()) |i| {
+                let name = categories[i];
+                let count = items.filter(cl(item) Bool { item.category == name; }).length;
+                let y = 16 + i.to_f64() * 40;
+                ctx.fillStyle = "#66756b";
+                ctx.fillText(name, 12, y + 14);
+                ctx.fillStyle = "#2f6b4f";
+                ctx.fillRect(90, y, count * 50, 20);
+            };
+        },
+        ~> {},
+    };
+}
+
+fn count_up(target: Browser.HTMLElement, total: F64) void {
+    let start = Browser.performance.now();
+    let step = cl(now: F64) void {
+        let progress = Browser.Math.min(1, (now - start) / 600);
+        target.textContent = money(total * progress);
+        if progress < 1 { Browser.requestAnimationFrame(step); };
+    };
+    Browser.requestAnimationFrame(step);
+}
+
+fn render(state: State) void {
+    let document = Browser.document;
+    let list = state.list;
+    let query = state.query.toLowerCase();
+    let visible = state.items.filter(cl(item) Bool {
+        (state.category == "All" or item.category == state.category)
+            and item.name.toLowerCase().includes(query);
+    });
+    visible.sort(cl(a, b) F64 {
+        if state.sort == "price" { a.price - b.price; }
+        else if state.sort == "quantity" { b.quantity - a.quantity; }
+        else { a.name.localeCompare(b.name); };
+    });
+    list.replaceChildren();
+    if visible.length == 0 {
+        let empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "Nothing matches “" + state.query + "”.";
+        list.append(empty);
+    };
+    visible.forEach(cl(item) void {
+        let row = document.createElement("li");
+        row.className = "item";
+        row.dataset.id = item.id;
+        row.classList.toggle("favorite", state.favorites.has(item.id));
+        let star = document.createElement("button");
+        star.className = "star";
+        star.textContent = "★";
+        star.setAttribute("aria-label", "Favorite " + item.name);
+        let text = document.createElement("div");
+        let title = document.createElement("h2");
+        title.textContent = item.name;
+        let meta = document.createElement("p");
+        meta.textContent = item.category + " · " + item.quantity.toString() + " on hand";
+        text.append(title, meta);
+        let price = document.createElement("span");
+        price.className = "price";
+        price.textContent = money(item.price);
+        row.append(star, text, price);
+        list.append(row);
+    });
+    let total = state.items.reduce(cl(sum, item) F64 { sum + item.price * item.quantity; }, 0);
+    count_up(state.total, total);
+    draw_chart(state.chart, state.items);
+    let url = new Browser.URL(Browser.location.href);
+    if state.query.length > 0 { url.searchParams.set("q", state.query); } else { url.searchParams.delete("q"); };
+    Browser.history.replaceState(null, "", url.href);
+    state.status.textContent = visible.length.toString() + " of " + state.items.length.toString()
+        + " items · updated " + new Browser.Date().toLocaleTimeString("en-US");
+}
+
+struct State:
+    | items: Browser.Array
+    | favorites: Browser.Set
+    | query: Str
+    | category: Str
+    | sort: Str
+    | list: Browser.HTMLElement
+    | chart: Browser.HTMLCanvasElement
+    | total: Browser.HTMLElement
+    | status: Browser.HTMLElement
+
+fn by_id(id: Str) Browser.HTMLElement {
+    Browser.document.getElementById(id) orelse fatal;
+}
+
+export main() void {
+    let document = Browser.document;
+    let response = await Browser.fetch("items.json");
+    let items = await response.json();
+    let search: ?Browser.HTMLInputElement = document.querySelector("#search");
+    let initial = new Browser.URL(Browser.location.href).searchParams.get("q");
+    let state = State {
+        items: items, favorites: load_favorites(),
+        query: promote initial { |q| => q, ~> "", },
+        category: "All", sort: "name",
+        list: by_id("items"), chart: document.querySelector("canvas") orelse fatal, total: by_id("total-value"), status: by_id("status"),
+    };
+
+    let chips = by_id("chips");
+    ["All", "Produce", "Dairy", "Bakery", "Pantry"].forEach(cl(name) void {
+        let chip = document.createElement("button");
+        chip.className = "chip";
+        chip.textContent = name;
+        chip.classList.toggle("active", name == state.category);
+        chip.addEventListener("click", cl(event) void {
+            state.category = name;
+            chips.querySelectorAll(".chip").forEach(cl(other) void { other.classList.toggle("active", other == chip); });
+            render(state);
+        });
+        chips.append(chip);
+    });
+
+    promote search {
+        |input| => {
+            input.value = state.query;
+            let timer = 0.0;
+            input.addEventListener("input", cl(event) void {
+                Browser.clearTimeout(timer);
+                timer = Browser.setTimeout(cl() void {
+                    state.query = input.value;
+                    render(state);
+                }, 150);
+            });
+            document.addEventListener("keydown", cl(event) void {
+                if event.key == "/" and document.activeElement != input {
+                    event.preventDefault();
+                    input.focus();
+                };
+            });
+        },
+        ~> {},
+    };
+
+    let sort: ?Browser.HTMLSelectElement = document.querySelector("#sort");
+    promote sort {
+        |select| => select.addEventListener("change", cl(event) void {
+            state.sort = select.value;
+            render(state);
+        }),
+        ~> {},
+    };
+
+    state.list.addEventListener("click", cl(event) void {
+        alt event.target {
+            Browser.Element |target| => {
+                let row: ?Browser.HTMLElement = target.closest(".item");
+                promote row { |row| => {
+                    let id = row.dataset.id;
+                    if state.favorites.has(id) { state.favorites.delete(id); } else { state.favorites.add(id); };
+                    save_favorites(state.favorites);
+                    render(state);
+                }, ~> {}, };
+            },
+            ~> {},
+        };
+    });
+
+    let add: ?Browser.HTMLFormElement = document.querySelector("#add");
+    promote add {
+        |form| => form.addEventListener("submit", cl(event) void {
+            event.preventDefault();
+            let data = new Browser.FormData(form);
+            let name = data.get("name");
+            let price = Browser.Number(data.get("price"));
+            let error = by_id("form-error");
+            if not form.checkValidity() {
+                error.textContent = "Give the item a name and a price.";
+            } else {
+                error.textContent = "";
+                state.items.push(&{ id: "custom-" + Browser.Date.now().toString(), name: name, category: data.get("category"), price: price, quantity: 1 });
+                form.reset();
+                render(state);
+            };
+        }),
+        ~> {},
+    };
+
+    render(state);
+}

@@ -1,0 +1,9 @@
+// Optional iterator result: null means empty; a present wrapper holds any T,
+// including non-nullable scalar types. Use `promote` or `orelse` to unwrap.
+mod Found[T] {
+    struct &:
+        | value: T
+    fn &.new(value: T) & {
+        &{ value: value };
+    }
+}

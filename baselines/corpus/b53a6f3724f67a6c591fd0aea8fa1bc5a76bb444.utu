@@ -1,0 +1,14 @@
+
+      struct P:
+        | v: I32
+      fn find(ok: Bool) ?P { if ok { P { v: 7 }; } else { null; }; }
+      fn keep(p: P) P { p; }
+      export lib {
+        fn factorial(n: I32) I32 { let fact = cl(k: I32) I32 { if k <= 1 { 1; } else { k * fact(k - 1); }; }; fact(n); }
+        fn countdown() I32 { let calls = 0; let tick = cl(k: I32) void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
+        fn captured() I32 { promote find(true) { |p| => { let read = cl() I32 { p.v; }; read(); }, ~> 0, }; }
+        fn required() I32 { let p = find(true) orelse fatal; p.v; }
+        fn scaled(i: I32) F64 { let y = 16 + i.to_f64() * 40; y + 14; }
+        fn loop_values() I32 { let last = P { v: 0 }; for (0..<3) |i| { keep(last); }; while (last.v < 2) { last.v += 1; keep(last); }; last.v; }
+      }
+    

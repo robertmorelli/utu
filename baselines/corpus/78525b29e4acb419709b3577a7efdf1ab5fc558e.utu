@@ -1,0 +1,38 @@
+mod boxy[T] {
+    struct Box:
+        | value : T
+
+    fn Box.new(value: T) Box {
+        Box { value: value };
+    }
+
+    fn Box.get |self| () T {
+        self.value;
+    }
+}
+
+using boxy[I32] |box_i32|;
+
+fn double_inline(value: boxy[I32].Box) I32 {
+    value.get() * 2;
+}
+
+test "inline qualified types work in signatures" {
+    let box: boxy[I32].Box = boxy[I32].Box.new(6);
+    assert double_inline(box) == 12;
+}
+
+test "inline qualified associated calls work" {
+    let box: boxy[I32].Box = boxy[I32].Box.new(10);
+    assert box.get() == 10;
+}
+
+test "inline qualified associated calls work from values" {
+    let box: boxy[I32].Box = boxy[I32].Box.new(4);
+    assert box.get() == 4;
+}
+
+test "inline and alias paths stay interchangeable" {
+    let box: box_i32.Box = box_i32.Box.new(13);
+    assert box.get() == 13;
+}

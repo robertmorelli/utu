@@ -1,0 +1,2 @@
+mem s: U8 = @embed/\ missing.bin \/;
+export main() I32 { 1; }

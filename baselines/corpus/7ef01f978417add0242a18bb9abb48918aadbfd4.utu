@@ -1,0 +1,38 @@
+mod duo[L, R] {
+    struct Pair:
+        | left : L
+        | right : R
+
+    fn Pair.new(left: L, right: R) Pair {
+        Pair { left: left, right: right };
+    }
+
+    fn Pair.left |self| () L {
+        self.left;
+    }
+
+    fn Pair.right |self| () R {
+        self.right;
+    }
+}
+
+using duo[I32, I32] |ints|;
+
+fn maybe_pair(flag: Bool) ?ints.Pair {
+    if flag { ints.Pair.new(2, 9); } else { null; };
+}
+
+test "two type parameters fill struct fields" {
+    let pair: ints.Pair = ints.Pair.new(3, 4);
+    assert pair.left() + pair.right() == 7;
+}
+
+test "module types work in nullable positions" {
+    let maybe: ?ints.Pair = maybe_pair(true);
+    assert (maybe orelse ints.Pair.new(0, 0)).right() == 9;
+}
+
+test "inline two parameter type paths work" {
+    let pair: duo[I32, I32].Pair = ints.Pair.new(5, 6);
+    assert pair.left() == 5;
+}

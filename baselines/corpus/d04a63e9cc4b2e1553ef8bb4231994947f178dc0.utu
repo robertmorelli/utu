@@ -1,0 +1,19 @@
+let str_concat: fun(Str, Str) Str = @es/\(a, b) => a + b\/;
+
+fn label() Str {
+    "done";
+}
+
+fn wrap(value: Str) Str {
+    "["
+    -o str_concat(&, value)
+    -o str_concat(&, "]");
+}
+
+fn decorate(value: Str) Str {
+    wrap(value);
+}
+
+fn main() Str {
+    decorate(label());
+}

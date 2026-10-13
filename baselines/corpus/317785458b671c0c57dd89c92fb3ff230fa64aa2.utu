@@ -1,0 +1,13 @@
+
+      struct Item: | value: I32
+      export lib {
+        fn growth() I32 { let a = [1,2,3,4,5] repeat(4) collect(I32); a.len()*100+a[19]; }
+        fn empty() I32 { let a = [Item {value:1}] filter |x| {false;} collect(Item); a.len(); }
+        fn structs() I32 { let a = [1,2,3] map |x| {Item {value:x};} collect(Item); a[2].value; }
+        fn float_sum() F64 { [1.5,2.5] map |x| {x*2.0;} sum; }
+        fn empty_product() F64 { let a: Array[F64] = []; a product; }
+        fn wide_sum() I64 { let a: Array[I64] = [3,4]; a sum; }
+        fn sorted() I32 { let a=[5,3,1,8,2,4] sort(I32) |a,b| {a<b;}; a[0]*100+a[5]; }
+        fn floats() F64 { let a = [1,2] map |x| {x.to_f64()/2.0;} collect(F64); a[0]+a[1]; }
+      }
+    

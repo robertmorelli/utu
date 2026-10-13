@@ -1,0 +1,99 @@
+using Browser from std:Browser;
+
+struct Task:
+    | done: Bool
+
+fn element(document: Browser.Document, tag: Str, class_name: Str, label: Str) Browser.HTMLElement {
+    let node = document.createElement(tag);
+    node.className = class_name;
+    node.textContent = label;
+    node;
+}
+
+fn save(document: Browser.Document) void {
+    let data = Browser.Array();
+    document.querySelectorAll(".task").forEach(cl(row) void {
+        promote row.querySelector(".task-label") {
+            |text| => data.push(&{ label: text.textContent, done: row.classList.contains("done") }),
+            ~> {},
+        };
+    });
+    Browser.localStorage.setItem("utu-focus-v1", Browser.JSON.stringify(data));
+}
+
+fn paint(task: Task, row: Browser.HTMLElement, toggle: Browser.HTMLElement) void {
+    row.classList.toggle("done", task.done);
+    toggle.textContent = if task.done { "✓"; } else { "○"; };
+    toggle.setAttribute("aria-label", if task.done { "Reopen task"; } else { "Complete task"; });
+}
+
+fn add_task(document: Browser.Document, list: Browser.HTMLElement, label: Str, initial_done: Bool) void {
+    if label.len() > 0 {
+        let task: Task = Task { done: initial_done };
+        let row = element(document, "li", "task", "");
+        let toggle = element(document, "button", "toggle", "○");
+        let text = element(document, "span", "task-label", label);
+        let remove = element(document, "button", "remove", "×");
+        remove.setAttribute("aria-label", "Delete task");
+        row.append(toggle, text, remove);
+        list.appendChild(row);
+        paint(task, row, toggle);
+        toggle.addEventListener("click", cl(event) void {
+            task.done = not task.done;
+            paint(task, row, toggle);
+            save(document);
+        });
+        remove.addEventListener("click", cl(event) void {
+            row.remove();
+            save(document);
+        });
+    };
+}
+
+export main() void {
+    let document = Browser.document;
+    let app = element(document, "main", "app", "");
+    document.body.appendChild(app);
+    app.append(
+        element(document, "p", "eyebrow", "UTU / BROWSER ABI EXPERIMENT"),
+        element(document, "h1", "title", "A little more focus."),
+        element(document, "p", "subtitle", "Make room for what matters. One task at a time."),
+    );
+    let panel = element(document, "section", "panel", "");
+    app.appendChild(panel);
+    let form = element(document, "form", "new-task", "");
+    let input = document.createElement("input");
+    input.className = "task-input";
+    input.placeholder = "What would you like to do?";
+    input.maxLength = 200.0;
+    input.setAttribute("aria-label", "New task");
+    let submit = element(document, "button", "add", "Add task ↗");
+    submit.setAttribute("type", "submit");
+    form.append(input, submit);
+    let list = element(document, "ul", "tasks", "");
+    panel.append(form, list);
+    promote Browser.localStorage.getItem("utu-focus-v1") {
+        |stored| => {
+            let data = Browser.JSON.parse(stored);
+            let count: F64 = data.length;
+            let index: F64 = 0.0;
+            while (index < count) {
+                let item = data[index];
+                add_task(document, list, item.label, item.done);
+                index = index + 1.0;
+            };
+        },
+        ~> {
+            add_task(document, list, "Build something small and useful", false);
+            add_task(document, list, "Take a proper screen break", false);
+            add_task(document, list, "Try the browser ABI from UTU", false);
+        },
+    };
+    form.addEventListener("submit", cl(event) void {
+        event.preventDefault();
+        add_task(document, list, input.value, false);
+        save(document);
+        input.value = "";
+    });
+    app.appendChild(element(document, "p", "footnote", "DOM creation, events, state, and local storage are written in UTU. Browser calls come from generated .d.ts bindings."));
+}

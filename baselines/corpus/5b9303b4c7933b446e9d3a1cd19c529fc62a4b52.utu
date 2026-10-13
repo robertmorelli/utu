@@ -1,0 +1,9 @@
+// ERROR DEMO: return type mismatch
+//
+// `status` is Bool because of its declaration, while the function signature
+// requires I32. Both declarations should appear in the blame chain.
+
+fn return_blame_demo() I32 {
+    let status: Bool = true;
+    status;
+}

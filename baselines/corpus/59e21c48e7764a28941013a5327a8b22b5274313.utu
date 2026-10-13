@@ -1,0 +1,50 @@
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
+
+enum Shape:
+    | Circle { radius: I32 }
+    | Rect { width: I32, height: I32 }
+    | Triangle { base: I32, height: I32 }
+
+fn area(shape: Shape) I32 {
+    alt shape {
+        Circle |c| => c.radius * c.radius,
+        Rect |r| => r.width * r.height,
+        Triangle |t| => t.base * t.height / 2,
+        ~> 0,
+    };
+}
+
+fn describe(shape: Shape) Str {
+    alt shape {
+        Circle => "circle",
+        Rect => "rect",
+        Triangle => "triangle",
+        ~> "unknown",
+    };
+}
+
+fn tag(kind: I32) Str {
+    match kind {
+        0 => "zero",
+        1 => "one",
+        ~> "many",
+    };
+}
+
+test "alt dispatches circle arms" {
+    assert area(Circle { radius: 4 }) == 16;
+}
+
+test "alt dispatches rect arms" {
+    assert area(Rect { width: 3, height: 4 }) == 12;
+}
+
+test "alt dispatches triangle arms" {
+    assert area(Triangle { base: 5, height: 4 }) == 10;
+}
+
+test "alt and match can return strings" {
+    assert str_eq(describe(Rect { width: 2, height: 6 }), "rect");
+    assert str_eq(tag(0), "zero");
+    assert str_eq(tag(3), "many");
+}

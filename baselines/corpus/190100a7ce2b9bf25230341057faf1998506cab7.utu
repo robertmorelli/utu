@@ -1,0 +1,1740 @@
+// Foundry's interface in wutu: state, widgets, the HUD, the build palette,
+// one panel per machine type, the footer, and the windows. See UI.md.
+using Browser from std:Browser;
+using sim from "./sim.utu";
+
+mod ui {
+    struct Alert:
+        | text: Str
+        | kind: Str
+        | entity: I32
+
+    struct Ui:
+        | w: sim.World
+        | game_text: Str
+        | starter_text: Str
+        | speed: I32
+        | tool: I32
+        | dir: I32
+        | tab: I32
+        | cam_x: F64
+        | cam_y: F64
+        | zoom: F64
+        | selected: I32
+        | pinned: Array[I32]
+        | hover_x: I32
+        | hover_y: I32
+        | window: Str
+        | prod: Array[I32]
+        | prod10: Array[I32]
+        | last: Array[I32]
+        | last10: Array[I32]
+        | samples: I32
+        | supply: Array[I32]
+        | demand: Array[I32]
+        | alerts: Array[Alert]
+        | done_count: I32
+        | range10: Bool
+        | search: Str
+        | text: Str
+        | notice: Str
+        | drag: Bool
+        | drag_x: F64
+        | drag_y: F64
+        | dragged: Bool
+        | frame: I32
+        | glyphs: Array[Str]
+        | colors: Array[Str]
+        | item_colors: Array[Str]
+
+    let tool_none: I32 = -1;
+    let tool_remove: I32 = -2;
+    let item_count: I32 = 26;
+
+    fn categories() Array[Str] {
+        ["extraction", "smelting", "production", "logistics", "storage", "energy", "science", "circuits"];
+    }
+
+    fn category_color(category: Str) Str {
+        let names = categories();
+        let colors = ["#a1887f", "#e67e22", "#4da3ff", "#f1c40f", "#95a5a6", "#4cc38a", "#b388ff", "#ff6fa5"];
+        let color = "#888888";
+        for (0..<names.len()) |i| {
+            if names[i] == category {
+                color = colors[i];
+            };
+        };
+        color;
+    }
+
+    // Two capital letters from a machine name: "electric-miner" → "EM".
+    fn glyph(name: Str) Str {
+        let codes = [name[0] - 32, 0];
+        let dash = -1;
+        for (0..<name.len()) |i| {
+            if dash < 0 and name[i] == 45 {
+                dash = i;
+            };
+        };
+        codes[1] = if dash > 0 and dash + 1 < name.len() { name[dash + 1] - 32; } else { name[1] - 32; };
+        Str.from_codes(codes, 2);
+    }
+
+    fn new_ui(w: sim.World, game_text: Str, starter_text: Str) Ui {
+        let machines = w.game.machines;
+        let empty_alerts: Array[Alert] = [];
+        let none: Array[I32] = [];
+        Ui {
+            w: w, game_text: game_text, starter_text: starter_text, speed: 1, tool: tool_none, dir: 1, tab: 0,
+            cam_x: 0.0, cam_y: 0.0, zoom: 24.0, selected: -1, pinned: none, hover_x: -1, hover_y: -1, window: "",
+            prod: Array[I32].new_default(60 * item_count), prod10: Array[I32].new_default(60 * item_count),
+            last: Array[I32].new_default(item_count), last10: Array[I32].new_default(item_count), samples: w.tick / 60,
+            supply: Array[I32].new_default(60), demand: Array[I32].new_default(60), alerts: empty_alerts,
+            done_count: 0, range10: false, search: "", text: "", notice: "",
+            drag: false, drag_x: 0.0, drag_y: 0.0, dragged: false, frame: 0,
+            glyphs: machines map |m| { glyph(m.name); } collect(Str),
+            colors: machines map |m| { category_color(m.category); } collect(Str),
+            item_colors: w.game.items map |item| { item.color; } collect(Str),
+        };
+    }
+
+    // ── sampling and alerts ──────────────────────────────────────────────────
+
+    fn add_alert(ui: Ui, text: Str, kind: Str, entity: I32) void {
+        let kept = ui.alerts filter |a| { not (a.text == text and a.entity == entity); } take(7) collect(Alert);
+        ui.alerts = [Alert { text: text, kind: kind, entity: entity }] chain(kept) collect(Alert);
+    }
+
+    // Take the 1-second (and every tenth, the 10-second) production and power samples.
+    fn sample(ui: Ui) void {
+        let w = ui.w;
+        while (ui.samples < w.tick / 60) {
+            let slot = ui.samples % 60;
+            for (0..<item_count) |i| {
+                ui.prod[slot * item_count + i] = w.produced[i] - ui.last[i];
+                ui.last[i] = w.produced[i];
+            };
+            ui.supply[slot] = w.supply;
+            ui.demand[slot] = w.demand;
+            if ui.samples % 10 == 0 {
+                let slot10 = (ui.samples / 10) % 60;
+                for (0..<item_count) |i| {
+                    ui.prod10[slot10 * item_count + i] = w.produced[i] - ui.last10[i];
+                    ui.last10[i] = w.produced[i];
+                };
+            };
+            ui.samples += 1;
+            check_alerts(ui);
+        };
+    }
+
+    fn check_alerts(ui: Ui) void {
+        let w = ui.w;
+        if w.satisfaction < 500 {
+            add_alert(ui, "No power: " + (w.satisfaction / 10).to_str() + "% satisfaction", "bad", -1);
+        };
+        let done = w.done sum;
+        if done > ui.done_count {
+            if ui.done_count > 0 or ui.w.tick > 60 {
+                add_alert(ui, "Research complete", "good", -1);
+            };
+            ui.done_count = done;
+        };
+        let crafters = w.crafters;
+        for (0..<crafters.n) |i| {
+            let e = crafters.items[i];
+            if not e.busy and e.recipe >= 0 {
+                let full = false;
+                for (w.game.recipes[e.recipe].products) |p| {
+                    if e.out[p[0]] > p[1] {
+                        full = true;
+                    };
+                };
+                if full {
+                    add_alert(ui, w.game.machines[e.machine].label + " #" + e.id.to_str() + " output full", "", e.id);
+                };
+            };
+        };
+    }
+
+    fn per_minute(ui: Ui, item: I32) I32 {
+        let total = 0;
+        for (0..<60) |s| {
+            total += if ui.range10 { ui.prod10[s * item_count + item]; } else { ui.prod[s * item_count + item]; };
+        };
+        if ui.range10 { total / 10; } else { total; };
+    }
+
+    // ── small widgets ────────────────────────────────────────────────────────
+
+    fn percent(value: I32, max: I32) Str {
+        let p = if max <= 0 { 0; } else { sim.imin(100, sim.imax(0, value * 100 / max)); };
+        p.to_str() + "%";
+    }
+
+    fn bar(value: I32, max: I32, kind: Str) Browser.HTMLElement {
+        @wutu/\
+        div.bar {
+            <class = kind;
+            i {
+                width: $[percent(value, max)];
+            }
+        }
+        \/;
+    }
+
+    fn row(label: Str, value: Str) Browser.HTMLElement {
+        @wutu/\
+        div.row {
+            span.muted { = label; }
+            b { = value; }
+        }
+        \/;
+    }
+
+    fn meter_row(label: Str, value: I32, max: I32, kind: Str) Browser.HTMLElement {
+        @wutu/\
+        div.row {
+            span.muted { = label; }
+            = bar(value, max, kind);
+        }
+        \/;
+    }
+
+    fn item_name(ui: Ui, item: I32) Str {
+        if item < 0 { "empty"; } else { ui.w.game.items[item].label; };
+    }
+
+    fn slot(ui: Ui, item: I32, count: I32) Browser.HTMLElement {
+        @wutu/\
+        div.slot {
+            <title = item_name(ui, item);
+            if $[item >= 0] {
+                span.dot {
+                    background: $[ui.item_colors[item]];
+                }
+                b { = count.to_str(); }
+            }
+        }
+        \/;
+    }
+
+    // Nonzero counts as slots.
+    fn slots(ui: Ui, counts: Array[I32]) Browser.HTMLElement {
+        @wutu/\
+        div.slots {
+            for $[(0..<counts.len()) filter |i| { counts[i] > 0; }] |i| key $[i.to_str()] {
+                = slot(ui, i, counts[i]);
+            }
+        }
+        \/;
+    }
+
+    fn lane(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div.lane {
+            for $[(0..<(e.belt_n / 2))] |k| key $[k.to_str()] {
+                i {
+                    left: $[percent(e.belt[k * 2 + 1] * 90 / 100, 256)];
+                    background: $[ui.item_colors[e.belt[k * 2]]];
+                }
+            }
+        }
+        \/;
+    }
+
+    fn state_name(e: sim.Entity) Str {
+        match e.state {
+            0 => "idle",
+            1 => "carrying",
+            ~> "returning",
+        };
+    }
+
+    fn neighbor_name(ui: Ui, x: I32, y: I32) Str {
+        promote sim.at(ui.w, x, y) {
+            |n| => ui.w.game.machines[n.machine].label,
+            ~> "nothing",
+        };
+    }
+
+    fn fluid_gauge(ui: Ui, item: I32, amount: I32, max: I32) Browser.HTMLElement {
+        @wutu/\
+        div {
+            <title = item_name(ui, item) + ": " + amount.to_str();
+            div.gauge {
+                i {
+                    height: $[percent(amount, max)];
+                    background: $[ui.item_colors[item]];
+                }
+            }
+            small.muted { = amount.to_str(); }
+        }
+        \/;
+    }
+
+    // ── HUD ──────────────────────────────────────────────────────────────────
+
+    fn clock(tick: I32) Str {
+        let phase = tick % 25200;
+        let minutes = phase * 1440 / 25200;
+        let hours = minutes / 60;
+        let mins = minutes % 60;
+        (if hours < 10 { "0"; } else { ""; }) + hours.to_str() + ":" + (if mins < 10 { "0"; } else { ""; }) + mins.to_str();
+    }
+
+    fn hud(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "hud";
+        header.hud {
+            span.hud-title { "FOUNDRY"; }
+            div.hud-group {
+                span { = if ui.w.light > 0 { "☀"; } else { "☾"; }; }
+                b { = clock(ui.w.tick); }
+            }
+            div.hud-group {
+                <title = $["Supply " + ui.w.supply.to_str() + " / demand " + ui.w.demand.to_str()];
+                span.muted { "Power"; }
+                div.meter {
+                    <class = if ui.w.satisfaction < 500 { "low"; } else { ""; };
+                    i {
+                        width: $[percent(ui.w.satisfaction, 1000)];
+                    }
+                }
+                small { = (ui.w.satisfaction / 10).to_str() + "%"; }
+            }
+            div.hud-group {
+                span.muted { = research_name(ui); }
+                div.meter.research {
+                    i {
+                        width: $[research_percent(ui)];
+                    }
+                }
+            }
+            for $[[5, 6, 7, 9, 11, 13, 17, 18]] |item| key $[item.to_str()] {
+                div.counter {
+                    <title = item_name(ui, item) + " per minute";
+                    b { = per_minute(ui, item).to_str(); }
+                    small { = item_name(ui, item); }
+                }
+            }
+            div.hud-group {
+                for $[[0, 1, 2, 4]] |s| key $[s.to_str()] {
+                    button {
+                        <class = if ui.speed == s { "active"; } else { ""; };
+                        = if s == 0 { "❚❚"; } else { s.to_str() + "×"; };
+                        on click {
+                            ui.speed = s;
+                        };
+                    }
+                }
+            }
+            div.hud-group {
+                for $[["research", "production", "power", "saves"]] |name| key $[name] {
+                    button {
+                        <class = if ui.window == name { "active"; } else { ""; };
+                        = name;
+                        on click {
+                            ui.window = if ui.window == name { ""; } else { name; };
+                            wutu.invalidate("windows");
+                        };
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn research_name(ui: Ui) Str {
+        let r = ui.w.research_current;
+        if r < 0 { "No research"; } else { ui.w.game.techs[r].label; };
+    }
+
+    fn research_percent(ui: Ui) Str {
+        let r = ui.w.research_current;
+        if r < 0 { "0%"; } else { percent(ui.w.research_progress, ui.w.game.techs[r].units); };
+    }
+
+    // ── palette ──────────────────────────────────────────────────────────────
+
+    fn palette(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "palette";
+        nav.palette {
+            div.tabs {
+                for $[categories()] |name, index| key $[name] {
+                    button {
+                        <class = if ui.tab == index.to_i32() { "active"; } else { ""; };
+                        = name;
+                        on click {
+                            ui.tab = index.to_i32();
+                        };
+                    }
+                }
+            }
+            div.machines {
+                for $[(0..<ui.w.game.machines.len()) filter |m| { ui.w.game.machines[m].category == categories()[ui.tab]; }] |m| key $[m.to_str()] {
+                    button.machine-btn {
+                        <class = if ui.tool == m { "active"; } else { ""; };
+                        <disabled = ui.w.machine_unlocked[m] == 0;
+                        <title = ui.w.game.machines[m].label + " · speed " + ui.w.game.machines[m].speed.to_str() + " · power " + ui.w.game.machines[m].power.to_str();
+                        span.glyph {
+                            background: $[ui.colors[m]];
+                            = ui.glyphs[m];
+                        }
+                        span { = ui.w.game.machines[m].label; }
+                        on click {
+                            ui.tool = if ui.tool == m { tool_none; } else { m; };
+                        };
+                    }
+                }
+            }
+            div.tools {
+                button {
+                    <title = "Rotate (R)";
+                    = "Facing " + ["N", "E", "S", "W"][ui.dir];
+                    on click {
+                        ui.dir = (ui.dir + 1) % 4;
+                    };
+                }
+                button {
+                    <class = if ui.tool == tool_remove { "active"; } else { ""; };
+                    <title = "Remove (X)";
+                    "Remove";
+                    on click {
+                        ui.tool = if ui.tool == tool_remove { tool_none; } else { tool_remove; };
+                    };
+                }
+                button {
+                    <title = "Clear tool (Esc)";
+                    "Select";
+                    on click {
+                        ui.tool = tool_none;
+                    };
+                }
+            }
+        }
+        \/;
+    }
+
+    // ── inspector ────────────────────────────────────────────────────────────
+
+    fn is_pinned(ui: Ui, id: I32) Bool {
+        ui.pinned any |p| { p == id; };
+    }
+
+    fn toggle_pin(ui: Ui, id: I32) void {
+        if is_pinned(ui, id) {
+            ui.pinned = ui.pinned filter |p| { p != id; } collect(I32);
+        } else {
+            ui.pinned = ui.pinned chain([id]) collect(I32);
+        };
+    }
+
+    fn inspected(ui: Ui) Array[sim.Entity] {
+        let ids = if ui.selected > 0 and not is_pinned(ui, ui.selected) { [ui.selected] chain(ui.pinned) collect(I32); } else { ui.pinned; };
+        let found: Array[sim.Entity] = [];
+        for (ids) |id| {
+            promote sim.entity(ui.w, id) {
+                |e| => {
+                    found = found chain([e]) collect(sim.Entity);
+                },
+                ~> {},
+            };
+        };
+        found;
+    }
+
+    fn inspector(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "inspector";
+        aside.inspector {
+            for $[inspected(ui)] |e| key $["panel-" + e.id.to_str()] {
+                = machine_panel(ui, e);
+            }
+            if $[ui.selected <= 0 and ui.pinned.len() == 0] {
+                p.muted { "Click a machine to inspect it. Pick a machine on the left to build."; }
+            }
+        }
+        \/;
+    }
+
+    fn machine_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        section.panel {
+            <class = if e.id == ui.selected { "selected"; } else { ""; };
+            div.panel-head {
+                span.glyph {
+                    background: $[ui.colors[e.machine]];
+                    = ui.glyphs[e.machine];
+                }
+                h3 { = ui.w.game.machines[e.machine].label; }
+                small.muted { = "#" + e.id.to_str() + " (" + e.x.to_str() + ", " + e.y.to_str() + ") " + ["N", "E", "S", "W"][e.dir]; }
+                button {
+                    <title = "Rotate";
+                    "↻";
+                    on click {
+                        sim.rotate(e);
+                    };
+                }
+                button {
+                    <title = if is_pinned(ui, e.id) { "Unpin"; } else { "Pin"; };
+                    <class = if is_pinned(ui, e.id) { "active"; } else { ""; };
+                    "📌";
+                    on click {
+                        toggle_pin(ui, e.id);
+                    };
+                }
+                button {
+                    <title = "Remove";
+                    "✕";
+                    on click {
+                        sim.remove(ui.w, e.x, e.y);
+                        ui.pinned = ui.pinned filter |p| { p != e.id; } collect(I32);
+                        if ui.selected == e.id {
+                            ui.selected = -1;
+                        };
+                    };
+                }
+            }
+            div.panel-body {
+                = panel_body(ui, e);
+            }
+        }
+        \/;
+    }
+
+    fn panel_body(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        match e.machine {
+            0 => burner_miner(ui, e),
+            1 => electric_miner(ui, e),
+            2 => offshore_pump(ui, e),
+            3 => pumpjack(ui, e),
+            4 => stone_furnace(ui, e),
+            5 => steel_furnace(ui, e),
+            6 => electric_furnace(ui, e),
+            7 => assembler_1(ui, e),
+            8 => assembler_2(ui, e),
+            9 => assembler_3(ui, e),
+            10 => chemical_plant(ui, e),
+            11 => oil_refinery(ui, e),
+            12 => centrifuge(ui, e),
+            13 => belt(ui, e),
+            14 => fast_belt(ui, e),
+            15 => express_belt(ui, e),
+            16 => splitter(ui, e),
+            17 => underground(ui, e),
+            18 => pipe(ui, e),
+            19 => storage_tank(ui, e),
+            20 => inserter(ui, e),
+            21 => long_inserter(ui, e),
+            22 => fast_inserter(ui, e),
+            23 => filter_inserter(ui, e),
+            24 => stack_inserter(ui, e),
+            25 => wooden_chest(ui, e),
+            26 => steel_chest(ui, e),
+            27 => requester_chest(ui, e),
+            28 => steam_engine(ui, e),
+            29 => solar_panel(ui, e),
+            30 => accumulator(ui, e),
+            31 => lab(ui, e),
+            32 => radar(ui, e),
+            33 => beacon(ui, e),
+            34 => combinator(ui, e),
+            35 => lamp(ui, e),
+            ~> silo(ui, e),
+        };
+    }
+
+    // ── extraction ───────────────────────────────────────────────────────────
+
+    fn tile_ore(ui: Ui, x: I32, y: I32) I32 {
+        if sim.inside(ui.w, x, y) { ui.w.res_kind[y * ui.w.width + x]; } else { -1; };
+    }
+
+    fn tile_amount(ui: Ui, x: I32, y: I32) I32 {
+        if sim.inside(ui.w, x, y) { ui.w.res_amount[y * ui.w.width + x]; } else { 0; };
+    }
+
+    fn burner_miner(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                span.muted { "Fuel"; }
+                = slot(ui, if e.fuel > 0 { 2; } else { -1; }, e.fuel);
+                = bar(e.burn, 3600, "");
+            }
+            = row("Under the drill", item_name(ui, tile_ore(ui, e.x, e.y)) + " × " + tile_amount(ui, e.x, e.y).to_str());
+            = meter_row("Mining", e.progress, 60000, "info");
+            div.row {
+                span.muted { "Output"; }
+                = slot(ui, e.hand, e.held);
+            }
+        }
+        \/;
+    }
+
+    fn electric_miner(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.grid3 {
+                for $[(0..<9)] |k| key $[k.to_str()] {
+                    div {
+                        background: $[if tile_ore(ui, e.x + k % 3 - 1, e.y + k / 3 - 1) >= 0 { ui.item_colors[tile_ore(ui, e.x + k % 3 - 1, e.y + k / 3 - 1)]; } else { "#2a2f36"; }];
+                        = tile_amount(ui, e.x + k % 3 - 1, e.y + k / 3 - 1).to_str();
+                    }
+                }
+            }
+            = meter_row("Power", ui.w.satisfaction, 1000, "good");
+            = meter_row("Mining", e.progress, 60000, "info");
+            div.row {
+                span.muted { "Output"; }
+                = slot(ui, e.hand, e.held);
+            }
+        }
+        \/;
+    }
+
+    fn offshore_pump(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let target = sim.back(ui.w, e, 1);
+        let fill = promote target { |t| => t.amount, ~> 0, };
+        let capacity = promote target { |t| => ui.w.speed[t.machine], ~> 100, };
+        @wutu/\
+        div {
+            = row("Flow", if e.busy { "600 / s"; } else { "0 / s"; });
+            = meter_row("Target pipe", fill, capacity, "info");
+        }
+        \/;
+    }
+
+    fn pumpjack(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let field = tile_amount(ui, e.x, e.y);
+        @wutu/\
+        div {
+            = row("Yield", (sim.imax(100, sim.imin(1000, field / 100)) / 10).to_str() + "%");
+            = row("Oil field", field.to_str());
+            div.gauges {
+                = fluid_gauge(ui, 23, e.amount, 100);
+            }
+            = meter_row("Pumping", e.progress, 6000, "info");
+        }
+        \/;
+    }
+
+    // ── smelting ─────────────────────────────────────────────────────────────
+
+    fn recipe_name(ui: Ui, r: I32) Str {
+        if r < 0 { "none"; } else { ui.w.game.recipes[r].name; };
+    }
+
+    fn first_item(counts: Array[I32]) I32 {
+        let found = -1;
+        for (0..<counts.len()) |i| {
+            if found < 0 and counts[i] > 0 {
+                found = i;
+            };
+        };
+        found;
+    }
+
+    fn furnace_slots(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                span.flame {
+                    <class = if e.burn > 0 or (e.busy and not ui.w.burner[e.machine]) { "on"; } else { ""; };
+                }
+                span { = recipe_name(ui, e.recipe); }
+            }
+            div.slots {
+                = slot(ui, first_item(e.inv), if first_item(e.inv) >= 0 { e.inv[first_item(e.inv)]; } else { 0; });
+                span { "→"; }
+                = slot(ui, first_item(e.out), if first_item(e.out) >= 0 { e.out[first_item(e.out)]; } else { 0; });
+            }
+            = meter_row("Progress", e.progress, if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time * 1000; } else { 1; }, "");
+        }
+        \/;
+    }
+
+    fn stone_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                span.muted { "Fuel"; }
+                = slot(ui, if e.fuel > 0 { 2; } else { -1; }, e.fuel);
+                = bar(e.burn, 3600, "");
+            }
+            = furnace_slots(ui, e);
+        }
+        \/;
+    }
+
+    fn steel_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                span.muted { "Fuel"; }
+                = slot(ui, if e.fuel > 0 { 2; } else { -1; }, e.fuel);
+                = bar(e.burn, 3600, "");
+            }
+            = furnace_slots(ui, e);
+            div.row {
+                span.muted { "Temperature"; }
+                div.gauge {
+                    i {
+                        height: $[percent(e.heat, 1500)];
+                        background: $[if e.heat > 1000 { "#ff6a3a"; } else { "#f0a73a"; }];
+                    }
+                }
+                b { = e.heat.to_str() + " °C"; }
+            }
+        }
+        \/;
+    }
+
+    fn electric_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = row("Power draw", if e.busy { (180 * ui.w.satisfaction / 1000).to_str() + " kW"; } else { "idle"; });
+            = furnace_slots(ui, e);
+            = row("Crafts", e.crafts.to_str());
+        }
+        \/;
+    }
+
+    // ── production ───────────────────────────────────────────────────────────
+
+    fn ingredients(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        table {
+            if $[e.recipe >= 0] {
+                for $[ui.w.game.recipes[e.recipe].ingredients] |ing| key $["in" + ing[0].to_str()] {
+                    tr {
+                        td {
+                            span.dot {
+                                background: $[ui.item_colors[ing[0]]];
+                            }
+                            = " " + item_name(ui, ing[0]);
+                        }
+                        td.num { = e.inv[ing[0]].to_str() + " / " + ing[1].to_str(); }
+                    }
+                }
+                for $[ui.w.game.recipes[e.recipe].products] |prod| key $["out" + prod[0].to_str()] {
+                    tr {
+                        td { = "→ " + item_name(ui, prod[0]); }
+                        td.num { = e.out[prod[0]].to_str(); }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn progress_ring(e: sim.Entity, time: I32) Browser.Element {
+        let fraction = if time <= 0 { 0.0; } else { e.progress.to_f64() / (time * 1000).to_f64(); };
+        @wutu/\
+        svg {
+            <viewBox = "0 0 40 40";
+            width: 40px;
+            height: 40px;
+            circle {
+                <cx = "20";
+                <cy = "20";
+                <r = "16";
+                fill: none;
+                stroke: #2f3843;
+                stroke-width: 5;
+            }
+            circle {
+                <cx = "20";
+                <cy = "20";
+                <r = "16";
+                fill: none;
+                stroke: #f0a73a;
+                stroke-width: 5;
+                stroke-dasharray: $[(fraction * 100.5).toFixed(1) + " 100.5"];
+                transform: rotate(-90deg);
+                transform-origin: center;
+            }
+        }
+        \/;
+    }
+
+    fn recipe_time(ui: Ui, e: sim.Entity) I32 {
+        if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time; } else { 0; };
+    }
+
+    fn allowed_recipes(ui: Ui, e: sim.Entity) Array[I32] {
+        (0..<ui.w.game.recipes.len()) filter |r| { sim.recipe_allowed(ui.w, e, r); } collect(I32);
+    }
+
+    fn assembler_1(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.recipe-grid {
+                for $[allowed_recipes(ui, e)] |r| key $[r.to_str()] {
+                    button {
+                        <class = if e.recipe == r { "active"; } else { ""; };
+                        = ui.w.game.recipes[r].name;
+                        on click {
+                            sim.set_recipe(ui.w, e, r);
+                        };
+                    }
+                }
+            }
+            div.row {
+                = ingredients(ui, e);
+                = progress_ring(e, recipe_time(ui, e));
+            }
+        }
+        \/;
+    }
+
+    fn effective_speed(ui: Ui, e: sim.Entity) I32 {
+        (ui.w.speed[e.machine] + 250 * sim.beacons(ui.w, e) * ui.w.satisfaction / 1000) * ui.w.satisfaction / 1000;
+    }
+
+    fn assembler_2(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            select as pick {
+                <aria-label = "Recipe";
+                option {
+                    <value = "-1";
+                    "Choose a recipe";
+                }
+                for $[allowed_recipes(ui, e)] |r| key $[r.to_str()] {
+                    option {
+                        <value = r.to_str();
+                        <selected = e.recipe == r;
+                        = ui.w.game.recipes[r].name;
+                    }
+                }
+                on change {
+                    sim.set_recipe(ui.w, e, Browser.parseInt(pick.value, 10).to_i32());
+                };
+            }
+            = ingredients(ui, e);
+            = row("Crafts", e.crafts.to_str());
+            = row("Speed", (effective_speed(ui, e) / 10).to_str() + "%");
+            = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
+        }
+        \/;
+    }
+
+    fn assembler_3(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            input as query {
+                <type = "search";
+                <placeholder = "Search recipes";
+                <value = ui.search;
+                on input {
+                    ui.search = query.value;
+                };
+            }
+            div.recipe-grid {
+                for $[allowed_recipes(ui, e) filter |r| { ui.search.len() == 0 or ui.w.game.recipes[r].name.includes(ui.search); }] |r| key $[r.to_str()] {
+                    button {
+                        <class = if e.recipe == r { "active"; } else { ""; };
+                        = ui.w.game.recipes[r].name;
+                        on click {
+                            sim.set_recipe(ui.w, e, r);
+                        };
+                    }
+                }
+            }
+            = row("Beacons in range", sim.beacons(ui.w, e).to_str());
+            = row("Effective speed", (effective_speed(ui, e) / 10).to_str() + "%");
+            = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
+        }
+        \/;
+    }
+
+    fn fluid_side(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div.gauges {
+            if $[e.recipe >= 0] {
+                for $[ui.w.game.recipes[e.recipe].ingredients filter |ing| { ui.w.is_fluid[ing[0]]; }] |ing| key $["fi" + ing[0].to_str()] {
+                    = fluid_gauge(ui, ing[0], e.inv[ing[0]], ing[1] * 2);
+                }
+                span { "→"; }
+                for $[ui.w.game.recipes[e.recipe].products filter |prod| { ui.w.is_fluid[prod[0]]; }] |prod| key $["fo" + prod[0].to_str()] {
+                    = fluid_gauge(ui, prod[0], e.out[prod[0]], prod[1] * 2);
+                }
+            }
+        }
+        \/;
+    }
+
+    fn chemical_plant(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            select as pick {
+                <aria-label = "Recipe";
+                option {
+                    <value = "-1";
+                    "Choose a recipe";
+                }
+                for $[allowed_recipes(ui, e)] |r| key $[r.to_str()] {
+                    option {
+                        <value = r.to_str();
+                        <selected = e.recipe == r;
+                        = ui.w.game.recipes[r].name;
+                    }
+                }
+                on change {
+                    sim.set_recipe(ui.w, e, Browser.parseInt(pick.value, 10).to_i32());
+                };
+            }
+            = fluid_side(ui, e);
+            = slots(ui, e.inv);
+            = slots(ui, e.out);
+            = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
+        }
+        \/;
+    }
+
+    fn oil_refinery(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.gauges {
+                = fluid_gauge(ui, 23, e.inv[23], 200);
+                span { "→"; }
+                = fluid_gauge(ui, 24, e.out[24], 90);
+            }
+            = row("Crafts", e.crafts.to_str());
+            = meter_row("Progress", e.progress, 300000, "");
+        }
+        \/;
+    }
+
+    fn centrifuge(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                = progress_ring(e, 720);
+                div {
+                    = row("Uranium-238", e.out[20].to_str());
+                    = row("Uranium-235", e.out[21].to_str());
+                }
+            }
+            = row("Next U-235 in", ((6 - e.crafts % 7 + 7) % 7 + 1).to_str() + " crafts");
+            = slots(ui, e.inv);
+        }
+        \/;
+    }
+
+    // ── logistics ────────────────────────────────────────────────────────────
+
+    fn belt_items(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div.items {
+            for $[(0..<(e.belt_n / 2))] |k| key $[k.to_str()] {
+                span {
+                    <title = item_name(ui, e.belt[k * 2]);
+                    span.dot {
+                        background: $[ui.item_colors[e.belt[k * 2]]];
+                    }
+                    = " " + item_name(ui, e.belt[k * 2]);
+                }
+            }
+        }
+        \/;
+    }
+
+    fn belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = lane(ui, e);
+            = belt_items(ui, e);
+            = row("Speed", ui.w.speed[e.machine].to_str() + " / tick");
+        }
+        \/;
+    }
+
+    fn fast_belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = lane(ui, e);
+            = meter_row("Compression", (e.belt_n / 2) * 64, 256, "info");
+            = belt_items(ui, e);
+        }
+        \/;
+    }
+
+    fn express_belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = lane(ui, e);
+            = row("State", if e.belt_n > 0 and e.belt[1] >= 256 { "blocked"; } else { "moving"; });
+            = belt_items(ui, e);
+        }
+        \/;
+    }
+
+    fn splitter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                for $[(0..<3)] |p| key $[p.to_str()] {
+                    button {
+                        <class = if e.priority == p { "active"; } else { ""; };
+                        = ["Alternate", "Front", "Side"][p];
+                        on click {
+                            e.priority = p;
+                        };
+                    }
+                }
+            }
+            select as pick {
+                <aria-label = "Filter";
+                option {
+                    <value = "-1";
+                    "No filter";
+                }
+                for $[(0..<22)] |i| key $[i.to_str()] {
+                    option {
+                        <value = i.to_str();
+                        <selected = e.pick == i;
+                        = item_name(ui, i);
+                    }
+                }
+                on change {
+                    e.pick = Browser.parseInt(pick.value, 10).to_i32();
+                };
+            }
+            = row("Next output", if e.toggle == 0 { "front"; } else { "side"; });
+            = lane(ui, e);
+        }
+        \/;
+    }
+
+    fn exit_distance(ui: Ui, e: sim.Entity) Str {
+        let found = "no exit";
+        for (1...5) |d| {
+            promote sim.front(ui.w, e, d) {
+                |t| => {
+                    if found == "no exit" and t.cls == 9 and t.dir == e.dir and t.role == 1 {
+                        found = d.to_str() + " tiles";
+                    };
+                },
+                ~> {},
+            };
+        };
+        found;
+    }
+
+    fn underground(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                button {
+                    <class = if e.role == 0 { "active"; } else { ""; };
+                    "Entrance";
+                    on click {
+                        e.role = 0;
+                    };
+                }
+                button {
+                    <class = if e.role == 1 { "active"; } else { ""; };
+                    "Exit";
+                    on click {
+                        e.role = 1;
+                    };
+                }
+            }
+            = row("Linked exit", if e.role == 0 { exit_distance(ui, e); } else { "this is an exit"; });
+            = lane(ui, e);
+        }
+        \/;
+    }
+
+    fn connected(ui: Ui, e: sim.Entity, side: I32) Bool {
+        promote sim.neighbor(ui.w, e, side) {
+            |n| => n.cls == 10,
+            ~> false,
+        };
+    }
+
+    fn pipe(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = row("Fluid", if e.fluid >= 0 { item_name(ui, e.fluid); } else { "empty"; });
+            = meter_row("Amount", e.amount, 100, "info");
+            div.row {
+                span.muted { "Connections"; }
+                b { = (if connected(ui, e, 0) { "↑"; } else { "·"; }) + (if connected(ui, e, 1) { "→"; } else { "·"; }) + (if connected(ui, e, 2) { "↓"; } else { "·"; }) + (if connected(ui, e, 3) { "←"; } else { "·"; }); }
+            }
+        }
+        \/;
+    }
+
+    fn storage_tank(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.tank {
+                i {
+                    height: $[percent(e.amount, 2500)];
+                    background: $[if e.fluid >= 0 { ui.item_colors[e.fluid]; } else { "#333"; }];
+                }
+            }
+            = row("Fluid", if e.fluid >= 0 { item_name(ui, e.fluid); } else { "empty"; });
+            = row("Fill", percent(e.amount, 2500) + " of 2500");
+        }
+        \/;
+    }
+
+    fn inserter_common(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let reach = ui.w.reach[e.machine];
+        let dxs = [0, 1, 0, -1];
+        let dys = [-1, 0, 1, 0];
+        @wutu/\
+        div {
+            = row("State", state_name(e));
+            = meter_row("Swing", e.timer, ui.w.speed[e.machine], "info");
+            div.row {
+                span.muted { "Hand"; }
+                = slot(ui, e.hand, e.held);
+            }
+            = row("Moved", e.moved.to_str());
+            = row("From", neighbor_name(ui, e.x - dxs[e.dir] * reach, e.y - dys[e.dir] * reach));
+            = row("To", neighbor_name(ui, e.x + dxs[e.dir] * reach, e.y + dys[e.dir] * reach));
+        }
+        \/;
+    }
+
+    fn inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        inserter_common(ui, e);
+    }
+
+    fn long_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.reach {
+                for $[(0..<5)] |k| key $[k.to_str()] {
+                    div {
+                        <class = if k == 0 { "src"; } else { if k == 2 { "me"; } else { if k == 4 { "dst"; } else { ""; }; }; };
+                    }
+                }
+            }
+            = inserter_common(ui, e);
+        }
+        \/;
+    }
+
+    fn fast_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = row("State", state_name(e));
+            div.row {
+                span.muted { "Hand"; }
+                = slot(ui, e.hand, e.held);
+            }
+            = row("Moved", e.moved.to_str());
+            = row("Average", (e.moved * 3600 / sim.imax(1, ui.w.tick)).to_str() + " / min");
+        }
+        \/;
+    }
+
+    fn filter_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.items {
+                for $[(0..<22)] |i| key $[i.to_str()] {
+                    button {
+                        <class = if e.pick == i { "active"; } else { ""; };
+                        <title = item_name(ui, i);
+                        span.dot {
+                            background: $[ui.item_colors[i]];
+                        }
+                        on click {
+                            e.pick = if e.pick == i { -1; } else { i; };
+                        };
+                    }
+                }
+            }
+            = row("Filter", item_name(ui, e.pick));
+            = row("State", state_name(e));
+            = row("Moved", e.moved.to_str());
+        }
+        \/;
+    }
+
+    fn stack_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            label.row {
+                span.muted { = "Stack size " + e.stack.to_str(); }
+                input as size {
+                    <type = "range";
+                    <min = "1";
+                    <max = "4";
+                    <value = e.stack.to_str();
+                    on input {
+                        e.stack = sim.imax(1, sim.imin(4, Browser.parseInt(size.value, 10).to_i32()));
+                    };
+                }
+            }
+            div.row {
+                span.muted { "Hand"; }
+                = slot(ui, e.hand, e.held);
+            }
+            = row("Moved", e.moved.to_str());
+        }
+        \/;
+    }
+
+    // ── storage ──────────────────────────────────────────────────────────────
+
+    fn used_slots(counts: Array[I32]) I32 {
+        counts fold(0) |a, c| { a + (c + 49) / 50; };
+    }
+
+    fn chest_grid(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let stacks = (0..<e.inv.len()) flat_map |i| { (0..<((e.inv[i] + 49) / 50)) map |k| { i; } collect(I32); } collect(I32);
+        @wutu/\
+        div.chest-grid {
+            for $[(0..<ui.w.speed[e.machine])] |s| key $[s.to_str()] {
+                div {
+                    if $[s < stacks.len()] {
+                        span.dot {
+                            background: $[ui.item_colors[stacks[s]]];
+                        }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn wooden_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = chest_grid(ui, e);
+            = row("Used", used_slots(e.inv).to_str() + " of 16 slots");
+        }
+        \/;
+    }
+
+    fn steel_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = chest_grid(ui, e);
+            = meter_row("Used", used_slots(e.inv), 48, "");
+            table {
+                for $[((0..<e.inv.len()) filter |i| { e.inv[i] > 0; } sort(I32) |a, b| { e.inv[a] > e.inv[b]; })] |i| key $[i.to_str()] {
+                    tr {
+                        td { = item_name(ui, i); }
+                        td.num { = e.inv[i].to_str(); }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn requester_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        table {
+            for $[(0..<e.inv.len()) filter |i| { e.inv[i] > 0; }] |i| key $[i.to_str()] {
+                tr {
+                    td { = item_name(ui, i); }
+                    td.num { = e.inv[i].to_str(); }
+                    td {
+                        = bar(e.inv[i] % 50 + (if e.inv[i] % 50 == 0 { 50; } else { 0; }), 50, "");
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    // ── energy ───────────────────────────────────────────────────────────────
+
+    fn steam_engine(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                span.muted { "Fuel"; }
+                = slot(ui, if e.fuel > 0 { 2; } else { -1; }, e.fuel);
+                = bar(e.burn, 900, "");
+            }
+            = meter_row("Water", e.amount, 100, "info");
+            = row("Running", if e.busy { "yes"; } else { "no"; });
+            = row("Output", if e.busy { "900 kW"; } else { "0 kW"; });
+        }
+        \/;
+    }
+
+    fn solar_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let angle = (ui.w.tick % 25200).to_f64() / 25200.0 * 6.2832;
+        @wutu/\
+        div {
+            svg {
+                <viewBox = "0 0 100 50";
+                width: 100%;
+                height: 60px;
+                path {
+                    <d = "M 5 48 A 45 45 0 0 1 95 48";
+                    fill: none;
+                    stroke: #2f3843;
+                    stroke-width: 2;
+                }
+                circle {
+                    <cx = (50.0 - 45.0 * Browser.Math.cos(angle)).toFixed(1);
+                    <cy = (48.0 - 45.0 * Browser.Math.sin(angle)).toFixed(1);
+                    <r = "5";
+                    fill: $[if ui.w.light > 0 { "#ffd54a"; } else { "#55606e"; }];
+                }
+            }
+            = meter_row("Light", ui.w.light, 1000, "");
+            = row("Output", (60 * ui.w.light / 1000).to_str() + " kW");
+        }
+        \/;
+    }
+
+    fn accumulator(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = meter_row("Charge", e.charge, 5000, "good");
+            = row("Stored", e.charge.to_str() + " / 5000");
+            = row("State", if ui.w.supply > ui.w.demand and e.charge < 5000 { "charging"; } else { if ui.w.supply < ui.w.demand and e.charge > 0 { "discharging"; } else { "idle"; }; });
+        }
+        \/;
+    }
+
+    // ── science ──────────────────────────────────────────────────────────────
+
+    fn lab(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let r = ui.w.research_current;
+        @wutu/\
+        div {
+            = row("Research", research_name(ui));
+            div.slots {
+                = slot(ui, 17, e.inv[17]);
+                = slot(ui, 18, e.inv[18]);
+                = slot(ui, 19, e.inv[19]);
+            }
+            = meter_row("Unit", e.progress, if r >= 0 { ui.w.game.techs[r].time * 1000; } else { 1; }, "info");
+            = meter_row("Research", ui.w.research_progress, if r >= 0 { ui.w.game.techs[r].units; } else { 1; }, "good");
+        }
+        \/;
+    }
+
+    fn radar(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = meter_row("Sweep", e.progress, 300000, "info");
+            = row("Chunks revealed", e.crafts.to_str());
+        }
+        \/;
+    }
+
+    fn beacon(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        let count = (0..<25) count_where |k| {
+            promote sim.at(ui.w, e.x + k % 5 - 2, e.y + k / 5 - 2) {
+                |n| => sim.is_crafter(n.cls),
+                ~> false,
+            };
+        };
+        @wutu/\
+        div {
+            = row("Crafters in range", count.to_str());
+            = row("Bonus each", "+" + (25 * ui.w.satisfaction / 1000).to_str() + "% speed");
+        }
+        \/;
+    }
+
+    fn combinator_source(ui: Ui, e: sim.Entity) I32 {
+        promote sim.back(ui.w, e, 1) {
+            |s| => if s.inv.len() > 0 { s.inv[e.cond_item]; } else { 0; },
+            ~> 0,
+        };
+    }
+
+    fn combinator(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                select as item {
+                    <aria-label = "Item";
+                    for $[(0..<22)] |i| key $[i.to_str()] {
+                        option {
+                            <value = i.to_str();
+                            <selected = e.cond_item == i;
+                            = item_name(ui, i);
+                        }
+                    }
+                    on change {
+                        e.cond_item = Browser.parseInt(item.value, 10).to_i32();
+                    };
+                }
+                select as op {
+                    <aria-label = "Operator";
+                    for $[(0..<3)] |o| key $[o.to_str()] {
+                        option {
+                            <value = o.to_str();
+                            <selected = e.cond_op == o;
+                            = [">", "<", "="][o];
+                        }
+                    }
+                    on change {
+                        e.cond_op = Browser.parseInt(op.value, 10).to_i32();
+                    };
+                }
+                input as amount {
+                    <type = "number";
+                    <aria-label = "Value";
+                    <value = e.cond_value.to_str();
+                    width: 70px;
+                    on change {
+                        e.cond_value = Browser.parseInt(amount.value, 10).to_i32();
+                    };
+                }
+            }
+            = row("Source count", combinator_source(ui, e).to_str());
+            = row("Signal", if e.signal { "on"; } else { "off"; });
+        }
+        \/;
+    }
+
+    fn lamp(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.lamp {
+                <class = if e.signal { "on"; } else { ""; };
+            }
+            = row("Controlled by", if (0..<4) any |side| { connected_combinator(ui, e, side); } { "combinator"; } else { "nothing"; });
+        }
+        \/;
+    }
+
+    fn connected_combinator(ui: Ui, e: sim.Entity, side: I32) Bool {
+        promote sim.neighbor(ui.w, e, side) {
+            |n| => n.cls == 19,
+            ~> false,
+        };
+    }
+
+    fn silo(ui: Ui, e: sim.Entity) Browser.HTMLElement {
+        @wutu/\
+        div {
+            = meter_row("Rocket", e.held, 20, "good");
+            = meter_row("Part", e.progress, 180000, "info");
+            div.slots {
+                = slot(ui, 7, e.inv[7]);
+                = slot(ui, 12, e.inv[12]);
+                = slot(ui, 16, e.inv[16]);
+            }
+            button {
+                <disabled = e.held < 20;
+                "Launch";
+                on click {
+                    sim.launch(e);
+                };
+            }
+            = row("Rockets launched", e.crafts.to_str());
+        }
+        \/;
+    }
+
+    // ── footer ───────────────────────────────────────────────────────────────
+
+    fn footer(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "footer";
+        footer.footer {
+            div.alerts {
+                for $[ui.alerts] |a, index| key $[a.text + index.to_str()] {
+                    div.alert {
+                        <class = a.kind;
+                        = a.text;
+                    }
+                }
+                if $[ui.alerts.len() == 0] {
+                    span.muted { "No alerts."; }
+                }
+            }
+            div.minimap {
+                canvas#minimap {
+                    <width = ui.w.width.to_str();
+                    <height = ui.w.height.to_str();
+                }
+            }
+            div.tileinfo {
+                = tile_info(ui);
+            }
+        }
+        \/;
+    }
+
+    fn tile_info(ui: Ui) Browser.HTMLElement {
+        let x = ui.hover_x;
+        let y = ui.hover_y;
+        let inside = sim.inside(ui.w, x, y);
+        @wutu/\
+        div {
+            if $[inside] {
+                = row("Tile", "(" + x.to_str() + ", " + y.to_str() + ")");
+                = row("Terrain", if ui.w.water[y * ui.w.width + x] == 1 { "water"; } else { "land"; });
+                = row("Resource", if tile_ore(ui, x, y) >= 0 { item_name(ui, tile_ore(ui, x, y)) + " × " + tile_amount(ui, x, y).to_str(); } else { "none"; });
+                = row("Entity", neighbor_name(ui, x, y));
+            } else {
+                span.muted { "Hover the map."; }
+            }
+        }
+        \/;
+    }
+
+    // ── windows ──────────────────────────────────────────────────────────────
+
+    fn windows(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        @island "windows";
+        div {
+            if $[ui.window.len() > 0] {
+                section.window {
+                    div.window-head {
+                        h2 { = ui.window; }
+                        button {
+                            "Close";
+                            on click {
+                                ui.window = "";
+                            };
+                        }
+                    }
+                    div.window-body {
+                        = window_body(ui);
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn window_body(ui: Ui) Browser.HTMLElement {
+        if ui.window == "research" { research_window(ui); } else {
+            if ui.window == "production" { production_window(ui); } else {
+                if ui.window == "power" { power_window(ui); } else { saves_window(ui); };
+            };
+        };
+    }
+
+    fn tech_state(ui: Ui, t: I32) Str {
+        if ui.w.done[t] == 1 { "done"; } else {
+            if ui.w.research_current == t { "current"; } else {
+                if sim.research_available(ui.w, t) { "available"; } else { "locked"; };
+            };
+        };
+    }
+
+    fn unlocks(ui: Ui, t: I32) Str {
+        let tech = ui.w.game.techs[t];
+        let parts = (tech.machines map |m| { ui.w.game.machines[m].label; } collect(Str)) chain(tech.recipes map |r| { ui.w.game.recipes[r].name; } collect(Str)) collect(Str);
+        parts fold("") |text, part, i| { if i == 0 { part; } else { text + ", " + part; }; };
+    }
+
+    fn research_window(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        div.techs {
+            for $[(0..<ui.w.game.techs.len())] |t| key $[t.to_str()] {
+                button.tech {
+                    <class = tech_state(ui, t);
+                    <disabled = tech_state(ui, t) != "available";
+                    b { = ui.w.game.techs[t].label; }
+                    small.muted { = ui.w.game.techs[t].units.to_str() + " × " + (ui.w.game.techs[t].packs sum).to_str() + " packs"; }
+                    small { = unlocks(ui, t); }
+                    if $[ui.w.research_current == t] {
+                        = bar(ui.w.research_progress, ui.w.game.techs[t].units, "info");
+                    }
+                    on click {
+                        sim.start_research(ui.w, t);
+                    };
+                }
+            }
+        }
+        \/;
+    }
+
+    fn spark_path(ui: Ui, item: I32) Str {
+        let values = (0..<60) map |k| {
+            let s = (ui.samples + k) % 60;
+            if ui.range10 { ui.prod10[s * item_count + item]; } else { ui.prod[s * item_count + item]; };
+        } collect(I32);
+        let high = sim.imax(1, values fold(0) |m, v| { sim.imax(m, v); });
+        values fold("") |d, v, k| {
+            d + (if k == 0 { "M"; } else { " L"; }) + k.to_str() + " " + (20 - v * 18 / high).to_str();
+        };
+    }
+
+    fn production_window(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        div {
+            div.row {
+                button {
+                    <class = if ui.range10 { ""; } else { "active"; };
+                    "1 min";
+                    on click {
+                        ui.range10 = false;
+                    };
+                }
+                button {
+                    <class = if ui.range10 { "active"; } else { ""; };
+                    "10 min";
+                    on click {
+                        ui.range10 = true;
+                    };
+                }
+            }
+            table {
+                for $[(0..<item_count)] |i| key $[i.to_str()] {
+                    tr {
+                        td {
+                            span.dot {
+                                background: $[ui.item_colors[i]];
+                            }
+                            = " " + item_name(ui, i);
+                        }
+                        td.num { = per_minute(ui, i).to_str() + " / min"; }
+                        td {
+                            svg.spark {
+                                <viewBox = "0 0 60 22";
+                                <preserveAspectRatio = "none";
+                                path {
+                                    <d = spark_path(ui, i);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn graph_path(values: Array[I32], start: I32, high: I32) Str {
+        (0..<60) fold("") |d, k| {
+            let v = values[(start + k) % 60];
+            d + (if k == 0 { "M"; } else { " L"; }) + (k * 10).to_str() + " " + (118 - v * 110 / sim.imax(1, high)).to_str();
+        };
+    }
+
+    fn demand_by_machine(ui: Ui) Array[I32] {
+        let totals = Array[I32].new_default(ui.w.game.machines.len());
+        let all = ui.w.entities;
+        for (0..<all.n) |i| {
+            let e = all.items[i];
+            if e.busy or e.cls == 17 or e.cls == 18 {
+                totals[e.machine] += ui.w.power[e.machine];
+            };
+        };
+        totals;
+    }
+
+    fn power_window(ui: Ui) Browser.HTMLElement {
+        let high = sim.imax(ui.supply fold(0) |m, v| { sim.imax(m, v); }, ui.demand fold(0) |m, v| { sim.imax(m, v); });
+        let totals = demand_by_machine(ui);
+        @wutu/\
+        div {
+            = row("Satisfaction", (ui.w.satisfaction / 10).to_str() + "%");
+            = row("Supply / demand", ui.w.supply.to_str() + " / " + ui.w.demand.to_str() + " kW");
+            svg.graph {
+                <viewBox = "0 0 600 120";
+                <preserveAspectRatio = "none";
+                path.supply {
+                    <d = graph_path(ui.supply, ui.samples, high);
+                }
+                path.demand {
+                    <d = graph_path(ui.demand, ui.samples, high);
+                }
+            }
+            table {
+                tr {
+                    th { "Machine"; }
+                    th.num { "Demand (kW)"; }
+                }
+                for $[(0..<totals.len()) filter |m| { totals[m] > 0; }] |m| key $[m.to_str()] {
+                    tr {
+                        td { = ui.w.game.machines[m].label; }
+                        td.num { = totals[m].to_str(); }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+
+    fn load_world(ui: Ui, text: Str) void {
+        promote sim.load(ui.game_text, text) {
+            |w| => {
+                ui.w = w;
+                ui.selected = -1;
+                ui.pinned = [];
+                ui.samples = w.tick / 60;
+                ui.notice = "Loaded.";
+            },
+            ~> {
+                ui.notice = "Could not load: " + sim.load_error(ui.game_text, text);
+            },
+        };
+    }
+
+    fn saves_window(ui: Ui) Browser.HTMLElement {
+        @wutu/\
+        div.saves {
+            for $[(1...3)] |n| key $[n.to_str()] {
+                div.row {
+                    b { = "Slot " + n.to_str(); }
+                    button {
+                        "Save";
+                        on click {
+                            Browser.localStorage.setItem("foundry-slot-" + n.to_str(), sim.save_text(ui.w));
+                            ui.notice = "Saved to slot " + n.to_str() + ".";
+                        };
+                    }
+                    button {
+                        "Load";
+                        on click {
+                            promote Browser.localStorage.getItem("foundry-slot-" + n.to_str()) {
+                                |text| => load_world(ui, text),
+                                ~> {
+                                    ui.notice = "Slot " + n.to_str() + " is empty.";
+                                },
+                            };
+                        };
+                    }
+                }
+            }
+            div.row {
+                button {
+                    "Export";
+                    on click {
+                        ui.text = sim.save_text(ui.w);
+                    };
+                }
+                button {
+                    "Import";
+                    on click {
+                        load_world(ui, ui.text);
+                    };
+                }
+                button {
+                    "New starter game";
+                    on click {
+                        load_world(ui, ui.starter_text);
+                    };
+                }
+            }
+            textarea as box {
+                <aria-label = "Save JSON";
+                <.value = ui.text;
+                on input {
+                    ui.text = box.value;
+                };
+            }
+            p.muted { = ui.notice; }
+        }
+        \/;
+    }
+}

@@ -1,0 +1,14 @@
+using mathops |ops| from "./_ops.utu";
+
+mod boxes {
+    struct &:
+        | value : I32
+
+    fn &.new(value: I32) & {
+        &{ value: value };
+    }
+
+    fn &.score |self| () I32 {
+        ops.double(self.value) + ops.triple(1);
+    }
+}

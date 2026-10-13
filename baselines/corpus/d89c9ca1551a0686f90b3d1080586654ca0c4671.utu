@@ -1,0 +1,4 @@
+
+      mod Host { let twice: fun(F64) F64 = @es/\ n => n * 2 \/; }
+      export lib { fn run() F64 { Host.twice(F64.sqrt(441.0)); } }
+    

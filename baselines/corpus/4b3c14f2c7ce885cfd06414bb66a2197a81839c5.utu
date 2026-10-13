@@ -1,0 +1,11 @@
+
+      struct Pt:
+        | x : I32
+      fn takes(n: I32) I32 { n; }
+      export lib {
+        fn bad_arg() I32 { takes(true); }
+        fn bad_let() I32 { let a: I32 = true; a; }
+        fn bad_field() Pt { Pt { x: true }; }
+        fn bad_ret() I32 { true; }
+      }
+    

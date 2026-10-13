@@ -1,0 +1,432 @@
+using Browser from std:Browser;
+
+struct Expense:
+    | id: Str
+    | title: Str
+    | payer: Str
+    | cents: I32
+
+struct Trip:
+    | draft: Str
+    | amount: F64
+    | payer: Str
+    | expenses: Array[Expense]
+
+struct Balance:
+    | name: Str
+    | cents: I32
+
+fn money(cents: I32) Str {
+    "$" + (cents.to_f64() / 100.0).toFixed(2);
+}
+
+fn total(state: Trip) I32 {
+    state.expenses map |expense| { expense.cents; } sum;
+}
+
+fn paid(state: Trip, person: Str) I32 {
+    state.expenses filter |expense| { expense.payer == person; } map |expense| { expense.cents; } sum;
+}
+
+fn transfer(debtor: Balance, creditor: Balance) Browser.HTMLElement {
+    let amount = if -debtor.cents < creditor.cents { -debtor.cents; } else { creditor.cents; };
+    debtor.cents += amount;
+    creditor.cents -= amount;
+    @wutu/\
+    p.transfer {
+        padding-block:1rem;
+        border-top:1px solid #52689b;
+        = debtor.name + " → " + creditor.name + "   " + money(amount);
+    }
+    \/;
+}
+
+fn settlement(state: Trip) Browser.HTMLElement {
+    let sum = total(state);
+    let share = sum / 3;
+    let remainder = sum - share * 3;
+    let balances = [
+        Balance { name: "Ada", cents: paid(state, "Ada") - share - if remainder > 0 { 1; } else { 0; } },
+        Balance { name: "Ben", cents: paid(state, "Ben") - share - if remainder > 1 { 1; } else { 0; } },
+        Balance { name: "Cleo", cents: paid(state, "Cleo") - share }
+    ];
+    @wutu/\
+    section.panel.stack {
+        background:var(--ink);
+        color:#fff;
+        h2 {
+            "Make it even";
+        }
+        p {
+            color:#c4d0ff;
+            "Equal shares. A short path back to zero.";
+        }
+        if $[sum == 0] {
+            p {
+                "No expenses yet. Add the first one to get started.";
+            }
+        }
+        for $[balances] |debtor| {
+            for $[balances] |creditor| {
+                if $[debtor.cents < 0 and creditor.cents > 0] {
+                    = transfer(debtor, creditor);
+                }
+            }
+        }
+        p {
+            font-size:0.8rem;
+            color:#c4d0ff;
+            "Calculated suggestions only. No payments are sent. Spare cents are assigned in name order.";
+        }
+    }
+    \/;
+}
+
+export main() void {
+    let state = @stored/\
+        Trip "split-v1" Trip {
+            draft: "", amount: 0.0, payer: "Ada",
+            expenses: [
+                Expense { id: "stay", title: "The cabin", payer: "Ada", cents: 18000 },
+                Expense { id: "food", title: "Groceries & coffee", payer: "Ben", cents: 6000 },
+                Expense { id: "fuel", title: "Fuel for the way home", payer: "Cleo", cents: 3000 }
+            ]
+        }
+    \/;
+    state.expenses = state.expenses filter |expense| {
+        expense.cents >= 0 and expense.cents <= 10000000
+        and (expense.payer == "Ada" or expense.payer == "Ben" or expense.payer == "Cleo");
+    } take(100) collect(Expense);
+    if state.payer != "Ada" and state.payer != "Ben" and state.payer != "Cleo" { state.payer = "Ada"; };
+    let app = @wutu/\
+    @reactive;
+    @document {
+        :root {
+            --paper:#f1f4fa;
+            --ink:#1a315a;
+            --muted:#5c6980;
+            --accent:#315be7;
+            --on:#fff;
+            --card:#fff;
+            --line:#cfd8e8;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+            margin: 0;
+            background: var(--paper);
+            color: var(--ink);
+            font: 16px/1.55 system-ui, sans-serif;
+        }
+        button, input, select {
+            font: inherit;
+        }
+        button, input, select {
+            padding: 0.7rem 0.9rem;
+            border: 1px solid var(--line);
+            border-radius: 0.5rem;
+            color: inherit;
+            background: var(--card);
+            min-inline-size: 0;
+        }
+        button {
+            cursor: pointer;
+        }
+        button:hover {
+            border-color: var(--accent);
+        }
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+        a {
+            color: inherit;
+            text-underline-offset: 0.25em;
+        }
+        h1, h2, h3, p {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        h1 {
+            font-size: clamp(3rem, 7vw, 6rem);
+            line-height: 1.02;
+            letter-spacing: -0.06em;
+        }
+        h2 {
+            font-size: 1.3rem;
+            letter-spacing: -0.025em;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 650;
+        }
+        .eyebrow {
+            font: 700 0.75rem system-ui;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+        .muted {
+            color: var(--muted);
+        }
+        .primary {
+            background: var(--accent);
+            color: var(--on);
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+        .bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .stack {
+            display: grid;
+            gap: 1rem;
+        }
+        .panel {
+            padding: 1.5rem;
+            border: 1px solid var(--line);
+            background: var(--card);
+            border-radius: 0.8rem;
+        }
+        .site-nav {
+            padding-block: 1.4rem;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.85rem;
+        }
+        .site-nav nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+        footer {
+            padding-block: 1.5rem;
+            border-top: 1px solid var(--line);
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        main {
+            max-width: 1320px;
+            margin: auto;
+            padding: 0 clamp(1rem, 4vw, 3rem);
+            display: grid;
+            gap: 2.5rem;
+        }
+        .hero {
+            padding-block: 1.5rem;
+            display: grid;
+            gap: 1.5rem;
+        }
+        .hero p {
+            max-width: 39rem;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            button {
+                transition: background 120ms, border-color 120ms;
+            }
+        }
+    }
+    main {
+        header.site-nav.bar {
+            strong {
+                "SPLIT / GOOD TRIPS. CLEAR NUMBERS.";
+            }
+            nav {
+                a {
+                    <href = "../";
+                    "More Wutu sites";
+                }
+                a {
+                    <href = "source.html";
+                    "Read the source ↗";
+                }
+            }
+        }
+        section.hero {
+            p.eyebrow {
+                "THE CABIN WEEKEND / ADA, BEN & CLEO";
+            }
+            h1 {
+                "Keep the memories.";
+                br {
+                }
+                span {
+                    color:var(--accent);
+                    "Split the rest.";
+                }
+            }
+            p.muted {
+                "A shared expense notebook for three friends. Log who paid, keep the totals clear, and leave the awkward arithmetic here.";
+            }
+        }
+        section {
+            display:grid;
+            grid-template-columns:repeat(3, 1fr);
+            gap:1rem;
+            @media (width < 40rem) {
+                grid-template-columns: 1fr;
+            }
+            article.panel.stack {
+                p.eyebrow {
+                    "TOTAL SPENT";
+                }
+                strong {
+                    <id = "total";
+                    font-size:2.5rem;
+                    = money(total(state));
+                }
+            }
+            article.panel.stack {
+                p.eyebrow {
+                    "AVERAGE SHARE";
+                }
+                strong {
+                    font-size:2.5rem;
+                    = "$" + (total(state).to_f64() / 300.0).toFixed(2);
+                }
+            }
+            article.panel.stack {
+                p.eyebrow {
+                    "EXPENSES LOGGED";
+                }
+                strong {
+                    font-size:2.5rem;
+                    = state.expenses.len().to_f64().toString();
+                }
+            }
+        }
+        div {
+            display:grid;
+            grid-template-columns:minmax(0, 1.4fr) minmax(18rem, 1fr);
+            gap:2rem;
+            align-items:start;
+            @media (width < 52rem) {
+                grid-template-columns: 1fr;
+            }
+            section.stack {
+                h2 {
+                    "The shared notebook";
+                }
+                for $[state.expenses] |expense| key $[expense.id] {
+                    article.expense.panel.bar {
+                        div {
+                            h3 {
+                                = expense.title;
+                            }
+                            p.muted {
+                                = expense.payer + " paid for everyone";
+                            }
+                        }
+                        div.bar {
+                            strong {
+                                = money(expense.cents);
+                            }
+                            button {
+                                <aria-label = $["Remove " + expense.title];
+                                "×";
+                                on click {
+                                    state.expenses = state.expenses filter |item| {
+                                        item.id != expense.id;
+                                    }
+                                    collect(Expense);
+                                };
+                            }
+                        }
+                    }
+                }
+                if $[state.expenses.len() == 0] {
+                    p.panel {
+                        "Your notebook is empty. Start with coffee, fuel, or a place to stay.";
+                    }
+                }
+                = settlement(state);
+            }
+            form.panel.stack {
+                h2 {
+                    "Add an expense";
+                }
+                label {
+                    "What was it for?";
+                    input as title {
+                        <required = "";
+                        <maxlength = "100";
+                        <placeholder = "Dinner on the last night";
+                        bind:value = state.draft;
+                    }
+                }
+                label {
+                    "Amount ($)";
+                    input {
+                        <type = "number";
+                        <required = "";
+                        <min = "0.01";
+                        <max = "100000";
+                        <step = "0.01";
+                        bind:number = state.amount;
+                    }
+                }
+                label {
+                    "Who paid?";
+                    select {
+                        bind:value = state.payer;
+                        option {
+                            <value = "Ada";
+                            "Ada";
+                        }
+                        option {
+                            <value = "Ben";
+                            "Ben";
+                        }
+                        option {
+                            <value = "Cleo";
+                            "Cleo";
+                        }
+                    }
+                }
+                button.primary {
+                    <type = "submit";
+                    <disabled = $[state.expenses.len() >= 100];
+                    "Add expense +";
+                }
+                p.muted {
+                    "USD. Shared equally between three people. Up to 100 expenses; $100,000 per expense.";
+                }
+                on submit {
+                    if state.draft.trim().len() > 0 and state.amount >= 0.01 and state.amount <= 100000.0 and state.expenses.len() < 100 {
+                        state.expenses = state.expenses chain([Expense {
+                            id: Browser.crypto.randomUUID(),
+                            title: state.draft.trim(),
+                            payer: state.payer,
+                            cents: (state.amount * 100.0 + 0.5).to_i32()
+                        }
+                        ]) collect(Expense);
+                        state.draft = "";
+                        state.amount = 0.0;
+                        title.focus();
+                    };
+                };
+            }
+        }
+        footer.bar {
+            p {
+                "Built in Utu + Wutu. Data stays in this browser.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

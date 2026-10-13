@@ -1,0 +1,18 @@
+
+      export lib {
+          fn make(n: I32, seed: I32) Array[I32] {
+              let xs = Array[I32].new(n, 0);
+              let s = seed;
+              for (0..<n) |i| { s = s * 1103515245 + 12345; xs[i] = s ^ (s << 13); };
+              if n > 2 { xs[0] = 2147483647; xs[1] = -2147483648; xs[2] = 0; };
+              xs;
+          }
+          fn at(xs: Array[I32], i: I32) I32 { xs[i]; }
+          fn up(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a < b; }; }
+          fn down(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a > b; }; }
+          fn unsigned_up(xs: Array[I32]) Array[U32] { xs map |x| { x.to_u32(); } sort(U32) |a, b| { a < b; }; }
+          fn unsigned_at(xs: Array[U32], i: I32) U32 { xs[i]; }
+          fn unsigned_len(xs: Array[U32]) I32 { xs.len(); }
+          fn len(xs: Array[I32]) I32 { xs.len(); }
+      }
+    

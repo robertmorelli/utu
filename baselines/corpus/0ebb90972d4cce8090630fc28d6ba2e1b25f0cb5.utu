@@ -1,0 +1,122 @@
+
+export lib {
+      fn std_I32_add(a: I32, b: I32) I32 { a + b; }
+      fn std_I32_sub(a: I32, b: I32) I32 { a - b; }
+      fn std_I32_mul(a: I32, b: I32) I32 { a * b; }
+      fn std_I32_div(a: I32, b: I32) I32 { a / b; }
+      fn std_I32_rem(a: I32, b: I32) I32 { a % b; }
+      fn std_I32_band(a: I32, b: I32) I32 { a & b; }
+      fn std_I32_bor(a: I32, b: I32) I32 { a | b; }
+      fn std_I32_bxor(a: I32, b: I32) I32 { a ^ b; }
+      fn std_I32_shl(a: I32, b: I32) I32 { a << b; }
+      fn std_I32_shr(a: I32, b: I32) I32 { a >> b; }
+      fn std_I32_ushr(a: I32, b: I32) I32 { a >>> b; }
+      fn std_I32_eq(a: I32, b: I32) I32 { if a == b { 1; } else { 0; }; }
+      fn std_I32_ne(a: I32, b: I32) I32 { if a != b { 1; } else { 0; }; }
+      fn std_I32_lt(a: I32, b: I32) I32 { if a < b { 1; } else { 0; }; }
+      fn std_I32_le(a: I32, b: I32) I32 { if a <= b { 1; } else { 0; }; }
+      fn std_I32_gt(a: I32, b: I32) I32 { if a > b { 1; } else { 0; }; }
+      fn std_I32_ge(a: I32, b: I32) I32 { if a >= b { 1; } else { 0; }; }
+      fn std_I32_neg(a: I32) I32 { -a; }
+      fn std_I32_bnot(a: I32) I32 { ~a; }
+      fn std_I32_clz(a: I32) I32 { I32.clz(a); }
+      fn std_I32_ctz(a: I32) I32 { I32.ctz(a); }
+      fn std_I32_popcnt(a: I32) I32 { I32.popcnt(a); }
+      fn std_U32_add(a: U32, b: U32) U32 { a + b; }
+      fn std_U32_sub(a: U32, b: U32) U32 { a - b; }
+      fn std_U32_mul(a: U32, b: U32) U32 { a * b; }
+      fn std_U32_div(a: U32, b: U32) U32 { a / b; }
+      fn std_U32_rem(a: U32, b: U32) U32 { a % b; }
+      fn std_U32_band(a: U32, b: U32) U32 { a & b; }
+      fn std_U32_bor(a: U32, b: U32) U32 { a | b; }
+      fn std_U32_bxor(a: U32, b: U32) U32 { a ^ b; }
+      fn std_U32_shl(a: U32, b: U32) U32 { a << b; }
+      fn std_U32_shr(a: U32, b: U32) U32 { a >> b; }
+      fn std_U32_ushr(a: U32, b: U32) U32 { a >>> b; }
+      fn std_U32_eq(a: U32, b: U32) I32 { if a == b { 1; } else { 0; }; }
+      fn std_U32_ne(a: U32, b: U32) I32 { if a != b { 1; } else { 0; }; }
+      fn std_U32_lt(a: U32, b: U32) I32 { if a < b { 1; } else { 0; }; }
+      fn std_U32_le(a: U32, b: U32) I32 { if a <= b { 1; } else { 0; }; }
+      fn std_U32_gt(a: U32, b: U32) I32 { if a > b { 1; } else { 0; }; }
+      fn std_U32_ge(a: U32, b: U32) I32 { if a >= b { 1; } else { 0; }; }
+      fn std_U32_neg(a: U32) U32 { -a; }
+      fn std_U32_bnot(a: U32) U32 { ~a; }
+      fn std_I64_add(a: I64, b: I64) I64 { a + b; }
+      fn std_I64_sub(a: I64, b: I64) I64 { a - b; }
+      fn std_I64_mul(a: I64, b: I64) I64 { a * b; }
+      fn std_I64_div(a: I64, b: I64) I64 { a / b; }
+      fn std_I64_rem(a: I64, b: I64) I64 { a % b; }
+      fn std_I64_band(a: I64, b: I64) I64 { a & b; }
+      fn std_I64_bor(a: I64, b: I64) I64 { a | b; }
+      fn std_I64_bxor(a: I64, b: I64) I64 { a ^ b; }
+      fn std_I64_shl(a: I64, b: I64) I64 { a << b; }
+      fn std_I64_shr(a: I64, b: I64) I64 { a >> b; }
+      fn std_I64_ushr(a: I64, b: I64) I64 { a >>> b; }
+      fn std_I64_eq(a: I64, b: I64) I32 { if a == b { 1; } else { 0; }; }
+      fn std_I64_ne(a: I64, b: I64) I32 { if a != b { 1; } else { 0; }; }
+      fn std_I64_lt(a: I64, b: I64) I32 { if a < b { 1; } else { 0; }; }
+      fn std_I64_le(a: I64, b: I64) I32 { if a <= b { 1; } else { 0; }; }
+      fn std_I64_gt(a: I64, b: I64) I32 { if a > b { 1; } else { 0; }; }
+      fn std_I64_ge(a: I64, b: I64) I32 { if a >= b { 1; } else { 0; }; }
+      fn std_I64_neg(a: I64) I64 { -a; }
+      fn std_I64_bnot(a: I64) I64 { ~a; }
+      fn std_U64_add(a: U64, b: U64) U64 { a + b; }
+      fn std_U64_sub(a: U64, b: U64) U64 { a - b; }
+      fn std_U64_mul(a: U64, b: U64) U64 { a * b; }
+      fn std_U64_div(a: U64, b: U64) U64 { a / b; }
+      fn std_U64_rem(a: U64, b: U64) U64 { a % b; }
+      fn std_U64_band(a: U64, b: U64) U64 { a & b; }
+      fn std_U64_bor(a: U64, b: U64) U64 { a | b; }
+      fn std_U64_bxor(a: U64, b: U64) U64 { a ^ b; }
+      fn std_U64_shl(a: U64, b: U64) U64 { a << b; }
+      fn std_U64_shr(a: U64, b: U64) U64 { a >> b; }
+      fn std_U64_ushr(a: U64, b: U64) U64 { a >>> b; }
+      fn std_U64_eq(a: U64, b: U64) I32 { if a == b { 1; } else { 0; }; }
+      fn std_U64_ne(a: U64, b: U64) I32 { if a != b { 1; } else { 0; }; }
+      fn std_U64_lt(a: U64, b: U64) I32 { if a < b { 1; } else { 0; }; }
+      fn std_U64_le(a: U64, b: U64) I32 { if a <= b { 1; } else { 0; }; }
+      fn std_U64_gt(a: U64, b: U64) I32 { if a > b { 1; } else { 0; }; }
+      fn std_U64_ge(a: U64, b: U64) I32 { if a >= b { 1; } else { 0; }; }
+      fn std_U64_neg(a: U64) U64 { -a; }
+      fn std_U64_bnot(a: U64) U64 { ~a; }
+      fn std_F32_add(a: F32, b: F32) F32 { a + b; }
+      fn std_F32_sub(a: F32, b: F32) F32 { a - b; }
+      fn std_F32_mul(a: F32, b: F32) F32 { a * b; }
+      fn std_F32_div(a: F32, b: F32) F32 { a / b; }
+      fn std_F32_eq(a: F32, b: F32) I32 { if a == b { 1; } else { 0; }; }
+      fn std_F32_ne(a: F32, b: F32) I32 { if a != b { 1; } else { 0; }; }
+      fn std_F32_lt(a: F32, b: F32) I32 { if a < b { 1; } else { 0; }; }
+      fn std_F32_le(a: F32, b: F32) I32 { if a <= b { 1; } else { 0; }; }
+      fn std_F32_gt(a: F32, b: F32) I32 { if a > b { 1; } else { 0; }; }
+      fn std_F32_ge(a: F32, b: F32) I32 { if a >= b { 1; } else { 0; }; }
+      fn std_F32_neg(a: F32) F32 { -a; }
+      fn std_F32_abs(a: F32) F32 { F32.abs(a); }
+      fn std_F32_sqrt(a: F32) F32 { F32.sqrt(a); }
+      fn std_F32_ceil(a: F32) F32 { F32.ceil(a); }
+      fn std_F32_floor(a: F32) F32 { F32.floor(a); }
+      fn std_F32_trunc(a: F32) F32 { F32.trunc(a); }
+      fn std_F32_nearest(a: F32) F32 { F32.nearest(a); }
+      fn std_F32_min(a: F32, b: F32) F32 { F32.min(a, b); }
+      fn std_F32_max(a: F32, b: F32) F32 { F32.max(a, b); }
+      fn std_F32_from_bits(a: F32) F32 { F32.from_bits(a.bits()); }
+      fn std_F64_add(a: F64, b: F64) F64 { a + b; }
+      fn std_F64_sub(a: F64, b: F64) F64 { a - b; }
+      fn std_F64_mul(a: F64, b: F64) F64 { a * b; }
+      fn std_F64_div(a: F64, b: F64) F64 { a / b; }
+      fn std_F64_eq(a: F64, b: F64) I32 { if a == b { 1; } else { 0; }; }
+      fn std_F64_ne(a: F64, b: F64) I32 { if a != b { 1; } else { 0; }; }
+      fn std_F64_lt(a: F64, b: F64) I32 { if a < b { 1; } else { 0; }; }
+      fn std_F64_le(a: F64, b: F64) I32 { if a <= b { 1; } else { 0; }; }
+      fn std_F64_gt(a: F64, b: F64) I32 { if a > b { 1; } else { 0; }; }
+      fn std_F64_ge(a: F64, b: F64) I32 { if a >= b { 1; } else { 0; }; }
+      fn std_F64_neg(a: F64) F64 { -a; }
+      fn std_F64_abs(a: F64) F64 { F64.abs(a); }
+      fn std_F64_sqrt(a: F64) F64 { F64.sqrt(a); }
+      fn std_F64_ceil(a: F64) F64 { F64.ceil(a); }
+      fn std_F64_floor(a: F64) F64 { F64.floor(a); }
+      fn std_F64_trunc(a: F64) F64 { F64.trunc(a); }
+      fn std_F64_nearest(a: F64) F64 { F64.nearest(a); }
+      fn std_F64_min(a: F64, b: F64) F64 { F64.min(a, b); }
+      fn std_F64_max(a: F64, b: F64) F64 { F64.max(a, b); }
+      fn std_F64_from_bits(a: F64) F64 { F64.from_bits(a.bits()); }
+    }

@@ -1,0 +1,11 @@
+export lib {
+  fn run(base: Str, piece: Str, repeats: I32) Str {
+    let out: Str = base;
+    for (0..<repeats) {
+      let size: I32 = out.len();
+      let middle: I32 = size / 2;
+      out = out.slice(0, middle) + piece + out.slice(middle, size);
+    };
+    out;
+  }
+}

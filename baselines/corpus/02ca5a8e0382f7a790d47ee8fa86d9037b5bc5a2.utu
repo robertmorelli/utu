@@ -1,0 +1,6 @@
+
+        export lib {
+          fn add_one_i64(value: I64) I64 { value + 1; }
+          fn half_f64(value: F64) F64 { value / 2.0; }
+        }
+      

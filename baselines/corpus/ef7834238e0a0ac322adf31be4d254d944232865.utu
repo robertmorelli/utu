@@ -1,0 +1,1 @@
+export lib { fn bad() void { let a = 1 + "x"; let b: F64 = a; let c: Str = a; } }

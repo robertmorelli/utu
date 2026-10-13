@@ -1,0 +1,6 @@
+using Browser from std:Browser;
+export main() Browser.HTMLElement {
+    // wutu.invalidate("commented-out") is ignored
+    wutu.invalidate("board");
+    @wutu/\ @island "board"; div { "x"; } \/;
+}

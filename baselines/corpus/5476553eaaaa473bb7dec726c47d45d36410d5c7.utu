@@ -1,0 +1,76 @@
+// std/IntMap.utu — I32 keys to I32 values, open addressing.
+//
+//   let m = IntMap.new();
+//   m.set(7, 70);
+//   m.get(7, -1);      // 70; -1 when absent
+//   m.has(8);          // false
+//   m.len();           // 1
+//
+// Linear probing over a power-of-two table, at most half full. Keys are mixed
+// with a Fibonacci multiply, so sequential and strided keys spread out.
+mod IntMap {
+    struct &:
+        | keys: Array[I32]
+        | values: Array[I32]
+        | full: Array[I32]
+        | count: I32
+        | shift: I32
+
+    fn &.new() & {
+        &{ keys: Array[I32].new(16, 0), values: Array[I32].new(16, 0), full: Array[I32].new(16, 0), count: 0, shift: 28 };
+    }
+
+    fn &.len |self| () I32 {
+        self.count;
+    }
+
+    // The slot holding key, or the empty slot where it belongs.
+    fn &.slot |self| (key: I32) I32 {
+        let mask = self.keys.len() - 1;
+        let i = (key * -1640531535) >>> self.shift;
+        while (self.full[i] != 0 and self.keys[i] != key) { i = (i + 1) & mask; };
+        i;
+    }
+
+    fn &.has |self| (key: I32) Bool {
+        self.full[self.slot(key)] != 0;
+    }
+
+    fn &.get |self| (key: I32, missing: I32) I32 {
+        let i = self.slot(key);
+        if self.full[i] != 0 { self.values[i]; } else { missing; };
+    }
+
+    fn &.set |self| (key: I32, value: I32) void {
+        let i = self.slot(key);
+        if self.full[i] == 0 {
+            if (self.count + 1) * 2 > self.keys.len() {
+                self.grow();
+                i = self.slot(key);
+            };
+            self.full[i] = 1;
+            self.keys[i] = key;
+            self.count += 1;
+        };
+        self.values[i] = value;
+    }
+
+    fn &.grow |self| () void {
+        let keys = self.keys;
+        let values = self.values;
+        let full = self.full;
+        let size = keys.len() * 2;
+        self.keys = Array[I32].new(size, 0);
+        self.values = Array[I32].new(size, 0);
+        self.full = Array[I32].new(size, 0);
+        self.shift -= 1;
+        for (0 ..< keys.len()) |j| {
+            if full[j] != 0 {
+                let i = self.slot(keys[j]);
+                self.full[i] = 1;
+                self.keys[i] = keys[j];
+                self.values[i] = values[j];
+            };
+        };
+    }
+}

@@ -1,0 +1,19 @@
+
+        export lib {
+          fn dense_pick(x: I32) I32 {
+            match x {
+              0 => 10,
+              1 => 20,
+              2 => 30,
+              ~> 99,
+            };
+          }
+          fn sparse_pick(x: I32) I32 {
+            match x {
+              0   => 1,
+              100 => 2,
+              ~> 0,
+            };
+          }
+        }
+      

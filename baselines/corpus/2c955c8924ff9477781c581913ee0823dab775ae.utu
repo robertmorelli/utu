@@ -1,0 +1,45 @@
+using Browser from std:Browser;
+using sim from "../sim.utu";
+using view from "./view.utu";
+
+fn draw(ui: view.Ui, ctx: Browser.CanvasRenderingContext2D) void {
+    ctx.fillStyle = "#0c0e11";
+    ctx.fillRect(0, 0, 960, 640);
+    let all = ui.w.entities;
+    for (0..<all.n) |i| {
+        let e = all.items[i];
+        if e.x < 40 and e.y < 26 {
+            ctx.fillStyle = if e.busy { "#4cc38a"; } else { "#8a96a3"; };
+            ctx.fillRect(e.x.to_f64() * 24 + 2, e.y.to_f64() * 24 + 2, 20, 20);
+        };
+    };
+}
+
+export main() void {
+    let document = Browser.document;
+    let game = document.getElementById("game") orelse fatal;
+    let save = document.getElementById("save") orelse fatal;
+    let world = sim.load(game.textContent, save.textContent) orelse fatal;
+    let ui = view.Ui { w: world, speed: 1, selected: 3 };
+    let app = @wutu/\
+    @reactive;
+    div.app {
+        = view.hud(ui);
+        main.map { canvas#map { <width = "960"; <height = "640"; } }
+        = view.panel(ui);
+    }
+    \/;
+    document.body.append(app);
+    let canvas: ?Browser.HTMLCanvasElement = document.querySelector("#map");
+    let ctx = (canvas orelse fatal).getContext("2d") orelse fatal;
+    let frame = cl(time: F64) void {
+        for (0..<ui.speed) |k| {
+            sim.step(ui.w);
+        };
+        draw(ui, ctx);
+        wutu.invalidate("hud");
+        wutu.invalidate("inspector");
+        Browser.requestAnimationFrame(frame);
+    };
+    Browser.requestAnimationFrame(frame);
+}

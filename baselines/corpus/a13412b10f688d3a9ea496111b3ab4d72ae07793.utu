@@ -1,0 +1,1 @@
+export lib { fn run() I32 { let n: I32 = 5; let f: cl(I32) I32 = cl(n) { n + 1; }; f(7); } }

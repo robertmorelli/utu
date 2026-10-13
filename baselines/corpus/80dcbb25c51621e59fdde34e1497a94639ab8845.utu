@@ -1,0 +1,1 @@
+export main() I32 { for (5) |x| { x; }; 1; }

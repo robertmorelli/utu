@@ -1,0 +1,10 @@
+
+        let later: fun(I32) Promise[I32] =
+          @es/\ (v) => new Promise(r => setTimeout(() => r(v * 2), 5)) \/;
+        export lib {
+          fn compute(n: I32) I32 {
+            let doubled: I32 = await later(n);
+            doubled + 1;
+          }
+        }
+      

@@ -1,0 +1,78 @@
+// std/Str.utu — Str string reference type module
+// & maps to Binaryen's stringref-backed host string model.
+// This is a deliberate Binaryen feature, not a core Wasm GC heap type like
+// arrays or structs. Utu treats it as a first-class type because Binaryen is
+// the backend and can optimize JS-style string operations directly.
+// They ARE nullable: ?Str is valid.
+//
+// Operator overloads:
+//   s1 + s2    → Str:add(s1, s2)   — concatenation
+//   s1 == s2   → Str:eq(s1, s2)    — equality
+//   s1 != s2   → Str:ne(s1, s2)    — inequality
+
+mod Str {
+    type & = @ir/\ <ir-wasm-ref type-repr="wasm-stringref"/> \/
+
+    // Concatenation via the + operator.
+    fn &:add |a, b| & { @ir/\ <ir-string-concat><ir-ident name="a"/><ir-ident name="b"/></ir-string-concat> \/; }
+
+    // Equality — structural (content) comparison.
+    fn &:eq |a, b| Bool { @ir/\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \/; }
+    fn &:ne |a, b| Bool { @ir/\ <ir-string-ne><ir-ident name="a"/><ir-ident name="b"/></ir-string-ne> \/; }
+
+    // Number of UTF-16 code units in the host string.
+    fn len(s: &) I32 {
+        @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
+    }
+
+    // Substring [start, end) — returns a new string.
+    fn slice(s: &, start: I32, end_: I32) & {
+        @ir/\ <ir-string-slice-wtf16>
+            <ir-ident name="s"/>
+            <ir-ident name="start"/>
+            <ir-ident name="end_"/>
+        </ir-string-slice-wtf16> \/;
+    }
+
+    // Read one UTF-16 code unit at index i.
+    fn get(s: &, i: I32) I32 {
+        @ir/\ <ir-string-get-wtf16><ir-ident name="s"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+    }
+
+    // A one-code-point string.
+    fn from_code_point(code: I32) & {
+        @ir/\ <ir-string-from-code-point><ir-ident name="code"/></ir-string-from-code-point> \/;
+    }
+
+    // The first `count` UTF-16 code units of `codes`, as one string. Build
+    // text in an Array[I32] and convert once, rather than concatenating.
+    fn from_codes(codes: Array[I32], count: I32) & {
+        @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="count"/></ir-string-from-codes> \/;
+    }
+
+    // Receiver/index forms mirror Array's surface while preserving the
+    // existing static Str.len/slice/get entry points.
+    fn &.len |self| () I32 {
+        @ir/\ <ir-string-measure-utf16><ir-ident name="self"/></ir-string-measure-utf16> \/;
+    }
+    fn &.slice |self| (start: I32, end_: I32) & {
+        @ir/\ <ir-string-slice-wtf16>
+            <ir-ident name="self"/>
+            <ir-ident name="start"/>
+            <ir-ident name="end_"/>
+        </ir-string-slice-wtf16> \/;
+    }
+    fn &.get |self| (i: I32) I32 {
+        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+    }
+    fn &.get_index |self| (i: I32) I32 {
+        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+    }
+    fn &.get_slice |self| (start: I32, end_: I32) & {
+        @ir/\ <ir-string-slice-wtf16>
+            <ir-ident name="self"/>
+            <ir-ident name="start"/>
+            <ir-ident name="end_"/>
+        </ir-string-slice-wtf16> \/;
+    }
+}

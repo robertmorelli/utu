@@ -1,0 +1,14 @@
+
+        struct Holder:
+          | cb : cl(I32) I32
+        export lib {
+          fn double(x: I32) I32 { x * 2; }
+          fn from_return() cl(I32) I32 { double; }
+          fn from_field() Holder { Holder { cb: double }; }
+          fn from_assign() I32 {
+            let c: cl(I32) I32 = cl(x) { x; };
+            c = double;
+            c(21);
+          }
+        }
+      

@@ -1,0 +1,2 @@
+let x: I32 = true;
+export lib { fn bad() I32 { x; } }

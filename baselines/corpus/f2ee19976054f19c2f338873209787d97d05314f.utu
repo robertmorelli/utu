@@ -1,0 +1,4 @@
+enum(U8) T:
+    | A
+fn f(t: T) I32 { 1; }
+export main() I32 { f(0); }

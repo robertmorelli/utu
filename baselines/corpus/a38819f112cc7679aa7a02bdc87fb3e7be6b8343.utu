@@ -1,0 +1,7 @@
+
+      export lib {
+          fn loop_value() I32 { let h = 10; h += { let i = 0; while (i < 3) { i += 1; }; i; }; h; }
+          fn deep() I32 { let h = 1; h *= { let a = 2; a += { let b = 3; b -= 1; b; }; a; }; h; }
+          fn searched(n: I32) I32 { let hits = 0; let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 3; }; for (0..<n) |q| { hits += xs bisect |v| { v < q * 2; }; }; hits; }
+      }
+    

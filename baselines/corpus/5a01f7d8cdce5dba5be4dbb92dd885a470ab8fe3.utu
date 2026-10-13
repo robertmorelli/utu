@@ -1,0 +1,22 @@
+
+      struct Counter:
+          | n: I32
+      struct P:
+          | v: I32
+      fn items(c: Counter) Array[I32] { c.n += 1; [1, 2, 3]; }
+      export lib {
+          fn sum() I32 { let s = 0; for ([1, 2, 3]) |x| { s += x; }; s; }
+          fn indexed() I32 { let s = 0; for ([10, 20, 30], 0..<99) |x, i| { s += x * i; }; s; }
+          fn zipped() I32 { let s = 0; for ([1, 2, 3], [10, 20]) |a, b| { s += a * b; }; s; }
+          fn control() I32 {
+              let s = 0;
+              for ([1, 2, 3, 4, 5]) |x| { if x == 2 { continue; }; if x == 5 { break; }; s += x; };
+              s;
+          }
+          fn once() I32 { let c = Counter { n: 0 }; for (items(c)) |x| { x; }; c.n; }
+          fn mutate() I32 { let ps = [P { v: 1 }, P { v: 2 }]; for (ps) |p| { p.v *= 10; }; ps[0].v + ps[1].v; }
+          fn nested() I32 { let s = 0; for ([[1, 2], [3]]) |row| { for (row) |x| { s += x; }; }; s; }
+          fn empty() I32 { let xs: Array[I32] = []; let s = 7; for (xs) |x| { s = 0; }; s; }
+          fn uncaptured() I32 { let n = 0; for (["a", "b"]) { n += 1; }; n; }
+      }
+    

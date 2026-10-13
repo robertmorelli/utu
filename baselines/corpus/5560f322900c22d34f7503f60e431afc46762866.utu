@@ -1,0 +1,47 @@
+struct Box:
+    | value : I32
+
+fn maybe_box(flag: Bool) ?Box {
+    if flag { Box { value: 41 }; } else { Box.null; };
+}
+
+fn promote_test(flag: Bool) I32 {
+    promote maybe_box(flag) {
+        |box| => box.value,
+        ~> 0,
+    };
+}
+
+fn promote_no_else(flag: Bool) I32 {
+    promote maybe_box(flag) {
+        |box| => box.value,
+        ~> 0,
+    };
+}
+
+fn inferred_promote_test(flag: Bool) I32 {
+    promote maybe_box(flag) {
+        |box| => box.value + 1,
+        ~> 0,
+    };
+}
+
+test "promote binds non-null value" {
+    assert promote_test(true) == 41;
+}
+
+test "promote runs else block on null" {
+    assert promote_test(false) == 0;
+}
+
+test "promote with an explicit else still returns the non-null value" {
+    assert promote_no_else(true) == 41;
+}
+
+test "promote capture keeps the inferred type in the then branch" {
+    assert inferred_promote_test(true) == 42;
+}
+
+test "promote capture still runs the else branch on null" {
+    assert inferred_promote_test(false) == 0;
+}

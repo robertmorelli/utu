@@ -1,0 +1,605 @@
+using Browser from std:Browser;
+
+fn number(value: I32) Str {
+    value.to_f64().toString();
+}
+
+fn money(cents: I32) Str {
+    "$" + (cents.to_f64() / 100.0).toFixed(2);
+}
+
+fn node(id: Str) Browser.HTMLElement {
+    Browser.document.getElementById(id) orelse fatal;
+}
+
+fn restore_focus(id: Str) void {
+    promote Browser.document.getElementById(id) {
+        |element| => element.focus(), ~> {
+        },
+    };
+}
+
+fn persist(key: Str,
+value: Str) void {
+    try {
+        Browser.localStorage.setItem(key, value);
+    } catch {
+        node("notice").textContent = "Storage is unavailable. Your changes will last for this session.";
+    };
+}
+
+struct Line:
+    | id: Str
+    | title: Str
+    | hours: F64
+    | rate: I32
+
+struct Estimate:
+    | lines: Array[Line]
+    | project: Str
+    | edit: Str
+
+fn amount(line: Line) I32 {
+    (line.hours * line.rate.to_f64()).to_i32();
+}
+
+fn input(id: Str) Browser.HTMLInputElement {
+    let field: ?Browser.HTMLInputElement = Browser.document.querySelector("#" + id);
+    field orelse fatal;
+}
+
+fn save(state: Estimate) void {
+    let data = Browser.Array();
+    state.lines each |line| {
+        data.push(&{
+            id: line.id,
+            title: line.title,
+            hours: line.hours,
+            rate: line.rate
+        });
+    };
+    persist("scope-lines-v1", Browser.JSON.stringify(data));
+    persist("scope-project-v1", state.project);
+}
+
+fn csv_field(value: Str) Str {
+    let safe = if value.startsWith("=") or value.startsWith("+") or value.startsWith("-") or value.startsWith("@") {
+        "'" + value;
+    } else {
+        value;
+    };
+    let quote = Browser.String.fromCharCode(34);
+    quote + safe.replaceAll(quote, quote + quote) + quote;
+}
+
+fn csv(state: Estimate) Str {
+    let newline = Browser.String.fromCharCode(13, 10);
+    let text = "Project,Work,Hours,Rate USD,Amount USD" + newline;
+    state.lines each |line| {
+        text += csv_field(state.project)
+            + ","
+            + csv_field(line.title)
+            + ","
+            + line.hours.toString()
+            + ","
+            + (line.rate.to_f64() / 100.0).toFixed(2)
+            + ","
+            + (amount(line).to_f64() / 100.0).toFixed(2)
+            + newline;
+    };
+    "data:text/csv;charset=utf-8," + Browser.encodeURIComponent(text);
+}
+
+fn refresh(state: Estimate) void {
+    save(state);
+}
+
+fn estimate(state: Estimate) Browser.HTMLElement {
+    let total = state.lines map |line| {
+        amount(line).to_f64();
+    } sum;
+    let hours = state.lines map |line| {
+        line.hours;
+    } sum;
+    @wutu/\
+    section {
+        <id = "estimate";
+        display:grid;
+        gap:1.5rem;
+        div {
+            display:grid;
+            grid-template-columns:repeat(3, minmax(0, 1fr));
+            gap:0.75rem;
+            @media (width < 32rem) {
+                grid-template-columns: 1fr;
+            }
+            article {
+                padding:1.25rem;
+                background:var(--accent);
+                color:var(--on-accent);
+                border-radius:0.8rem;
+                p.eyebrow {
+                    "ESTIMATED TOTAL";
+                }
+                strong {
+                    <id = "estimate-total";
+                    display:block;
+                    padding-block-start:0.6rem;
+                    font-size:clamp(1.3rem, 3vw, 2.5rem);
+                    = "$" + (total / 100.0).toFixed(2);
+                }
+            }
+            article {
+                padding:1.25rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:0.8rem;
+                p.eyebrow {
+                    "PLANNED HOURS";
+                }
+                strong {
+                    display:block;
+                    padding-block-start:0.6rem;
+                    font-size:2.5rem;
+                    = hours.toFixed(1);
+                }
+            }
+            article {
+                padding:1.25rem;
+                background:var(--panel);
+                border:1px solid var(--line);
+                border-radius:0.8rem;
+                p.eyebrow {
+                    "WORK ITEMS";
+                }
+                strong {
+                    display:block;
+                    padding-block-start:0.6rem;
+                    font-size:2.5rem;
+                    = number(state.lines.len());
+                }
+            }
+        }
+        for $[state.lines] |line| key $[line.id] {
+            article.line {
+                display:grid;
+                grid-template-columns:1fr auto;
+                gap:1rem;
+                padding:1.25rem;
+                border:1px solid var(--line);
+                border-radius:0.75rem;
+                background:var(--panel);
+                div {
+                    display:grid;
+                    gap:0.5rem;
+                    h3 {
+                        = line.title;
+                    }
+                    p.muted {
+                        = line.hours.toString();
+                        " h × ";
+                        = money(line.rate);
+                        " / h";
+                    }
+                }
+                strong {
+                    = money(amount(line));
+                }
+                div {
+                    grid-column:1 / -1;
+                    display:flex;
+                    gap:0.6rem;
+                    button {
+                        <aria-label = $["Edit " + line.title];
+                        "Edit";
+                        on click {
+                            state.edit = line.id;
+                            input("work").value = line.title;
+                            input("hours").value = line.hours.toString();
+                            input("rate").value = (line.rate.to_f64() / 100.0).toString();
+                            input("work").focus();
+                        };
+                    }
+                    button {
+                        <aria-label = $["Delete " + line.title];
+                        "Delete";
+                        on click {
+                            state.lines = state.lines filter |l| {
+                                l.id != line.id;
+                            }
+                            collect(Line);
+                            if state.edit == line.id {
+                                state.edit = "";
+                            };
+                            refresh(state);
+                            restore_focus("work");
+                        };
+                    }
+                }
+            }
+        }
+        if $[state.lines.len() == 0] {
+            p.empty {
+                "A blank canvas. Add your first work item to start the estimate.";
+            }
+        }
+        a {
+            <href = $[csv(state)];
+            <download = "project-estimate.csv";
+            justify-self:start;
+            color:var(--accent);
+            font-weight:700;
+            "Download estimate as CSV ↓";
+        }
+    }
+    \/;
+}
+
+export main() void {
+    let state = Estimate {
+        project: "Brand & website refresh",
+        edit: "",
+        lines: [Line {
+            id: "discovery",
+            title: "Discovery & direction",
+            hours: 6.0,
+            rate: 9000
+        },
+        Line {
+            id: "design",
+            title: "Visual design",
+            hours: 16.0,
+            rate: 9500
+        },
+        Line {
+            id: "build",
+            title: "Website development",
+            hours: 24.0,
+            rate: 10000
+        }
+        ]
+    };
+    try {
+        promote Browser.localStorage.getItem("scope-project-v1") {
+            |p|=> {
+                state.project = p;
+            },
+            ~> {
+            },
+        };
+        promote Browser.localStorage.getItem("scope-lines-v1") {
+            |saved|=> {
+                let data = Browser.JSON.parse(saved);
+                let length: F64 = data.length;
+                let i: F64 = 0.0;
+                let lines: Array[Line] = [];
+                while(i<length) {
+                    let row = data[i];
+                    let rate: F64 = row.rate;
+                    lines = lines chain([Line {
+                        id: row.id,
+                        title: row.title,
+                        hours: row.hours,
+                        rate: rate.to_i32()
+                    }
+                    ]) collect(Line);
+                    i += 1.0;
+                };
+                state.lines = lines;
+            },
+            ~> {
+            },
+        };
+    } catch {
+    };
+    let app = @wutu/\
+    @reactive;
+    @document {
+        :root {
+            --bg: oklch(97% 0.008 285);
+            --ink: oklch(27% 0.04 285);
+            --accent: oklch(48% 0.2 285);
+            --panel: oklch(100% 0 0);
+            --muted: oklch(51% 0.025 285);
+            --line: oklch(86% 0.025 285);
+            --on-accent: oklch(97% 0.008 285);
+            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+        }
+        button, input, select, textarea {
+            font: inherit;
+        }
+        button, a, input, select, textarea {
+            touch-action: manipulation;
+        }
+        button {
+            cursor: pointer;
+        }
+        a {
+            color: inherit;
+            text-underline-offset: 0.25em;
+        }
+        h1, h2, h3, p {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        button, input, select, textarea {
+            border: 1px solid var(--line);
+            border-radius: 0.6rem;
+            padding: 0.75rem 1rem;
+            background: var(--panel);
+            color: var(--ink);
+            min-inline-size: 0;
+        }
+        button:hover {
+            border-color: var(--accent);
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+        }
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 650;
+        }
+        .primary {
+            background: var(--accent);
+            color: var(--on-accent);
+            border-color: var(--accent);
+            font-weight: 700;
+        }
+        .muted {
+            color: var(--muted);
+        }
+        .eyebrow {
+            font: 700 0.75rem system-ui, sans-serif;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+        .toolbar {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .toolbar label {
+            flex: 1 1 10rem;
+        }
+        .empty {
+            padding: 2rem;
+            border: 1px dashed var(--line);
+            color: var(--muted);
+        }
+        .site-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding-block: 1.25rem;
+            border-block-end: 1px solid var(--line);
+            font: 650 0.8rem system-ui, sans-serif;
+        }
+        .site-nav nav {
+            display: flex;
+            gap: 1.25rem;
+        }
+        .site-footer {
+            border-block-start: 1px solid var(--line);
+            padding-block: 1.5rem;
+            color: var(--muted);
+            font: 0.8rem system-ui, sans-serif;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        @media print {
+            .site-nav, .site-footer, form, .toolbar, button {
+                display: none;
+            }
+            body {
+                background: white;
+                color: black;
+            }
+        }
+    }
+    main {
+        max-inline-size:78rem;
+        margin-inline:auto;
+        padding-inline:clamp(1.2rem, 5vw, 4rem);
+        display:grid;
+        gap:2.5rem;
+        header.site-nav {
+            a {
+                <href = "./";
+                "SCOPE / INDEPENDENT WORK, CLEARLY PRICED";
+            }
+            nav {
+                a {
+                    <href = "../";
+                    "All five sites";
+                }
+                a {
+                    <href = "source.html";
+                    "View Utu source ↗";
+                }
+            }
+        }
+        section {
+            display:grid;
+            gap:1.25rem;
+            padding-block:1.5rem;
+            p.eyebrow {
+                color:var(--accent);
+                "SMALL STUDIO. BIG CLARITY.";
+            }
+            h1 {
+                font-size:clamp(3rem, 7vw, 6rem);
+                font-weight:550;
+                letter-spacing:-0.065em;
+                line-height:1;
+                "Good work starts";
+                br {
+                }
+                "with a clear scope.";
+            }
+            p.muted {
+                max-inline-size:34rem;
+                line-height:1.7;
+                "Turn the moving parts of a project into a thoughtful estimate. Work in hours, see the whole picture, and export when you are ready.";
+            }
+        }
+        label {
+            max-inline-size:40rem;
+            "Project name";
+            input as project {
+                <id = "project";
+                <.value = $[state.project];
+                <maxlength = "160";
+                on input {
+                    state.project = project.value;
+                    refresh(state);
+                };
+            }
+        }
+        div {
+            display:grid;
+            grid-template-columns:minmax(0, 1.8fr) minmax(17rem, 1fr);
+            gap:2rem;
+            align-items:start;
+            @media (width < 54rem) {
+                grid-template-columns: 1fr;
+            }
+            = estimate(state);
+            aside {
+                display:grid;
+                gap:1.5rem;
+                padding:1.75rem;
+                border:1px solid var(--line);
+                border-radius:1rem;
+                background:var(--panel);
+                p.eyebrow {
+                    color:var(--accent);
+                    "BUILD YOUR ESTIMATE";
+                }
+                h2 {
+                    "A little more detail";
+                }
+                form as form {
+                    display:grid;
+                    gap:1rem;
+                    label {
+                        "Work description";
+                        input as work {
+                            <id = "work";
+                            <required = "";
+                            <maxlength = "160";
+                            <placeholder = "e.g. Homepage design";
+                        }
+                    }
+                    label {
+                        "Hours";
+                        input as hours {
+                            <id = "hours";
+                            <type = "number";
+                            <required = "";
+                            <min = "0.25";
+                            <max = "1000";
+                            <step = "0.25";
+                            <value = "4";
+                        }
+                    }
+                    label {
+                        "Hourly rate ($)";
+                        input as rate {
+                            <id = "rate";
+                            <type = "number";
+                            <required = "";
+                            <min = "1";
+                            <max = "10000";
+                            <step = "1";
+                            <value = "90";
+                        }
+                    }
+                    button.primary {
+                        <id = "submit";
+                        <type = "submit";
+                        = if state.edit == "" {
+                            "Add work item";
+                        }
+                        else {
+                            "Update item";
+                        };
+                    }
+                    button {
+                        <type = "button";
+                        "Cancel editing";
+                        on click {
+                            state.edit = "";
+                            form.reset();
+                            work.focus();
+                        };
+                    }
+                    on submit {
+                        event.preventDefault();
+                        if work.value.trim().len()>0 {
+                            if state.edit == "" {
+                                state.lines = state.lines chain([Line {
+                                    id: Browser.crypto.randomUUID(),
+                                    title: work.value.trim(),
+                                    hours: hours.valueAsNumber,
+                                    rate: (rate.valueAsNumber * 100.0).to_i32()
+                                }
+                                ]) collect(Line);
+                            }
+                            else {
+                                state.lines each |line| {
+                                    if line.id == state.edit {
+                                        line.title = work.value.trim();
+                                        line.hours = hours.valueAsNumber;
+                                        line.rate = (rate.valueAsNumber * 100.0).to_i32();
+                                    };
+                                };
+                            };
+                            state.edit = "";
+                            refresh(state);
+                            form.reset();
+                            work.focus();
+                        };
+                    };
+                }
+                p.muted {
+                    font-size:0.8rem;
+                    line-height:1.65;
+                    "USD estimates, before taxes or expenses. A planning tool, not an invoice or a payment request.";
+                }
+            }
+        }
+        footer.site-footer {
+            p {
+                "Less spreadsheet wrestling. More time for the work.";
+            }
+            p {
+                <id = "notice";
+                <role = "status";
+                "Saved on this device. No account needed.";
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

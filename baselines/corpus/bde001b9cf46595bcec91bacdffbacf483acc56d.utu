@@ -1,0 +1,1 @@
+export lib { fn bad() void { null; } }

@@ -1,0 +1,3 @@
+struct Box:
+  | value : Nope
+export lib { fn bad() I32 { 0; } }

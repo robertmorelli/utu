@@ -1,0 +1,17 @@
+mod List[T] {
+    // Persistent edits; the input remains unchanged.
+    fn append(self: Array[T], value: T) Array[T] {
+        let result = Array[T].new(self.len() + 1, value);
+        let i = 0;
+        while (i < self.len()) { result[i] = self[i]; i += 1; };
+        result;
+    }
+    fn remove_at(self: Array[T], index: I32) Array[T] {
+        if index < 0 or index >= self.len() { self; } else {
+            let result = Array[T].new(self.len() - 1, self[0]);
+            let i = 0;
+            while (i < result.len()) { result[i] = self[if i < index { i; } else { i + 1; }]; i += 1; };
+            result;
+        };
+    }
+}

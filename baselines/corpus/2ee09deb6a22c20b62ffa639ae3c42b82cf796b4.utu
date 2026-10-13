@@ -1,0 +1,19 @@
+
+      struct Point:
+        | x : I32
+        | y : I32
+      export lib {
+        fn make_x(a: I32, b: I32) I32 {
+          let p: Point = Point { x: a, y: b };
+          p.x;
+        }
+        fn make_y(a: I32, b: I32) I32 {
+          let p: Point = Point { x: a, y: b };
+          p.y;
+        }
+        fn swapped(a: I32, b: I32) I32 {
+          let p: Point = Point { y: b, x: a };
+          p.x + p.y;
+        }
+      }
+    

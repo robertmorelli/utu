@@ -1,0 +1,4 @@
+
+      let value: I32 = 40 + 2;
+      export main() I32 { value; }
+    

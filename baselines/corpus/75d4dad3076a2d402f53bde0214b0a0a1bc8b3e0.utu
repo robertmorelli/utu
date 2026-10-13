@@ -1,0 +1,4 @@
+
+      fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+      export lib { fn run(x: I32) I32 { apply(cl(n) { n; }, x); } }
+    

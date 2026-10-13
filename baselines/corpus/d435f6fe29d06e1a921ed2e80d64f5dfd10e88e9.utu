@@ -1,0 +1,35 @@
+// 02 — `ms`. The overload problem, in its smallest form.
+//
+// The .d.ts is genuinely two call signatures on one name:
+//   function ms(value: StringValue, options?: Options): number;
+//   function ms(value: number, options?: Options): string;
+//
+// utu has no overloading, so one JS export has to become two utu names. The
+// ingester will have to mangle, and there is no good automatic scheme: `ms_1` /
+// `ms_2` is meaningless, and `ms_str` / `ms_num` requires understanding which
+// parameter discriminates. This is the clearest case where a .d.ts cannot be
+// mechanically translated without a naming policy.
+
+let ms_parse: fun(Str) I32 = @es/\ ((m) => (s) => m.default(s))(await import('ms')) \/;
+let ms_format: fun(I32) Str = @es/\ ((m) => (n) => m.default(n))(await import('ms')) \/;
+
+// The long form is a third signature selected by an options bag, not by arity.
+let ms_format_long: fun(I32) Str =
+    @es/\ ((m) => (n) => m.default(n, { long: true }))(await import('ms')) \/;
+
+export main() I32 {
+    ms_parse("2h");
+}
+
+test "string form parses to milliseconds" {
+    assert ms_parse("2h") == 7200000;
+    assert ms_parse("100ms") == 100;
+}
+
+test "number form formats to a string" {
+    assert ms_format(7200000) == "2h";
+}
+
+test "the options-selected third signature needs its own binding too" {
+    assert ms_format_long(7200000) == "2 hours";
+}

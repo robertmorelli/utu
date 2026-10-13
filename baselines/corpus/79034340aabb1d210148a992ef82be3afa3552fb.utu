@@ -1,0 +1,11 @@
+export lib {
+  fn run(n: I32) I32 {
+    let x: I32 = 305419896;
+    for (0..<n) |i| {
+      x += i;
+      x ^= x << 13;
+      x ^= x >> 17;
+    };
+    x;
+  }
+}

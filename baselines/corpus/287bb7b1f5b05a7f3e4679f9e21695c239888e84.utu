@@ -1,0 +1,11 @@
+
+      export lib {
+          fn make(n: I32) Array[I32] { let xs = Array[I32].new(n, 0); let s = 7; for (0..<n) |i| { s = s * 1103515245 + 12345; xs[i] = s; }; xs; }
+          fn distinct_count(xs: Array[I32], m: I32) I32 { (xs distinct_by(I32, I32) |x| { x & m; }).len(); }
+          fn first_of(xs: Array[I32], m: I32, k: I32) I32 { (xs distinct_by(I32, I32) |x| { x & m; })[k]; }
+          fn group_count(xs: Array[I32], m: I32) I32 { (xs group_by(I32, I32) |x| { x & m; }).len(); }
+          fn group_checksum(xs: Array[I32], m: I32) I32 { (xs group_by(I32, I32) |x| { x & m; }) fold(0) |a, g, i| { a * 31 + g.key * 7 + g.values.len() + g.values[0]; }; }
+          fn wide_keys(xs: Array[I32]) I32 { (xs distinct_by(I32, I64) |x| { x.to_i64() * 4294967296; }).len(); }
+          fn unsigned_keys(xs: Array[I32]) I32 { (xs group_by(I32, U32) |x| { x.to_u32() >>> 20; }).len(); }
+      }
+    

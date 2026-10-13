@@ -1,0 +1,8 @@
+
+      export lib {
+          fn ints(n: I32) I32 { let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 2147483 - 7; }; xs fast_sum; }
+          fn plain(n: I32) I32 { let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 2147483 - 7; }; xs sum; }
+          fn floats(n: I32) F64 { let xs = Array[F64].new(n, 0.0); for (0..<n) |i| { xs[i] = i.to_f64() * 0.1; }; xs filter |x| { x > 0.05; } fast_sum; }
+          fn wide(n: I32) I64 { let xs = Array[I64].new(n, 0); for (0..<n) |i| { xs[i] = i.to_i64() * 3000000000; }; xs fast_sum; }
+      }
+    

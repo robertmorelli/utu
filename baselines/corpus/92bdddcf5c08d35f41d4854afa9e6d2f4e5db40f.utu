@@ -1,0 +1,42 @@
+// 09 — node:crypto webcrypto. Promise-returning APIs.
+//
+//   digest(algorithm: AlgorithmIdentifier, data: BufferSource): Promise<ArrayBuffer>;
+//
+// This is the best case in the whole set. `Promise<T>` is already a first-class
+// utu type over externref, so a promise-returning .d.ts signature maps directly
+// with no wrapper and no bookkeeping — and `await` is straight-line.
+//
+// The only friction is the payload: `Promise<ArrayBuffer>` becomes
+// `Promise[Externref]`, so `T` is opaque and needs accessors, exactly as in 03.
+
+let digest_hex: fun(Str) Promise[Str] =
+    @es/\ ((c) => async (text) => {
+        const bytes = new TextEncoder().encode(text);
+        const buf = await c.webcrypto.subtle.digest('SHA-256', bytes);
+        return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    })(await import('node:crypto')) \/;
+
+let random_int: fun(I32) Promise[I32] =
+    @es/\ ((c) => async (max) => c.randomInt(max))(await import('node:crypto')) \/;
+
+export main() Str {
+    await digest_hex("utu");
+}
+
+test "an awaited promise reads as straight-line code" {
+    let hex: Str = await digest_hex("abc");
+    assert hex.len() == 64;
+    assert hex.slice(0, 8) == "ba7816bf";
+}
+
+test "Promise[T] needs no wrapper for scalar payloads" {
+    let n: I32 = await random_int(10);
+    assert n >= 0;
+    assert n < 10;
+}
+
+test "two awaits in sequence" {
+    let a: Str = await digest_hex("x");
+    let b: Str = await digest_hex("x");
+    assert a == b;
+}

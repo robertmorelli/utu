@@ -1,0 +1,12 @@
+struct Point:
+    | x : I32
+    | y : I32
+
+fn score(point: Point) I32 {
+    point.x * point.x + point.y * point.y;
+}
+
+export main() I32 {
+    let point: Point = Point { x: 3, y: 4 };
+    score(point);
+}

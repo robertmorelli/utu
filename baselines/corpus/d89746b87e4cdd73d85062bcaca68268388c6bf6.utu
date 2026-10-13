@@ -1,0 +1,31 @@
+
+        mod math {
+          struct Pair:
+            | left : I32
+            | right : I32
+          fn Pair.new(left: I32, right: I32) Pair { Pair { left: left, right: right }; }
+          fn Pair.sum |self| () I32 { self.left + self.right; }
+          fn inc(value: I32) I32 { value + 1; }
+        }
+        mod boxy[T] {
+          struct Box:
+            | value : T
+          fn Box.new(value: T) Box { Box { value: value }; }
+          fn Box.get |self| () T { self.value; }
+        }
+        using boxy[I32] |box_i32|;
+        mod cell[T] {
+          struct Cell:
+            | value : T
+          fn Cell.new(value: T) Cell { Cell { value: value }; }
+          fn Cell.get |self| () T { self.value; }
+          fn wrap(value: T) Cell { Cell.new(value); }
+        }
+        using cell[I32];
+        export lib {
+          fn plain() I32 { math.inc(math.Pair.new(2, 3).sum()); }
+          fn parameterized() I32 { boxy[I32].Box.new(7).get(); }
+          fn alias_path() I32 { box_i32.Box.new(8).get(); }
+          fn open_path() I32 { wrap(9).get() + Cell.new(1).get(); }
+        }
+      

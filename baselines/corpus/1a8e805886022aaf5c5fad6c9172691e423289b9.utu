@@ -1,0 +1,17 @@
+// ERROR DEMO: whole-file recovery
+//
+// These errors are deliberately independent. The type graph should report all
+// of them in one analysis. The unresolved name must not create fake cascading
+// errors for the block or function around it.
+
+fn accepts_number(value: I32) I32 {
+    value;
+}
+
+fn recovery_demo() I32 {
+    let should_be_bool: Bool = 1;
+    let should_be_number: I32 = false;
+    accepts_number(true);
+    missing_value;
+    0;
+}

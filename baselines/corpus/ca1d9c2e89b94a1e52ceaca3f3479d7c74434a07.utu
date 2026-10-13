@@ -1,0 +1,19 @@
+
+      struct P:
+        | v: I32
+        | next: ?P
+      fn find(ok: Bool) ?P { if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
+      fn bump(p: P) void { p.v += 1; }
+      export lib {
+        fn run() I32 {
+          let p = find(true);
+          let q = find(false);
+          p?.v = 10;
+          q?.v = 5;
+          p?.next?.v = 7;
+          p?.next?.next?.v = 99;
+          p?.next?.v += 100;
+          promote p { |x| => { bump(x); x.v + (x.next orelse fatal).v; }, ~> 0, };
+        }
+      }
+    

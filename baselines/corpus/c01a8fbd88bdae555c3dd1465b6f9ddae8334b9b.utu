@@ -1,0 +1,5 @@
+struct P:
+  | v: I32
+fn take(v: I32) I32 { v; }
+fn g(p: ?P) I32 { let x = p?.v; }
+export lib { fn run() I32 { 0; } }

@@ -1,0 +1,31 @@
+
+      export lib {
+          fn whiles() I32 {
+              let i = 0;
+              let s = 0;
+              while (i < 10) {
+                  i += 1;
+                  if i % 2 == 0 { continue; };
+                  if i > 7 { break; };
+                  s += i;
+              };
+              s;
+          }
+          fn ranges() I32 {
+              let s = 0;
+              for (0..<10) |i| { if i % 3 == 0 { continue; }; s += i; };
+              for (1...5) |i| { if i == 5 { continue; }; s += 100; };
+              s;
+          }
+          fn nested() I32 {
+              let s = 0;
+              for (0..<3) |i| { for (0..<3) |j| { if j == 1 { continue; }; s += 10 * i + j; }; };
+              s;
+          }
+          fn eaches() I32 {
+              let s = 0;
+              [1, 2, 3, 4] each |x| { if x == 2 { continue; }; s += x; };
+              s;
+          }
+      }
+    

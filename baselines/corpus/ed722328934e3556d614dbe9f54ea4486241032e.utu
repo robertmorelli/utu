@@ -1,0 +1,167 @@
+using List[Purchase] |purchases| from std:List;
+using Browser from std:Browser;
+using theme from "../theme.utu";
+using NumberField from std:NumberField;
+struct Purchase:
+| title: Str
+| cents: I32
+struct LedgerState:
+| purchases: Array[Purchase]
+struct Draft:
+| title: Str
+fn ledger_form(state: LedgerState) Browser.HTMLElement {
+    let draft=Draft {
+        title:""
+    };
+    let amount=NumberField.new("");
+    @wutu/\
+    @island "ledger-form";
+    form.panel {
+        label {
+            "Purchase";
+            input {
+                <required = "";
+                bind:value = draft.title;
+            }
+        }
+        label {
+            "Amount ($)";
+            input {
+                <inputmode = "decimal";
+                bind:value = amount.text;
+            }
+        }
+        p {
+            <role = "status";
+            = if amount.text.len()>0 {
+                amount.error(0.01,10000.0);
+            }
+            else {
+                "";
+            };
+        }
+        button.primary {
+            <type = "submit";
+            "Record purchase";
+        }
+        on submit {
+            if draft.title.trim().len()>0 and amount.valid(0.01,10000.0) {
+                state.purchases=purchases.append(state.purchases, Purchase {
+                    title:draft.title,
+                    cents:(amount.value()*100.0+0.5).to_i32()
+                });
+                draft.title="";
+                amount.text="";
+                wutu.save("ledger-v2");
+                wutu.invalidate("ledger-workspace");
+            };
+        };
+    }
+    \/;
+}
+fn workspace(state: LedgerState) Browser.HTMLElement {
+    @wutu/\
+    @island "ledger-workspace";
+    section.workspace {
+        = ledger_form(state);
+        div.grid {
+            article.well.stack {
+                p.eyebrow {
+                    "MONTHLY LIMIT";
+                }
+                strong.big {
+                    "$500.00";
+                }
+            }
+            article.well.stack {
+                p.eyebrow {
+                    "REMAINING";
+                }
+                strong.big {
+                    = wutu.money(50000-(state.purchases map |p| {
+                        p.cents;
+                    }
+                    sum));
+                }
+            }
+        }
+        for $[state.purchases] |purchase,index| {
+            article.panel.bar {
+                h3 {
+                    = purchase.title;
+                }
+                div.bar {
+                    strong {
+                        = wutu.money(purchase.cents);
+                    }
+                    button {
+                        <aria-label = $["Remove "+purchase.title];
+                        "Remove";
+                        on click {
+                            state.purchases=purchases.remove_at(state.purchases, index.to_i64().to_i32());
+                            wutu.save("ledger-v2");
+                        };
+                    }
+                }
+            }
+        }
+    }
+    \/;
+}
+export main() void {
+    let state = @stored/\
+        LedgerState "ledger-v2" manual
+        LedgerState {
+            purchases:[Purchase {
+                title:"Market groceries",
+                cents:6500
+            },Purchase {
+                title:"Train pass",
+                cents:4200
+            }
+            ]
+        }
+    \/;
+    let app = @wutu/\
+    @reactive;
+    @style $[theme.sheet()];
+    main {
+        <data-theme = "ledger";
+        nav {
+            strong {
+                "LEDGER / AN EVERYDAY TOOL";
+            }
+            a {
+                <href = "../";
+                "All five sites";
+            }
+            a {
+                <href = "source.html";
+                "Read source ↗";
+            }
+        }
+        header.hero {
+            p.eyebrow {
+                "SMALL SOFTWARE. REAL LIFE.";
+            }
+            h1 {
+                "Give every good idea a little room.";
+            }
+            p.muted {
+                "A simple monthly spending notebook. Set a limit, record purchases, and see what remains before the next one.";
+            }
+        }
+        = workspace(state);
+        footer {
+            p {
+                "Stored on this device. Built with Utu + Wutu.";
+            }
+            p {
+                <role = "status";
+                = wutu.storage_error();
+            }
+        }
+    }
+    \/;
+    Browser.document.body.append(app);
+}

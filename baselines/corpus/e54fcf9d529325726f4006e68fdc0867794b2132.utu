@@ -1,0 +1,1628 @@
+// Foundry simulation in utu: SPEC.md, tick for tick.
+//
+// The world is one struct that callers keep and pass to every function; utu
+// globals are constants. Game content and saves load through @json.
+
+mod sim {
+    // ── game content (data/game.json) ────────────────────────────────────────
+
+    struct Item:
+        | name: Str
+        | label: Str
+        | fluid: Bool
+        | color: Str
+
+    struct Recipe:
+        | name: Str
+        | category: Str
+        | time: I32
+        | ingredients: Array[Array[I32]]
+        | products: Array[Array[I32]]
+
+    struct Machine:
+        | name: Str
+        | label: Str
+        | class: Str
+        | speed: I32
+        | power: I32
+        | burner: Bool
+        | category: Str
+        | reach: I32
+
+    struct Tech:
+        | name: Str
+        | label: Str
+        | units: I32
+        | time: I32
+        | packs: Array[I32]
+        | prereqs: Array[I32]
+        | machines: Array[I32]
+        | recipes: Array[I32]
+
+    struct Start:
+        | machines: Array[I32]
+        | recipes: Array[I32]
+
+    struct GameData:
+        | items: Array[Item]
+        | recipes: Array[Recipe]
+        | machines: Array[Machine]
+        | techs: Array[Tech]
+        | start: Start
+
+    // ── saves ────────────────────────────────────────────────────────────────────
+
+    struct Research:
+        | current: I32
+        | progress: I32
+        | done: Array[I32]
+
+    struct SaveEntity:
+        | id: I32
+        | machine: I32
+        | x: I32
+        | y: I32
+        | dir: I32
+        | recipe: I32
+        | progress: I32
+        | busy: Bool
+        | fuel: I32
+        | burn: I32
+        | heat: I32
+        | inv: ?Array[I32]
+        | out: ?Array[I32]
+        | belt: ?Array[I32]
+        | state: I32
+        | timer: I32
+        | hand: I32
+        | held: I32
+        | pick: I32
+        | stack: I32
+        | priority: I32
+        | toggle: I32
+        | role: I32
+        | fluid: I32
+        | amount: I32
+        | charge: I32
+        | condItem: I32
+        | condOp: I32
+        | condValue: I32
+        | signal: Bool
+        | crafts: I32
+        | moved: I32
+
+    struct Save:
+        | version: I32
+        | tick: I32
+        | width: I32
+        | height: I32
+        | nextId: I32
+        | terrain: Str
+        | resources: Array[Array[I32]]
+        | revealed: Str
+        | research: Research
+        | entities: Array[SaveEntity]
+
+    // ── the world ────────────────────────────────────────────────────────────────
+
+    let item_count: I32 = 26;
+    let coal_item: I32 = 2;
+    let red_pack: I32 = 17;
+    let u238_item: I32 = 20;
+    let u235_item: I32 = 21;
+    let water_item: I32 = 22;
+    let crude_item: I32 = 23;
+    let rocket_part_recipe: I32 = 18;
+    let belt_capacity: I32 = 10;
+
+    // Machine classes, in the order of the names in class_of.
+    let miner_class: I32 = 0;
+    let pump_class: I32 = 1;
+    let furnace_class: I32 = 2;
+    let assembler_class: I32 = 3;
+    let chemical_class: I32 = 4;
+    let refinery_class: I32 = 5;
+    let centrifuge_class: I32 = 6;
+    let belt_class: I32 = 7;
+    let splitter_class: I32 = 8;
+    let underground_class: I32 = 9;
+    let pipe_class: I32 = 10;
+    let inserter_class: I32 = 11;
+    let chest_class: I32 = 12;
+    let steam_class: I32 = 13;
+    let solar_class: I32 = 14;
+    let accumulator_class: I32 = 15;
+    let lab_class: I32 = 16;
+    let radar_class: I32 = 17;
+    let beacon_class: I32 = 18;
+    let combinator_class: I32 = 19;
+    let lamp_class: I32 = 20;
+    let silo_class: I32 = 21;
+    let class_count: I32 = 22;
+
+    // Machine ids the rules name.
+    let burner_miner_id: I32 = 0;
+    let offshore_pump_id: I32 = 2;
+    let steel_furnace_id: I32 = 5;
+    let assembler_1_id: I32 = 7;
+    let filter_inserter_id: I32 = 23;
+    let stack_inserter_id: I32 = 24;
+
+    struct Entity:
+        | id: I32
+        | machine: I32
+        | cls: I32
+        | x: I32
+        | y: I32
+        | dir: I32
+        | recipe: I32
+        | progress: I32
+        | busy: Bool
+        | fuel: I32
+        | burn: I32
+        | heat: I32
+        | inv: Array[I32]
+        | out: Array[I32]
+        | belt: Array[I32]
+        | belt_n: I32
+        | state: I32
+        | timer: I32
+        | hand: I32
+        | held: I32
+        | pick: I32
+        | stack: I32
+        | priority: I32
+        | toggle: I32
+        | role: I32
+        | fluid: I32
+        | amount: I32
+        | charge: I32
+        | cond_item: I32
+        | cond_op: I32
+        | cond_value: I32
+        | signal: Bool
+        | crafts: I32
+        | moved: I32
+
+    // A growable list of entities, kept in id order.
+    struct List:
+        | items: Array[Entity]
+        | n: I32
+
+    struct World:
+        | game: GameData
+        | width: I32
+        | height: I32
+        | tick: I32
+        | next_id: I32
+        | satisfaction: I32
+        | light: I32
+        | demand: I32
+        | supply: I32
+        | water: Array[I32]
+        | res_kind: Array[I32]
+        | res_amount: Array[I32]
+        | revealed: Array[I32]
+        | chunks_x: I32
+        | chunks_y: I32
+        | grid: Array[?Entity]
+        | entities: List
+        | classes: Array[List]
+        | crafters: List
+        | belts: List
+        | fluid_machines: List
+        | research_current: I32
+        | research_progress: I32
+        | done: Array[I32]
+        | machine_unlocked: Array[I32]
+        | recipe_unlocked: Array[I32]
+        | produced: Array[I32]
+        | speed: Array[I32]
+        | power: Array[I32]
+        | burner: Array[Bool]
+        | reach: Array[I32]
+        | mclass: Array[I32]
+        | is_fluid: Array[Bool]
+        | smelts: Array[I32]
+        | sentinel: Entity
+
+    fn imin(a: I32, b: I32) I32 {
+        if a < b { a; } else { b; };
+    }
+
+    fn imax(a: I32, b: I32) I32 {
+        if a > b { a; } else { b; };
+    }
+
+    fn dx(dir: I32) I32 {
+        match dir {
+            1 => 1,
+            3 => -1,
+            ~> 0,
+        };
+    }
+
+    fn dy(dir: I32) I32 {
+        match dir {
+            0 => -1,
+            2 => 1,
+            ~> 0,
+        };
+    }
+
+    fn is_crafter(c: I32) Bool {
+        c >= furnace_class and c <= centrifuge_class;
+    }
+
+    fn is_belt_like(c: I32) Bool {
+        c >= belt_class and c <= underground_class;
+    }
+
+    fn has_inventory(c: I32) Bool {
+        is_crafter(c) or c == chest_class or c == lab_class or c == silo_class;
+    }
+
+    fn class_of(name: Str) I32 {
+        let names = ["miner", "pump", "furnace", "assembler", "chemical", "refinery", "centrifuge",
+            "belt", "splitter", "underground", "pipe", "inserter", "chest", "steam", "solar",
+            "accumulator", "lab", "radar", "beacon", "combinator", "lamp", "silo"];
+        let found = -1;
+        for (0..<names.len()) |i| {
+            if names[i] == name {
+                found = i;
+            };
+        };
+        found;
+    }
+
+    // ── lists ────────────────────────────────────────────────────────────────────
+
+    fn list_new(sentinel: Entity) List {
+        List { items: Array[Entity].new(16, sentinel), n: 0 };
+    }
+
+    fn list_push(list: List, e: Entity) void {
+        if list.n == list.items.len() {
+            let grown = Array[Entity].new(list.n * 2, e);
+            grown.copy_from(0, list.items, 0, list.n);
+            list.items = grown;
+        };
+        list.items[list.n] = e;
+        list.n += 1;
+    }
+
+    fn list_remove(list: List, e: Entity) void {
+        let i = 0;
+        while (i < list.n and list.items[i].id != e.id) {
+            i += 1;
+        };
+        if i < list.n {
+            list.items.copy_from(i, list.items, i + 1, list.n - i - 1);
+            list.n -= 1;
+        };
+    }
+
+    // ── creating ─────────────────────────────────────────────────────────────────
+
+    fn new_entity(w: World, id: I32, machine: I32, x: I32, y: I32, dir: I32) Entity {
+        let cls = w.mclass[machine];
+        let none: Array[I32] = [];
+        Entity {
+            id: id, machine: machine, cls: cls, x: x, y: y, dir: dir,
+            recipe: -1, progress: 0, busy: false, fuel: 0, burn: 0,
+            heat: if machine == steel_furnace_id { 20; } else { 0; },
+            inv: if has_inventory(cls) { Array[I32].new_default(item_count); } else { none; },
+            out: if is_crafter(cls) { Array[I32].new_default(item_count); } else { none; },
+            belt: if is_belt_like(cls) { Array[I32].new_default(belt_capacity); } else { none; },
+            belt_n: 0, state: 0, timer: 0, hand: -1, held: 0, pick: -1,
+            stack: if machine == stack_inserter_id { 4; } else { 1; },
+            priority: 0, toggle: 0, role: 0, fluid: -1, amount: 0, charge: 0,
+            cond_item: 0, cond_op: 0, cond_value: 0, signal: false, crafts: 0, moved: 0,
+        };
+    }
+
+    fn lists_of(w: World, e: Entity, add: Bool) void {
+        let lists = [w.classes[e.cls]];
+        if is_crafter(e.cls) {
+            lists = [w.classes[e.cls], w.crafters];
+        };
+        if is_belt_like(e.cls) {
+            lists = [w.classes[e.cls], w.belts];
+        };
+        if e.cls == chemical_class or e.cls == refinery_class {
+            lists = [w.classes[e.cls], w.crafters, w.fluid_machines];
+        };
+        if e.cls == steam_class {
+            lists = [w.classes[e.cls], w.fluid_machines];
+        };
+        for (lists) |list| {
+            if add {
+                list_push(list, e);
+            } else {
+                list_remove(list, e);
+            };
+        };
+    }
+
+    fn add_entity(w: World, e: Entity) void {
+        list_push(w.entities, e);
+        w.grid[e.y * w.width + e.x] = e;
+        lists_of(w, e, true);
+    }
+
+    fn remove_entity(w: World, e: Entity) void {
+        list_remove(w.entities, e);
+        w.grid[e.y * w.width + e.x] = null;
+        lists_of(w, e, false);
+    }
+
+    fn new_world(game: GameData, width: I32, height: I32) World {
+        let machines = game.machines.len();
+        let sentinel_classes = Array[I32].new_default(machines);
+        let blank: Array[I32] = [];
+        let sentinel = Entity {
+            id: -1, machine: 0, cls: 0, x: 0, y: 0, dir: 0, recipe: -1, progress: 0, busy: false, fuel: 0, burn: 0, heat: 0,
+            inv: blank, out: blank, belt: blank, belt_n: 0, state: 0, timer: 0, hand: -1, held: 0, pick: -1, stack: 1,
+            priority: 0, toggle: 0, role: 0, fluid: -1, amount: 0, charge: 0, cond_item: 0, cond_op: 0, cond_value: 0,
+            signal: false, crafts: 0, moved: 0,
+        };
+        let classes = Array[List].new(class_count, list_new(sentinel));
+        for (0..<class_count) |c| {
+            classes[c] = list_new(sentinel);
+        };
+        let tiles = width * height;
+        let chunks_x = (width + 7) / 8;
+        let chunks_y = (height + 7) / 8;
+        let w = World {
+            game: game, width: width, height: height, tick: 0, next_id: 1, satisfaction: 1000, light: 0, demand: 0, supply: 0,
+            water: Array[I32].new_default(tiles),
+            res_kind: Array[I32].new(tiles, -1),
+            res_amount: Array[I32].new_default(tiles),
+            revealed: Array[I32].new_default(chunks_x * chunks_y),
+            chunks_x: chunks_x, chunks_y: chunks_y,
+            grid: Array[?Entity].new_default(tiles),
+            entities: list_new(sentinel), classes: classes,
+            crafters: list_new(sentinel), belts: list_new(sentinel), fluid_machines: list_new(sentinel),
+            research_current: -1, research_progress: 0,
+            done: Array[I32].new_default(game.techs.len()),
+            machine_unlocked: Array[I32].new_default(machines),
+            recipe_unlocked: Array[I32].new_default(game.recipes.len()),
+            produced: Array[I32].new_default(item_count),
+            speed: Array[I32].new_default(machines),
+            power: Array[I32].new_default(machines),
+            burner: Array[Bool].new_default(machines),
+            reach: Array[I32].new_default(machines),
+            mclass: sentinel_classes,
+            is_fluid: Array[Bool].new_default(item_count),
+            smelts: Array[I32].new(item_count, -1),
+            sentinel: sentinel,
+        };
+        for (0..<machines) |m| {
+            let machine = game.machines[m];
+            w.speed[m] = machine.speed;
+            w.power[m] = machine.power;
+            w.burner[m] = machine.burner;
+            w.reach[m] = machine.reach;
+            w.mclass[m] = class_of(machine.class);
+        };
+        for (0..<item_count) |i| {
+            w.is_fluid[i] = game.items[i].fluid;
+        };
+        // The first smelting recipe with a single ingredient, per ingredient.
+        for (0..<game.recipes.len()) |r| {
+            let recipe = game.recipes[r];
+            if recipe.category == "smelting" and recipe.ingredients.len() == 1 {
+                let item = recipe.ingredients[0][0];
+                if w.smelts[item] < 0 {
+                    w.smelts[item] = r;
+                };
+            };
+        };
+        for (game.start.machines) |m| {
+            w.machine_unlocked[m] = 1;
+        };
+        for (game.start.recipes) |r| {
+            w.recipe_unlocked[r] = 1;
+        };
+        w;
+    }
+
+    // ── queries ──────────────────────────────────────────────────────────────────
+
+    fn inside(w: World, x: I32, y: I32) Bool {
+        x >= 0 and y >= 0 and x < w.width and y < w.height;
+    }
+
+    fn at(w: World, x: I32, y: I32) ?Entity {
+        if inside(w, x, y) { w.grid[y * w.width + x]; } else { null; };
+    }
+
+    fn front(w: World, e: Entity, distance: I32) ?Entity {
+        at(w, e.x + dx(e.dir) * distance, e.y + dy(e.dir) * distance);
+    }
+
+    fn back(w: World, e: Entity, distance: I32) ?Entity {
+        at(w, e.x - dx(e.dir) * distance, e.y - dy(e.dir) * distance);
+    }
+
+    fn neighbor(w: World, e: Entity, side: I32) ?Entity {
+        at(w, e.x + dx(side), e.y + dy(side));
+    }
+
+    fn all_zero(counts: Array[I32]) Bool {
+        let zero = true;
+        for (counts) |c| {
+            if c != 0 {
+                zero = false;
+            };
+        };
+        zero;
+    }
+
+    fn is_ore(w: World, tile: I32) Bool {
+        w.res_kind[tile] >= 0 and not w.is_fluid[w.res_kind[tile]] and w.res_amount[tile] > 0;
+    }
+
+    // ── queries for views ────────────────────────────────────────────────────────
+
+    fn entity(w: World, id: I32) ?Entity {
+        let found: ?Entity = null;
+        let all = w.entities;
+        let lo = 0;
+        let hi = all.n;
+        // Entities are in id order: binary search.
+        while (lo < hi) {
+            let mid = (lo + hi) >>> 1;
+            if all.items[mid].id < id {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            };
+        };
+        if lo < all.n and all.items[lo].id == id {
+            found = all.items[lo];
+        };
+        found;
+    }
+
+    fn get_progress(w: World, id: I32) I32 {
+        promote entity(w, id) {
+            |e| => e.progress / 1000,
+            ~> 0,
+        };
+    }
+
+    // ── commands ─────────────────────────────────────────────────────────────────
+
+    fn can_place(w: World, machine: I32, x: I32, y: I32, dir: I32) Bool {
+        if not inside(w, x, y) {
+            return false;
+        };
+        let tile = y * w.width + x;
+        if w.revealed[(y >> 3) * w.chunks_x + (x >> 3)] == 0 or w.water[tile] == 1 or w.machine_unlocked[machine] == 0 {
+            return false;
+        };
+        let empty = promote w.grid[tile] {
+            |e| => false,
+            ~> true,
+        };
+        if not empty {
+            return false;
+        };
+        let name = w.game.machines[machine].name;
+        if name == "burner-miner" {
+            return is_ore(w, tile);
+        };
+        if name == "electric-miner" {
+            let found = false;
+            for (-1...1) |oy| {
+                for (-1...1) |ox| {
+                    if inside(w, x + ox, y + oy) and is_ore(w, (y + oy) * w.width + x + ox) {
+                        found = true;
+                    };
+                };
+            };
+            return found;
+        };
+        if name == "pumpjack" {
+            return w.res_kind[tile] == crude_item;
+        };
+        if name == "offshore-pump" {
+            let fx = x + dx(dir);
+            let fy = y + dy(dir);
+            return inside(w, fx, fy) and w.water[fy * w.width + fx] == 1;
+        };
+        true;
+    }
+
+    fn place(w: World, machine: I32, x: I32, y: I32, dir: I32) Bool {
+        if not can_place(w, machine, x, y, dir) {
+            return false;
+        };
+        add_entity(w, new_entity(w, w.next_id, machine, x, y, dir));
+        w.next_id += 1;
+        true;
+    }
+
+    fn remove(w: World, x: I32, y: I32) void {
+        promote at(w, x, y) {
+            |e| => remove_entity(w, e),
+            ~> {},
+        };
+    }
+
+    fn rotate(e: Entity) void {
+        e.dir = (e.dir + 1) % 4;
+    }
+
+    fn recipe_allowed(w: World, e: Entity, r: I32) Bool {
+        if r < 0 or r >= w.game.recipes.len() or w.recipe_unlocked[r] == 0 {
+            return false;
+        };
+        let recipe = w.game.recipes[r];
+        let category = match e.cls {
+            3 => "crafting",
+            4 => "chemistry",
+            5 => "refining",
+            6 => "centrifuge",
+            ~> "",
+        };
+        recipe.category == category and (e.machine != assembler_1_id or recipe.ingredients.len() <= 2);
+    }
+
+    fn set_recipe(w: World, e: Entity, r: I32) void {
+        if recipe_allowed(w, e, r) {
+            e.recipe = r;
+            e.busy = false;
+            e.progress = 0;
+        };
+    }
+
+    fn launch(e: Entity) void {
+        if e.cls == silo_class and e.held == 20 {
+            e.held = 0;
+            e.crafts += 1;
+        };
+    }
+
+    fn research_available(w: World, t: I32) Bool {
+        let ready = w.done[t] == 0;
+        for (w.game.techs[t].prereqs) |p| {
+            if w.done[p] == 0 {
+                ready = false;
+            };
+        };
+        ready;
+    }
+
+    fn start_research(w: World, t: I32) void {
+        if research_available(w, t) {
+            w.research_current = t;
+            w.research_progress = 0;
+        };
+    }
+
+    // ── inserting ────────────────────────────────────────────────────────────────
+
+    // How many of n items the entity takes; with commit, take them.
+    fn insert(w: World, e: Entity, item: I32, n: I32, commit: Bool) I32 {
+        if n <= 0 {
+            return 0;
+        };
+        let c = e.cls;
+        if is_belt_like(c) {
+            if e.belt_n > 0 and e.belt[e.belt_n - 1] < 64 {
+                return 0;
+            };
+            if commit {
+                e.belt[e.belt_n] = item;
+                e.belt[e.belt_n + 1] = 0;
+                e.belt_n += 2;
+            };
+            return 1;
+        };
+        if c == chest_class {
+            let used = 0;
+            for (e.inv) |count| {
+                used += (count + 49) / 50;
+            };
+            let partial = e.inv[item] % 50;
+            let room = (w.speed[e.machine] - used) * 50 + (if partial > 0 { 50 - partial; } else { 0; });
+            let taken = imax(0, imin(n, room));
+            if commit {
+                e.inv[item] += taken;
+            };
+            return taken;
+        };
+        if is_crafter(c) {
+            let recipe = e.recipe;
+            if recipe < 0 and c == furnace_class and all_zero(e.inv) {
+                recipe = w.smelts[item];
+            };
+            if recipe >= 0 {
+                let ingredients = w.game.recipes[recipe].ingredients;
+                for (ingredients) |ingredient| {
+                    if ingredient[0] == item {
+                        let taken = imax(0, imin(n, 2 * ingredient[1] - e.inv[item]));
+                        if commit and taken > 0 {
+                            e.inv[item] += taken;
+                            e.recipe = recipe;
+                        };
+                        return taken;
+                    };
+                };
+            };
+            if w.burner[e.machine] and item == coal_item {
+                return fuel_up(e, n, commit);
+            };
+            return 0;
+        };
+        if c == lab_class {
+            let r = w.research_current;
+            if r < 0 or w.done[r] == 1 or item < red_pack or item > red_pack + 2 {
+                return 0;
+            };
+            if w.game.techs[r].packs[item - red_pack] == 0 {
+                return 0;
+            };
+            let taken = imax(0, imin(n, 4 - e.inv[item]));
+            if commit {
+                e.inv[item] += taken;
+            };
+            return taken;
+        };
+        if c == silo_class {
+            for (w.game.recipes[rocket_part_recipe].ingredients) |ingredient| {
+                if ingredient[0] == item {
+                    let taken = imax(0, imin(n, 2 * ingredient[1] - e.inv[item]));
+                    if commit {
+                        e.inv[item] += taken;
+                    };
+                    return taken;
+                };
+            };
+            return 0;
+        };
+        if (c == steam_class or e.machine == burner_miner_id) and item == coal_item {
+            return fuel_up(e, n, commit);
+        };
+        0;
+    }
+
+    fn fuel_up(e: Entity, n: I32, commit: Bool) I32 {
+        let taken = imax(0, imin(n, 5 - e.fuel));
+        if commit {
+            e.fuel += taken;
+        };
+        taken;
+    }
+
+    fn push_fluid(w: World, amount: I32, fluid: I32, t: Entity) I32 {
+        if t.cls != pipe_class or (t.fluid != fluid and t.fluid != -1) or amount <= 0 {
+            return 0;
+        };
+        let moved = imin(amount, w.speed[t.machine] - t.amount);
+        if moved <= 0 {
+            return 0;
+        };
+        t.amount += moved;
+        t.fluid = fluid;
+        moved;
+    }
+
+    // ── the tick ─────────────────────────────────────────────────────────────────
+
+    fn step(w: World) void {
+        power(w);
+        signals(w);
+        fluids(w);
+        let miners = w.classes[miner_class];
+        for (0..<miners.n) |i| {
+            mine(w, miners.items[i]);
+        };
+        for (0..<w.crafters.n) |i| {
+            craft(w, w.crafters.items[i]);
+        };
+        let labs = w.classes[lab_class];
+        for (0..<labs.n) |i| {
+            lab(w, labs.items[i]);
+        };
+        let silos = w.classes[silo_class];
+        for (0..<silos.n) |i| {
+            silo(w, silos.items[i]);
+        };
+        let radars = w.classes[radar_class];
+        for (0..<radars.n) |i| {
+            radar(w, radars.items[i]);
+        };
+        let inserters = w.classes[inserter_class];
+        for (0..<inserters.n) |i| {
+            swing(w, inserters.items[i]);
+        };
+        for (0..<w.belts.n) |i| {
+            move_belt(w, w.belts.items[i]);
+        };
+        w.tick += 1;
+    }
+
+    fn power(w: World) void {
+        let p = w.tick % 25200;
+        w.light = if p < 2520 { p * 1000 / 2520; } else { if p < 12600 { 1000; } else { if p < 15120 { (15120 - p) * 1000 / 2520; } else { 0; }; }; };
+        let demand = 0;
+        let all = w.entities;
+        for (0..<all.n) |i| {
+            let e = all.items[i];
+            if e.busy or e.cls == radar_class or e.cls == beacon_class {
+                demand += w.power[e.machine];
+            };
+        };
+        let supply = 0;
+        let engines = w.classes[steam_class];
+        for (0..<engines.n) |i| {
+            let e = engines.items[i];
+            if demand > 0 and e.amount >= 1 and (e.burn > 0 or e.fuel > 0) {
+                if e.burn == 0 {
+                    e.fuel -= 1;
+                    e.burn = 900;
+                };
+                e.burn -= 1;
+                e.amount -= 1;
+                supply += 900;
+                e.busy = true;
+            } else {
+                e.busy = false;
+            };
+        };
+        supply += w.classes[solar_class].n * (60 * w.light / 1000);
+        let accumulators = w.classes[accumulator_class];
+        if supply > demand {
+            let excess = supply - demand;
+            for (0..<accumulators.n) |i| {
+                let e = accumulators.items[i];
+                let c = imin(imin(300, 5000 - e.charge), excess);
+                e.charge += c;
+                excess -= c;
+            };
+        } else {
+            if supply < demand {
+                let deficit = demand - supply;
+                for (0..<accumulators.n) |i| {
+                    let e = accumulators.items[i];
+                    let d = imin(imin(300, e.charge), deficit);
+                    e.charge -= d;
+                    deficit -= d;
+                    supply += d;
+                };
+            };
+        };
+        w.demand = demand;
+        w.supply = supply;
+        w.satisfaction = if demand == 0 { 1000; } else { imin(1000, supply * 1000 / demand); };
+    }
+
+    fn signals(w: World) void {
+        let combinators = w.classes[combinator_class];
+        for (0..<combinators.n) |i| {
+            let e = combinators.items[i];
+            let count = 0;
+            promote back(w, e, 1) {
+                |source| => {
+                    if source.inv.len() > 0 {
+                        count = source.inv[e.cond_item];
+                    } else {
+                        let k = 0;
+                        while (k < source.belt_n) {
+                            if source.belt[k] == e.cond_item {
+                                count += 1;
+                            };
+                            k += 2;
+                        };
+                    };
+                },
+                ~> {},
+            };
+            e.signal = match e.cond_op {
+                0 => count > e.cond_value,
+                1 => count < e.cond_value,
+                ~> count == e.cond_value,
+            };
+        };
+        let lamps = w.classes[lamp_class];
+        for (0..<lamps.n) |i| {
+            let e = lamps.items[i];
+            let lit = false;
+            for (0..<4) |side| {
+                promote neighbor(w, e, side) {
+                    |n| => {
+                        if n.cls == combinator_class and n.signal {
+                            lit = true;
+                        };
+                    },
+                    ~> {},
+                };
+            };
+            e.signal = lit;
+        };
+    }
+
+    fn fluids(w: World) void {
+        let pumps = w.classes[pump_class];
+        for (0..<pumps.n) |i| {
+            let e = pumps.items[i];
+            if e.machine == offshore_pump_id {
+                let fx = e.x + dx(e.dir);
+                let fy = e.y + dy(e.dir);
+                let pushed = 0;
+                if inside(w, fx, fy) and w.water[fy * w.width + fx] == 1 {
+                    promote back(w, e, 1) {
+                        |target| => {
+                            pushed = push_fluid(w, 10, water_item, target);
+                        },
+                        ~> {},
+                    };
+                };
+                e.busy = pushed > 0;
+                w.produced[water_item] += pushed;
+            } else {
+                let tile = e.y * w.width + e.x;
+                if w.res_kind[tile] == crude_item {
+                    let output = imax(100, imin(1000, w.res_amount[tile] / 100));
+                    let rate = output * w.satisfaction / 1000;
+                    if e.amount < 100 and rate > 0 {
+                        e.progress += rate;
+                        e.busy = true;
+                        if e.progress >= 6000 {
+                            e.progress -= 6000;
+                            e.amount += 1;
+                            w.produced[crude_item] += 1;
+                            if w.res_amount[tile] > 0 {
+                                w.res_amount[tile] -= 1;
+                            };
+                        };
+                    } else {
+                        e.busy = false;
+                    };
+                } else {
+                    e.busy = false;
+                };
+                promote front(w, e, 1) {
+                    |target| => {
+                        e.amount -= push_fluid(w, e.amount, crude_item, target);
+                    },
+                    ~> {},
+                };
+            };
+        };
+        let pipes = w.classes[pipe_class];
+        for (0..<pipes.n) |i| {
+            let a = pipes.items[i];
+            for (0..<4) |side| {
+                promote neighbor(w, a, side) {
+                    |b| => {
+                        if b.cls == pipe_class and b.id > a.id and not (a.fluid >= 0 and b.fluid >= 0 and a.fluid != b.fluid) {
+                            let f = if a.fluid >= 0 { a.fluid; } else { b.fluid; };
+                            if f >= 0 {
+                                let cap_a = w.speed[a.machine];
+                                let cap_b = w.speed[b.machine];
+                                let total = a.amount + b.amount;
+                                a.amount = total * cap_a / (cap_a + cap_b);
+                                b.amount = total - a.amount;
+                                a.fluid = if a.amount > 0 { f; } else { -1; };
+                                b.fluid = if b.amount > 0 { f; } else { -1; };
+                            };
+                        };
+                    },
+                    ~> {},
+                };
+            };
+        };
+        for (0..<w.fluid_machines.n) |i| {
+            let e = w.fluid_machines.items[i];
+            if e.cls == steam_class {
+                for (0..<4) |side| {
+                    promote neighbor(w, e, side) {
+                        |n| => {
+                            if n.cls == pipe_class and n.fluid == water_item {
+                                let take = imin(n.amount, 100 - e.amount);
+                                if take > 0 {
+                                    n.amount -= take;
+                                    e.amount += take;
+                                    if n.amount == 0 {
+                                        n.fluid = -1;
+                                    };
+                                };
+                            };
+                        },
+                        ~> {},
+                    };
+                };
+            } else {
+                if e.recipe >= 0 {
+                    let recipe = w.game.recipes[e.recipe];
+                    for (recipe.ingredients) |ingredient| {
+                        let f = ingredient[0];
+                        if w.is_fluid[f] {
+                            for (0..<4) |side| {
+                                promote neighbor(w, e, side) {
+                                    |n| => {
+                                        if n.cls == pipe_class and n.fluid == f {
+                                            let take = imin(n.amount, 2 * ingredient[1] - e.inv[f]);
+                                            if take > 0 {
+                                                n.amount -= take;
+                                                e.inv[f] += take;
+                                                if n.amount == 0 {
+                                                    n.fluid = -1;
+                                                };
+                                            };
+                                        };
+                                    },
+                                    ~> {},
+                                };
+                            };
+                        };
+                    };
+                    for (recipe.products) |product| {
+                        let f = product[0];
+                        if w.is_fluid[f] {
+                            for (0..<4) |side| {
+                                promote neighbor(w, e, side) {
+                                    |n| => {
+                                        e.out[f] -= push_fluid(w, e.out[f], f, n);
+                                    },
+                                    ~> {},
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    }
+
+    fn mining_tile(w: World, e: Entity) I32 {
+        if e.machine == burner_miner_id {
+            let t = e.y * w.width + e.x;
+            return if is_ore(w, t) and (e.held == 0 or w.res_kind[t] == e.hand) { t; } else { -1; };
+        };
+        for (-1..<2) |oy| {
+            for (-1..<2) |ox| {
+                if inside(w, e.x + ox, e.y + oy) {
+                    let t = (e.y + oy) * w.width + e.x + ox;
+                    if is_ore(w, t) and (e.held == 0 or w.res_kind[t] == e.hand) {
+                        return t;
+                    };
+                };
+            };
+        };
+        -1;
+    }
+
+    fn mine(w: World, e: Entity) void {
+        let tile = mining_tile(w, e);
+        if tile >= 0 and e.held < 5 {
+            let rate = 0;
+            if w.burner[e.machine] {
+                if e.burn == 0 and e.fuel > 0 {
+                    e.fuel -= 1;
+                    e.burn = 3600;
+                };
+                if e.burn > 0 {
+                    rate = w.speed[e.machine];
+                    e.burn -= 1;
+                };
+            } else {
+                rate = w.speed[e.machine] * w.satisfaction / 1000;
+            };
+            e.progress += rate;
+            e.busy = rate > 0;
+            if e.progress >= 60000 {
+                e.progress = 0;
+                e.hand = w.res_kind[tile];
+                w.produced[e.hand] += 1;
+                w.res_amount[tile] -= 1;
+                if w.res_amount[tile] == 0 {
+                    w.res_kind[tile] = -1;
+                };
+                e.held += 1;
+            };
+        } else {
+            e.busy = false;
+        };
+        if e.held > 0 {
+            promote front(w, e, 1) {
+                |target| => {
+                    if insert(w, target, e.hand, 1, true) == 1 {
+                        e.held -= 1;
+                        if e.held == 0 {
+                            e.hand = -1;
+                        };
+                    };
+                },
+                ~> {},
+            };
+        };
+    }
+
+    fn beacons(w: World, e: Entity) I32 {
+        let count = 0;
+        for (-2..<3) |oy| {
+            for (-2..<3) |ox| {
+                promote at(w, e.x + ox, e.y + oy) {
+                    |b| => {
+                        if b.cls == beacon_class {
+                            count += 1;
+                        };
+                    },
+                    ~> {},
+                };
+            };
+        };
+        count;
+    }
+
+    fn craft(w: World, e: Entity) void {
+        if not e.busy and e.recipe >= 0 {
+            let recipe = w.game.recipes[e.recipe];
+            let ready = true;
+            for (recipe.ingredients) |ingredient| {
+                if e.inv[ingredient[0]] < ingredient[1] {
+                    ready = false;
+                };
+            };
+            for (recipe.products) |product| {
+                if e.out[product[0]] > product[1] {
+                    ready = false;
+                };
+            };
+            if e.cls == centrifuge_class and (e.out[u238_item] > 1 or e.out[u235_item] > 1) {
+                ready = false;
+            };
+            if ready {
+                for (recipe.ingredients) |ingredient| {
+                    e.inv[ingredient[0]] -= ingredient[1];
+                };
+                e.busy = true;
+                e.progress = 0;
+            };
+        };
+        if e.busy {
+            let bonus = 250 * beacons(w, e) * w.satisfaction / 1000;
+            let rate = 0;
+            if w.burner[e.machine] {
+                if e.burn == 0 and e.fuel > 0 {
+                    e.fuel -= 1;
+                    e.burn = 3600;
+                };
+                if e.burn > 0 {
+                    e.burn -= 1;
+                    rate = w.speed[e.machine] + bonus;
+                };
+            } else {
+                rate = (w.speed[e.machine] + bonus) * w.satisfaction / 1000;
+            };
+            e.progress += rate;
+            let recipe = w.game.recipes[e.recipe];
+            if e.progress >= recipe.time * 1000 {
+                if e.cls == centrifuge_class {
+                    let product = if e.crafts % 7 == 6 { u235_item; } else { u238_item; };
+                    e.out[product] += 1;
+                    w.produced[product] += 1;
+                } else {
+                    for (recipe.products) |product| {
+                        e.out[product[0]] += product[1];
+                        w.produced[product[0]] += product[1];
+                    };
+                };
+                e.crafts += 1;
+                e.busy = false;
+                e.progress = 0;
+            };
+        };
+        if e.cls == furnace_class and not e.busy and all_zero(e.inv) and all_zero(e.out) {
+            e.recipe = -1;
+        };
+        if e.machine == steel_furnace_id {
+            e.heat = if e.busy { imin(1500, e.heat + 3); } else { imax(20, e.heat - 1); };
+        };
+    }
+
+    fn lab(w: World, e: Entity) void {
+        let r = w.research_current;
+        if r < 0 or w.done[r] == 1 {
+            e.busy = false;
+            e.progress = 0;
+            return;
+        };
+        let tech = w.game.techs[r];
+        if not e.busy and e.inv[red_pack] >= tech.packs[0] and e.inv[red_pack + 1] >= tech.packs[1] and e.inv[red_pack + 2] >= tech.packs[2] {
+            for (0..<3) |k| {
+                e.inv[red_pack + k] -= tech.packs[k];
+            };
+            e.busy = true;
+            e.progress = 0;
+        };
+        if e.busy {
+            e.progress += w.satisfaction;
+            if e.progress >= tech.time * 1000 {
+                e.busy = false;
+                e.progress = 0;
+                w.research_progress += 1;
+                if w.research_progress >= tech.units {
+                    complete(w, r);
+                };
+            };
+        };
+    }
+
+    fn complete(w: World, r: I32) void {
+        w.done[r] = 1;
+        for (w.game.techs[r].machines) |m| {
+            w.machine_unlocked[m] = 1;
+        };
+        for (w.game.techs[r].recipes) |recipe| {
+            w.recipe_unlocked[recipe] = 1;
+        };
+        w.research_current = -1;
+        w.research_progress = 0;
+    }
+
+    fn silo(w: World, e: Entity) void {
+        if e.held >= 20 {
+            e.busy = false;
+            return;
+        };
+        let recipe = w.game.recipes[rocket_part_recipe];
+        if not e.busy {
+            let ready = true;
+            for (recipe.ingredients) |ingredient| {
+                if e.inv[ingredient[0]] < ingredient[1] {
+                    ready = false;
+                };
+            };
+            if ready {
+                for (recipe.ingredients) |ingredient| {
+                    e.inv[ingredient[0]] -= ingredient[1];
+                };
+                e.busy = true;
+                e.progress = 0;
+            };
+        };
+        if e.busy {
+            e.progress += w.speed[e.machine] * w.satisfaction / 1000;
+            if e.progress >= recipe.time * 1000 {
+                e.held += 1;
+                e.busy = false;
+                e.progress = 0;
+            };
+        };
+    }
+
+    fn radar(w: World, e: Entity) void {
+        e.busy = true;
+        e.progress += w.satisfaction;
+        if e.progress < 300000 {
+            return;
+        };
+        e.progress = 0;
+        let cx = e.x >> 3;
+        let cy = e.y >> 3;
+        for (0...3) |r| {
+            for (-r...r) |oy| {
+                for (-r...r) |ox| {
+                    if imax(if ox < 0 { 0 - ox; } else { ox; }, if oy < 0 { 0 - oy; } else { oy; }) == r {
+                        let x = cx + ox;
+                        let y = cy + oy;
+                        if x >= 0 and y >= 0 and x < w.chunks_x and y < w.chunks_y {
+                            let chunk = y * w.chunks_x + x;
+                            if w.revealed[chunk] == 0 {
+                                w.revealed[chunk] = 1;
+                                e.crafts += 1;
+                                return;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    }
+
+    fn disabled(w: World, e: Entity) Bool {
+        let off = false;
+        for (0..<4) |side| {
+            promote neighbor(w, e, side) {
+                |n| => {
+                    if n.cls == combinator_class and not n.signal {
+                        off = true;
+                    };
+                },
+                ~> {},
+            };
+        };
+        off;
+    }
+
+    fn swing(w: World, e: Entity) void {
+        let reach = w.reach[e.machine];
+        let time = w.speed[e.machine];
+        if e.state == 0 {
+            if disabled(w, e) {
+                return;
+            };
+            promote back(w, e, reach) {
+                |source| => {
+                    promote front(w, e, reach) {
+                        |target| => {
+                            choose_and_take(w, e, source, target, time);
+                        },
+                        ~> {},
+                    };
+                },
+                ~> {},
+            };
+            return;
+        };
+        if e.state == 1 {
+            if e.timer > 0 {
+                e.timer -= 1;
+            };
+            if e.timer == 0 {
+                let accepted = 0;
+                promote front(w, e, reach) {
+                    |target| => {
+                        accepted = insert(w, target, e.hand, e.held, true);
+                    },
+                    ~> {},
+                };
+                e.held -= accepted;
+                e.moved += accepted;
+                if e.held == 0 {
+                    e.hand = -1;
+                    e.state = 2;
+                    e.timer = time;
+                };
+            };
+            return;
+        };
+        e.timer -= 1;
+        if e.timer == 0 {
+            e.state = 0;
+        };
+    }
+
+    // Pick an item from source that target accepts, and start the swing.
+    fn choose_and_take(w: World, e: Entity, source: Entity, target: Entity, time: I32) void {
+        let filter = if e.machine == filter_inserter_id { e.pick; } else { -2; };
+        if filter == -1 {
+            return;
+        };
+        let c = source.cls;
+        let item = -1;
+        let n = 0;
+        if is_belt_like(c) {
+            if source.belt_n > 0 and (filter == -2 or source.belt[0] == filter) and insert(w, target, source.belt[0], 1, false) >= 1 {
+                item = source.belt[0];
+                n = 1;
+                source.belt.copy_from(0, source.belt, 2, source.belt_n - 2);
+                source.belt_n -= 2;
+            };
+        } else {
+            if c == chest_class or is_crafter(c) {
+                let counts = if c == chest_class { source.inv; } else { source.out; };
+                let k = 0;
+                while (k < item_count and item < 0) {
+                    if counts[k] > 0 and (filter == -2 or k == filter) and not w.is_fluid[k] {
+                        let accepted = insert(w, target, k, imin(e.stack, counts[k]), false);
+                        if accepted >= 1 {
+                            item = k;
+                            n = accepted;
+                            counts[k] -= accepted;
+                        };
+                    };
+                    k += 1;
+                };
+            } else {
+                if c == miner_class and source.held > 0 and (filter == -2 or source.hand == filter) {
+                    let accepted = insert(w, target, source.hand, imin(e.stack, source.held), false);
+                    if accepted >= 1 {
+                        item = source.hand;
+                        n = accepted;
+                        source.held -= accepted;
+                        if source.held == 0 {
+                            source.hand = -1;
+                        };
+                    };
+                };
+            };
+        };
+        if item >= 0 {
+            e.hand = item;
+            e.held = n;
+            e.state = 1;
+            e.timer = time;
+        };
+    }
+
+    // Pass the front item of e's belt to t, if t is belt-like with room.
+    fn pass(e: Entity, t: Entity) Bool {
+        if t.id == e.id or not is_belt_like(t.cls) {
+            return false;
+        };
+        if t.belt_n > 0 and t.belt[t.belt_n - 1] < 64 {
+            return false;
+        };
+        t.belt[t.belt_n] = e.belt[0];
+        t.belt[t.belt_n + 1] = 0;
+        t.belt_n += 2;
+        e.belt.copy_from(0, e.belt, 2, e.belt_n - 2);
+        e.belt_n -= 2;
+        true;
+    }
+
+    fn pass_to(e: Entity, target: ?Entity) Bool {
+        promote target {
+            |t| => pass(e, t),
+            ~> false,
+        };
+    }
+
+    fn move_belt(w: World, e: Entity) void {
+        let speed = w.speed[e.machine];
+        let k = 0;
+        while (k < e.belt_n) {
+            let limit = if k == 0 { 256; } else { e.belt[k - 1] - 64; };
+            let pos = e.belt[k + 1];
+            e.belt[k + 1] = imax(pos, imin(pos + speed, limit));
+            k += 2;
+        };
+        if e.belt_n == 0 or e.belt[1] < 256 {
+            return;
+        };
+        if e.cls == belt_class {
+            let moved = pass_to(e, front(w, e, 1));
+            return;
+        };
+        if e.cls == underground_class {
+            if e.role == 1 {
+                let moved = pass_to(e, front(w, e, 1));
+                return;
+            };
+            for (1...5) |d| {
+                let found = false;
+                promote front(w, e, d) {
+                    |t| => {
+                        if t.cls == underground_class and t.dir == e.dir and t.role == 1 {
+                            let moved = pass(e, t);
+                            found = true;
+                        };
+                    },
+                    ~> {},
+                };
+                if found {
+                    return;
+                };
+            };
+            return;
+        };
+        // Splitter.
+        let item = e.belt[0];
+        let side_dir = (e.dir + 1) % 4;
+        let ahead = front(w, e, 1);
+        let side = at(w, e.x + dx(e.dir) + dx(side_dir), e.y + dy(e.dir) + dy(side_dir));
+        let side_first = if e.pick >= 0 { item == e.pick; } else { if e.priority == 1 { false; } else { if e.priority == 2 { true; } else { e.toggle != 0; }; }; };
+        let only = e.pick >= 0;
+        if side_first {
+            if pass_to(e, side) {
+                e.toggle = 0;
+            } else {
+                if not only and pass_to(e, ahead) {
+                    e.toggle = 1;
+                };
+            };
+        } else {
+            if pass_to(e, ahead) {
+                e.toggle = 1;
+            } else {
+                if not only and pass_to(e, side) {
+                    e.toggle = 0;
+                };
+            };
+        };
+    }
+
+    // ── hash ─────────────────────────────────────────────────────────────────────
+
+    fn feed(h: I32, v: I32) I32 {
+        let x = h;
+        for (0..<4) |k| {
+            x = (x ^ ((v >> (8 * k)) & 255)) * 16777619;
+        };
+        x;
+    }
+
+    fn feed_list(h: I32, list: Array[I32], n: I32) I32 {
+        let x = feed(h, n);
+        for (0..<n) |i| {
+            x = feed(x, list[i]);
+        };
+        x;
+    }
+
+    fn flag(b: Bool) I32 {
+        if b { 1; } else { 0; };
+    }
+
+    fn hash(w: World) I32 {
+        let h = -2128831035;
+        let done_mask = 0;
+        for (0..<w.done.len()) |t| {
+            if w.done[t] == 1 {
+                done_mask = done_mask | (1 << t);
+            };
+        };
+        let revealed = 0;
+        for (w.revealed) |r| {
+            revealed += r;
+        };
+        let resources = 0;
+        for (w.res_amount) |a| {
+            resources += a;
+        };
+        for ([w.tick, w.satisfaction, w.research_current, w.research_progress, done_mask, revealed, resources]) |v| {
+            h = feed(h, v);
+        };
+        let all = w.entities;
+        for (0..<all.n) |i| {
+            let e = all.items[i];
+            for ([e.id, e.machine, e.x, e.y, e.dir, e.recipe, e.progress, flag(e.busy), e.fuel, e.burn, e.heat]) |v| {
+                h = feed(h, v);
+            };
+            h = feed_list(h, e.inv, e.inv.len());
+            h = feed_list(h, e.out, e.out.len());
+            h = feed_list(h, e.belt, e.belt_n);
+            for ([e.state, e.timer, e.hand, e.held, e.pick, e.stack, e.priority, e.toggle, e.role, e.fluid,
+                  e.amount, e.charge, e.cond_item, e.cond_op, e.cond_value, flag(e.signal), e.crafts, e.moved]) |v| {
+                h = feed(h, v);
+            };
+        };
+        h;
+    }
+
+    // ── loading and saving ───────────────────────────────────────────────────────
+
+    fn load(game_text: Str, save_text: Str) ?World {
+        promote @json/\ decode GameData game_text \/ {
+            |game| => {
+                promote @json/\ decode Save save_text \/ {
+                    |save| => world_from_save(game, save),
+                    ~> null,
+                };
+            },
+            ~> null,
+        };
+    }
+
+    fn load_error(game_text: Str, save_text: Str) Str {
+        let game = @json/\ error GameData game_text \/;
+        if game.len() > 0 { "game.json: " + game; } else { "save: " + @json/\ error Save save_text \/; };
+    }
+
+    fn save_text(w: World) Str {
+        @json/\ encode Save to_save(w) \/;
+    }
+
+    fn copy_counts(source: ?Array[I32], fallback: Array[I32]) Array[I32] {
+        promote source {
+            |s| => {
+                let copy = Array[I32].new_default(s.len());
+                copy.copy_from(0, s, 0, s.len());
+                copy;
+            },
+            ~> fallback,
+        };
+    }
+
+    fn world_from_save(game: GameData, save: Save) World {
+        let w = new_world(game, save.width, save.height);
+        w.tick = save.tick;
+        w.next_id = save.nextId;
+        for (0..<save.terrain.len()) |i| {
+            if save.terrain[i] == 126 {
+                w.water[i] = 1;
+            };
+        };
+        for (save.resources) |r| {
+            let tile = r[1] * w.width + r[0];
+            w.res_kind[tile] = r[2];
+            w.res_amount[tile] = r[3];
+        };
+        for (0..<save.revealed.len()) |i| {
+            if save.revealed[i] == 49 {
+                w.revealed[i] = 1;
+            };
+        };
+        for (save.research.done) |t| {
+            complete(w, t);
+        };
+        w.research_current = save.research.current;
+        w.research_progress = save.research.progress;
+        let ordered = save.entities sort(SaveEntity) |a, b| { a.id < b.id; };
+        for (ordered) |s| {
+            let e = new_entity(w, s.id, s.machine, s.x, s.y, s.dir);
+            e.recipe = s.recipe;
+            e.progress = s.progress;
+            e.busy = s.busy;
+            e.fuel = s.fuel;
+            e.burn = s.burn;
+            e.heat = s.heat;
+            e.inv = copy_counts(s.inv, e.inv);
+            e.out = copy_counts(s.out, e.out);
+            promote s.belt {
+                |items| => {
+                    e.belt.copy_from(0, items, 0, items.len());
+                    e.belt_n = items.len();
+                },
+                ~> {},
+            };
+            e.state = s.state;
+            e.timer = s.timer;
+            e.hand = s.hand;
+            e.held = s.held;
+            e.pick = s.pick;
+            e.stack = s.stack;
+            e.priority = s.priority;
+            e.toggle = s.toggle;
+            e.role = s.role;
+            e.fluid = s.fluid;
+            e.amount = s.amount;
+            e.charge = s.charge;
+            e.cond_item = s.condItem;
+            e.cond_op = s.condOp;
+            e.cond_value = s.condValue;
+            e.signal = s.signal;
+            e.crafts = s.crafts;
+            e.moved = s.moved;
+            add_entity(w, e);
+        };
+        w;
+    }
+
+    fn counts_or_null(counts: Array[I32], n: I32, present: Bool) ?Array[I32] {
+        if present { counts.slice(0, n); } else { null; };
+    }
+
+    fn to_save(w: World) Save {
+        let terrain = Array[I32].new_default(w.water.len());
+        for (0..<w.water.len()) |i| {
+            terrain[i] = if w.water[i] == 1 { 126; } else { 46; };
+        };
+        let revealed = Array[I32].new_default(w.revealed.len());
+        for (0..<w.revealed.len()) |i| {
+            revealed[i] = 48 + w.revealed[i];
+        };
+        let resources = (0..<w.res_kind.len()) filter |t| { w.res_kind[t] >= 0; }
+            map |t| { [t % w.width, t / w.width, w.res_kind[t], w.res_amount[t]]; } collect(Array[I32]);
+        let done = (0..<w.done.len()) filter |t| { w.done[t] == 1; } collect(I32);
+        let all = w.entities;
+        let entities = (0..<all.n) map |i| {
+            let e = all.items[i];
+            SaveEntity {
+                id: e.id, machine: e.machine, x: e.x, y: e.y, dir: e.dir, recipe: e.recipe, progress: e.progress,
+                busy: e.busy, fuel: e.fuel, burn: e.burn, heat: e.heat,
+                inv: counts_or_null(e.inv, e.inv.len(), has_inventory(e.cls)),
+                out: counts_or_null(e.out, e.out.len(), is_crafter(e.cls)),
+                belt: counts_or_null(e.belt, e.belt_n, is_belt_like(e.cls)),
+                state: e.state, timer: e.timer, hand: e.hand, held: e.held, pick: e.pick, stack: e.stack,
+                priority: e.priority, toggle: e.toggle, role: e.role, fluid: e.fluid, amount: e.amount, charge: e.charge,
+                condItem: e.cond_item, condOp: e.cond_op, condValue: e.cond_value, signal: e.signal,
+                crafts: e.crafts, moved: e.moved,
+            };
+        } collect(SaveEntity);
+        Save {
+            version: 1, tick: w.tick, width: w.width, height: w.height, nextId: w.next_id,
+            terrain: Str.from_codes(terrain, terrain.len()), resources: resources,
+            revealed: Str.from_codes(revealed, revealed.len()),
+            research: Research { current: w.research_current, progress: w.research_progress, done: done },
+            entities: entities,
+        };
+    }
+}

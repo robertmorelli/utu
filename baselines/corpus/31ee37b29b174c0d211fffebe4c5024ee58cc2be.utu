@@ -1,0 +1,4 @@
+
+      mod Sum[T] { fn total(xs: Array[T]) T { xs sum; } }
+      export main() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; Sum[I32].total(a).to_f64()+Sum[F64].total(b); }
+    

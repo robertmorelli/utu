@@ -1,0 +1,51 @@
+// 07 — js-yaml. The nominal-handle pattern, which is where utu is strongest.
+//
+//   function load(str: string, opts?: LoadOptions): unknown;
+//
+// The return type is literally `unknown`. Structural typing has nothing to
+// offer here — there is no shape to match. What you want is exactly what utu
+// gives you: an opaque nominal handle that cannot be confused with any other
+// handle, plus explicit accessors that say how to read it.
+//
+// This binding is *better* than the .d.ts it came from, because `YamlDoc` is a
+// distinct type while `unknown` is assignable from anything.
+
+mod YamlDoc {
+    type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
+
+    fn &.str |self| (key: Str) Str { yaml_get_str(self, key); }
+    fn &.int |self| (key: Str) I32 { yaml_get_int(self, key); }
+    fn &.has |self| (key: Str) Bool { yaml_has(self, key); }
+}
+
+let parse: fun(Str) YamlDoc =
+    @es/\ ((m) => (s) => m.default.load(s))(await import('js-yaml')) \/;
+
+let dump: fun(YamlDoc) Str =
+    @es/\ ((m) => (d) => m.default.dump(d))(await import('js-yaml')) \/;
+
+// The accessors a .d.ts can never generate, because `unknown` has no members.
+let yaml_get_str: fun(YamlDoc, Str) Str = @es/\ (d, k) => String(d[k]) \/;
+let yaml_get_int: fun(YamlDoc, Str) I32 = @es/\ (d, k) => Number(d[k]) \/;
+let yaml_has: fun(YamlDoc, Str) Bool = @es/\ (d, k) => (k in d) ? 1 : 0 \/;
+
+export main() Str {
+    parse("name: utu\nyear: 2026\n").str("name");
+}
+
+test "a parsed document is an opaque nominal handle" {
+    let doc: YamlDoc = parse("name: utu\nyear: 2026\n");
+    assert doc.str("name") == "utu";
+    assert doc.int("year") == 2026;
+}
+
+test "membership and round-trip through the same handle type" {
+    let doc: YamlDoc = parse("a: 1\nb: 2\n");
+    assert doc.has("a");
+    assert doc.has("zzz") == false;
+    assert dump(doc) == "a: 1\nb: 2\n";
+}
+
+test "methods promote onto the handle so calls read natively" {
+    assert parse("k: v\n").str("k") == "v";
+}

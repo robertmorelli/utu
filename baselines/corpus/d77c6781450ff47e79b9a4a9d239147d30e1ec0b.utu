@@ -1,0 +1,1 @@
+export lib { fn bad(flag: Bool) I32 { match flag { true => 1, }; } }

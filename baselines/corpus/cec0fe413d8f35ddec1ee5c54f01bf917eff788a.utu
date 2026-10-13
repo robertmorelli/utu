@@ -1,0 +1,21 @@
+
+      mod store {
+          struct Row:
+              | id: I32
+              | tags: ?Array[Str]
+          struct Table:
+              | rows: Array[Row]
+          fn count(text: Str) I32 {
+              promote @json/\ decode Table text \/ {
+                  |t| => t.rows.len(),
+                  ~> -1,
+              };
+          }
+      }
+      struct Row:
+          | name: Str
+      export lib {
+          fn rows(text: Str) I32 { store.count(text); }
+          fn name(text: Str) Str { promote @json/\ decode Row text \/ { |r| => r.name, ~> "?", }; }
+      }
+    

@@ -1,0 +1,8 @@
+
+      proto P:
+        | value() I32
+      struct Line[P]:
+        | x : I32
+      fn accept(value: P) I32 { 1; }
+      export main() I32 { accept(Line { x: 3 }); }
+    

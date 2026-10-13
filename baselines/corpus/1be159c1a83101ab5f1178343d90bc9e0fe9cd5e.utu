@@ -1,0 +1,31 @@
+// std/I31.utu — I31 WasmGC reference type module
+// & maps to WasmGC i31ref: a 31-bit signed integer packed into a GC reference.
+// I31 IS nullable: ?I31 is valid (it is a heap reference).
+//
+// I31 is useful when you need a type that fits in both a GC reference slot
+// and carries an integer payload without heap allocation.
+// The sign bit of the 32-bit I32 is used to tag the reference, so only
+// 31 bits of payload are available.
+
+mod I31 {
+    type & = @ir/\ <ir-wasm-ref type-repr="wasm-i31"/> \/
+
+    // Pack an I32 value into an I31 reference (truncates to 31 bits).
+    fn from_i32(x: I32) & {
+        @ir/\ <ir-i31-new><ir-ident name="x"/></ir-i31-new> \/;
+    }
+
+    // Unpack as signed I32 (sign-extends from 31 bits).
+    fn get_s(r: &) I32 {
+        @ir/\ <ir-i31-get-s><ir-ident name="r"/></ir-i31-get-s> \/;
+    }
+
+    // Unpack as unsigned I32 (zero-extends from 31 bits).
+    fn get_u(r: &) I32 {
+        @ir/\ <ir-i31-get-u><ir-ident name="r"/></ir-i31-get-u> \/;
+    }
+
+    // Reference equality (same I31 value → same reference → eq).
+    fn &:eq |a, b| Bool { @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/; }
+    fn &:ne |a, b| Bool { @ir/\ <ir-ref-ne><ir-ident name="a"/><ir-ident name="b"/></ir-ref-ne> \/; }
+}

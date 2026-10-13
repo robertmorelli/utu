@@ -1,0 +1,1 @@
+export lib { fn bad(x: I32, x: I32) I32 { x; } }

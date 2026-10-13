@@ -1,0 +1,6 @@
+
+      export lib {
+          fn ints(n: I32) I32 { let xs = Array[I32].new(n, 3); promote xs reduce(I32) |a, x, i| { a * 2 + x + i.to_i32(); } { |f| => f.value, ~> -1, }; }
+          fn floats(n: I32) F64 { let xs = Array[F64].new(n, 1.5); promote xs reduce(F64) |a, x| { a + x; } { |f| => f.value, ~> -1.0, }; }
+      }
+    

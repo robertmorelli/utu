@@ -1,0 +1,25 @@
+// Headless entry for tests and benchmarks: the simulation behind a small API.
+using sim from "./sim.utu";
+
+export lib {
+    fn create(game_text: Str, save_text: Str) ?sim.World {
+        sim.load(game_text, save_text);
+    }
+    fn load_error(game_text: Str, save_text: Str) Str {
+        sim.load_error(game_text, save_text);
+    }
+    fn run(w: sim.World, ticks: I32) void {
+        for (0..<ticks) |i| {
+            sim.step(w);
+        };
+    }
+    fn state_hash(w: sim.World) I32 {
+        sim.hash(w);
+    }
+    fn entity_count(w: sim.World) I32 {
+        w.entities.n;
+    }
+    fn save_text(w: sim.World) Str {
+        sim.save_text(w);
+    }
+}

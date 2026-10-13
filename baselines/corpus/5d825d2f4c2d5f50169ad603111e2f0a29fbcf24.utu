@@ -1,0 +1,5 @@
+let console_log: fun(Str) void = @es/\console.log\/;
+
+export main() void {
+    console_log("hello world");
+}

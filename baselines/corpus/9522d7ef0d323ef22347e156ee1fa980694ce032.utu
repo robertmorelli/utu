@@ -1,0 +1,10 @@
+
+      mod Document { type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/ }
+      mod Element { type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/ }
+      export lib {
+        fn bad(element: Element) Document {
+          let doc: Document = element;
+          doc;
+        }
+      }
+    

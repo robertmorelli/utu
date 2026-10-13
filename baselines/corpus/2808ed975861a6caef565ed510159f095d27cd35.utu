@@ -1,0 +1,30 @@
+
+      struct Log:
+          | v: I32
+      struct P:
+          | v: I32
+      fn squares(n: I32) yield I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }
+      fn three() yield I32 { yield 1; yield 2; yield 3; }
+      fn upto(n: I32) yield I32 { let i = 0; while (true) { if i == n { return; }; yield i; i += 1; }; }
+      fn shadowing(s: I32) yield I32 { let x = s * 2; yield x; yield x + 1; }
+      fn doubled(n: I32) yield I32 { for (squares(n)) |x| { yield x * 2; }; }
+      fn points(n: I32) yield P { for (0..<n) |i| { yield P { v: i }; }; }
+      fn guarded(l: Log) yield I32 { defer l.v += 100; yield 1; yield 2; }
+      fn bump(l: Log) I32 { l.v += 1; 3; }
+      fn first_over(limit: I32) I32 { for (squares(100)) |x| { if x > limit { return x; }; }; -1; }
+      export lib {
+          fn sum() I32 { let s = 0; for (squares(10)) |x| { s += x; }; s; }
+          fn broken() I32 { let s = 0; for (squares(100)) |x| { if x > 30 { break; }; s += x; }; s; }
+          fn skipped() I32 { let s = 0; for (squares(10)) |x| { if x == 16 { continue; }; s += x; }; s; }
+          fn ordered() I32 { let s = 0; for (three()) |x| { s = s * 10 + x; }; s; }
+          fn returned() I32 { let s = 0; for (upto(5)) |x| { s += x; }; s; }
+          fn hygiene() I32 { let s = 100; let x = 7; for (shadowing(3)) |v| { s += v + x; }; s; }
+          fn nested() I32 { let s = 0; for (doubled(10)) |x| { s += x; }; s; }
+          fn early() I32 { first_over(50); }
+          fn inner_loops() I32 { let s = 0; for (squares(5)) |x| { for (0..<3) |j| { if j == 1 { continue; }; s += x; }; }; s; }
+          fn structs() I32 { let s = 0; for (points(4)) |p| { s += p.v; }; s; }
+          fn deferred() I32 { let l = Log { v: 0 }; for (guarded(l)) |x| { if x == 1 { break; }; }; l.v; }
+          fn once() I32 { let l = Log { v: 0 }; let s = 0; for (upto(bump(l))) |x| { s += x; }; l.v * 100 + s; }
+          fn awaited() I32 { let s = 0; await for (squares(4)) |x| { s += x; }; s; }
+      }
+    

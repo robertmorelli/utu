@@ -1,0 +1,16 @@
+
+        proto Value:
+          | get set value : I32
+        tag struct Cell[Value]:
+          | value : I32
+        fn update(item: Value) I32 {
+          item.value = 9;
+          item.value;
+        }
+        export lib {
+          fn run() I32 {
+            let cell: Cell = Cell { value: 1 };
+            update(cell);
+          }
+        }
+      

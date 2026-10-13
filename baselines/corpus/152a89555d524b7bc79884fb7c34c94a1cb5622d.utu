@@ -1,0 +1,9 @@
+
+      export lib {
+        fn spin() I32 {
+          let i: I32 = 0;
+          while () { i += 1; if i == 3 { return i; }; };
+          i;
+        }
+      }
+    

@@ -1,0 +1,2103 @@
+{
+ "benchmarks/deltablue/deltablue.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "1c51a998ff843e37",
+  "queries": "3f194b0a5f2beb40",
+  "graphs": "75c0ed3521e82a8b"
+ },
+ "benchmarks/deltablue/deltablue.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/loops/loops.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "a727724f2965dbf4",
+  "queries": "0b79555d4c416c5f",
+  "graphs": "3d6b28245f51324b"
+ },
+ "benchmarks/loops/loops.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/pantry/kernels.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "7a21c16efff2ba34",
+  "queries": "c428cf52a3db66cf",
+  "graphs": "b565fbcc3d5d17c0"
+ },
+ "benchmarks/pantry/kernels.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/suite/analyzer.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "303d08f243b2b2c1",
+  "queries": "85bf568c29c56f98",
+  "graphs": "0b5a4e2e63b2c30b"
+ },
+ "benchmarks/suite/analyzer.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/suite/scalar.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "89f29ae7188b98d7",
+  "queries": "c20131f25fa51e33",
+  "graphs": "297aeaa2554b5a7e"
+ },
+ "benchmarks/suite/scalar.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/suite/sieve.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "646d447f52c3433c",
+  "queries": "cd8c50baf6b26989",
+  "graphs": "11d4e4a38828744e"
+ },
+ "benchmarks/suite/sieve.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/suite/strings.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "2fc775625c0a05ba",
+  "queries": "4818d65ca871f8c8",
+  "graphs": "257f971e5a52d808"
+ },
+ "benchmarks/suite/strings.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/tiny/benchmark.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "d7ddd1ae51318f69",
+  "queries": "26f9eed4ee433afc",
+  "graphs": "e8a6a92693babae8"
+ },
+ "benchmarks/tiny/benchmark.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/bench/bench_basic.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "4b6478f81d828521",
+  "queries": "2895ba63c622ba4d",
+  "graphs": "5b70c6def9560eaa"
+ },
+ "examples/bench/bench_basic.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/browser-board/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "3b66ea8279424c47",
+  "queries": "981e67b46acafd4f",
+  "graphs": "d4ed654430e40bfd"
+ },
+ "examples/browser-board/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/browser-pantry/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "809167012b2b3258",
+  "queries": "4e71baa60feb9b9e",
+  "graphs": "48150b262f86b454"
+ },
+ "examples/browser-pantry/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/call_simple.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "3ab3f488d40ae606",
+  "queries": "9c28d16737d60887",
+  "graphs": "0fceb24d5bf73c80"
+ },
+ "examples/call_simple.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/assert_fail.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "9a8dfe3ff26fe122",
+  "queries": "b0d172b8fb2ca8b4",
+  "graphs": "d5fcf806388187fe"
+ },
+ "examples/ci/assert_fail.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/assert_pass.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "c380ac89ddd02196",
+  "queries": "c09313bfdb7fb24a",
+  "graphs": "1fec4bd948cee3cb"
+ },
+ "examples/ci/assert_pass.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_alt_fallback.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "a9e2e2aa9b48071e",
+  "queries": "8692ee0db7a72c9c",
+  "graphs": "0c23a88be9e395ec"
+ },
+ "examples/ci/codegen_alt_fallback.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_arithmetic_locals.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "2cd56f5ea682143c",
+  "queries": "f06f4c9c3c6174ce",
+  "graphs": "0519b4fdc12d09da"
+ },
+ "examples/ci/codegen_arithmetic_locals.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_arrays.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "eb53e70b251cc6c5",
+  "queries": "71c9a18d297062e6",
+  "graphs": "62c3bdc608051285"
+ },
+ "examples/ci/codegen_arrays.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_break_and_call.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "d87c5a5e7771196f",
+  "queries": "26a5bf9b5820ac5a",
+  "graphs": "fcff7896b23e32c1"
+ },
+ "examples/ci/codegen_break_and_call.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_closures.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "6be68e42eaa186cc",
+  "queries": "a9ba06fa4a706eda",
+  "graphs": "0dedc87da97620b8"
+ },
+ "examples/ci/codegen_closures.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_composition.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "7f371e8806ddfddb",
+  "queries": "c183a52cd63f8e58",
+  "graphs": "df8d826e298fd925"
+ },
+ "examples/ci/codegen_composition.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_control_flow.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "37e057a9adb5f123",
+  "queries": "0cc5a46e25b5b6d6",
+  "graphs": "e33fc4242c392ccc"
+ },
+ "examples/ci/codegen_control_flow.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_globals.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "646bc3bb8e28bfaa",
+  "queries": "fb772dd26e0d4c9b",
+  "graphs": "9d98e1698ce7e8dc"
+ },
+ "examples/ci/codegen_globals.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_import_values.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "27032a252b989307",
+  "queries": "a60a196d4ba6c341",
+  "graphs": "4c8b1afc1b57c46d"
+ },
+ "examples/ci/codegen_import_values.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_imports_exports.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "2e560f705de9ff41",
+  "queries": "ede9614243eb48a9",
+  "graphs": "aa436bef4ae0921c"
+ },
+ "examples/ci/codegen_imports_exports.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_jsgen.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "e6fff3e84a3025ef",
+  "queries": "2e1b958d3d1df17d",
+  "graphs": "702aeb6907bb2e75"
+ },
+ "examples/ci/codegen_jsgen.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_match.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "a71e09aa32ea5427",
+  "queries": "98b721b74470d01b",
+  "graphs": "860c26f1ca6bce83"
+ },
+ "examples/ci/codegen_match.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_nullable.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "bed68deb744c24b1",
+  "queries": "ebaae92dce05031d",
+  "graphs": "b23d9ea2e919f8b7"
+ },
+ "examples/ci/codegen_nullable.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_pipes.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "93e85bbab0f0bd07",
+  "queries": "93dd034ce4d2836f",
+  "graphs": "0d5a112b05402133"
+ },
+ "examples/ci/codegen_pipes.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_promote.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "35799ac72d5aa073",
+  "queries": "f7c515f69d1557ab",
+  "graphs": "3087248d9492d8a6"
+ },
+ "examples/ci/codegen_promote.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_promote_simple.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "891aa0e9e20250ec",
+  "queries": "9aa299ca409f1c5c",
+  "graphs": "2b700422cbda66b0"
+ },
+ "examples/ci/codegen_promote_simple.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_protocols.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "bc446fdfaf57e97f",
+  "queries": "bfe39c937f507a84",
+  "graphs": "bd0e10aa4607a0b5"
+ },
+ "examples/ci/codegen_protocols.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_scalar_match.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "0aaf6bb1494e0e97",
+  "queries": "420de24588897ad2",
+  "graphs": "c7ee74bb292a2315"
+ },
+ "examples/ci/codegen_scalar_match.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_structs.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "9b4141885475e280",
+  "queries": "c5617e069cd9e774",
+  "graphs": "52e2279e19000cbe"
+ },
+ "examples/ci/codegen_structs.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_test_surface.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "affcc332d405bc22",
+  "queries": "b3c8c3031f3a381e",
+  "graphs": "25047b1a8377bac9"
+ },
+ "examples/ci/codegen_test_surface.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/codegen_traps.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "d0abd45d909e2a77",
+  "queries": "cc23636aea7e2608",
+  "graphs": "7236b6ffae619a28"
+ },
+ "examples/ci/codegen_traps.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/global_string.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "460b15d0c8b6fce4",
+  "queries": "9423a007c2d2f042",
+  "graphs": "eb09d257dbb46c5b"
+ },
+ "examples/ci/global_string.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/hello.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "31a2703a2b410243",
+  "queries": "859dc632cbd4c4c0",
+  "graphs": "c6f5db2dbd911ff8"
+ },
+ "examples/ci/hello.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/node_builtin_imports.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "67ff02c54400a95c",
+  "queries": "966ac0486326aab0",
+  "graphs": "729ed896dc8df79c"
+ },
+ "examples/ci/node_builtin_imports.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/string_echo.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "f758cc07f4ec4668",
+  "queries": "36a824afff2266f9",
+  "graphs": "97c7de986dbd9684"
+ },
+ "examples/ci/string_echo.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/string_roundtrip.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "c8040c0a234a26e2",
+  "queries": "f59ae78b97018e9e",
+  "graphs": "352cbf1c0aa6564d"
+ },
+ "examples/ci/string_roundtrip.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/tests_basic.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "40d77ebc38be5816",
+  "queries": "b27e2ad567ec4a13",
+  "graphs": "79c77aa1e00f9435"
+ },
+ "examples/ci/tests_basic.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/ci/tests_fail.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "77743ee6aab080d4",
+  "queries": "9a630ff96e314a27",
+  "graphs": "52239cb893e2d659"
+ },
+ "examples/ci/tests_fail.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/closures.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "e299b4781006fb80",
+  "queries": "32e1b20918ca2ad9",
+  "graphs": "9e1e2afdb0232568"
+ },
+ "examples/closures.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/error_demo/01_argument_blame.utu analysis": {
+  "diagnostics": "99f98af32d627d1a",
+  "formatted": "56f2fed80b0ea6ef",
+  "entries": "885a0f8b540d3c88",
+  "queries": "174d459913a16864",
+  "graphs": "3fa8c2dd944b15e2"
+ },
+ "examples/error_demo/01_argument_blame.utu normal": {
+  "diagnostics": "99f98af32d627d1a",
+  "formatted": "56f2fed80b0ea6ef"
+ },
+ "examples/error_demo/02_return_blame.utu analysis": {
+  "diagnostics": "e86b10a7ed1a84ab",
+  "formatted": "c520d7d1ae1a4e39",
+  "entries": "48e63d98906065d9",
+  "queries": "519a63b817e7d57e",
+  "graphs": "7f715a63698ad055"
+ },
+ "examples/error_demo/02_return_blame.utu normal": {
+  "diagnostics": "e86b10a7ed1a84ab",
+  "formatted": "c520d7d1ae1a4e39"
+ },
+ "examples/error_demo/03_branch_confluence.utu analysis": {
+  "diagnostics": "d58f45cf11f48e32",
+  "formatted": "c405d2ae62d6e2a3",
+  "entries": "da6af73124bbab5f",
+  "queries": "1fc86058285726f3",
+  "graphs": "1ac871aae8898c7f"
+ },
+ "examples/error_demo/03_branch_confluence.utu normal": {
+  "diagnostics": "d58f45cf11f48e32",
+  "formatted": "c405d2ae62d6e2a3"
+ },
+ "examples/error_demo/04_field_assignment_blame.utu analysis": {
+  "diagnostics": "95daffa946bcd369",
+  "formatted": "0c1af43007c92fe7",
+  "entries": "543004e1ab8613f2",
+  "queries": "5b8cdeef212ff168",
+  "graphs": "af3fd4b45483f54c"
+ },
+ "examples/error_demo/04_field_assignment_blame.utu normal": {
+  "diagnostics": "95daffa946bcd369",
+  "formatted": "0c1af43007c92fe7"
+ },
+ "examples/error_demo/05_whole_file_recovery.utu analysis": {
+  "diagnostics": "eccfd66345e06840",
+  "formatted": "31a3a423245ecbf8",
+  "entries": "90e753542937ac59",
+  "queries": "783af73ac676ef1e",
+  "graphs": "bcccdbaf69af3767"
+ },
+ "examples/error_demo/05_whole_file_recovery.utu normal": {
+  "diagnostics": "eccfd66345e06840",
+  "formatted": "31a3a423245ecbf8"
+ },
+ "examples/fannkuch.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "31746a60b9051513",
+  "queries": "055cf83f7bf39cf1",
+  "graphs": "e03b7e107fefc027"
+ },
+ "examples/fannkuch.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/float.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "70821c4bcb8f8048",
+  "queries": "f74201df3221fda9",
+  "graphs": "0d14d6497e1bd645"
+ },
+ "examples/float.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/foundry/utu/app.utu analysis": {
+  "diagnostics": "d8d88808e923c2c8",
+  "formatted": "bafbdce6d2b35942",
+  "entries": "a2237b6f27daaba5",
+  "queries": "70f039cb21b493b0",
+  "graphs": "12c36e32351b016b"
+ },
+ "examples/foundry/utu/app.utu normal": {
+  "diagnostics": "d8d88808e923c2c8",
+  "formatted": "bafbdce6d2b35942"
+ },
+ "examples/foundry/utu/headless.utu analysis": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce",
+  "entries": "d4543c06182576b6",
+  "queries": "458aec8a221be255",
+  "graphs": "ad08da4aeeaef489"
+ },
+ "examples/foundry/utu/headless.utu normal": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce"
+ },
+ "examples/foundry/utu/proto/app.utu analysis": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce",
+  "entries": "3656949b3b7a891b",
+  "queries": "348b6f19db89ca37",
+  "graphs": "fcb284948fdb83a2"
+ },
+ "examples/foundry/utu/proto/app.utu normal": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce"
+ },
+ "examples/foundry/utu/proto/view.utu analysis": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce",
+  "entries": "ff8b027a2789fcfd",
+  "queries": "2b23439a0473538a",
+  "graphs": "55a75a1837ce6ded"
+ },
+ "examples/foundry/utu/proto/view.utu normal": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce"
+ },
+ "examples/foundry/utu/sim.utu analysis": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce",
+  "entries": "ef4743dc87a49447",
+  "queries": "6ad228d3975ccdae",
+  "graphs": "fb0b17b44d72d4bf"
+ },
+ "examples/foundry/utu/sim.utu normal": {
+  "diagnostics": "2596ddf21cadebd4",
+  "formatted": "305a1c632e1decce"
+ },
+ "examples/foundry/utu/style.utu analysis": {
+  "diagnostics": "e5c6e2d736b9a521",
+  "formatted": "95c79ad04b7d9224",
+  "entries": "35c969d10b3be59a",
+  "queries": "df7585d56690b7ab",
+  "graphs": "eb28cba4a4b590da"
+ },
+ "examples/foundry/utu/style.utu normal": {
+  "diagnostics": "e5c6e2d736b9a521",
+  "formatted": "95c79ad04b7d9224"
+ },
+ "examples/foundry/utu/ui.utu analysis": {
+  "diagnostics": "8dd934ef7129775f",
+  "formatted": "8599ba847343f640",
+  "entries": "ec54ab65a682c871",
+  "queries": "66563f6d12b40a99",
+  "graphs": "183a94f2ef074c62"
+ },
+ "examples/foundry/utu/ui.utu normal": {
+  "diagnostics": "8dd934ef7129775f",
+  "formatted": "8599ba847343f640"
+ },
+ "examples/hello.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "72aa59034f750795",
+  "queries": "242149c2fee0152f",
+  "graphs": "21d396d1cf438e70"
+ },
+ "examples/hello.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/hello_name.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "6f80273933ccb8fa",
+  "queries": "090995326500b807",
+  "graphs": "05ce4a7c007a97fc"
+ },
+ "examples/hello_name.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/hello_world.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "0a0a41c2bb8f7180",
+  "queries": "ff5f11d698e6899f",
+  "graphs": "d6eeabbb65355ff5"
+ },
+ "examples/hello_world.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/jpl/jpl.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "595288de77a857f1",
+  "queries": "af58538ac2e15069",
+  "graphs": "2e363740d5699f40"
+ },
+ "examples/jpl/jpl.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/json/json.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "b74e29ddd4bf28c1",
+  "queries": "30e5c2e57f0f2a89",
+  "graphs": "a0ecbcf8136f9e3c"
+ },
+ "examples/json/json.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/console.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "6c6ec58ffe7bc527",
+  "queries": "6169b9b0dbbb85f6",
+  "graphs": "dd126289ce3104bd"
+ },
+ "examples/modules/console.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/inline_paths.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "1887cc3a0bf2db28",
+  "queries": "36f8ce8073b6c836",
+  "graphs": "c71dc1db08ed1682"
+ },
+ "examples/modules/inline_paths.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/main_and_bench.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "19c97dbf3474de3a",
+  "queries": "7c2b7b09e3611d12",
+  "graphs": "6b9aced31a7f9b2c"
+ },
+ "examples/modules/main_and_bench.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/method_promotion.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "87163981b953a731",
+  "queries": "3e779fa90931230e",
+  "graphs": "2b13d4e82c6863c5"
+ },
+ "examples/modules/method_promotion.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/multiple_instantiations.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "3fe6d288baf8ea4a",
+  "queries": "ebdcc49ac73099e8",
+  "graphs": "f4128128bf16c250"
+ },
+ "examples/modules/multiple_instantiations.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/open_constructs.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "2f70e3863d9165c0",
+  "queries": "d9bcf7d38e2d9978",
+  "graphs": "a6934cef8367b590"
+ },
+ "examples/modules/open_constructs.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/parameterized_aliases.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "e701451d2b53bdeb",
+  "queries": "490afb355a0bf778",
+  "graphs": "fc2d16d5da391965"
+ },
+ "examples/modules/parameterized_aliases.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/plain_modules.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "2c0ab2585da880e4",
+  "queries": "df563eb86656d9a1",
+  "graphs": "9d4d27c2e09b5314"
+ },
+ "examples/modules/plain_modules.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/top_level.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "9007a77995f63b18",
+  "queries": "5cdc7eb3c67c2212",
+  "graphs": "8791a704e003627d"
+ },
+ "examples/modules/top_level.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/modules/two_params_and_nullable.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "a8db79acc5d2c65f",
+  "queries": "3ef71484637be785",
+  "graphs": "a6e5a7a292ff2b77"
+ },
+ "examples/modules/two_params_and_nullable.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/multi_file/_boxes.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "42cf6f6b162ff45e",
+  "queries": "1e9f3c3b7358426e",
+  "graphs": "8cc7b94c965a7be1"
+ },
+ "examples/multi_file/_boxes.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/multi_file/_ops.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "7fde95d7b657915b",
+  "queries": "1b92935007f2e7cb",
+  "graphs": "2619b29c1aabf106"
+ },
+ "examples/multi_file/_ops.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/multi_file/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "76c77e67b3239e36",
+  "queries": "aefafc8d383df6ba",
+  "graphs": "ca62888db6d7098a"
+ },
+ "examples/multi_file/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/multi_file/tests.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "bb968dfaa169169a",
+  "queries": "4a463fdd061d5555",
+  "graphs": "399c8fd8b6854af6"
+ },
+ "examples/multi_file/tests.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/promises.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "9f442963df35f557",
+  "queries": "5fd89ea560a230fa",
+  "graphs": "036cd8a5f9b03453"
+ },
+ "examples/promises.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/protocols.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "ccdf8c5ff85321a0",
+  "queries": "26779a731585740b",
+  "graphs": "ead78dfddc935fd0"
+ },
+ "examples/protocols.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/queries/indexes.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "89cd1167887c7e48",
+  "queries": "726e7afa3dbeeba1",
+  "graphs": "68202321f70b5e91"
+ },
+ "examples/queries/indexes.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/queries/iterators.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "be7fd4e4e3195665",
+  "queries": "2a765630a211999b",
+  "graphs": "eb7dd412231eefd2"
+ },
+ "examples/queries/iterators.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/spectralnorm.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "f6c6cb7cf08e54cd",
+  "queries": "442271a4e16ca3a7",
+  "graphs": "9d907fa89f55049b"
+ },
+ "examples/spectralnorm.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/working/arrays_and_for.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "9d90fd84d32cffc0",
+  "queries": "f10956a1ee8f420f",
+  "graphs": "5e518f91d50a4cf9"
+ },
+ "examples/working/arrays_and_for.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/working/closures.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "36d479dd1d2278e9",
+  "queries": "ecddfea75abb5636",
+  "graphs": "29a91543db2995dc"
+ },
+ "examples/working/closures.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/working/hello.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "4643966375b34c6d",
+  "queries": "ff21a55cfe4836be",
+  "graphs": "3395fef760c26af0"
+ },
+ "examples/working/hello.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/working/strings.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "89c745eaf1171bc2",
+  "queries": "a62c1cde0716a01b",
+  "graphs": "fa5e599684673d23"
+ },
+ "examples/working/strings.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/working/structs.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "3bb4ff140b890daf",
+  "queries": "1dcdbd7ae54ace31",
+  "graphs": "208574602d88a199"
+ },
+ "examples/working/structs.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-five/folio/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "b1b69e23e276feb0",
+  "queries": "441bd94dfd530552",
+  "graphs": "c35374b4be809acd"
+ },
+ "examples/wutu-five/folio/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-five/juniper/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "f5688001b6a2c2d2",
+  "queries": "a33c16266e4fd3cb",
+  "graphs": "eb50394e3f54e598"
+ },
+ "examples/wutu-five/juniper/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-five/scope/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "9c8e610a4548019a",
+  "queries": "b6cdee7e8d58bfe5",
+  "graphs": "db658b1e4c8951a5"
+ },
+ "examples/wutu-five/scope/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-five/signal/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "1326171753e64e0a",
+  "queries": "f9a5b62ead494a48",
+  "graphs": "a87d114649dded35"
+ },
+ "examples/wutu-five/signal/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-five/wayfarer/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "39c4f39dbaae4ea9",
+  "queries": "372e9c3b04c58ccd",
+  "graphs": "bb8c92878b8799c3"
+ },
+ "examples/wutu-five/wayfarer/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-garden/main.utu analysis": {
+  "diagnostics": "08362091da8a7f62",
+  "formatted": "91dbad0492e2ca0d",
+  "entries": "ce3b792474f96ef0",
+  "queries": "31f69b4a35142b23",
+  "graphs": "9a2bf914885ef764"
+ },
+ "examples/wutu-garden/main.utu normal": {
+  "diagnostics": "08362091da8a7f62",
+  "formatted": "91dbad0492e2ca0d"
+ },
+ "examples/wutu-more/dispatch/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "6209adf55eb927c0",
+  "queries": "287ac6b19f1fa620",
+  "graphs": "8b2ec712c6c2a903"
+ },
+ "examples/wutu-more/dispatch/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-more/split/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "084004327d24daac",
+  "queries": "446c1d6aea1fe3ba",
+  "graphs": "346f06e915bd2704"
+ },
+ "examples/wutu-more/split/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-more/supper/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "ff00a75718f49113",
+  "queries": "803e6b8fce52ffa4",
+  "graphs": "ac3980e5b2c81ba8"
+ },
+ "examples/wutu-more/supper/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-reactive/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "cbae7adc9c4479f2",
+  "queries": "9abca1225f2e8e09",
+  "graphs": "d8d2c20b197ad5f2"
+ },
+ "examples/wutu-reactive/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-reactive/ui.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "272110b1ad4150e2",
+  "queries": "0c8f5e5204f2e50d",
+  "graphs": "9634bdc9cd7ef970"
+ },
+ "examples/wutu-reactive/ui.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-one/atlas/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "853a971680be3537",
+  "queries": "b356a98f14759baf",
+  "graphs": "bcb1a499de67b70b"
+ },
+ "examples/wutu-round-one/atlas/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-one/ledger/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "0d0e8ac23a05addf",
+  "queries": "0090acc3001e2b06",
+  "graphs": "cf5cbcca48e9632a"
+ },
+ "examples/wutu-round-one/ledger/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-one/meter/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "d97e8da161e2b14e",
+  "queries": "651f2231d9618810",
+  "graphs": "97db2f5a189b65ab"
+ },
+ "examples/wutu-round-one/meter/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-one/pantry/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "754d8c90fea40752",
+  "queries": "accea172c899bab6",
+  "graphs": "30f6b38e136a373d"
+ },
+ "examples/wutu-round-one/pantry/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-one/studio/main.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "e60de948525ff5e9",
+  "queries": "ab3ecd381f7fb4f4",
+  "graphs": "a0c33fbe9887a13b"
+ },
+ "examples/wutu-round-one/studio/main.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-one/theme.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "dbbd73f43d593ee1",
+  "queries": "5f37572513779a20",
+  "graphs": "d9d4de2409c2f41e"
+ },
+ "examples/wutu-round-one/theme.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/wutu-round-two/grove/main.utu analysis": {
+  "diagnostics": "49fec77f0fca49e1",
+  "formatted": "d533b34df74b6626",
+  "entries": "74fc9f4bf3a6acf2",
+  "queries": "fe8627b1c20a5ea5",
+  "graphs": "f28b59809297c3bc"
+ },
+ "examples/wutu-round-two/grove/main.utu normal": {
+  "diagnostics": "49fec77f0fca49e1",
+  "formatted": "d533b34df74b6626"
+ },
+ "examples/wutu-round-two/pitch/main.utu analysis": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52",
+  "entries": "19adc7ad6ebe9bd6",
+  "queries": "99baaf3fe3694645",
+  "graphs": "c2b102e096956f83"
+ },
+ "examples/wutu-round-two/pitch/main.utu normal": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52"
+ },
+ "examples/wutu-round-two/readroom/main.utu analysis": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52",
+  "entries": "303a905616ad1c4a",
+  "queries": "aa7112004898d376",
+  "graphs": "4faa74c8eb962b98"
+ },
+ "examples/wutu-round-two/readroom/main.utu normal": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52"
+ },
+ "examples/wutu-round-two/tempo/main.utu analysis": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52",
+  "entries": "2d36d19cc5e7352e",
+  "queries": "228fac93a1db8751",
+  "graphs": "c62d46e8fb420777"
+ },
+ "examples/wutu-round-two/tempo/main.utu normal": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52"
+ },
+ "examples/wutu-round-two/theme.utu analysis": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52",
+  "entries": "ffa576f902dc3b87",
+  "queries": "f31a9f82887b0d99",
+  "graphs": "1f02438b26a003f7"
+ },
+ "examples/wutu-round-two/theme.utu normal": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52"
+ },
+ "examples/wutu-round-two/venue/main.utu analysis": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52",
+  "entries": "e193eee73e8ced47",
+  "queries": "38fe2463f7e1f5d3",
+  "graphs": "acfb292a97e5a532"
+ },
+ "examples/wutu-round-two/venue/main.utu normal": {
+  "diagnostics": "d7044c71e3eb1b73",
+  "formatted": "2762dde8f58f0f52"
+ },
+ "hand_written_bindings/01_path.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "70a6ae9b5595be5e",
+  "queries": "10f5ccde1e54dc0f",
+  "graphs": "98bfa99ebcf79432"
+ },
+ "hand_written_bindings/01_path.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/02_ms_overloads.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "fd179343dd2039ee",
+  "queries": "0965173e5849f80e",
+  "graphs": "19c419d9e519eb24"
+ },
+ "hand_written_bindings/02_ms_overloads.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/03_base64_binary.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "1553c35ef209cac9",
+  "queries": "13dab6e9616e0543",
+  "graphs": "68b977bf7f86147a"
+ },
+ "hand_written_bindings/03_base64_binary.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/04_semver_options.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "69e734233f6e3026",
+  "queries": "03a968f6b6feeb35",
+  "graphs": "3a535a9c8c91b611"
+ },
+ "hand_written_bindings/04_semver_options.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/05_picocolors.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "dd43036ef8eebe24",
+  "queries": "8a6f079c45d2067e",
+  "graphs": "11443894ef598d1e"
+ },
+ "hand_written_bindings/05_picocolors.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/06_color_name_data.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "14b94402b48bc1b2",
+  "queries": "eca82cc4c922d294",
+  "graphs": "db610bce043a7573"
+ },
+ "hand_written_bindings/06_color_name_data.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/07_yaml_handle.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "6143941eb0770564",
+  "queries": "1326f175d784b5dd",
+  "graphs": "40f9593780d410f2"
+ },
+ "hand_written_bindings/07_yaml_handle.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/08_minimatch_struct.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "aab68e924e28777d",
+  "queries": "1d0cea4e8d8340a5",
+  "graphs": "f805ed716c1d13a9"
+ },
+ "hand_written_bindings/08_minimatch_struct.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/09_webcrypto_async.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "07acef1b4f8becdf",
+  "queries": "6be2c9d9900b9faa",
+  "graphs": "701dc139fc0974b2"
+ },
+ "hand_written_bindings/09_webcrypto_async.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "hand_written_bindings/10_events_callbacks.utu analysis": {
+  "diagnostics": "c7e19c3ce7a1462f",
+  "formatted": "7c24852e60e67553",
+  "entries": "fe61f680a17f702f",
+  "queries": "21dea1305cea7335",
+  "graphs": "865765cc882a9ff4"
+ },
+ "hand_written_bindings/10_events_callbacks.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "negative/000 undefined local analysis": {
+  "diagnostics": "925db7ad41ab5549",
+  "formatted": "3a1fe88732918e46",
+  "entries": "a2d3262167d0a1bd",
+  "queries": "2b4dea420e32bd65",
+  "graphs": "803515c203fe8544"
+ },
+ "negative/000 undefined local normal": {
+  "diagnostics": "925db7ad41ab5549",
+  "formatted": "3a1fe88732918e46"
+ },
+ "negative/001 undefined rhs in let analysis": {
+  "diagnostics": "823a27e2b30131a6",
+  "formatted": "8ddd27154c2e60ab",
+  "entries": "9cf9103d65d302e7",
+  "queries": "947d0310e383855f",
+  "graphs": "a4037cc23ff5cd3b"
+ },
+ "negative/001 undefined rhs in let normal": {
+  "diagnostics": "823a27e2b30131a6",
+  "formatted": "8ddd27154c2e60ab"
+ },
+ "negative/002 undefined rhs in assign analysis": {
+  "diagnostics": "56c745c8aea7fe02",
+  "formatted": "82819f7c1e627fca",
+  "entries": "7247b121d5e2ca5b",
+  "queries": "c1acf6cd176033fa",
+  "graphs": "84f619b04ad90991"
+ },
+ "negative/002 undefined rhs in assign normal": {
+  "diagnostics": "56c745c8aea7fe02",
+  "formatted": "82819f7c1e627fca"
+ },
+ "negative/003 unknown type in param analysis": {
+  "diagnostics": "81f4a93d4fb7e2f7",
+  "formatted": "d7157460f5c7b39c",
+  "entries": "dc296c7d4cdbe809",
+  "queries": "a061301e2ef8acd8",
+  "graphs": "db906971dc70a80e"
+ },
+ "negative/003 unknown type in param normal": {
+  "diagnostics": "81f4a93d4fb7e2f7",
+  "formatted": "d7157460f5c7b39c"
+ },
+ "negative/004 unknown type in return analysis": {
+  "diagnostics": "122e691cac8dff3c",
+  "formatted": "c66cdba64bb910fe",
+  "entries": "535afa0f83374b53",
+  "queries": "f0ac247382828428",
+  "graphs": "d5ed4ce4f23d0b1c"
+ },
+ "negative/004 unknown type in return normal": {
+  "diagnostics": "122e691cac8dff3c",
+  "formatted": "c66cdba64bb910fe"
+ },
+ "negative/005 unknown type in struct field analysis": {
+  "diagnostics": "d984ed7eacb13804",
+  "formatted": "27df375dd4ed71ae",
+  "entries": "0073e88f61691632",
+  "queries": "232de6d02cd63891",
+  "graphs": "0fb268174a46f12a"
+ },
+ "negative/005 unknown type in struct field normal": {
+  "diagnostics": "d984ed7eacb13804",
+  "formatted": "27df375dd4ed71ae"
+ },
+ "negative/006 unknown field analysis": {
+  "diagnostics": "e8e771ea3eda8086",
+  "formatted": "97e11f0a8930d414",
+  "entries": "4f635db5d5ad6936",
+  "queries": "93e29f86abac928d",
+  "graphs": "2360ce3627c72de3"
+ },
+ "negative/006 unknown field normal": {
+  "diagnostics": "e8e771ea3eda8086",
+  "formatted": "97e11f0a8930d414"
+ },
+ "negative/007 unknown method analysis": {
+  "diagnostics": "66d4ac7f395dbd85",
+  "formatted": "c487038c36f3a2b9",
+  "entries": "6388cd0d3ad48c8c",
+  "queries": "cbe6e3eac155a3d0",
+  "graphs": "21543256344b2c59"
+ },
+ "negative/007 unknown method normal": {
+  "diagnostics": "66d4ac7f395dbd85",
+  "formatted": "c487038c36f3a2b9"
+ },
+ "negative/008 data field is not callable method analysis": {
+  "diagnostics": "daf4d3e78ba539b4",
+  "formatted": "cf10d0ca2a749b7d",
+  "entries": "1f1f4f54d05992d5",
+  "queries": "f870bc84744339a9",
+  "graphs": "ca28170c41e28c9e"
+ },
+ "negative/008 data field is not callable method normal": {
+  "diagnostics": "daf4d3e78ba539b4",
+  "formatted": "cf10d0ca2a749b7d"
+ },
+ "negative/009 unknown static method analysis": {
+  "diagnostics": "1e1dd7db35b803a6",
+  "formatted": "c4f6e97f912c7100",
+  "entries": "2fc624fcf8c97e46",
+  "queries": "bde4ff4452a0c236",
+  "graphs": "921f42330f4f81db"
+ },
+ "negative/009 unknown static method normal": {
+  "diagnostics": "1e1dd7db35b803a6",
+  "formatted": "c4f6e97f912c7100"
+ },
+ "negative/010 free call too few args analysis": {
+  "diagnostics": "8e3439bad7805237",
+  "formatted": "4ad0a2338a5edba7",
+  "entries": "eb777fb72679ae4c",
+  "queries": "5b8ef61bf009819f",
+  "graphs": "1102be15201f9e15"
+ },
+ "negative/010 free call too few args normal": {
+  "diagnostics": "8e3439bad7805237",
+  "formatted": "4ad0a2338a5edba7"
+ },
+ "negative/011 free call too many args analysis": {
+  "diagnostics": "2074e30b70d3d55a",
+  "formatted": "52d99ab90939fa88",
+  "entries": "877002ef677f7bf0",
+  "queries": "a95075853de33431",
+  "graphs": "894135badedba39f"
+ },
+ "negative/011 free call too many args normal": {
+  "diagnostics": "2074e30b70d3d55a",
+  "formatted": "52d99ab90939fa88"
+ },
+ "negative/012 static call too few args analysis": {
+  "diagnostics": "e8e01422bbe174de",
+  "formatted": "52eebc5bf7c17d19",
+  "entries": "2d6cfe1a06473f04",
+  "queries": "9db3de65aba7ee50",
+  "graphs": "6693b4c287d7e177"
+ },
+ "negative/012 static call too few args normal": {
+  "diagnostics": "e8e01422bbe174de",
+  "formatted": "52eebc5bf7c17d19"
+ },
+ "negative/013 call arg type mismatch analysis": {
+  "diagnostics": "65dc0ec1a02a3661",
+  "formatted": "73d03fd674a66c05",
+  "entries": "93f5b2fe13aeb5cf",
+  "queries": "14df5943d7ff6317",
+  "graphs": "354e064cf95e77a7"
+ },
+ "negative/013 call arg type mismatch normal": {
+  "diagnostics": "65dc0ec1a02a3661",
+  "formatted": "73d03fd674a66c05"
+ },
+ "negative/014 second call arg type mismatch analysis": {
+  "diagnostics": "ce97ae4266513713",
+  "formatted": "561ed265db4edbfd",
+  "entries": "72ffcc983def242a",
+  "queries": "93103050eb1f2f0c",
+  "graphs": "ae96cfadd90b4933"
+ },
+ "negative/014 second call arg type mismatch normal": {
+  "diagnostics": "ce97ae4266513713",
+  "formatted": "561ed265db4edbfd"
+ },
+ "negative/015 Bool call arg type mismatch analysis": {
+  "diagnostics": "23168b5a59879c27",
+  "formatted": "ff33bee20d22a867",
+  "entries": "19b808f225a96794",
+  "queries": "b23c7b8296508574",
+  "graphs": "58cce28d598176b8"
+ },
+ "negative/015 Bool call arg type mismatch normal": {
+  "diagnostics": "23168b5a59879c27",
+  "formatted": "ff33bee20d22a867"
+ },
+ "negative/016 let type mismatch analysis": {
+  "diagnostics": "1c3d848bffb896b7",
+  "formatted": "520724bafff9858c",
+  "entries": "5e185fec5a48a3d7",
+  "queries": "7c2c88ce7637cc9e",
+  "graphs": "44ea8fa672e8860d"
+ },
+ "negative/016 let type mismatch normal": {
+  "diagnostics": "1c3d848bffb896b7",
+  "formatted": "520724bafff9858c"
+ },
+ "negative/017 global type mismatch analysis": {
+  "diagnostics": "87912d63334664f3",
+  "formatted": "a94c9c4a53895ac7",
+  "entries": "3c6c767b00215415",
+  "queries": "679176e98be35e31",
+  "graphs": "986ae781bd67434b"
+ },
+ "negative/017 global type mismatch normal": {
+  "diagnostics": "87912d63334664f3",
+  "formatted": "a94c9c4a53895ac7"
+ },
+ "negative/018 return type mismatch analysis": {
+  "diagnostics": "706edc9a467cde52",
+  "formatted": "a16b2dbf79179cee",
+  "entries": "60ef38c9665959f6",
+  "queries": "fd8f84ad1a31ec3e",
+  "graphs": "1126f9d7b0270142"
+ },
+ "negative/018 return type mismatch normal": {
+  "diagnostics": "706edc9a467cde52",
+  "formatted": "a16b2dbf79179cee"
+ },
+ "negative/019 if condition type mismatch analysis": {
+  "diagnostics": "136feafa97deb13d",
+  "formatted": "97f452056d5fe208",
+  "entries": "686f7272dc5a36b5",
+  "queries": "541e824cb8f39782",
+  "graphs": "314f393ed520d6bd"
+ },
+ "negative/019 if condition type mismatch normal": {
+  "diagnostics": "136feafa97deb13d",
+  "formatted": "97f452056d5fe208"
+ },
+ "negative/020 while condition type mismatch analysis": {
+  "diagnostics": "566d6cf3849cf0cb",
+  "formatted": "6c513aba64619979",
+  "entries": "05f2c0b96445643f",
+  "queries": "5f1780818ba96319",
+  "graphs": "1262c36004e38b2e"
+ },
+ "negative/020 while condition type mismatch normal": {
+  "diagnostics": "566d6cf3849cf0cb",
+  "formatted": "6c513aba64619979"
+ },
+ "negative/021 if branch type mismatch analysis": {
+  "diagnostics": "ee07ac0255dede2d",
+  "formatted": "6640fa5d5be072a7",
+  "entries": "2cb3993a8bc9af9c",
+  "queries": "62d4dac967469128",
+  "graphs": "087e7466c389ba2b"
+ },
+ "negative/021 if branch type mismatch normal": {
+  "diagnostics": "ee07ac0255dede2d",
+  "formatted": "6640fa5d5be072a7"
+ },
+ "negative/022 match arm type mismatch analysis": {
+  "diagnostics": "ee1465f68e47add2",
+  "formatted": "3b658193ad5173f2",
+  "entries": "9ea0522380fef5c3",
+  "queries": "ee20ed2b8d7194b0",
+  "graphs": "f5b965a79e20a8b9"
+ },
+ "negative/022 match arm type mismatch normal": {
+  "diagnostics": "ee1465f68e47add2",
+  "formatted": "3b658193ad5173f2"
+ },
+ "negative/023 enum alt missing variant analysis": {
+  "diagnostics": "d282e4820f392e73",
+  "formatted": "0083a440263278db",
+  "entries": "91673d7d62e155cb",
+  "queries": "b592c1f9c9e2f770",
+  "graphs": "a16a4375ef49f444"
+ },
+ "negative/023 enum alt missing variant normal": {
+  "diagnostics": "d282e4820f392e73",
+  "formatted": "0083a440263278db"
+ },
+ "negative/024 integer match missing default analysis": {
+  "diagnostics": "fcdec86f5dc6bbb5",
+  "formatted": "dd8522c227ede5f4",
+  "entries": "50b4e91ff712439c",
+  "queries": "cadaf7002c73a913",
+  "graphs": "1513ec34b56d0434"
+ },
+ "negative/024 integer match missing default normal": {
+  "diagnostics": "fcdec86f5dc6bbb5",
+  "formatted": "dd8522c227ede5f4"
+ },
+ "negative/025 Bool match missing arm analysis": {
+  "diagnostics": "fcb0732944b99151",
+  "formatted": "03dce831ccdb4c13",
+  "entries": "c00cdf80ee415616",
+  "queries": "7d4fb6babf78a658",
+  "graphs": "c36b80cd7a0ad7df"
+ },
+ "negative/025 Bool match missing arm normal": {
+  "diagnostics": "fcb0732944b99151",
+  "formatted": "03dce831ccdb4c13"
+ },
+ "negative/026 orelse receiver must be nullable analysis": {
+  "diagnostics": "cce32b57e4dfb064",
+  "formatted": "22b0eab9de0a61e8",
+  "entries": "8d01734cd451efd9",
+  "queries": "34e657d6db7b548c",
+  "graphs": "3bff35585f3c505d"
+ },
+ "negative/026 orelse receiver must be nullable normal": {
+  "diagnostics": "cce32b57e4dfb064",
+  "formatted": "22b0eab9de0a61e8"
+ },
+ "negative/027 orelse fallback type mismatch analysis": {
+  "diagnostics": "83916885b2b17efa",
+  "formatted": "b563ab0ebe1dde75",
+  "entries": "c613a7c0f6cf5548",
+  "queries": "2591a54c814c2fdf",
+  "graphs": "96c9aabde99e82b5"
+ },
+ "negative/027 orelse fallback type mismatch normal": {
+  "diagnostics": "83916885b2b17efa",
+  "formatted": "b563ab0ebe1dde75"
+ },
+ "negative/028 assign type mismatch analysis": {
+  "diagnostics": "fb2d41cb4025e740",
+  "formatted": "804de7848c7799fe",
+  "entries": "28d4ad9c449f2134",
+  "queries": "7b58647601138170",
+  "graphs": "c305c1a50a704770"
+ },
+ "negative/028 assign type mismatch normal": {
+  "diagnostics": "fb2d41cb4025e740",
+  "formatted": "804de7848c7799fe"
+ },
+ "negative/029 downstream errors fold under their cause analysis": {
+  "diagnostics": "8667acd8919e95d8",
+  "formatted": "fb64b89a416f9470",
+  "entries": "cc16d7ce71f06b78",
+  "queries": "143792a833b6282a",
+  "graphs": "75f792d83e493765"
+ },
+ "negative/029 downstream errors fold under their cause normal": {
+  "diagnostics": "8667acd8919e95d8",
+  "formatted": "fb64b89a416f9470"
+ },
+ "negative/030 field assign type mismatch analysis": {
+  "diagnostics": "01d4bfed30c8cb17",
+  "formatted": "b4c4ec41eac0fd42",
+  "entries": "92d08b2bf5bb8374",
+  "queries": "4d20e5f52cb72c73",
+  "graphs": "716f28b3104536a0"
+ },
+ "negative/030 field assign type mismatch normal": {
+  "diagnostics": "01d4bfed30c8cb17",
+  "formatted": "b4c4ec41eac0fd42"
+ },
+ "negative/031 struct init missing field analysis": {
+  "diagnostics": "cf97fc3353524317",
+  "formatted": "2473a3932e0074b8",
+  "entries": "0daeafdc52cc6d7b",
+  "queries": "a4c12aae68f0a295",
+  "graphs": "8b2f5c642d0d4957"
+ },
+ "negative/031 struct init missing field normal": {
+  "diagnostics": "cf97fc3353524317",
+  "formatted": "2473a3932e0074b8"
+ },
+ "negative/032 struct init duplicate field analysis": {
+  "diagnostics": "bc3af84861ac713d",
+  "formatted": "23a5b0e51fb83881",
+  "entries": "7603a2002349f3de",
+  "queries": "b48c9c418067d5ef",
+  "graphs": "2cc41d3a5abfde58"
+ },
+ "negative/032 struct init duplicate field normal": {
+  "diagnostics": "bc3af84861ac713d",
+  "formatted": "23a5b0e51fb83881"
+ },
+ "negative/033 struct init field type mismatch analysis": {
+  "diagnostics": "5e3f561fa77224e6",
+  "formatted": "a0b914bd42701503",
+  "entries": "6766dd81f19e8681",
+  "queries": "7e3957ecd2066667",
+  "graphs": "91348cc7f7887afc"
+ },
+ "negative/033 struct init field type mismatch normal": {
+  "diagnostics": "5e3f561fa77224e6",
+  "formatted": "a0b914bd42701503"
+ },
+ "negative/034 nullable field without promote analysis": {
+  "diagnostics": "a28212d81141b3df",
+  "formatted": "1fd50d024e68dfd1",
+  "entries": "6b434888dee1afd9",
+  "queries": "8b74b80074b99a43",
+  "graphs": "f7b5468e575c8c91"
+ },
+ "negative/034 nullable field without promote normal": {
+  "diagnostics": "a28212d81141b3df",
+  "formatted": "1fd50d024e68dfd1"
+ },
+ "negative/035 nullable method without promote analysis": {
+  "diagnostics": "f58a24c388f37b62",
+  "formatted": "e04632449bc0d990",
+  "entries": "8207880cf29b3291",
+  "queries": "92627069d200d40c",
+  "graphs": "1f396472ab9d4111"
+ },
+ "negative/035 nullable method without promote normal": {
+  "diagnostics": "f58a24c388f37b62",
+  "formatted": "e04632449bc0d990"
+ },
+ "negative/036 assign global immutable analysis": {
+  "diagnostics": "a12f31a8603f16d8",
+  "formatted": "1e4e976f3ec021e5",
+  "entries": "becc148fad89b8da",
+  "queries": "a169e59d2d8bb085",
+  "graphs": "a40714a48a7e9073"
+ },
+ "negative/036 assign global immutable normal": {
+  "diagnostics": "a12f31a8603f16d8",
+  "formatted": "1e4e976f3ec021e5"
+ },
+ "negative/037 assign function immutable analysis": {
+  "diagnostics": "8ffbcc903771f923",
+  "formatted": "ff104eef88420a7c",
+  "entries": "36f908ec79d5a121",
+  "queries": "9f8586e56e2e2f2e",
+  "graphs": "bcc2c99680a6a64b"
+ },
+ "negative/037 assign function immutable normal": {
+  "diagnostics": "8ffbcc903771f923",
+  "formatted": "ff104eef88420a7c"
+ },
+ "negative/038 es dsl requires typed binding analysis": {
+  "diagnostics": "d31362d26e60383b",
+  "formatted": "95879bd45c1864d0",
+  "entries": "086d18b6946d5d31",
+  "queries": "7c838c63bc0ae111",
+  "graphs": "e5891c05e980463e"
+ },
+ "negative/038 es dsl requires typed binding normal": {
+  "diagnostics": "d31362d26e60383b",
+  "formatted": "95879bd45c1864d0"
+ },
+ "negative/039 invalid assignment target parse error analysis": {
+  "diagnostics": "b283ff7b752ef118",
+  "formatted": "cef341efefc96a7a",
+  "entries": "290c09df57744da6",
+  "queries": "28bfe461df489d45",
+  "graphs": "a461bf77bc4e4d73"
+ },
+ "negative/039 invalid assignment target parse error normal": {
+  "diagnostics": "b283ff7b752ef118",
+  "formatted": "cef341efefc96a7a"
+ },
+ "negative/040 direct recursive struct analysis": {
+  "diagnostics": "571d4d6abaca14ec",
+  "formatted": "3b5570ecc5c4a024",
+  "entries": "3d4d3eccd43bf997",
+  "queries": "1e48e9e48ff66dab",
+  "graphs": "7b3494619769c2c0"
+ },
+ "negative/040 direct recursive struct normal": {
+  "diagnostics": "571d4d6abaca14ec",
+  "formatted": "3b5570ecc5c4a024"
+ },
+ "negative/041 indirect recursive struct analysis": {
+  "diagnostics": "0ae306e0dd991726",
+  "formatted": "cea7e418b4e5404e",
+  "entries": "6eb71f6e88d8cf6c",
+  "queries": "fa15bc74ce48cfe6",
+  "graphs": "da1cd7aa8c683c0b"
+ },
+ "negative/041 indirect recursive struct normal": {
+  "diagnostics": "0ae306e0dd991726",
+  "formatted": "cea7e418b4e5404e"
+ },
+ "negative/042 nullable recursive struct is allowed except missing init field analysis": {
+  "diagnostics": "87255d7a1ace7e17",
+  "formatted": "df8736809cffd427",
+  "entries": "3761f5a72dee416f",
+  "queries": "f302e5f909fdffc9",
+  "graphs": "20b29f209290b528"
+ },
+ "negative/042 nullable recursive struct is allowed except missing init field normal": {
+  "diagnostics": "87255d7a1ace7e17",
+  "formatted": "df8736809cffd427"
+ },
+ "std/Array.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "248330a9606f10a4",
+  "queries": "76fd4af72904e183",
+  "graphs": "b35ad4cee9758ef4"
+ },
+ "std/Array.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Bool.utu analysis": {
+  "diagnostics": "cab26b787eede61c",
+  "formatted": "2a3145ec632db9c2",
+  "entries": "032f0ade47b17d06",
+  "queries": "1cb1986a75a321ed",
+  "graphs": "8084a4459f67e1f1"
+ },
+ "std/Bool.utu normal": {
+  "diagnostics": "cab26b787eede61c",
+  "formatted": "2a3145ec632db9c2"
+ },
+ "std/Buffer.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "7fc008f8d259770b",
+  "queries": "ef288d2294dc863d",
+  "graphs": "18fad5e3415e072c"
+ },
+ "std/Buffer.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Externref.utu analysis": {
+  "diagnostics": "9e70e2b6ccd6edd5",
+  "formatted": "effb3b51ad80da56",
+  "entries": "a3f5658572b059a6",
+  "queries": "8f411c5a3d588161",
+  "graphs": "681a8aa22c6955c7"
+ },
+ "std/Externref.utu normal": {
+  "diagnostics": "9e70e2b6ccd6edd5",
+  "formatted": "effb3b51ad80da56"
+ },
+ "std/F32.utu analysis": {
+  "diagnostics": "6952ac5ee9344413",
+  "formatted": "d7db44d7c88fb87e",
+  "entries": "3cd815dd572068cd",
+  "queries": "9655960cd749b4d1",
+  "graphs": "6f9311b7da775fcf"
+ },
+ "std/F32.utu normal": {
+  "diagnostics": "6952ac5ee9344413",
+  "formatted": "d7db44d7c88fb87e"
+ },
+ "std/F64.utu analysis": {
+  "diagnostics": "7b4b2ab1fa025f25",
+  "formatted": "fb6eaa6d232fe0a6",
+  "entries": "53706647a9521094",
+  "queries": "bb7cb597c5762fd2",
+  "graphs": "f526078987451643"
+ },
+ "std/F64.utu normal": {
+  "diagnostics": "7b4b2ab1fa025f25",
+  "formatted": "fb6eaa6d232fe0a6"
+ },
+ "std/Found.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "fc6c1c01d8184b94",
+  "queries": "0536b92f3db52ac7",
+  "graphs": "f251a099e43422df"
+ },
+ "std/Found.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Group.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "602a7dab9a828d77",
+  "queries": "7426537dec5cf42c",
+  "graphs": "452b9ec628db48b0"
+ },
+ "std/Group.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/I31.utu analysis": {
+  "diagnostics": "1c27bb60bf8ecd3d",
+  "formatted": "3dc2ac36c051bdc8",
+  "entries": "a985302561cb1ed5",
+  "queries": "66d6bbc7a75be68d",
+  "graphs": "ba5ce33eafe0c159"
+ },
+ "std/I31.utu normal": {
+  "diagnostics": "1c27bb60bf8ecd3d",
+  "formatted": "3dc2ac36c051bdc8"
+ },
+ "std/I32.utu analysis": {
+  "diagnostics": "7f901ac55ee28497",
+  "formatted": "a78375e92579cea6",
+  "entries": "017feeff2b2ea0bd",
+  "queries": "5f7f5798507cbb42",
+  "graphs": "f8caaee864667c9e"
+ },
+ "std/I32.utu normal": {
+  "diagnostics": "7f901ac55ee28497",
+  "formatted": "a78375e92579cea6"
+ },
+ "std/I64.utu analysis": {
+  "diagnostics": "8fbedddf789fad54",
+  "formatted": "241c6191ab45f028",
+  "entries": "c7359f85dba2a385",
+  "queries": "ec9eb0de2741331d",
+  "graphs": "fa99cae857149705"
+ },
+ "std/I64.utu normal": {
+  "diagnostics": "8fbedddf789fad54",
+  "formatted": "241c6191ab45f028"
+ },
+ "std/IntMap.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "16cde7cd50dfe88f",
+  "queries": "4df2cc98e5a32cbd",
+  "graphs": "e1f0bac0f624bd06"
+ },
+ "std/IntMap.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Interner.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "cca09a634618d18f",
+  "queries": "5b5d522c28232ca2",
+  "graphs": "5493801cf1ac01ae"
+ },
+ "std/Interner.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/List.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "08b3c6970a525eae",
+  "queries": "fbae13153b1f9967",
+  "graphs": "a7b311599aa68c9e"
+ },
+ "std/List.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/LiteralDefaults.utu analysis": {
+  "diagnostics": "1912e1a7fe8861e8",
+  "formatted": "f8d695782ab7a4e6",
+  "entries": "ecc3985707c52bb9",
+  "queries": "c210da0e491cde9a",
+  "graphs": "8825b0bab69de58e"
+ },
+ "std/LiteralDefaults.utu normal": {
+  "diagnostics": "1912e1a7fe8861e8",
+  "formatted": "f8d695782ab7a4e6"
+ },
+ "std/M128.utu analysis": {
+  "diagnostics": "bee58a3ef41cbecc",
+  "formatted": "4757247cdc91c3c9",
+  "entries": "efe9f4fad20e0a7f",
+  "queries": "a9c62d6a06d5d8f8",
+  "graphs": "3b51da5ced9a80cf"
+ },
+ "std/M128.utu normal": {
+  "diagnostics": "bee58a3ef41cbecc",
+  "formatted": "4757247cdc91c3c9"
+ },
+ "std/M32.utu analysis": {
+  "diagnostics": "4dfee3ee41e6b1d3",
+  "formatted": "077f011a5acbf792",
+  "entries": "a1b9c6fea4590f62",
+  "queries": "502898bfc2b34c2e",
+  "graphs": "7e96b6c8704d7c4d"
+ },
+ "std/M32.utu normal": {
+  "diagnostics": "4dfee3ee41e6b1d3",
+  "formatted": "077f011a5acbf792"
+ },
+ "std/M64.utu analysis": {
+  "diagnostics": "f7d1eb9781543395",
+  "formatted": "06d5bb20eb44a379",
+  "entries": "132132f11e052844",
+  "queries": "38723dd6d86ba44a",
+  "graphs": "17fd16593d9c5d6a"
+ },
+ "std/M64.utu normal": {
+  "diagnostics": "f7d1eb9781543395",
+  "formatted": "06d5bb20eb44a379"
+ },
+ "std/NumberField.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "d99f66bdd36f4906",
+  "queries": "c4885911c2844adb",
+  "graphs": "469c10c26a7962a4"
+ },
+ "std/NumberField.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/PersistentSegmentTree.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "393db6e7679341c7",
+  "queries": "eef8081446ca24cc",
+  "graphs": "6851c2c1d2114ed7"
+ },
+ "std/PersistentSegmentTree.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Prelude.utu analysis": {
+  "diagnostics": "4b9deab751cb8088",
+  "formatted": "e94e084e4308ee05",
+  "entries": "cd3713cca9c5bd17",
+  "queries": "416aa5b70ca38b2b",
+  "graphs": "f410e193ab49802c"
+ },
+ "std/Prelude.utu normal": {
+  "diagnostics": "4b9deab751cb8088",
+  "formatted": "e94e084e4308ee05"
+ },
+ "std/Promise.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "7825b1bb7d7327ef",
+  "queries": "17ebb3d05190f956",
+  "graphs": "372ee032a41fc336"
+ },
+ "std/Promise.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/SegmentTree.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "794d9f5a4f7579b5",
+  "queries": "cc613e848e74b4f1",
+  "graphs": "6851c2c1d2114ed7"
+ },
+ "std/SegmentTree.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Spatial.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "44f736eaf3cf1c7d",
+  "queries": "ce2eb49c01136f45",
+  "graphs": "7a58504652e71a3d"
+ },
+ "std/Spatial.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Str.utu analysis": {
+  "diagnostics": "581d8e16c4a80cbd",
+  "formatted": "9fc0697b7cc9bd3b",
+  "entries": "8fe83f86fe2bb02c",
+  "queries": "034502866415262a",
+  "graphs": "8a83abc8321c1244"
+ },
+ "std/Str.utu normal": {
+  "diagnostics": "581d8e16c4a80cbd",
+  "formatted": "9fc0697b7cc9bd3b"
+ },
+ "std/U32.utu analysis": {
+  "diagnostics": "7d3ce42995a1e38a",
+  "formatted": "d53e70b5fd88fcbf",
+  "entries": "49a2dd03ce26fe03",
+  "queries": "2416aa6e223a5e46",
+  "graphs": "61815b4ca13b3c77"
+ },
+ "std/U32.utu normal": {
+  "diagnostics": "7d3ce42995a1e38a",
+  "formatted": "d53e70b5fd88fcbf"
+ },
+ "std/U64.utu analysis": {
+  "diagnostics": "5cea437de8f4acfd",
+  "formatted": "516ad35305988548",
+  "entries": "c826e476de2242a7",
+  "queries": "31ebc04815e2b8be",
+  "graphs": "a64a5587a6d384c6"
+ },
+ "std/U64.utu normal": {
+  "diagnostics": "5cea437de8f4acfd",
+  "formatted": "516ad35305988548"
+ },
+ "std/V128.utu analysis": {
+  "diagnostics": "c944db68caef6ffc",
+  "formatted": "8e78dc4d7fd726dc",
+  "entries": "6f3034a8b435c2f6",
+  "queries": "154481bf2bf55dc1",
+  "graphs": "c80a481db83ee802"
+ },
+ "std/V128.utu normal": {
+  "diagnostics": "c944db68caef6ffc",
+  "formatted": "8e78dc4d7fd726dc"
+ },
+ "std/Wutu.utu analysis": {
+  "diagnostics": "89328e54c70fa141",
+  "formatted": "61c44761e01f0b81",
+  "entries": "547196f04e10807c",
+  "queries": "367486a31dbad265",
+  "graphs": "894e03cb564c1270"
+ },
+ "std/Wutu.utu normal": {
+  "diagnostics": "89328e54c70fa141",
+  "formatted": "61c44761e01f0b81"
+ }
+}

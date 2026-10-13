@@ -1,0 +1,12 @@
+
+      let later: fun(I32) Promise[I32] = @es/\ (v) => new Promise(r => setTimeout(() => r(v * 10), 2)) \/;
+      fn ticks(n: I32) yield I32 {
+          for (0..<n) |i| {
+              let value: I32 = await later(i);
+              yield value;
+          };
+      }
+      export lib {
+          fn total(n: I32) I32 { let s = 0; await for (ticks(n)) |t| { s += t; }; s; }
+      }
+    

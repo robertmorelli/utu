@@ -1,0 +1,2 @@
+fn f() I32 { 1; }
+export lib { fn bad() I32 { f = 2; 0; } }

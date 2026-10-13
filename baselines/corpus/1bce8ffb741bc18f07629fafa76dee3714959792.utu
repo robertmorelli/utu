@@ -1,0 +1,10 @@
+let substring: fun(Str, I32, I32) Str = @es/\(s, start, end) => s.substring(start, end)\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
+
+fn readme_prefix() Str {
+    substring("# UTU README", 0, 5);
+}
+
+test "string helpers work without builtin host helpers" {
+    assert str_eq(readme_prefix(), "# UTU");
+}

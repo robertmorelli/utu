@@ -1,14 +1,14 @@
 // What every program does when run, recorded so a backend change can be
 // checked by behavior rather than by bytes.
 //
-//   node scripts/run-differential.mjs --record    record .tmp/run-differential.json
+//   node scripts/run-differential.mjs --record    record baselines/run-differential.json
 //   node scripts/run-differential.mjs             compare against it
 //   ... --only=substring   just the matching programs
 //   ... --jobs=N           worker threads (default: one per core)
 //   ... --optimize=LEVEL   build at none (default), size, or speed, each with
 //                          its own record
 //
-// Each program under examples/, benchmarks/, and .tmp/corpus is built for its
+// Each program under examples/, benchmarks/, and baselines/corpus is built for its
 // `normal` and `test` targets; every exported function that takes no
 // arguments is called, and its result (or trap), plus what it printed, is
 // recorded. Programs that run longer than a few seconds (after building, which
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const recordFor = optimize => path.join(ROOT, '.tmp', `run-differential${optimize === 'none' ? '' : `.${optimize}`}.json`);
+const recordFor = optimize => path.join(ROOT, 'baselines', `run-differential${optimize === 'none' ? '' : `.${optimize}`}.json`);
 const BUILD_TIMEOUT_MS = 120_000;
 const RUN_TIMEOUT_MS = 8000;
 
@@ -36,7 +36,7 @@ async function main() {
   const files = [
     ...await programs(path.join(ROOT, 'examples')),
     ...await programs(path.join(ROOT, 'benchmarks')),
-    ...await programs(path.join(ROOT, '.tmp', 'corpus')).catch(() => []),
+    ...await programs(path.join(ROOT, 'baselines', 'corpus')),
   ].filter(file => !only || file.includes(only));
   const queue = files.flatMap(file => ['normal', 'test'].map(target => ({ file, target })));
   const jobs = Math.min(Number(flag('jobs') ?? os.availableParallelism()), queue.length);
@@ -104,7 +104,9 @@ async function worker() {
     resolvePackage: nodePackageResolver({ root: workerData.ROOT }),
   });
   parentPort.on('message', async ({ file, target }) => {
-    parentPort.postMessage(await run(file, target).catch(error => ({ fails: summarizeError(error) })));
+    const result = await run(file, target).catch(error => ({ fails: summarizeError(error) }));
+    // Paths in messages are relative to the repository, so records are portable.
+    parentPort.postMessage(JSON.parse(JSON.stringify(result).split(workerData.ROOT).join('<root>')));
   });
 
   async function run(file, target) {

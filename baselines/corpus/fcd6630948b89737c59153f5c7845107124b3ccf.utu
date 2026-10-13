@@ -1,0 +1,39 @@
+// 01 — node:path. The baseline case: free functions over Str and I32.
+//
+// This is what the ingester will emit for the easy 60% of a .d.ts:
+//   export function join(...paths: string[]): string;
+//   export const sep: string;
+
+let join2: fun(Str, Str) Str = @es/\ (await import('node:path')).join \/;
+let basename: fun(Str) Str = @es/\ (await import('node:path')).basename \/;
+let extname: fun(Str) Str = @es/\ (await import('node:path')).extname \/;
+// PAIN: `await` is only legal at the top level of the glue module, so any body
+// that needs to *wrap* the import (here, to convert a JS boolean to utu Bool)
+// cannot say `(p) => (await import(…)).isAbsolute(p)` — that is a JS syntax
+// error inside a non-async arrow. Every wrapping binding has to be written as
+// an IIFE taking the module as a parameter.
+let is_absolute: fun(Str) Bool =
+    @es/\ ((m) => (p) => m.isAbsolute(p) ? 1 : 0)(await import('node:path')) \/;
+let sep: Str = @es/\ (await import('node:path')).sep \/;
+
+export main() Str {
+    join2("usr", "local");
+}
+
+test "join composes two segments" {
+    assert join2("a", "b") == "a/b";
+}
+
+test "basename and extname decompose a path" {
+    assert basename("/tmp/report.txt") == "report.txt";
+    assert extname("/tmp/report.txt") == ".txt";
+}
+
+test "a JS boolean must be hand-converted to utu Bool" {
+    assert is_absolute("/tmp");
+    assert is_absolute("tmp") == false;
+}
+
+test "value imports read as zero-arg accessors" {
+    assert sep == "/";
+}

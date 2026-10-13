@@ -1,0 +1,7 @@
+
+        mod Pair[A, B] {
+          struct &: | left : A | right : B
+          fn &.new(left: A, right: B) & { &{ left: left, right: right }; }
+        }
+        export lib { fn bad() Pair[I32] { Pair[I32].new(1, 2); } }
+      

@@ -1,0 +1,30 @@
+
+      struct Log:
+          | v: I32
+      fn value(l: Log) I32 { defer l.v = 100; l.v + 1; }
+      fn early(l: Log, stop: Bool) I32 { defer l.v += 1; if stop { return 5; }; 7; }
+      fn returned(l: Log) I32 { defer l.v = 99; return l.v; }
+      fn nested(l: Log) I32 { defer l.v = l.v * 10 + 1; { defer l.v = l.v * 10 + 2; return 0; }; }
+      fn cleared(l: Log) void { defer l.v += 5; l.v = 1; }
+      export lib {
+          fn order() I32 { let l = Log { v: 0 }; { defer l.v = l.v * 10 + 1; defer l.v = l.v * 10 + 2; l.v = 9; }; l.v; }
+          fn after_value() I32 { let l = Log { v: 1 }; let a = value(l); a * 1000 + l.v; }
+          fn on_return() I32 { let l = Log { v: 0 }; let a = early(l, true); let b = early(l, false); a * 100 + b * 10 + l.v; }
+          fn return_first() I32 { let l = Log { v: 3 }; returned(l) * 100 + l.v; }
+          fn scopes() I32 { let l = Log { v: 0 }; nested(l); l.v; }
+          fn void_fn() I32 { let l = Log { v: 0 }; cleared(l); l.v; }
+          fn loops() I32 {
+              let l = Log { v: 0 };
+              let s = 0;
+              for (0..<4) |i| { defer l.v += 1; if i % 2 == 0 { continue; }; s += i; };
+              s * 10 + l.v;
+          }
+          fn break_scope() I32 {
+              let l = Log { v: 0 };
+              { defer l.v += 100; while (true) { defer l.v += 1; break; }; l.v *= 2; };
+              l.v;
+          }
+          fn binding_at_site() I32 { let l = Log { v: 0 }; let x = 1; { defer l.v = x; let x = 2; l.v = x; }; l.v; }
+          fn iterator_body() I32 { let l = Log { v: 0 }; [1, 2, 3] each |x| { defer l.v += x; }; l.v; }
+      }
+    

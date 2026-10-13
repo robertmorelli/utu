@@ -1,0 +1,83 @@
+fn swap(values: Array[I32], left: I32, right: I32) void {
+    let temp: I32 = values[left];
+    values[left] = values[right];
+    values[right] = temp;
+}
+
+fn reverse_prefix(values: Array[I32], last: I32) void {
+    let left: I32 = 0;
+    let right: I32 = last;
+    for (0..<values.len()) |step| {
+        if left >= right {
+            break;
+        };
+        swap(values, left, right);
+        left += 1;
+        right -= 1;
+    };
+}
+
+fn copy_array(values: Array[I32]) Array[I32] {
+    let out: Array[I32] = Array[I32].new(values.len(), 0);
+    for (0..<values.len()) |i| {
+        out[i] = values[i];
+    };
+    out;
+}
+
+fn count_flips_work(work: Array[I32], flips: I32) I32 {
+    if work[0] == 0 {
+        flips;
+    } else {
+        reverse_prefix(work, work[0]);
+        count_flips_work(work, flips + 1);
+    };
+}
+
+fn count_flips(values: Array[I32]) I32 {
+    let work: Array[I32] = copy_array(values);
+    count_flips_work(work, 0);
+}
+
+fn search(perm: Array[I32], pos: I32) I32 {
+    if pos == perm.len() {
+        count_flips(perm);
+    } else {
+        let best: I32 = 0;
+        for (pos..<perm.len()) |i| {
+            swap(perm, pos, i);
+            let candidate: I32 = search(perm, pos + 1);
+            if candidate > best {
+                best = candidate;
+            };
+            swap(perm, pos, i);
+        };
+        best;
+    };
+}
+
+fn fannkuch(n: I32) I32 {
+    let perm: Array[I32] = Array[I32].new(n, 0);
+    for (0..<n) |i| {
+        perm[i] = i;
+    };
+    search(perm, 0);
+}
+
+test "fannkuch(4) = 4" {
+    assert fannkuch(4) == 4;
+}
+
+test "fannkuch(5) = 7" {
+    assert fannkuch(5) == 7;
+}
+
+bench "fannkuch" {
+    measure {
+        fannkuch(5);
+    }
+}
+
+export main() I32 {
+    fannkuch(6);
+}

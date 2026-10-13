@@ -1,0 +1,11 @@
+
+      export lib {
+        fn outer(n: I32, m: I32) I32 {
+          let a: I32 = 5;
+          let f: cl(I32) I32 = cl(x) { x * n + a; };
+          let g: cl(I32) I32 = cl(x) { x + 1; };
+          let h: cl(I32) I32 = cl(x) { let inner: cl(I32) I32 = cl(y) { y + m; }; x; };
+          f(1) + g(2) + h(3);
+        }
+      }
+    

@@ -1,0 +1,2 @@
+using Browser from std:Browser;
+export main() void { let s = @stored/\ Str "k" "x" \/; }

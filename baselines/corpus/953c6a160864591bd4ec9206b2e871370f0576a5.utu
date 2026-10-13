@@ -1,0 +1,9 @@
+
+      fn __closure0() I32 { 30; }
+      export lib {
+        fn run() I32 {
+          let n: I32 = 5;
+          let f: cl() I32 = cl() { n + __closure0(); }; f();
+        }
+      }
+    

@@ -1,0 +1,3 @@
+struct Box:
+    | value: I32
+export main() Bool { let b = Box { value: 1 }; b < b; }

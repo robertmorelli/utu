@@ -1,0 +1,11 @@
+
+        export lib {
+          fn double(x: I32) I32 { x * 2; }
+          fn triple(x: I32) I32 { x * 3; }
+          fn apply(pick: Bool, n: I32) I32 {
+            let f: fun(I32) I32 = double;
+            let g: fun(I32) I32 = triple;
+            if pick { f(n); } else { g(n); };
+          }
+        }
+      

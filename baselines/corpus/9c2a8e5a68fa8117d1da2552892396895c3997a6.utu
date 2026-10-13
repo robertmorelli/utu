@@ -1,0 +1,1 @@
+fn x() I32 { 1; } fn x() I32 { 2; } export lib { fn bad() I32 { x(); } }
