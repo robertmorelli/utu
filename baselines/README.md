@@ -10,6 +10,7 @@ so every later compiler, the self-hosted one included, is checked against it.
 | `behavior-fingerprints.json` | hashes of the diagnostics, formatted output, editor range entries, every editor query at every node, and the graphs, for every `.utu` file and the negative corpus | `scripts/behavior-fingerprints.mjs` |
 | `definitions.json.gz` | stage 0's go-to-definition at every node of every program's own files (from the behavior fingerprints' full outputs) | `scripts/selfhost-resolve-differential.mjs` |
 | `corpus/` | 465 programs gathered for the syntax differential, which the checks above also cover | `scripts/syntax-differential.mjs` |
+| `stage0-sizes.json` | the size of stage 0's `-Oz` build of every program of the run differential that builds | `scripts/selfhost-size-differential.mjs` (recorded with `--record`) |
 
 Paths in messages are relative to the repository (`<root>`). The behavior
 fingerprints' full outputs are not kept here (they are 90 MB); `--record`

@@ -25,6 +25,7 @@ const commands = [
   ['node', './scripts/selfhost-run-differential.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs', '--optimize=size'],
   ['node', './scripts/selfhost-diagnostics-differential.mjs'],
+  ['node', './scripts/selfhost-size-differential.mjs'],
   ['node', './scripts/test-source-warnings.mjs'],
   ['node', './scripts/test-query-features.mjs'],
   ['node', './scripts/test-wutu-stencils.mjs'],
