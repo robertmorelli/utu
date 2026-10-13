@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PLATFORM_SOURCES } from '../compiler/platform-sources.generated.js';
 import { compile, instantiate, loadCompiler } from './compiler.js';
+import { catalogStdlib } from './catalog.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -89,8 +90,19 @@ function readOr(file, fallback) {
   try { return fs.readFileSync(file, 'utf8'); } catch { return fallback; }
 }
 
+// The platform's declarations ready to read, when `bun run build` has made them.
+const CATALOG = path.join(ROOT, 'dist', 'selfhost', 'catalog');
+let platform;
+
+/** The standard library, its host declarations from the catalog when there is one. */
+export function nodeStdlib() {
+  return platform ??= fs.existsSync(path.join(CATALOG, 'catalog.json'))
+    ? catalogStdlib(PLATFORM_SOURCES, name => fs.promises.readFile(path.join(CATALOG, name)))
+    : PLATFORM_SOURCES;
+}
+
 /** A host for programs under `root` (where packages and the glue resolve). */
-export function nodeHost({ root = process.cwd(), stdlib = PLATFORM_SOURCES } = {}) {
+export function nodeHost({ root = process.cwd(), stdlib = nodeStdlib() } = {}) {
   let packages;
   return {
     stdlib,

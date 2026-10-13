@@ -45,6 +45,7 @@ async function main() {
   await generatePlatformSources();
   buildCompiler();
   await bundleSelfhost();
+  execSync(`node ${path.join('scripts', 'build-catalog.mjs')}`, { cwd: ROOT, stdio: 'inherit' });
   await bundlePackage();
   await bundleVscodeExtension();
 }
