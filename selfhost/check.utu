@@ -217,13 +217,16 @@ fn check_function(fi: I32) void {
     };
     cur_params.resize(1);
     cur_params[0] = cur_locals.len();
+    mark_boxes(fn_body(decl));
     let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] };
-    finish_function(fi_func[fi], fn_body(decl), cx);
+    finish_function(fi_func[fi], fn_body(decl), cx, box_params(decls, params));
 }
 
-// A body checked against the result type, as function `f`'s.
-fn finish_function(f: I32, body_node: I32, cx: Cx) void {
+// A body checked against the result type, as function `f`'s (after
+// `prologue`, when it is a node: moving boxed parameters into their boxes).
+fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     let m = w_mark();
+    if prologue >= 0 { w_push(prologue); };
     let t = check_block(body_node, cx.result, cx);
     if ty_is(cx.result, Ty.Void) { drop_value(t); } else { coerce(t, cx.result, body_node); };
     w_node(Op.Seq, repr(cx.result), 0, 0, m);
@@ -253,6 +256,9 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
+// A value checked as Void: dropped, if it is one.
+fn discard(t: I32) void { drop_value(t); }
+
 // Drop the value on top of the stack, if it has one.
 fn drop_value(t: I32) void {
     let vt = repr(t);
@@ -270,6 +276,11 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
     if ty_is(actual, Ty.Error) or ty_is(expected, Ty.Error) or ty_is(actual, Ty.Never) { return expected; };
     if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return expected; };
     if is_variant_of(actual, expected) { return expected; };
+    let target = if ty_is(expected, Ty.Nullable) { ty_a[expected]; } else { expected; };
+    if ty_is(actual, Ty.Fun) and ty_is(target, Ty.Closure) and ty_a[actual] == ty_a[target] and ty_b[actual] == ty_b[target] {
+        decay_fun(actual, w_mark() - 1);
+        return expected;
+    };
     if ty_is(expected, Ty.Nullable) and is_variant_of(actual, ty_a[expected]) { return expected; };
     if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) {
         w_pop();
@@ -354,6 +365,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Null_expr.to_i32() { return check_null_expr(node, cx); };
     if kind == Node.Try_expr.to_i32() { return check_try(node, expect, cx); };
     if kind == Node.Tuple_expr.to_i32() { return check_tuple(node, expect, cx); };
+    if kind == Node.Closure_expr.to_i32() { return check_closure(node, expect, cx); };
     unsupported(node);
 }
 
@@ -375,7 +387,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
     };
     if k == Decl.Fn.to_i32() or is_type_decl(decl) { return unsupported(node); };
     let t = decl_ty[decl];
-    w_leaf(Op.LocalGet, repr(t), decl_local[decl], 0);
+    read_value(decl, t);
     t;
 }
 
@@ -500,6 +512,26 @@ fn check_let(node: I32, cx: Cx) I32 {
         return ty_void();
     };
     let m = w_mark();
+    if decl_boxed[decl] == 1 and is_kind(init, Node.Closure_expr) {
+        // A closure that calls itself: its box first (a closure is an
+        // externref), then the closure, which captures the box, into it.
+        let h = box_type(vt_externref);
+        let mb = w_mark();
+        w_leaf(Op.RefNull, vt_externref, vt_externref, 0);
+        w_node(Op.StructNew, vt_ref(h, false), h, 0, mb);
+        let local = new_local(vt_ref(h, true));
+        decl_local[decl] = local;
+        decl_ty[decl] = if annotated { t; } else { closure_syntax_type(init, cx.inst); };
+        w_node(Op.LocalSet, vt_none, local, 0, mb);
+        let ms = w_mark();
+        w_leaf(Op.LocalGet, vt_ref(h, true), local, 0);
+        let actual = check_expr(init, t, cx);
+        if annotated { coerce(actual, t, init); } else { t = actual; };
+        decl_ty[decl] = t;
+        w_node(Op.StructSet, vt_none, h, 0, ms);
+        w_node(Op.Seq, vt_none, 0, 0, m);
+        return ty_void();
+    };
     let actual = check_expr(init, t, cx);
     if annotated { coerce(actual, t, init); } else { t = actual; };
     if ty_is(t, Ty.Null) {
@@ -512,10 +544,8 @@ fn check_let(node: I32, cx: Cx) I32 {
         w_node(Op.Seq, repr(t), 0, 0, m);
         return ty_void();
     };
-    let local = new_local(repr(t));
-    decl_local[decl] = local;
     decl_ty[decl] = t;
-    w_node(Op.LocalSet, vt_none, local, 0, m);
+    bind_value(decl, t, m);
     ty_void();
 }
 
@@ -598,16 +628,17 @@ fn check_assign(node: I32, cx: Cx) I32 {
     };
     let t = decl_ty[decl];
     let m = w_mark();
+    write_begin(decl, t);
     if op == Tok.Eq.to_i32() {
         coerce(check_expr(value, t, cx), t, value);
     } else {
         // `x op= e` is `x = x op e`.
         let word = compound_word(op, node_last[target]);
         let m2 = w_mark();
-        w_leaf(Op.LocalGet, repr(t), decl_local[decl], 0);
+        read_value(decl, t);
         apply_operator(word, t, value, node, cx, m2);
     };
-    w_node(Op.LocalSet, vt_none, decl_local[decl], 0, m);
+    write_end(decl, t, m);
     ty_void();
 }
 
@@ -810,7 +841,10 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         if not decl_is(decl, Decl.Fn) {
             let t = if decl_is(decl, Decl.Global) { global_type(decl); } else { decl_ty[decl]; };
             if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
-            return unsupported(node);
+            if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, node, cx); };
+            if ty_is(t, Ty.Error) { return finish_error(args, m, cx); };
+            report(Diag.NotCallable, callee, word_of(callee));
+            return finish_error(args, m, cx);
         };
         let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
         return call_with(fi, args, 0, m, node, cx);
@@ -851,14 +885,24 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             if r >= 0 { return r; };
         };
         let decl = node_decl[last_child(callee)];
-        if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+        if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
         let owner_t = type_path(first_child(callee), cx.inst);
         let inst = if is_kind(first_child(callee), Node.Type_ident) and decl_is(node_decl[first_child(callee)], Decl.Module) {
             instance_for(node_decl[first_child(callee)], cx.inst);
         } else { ty_inst(owner_t); };
         return call_with(fn_instance(decl, inst), args, 0, m, node, cx);
     };
-    unsupported(node);
+    call_value(callee, args, m, node, cx);
+}
+
+// A call of any other expression: a `fun` or `cl` value.
+fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+    let t = type_only(callee, -1, cx);
+    if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, at, cx); };
+    if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, at, cx); };
+    if ty_is(t, Ty.Error) { return unsupported(at); };
+    report(Diag.NotCallable, callee, -1);
+    finish_error(args, m, cx);
 }
 
 // Arguments checked and pushed, after any already pushed since `m`; then
@@ -1170,7 +1214,7 @@ fn check_if(node: I32, expect: I32, cx: Cx) I32 {
     let label = new_label();
     if else_ < 0 {
         let m1 = w_mark();
-        drop_value(check_block(then_, -1, cx));
+        discard(check_block(then_, ty_void(), cx));
         w_node(Op.Seq, vt_none, 0, 0, m1);
         w_node(Op.If, vt_none, label, 0, m);
         return ty_void();
@@ -1203,7 +1247,7 @@ fn check_while(node: I32, cx: Cx) I32 {
         w_node(Op.BrIf, vt_none, brk, 0, mc);
     };
     enter_loop(brk, top, -1, -1);
-    drop_value(check_block(block, -1, cx));
+    discard(check_block(block, ty_void(), cx));
     leave_loop();
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
@@ -1284,6 +1328,7 @@ fn reset_check() void {
     reset_host();
     reset_enums();
     reset_control();
+    reset_closures();
     fi_grow();
 }
 
@@ -1487,5 +1532,6 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     };
     cur_params.resize(1);
     cur_params[0] = cur_locals.len();
-    finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result });
+    mark_boxes(last_child(item));
+    finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result }, -1);
 }

@@ -9,6 +9,7 @@ wasm.utu
 validate.utu
 check.utu
 control.utu
+closures.utu
 strings.utu
 data.utu
 mems.utu

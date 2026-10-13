@@ -204,6 +204,11 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         report(Diag.TupleMisplaced, node, -1);
         return error_value();
     };
+    // A `fun` has no place in an array yet (a `cl` does).
+    if ty_is(elem, Ty.Fun) {
+        report(Diag.FunInField, node, -1);
+        return error_value();
+    };
     if ty_is(elem, Ty.Error) { return error_value(); };
     let t = array_of(elem);
     let m = w_mark();

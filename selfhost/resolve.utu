@@ -139,6 +139,7 @@ enum(U8) Diag:
     | InternNotBytes
     | MemInitializer
     | MemElementRange
+    | ClosureParamType
 
 mem diag_kind: U8;
 mem diag_node: I32;

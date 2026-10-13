@@ -101,10 +101,22 @@ fn is_space(c: I32) Bool { c == 32 or c == 10 or c == 9 or c == 13; }
 // Write the host section for what the module imports (after the sweep).
 fn write_host_json() void {
     host_json.clear();
+    json_byte(123);
+    write_es_json();
+    if host_json.len() > 1 and host_json[host_json.len() - 1] != 123 { json_byte(44); };
+    let before = host_json.len();
+    write_closure_json();
+    if host_json.len() == before and host_json[host_json.len() - 1] == 44 { host_json.resize(host_json.len() - 1); };
+    json_byte(125);
+    // Nothing to say: no section.
+    if host_json.len() == 2 { host_json.clear(); };
+}
+
+fn write_es_json() void {
     let any = false;
     for (0 ..< es_func.len()) |i| { if func_live[es_func[i]] == 1 { any = true; }; };
     if not any { return; };
-    json_text("{\"es\":{\"es\":{");
+    json_text("\"es\":{\"es\":{");
     let first = true;
     for (0 ..< es_func.len()) |i| {
         let f = es_func[i];
@@ -119,5 +131,5 @@ fn write_host_json() void {
             json_string(dsl_text_start(es_body[i]), dsl_text_end(es_body[i]));
         };
     };
-    json_text("}}}");
+    json_text("}}");
 }

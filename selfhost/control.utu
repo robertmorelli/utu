@@ -223,7 +223,7 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
 fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     let e = last_child(arm);
     if in_loop {
-        drop_value(check_expr(e, -1, cx));
+        discard(check_expr(e, ty_void(), cx));
         return t;
     };
     let actual = check_expr(e, t, cx);
@@ -342,7 +342,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     decl_ty[d] = inner;
     let t = -1;
     if default_ < 0 {
-        drop_value(check_expr(arm, -1, cx));
+        discard(check_expr(arm, ty_void(), cx));
         w_node(Op.Seq, vt_none, 0, 0, mt);
         w_node(Op.If, vt_none, new_label(), 0, mi);
         w_node(Op.Seq, vt_none, 0, 0, m);
@@ -667,7 +667,7 @@ fn check_for(node: I32, cx: Cx) I32 {
     };
     let mn = w_mark();
     enter_loop(brk, next, -1, -1);
-    drop_value(check_block(block, -1, cx));
+    discard(check_block(block, ty_void(), cx));
     leave_loop();
     w_node(Op.Block, vt_none, next, 0, mn);
     for (0 ..< n) |j| {

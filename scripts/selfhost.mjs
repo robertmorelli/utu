@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject, PLATFORM_SOURCES, JS_STRING_BUILTINS_COMPILE_OPTIONS } from '../src/index.js';
-import { importObjectFromEval, importObjectFromGlue, glueModuleSource, exceptionImports } from '../src/runtime/host-imports.js';
+import { importObjectFromEval, importObjectFromGlue, glueModuleSource, exceptionImports, closureImports } from '../src/runtime/host-imports.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'selfhost');
@@ -151,6 +151,7 @@ export async function instantiateBuilt(wasm) {
   const [section] = WebAssembly.Module.customSections(module, 'utu');
   const spec = section ? JSON.parse(new TextDecoder().decode(section)) : {};
   const imports = await esImports(spec.es ?? {});
+  if (spec.closures) imports.utu = closureImports(spec.closures, imports.utu ?? {});
   if (WebAssembly.Module.imports(module).some(entry => entry.module === 'utu' && entry.name === 'js_tag')) {
     imports.utu = exceptionImports(imports.utu ?? {});
   }
