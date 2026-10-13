@@ -122,3 +122,47 @@ name (an iterator capture is a `let` spanning the pipeline, a module name
 in a path answers for the path), the script says how it compares. On the
 96,000-line program, loading, parsing, and resolving 1.1 million nodes
 takes 115 ms; resolving alone, 12.
+
+## The rest of the compiler (planned)
+
+The tree is never rewritten. Everything after names reads it and writes new
+tables:
+
+- **Types** (`types.utu`): every type is an interned id (`ty_*`), so
+  types compare as ints: a named type is a declaration and a module
+  instance (`Array[I32]` is Array's promoted type in the instance
+  `Array[I32]`), and nullable, tuple, `fun`, and `cl` types are built from
+  ids. Instances (`inst_*`) are interned the same way. A type's wasm
+  representation comes from the declarations: a module's `type & = @ir/\
+  <ir-wasm-scalar type-repr="wasm-i32"/> \/` says what `I32` is.
+- **Checking** (`check.utu`, with `validate.utu` for rules about
+  declarations): monomorphization on demand. Starting from
+  the exports (or tests), each function is checked once per instance it is
+  called in, against the types its module's arguments give its
+  parameters, and translated as it is checked into a wasm-shaped IR (the
+  `w_*` mems): typed nodes, children built before parents, as the parser
+  builds its tree. Calls enqueue the instances they reach, so only what is
+  reached is compiled. Expected types flow down (literals, `null`,
+  closures, `&{…}` read them); the language's surface constructs (operators
+  through their std declarations, loops, iterators, generators, `defer`)
+  become IR as they are checked. Diagnostics are collected, with an error
+  type that stops cascades.
+- **Intrinsics**: a function whose body is `@ir/\ … \/` (std's scalar
+  operators, array access) is expanded where it is called: the XML is
+  parsed once into a small tree and translated per call.
+- **Encoding** (`wasm.utu`): once every function is checked, a sweep from
+  the exports finds what is reached, indices are assigned (imports first),
+  and only that is encoded. Every function of the program's own files is
+  checked, reached or not, so its mistakes are reported; the standard
+  library's are checked when reached. Types live in one recursion group,
+  except the function types host builtins need on their own.
+- **The host contract**: what the module needs from its host (`@es`
+  bodies, closures, promises, host-created mems) is a custom section of
+  the module, so a compiled program is one file, and a small loader builds
+  its imports from it.
+
+The check for all of it is behavior, not bytes: every program in
+`examples/`, `benchmarks/`, and `baselines/corpus` must do what
+`baselines/run-differential*.json` recorded stage 0's builds doing, and
+report the diagnostics stage 0 reported. Then the compiler compiles
+itself, and that compiler compiles itself to the same bytes.

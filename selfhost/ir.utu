@@ -1,0 +1,262 @@
+// ── @ir bodies ───────────────────────────────────────────────────────────────
+//
+// The standard library writes its intrinsics as XML in `@ir/\ … \/`:
+// scalar operators (`<ir-i32-add><ir-ident name="a"/><ir-ident name="b"/>
+// </ir-i32-add>`), array access, string builtins, and the representation
+// of each scalar type (`<ir-wasm-scalar type-repr="wasm-i32"/>`). Each body
+// is parsed once into a small tree (`x_*`); its tag and attribute names are
+// interned words, so they compare with the names below as ints.
+
+mem x_tag: I32;        // the tag's word id
+mem x_attr_first: I32; // its first attribute, in attr_*
+mem x_attr_count: I32;
+mem x_child: I32;      // first child element, or -1
+mem x_next: I32;       // next sibling element, or -1
+mem attr_name: I32;    // word id
+mem attr_start: I32;   // the value's bytes in src
+mem attr_end: I32;
+mem x_cache: I32;      // by DSL node: its parsed root, -2 before parsing, -1 when it does not parse
+
+fn reset_ir_trees() void {
+    x_tag.clear();
+    x_attr_first.clear();
+    x_attr_count.clear();
+    x_child.clear();
+    x_next.clear();
+    attr_name.clear();
+    attr_start.clear();
+    attr_end.clear();
+    x_cache.clear();
+}
+
+// The tree of an `@ir` DSL expression (or of its body token's node).
+fn ir_tree(dsl: I32) I32 {
+    if dsl < 0 { return -1; };
+    if x_cache.len() < node_kind.len() {
+        let old = x_cache.len();
+        x_cache.resize(node_kind.len());
+        for (old ..< node_kind.len()) |n| { x_cache[n] = -2; };
+    };
+    if x_cache[dsl] != -2 { return x_cache[dsl]; };
+    let body = if is_kind(dsl, Node.Dsl_expr) { last_child(dsl); } else { dsl; };
+    let t = node_first[body];
+    // The body token is `/\ … \/`.
+    let at = XmlAt { pos: tok_start[t] + 2, end: tok_end[t] - 2 };
+    let root = x_element(at);
+    x_cache[dsl] = root;
+    root;
+}
+
+struct XmlAt:
+    | pos: I32
+    | end: I32
+
+fn x_space(at: XmlAt) void {
+    while (at.pos < at.end and (src[at.pos] == 32 or src[at.pos] == 10 or src[at.pos] == 9 or src[at.pos] == 13)) { at.pos += 1; };
+}
+
+fn x_name_char(c: I32) Bool { (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 45 or c == 95; }
+
+// An element at `at`, or -1.
+fn x_element(at: XmlAt) I32 {
+    x_space(at);
+    if at.pos >= at.end or src[at.pos] != 60 { return -1; };
+    at.pos += 1;
+    let name_start = at.pos;
+    while (at.pos < at.end and x_name_char(src[at.pos])) { at.pos += 1; };
+    let id = x_tag.len();
+    x_tag.push(src.intern(name_start, at.pos));
+    x_attr_first.push(attr_name.len());
+    x_attr_count.push(0);
+    x_child.push(-1);
+    x_next.push(-1);
+    // Attributes, up to `/>` or `>`.
+    while (true) {
+        x_space(at);
+        if at.pos >= at.end { return id; };
+        let c = src[at.pos];
+        if c == 47 {
+            at.pos += 2;
+            return id;
+        };
+        if c == 62 {
+            at.pos += 1;
+            break;
+        };
+        let a_start = at.pos;
+        while (at.pos < at.end and x_name_char(src[at.pos])) { at.pos += 1; };
+        if at.pos == a_start { return -1; };
+        attr_name.push(src.intern(a_start, at.pos));
+        x_space(at);
+        at.pos += 1;   // =
+        x_space(at);
+        at.pos += 1;   // "
+        let v_start = at.pos;
+        while (at.pos < at.end and src[at.pos] != 34) { at.pos += 1; };
+        attr_start.push(v_start);
+        attr_end.push(at.pos);
+        at.pos += 1;
+        x_attr_count[id] += 1;
+    };
+    // Children, up to `</name>`.
+    let last = -1;
+    while (true) {
+        x_space(at);
+        if at.pos >= at.end { return id; };
+        if src[at.pos] == 60 and src[at.pos + 1] == 47 {
+            while (at.pos < at.end and src[at.pos] != 62) { at.pos += 1; };
+            at.pos += 1;
+            return id;
+        };
+        let child = x_element(at);
+        if child < 0 { return id; };
+        if last < 0 { x_child[id] = child; } else { x_next[last] = child; };
+        last = child;
+    };
+    id;
+}
+
+// The attribute named `name` (a word id) of an element, or -1.
+fn x_attr(x: I32, name: I32) I32 {
+    if x < 0 { return -1; };
+    for (0 ..< x_attr_count[x]) |i| {
+        let a = x_attr_first[x] + i;
+        if attr_name[a] == name { return a; };
+    };
+    -1;
+}
+
+fn attr_is(a: I32, text: Str) Bool {
+    if attr_end[a] - attr_start[a] != text.len() { return false; };
+    for (0 ..< text.len()) |i| { if src[attr_start[a] + i] != text.get(i) { return false; }; };
+    true;
+}
+
+// The attribute's value as a word id (to compare with names).
+fn attr_word(a: I32) I32 { src.intern(attr_start[a], attr_end[a]); }
+
+fn x_children(x: I32) I32 {
+    let n = 0;
+    let c = x_child[x];
+    while (c >= 0) {
+        n += 1;
+        c = x_next[c];
+    };
+    n;
+}
+
+// ── Names the compiler knows ──
+//
+// Interned when checking starts, after everything in the files, so each
+// has a word id; `word_opcode` maps a tag's word to its wasm opcode.
+
+mem known: I32;        // by Known: its word id
+mem word_opcode: I32;  // by word id: the opcode of an `ir-…` tag, or -1
+
+enum(U8) Known:
+    | IrIdent
+    | IrLit
+    | Name
+    | Kind
+    | Value
+    | TypeName
+    | TypeRepr
+    | Main
+    | Add
+    | Sub
+    | Mul
+    | Div
+    | Rem
+    | Band
+    | Bor
+    | Bxor
+    | Shl
+    | Shr
+    | Ushr
+    | Eq
+    | Ne
+    | Lt
+    | Le
+    | Gt
+    | Ge
+    | Neg
+    | Bnot
+    | Es
+    | Ir
+    | Comptime
+    | Embed
+    | IrWasmScalar
+    | WordI32
+
+fn known_word(k: Known) I32 { known[k.to_i32()]; }
+
+fn attr_type_repr() I32 { known_word(Known.TypeRepr); }
+
+// The tag names, and the opcodes of those that are one wasm instruction
+// (0xFC00 + n and 0xFD00 + n for prefixed ones).
+fn opcode_table() Str {
+    "i32-eqz 69 i32-eq 70 i32-ne 71 i32-lt-s 72 i32-gt-s 74 i32-le-s 76 i32-ge-s 78 "
+    + "u32-eq 70 u32-ne 71 u32-lt-u 73 u32-gt-u 75 u32-le-u 77 u32-ge-u 79 "
+    + "i64-eqz 80 i64-eq 81 i64-ne 82 i64-lt-s 83 i64-gt-s 85 i64-le-s 87 i64-ge-s 89 "
+    + "u64-eq 81 u64-ne 82 u64-lt-u 84 u64-gt-u 86 u64-le-u 88 u64-ge-u 90 "
+    + "f32-eq 91 f32-ne 92 f32-lt 93 f32-gt 94 f32-le 95 f32-ge 96 "
+    + "f64-eq 97 f64-ne 98 f64-lt 99 f64-gt 100 f64-le 101 f64-ge 102 "
+    + "i32-clz 103 i32-ctz 104 i32-popcnt 105 i32-add 106 i32-sub 107 i32-mul 108 i32-div-s 109 i32-rem-s 111 "
+    + "i32-and 113 i32-or 114 i32-xor 115 i32-shl 116 i32-shr-s 117 i32-shr-u 118 "
+    + "u32-add 106 u32-sub 107 u32-mul 108 u32-div-u 110 u32-rem-u 112 u32-and 113 u32-or 114 u32-xor 115 "
+    + "u32-shl 116 u32-shr-u 118 "
+    + "i64-clz 121 i64-ctz 122 i64-popcnt 123 i64-add 124 i64-sub 125 i64-mul 126 i64-div-s 127 i64-rem-s 129 "
+    + "i64-and 131 i64-or 132 i64-xor 133 i64-shl 134 i64-shr-s 135 i64-shr-u 136 "
+    + "u64-add 124 u64-sub 125 u64-mul 126 u64-div-u 128 u64-rem-u 130 u64-and 131 u64-or 132 u64-xor 133 "
+    + "u64-shl 134 u64-shr-u 136 "
+    + "f32-abs 139 f32-neg 140 f32-ceil 141 f32-floor 142 f32-trunc 143 f32-nearest 144 f32-sqrt 145 "
+    + "f32-add 146 f32-sub 147 f32-mul 148 f32-div 149 f32-min 150 f32-max 151 "
+    + "f64-abs 153 f64-neg 154 f64-ceil 155 f64-floor 156 f64-trunc 157 f64-nearest 158 f64-sqrt 159 "
+    + "f64-add 160 f64-sub 161 f64-mul 162 f64-div 163 f64-min 164 f64-max 165 "
+    + "i32-wrap 167 u32-wrap 167 i64-extend-s 172 i64-extend-u 173 u64-extend-s 172 u64-extend-u 173 "
+    + "f32-convert-s-i32 178 f32-convert-u-i32 179 f32-convert-s-i64 180 f32-convert-u-i64 181 f32-demote 182 "
+    + "f64-convert-s-i32 183 f64-convert-u-i32 184 f64-convert-s-i64 185 f64-convert-u-i64 186 f64-promote 187 "
+    + "i32-reinterpret 188 i64-reinterpret 189 f32-reinterpret 190 f64-reinterpret 191 "
+    + "i32-trunc-s-sat-f32 64512 u32-trunc-u-sat-f32 64513 i32-trunc-s-sat-f64 64514 u32-trunc-u-sat-f64 64515 "
+    + "i64-trunc-s-sat-f32 64516 u64-trunc-u-sat-f32 64517 i64-trunc-s-sat-f64 64518 u64-trunc-u-sat-f64 64519 "
+    + "v128-not 64845 v128-and 64846 v128-andnot 64847 v128-or 64848 v128-xor 64849 v128-bitselect 64850 "
+    + "v128-any-true 64851";
+}
+
+fn intern_known() void {
+    word_opcode.clear();
+    known.resize(Known.count());
+    let names = ["ir-ident", "ir-lit", "name", "kind", "value", "type-name", "type-repr", "main",
+        "add", "sub", "mul", "div", "rem", "band", "bor", "bxor", "shl", "shr", "ushr",
+        "eq", "ne", "lt", "le", "gt", "ge", "neg", "bnot", "es", "ir", "comptime", "embed", "ir-wasm-scalar", "I32"];
+    for (0 ..< Known.count()) |k| { known[k] = intern_text(names[k]); };
+    // Tags: "ir-" and the name, then its opcode.
+    let table = opcode_table();
+    let i = 0;
+    let n = table.len();
+    while (i < n) {
+        let start = src.len();
+        for ([105, 114, 45]) |b| { src.push(b); };
+        while (table.get(i) != 32) {
+            src.push(table.get(i));
+            i += 1;
+        };
+        let word = src.intern(start, src.len());
+        i += 1;
+        let code = 0;
+        while (i < n and table.get(i) != 32) {
+            code = code * 10 + table.get(i) - 48;
+            i += 1;
+        };
+        i += 1;
+        if word_opcode.len() <= word {
+            let old = word_opcode.len();
+            word_opcode.resize(word + 1);
+            for (old ..< word + 1) |w| { word_opcode[w] = -1; };
+        };
+        word_opcode[word] = code;
+    };
+}
+
+// The opcode of a tag, or -1 when it is not one plain instruction.
+fn tag_opcode(word: I32) I32 { if word < word_opcode.len() { word_opcode[word]; } else { -1; }; }

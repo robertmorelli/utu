@@ -52,14 +52,19 @@ fn reset_program() void {
     import_node.clear();
     import_path.clear();
     import_target.clear();
+    node_parent.clear();
     reset_resolve();
 }
 
 // Intern a name that is not in any file (pushed onto `src`).
 fn intern_text(text: Str) I32 {
     let start = src.len();
+    let before = src.interned();
     for (0 ..< text.len()) |c| { src.push(text.get(c)); };
-    src.intern(start, src.len());
+    let id = src.intern(start, src.len());
+    // Already interned: its bytes are elsewhere.
+    if id < before { src.resize(start); };
+    id;
 }
 
 // Room for a file of `n` bytes, which the host then writes at file_start.

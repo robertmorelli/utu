@@ -1,0 +1,236 @@
+// ── Validation ───────────────────────────────────────────────────────────────
+//
+// Rules about declarations that need no expression's type: duplicate
+// names, where tuples and nullable types may appear, what a struct field
+// and a global's initializer may be, struct types that contain themselves.
+// They run over the program's own files (the standard library's are known
+// to keep them) before any function is checked.
+
+// `type N = distinct B;`: B is one of the numeric scalars.
+fn validate_distinct(node: I32) void {
+    let base = last_child(node);
+    let t = decl_type(node_decl[base], 0);
+    if not (t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64)
+        or t == prelude(Prelude.U64) or t == prelude(Prelude.F32) or t == prelude(Prelude.F64)) {
+        report(Diag.InvalidDistinct, node, word_of(first_child(node)));
+    };
+}
+
+// ── Integer enums ──
+//
+// A variant's value counts up from 0, or from the previous `= n`; each fits
+// the representation, and no two are equal.
+
+mem variant_value: I32;  // by declaration (a variant of an integer enum): its value
+
+fn int_enum_values() void {
+    variant_value.resize(decl_kind.len());
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.IntEnum) { enum_values(d); };
+    };
+}
+
+fn enum_values(decl: I32) void {
+    let node = decl_node[decl];
+    let repr_word = word_of(after_qualifier(node));
+    let lo = 0;
+    let hi = 2147483647;
+    if repr_word == Kw.count() { hi = 255; };                       // U8
+    if repr_word == Kw.count() + 1 { lo = -128; hi = 127; };        // I8
+    if repr_word == Kw.count() + 2 { hi = 65535; };                 // U16
+    if repr_word == Kw.count() + 3 { lo = -32768; hi = 32767; };    // I16
+    if repr_word == known_word(Known.WordI32) { lo = -2147483648; };
+    let own = file_role[file_of_token(node_first[node])] != FileRole.Prelude.to_i32();
+    let next = 0;
+    let first = -1;
+    let c = first_child(node);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) {
+            let v = node_decl[first_child(c)];
+            let lit = last_child(c);
+            if is_kind(lit, Node.Int_lit) {
+                let value = int_value(lit).to_i32();
+                if tok_kind[node_last[lit] - 2] == Tok.Minus.to_i32() or tok_kind[node_first[lit] - 1] == Tok.Minus.to_i32() { value = 0 - value; };
+                next = value;
+            };
+            variant_value[v] = next;
+            if own and (next < lo or next > hi) { report(Diag.EnumValueRange, c, decl_name[v]); };
+            if own {
+                let other = first;
+                while (other >= 0 and other != v) {
+                    if variant_value[other] == next {
+                        report(Diag.EnumValueTwice, c, decl_name[v]);
+                        other = v;
+                    } else {
+                        other = other + 1;
+                        while (other < v and not decl_is(other, Decl.Variant)) { other += 1; };
+                    };
+                };
+            };
+            if first < 0 { first = v; };
+            next += 1;
+        };
+        c = next_sibling(c);
+    };
+}
+
+fn validate_program() void {
+    int_enum_values();
+    for (0 ..< file_root.len()) |file| {
+        if file_root[file] < 0 {
+            report(Diag.ParseError, -1, file);
+        } else if file_role[file] != FileRole.Prelude.to_i32() {
+            validate_tree(file_root[file]);
+        };
+    };
+    validate_recursive_structs();
+}
+
+fn validate_tree(node: I32) void {
+    let kind = node_kind[node];
+    if kind == Node.Param_list.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration); }
+    else if kind == Node.Struct_decl.to_i32() { duplicate_names(node, Diag.DuplicateField); }
+    else if kind == Node.Field_list.to_i32() { duplicate_names(node, Diag.DuplicateField); }
+    else if kind == Node.Enum_decl.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration); }
+    else if kind == Node.Block.to_i32() { duplicate_lets(node); }
+    else if kind == Node.Nullable_type.to_i32() { validate_nullable(node); }
+    else if kind == Node.Tuple_type.to_i32() { validate_tuple_type(node); }
+    else if kind == Node.Field.to_i32() { validate_field_type(node); }
+    else if kind == Node.Global_decl.to_i32() { validate_global(node); }
+    else if kind == Node.Distinct_decl.to_i32() { validate_distinct(node); };
+    let c = first_child(node);
+    while (c >= 0) {
+        validate_tree(c);
+        c = next_sibling(c);
+    };
+}
+
+// Children that declare a name (parameters, fields, variants), each name once.
+fn duplicate_names(node: I32, kind: Diag) void {
+    let c = first_child(node);
+    while (c >= 0) {
+        let k = node_kind[c];
+        if k == Node.Param.to_i32() or k == Node.Field.to_i32() or k == Node.Variant.to_i32() {
+            let word = word_of(first_child(c));
+            let other = first_child(node);
+            while (other != c) {
+                if node_kind[other] == k and word_of(first_child(other)) == word {
+                    report(kind, c, word);
+                    other = c;
+                } else {
+                    other = next_sibling(other);
+                };
+            };
+        };
+        c = next_sibling(c);
+    };
+}
+
+// The lets of a block, each name once.
+fn duplicate_lets(block: I32) void {
+    let c = first_child(block);
+    while (c >= 0) {
+        if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
+            let word = word_of(first_child(c));
+            let other = first_child(block);
+            while (other != c) {
+                if is_kind(other, Node.Bind_expr) and is_kind(first_child(other), Node.Identifier) and word_of(first_child(other)) == word {
+                    report(Diag.DuplicateDeclaration, c, word);
+                    other = c;
+                } else {
+                    other = next_sibling(other);
+                };
+            };
+        };
+        c = next_sibling(c);
+    };
+}
+
+// `?I32`: a scalar has no null.
+fn validate_nullable(node: I32) void {
+    let inner = first_child(node);
+    if not is_kind(inner, Node.Ref_type) { return; };
+    let name = first_child(inner);
+    if not is_kind(name, Node.Type_ident) { return; };
+    let decl = node_decl[name];
+    if decl_is(decl, Decl.TypeDecl) and is_scalar_decl(decl) { report(Diag.InvalidNullableType, node, word_of(name)); };
+}
+
+fn is_scalar_decl(decl: I32) Bool {
+    let x = ir_tree(last_child(last_child(decl_node[decl])));
+    x >= 0 and x_tag[x] == known_word(Known.IrWasmScalar);
+}
+
+// A tuple type is only a function's result.
+fn validate_tuple_type(node: I32) void {
+    let parent = parent_of(node);
+    if is_kind(parent, Node.Return_type) {
+        let owner = parent_of(parent);
+        if is_kind(owner, Node.Fn_decl) or is_kind(owner, Node.Func_type) or is_kind(owner, Node.Export_main_decl) { return; };
+    };
+    report(Diag.TupleMisplaced, node, -1);
+}
+
+// A struct field holds no `fun` (use `cl`).
+fn validate_field_type(node: I32) void {
+    let t = next_sibling(first_child(node));
+    if is_kind(t, Node.Func_type) { report(Diag.FunInField, node, -1); };
+}
+
+// A global's initializer is a literal (maybe negated).
+fn validate_global(node: I32) void {
+    let init = last_child(node);
+    if is_kind(init, Node.Literal) { return; };
+    if is_kind(init, Node.Dsl_expr) { return; };
+    if is_kind(init, Node.Unary_expr) and tok_kind[node_first[init]] == Tok.Minus.to_i32() and is_kind(last_child(init), Node.Literal) { return; };
+    report(Diag.InvalidGlobalInitializer, init, word_of(first_child(node)));
+}
+
+// A struct that reaches itself through fields of struct types (not
+// nullable, not arrays) can never be built.
+fn validate_recursive_structs() void {
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Struct) and file_role[file_of_token(node_first[decl_node[d]])] != FileRole.Prelude.to_i32()
+            and not is_generic(module_of(d)) and reaches_struct(d, d, 0) {
+            report(Diag.RecursiveType, decl_node[d], decl_name[d]);
+        };
+    };
+}
+
+fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
+    if depth > 64 { return false; };
+    let c = first_child(decl_node[from]);
+    while (c >= 0) {
+        if is_kind(c, Node.Field) {
+            let t = next_sibling(first_child(c));
+            if is_kind(t, Node.Ref_type) and is_kind(first_child(t), Node.Type_ident) {
+                let d = node_decl[first_child(t)];
+                if decl_is(d, Decl.Struct) and (d == target or reaches_struct(d, target, depth + 1)) { return true; };
+            };
+        };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+// ── Parents ──
+//
+// The tree records children, not parents; validation and checking ask for
+// a node's parent now and then, so they are computed once.
+
+mem node_parent: I32;
+
+fn parent_of(node: I32) I32 {
+    if node_parent.len() != node_kind.len() {
+        node_parent.resize(node_kind.len());
+        for (0 ..< node_kind.len()) |n| { node_parent[n] = -1; };
+        for (0 ..< node_kind.len()) |n| {
+            let c = node_child[n];
+            while (c >= 0) {
+                node_parent[c] = n;
+                c = node_next[c];
+            };
+        };
+    };
+    node_parent[node];
+}

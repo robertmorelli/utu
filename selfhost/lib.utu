@@ -41,6 +41,13 @@ export lib {
 
     fn node_count() I32 { node_kind.len(); }
 
+    // Check and encode the resolved program for a Target (0: its exports,
+    // 1: its tests). Returns the module's size in `out`, or -1 when there
+    // are diagnostics.
+    fn compile_program(target: I32) I32 { compile(Target.from_i32(target)); }
+
+    fn diagnostic_count() I32 { diag_kind.len(); }
+
     fn diagnostic_kind(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
 
     fn diagnostic_node(i: I32) I32 { diag_node[i]; }
@@ -57,6 +64,21 @@ export lib {
     fn tokens(n: I32) I32 { lex(file_start[0], file_end[0]); }
 
     fn nodes(n: I32) I32 { parse_file(0); }
+
+    // A module with one exported function, `answer`, returning 42: a check
+    // of the encoder alone.
+    fn debug_answer_module() I32 {
+        reset_wasm();
+        let f = new_func(FuncKind.Defined, func_type(vl_empty(), vl_one(vt_i32)));
+        let m = w_mark();
+        w_i32(40);
+        w_i32(2);
+        w_node(Op.Plain, vt_i32, 106, 0, m);
+        func_body[f] = w_pop();
+        func_field_name[f] = name_add("answer");
+        func_debug_name[f] = name_add("answer");
+        encode_module();
+    }
 
     // A node kind's name in tree-sitter's spelling.
     fn node_kind_name(kind: I32) Str {

@@ -2,4 +2,9 @@ lex.utu
 parse.utu
 source.utu
 resolve.utu
+types.utu
+ir.utu
+wasm.utu
+validate.utu
+check.utu
 lib.utu

@@ -1,0 +1,1337 @@
+// ── Checking ─────────────────────────────────────────────────────────────────
+//
+// Monomorphization on demand: each function is checked once per instance
+// it is reached in, and translated as it is checked into IR. A function
+// instance (`fi_*`) is a function declaration and the instance of its
+// module; checking a call enqueues the callee's, so only what the entry
+// points reach is compiled.
+//
+// `expr` checks an expression against the type expected of it (-1 for
+// none), pushes its IR node, and returns its type. Expected types flow
+// down: an integer literal becomes the integer or float type expected of
+// it, `null` the nullable type.
+
+mem fi_decl: I32;
+mem fi_inst: I32;
+mem fi_func: I32;     // its wasm function, or -1 for an intrinsic
+mem fi_params: I32;   // a list of parameter types (self first)
+mem fi_result: I32;
+mem fi_ir: I32;       // an intrinsic's @ir tree, else -1
+mem fi_table: I32;    // open addressing over (decl, inst), -1 empty
+mem fi_queue: I32;    // instances to check, in order
+
+// The function being checked.
+mem decl_local: I32;  // by declaration: its local
+mem decl_ty: I32;     // by declaration: its type (locals and parameters)
+mem cur_locals: I32;  // value types of its locals, parameters first
+mem cur_params: I32;  // [0]: how many of them are parameters
+mem next_label: I32;  // [0]
+mem loop_break: I32;  // per enclosing loop, innermost last
+mem loop_continue: I32;
+
+// Where checking is.
+struct Cx:
+    | inst: I32      // the instance the code is in
+    | fi: I32        // the function instance
+    | result: I32    // its result type
+
+// ── Function instances ──
+
+fn fi_hash(decl: I32, inst: I32) I32 { (decl * -1640531535) ^ (inst * 40503); }
+
+fn fn_instance(decl: I32, inst: I32) I32 {
+    if (fi_decl.len() + 1) * 2 > fi_table.len() { fi_grow(); };
+    let mask = fi_table.len() - 1;
+    let h = fi_hash(decl, inst) & mask;
+    while (fi_table[h] >= 0) {
+        let f = fi_table[h];
+        if fi_decl[f] == decl and fi_inst[f] == inst { return f; };
+        h = (h + 1) & mask;
+    };
+    let id = fi_decl.len();
+    fi_table[h] = id;
+    fi_decl.push(decl);
+    fi_inst.push(inst);
+    fi_func.push(-1);
+    fi_ir.push(-1);
+    let sig = signature(decl, inst);
+    fi_params.push(sig_params[0]);
+    fi_result.push(sig_result[0]);
+    let body = fn_body(decl);
+    let ir = intrinsic_body(body);
+    if ir >= 0 {
+        fi_ir[id] = ir;
+    } else {
+        let m = vl_begin();
+        let params = fi_params[id];
+        for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
+        let f = new_func(FuncKind.Defined, func_type(vl_end(m), vl_of_result(repr(fi_result[id]))));
+        fi_func[id] = f;
+        func_debug_name[f] = fn_debug_name(decl);
+        fi_queue.push(id);
+    };
+    id;
+}
+
+fn fi_grow() void {
+    let n = if fi_table.len() == 0 { 256; } else { fi_table.len() * 2; };
+    fi_table.resize(n);
+    for (0 ..< n) |i| { fi_table[i] = -1; };
+    let mask = n - 1;
+    for (0 ..< fi_decl.len()) |f| {
+        let h = fi_hash(fi_decl[f], fi_inst[f]) & mask;
+        while (fi_table[h] >= 0) { h = (h + 1) & mask; };
+        fi_table[h] = f;
+    };
+}
+
+// A function's block (its last child).
+fn fn_body(decl: I32) I32 { last_child(decl_node[decl]); }
+
+// The @ir tree of a body that is one `@ir/\ … \/` expression, or -1.
+fn intrinsic_body(block: I32) I32 {
+    let e = first_child(block);
+    if e < 0 or next_sibling(e) >= 0 or not is_kind(e, Node.Dsl_expr) { return -1; };
+    if word_of(first_child(e)) != known_word(Known.Ir) { return -1; };
+    ir_tree(e);
+}
+
+fn fn_debug_name(decl: I32) I32 {
+    let node = decl_node[decl];
+    let name = first_child(node);
+    let t0 = node_first[name];
+    let t1 = node_last[name];
+    if is_kind(node, Node.Op_decl) { t1 = node_last[next_sibling(name)]; };
+    name_from_src(tok_start[t0], tok_end[t1 - 1]);
+}
+
+// A function's parameter types (self first) and result type, in an instance.
+mem sig_params: I32;  // [0]
+mem sig_result: I32;  // [0]
+
+fn signature(decl: I32, inst: I32) void {
+    let node = decl_node[decl];
+    let m = vl_begin();
+    let result = ty_void();
+    let self_ty = receiver_type(decl, inst);
+    let c = first_child(node);
+    while (c >= 0) {
+        let kind = node_kind[c];
+        if kind == Node.Self_param.to_i32() {
+            vl_add(self_ty);
+        } else if kind == Node.Capture.to_i32() {
+            // An operator's captures are operands of its type.
+            let n = first_child(c);
+            while (n >= 0) {
+                vl_add(self_ty);
+                n = next_sibling(n);
+            };
+        } else if kind == Node.Param_list.to_i32() {
+            let p = first_child(c);
+            while (p >= 0) {
+                vl_add(type_of(next_sibling(first_child(p)), inst));
+                p = next_sibling(p);
+            };
+        } else if kind == Node.Return_type.to_i32() {
+            result = type_of(c, inst);
+        };
+        c = next_sibling(c);
+    };
+    sig_params.resize(1);
+    sig_result.resize(1);
+    sig_params[0] = vl_end(m);
+    sig_result[0] = result;
+}
+
+// The type a method or operator belongs to, in an instance (Error for a free function).
+fn receiver_type(decl: I32, inst: I32) I32 {
+    let owner = decl_a[decl];
+    if owner < 0 { return ty_error(); };
+    let node = decl_node[decl];
+    let r = first_child(if is_kind(node, Node.Fn_decl) { first_child(node); } else { node; });
+    let args = next_sibling(r);
+    if is_kind(node, Node.Fn_decl) and is_kind(args, Node.Module_type_arg_list) {
+        return named(owner, instance(module_of(owner), type_args(args, inst)));
+    };
+    decl_type(owner, inst);
+}
+
+// The parameter declarations of a function, in order: self, then the rest
+// (an operator's captures).
+fn param_decls(decl: I32) I32 {
+    let m = vl_begin();
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        let kind = node_kind[c];
+        if kind == Node.Self_param.to_i32() {
+            vl_add(node_decl[first_child(c)]);
+        } else if kind == Node.Capture.to_i32() {
+            let n = first_child(c);
+            while (n >= 0) {
+                vl_add(node_decl[n]);
+                n = next_sibling(n);
+            };
+        } else if kind == Node.Param_list.to_i32() {
+            let p = first_child(c);
+            while (p >= 0) {
+                vl_add(node_decl[first_child(p)]);
+                p = next_sibling(p);
+            };
+        };
+        c = next_sibling(c);
+    };
+    vl_end(m);
+}
+
+// ── Checking functions ──
+
+fn new_local(vt: I32) I32 {
+    cur_locals.push(vt);
+    cur_locals.len() - 1;
+}
+
+fn new_label() I32 {
+    next_label[0] += 1;
+    next_label[0];
+}
+
+// Check a function instance's body into its wasm function.
+fn check_function(fi: I32) void {
+    let decl = fi_decl[fi];
+    cur_locals.clear();
+    next_label.resize(1);
+    next_label[0] = 0;
+    loop_break.clear();
+    loop_continue.clear();
+    let params = fi_params[fi];
+    let decls = param_decls(decl);
+    for (0 ..< vl_len[decls]) |i| {
+        let d = vl_item(decls, i);
+        let t = vl_item(params, i);
+        decl_local[d] = new_local(repr(t));
+        decl_ty[d] = t;
+    };
+    cur_params.resize(1);
+    cur_params[0] = cur_locals.len();
+    let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] };
+    finish_function(fi_func[fi], fn_body(decl), cx);
+}
+
+// A body checked against the result type, as function `f`'s.
+fn finish_function(f: I32, body_node: I32, cx: Cx) void {
+    let m = w_mark();
+    let t = check_block(body_node, cx.result, cx);
+    if ty_is(cx.result, Ty.Void) { drop_value(t); } else { coerce(t, cx.result, body_node); };
+    w_node(Op.Seq, repr(cx.result), 0, 0, m);
+    func_body[f] = w_pop();
+    func_locals[f] = local_types.len();
+    func_local_count[f] = cur_locals.len() - cur_params[0];
+    for (cur_params[0] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
+}
+
+// Statements of a block; its value is its last one's.
+fn check_block(block: I32, expect: I32, cx: Cx) I32 {
+    let m = w_mark();
+    let c = first_child(block);
+    let t = ty_void();
+    while (c >= 0) {
+        let next = next_sibling(c);
+        if next < 0 {
+            t = check_expr(c, expect, cx);
+        } else {
+            drop_value(check_expr(c, -1, cx));
+        };
+        c = next;
+    };
+    w_node(Op.Seq, repr(t), 0, 0, m);
+    t;
+}
+
+// Drop the value on top of the stack, if it has one.
+fn drop_value(t: I32) void {
+    let vt = repr(t);
+    if vt == vt_none or vt == vt_unreachable or ty_is(t, Ty.Error) { return; };
+    let m = w_mark() - 1;
+    w_node(Op.Drop, vt_none, 0, 0, m);
+}
+
+// ── Types against types ──
+
+// Make the value on top of the stack (of type `actual`) a value of
+// `expected`, or report that it is not one.
+fn coerce(actual: I32, expected: I32, at: I32) I32 {
+    if expected < 0 or actual == expected { return actual; };
+    if ty_is(actual, Ty.Error) or ty_is(expected, Ty.Error) or ty_is(actual, Ty.Never) { return expected; };
+    if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return expected; };
+    if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) {
+        w_pop();
+        w_leaf(Op.RefNull, repr(expected), heap_of(repr(expected)), 0);
+        return expected;
+    };
+    if ty_is(expected, Ty.Void) {
+        drop_value(actual);
+        return expected;
+    };
+    mismatch(at, expected, actual);
+    expected;
+}
+
+fn heap_of(vt: I32) I32 { vt_nullable(vt); }
+
+// ── Diagnostics ──
+
+mem diag_expected: I32;  // by diagnostic: the expected type, or -1
+mem diag_actual: I32;
+
+fn mismatch(at: I32, expected: I32, actual: I32) void {
+    report(Diag.TypeMismatch, at, -1);
+    note_types(expected, actual);
+}
+
+fn note_types(expected: I32, actual: I32) void {
+    diag_expected.resize(diag_kind.len());
+    diag_actual.resize(diag_kind.len());
+    diag_expected[diag_kind.len() - 1] = expected;
+    diag_actual[diag_kind.len() - 1] = actual;
+}
+
+// Something the compiler cannot do yet: reported, and checking goes on.
+fn unsupported(at: I32) I32 {
+    report(Diag.Unsupported, at, -1);
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    ty_error();
+}
+
+fn error_value() I32 {
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    ty_error();
+}
+
+// ── Expressions ──
+
+fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
+    let kind = node_kind[node];
+    if kind == Node.Identifier.to_i32() { return check_ident(node, cx); };
+    if kind == Node.Literal.to_i32() { return check_literal(node, expect, cx); };
+    if kind == Node.Paren_expr.to_i32() { return check_expr(first_child(node), expect, cx); };
+    if kind == Node.Binary_expr.to_i32() { return check_binary(node, expect, cx); };
+    if kind == Node.Unary_expr.to_i32() { return check_unary(node, expect, cx); };
+    if kind == Node.Call_expr.to_i32() { return check_call(node, expect, cx); };
+    if kind == Node.Block.to_i32() { return check_block(node, expect, cx); };
+    if kind == Node.Block_expr.to_i32() { return check_labeled(node, expect, cx); };
+    if kind == Node.Bind_expr.to_i32() { return check_let(node, cx); };
+    if kind == Node.Assign_expr.to_i32() { return check_assign(node, cx); };
+    if kind == Node.If_expr.to_i32() { return check_if(node, expect, cx); };
+    if kind == Node.While_expr.to_i32() { return check_while(node, cx); };
+    if kind == Node.For_expr.to_i32() { return check_for(node, cx); };
+    if kind == Node.Return_expr.to_i32() { return check_return(node, cx); };
+    if kind == Node.Break_expr.to_i32() { return check_break(node, true); };
+    if kind == Node.Continue_expr.to_i32() { return check_break(node, false); };
+    if kind == Node.Fatal_expr.to_i32() {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return ty_never();
+    };
+    if kind == Node.Assert_expr.to_i32() { return check_assert(node, cx); };
+    if kind == Node.Field_expr.to_i32() { return check_field(node, expect, cx); };
+    if kind == Node.Type_member_expr.to_i32() { return check_type_member(node, expect, cx); };
+    unsupported(node);
+}
+
+fn check_ident(node: I32, cx: Cx) I32 {
+    let decl = node_decl[node];
+    if decl < 0 { return error_value(); };
+    let k = decl_kind[decl];
+    if k == Decl.Global.to_i32() { return global_get(decl, cx); };
+    if k == Decl.Fn.to_i32() or k == Decl.Mem.to_i32() or is_type_decl(decl) { return unsupported(node); };
+    let t = decl_ty[decl];
+    w_leaf(Op.LocalGet, repr(t), decl_local[decl], 0);
+    t;
+}
+
+// ── Literals ──
+
+fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
+    let c = first_child(node);
+    if c < 0 {
+        // true, false, null
+        let w = tok_word[node_first[node]];
+        if w == Kw.True.to_i32() or w == Kw.False.to_i32() {
+            w_i32(if w == Kw.True.to_i32() { 1; } else { 0; });
+            return prelude(Prelude.Bool);
+        };
+        if expect >= 0 and ty_is(expect, Ty.Nullable) {
+            let vt = repr(expect);
+            w_leaf(Op.RefNull, vt, heap_of(vt), 0);
+            return expect;
+        };
+        if expect < 0 or not ty_is(expect, Ty.Error) { report(Diag.BareNull, node, -1); };
+        w_leaf(Op.RefNull, vt_externref, vt_externref, 0);
+        return ty_error();
+    };
+    if is_kind(c, Node.Int_lit) { return int_literal(c, expect, false); };
+    if is_kind(c, Node.Float_lit) { return float_literal(c, expect, false); };
+    unsupported(node);
+}
+
+// An integer literal's value, as 64 bits.
+fn int_value(node: I32) I64 {
+    let t = node_first[node];
+    let i = tok_start[t];
+    let end_ = tok_end[t];
+    let v: I64 = 0;
+    if end_ - i > 2 and src[i] == 48 and (src[i + 1] == 120 or src[i + 1] == 98) {
+        let hex = src[i + 1] == 120;
+        i += 2;
+        while (i < end_) {
+            let c = src[i];
+            let d = if c >= 97 { c - 87; } else if c >= 65 { c - 55; } else { c - 48; };
+            v = if hex { v * 16 + d.to_i64(); } else { v * 2 + d.to_i64(); };
+            i += 1;
+        };
+        return v;
+    };
+    while (i < end_) {
+        v = v * 10 + (src[i] - 48).to_i64();
+        i += 1;
+    };
+    v;
+}
+
+// The type an integer literal takes: the one expected, when integers
+// adopt it, else I32.
+fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
+    let v = int_value(node);
+    if negate { v = 0 - v; };
+    let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
+    if not fits(v, t, negate) { report(Diag.IntegerOutOfRange, node, -1); };
+    push_number(t, v, false);
+    t;
+}
+
+// Whether an integer literal's value fits its type. A literal past the
+// 64-bit range wraps when it is read, so U64's top half reads negative.
+fn fits(v: I64, t: I32, negate: Bool) Bool {
+    if t == prelude(Prelude.I32) { return v >= -2147483648 and v <= 2147483647; };
+    if t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { return v >= 0 and v <= 4294967295; };
+    if t == prelude(Prelude.I64) { return negate or v >= 0; };
+    true;
+}
+
+// Push a constant of numeric type `t`: the integer `v`, or (when `is_float`)
+// the float whose bits are `v`.
+fn push_number(t: I32, v: I64, is_float: Bool) void {
+    let vt = repr(t);
+    if vt == vt_i32 {
+        w_i32(v.to_i32());
+    } else if vt == vt_i64 {
+        w_leaf(Op.I64Const, vt_i64, (v & 4294967295).to_i32(), (v >> 32).to_i32());
+    } else if vt == vt_f64 {
+        let bits = if is_float { v; } else { v.to_f64().bits(); };
+        w_leaf(Op.F64Const, vt_f64, (bits & 4294967295).to_i32(), (bits >> 32).to_i32());
+    } else if vt == vt_f32 {
+        let f = if is_float { F64.from_bits(v); } else { v.to_f64(); };
+        w_leaf(Op.F32Const, vt_f32, f.to_f32().bits(), 0);
+    } else {
+        w_i32(v.to_i32());
+    };
+}
+
+let parse_number: fun(Str) F64 = @es/\ (s) => Number(s) \/;
+
+fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
+    let t = node_first[node];
+    let text = "";
+    for (tok_start[t] ..< tok_end[t]) |i| { text = text + Str.from_code_point(src[i]); };
+    let f = parse_number(text);
+    if negate { f = 0.0 - f; };
+    let ft = if expect >= 0 and is_float(expect) { expect; } else { prelude(Prelude.F64); };
+    push_number(ft, f.bits(), true);
+    ft;
+}
+
+// ── Locals and globals ──
+
+fn check_let(node: I32, cx: Cx) I32 {
+    let name = first_child(node);
+    if is_kind(name, Node.Tuple_pattern) { return unsupported(node); };
+    let decl = node_decl[name];
+    let init = last_child(node);
+    let annotated = next_sibling(name) != init;
+    let t = if annotated { type_of(next_sibling(name), cx.inst); } else { -1; };
+    let m = w_mark();
+    let actual = check_expr(init, t, cx);
+    if annotated { coerce(actual, t, init); } else { t = actual; };
+    if ty_is(t, Ty.Null) {
+        report(Diag.TypeMismatch, init, -1);
+        t = ty_error();
+    };
+    let local = new_local(repr(t));
+    decl_local[decl] = local;
+    decl_ty[decl] = t;
+    w_node(Op.LocalSet, vt_none, local, 0, m);
+    ty_void();
+}
+
+mem decl_global: I32;  // by declaration: its wasm global, or -1
+
+fn global_get(decl: I32, cx: Cx) I32 {
+    let g = global_of(decl);
+    if g < 0 { return error_value(); };
+    let t = decl_ty[decl];
+    w_leaf(Op.GlobalGet, repr(t), g, 0);
+    t;
+}
+
+// A top-level `let`: a wasm global holding its constant value.
+fn global_of(decl: I32) I32 {
+    if decl_global[decl] != -1 { return decl_global[decl]; };
+    let node = decl_node[decl];
+    let t = type_of(next_sibling(first_child(node)), 0);
+    decl_ty[decl] = t;
+    let init = last_child(node);
+    let m = w_mark();
+    let cx = Cx { inst: 0, fi: -1, result: t };
+    let actual = constant(init, t, cx);
+    if actual < 0 {
+        w_stack.resize(m);
+        decl_global[decl] = -2;
+        unsupported(init);
+        w_pop();
+        return -2;
+    };
+    coerce(actual, t, init);
+    let g = add_global(repr(t), false, w_pop());
+    decl_global[decl] = g;
+    g;
+}
+
+// A constant expression (a literal, maybe negated), or -1.
+fn constant(node: I32, expect: I32, cx: Cx) I32 {
+    if is_kind(node, Node.Literal) {
+        let c = first_child(node);
+        if c < 0 or is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit) { return check_literal(node, expect, cx); };
+        return -1;
+    };
+    if is_kind(node, Node.Unary_expr) and tok_kind[node_first[node]] == Tok.Minus.to_i32() {
+        let lit = first_child(last_child(node));
+        if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Int_lit) { return int_literal(lit, expect, true); };
+        if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true); };
+    };
+    -1;
+}
+
+// `x = e`, `x += e`, …
+fn check_assign(node: I32, cx: Cx) I32 {
+    let target = first_child(node);
+    let value = last_child(node);
+    let op = tok_kind[node_last[target]];
+    if not is_kind(target, Node.Identifier) { return unsupported(node); };
+    let decl = node_decl[target];
+    if decl < 0 { return error_value(); };
+    if decl_is(decl, Decl.Global) or decl_is(decl, Decl.Fn) or decl_is(decl, Decl.Mem) {
+        report(Diag.AssignmentToImmutable, target, word_of(target));
+        return error_value();
+    };
+    let t = decl_ty[decl];
+    let m = w_mark();
+    if op == Tok.Eq.to_i32() {
+        coerce(check_expr(value, t, cx), t, value);
+    } else {
+        // `x op= e` is `x = x op e`.
+        let word = compound_word(op, node_last[target]);
+        let m2 = w_mark();
+        w_leaf(Op.LocalGet, repr(t), decl_local[decl], 0);
+        apply_operator(word, t, value, node, cx, m2);
+    };
+    w_node(Op.LocalSet, vt_none, decl_local[decl], 0, m);
+    ty_void();
+}
+
+// The operator a compound assignment applies (`+=` adds).
+fn compound_word(op: I32, t: I32) I32 {
+    if op == Tok.PlusEq.to_i32() { return known_word(Known.Add); };
+    if op == Tok.MinusEq.to_i32() { return known_word(Known.Sub); };
+    if op == Tok.StarEq.to_i32() { return known_word(Known.Mul); };
+    if op == Tok.SlashEq.to_i32() { return known_word(Known.Div); };
+    if op == Tok.PercentEq.to_i32() { return known_word(Known.Rem); };
+    if op == Tok.AmpEq.to_i32() { return known_word(Known.Band); };
+    if op == Tok.PipeEq.to_i32() { return known_word(Known.Bor); };
+    if op == Tok.CaretEq.to_i32() { return known_word(Known.Bxor); };
+    if op == Tok.ShlEq.to_i32() { return known_word(Known.Shl); };
+    if op == Tok.ShrEq.to_i32() { return known_word(Known.Shr); };
+    if op == Tok.Shr3Eq.to_i32() { return known_word(Known.Ushr); };
+    // `and=`, `or=`, `xor=`: the word before `=`.
+    tok_word[t];
+}
+
+// ── Operators ──
+
+// The operator method a binary operator token names (`+` is add), or the
+// keyword's id for `and`, `or`, `xor`.
+fn operator_word(t: I32) I32 {
+    let k = tok_kind[t];
+    if k == Tok.Plus.to_i32() { return known_word(Known.Add); };
+    if k == Tok.Minus.to_i32() { return known_word(Known.Sub); };
+    if k == Tok.Star.to_i32() { return known_word(Known.Mul); };
+    if k == Tok.Slash.to_i32() { return known_word(Known.Div); };
+    if k == Tok.Percent.to_i32() { return known_word(Known.Rem); };
+    if k == Tok.Amp.to_i32() { return known_word(Known.Band); };
+    if k == Tok.Pipe.to_i32() { return known_word(Known.Bor); };
+    if k == Tok.Caret.to_i32() { return known_word(Known.Bxor); };
+    if k == Tok.Shl.to_i32() { return known_word(Known.Shl); };
+    if k == Tok.Shr.to_i32() { return known_word(Known.Shr); };
+    if k == Tok.Shr3.to_i32() { return known_word(Known.Ushr); };
+    if k == Tok.EqEq.to_i32() { return known_word(Known.Eq); };
+    if k == Tok.BangEq.to_i32() { return known_word(Known.Ne); };
+    if k == Tok.Lt.to_i32() { return known_word(Known.Lt); };
+    if k == Tok.LtEq.to_i32() { return known_word(Known.Le); };
+    if k == Tok.Gt.to_i32() { return known_word(Known.Gt); };
+    if k == Tok.GtEq.to_i32() { return known_word(Known.Ge); };
+    tok_word[t];
+}
+
+fn is_comparison(word: I32) Bool {
+    word == known_word(Known.Eq) or word == known_word(Known.Ne) or word == known_word(Known.Lt)
+        or word == known_word(Known.Le) or word == known_word(Known.Gt) or word == known_word(Known.Ge);
+}
+
+// The token after a node's last (its operator, in a binary expression).
+fn token_after(node: I32) I32 {
+    let t = node_last[node];
+    while (tok_kind[t] == Tok.Comment.to_i32()) { t += 1; };
+    t;
+}
+
+fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
+    let left = first_child(node);
+    let right = last_child(node);
+    let word = operator_word(token_after(left));
+    if word == Kw.And.to_i32() or word == Kw.Or.to_i32() { return check_logical(node, word, cx); };
+    let bool_t = prelude(Prelude.Bool);
+    if word == Kw.Xor.to_i32() {
+        let m = w_mark();
+        coerce(check_expr(left, bool_t, cx), bool_t, left);
+        coerce(check_expr(right, bool_t, cx), bool_t, right);
+        w_node(Op.Plain, vt_i32, 115, 0, m);
+        return bool_t;
+    };
+    // The operand type: the left's, unless it is a literal (`1 + x`, `0 == n`),
+    // which takes the right's.
+    let operand_expect = if is_comparison(word) { -1; } else { expect; };
+    let m = w_mark();
+    let t = -1;
+    if is_number_literal(left) and not is_number_literal(right) {
+        // The right decides; operands stay in order.
+        let rt = type_only(right, operand_expect, cx);
+        t = check_expr(left, rt, cx);
+    } else {
+        t = check_expr(left, operand_expect, cx);
+    };
+    apply_operator(word, t, right, node, cx, m);
+}
+
+// With the left operand on the stack (since `m`): check the right against
+// its type and apply the operator `word` of that type.
+fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
+    if ty_is(t, Ty.Error) {
+        check_expr(right, -1, cx);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let decl = ty_decl(t);
+    let op = member(decl, word, Space.Operator);
+    if op < 0 {
+        check_expr(right, t, cx);
+        report(Diag.UnknownOperator, at, word);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let fi = fn_instance(op, ty_inst(t));
+    coerce(check_expr(right, vl_item(fi_params[fi], 1), cx), vl_item(fi_params[fi], 1), right);
+    finish_call(fi, m, cx);
+}
+
+fn is_number_literal(node: I32) Bool {
+    if is_kind(node, Node.Paren_expr) { return is_number_literal(first_child(node)); };
+    if is_kind(node, Node.Unary_expr) { return is_number_literal(last_child(node)); };
+    let c = first_child(node);
+    is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit));
+}
+
+// The type an expression has, without keeping its IR.
+fn type_only(node: I32, expect: I32, cx: Cx) I32 {
+    let m = w_mark();
+    let diags = diag_kind.len();
+    let t = check_expr(node, expect, cx);
+    w_stack.resize(m);
+    diag_kind.resize(diags);
+    diag_node.resize(diags);
+    diag_word.resize(diags);
+    t;
+}
+
+// `a and b` is `if a { b } else { false }`; `a or b`, `if a { true } else { b }`.
+fn check_logical(node: I32, word: I32, cx: Cx) I32 {
+    let bool_t = prelude(Prelude.Bool);
+    let m = w_mark();
+    coerce(check_expr(first_child(node), bool_t, cx), bool_t, first_child(node));
+    let m1 = w_mark();
+    if word == Kw.And.to_i32() {
+        coerce(check_expr(last_child(node), bool_t, cx), bool_t, last_child(node));
+        w_node(Op.Seq, vt_i32, 0, 0, m1);
+        let m2 = w_mark();
+        w_i32(0);
+        w_node(Op.Seq, vt_i32, 0, 0, m2);
+    } else {
+        w_i32(1);
+        w_node(Op.Seq, vt_i32, 0, 0, m1);
+        let m2 = w_mark();
+        coerce(check_expr(last_child(node), bool_t, cx), bool_t, last_child(node));
+        w_node(Op.Seq, vt_i32, 0, 0, m2);
+    };
+    w_node(Op.If, vt_i32, new_label(), 0, m);
+    bool_t;
+}
+
+fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
+    let operand = last_child(node);
+    let op = tok_kind[node_first[node]];
+    if op == Tok.Minus.to_i32() and is_kind(operand, Node.Literal) {
+        let lit = first_child(operand);
+        if is_kind(lit, Node.Int_lit) { return int_literal(lit, expect, true); };
+        if is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true); };
+    };
+    let m = w_mark();
+    if tok_word[node_first[node]] == Kw.Not.to_i32() {
+        let bool_t = prelude(Prelude.Bool);
+        coerce(check_expr(operand, bool_t, cx), bool_t, operand);
+        w_node(Op.Plain, vt_i32, 69, 0, m);
+        return bool_t;
+    };
+    let word = if op == Tok.Minus.to_i32() { known_word(Known.Neg); } else { known_word(Known.Bnot); };
+    let t = check_expr(operand, expect, cx);
+    if ty_is(t, Ty.Error) { return t; };
+    let decl = member(ty_decl(t), word, Space.Operator);
+    if decl < 0 {
+        report(Diag.UnknownOperator, node, word);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    finish_call(fn_instance(decl, ty_inst(t)), m, cx);
+}
+
+// ── Calls ──
+
+fn check_call(node: I32, expect: I32, cx: Cx) I32 {
+    let callee = first_child(node);
+    let args = next_sibling(callee);
+    let m = w_mark();
+    if is_kind(callee, Node.Identifier) {
+        let decl = node_decl[callee];
+        if decl < 0 { return error_value(); };
+        if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+        let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
+        return call_with(fi, args, 0, m, node, cx);
+    };
+    if is_kind(callee, Node.Field_expr) {
+        let base = first_child(callee);
+        let name = last_child(callee);
+        let module = node_decl[base];
+        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
+            let decl = node_decl[name];
+            if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+            return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
+        };
+        // A method: the receiver is its first argument.
+        let rt = check_expr(base, -1, cx);
+        if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
+        let decl = member(ty_decl(rt), word_of(name), Space.Method);
+        if decl < 0 {
+            report(Diag.UnknownMethod, name, word_of(name));
+            return finish_error(args, m, cx);
+        };
+        let fi = fn_instance(decl, ty_inst(rt));
+        coerce(rt, vl_item(fi_params[fi], 0), base);
+        return call_with(fi, args, 1, m, node, cx);
+    };
+    if is_kind(callee, Node.Type_member_expr) {
+        let decl = node_decl[last_child(callee)];
+        if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+        let owner_t = type_path(first_child(callee), cx.inst);
+        let inst = if is_kind(first_child(callee), Node.Type_ident) and decl_is(node_decl[first_child(callee)], Decl.Module) {
+            instance_for(node_decl[first_child(callee)], cx.inst);
+        } else { ty_inst(owner_t); };
+        return call_with(fn_instance(decl, inst), args, 0, m, node, cx);
+    };
+    unsupported(node);
+}
+
+// Arguments checked and pushed, after any already pushed since `m`; then
+// the call (or the intrinsic, expanded).
+fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 {
+    let params = fi_params[fi];
+    let i = first_param;
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    while (a >= 0) {
+        if i < vl_len[params] {
+            let pt = vl_item(params, i);
+            coerce(check_expr(a, pt, cx), pt, a);
+        } else {
+            drop_value(check_expr(a, -1, cx));
+        };
+        i += 1;
+        a = next_sibling(a);
+    };
+    if i != vl_len[params] {
+        report(Diag.WrongArity, at, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    finish_call(fi, m, cx);
+}
+
+fn finish_error(args: I32, m: I32, cx: Cx) I32 {
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    while (a >= 0) {
+        drop_value(check_expr(a, -1, cx));
+        a = next_sibling(a);
+    };
+    w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+    ty_error();
+}
+
+// The wasm function of a function instance. An intrinsic has none until
+// it is needed as one (exported, or a value): then its body is its
+// expansion, of its parameters.
+fn function_of(fi: I32) I32 {
+    if fi_func[fi] >= 0 { return fi_func[fi]; };
+    let params = fi_params[fi];
+    let mv = vl_begin();
+    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
+    let f = new_func(FuncKind.Defined, func_type(vl_end(mv), vl_of_result(repr(fi_result[fi]))));
+    fi_func[fi] = f;
+    func_debug_name[f] = fn_debug_name(fi_decl[fi]);
+    let saved = cur_locals.len();
+    cur_locals.clear();
+    for (0 ..< vl_len[params]) |i| { new_local(repr(vl_item(params, i))); };
+    let m = w_mark();
+    for (0 ..< vl_len[params]) |i| { w_leaf(Op.LocalGet, repr(vl_item(params, i)), i, 0); };
+    expand(fi, m, Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] });
+    func_body[f] = w_pop();
+    func_locals[f] = local_types.len();
+    func_local_count[f] = cur_locals.len() - vl_len[params];
+    for (vl_len[params] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
+    f;
+}
+
+// The arguments are on the stack since `m`: call the function, or expand it.
+fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
+    let result = fi_result[fi];
+    if fi_ir[fi] >= 0 { return expand(fi, m, cx); };
+    w_node(Op.Call, repr(result), fi_func[fi], 0, m);
+    result;
+}
+
+// ── Intrinsics ──
+//
+// The arguments are on the stack since `m`. Each `<ir-ident name="p"/>`
+// is the argument for p: moved in place when every parameter is used once
+// and in order, else read from a local each argument is stored in first.
+
+fn expand(fi: I32, m: I32, cx: Cx) I32 {
+    let x = fi_ir[fi];
+    let decls = param_decls(fi_decl[fi]);
+    let n = vl_len[decls];
+    let args = Array[I32].new(n, 0);
+    for (0 ..< n) |i| { args[i] = w_stack[m + i]; };
+    w_stack.resize(m);
+    // In order, once each?
+    let uses = ident_uses(x, decls);
+    let direct = vl_len[uses] == n;
+    for (0 ..< vl_len[uses]) |i| { if vl_item(uses, i) != i { direct = false; }; };
+    let locals = Array[I32].new(n, -1);
+    if not direct {
+        for (0 ..< n) |i| {
+            let vt = repr(vl_item(fi_params[fi], i));
+            let local = new_local(vt);
+            locals[i] = local;
+            let ms = w_mark();
+            w_push(args[i]);
+            w_node(Op.LocalSet, vt_none, local, 0, ms);
+        };
+    };
+    let pre = w_mark() - m;
+    let result_vt = repr(fi_result[fi]);
+    let ok = translate(x, decls, args, locals, direct, fi, result_vt);
+    if not ok {
+        w_stack.resize(m);
+        report(Diag.Unsupported, decl_node[fi_decl[fi]], -1);
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return ty_error();
+    };
+    if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
+    fi_result[fi];
+}
+
+// The parameter indices of the `ir-ident`s of a tree, in order.
+fn ident_uses(x: I32, decls: I32) I32 {
+    let m = vl_begin();
+    collect_uses(x, decls);
+    vl_end(m);
+}
+
+fn collect_uses(x: I32, decls: I32) void {
+    if x_tag[x] == known_word(Known.IrIdent) {
+        vl_add(param_index(x, decls));
+        return;
+    };
+    let c = x_child[x];
+    while (c >= 0) {
+        collect_uses(c, decls);
+        c = x_next[c];
+    };
+}
+
+fn param_index(x: I32, decls: I32) I32 {
+    let a = x_attr(x, known_word(Known.Name));
+    if a < 0 { return -1; };
+    let word = attr_word(a);
+    for (0 ..< vl_len[decls]) |i| { if decl_name[vl_item(decls, i)] == word { return i; }; };
+    -1;
+}
+
+// Push the IR of an @ir element; false when it is not one the compiler knows.
+fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32, result_vt: I32) Bool {
+    let tag = x_tag[x];
+    if tag == known_word(Known.IrIdent) {
+        let i = param_index(x, decls);
+        if i < 0 { return false; };
+        if direct { w_push(args[i]); } else { w_leaf(Op.LocalGet, repr(vl_item(fi_params[fi], i)), locals[i], 0); };
+        return true;
+    };
+    if tag == known_word(Known.IrLit) {
+        let tn = x_attr(x, known_word(Known.TypeName));
+        let v = x_attr(x, known_word(Known.Value));
+        if tn < 0 or v < 0 { return false; };
+        let t = decl_type(promoted(lookup(attr_word(tn))), 0);
+        let neg = src[attr_start[v]] == 45;
+        let value: I64 = 0;
+        for ((attr_start[v] + if neg { 1; } else { 0; }) ..< attr_end[v]) |i| { value = value * 10 + (src[i] - 48).to_i64(); };
+        push_number(t, if neg { 0 - value; } else { value; }, false);
+        return true;
+    };
+    let opcode = tag_opcode(tag);
+    if opcode < 0 { return false; };
+    let m = w_mark();
+    let c = x_child[x];
+    while (c >= 0) {
+        if not translate(c, decls, args, locals, direct, fi, -1) { return false; };
+        c = x_next[c];
+    };
+    w_node(Op.Plain, opcode_result(opcode), opcode, 0, m);
+    true;
+}
+
+// The value type a plain instruction leaves.
+fn opcode_result(op: I32) I32 {
+    if op <= 120 { return vt_i32; };
+    if op <= 138 { return vt_i64; };
+    if op <= 152 { return vt_f32; };
+    if op <= 166 { return vt_f64; };
+    if op <= 171 { return vt_i32; };
+    if op <= 177 { return vt_i64; };
+    if op <= 182 { return vt_f32; };
+    if op <= 187 { return vt_f64; };
+    if op == 188 { return vt_i32; };
+    if op == 189 { return vt_i64; };
+    if op == 190 { return vt_f32; };
+    if op == 191 { return vt_f64; };
+    if op >= 64512 and op <= 64515 { return vt_i32; };
+    if op >= 64516 and op <= 64519 { return vt_i64; };
+    if op == 64851 { return vt_i32; };
+    vt_v128;
+}
+
+// `x.f` (not called): a module's global.
+fn check_field(node: I32, expect: I32, cx: Cx) I32 {
+    let base = first_child(node);
+    let name = last_child(node);
+    if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module) and decl_is(node_decl[name], Decl.Global) {
+        return global_get(node_decl[name], cx);
+    };
+    unsupported(node);
+}
+
+// `T.x` (not called): a module's global.
+fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
+    let decl = node_decl[last_child(node)];
+    if decl_is(decl, Decl.Global) { return global_get(decl, cx); };
+    unsupported(node);
+}
+
+// ── Control ──
+
+fn check_labeled(node: I32, expect: I32, cx: Cx) I32 {
+    if is_kind(first_child(node), Node.Identifier) { return unsupported(node); };
+    check_block(last_child(node), expect, cx);
+}
+
+fn check_if(node: I32, expect: I32, cx: Cx) I32 {
+    let cond = first_child(node);
+    let then_ = next_sibling(cond);
+    let else_ = next_sibling(then_);
+    let bool_t = prelude(Prelude.Bool);
+    let m = w_mark();
+    coerce(check_expr(cond, bool_t, cx), bool_t, cond);
+    let label = new_label();
+    if else_ < 0 {
+        let m1 = w_mark();
+        drop_value(check_block(then_, -1, cx));
+        w_node(Op.Seq, vt_none, 0, 0, m1);
+        w_node(Op.If, vt_none, label, 0, m);
+        return ty_void();
+    };
+    // The result: what is expected, else the then branch's type, else
+    // (when it does not complete) the else branch's.
+    let t1 = check_block(then_, expect, cx);
+    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
+    if t >= 0 { coerce(t1, t, then_); };
+    let t2 = if is_kind(else_, Node.If_expr) { check_if(else_, t, cx); } else { check_block(else_, t, cx); };
+    if t < 0 { t = t2; } else { coerce(t2, t, else_); };
+    w_node(Op.If, repr(t), label, 0, m);
+    t;
+}
+
+// `while (c) { … }`:
+//   block $break  loop $top  (br_if $break (not c))  body  (br $top)  end  end
+fn check_while(node: I32, cx: Cx) I32 {
+    let cond = first_child(node);
+    let block = last_child(node);
+    let brk = new_label();
+    let top = new_label();
+    let m = w_mark();
+    let ml = w_mark();
+    if cond != block {
+        let bool_t = prelude(Prelude.Bool);
+        let mc = w_mark();
+        coerce(check_expr(cond, bool_t, cx), bool_t, cond);
+        w_node(Op.Plain, vt_i32, 69, 0, mc);
+        w_node(Op.BrIf, vt_none, brk, 0, mc);
+    };
+    loop_break.push(brk);
+    loop_continue.push(top);
+    drop_value(check_block(block, -1, cx));
+    loop_break.resize(loop_break.len() - 1);
+    loop_continue.resize(loop_continue.len() - 1);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, m);
+    ty_void();
+}
+
+// `for (a ..< b) |i| { … }`, `for (a ... b)`: count from a; b is read once.
+//   i = a; end = b
+//   block $break  loop $top
+//     (br_if $break (i >= end))      ; `>` for `...`
+//     block $next  body  end
+//     i = i + 1
+//     br $top
+//   end  end
+fn check_for(node: I32, cx: Cx) I32 {
+    let sources = first_child(node);
+    let source = first_child(sources);
+    let capture = next_sibling(sources);
+    let block = last_child(node);
+    if next_sibling(source) >= 0 or not is_kind(capture, Node.Capture) { return unsupported(node); };
+    let lo = first_child(source);
+    let hi = next_sibling(lo);
+    if hi < 0 { return unsupported(node); };
+    let inclusive = tok_kind[token_after(lo)] == Tok.DotDotDot.to_i32();
+    let m = w_mark();
+    // The bounds' type: the start's, unless it is a literal.
+    let t = if is_number_literal(lo) and not is_number_literal(hi) { type_only(hi, -1, cx); } else { type_only(lo, -1, cx); };
+    if not is_numeric(t) or is_float(t) {
+        w_stack.resize(m);
+        return unsupported(node);
+    };
+    let vt = repr(t);
+    let i = new_local(vt);
+    let end_ = new_local(vt);
+    let mi = w_mark();
+    coerce(check_expr(lo, t, cx), t, lo);
+    w_node(Op.LocalSet, vt_none, i, 0, mi);
+    let me = w_mark();
+    coerce(check_expr(hi, t, cx), t, hi);
+    w_node(Op.LocalSet, vt_none, end_, 0, me);
+    let name = first_child(capture);
+    decl_local[node_decl[name]] = i;
+    decl_ty[node_decl[name]] = t;
+    let brk = new_label();
+    let top = new_label();
+    let next = new_label();
+    let mb = w_mark();
+    let ml = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt, i, 0);
+    w_leaf(Op.LocalGet, vt, end_, 0);
+    let unsigned = t == prelude(Prelude.U32) or t == prelude(Prelude.U64);
+    let cmp = if vt == vt_i64 { if inclusive { if unsigned { 86; } else { 85; }; } else { if unsigned { 90; } else { 89; }; }; }
+        else { if inclusive { if unsigned { 75; } else { 74; }; } else { if unsigned { 79; } else { 78; }; }; };
+    w_node(Op.Plain, vt_i32, cmp, 0, mc);
+    w_node(Op.BrIf, vt_none, brk, 0, mc);
+    let mn = w_mark();
+    loop_break.push(brk);
+    loop_continue.push(next);
+    drop_value(check_block(block, -1, cx));
+    loop_break.resize(loop_break.len() - 1);
+    loop_continue.resize(loop_continue.len() - 1);
+    w_node(Op.Block, vt_none, next, 0, mn);
+    let mstep = w_mark();
+    w_leaf(Op.LocalGet, vt, i, 0);
+    if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0); } else { w_i32(1); };
+    w_node(Op.Plain, vt, if vt == vt_i64 { 124; } else { 106; }, 0, mstep);
+    w_node(Op.LocalSet, vt_none, i, 0, mstep);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+fn check_break(node: I32, is_break: Bool) I32 {
+    if loop_break.len() == 0 {
+        report(Diag.InvalidBreak, node, -1);
+        return error_value();
+    };
+    if not is_break and first_child(node) >= 0 { return unsupported(node); };
+    let label = if is_break { loop_break[loop_break.len() - 1]; } else { loop_continue[loop_continue.len() - 1]; };
+    w_leaf(Op.Br, vt_unreachable, label, 0);
+    ty_never();
+}
+
+fn check_return(node: I32, cx: Cx) I32 {
+    let value = first_child(node);
+    let m = w_mark();
+    if value >= 0 {
+        coerce(check_expr(value, cx.result, cx), cx.result, value);
+    } else if not ty_is(cx.result, Ty.Void) {
+        mismatch(node, cx.result, ty_void());
+    };
+    w_node(Op.Return, vt_unreachable, 0, 0, m);
+    ty_never();
+}
+
+// `assert c` traps unless c.
+fn check_assert(node: I32, cx: Cx) I32 {
+    let bool_t = prelude(Prelude.Bool);
+    let m = w_mark();
+    coerce(check_expr(first_child(node), bool_t, cx), bool_t, first_child(node));
+    w_node(Op.Plain, vt_i32, 69, 0, m);
+    let mt = w_mark();
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, new_label(), 0, m);
+    ty_void();
+}
+
+// ── Entry points ──
+
+enum(U8) Target:
+    | Normal
+    | Tests
+
+fn reset_check() void {
+    fi_decl.clear();
+    fi_inst.clear();
+    fi_func.clear();
+    fi_params.clear();
+    fi_result.clear();
+    fi_ir.clear();
+    fi_table.clear();
+    fi_queue.clear();
+    cur_locals.clear();
+    decl_local.resize(decl_kind.len());
+    decl_ty.resize(decl_kind.len());
+    decl_global.resize(decl_kind.len());
+    for (0 ..< decl_kind.len()) |d| {
+        decl_local[d] = -1;
+        decl_ty[d] = 0;
+        decl_global[d] = -1;
+    };
+    diag_expected.clear();
+    diag_actual.clear();
+    fi_grow();
+}
+
+// Check the program from its entry points, and encode it. Returns the
+// module's size in `out`, or -1 when there are diagnostics.
+fn compile(target: Target) I32 {
+    reset_wasm();
+    reset_types();
+    reset_ir_trees();
+    intern_known();
+    find_prelude_types();
+    reset_check();
+    validate_program();
+    keep_target_diagnostics(target);
+    if diag_kind.len() > 0 { return -1; };
+    let tests = 0;
+    for (0 ..< file_root.len()) |file| {
+        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
+            let item = first_child(file_root[file]);
+            while (item >= 0) {
+                if target == Target.Normal and is_kind(item, Node.Export_lib_decl) {
+                    let f = first_child(item);
+                    while (f >= 0) {
+                        let fi = fn_instance(node_decl[last_child(first_child(f))], 0);
+                        func_field_name[function_of(fi)] = fn_debug_name(fi_decl[fi]);
+                        f = next_sibling(f);
+                    };
+                };
+                if target == Target.Normal and is_kind(item, Node.Export_main_decl) { entry_function(item, intern_text("main"), -1); };
+                if target == Target.Tests and is_kind(item, Node.Test_decl) {
+                    entry_function(item, -1, tests);
+                    tests += 1;
+                };
+                item = next_sibling(item);
+            };
+        };
+    };
+    // Every function of the program's own files is checked, reached or not.
+    for (0 ..< file_root.len()) |file| {
+        if file_role[file] != FileRole.Prelude.to_i32() and file_root[file] >= 0 {
+            let item = first_child(file_root[file]);
+            let entry = file_role[file] == FileRole.Entry.to_i32();
+            while (item >= 0) {
+                if entry and (target == Target.Normal or not is_kind(item, Node.Export_lib_decl)) { check_item(item); };
+                if is_kind(item, Node.Module_decl) {
+                    let module = node_decl[name_node(first_child(item))];
+                    if not is_generic(module) {
+                        let c = first_child(item);
+                        while (c >= 0) {
+                            check_item(c);
+                            c = next_sibling(c);
+                        };
+                    };
+                };
+                item = next_sibling(item);
+            };
+        };
+    };
+    let next = 0;
+    while (next < fi_queue.len()) {
+        check_function(fi_queue[next]);
+        next += 1;
+    };
+    if diag_kind.len() > 0 { return -1; };
+    encode_module();
+}
+
+// Enqueue a function declaration (or those of an `export lib`).
+fn check_item(item: I32) void {
+    if is_kind(item, Node.Export_lib_decl) {
+        let f = first_child(item);
+        while (f >= 0) {
+            check_item(f);
+            f = next_sibling(f);
+        };
+        return;
+    };
+    if is_kind(item, Node.Fn_decl) {
+        fn_instance(node_decl[last_child(first_child(item))], 0);
+        return;
+    };
+    if is_kind(item, Node.Op_decl) {
+        fn_instance(node_decl[next_sibling(first_child(item))], 0);
+        return;
+    };
+    if is_kind(item, Node.Global_decl) { global_of(node_decl[first_child(item)]); };
+}
+
+// Resolution reports on the whole entry file; drop what is in surfaces the
+// target leaves out (tests in a normal build, exports in a test build), as
+// those are not part of the program built.
+fn keep_target_diagnostics(target: Target) void {
+    let kept = 0;
+    for (0 ..< diag_kind.len()) |i| {
+        if in_target(diag_node[i], target) {
+            diag_kind[kept] = diag_kind[i];
+            diag_node[kept] = diag_node[i];
+            diag_word[kept] = diag_word[i];
+            kept += 1;
+        };
+    };
+    diag_kind.resize(kept);
+    diag_node.resize(kept);
+    diag_word.resize(kept);
+}
+
+fn in_target(node: I32, target: Target) Bool {
+    if node < 0 { return true; };
+    let t = node_first[node];
+    let file = file_of_token(t);
+    if file_role[file] != FileRole.Entry.to_i32() { return true; };
+    let item = first_child(file_root[file]);
+    while (item >= 0) {
+        if node_first[item] <= t and t < node_last[item] {
+            let kind = node_kind[item];
+            if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
+            if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };
+            if kind == Node.Bench_decl.to_i32() { return false; };
+            return true;
+        };
+        item = next_sibling(item);
+    };
+    true;
+}
+
+// `export main(…)` and tests: functions of their own, exported.
+fn entry_function(item: I32, name: I32, test_index: I32) void {
+    let m = vl_begin();
+    let result = ty_void();
+    let cx_inst = 0;
+    let c = first_child(item);
+    while (c >= 0) {
+        if is_kind(c, Node.Param_list) {
+            let p = first_child(c);
+            while (p >= 0) {
+                vl_add(type_of(next_sibling(first_child(p)), 0));
+                p = next_sibling(p);
+            };
+        } else if is_kind(c, Node.Return_type) {
+            result = type_of(c, 0);
+        };
+        c = next_sibling(c);
+    };
+    let params = vl_end(m);
+    let mv = vl_begin();
+    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
+    let f = new_func(FuncKind.Defined, func_type(vl_end(mv), vl_of_result(repr(result))));
+    let export_name = if name >= 0 { name_from_src(src.interned_start(name), src.interned_start(name) + src.interned_size(name)); }
+        else { name_add("__test_" + test_index.to_str()); };
+    func_field_name[f] = export_name;
+    func_debug_name[f] = export_name;
+    cur_locals.clear();
+    next_label.resize(1);
+    next_label[0] = 0;
+    loop_break.clear();
+    loop_continue.clear();
+    c = first_child(item);
+    let i = 0;
+    while (c >= 0) {
+        if is_kind(c, Node.Param_list) {
+            let p = first_child(c);
+            while (p >= 0) {
+                let d = node_decl[first_child(p)];
+                decl_local[d] = new_local(repr(vl_item(params, i)));
+                decl_ty[d] = vl_item(params, i);
+                i += 1;
+                p = next_sibling(p);
+            };
+        };
+        c = next_sibling(c);
+    };
+    cur_params.resize(1);
+    cur_params[0] = cur_locals.len();
+    finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result });
+}

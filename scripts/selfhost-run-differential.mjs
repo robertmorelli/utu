@@ -1,0 +1,186 @@
+// What programs the self-hosted compiler builds do when run, against what
+// stage 0's builds did (baselines/run-differential.json).
+//
+//   node scripts/selfhost-run-differential.mjs [--only=substring] [--show=N] [--jobs=N]
+//
+// Every program under examples/, benchmarks/, and baselines/corpus, for its
+// `normal` and `test` targets, as scripts/run-differential.mjs runs them:
+// every exported function that takes no arguments is called, and its result
+// (or trap) and what it printed are compared. A program the compiler cannot
+// build yet (it reports something unsupported) is counted, not compared.
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const RUN_TIMEOUT_MS = 8000;
+
+// Where the self-hosted compiler deliberately differs from stage 0, and why.
+const INTENDED = {
+  // `fn Box.make` with no type Box: stage 0 says nothing when the method is
+  // never called (here, only from an export the test build leaves out).
+  'baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu test': 'a method of an unknown type is reported',
+};
+
+if (isMainThread) await main();
+else await worker();
+
+async function main() {
+  // Build once here first, so a compiler that does not build fails at once.
+  await (await import('./selfhost.mjs')).buildSelfhost();
+  const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
+  const only = flag('only');
+  const show = Number(flag('show') ?? 10);
+  const recorded = JSON.parse(await fs.readFile(path.join(ROOT, 'baselines', 'run-differential.json'), 'utf8'));
+  const files = [
+    ...await programs(path.join(ROOT, 'examples')),
+    ...await programs(path.join(ROOT, 'benchmarks')),
+    ...await programs(path.join(ROOT, 'baselines', 'corpus')),
+  ].filter(file => !only || file.includes(only));
+  const queue = files.flatMap(file => ['normal', 'test'].map(target => ({ file, target })));
+  const jobs = Math.min(Number(flag('jobs') ?? os.availableParallelism()), queue.length);
+  const started = performance.now();
+  const results = {};
+  await Promise.all(Array.from({ length: jobs }, async () => {
+    let thread = null;
+    for (let job = queue.shift(); job; job = queue.shift()) {
+      thread ??= new Worker(fileURLToPath(import.meta.url), { workerData: { ROOT } });
+      const key = `${path.relative(ROOT, job.file)} ${job.target}`;
+      const outcome = await new Promise(resolve => {
+        let timer = null;
+        thread.on('message', message => {
+          clearTimeout(timer);
+          if (message === 'running') timer = setTimeout(() => resolve({ timeout: true }), RUN_TIMEOUT_MS);
+          else resolve({ value: message });
+        });
+        thread.once('error', error => { clearTimeout(timer); resolve({ value: { crash: error.message } }); });
+        thread.postMessage(job);
+      });
+      thread.removeAllListeners('message');
+      thread.removeAllListeners('error');
+      if (outcome.timeout || outcome.value?.crash) {
+        await thread.terminate();
+        thread = null;
+      }
+      results[key] = outcome.timeout ? 'timeout' : outcome.value;
+    }
+    await thread?.terminate();
+  }));
+
+  const keys = Object.keys(results).sort();
+  const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0 };
+  const differ = [];
+  const reasons = new Map();
+  for (const key of keys) {
+    const result = results[key];
+    if (INTENDED[key]) { count.intended++; continue; }
+    if (result?.unsupported) {
+      count.unsupported++;
+      for (const reason of result.unsupported) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+      continue;
+    }
+    if (result?.diagnostics) {
+      // Stage 0 rejected it too (or failed to build it): the same outcome.
+      if (recorded[key]?.diagnostics || recorded[key]?.compile) { count.same++; continue; }
+      count.rejected++;
+      differ.push(`REJECTS ${key}: ${result.diagnostics.slice(0, 3).join('; ')}`);
+      continue;
+    }
+    if (JSON.stringify(recorded[key]) === JSON.stringify(result)) { count.same++; continue; }
+    count.differ++;
+    differ.push(`DIFFERS ${key}\n  was ${JSON.stringify(recorded[key]).slice(0, 300)}\n  now ${JSON.stringify(result).slice(0, 300)}`);
+  }
+  for (const line of differ.slice(0, show)) console.log(line);
+  const top = [...reasons].sort((a, b) => b[1] - a[1]).slice(0, Number(flag('reasons') ?? 15));
+  if (top.length) console.log(`unsupported, by what (programs):\n${top.map(([reason, n]) => `  ${n} ${reason}`).join('\n')}`);
+  const seconds = ((performance.now() - started) / 1000).toFixed(1);
+  console.log(`${keys.length} builds: ${count.same} behave as stage 0's, ${count.differ} differ, `
+    + `${count.rejected} rejected that stage 0 built, ${count.intended} differ on purpose, ${count.unsupported} not supported yet, in ${seconds} s`);
+  if (count.differ || count.rejected) process.exit(1);
+}
+
+async function worker() {
+  process.on('unhandledRejection', () => {});
+  const { loadProgram, loadSelfhost } = await import('./selfhost.mjs');
+  const { instantiateLowered } = await import('../src/index.js');
+  const utu = await loadSelfhost();
+  parentPort.on('message', async ({ file, target }) => {
+    const result = await run(file, target).catch(error => ({ crash: summarizeError(error) }));
+    parentPort.postMessage(JSON.parse(JSON.stringify(result).split(workerData.ROOT).join('<root>')));
+  });
+
+  async function run(file, target) {
+    const files = loadProgram(utu, file);
+    const size = utu.compile_program(target === 'test' ? 1 : 0);
+    if (size < 0) {
+      const diagnostics = [];
+      const unsupported = new Set();
+      for (let i = 0; i < utu.diagnostic_count(); i++) {
+        const kind = utu.diagnostic_kind(i);
+        const node = utu.diagnostic_node(i);
+        const what = node < 0 ? 'file' : utu.node_kind_name(new Uint8Array(utu.node_kind.buffer)[node]);
+        if (kind === 'Unsupported') unsupported.add(what);
+        diagnostics.push(`${kind} ${what}`);
+      }
+      return unsupported.size ? { unsupported: [...unsupported] } : { diagnostics };
+    }
+    const wasm = new Uint8Array(utu.out.buffer, 0, size).slice();
+    if (!WebAssembly.validate(wasm)) {
+      try { await WebAssembly.compile(wasm); } catch (error) { return { emit: summarizeError(error) }; }
+    }
+    let instance;
+    try {
+      ({ instance } = await instantiateLowered(wasm, {}));
+    } catch (error) {
+      return { instantiate: summarizeError(error) };
+    }
+    const calls = {};
+    const printed = [];
+    const log = console.log;
+    parentPort.postMessage('running');
+    for (const [name, value] of Object.entries(instance.exports).sort(([a], [b]) => a.localeCompare(b))) {
+      if (typeof value !== 'function' || value.length !== 0) continue;
+      printed.length = 0;
+      console.log = (...args) => printed.push(args.map(String).join(' '));
+      try {
+        const result = await value();
+        calls[name] = { result: summarize(result), printed: [...printed] };
+      } catch (error) {
+        calls[name] = { throws: summarizeError(error), printed: [...printed] };
+      } finally {
+        console.log = log;
+      }
+    }
+    return { calls };
+  }
+}
+
+function summarize(value) {
+  if (typeof value === 'bigint') return `${value}n`;
+  if (typeof value === 'number') return Object.is(value, -0) ? '-0' : Number.isNaN(value) ? 'NaN' : value;
+  if (typeof value === 'string' || typeof value === 'boolean' || value == null) return value ?? null;
+  if (Array.isArray(value)) return value.map(summarize);
+  return typeof value;
+}
+
+function summarizeError(error) {
+  const message = String(error?.message ?? error).split('\n')[0].replace(/\(?wasm-function\[\d+\][^)]*\)?/g, '').trim();
+  return `${error?.constructor?.name ?? 'Error'}: ${message}`;
+}
+
+async function programs(directory) {
+  const out = [];
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (['node_modules', 'error_demo', 'dist', '.utu'].includes(entry.name)) continue;
+      out.push(...await programs(file));
+    } else if (entry.name.endsWith('.utu')) {
+      const source = await fs.readFile(file, 'utf8');
+      if (/^\s*export\s+(main|lib)\b|^\s*test\s/m.test(source)) out.push(file);
+    }
+  }
+  return out.sort();
+}

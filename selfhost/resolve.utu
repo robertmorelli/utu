@@ -97,6 +97,25 @@ enum(U8) Diag:
     | UnknownImport
     | DuplicateDeclaration
     | NotAModule
+    | TypeMismatch
+    | UnknownMethod
+    | UnknownOperator
+    | WrongArity
+    | AssignmentToImmutable
+    | InvalidBreak
+    | Unsupported
+    | ParseError
+    | DuplicateField
+    | InvalidNullableType
+    | TupleMisplaced
+    | FunInField
+    | InvalidGlobalInitializer
+    | RecursiveType
+    | IntegerOutOfRange
+    | BareNull
+    | InvalidDistinct
+    | EnumValueRange
+    | EnumValueTwice
 
 mem diag_kind: U8;
 mem diag_node: I32;
