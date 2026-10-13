@@ -294,13 +294,21 @@ export function inheritGraphFacts(to, from) {
   return to;
 }
 
-export function replaceTypedNode(from, to) {
+/** Replace `from` with `to`, which inherits its facts (and its backend facts, given `facts`). */
+export function replaceTypedNode(from, to, facts = null) {
   inheritGraphFacts(to, from);
+  facts?.inherit(from, to);
   from.replaceWith(to);
   return to;
 }
 
-export function cloneGraphSubtree(node) {
+// What a name can be declared by (resolve-bindings.js).
+const DECLARATIONS = new Set([
+  'ir-let', 'ir-param', 'ir-self-param', 'ir-capture', 'ir-alt-arm', 'ir-promote', 'ir-global', 'ir-fn', 'ir-extern-fn',
+]);
+
+/** A deep copy with fresh ids that names what the original names (and has its backend facts, given `facts`). */
+export function cloneGraphSubtree(node, facts = null) {
   const clone = node.cloneNode(true);
   const originals = [node, ...node.querySelectorAll('*')];
   const copies = [clone, ...clone.querySelectorAll('*')];
@@ -312,7 +320,20 @@ export function cloneGraphSubtree(node) {
     if (declaration) graphs.scope.resolutions.set(copy.id, declaration);
     const diagnostic = graphs.diagnostics?.facts.get(original.id);
     if (diagnostic) graphs.diagnostics.facts.set(copy.id, { ...diagnostic, node: copy });
+    facts?.copy(original, copy);
   });
+  if (facts) {
+    // A name declared inside the copied code names the copy's declaration.
+    // (Only declarations: a few rewrites give a wrapper the id of a node inside it.)
+    const copyOf = new Map();
+    originals.forEach((original, index) => { if (DECLARATIONS.has(original.localName)) copyOf.set(original, copies[index]); });
+    if (copyOf.size) {
+      for (const copy of copies) {
+        const declaration = facts.declaration(copy.id);
+        if (copyOf.has(declaration)) facts.bindings.set(copy.id, copyOf.get(declaration));
+      }
+    }
+  }
   return clone;
 }
 

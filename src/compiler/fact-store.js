@@ -29,29 +29,12 @@ export class TypeFacts {
     this.source = new Array(count).fill(undefined);
     this.project = new Uint8Array(count);
     this.expected = new Array(count).fill(NO_EDGES);
-    // The expectations each node's rules placed on others, in creation order.
-    this.owned = new Array(count).fill(NO_EDGES);
     this.rule = new Array(count).fill(undefined);
     this.function = new Array(count).fill(null);
     this.resolution = new Array(count).fill(null);
     this.field = new Array(count).fill(undefined);
     // Rare facts by row: protocolCall, foreign, foreignError, foreignChecked.
     this.rare = new Map();
-    // Each node's parent when the facts were built, so a later refresh can
-    // tell which nodes a lowering moved.
-    this.parents = nodes.map(node => node.parentNode);
-  }
-
-  /** Copy the facts a solve produced for row `from` of `old` into row `to` (not its rule or expectations). */
-  copyRow(to, old, from) {
-    this.type[to] = old.type[from];
-    this.source[to] = old.source[from];
-    this.project[to] = old.project[from];
-    this.function[to] = old.function[from];
-    this.resolution[to] = old.resolution[from];
-    this.field[to] = old.field[from];
-    const rare = old.rare.get(from);
-    if (rare !== undefined) this.rare.set(to, rare);
   }
 
   /** A node's row, or -1 when it was not analyzed (or belongs to another document). */
@@ -147,3 +130,4 @@ class SlotView {
   get foreignChecked() { return this.facts.rareFact(this.row, 'foreignChecked'); }
   set foreignChecked(checked) { this.facts.setRareFact(this.row, 'foreignChecked', checked); }
 }
+

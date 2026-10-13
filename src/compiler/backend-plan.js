@@ -2,8 +2,8 @@
 
 import { buildLayoutGraph } from './semantic-graphs.js';
 import { buildProgramIndex } from './program-index.js';
-import { assertGraphRevision, retainGraph, retainedGraphs } from './graph-store.js';
-import { actualType } from './type-graph.js';
+import { assertGraphRevision, replaceRetainedGraphs, retainGraph, retainedGraphs } from './graph-store.js';
+import { BackendFacts, expectationMatters } from './backend-facts.js';
 import { linkTypeDecls } from './link-type-decls.js';
 import { rebuildSemanticGraphs } from './semantic-analysis.js';
 import { projectGraphs } from './project-graphs.js';
@@ -27,37 +27,56 @@ import { closureCallImport } from './closure-abi.js';
  * @property {object} runtime
  */
 
-/** @returns {BackendPlan} */
-export function buildBackendPlan(doc, typeIndex, program = null) {
+/**
+ * The plan for `doc` from `facts` (by default, the retained graphs' facts) and,
+ * for the runtime it needs, `callGraph` (by default, the retained one).
+ *
+ * @returns {BackendPlan}
+ */
+export function buildBackendPlan(doc, typeIndex, program = null, { facts = null, callGraph = null } = {}) {
   const root = doc.body.firstChild;
   const graphs = retainedGraphs(doc);
   const index = program ?? graphs.program ?? buildProgramIndex(doc);
   const layout = graphs.layout?.typeIndex === typeIndex ? graphs.layout : buildLayoutGraph(typeIndex);
   const types = graphs.types;
   const scope = graphs.scope;
-  const calls = graphs.calls;
-  for (const [name, graph] of [['scope', scope], ['types', types], ['calls', calls]]) {
-    if (graph) assertGraphRevision(graph, index, `backend plan: ${name}`);
+  const calls = callGraph ?? graphs.calls;
+  if (!facts) {
+    for (const [name, graph] of [['scope', scope], ['types', types], ['calls', calls]]) {
+      if (graph) assertGraphRevision(graph, index, `backend plan: ${name}`);
+    }
+    facts = BackendFacts.fromGraphs({ types, scope, calls });
   }
+  // In document order, as code generation registers the types it meets.
   const nodeTypes = new Map();
   const expectations = new Map();
+  const bindings = new Map();
   const fields = new Map();
   const protocolCalls = new Map();
-  const facts = types?.facts;
-  for (let r = 0; r < (facts?.nodes.length ?? 0); r++) {
-    const node = facts.nodes[r];
+  const callTargets = new Map();
+  const byNode = [[facts.fields, fields], [facts.protocolCalls, protocolCalls]];
+  const byId = [[facts.callTargets, callTargets]];
+  for (const node of index.all) {
     const id = node.id;
-    const actual = facts.typeName(r);
-    if (id && actual && node.localName !== 'ir-fn' && node.localName !== 'ir-extern-fn') nodeTypes.set(id, actual);
-    const expected = facts.expected[r].map(edge => edge.read()).find(Boolean);
-    if (id && expected) expectations.set(id, expected);
-    if (id && facts.field[r]) fields.set(id, facts.field[r]);
-    const protocolCall = facts.rareFact(r, 'protocolCall');
-    if (id && protocolCall) protocolCalls.set(id, protocolCall);
+    if (!id) continue;
+    const type = facts.type(node);
+    if (type && node.localName !== 'ir-fn' && node.localName !== 'ir-extern-fn') nodeTypes.set(id, type);
+    const expected = facts.expectation(node);
+    if (expected) expectations.set(id, expected);
+    for (const [from, to] of byNode) {
+      const value = from.get(node);
+      if (value !== undefined) to.set(id, value);
+    }
+    const declaration = facts.declaration(id);
+    if (declaration) bindings.set(id, declaration.id);
+    for (const [from, to] of byId) {
+      const value = from.get(id);
+      if (value !== undefined) to.set(id, value);
+    }
   }
-  const bindings = new Map([...scope?.resolutions ?? []].map(([id, decl]) => [id, decl.id]));
-  const callTargets = new Map([...calls?.targets ?? []].map(([id, decl]) => [id, decl.id]));
-  const runtime = buildRuntimePlan(index, types, calls);
+  // By node: codegen asks about the node it is emitting.
+  const resolutions = facts.resolutions;
+  const runtime = buildRuntimePlan(index, calls);
 
   return {
     kind: 'backend-plan',
@@ -74,6 +93,7 @@ export function buildBackendPlan(doc, typeIndex, program = null) {
     bindings,
     fields,
     protocolCalls,
+    resolutions,
     calls,
     callTargets,
     functionsByName: index.functions,
@@ -144,12 +164,11 @@ export function backendFingerprint(doc) {
   return doc?.body?.firstChild?.outerHTML ?? '';
 }
 
-function buildRuntimePlan(program, typeGraph, callGraph) {
+function buildRuntimePlan(program, callGraph) {
   const closureCalls = new Map();
   for (const edge of callGraph?.edges ?? []) {
     if (!edge.indirect) continue;
-    const type = callGraph.callableTypes?.get(edge.call.id)
-      ?? (typeGraph ? actualType(typeGraph, edge.call.firstElementChild) : null);
+    const type = callGraph.callableTypes?.get(edge.call.id);
     const parts = callableParts(type);
     if (parts?.kind !== 'cl') continue;
     const field = closureCallImport(parts);
@@ -161,9 +180,7 @@ function buildRuntimePlan(program, typeGraph, callGraph) {
     ...(sites.promiseThen?.length ? ['promise_then'] : []),
     ...(sites.promiseCatch?.length ? ['promise_catch'] : []),
   ];
-  const awaits = [...new Set((sites.awaits ?? [])
-    .map(node => typeGraph ? actualType(typeGraph, node) : node.getAttribute('data-type-name'))
-    .filter(Boolean))].sort();
+  const awaits = [...new Set((callGraph?.awaitTypes ?? []).filter(Boolean))].sort();
   const asyncExports = [...(callGraph?.functions.values() ?? [])]
     .filter(({ id, node }) => node.getAttribute('data-export') !== null
       && callGraph.effects.get(id)?.has('await'))
@@ -186,4 +203,53 @@ function readJson(value, fallback) {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Debug builds: analyze the lowered program from scratch and throw if the
+ * plan it gives answers any question codegen asks differently from `plan`,
+ * which was built from the facts the lowerings carried. The fresh analysis
+ * may annotate the IR (literals take their context's type); the document and
+ * the retained graphs are restored afterwards.
+ */
+export function checkBackendPlan(doc, typeIndex, plan, captures) {
+  const root = doc.body.firstChild;
+  const nodes = [root, ...root.querySelectorAll('*')];
+  const attributes = nodes.map(node => [...node.attributes].map(({ name, value }) => [name, value]));
+  const retained = { ...retainedGraphs(doc) };
+  const { program } = rebuildSemanticGraphs(doc, typeIndex, { captures });
+  const reference = buildBackendPlan(doc, typeIndex, program);
+  if (root.querySelectorAll('*').length !== nodes.length - 1) throw new Error('backend plan check: a fresh analysis changed the program');
+  nodes.forEach((node, index) => {
+    const before = new Map(attributes[index]);
+    for (const { name } of [...node.attributes]) if (!before.has(name)) node.removeAttribute(name);
+    for (const [name, value] of before) if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+  });
+  replaceRetainedGraphs(doc, retained);
+  const difference = backendPlanDifference(plan, reference, program);
+  if (difference) throw new Error(`backend facts differ from a fresh analysis of the lowered program: ${difference}`);
+}
+
+/** The first question two plans answer differently on the nodes of `program`, or null. */
+export function backendPlanDifference(a, b, program) {
+  const json = value => (value && typeof value === 'object'
+    ? JSON.stringify(value, (_, v) => (v?.nodeType ? v.id : v)) : value ?? null);
+  const differ = (what, node, x, y) => (json(x) !== json(y)
+    ? `${what} of ${node.localName}#${node.id} (${node.getAttribute('data-rewrite-kind') ?? 'as written'}): ${json(x)} vs ${json(y)}` : null);
+  for (const node of program.all) {
+    for (const method of ['typeOf', 'bindingIdOf', 'callTargetIdOf', 'fieldOf']) {
+      const difference = differ(method, node, a[method](node), b[method](node));
+      if (difference) return difference;
+    }
+    // Lowerings record expectations only where codegen reads them.
+    if (expectationMatters(node, b.typeOf(node))) {
+      const difference = differ('expectedOf', node, a.expectedOf(node), b.expectedOf(node));
+      if (difference) return difference;
+    }
+    const difference = differ('protocol call', node, a.protocolCalls.get(node.id), b.protocolCalls.get(node.id))
+      ?? differ('resolution', node, a.resolutions.get(node), b.resolutions.get(node));
+    if (difference) return difference;
+  }
+  if (json(a.runtime) !== json(b.runtime)) return `runtime: ${json(a.runtime)} vs ${json(b.runtime)}`;
+  return null;
 }

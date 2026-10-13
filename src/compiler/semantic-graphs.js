@@ -54,11 +54,12 @@ export function buildCallGraph(root, typeGraph = null) {
     promiseCatch: nodes('ir-promise-catch'),
   };
   const targets = new Map(edges.filter(edge => edge.declaration).map(edge => [edge.call.id, edge.declaration]));
+  const awaitTypes = awaitSites.map(node => (typeGraph ? actualType(typeGraph, node) : node.getAttribute('data-type-name')));
   const callableTypes = new Map(nodes('ir-call').map(call => [call.id,
     typeGraph ? actualType(typeGraph, call.firstElementChild) : call.firstElementChild?.getAttribute('data-type-name') ?? null]));
   return {
     kind: 'call', programRevision: typeGraph?.programRevision ?? null,
-    functions, edges, effects, sites, targets, callableTypes,
+    functions, edges, effects, sites, targets, callableTypes, awaitTypes,
   };
 }
 

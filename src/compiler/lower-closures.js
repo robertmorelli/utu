@@ -25,6 +25,9 @@
 //
 // This pass must run after resolveBindings (it consumes scope-graph captures)
 // and before the type registry is finalised, since it introduces new structs.
+//
+// Given backend facts, it reads types from them and records the facts of
+// every node it creates (backend-facts.js).
 
 import { bodyOf, childOf, createSyntheticNode, firstTypeChild, replaceTypedNode, typeNodeToStr } from './ir-helpers.js';
 import { declarationType, planCoercions } from './type-graph.js';
@@ -37,13 +40,17 @@ export { closureCallImport } from './closure-abi.js';
  * @param {Document} doc
  * @returns {boolean} whether literals or function-to-closure coercions changed the IR
  */
-export function lowerClosures(doc, typeIndex, graph) {
+export function lowerClosures(doc, typeIndex, graph, facts = null) {
   const root = doc.body.firstChild;
   if (!root) return false;
   const scopeGraph = retainedGraphs(doc).scope;
+  const lowering = {
+    facts,
+    typeOf: facts ? node => facts.type(node) : node => node?.attr?.('data-type-name') ?? null,
+  };
 
   if (!graph.coercions.length) planCoercions(graph);
-  let changed = insertDecays(graph);
+  let changed = insertDecays(graph, lowering);
   const closures = closurePostorder(root);
   if (closures.length === 0) return changed;
   const names = new Set([...root.querySelectorAll('[name]')].map(node => node.getAttribute('name')));
@@ -52,7 +59,7 @@ export function lowerClosures(doc, typeIndex, graph) {
   // made independent closures quadratic; parents must still follow children.
   for (const closure of closures) {
     while (names.has(`__ClosureEnv${index}`) || names.has(`__closure${index}`)) index++;
-    liftClosure(closure, root, index++, typeIndex, graph, scopeGraph);
+    liftClosure(closure, root, index++, typeIndex, graph, scopeGraph, lowering);
     changed = true;
   }
 
@@ -67,21 +74,22 @@ export function lowerClosures(doc, typeIndex, graph) {
 //
 // Sites come directly from the graph's expectation edges.
 
-function insertDecays(graph) {
+function insertDecays(graph, lowering) {
   let changed = false;
   for (const coercion of graph.coercions) {
-    if (coercion.kind === 'fun-to-cl') changed = decayInto(coercion.node, coercion.to) || changed;
+    if (coercion.kind === 'fun-to-cl') changed = decayInto(coercion.node, coercion.to, lowering) || changed;
   }
   return changed;
 }
 
-function decayInto(node, expectedType) {
+function decayInto(node, expectedType, { facts }) {
   if (!node || !expectedType) return false;
 
   const doc = node.ownerDocument;
   const decay = createSyntheticNode(doc, T.CLOSURE_DECAY, node, 'lower-closures', 'closure-decay');
-  replaceTypedNode(node, decay);
+  replaceTypedNode(node, decay, facts);
   decay.setAttribute('data-type-name', expectedType);
+  facts?.setType(decay, expectedType);
   decay.appendChild(node);
 
   // A block's type is its tail's type, and the tail just changed
@@ -92,18 +100,24 @@ function decayInto(node, expectedType) {
        child = parent, parent = parent.parentElement) {
     parent.setAttribute('data-type-name', expectedType);
   }
+  for (let child = decay, parent = decay.parentElement;
+       facts && parent?.lastElementChild === child && (parent.localName === 'ir-block' || parent.localName === 'ir-paren');
+       child = parent, parent = parent.parentElement) {
+    facts.setType(parent, expectedType);
+  }
   return true;
 }
 
-function liftClosure(closure, root, index, typeIndex, graph, scopeGraph) {
+function liftClosure(closure, root, index, typeIndex, graph, scopeGraph, lowering) {
   const doc = closure.ownerDocument;
   const envType = `__ClosureEnv${index}`;
   const fnName = `__closure${index}`;
   const captures = readCaptures(closure, typeIndex, graph, scopeGraph);
 
-  root.insertBefore(buildEnvStruct(doc, closure, envType, captures), root.firstChild);
-  root.appendChild(buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph));
-  replaceTypedNode(closure, buildMakeClosure(doc, closure, fnName, envType, captures));
+  const env = buildEnvStruct(doc, closure, envType, captures, lowering);
+  root.insertBefore(env, root.firstChild);
+  root.appendChild(buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph, env, lowering));
+  replaceTypedNode(closure, buildMakeClosure(doc, closure, fnName, envType, captures, lowering), lowering.facts);
 }
 
 // ── Captures ──────────────────────────────────────────────────────────────────
@@ -119,6 +133,7 @@ function readCaptures(closure, typeIndex, graph, scopeGraph) {
     return {
       name,
       bindingId: decl.id,
+      declaration: decl,
       type,
       mode: isScalar ? 'snapshot' : 'shared',
     };
@@ -127,20 +142,21 @@ function readCaptures(closure, typeIndex, graph, scopeGraph) {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
-function buildEnvStruct(doc, site, envType, captures) {
+function buildEnvStruct(doc, site, envType, captures, lowering) {
   const struct = createSyntheticNode(doc, T.STRUCT, site, 'lower-closures', 'closure-env-struct');
   struct.setAttribute('name', envType);
   for (const capture of captures) {
     const field = createSyntheticNode(doc, T.FIELD, site, 'lower-closures', 'closure-env-field');
     field.setAttribute('name', capture.name);
     field.setAttribute('data-capture-mode', capture.mode);
-    field.appendChild(buildTypeNode(doc, site, capture.type));
+    field.appendChild(buildTypeNode(doc, site, capture.type, lowering));
     struct.appendChild(field);
   }
   return struct;
 }
 
-function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
+function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph, env, lowering) {
+  const { facts, typeOf } = lowering;
   const fn = createSyntheticNode(doc, T.FN, closure, 'lower-closures', 'closure-lifted-fn');
   fn.setAttribute('name', fnName);
   fn.setAttribute('data-closure-lifted', 'true');
@@ -159,7 +175,8 @@ function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
   let envName = '__env';
   for (let suffix = 0; occupied.has(envName); suffix++) envName = `__env${suffix}`;
   envParam.setAttribute('name', envName);
-  envParam.appendChild(buildTypeNode(doc, closure, envType));
+  envParam.appendChild(buildTypeNode(doc, closure, envType, lowering));
+  facts?.setType(envParam, envType);
   params.appendChild(envParam);
 
   const declared = childOf(closure, 'ir-param-list');
@@ -167,32 +184,33 @@ function buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph) {
     // Parameters whose type came from the closure's expectation carry it on
     // data-type-name only.  Materialise a type node so the lifted function is
     // shaped like any other and codegen needs no special case.
-    if (!firstTypeChild(param) && param.attr('data-type-name')) {
-      param.appendChild(buildTypeNode(doc, param, param.attr('data-type-name')));
+    if (!firstTypeChild(param) && typeOf(param)) {
+      param.appendChild(buildTypeNode(doc, param, typeOf(param), lowering));
     }
     params.appendChild(param);
   }
   fn.appendChild(params);
 
-  fn.appendChild(buildTypeNode(doc, closure, closureReturnType(closure)));
+  fn.appendChild(buildTypeNode(doc, closure, closureReturnType(closure, typeOf), lowering));
 
   const body = bodyOf(closure);
   if (body) {
-    rewriteCaptureReads(body, captures, envParam, doc, scopeGraph);
+    rewriteCaptureReads(body, captures, envParam, doc, scopeGraph, env, lowering);
     fn.appendChild(body);
   }
   return fn;
 }
 
-function buildMakeClosure(doc, closure, fnName, envType, captures) {
+function buildMakeClosure(doc, closure, fnName, envType, captures, { facts, typeOf }) {
   const make = createSyntheticNode(doc, T.MAKE_CLOSURE, closure, 'lower-closures', 'make-closure');
   make.setAttribute('fn', fnName);
   make.setAttribute('env-type', envType);
-  if (closure.attr('data-type-name')) make.setAttribute('data-type-name', closure.attr('data-type-name'));
+  if (typeOf(closure)) make.setAttribute('data-type-name', typeOf(closure));
 
   const init = createSyntheticNode(doc, T.STRUCT_INIT, closure, 'lower-closures', 'closure-env-init');
   init.setAttribute('type-name', envType);
   init.setAttribute('data-type-name', envType);
+  facts?.setType(init, envType);
   for (const capture of captures) {
     const fieldInit = createSyntheticNode(doc, T.FIELD_INIT, closure, 'lower-closures', 'closure-env-init-field');
     fieldInit.setAttribute('field', capture.name);
@@ -200,6 +218,8 @@ function buildMakeClosure(doc, closure, fnName, envType, captures) {
     ident.setAttribute('name', capture.name);
     ident.setAttribute('data-binding-id', capture.bindingId);
     if (capture.type !== 'unknown') ident.setAttribute('data-type-name', capture.type);
+    if (capture.type !== 'unknown') facts?.setType(ident, capture.type);
+    facts?.bindings.set(ident.id, capture.declaration);
     fieldInit.appendChild(ident);
     init.appendChild(fieldInit);
   }
@@ -214,9 +234,11 @@ function buildMakeClosure(doc, closure, fnName, envType, captures) {
  * binding id rather than by name so a shadowed inner binding of the same name
  * is left alone.
  */
-function rewriteCaptureReads(body, captures, envParam, doc, scopeGraph) {
+function rewriteCaptureReads(body, captures, envParam, doc, scopeGraph, env, { facts }) {
   if (captures.length === 0) return;
   const byBinding = new Map(captures.map(capture => [capture.bindingId, capture]));
+  const envType = env.getAttribute('name');
+  const fieldNodes = [...env.children];
 
   for (const ident of [...body.querySelectorAll('ir-ident')]) {
     const bindingId = scopeGraph?.resolutions.get(ident.id)?.id ?? ident.attr('data-binding-id');
@@ -236,7 +258,15 @@ function rewriteCaptureReads(body, captures, envParam, doc, scopeGraph) {
     receiver.setAttribute('data-type-name', access.attr('data-field-owner-name'));
 
     access.appendChild(receiver);
-    replaceTypedNode(ident, access);
+    replaceTypedNode(ident, access, facts);
+    if (facts) {
+      const index = captures.indexOf(capture);
+      if (capture.type !== 'unknown') facts.setType(access, capture.type);
+      facts.fields.set(access, { owner: envType, type: capture.type, index, declaration: fieldNodes[index] });
+      facts.bindings.delete(access.id);
+      facts.setType(receiver, envType);
+      facts.bindings.set(receiver.id, envParam);
+    }
   }
 }
 
@@ -259,12 +289,12 @@ function closurePostorder(root) {
   return result;
 }
 
-function closureReturnType(closure) {
+function closureReturnType(closure, typeOf) {
   const declared = typeNodeToStr(firstTypeChild(closure));
   if (declared) return declared;
-  const parts = callableParts(closure.attr('data-type-name'));
+  const parts = callableParts(typeOf(closure));
   if (parts) return parts.ret;
-  return bodyOf(closure)?.attr?.('data-type-name') ?? 'void';
+  return typeOf(bodyOf(closure)) ?? 'void';
 }
 
 /**
@@ -272,11 +302,12 @@ function closureReturnType(closure) {
  * structural types use their canonical type string as the reference name.
  * This is internal IR, not a source-level declaration spelling.
  */
-function buildTypeNode(doc, site, typeStr) {
+function buildTypeNode(doc, site, typeStr, { facts }) {
   if (typeStr === 'void') {
     return createSyntheticNode(doc, T.TYPE_VOID, site, 'lower-closures', 'closure-type');
   }
   const node = createSyntheticNode(doc, T.TYPE_REF, site, 'lower-closures', 'closure-type');
   node.setAttribute('name', typeStr);
+  facts?.setType(node, typeStr);
   return node;
 }

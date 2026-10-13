@@ -80,12 +80,10 @@ export function buildTypeGraph(doc, typeIndex) {
   return graph;
 }
 
-/** A node's rule and the expectations it places on other nodes (which it owns). */
+/** A node's rule and the expectations it places on other nodes. */
 function addNodeRules(graph, node) {
-  graph.owner = node;
   addActualRule(graph, node);
   addExpectations(graph, node);
-  graph.owner = null;
 }
 
 export function settleTypeGraph(doc, typeIndex) {
@@ -96,7 +94,7 @@ export function settleTypeGraph(doc, typeIndex) {
   return settle(graph, graph.rules);
 }
 
-/** Solve from `start` (all rules after a build, the changed ones after a refresh), then settle context. */
+/** Solve from `start` (all rules), then settle context. */
 function settle(graph, start) {
   // Written types do not change while settling (rewrites set attributes and
   // parameter types, never type nodes), so each is read off the IR once.
@@ -115,137 +113,6 @@ function settle(graph, start) {
   } finally {
     graph.declaredTypes = null;
   }
-}
-
-/**
- * Bring a settled graph up to date after a lowering edited the IR, as if it
- * were built and settled again from scratch, without redoing what did not
- * change. `records` are the mutation records of the lowering.
- *
- * A node keeps its rule, the expectations it owns, and its facts unless it
- * is dirty: new, moved, a target (or ancestor, child, or sibling of one) of a
- * recorded change, or an identifier whose declaration changed. Rules and
- * expectations are reassembled in document order, as a build would create
- * them; the solver starts from the dirty nodes' rules and reaches their
- * dependents; contextual rewrites and coercions run over every edge, as
- * after a build. Debug builds check the result against a full settle.
- */
-export function refreshTypeGraph(graph, doc, typeIndex, records) {
-  const retained = retainedGraphs(doc);
-  const programIndex = retained.program ?? buildProgramIndex(doc);
-  const old = graph.facts;
-  const oldBindings = graph.bindings;
-
-  Object.assign(graph, {
-    doc, root: doc.body.firstChild, typeIndex, programIndex, programRevision: programIndex.revision,
-    byKind: programIndex.byKind, nodesByKind: programIndex.byKind, scopeGraph: retained.scope,
-    rules: [], expectations: [], failures: [], coercions: [], changed: false,
-  });
-  const facts = graph.facts = new TypeFacts(doc, programIndex.all);
-  graph.slots = facts.views();
-  const resolutions = graph.scopeGraph?.resolutions;
-  const bindings = graph.bindings = denseArray(doc.count);
-  if (resolutions) {
-    for (const ident of programIndex.byKind.get('ir-ident') ?? []) {
-      const decl = resolutions.get(ident.id);
-      if (decl !== undefined) bindings[ident.$] = decl;
-    }
-  }
-  graph.fnIndex = programIndex.functions;
-  graph.literalDefaults = collectLiteralDefaults(graph);
-
-  const dirty = dirtyNodes(graph, old, oldBindings, records);
-  graph.lastRefresh = { records: records.length, dirty: dirty.size, nodes: facts.nodes.length };
-  const start = [];
-  for (let r = 0; r < facts.nodes.length; r++) {
-    const node = facts.nodes[r];
-    const was = old.rowOf(node);
-    if (dirty.has(node) || was < 0) {
-      facts.setTypeName(r, node.getAttribute('data-type-name'));
-      addNodeRules(graph, node);
-      if (facts.rule[r]) start.push(facts.rule[r]);
-      continue;
-    }
-    facts.copyRow(r, old, was);
-    const rule = old.rule[was];
-    if (rule) {
-      rule.index = graph.rules.length;
-      graph.rules.push(rule);
-      facts.rule[r] = rule;
-    }
-    const owned = old.owned[was];
-    if (owned !== NO_EDGES) facts.owned[r] = owned;
-    for (const edge of owned) {
-      graph.expectations.push(edge);
-      const target = facts.rowOf(edge.value);
-      if (target >= 0) {
-        if (facts.expected[target] === NO_EDGES) facts.expected[target] = [edge];
-        else facts.expected[target].push(edge);
-      }
-    }
-  }
-  return settle(graph, start);
-}
-
-// Rules whose dependencies include their siblings: an assigned value reads
-// its target, an operand the other operand (see rule()).
-const SIBLING_CONTEXT = new Set(['ir-binary', 'ir-assign']);
-
-/**
- * The nodes whose rules and expectations a refresh must rebuild (see
- * refreshTypeGraph). A rule or edge reads its node, its children (and a call
- * its grandchildren), its siblings under an operator or assignment, and,
- * for owners such as functions and branches, descendants: so a change dirties
- * the changed node and its ancestors, plus siblings where they are read.
- */
-function dirtyNodes(graph, old, oldBindings, records) {
-  const dirty = new Set();
-  const inDocument = node => {
-    let top = node;
-    while (top.parentNode) top = top.parentNode;
-    return top === graph.doc;
-  };
-  const withAncestors = node => {
-    for (let at = node; at?.nodeType === 1 && !dirty.has(at); at = at.parentNode) dirty.add(at);
-  };
-  const withSiblings = parent => {
-    if (parent?.nodeType === 1 && SIBLING_CONTEXT.has(parent.localName)) for (const child of parent.children) dirty.add(child);
-  };
-  for (const { type, target } of records) {
-    if (target?.nodeType !== 1 || !inDocument(target)) continue;
-    // Siblings first: withAncestors stops at nodes already marked.
-    if (type === 'childList') withSiblings(target);
-    dirty.delete(target);
-    withAncestors(target);
-  }
-  const { facts } = graph;
-  for (let r = 0; r < facts.nodes.length; r++) {
-    const node = facts.nodes[r];
-    const was = old.rowOf(node);
-    if (was < 0 || old.parents[was] !== node.parentNode) {
-      // New or moved: it, what contains it, and its new (and old) siblings.
-      withSiblings(node.parentNode);
-      dirty.delete(node);
-      withAncestors(node);
-      const from = was < 0 ? null : old.parents[was];
-      if (from?.nodeType === 1 && inDocument(from)) {
-        withSiblings(from);
-        dirty.delete(from);
-        withAncestors(from);
-      }
-      continue;
-    }
-    // Foreign and protocol facts accumulate as rules run (an error recorded
-    // while a receiver's type was still provisional stays); re-derive them.
-    if (old.rare.has(was)) dirty.add(node);
-    if (node.localName === 'ir-ident') {
-      const before = oldBindings?.[node.$] ?? null;
-      const now = graph.bindings[node.$] ?? null;
-      if (before !== now || bindingDependency(graph, node) !== old.rule[was]?.a) dirty.add(node);
-    }
-    if (node.getAttribute('data-iterator-element')) dirty.add(node);
-  }
-  return dirty;
 }
 
 /** declaredTypeStr(node), remembered while the graph settles. */
@@ -737,16 +604,7 @@ class Edge {
 function expect(graph, value, kind, a, b, c, site, source, mode, label) {
   if (!value) return;
   const edge = new Edge(graph, value, kind, a, b, c, site, source, mode, label);
-  // The node whose rules placed it; edges added while settling have none.
-  const owner = edge.owner = graph.owner ?? null;
   graph.expectations.push(edge);
-  if (owner !== null) {
-    const o = graph.facts.rowOf(owner);
-    if (o >= 0) {
-      if (graph.facts.owned[o] === NO_EDGES) graph.facts.owned[o] = [edge];
-      else graph.facts.owned[o].push(edge);
-    }
-  }
   const { facts } = graph;
   const r = facts.rowOf(value);
   if (r >= 0) {
@@ -773,6 +631,20 @@ function expectedType(graph, node) {
 function edgeSource(edge) {
   return typeof edge.source === 'function' ? edge.source() : edge.source;
 }
+
+/**
+ * Node kinds with a type rule. Any other node's type is whatever its
+ * `data-type-name` attribute says (declarations and type references stamped
+ * by linkTypeDecls, nodes a lowering typed).
+ */
+export const TYPE_RULE_KINDS = new Set([
+  'ir-assign', 'ir-while', 'ir-for', 'ir-loop-match', 'ir-defer', 'ir-assert', 'ir-return', 'ir-break',
+  'ir-continue', 'ir-index', 'ir-slice', 'ir-lit', 'ir-ident', 'ir-param', 'ir-let', 'ir-global',
+  'ir-self-param', 'ir-fn', 'ir-extern-fn', 'ir-block', 'ir-paren', 'ir-unary', 'ir-binary', 'ir-tuple',
+  'ir-tuple-get', 'ir-if', 'ir-match', 'ir-alt', 'ir-promote', 'ir-else', 'ir-fatal', 'ir-call', 'ir-await',
+  'ir-closure', 'ir-type-member', 'ir-field-access', 'ir-struct-init', 'ir-try', 'ir-caught', 'ir-array-lit',
+  'ir-null-ref', 'ir-ref-test', 'ir-ref-is-null', 'ir-ref-cast',
+]);
 
 function addActualRule(graph, node) {
   const one = node.firstElementChild;
@@ -1189,6 +1061,15 @@ function fieldActual(graph, node, owner) {
   return field.type;
 }
 
+/** The field fact for reading `fieldName` of a struct or enum `owner` (as fieldActual records), or null. */
+export function structFieldFact(typeIndex, owner, fieldName) {
+  const entry = owner && typeIndex?.get(unwrapNullable(owner));
+  const index = entry?.fields?.findIndex(field => field.name === fieldName) ?? -1;
+  if (index < 0) return null;
+  const field = entry.fields[index];
+  return { owner: unwrapNullable(owner), type: field.type, index, declaration: fieldDecl(entry, field.name) };
+}
+
 function awaitedType(type, graph) {
   const entry = graph.typeIndex?.get(unwrapNullable(type ?? ''));
   return isInstanceOf(entry, 'Promise') ? moduleArgsOf(entry)[0] ?? null : null;
@@ -1375,8 +1256,12 @@ function loweredOperator(graph, node) {
   }
   if (isOperandless(owner)) return null;
   if (node.localName === 'ir-binary' && owner === 'Bool' && (label === 'and' || label === 'or')) return { shortCircuit: true };
-  const fn = syntax === 'operator' ? graph.fnIndex.get(`${owner}:${method}`) ?? null : memberFn(graph, owner, method);
-  return { owner, method, label, syntax, fn };
+  return { owner, method, label, syntax, fn: operatorFunction(graph, owner, method, syntax) };
+}
+
+/** The function a lowered operator call (`owner:method`) or index call (`owner.method`) targets, or null. */
+export function operatorFunction(graph, owner, method, syntax) {
+  return syntax === 'operator' ? graph.fnIndex.get(`${owner}:${method}`) ?? null : memberFn(graph, owner, method);
 }
 
 /** The parameter an operand will be passed to once its operator is a call (as callParameter). */

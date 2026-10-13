@@ -4,6 +4,17 @@ import { projectTypeGraph } from './type-graph.js';
 import { retainedGraphs } from './graph-store.js';
 import { setData } from './ir-helpers.js';
 
+/** The host runtime a program needs (closures, promises), on its root for the loader. */
+export function projectRuntime(doc, runtime) {
+  const root = doc.body.firstChild;
+  if (!root || !runtime) return;
+  root.setAttribute('data-closure-runtime', JSON.stringify({
+    new: runtime.closures.new,
+    calls: runtime.closures.calls.map(call => call.field),
+  }));
+  root.setAttribute('data-promise-runtime', JSON.stringify(runtime.promises));
+}
+
 export function projectGraphs(doc) {
   const graphs = retainedGraphs(doc);
   for (const [id, declaration] of graphs.scope?.resolutions ?? []) {
@@ -36,15 +47,7 @@ export function projectGraphs(doc) {
       if (slot.field.declaration?.id) setData(node, 'data-field-decl-id', slot.field.declaration.id);
     }
   }
-  const runtime = graphs.backend?.runtime;
-  const root = doc.body.firstChild;
-  if (root && runtime) {
-    root.setAttribute('data-closure-runtime', JSON.stringify({
-      new: runtime.closures.new,
-      calls: runtime.closures.calls.map(call => call.field),
-    }));
-    root.setAttribute('data-promise-runtime', JSON.stringify(runtime.promises));
-  }
+  projectRuntime(doc, graphs.backend?.runtime);
   for (const { node, kind, message, data } of graphs.diagnostics?.facts.values() ?? []) {
     if (node?.nodeType !== 1) continue;
     node.setAttribute('data-error-kind', kind);

@@ -5,6 +5,7 @@
 //   ... --optimized       also check -Oz and -O3 (Binaryen's optimizer runs; slower)
 //   ... --only=substring  just the matching programs
 //   ... --jobs=N          worker threads (default: one per core)
+//   ... --corpus          also the programs in .tmp/corpus (the syntax corpus)
 //
 // Covers every .utu program under examples/ and benchmarks/. The default check
 // hashes -O0 output, which is fast and shows every change the compiler makes;
@@ -28,7 +29,8 @@ async function main() {
   const record = process.argv.includes('--record');
   const levels = process.argv.includes('--optimized') ? ['none', 'size', 'speed'] : ['none'];
   const only = flag('only');
-  const files = [...await programs(path.join(ROOT, 'examples')), ...await programs(path.join(ROOT, 'benchmarks'))]
+  const corpus = process.argv.includes('--corpus') ? await programs(path.join(ROOT, '.tmp', 'corpus')).catch(() => []) : [];
+  const files = [...await programs(path.join(ROOT, 'examples')), ...await programs(path.join(ROOT, 'benchmarks')), ...corpus]
     .filter(file => !only || file.includes(only));
   const queue = files.flatMap(file => levels.map(level => ({ file, level })));
   const jobs = Math.min(Number(flag('jobs') ?? os.availableParallelism()), queue.length);

@@ -757,11 +757,15 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'canonical_graphs.utu', source, async (file) => {
       const { doc, graphs, snapshot } = await compiler.analyzeFile(file);
-      const revision = graphs.program.revision;
+      // The semantic graphs describe the checked program as written; lowering
+      // carries their facts to the backend plan, which describes the program
+      // codegen emits.
+      const checked = graphs.types.programRevision;
       for (const name of ['scope', 'types', 'calls', 'controlFlow']) {
-        assertEq(graphs[name].programRevision, revision, `${name} graph is stale`);
+        assertEq(graphs[name].programRevision, checked, `${name} graph is not of the checked program`);
       }
-      assertEq(graphs.backend.programRevision, revision, 'backend plan is stale');
+      assertEq(graphs.backend.programRevision, graphs.program.revision, 'backend plan is stale');
+      assert(graphs.program.revision > checked, 'the backend plan must describe the lowered program');
       assert(graphs.calls.targets.size > 0, 'calls must retain canonical targets');
       assert(graphs.backend.callTargets.size > 0, 'backend must retain canonical call targets');
       assert(graphs.backend.runtime.closures.new, 'closure runtime must come from the backend plan');

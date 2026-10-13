@@ -70,9 +70,9 @@ import { collectPreludeModules } from './prelude.js';
 import { validateIrStructure } from './validate-ir-structure.js';
 import { buildElaborationGraph } from './elaboration-graph.js';
 import { refreshProgramIndex } from './program-index.js';
-import { rebuildSemanticGraphs, refreshSemanticGraphs, watchEdits } from './semantic-analysis.js';
-import { buildBackendPlan, sealBackendPlan } from './backend-plan.js';
-import { projectGraphs } from './project-graphs.js';
+import { BackendFacts } from './backend-facts.js';
+import { buildBackendPlan, checkBackendPlan, sealBackendPlan } from './backend-plan.js';
+import { projectGraphs, projectRuntime } from './project-graphs.js';
 import {
   buildCallGraph, buildControlFlowGraph, buildLayoutGraph, buildTypeDeclarationGraph, retainGraph, retainedGraphs,
 } from './semantic-graphs.js';
@@ -137,7 +137,7 @@ function passClock(file) {
     const now = performance.now();
     const elements = doc?.querySelectorAll?.('*').length ?? 0;
     console.error(`${(now - last).toFixed(1).padStart(9)} ms ${String(elements).padStart(8)} nodes  ${name}`);
-    if (name.startsWith('semantic graphs (type graph 5)')) console.error(`${(now - started).toFixed(1).padStart(9)} ms total`);
+    if (name === 'backend plan') console.error(`${(now - started).toFixed(1).padStart(9)} ms total`);
     last = performance.now();
   };
 }
@@ -406,47 +406,31 @@ export function createCompiler(env) {
     }
     if (diagnosticFacts(doc).size > 0) { projectGraphs(doc); return doc; }
 
-    // Closure and operator lowering edit the program. They consume this
-    // settled graph; the graphs are then brought up to date for what they
-    // changed (refreshSemanticGraphs), and debug builds check that against
-    // a full settle.
-    let edits = watchEdits(doc);
-    if (lowerClosures(doc, typeIndex, typeGraph)) {
+    // Lowering changes representation, not meaning: closure, operator, and
+    // alt/promote lowering record the facts of what they build (backend
+    // facts), so the lowered program is not analyzed again. Debug builds
+    // re-analyze it from scratch and compare what codegen will ask.
+    const facts = BackendFacts.fromGraphs(retainedGraphs(doc));
+    const surfaceCalls = retainedGraphs(doc).calls;
+    if (lowerClosures(doc, typeIndex, typeGraph, facts)) {
       typeIndex = linkTypeDecls(doc, elaboration);
       debugAssert(doc, 'lowerClosures', { typeIndex });
     }
-    lowerOperators(doc, typeGraph);
+    lowerOperators(doc, typeGraph, facts);
     clock('lowerClosures + lowerOperators', doc);
+    lowerBackendControl(doc, typeIndex, { target, facts });
+    debugAssert(doc, 'lowerBackendControl', { typeIndex, requireBindings: true, target });
+    clock('lowerBackendControl', doc);
 
-    let semantic = refreshSemanticGraphs(doc, typeIndex, typeGraph, edits(), { captures: retainedCaptures, check: debugAssertions });
-    let typedProgram = semantic.program;
-    typeGraph = semantic.types;
-    if (typeGraph.lastRefresh) clock(`  refreshed ${typeGraph.lastRefresh.dirty} of ${typeGraph.lastRefresh.nodes} nodes`, null);
+    const typedProgram = refreshProgramIndex(doc);
     elaboration.typeIndex = typeIndex;
     elaboration.layout = retainGraph(doc, 'layout', buildLayoutGraph(typeIndex));
     elaboration.declarations = retainGraph(doc, 'declarations', buildTypeDeclarationGraph(typeIndex));
-
-    projectTypeGraph(typeGraph); // backend-control compatibility boundary
-    clock('semantic graphs (type graph 4)', doc);
-
-    // Backend control lowering is another destructive boundary. Normal builds
-    // receive a fresh canonical graph set for the lowered program; analysis
-    // builds retain the checked surface graph unchanged.
-    edits = watchEdits(doc);
-    const backendChanged = lowerBackendControl(doc, typeIndex, { target });
-    const backendEdits = edits();
-    debugAssert(doc, 'lowerBackendControl', { typeIndex, requireBindings: true, target });
-    clock('lowerBackendControl', doc);
-    if (backendChanged) {
-      semantic = refreshSemanticGraphs(doc, typeIndex, typeGraph, backendEdits, { captures: retainedCaptures, check: debugAssertions });
-      typedProgram = semantic.program;
-      typeGraph = semantic.types;
-    }
-
-    const backendPlan = retainGraph(doc, 'backend', buildBackendPlan(doc, typeIndex, typedProgram));
-    projectGraphs(doc);
+    const backendPlan = retainGraph(doc, 'backend', buildBackendPlan(doc, typeIndex, typedProgram, { facts, callGraph: surfaceCalls }));
+    if (debugAssertions) checkBackendPlan(doc, typeIndex, backendPlan, retainedCaptures);
+    projectRuntime(doc, backendPlan.runtime);
     sealBackendPlan(backendPlan);
-    clock('semantic graphs (type graph 5) + backend plan', doc);
+    clock('backend plan', doc);
     return doc;
   }
 
