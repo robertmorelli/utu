@@ -1,13 +1,13 @@
-// The self-hosted lexer (selfhost/lexer.utu) against the stage 0 parser:
+// The self-hosted lexer (selfhost/syntax.utu) against the stage 0 parser:
 // for every source the JavaScript parser accepts, the lexer's tokens must be
 // exactly the leaves of its syntax tree, in order, with the same spans.
 //
-//   node scripts/selfhost-lexer-differential.mjs [files…] [--fuzz=N] [--show=N]
+//   node scripts/selfhost-lexer-differential.mjs [files…] [--fuzz=N] [--seed=N] [--show=N]
 //
 // Defaults to every .utu file under examples/, benchmarks/, std/,
 // hand_written_bindings/, and baselines/corpus. --fuzz=N adds N mutants of
-// each (characters deleted, duplicated, or swapped), which reach odd corners
-// of the lexer. A source the JavaScript parser rejects is only checked to lex
+// each (characters deleted, duplicated, or swapped, or words and operators
+// inserted), which reach odd corners of the lexer. A source the JavaScript parser rejects is only checked to lex
 // to an end (or an error) without trapping.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +18,7 @@ import { parseSyntax } from '../src/compiler/syntax/parser.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
 const fuzz = Number(flag('fuzz') ?? 0);
+const seedBase = Number(flag('seed') ?? 0);
 const show = Number(flag('show') ?? 10);
 const inputs = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 
@@ -25,7 +26,7 @@ const inputs = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 const INSERTS = [' -o ', '-o', '?.', '?', ' in ', ' type ', ' test ', ' and ', ' not ', ' return ', ' fatal ',
   '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//'];
 
-// Token kinds, in selfhost/lexer.utu's order.
+// Token kinds, in selfhost/syntax.utu's order.
 const KINDS = ['End', 'Error', 'Word', 'Int', 'Float', 'String', 'MultilineLine', 'DslBody', 'Comment'];
 const PUNCT = KINDS.length;
 
@@ -73,9 +74,9 @@ async function loadLexer() {
     readFile: file => fs.promises.readFile(file, 'utf8'),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
   });
-  const doc = await compiler.compileFile(path.join(ROOT, 'selfhost', 'lexer.utu'));
+  const doc = await compiler.compileFile(path.join(ROOT, 'selfhost', 'syntax.utu'));
   const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.getAttribute('data-error-message'));
-  if (errors.length) throw new Error(`selfhost/lexer.utu:\n${errors.join('\n')}`);
+  if (errors.length) throw new Error(`selfhost/syntax.utu:\n${errors.join('\n')}`);
   const wasm = emitBinary(doc);
   const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
   return instance.exports;
@@ -154,6 +155,13 @@ function compare(expected, tokens, text) {
       t += 3;
       continue;
     }
+    if (/^(and|or|xor)=$/.test(leaf.type)) {
+      // `x and= y`: the parser joins the word and the `=` after it.
+      const [word, eq] = tokens.slice(t, t + 2);
+      if (!eq || word.start !== leaf.startIndex || eq.end !== leaf.endIndex || word.end !== eq.start) return `${leaf.type} @${leaf.startIndex}`;
+      t += 2;
+      continue;
+    }
     const kind = expectedKind(leaf, text);
     const got = token.kind < PUNCT ? KINDS[token.kind] : 'Punct';
     if (got !== kind || token.start !== leaf.startIndex || token.end !== leaf.endIndex) {
@@ -178,7 +186,7 @@ function utuFiles(entry) {
 
 /** `count` small mutations of `source`, the same ones every run. */
 function mutants(source, count) {
-  let seed = source.length * 2654435761 >>> 0;
+  let seed = (source.length * 2654435761 + seedBase * 40503) >>> 0;
   const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
   return Array.from({ length: count }, () => {
     const i = Math.floor(random() * source.length);

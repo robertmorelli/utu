@@ -156,9 +156,10 @@ mem per hot column.
 ### Order
 
 1. **Lexer and parser** (utu-native, replacing tree-sitter for compiling;
-   tree-sitter stays for the editor). The lexer is done (`selfhost/`): its
-   tokens are the leaves of stage 0's syntax tree on every source and
-   mutant. Differential test: the store dump for
+   tree-sitter stays for the editor). Done (`selfhost/syntax.utu`): the
+   lexer's tokens are the leaves of stage 0's syntax tree, and the parser's
+   nodes are its named nodes, on every source and on millions of mutants.
+   Comment attachment remains. Differential test: the store dump for
    every `.utu` in `std/`, `examples/`, and the tests matches Plan A's.
 2. **Modules, imports, instantiation, name resolution.**
 3. **The type graph.** The largest piece; diagnostics must match Plan A's on

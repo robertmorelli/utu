@@ -1,0 +1,2479 @@
+// utu's syntax, in utu: the lexer (source bytes in, tokens out) and the
+// parser (tokens in, a tree of nodes out). They share a file because mems,
+// which both use, are top-level declarations of one program.
+//
+// ── The lexer ────────────────────────────────────────────────────────────────
+//
+// A state machine, built during compilation (`build`) into a const mem:
+// lexing is one table load per byte in a `loop match`. Each token's kind and
+// byte span go into three mems.
+//
+// The lexer does not know the grammar: every word is a `Word` (the parser
+// decides which are keywords, which are identifiers, and which are type
+// names), and the parser joins `std` `:` `Str` into a platform path.
+// Comments are tokens, so the parser can attach them to the tree.
+//
+// A few tokens depend on the token before them. `-o` (pipe), `?.` (optional
+// field), and compound assignments (`&=`, `<<=`, …) only follow a finished
+// expression: `x -o in` pipes to `in`, while `type &= …` declares the self
+// type. So the machine has start states after an expression and not, and
+// the state a token ends in says which start state comes next. Words that
+// begin an expression (`and`, `let`, …) are paths through the word states
+// that end in a state of their own, except after `.` or `?.`, where a word
+// is always a name (`Box.new -o f`, `row.cl >>>= 1`): that has a start
+// state of its own too.
+//
+// The JavaScript compiler's parser is the reference: for every program it
+// accepts, these tokens are exactly the leaves of its syntax tree
+// (scripts/selfhost-lexer-differential.mjs).
+
+enum(U8) Tok:
+    | End
+    | Error
+    | Word
+    | Int
+    | Float
+    | String
+    | MultilineLine
+    | DslBody
+    | Comment
+    | LParen
+    | RParen
+    | LBrace
+    | RBrace
+    | LBracket
+    | RBracket
+    | Comma
+    | Semi
+    | Colon
+    | At
+    | Dot
+    | DotDotDot
+    | DotDotLt
+    | Pipe
+    | PipeEq
+    | Amp
+    | AmpEq
+    | Caret
+    | CaretEq
+    | Star
+    | StarEq
+    | Slash
+    | SlashEq
+    | Percent
+    | PercentEq
+    | Plus
+    | PlusEq
+    | Minus
+    | MinusEq
+    | MinusO
+    | Lt
+    | LtEq
+    | Shl
+    | ShlEq
+    | Gt
+    | GtEq
+    | Shr
+    | ShrEq
+    | Shr3
+    | Shr3Eq
+    | Eq
+    | EqEq
+    | FatArrow
+    | BangEq
+    | Question
+    | QuestionDot
+    | Tilde
+    | TildeArrow
+
+// What the table says to do next, below the real states:
+let error_code: I32 = 0;   // no token can continue or start here
+let accept_code: I32 = 1;  // the token ends before this byte
+let back1_code: I32 = 2;   // the token ended one byte back
+let back2_code: I32 = 3;   // the token ended two bytes back
+let skip_code: I32 = 4;    // whitespace through this byte: drop it
+let dsl_code: I32 = 5;     // `/\`: a DSL body, which nests
+let done_code: I32 = 6;    // the end of the source
+let start_before: I32 = 7; // the start states: not after an expression,
+let start_after: I32 = 8;  // after one,
+let start_member: I32 = 9; // after `.` or `?.`,
+let start_type: I32 = 10;  // and after `type`
+
+// The source ends with this byte, which UTF-8 never uses.
+let end_byte: I32 = 255;
+
+// next = dfa[state * 256 + byte]. A token ending in a state has kind
+// kind_of[state]; one backed off from it has kind back_kind[state]. The
+// start state that follows is after_of (0: before, 1: after, 2: the same,
+// 3: member, 4: type).
+const mem dfa: U8 = @comptime/\ build().tabs \/;
+const mem kind_of: U8 = @comptime/\ build().kinds \/;
+const mem back_kind: U8 = @comptime/\ build().backs \/;
+const mem after_of: U8 = @comptime/\ build().afters \/;
+
+export mem src: U8;
+export mem tok_kind: U8;
+export mem tok_start: I32;
+export mem tok_end: I32;
+
+// ── The state machine, built at compile time ─────────────────────────────────
+
+struct Machine:
+    | tabs: Array[I32]
+    | kinds: Array[I32]
+    | backs: Array[I32]
+    | afters: Array[I32]
+    | next: I32
+    | word: I32
+
+fn set(m: Machine, from: I32, c: I32, to: I32) void {
+    m.tabs[from * 256 + c] = to;
+}
+
+fn get(m: Machine, from: I32, c: I32) I32 {
+    m.tabs[from * 256 + c];
+}
+
+fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
+    for (lo ... hi) |c| { set(m, from, c, to); };
+}
+
+fn both(m: Machine, c: I32, to: I32) void {
+    set(m, start_before, c, to);
+    set(m, start_after, c, to);
+}
+
+fn is_word_char(c: I32) Bool {
+    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c == 95 or (c >= 48 and c <= 57);
+}
+
+// A state whose token is complete: any byte without an edge ends it.
+fn ends(m: Machine, kind: Tok, after: I32) I32 {
+    let state = m.next;
+    m.next += 1;
+    m.kinds[state] = kind.to_i32();
+    m.afters[state] = after;
+    for (0 ..< 256) |c| { set(m, state, c, accept_code); };
+    state;
+}
+
+// A state in the middle of a token: any byte without an edge is an error.
+fn inside(m: Machine) I32 {
+    let state = m.next;
+    m.next += 1;
+    state;
+}
+
+// A state that backs off when no edge continues: the token was `kind`, ending `by` bytes back.
+fn backs_off(m: Machine, kind: Tok, after: I32, by: I32) I32 {
+    let state = inside(m);
+    m.backs[state] = kind.to_i32();
+    m.afters[state] = after;
+    for (0 ..< 256) |c| { set(m, state, c, if by == 1 { back1_code; } else { back2_code; }); };
+    state;
+}
+
+fn single(m: Machine, c: I32, kind: Tok, after: I32) void {
+    both(m, c, ends(m, kind, after));
+}
+
+fn whitespace(m: Machine) void {
+    // JavaScript's `\s`, which is what the grammar skips: ASCII tab through
+    // carriage return and space, and the UTF-8 encodings of no-break space,
+    // ogham space mark, the en quad through hair space, the line and
+    // paragraph separators, narrow no-break space, medium mathematical
+    // space, ideographic space, and the byte order mark.
+    for (9 ... 13) |c| { both(m, c, skip_code); };
+    both(m, 32, skip_code);
+    let c2 = inside(m);
+    both(m, 194, c2);
+    set(m, c2, 160, skip_code);
+    let e1 = inside(m);
+    let e1_9a = inside(m);
+    both(m, 225, e1);
+    set(m, e1, 154, e1_9a);
+    set(m, e1_9a, 128, skip_code);
+    let e2 = inside(m);
+    let e2_80 = inside(m);
+    let e2_81 = inside(m);
+    both(m, 226, e2);
+    set(m, e2, 128, e2_80);
+    set_range(m, e2_80, 128, 138, skip_code);
+    set(m, e2_80, 168, skip_code);
+    set(m, e2_80, 169, skip_code);
+    set(m, e2_80, 175, skip_code);
+    set(m, e2, 129, e2_81);
+    set(m, e2_81, 159, skip_code);
+    let e3 = inside(m);
+    let e3_80 = inside(m);
+    both(m, 227, e3);
+    set(m, e3, 128, e3_80);
+    set(m, e3_80, 128, skip_code);
+    let ef = inside(m);
+    let ef_bb = inside(m);
+    both(m, 239, ef);
+    set(m, ef, 187, ef_bb);
+    set(m, ef_bb, 191, skip_code);
+}
+
+// A token running to the end of its line: `// …` and `\\ …`.
+fn to_line_end(m: Machine, state: I32) void {
+    for (0 ..< 256) |c| { set(m, state, c, state); };
+    set(m, state, 10, accept_code);
+    set(m, state, end_byte, accept_code);
+}
+
+// `"…"` with backslash escapes; a newline or the end of the source inside is an error.
+fn strings(m: Machine) void {
+    let body = inside(m);
+    let escape = inside(m);
+    let close = ends(m, Tok.String, 1);
+    both(m, 34, body);
+    for (0 ..< 255) |c| {
+        set(m, body, c, body);
+        set(m, escape, c, body);
+    };
+    set(m, body, 10, error_code);
+    set(m, body, 34, close);
+    set(m, body, 92, escape);
+    set(m, escape, 10, error_code);
+}
+
+// Numbers, as the grammar's regular expressions take them: a float
+// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
+fn numbers(m: Machine) void {
+    let int = ends(m, Tok.Int, 1);
+    let zero = ends(m, Tok.Int, 1);
+    let dot = backs_off(m, Tok.Int, 1, 1);
+    let float = ends(m, Tok.Float, 1);
+    let exp = backs_off(m, Tok.Float, 1, 1);
+    let exp_sign = backs_off(m, Tok.Float, 1, 2);
+    let exp_digits = ends(m, Tok.Float, 1);
+    let hex_start = backs_off(m, Tok.Int, 1, 1);
+    let hex = ends(m, Tok.Int, 1);
+    let bin_start = backs_off(m, Tok.Int, 1, 1);
+    let bin = ends(m, Tok.Int, 1);
+    set_range(m, start_before, 49, 57, int);
+    set_range(m, start_after, 49, 57, int);
+    both(m, 48, zero);
+    for ([int, zero]) |state| {
+        set_range(m, state, 48, 57, int);
+        set(m, state, 46, dot);
+    };
+    set(m, zero, 120, hex_start);
+    set(m, zero, 98, bin_start);
+    set_range(m, dot, 48, 57, float);
+    set_range(m, float, 48, 57, float);
+    set(m, float, 101, exp);
+    set(m, float, 69, exp);
+    set(m, exp, 43, exp_sign);
+    set(m, exp, 45, exp_sign);
+    set_range(m, exp, 48, 57, exp_digits);
+    set_range(m, exp_sign, 48, 57, exp_digits);
+    set_range(m, exp_digits, 48, 57, exp_digits);
+    for ([hex_start, hex]) |state| {
+        set_range(m, state, 48, 57, hex);
+        set_range(m, state, 97, 102, hex);
+        set_range(m, state, 65, 70, hex);
+    };
+    for ([bin_start, bin]) |state| {
+        set(m, state, 48, bin);
+        set(m, state, 49, bin);
+    };
+}
+
+// A word state: word characters continue the word, anything else ends it.
+fn word_state(m: Machine, after: I32) I32 {
+    let state = ends(m, Tok.Word, after);
+    for (0 ..< 256) |c| { if is_word_char(c) { set(m, state, c, m.word); }; };
+    state;
+}
+
+fn words(m: Machine) void {
+    m.word = word_state(m, 1);
+    for (0 ..< 256) |c| { if is_word_char(c) { set(m, m.word, c, m.word); }; };
+    for (0 ..< 256) |c| {
+        if is_word_char(c) and (c < 48 or c > 57) { both(m, c, m.word); };
+    };
+    // Words after which an expression begins, so a `-o`, `?.`, or compound
+    // assignment cannot follow them. Each is a path through word states,
+    // from the start states where it is a keyword, ending in one whose token
+    // is followed by the start state before an expression. The keywords that
+    // begin an expression are keywords wherever they stand; elsewhere other
+    // words are names: `x -o in` pipes to `in`. Not `break`, which is a whole
+    // expression, nor `return` and `continue`, whose `-o` the parser reads as
+    // a pipe (`return -o f`).
+    for (["if", "match", "loop", "alt", "promote", "try", "for", "while", "defer", "yield", "let", "cl", "new",
+            "await", "assert", "not"]) |word| {
+        keyword_path(m, start_before, word, 0);
+        keyword_path(m, start_after, word, 0);
+    };
+    // The keyword operators, and `else`, follow an expression; where one
+    // begins, they are names (`assert or >>>= 1`).
+    for (["and", "or", "xor", "orelse", "else"]) |word| { keyword_path(m, start_after, word, 0); };
+    // `type &= …` declares the self type: after `type`, `&=` is `&` and `=`.
+    keyword_path(m, start_before, "type", 4);
+    keyword_path(m, start_after, "type", 4);
+}
+
+// The path of `word` through the word states from `root`, ending in a state whose token is followed by start state `after`.
+fn keyword_path(m: Machine, root: I32, word: Str, after: I32) void {
+    let current = root;
+    for (0 ..< word.len()) |k| {
+        let c = word.get(k);
+        let next = get(m, current, c);
+        if next == m.word {
+            next = word_state(m, 1);
+            set(m, current, c, next);
+        };
+        current = next;
+    };
+    m.afters[current] = after;
+}
+
+// `X` and, after an expression, `X=` (but not before `>`: `|x|=> …` closes
+// a capture before an arm). Returns the state after `X` following an expression.
+fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
+    set(m, start_before, c, ends(m, plain, 0));
+    let first = ends(m, plain, 0);
+    set(m, start_after, c, first);
+    let eq = ends(m, assign, 0);
+    set(m, first, 61, eq);
+    set(m, eq, 62, back1_code);
+    m.backs[eq] = plain.to_i32();
+    first;
+}
+
+fn punctuation(m: Machine) void {
+    single(m, 40, Tok.LParen, 0);
+    single(m, 41, Tok.RParen, 1);
+    single(m, 123, Tok.LBrace, 0);
+    single(m, 125, Tok.RBrace, 1);
+    single(m, 91, Tok.LBracket, 0);
+    single(m, 93, Tok.RBracket, 1);
+    single(m, 44, Tok.Comma, 0);
+    single(m, 59, Tok.Semi, 0);
+    single(m, 58, Tok.Colon, 0);
+    single(m, 64, Tok.At, 0);
+
+    // `.`, `...`, `..<`; `..` alone is two dots.
+    let dot = ends(m, Tok.Dot, 3);
+    let dots = backs_off(m, Tok.Dot, 3, 1);
+    both(m, 46, dot);
+    set(m, dot, 46, dots);
+    set(m, dots, 46, ends(m, Tok.DotDotDot, 0));
+    set(m, dots, 60, ends(m, Tok.DotDotLt, 0));
+
+    compound(m, 124, Tok.Pipe, Tok.PipeEq);
+    compound(m, 38, Tok.Amp, Tok.AmpEq);
+    compound(m, 94, Tok.Caret, Tok.CaretEq);
+    compound(m, 42, Tok.Star, Tok.StarEq);
+    compound(m, 37, Tok.Percent, Tok.PercentEq);
+    compound(m, 43, Tok.Plus, Tok.PlusEq);
+
+    // `/`: also `//` comments and `/\` DSL bodies.
+    let slash_after = compound(m, 47, Tok.Slash, Tok.SlashEq);
+    let comment = ends(m, Tok.Comment, 2);
+    to_line_end(m, comment);
+    for ([get(m, start_before, 47), slash_after]) |state| {
+        set(m, state, 47, comment);
+        set(m, state, 92, dsl_code);
+    };
+    // `\\` multiline string lines.
+    let backslash = inside(m);
+    let line = ends(m, Tok.MultilineLine, 1);
+    to_line_end(m, line);
+    both(m, 92, backslash);
+    set(m, backslash, 92, line);
+
+    // `-`, and after an expression `-o` and `-=`.
+    let minus = compound(m, 45, Tok.Minus, Tok.MinusEq);
+    set(m, minus, 111, ends(m, Tok.MinusO, 0));
+
+    // `<`, `<=`, `<<`, and after an expression `<<=`.
+    for ([start_before, start_after]) |start| {
+        let lt = ends(m, Tok.Lt, 0);
+        let shl = ends(m, Tok.Shl, 0);
+        set(m, start, 60, lt);
+        set(m, lt, 61, ends(m, Tok.LtEq, 0));
+        set(m, lt, 60, shl);
+        if start == start_after { set(m, shl, 61, ends(m, Tok.ShlEq, 0)); };
+    };
+    // `>`, `>=`, `>>`, `>>>`, and after an expression `>>=` and `>>>=`.
+    for ([start_before, start_after]) |start| {
+        let gt = ends(m, Tok.Gt, 0);
+        let shr = ends(m, Tok.Shr, 0);
+        let shr3 = ends(m, Tok.Shr3, 0);
+        set(m, start, 62, gt);
+        set(m, gt, 61, ends(m, Tok.GtEq, 0));
+        set(m, gt, 62, shr);
+        set(m, shr, 62, shr3);
+        if start == start_after {
+            set(m, shr, 61, ends(m, Tok.ShrEq, 0));
+            set(m, shr3, 61, ends(m, Tok.Shr3Eq, 0));
+        };
+    };
+
+    // `=`, `==`, `=>`.
+    let eq = ends(m, Tok.Eq, 0);
+    both(m, 61, eq);
+    set(m, eq, 61, ends(m, Tok.EqEq, 0));
+    set(m, eq, 62, ends(m, Tok.FatArrow, 0));
+    // `!=` (`!` alone is no token).
+    let bang = inside(m);
+    both(m, 33, bang);
+    set(m, bang, 61, ends(m, Tok.BangEq, 0));
+    // `~`, `~>`.
+    let tilde = ends(m, Tok.Tilde, 0);
+    both(m, 126, tilde);
+    set(m, tilde, 62, ends(m, Tok.TildeArrow, 0));
+    // `?`, and after an expression `?.` (but `?.{I32}` after a parameter
+    // list is a nullable tuple type).
+    set(m, start_before, 63, ends(m, Tok.Question, 0));
+    let question = ends(m, Tok.Question, 0);
+    let optional = ends(m, Tok.QuestionDot, 3);
+    set(m, start_after, 63, question);
+    set(m, question, 46, optional);
+    set(m, optional, 123, back1_code);
+    m.backs[optional] = Tok.Question.to_i32();
+}
+
+fn build() Machine {
+    let m = Machine {
+        tabs: Array[I32].new(256 * 256, error_code),
+        kinds: Array[I32].new(256, Tok.Error.to_i32()),
+        backs: Array[I32].new(256, Tok.Error.to_i32()),
+        afters: Array[I32].new(256, 0),
+        next: start_type + 1,
+        word: 0,
+    };
+    both(m, end_byte, done_code);
+    whitespace(m);
+    strings(m);
+    numbers(m);
+    words(m);
+    punctuation(m);
+    // After `.` or `?.`, as before an expression, except that every word is a name.
+    for (0 ..< 256) |c| { set(m, start_member, c, get(m, start_before, c)); };
+    for (0 ..< 256) |c| {
+        if is_word_char(c) and (c < 48 or c > 57) { set(m, start_member, c, m.word); };
+    };
+    // After `type`, as after an expression, except that `&` is never `&=`.
+    for (0 ..< 256) |c| { set(m, start_type, c, get(m, start_after, c)); };
+    set(m, start_type, 38, get(m, start_before, 38));
+    if m.next > 256 { fatal; };
+    m.tabs = m.tabs.slice(0, m.next * 256);
+    m.kinds = m.kinds.slice(0, m.next);
+    m.backs = m.backs.slice(0, m.next);
+    m.afters = m.afters.slice(0, m.next);
+    m;
+}
+
+// ── Lexing ───────────────────────────────────────────────────────────────────
+
+fn push(kind: I32, start: I32, end_: I32) void {
+    tok_kind.push(kind);
+    tok_start.push(start);
+    tok_end.push(end_);
+}
+
+// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
+fn dsl_end(i: I32, n: I32) I32 {
+    let j = i + 2;
+    let depth = 1;
+    while (j < n) {
+        let c = src[j];
+        j += 1;
+        if c == 47 and src[j] == 92 {
+            depth += 1;
+            j += 1;
+        } else if c == 92 and src[j] == 47 {
+            j += 1;
+            depth -= 1;
+            if depth == 0 { return j; };
+        };
+    };
+    -1;
+}
+
+// Lex the `n` bytes of `src` (followed by the end byte). Returns the number
+// of tokens, the last of them `End`, or `Error` (at the start of the token
+// that cannot be lexed: a byte no token starts with, or a string or DSL body
+// that does not close).
+fn lex(n: I32) I32 {
+    tok_kind.clear();
+    tok_start.clear();
+    tok_end.clear();
+    let i = 0;
+    let j = 0;
+    let start = start_before;
+    let state = start;
+    let next = dfa[start * 256 + src[0]];
+    loop match next {
+        0 => {
+            push(Tok.Error.to_i32(), i, i);
+            return tok_kind.len();
+        },
+        1 => {
+            push(kind_of[state], i, j);
+            let after = after_of[state];
+            if after == 0 { start = start_before; } else if after == 1 { start = start_after; }
+            else if after == 3 { start = start_member; } else if after == 4 { start = start_type; };
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        2 => {
+            j -= 1;
+            push(back_kind[state], i, j);
+            let after = after_of[state];
+            start = if after == 1 { start_after; } else if after == 3 { start_member; } else { start_before; };
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        3 => {
+            j -= 2;
+            push(back_kind[state], i, j);
+            let after = after_of[state];
+            start = if after == 1 { start_after; } else if after == 3 { start_member; } else { start_before; };
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        4 => {
+            j += 1;
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        5 => {
+            j = dsl_end(i, n);
+            if j < 0 {
+                push(Tok.Error.to_i32(), i, i);
+                return tok_kind.len();
+            };
+            push(Tok.DslBody.to_i32(), i, j);
+            start = start_after;
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        6 => {
+            push(Tok.End.to_i32(), n, n);
+            return tok_kind.len();
+        },
+        ~> {
+            state = next;
+            j += 1;
+            next = dfa[state * 256 + src[j]];
+            continue next;
+        },
+    };
+    tok_kind.len();
+}
+
+// ── The parser ───────────────────────────────────────────────────────────────
+//
+// Recursive descent over the tokens (comments skipped), building a tree of
+// named nodes in mems: each node's kind, its first token and the token after
+// its last (as positions in `ptok`, the tokens without comments), its first
+// child, and its next sibling. Punctuation and keywords are not nodes; a
+// node's span covers them.
+//
+// A node is made from the nodes made since it began: those wait on the
+// `pending` stack, and finishing a node links them as its children and puts
+// it in their place. Trying a parse and giving it up (`save`, `restore`)
+// truncates the node mems and the stack.
+//
+// The grammar is stage 0's (src/compiler/syntax/parser.js), function by
+// function, which in turn is tree-sitter-utu's: the nodes are the named nodes
+// of its syntax tree, with the same spans, for every program it accepts
+// (scripts/selfhost-parser-differential.mjs). A program it does not accept
+// fails with a thrown error; stage 0 hands those to tree-sitter, whose error
+// recovery reports them.
+
+enum(U8) Node:
+    | Source_file
+    | Comment
+    | Identifier
+    | Type_ident
+    | Int_lit
+    | Float_lit
+    | String_lit
+    | Multiline_string_line
+    | Multiline_string_lit
+    | Dsl_body
+    | Platform_path
+    | Void_type
+    | Bool_lit
+    | Module_decl
+    | Module_name
+    | Module_type_param_list
+    | Module_type_param
+    | Module_type_arg_list
+    | Impl_list
+    | Promoted_type
+    | Nom_qualifier
+    | Nom_tag
+    | Struct_decl
+    | Field
+    | Enum_decl
+    | Variant
+    | Field_list
+    | Proto_decl
+    | Proto_member
+    | Proto_getter
+    | Proto_setter
+    | Proto_get_setter
+    | Proto_method
+    | Op_decl
+    | Fn_decl
+    | Fn_name
+    | Self_param
+    | Param_list
+    | Param
+    | Return_type
+    | Yield_type
+    | Type_list
+    | Global_decl
+    | Mem_decl
+    | Distinct_decl
+    | Type_decl
+    | Using_decl
+    | Captured_module_name
+    | Export_lib_decl
+    | Export_main_decl
+    | Test_decl
+    | Bench_decl
+    | Measure_decl
+    | Nullable_type
+    | Paren_type
+    | Tuple_type
+    | Func_type
+    | Closure_type
+    | Ref_type
+    | Instantiated_module_ref
+    | Qualified_type_ref
+    | Module_ref
+    | Block
+    | Capture
+    | Call_expr
+    | Arg_list
+    | Field_expr
+    | Optional_field_expr
+    | Slice_expr
+    | Index_expr
+    | Assign_expr
+    | Binary_expr
+    | Iterator_expr
+    | Else_expr
+    | Pipe_expr
+    | Pipe_target
+    | Pipe_args
+    | Pipe_args_with_placeholder
+    | Pipe_args_no_placeholder
+    | Pipe_arg
+    | Pipe_arg_placeholder
+    | Unary_op
+    | Unary_expr
+    | Block_expr
+    | Implicit_struct_init
+    | Literal
+    | Await_expr
+    | Assert_expr
+    | New_expr
+    | Return_expr
+    | Continue_expr
+    | Yield_expr
+    | Defer_expr
+    | Break_expr
+    | Fatal_expr
+    | Prune_expr
+    | Struct_init
+    | Inline_module_type_path
+    | Type_member_expr
+    | Null_expr
+    | Promoted_module_call_expr
+    | Field_init
+    | Range_expr
+    | Paren_expr
+    | Array_expr
+    | Tuple_expr
+    | Dsl_expr
+    | Bind_expr
+    | Tuple_pattern
+    | Closure_expr
+    | Closure_param_list
+    | Closure_param
+    | If_expr
+    | Match_expr
+    | Loop_match_expr
+    | Match_arm
+    | Match_default
+    | Match_lit
+    | Alt_expr
+    | Alt_arm
+    | Alt_default
+    | Promote_expr
+    | Try_expr
+    | For_expr
+    | For_sources
+    | For_source
+    | While_expr
+
+// Every keyword of the grammar, as interned word ids: each is its variant's
+// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
+// keyword may stand, the parser compares ids.
+enum(U8) Kw:
+    | Mod
+    | Using
+    | Tag
+    | Rec
+    | Struct
+    | Proto
+    | Enum
+    | Fn
+    | Let
+    | Mem
+    | Export
+    | Const
+    | Type
+    | Distinct
+    | Lib
+    | Main
+    | Test
+    | Bench
+    | Measure
+    | In
+    | Out
+    | Get
+    | Set
+    | Yield
+    | Void
+    | Fun
+    | Cl
+    | From
+    | Map
+    | Filter
+    | Flat_map
+    | Skip_while
+    | Take_while
+    | Each
+    | Any
+    | All
+    | Count_where
+    | First_index
+    | Last_index
+    | Bisect
+    | Fold
+    | Scan
+    | Zip
+    | Skip
+    | Take
+    | Chain
+    | Repeat
+    | Sort
+    | Min_by
+    | Max_by
+    | First_where
+    | Reduce
+    | Partition
+    | Collect
+    | Group_by
+    | Distinct_by
+    | Batched
+    | Windows
+    | Sum
+    | Fast_sum
+    | Product
+    | Count
+    | Await
+    | New
+    | Assert
+    | Not
+    | And
+    | Or
+    | Xor
+    | Orelse
+    | If
+    | Else
+    | Promote
+    | Try
+    | Catch
+    | Match
+    | Loop
+    | Alt
+    | For
+    | While
+    | Break
+    | Continue
+    | Defer
+    | Return
+    | Fatal
+    | Prune
+    | True
+    | False
+    | Null
+
+// The tokens the parser reads (positions of the lexer's tokens, without
+// comments), and each token's interned word id (-1 when it is not a word).
+export mem ptok: I32;
+export mem tok_word: I32;
+
+export mem node_kind: U8;
+export mem node_first: I32;
+export mem node_last: I32;
+export mem node_child: I32;
+export mem node_next: I32;
+mem pending: I32;
+
+let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/;
+
+// Give up: the program is not one this parser accepts.
+fn fail() void {
+    syntax_error();
+}
+
+struct Parser:
+    | pos: I32
+
+struct Save:
+    | pos: I32
+    | nodes: I32
+    | pending: I32
+
+// ── Tokens ──
+
+fn kind_at(p: Parser, offset: I32) I32 { tok_kind[ptok[p.pos + offset]]; }
+
+fn is(p: Parser, kind: Tok) Bool { tok_kind[ptok[p.pos]] == kind.to_i32(); }
+
+fn is_at(p: Parser, offset: I32, kind: Tok) Bool { tok_kind[ptok[p.pos + offset]] == kind.to_i32(); }
+
+fn word_id(p: Parser) I32 { tok_word[ptok[p.pos]]; }
+
+fn is_kw(p: Parser, kw: Kw) Bool { tok_word[ptok[p.pos]] == kw.to_i32(); }
+
+fn is_word(p: Parser) Bool { is(p, Tok.Word); }
+
+fn is_keyword_id(id: I32) Bool { id >= 0 and id < Kw.count(); }
+
+fn at_end(p: Parser) Bool { is(p, Tok.End); }
+
+// Whether the tokens at positions `a` and `b` touch, with nothing between them.
+fn adjacent(a: I32, b: I32) Bool { tok_end[ptok[a]] == tok_start[ptok[b]]; }
+
+// Identifier-shaped: a lowercase first letter, or `_` and more.
+fn shaped_at(p: Parser, offset: I32) Bool {
+    let t = ptok[p.pos + offset];
+    if tok_kind[t] != Tok.Word.to_i32() { return false; };
+    let c = src[tok_start[t]];
+    (c >= 97 and c <= 122) or (c == 95 and tok_end[t] - tok_start[t] > 1);
+}
+
+fn shaped(p: Parser) Bool { shaped_at(p, 0); }
+
+fn advance(p: Parser) void { p.pos += 1; }
+
+fn expect(p: Parser, kind: Tok) void {
+    if not is(p, kind) { fail(); };
+    p.pos += 1;
+}
+
+fn expect_kw(p: Parser, kw: Kw) void {
+    if not is_kw(p, kw) { fail(); };
+    p.pos += 1;
+}
+
+// ── Nodes ──
+
+fn mark() I32 { pending.len(); }
+
+// A node of the nodes made since `at` (on the pending stack), spanning tokens first ..< last.
+fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
+    let id = node_kind.len();
+    let n = pending.len();
+    node_kind.push(kind.to_i32());
+    node_first.push(first);
+    node_last.push(last);
+    if at < n {
+        node_child.push(pending[at]);
+        for (at ..< n - 1) |k| { node_next[pending[k]] = pending[k + 1]; };
+        node_next[pending[n - 1]] = -1;
+    } else {
+        node_child.push(-1);
+    };
+    node_next.push(-1);
+    pending.resize(at);
+    pending.push(id);
+    id;
+}
+
+// A node from `at` up to the cursor.
+fn node(p: Parser, kind: Node, at: I32, first: I32) I32 { finish(kind, at, first, p.pos); }
+
+// A node of the token at the cursor.
+fn leaf(p: Parser, kind: Node) I32 {
+    let at = mark();
+    p.pos += 1;
+    finish(kind, at, p.pos - 1, p.pos);
+}
+
+// The mark below `left`, the node on top of the stack, so a node can begin with it.
+fn mark_below(left: I32) I32 {
+    if pending[pending.len() - 1] != left { fatal; };
+    pending.len() - 1;
+}
+
+fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len() }; }
+
+fn restore(p: Parser, s: Save) void {
+    p.pos = s.pos;
+    node_kind.resize(s.nodes);
+    node_first.resize(s.nodes);
+    node_last.resize(s.nodes);
+    node_child.resize(s.nodes);
+    node_next.resize(s.nodes);
+    pending.resize(s.pending);
+}
+
+// ── Words ──
+
+fn identifier(p: Parser) I32 {
+    if not shaped(p) { fail(); };
+    leaf(p, Node.Identifier);
+}
+
+fn type_ident(p: Parser) I32 {
+    if not is_word(p) { fail(); };
+    leaf(p, Node.Type_ident);
+}
+
+// A type name where no keyword can stand.
+fn unreserved_type_ident(p: Parser) I32 {
+    if is_keyword_id(word_id(p)) { fail(); };
+    type_ident(p);
+}
+
+// `identifier` where the word is identifier-shaped, else `type_ident` (both fit here).
+fn identifier_or_type(p: Parser) I32 {
+    if not is_word(p) { fail(); };
+    leaf(p, if shaped(p) { Node.Identifier; } else { Node.Type_ident; });
+}
+
+fn string_lit(p: Parser) I32 {
+    if not is(p, Tok.String) { fail(); };
+    leaf(p, Node.String_lit);
+}
+
+fn number(p: Parser) I32 {
+    if is(p, Tok.Int) { return leaf(p, Node.Int_lit); };
+    if is(p, Tok.Float) { return leaf(p, Node.Float_lit); };
+    fail();
+    -1;
+}
+
+fn int_lit(p: Parser) I32 {
+    if not is(p, Tok.Int) { fail(); };
+    leaf(p, Node.Int_lit);
+}
+
+// ── Source file and items ──
+
+fn source_file(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    while (not at_end(p)) { item(p); };
+    node(p, Node.Source_file, at, first);
+}
+
+fn item(p: Parser) void {
+    let w = word_id(p);
+    if w == Kw.Mod.to_i32() { module_decl(p); return; };
+    if w == Kw.Using.to_i32() { using_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Tag.to_i32() or w == Kw.Rec.to_i32() or w == Kw.Struct.to_i32() or w == Kw.Enum.to_i32() { struct_or_enum(p); return; };
+    if w == Kw.Proto.to_i32() { proto_decl(p); return; };
+    if w == Kw.Fn.to_i32() { fn_or_op_decl(p); return; };
+    if w == Kw.Let.to_i32() { global_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Mem.to_i32() or w == Kw.Const.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Type.to_i32() { distinct_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Export.to_i32() {
+        let after = tok_word[ptok[p.pos + 1]];
+        if after == Kw.Lib.to_i32() { export_lib_decl(p); return; };
+        if after == Kw.Main.to_i32() { export_main_decl(p); return; };
+        if after == Kw.Const.to_i32() or after == Kw.Mem.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
+        fail();
+        return;
+    };
+    if w == Kw.Test.to_i32() { test_decl(p); return; };
+    if w == Kw.Bench.to_i32() { bench_decl(p); return; };
+    fail();
+}
+
+fn module_item(p: Parser) void {
+    let w = word_id(p);
+    if w == Kw.Type.to_i32() { type_decl(p); return; };
+    if w == Kw.Tag.to_i32() or w == Kw.Rec.to_i32() or w == Kw.Struct.to_i32() or w == Kw.Enum.to_i32() { struct_or_enum(p); return; };
+    if w == Kw.Proto.to_i32() { proto_decl(p); return; };
+    if w == Kw.Fn.to_i32() { fn_or_op_decl(p); return; };
+    if w == Kw.Let.to_i32() { global_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Test.to_i32() { test_decl(p); return; };
+    if w == Kw.Bench.to_i32() { bench_decl(p); return; };
+    fail();
+}
+
+fn module_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect_kw(p, Kw.Mod);
+    module_name(p);
+    if is(p, Tok.LBracket) { module_type_param_list(p); };
+    expect(p, Tok.LBrace);
+    while (not is(p, Tok.RBrace)) { module_item(p); };
+    expect(p, Tok.RBrace);
+    node(p, Node.Module_decl, at, first);
+}
+
+fn module_name(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    identifier_or_type(p);
+    node(p, Node.Module_name, at, first);
+}
+
+fn module_type_param_list(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.LBracket);
+    module_type_param(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        if is(p, Tok.RBracket) { break; };
+        module_type_param(p);
+    };
+    expect(p, Tok.RBracket);
+    node(p, Node.Module_type_param_list, at, first);
+}
+
+fn module_type_param(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    // `in` and `out` are always variance keywords here, never parameter names.
+    if is_kw(p, Kw.In) or is_kw(p, Kw.Out) { advance(p); };
+    unreserved_type_ident(p);
+    node(p, Node.Module_type_param, at, first);
+}
+
+fn module_type_arg_list(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.LBracket);
+    type_(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        if is(p, Tok.RBracket) { break; };
+        type_(p);
+    };
+    expect(p, Tok.RBracket);
+    node(p, Node.Module_type_arg_list, at, first);
+}
+
+fn impl_list(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.LBracket);
+    if not is(p, Tok.RBracket) {
+        type_ident_or_promoted(p);
+        while (is(p, Tok.Comma)) {
+            advance(p);
+            if is(p, Tok.RBracket) { break; };
+            type_ident_or_promoted(p);
+        };
+    };
+    expect(p, Tok.RBracket);
+    node(p, Node.Impl_list, at, first);
+}
+
+fn type_ident_or_promoted(p: Parser) I32 {
+    if is(p, Tok.Amp) { promoted_type(p); } else { type_ident(p); };
+}
+
+fn promoted_type(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.Amp);
+    node(p, Node.Promoted_type, at, first);
+}
+
+fn struct_or_enum(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if is_kw(p, Kw.Tag) or is_kw(p, Kw.Rec) {
+        let tags = mark();
+        while (is_kw(p, Kw.Tag) or is_kw(p, Kw.Rec)) {
+            let tag = mark();
+            advance(p);
+            node(p, Node.Nom_tag, tag, p.pos - 1);
+        };
+        node(p, Node.Nom_qualifier, tags, first);
+    };
+    if is_kw(p, Kw.Struct) { return struct_decl(p, at, first); };
+    if is_kw(p, Kw.Enum) { return enum_decl(p, at, first); };
+    fail();
+    -1;
+}
+
+fn struct_decl(p: Parser, at: I32, first: I32) I32 {
+    advance(p);
+    type_ident_or_promoted(p);
+    if is(p, Tok.LBracket) { impl_list(p); };
+    expect(p, Tok.Colon);
+    while (is(p, Tok.Pipe)) {
+        advance(p);
+        field(p);
+    };
+    node(p, Node.Struct_decl, at, first);
+}
+
+fn field(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    identifier(p);
+    expect(p, Tok.Colon);
+    type_(p);
+    node(p, Node.Field, at, first);
+}
+
+fn enum_decl(p: Parser, at: I32, first: I32) I32 {
+    advance(p);
+    if is(p, Tok.LParen) {
+        advance(p);
+        type_ident(p);
+        expect(p, Tok.RParen);
+    };
+    type_ident_or_promoted(p);
+    if is(p, Tok.LBracket) { impl_list(p); };
+    expect(p, Tok.Colon);
+    while (is(p, Tok.Pipe)) {
+        advance(p);
+        variant(p);
+    };
+    node(p, Node.Enum_decl, at, first);
+}
+
+fn variant(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    type_ident(p);
+    if is(p, Tok.LBrace) {
+        advance(p);
+        if not is(p, Tok.RBrace) { field_list(p); };
+        expect(p, Tok.RBrace);
+    } else if is(p, Tok.Eq) {
+        advance(p);
+        if is(p, Tok.Minus) { advance(p); };
+        int_lit(p);
+    };
+    node(p, Node.Variant, at, first);
+}
+
+fn field_list(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    field(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        if is(p, Tok.RBrace) { break; };
+        field(p);
+    };
+    node(p, Node.Field_list, at, first);
+}
+
+fn proto_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    type_ident_or_promoted(p);
+    expect(p, Tok.Colon);
+    while (is(p, Tok.Pipe)) {
+        advance(p);
+        proto_member(p);
+    };
+    node(p, Node.Proto_decl, at, first);
+}
+
+fn proto_member(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    let member = mark();
+    if is_kw(p, Kw.Get) {
+        advance(p);
+        let both_ = is_kw(p, Kw.Set);
+        if both_ { advance(p); };
+        identifier(p);
+        expect(p, Tok.Colon);
+        type_(p);
+        node(p, if both_ { Node.Proto_get_setter; } else { Node.Proto_getter; }, member, first);
+    } else if is_kw(p, Kw.Set) {
+        advance(p);
+        identifier(p);
+        expect(p, Tok.Colon);
+        type_(p);
+        node(p, Node.Proto_setter, member, first);
+    } else {
+        identifier(p);
+        expect(p, Tok.LParen);
+        if not is(p, Tok.RParen) { type_list(p); };
+        expect(p, Tok.RParen);
+        return_type(p);
+        node(p, Node.Proto_method, member, first);
+    };
+    node(p, Node.Proto_member, at, first);
+}
+
+fn fn_or_op_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    // `fn T:op |a, b| R { … }` is an operator; `fn T.name(…)` and `fn name(…)` are functions.
+    if not shaped(p) or is(p, Tok.Amp) {
+        let s = save(p);
+        type_ident_or_promoted(p);
+        if is(p, Tok.Colon) {
+            advance(p);
+            identifier(p);
+            capture(p);
+            return_type(p);
+            block(p);
+            return node(p, Node.Op_decl, at, first);
+        };
+        restore(p, s);
+    };
+    fn_name(p);
+    if is(p, Tok.Pipe) { self_param(p); };
+    expect(p, Tok.LParen);
+    if not is(p, Tok.RParen) { param_list(p); };
+    expect(p, Tok.RParen);
+    return_type(p);
+    block(p);
+    node(p, Node.Fn_decl, at, first);
+}
+
+fn fn_name(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if shaped(p) {
+        identifier(p);
+    } else {
+        type_ident_or_promoted(p);
+        if is(p, Tok.LBracket) { module_type_arg_list(p); };
+        expect(p, Tok.Dot);
+        identifier(p);
+    };
+    node(p, Node.Fn_name, at, first);
+}
+
+fn self_param(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.Pipe);
+    identifier(p);
+    expect(p, Tok.Pipe);
+    node(p, Node.Self_param, at, first);
+}
+
+fn param_list(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    param(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        if is(p, Tok.RParen) { break; };
+        param(p);
+    };
+    node(p, Node.Param_list, at, first);
+}
+
+fn param(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    identifier(p);
+    expect(p, Tok.Colon);
+    type_(p);
+    node(p, Node.Param, at, first);
+}
+
+fn return_type(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if is_kw(p, Kw.Void) {
+        leaf(p, Node.Void_type);
+    } else if is_kw(p, Kw.Yield) {
+        let inner = mark();
+        advance(p);
+        type_(p);
+        node(p, Node.Yield_type, inner, first);
+    } else {
+        type_(p);
+    };
+    node(p, Node.Return_type, at, first);
+}
+
+fn type_list(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    type_(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        type_(p);
+    };
+    node(p, Node.Type_list, at, first);
+}
+
+fn global_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    identifier(p);
+    expect(p, Tok.Colon);
+    type_(p);
+    expect(p, Tok.Eq);
+    expression(p);
+    node(p, Node.Global_decl, at, first);
+}
+
+fn mem_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if is_kw(p, Kw.Export) { advance(p); };
+    if is_kw(p, Kw.Const) { advance(p); };
+    expect_kw(p, Kw.Mem);
+    identifier(p);
+    expect(p, Tok.Colon);
+    type_ident(p);
+    if is(p, Tok.Eq) {
+        advance(p);
+        expression(p);
+    };
+    node(p, Node.Mem_decl, at, first);
+}
+
+fn distinct_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    type_ident(p);
+    expect(p, Tok.Eq);
+    expect_kw(p, Kw.Distinct);
+    type_ident(p);
+    node(p, Node.Distinct_decl, at, first);
+}
+
+fn type_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    type_ident_or_promoted(p);
+    expect(p, Tok.Eq);
+    dsl_expr(p);
+    node(p, Node.Type_decl, at, first);
+}
+
+fn using_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    module_name(p);
+    if is(p, Tok.LBracket) { module_type_arg_list(p); };
+    if is(p, Tok.Pipe) {
+        let captured = mark();
+        let start = p.pos;
+        advance(p);
+        module_name(p);
+        expect(p, Tok.Pipe);
+        node(p, Node.Captured_module_name, captured, start);
+    };
+    if is_kw(p, Kw.From) {
+        advance(p);
+        if is(p, Tok.String) {
+            string_lit(p);
+        } else {
+            // `std:Str`: a lowercase word, `:`, and a word starting with a letter, touching.
+            if not (shaped(p) and src[tok_start[ptok[p.pos]]] != 95 and is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.Word)
+                    and src[tok_start[ptok[p.pos + 2]]] != 95 and adjacent(p.pos, p.pos + 1) and adjacent(p.pos + 1, p.pos + 2)) {
+                fail();
+            };
+            let path = mark();
+            p.pos += 3;
+            finish(Node.Platform_path, path, p.pos - 3, p.pos);
+        };
+    };
+    node(p, Node.Using_decl, at, first);
+}
+
+fn export_lib_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expect_kw(p, Kw.Lib);
+    expect(p, Tok.LBrace);
+    while (is_kw(p, Kw.Fn)) { fn_or_op_decl(p); };
+    expect(p, Tok.RBrace);
+    node(p, Node.Export_lib_decl, at, first);
+}
+
+fn export_main_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expect_kw(p, Kw.Main);
+    expect(p, Tok.LParen);
+    if not is(p, Tok.RParen) { param_list(p); };
+    expect(p, Tok.RParen);
+    return_type(p);
+    block(p);
+    node(p, Node.Export_main_decl, at, first);
+}
+
+fn test_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    string_lit(p);
+    block(p);
+    node(p, Node.Test_decl, at, first);
+}
+
+fn bench_decl(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    string_lit(p);
+    expect(p, Tok.LBrace);
+    while (not is_kw(p, Kw.Measure)) {
+        expression(p);
+        expect(p, Tok.Semi);
+    };
+    let measure = mark();
+    let start = p.pos;
+    advance(p);
+    block(p);
+    node(p, Node.Measure_decl, measure, start);
+    expect(p, Tok.RBrace);
+    node(p, Node.Bench_decl, at, first);
+}
+
+// ── Types ──
+
+fn type_(p: Parser) I32 {
+    if is(p, Tok.Question) {
+        let at = mark();
+        let first = p.pos;
+        advance(p);
+        base_type(p);
+        return node(p, Node.Nullable_type, at, first);
+    };
+    base_type(p);
+}
+
+fn base_type(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if is(p, Tok.Amp) { return promoted_type(p); };
+    if is(p, Tok.LParen) {
+        advance(p);
+        type_(p);
+        expect(p, Tok.RParen);
+        return node(p, Node.Paren_type, at, first);
+    };
+    if is(p, Tok.Dot) {
+        advance(p);
+        expect(p, Tok.LBrace);
+        type_(p);
+        while (is(p, Tok.Comma)) {
+            advance(p);
+            if is(p, Tok.RBrace) { break; };
+            type_(p);
+        };
+        expect(p, Tok.RBrace);
+        return node(p, Node.Tuple_type, at, first);
+    };
+    // Where a type begins, `fun` and `cl` are always keywords.
+    if is_kw(p, Kw.Fun) or is_kw(p, Kw.Cl) {
+        let closure = is_kw(p, Kw.Cl);
+        advance(p);
+        expect(p, Tok.LParen);
+        if not is(p, Tok.RParen) { type_list(p); };
+        expect(p, Tok.RParen);
+        return_type(p);
+        return node(p, if closure { Node.Closure_type; } else { Node.Func_type; }, at, first);
+    };
+    ref_type(p);
+    node(p, Node.Ref_type, at, first);
+}
+
+// The inside of a ref_type: a type name, `M.T`, `M[A]`, or `M[A].T`.
+fn ref_type(p: Parser) I32 {
+    if not is_word(p) { fail(); };
+    let s = save(p);
+    let at = mark();
+    let first = p.pos;
+    module_name(p);
+    if is(p, Tok.LBracket) {
+        module_type_arg_list(p);
+        let instantiated = node(p, Node.Instantiated_module_ref, at, first);
+        if is(p, Tok.Dot) {
+            advance(p);
+            type_ident(p);
+            return node(p, Node.Qualified_type_ref, at, first);
+        };
+        return instantiated;
+    };
+    if is(p, Tok.Dot) {
+        node(p, Node.Module_ref, at, first);
+        advance(p);
+        type_ident(p);
+        return node(p, Node.Qualified_type_ref, at, first);
+    };
+    restore(p, s);
+    type_ident(p);
+}
+
+// ── Blocks ──
+
+fn block(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.LBrace);
+    while (not is(p, Tok.RBrace)) {
+        expression(p);
+        expect(p, Tok.Semi);
+    };
+    advance(p);
+    node(p, Node.Block, at, first);
+}
+
+fn capture(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.Pipe);
+    identifier(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        identifier(p);
+    };
+    expect(p, Tok.Pipe);
+    node(p, Node.Capture, at, first);
+}
+
+// ── Expressions ──
+
+fn expression(p: Parser) I32 { expr(p, -1000, true); }
+
+// An expression whose operators have precedence above `min`, or equal to it
+// when `or_equal` (the rule this operand belongs to is right-associative).
+fn expr(p: Parser, min: I32, or_equal: Bool) I32 {
+    let left = prefix(p);
+    while (true) {
+        let next = infix(p, left, min, or_equal);
+        if next < 0 { return left; };
+        left = next;
+    };
+    left;
+}
+
+fn binds(precedence: I32, min: I32, or_equal: Bool) Bool {
+    precedence > min or (precedence == min and or_equal);
+}
+
+// The precedence of a binary operator token (or keyword), and whether it is right-associative; -1 if none.
+fn binary_precedence(p: Parser) I32 {
+    let k = kind_at(p, 0);
+    if k == Tok.Caret.to_i32() { return 12; };
+    if k == Tok.Star.to_i32() or k == Tok.Slash.to_i32() or k == Tok.Percent.to_i32() { return 11; };
+    if k == Tok.Plus.to_i32() or k == Tok.Minus.to_i32() { return 10; };
+    if k == Tok.Shl.to_i32() or k == Tok.Shr.to_i32() or k == Tok.Shr3.to_i32() { return 9; };
+    if k == Tok.Amp.to_i32() { return 8; };
+    if k == Tok.Pipe.to_i32() { return 6; };
+    if k == Tok.EqEq.to_i32() or k == Tok.BangEq.to_i32() or k == Tok.Lt.to_i32() or k == Tok.Gt.to_i32()
+        or k == Tok.LtEq.to_i32() or k == Tok.GtEq.to_i32() { return 5; };
+    let w = word_id(p);
+    if w == Kw.And.to_i32() { return 4; };
+    if w == Kw.Xor.to_i32() { return 3; };
+    if w == Kw.Or.to_i32() { return 2; };
+    -1;
+}
+
+fn is_assignment(k: I32) Bool {
+    k == Tok.Eq.to_i32() or k == Tok.PlusEq.to_i32() or k == Tok.MinusEq.to_i32() or k == Tok.StarEq.to_i32()
+        or k == Tok.SlashEq.to_i32() or k == Tok.PercentEq.to_i32() or k == Tok.ShlEq.to_i32() or k == Tok.ShrEq.to_i32()
+        or k == Tok.Shr3Eq.to_i32() or k == Tok.AmpEq.to_i32() or k == Tok.PipeEq.to_i32() or k == Tok.CaretEq.to_i32();
+}
+
+// The form of an iterator keyword: 0 capture, 1 param-capture, 2 param,
+// 3 element-capture, 4 element, 5 element-key-capture, 6 element-param,
+// 7 none; -1 when the word is not one.
+fn iterator_form(w: I32) I32 {
+    if w >= Kw.Map.to_i32() and w <= Kw.Bisect.to_i32() { return 0; };
+    if w >= Kw.Fold.to_i32() and w <= Kw.Zip.to_i32() { return 1; };
+    if w >= Kw.Skip.to_i32() and w <= Kw.Repeat.to_i32() { return 2; };
+    if w >= Kw.Sort.to_i32() and w <= Kw.Partition.to_i32() { return 3; };
+    if w == Kw.Collect.to_i32() { return 4; };
+    if w == Kw.Group_by.to_i32() or w == Kw.Distinct_by.to_i32() { return 5; };
+    if w == Kw.Batched.to_i32() or w == Kw.Windows.to_i32() { return 6; };
+    if w >= Kw.Sum.to_i32() and w <= Kw.Count.to_i32() { return 7; };
+    -1;
+}
+
+// Extend `left` by one postfix or infix operation, or return -1.
+fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
+    let k = kind_at(p, 0);
+    let w = word_id(p);
+    // Postfix: calls, fields, indexes (precedence 14).
+    if binds(14, min, or_equal) {
+        if k == Tok.LParen.to_i32() {
+            let at = mark_below(left);
+            advance(p);
+            arg_list_or_none(p);
+            expect(p, Tok.RParen);
+            return node(p, Node.Call_expr, at, node_first[left]);
+        };
+        if k == Tok.Dot.to_i32() or k == Tok.QuestionDot.to_i32() {
+            let at = mark_below(left);
+            advance(p);
+            identifier_or_type(p);
+            return node(p, if k == Tok.Dot.to_i32() { Node.Field_expr; } else { Node.Optional_field_expr; }, at, node_first[left]);
+        };
+        if k == Tok.LBracket.to_i32() {
+            let at = mark_below(left);
+            advance(p);
+            expression(p);
+            if is(p, Tok.Comma) {
+                advance(p);
+                expression(p);
+                expect(p, Tok.RBracket);
+                return node(p, Node.Slice_expr, at, node_first[left]);
+            };
+            expect(p, Tok.RBracket);
+            return node(p, Node.Index_expr, at, node_first[left]);
+        };
+    };
+    // Compound assignment keywords are one token: `x and= y`.
+    if (w == Kw.And.to_i32() or w == Kw.Or.to_i32() or w == Kw.Xor.to_i32()) and is_at(p, 1, Tok.Eq) and adjacent(p.pos, p.pos + 1) {
+        return assignment(p, left, 2);
+    };
+    if is_assignment(k) { return assignment(p, left, 1); };
+    let precedence = binary_precedence(p);
+    if precedence >= 0 {
+        if not binds(precedence, min, or_equal) { return -1; };
+        let at = mark_below(left);
+        advance(p);
+        expr(p, precedence, precedence == 12);
+        return node(p, Node.Binary_expr, at, node_first[left]);
+    };
+    let form = iterator_form(w);
+    if form >= 0 {
+        if not binds(1, min, or_equal) { return -1; };
+        return iterator(p, left, form);
+    };
+    if w == Kw.Orelse.to_i32() {
+        if not binds(1, min, or_equal) { return -1; };
+        let at = mark_below(left);
+        advance(p);
+        expr(p, 1, false);
+        return node(p, Node.Else_expr, at, node_first[left]);
+    };
+    if k == Tok.MinusO.to_i32() {
+        if not binds(0, min, or_equal) { return -1; };
+        let at = mark_below(left);
+        advance(p);
+        pipe_target(p);
+        return node(p, Node.Pipe_expr, at, node_first[left]);
+    };
+    -1;
+}
+
+// An assignment to `left`, whatever the surrounding precedence: tree-sitter
+// shifts the operator onto an assignable target before reducing it into an
+// enclosing expression, so `a + b = c` is `a + (b = c)`.
+fn assignment(p: Parser, left: I32, operator_tokens: I32) I32 {
+    let target = node_kind[left];
+    let assignable = target == Node.Identifier.to_i32() or target == Node.Field_expr.to_i32()
+        or target == Node.Optional_field_expr.to_i32() or target == Node.Index_expr.to_i32()
+        or (target == Node.Type_member_expr.to_i32() and node_kind[node_child[left]] == Node.Type_ident.to_i32());
+    if not assignable { return -1; };
+    let at = mark_below(left);
+    p.pos += operator_tokens;
+    expr(p, 0, true);
+    node(p, Node.Assign_expr, at, node_first[left]);
+}
+
+fn arg_list_or_none(p: Parser) void {
+    if is(p, Tok.RParen) { return; };
+    let at = mark();
+    let first = p.pos;
+    expression(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        if is(p, Tok.RParen) { break; };
+        expression(p);
+    };
+    node(p, Node.Arg_list, at, first);
+}
+
+fn iterator(p: Parser, left: I32, form: I32) I32 {
+    let at = mark_below(left);
+    advance(p);
+    if form == 1 or form == 2 {
+        expect(p, Tok.LParen);
+        expression(p);
+        expect(p, Tok.RParen);
+    } else if form == 3 or form == 4 {
+        expect(p, Tok.LParen);
+        type_(p);
+        expect(p, Tok.RParen);
+    } else if form == 5 {
+        expect(p, Tok.LParen);
+        type_(p);
+        expect(p, Tok.Comma);
+        type_(p);
+        expect(p, Tok.RParen);
+    } else if form == 6 {
+        expect(p, Tok.LParen);
+        type_(p);
+        expect(p, Tok.Comma);
+        expression(p);
+        expect(p, Tok.RParen);
+    };
+    if form == 0 or form == 1 or form == 3 or form == 5 {
+        capture(p);
+        block(p);
+    };
+    node(p, Node.Iterator_expr, at, node_first[left]);
+}
+
+fn pipe_target(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if not is_word(p) { fail(); };
+    if is_at(p, 1, Tok.LBracket) {
+        let module = mark();
+        module_name(p);
+        module_type_arg_list(p);
+        node(p, Node.Instantiated_module_ref, module, first);
+    } else {
+        // Not a module: the path starts with a plain name.
+        identifier_or_type(p);
+    };
+    while (is(p, Tok.Dot)) {
+        advance(p);
+        identifier_or_type(p);
+    };
+    // Stage 0 reads the first dot of `...` or `..<` as a path's next `.`, which then has no name.
+    if is(p, Tok.DotDotDot) or is(p, Tok.DotDotLt) { fail(); };
+    if is(p, Tok.LParen) {
+        advance(p);
+        pipe_args(p);
+        expect(p, Tok.RParen);
+    };
+    node(p, Node.Pipe_target, at, first);
+}
+
+fn pipe_args(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    let args = mark();
+    let placeholder = false;
+    while (true) {
+        let arg = mark();
+        let start = p.pos;
+        if is(p, Tok.Amp) {
+            if placeholder { fail(); };
+            placeholder = true;
+            promoted_type(p);
+            node(p, Node.Pipe_arg_placeholder, arg, start);
+        } else {
+            expression(p);
+            node(p, Node.Pipe_arg, arg, start);
+        };
+        if not is(p, Tok.Comma) { break; };
+        advance(p);
+        if is(p, Tok.RParen) { break; };
+    };
+    node(p, if placeholder { Node.Pipe_args_with_placeholder; } else { Node.Pipe_args_no_placeholder; }, args, first);
+    node(p, Node.Pipe_args, at, first);
+}
+
+fn prefix(p: Parser) I32 {
+    if at_end(p) { fail(); };
+    let at = mark();
+    let first = p.pos;
+    if is_word(p) {
+        if is_expression_keyword(word_id(p)) { return keyword_expression(p); };
+        return word_expression(p);
+    };
+    if is(p, Tok.Int) or is(p, Tok.Float) {
+        number(p);
+        return node(p, Node.Literal, at, first);
+    };
+    if is(p, Tok.String) {
+        string_lit(p);
+        return node(p, Node.Literal, at, first);
+    };
+    if is(p, Tok.MultilineLine) {
+        let lines = mark();
+        while (is(p, Tok.MultilineLine)) { leaf(p, Node.Multiline_string_line); };
+        node(p, Node.Multiline_string_lit, lines, first);
+        return node(p, Node.Literal, at, first);
+    };
+    if is(p, Tok.Minus) or is(p, Tok.Tilde) {
+        advance(p);
+        node(p, Node.Unary_op, at, first);
+        expr(p, 13, true);
+        return node(p, Node.Unary_expr, at, first);
+    };
+    if is(p, Tok.LParen) { return paren_or_range(p); };
+    if is(p, Tok.LBracket) { return array_expr(p); };
+    if is(p, Tok.Dot) { return tuple_expr(p); };
+    if is(p, Tok.LBrace) {
+        block(p);
+        return node(p, Node.Block_expr, at, first);
+    };
+    if is(p, Tok.Amp) {
+        promoted_type(p);
+        field_inits(p);
+        return node(p, Node.Implicit_struct_init, at, first);
+    };
+    if is(p, Tok.At) { return dsl_expr(p); };
+    fail();
+    -1;
+}
+
+// Keywords that begin an expression; elsewhere these words are identifiers.
+fn is_expression_keyword(w: I32) Bool {
+    w == Kw.If.to_i32() or w == Kw.Match.to_i32() or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32()
+        or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32()
+        or w == Kw.Break.to_i32() or w == Kw.Continue.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Yield.to_i32()
+        or w == Kw.Return.to_i32() or w == Kw.Let.to_i32() or w == Kw.Cl.to_i32() or w == Kw.Fatal.to_i32()
+        or w == Kw.Prune.to_i32() or w == Kw.New.to_i32() or w == Kw.Await.to_i32() or w == Kw.Assert.to_i32()
+        or w == Kw.Not.to_i32() or w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32();
+}
+
+fn keyword_expression(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    let w = word_id(p);
+    if w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32() {
+        advance(p);
+        return node(p, Node.Literal, at, first);
+    };
+    if w == Kw.Not.to_i32() {
+        advance(p);
+        node(p, Node.Unary_op, at, first);
+        expr(p, 13, true);
+        return node(p, Node.Unary_expr, at, first);
+    };
+    if w == Kw.Await.to_i32() {
+        advance(p);
+        expr(p, 13, true);
+        return node(p, Node.Await_expr, at, first);
+    };
+    if w == Kw.Assert.to_i32() {
+        advance(p);
+        expr(p, -2, true);
+        return node(p, Node.Assert_expr, at, first);
+    };
+    if w == Kw.New.to_i32() {
+        advance(p);
+        let callee = prefix(p);
+        while (is(p, Tok.Dot) or is(p, Tok.QuestionDot) or is(p, Tok.LBracket)) {
+            callee = infix(p, callee, 13, false);
+            if callee < 0 { fail(); };
+        };
+        expect(p, Tok.LParen);
+        arg_list_or_none(p);
+        expect(p, Tok.RParen);
+        return node(p, Node.New_expr, at, first);
+    };
+    if w == Kw.Return.to_i32() or w == Kw.Continue.to_i32() {
+        advance(p);
+        if starts_expression(p) { expr(p, 0, true); };
+        return node(p, if w == Kw.Return.to_i32() { Node.Return_expr; } else { Node.Continue_expr; }, at, first);
+    };
+    if w == Kw.Yield.to_i32() or w == Kw.Defer.to_i32() {
+        advance(p);
+        expr(p, 0, true);
+        return node(p, if w == Kw.Yield.to_i32() { Node.Yield_expr; } else { Node.Defer_expr; }, at, first);
+    };
+    if w == Kw.Break.to_i32() { return leaf(p, Node.Break_expr); };
+    if w == Kw.Fatal.to_i32() { return leaf(p, Node.Fatal_expr); };
+    if w == Kw.Prune.to_i32() { return leaf(p, Node.Prune_expr); };
+    if w == Kw.Let.to_i32() { return bind_expr(p); };
+    if w == Kw.Cl.to_i32() { return closure_expr(p); };
+    if w == Kw.If.to_i32() { return if_expr(p); };
+    if w == Kw.Match.to_i32() {
+        advance(p);
+        return match_expr(p, Node.Match_expr, at, first);
+    };
+    if w == Kw.Loop.to_i32() {
+        advance(p);
+        expect_kw(p, Kw.Match);
+        return match_expr(p, Node.Loop_match_expr, at, first);
+    };
+    if w == Kw.Alt.to_i32() { return alt_expr(p); };
+    if w == Kw.Promote.to_i32() { return promote_expr(p); };
+    if w == Kw.Try.to_i32() { return try_expr(p); };
+    if w == Kw.For.to_i32() { return for_expr(p); };
+    if w == Kw.While.to_i32() { return while_expr(p); };
+    fail();
+    -1;
+}
+
+// Whether the token at the cursor begins `return`'s or `continue`'s optional
+// value. Words that continue an expression (`and`, `orelse`, `map`, …) and
+// `-o` instead extend the bare `return`.
+fn starts_expression(p: Parser) Bool {
+    if at_end(p) { return false; };
+    if is_word(p) {
+        let w = word_id(p);
+        return iterator_form(w) < 0 and w != Kw.And.to_i32() and w != Kw.Or.to_i32() and w != Kw.Xor.to_i32()
+            and w != Kw.Orelse.to_i32();
+    };
+    is(p, Tok.Int) or is(p, Tok.Float) or is(p, Tok.String) or is(p, Tok.MultilineLine) or is(p, Tok.Minus)
+        or is(p, Tok.Tilde) or is(p, Tok.LParen) or is(p, Tok.LBracket) or is(p, Tok.Dot) or is(p, Tok.LBrace)
+        or is(p, Tok.Amp) or is(p, Tok.At);
+}
+
+fn word_expression(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if shaped(p) {
+        // `label: { … }`
+        if is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.LBrace) {
+            identifier(p);
+            advance(p);
+            block(p);
+            return node(p, Node.Block_expr, at, first);
+        };
+        // `m.T { field: … }` builds a struct from module m.
+        let qualified = qualified_struct_init(p);
+        if qualified >= 0 { return qualified; };
+        // `m[i]` indexes; `m[A]…` names an instantiated module only when the
+        // brackets do not hold an index.
+        if index_ahead(p) { return identifier(p); };
+        if not module_args_ahead(p) { return identifier(p); };
+    };
+    // A type name begins `T.null`, `T.member`, `T { … }`, `M[A].f(…)`, or `M[A].T.member`.
+    if module_call_ahead(p) { return module_call(p); };
+    let s = save(p);
+    let type_name = not shaped(p);
+    leaf(p, if type_name { Node.Type_ident; } else { Node.Identifier; });
+    if type_name and is(p, Tok.LBrace) {
+        field_inits(p);
+        return node(p, Node.Struct_init, at, first);
+    };
+    if is(p, Tok.LBracket) {
+        restore(p, s);
+        // After `M[A]`, only `.T.member` is left (`.f(…)` was a module call).
+        module_name(p);
+        module_type_arg_list(p);
+        expect(p, Tok.Dot);
+        if shaped(p) { fail(); };
+        type_ident(p);
+        node(p, Node.Inline_module_type_path, at, first);
+        expect(p, Tok.Dot);
+        identifier_or_type(p);
+        return node(p, Node.Type_member_expr, at, first);
+    };
+    if not type_name or not is(p, Tok.Dot) { fail(); };
+    advance(p);
+    if is_kw(p, Kw.Null) {
+        advance(p);
+        return node(p, Node.Null_expr, at, first);
+    };
+    // `M.T { … }` is the member `M.T` before a block, never a struct: the
+    // member rule's precedence wins. (`M.T.member` is a field of `M.T`.)
+    identifier_or_type(p);
+    node(p, Node.Type_member_expr, at, first);
+}
+
+// `m.T { field: … }` at the cursor (m a lowercase module), or -1 without consuming.
+fn qualified_struct_init(p: Parser) I32 {
+    if not (is_at(p, 1, Tok.Dot) and is_at(p, 2, Tok.Word) and is_at(p, 3, Tok.LBrace)) { return -1; };
+    let s = save(p);
+    let made = try {
+        let at = mark();
+        let first = p.pos;
+        identifier(p);
+        node(p, Node.Module_name, at, first);
+        node(p, Node.Module_ref, at, first);
+        advance(p);
+        type_ident(p);
+        node(p, Node.Qualified_type_ref, at, first);
+        field_inits(p);
+        node(p, Node.Struct_init, at, first);
+    } catch {
+        -1;
+    };
+    if made < 0 { restore(p, s); };
+    made;
+}
+
+// Whether the cursor starts `name[index]` or `name[start, end]` with expressions inside.
+fn index_ahead(p: Parser) Bool {
+    if not is_at(p, 1, Tok.LBracket) { return false; };
+    let s = save(p);
+    let found = try {
+        advance(p);
+        advance(p);
+        expression(p);
+        if is(p, Tok.Comma) {
+            advance(p);
+            expression(p);
+        };
+        is(p, Tok.RBracket);
+    } catch {
+        false;
+    };
+    restore(p, s);
+    found;
+}
+
+// Whether the cursor starts `name[types].`, a module instantiation.
+fn module_args_ahead(p: Parser) Bool {
+    if not is_at(p, 1, Tok.LBracket) { return false; };
+    let s = save(p);
+    let found = try {
+        module_name(p);
+        module_type_arg_list(p);
+        is(p, Tok.Dot);
+    } catch {
+        false;
+    };
+    restore(p, s);
+    found;
+}
+
+// Whether the cursor starts `name[types].identifier(`.
+fn module_call_ahead(p: Parser) Bool {
+    if not is_at(p, 1, Tok.LBracket) { return false; };
+    let s = save(p);
+    let found = try {
+        module_name(p);
+        module_type_arg_list(p);
+        is(p, Tok.Dot) and shaped_at(p, 1) and is_at(p, 2, Tok.LParen);
+    } catch {
+        false;
+    };
+    restore(p, s);
+    found;
+}
+
+fn module_call(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    module_name(p);
+    module_type_arg_list(p);
+    expect(p, Tok.Dot);
+    identifier(p);
+    expect(p, Tok.LParen);
+    arg_list_or_none(p);
+    expect(p, Tok.RParen);
+    node(p, Node.Promoted_module_call_expr, at, first);
+}
+
+fn field_inits(p: Parser) void {
+    expect(p, Tok.LBrace);
+    if not is(p, Tok.RBrace) {
+        field_init(p);
+        while (is(p, Tok.Comma)) {
+            advance(p);
+            if is(p, Tok.RBrace) { break; };
+            field_init(p);
+        };
+    };
+    expect(p, Tok.RBrace);
+}
+
+fn field_init(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    identifier(p);
+    expect(p, Tok.Colon);
+    expression(p);
+    node(p, Node.Field_init, at, first);
+}
+
+fn paren_or_range(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expression(p);
+    if is(p, Tok.DotDotDot) or is(p, Tok.DotDotLt) {
+        advance(p);
+        expression(p);
+        expect(p, Tok.RParen);
+        return node(p, Node.Range_expr, at, first);
+    };
+    expect(p, Tok.RParen);
+    node(p, Node.Paren_expr, at, first);
+}
+
+fn array_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    if not is(p, Tok.RBracket) {
+        expression(p);
+        while (is(p, Tok.Comma)) {
+            advance(p);
+            if is(p, Tok.RBracket) { break; };
+            expression(p);
+        };
+    };
+    expect(p, Tok.RBracket);
+    node(p, Node.Array_expr, at, first);
+}
+
+fn tuple_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expect(p, Tok.LBrace);
+    expression(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        if is(p, Tok.RBrace) { break; };
+        expression(p);
+    };
+    expect(p, Tok.RBrace);
+    node(p, Node.Tuple_expr, at, first);
+}
+
+fn dsl_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expect(p, Tok.At);
+    identifier(p);
+    if not is(p, Tok.DslBody) { fail(); };
+    leaf(p, Node.Dsl_body);
+    node(p, Node.Dsl_expr, at, first);
+}
+
+fn bind_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    if is(p, Tok.Dot) {
+        let pattern = mark();
+        let start = p.pos;
+        advance(p);
+        expect(p, Tok.LBrace);
+        identifier(p);
+        while (is(p, Tok.Comma)) {
+            advance(p);
+            if is(p, Tok.RBrace) { break; };
+            identifier(p);
+        };
+        expect(p, Tok.RBrace);
+        node(p, Node.Tuple_pattern, pattern, start);
+    } else {
+        identifier(p);
+        if is(p, Tok.Colon) {
+            advance(p);
+            type_(p);
+        };
+    };
+    expect(p, Tok.Eq);
+    expr(p, 0, true);
+    node(p, Node.Bind_expr, at, first);
+}
+
+fn closure_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expect(p, Tok.LParen);
+    if not is(p, Tok.RParen) {
+        let params = mark();
+        let start = p.pos;
+        closure_param(p);
+        while (is(p, Tok.Comma)) {
+            advance(p);
+            if is(p, Tok.RParen) { break; };
+            closure_param(p);
+        };
+        node(p, Node.Closure_param_list, params, start);
+    };
+    expect(p, Tok.RParen);
+    if not is(p, Tok.LBrace) { return_type(p); };
+    block(p);
+    node(p, Node.Closure_expr, at, first);
+}
+
+fn closure_param(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    identifier(p);
+    if is(p, Tok.Colon) {
+        advance(p);
+        type_(p);
+    };
+    node(p, Node.Closure_param, at, first);
+}
+
+fn if_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expression(p);
+    block(p);
+    if is_kw(p, Kw.Else) {
+        advance(p);
+        if is_kw(p, Kw.If) { if_expr(p); } else { block(p); };
+    };
+    node(p, Node.If_expr, at, first);
+}
+
+fn match_expr(p: Parser, kind: Node, at: I32, first: I32) I32 {
+    expression(p);
+    expect(p, Tok.LBrace);
+    while (not is(p, Tok.RBrace) and not is(p, Tok.TildeArrow)) { match_arm(p); };
+    if is(p, Tok.TildeArrow) {
+        let default = mark();
+        let start = p.pos;
+        advance(p);
+        expression(p);
+        expect(p, Tok.Comma);
+        node(p, Node.Match_default, default, start);
+    };
+    expect(p, Tok.RBrace);
+    node(p, kind, at, first);
+}
+
+fn match_arm(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    match_lit(p);
+    expect(p, Tok.FatArrow);
+    expression(p);
+    expect(p, Tok.Comma);
+    node(p, Node.Match_arm, at, first);
+}
+
+fn match_lit(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    if is_kw(p, Kw.True) or is_kw(p, Kw.False) {
+        leaf(p, Node.Bool_lit);
+    } else if is_word(p) {
+        unreserved_type_ident(p);
+        expect(p, Tok.Dot);
+        type_ident(p);
+    } else {
+        if is(p, Tok.Minus) { advance(p); };
+        number(p);
+    };
+    node(p, Node.Match_lit, at, first);
+}
+
+fn alt_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expression(p);
+    expect(p, Tok.LBrace);
+    while (not is(p, Tok.RBrace) and not is(p, Tok.TildeArrow)) {
+        let arm = mark();
+        let start = p.pos;
+        alt_pattern(p);
+        if is(p, Tok.Pipe) {
+            advance(p);
+            identifier(p);
+            expect(p, Tok.Pipe);
+        };
+        expect(p, Tok.FatArrow);
+        expression(p);
+        expect(p, Tok.Comma);
+        node(p, Node.Alt_arm, arm, start);
+    };
+    if is(p, Tok.TildeArrow) {
+        let default = mark();
+        let start = p.pos;
+        advance(p);
+        expression(p);
+        expect(p, Tok.Comma);
+        node(p, Node.Alt_default, default, start);
+    };
+    expect(p, Tok.RBrace);
+    node(p, Node.Alt_expr, at, first);
+}
+
+fn alt_pattern(p: Parser) I32 {
+    let s = save(p);
+    let at = mark();
+    let first = p.pos;
+    module_name(p);
+    if is(p, Tok.LBracket) or is(p, Tok.Dot) {
+        if is(p, Tok.LBracket) {
+            module_type_arg_list(p);
+            node(p, Node.Instantiated_module_ref, at, first);
+        } else {
+            node(p, Node.Module_ref, at, first);
+        };
+        expect(p, Tok.Dot);
+        type_ident(p);
+        return node(p, Node.Qualified_type_ref, at, first);
+    };
+    restore(p, s);
+    // A bare variant name cannot be a keyword; a module before `.` can.
+    unreserved_type_ident(p);
+}
+
+fn promote_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expression(p);
+    expect(p, Tok.LBrace);
+    expect(p, Tok.Pipe);
+    identifier(p);
+    expect(p, Tok.Pipe);
+    expect(p, Tok.FatArrow);
+    expression(p);
+    expect(p, Tok.Comma);
+    if is(p, Tok.TildeArrow) {
+        advance(p);
+        expression(p);
+        expect(p, Tok.Comma);
+    };
+    expect(p, Tok.RBrace);
+    node(p, Node.Promote_expr, at, first);
+}
+
+fn try_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    block(p);
+    expect_kw(p, Kw.Catch);
+    if is(p, Tok.Pipe) {
+        advance(p);
+        identifier(p);
+        expect(p, Tok.Pipe);
+    };
+    block(p);
+    node(p, Node.Try_expr, at, first);
+}
+
+fn for_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expect(p, Tok.LParen);
+    let sources = mark();
+    let start = p.pos;
+    for_source(p);
+    while (is(p, Tok.Comma)) {
+        advance(p);
+        for_source(p);
+    };
+    node(p, Node.For_sources, sources, start);
+    expect(p, Tok.RParen);
+    if is(p, Tok.Pipe) { capture(p); };
+    block(p);
+    node(p, Node.For_expr, at, first);
+}
+
+fn for_source(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    expression(p);
+    if is(p, Tok.DotDotDot) or is(p, Tok.DotDotLt) {
+        advance(p);
+        expression(p);
+    };
+    node(p, Node.For_source, at, first);
+}
+
+fn while_expr(p: Parser) I32 {
+    let at = mark();
+    let first = p.pos;
+    advance(p);
+    expect(p, Tok.LParen);
+    if not is(p, Tok.RParen) { expression(p); };
+    expect(p, Tok.RParen);
+    block(p);
+    node(p, Node.While_expr, at, first);
+}
+
+// ── Running the parser ───────────────────────────────────────────────────────
+
+// Intern every keyword (behind the source, after the end byte), then every
+// word token, so a word's id is its keyword's when it is one.
+fn intern_words(n: I32) void {
+    src.resize(n + 1);
+    src.intern_reset();
+    for (0 ..< Kw.count()) |k| {
+        let name = Kw.name(Kw.from_i32(k));
+        let start = src.len();
+        for (0 ..< name.len()) |c| {
+            let b = name.get(c);
+            src.push(if c == 0 { b + 32; } else { b; });
+        };
+        src.intern(start, src.len());
+    };
+    tok_word.clear();
+    ptok.clear();
+    for (0 ..< tok_kind.len()) |t| {
+        let kind = tok_kind[t];
+        tok_word.push(if kind == Tok.Word.to_i32() { src.intern(tok_start[t], tok_end[t]); } else { -1; });
+        if kind != Tok.Comment.to_i32() { ptok.push(t); };
+    };
+    // Lookahead past the end reads the End token again.
+    for (0 ..< 4) |k| { ptok.push(tok_kind.len() - 1); };
+}
+
+// Parse the `n` bytes of `src`. Returns the number of nodes (the last is the
+// source file), or -1 when the source does not lex or does not parse.
+fn parse(n: I32) I32 {
+    let count = lex(n);
+    if tok_kind[count - 1] != Tok.End.to_i32() { return -1; };
+    intern_words(n);
+    node_kind.clear();
+    node_first.clear();
+    node_last.clear();
+    node_child.clear();
+    node_next.clear();
+    pending.clear();
+    try {
+        source_file(Parser { pos: 0 });
+        node_kind.len();
+    } catch {
+        -1;
+    };
+}
+
+export lib {
+    // Make room for `n` source bytes, which the host then writes into `src`.
+    fn source(n: I32) void {
+        src.resize(n + 1);
+        src[n] = end_byte;
+    }
+
+    fn tokens(n: I32) I32 { lex(n); }
+
+    fn nodes(n: I32) I32 { parse(n); }
+
+    // A node kind's name in tree-sitter's spelling.
+    fn node_kind_name(kind: I32) Str {
+        let name = Node.name(Node.from_i32(kind));
+        Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len());
+    }
+}
