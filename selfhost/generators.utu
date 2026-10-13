@@ -27,6 +27,7 @@ mem gen_cx_fi: I32;
 mem gen_cx_result: I32;
 mem gen_decl: I32;      // the generator's declaration
 mem gen_defers: I32;    // the defers pending when the generation began
+mem gen_rec: I32;       // for a recursive generation, its index in rec_*; else -1
 
 fn reset_generators() void {
     gen_whole.clear();
@@ -38,6 +39,15 @@ fn reset_generators() void {
     gen_cx_result.clear();
     gen_decl.clear();
     gen_defers.clear();
+    gen_rec.clear();
+    rec_kind.clear();
+    rec_val.clear();
+    rec_top.clear();
+    rec_args.clear();
+    rec_elem.clear();
+    rec_params.clear();
+    prune_flag.clear();
+    prune_loop.clear();
 }
 
 // Whether a function declaration is a generator (its result is `yield T`).
@@ -115,7 +125,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
                     report(Diag.GeneratorPassThrough, node, decl_name[gen]);
                     return error_value();
                 };
-                return unsupported(node);
+                return rec_push_call(gen_rec[i], node, call, cx);
             };
             report(Diag.GeneratorRecursion, node, decl_name[gen]);
             return error_value();
@@ -141,6 +151,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         c = next_sibling(c);
     };
     let elem = type_of(first_child(ret), inst);
+    if delegates_to_itself(gen) { return check_recursive_loop(node, call, gen, cap, elem, inst, cx); };
     // Set aside its declarations' locals, in case an outer expansion of it is running.
     let decls = generator_decls(gen);
     let saved_local = Array[I32].new(vl_len[decls], 0);
@@ -181,6 +192,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     gen_cx_result.push(cx.result);
     gen_decl.push(gen);
     gen_defers.push(defer_node.len());
+    gen_rec.push(-1);
     let mb = w_mark();
     mark_boxes(fn_body(gen));
     // The generator's own loops are its; the consumer's loops are not in reach.
@@ -197,6 +209,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     gen_cx_result.resize(k);
     gen_decl.resize(k);
     gen_defers.resize(k);
+    gen_rec.resize(k);
     for (0 ..< vl_len[decls]) |i| {
         decl_local[vl_item(decls, i)] = saved_local[i];
         decl_ty[vl_item(decls, i)] = saved_ty[i];
@@ -237,6 +250,7 @@ fn check_yield(node: I32, cx: Cx) I32 {
         return error_value();
     };
     let t = gen_type[k];
+    if gen_rec[k] >= 0 { return rec_push_value(gen_rec[k], first_child(node), cx); };
     let m = w_mark();
     let value = first_child(node);
     let mv = w_mark();
@@ -277,4 +291,449 @@ fn generator_return(node: I32) I32 {
     };
     w_leaf(Op.Br, vt_unreachable, gen_whole[k], 0);
     ty_never();
+}
+
+// ── Recursive generators ──
+//
+// A generator that delegates to itself (`for (walk(c)) |d| { yield d; }`)
+// would expand without end, so it runs on an explicit stack instead, as in
+// stage 0. Its body and the consumer's each appear once:
+//
+//   items   one per yield (a value) or delegation (a call's arguments), in
+//           arrays: kind (0 value, 1 call), val, and one per parameter
+//   frames  one per running call: [cur, end) over its items; the suspended
+//           ones in fcur and fend
+//
+//   loop {
+//     the running frame's next item (or, at its end, the suspended one)
+//     a value → the consumer's body; `prune` skips the calls that follow
+//     a call  → the generator's body once, with its arguments; its yields
+//               and delegations push items, which become a new frame
+//   }
+//
+// A call's body runs to completion before its values are consumed; values
+// still arrive in depth-first order.
+
+// The recursive generations being checked: their item arrays' locals.
+mem rec_kind: I32;
+mem rec_val: I32;
+mem rec_top: I32;
+mem rec_args: I32;    // a list of the parameters' array locals
+mem rec_elem: I32;    // the yielded type
+mem rec_params: I32;  // a list of the parameters' types
+mem prune_flag: I32;  // the innermost recursive consumer's `pruned` local
+mem prune_loop: I32;  // and its loop
+
+fn rec_array_heap(vt: I32) I32 { array_type(storage(vt), true); }
+
+// A new array of 16 elements of vt's storage, in a new local.
+fn rec_new_array(vt: I32) I32 {
+    let heap = rec_array_heap(vt);
+    let local = new_local(vt_ref(heap, false));
+    let m = w_mark();
+    w_i32(16);
+    w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, m);
+    ls(local, m);
+    local;
+}
+
+// array[index] = the value just pushed (at m); index is a local.
+fn rec_set(array: I32, index: I32, m: I32) void {
+    let v = w_pop();
+    lg(array);
+    lg(index);
+    w_push(v);
+    w_node(Op.ArraySet, vt_none, vt_heap(cur_locals[array]), 0, m);
+}
+
+// array[index], read as vt (a reference stored nullable is read non-null).
+fn rec_get(array: I32, index: I32, vt: I32) void {
+    let heap = vt_heap(cur_locals[array]);
+    let m = w_mark();
+    lg(array);
+    lg(index);
+    w_node(Op.ArrayGet, storage(vt), heap, 0, m);
+    if storage(vt) != vt { w_node(Op.RefAsNonNull, vt, 0, 0, m); };
+}
+
+// When `top` reaches an array's length, each of `arrays` (locals) doubles.
+fn rec_grow(top: I32, arrays: Array[I32], n: I32) void {
+    let mi = w_mark();
+    let mc = w_mark();
+    lg(top);
+    let ml = w_mark();
+    lg(arrays[0]);
+    w_node(Op.ArrayLen, vt_i32, 0, 0, ml);
+    plain(70, vt_i32, mc);
+    let mt = w_mark();
+    for (0 ..< n) |k| {
+        let heap = vt_heap(cur_locals[arrays[k]]);
+        let grown = new_local(cur_locals[arrays[k]]);
+        let mg = w_mark();
+        lg(top);
+        w_i32(2);
+        plain(108, vt_i32, mg);
+        w_node(Op.ArrayNewDefault, cur_locals[arrays[k]], heap, 0, mg);
+        ls(grown, mg);
+        let mcp = w_mark();
+        lg(grown);
+        w_i32(0);
+        lg(arrays[k]);
+        w_i32(0);
+        lg(top);
+        w_node(Op.ArrayCopy, vt_none, heap, heap, mcp);
+        let ms = w_mark();
+        lg(grown);
+        ls(arrays[k], ms);
+    };
+    seq_void(mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+}
+
+// The item arrays of recursive generation r.
+fn rec_item_arrays(r: I32) Array[I32] {
+    let n = vl_len[rec_args[r]];
+    let arrays = Array[I32].new(n + 2, 0);
+    arrays[0] = rec_kind[r];
+    arrays[1] = rec_val[r];
+    for (0 ..< n) |i| { arrays[i + 2] = vl_item(rec_args[r], i); };
+    arrays;
+}
+
+// kind[top] = kind_; top += 1 (after the item's own sets).
+fn rec_finish_item(r: I32, kind_: I32) void {
+    let m = w_mark();
+    w_i32(kind_);
+    rec_set(rec_kind[r], rec_top[r], m);
+    incr(rec_top[r]);
+}
+
+// `yield v` in a recursive generation: a value item.
+fn rec_push_value(r: I32, value: I32, cx: Cx) I32 {
+    let t = rec_elem[r];
+    let m = w_mark();
+    let v = new_local(repr(t));
+    let mv = w_mark();
+    coerce(check_expr(value, t, cx), t, value);
+    ls(v, mv);
+    rec_grow(rec_top[r], rec_item_arrays(r), vl_len[rec_args[r]] + 2);
+    let ms = w_mark();
+    lg(v);
+    rec_set(rec_val[r], rec_top[r], ms);
+    rec_finish_item(r, 0);
+    seq_void(m);
+    ty_void();
+}
+
+// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
+fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
+    let params = rec_params[r];
+    let args = next_sibling(first_child(call));
+    if child_count(args) != vl_len[params] {
+        report2(Diag.GeneratorArity, node, word_of(first_child(call)), vl_len[params], child_count(args));
+        return error_value();
+    };
+    let m = w_mark();
+    let values = Array[I32].new(vl_len[params] + 1, 0);
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    for (0 ..< vl_len[params]) |i| {
+        let pt = vl_item(params, i);
+        values[i] = new_local(repr(pt));
+        let ma = w_mark();
+        coerce(check_expr(a, pt, cx), pt, a);
+        ls(values[i], ma);
+        a = next_sibling(a);
+    };
+    rec_grow(rec_top[r], rec_item_arrays(r), vl_len[params] + 2);
+    for (0 ..< vl_len[params]) |i| {
+        let ms = w_mark();
+        lg(values[i]);
+        rec_set(vl_item(rec_args[r], i), rec_top[r], ms);
+    };
+    rec_finish_item(r, 1);
+    seq_void(m);
+    ty_void();
+}
+
+// `for (walk(root)) |x| { body }`, walk recursive.
+fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, inst: I32, cx: Cx) I32 {
+    let params = param_list_of(gen);
+    let args = next_sibling(first_child(call));
+    if child_count(args) != child_count(params) {
+        report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args));
+        return error_value();
+    };
+    let np = child_count(params);
+    let decls = generator_decls(gen);
+    let saved_local = Array[I32].new(vl_len[decls], 0);
+    let saved_ty = Array[I32].new(vl_len[decls], 0);
+    for (0 ..< vl_len[decls]) |i| {
+        saved_local[i] = decl_local[vl_item(decls, i)];
+        saved_ty[i] = decl_ty[vl_item(decls, i)];
+    };
+    let m = w_mark();
+    // The parameters' types, and the roots: the call's arguments.
+    let mt = vl_begin();
+    let p = if params >= 0 { first_child(params); } else { -1; };
+    while (p >= 0) {
+        vl_add(type_of(next_sibling(first_child(p)), inst));
+        p = next_sibling(p);
+    };
+    let ptypes = vl_end(mt);
+    let roots = Array[I32].new(np + 1, 0);
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    for (0 ..< np) |i| {
+        let pt = vl_item(ptypes, i);
+        roots[i] = new_local(repr(pt));
+        let ma = w_mark();
+        coerce(check_expr(a, pt, cx), pt, a);
+        ls(roots[i], ma);
+        a = next_sibling(a);
+    };
+    // The items, starting with the root call; the frames.
+    let kind = rec_new_array(vt_i32);
+    let val = rec_new_array(repr(elem));
+    let ma = vl_begin();
+    for (0 ..< np) |i| { vl_add(rec_new_array(repr(vl_item(ptypes, i)))); };
+    let arg_arrays = vl_end(ma);
+    let top = new_local(vt_i32);
+    let cur = new_local(vt_i32);
+    let end_ = new_local(vt_i32);
+    let fsp = new_local(vt_i32);
+    let fcur = rec_new_array(vt_i32);
+    let fend = rec_new_array(vt_i32);
+    let mk = w_mark();
+    w_i32(1);
+    rec_set(kind, top, mk);
+    for (0 ..< np) |i| {
+        let mr = w_mark();
+        lg(roots[i]);
+        rec_set(vl_item(arg_arrays, i), top, mr);
+    };
+    let m1 = w_mark();
+    w_i32(1);
+    ls(top, m1);
+    let m2 = w_mark();
+    w_i32(1);
+    ls(end_, m2);
+    // The generation.
+    let whole = new_label();
+    let again = new_label();
+    let mw = w_mark();
+    let ml = w_mark();
+    let mi = w_mark();
+    // cur == end: the running frame is done.
+    let mc = w_mark();
+    lg(cur);
+    lg(end_);
+    plain(70, vt_i32, mc);
+    let mthen = w_mark();
+    let mz = w_mark();
+    let mzc = w_mark();
+    lg(fsp);
+    plain(69, vt_i32, mzc);
+    let mzt = w_mark();
+    w_leaf(Op.Br, vt_unreachable, whole, 0);
+    seq_void(mzt);
+    w_node(Op.If, vt_none, new_label(), 0, mz);
+    let md = w_mark();
+    lg(fsp);
+    w_i32(1);
+    plain(107, vt_i32, md);
+    ls(fsp, md);
+    rec_get(fcur, fsp, vt_i32);
+    ls(cur, w_mark() - 1);
+    rec_get(fend, fsp, vt_i32);
+    ls(end_, w_mark() - 1);
+    let mtop = w_mark();
+    lg(end_);
+    ls(top, mtop);
+    seq_void(mthen);
+    // Else: the next item.
+    let melse = w_mark();
+    let i = new_local(vt_i32);
+    let k = new_local(vt_i32);
+    let mi1 = w_mark();
+    lg(cur);
+    ls(i, mi1);
+    incr(cur);
+    rec_get(kind, i, vt_i32);
+    ls(k, w_mark() - 1);
+    // A value: the consumer's body.
+    let mv = w_mark();
+    let mvc = w_mark();
+    lg(k);
+    plain(69, vt_i32, mvc);
+    let mvt = w_mark();
+    let pruned = new_local(vt_i32);
+    let mp = w_mark();
+    w_i32(0);
+    ls(pruned, mp);
+    let mcap = w_mark();
+    rec_get(val, i, repr(elem));
+    if cap >= 0 {
+        decl_ty[cap] = elem;
+        bind_value(cap, elem, mcap);
+    } else {
+        drop_value(elem);
+    };
+    let resume = new_label();
+    let mr = w_mark();
+    enter_loop(whole, resume, -1, -1);
+    prune_flag.push(pruned);
+    prune_loop.push(node);
+    discard(check_block(last_child(node), ty_void(), cx));
+    prune_flag.resize(prune_flag.len() - 1);
+    prune_loop.resize(prune_loop.len() - 1);
+    leave_loop();
+    w_node(Op.Block, vt_none, resume, 0, mr);
+    // Pruned: skip the calls that follow.
+    let mpr = w_mark();
+    lg(pruned);
+    let mskip = w_mark();
+    let skip_loop = new_label();
+    let skip_out = new_label();
+    let mso = w_mark();
+    let msl = w_mark();
+    // while cur < end and kind[cur] == 1: cur += 1
+    let mex = w_mark();
+    lg(cur);
+    lg(end_);
+    plain(72, vt_i32, mex);
+    plain(69, vt_i32, mex);
+    w_node(Op.BrIf, vt_none, skip_out, 0, mex);
+    let mek = w_mark();
+    rec_get(kind, cur, vt_i32);
+    w_i32(1);
+    plain(71, vt_i32, mek);
+    w_node(Op.BrIf, vt_none, skip_out, 0, mek);
+    incr(cur);
+    w_leaf(Op.Br, vt_unreachable, skip_loop, 0);
+    w_node(Op.Loop, vt_none, skip_loop, 0, msl);
+    w_node(Op.Block, vt_none, skip_out, 0, mso);
+    seq_void(mskip);
+    w_node(Op.If, vt_none, new_label(), 0, mpr);
+    seq_void(mvt);
+    w_node(Op.If, vt_none, new_label(), 0, mv);
+    // A call: the generator's body, with its arguments.
+    let mcall = w_mark();
+    let mcc = w_mark();
+    lg(k);
+    w_i32(1);
+    plain(70, vt_i32, mcc);
+    let mct = w_mark();
+    mark_boxes(fn_body(gen));
+    let pnode = if params >= 0 { first_child(params); } else { -1; };
+    for (0 ..< np) |j| {
+        let d = node_decl[first_child(pnode)];
+        let pt = vl_item(ptypes, j);
+        let mg = w_mark();
+        rec_get(vl_item(arg_arrays, j), i, repr(pt));
+        decl_ty[d] = pt;
+        bind_value(d, pt, mg);
+        pnode = next_sibling(pnode);
+    };
+    let start = new_local(vt_i32);
+    let mst = w_mark();
+    lg(top);
+    ls(start, mst);
+    let frame = new_label();
+    let r = rec_kind.len();
+    rec_kind.push(kind);
+    rec_val.push(val);
+    rec_top.push(top);
+    rec_args.push(arg_arrays);
+    rec_elem.push(elem);
+    rec_params.push(ptypes);
+    gen_whole.push(frame);
+    gen_capture.push(-1);
+    gen_body.push(-1);
+    gen_type.push(elem);
+    gen_cx_inst.push(cx.inst);
+    gen_cx_fi.push(cx.fi);
+    gen_cx_result.push(cx.result);
+    gen_decl.push(gen);
+    gen_defers.push(defer_node.len());
+    gen_rec.push(r);
+    let mb = w_mark();
+    let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
+    discard(check_block(fn_body(gen), ty_void(), gcx));
+    w_node(Op.Block, vt_none, frame, 0, mb);
+    let g = gen_whole.len() - 1;
+    gen_whole.resize(g);
+    gen_capture.resize(g);
+    gen_body.resize(g);
+    gen_type.resize(g);
+    gen_cx_inst.resize(g);
+    gen_cx_fi.resize(g);
+    gen_cx_result.resize(g);
+    gen_decl.resize(g);
+    gen_defers.resize(g);
+    gen_rec.resize(g);
+    rec_kind.resize(r);
+    rec_val.resize(r);
+    rec_top.resize(r);
+    rec_args.resize(r);
+    rec_elem.resize(r);
+    rec_params.resize(r);
+    // Its items, if any, are the running frame; the one it ran in waits.
+    let mf = w_mark();
+    let mfc = w_mark();
+    lg(top);
+    lg(start);
+    plain(74, vt_i32, mfc);
+    let mft = w_mark();
+    let frames = Array[I32].new(2, 0);
+    frames[0] = fcur;
+    frames[1] = fend;
+    rec_grow(fsp, frames, 2);
+    let ms1 = w_mark();
+    lg(cur);
+    rec_set(fcur, fsp, ms1);
+    let ms2 = w_mark();
+    lg(end_);
+    rec_set(fend, fsp, ms2);
+    incr(fsp);
+    let ms3 = w_mark();
+    lg(start);
+    ls(cur, ms3);
+    let ms4 = w_mark();
+    lg(top);
+    ls(end_, ms4);
+    seq_void(mft);
+    w_node(Op.If, vt_none, new_label(), 0, mf);
+    seq_void(mct);
+    w_node(Op.If, vt_none, new_label(), 0, mcall);
+    seq_void(melse);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    w_leaf(Op.Br, vt_unreachable, again, 0);
+    w_node(Op.Loop, vt_none, again, 0, ml);
+    w_node(Op.Block, vt_none, whole, 0, mw);
+    for (0 ..< vl_len[decls]) |j| {
+        decl_local[vl_item(decls, j)] = saved_local[j];
+        decl_ty[vl_item(decls, j)] = saved_ty[j];
+    };
+    seq_void(m);
+    ty_void();
+}
+
+// `prune;` in the body of a recursive generator's consumer.
+fn check_prune(node: I32) I32 {
+    if prune_flag.len() == 0 {
+        report(Diag.PruneOutside, node, -1);
+        return error_value();
+    };
+    // A closure in the consumer is a function of its own.
+    let p = parent_of(node);
+    while (p >= 0 and p != prune_loop[prune_loop.len() - 1]) {
+        if is_kind(p, Node.Closure_expr) {
+            report(Diag.PruneInClosure, node, -1);
+            return error_value();
+        };
+        p = parent_of(p);
+    };
+    let m = w_mark();
+    w_i32(1);
+    ls(prune_flag[prune_flag.len() - 1], m);
+    ty_void();
 }

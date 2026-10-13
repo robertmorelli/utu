@@ -183,7 +183,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.NonExhaustive { return "non-exhaustive-match"; };
     if k == Diag.InvalidForSource or k == Diag.GeneratorRecursion or k == Diag.YieldOutside or k == Diag.GeneratorReturnValue
         or k == Diag.GeneratorCall or k == Diag.YieldInClosure or k == Diag.AwaitForSource or k == Diag.GeneratorPassThrough
-        or k == Diag.GeneratorArity { return "invalid-for-source"; };
+        or k == Diag.GeneratorArity or k == Diag.PruneOutside or k == Diag.PruneInClosure { return "invalid-for-source"; };
     if k == Diag.IteratorUnfinished or k == Diag.IteratorCaptures or k == Diag.IteratorTerminalInside or k == Diag.IteratorSource { return "invalid-iterator-usage"; };
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
     if k == Diag.InvalidDslUsage { return "invalid-dsl-usage"; };
@@ -315,6 +315,8 @@ fn diag_text(i: I32) Str {
         if a == 1 { return "a generator loop binds one value: for (gen()) |value| { … }"; };
         return "for can only iterate an array, got " + type_text(b) + "; count with a range like 0..<n";
     };
+    if k == Diag.PruneInClosure { return "prune cannot appear inside a closure"; };
+    if k == Diag.PruneOutside { return "prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself"; };
     if k == Diag.GeneratorPassThrough { return "a recursive generator passes its own values straight through: `for (" + w + "(…)) |v| { yield v; }`"; };
     if k == Diag.GeneratorArity { return w + " expects " + int_text(a) + " argument(s), got " + int_text(b); };
     if k == Diag.GeneratorRecursion { return "generator " + w + " consumes itself; generators expand inline, so they cannot recurse"; };
