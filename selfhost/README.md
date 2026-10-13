@@ -27,6 +27,13 @@ in order, and compiles the result as one file. Errors name the file and
 line they came from. `node scripts/selfhost.mjs --out=utu.wasm` writes the
 module.
 
+`bun run build` ships it: stage 0 builds this compiler, which builds
+itself, and that build (checked to build itself to the same bytes) is
+`dist/utu.wasm`, with `utu.host.json` (what it needs from its host) and
+`utu.sources` (the hash of these files, so a stale build is refused).
+`src/selfhost/` drives it from JavaScript; `cli/utu.mjs` is its command
+line.
+
 ## Lexer
 
 A state machine, built during compilation into a const mem: lexing is one
