@@ -127,6 +127,15 @@ enum(U8) Diag:
     | MemKind
     | NonDefaultable
     | InvalidModuleArity
+    | NotCallable
+    | AltNotEnum
+    | UnknownVariant
+    | NonExhaustive
+    | MatchType
+    | MatchPattern
+    | DuplicatePattern
+    | NotNullable
+    | InvalidForSource
 
 mem diag_kind: U8;
 mem diag_node: I32;

@@ -1,7 +1,9 @@
 // What programs the self-hosted compiler builds do when run, against what
 // stage 0's builds did (baselines/run-differential.json).
 //
-//   node scripts/selfhost-run-differential.mjs [--only=substring] [--show=N] [--jobs=N]
+//   node scripts/selfhost-run-differential.mjs [--only=substring] [--show=N] [--jobs=N] [--why=node_kind]
+//
+// --why=call_expr lists the source of the call_exprs it cannot build yet.
 //
 // Every program under examples/, benchmarks/, and baselines/corpus, for its
 // `normal` and `test` targets, as scripts/run-differential.mjs runs them:
@@ -49,7 +51,7 @@ async function main() {
   await Promise.all(Array.from({ length: jobs }, async () => {
     let thread = null;
     for (let job = queue.shift(); job; job = queue.shift()) {
-      thread ??= new Worker(fileURLToPath(import.meta.url), { workerData: { ROOT } });
+      thread ??= new Worker(fileURLToPath(import.meta.url), { workerData: { ROOT, why: flag('why') } });
       const key = `${path.relative(ROOT, job.file)} ${job.target}`;
       const outcome = await new Promise(resolve => {
         let timer = null;
@@ -76,11 +78,13 @@ async function main() {
   const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0 };
   const differ = [];
   const reasons = new Map();
+  const whys = [];
   for (const key of keys) {
     const result = results[key];
     if (INTENDED[key]) { count.intended++; continue; }
     if (result?.unsupported) {
       count.unsupported++;
+      for (const snippet of result.snippets ?? []) whys.push(snippet);
       for (const reason of result.unsupported) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
       continue;
     }
@@ -96,6 +100,7 @@ async function main() {
     differ.push(`DIFFERS ${key}\n  was ${JSON.stringify(recorded[key]).slice(0, 300)}\n  now ${JSON.stringify(result).slice(0, 300)}`);
   }
   for (const line of differ.slice(0, show)) console.log(line);
+  if (whys.length) console.log(`${flag('why')}, unsupported:\n${[...new Set(whys)].slice(0, Number(flag('show') ?? 30)).map(w => `  ${w}`).join('\n')}`);
   const top = [...reasons].sort((a, b) => b[1] - a[1]).slice(0, Number(flag('reasons') ?? 15));
   if (top.length) console.log(`unsupported, by what (programs):\n${top.map(([reason, n]) => `  ${n} ${reason}`).join('\n')}`);
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
@@ -106,8 +111,7 @@ async function main() {
 
 async function worker() {
   process.on('unhandledRejection', () => {});
-  const { loadProgram, loadSelfhost } = await import('./selfhost.mjs');
-  const { instantiateLowered } = await import('../src/index.js');
+  const { loadProgram, loadSelfhost, instantiateBuilt } = await import('./selfhost.mjs');
   const utu = await loadSelfhost();
   parentPort.on('message', async ({ file, target }) => {
     const result = await run(file, target).catch(error => ({ crash: summarizeError(error) }));
@@ -120,14 +124,24 @@ async function worker() {
     if (size < 0) {
       const diagnostics = [];
       const unsupported = new Set();
+      const snippets = [];
       for (let i = 0; i < utu.diagnostic_count(); i++) {
         const kind = utu.diagnostic_kind(i);
         const node = utu.diagnostic_node(i);
         const what = node < 0 ? 'file' : utu.node_kind_name(new Uint8Array(utu.node_kind.buffer)[node]);
-        if (kind === 'Unsupported') unsupported.add(what);
+        if (kind === 'Unsupported') {
+          unsupported.add(what);
+          if (what === workerData.why) {
+            const first = new Int32Array(utu.node_first.buffer)[node];
+            const last = new Int32Array(utu.node_last.buffer)[node];
+            const start = new Int32Array(utu.tok_start.buffer)[first];
+            const end = new Int32Array(utu.tok_end.buffer)[last - 1];
+            snippets.push(new TextDecoder().decode(new Uint8Array(utu.src.buffer, start, Math.min(end - start, 120))).replace(/\s+/g, ' '));
+          }
+        }
         diagnostics.push(`${kind} ${what}`);
       }
-      return unsupported.size ? { unsupported: [...unsupported] } : { diagnostics };
+      return unsupported.size ? { unsupported: [...unsupported], snippets } : { diagnostics };
     }
     const wasm = new Uint8Array(utu.out.buffer, 0, size).slice();
     if (!WebAssembly.validate(wasm)) {
@@ -135,7 +149,7 @@ async function worker() {
     }
     let instance;
     try {
-      ({ instance } = await instantiateLowered(wasm, {}));
+      ({ instance } = await instantiateBuilt(wasm));
     } catch (error) {
       return { instantiate: summarizeError(error) };
     }

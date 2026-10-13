@@ -1,0 +1,280 @@
+// ── Enums ────────────────────────────────────────────────────────────────────
+//
+// Integer enums (`enum(U8) Tag: | Leaf | Eof = 255`) and distinct types
+// (`type Id = distinct I32;`) are scalars: a value is its integer (or its
+// base's value). Their operations are the language's own: comparisons,
+// `t.to_i32()` and `Tag.from_i32(i)` (or `to_<base>`, `from_<base>`), and for
+// an integer enum `Tag.count()`, `Tag.name(t)`, and `Tag.Leaf`.
+//
+// An enum with data (`enum Shape: | Circle { r: F64 } | Square { s: F64 }`)
+// is a struct type its variants extend: each variant is a struct of its
+// fields, and `alt` tests which one a value is.
+
+// ── Scalar enums and distinct types ──
+
+fn is_scalar_kind(decl: I32) Bool { decl_is(decl, Decl.IntEnum) or decl_is(decl, Decl.Distinct); }
+
+// The base of a distinct type (I32, F64, …).
+fn distinct_base(decl: I32) I32 { decl_type(node_decl[last_child(decl_node[decl])], 0); }
+
+// The type a scalar kind converts to and from: I32 for an integer enum.
+fn scalar_base(decl: I32) I32 { if decl_is(decl, Decl.IntEnum) { prelude(Prelude.I32); } else { distinct_base(decl); }; }
+
+// Whether its comparisons are unsigned (U32 and U64 bases, U32 enums).
+fn scalar_unsigned(decl: I32) Bool {
+    let base = if decl_is(decl, Decl.IntEnum) { -1; } else { distinct_base(decl); };
+    if base == prelude(Prelude.U32) or base == prelude(Prelude.U64) { return true; };
+    decl_is(decl, Decl.IntEnum) and word_of(after_qualifier(decl_node[decl])) == known_word(Known.WordU32);
+}
+
+// A comparison of two values of a scalar kind (on the stack since `m`).
+fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
+    let base = repr(scalar_base(decl));
+    let unsigned = scalar_unsigned(decl);
+    let op = -1;
+    if base == vt_i32 or base == vt_i64 {
+        let b = if base == vt_i32 { 70; } else { 81; };
+        if word == known_word(Known.Eq) { op = b; }
+        else if word == known_word(Known.Ne) { op = b + 1; }
+        else if word == known_word(Known.Lt) { op = b + if unsigned { 3; } else { 2; }; }
+        else if word == known_word(Known.Gt) { op = b + if unsigned { 5; } else { 4; }; }
+        else if word == known_word(Known.Le) { op = b + if unsigned { 7; } else { 6; }; }
+        else if word == known_word(Known.Ge) { op = b + if unsigned { 9; } else { 8; }; };
+    } else {
+        let b = if base == vt_f32 { 91; } else { 97; };
+        if word == known_word(Known.Eq) { op = b; }
+        else if word == known_word(Known.Ne) { op = b + 1; }
+        else if word == known_word(Known.Lt) { op = b + 2; }
+        else if word == known_word(Known.Gt) { op = b + 3; }
+        else if word == known_word(Known.Le) { op = b + 4; }
+        else if word == known_word(Known.Ge) { op = b + 5; };
+    };
+    if op < 0 { return false; };
+    w_node(Op.Plain, vt_i32, op, 0, m);
+    true;
+}
+
+// `x.to_i32()` of a scalar kind (x on the stack since `m`): the same value,
+// now of its base type. Returns -1 when `word` is no such method.
+fn scalar_method(decl: I32, word: I32, m: I32) I32 {
+    let base = scalar_base(decl);
+    if word != conversion_word(true, base) { return -1; };
+    base;
+}
+
+// `to_i32` (or `from_i32`) for a base type.
+fn conversion_word(to: Bool, base: I32) I32 {
+    let name = Prelude.name(Prelude.from_i32(prelude_index(base)));
+    intern_text(if to { "to_"; } else { "from_"; } + Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()));
+}
+
+fn prelude_index(t: I32) I32 {
+    for (0 ..< Prelude.count()) |p| { if prelude_ty[p] == t { return p; }; };
+    0;
+}
+
+// `Tag.from_i32(i)`, `Tag.count()`, `Tag.name(t)`: static operations of a
+// scalar kind. -1 when `word` is none of them.
+fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
+    let t = named(decl, 0);
+    let base = scalar_base(decl);
+    let m = w_mark();
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    if word == conversion_word(false, base) {
+        if a < 0 or next_sibling(a) >= 0 {
+            report(Diag.WrongArity, at, word);
+            return error_value();
+        };
+        coerce(check_expr(a, base, cx), base, a);
+        return t;
+    };
+    if not decl_is(decl, Decl.IntEnum) { return -1; };
+    if word == known_word(Known.Count) {
+        w_i32(variant_count(decl));
+        return prelude(Prelude.I32);
+    };
+    if word == known_word(Known.Name) {
+        if a < 0 or next_sibling(a) >= 0 {
+            report(Diag.WrongArity, at, word);
+            return error_value();
+        };
+        coerce(check_expr(a, t, cx), t, a);
+        w_node(Op.Call, vt_extern, enum_name_helper(decl), 0, m);
+        return prelude(Prelude.Str);
+    };
+    -1;
+}
+
+fn variant_count(decl: I32) I32 {
+    let n = 0;
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) { n += 1; };
+        c = next_sibling(c);
+    };
+    n;
+}
+
+// `Tag.Leaf`: its value.
+fn enum_variant_value(variant: I32) I32 {
+    w_i32(variant_value[variant]);
+    named(decl_owner[variant], 0);
+}
+
+mem name_helper_enum: I32;   // pairs: enum declaration, function
+
+// (value) → its variant's name, or "?": one comparison per variant.
+fn enum_name_helper(decl: I32) I32 {
+    let i = 0;
+    while (i < name_helper_enum.len()) {
+        if name_helper_enum[i] == decl { return name_helper_enum[i + 1]; };
+        i += 2;
+    };
+    let f = helper(vl_one(vt_i32), vl_one(vt_extern), vl_empty(), "enum.name");
+    name_helper_enum.push(decl);
+    name_helper_enum.push(f);
+    let m = w_mark();
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) {
+            let v = node_decl[first_child(c)];
+            let mi = w_mark();
+            let mc = w_mark();
+            w_leaf(Op.LocalGet, vt_i32, 0, 0);
+            w_i32(variant_value[v]);
+            w_node(Op.Plain, vt_i32, 70, 0, mc);
+            let mt = w_mark();
+            let mr = w_mark();
+            text_constant(decl_name[v]);
+            w_node(Op.Return, vt_unreachable, 0, 0, mr);
+            w_node(Op.Seq, vt_none, 0, 0, mt);
+            w_node(Op.If, vt_none, 1, 0, mi);
+        };
+        c = next_sibling(c);
+    };
+    text_constant(intern_text("?"));
+    w_node(Op.Seq, vt_extern, 0, 0, m);
+    func_body[f] = w_pop();
+    f;
+}
+
+// A string constant whose text is word `word`.
+fn text_constant(word: I32) void { w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0); }
+
+// ── Enums with data ──
+
+// Whether `actual` is a variant of the enum type `expected` (it converts to it).
+fn is_variant_of(actual: I32, expected: I32) Bool {
+    let v = ty_decl(actual);
+    let e = ty_decl(expected);
+    decl_is(v, Decl.Variant) and decl_owner[v] == e and ty_inst(actual) == ty_inst(expected);
+}
+
+// `alt e { V |x| => …, ~> … }`: e once, then each arm tests its variant.
+//   s = e
+//   if ref.test $V s { x = ref.cast $V s; arm } else if … else { default }
+fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
+    let scrutinee = first_child(node);
+    let m = w_mark();
+    let st = check_expr(scrutinee, -1, cx);
+    let enum_decl = ty_decl(st);
+    if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
+    if not decl_is(enum_decl, Decl.Enum) {
+        report(Diag.AltNotEnum, scrutinee, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let s = new_local(repr(st));
+    w_node(Op.LocalSet, vt_none, s, 0, m);
+    // The arms, and the default.
+    let arms = next_sibling(scrutinee);
+    let default_ = -1;
+    let n = 0;
+    let c = arms;
+    while (c >= 0) {
+        if is_kind(c, Node.Alt_default) { default_ = c; } else { n += 1; };
+        c = next_sibling(c);
+    };
+    if default_ < 0 { check_alt_exhaustive(node, enum_decl); };
+    let t = alt_arms(arms, s, st, expect, default_, cx);
+    w_node(Op.Seq, repr(t), 0, 0, m);
+    t;
+}
+
+// The arms from `arm` on, as a chain of ifs; returns the result type.
+fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
+    let a = arm;
+    while (a >= 0 and not is_kind(a, Node.Alt_arm)) { a = next_sibling(a); };
+    if a < 0 {
+        if default_ >= 0 { return check_expr(first_child(default_), expect, cx); };
+        // No default: every variant has an arm, so this is not reached.
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return ty_never();
+    };
+    let pattern = first_child(a);
+    let variant = alt_variant(pattern, ty_decl(st));
+    let m = w_mark();
+    if variant < 0 {
+        report(Diag.UnknownVariant, pattern, word_of(pattern));
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return ty_error();
+    };
+    let vt_ = named(variant, ty_inst(st));
+    let vrepr = repr(vt_);
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, repr(st), s, 0);
+    w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc);
+    // The arm: bind, then its expression.
+    let mt = w_mark();
+    let c = next_sibling(pattern);
+    if is_kind(c, Node.Identifier) {
+        let d = node_decl[c];
+        let local = new_local(vrepr);
+        decl_local[d] = local;
+        decl_ty[d] = vt_;
+        let mb = w_mark();
+        w_leaf(Op.LocalGet, repr(st), s, 0);
+        w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb);
+        w_node(Op.LocalSet, vt_none, local, 0, mb);
+        c = next_sibling(c);
+    };
+    let t1 = check_expr(c, expect, cx);
+    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
+    if t >= 0 { coerce(t1, t, c); };
+    w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mt);
+    let me = w_mark();
+    let t2 = alt_arms(next_sibling(a), s, st, if t >= 0 { t; } else { -1; }, default_, cx);
+    if t < 0 { t = t2; } else { coerce(t2, t, a); };
+    w_node(Op.Seq, repr(t), 0, 0, me);
+    w_node(Op.If, repr(t), new_label(), 0, m);
+    t;
+}
+
+// The variant an alt arm names (`Circle`, or `Shape.Circle`).
+fn alt_variant(pattern: I32, enum_decl: I32) I32 {
+    let word = if is_kind(pattern, Node.Qualified_type_ref) { word_of(name_node(last_child(pattern))); } else { word_of(pattern); };
+    let v = member(enum_decl, word, Space.Member);
+    if decl_is(v, Decl.Variant) { v; } else { -1; };
+}
+
+fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
+    let c = first_child(decl_node[enum_decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) {
+            let v = node_decl[first_child(c)];
+            let covered = false;
+            let a = next_sibling(first_child(node));
+            while (a >= 0) {
+                if is_kind(a, Node.Alt_arm) and alt_variant(first_child(a), enum_decl) == v { covered = true; };
+                a = next_sibling(a);
+            };
+            if not covered {
+                report(Diag.NonExhaustive, node, decl_name[v]);
+                return;
+            };
+        };
+        c = next_sibling(c);
+    };
+}
+
+fn reset_enums() void { name_helper_enum.clear(); }

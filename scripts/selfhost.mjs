@@ -7,8 +7,11 @@
 // one file. Errors point at the file and line they came from.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject, PLATFORM_SOURCES } from '../src/index.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import os from 'node:os';
+import { createHash } from 'node:crypto';
+import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject, PLATFORM_SOURCES, JS_STRING_BUILTINS_COMPILE_OPTIONS } from '../src/index.js';
+import { importObjectFromEval, importObjectFromGlue, glueModuleSource, exceptionImports } from '../src/runtime/host-imports.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'selfhost');
@@ -111,6 +114,41 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
   }
   files.diagnostics = utu.resolve();
   return files;
+}
+
+/**
+ * Instantiate a module the self-hosted compiler built: its imports come from
+ * its `utu` custom section (what the host provides) and the engine's JS
+ * string builtins.
+ */
+export async function instantiateBuilt(wasm) {
+  const module = await WebAssembly.compile(wasm, JS_STRING_BUILTINS_COMPILE_OPTIONS);
+  const [section] = WebAssembly.Module.customSections(module, 'utu');
+  const spec = section ? JSON.parse(new TextDecoder().decode(section)) : {};
+  const imports = await esImports(spec.es ?? {});
+  if (WebAssembly.Module.imports(module).some(entry => entry.module === 'utu' && entry.name === 'js_tag')) {
+    imports.utu = exceptionImports(imports.utu ?? {});
+  }
+  return { module, instance: await WebAssembly.instantiate(module, imports) };
+}
+
+/**
+ * The `@es` imports: their bodies as the exports of an ES module, written
+ * beside the project's node_modules (as stage 0's loader does), so a body
+ * may import packages and await at the top level.
+ */
+async function esImports(spec) {
+  const source = glueModuleSource(spec);
+  if (!source) return {};
+  const dir = fs.existsSync(path.join(ROOT, 'node_modules')) ? path.join(ROOT, 'node_modules', '.utu') : fs.mkdtempSync(path.join(os.tmpdir(), 'utu-glue-'));
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `glue-${createHash('sha256').update(source).digest('hex').slice(0, 16)}.mjs`);
+  if (!fs.existsSync(file)) {
+    const partial = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(partial, source);
+    fs.renameSync(partial, file);
+  }
+  return importObjectFromGlue(spec, await import(pathToFileURL(file).href));
 }
 
 /** The self-hosted compiler's exports. */

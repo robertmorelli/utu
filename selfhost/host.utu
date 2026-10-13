@@ -1,0 +1,123 @@
+// ── The host ─────────────────────────────────────────────────────────────────
+//
+// What a program needs from its JavaScript host. An `@es` binding
+// (`let f: fun(I32) I32 = @es/\ (x) => x + 1 \/;`) is an imported function,
+// `__es_N` of the module `es`; a binding of another type is an imported
+// function of no arguments that returns its value, called at each read.
+// The bodies go into the module's `utu` custom section as JSON, in the form
+// src/runtime/host-imports.js reads: `{"es":{"es":{"__es_0":"…"}}}`.
+
+mem decl_es: I32;     // by declaration: its imported function, or -1
+mem es_func: I32;     // the @es imports, in order
+mem es_body: I32;     // the DSL node of each
+
+fn reset_host() void {
+    decl_es.resize(decl_kind.len());
+    for (0 ..< decl_kind.len()) |d| { decl_es[d] = -1; };
+    es_func.clear();
+    es_body.clear();
+}
+
+// Whether a node is `@es/\ … \/`.
+fn is_es(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Es); }
+
+// The imported function of an @es binding of type `t`.
+fn es_import(decl: I32, dsl: I32, t: I32) I32 {
+    if decl_es[decl] >= 0 { return decl_es[decl]; };
+    let ft = es_signature(t);
+    let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), ft);
+    let w = decl_name[decl];
+    func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w));
+    decl_es[decl] = f;
+    es_func.push(f);
+    es_body.push(dsl);
+    f;
+}
+
+// A fun type's signature; for another type, () → its value.
+fn es_signature(t: I32) I32 {
+    if ty_is(t, Ty.Fun) { return fun_heap(t); };
+    func_type(vl_empty(), vl_of_result(repr(t)));
+}
+
+// A read of an @es binding of type `t`: the function as a value, or the
+// value its accessor returns.
+fn es_read(decl: I32, t: I32) I32 {
+    let f = decl_es[decl];
+    if ty_is(t, Ty.Fun) { w_leaf(Op.RefFunc, vt_ref(func_type_of[f], false), f, 0); }
+    else { w_leaf(Op.Call, repr(t), f, 0); };
+    t;
+}
+
+// ── The custom section ──
+
+fn json_byte(b: I32) void { host_json.push(b); }
+
+fn json_text(text: Str) void { for (0 ..< text.len()) |i| { host_json.push(text.get(i)); }; }
+
+// A JSON string of src[start ..< end_].
+fn json_string(start: I32, end_: I32) void {
+    json_byte(34);
+    for (start ..< end_) |i| {
+        let c = src[i];
+        if c == 34 or c == 92 {
+            json_byte(92);
+            json_byte(c);
+        } else if c == 10 { json_text("\\n"); }
+        else if c == 13 { json_text("\\r"); }
+        else if c == 9 { json_text("\\t"); }
+        else if c < 32 {
+            json_text("\\u00");
+            json_byte(hex_digit(c >> 4));
+            json_byte(hex_digit(c & 15));
+        } else {
+            json_byte(c);
+        };
+    };
+    json_byte(34);
+}
+
+fn hex_digit(d: I32) I32 { if d < 10 { 48 + d; } else { 87 + d; }; }
+
+// The body of `@name/\ body \/`, without its delimiters and outer spaces.
+fn dsl_text_start(dsl: I32) I32 {
+    let t = node_first[last_child(dsl)];
+    let i = tok_start[t] + 2;
+    let end_ = tok_end[t] - 2;
+    while (i < end_ and is_space(src[i])) { i += 1; };
+    i;
+}
+
+fn dsl_text_end(dsl: I32) I32 {
+    let t = node_first[last_child(dsl)];
+    let i = tok_end[t] - 2;
+    let start = tok_start[t] + 2;
+    while (i > start and is_space(src[i - 1])) { i -= 1; };
+    i;
+}
+
+fn is_space(c: I32) Bool { c == 32 or c == 10 or c == 9 or c == 13; }
+
+// Write the host section for what the module imports (after the sweep).
+fn write_host_json() void {
+    host_json.clear();
+    let any = false;
+    for (0 ..< es_func.len()) |i| { if func_live[es_func[i]] == 1 { any = true; }; };
+    if not any { return; };
+    json_text("{\"es\":{\"es\":{");
+    let first = true;
+    for (0 ..< es_func.len()) |i| {
+        let f = es_func[i];
+        if func_live[f] == 1 {
+            if not first { json_byte(44); };
+            first = false;
+            json_byte(34);
+            let name = func_field_name[f];
+            for (0 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]); };
+            json_byte(34);
+            json_byte(58);
+            json_string(dsl_text_start(es_body[i]), dsl_text_end(es_body[i]));
+        };
+    };
+    json_text("}}}");
+}

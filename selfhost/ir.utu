@@ -205,6 +205,8 @@ enum(U8) Known:
     | IrArrayNew
     | IrArraySlice
     | IrArrayCopy
+    | Count
+    | WordU32
 
 fn known_word(k: Known) I32 { known[k.to_i32()]; }
 
@@ -249,7 +251,8 @@ fn intern_known() void {
         "eq", "ne", "lt", "le", "gt", "ge", "neg", "bnot", "es", "ir", "comptime", "embed", "ir-wasm-scalar", "I32", "Array", "get_index", "set_index", "get_slice",
         "ir-string-concat", "ir-string-eq", "ir-string-ne", "ir-string-measure-utf16", "ir-string-slice-wtf16",
         "ir-string-get-wtf16", "ir-string-from-code-point", "ir-string-from-codes",
-        "ir-array-get", "ir-array-set", "ir-array-len", "ir-array-new", "ir-array-slice", "ir-array-copy"];
+        "ir-array-get", "ir-array-set", "ir-array-len", "ir-array-new", "ir-array-slice", "ir-array-copy",
+        "count", "U32"];
     for (0 ..< Known.count()) |k| { known[k] = intern_text(names[k]); };
     // Tags: "ir-" and the name, then its opcode.
     let table = opcode_table();

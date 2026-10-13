@@ -37,7 +37,7 @@ try {
   const context = { subscriptions: [], extensionUri: vscode.Uri.parse(`${pathToFileURL(ROOT).href}/`) };
   await nodeActivate(context);
   const commands = globalThis.__utuVscodeStub.commands;
-  for (const name of ['utu.compileCurrentFile', 'utu.runMain', 'utu.showGeneratedWat', 'utu.showSyntaxTree', 'utu.showCompilerIR', 'utu.showSemanticXray', 'utu.showCompilerGraphs']) {
+  for (const name of ['utu.compileCurrentFile', 'utu.runMain', 'utu.showGeneratedWat', 'utu.showSyntaxTree', 'utu.showCompilerIR', 'utu.showSemanticXray', 'utu.showCompilerGraphs', 'utu.createWutuWebsite', 'utu.previewWutuWebsite']) {
     if (!commands.has(name)) throw new Error(`activation did not register ${name}`);
   }
 
@@ -62,6 +62,14 @@ try {
   if (!(binary instanceof Uint8Array) || binary.length === 0) throw new Error('compile command did not return Wasm');
   const result = await commands.get('utu.runMain')(document);
   if (result !== 42) throw new Error(`runMain returned ${String(result)} instead of 42`);
+  const created = await commands.get('utu.createWutuWebsite')();
+  if (!created?.fsPath.endsWith('/my-wutu-site/main.utu')) throw new Error('Wutu starter was not created');
+  const starter = await vscode.workspace.openTextDocument(created);
+  const starterBinary = await commands.get('utu.compileCurrentFile')(starter);
+  if (!(starterBinary instanceof Uint8Array)) throw new Error('Wutu starter did not compile');
+  await commands.get('utu.previewWutuWebsite')(starter);
+  const preview = globalThis.__utuVscodeStub.terminals.at(-1);
+  if (!preview?.sent?.includes('cli/wutu.mjs') || !preview.sent.includes('dev')) throw new Error('Wutu preview did not launch the dev CLI');
 
   (nodeBundle.deactivate ?? nodeBundle.default?.deactivate)?.();
   for (const disposable of context.subscriptions.reverse()) disposable?.dispose?.();
@@ -134,17 +142,29 @@ class Uri {
   static parse(value) { return new Uri(value); }
   static joinPath(base, ...parts) { const url = new URL(base.toString()); url.pathname = [url.pathname.replace(/\/$/, ''), ...parts].join('/'); return new Uri(url.toString()); }
 }
-const state = globalThis.__utuVscodeStub = { commands: new Map(), providers: {}, textDocuments: [], Position };
+const state = globalThis.__utuVscodeStub = { commands: new Map(), providers: {}, textDocuments: [], files: new Map(), terminals: [], Position };
 const event = () => new Disposable();
 const output = { lines: [], appendLine(line) { this.lines.push(line); }, show() {}, dispose() {} };
 const workspace = {
   get textDocuments() { return state.textDocuments; },
-  fs: { async readFile() { throw new Error('unexpected workspace file read'); } },
+  workspaceFolders: [{ uri: Uri.parse(${JSON.stringify(pathToFileURL(ROOT).href)}), name: 'utu', index: 0 }],
+  getWorkspaceFolder() { return this.workspaceFolders[0]; },
+  fs: {
+    async stat(uri) { if (uri.fsPath.endsWith('/cli/wutu.mjs') || state.files.has(uri.toString())) return {}; throw Object.assign(new Error('missing'), { code: 'FileNotFound' }); },
+    async createDirectory() {},
+    async writeFile(uri, bytes) { state.files.set(uri.toString(), new TextDecoder().decode(bytes)); },
+    async readFile(uri) { const source = state.files.get(uri.toString()); if (source === undefined) throw new Error('unexpected workspace file read'); return new TextEncoder().encode(source); },
+  },
   registerTextDocumentContentProvider: event,
   onDidOpenTextDocument: event, onDidChangeTextDocument: event, onDidSaveTextDocument: event,
   onDidCloseTextDocument: event, onDidChangeConfiguration: event,
   getConfiguration() { return { get(_key, fallback) { return fallback; } }; },
-  async openTextDocument() { throw new Error('unexpected openTextDocument'); },
+  async openTextDocument(uri) { const source = state.files.get(uri.toString()); if (source === undefined) throw new Error('unexpected openTextDocument'); return {
+    uri, languageId: 'utu', version: 1, fileName: uri.fsPath, isDirty: false,
+    getText: () => source,
+    positionAt(offset) { const lines = source.slice(0, offset).split('\\n'); return new Position(lines.length - 1, lines.at(-1).length); },
+    offsetAt(position) { return source.split('\\n').slice(0, position.line).reduce((sum, line) => sum + line.length + 1, 0) + position.character; },
+  }; },
 };
 const window = {
   activeTextEditor: undefined,
@@ -153,6 +173,8 @@ const window = {
   setStatusBarMessage() {},
   async showErrorMessage(message) { throw new Error(message); },
   async showWarningMessage() {},
+  async showInputBox() { return 'my-wutu-site'; },
+  createTerminal(options) { const terminal = { options, sent: '', sendText(text) { this.sent = text; }, show() {} }; state.terminals.push(terminal); return terminal; },
   async showTextDocument() {},
 };
 const commands = {

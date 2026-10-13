@@ -233,6 +233,8 @@ fn type_of(node: I32, inst: I32) I32 {
         let params = vl_end(m);
         return ty(if kind == Node.Func_type.to_i32() { Ty.Fun; } else { Ty.Closure; }, params, result);
     };
+    // A generator's `yield T`, and anything else not known yet.
+    report(Diag.Unsupported, node, -1);
     ty_error();
 }
 
@@ -363,7 +365,7 @@ fn repr(t: I32) I32 {
     if dk == Decl.TypeDecl.to_i32() { return type_decl_repr(decl, ty_b[t]); };
     if dk == Decl.IntEnum.to_i32() { return vt_i32; };
     if dk == Decl.Distinct.to_i32() { return repr(decl_type(node_decl[name_node(last_child(decl_node[decl]))], 0)); };
-    if dk == Decl.Struct.to_i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true); };
+    if dk == Decl.Struct.to_i32() or dk == Decl.Enum.to_i32() or dk == Decl.Variant.to_i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true); };
     vt_i32;
 }
 
@@ -408,7 +410,9 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
         if struct_inst[e] == inst { return struct_heap[e]; };
         e = struct_next[e];
     };
-    let h = struct_type(-1, false);
+    // An enum is a struct its variants extend; a variant, a struct of its fields.
+    let super = if decl_is(decl, Decl.Variant) { struct_heap_of(decl_owner[decl], inst); } else { -1; };
+    let h = struct_type(super, decl_is(decl, Decl.Enum));
     let entry = struct_inst.len();
     struct_of_decl.push(decl);
     struct_inst.push(inst);
@@ -417,7 +421,8 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
     struct_first[decl] = entry;
     // Fields after the entry exists, so a field of the struct's own type
     // finds it; their types first, since they may make other structs.
-    let c = first_child(decl_node[decl]);
+    let holder = fields_holder(decl);
+    let c = if holder >= 0 and not decl_is(decl, Decl.Enum) { first_child(holder); } else { -1; };
     let n = 0;
     while (c >= 0) {
         if is_kind(c, Node.Field) { n += 1; };
@@ -425,7 +430,7 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
     };
     let vts = Array[I32].new(n, 0);
     let i = 0;
-    c = first_child(decl_node[decl]);
+    c = if holder >= 0 and not decl_is(decl, Decl.Enum) { first_child(holder); } else { -1; };
     while (c >= 0) {
         if is_kind(c, Node.Field) {
             vts[i] = storage(repr(type_of(next_sibling(first_child(c)), inst)));

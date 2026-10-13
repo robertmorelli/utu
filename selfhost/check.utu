@@ -203,6 +203,8 @@ fn check_function(fi: I32) void {
     next_label[0] = 0;
     loop_break.clear();
     loop_continue.clear();
+    loop_state.clear();
+    loop_state_type.clear();
     let params = fi_params[fi];
     let decls = param_decls(decl);
     for (0 ..< vl_len[decls]) |i| {
@@ -239,7 +241,9 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
         if next < 0 {
             t = check_expr(c, expect, cx);
         } else {
-            drop_value(check_expr(c, -1, cx));
+            // A statement's value is dropped: it is checked as Void, so
+            // branches of different types are fine there.
+            coerce(check_expr(c, ty_void(), cx), ty_void(), c);
         };
         c = next;
     };
@@ -263,6 +267,8 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
     if expected < 0 or actual == expected { return actual; };
     if ty_is(actual, Ty.Error) or ty_is(expected, Ty.Error) or ty_is(actual, Ty.Never) { return expected; };
     if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return expected; };
+    if is_variant_of(actual, expected) { return expected; };
+    if ty_is(expected, Ty.Nullable) and is_variant_of(actual, ty_a[expected]) { return expected; };
     if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) {
         w_pop();
         w_leaf(Op.RefNull, repr(expected), heap_of(repr(expected)), 0);
@@ -325,8 +331,8 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.While_expr.to_i32() { return check_while(node, cx); };
     if kind == Node.For_expr.to_i32() { return check_for(node, cx); };
     if kind == Node.Return_expr.to_i32() { return check_return(node, cx); };
-    if kind == Node.Break_expr.to_i32() { return check_break(node, true); };
-    if kind == Node.Continue_expr.to_i32() { return check_break(node, false); };
+    if kind == Node.Break_expr.to_i32() { return check_break(node, true, cx); };
+    if kind == Node.Continue_expr.to_i32() { return check_break(node, false, cx); };
     if kind == Node.Fatal_expr.to_i32() {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return ty_never();
@@ -339,6 +345,13 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Index_expr.to_i32() or kind == Node.Slice_expr.to_i32() { return check_index(node, expect, cx); };
     if kind == Node.Array_expr.to_i32() { return check_array_lit(node, expect, cx); };
     if kind == Node.Promoted_module_call_expr.to_i32() { return check_promoted_call(node, expect, cx); };
+    if kind == Node.Alt_expr.to_i32() { return check_alt(node, expect, cx); };
+    if kind == Node.Match_expr.to_i32() or kind == Node.Loop_match_expr.to_i32() { return check_match(node, expect, cx); };
+    if kind == Node.Promote_expr.to_i32() { return check_promote(node, expect, cx); };
+    if kind == Node.Else_expr.to_i32() { return check_orelse(node, expect, cx); };
+    if kind == Node.Null_expr.to_i32() { return check_null_expr(node, cx); };
+    if kind == Node.Try_expr.to_i32() { return check_try(node, expect, cx); };
+    if kind == Node.Tuple_expr.to_i32() { return check_tuple(node, expect, cx); };
     unsupported(node);
 }
 
@@ -346,7 +359,14 @@ fn check_ident(node: I32, cx: Cx) I32 {
     let decl = node_decl[node];
     if decl < 0 { return error_value(); };
     let k = decl_kind[decl];
+    if k == Decl.Global.to_i32() and is_es(last_child(decl_node[decl])) {
+        let t = global_type(decl);
+        es_import(decl, last_child(decl_node[decl]), t);
+        return es_read(decl, t);
+    };
+    if decl_es[decl] >= 0 { return es_read(decl, decl_ty[decl]); };
     if k == Decl.Global.to_i32() { return global_get(decl, cx); };
+    if k == Decl.Fn.to_i32() { return fn_value(decl, cx); };
     if k == Decl.Mem.to_i32() {
         report(Diag.MemNotValue, node, decl_name[decl]);
         return error_value();
@@ -466,11 +486,17 @@ fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
 
 fn check_let(node: I32, cx: Cx) I32 {
     let name = first_child(node);
-    if is_kind(name, Node.Tuple_pattern) { return unsupported(node); };
+    if is_kind(name, Node.Tuple_pattern) { return check_let_tuple(node, cx); };
     let decl = node_decl[name];
     let init = last_child(node);
     let annotated = next_sibling(name) != init;
     let t = if annotated { type_of(next_sibling(name), cx.inst); } else { -1; };
+    if is_es(init) and annotated {
+        decl_ty[decl] = t;
+        es_import(decl, init, t);
+        w_leaf(Op.Nop, vt_none, 0, 0);
+        return ty_void();
+    };
     let m = w_mark();
     let actual = check_expr(init, t, cx);
     if annotated { coerce(actual, t, init); } else { t = actual; };
@@ -486,6 +512,21 @@ fn check_let(node: I32, cx: Cx) I32 {
 }
 
 mem decl_global: I32;  // by declaration: its wasm global, or -1
+
+fn global_type(decl: I32) I32 {
+    let t = type_of(next_sibling(first_child(decl_node[decl])), 0);
+    decl_ty[decl] = t;
+    t;
+}
+
+// A function named as a value: a `fun`.
+fn fn_value(decl: I32, cx: Cx) I32 {
+    let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
+    let f = function_of(fi);
+    let t = ty(Ty.Fun, fi_params[fi], fi_result[fi]);
+    w_leaf(Op.RefFunc, vt_ref(func_type_of[f], false), f, 0);
+    t;
+}
 
 fn global_get(decl: I32, cx: Cx) I32 {
     let g = global_of(decl);
@@ -622,6 +663,9 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
     let right = last_child(node);
     let word = operator_word(token_after(left));
     if word == Kw.And.to_i32() or word == Kw.Or.to_i32() { return check_logical(node, word, cx); };
+    if (word == known_word(Known.Eq) or word == known_word(Known.Ne)) and (is_null_literal(left) or is_null_literal(right)) {
+        return check_null_compare(node, if is_null_literal(left) { right; } else { left; }, word == known_word(Known.Eq), cx);
+    };
     let bool_t = prelude(Prelude.Bool);
     if word == Kw.Xor.to_i32() {
         let m = w_mark();
@@ -654,6 +698,13 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
         return ty_error();
     };
     let decl = ty_decl(t);
+    if is_scalar_kind(decl) {
+        coerce(check_expr(right, t, cx), t, right);
+        if scalar_compare(decl, word, m) { return prelude(Prelude.Bool); };
+        report(Diag.UnknownOperator, at, word);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
     let op = member(decl, word, Space.Operator);
     if op < 0 {
         check_expr(right, t, cx);
@@ -744,7 +795,15 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(callee, Node.Identifier) {
         let decl = node_decl[callee];
         if decl < 0 { return error_value(); };
-        if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+        if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
+            es_import(decl, last_child(decl_node[decl]), global_type(decl));
+        };
+        if decl_es[decl] >= 0 { return call_es(decl, args, m, node, cx); };
+        if not decl_is(decl, Decl.Fn) {
+            let t = if decl_is(decl, Decl.Global) { global_type(decl); } else { decl_ty[decl]; };
+            if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
+            return unsupported(node);
+        };
         let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
         return call_with(fi, args, 0, m, node, cx);
     };
@@ -762,6 +821,10 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         let rt = check_expr(base, -1, cx);
         if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
         if decl_is(ty_decl(rt), Decl.Proto) { return unsupported(node); };
+        if is_scalar_kind(ty_decl(rt)) {
+            let base = scalar_method(ty_decl(rt), word_of(name), m);
+            if base >= 0 and args < 0 { return base; };
+        };
         let decl = member(ty_decl(rt), word_of(name), Space.Method);
         if decl < 0 {
             // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
@@ -774,6 +837,11 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         return call_with(fi, args, 1, m, node, cx);
     };
     if is_kind(callee, Node.Type_member_expr) {
+        let owner_decl = node_decl[first_child(callee)];
+        if is_scalar_kind(owner_decl) {
+            let r = scalar_static(owner_decl, word_of(last_child(callee)), args, node, cx);
+            if r >= 0 { return r; };
+        };
         let decl = node_decl[last_child(callee)];
         if not decl_is(decl, Decl.Fn) { return unsupported(node); };
         let owner_t = type_path(first_child(callee), cx.inst);
@@ -809,6 +877,54 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
         return ty_error();
     };
     finish_call(fi, m, cx);
+}
+
+// A call of an @es function: its import, directly.
+fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+    let t = decl_ty[decl];
+    if not ty_is(t, Ty.Fun) {
+        report(Diag.NotCallable, at, decl_name[decl]);
+        return finish_error(args, m, cx);
+    };
+    if not check_args(ty_a[t], args, 0, at, cx) {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    w_node(Op.Call, repr(ty_b[t]), decl_es[decl], 0, m);
+    ty_b[t];
+}
+
+// A call of a `fun` value: the arguments, then the value, then call_ref.
+fn call_ref(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+    if not check_args(ty_a[t], args, 0, at, cx) {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    check_expr(callee, t, cx);
+    w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m);
+    ty_b[t];
+}
+
+// Check the arguments against parameter types (from `first`); false after
+// reporting a wrong count.
+fn check_args(params: I32, args: I32, first: I32, at: I32, cx: Cx) Bool {
+    let i = first;
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    while (a >= 0) {
+        if i < vl_len[params] {
+            let pt = vl_item(params, i);
+            coerce(check_expr(a, pt, cx), pt, a);
+        } else {
+            drop_value(check_expr(a, -1, cx));
+        };
+        i += 1;
+        a = next_sibling(a);
+    };
+    if i != vl_len[params] {
+        report(Diag.WrongArity, at, -1);
+        return false;
+    };
+    true;
 }
 
 fn finish_error(args: I32, m: I32, cx: Cx) I32 {
@@ -1021,10 +1137,11 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
-// `T.x` (not called): a module's global.
+// `T.x` (not called): a module's global, or an integer enum's variant.
 fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let decl = node_decl[last_child(node)];
     if decl_is(decl, Decl.Global) { return global_get(decl, cx); };
+    if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl); };
     unsupported(node);
 }
 
@@ -1077,92 +1194,26 @@ fn check_while(node: I32, cx: Cx) I32 {
         w_node(Op.Plain, vt_i32, 69, 0, mc);
         w_node(Op.BrIf, vt_none, brk, 0, mc);
     };
-    loop_break.push(brk);
-    loop_continue.push(top);
+    enter_loop(brk, top, -1, -1);
     drop_value(check_block(block, -1, cx));
-    loop_break.resize(loop_break.len() - 1);
-    loop_continue.resize(loop_continue.len() - 1);
+    leave_loop();
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, m);
     ty_void();
 }
 
-// `for (a ..< b) |i| { … }`, `for (a ... b)`: count from a; b is read once.
-//   i = a; end = b
-//   block $break  loop $top
-//     (br_if $break (i >= end))      ; `>` for `...`
-//     block $next  body  end
-//     i = i + 1
-//     br $top
-//   end  end
-fn check_for(node: I32, cx: Cx) I32 {
-    let sources = first_child(node);
-    let source = first_child(sources);
-    let capture = next_sibling(sources);
-    let block = last_child(node);
-    if next_sibling(source) >= 0 or not is_kind(capture, Node.Capture) { return unsupported(node); };
-    let lo = first_child(source);
-    let hi = next_sibling(lo);
-    if hi < 0 { return unsupported(node); };
-    let inclusive = tok_kind[token_after(lo)] == Tok.DotDotDot.to_i32();
-    let m = w_mark();
-    // The bounds' type: the start's, unless it is a literal.
-    let t = if is_number_literal(lo) and not is_number_literal(hi) { type_only(hi, -1, cx); } else { type_only(lo, -1, cx); };
-    if not is_numeric(t) or is_float(t) {
-        w_stack.resize(m);
-        return unsupported(node);
-    };
-    let vt = repr(t);
-    let i = new_local(vt);
-    let end_ = new_local(vt);
-    let mi = w_mark();
-    coerce(check_expr(lo, t, cx), t, lo);
-    w_node(Op.LocalSet, vt_none, i, 0, mi);
-    let me = w_mark();
-    coerce(check_expr(hi, t, cx), t, hi);
-    w_node(Op.LocalSet, vt_none, end_, 0, me);
-    let name = first_child(capture);
-    decl_local[node_decl[name]] = i;
-    decl_ty[node_decl[name]] = t;
-    let brk = new_label();
-    let top = new_label();
-    let next = new_label();
-    let mb = w_mark();
-    let ml = w_mark();
-    let mc = w_mark();
-    w_leaf(Op.LocalGet, vt, i, 0);
-    w_leaf(Op.LocalGet, vt, end_, 0);
-    let unsigned = t == prelude(Prelude.U32) or t == prelude(Prelude.U64);
-    let cmp = if vt == vt_i64 { if inclusive { if unsigned { 86; } else { 85; }; } else { if unsigned { 90; } else { 89; }; }; }
-        else { if inclusive { if unsigned { 75; } else { 74; }; } else { if unsigned { 79; } else { 78; }; }; };
-    w_node(Op.Plain, vt_i32, cmp, 0, mc);
-    w_node(Op.BrIf, vt_none, brk, 0, mc);
-    let mn = w_mark();
-    loop_break.push(brk);
-    loop_continue.push(next);
-    drop_value(check_block(block, -1, cx));
-    loop_break.resize(loop_break.len() - 1);
-    loop_continue.resize(loop_continue.len() - 1);
-    w_node(Op.Block, vt_none, next, 0, mn);
-    let mstep = w_mark();
-    w_leaf(Op.LocalGet, vt, i, 0);
-    if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0); } else { w_i32(1); };
-    w_node(Op.Plain, vt, if vt == vt_i64 { 124; } else { 106; }, 0, mstep);
-    w_node(Op.LocalSet, vt_none, i, 0, mstep);
-    w_leaf(Op.Br, vt_unreachable, top, 0);
-    w_node(Op.Loop, vt_none, top, 0, ml);
-    w_node(Op.Block, vt_none, brk, 0, mb);
-    w_node(Op.Seq, vt_none, 0, 0, m);
-    ty_void();
-}
-
-fn check_break(node: I32, is_break: Bool) I32 {
+fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
+    if not is_break and first_child(node) >= 0 { return check_continue_state(node, cx); };
     if loop_break.len() == 0 {
         report(Diag.InvalidBreak, node, -1);
         return error_value();
     };
-    if not is_break and first_child(node) >= 0 { return unsupported(node); };
+    // A loop match moves on with `continue <state>`, never a plain continue.
+    if not is_break and loop_state[loop_state.len() - 1] >= 0 {
+        report(Diag.InvalidBreak, node, -1);
+        return error_value();
+    };
     let label = if is_break { loop_break[loop_break.len() - 1]; } else { loop_continue[loop_continue.len() - 1]; };
     w_leaf(Op.Br, vt_unreachable, label, 0);
     ty_never();
@@ -1221,6 +1272,9 @@ fn reset_check() void {
     diag_actual.clear();
     reset_data();
     reset_mems();
+    reset_host();
+    reset_enums();
+    reset_control();
     fi_grow();
 }
 
@@ -1311,7 +1365,7 @@ fn check_item(item: I32) void {
         fn_instance(node_decl[next_sibling(first_child(item))], 0);
         return;
     };
-    if is_kind(item, Node.Global_decl) { global_of(node_decl[first_child(item)]); };
+    if is_kind(item, Node.Global_decl) and not is_es(last_child(item)) { global_of(node_decl[first_child(item)]); };
 }
 
 // Resolution reports on the whole entry file; drop what is in surfaces the
@@ -1382,6 +1436,8 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     next_label[0] = 0;
     loop_break.clear();
     loop_continue.clear();
+    loop_state.clear();
+    loop_state_type.clear();
     c = first_child(item);
     let i = 0;
     while (c >= 0) {

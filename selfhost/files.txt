@@ -7,7 +7,10 @@ ir.utu
 wasm.utu
 validate.utu
 check.utu
+control.utu
 strings.utu
 data.utu
 mems.utu
+host.utu
+enums.utu
 lib.utu

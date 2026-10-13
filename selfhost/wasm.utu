@@ -1033,6 +1033,7 @@ fn encode_names() void {
 // The module's bytes, in `out`. Returns their number.
 fn encode_module() I32 {
     sweep();
+    write_host_json();
     assign_indices();
     out.clear();
     sec.clear();
