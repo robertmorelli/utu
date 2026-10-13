@@ -127,9 +127,12 @@ async function loadGlueModule(spec, options, live = null) {
     const dir = await glueDirectory(fs, path, os, options.projectRoot ?? process.cwd());
     const file = path.join(dir, `glue-${digestOf(source)}.mjs`);
     // Content-addressed, so a concurrent writer can only be writing identical
-    // bytes. Written before import because bare specifiers resolve from the
-    // file's own location, not from a data: URL or the cwd.
-    await fs.writeFile(file, source);
+    // bytes; it writes beside the file and renames, so an importer never sees
+    // a partly written one. Written before import because bare specifiers
+    // resolve from the file's own location, not from a data: URL or the cwd.
+    const partial = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+    await fs.writeFile(partial, source);
+    await fs.rename(partial, file);
     moduleUrl = url.pathToFileURL(file).href;
   } catch {
     return null;
