@@ -1,13 +1,22 @@
 // The utu lexer, in utu: source bytes in, tokens out.
 //
-// One pass over `src` (UTF-8) writes each token's kind and byte span into
-// three mems. The lexer does not know the grammar: every word is a `Word`
-// (the parser decides which are keywords, which are identifiers, and which
-// are type names), and the parser joins `std` `:` `Str` into a platform
-// path. Two operators exist only after an expression, `-o` (pipe) and `?.`
-// (optional field); the token before them says whether one has ended.
+// A state machine, built during compilation (`build`) into a const mem:
+// lexing is one table load per byte in a `loop match`. Each token's kind and
+// byte span go into three mems.
 //
+// The lexer does not know the grammar: every word is a `Word` (the parser
+// decides which are keywords, which are identifiers, and which are type
+// names), and the parser joins `std` `:` `Str` into a platform path.
 // Comments are tokens, so the parser can attach them to the tree.
+//
+// A few tokens depend on the token before them. `-o` (pipe), `?.` (optional
+// field), and compound assignments (`&=`, `<<=`, …) only follow a finished
+// expression: `x -o in` pipes to `in`, while `type &= …` declares the self
+// type. So the machine has two start states, after an expression and not,
+// and the state a token ends in says which start state comes next. Words
+// that begin an expression (`return`, `and`, …) are paths through the word
+// states that end in a state of their own.
+//
 // The JavaScript compiler's parser is the reference: for every program it
 // accepts, these tokens are exactly the leaves of its syntax tree
 // (scripts/selfhost-lexer-differential.mjs).
@@ -71,132 +80,373 @@ enum(U8) Tok:
     | Tilde
     | TildeArrow
 
+// What the table says to do next, below the real states:
+let error_code: I32 = 0;   // no token can continue or start here
+let accept_code: I32 = 1;  // the token ends before this byte
+let back1_code: I32 = 2;   // the token ended one byte back
+let back2_code: I32 = 3;   // the token ended two bytes back
+let skip_code: I32 = 4;    // whitespace through this byte: drop it
+let dsl_code: I32 = 5;     // `/\`: a DSL body, which nests
+let done_code: I32 = 6;    // the end of the source
+let start_before: I32 = 7; // the start states: not after an expression,
+let start_after: I32 = 8;  // and after one
+
+// The source ends with this byte, which UTF-8 never uses.
+let end_byte: I32 = 255;
+
+// next = dfa[state * 256 + byte]. A token ending in a state has kind
+// kind_of[state]; one backed off from it has kind back_kind[state]. The
+// start state that follows is after_of (0: before, 1: after, 2: the same).
+const mem dfa: U8 = @comptime/\ build().tabs \/;
+const mem kind_of: U8 = @comptime/\ build().kinds \/;
+const mem back_kind: U8 = @comptime/\ build().backs \/;
+const mem after_of: U8 = @comptime/\ build().afters \/;
+
 export mem src: U8;
 export mem tok_kind: U8;
 export mem tok_start: I32;
 export mem tok_end: I32;
 
-// ── Characters ───────────────────────────────────────────────────────────────
+// ── The state machine, built at compile time ─────────────────────────────────
 
-fn is_digit(c: I32) Bool { c >= 48 and c <= 57; }
+struct Machine:
+    | tabs: Array[I32]
+    | kinds: Array[I32]
+    | backs: Array[I32]
+    | afters: Array[I32]
+    | next: I32
+    | word: I32
 
-fn is_word_start(c: I32) Bool {
-    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c == 95;
+fn set(m: Machine, from: I32, c: I32, to: I32) void {
+    m.tabs[from * 256 + c] = to;
 }
 
-fn is_word_char(c: I32) Bool { is_word_start(c) or is_digit(c); }
-
-fn is_hex(c: I32) Bool { is_digit(c) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70); }
-
-// The byte at `i`, or -1 past the end (`n` bytes).
-fn at(i: I32, n: I32) I32 {
-    if i < n { src[i]; } else { -1; };
+fn get(m: Machine, from: I32, c: I32) I32 {
+    m.tabs[from * 256 + c];
 }
 
-// The length of the whitespace at `i`, or 0: JavaScript's `\s`, which is
-// what the grammar skips. ASCII tab through carriage return and space, and
-// the UTF-8 encodings of no-break space, ogham space mark, the en quad
-// through hair space, the line and paragraph separators, narrow no-break
-// space, medium mathematical space, ideographic space, and the byte order mark.
-fn space_at(i: I32, n: I32) I32 {
-    let c = at(i, n);
-    if c == 32 or (c >= 9 and c <= 13) { return 1; };
-    let b = at(i + 1, n);
-    let d = at(i + 2, n);
-    if c == 194 and b == 160 { return 2; };
-    if c == 225 and b == 154 and d == 128 { return 3; };
-    if c == 226 and b == 128 and ((d >= 128 and d <= 138) or d == 168 or d == 169 or d == 175) { return 3; };
-    if c == 226 and b == 129 and d == 159 { return 3; };
-    if c == 227 and b == 128 and d == 128 { return 3; };
-    if c == 239 and b == 187 and d == 191 { return 3; };
-    0;
+fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
+    for (lo ... hi) |c| { set(m, from, c, to); };
 }
 
-// ── Tokens ───────────────────────────────────────────────────────────────────
+fn both(m: Machine, c: I32, to: I32) void {
+    set(m, start_before, c, to);
+    set(m, start_after, c, to);
+}
 
-fn push(kind: Tok, start: I32, end_: I32) void {
-    tok_kind.push(kind.to_i32());
+fn is_word_char(c: I32) Bool {
+    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c == 95 or (c >= 48 and c <= 57);
+}
+
+// A state whose token is complete: any byte without an edge ends it.
+fn ends(m: Machine, kind: Tok, after: I32) I32 {
+    let state = m.next;
+    m.next += 1;
+    m.kinds[state] = kind.to_i32();
+    m.afters[state] = after;
+    for (0 ..< 256) |c| { set(m, state, c, accept_code); };
+    state;
+}
+
+// A state in the middle of a token: any byte without an edge is an error.
+fn inside(m: Machine) I32 {
+    let state = m.next;
+    m.next += 1;
+    state;
+}
+
+// A state that backs off when no edge continues: the token was `kind`, ending `by` bytes back.
+fn backs_off(m: Machine, kind: Tok, after: I32, by: I32) I32 {
+    let state = inside(m);
+    m.backs[state] = kind.to_i32();
+    m.afters[state] = after;
+    for (0 ..< 256) |c| { set(m, state, c, if by == 1 { back1_code; } else { back2_code; }); };
+    state;
+}
+
+fn single(m: Machine, c: I32, kind: Tok, after: I32) void {
+    both(m, c, ends(m, kind, after));
+}
+
+fn whitespace(m: Machine) void {
+    // JavaScript's `\s`, which is what the grammar skips: ASCII tab through
+    // carriage return and space, and the UTF-8 encodings of no-break space,
+    // ogham space mark, the en quad through hair space, the line and
+    // paragraph separators, narrow no-break space, medium mathematical
+    // space, ideographic space, and the byte order mark.
+    for (9 ... 13) |c| { both(m, c, skip_code); };
+    both(m, 32, skip_code);
+    let c2 = inside(m);
+    both(m, 194, c2);
+    set(m, c2, 160, skip_code);
+    let e1 = inside(m);
+    let e1_9a = inside(m);
+    both(m, 225, e1);
+    set(m, e1, 154, e1_9a);
+    set(m, e1_9a, 128, skip_code);
+    let e2 = inside(m);
+    let e2_80 = inside(m);
+    let e2_81 = inside(m);
+    both(m, 226, e2);
+    set(m, e2, 128, e2_80);
+    set_range(m, e2_80, 128, 138, skip_code);
+    set(m, e2_80, 168, skip_code);
+    set(m, e2_80, 169, skip_code);
+    set(m, e2_80, 175, skip_code);
+    set(m, e2, 129, e2_81);
+    set(m, e2_81, 159, skip_code);
+    let e3 = inside(m);
+    let e3_80 = inside(m);
+    both(m, 227, e3);
+    set(m, e3, 128, e3_80);
+    set(m, e3_80, 128, skip_code);
+    let ef = inside(m);
+    let ef_bb = inside(m);
+    both(m, 239, ef);
+    set(m, ef, 187, ef_bb);
+    set(m, ef_bb, 191, skip_code);
+}
+
+// A token running to the end of its line: `// …` and `\\ …`.
+fn to_line_end(m: Machine, state: I32) void {
+    for (0 ..< 256) |c| { set(m, state, c, state); };
+    set(m, state, 10, accept_code);
+    set(m, state, end_byte, accept_code);
+}
+
+// `"…"` with backslash escapes; a newline or the end of the source inside is an error.
+fn strings(m: Machine) void {
+    let body = inside(m);
+    let escape = inside(m);
+    let close = ends(m, Tok.String, 1);
+    both(m, 34, body);
+    for (0 ..< 255) |c| {
+        set(m, body, c, body);
+        set(m, escape, c, body);
+    };
+    set(m, body, 10, error_code);
+    set(m, body, 34, close);
+    set(m, body, 92, escape);
+    set(m, escape, 10, error_code);
+}
+
+// Numbers, as the grammar's regular expressions take them: a float
+// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
+fn numbers(m: Machine) void {
+    let int = ends(m, Tok.Int, 1);
+    let zero = ends(m, Tok.Int, 1);
+    let dot = backs_off(m, Tok.Int, 1, 1);
+    let float = ends(m, Tok.Float, 1);
+    let exp = backs_off(m, Tok.Float, 1, 1);
+    let exp_sign = backs_off(m, Tok.Float, 1, 2);
+    let exp_digits = ends(m, Tok.Float, 1);
+    let hex_start = backs_off(m, Tok.Int, 1, 1);
+    let hex = ends(m, Tok.Int, 1);
+    let bin_start = backs_off(m, Tok.Int, 1, 1);
+    let bin = ends(m, Tok.Int, 1);
+    set_range(m, start_before, 49, 57, int);
+    set_range(m, start_after, 49, 57, int);
+    both(m, 48, zero);
+    for ([int, zero]) |state| {
+        set_range(m, state, 48, 57, int);
+        set(m, state, 46, dot);
+    };
+    set(m, zero, 120, hex_start);
+    set(m, zero, 98, bin_start);
+    set_range(m, dot, 48, 57, float);
+    set_range(m, float, 48, 57, float);
+    set(m, float, 101, exp);
+    set(m, float, 69, exp);
+    set(m, exp, 43, exp_sign);
+    set(m, exp, 45, exp_sign);
+    set_range(m, exp, 48, 57, exp_digits);
+    set_range(m, exp_sign, 48, 57, exp_digits);
+    set_range(m, exp_digits, 48, 57, exp_digits);
+    for ([hex_start, hex]) |state| {
+        set_range(m, state, 48, 57, hex);
+        set_range(m, state, 97, 102, hex);
+        set_range(m, state, 65, 70, hex);
+    };
+    for ([bin_start, bin]) |state| {
+        set(m, state, 48, bin);
+        set(m, state, 49, bin);
+    };
+}
+
+// A word state: word characters continue the word, anything else ends it.
+fn word_state(m: Machine, after: I32) I32 {
+    let state = ends(m, Tok.Word, after);
+    for (0 ..< 256) |c| { if is_word_char(c) { set(m, state, c, m.word); }; };
+    state;
+}
+
+fn words(m: Machine) void {
+    m.word = word_state(m, 1);
+    for (0 ..< 256) |c| { if is_word_char(c) { set(m, m.word, c, m.word); }; };
+    for (0 ..< 256) |c| {
+        if is_word_char(c) and (c < 48 or c > 57) { both(m, c, m.word); };
+    };
+    // Words after which an expression or a type begins, so a `-o`, `?.`, or
+    // compound assignment cannot follow them: the keywords that begin an
+    // expression (elsewhere they are identifiers: `x -o in` pipes to `in`),
+    // the keyword operators, `else`, and `type` (`type &= …` declares the
+    // self type). Each is a path through word states ending in one whose
+    // token is followed by the start state before an expression.
+    let keywords = ["if", "else", "match", "loop", "alt", "promote", "try", "for", "while", "break", "continue",
+        "defer", "yield", "return", "let", "cl", "new", "await", "assert", "not", "and", "or", "xor",
+        "orelse", "type"];
+    for (keywords) |word| {
+        let current = start_before;
+        for (0 ..< word.len()) |k| {
+            let c = word.get(k);
+            let next = get(m, current, c);
+            if next == m.word {
+                next = word_state(m, 1);
+                set(m, current, c, next);
+                if current == start_before { set(m, start_after, c, next); };
+            };
+            current = next;
+        };
+        m.afters[current] = 0;
+    };
+}
+
+// `X` and, after an expression, `X=` (but not before `>`: `|x|=> …` closes
+// a capture before an arm). Returns the state after `X` following an expression.
+fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
+    set(m, start_before, c, ends(m, plain, 0));
+    let first = ends(m, plain, 0);
+    set(m, start_after, c, first);
+    let eq = ends(m, assign, 0);
+    set(m, first, 61, eq);
+    set(m, eq, 62, back1_code);
+    m.backs[eq] = plain.to_i32();
+    first;
+}
+
+fn punctuation(m: Machine) void {
+    single(m, 40, Tok.LParen, 0);
+    single(m, 41, Tok.RParen, 1);
+    single(m, 123, Tok.LBrace, 0);
+    single(m, 125, Tok.RBrace, 1);
+    single(m, 91, Tok.LBracket, 0);
+    single(m, 93, Tok.RBracket, 1);
+    single(m, 44, Tok.Comma, 0);
+    single(m, 59, Tok.Semi, 0);
+    single(m, 58, Tok.Colon, 0);
+    single(m, 64, Tok.At, 0);
+
+    // `.`, `...`, `..<`; `..` alone is two dots.
+    let dot = ends(m, Tok.Dot, 0);
+    let dots = backs_off(m, Tok.Dot, 0, 1);
+    both(m, 46, dot);
+    set(m, dot, 46, dots);
+    set(m, dots, 46, ends(m, Tok.DotDotDot, 0));
+    set(m, dots, 60, ends(m, Tok.DotDotLt, 0));
+
+    compound(m, 124, Tok.Pipe, Tok.PipeEq);
+    compound(m, 38, Tok.Amp, Tok.AmpEq);
+    compound(m, 94, Tok.Caret, Tok.CaretEq);
+    compound(m, 42, Tok.Star, Tok.StarEq);
+    compound(m, 37, Tok.Percent, Tok.PercentEq);
+    compound(m, 43, Tok.Plus, Tok.PlusEq);
+
+    // `/`: also `//` comments and `/\` DSL bodies.
+    let slash_after = compound(m, 47, Tok.Slash, Tok.SlashEq);
+    let comment = ends(m, Tok.Comment, 2);
+    to_line_end(m, comment);
+    for ([get(m, start_before, 47), slash_after]) |state| {
+        set(m, state, 47, comment);
+        set(m, state, 92, dsl_code);
+    };
+    // `\\` multiline string lines.
+    let backslash = inside(m);
+    let line = ends(m, Tok.MultilineLine, 1);
+    to_line_end(m, line);
+    both(m, 92, backslash);
+    set(m, backslash, 92, line);
+
+    // `-`, and after an expression `-o` and `-=`.
+    let minus = compound(m, 45, Tok.Minus, Tok.MinusEq);
+    set(m, minus, 111, ends(m, Tok.MinusO, 0));
+
+    // `<`, `<=`, `<<`, and after an expression `<<=`.
+    for ([start_before, start_after]) |start| {
+        let lt = ends(m, Tok.Lt, 0);
+        let shl = ends(m, Tok.Shl, 0);
+        set(m, start, 60, lt);
+        set(m, lt, 61, ends(m, Tok.LtEq, 0));
+        set(m, lt, 60, shl);
+        if start == start_after { set(m, shl, 61, ends(m, Tok.ShlEq, 0)); };
+    };
+    // `>`, `>=`, `>>`, `>>>`, and after an expression `>>=` and `>>>=`.
+    for ([start_before, start_after]) |start| {
+        let gt = ends(m, Tok.Gt, 0);
+        let shr = ends(m, Tok.Shr, 0);
+        let shr3 = ends(m, Tok.Shr3, 0);
+        set(m, start, 62, gt);
+        set(m, gt, 61, ends(m, Tok.GtEq, 0));
+        set(m, gt, 62, shr);
+        set(m, shr, 62, shr3);
+        if start == start_after {
+            set(m, shr, 61, ends(m, Tok.ShrEq, 0));
+            set(m, shr3, 61, ends(m, Tok.Shr3Eq, 0));
+        };
+    };
+
+    // `=`, `==`, `=>`.
+    let eq = ends(m, Tok.Eq, 0);
+    both(m, 61, eq);
+    set(m, eq, 61, ends(m, Tok.EqEq, 0));
+    set(m, eq, 62, ends(m, Tok.FatArrow, 0));
+    // `!=` (`!` alone is no token).
+    let bang = inside(m);
+    both(m, 33, bang);
+    set(m, bang, 61, ends(m, Tok.BangEq, 0));
+    // `~`, `~>`.
+    let tilde = ends(m, Tok.Tilde, 0);
+    both(m, 126, tilde);
+    set(m, tilde, 62, ends(m, Tok.TildeArrow, 0));
+    // `?`, and after an expression `?.` (but `?.{I32}` after a parameter
+    // list is a nullable tuple type).
+    set(m, start_before, 63, ends(m, Tok.Question, 0));
+    let question = ends(m, Tok.Question, 0);
+    let optional = ends(m, Tok.QuestionDot, 0);
+    set(m, start_after, 63, question);
+    set(m, question, 46, optional);
+    set(m, optional, 123, back1_code);
+    m.backs[optional] = Tok.Question.to_i32();
+}
+
+fn build() Machine {
+    let m = Machine {
+        tabs: Array[I32].new(256 * 256, error_code),
+        kinds: Array[I32].new(256, Tok.Error.to_i32()),
+        backs: Array[I32].new(256, Tok.Error.to_i32()),
+        afters: Array[I32].new(256, 0),
+        next: start_after + 1,
+        word: 0,
+    };
+    both(m, end_byte, done_code);
+    whitespace(m);
+    strings(m);
+    numbers(m);
+    words(m);
+    punctuation(m);
+    if m.next > 256 { fatal; };
+    m.tabs = m.tabs.slice(0, m.next * 256);
+    m.kinds = m.kinds.slice(0, m.next);
+    m.backs = m.backs.slice(0, m.next);
+    m.afters = m.afters.slice(0, m.next);
+    m;
+}
+
+// ── Lexing ───────────────────────────────────────────────────────────────────
+
+fn push(kind: I32, start: I32, end_: I32) void {
+    tok_kind.push(kind);
     tok_start.push(start);
     tok_end.push(end_);
-}
-
-// Whether the word src[start..end) is `text`.
-fn word_is(start: I32, end_: I32, text: Str) Bool {
-    if end_ - start != text.len() { return false; };
-    for (0 ..< text.len()) |k| {
-        if src[start + k] != text.get(k) { return false; };
-    };
-    true;
-}
-
-// Words after which an expression or a type begins, so a `-o`, `?.`, or
-// compound assignment cannot follow them: the keywords that begin an
-// expression (elsewhere they are identifiers: `x -o in` pipes to `in`), the
-// keyword operators, `else`, and `type` (`type &= …` declares the self type).
-fn begins_expression(start: I32, end_: I32) Bool {
-    word_is(start, end_, "if") or word_is(start, end_, "else") or word_is(start, end_, "match")
-        or word_is(start, end_, "loop") or word_is(start, end_, "alt") or word_is(start, end_, "promote")
-        or word_is(start, end_, "try") or word_is(start, end_, "for") or word_is(start, end_, "while")
-        or word_is(start, end_, "break") or word_is(start, end_, "continue") or word_is(start, end_, "defer")
-        or word_is(start, end_, "yield") or word_is(start, end_, "return") or word_is(start, end_, "let")
-        or word_is(start, end_, "cl") or word_is(start, end_, "new") or word_is(start, end_, "await")
-        or word_is(start, end_, "assert") or word_is(start, end_, "not") or word_is(start, end_, "and")
-        or word_is(start, end_, "or") or word_is(start, end_, "xor") or word_is(start, end_, "orelse")
-        or word_is(start, end_, "type");
-}
-
-// The end of the number at `i`: `1.5e-3` is a float, `0x1f`, `0b101`, `15` ints.
-fn number_end(i: I32, n: I32) I32 {
-    let j = i;
-    while (is_digit(at(j, n))) { j += 1; };
-    if at(j, n) == 46 and is_digit(at(j + 1, n)) {
-        j += 1;
-        while (is_digit(at(j, n))) { j += 1; };
-        let e = at(j, n);
-        if e == 101 or e == 69 {
-            let k = j + 1;
-            let sign = at(k, n);
-            if sign == 43 or sign == 45 { k += 1; };
-            if is_digit(at(k, n)) {
-                while (is_digit(at(k, n))) { k += 1; };
-                j = k;
-            };
-        };
-        return j;
-    };
-    if src[i] == 48 and at(i + 1, n) == 120 and is_hex(at(i + 2, n)) {
-        j = i + 2;
-        while (is_hex(at(j, n))) { j += 1; };
-        return j;
-    };
-    if src[i] == 48 and at(i + 1, n) == 98 and (at(i + 2, n) == 48 or at(i + 2, n) == 49) {
-        j = i + 2;
-        while (at(j, n) == 48 or at(j, n) == 49) { j += 1; };
-        return j;
-    };
-    j;
-}
-
-fn is_float(start: I32, end_: I32) Bool {
-    for (start ..< end_) |k| { if src[k] == 46 { return true; }; };
-    false;
-}
-
-// The end of the string literal at `i` (a `"`), or -1 when it is not closed on its line.
-fn string_end(i: I32, n: I32) I32 {
-    let j = i + 1;
-    while (j < n) {
-        let c = src[j];
-        if c == 34 { return j + 1; };
-        if c == 10 { return -1; };
-        if c == 92 {
-            if j + 1 >= n or src[j + 1] == 10 { return -1; };
-            j += 2;
-        } else {
-            j += 1;
-        };
-    };
-    -1;
 }
 
 // The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
@@ -206,10 +456,10 @@ fn dsl_end(i: I32, n: I32) I32 {
     while (j < n) {
         let c = src[j];
         j += 1;
-        if c == 47 and at(j, n) == 92 {
+        if c == 47 and src[j] == 92 {
             depth += 1;
             j += 1;
-        } else if c == 92 and at(j, n) == 47 {
+        } else if c == 92 and src[j] == 47 {
             j += 1;
             depth -= 1;
             if depth == 0 { return j; };
@@ -218,160 +468,91 @@ fn dsl_end(i: I32, n: I32) I32 {
     -1;
 }
 
-fn line_end(i: I32, n: I32) I32 {
-    let j = i;
-    while (j < n and src[j] != 10) { j += 1; };
-    j;
-}
-
-// Punctuation at `i`: its kind and length. `after` says whether an expression just ended.
-fn punct(i: I32, n: I32, after: Bool) .{Tok, I32} {
-    let c = src[i];
-    let b = at(i + 1, n);
-    let d = at(i + 2, n);
-    if c == 40 { return .{Tok.LParen, 1}; };
-    if c == 41 { return .{Tok.RParen, 1}; };
-    if c == 123 { return .{Tok.LBrace, 1}; };
-    if c == 125 { return .{Tok.RBrace, 1}; };
-    if c == 91 { return .{Tok.LBracket, 1}; };
-    if c == 93 { return .{Tok.RBracket, 1}; };
-    if c == 44 { return .{Tok.Comma, 1}; };
-    if c == 59 { return .{Tok.Semi, 1}; };
-    if c == 58 { return .{Tok.Colon, 1}; };
-    if c == 64 { return .{Tok.At, 1}; };
-    if c == 46 {
-        if b == 46 and d == 46 { return .{Tok.DotDotDot, 3}; };
-        if b == 46 and d == 60 { return .{Tok.DotDotLt, 3}; };
-        return .{Tok.Dot, 1};
-    };
-    // A compound assignment follows its target (`type & = …` is the self type
-    // and `=`), and is never followed by `>` (`|x|=> …` closes a capture).
-    let assigns = after and d != 62;
-    if c == 124 { if assigns and b == 61 { return .{Tok.PipeEq, 2}; }; return .{Tok.Pipe, 1}; };
-    if c == 38 { if assigns and b == 61 { return .{Tok.AmpEq, 2}; }; return .{Tok.Amp, 1}; };
-    if c == 94 { if assigns and b == 61 { return .{Tok.CaretEq, 2}; }; return .{Tok.Caret, 1}; };
-    if c == 42 { if assigns and b == 61 { return .{Tok.StarEq, 2}; }; return .{Tok.Star, 1}; };
-    if c == 47 { if assigns and b == 61 { return .{Tok.SlashEq, 2}; }; return .{Tok.Slash, 1}; };
-    if c == 37 { if assigns and b == 61 { return .{Tok.PercentEq, 2}; }; return .{Tok.Percent, 1}; };
-    if c == 43 { if assigns and b == 61 { return .{Tok.PlusEq, 2}; }; return .{Tok.Plus, 1}; };
-    if c == 45 {
-        if after and b == 111 { return .{Tok.MinusO, 2}; };
-        if assigns and b == 61 { return .{Tok.MinusEq, 2}; };
-        return .{Tok.Minus, 1};
-    };
-    if c == 60 {
-        if after and b == 60 and d == 61 { return .{Tok.ShlEq, 3}; };
-        if b == 60 { return .{Tok.Shl, 2}; };
-        if b == 61 { return .{Tok.LtEq, 2}; };
-        return .{Tok.Lt, 1};
-    };
-    if c == 62 {
-        if after and b == 62 and d == 62 and at(i + 3, n) == 61 { return .{Tok.Shr3Eq, 4}; };
-        if b == 62 and d == 62 { return .{Tok.Shr3, 3}; };
-        if after and b == 62 and d == 61 { return .{Tok.ShrEq, 3}; };
-        if b == 62 { return .{Tok.Shr, 2}; };
-        if b == 61 { return .{Tok.GtEq, 2}; };
-        return .{Tok.Gt, 1};
-    };
-    if c == 61 {
-        if b == 62 { return .{Tok.FatArrow, 2}; };
-        if b == 61 { return .{Tok.EqEq, 2}; };
-        return .{Tok.Eq, 1};
-    };
-    if c == 33 and b == 61 { return .{Tok.BangEq, 2}; };
-    if c == 63 {
-        // `?.{I32}` after a parameter list is a nullable tuple type, not a field access.
-        if after and b == 46 and d != 123 { return .{Tok.QuestionDot, 2}; };
-        return .{Tok.Question, 1};
-    };
-    if c == 126 { if b == 62 { return .{Tok.TildeArrow, 2}; }; return .{Tok.Tilde, 1}; };
-    .{Tok.Error, 0};
-}
-
-// Lex the `n` bytes of `src`. Returns the number of tokens, the last of them
-// `End`, or `Error` (at the offending byte) when the source has a byte no
-// token can start with, or a string or DSL body that does not close.
+// Lex the `n` bytes of `src` (followed by the end byte). Returns the number
+// of tokens, the last of them `End`, or `Error` (at the start of the token
+// that cannot be lexed: a byte no token starts with, or a string or DSL body
+// that does not close).
 fn lex(n: I32) I32 {
     tok_kind.clear();
     tok_start.clear();
     tok_end.clear();
     let i = 0;
-    // Whether the last token (not a comment) ended an expression.
-    let after = false;
-    while (i < n) {
-        let space = space_at(i, n);
-        if space > 0 {
-            i += space;
-            continue;
-        };
-        let c = src[i];
-        let b = at(i + 1, n);
-        if c == 47 and b == 47 {
-            let j = line_end(i, n);
-            push(Tok.Comment, i, j);
-            i = j;
-            continue;
-        };
-        if c == 92 and b == 92 {
-            let j = line_end(i, n);
-            push(Tok.MultilineLine, i, j);
-            i = j;
-            after = true;
-            continue;
-        };
-        if c == 47 and b == 92 {
-            let j = dsl_end(i, n);
-            if j < 0 {
-                push(Tok.Error, i, i);
-                return tok_kind.len();
-            };
-            push(Tok.DslBody, i, j);
-            i = j;
-            after = true;
-            continue;
-        };
-        if is_word_start(c) {
-            let j = i + 1;
-            while (is_word_char(at(j, n))) { j += 1; };
-            push(Tok.Word, i, j);
-            after = not begins_expression(i, j);
-            i = j;
-            continue;
-        };
-        if is_digit(c) {
-            let j = number_end(i, n);
-            push(if is_float(i, j) { Tok.Float; } else { Tok.Int; }, i, j);
-            i = j;
-            after = true;
-            continue;
-        };
-        if c == 34 {
-            let j = string_end(i, n);
-            if j < 0 {
-                push(Tok.Error, i, i);
-                return tok_kind.len();
-            };
-            push(Tok.String, i, j);
-            i = j;
-            after = true;
-            continue;
-        };
-        let .{kind, length} = punct(i, n, after);
-        if length == 0 {
-            push(Tok.Error, i, i);
+    let j = 0;
+    let start = start_before;
+    let state = start;
+    let next = dfa[start * 256 + src[0]];
+    loop match next {
+        0 => {
+            push(Tok.Error.to_i32(), i, i);
             return tok_kind.len();
-        };
-        push(kind, i, i + length);
-        i += length;
-        after = kind == Tok.RParen or kind == Tok.RBracket or kind == Tok.RBrace;
+        },
+        1 => {
+            push(kind_of[state], i, j);
+            let after = after_of[state];
+            if after == 0 { start = start_before; } else if after == 1 { start = start_after; };
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        2 => {
+            j -= 1;
+            push(back_kind[state], i, j);
+            start = if after_of[state] == 1 { start_after; } else { start_before; };
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        3 => {
+            j -= 2;
+            push(back_kind[state], i, j);
+            start = if after_of[state] == 1 { start_after; } else { start_before; };
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        4 => {
+            j += 1;
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        5 => {
+            j = dsl_end(i, n);
+            if j < 0 {
+                push(Tok.Error.to_i32(), i, i);
+                return tok_kind.len();
+            };
+            push(Tok.DslBody.to_i32(), i, j);
+            start = start_after;
+            i = j;
+            state = start;
+            next = dfa[start * 256 + src[j]];
+            continue next;
+        },
+        6 => {
+            push(Tok.End.to_i32(), n, n);
+            return tok_kind.len();
+        },
+        ~> {
+            state = next;
+            j += 1;
+            next = dfa[state * 256 + src[j]];
+            continue next;
+        },
     };
-    push(Tok.End, n, n);
     tok_kind.len();
 }
 
 export lib {
     // Make room for `n` source bytes, which the host then writes into `src`.
-    fn source(n: I32) void { src.resize(n); }
+    fn source(n: I32) void {
+        src.resize(n + 1);
+        src[n] = end_byte;
+    }
 
     fn tokens(n: I32) I32 { lex(n); }
 }

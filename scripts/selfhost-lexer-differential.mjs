@@ -7,7 +7,8 @@
 // Defaults to every .utu file under examples/, benchmarks/, std/,
 // hand_written_bindings/, and baselines/corpus. --fuzz=N adds N mutants of
 // each (characters deleted, duplicated, or swapped), which reach odd corners
-// of the lexer; a mutant counts only when the JavaScript parser accepts it.
+// of the lexer. A source the JavaScript parser rejects is only checked to lex
+// to an end (or an error) without trapping.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,7 +42,16 @@ for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   for (const [name, text] of [[path.relative(ROOT, file), source], ...mutants(source, fuzz).map((m, i) => [`${path.relative(ROOT, file)}#mutant${i}`, m])]) {
     const tree = parseSyntax(text);
-    if (!tree) { skipped++; continue; }
+    if (!tree) {
+      // Whatever the source, the lexer finishes: its last token is End or Error.
+      const last = lex(text).at(-1);
+      if (last?.kind !== 0 && last?.kind !== 1) {
+        differ++;
+        if (differ <= show) console.log(`DIFFERS ${name}: lexing did not finish`);
+      }
+      skipped++;
+      continue;
+    }
     checked++;
     const problem = compare(leaves(tree.rootNode), lex(text), text);
     if (problem) {
