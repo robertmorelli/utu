@@ -650,6 +650,16 @@ fn check_for(node: I32, cx: Cx) I32 {
     let brk = new_label();
     let top = new_label();
     let next = new_label();
+    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) {
+        let d = if capture >= 0 { node_decl[first_child(capture)]; } else { -1; };
+        if d >= 0 {
+            decl_ty[d] = types[0];
+            decl_local[d] = counters[0];
+        };
+        unrolled_for(block, counters[0], ends[0], repr(types[0]), types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), brk, top, cx);
+        w_node(Op.Seq, vt_none, 0, 0, m);
+        return ty_void();
+    };
     let mb = w_mark();
     let ml = w_mark();
     for (0 ..< n) |k| {
@@ -707,3 +717,100 @@ fn check_for(node: I32, cx: Cx) I32 {
 }
 
 fn w_type_of_local(local: I32) I32 { cur_locals[local]; }
+
+// ── Unrolling (speed builds, as stage 0's -O3) ──
+//
+// `for (a ..< b) |i| { … }` with a small body: while four or more values
+// remain, four copies of the body run without a test between them; then
+// the rest one at a time. Each copy has its own `continue` label, so
+// continue still skips one value.
+//
+//   block $brk
+//     loop $top
+//       br_if $brk (i >= end)
+//       if (end - i) >=u 4 { 4 × (block $next_k { body }; i += 1); br $top }
+//       block $next { body }; i += 1
+//       br $top
+
+let unroll_copies: I32 = 4;
+let unroll_max_nodes: I32 = 64;
+
+// A body worth unrolling: small, and neither looping, allocating, nor
+// branching many ways (those got slower unrolled, measured on V8 in stage 0).
+fn unrollable(block: I32) Bool { unroll_nodes(block) <= unroll_max_nodes; }
+
+// The nodes of a body, or more than the most when it may not be unrolled.
+fn unroll_nodes(node: I32) I32 {
+    let kind = node_kind[node];
+    if kind == Node.For_expr.to_i32() or kind == Node.While_expr.to_i32() or kind == Node.Loop_match_expr.to_i32()
+        or kind == Node.Match_expr.to_i32() or kind == Node.Alt_expr.to_i32() or kind == Node.Promote_expr.to_i32()
+        or kind == Node.Struct_init.to_i32() or kind == Node.Implicit_struct_init.to_i32() or kind == Node.Array_expr.to_i32()
+        or kind == Node.Closure_expr.to_i32() or kind == Node.Dsl_expr.to_i32() or kind == Node.If_expr.to_i32() {
+        return unroll_max_nodes + 1;
+    };
+    if kind == Node.Call_expr.to_i32() {
+        let callee = first_child(node);
+        if (is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Type_member_expr)) and allocating_method(word_of(last_child(callee))) {
+            return unroll_max_nodes + 1;
+        };
+    };
+    let total = 1;
+    let c = first_child(node);
+    while (c >= 0) {
+        total += unroll_nodes(c);
+        if total > unroll_max_nodes { return total; };
+        c = next_sibling(c);
+    };
+    total;
+}
+
+fn allocating_method(word: I32) Bool {
+    for (["slice", "get_slice", "new", "new_default", "copy_from", "push"]) |name| {
+        if word == intern_text(name) { return true; };
+    };
+    false;
+}
+
+fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, brk: I32, top: I32, cx: Cx) void {
+    let wide = vt == vt_i64;
+    let mb = w_mark();
+    let ml = w_mark();
+    // br_if $brk (i >= end)
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt, counter, 0);
+    w_leaf(Op.LocalGet, vt, end_, 0);
+    w_node(Op.Plain, vt_i32, if wide { if unsigned { 90; } else { 89; }; } else { if unsigned { 79; } else { 78; }; }, 0, mc);
+    w_node(Op.BrIf, vt_none, brk, 0, mc);
+    // if (end - i) >=u 4 { four copies; br $top }
+    let mi = w_mark();
+    let mr = w_mark();
+    w_leaf(Op.LocalGet, vt, end_, 0);
+    w_leaf(Op.LocalGet, vt, counter, 0);
+    w_node(Op.Plain, vt, if wide { 125; } else { 107; }, 0, mr);
+    if wide { w_leaf(Op.I64Const, vt_i64, unroll_copies, 0); } else { w_i32(unroll_copies); };
+    w_node(Op.Plain, vt_i32, if wide { 90; } else { 79; }, 0, mr);
+    let mt = w_mark();
+    for (0 ..< unroll_copies) |_k| { unrolled_step(block, counter, vt, brk, cx); };
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    unrolled_step(block, counter, vt, brk, cx);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+}
+
+// One iteration: the body (its continue goes to the end of this copy), then i += 1.
+fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) void {
+    let next = new_label();
+    let mn = w_mark();
+    enter_loop(brk, next, -1, -1);
+    discard(check_block(block, ty_void(), cx));
+    leave_loop();
+    w_node(Op.Block, vt_none, next, 0, mn);
+    let ms = w_mark();
+    w_leaf(Op.LocalGet, vt, counter, 0);
+    if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0); } else { w_i32(1); };
+    w_node(Op.Plain, vt, if vt == vt_i64 { 124; } else { 106; }, 0, ms);
+    w_node(Op.LocalSet, vt_none, counter, 0, ms);
+}
