@@ -25,6 +25,7 @@ import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
 import { build } from 'esbuild';
 
@@ -43,6 +44,7 @@ async function main() {
   await syncWutuRuntime();
   await generatePlatformSources();
   buildCompiler();
+  await bundleSelfhost();
   await bundlePackage();
   await bundleVscodeExtension();
 }
@@ -171,6 +173,38 @@ async function bundlePackage() {
       'globalThis.process': 'undefined',
     },
     plugins: [embeddedWasmPlugin(), hostNeutralDependencyPlugin(), nodeBranchStubPlugin()],
+  });
+}
+
+// dist/selfhost/utu.js: the self-hosted compiler's JavaScript API (the
+// driver, the standard library's sources), for editors and pages. The
+// browser catalog is a chunk of its own, loaded only by programs that
+// import it, and holds its graphs as JSON: larger on disk than the
+// committed gzip, but half the size served compressed.
+async function bundleSelfhost() {
+  await fs.rm(path.join(DIST_DIR, 'selfhost'), { recursive: true, force: true });
+  await build({
+    plugins: [{
+      name: 'catalog-json',
+      setup(api) {
+        api.onLoad({ filter: /browser-catalog\.generated\.js$/ }, async ({ path: file }) => {
+          const { gunzipSync } = await import('node:zlib');
+          const catalog = await import(pathToFileURL(file).href);
+          const json = name => JSON.stringify(gunzipSync(Buffer.from(catalog[`${name}_GZIP`], 'base64')).toString());
+          return { contents: `export const BROWSER_ABI_JSON = ${json('BROWSER_ABI')};\nexport const WORKER_ABI_JSON = ${json('WORKER_ABI')};\n`, loader: 'js' };
+        });
+      },
+    }],
+    entryPoints: { utu: path.join(ROOT, 'src', 'selfhost', 'index.js') },
+    outdir: path.join(DIST_DIR, 'selfhost'),
+    bundle: true,
+    splitting: true,
+    format: 'esm',
+    platform: 'neutral',
+    target: 'es2022',
+    minify: true,
+    legalComments: 'none',
+    chunkNames: '[name]-[hash]',
   });
 }
 
