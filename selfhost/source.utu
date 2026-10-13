@@ -30,6 +30,7 @@ mem file_tok: I32;      // first token
 mem file_tok_end: I32;  // after its last (End or Error)
 mem file_root: I32;     // its source file node, or -1 until it parses
 mem file_error: I32;    // the token its parse error is at, or -1
+mem file_wanted: I32;   // and the word of what the parser wanted there, or -1
 
 // `using M from "…"`, in the order files are parsed.
 mem import_file: I32;   // the file that imports
@@ -78,6 +79,7 @@ fn reset_program() void {
     file_tok_end.clear();
     file_root.clear();
     file_error.clear();
+    file_wanted.clear();
     import_file.clear();
     import_node.clear();
     import_path.clear();
@@ -110,6 +112,7 @@ fn add_file(n: I32, role: FileRole) I32 {
     file_tok_end.push(tok_kind.len());
     file_root.push(-1);
     file_error.push(-1);
+    file_wanted.push(-1);
     file;
 }
 
@@ -122,7 +125,10 @@ fn parse_file(file: I32) I32 {
     file_tok_end[file] = last;
     let root = parse(first, last);
     file_root[file] = root;
-    if root >= 0 { list_imports(file, root); } else { file_error[file] = parse_error_at[0]; };
+    if root >= 0 { list_imports(file, root); } else {
+        file_error[file] = parse_error_at[0];
+        file_wanted[file] = parse_error_wanted[0];
+    };
     root;
 }
 

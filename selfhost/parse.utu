@@ -258,13 +258,55 @@ mem pending: I32;
 let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/;
 
 // Give up: the program is not one this parser accepts. The furthest token
-// any attempt failed at is where the error is reported.
+// any attempt failed at is where the error is reported, with what the
+// attempts that got that far wanted there.
 mem parse_furthest: I32 = [0];
+mem parse_expected: I32;        // at the furthest token: Tok kinds, and keywords as kw_wanted + their word
 mem parse_error_at: I32 = [0];  // the token a failed parse reports
+mem parse_error_wanted: I32 = [-1];  // and the word of what it wanted there ("';' or '}'"), or -1
 
-fn fail(p: Parser) void {
-    if p.pos > parse_furthest[0] { parse_furthest[0] = p.pos; };
+let kw_wanted: I32 = 1000;
+
+fn fail(p: Parser) void { fail_wanting(p, -1); }
+
+fn fail_wanting(p: Parser, wanted: I32) void {
+    if p.pos > parse_furthest[0] {
+        parse_furthest[0] = p.pos;
+        parse_expected.clear();
+    };
+    if p.pos == parse_furthest[0] and wanted >= 0 {
+        let seen = false;
+        for (0 ..< parse_expected.len()) |i| { if parse_expected[i] == wanted { seen = true; }; };
+        if not seen { parse_expected.push(wanted); };
+    };
     syntax_error();
+}
+
+// What the furthest attempts wanted, in words: "';'", "';' or '}'", "'(', ',' or ')'".
+fn wanted_text() Str {
+    let n = parse_expected.len();
+    if n == 0 { return ""; };
+    let text = "";
+    for (0 ..< n) |i| {
+        if i > 0 { text = text + (if i == n - 1 { " or "; } else { ", "; }); };
+        let w = parse_expected[i];
+        text = text + "'" + (if w >= kw_wanted { word_text(w - kw_wanted); } else { tok_spelling(w); }) + "'";
+    };
+    text;
+}
+
+// How a kind of token is written (or named, for the kinds with no one spelling).
+fn tok_spelling(kind: I32) Str {
+    match kind {
+        0 => "end of file", 1 => "a character", 2 => "a name", 3 => "an integer", 4 => "a number",
+        5 => "a string", 6 => "\\\\", 7 => "/\\", 8 => "//",
+        9 => "(", 10 => ")", 11 => "{", 12 => "}", 13 => "[", 14 => "]", 15 => ",", 16 => ";", 17 => ":",
+        18 => "@", 19 => ".", 20 => "...", 21 => "..<", 22 => "|", 23 => "|=", 24 => "&", 25 => "&=",
+        26 => "^", 27 => "^=", 28 => "*", 29 => "*=", 30 => "/", 31 => "/=", 32 => "%", 33 => "%=",
+        34 => "+", 35 => "+=", 36 => "-", 37 => "-=", 38 => "-o", 39 => "<", 40 => "<=", 41 => "<<",
+        42 => "<<=", 43 => ">", 44 => ">=", 45 => ">>", 46 => ">>=", 47 => ">>>", 48 => ">>>=", 49 => "=",
+        50 => "==", 51 => "=>", 52 => "!=", 53 => "?", 54 => "?.", 55 => "~", ~> "~>",
+    };
 }
 
 struct Parser:
@@ -309,12 +351,12 @@ fn shaped(p: Parser) Bool { shaped_at(p, 0); }
 fn advance(p: Parser) void { p.pos += 1; }
 
 fn expect(p: Parser, kind: Tok) void {
-    if not is(p, kind) { fail(p); };
+    if not is(p, kind) { fail_wanting(p, kind.to_i32()); };
     p.pos += 1;
 }
 
 fn expect_kw(p: Parser, kw: Kw) void {
-    if not is_kw(p, kw) { fail(p); };
+    if not is_kw(p, kw) { fail_wanting(p, kw_wanted + kw.to_i32()); };
     p.pos += 1;
 }
 
@@ -1876,6 +1918,7 @@ fn intern_words(first: I32, last: I32) void {
 // their nodes. Returns the source file node, or -1 when the tokens do not
 // parse (and adds no nodes). Comments are the nodes after the source file.
 fn parse(first: I32, last: I32) I32 {
+    parse_error_wanted[0] = -1;
     if tok_kind[last - 1] != Tok.End.to_i32() {
         parse_error_at[0] = last - 1;
         return -1;
@@ -1884,6 +1927,7 @@ fn parse(first: I32, last: I32) I32 {
     let before = node_kind.len();
     pending.clear();
     parse_furthest[0] = 0;
+    parse_expected.clear();
     try {
         let root = source_file(Parser { pos: 0 });
         token_spans(before, root, first, last - 1);
@@ -1891,6 +1935,7 @@ fn parse(first: I32, last: I32) I32 {
         root;
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]];
+        if parse_expected.len() > 0 { parse_error_wanted[0] = intern_text(wanted_text()); };
         restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
         -1;
     };

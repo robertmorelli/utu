@@ -353,20 +353,31 @@ fn diag_text(i: I32) Str {
     if k == Diag.InternNotBytes { return "mem " + w + "." + word_text(a) + ": only byte mems (U8, I8) intern spans"; };
     if k == Diag.InvalidDslUsage { return "@es DSL must appear on the right-hand side of a typed let binding (let X: T = @es/\\...\\/)"; };
     if k == Diag.ParseError {
-        // Its row and column (in bytes), from 1.
-        let at = tok_start[a];
-        let row = 1;
-        let line = file_start[diag_word[i]];
-        for (file_start[diag_word[i]] ..< at) |b| {
-            if src[b] == 10 {
-                row += 1;
-                line = b + 1;
-            };
-        };
-        return "Parse error at " + int_text(row) + ":" + int_text(at - line + 1);
+        // What the parser wanted, and what it found.
+        let found = found_text(a);
+        if b >= 0 { return "Syntax error: expected " + word_text(b) + ", got " + found; };
+        return "Syntax error: unexpected " + found;
     };
     if k == Diag.Unsupported { return "not supported yet"; };
     Diag.name(k);
+}
+
+// A token as an error names it: a name, number, or symbol as written (a
+// long one cut short), and what the others are.
+fn found_text(t: I32) Str {
+    let kind = tok_kind[t];
+    if kind == Tok.End.to_i32() { return "the end of the file"; };
+    if kind == Tok.String.to_i32() or kind == Tok.MultilineLine.to_i32() { return "a string"; };
+    if kind == Tok.DslBody.to_i32() { return "a DSL body"; };
+    // The lexer stops before a character it does not know: that character.
+    if kind == Tok.Error.to_i32() {
+        let b = src[tok_start[t]];
+        let n = if b >= 240 { 4; } else if b >= 224 { 3; } else if b >= 192 { 2; } else { 1; };
+        return "character '" + bytes_text(tok_start[t], tok_start[t] + n) + "'";
+    };
+    let text = bytes_text(tok_start[t], tok_end[t]);
+    if text.len() > 24 { return "'" + text.slice(0, 24) + "…'"; };
+    "'" + text + "'";
 }
 
 // The span a diagnostic points at: its node's, as byte offsets.

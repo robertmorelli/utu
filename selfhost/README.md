@@ -193,11 +193,12 @@ purpose, where stage 0 builds a module given too few type arguments.
 `scripts/selfhost-diagnostics-differential.mjs` does the same for programs
 that do not build: for those programs and the negative corpus, every
 diagnostic's kind, message, and span must be stage 0's
-(`baselines/diagnostics.json.gz`). 1206 of 1234 builds diagnose the same,
+(`baselines/diagnostics.json.gz`). 1202 of 1234 builds diagnose the same,
 and none differs. The others differ on purpose: a program that does not parse
-is reported at the furthest token the parser reached, where stage 0
-reported tree-sitter's error recovery; and a few of stage 0's quirks are
-listed in the script with what this compiler does instead.
+is reported at the furthest token the parser reached, with what it wanted
+there (`Syntax error: expected ';', got 'x'`), where stage 0 reported
+tree-sitter's error recovery as `Parse error at 3:5`; and a few of stage
+0's quirks are listed in the script with what this compiler does instead.
 
 A diagnostic is recorded as a kind, a node, and up to four arguments (a
 word, types, counts, declarations); `diag.utu` makes its name, message, and

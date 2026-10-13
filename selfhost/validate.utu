@@ -79,7 +79,7 @@ fn validate_program() void {
     validate_protocols();
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
-            report2(Diag.ParseError, -1, file, file_error[file], -1);
+            report2(Diag.ParseError, -1, file, file_error[file], file_wanted[file]);
         } else if is_own_file(file) {
             validate_tree(file_root[file]);
         };

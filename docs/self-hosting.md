@@ -184,8 +184,8 @@ language stays as it is.
    did (`scripts/selfhost-run-differential.mjs`); 946 of 948 builds, none
    miscompiled (two differ on purpose). And every program that does not build is diagnosed as
    stage 0 diagnosed it, kinds, messages, and spans
-   (`scripts/selfhost-diagnostics-differential.mjs`); 1206 of 1234 builds,
-   none differing (28 on purpose).
+   (`scripts/selfhost-diagnostics-differential.mjs`); 1202 of 1234 builds,
+   none differing (32 on purpose: parse errors say what was expected).
 6. **Bootstrap.** Done: stage 0 builds stage 1, stage 1 builds stage 2,
    stage 2 builds stage 3, and stages 2 and 3 are identical
    (`scripts/selfhost-bootstrap.mjs`, part of `bun run test`). Stage 2
