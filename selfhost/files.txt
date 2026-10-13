@@ -10,6 +10,7 @@ validate.utu
 check.utu
 control.utu
 closures.utu
+generators.utu
 strings.utu
 data.utu
 mems.utu

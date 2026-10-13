@@ -140,6 +140,11 @@ enum(U8) Diag:
     | MemInitializer
     | MemElementRange
     | ClosureParamType
+    | GeneratorRecursion
+    | YieldOutside
+    | GeneratorReturnValue
+    | GeneratorCall
+    | YieldInClosure
 
 mem diag_kind: U8;
 mem diag_node: I32;

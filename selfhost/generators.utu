@@ -1,0 +1,239 @@
+// ── Generators ───────────────────────────────────────────────────────────────
+//
+// `fn squares(n: I32) yield I32 { for (0 ..< n) |i| { yield i * i; }; }` is
+// not a function: `for (squares(10)) |x| { body }` expands the generator's
+// body in place of the loop, with the consumer's body at each `yield`:
+//
+//   (the arguments into the generator's parameters)
+//   block $whole                      ; break in the body, return in the generator
+//     … the generator's code …
+//     block $resume                   ; continue in the body
+//       x = value; body
+//     end
+//     …
+//   end
+//
+// There is no frame, no closure, and no call per value. The generator's
+// declarations are the expansion's locals, set aside and restored when a
+// consumer body expands the same generator again inside it.
+
+// The expansions being checked, innermost last: what each yield needs.
+mem gen_whole: I32;     // the label a `return;` in the generator and a `break` in the body leave
+mem gen_capture: I32;   // the consumer's capture declaration, or -1
+mem gen_body: I32;      // the consumer's block
+mem gen_type: I32;      // the yielded type
+mem gen_cx_inst: I32;   // the consumer's checking context
+mem gen_cx_fi: I32;
+mem gen_cx_result: I32;
+mem gen_decl: I32;      // the generator's declaration
+
+fn reset_generators() void {
+    gen_whole.clear();
+    gen_capture.clear();
+    gen_body.clear();
+    gen_type.clear();
+    gen_cx_inst.clear();
+    gen_cx_fi.clear();
+    gen_cx_result.clear();
+    gen_decl.clear();
+}
+
+// Whether a function declaration is a generator (its result is `yield T`).
+fn is_generator(decl: I32) Bool {
+    if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return false; };
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Return_type) { return is_kind(first_child(c), Node.Yield_type); };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+// The generator a `for` loop consumes: its one source is a call of one.
+fn generator_call(for_node: I32) I32 {
+    let sources = first_child(for_node);
+    let source = first_child(sources);
+    if source < 0 or next_sibling(source) >= 0 or next_sibling(first_child(source)) >= 0 { return -1; };
+    let call = first_child(source);
+    if not is_kind(call, Node.Call_expr) or not is_kind(first_child(call), Node.Identifier) { return -1; };
+    if is_generator(node_decl[first_child(call)]) { call; } else { -1; };
+}
+
+// The declarations of a generator (its parameters and locals): those
+// whose node is inside it.
+fn generator_decls(gen: I32) I32 {
+    let node = decl_node[gen];
+    let m = vl_begin();
+    for (0 ..< decl_kind.len()) |d| {
+        if is_local_decl(d) and decl_node[d] >= 0 {
+            let t = node_first[decl_node[d]];
+            if t >= node_first[node] and t < node_last[node] { vl_add(d); };
+        };
+    };
+    vl_end(m);
+}
+
+// `for (gen(args)) |x| { body }`.
+fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
+    let gen = node_decl[first_child(call)];
+    // A generator that consumes itself would expand without end.
+    for (0 ..< gen_decl.len()) |i| {
+        if gen_decl[i] == gen {
+            report(Diag.GeneratorRecursion, node, decl_name[gen]);
+            return error_value();
+        };
+    };
+    let capture = next_sibling(first_child(node));
+    let body = last_child(node);
+    let cap = -1;
+    if is_kind(capture, Node.Capture) {
+        let name = first_child(capture);
+        if next_sibling(name) >= 0 {
+            report(Diag.InvalidForSource, capture, -1);
+            return error_value();
+        };
+        cap = node_decl[name];
+    };
+    let inst = instance_for(module_of(gen), cx.inst);
+    // Its element type: `yield T`.
+    let ret = -1;
+    let c = first_child(decl_node[gen]);
+    while (c >= 0) {
+        if is_kind(c, Node.Return_type) { ret = first_child(c); };
+        c = next_sibling(c);
+    };
+    let elem = type_of(first_child(ret), inst);
+    // Set aside its declarations' locals, in case an outer expansion of it is running.
+    let decls = generator_decls(gen);
+    let saved_local = Array[I32].new(vl_len[decls], 0);
+    let saved_ty = Array[I32].new(vl_len[decls], 0);
+    for (0 ..< vl_len[decls]) |i| {
+        saved_local[i] = decl_local[vl_item(decls, i)];
+        saved_ty[i] = decl_ty[vl_item(decls, i)];
+    };
+    let m = w_mark();
+    // Arguments into the parameters.
+    let params = param_list_of(gen);
+    let args = next_sibling(first_child(call));
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    let p = if params >= 0 { first_child(params); } else { -1; };
+    while (a >= 0 and p >= 0) {
+        let d = node_decl[first_child(p)];
+        let pt = type_of(next_sibling(first_child(p)), inst);
+        let ma = w_mark();
+        coerce(check_expr(a, pt, cx), pt, a);
+        decl_ty[d] = pt;
+        bind_value(d, pt, ma);
+        a = next_sibling(a);
+        p = next_sibling(p);
+    };
+    if a >= 0 or p >= 0 {
+        report(Diag.WrongArity, call, decl_name[gen]);
+        w_stack.resize(m);
+        return error_value();
+    };
+    // The generation.
+    let whole = new_label();
+    gen_whole.push(whole);
+    gen_capture.push(cap);
+    gen_body.push(body);
+    gen_type.push(elem);
+    gen_cx_inst.push(cx.inst);
+    gen_cx_fi.push(cx.fi);
+    gen_cx_result.push(cx.result);
+    gen_decl.push(gen);
+    let mb = w_mark();
+    mark_boxes(fn_body(gen));
+    // The generator's own loops are its; the consumer's loops are not in reach.
+    let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
+    discard(check_block(fn_body(gen), ty_void(), gcx));
+    w_node(Op.Block, vt_none, whole, 0, mb);
+    let k = gen_whole.len() - 1;
+    gen_whole.resize(k);
+    gen_capture.resize(k);
+    gen_body.resize(k);
+    gen_type.resize(k);
+    gen_cx_inst.resize(k);
+    gen_cx_fi.resize(k);
+    gen_cx_result.resize(k);
+    gen_decl.resize(k);
+    for (0 ..< vl_len[decls]) |i| {
+        decl_local[vl_item(decls, i)] = saved_local[i];
+        decl_ty[vl_item(decls, i)] = saved_ty[i];
+    };
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+fn param_list_of(decl: I32) I32 {
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Param_list) { return c; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+// The innermost expansion whose generator the node is in, or -1.
+fn expansion_of(node: I32) I32 {
+    let k = gen_decl.len() - 1;
+    let t = node_first[node];
+    while (k >= 0) {
+        if gen_decl[k] >= 0 {
+            let g = decl_node[gen_decl[k]];
+            if t >= node_first[g] and t < node_last[g] { return k; };
+        };
+        k -= 1;
+    };
+    -1;
+}
+
+// `yield v`: v into the consumer's capture, then its body, which `continue`
+// leaves (to resume the generator) and `break` ends the whole generation.
+fn check_yield(node: I32, cx: Cx) I32 {
+    let k = expansion_of(node);
+    if k < 0 {
+        report(Diag.YieldOutside, node, -1);
+        return error_value();
+    };
+    let t = gen_type[k];
+    let m = w_mark();
+    let value = first_child(node);
+    let mv = w_mark();
+    coerce(check_expr(value, t, cx), t, value);
+    let resume = new_label();
+    let mr = w_mark();
+    if gen_capture[k] >= 0 {
+        decl_ty[gen_capture[k]] = t;
+        bind_value(gen_capture[k], t, mv);
+    } else {
+        drop_value(t);
+    };
+    // The consumer's body, as part of the consumer: its loops and its result.
+    let ccx = Cx { inst: gen_cx_inst[k], fi: gen_cx_fi[k], result: gen_cx_result[k] };
+    // Its break and continue reach this expansion, not the generator's loops.
+    let saved = loop_break.len();
+    enter_loop(gen_whole[k], resume, -1, -1);
+    // While the body is checked, it is outside this expansion (a yield in
+    // it belongs to an outer one).
+    let decl = gen_decl[k];
+    gen_decl[k] = -1;
+    discard(check_block(gen_body[k], ty_void(), ccx));
+    gen_decl[k] = decl;
+    leave_loop();
+    w_node(Op.Block, vt_none, resume, 0, mr);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+// `return;` inside a generator's expansion ends the generation.
+fn generator_return(node: I32) I32 {
+    let k = expansion_of(node);
+    if k < 0 { return -1; };
+    if first_child(node) >= 0 {
+        report(Diag.GeneratorReturnValue, node, -1);
+        return error_value();
+    };
+    w_leaf(Op.Br, vt_unreachable, gen_whole[k], 0);
+    ty_never();
+}

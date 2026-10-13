@@ -97,7 +97,8 @@ fn validate_tree(node: I32) void {
     else if kind == Node.Tuple_type.to_i32() { validate_tuple_type(node); }
     else if kind == Node.Field.to_i32() { validate_field_type(node); }
     else if kind == Node.Global_decl.to_i32() { validate_global(node); }
-    else if kind == Node.Distinct_decl.to_i32() { validate_distinct(node); };
+    else if kind == Node.Distinct_decl.to_i32() { validate_distinct(node); }
+    else if kind == Node.Yield_expr.to_i32() { validate_yield(node); };
     let c = first_child(node);
     while (c >= 0) {
         validate_tree(c);
@@ -211,6 +212,24 @@ fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
         c = next_sibling(c);
     };
     false;
+}
+
+// `yield` belongs in a generator, and not in a closure inside one (the
+// generator expands into its consumer).
+fn validate_yield(node: I32) void {
+    let p = parent_of(node);
+    while (p >= 0) {
+        if is_kind(p, Node.Closure_expr) {
+            report(Diag.YieldInClosure, node, -1);
+            return;
+        };
+        if is_kind(p, Node.Fn_decl) {
+            if not is_generator(node_decl[last_child(first_child(p))]) { report(Diag.YieldOutside, node, -1); };
+            return;
+        };
+        p = parent_of(p);
+    };
+    report(Diag.YieldOutside, node, -1);
 }
 
 // ── Parents ──

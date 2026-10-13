@@ -366,6 +366,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Try_expr.to_i32() { return check_try(node, expect, cx); };
     if kind == Node.Tuple_expr.to_i32() { return check_tuple(node, expect, cx); };
     if kind == Node.Closure_expr.to_i32() { return check_closure(node, expect, cx); };
+    if kind == Node.Yield_expr.to_i32() { return check_yield(node, cx); };
     unsupported(node);
 }
 
@@ -834,6 +835,10 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(callee, Node.Identifier) {
         let decl = node_decl[callee];
         if decl < 0 { return error_value(); };
+        if is_generator(decl) {
+            report(Diag.GeneratorCall, node, decl_name[decl]);
+            return finish_error(args, m, cx);
+        };
         if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
             es_import(decl, last_child(decl_node[decl]), global_type(decl));
         };
@@ -1272,6 +1277,8 @@ fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
 }
 
 fn check_return(node: I32, cx: Cx) I32 {
+    let ended = generator_return(node);
+    if ended >= 0 { return ended; };
     let value = first_child(node);
     let m = w_mark();
     if value >= 0 {
@@ -1329,6 +1336,7 @@ fn reset_check() void {
     reset_enums();
     reset_control();
     reset_closures();
+    reset_generators();
     fi_grow();
 }
 
@@ -1433,7 +1441,9 @@ fn check_item(item: I32) void {
         return;
     };
     if is_kind(item, Node.Fn_decl) {
-        fn_instance(node_decl[last_child(first_child(item))], 0);
+        // A generator is checked where it is consumed.
+        let decl = node_decl[last_child(first_child(item))];
+        if not is_generator(decl) { fn_instance(decl, 0); };
         return;
     };
     if is_kind(item, Node.Op_decl) {
