@@ -1,6 +1,6 @@
-// The self-hosted parser (selfhost/syntax.utu) against the stage 0 parser:
+// The self-hosted parser (selfhost/parse.utu) against the stage 0 parser:
 // both accept the same sources, and for each one they accept, the named
-// nodes (comments aside) are the same, in the same order, with the same
+// nodes (comments included) are the same, in the same order, with the same
 // spans and depths.
 //
 //   node scripts/selfhost-parser-differential.mjs [files…] [--fuzz=N] [--seed=N] [--show=N]
@@ -12,8 +12,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject } from '../src/index.js';
 import { parseSyntax } from '../src/compiler/syntax/parser.js';
+import { loadSelfhost } from './selfhost.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -26,7 +26,7 @@ const INSERTS = [' -o ', '-o', '?.', '?', ' in ', ' type ', ' test ', ' and ', '
   '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//',
   ' map ', ' fold(0) ', '.{', '[', ']', '(', ')', '{', '}', ',', ';', ':', ' let ', ' if ', ' else ', ' cl() ', '&', '.'];
 
-const utu = await loadParser();
+const utu = await loadSelfhost();
 const names = new Map();
 const nameOf = kind => names.get(kind) ?? names.set(kind, utu.node_kind_name(kind)).get(kind);
 
@@ -54,58 +54,42 @@ const seconds = ((performance.now() - started) / 1000).toFixed(1);
 console.log(`${checked - differ}/${checked} sources parse as stage 0 parses them (${rejected} both reject) in ${seconds} s`);
 process.exit(differ ? 1 : 0);
 
-async function loadParser() {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser, target: 'normal', optimize: 'speed',
-    readFile: file => fs.promises.readFile(file, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  const doc = await compiler.compileFile(path.join(ROOT, 'selfhost', 'syntax.utu'));
-  const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.getAttribute('data-error-message'));
-  if (errors.length) throw new Error(`selfhost/syntax.utu:\n${errors.join('\n')}`);
-  const wasm = emitBinary(doc);
-  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
-  return instance.exports;
-}
 
 /** The self-hosted parser's named nodes for `text`, in preorder, or null when it rejects the source. */
 function parse(text) {
   const bytes = new TextEncoder().encode(text);
   utu.source(bytes.length);
   new Uint8Array(utu.src.buffer).set(bytes);
-  const count = utu.nodes(bytes.length);
-  if (count < 0) return null;
+  const root = utu.nodes(bytes.length);
+  if (root < 0) return null;
   const view = (mem, Type) => new Type(mem.buffer);
   const kind = view(utu.node_kind, Uint8Array);
   const first = view(utu.node_first, Int32Array);
   const last = view(utu.node_last, Int32Array);
   const child = view(utu.node_child, Int32Array);
   const next = view(utu.node_next, Int32Array);
-  const ptok = view(utu.ptok, Int32Array);
   const starts = view(utu.tok_start, Int32Array);
   const ends = view(utu.tok_end, Int32Array);
   const utf16 = utf16Offsets(bytes);
   const out = [];
   const visit = (node, depth) => {
-    let start = utf16[starts[ptok[first[node]]]];
-    let end = utf16[ends[ptok[last[node] - 1]]];
+    let start = utf16[starts[first[node]]];
+    let end = utf16[ends[last[node] - 1]];
     if (depth === 0) {
       // tree-sitter's root starts at its first token or comment and ends with the text.
-      start = view(utu.tok_kind, Uint8Array)[0] === 0 ? 0 : utf16[starts[0]];
+      start = last[node] > 0 ? start : 0;
       end = text.length;
     }
     out.push({ type: nameOf(kind[node]), start, end, depth });
     for (let c = child[node]; c >= 0; c = next[c]) visit(c, depth + 1);
   };
-  visit(count - 1, 0);
+  visit(root, 0);
   return out;
 }
 
 function reference(tree) {
   const out = [];
   const visit = (node, depth) => {
-    if (node.type === 'comment') return;
     out.push({ type: node.type, start: node.startIndex, end: node.endIndex, depth });
     for (const child of node.children) if (child.isNamed) visit(child, depth + 1);
   };

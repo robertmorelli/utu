@@ -1,0 +1,22 @@
+// ── The host interface ───────────────────────────────────────────────────────
+//
+// The host writes a source into `src`, runs the lexer or the parser, and
+// reads the token and node mems.
+
+export lib {
+    // Make room for `n` source bytes, which the host then writes into `src`.
+    fn source(n: I32) void {
+        src.resize(n + 1);
+        src[n] = end_byte;
+    }
+
+    fn tokens(n: I32) I32 { lex(n); }
+
+    fn nodes(n: I32) I32 { parse(n); }
+
+    // A node kind's name in tree-sitter's spelling.
+    fn node_kind_name(kind: I32) Str {
+        let name = Node.name(Node.from_i32(kind));
+        Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len());
+    }
+}

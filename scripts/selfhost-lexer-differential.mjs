@@ -1,4 +1,4 @@
-// The self-hosted lexer (selfhost/syntax.utu) against the stage 0 parser:
+// The self-hosted lexer (selfhost/lex.utu) against the stage 0 parser:
 // for every source the JavaScript parser accepts, the lexer's tokens must be
 // exactly the leaves of its syntax tree, in order, with the same spans.
 //
@@ -12,8 +12,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject } from '../src/index.js';
 import { parseSyntax } from '../src/compiler/syntax/parser.js';
+import { loadSelfhost } from './selfhost.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -26,11 +26,11 @@ const inputs = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 const INSERTS = [' -o ', '-o', '?.', '?', ' in ', ' type ', ' test ', ' and ', ' not ', ' return ', ' fatal ',
   '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//'];
 
-// Token kinds, in selfhost/syntax.utu's order.
+// Token kinds, in selfhost/lex.utu's order.
 const KINDS = ['End', 'Error', 'Word', 'Int', 'Float', 'String', 'MultilineLine', 'DslBody', 'Comment'];
 const PUNCT = KINDS.length;
 
-const lexer = await loadLexer();
+const lexer = await loadSelfhost();
 
 const roots = inputs.length ? inputs : ['examples', 'benchmarks', 'std', 'hand_written_bindings', 'baselines/corpus']
   .map(dir => path.join(ROOT, dir));
@@ -66,21 +66,6 @@ console.log(`${checked - differ}/${checked} sources lex as stage 0 parses them (
 process.exit(differ ? 1 : 0);
 
 // ── The lexer ────────────────────────────────────────────────────────────────
-
-async function loadLexer() {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser, target: 'normal', optimize: 'speed',
-    readFile: file => fs.promises.readFile(file, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  const doc = await compiler.compileFile(path.join(ROOT, 'selfhost', 'syntax.utu'));
-  const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.getAttribute('data-error-message'));
-  if (errors.length) throw new Error(`selfhost/syntax.utu:\n${errors.join('\n')}`);
-  const wasm = emitBinary(doc);
-  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
-  return instance.exports;
-}
 
 /** The lexer's tokens for `text`: `{ kind, start, end }`, offsets in UTF-16 code units. */
 function lex(text) {

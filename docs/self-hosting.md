@@ -153,14 +153,18 @@ at most 100 memories per module; this keeps far below it. Packing node
 columns into one mem cost 25% (an extra push and divide per node); keep one
 mem per hot column.
 
+Mems are top-level declarations of one program, so the compiler's files
+are joined into one source before compiling (`scripts/selfhost.mjs`, in the
+order of `selfhost/files.txt`), with errors placed back in their files. The
+language stays as it is.
+
 ### Order
 
 1. **Lexer and parser** (utu-native, replacing tree-sitter for compiling;
-   tree-sitter stays for the editor). Done (`selfhost/syntax.utu`): the
-   lexer's tokens are the leaves of stage 0's syntax tree, and the parser's
-   nodes are its named nodes, on every source and on millions of mutants.
-   Comment attachment remains. Differential test: the store dump for
-   every `.utu` in `std/`, `examples/`, and the tests matches Plan A's.
+   tree-sitter stays for the editor). Done (`selfhost/lex.utu`,
+   `parse.utu`): the lexer's tokens are the leaves of stage 0's syntax
+   tree, and the parser's nodes are its named nodes, comments included, on
+   every source and on millions of mutants.
 2. **Modules, imports, instantiation, name resolution.**
 3. **The type graph.** The largest piece; diagnostics must match Plan A's on
    the negative corpus.
