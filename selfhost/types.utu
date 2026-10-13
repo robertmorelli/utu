@@ -259,10 +259,14 @@ fn type_path(node: I32, inst: I32) I32 {
         if member_decl < 0 { return ty_error(); };
         let owner = module_of(member_decl);
         let at = 0;
+        let named_by = lookup(word_of(name_node(c)));
         if is_kind(c, Node.Instantiated_module_ref) {
             at = instance(owner, type_args(next_sibling(first_child(c)), inst));
         } else if is_kind(next_sibling(c), Node.Module_type_arg_list) {
             at = instance(owner, type_args(next_sibling(c), inst));
+        } else if decl_is(named_by, Decl.Alias) {
+            // `ints.Box` with `using boxy[I32] |ints|`: Box in boxy[I32].
+            at = alias_instance(named_by);
         } else {
             at = instance_for(owner, inst);
         };

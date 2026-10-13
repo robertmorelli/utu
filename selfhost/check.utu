@@ -633,7 +633,9 @@ fn global_of(decl: I32) I32 {
 fn constant(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(node, Node.Literal) {
         let c = first_child(node);
-        if c < 0 or is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit) { return check_literal(node, expect, cx); };
+        if c < 0 or is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit) or is_kind(c, Node.String_lit) or is_kind(c, Node.Multiline_string_lit) {
+            return check_literal(node, expect, cx);
+        };
         return -1;
     };
     if is_kind(node, Node.Unary_expr) and tok_kind[node_first[node]] == Tok.Minus.to_i32() {
@@ -903,6 +905,16 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             let decl = node_decl[name];
             if not decl_is(decl, Decl.Fn) { return unsupported(node); };
             return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
+        };
+        // `m.T.f(…)`: a static function of a module's (or alias's) type.
+        let st = static_type_path(base, cx);
+        if st >= 0 {
+            let target = static_member(ty_decl(st), word_of(name));
+            if not decl_is(target, Decl.Fn) {
+                report(Diag.UnknownMethod, name, word_of(name));
+                return finish_error(args, m, cx);
+            };
+            return call_with(fn_instance(target, ty_inst(st)), args, 0, m, node, cx);
         };
         // A method: the receiver is its first argument.
         let rt = check_base(callee, cx);
@@ -1199,6 +1211,29 @@ fn opcode_result(op: I32) I32 {
     if op >= 64516 and op <= 64519 { return vt_i64; };
     if op == 64851 { return vt_i32; };
     vt_v128;
+}
+
+// `m.T` (a field access naming a type of module or alias `m`): that
+// type, in the module's instance; else -1.
+fn static_type_path(node: I32, cx: Cx) I32 {
+    if not is_kind(node, Node.Field_expr) { return -1; };
+    let base = first_child(node);
+    if not is_kind(base, Node.Identifier) { return -1; };
+    let d = node_decl[base];
+    let inst = 0;
+    let module = -1;
+    if decl_is(d, Decl.Module) {
+        module = d;
+        inst = instance_for(d, cx.inst);
+    } else if decl_is(d, Decl.Alias) and decl_is(decl_a[d], Decl.Module) {
+        module = decl_a[d];
+        inst = alias_instance(d);
+    } else {
+        return -1;
+    };
+    let t = member(module, word_of(last_child(node)), Space.Member);
+    if t < 0 or not is_type_decl(t) { return -1; };
+    named(t, inst);
 }
 
 // `m.x`: `m` names a module.

@@ -387,7 +387,14 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
         return ty_void();
     };
     if method >= MemMethod.Intern.to_i32() { return call_interner(decl, method, args, at, m, cx); };
-    if method == MemMethod.Copy_in.to_i32() or method == MemMethod.View.to_i32() { return unsupported(at); };
+    if method == MemMethod.Copy_in.to_i32() or method == MemMethod.View.to_i32() {
+        // A view is a JS typed array: it needs std:JS's declarations.
+        if method == MemMethod.View.to_i32() and not has_foreign() {
+            report(Diag.MemView, at, decl_name[decl]);
+            return error_value();
+        };
+        return unsupported(at);
+    };
     let helpers = mem_helper_functions(decl);
     if method == MemMethod.Push.to_i32() {
         let t = mem_value_type(decl);

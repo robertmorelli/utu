@@ -156,6 +156,7 @@ enum(U8) Diag:
     | ProtoMissing
     | ProtoSignature
     | MemEmbed
+    | MemView
 
 mem diag_kind: U8;
 mem diag_node: I32;
