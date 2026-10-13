@@ -7,11 +7,10 @@
 // one file. Errors point at the file and line they came from.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import os from 'node:os';
-import { createHash } from 'node:crypto';
-import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject, PLATFORM_SOURCES, JS_STRING_BUILTINS_COMPILE_OPTIONS } from '../src/index.js';
-import { importObjectFromEval, importObjectFromGlue, glueModuleSource, exceptionImports, closureImports, promiseImports, awaitImports, promisifyExports, memoryImports } from '../src/runtime/host-imports.js';
+import { fileURLToPath } from 'node:url';
+import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject } from '../src/index.js';
+import { builtModule, compileProgram as driverCompileProgram, instantiate, loadProgram as driverLoadProgram } from '../src/selfhost/compiler.js';
+import { nodeHost } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'selfhost');
@@ -66,182 +65,25 @@ export async function buildSelfhost() {
   return { doc, wasm: emitBinary(doc, { sourceMap: true }).binary };
 }
 
-const ROLE = { entry: 0, import: 1, prelude: 2 };
+// The program side of the driver is the shipped one (src/selfhost/), with
+// packages resolved from this repository.
+const host = nodeHost({ root: ROOT });
 
-// The JSON of a declaration ABI's types, made once per document: std:JS and
-// std:Browser are views of one, and share it.
-const typesText = new WeakMap();
-let packageResolver = null;
-
-/** A foreign import's declaration ABI: a platform module's, or a package's. */
-async function foreignABI(raw, prefix, from, stdlib) {
-  if (/^"?(npm|node):/.test(raw)) {
-    packageResolver ??= (await import('../tools/dts/packages.mjs')).nodePackageResolver({ root: ROOT });
-    return packageResolver(JSON.parse(raw), { prefix, from });
-  }
-  const generated = await stdlib.get(raw)();
-  return generated.abi;
+/** Give the self-hosted compiler a program (see src/selfhost/compiler.js). */
+export function loadProgram(utu, entry, options = {}) {
+  return driverLoadProgram(utu, entry, { ...host, ...options });
 }
 
-/**
- * Give the self-hosted compiler a program: the entry file, the standard
- * library's prelude, and every file they import, then resolve its names.
- * Returns each file's key (path or `std:` name), and the decoder for byte
- * offsets in `src`. Host declarations (std:Browser, npm:…) are read here.
- */
-export async function loadProgram(utu, entry, { readFile = file => fs.readFileSync(file, 'utf8'), stdlib = PLATFORM_SOURCES } = {}) {
-  utu.reset();
-  const files = [];
-  const byKey = new Map();
-  const add = (key, text, role) => {
-    const bytes = new TextEncoder().encode(text);
-    const file = utu.file_add(bytes.length, role);
-    new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
-    files.push({ key, role, text, offset: utu.file_offset(file), bytes });
-    byKey.set(key, file);
-    utu.file_parse(file);
-    return file;
-  };
-  const foreign = [];
-  add(entry, readFile(entry), ROLE.entry);
-  const prelude = stdlib.get('std:Prelude');
-  if (typeof prelude === 'string') add('std:Prelude', prelude, ROLE.prelude);
-  for (let i = 0; i < utu.import_count(); i++) {
-    const from = files[utu.import_from(i)];
-    const raw = new TextDecoder().decode(new Uint8Array(utu.src.buffer, utu.import_path_start(i), utu.import_path_end(i) - utu.import_path_start(i)));
-    const platform = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(raw);
-    if (/^"?(npm|node):/.test(raw) || platform && typeof stdlib.get(raw) === 'function') {
-      utu.import_foreign(i);
-      const name = new TextDecoder().decode(new Uint8Array(utu.src.buffer, utu.import_name_start(i), utu.import_name_end(i) - utu.import_name_start(i)));
-      foreign.push({ i, raw, from: from.key, name });
-      continue;
-    }
-    const key = platform ? raw : path.resolve(path.dirname(from.key), JSON.parse(raw));
-    let file = byKey.get(key);
-    if (file === undefined) {
-      const role = from.role === ROLE.prelude ? ROLE.prelude : ROLE.import;
-      if (platform) {
-        const text = stdlib.get(key);
-        if (typeof text !== 'string') continue;
-        file = add(key, text, role);
-      } else {
-        let text;
-        try {
-          text = readFile(key);
-        } catch {
-          // A file that cannot be read ends the build, as in stage 0.
-          const bytes = new TextEncoder().encode(key);
-          new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
-          break;
-        }
-        file = add(key, text, role);
-      }
-    }
-    utu.import_bind(i, file);
-  }
-  // Each document once, then each import's view of one.
-  const write = text => {
-    const bytes = new TextEncoder().encode(text);
-    const at = utu.abi_room(bytes.length);
-    new Uint8Array(utu.src.buffer).set(bytes, at);
-    return at;
-  };
-  const docs = new Map();
-  for (const { i, raw, from, name } of foreign) {
-    let abi;
-    try { abi = await foreignABI(raw, name, from, stdlib); } catch { continue; }
-    if (!docs.has(abi.types)) {
-      if (!typesText.has(abi.types)) typesText.set(abi.types, JSON.stringify(abi.types));
-      docs.set(abi.types, utu.abi_doc(write(typesText.get(abi.types))));
-    }
-    const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
-    utu.abi_view(i, docs.get(abi.types), write(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals })));
-  }
-  files.diagnostics = utu.resolve();
-  // @embed: the files' bytes, read relative to the entry file.
-  for (let k = 0; k < utu.embed_files(); k++) {
-    const rel = new TextDecoder().decode(new Uint8Array(utu.src.buffer, utu.embed_path_start(k), utu.embed_path_end(k) - utu.embed_path_start(k)));
-    let bytes;
-    try { bytes = fs.readFileSync(path.resolve(path.dirname(entry), rel)); } catch { utu.embed_fail(k); continue; }
-    const at = utu.embed_set(k, bytes.length);
-    new Uint8Array(utu.embed_bytes.buffer).set(bytes, at);
-  }
-  return files;
+/** Compile the loaded program for a target (0: exports, 1: tests). */
+export function compileProgram(utu, target) {
+  return driverCompileProgram(utu, target, host);
 }
 
-/**
- * Compile the loaded program for a target (0: exports, 1: tests). A program
- * with @comptime mems is first built for evaluating them; that build runs
- * here, and its values go back to the compiler as the mems' contents.
- * Returns the module's size in `out`, or -1 when there are diagnostics.
- */
-export async function compileProgram(utu, target) {
-  const count = utu.comptime_mems();
-  if (count > 0) {
-    const size = utu.compile_program(2);
-    if (size < 0) return -1;
-    const { wasm, spec } = builtModule(utu, size);
-    const { instance } = await instantiateBuilt(wasm, spec);
-    for (let k = 0; k < count; k++) {
-      const name = utu.comptime_name(k);
-      const n = instance.exports[`__comptime_run_${name}`]();
-      const bytes = new Uint8Array(instance.exports[`__comptime_${name}`].buffer, 0, n * utu.comptime_value_size(k)).slice();
-      const at = utu.comptime_set(k, n);
-      new Uint8Array(utu.comptime_bytes.buffer).set(bytes, at);
-    }
-  }
-  return utu.compile_program(target);
-}
+export { builtModule };
 
-/**
- * What the last compile built: the module's bytes, and the spec of what it
- * needs from its host (`@es` bodies, closures, promises, hosted mems), which
- * the compiler gives beside the module, as stage 0 does, not in it.
- */
-export function builtModule(utu, size) {
-  const wasm = new Uint8Array(utu.out.buffer, 0, size).slice();
-  const n = utu.host_json_size();
-  const spec = n ? JSON.parse(new TextDecoder().decode(new Uint8Array(utu.host_json.buffer, 0, n))) : {};
-  return { wasm, spec };
-}
-
-/**
- * Instantiate a module the self-hosted compiler built: its imports come from
- * its spec (what the host provides) and the engine's JS string builtins.
- */
-export async function instantiateBuilt(wasm, spec = {}) {
-  const module = await WebAssembly.compile(wasm, JS_STRING_BUILTINS_COMPILE_OPTIONS);
-  const imports = await esImports(spec.es ?? {});
-  if (spec.closures) imports.utu = closureImports(spec.closures, imports.utu ?? {});
-  if (spec.mems) imports.utu = memoryImports(spec.mems, imports.utu ?? {});
-  if (spec.promises) {
-    imports.utu = promiseImports(spec.promises, imports.utu ?? {});
-    imports.utu = awaitImports(spec.promises, imports.utu);
-  }
-  if (WebAssembly.Module.imports(module).some(entry => entry.module === 'utu' && entry.name === 'js_tag')) {
-    imports.utu = exceptionImports(imports.utu ?? {});
-  }
-  const instance = await WebAssembly.instantiate(module, imports);
-  return { module, instance, exports: promisifyExports(instance, spec.promises) };
-}
-
-/**
- * The `@es` imports: their bodies as the exports of an ES module, written
- * beside the project's node_modules (as stage 0's loader does), so a body
- * may import packages and await at the top level.
- */
-async function esImports(spec) {
-  const source = glueModuleSource(spec);
-  if (!source) return {};
-  const dir = fs.existsSync(path.join(ROOT, 'node_modules')) ? path.join(ROOT, 'node_modules', '.utu') : fs.mkdtempSync(path.join(os.tmpdir(), 'utu-glue-'));
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `glue-${createHash('sha256').update(source).digest('hex').slice(0, 16)}.mjs`);
-  if (!fs.existsSync(file)) {
-    const partial = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(partial, source);
-    fs.renameSync(partial, file);
-  }
-  return importObjectFromGlue(spec, await import(pathToFileURL(file).href));
+/** Instantiate a module the self-hosted compiler built, with its spec. */
+export function instantiateBuilt(wasm, spec = {}) {
+  return instantiate(wasm, spec, host);
 }
 
 /**
@@ -263,17 +105,10 @@ export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) 
 /** The self-hosted compiler (its bytes and host spec), built by a loaded self-hosted compiler. */
 export async function buildWith(compiler) {
   const { text } = joinSelfhost();
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-stage-'));
-  const file = path.join(dir, 'utu.utu');
-  fs.writeFileSync(file, text);
-  try {
-    const files = await loadProgram(compiler, file);
-    const size = await compileProgram(compiler, 0);
-    if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
-    return builtModule(compiler, size);
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  const files = await loadProgram(compiler, JOINED, { readFile: async file => file === JOINED ? text : host.readFile(file) });
+  const size = await compileProgram(compiler, 0);
+  if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
+  return builtModule(compiler, size);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

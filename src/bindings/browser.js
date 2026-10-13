@@ -1,4 +1,5 @@
-import { BROWSER_ABI_GZIP, WORKER_ABI_GZIP } from './browser-catalog.generated.js';
+// The catalog (most of a megabyte) loads only when a program imports it.
+const catalog = () => import('./browser-catalog.generated.js');
 
 async function decode(base64, label) {
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -14,8 +15,8 @@ function lazy(load) {
 }
 
 /** Only declarations are shared; type identities and emitted operations are per compilation. */
-export const loadBrowserABI = lazy(() => decode(BROWSER_ABI_GZIP, 'browser'));
-const loadWorkerABI = lazy(() => decode(WORKER_ABI_GZIP, 'worker'));
+export const loadBrowserABI = lazy(async () => decode((await catalog()).BROWSER_ABI_GZIP, 'browser'));
+const loadWorkerABI = lazy(async () => decode((await catalog()).WORKER_ABI_GZIP, 'worker'));
 
 /** A module exposing part of a declaration graph. Standard types keep one identity across views. */
 function view(prefix, abi, keep) {

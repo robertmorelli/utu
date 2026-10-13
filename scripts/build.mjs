@@ -42,6 +42,7 @@ async function main() {
   if (buildGrammar) await generateParser();
   await syncWutuRuntime();
   await generatePlatformSources();
+  buildCompiler();
   await bundlePackage();
   await bundleVscodeExtension();
 }
@@ -68,6 +69,18 @@ async function generateParser() {
       console.warn('Warning: wasm build failed (emscripten may not be installed). Skipping.');
     }
   }
+}
+
+// ── The self-hosted compiler ─────────────────────────────────────────────────
+
+// dist/utu.wasm: stage 0 (the JavaScript compiler) builds selfhost/ into
+// stage 1, which builds stage 2; the build fails unless stage 2 builds itself
+// to the same bytes. So the compiler shipped always descends from stage 0,
+// and is never checked in. A child process, so it reads the platform sources
+// just generated.
+function buildCompiler() {
+  console.log('Building the self-hosted compiler…');
+  execSync(`node ${path.join('scripts', 'selfhost-bootstrap.mjs')} --out=${path.join(DIST_DIR, 'utu.wasm')}`, { cwd: ROOT, stdio: 'inherit' });
 }
 
 // ── Platform sources ──────────────────────────────────────────────────────────

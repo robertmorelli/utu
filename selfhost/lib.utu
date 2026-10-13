@@ -82,6 +82,14 @@ export lib {
     // How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level; }
 
+    // A test build's tests: how many, and where test k's name (a string
+    // literal, quotes and all) is in src.
+    fn test_count() I32 { test_node.len(); }
+
+    fn test_name_start(k: I32) I32 { tok_start[node_first[first_child(test_node[k])]]; }
+
+    fn test_name_end(k: I32) I32 { tok_end[node_first[first_child(test_node[k])]]; }
+
     fn file_count() I32 { file_root.len(); }
 
     fn diagnostic_count() I32 { diag_kind.len(); }

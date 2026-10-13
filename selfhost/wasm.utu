@@ -330,6 +330,7 @@ fn add_import_global(module: I32, field: I32, t: I32) I32 {
 }
 
 fn reset_wasm() void {
+    start_func[0] = -1;
     vl_start.clear();
     vl_len.clear();
     vl_items.clear();
@@ -435,6 +436,7 @@ enum(U16) Op:
     | ArrayLen
     | ArrayCopy   // a: destination type, b: source type
     | ArrayFill
+    | ArrayInitData  // a: type, b: data segment
     | RefNull     // a: heap type (a value type's heap, or an abstract one)
     | RefIsNull
     | RefAsNonNull
@@ -923,6 +925,25 @@ fn encode_globals() void {
     flush_section(6);
 }
 
+// The function run when the module is instantiated, or -1.
+mem start_func: I32 = [-1];
+
+fn encode_start() void {
+    if start_func[0] < 0 { return; };
+    leb_u(false, func_index[start_func[0]]);
+    flush_section(8);
+}
+
+// Mark what a function made after the sweep reaches.
+fn mark_late(f: I32) void {
+    mark_func(f);
+    while (live_work.len() > 0) {
+        let node = live_work[live_work.len() - 1];
+        live_work.resize(live_work.len() - 1);
+        scan_live(node);
+    };
+}
+
 fn encode_exports() void {
     let count = 0;
     for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 { count += 1; }; };
@@ -1060,6 +1081,7 @@ fn encode_names() void {
 // The module's bytes, in `out`. Returns their number.
 fn encode_module() I32 {
     sweep();
+    finish_mems();
     write_host_json();
     assign_indices();
     out.clear();
@@ -1075,6 +1097,7 @@ fn encode_module() I32 {
     encode_memories();
     encode_globals();
     encode_exports();
+    encode_start();
     // ref.func targets are found while encoding code; encode it first, into
     // its own buffer, then the elements before it.
     let code_start = out.len();
@@ -1234,6 +1257,7 @@ fn emit(node: I32, f: I32) void {
     else if op == Op.ArrayLen.to_i32() { op_fb(15); }
     else if op == Op.ArrayFill.to_i32() { op_fb(16); leb_u(true, type_index[a]); }
     else if op == Op.ArrayCopy.to_i32() { op_fb(17); leb_u(true, type_index[a]); leb_u(true, type_index[b]); }
+    else if op == Op.ArrayInitData.to_i32() { op_fb(18); leb_u(true, type_index[a]); leb_u(true, b); }
     else if op == Op.RefNull.to_i32() { op1(208); put_heap(true, a); }
     else if op == Op.RefIsNull.to_i32() { op1(209); }
     else if op == Op.RefFunc.to_i32() {

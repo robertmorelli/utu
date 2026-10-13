@@ -1572,6 +1572,10 @@ fn reset_check() void {
 
 // Check the program from its entry points, and encode it. Returns the
 // module's size in `out`, or -1 when there are diagnostics.
+
+// A test build's tests, in the order of their exports (`__test_0`, …).
+mem test_node: I32;
+
 fn compile(target: Target) I32 {
     restore_diagnostics();
     if missing_import[0] >= 0 { return -1; };
@@ -1596,6 +1600,7 @@ fn compile(target: Target) I32 {
     // checking, which finds what else is wrong.
     for (0 ..< file_root.len()) |file| { if file_root[file] < 0 { return -1; }; };
     let tests = 0;
+    test_node.clear();
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
@@ -1616,6 +1621,7 @@ fn compile(target: Target) I32 {
                 };
                 if target == Target.Tests and is_kind(item, Node.Test_decl) {
                     entry_function(item, -1, tests);
+                    test_node.push(item);
                     tests += 1;
                 };
                 item = next_sibling(item);
