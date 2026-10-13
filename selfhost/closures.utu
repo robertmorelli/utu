@@ -33,9 +33,15 @@ fn reset_closures() void {
 // ── What closures capture, and which captures are boxes ──
 
 // Whether declaration `d` is declared inside node `scope`.
+// Whether declaration d is inside `scope` (in the tree: a DSL's splice has
+// tokens of its own, outside its expansion's).
 fn declared_in(d: I32, scope: I32) Bool {
-    let t = node_first[decl_node[d]];
-    t >= node_first[scope] and t < node_last[scope];
+    let n = decl_node[d];
+    while (n >= 0) {
+        if n == scope { return true; };
+        n = parent_of(n);
+    };
+    false;
 }
 
 fn is_local_decl(d: I32) Bool {

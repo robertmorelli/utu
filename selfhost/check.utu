@@ -369,7 +369,20 @@ fn any_mismatch_since(from: I32) I32 {
 // Where a value comes from, to point at: a block's is its last expression's.
 fn value_site(node: I32) I32 {
     if is_kind(node, Node.Block) and last_child(node) >= 0 { return value_site(last_child(node)); };
+    // A DSL's splice: the utu written in its body; so too a parenthesis
+    // the expansion wrote around one.
+    if is_kind(node, Node.Splice) { return value_site(first_child(node)); };
+    if is_kind(node, Node.Paren_expr) and dsl_site_of(node) >= 0 and is_kind(first_child(node), Node.Splice) { return value_site(first_child(node)); };
     node;
+}
+
+// Whether an operand's type is unknown to stage 0: a name, or a call of
+// one, that does not resolve. An operator over it is reported too.
+fn unresolved(node: I32) Bool {
+    if is_kind(node, Node.Paren_expr) or is_kind(node, Node.Splice) { return unresolved(first_child(node)); };
+    if is_kind(node, Node.Identifier) { return node_decl[node] < 0; };
+    if is_kind(node, Node.Call_expr) { return unresolved(first_child(node)); };
+    false;
 }
 
 // Something the compiler cannot do yet: reported, and checking goes on.
@@ -390,7 +403,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     let kind = node_kind[node];
     if kind == Node.Identifier.to_i32() { return check_ident(node, cx); };
     if kind == Node.Literal.to_i32() { return check_literal(node, expect, cx); };
-    if kind == Node.Paren_expr.to_i32() { return check_expr(first_child(node), expect, cx); };
+    if kind == Node.Paren_expr.to_i32() or kind == Node.Splice.to_i32() { return check_expr(first_child(node), expect, cx); };
     if kind == Node.Binary_expr.to_i32() { return check_binary(node, expect, cx); };
     if kind == Node.Unary_expr.to_i32() { return check_unary(node, expect, cx); };
     if kind == Node.Call_expr.to_i32() { return check_call(node, expect, cx); };
@@ -699,6 +712,8 @@ fn check_assign(node: I32, cx: Cx) I32 {
     let target = first_child(node);
     let value = last_child(node);
     let op = tok_kind[node_last[target]];
+    // A parenthesis (a DSL's splice) is its expression.
+    while (is_kind(target, Node.Splice)) { target = first_child(target); };
     if (is_kind(target, Node.Field_expr) and not is_module_path(target)) or is_kind(target, Node.Optional_field_expr) { return check_field_set(target, value, op, node, cx); };
     if is_kind(target, Node.Index_expr) { return check_index_set(target, value, op, node, cx); };
     if not is_kind(target, Node.Identifier) { return unsupported(node); };
@@ -804,7 +819,9 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
     };
     // The operand type: the left's, unless it is a literal (`1 + x`, `0 == n`),
     // which takes the right's.
-    let operand_expect = if is_comparison(word) { -1; } else { expect; };
+    // (Only a number or string type types the operands: `x + y` where an
+    // Externref is wanted is the operands' sum, widened.)
+    let operand_expect = if is_comparison(word) or expect < 0 or not (is_numeric(expect) or expect == prelude(Prelude.Str)) { -1; } else { expect; };
     let m = w_mark();
     let t = -1;
     if is_number_literal(left) and not is_number_literal(right) {
@@ -821,6 +838,7 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
 // its type and apply the operator `word` of that type.
 fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     if ty_is(t, Ty.Error) {
+        if is_kind(at, Node.Binary_expr) and unresolved(first_child(at)) { report2(Diag.UnknownOperator, at, -1, -1, -1); };
         check_expr(right, -1, cx);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
@@ -863,7 +881,7 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
 }
 
 fn is_number_literal(node: I32) Bool {
-    if is_kind(node, Node.Paren_expr) { return is_number_literal(first_child(node)); };
+    if is_kind(node, Node.Paren_expr) or is_kind(node, Node.Splice) { return is_number_literal(first_child(node)); };
     if is_kind(node, Node.Unary_expr) { return is_number_literal(last_child(node)); };
     let c = first_child(node);
     is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit));
@@ -911,6 +929,7 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
         if is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true); };
     };
     let m = w_mark();
+    if unresolved(operand) { report2(Diag.UnknownOperator, node, -1, -1, -1); };
     if tok_word[node_first[node]] == Kw.Not.to_i32() {
         let bool_t = prelude(Prelude.Bool);
         coerce(check_expr(operand, bool_t, cx), bool_t, operand);
@@ -934,6 +953,8 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
 fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     let callee = first_child(node);
     let args = next_sibling(callee);
+    // A DSL's splice is its expression.
+    while (is_kind(callee, Node.Splice)) { callee = first_child(callee); };
     let m = w_mark();
     if is_kind(callee, Node.Identifier) {
         let decl = node_decl[callee];

@@ -39,6 +39,7 @@ const ITERATOR = KIND('iterator_expr');
 const DSL = KIND('dsl_expr');
 const FOR = KIND('for_expr');
 const PAREN = KIND('paren_expr');
+const SPLICE = KIND('splice');
 const FOR_SOURCE = KIND('for_source');
 const FUNC_TYPE_REF = KIND('func_type');
 const categories = new Map();
@@ -64,7 +65,7 @@ if (process.argv.includes('--record')) {
   process.exit(0);
 }
 
-const totals = { same: 0, differ: 0, left: 0, extra: 0, paths: 0, declarations: 0, diagnostics: 0 };
+const totals = { same: 0, differ: 0, left: 0, extra: 0, paths: 0, declarations: 0, expansion: 0, diagnostics: 0 };
 const shown = [];
 const diagnostics = [];
 let programs = 0;
@@ -83,7 +84,7 @@ for (const line of diagnostics) console.log(`DIAGNOSTIC ${line}`);
 for (const [category, n] of [...categories].sort((a, b) => b[1] - a[1])) console.log(`  ${n} ${category}`);
 console.log(`${programs} programs: ${totals.same} names resolve as stage 0's, ${totals.differ} differ, `
   + `${totals.left} left to types, ${totals.paths} module names in paths, ${totals.declarations} declaring names stage 0 answers otherwise, `
-  + `${totals.extra} stage 0 does not name; `
+  + `${totals.expansion} bound by DSL expansions, ${totals.extra} stage 0 does not name; `
   + `${totals.diagnostics} diagnostics, in ${seconds} s`);
 process.exit(totals.differ ? 1 : 0);
 
@@ -116,6 +117,8 @@ async function compare(entry, definitions) {
     const byte = starts[first[node]];
     const f = fileOf(byte);
     const file = files[f];
+    // Code a DSL expanded into is in no file of the program's.
+    if (byte >= file.offset + file.bytes.length) return { file: '<expansion>', start: 0, end: 0 };
     const name = file.key.startsWith('std:') ? file.key : path.relative(ROOT, file.key);
     return { file: name, start: offsets[f][byte - file.offset], end: offsets[f][ends[last[node] - 1] - file.offset] };
   };
@@ -153,6 +156,9 @@ async function compare(entry, definitions) {
       decl = nodeDecl[nextName(parent[n])];
     }
     let got = decl >= 0 ? place(declNode[decl]) : null;
+    // A name in a DSL body that its expansion binds (a template loop's item,
+    // an alt's narrowed value): stage 0's binding spans the whole site.
+    if (got?.file === '<expansion>') { totals.expansion++; continue; }
     // A declaration's own name names it, whatever stage 0 answers there.
     if (got && declNode[decl] === declarationOf(n)) {
       if (expected && (got.file !== expected.file || got.start !== expected.start || got.end !== expected.end)) { totals.declarations++; continue; }
@@ -164,12 +170,13 @@ async function compare(entry, definitions) {
       let owner = parent[declNode[decl]];
       if (kind[owner] === ITERATOR) {
         for (;;) {
-          const up = kind[parent[owner]] === PAREN ? parent[owner] : owner;
+          const up = kind[parent[owner]] === PAREN || kind[parent[owner]] === SPLICE ? parent[owner] : owner;
           if (kind[parent[up]] !== ITERATOR || child[parent[up]] !== up) break;
           owner = parent[up];
         }
         got = place(owner);
       } else if (kind[owner] === FOR && !rangesOnly(owner)) got = place(owner);
+      if (got.file === '<expansion>') { totals.expansion++; continue; }
     }
     if (got && declKind === 'Global' && kind[lastChild(declNode[decl])] === DSL && kind[next[child[declNode[decl]]]] === FUNC_TYPE_REF) {
       got = place(lastChild(declNode[decl]));

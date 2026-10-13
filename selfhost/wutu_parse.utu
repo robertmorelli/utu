@@ -1,0 +1,903 @@
+// ── Wutu: the template parser ────────────────────────────────────────────────
+//
+// Stage 0's wutu-parse.js, statement by statement, into flat tables: the
+// template's nodes (text, expression, if, for, element) and each element's
+// items (classes, attributes, events, two-way bindings, CSS, style values).
+// Ranges are offsets in the template's text (the body, inside `/\ … \/`).
+
+mem tn_kind: I32;       // 0 text, 1 expression, 2 if, 3 for, 4 element
+mem tn_start: I32;
+mem tn_parent: I32;
+mem tn_first: I32;      // first child, or -1
+mem tn_next: I32;       // next sibling, or -1
+mem tn_else: I32;       // if: first node of its otherwise branch, or -1
+mem tn_text: I32;       // text: the quoted literal; expression: its source; if: its condition; for: its iterable; element: its tag (words)
+mem tn_from: I32;       // its range, or -1
+mem tn_to: I32;
+mem tn_captures: I32;   // for: its captures (a word)
+mem tn_key: I32;        // for: its key's source (a word), or -1
+mem tn_key_from: I32;
+mem tn_key_to: I32;
+mem tn_global: I32;     // for: whether its key is global
+mem tn_binding: I32;    // element: its `as` alias (a word), or -1
+mem tn_index: I32;      // element: its number, in order
+mem tn_items: I32;      // element: its first item, or -1
+mem tn_items_last: I32;
+
+mem ti_kind: I32;       // 0 class, 1 attribute, 2 event, 3 two-way binding, 4 CSS, 5 style value
+mem ti_next: I32;
+mem ti_a: I32;          // a name or property (a word)
+mem ti_b: I32;          // a value, handler, or CSS source (a word)
+mem ti_c: I32;          // CSS: its scoped form (a word)
+mem ti_flags: I32;      // attribute: 1 property, 2 dynamic; event: 1 shorthand
+mem ti_from: I32;       // its range, or -1
+mem ti_to: I32;
+mem ti_at: I32;         // where its statement starts
+
+// The template's header.
+mem tw_reactive: I32 = [0];
+mem tw_scope: I32 = [-1];     // `@island "name"`: the quoted name (a word), or -1
+mem tw_style_value: I32;      // `@style = e;`: the sources (words), and their ranges
+mem tw_style_from: I32;
+mem tw_style_to: I32;
+mem tw_global: I32;           // `@document { … }` blocks (words)
+
+mem wp_at: I32 = [0];
+
+fn wutu_fail(message: Str, offset: I32) void { dsl_fail(message, offset, 1); }
+
+fn reset_template() void {
+    tn_kind.clear();
+    tn_start.clear();
+    tn_parent.clear();
+    tn_first.clear();
+    tn_next.clear();
+    tn_else.clear();
+    tn_text.clear();
+    tn_from.clear();
+    tn_to.clear();
+    tn_captures.clear();
+    tn_key.clear();
+    tn_key_from.clear();
+    tn_key_to.clear();
+    tn_global.clear();
+    tn_binding.clear();
+    tn_index.clear();
+    tn_items.clear();
+    tn_items_last.clear();
+    ti_kind.clear();
+    ti_next.clear();
+    ti_a.clear();
+    ti_b.clear();
+    ti_c.clear();
+    ti_flags.clear();
+    ti_from.clear();
+    ti_to.clear();
+    ti_at.clear();
+    tw_reactive[0] = 0;
+    tw_scope[0] = -1;
+    tw_style_value.clear();
+    tw_style_from.clear();
+    tw_style_to.clear();
+    tw_global.clear();
+}
+
+fn new_tnode(kind: I32, start: I32) I32 {
+    let n = tn_kind.len();
+    tn_kind.push(kind);
+    tn_start.push(start);
+    tn_parent.push(-1);
+    tn_first.push(-1);
+    tn_next.push(-1);
+    tn_else.push(-1);
+    tn_text.push(-1);
+    tn_from.push(-1);
+    tn_to.push(-1);
+    tn_captures.push(-1);
+    tn_key.push(-1);
+    tn_key_from.push(-1);
+    tn_key_to.push(-1);
+    tn_global.push(0);
+    tn_binding.push(-1);
+    tn_index.push(-1);
+    tn_items.push(-1);
+    tn_items_last.push(-1);
+    n;
+}
+
+fn add_item(node: I32, kind: I32, a: I32, b: I32, flags: I32, from: I32, to: I32, at: I32) I32 {
+    let i = ti_kind.len();
+    ti_kind.push(kind);
+    ti_next.push(-1);
+    ti_a.push(a);
+    ti_b.push(b);
+    ti_c.push(-1);
+    ti_flags.push(flags);
+    ti_from.push(from);
+    ti_to.push(to);
+    ti_at.push(at);
+    if tn_items[node] < 0 { tn_items[node] = i; } else { ti_next[tn_items_last[node]] = i; };
+    tn_items_last[node] = i;
+    i;
+}
+
+// Append child c to a list whose first is at `first_of` (a node's children, or its else).
+fn append_child(parent: I32, c: I32, otherwise: Bool) void {
+    let first = if otherwise { tn_else[parent]; } else { tn_first[parent]; };
+    if first < 0 {
+        if otherwise { tn_else[parent] = c; } else { tn_first[parent] = c; };
+        return;
+    };
+    let last = first;
+    while (tn_next[last] >= 0) { last = tn_next[last]; };
+    tn_next[last] = c;
+}
+
+// ── Vocabulary ──
+
+fn in_words(list: Str, w: Str) Bool {
+    let i = 0;
+    while (i < list.len()) {
+        while (i < list.len() and list.get(i) == 32) { i += 1; };
+        let j = i;
+        while (j < list.len() and list.get(j) != 32) { j += 1; };
+        if j - i == w.len() and text_at(list, i, w) { return true; };
+        i = j;
+    };
+    false;
+}
+
+fn is_boolean_attribute(name: Str) Bool {
+    in_words("hidden inert disabled required readonly checked multiple autofocus selected open reversed controls autoplay muted loop playsinline novalidate", name);
+}
+
+fn is_void_tag(tag: Str) Bool { in_words("area base br col embed hr img input link meta param source track wbr", tag); }
+
+fn is_svg_tag(tag: Str) Bool {
+    in_words("svg g path circle ellipse line polyline polygon rect text tspan defs use symbol linearGradient radialGradient stop clipPath mask pattern marker title desc foreignObject", tag);
+}
+
+fn is_svg_attribute(name: Str) Bool {
+    in_words("viewBox xmlns width height x y x1 y1 x2 y2 cx cy r rx ry d points fill fill-rule fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-dashoffset stroke-opacity opacity transform href offset stop-color stop-opacity gradientUnits gradientTransform preserveAspectRatio clip-path mask", name);
+}
+
+fn is_html_tag(tag: Str) Bool {
+    in_words("html head embed param script area base link meta a abbr address article aside audio b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i iframe img input ins kbd label legend li main map mark menu meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp search section select slot small source span strong style sub summary sup table tbody td template textarea tfoot th thead time title tr track u ul var video wbr", tag);
+}
+
+fn is_global_attribute(name: Str) Bool {
+    in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize nonce is popover", name);
+}
+
+fn tag_attributes(tag: Str) Str {
+    if tag == "script" { return "src type async defer nonce crossorigin integrity referrerpolicy nomodule"; };
+    if tag == "style" { return "media nonce type"; };
+    if tag == "embed" { return "src type width height"; };
+    if tag == "param" { return "name value"; };
+    if tag == "area" { return "alt coords shape href target download rel"; };
+    if tag == "base" { return "href target"; };
+    if tag == "link" { return "href rel type media sizes crossorigin"; };
+    if tag == "meta" { return "name content charset http-equiv"; };
+    if tag == "a" { return "href target rel download hreflang type"; };
+    if tag == "button" { return "type disabled name value form popovertarget popovertargetaction"; };
+    if tag == "input" { return "type name value placeholder required disabled readonly checked min max step minlength maxlength pattern multiple accept autocomplete autofocus size form"; };
+    if tag == "textarea" { return "name placeholder required disabled readonly rows cols minlength maxlength autocomplete form"; };
+    if tag == "form" { return "action method enctype target autocomplete novalidate"; };
+    if tag == "label" { return "for"; };
+    if tag == "img" { return "src alt width height loading decoding srcset sizes"; };
+    if tag == "source" { return "src srcset sizes type media"; };
+    if tag == "select" { return "name required disabled multiple size form"; };
+    if tag == "option" { return "value selected disabled label"; };
+    if tag == "optgroup" { return "label disabled"; };
+    if tag == "fieldset" { return "disabled form name"; };
+    if tag == "output" { return "for form name"; };
+    if tag == "details" { return "open name"; };
+    if tag == "dialog" { return "open"; };
+    if tag == "progress" { return "value max"; };
+    if tag == "meter" { return "value min max low high optimum"; };
+    if tag == "ol" { return "start reversed type"; };
+    if tag == "li" { return "value"; };
+    if tag == "time" { return "datetime"; };
+    if tag == "del" or tag == "ins" { return "datetime cite"; };
+    if tag == "blockquote" or tag == "q" { return "cite"; };
+    if tag == "canvas" { return "width height"; };
+    if tag == "td" { return "colspan rowspan headers"; };
+    if tag == "th" { return "colspan rowspan headers scope abbr"; };
+    if tag == "video" { return "src controls autoplay muted loop playsinline poster width height preload"; };
+    if tag == "audio" { return "src controls autoplay muted loop preload"; };
+    if tag == "iframe" { return "src title width height loading allow sandbox referrerpolicy"; };
+    "";
+}
+
+fn is_custom_element(tag: Str) Bool { text_index(tag, "-", 0) >= 0; }
+
+fn is_known_tag(tag: Str) Bool { is_html_tag(tag) or is_svg_tag(tag) or is_custom_element(tag); }
+
+fn is_allowed_attribute(tag: Str, name: Str) Bool {
+    is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
+        or (is_svg_tag(tag) and is_svg_attribute(name)) or is_custom_element(tag);
+}
+
+fn is_name_code(c: I32) Bool { is_word_code(c) or c == 45; }
+
+// `--x` or `-?[a-z][\w-]*`: a CSS property.
+fn is_css_property(head: Str) Bool {
+    if text_at(head, 0, "--") {
+        if head.len() < 3 { return false; };
+        for (2 ..< head.len()) |i| { if not is_name_code(head.get(i)) { return false; }; };
+        return true;
+    };
+    let i = if head.len() > 0 and head.get(0) == 45 { 1; } else { 0; };
+    if i >= head.len() or not is_lower_code(head.get(i)) { return false; };
+    for (i + 1 ..< head.len()) |k| { if not is_name_code(head.get(k)) { return false; }; };
+    true;
+}
+
+// ── The parser ──
+
+fn wp_done(text: Str) Bool { wp_at[0] >= text.len(); }
+
+fn wp_char(text: Str) I32 { if wp_at[0] < text.len() { text.get(wp_at[0]); } else { -1; }; }
+
+fn wp_at_text(text: Str, part: Str) Bool { text_at(text, wp_at[0], part); }
+
+// A word then whitespace at the cursor (`if `, `for `, `as `), not consumed.
+fn wp_keyword(text: Str, word: Str) Bool {
+    let i = wp_at[0];
+    text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()));
+}
+
+// Whitespace, `# line` comments (after whitespace), and CSS comments.
+fn wp_trivia(text: Str) void {
+    while (wp_at[0] < text.len()) {
+        let p = wp_at[0];
+        let c = text.get(p);
+        if is_space_code(c) {
+            wp_at[0] += 1;
+        } else if c == 35 and (p == 0 or is_space_code(text.get(p - 1))) {
+            wp_skip_line(text);
+        } else if text_at(text, p, "/*") {
+            let end = text_index(text, "*/", p + 2);
+            if end < 0 { wutu_fail("unterminated comment", p); };
+            wp_at[0] = end + 2;
+        } else {
+            return;
+        };
+    };
+}
+
+fn wp_skip_line(text: Str) void {
+    let end = text_index(text, "\n", wp_at[0]);
+    wp_at[0] = if end < 0 { text.len(); } else { end; };
+}
+
+fn wp_semicolon(text: Str) void {
+    let statement_end = wp_at[0];
+    wp_trivia(text);
+    if wp_char(text) != 59 { wutu_fail("expected ; after Wutu statement", statement_end); };
+    wp_at[0] += 1;
+}
+
+// A quoted string (CSS strings may have backslash escapes; Utu strings may not).
+fn wp_quoted(text: Str, escapes: Bool) Str {
+    let start = wp_at[0];
+    let quote = text.get(start);
+    wp_at[0] += 1;
+    while (wp_at[0] < text.len()) {
+        let c = text.get(wp_at[0]);
+        if escapes and c == 92 {
+            wp_at[0] += 2;
+        } else {
+            wp_at[0] += 1;
+            if c == quote { return text.slice(start, wp_at[0]); };
+        };
+    };
+    wutu_fail("unterminated string", start);
+    "";
+}
+
+// Skip a Utu token whose contents are not delimiters: a nested DSL, a
+// string, or a line comment. Whether it skipped one.
+fn wp_opaque(text: Str) Bool {
+    let p = wp_at[0];
+    let c = text.get(p);
+    if c == 64 {
+        let end = skip_dsl(text, p);
+        if end > p {
+            wp_at[0] = end;
+            return true;
+        };
+    } else if c == 34 {
+        wp_quoted(text, false);
+        return true;
+    } else if text_at(text, p, "//") {
+        wp_skip_line(text);
+        return true;
+    };
+    false;
+}
+
+// `@name/\ … \/` starting at `start`: the offset after it, else `start`.
+fn skip_dsl(text: Str, start: I32) I32 {
+    let i = start + 1;
+    if i >= text.len() or not is_word_code(text.get(i)) { return start; };
+    while (i < text.len() and is_word_code(text.get(i))) { i += 1; };
+    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    if not text_at(text, i, "/\\") { return start; };
+    let depth = 1;
+    let j = i + 2;
+    while (j < text.len() - 1) {
+        if text.get(j) == 47 and text.get(j + 1) == 92 {
+            depth += 1;
+            j += 1;
+        } else if text.get(j) == 92 and text.get(j + 1) == 47 {
+            depth -= 1;
+            if depth == 0 { return j + 2; };
+            j += 1;
+        };
+        j += 1;
+    };
+    wutu_fail("Unterminated DSL envelope", start);
+    start;
+}
+
+// An expression read: its source, and its range, here.
+mem wx_from: I32 = [0];
+mem wx_to: I32 = [0];
+
+// `= expression;`: up to the statement's semicolon.
+fn wp_bare_expression(text: Str) Str {
+    wp_trivia(text);
+    let start = wp_at[0];
+    let depth = 0;
+    while (not wp_done(text)) {
+        if not wp_opaque(text) {
+            let c = text.get(wp_at[0]);
+            if c == 59 and depth == 0 {
+                wx_from[0] = start;
+                wx_to[0] = wp_at[0];
+                return trim_text(text.slice(start, wp_at[0]));
+            };
+            if c == 40 or c == 91 or c == 123 { depth += 1; }
+            else if c == 41 or c == 93 or c == 125 {
+                if depth == 0 { wutu_fail("expected ; after expression", wp_at[0]); };
+                depth -= 1;
+            };
+            wp_at[0] += 1;
+        };
+    };
+    wutu_fail("unterminated expression", start);
+    "";
+}
+
+// `$[expression]`.
+fn wp_interpolation(text: Str) Str {
+    let open = wp_at[0];
+    wp_at[0] += 2;
+    let start = wp_at[0];
+    let depth = 1;
+    while (not wp_done(text)) {
+        if not wp_opaque(text) {
+            let c = text.get(wp_at[0]);
+            if c == 91 { depth += 1; }
+            else if c == 93 {
+                depth -= 1;
+                if depth == 0 {
+                    wx_from[0] = start;
+                    wx_to[0] = wp_at[0];
+                    wp_at[0] += 1;
+                    return text.slice(start, wx_to[0]);
+                };
+            };
+            wp_at[0] += 1;
+        };
+    };
+    wutu_fail("unterminated interpolation", open);
+    "";
+}
+
+fn wp_expression(text: Str) Str {
+    if wp_char(text) == 61 {
+        wp_at[0] += 1;
+        return wp_bare_expression(text);
+    };
+    if wp_at_text(text, "$[") { return wp_interpolation(text); };
+    wutu_fail("expected = expression; or $[expression]", wp_at[0]);
+    "";
+}
+
+// A brace-delimited Utu block, with its braces.
+fn wp_utu_block(text: Str) Str {
+    let start = wp_at[0];
+    let depth = 0;
+    let first = true;
+    while (first or (not wp_done(text) and depth > 0)) {
+        first = false;
+        if not wp_opaque(text) {
+            let c = text.get(wp_at[0]);
+            if c == 123 { depth += 1; } else if c == 125 { depth -= 1; };
+            wp_at[0] += 1;
+        };
+    };
+    if depth != 0 { wutu_fail("unterminated event handler", start); };
+    wx_from[0] = start;
+    wx_to[0] = wp_at[0];
+    text.slice(start, wp_at[0]);
+}
+
+// ── CSS ──
+
+// Up to a delimiter outside strings, functions, and attribute selectors.
+fn wp_css_until(text: Str, delimiters: Str) Str {
+    let start = wp_at[0];
+    let parens = 0;
+    let brackets = 0;
+    while (not wp_done(text)) {
+        let c = text.get(wp_at[0]);
+        if c == 34 or c == 39 { wp_quoted(text, true); }
+        else {
+            if parens == 0 and brackets == 0 and text_index(delimiters, Str.from_code_point(c), 0) >= 0 { break; };
+            if c == 40 { parens += 1; } else if c == 41 { parens -= 1; } else if c == 91 { brackets += 1; } else if c == 93 { brackets -= 1; };
+            wp_at[0] += 1;
+        };
+    };
+    trim_text(text.slice(start, wp_at[0]));
+}
+
+// The body of a `{ … }` CSS block (cursor on the brace), without its braces.
+fn wp_css_block(text: Str) Str {
+    let open = wp_at[0];
+    wp_at[0] += 1;
+    let start = wp_at[0];
+    let depth = 1;
+    while (not wp_done(text)) {
+        if wp_at_text(text, "/*") {
+            let end = text_index(text, "*/", wp_at[0] + 2);
+            if end < 0 { wutu_fail("unterminated CSS comment", wp_at[0]); };
+            wp_at[0] = end + 2;
+        } else {
+            let c = text.get(wp_at[0]);
+            if c == 34 or c == 39 { wp_quoted(text, true); }
+            else {
+                if c == 123 { depth += 1; };
+                if c == 125 {
+                    let before = trim_end(without_css_comments(text.slice(start - 1, wp_at[0])));
+                    let last = if before.len() > 0 { before.get(before.len() - 1); } else { -1; };
+                    if not (last == 59 or last == 123 or last == 125) { wutu_fail("CSS declarations require a semicolon", wp_at[0]); };
+                    depth -= 1;
+                    if depth == 0 {
+                        let block = text.slice(start, wp_at[0]);
+                        wp_at[0] += 1;
+                        return block;
+                    };
+                };
+                wp_at[0] += 1;
+            };
+        };
+    };
+    wutu_fail("unterminated CSS block", open);
+    "";
+}
+
+fn without_css_comments(text: Str) Str {
+    let out = "";
+    let i = 0;
+    while (i < text.len()) {
+        if text_at(text, i, "/*") {
+            let end = text_index(text, "*/", i + 2);
+            if end < 0 { return out + text.slice(i, text.len()); };
+            i = end + 2;
+        } else {
+            out = out + Str.from_code_point(text.get(i));
+            i += 1;
+        };
+    };
+    out;
+}
+
+// ── Template structure ──
+
+// The template; returns its root element.
+fn parse_template(text: Str) I32 {
+    reset_template();
+    wp_at[0] = 0;
+    wp_trivia(text);
+    if wp_at_text(text, "@reactive") {
+        wp_at[0] += 9;
+        wp_semicolon(text);
+        tw_reactive[0] = 1;
+        wp_trivia(text);
+    };
+    if wp_at_text(text, "@island") {
+        wp_at[0] += 7;
+        wp_trivia(text);
+        if wp_char(text) != 34 { wutu_fail("expected a quoted island name: @island \"name\";", wp_at[0]); };
+        tw_scope[0] = intern_text(wp_quoted(text, false));
+        wp_semicolon(text);
+        tw_reactive[0] = 1;
+        wp_trivia(text);
+    };
+    while (wp_at_text(text, "@style")) {
+        wp_at[0] += 6;
+        wp_trivia(text);
+        let source = wp_expression(text);
+        let from = wx_from[0];
+        let to = wx_to[0];
+        wp_semicolon(text);
+        tw_style_value.push(intern_text(source));
+        tw_style_from.push(from);
+        tw_style_to.push(to);
+        wp_trivia(text);
+    };
+    while (wp_at_text(text, "@document")) {
+        wp_at[0] += 9;
+        wp_trivia(text);
+        if wp_char(text) != 123 { wutu_fail("expected document CSS block", wp_at[0]); };
+        tw_global.push(intern_text(wp_css_block(text)));
+        wp_trivia(text);
+    };
+    let root = parse_tnode(text);
+    if tn_kind[root] != 4 { wutu_fail("root must be an element", tn_start[root]); };
+    wp_trivia(text);
+    if not wp_done(text) { wutu_fail("expected exactly one root element; use a component for siblings", wp_at[0]); };
+    root;
+}
+
+// Text, an expression, if, for, or an element.
+fn parse_tnode(text: Str) I32 {
+    wp_trivia(text);
+    let start = wp_at[0];
+    if wp_char(text) == 34 {
+        let expr = wp_quoted(text, false);
+        wp_semicolon(text);
+        let n = new_tnode(0, start);
+        tn_text[n] = intern_text(expr);
+        return n;
+    };
+    if wp_char(text) == 61 or wp_at_text(text, "$[") {
+        let source = wp_expression(text);
+        let from = wx_from[0];
+        let to = wx_to[0];
+        wp_semicolon(text);
+        let n = new_tnode(1, start);
+        tn_text[n] = intern_text(source);
+        tn_from[n] = from;
+        tn_to[n] = to;
+        return n;
+    };
+    if wp_keyword(text, "if") { return parse_tif(text); };
+    if wp_keyword(text, "for") { return parse_tfor(text); };
+    parse_telement(text);
+}
+
+// `{ nodes }`, into node n's children (or its otherwise).
+fn parse_branch(text: Str, n: I32, otherwise: Bool) void {
+    wp_trivia(text);
+    let open = wp_at[0];
+    if wp_char(text) != 123 { wutu_fail("expected {", wp_at[0]); };
+    wp_at[0] += 1;
+    while (true) {
+        wp_trivia(text);
+        if wp_done(text) { wutu_fail("unterminated branch", open); };
+        if wp_char(text) == 125 {
+            wp_at[0] += 1;
+            return;
+        };
+        let c = parse_tnode(text);
+        tn_parent[c] = n;
+        append_child(n, c, otherwise);
+    };
+}
+
+fn parse_tif(text: Str) I32 {
+    let start = wp_at[0];
+    wp_at[0] += 2;
+    wp_trivia(text);
+    let condition = wp_expression(text);
+    let n = new_tnode(2, start);
+    tn_text[n] = intern_text(condition);
+    tn_from[n] = wx_from[0];
+    tn_to[n] = wx_to[0];
+    parse_branch(text, n, false);
+    wp_trivia(text);
+    let p = wp_at[0];
+    if text_at(text, p, "else") {
+        let i = p + 4;
+        let gap = i;
+        while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+        if i > gap and text_at(text, i, "if") and i + 2 < text.len() and is_space_code(text.get(i + 2)) {
+            wp_at[0] = p + 4;
+            wp_trivia(text);
+            let inner = parse_tif(text);
+            tn_parent[inner] = n;
+            tn_else[n] = inner;
+        } else if i < text.len() and text.get(i) == 123 {
+            wp_at[0] = p + 4;
+            parse_branch(text, n, true);
+        };
+    };
+    n;
+}
+
+fn parse_tfor(text: Str) I32 {
+    let start = wp_at[0];
+    wp_at[0] += 3;
+    wp_trivia(text);
+    let iterable = wp_expression(text);
+    let n = new_tnode(3, start);
+    tn_text[n] = intern_text(iterable);
+    tn_from[n] = wx_from[0];
+    tn_to[n] = wx_to[0];
+    wp_trivia(text);
+    // |item| or |item, index|
+    let captures = wp_captures(text);
+    if captures.len() == 0 { wutu_fail("expected |item| or |item, index| after iterable", wp_at[0]); };
+    tn_captures[n] = intern_text(captures);
+    wp_trivia(text);
+    if wp_keyword(text, "key") {
+        wp_at[0] += 3;
+        wp_trivia(text);
+        if wp_keyword(text, "global") {
+            wp_at[0] += 6;
+            wp_trivia(text);
+            tn_global[n] = 1;
+        };
+        tn_key[n] = intern_text(wp_expression(text));
+        tn_key_from[n] = wx_from[0];
+        tn_key_to[n] = wx_to[0];
+    };
+    parse_branch(text, n, false);
+    n;
+}
+
+// `|a|` or `|a, b|` at the cursor: "a" or "a, b" as written (consumed), or "".
+fn wp_captures(text: Str) Str {
+    let p = wp_at[0];
+    if wp_char(text) != 124 { return ""; };
+    let i = p + 1;
+    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    let from = i;
+    if i >= text.len() or not (is_lower_code(text.get(i)) or text.get(i) == 95) { return ""; };
+    while (i < text.len() and is_word_code(text.get(i))) { i += 1; };
+    let j = i;
+    while (j < text.len() and is_space_code(text.get(j))) { j += 1; };
+    if j < text.len() and text.get(j) == 44 {
+        j += 1;
+        while (j < text.len() and is_space_code(text.get(j))) { j += 1; };
+        if j >= text.len() or not (is_lower_code(text.get(j)) or text.get(j) == 95) { return ""; };
+        while (j < text.len() and is_word_code(text.get(j))) { j += 1; };
+        i = j;
+    };
+    let to = i;
+    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    if i >= text.len() or text.get(i) != 124 { return ""; };
+    wp_at[0] = i + 1;
+    text.slice(from, to);
+}
+
+fn parse_telement(text: Str) I32 {
+    let start = wp_at[0];
+    let p = start;
+    if p >= text.len() or not is_lower_code(text.get(p)) { wutu_fail("expected an HTML tag (class-only heads do not create elements)", p); };
+    let q = p;
+    while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+    let tag = text.slice(p, q);
+    if not is_known_tag(tag) { wutu_fail("expected an HTML tag, found unknown element '" + tag + "' (custom element names need a hyphen)", p); };
+    wp_at[0] = q;
+    let n = new_tnode(4, start);
+    tn_text[n] = intern_text(tag);
+    while (wp_char(text) == 46 or wp_char(text) == 35) {
+        let shorthand = wp_char(text);
+        wp_at[0] += 1;
+        let a = wp_at[0];
+        let b = a;
+        while (b < text.len() and is_name_code(text.get(b))) { b += 1; };
+        if b == a { wutu_fail("expected class or id", a); };
+        let name = text.slice(a, b);
+        wp_at[0] = b;
+        if shorthand == 46 { add_item(n, 0, intern_text(name), -1, 0, -1, -1, a); }
+        else { add_item(n, 1, intern_text("id"), intern_text(js_string(name)), 0, -1, -1, wp_at[0]); };
+    };
+    wp_trivia(text);
+    if wp_keyword(text, "as") {
+        wp_at[0] += 2;
+        wp_trivia(text);
+        let a = wp_at[0];
+        if a >= text.len() or not (is_lower_code(text.get(a)) or text.get(a) == 95) { wutu_fail("expected node binding", a); };
+        let b = a;
+        while (b < text.len() and is_word_code(text.get(b))) { b += 1; };
+        tn_binding[n] = intern_text(text.slice(a, b));
+        wp_at[0] = b;
+        wp_trivia(text);
+    };
+    if wp_char(text) != 123 { wutu_fail("expected { after element head", wp_at[0]); };
+    wp_at[0] += 1;
+    while (true) {
+        wp_trivia(text);
+        if wp_done(text) { wutu_fail("unterminated element '" + tag + "'", start); };
+        if wp_char(text) == 125 {
+            wp_at[0] += 1;
+            break;
+        };
+        parse_element_statement(text, n);
+    };
+    if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start); };
+    n;
+}
+
+fn add_child(n: I32, c: I32) void {
+    tn_parent[c] = n;
+    append_child(n, c, false);
+}
+
+fn parse_element_statement(text: Str, n: I32) void {
+    let p = wp_at[0];
+    let c = text.get(p);
+    if c == 59 {
+        wp_at[0] += 1;
+        return;
+    };
+    if c == 34 or c == 61 or wp_at_text(text, "$[") or wp_keyword(text, "if") or wp_keyword(text, "for") {
+        add_child(n, parse_tnode(text));
+        return;
+    };
+    // bind:value|checked|number =
+    if text_at(text, p, "bind:") {
+        let q = p + 5;
+        let property = if text_at(text, q, "value") { "value"; } else if text_at(text, q, "checked") { "checked"; } else if text_at(text, q, "number") { "number"; } else { ""; };
+        if property.len() > 0 {
+            let r = q + property.len();
+            while (r < text.len() and is_space_code(text.get(r))) { r += 1; };
+            if r < text.len() and text.get(r) == 61 {
+                wp_at[0] = r + 1;
+                let source = wp_bare_expression(text);
+                let from = wx_from[0];
+                let to = wx_to[0];
+                wp_semicolon(text);
+                add_item(n, 3, intern_text(property), intern_text(source), 0, from, to, p);
+                return;
+            };
+        };
+    };
+    // on name { … }
+    if text_at(text, p, "on") and p + 2 < text.len() and is_space_code(text.get(p + 2)) {
+        let q = p + 2;
+        while (q < text.len() and is_space_code(text.get(q))) { q += 1; };
+        let a = q;
+        while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+        let r = q;
+        while (r < text.len() and is_space_code(text.get(r))) { r += 1; };
+        if q > a and r < text.len() and text.get(r) == 123 {
+            let name = text.slice(a, q);
+            wp_at[0] = r;
+            let source = wp_utu_block(text);
+            let from = wx_from[0];
+            let to = wx_to[0];
+            wp_semicolon(text);
+            add_item(n, 2, intern_text(name), intern_text(source), 1, from, to, p);
+            return;
+        };
+    };
+    if c == 60 or (c == 64 and event_head(text, p)) {
+        parse_attribute_or_event(text, n);
+        return;
+    };
+    if c == 58 or c == 64 or c == 38 {
+        parse_css_rule(text, n);
+        return;
+    };
+    parse_declaration_or_child(text, n);
+}
+
+// `@name =` at p.
+fn event_head(text: Str, p: I32) Bool {
+    let q = p + 1;
+    let a = q;
+    while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+    if q == a { return false; };
+    while (q < text.len() and is_space_code(text.get(q))) { q += 1; };
+    q < text.len() and text.get(q) == 61;
+}
+
+fn parse_attribute_or_event(text: Str, n: I32) void {
+    let is_event = text.get(wp_at[0]) == 64;
+    wp_at[0] += 1;
+    let is_property = not is_event and wp_char(text) == 46;
+    if is_property { wp_at[0] += 1; };
+    let name_start = wp_at[0];
+    let q = name_start;
+    while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+    if q == name_start { wutu_fail("expected attribute/event name", name_start); };
+    let name = text.slice(name_start, q);
+    wp_at[0] = q;
+    wp_trivia(text);
+    let value = "\"\"";
+    let dynamic = false;
+    let from = -1;
+    let to = -1;
+    if wp_char(text) == 61 {
+        wp_at[0] += 1;
+        wp_trivia(text);
+        if wp_char(text) == 34 {
+            // A quoted value is the whole attribute.
+            value = wp_quoted(text, false);
+            let value_end = wp_at[0];
+            wp_trivia(text);
+            let after = wp_char(text);
+            if after == 43 or after == 46 { wutu_fail("expected ; after quoted attribute value; build computed values with $[...]", value_end); };
+            wp_at[0] = value_end;
+        } else {
+            value = if wp_at_text(text, "$[") { wp_interpolation(text); } else { wp_bare_expression(text); };
+            dynamic = true;
+            from = wx_from[0];
+            to = wx_to[0];
+        };
+    } else if is_event or is_property {
+        wutu_fail("events and properties require a value", wp_at[0]);
+    };
+    wp_semicolon(text);
+    let tag = word_text(tn_text[n]);
+    if is_event {
+        if not dynamic { wutu_fail("event handlers take a closure: @" + name + "=$[cl(event) void { ... }];", name_start); };
+        add_item(n, 2, intern_text(name), intern_text(value), 0, from, to, name_start);
+        return;
+    };
+    if text_at(name, 0, "on") { wutu_fail("use @event=$[closure] for events", name_start); };
+    if not is_property and not is_allowed_attribute(tag, name) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
+    add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);
+}
+
+// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
+fn parse_css_rule(text: Str, n: I32) void {
+    let selector = wp_css_until(text, "{;");
+    if wp_char(text) == 59 {
+        wp_at[0] += 1;
+        let i = add_item(n, 4, -1, intern_text(selector + ";"), 0, -1, -1, wp_at[0]);
+        ti_c[i] = intern_text(selector + ";");
+        return;
+    };
+    let block = wp_css_block(text);
+    let i = add_item(n, 4, -1, intern_text(selector + "{" + block + "}"), 0, -1, -1, wp_at[0]);
+    ti_c[i] = intern_text(scoped_selector(selector) + "{" + block + "}");
+}
+
+fn scoped_selector(selector: Str) Str {
+    if selector == "@" { return "&, & *"; };
+    if text_at(selector, 0, "@ ") {
+        let rest = selector.slice(2, selector.len());
+        return if rest.len() > 0 { rest; } else { "&, & *"; };
+    };
+    if text_at(selector, 0, ":") { return "&" + selector; };
+    selector;
+}
+
+fn parse_declaration_or_child(text: Str, n: I32) void {
+    let start = wp_at[0];
+    let head = wp_css_until(text, ":{};");
+    if wp_char(text) != 58 {
+        wp_at[0] = start;
+        add_child(n, parse_telement(text));
+        return;
+    };
+    wp_at[0] += 1;
+    wp_trivia(text);
+    if wp_at_text(text, "$[") {
+        // `width: $[expression];`: applied with style.setProperty at render.
+        let source = wp_interpolation(text);
+        let from = wx_from[0];
+        let to = wx_to[0];
+        wp_trivia(text);
+        if wp_char(text) != 59 { wutu_fail("CSS declarations require a semicolon", wp_at[0]); };
+        wp_at[0] += 1;
+        if not is_css_property(head) { wutu_fail("invalid CSS property", start); };
+        add_item(n, 5, intern_text(trim_text(head)), intern_text(source), 0, from, to, start);
+        return;
+    };
+    let value = wp_css_until(text, ";{}");
+    if wp_char(text) != 59 { wutu_fail("CSS declarations require a semicolon", wp_at[0]); };
+    wp_at[0] += 1;
+    if not is_css_property(head) { wutu_fail("invalid CSS property", start); };
+    let declaration = head + ":" + value + ";";
+    let i = add_item(n, 4, -1, intern_text(declaration), 0, -1, -1, start);
+    ti_c[i] = intern_text(declaration);
+}

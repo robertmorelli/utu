@@ -1,0 +1,618 @@
+// ── Wutu: the expander ───────────────────────────────────────────────────────
+//
+// Stage 0's wutu.js: each @wutu template becomes ordinary utu that builds
+// the DOM through the Browser declarations. Static templates create
+// elements directly; when any template of the program is reactive
+// (`@reactive`, `@island`), every one goes through the reconciler in
+// std:Wutu, so components can join a view.
+
+mem wu_reconcile: I32 = [0];
+mem wu_site: I32 = [-1];
+mem wu_serial: I32 = [0];
+mem wu_node_count: I32 = [0];
+mem wu_aliases: I32;        // elements with an `as` alias, in order
+mem wu_style_key: I32;      // the site's stylesheets: keys and CSS (words), in order
+mem wu_style_css: I32;
+mem wu_decls: I32;          // the site's helper bindings (words), in order
+mem wu_declared_kind: I32;  // which helpers it has (words), and their names
+mem wu_declared_name: I32;
+mem wu_prefix: I32 = [-1];  // a word
+mem wu_view_hash: I32 = [-1];
+
+// Island renames: by splice, identifiers that name element aliases.
+mem splice_rename_k: I32;
+mem splice_rename_at: I32;   // the identifier's byte offset
+mem splice_rename_to: I32;   // the alias's element (a word)
+
+fn wutu_prefix() Str { word_text(wu_prefix[0]); }
+
+// Whether any DSL of the program asks for a reactive view.
+fn wutu_reactive_program() Bool {
+    for (0 ..< node_kind.len()) |n| {
+        if node_kind[n] == Node.Dsl_expr.to_i32() {
+            let body = dsl_body(n);
+            if text_index(body, "@reactive", 0) >= 0 or text_index(body, "@island", 0) >= 0 { return true; };
+        };
+    };
+    false;
+}
+
+// FNV-1a over the text's code units, base 36: stable class names and view identities.
+fn wutu_hash(text: Str) Str {
+    let n = -2128831035;
+    for (0 ..< text.len()) |i| { n = (n ^ text.get(i)) * 16777619; };
+    let v = n.to_i64() & 4294967295;
+    if v == 0 { return "0"; };
+    let digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+    let out = "";
+    while (v > 0) {
+        out = Str.from_code_point(digits.get((v % 36).to_i32())) + out;
+        v = v / 36;
+    };
+    out;
+}
+
+// A JS string literal safe inside `@es/\ … \/`: no `/` next to a `\`.
+fn es_string(text: Str) Str {
+    let json = js_string(text);
+    let out = "";
+    for (0 ..< json.len()) |i| {
+        let c = json.get(i);
+        let next_is_backslash = i + 1 < json.len() and json.get(i + 1) == 92;
+        let after_backslash = i > 0 and json.get(i - 1) == 92;
+        if c == 47 and (next_is_backslash or after_backslash) { out = out + "\\u002f"; } else { out = out + Str.from_code_point(c); };
+    };
+    out;
+}
+
+// ── A site ──
+
+fn expand_wutu(site: I32, reconcile: Bool) void {
+    let whole = bytes_text(tok_start[node_first[last_child(site)]], tok_end[node_first[last_child(site)]]);
+    let prefix = "";
+    let searching = true;
+    while (searching) {
+        prefix = "__wutu_" + int_text(wu_serial[0]) + "_";
+        wu_serial[0] += 1;
+        searching = text_index(whole, prefix, 0) >= 0;
+    };
+    wu_prefix[0] = intern_text(prefix);
+    wu_view_hash[0] = intern_text(wutu_hash(whole));
+    wu_site[0] = site;
+    wu_reconcile[0] = if reconcile { 1; } else { 0; };
+    wu_node_count[0] = 0;
+    wu_aliases.clear();
+    wu_style_key.clear();
+    wu_style_css.clear();
+    wu_decls.clear();
+    wu_declared_kind.clear();
+    wu_declared_name.clear();
+    let template = dsl_body(site);
+    let root = parse_template(template);
+    wutu_prepare(root);
+    for (0 ..< tw_global.len()) |k| { wutu_style(wutu_hash(word_text(tw_global[k])), word_text(tw_global[k])); };
+    wx_events.clear();
+    let code = wutu_element(root, false);
+    let root_id = node_uid(root);
+    let events = "";
+    for (0 ..< wx_events.len()) |k| { events = events + word_text(wx_events[k]); };
+    // Shared sheets install in source order, so later ones win the cascade.
+    let prelude = "";
+    for (0 ..< tw_style_value.len()) |k| {
+        prelude = prelude + wutu_helper("style") + "(" + wutu_island(word_text(tw_style_value[k]), tw_style_from[k], tw_style_to[k], root) + ");\n";
+    };
+    let css = "";
+    for (0 ..< wu_style_css.len()) |k| { css = css + word_text(wu_style_css[k]); };
+    css = without_hash_lines(css);
+    if css.len() > 0 {
+        let key = es_string("wutu-" + wutu_hash(css));
+        prelude = "let " + prefix + "install_css: fun() void = @es/\\ () => { if (!document.getElementById(" + key + ")) { const s=document.createElement('style'); s.id=" + key
+            + "; s.textContent=" + es_string(css) + "; document.head.append(s); } } \\/; " + prefix + "install_css();\n" + prelude;
+    };
+    let declarations = "";
+    for (0 ..< wu_decls.len()) |k| {
+        if k > 0 { declarations = declarations + "\n"; };
+        declarations = declarations + word_text(wu_decls[k]);
+    };
+    let render = "{ " + declarations + " " + prelude + code + " " + events + " " + root_id + "; }";
+    let value = render;
+    if tw_reactive[0] == 1 {
+        let mount = wutu_helper("mount");
+        let last = word_text(wu_decls[wu_decls.len() - 1]);
+        value = last + " " + mount + "(cl() Browser.HTMLElement " + render + ", " + (if tw_scope[0] >= 0 { word_text(tw_scope[0]); } else { "\"\""; }) + ")";
+    };
+    graft_expression(site, "{ " + (if reconcile { "wutu.init();"; } else { ""; }) + " " + value + "; }");
+}
+
+// Lines that begin with `# ` are comments.
+fn without_hash_lines(css: Str) Str {
+    let out = "";
+    let i = 0;
+    while (i < css.len()) {
+        let j = i;
+        while (j < css.len() and (css.get(j) == 32 or css.get(j) == 9)) { j += 1; };
+        if j + 1 < css.len() and css.get(j) == 35 and (css.get(j + 1) == 32 or css.get(j + 1) == 9) {
+            let end = j;
+            while (end < css.len() and css.get(end) != 10 and css.get(end) != 13) { end += 1; };
+            i = end;
+        } else {
+            let end = i;
+            while (end < css.len() and css.get(end) != 10) { end += 1; };
+            if end < css.len() { end += 1; };
+            out = out + css.slice(i, end);
+            i = end;
+        };
+    };
+    out;
+}
+
+fn wutu_style(key: Str, css: Str) void {
+    let w = intern_text(key);
+    for (0 ..< wu_style_key.len()) |k| {
+        if wu_style_key[k] == w {
+            wu_style_css[k] = intern_text(css);
+            return;
+        };
+    };
+    wu_style_key.push(w);
+    wu_style_css.push(intern_text(css));
+}
+
+// Number the elements and collect their aliases, in order.
+fn wutu_prepare(n: I32) void {
+    if tn_kind[n] == 4 {
+        tn_index[n] = wu_node_count[0];
+        wu_node_count[0] += 1;
+        if tn_binding[n] >= 0 { wu_aliases.push(n); };
+    };
+    let c = tn_first[n];
+    while (c >= 0) {
+        wutu_prepare(c);
+        c = tn_next[c];
+    };
+    c = tn_else[n];
+    while (c >= 0) {
+        wutu_prepare(c);
+        c = tn_next[c];
+    };
+}
+
+fn node_uid(n: I32) Str { wutu_prefix() + "node" + int_text(tn_index[n]); }
+
+// Whether template node n is node `ancestor` or under it.
+fn tn_within(n: I32, ancestor: I32) Bool {
+    let x = n;
+    while (x >= 0) {
+        if x == ancestor { return true; };
+        x = tn_parent[x];
+    };
+    false;
+}
+
+// The element an identifier names, seen from `owner`: an enclosing
+// element's own alias, or one alias inside an enclosing subtree; else -1.
+fn resolve_alias(name: I32, owner: I32, offset: I32) I32 {
+    let scope = owner;
+    while (scope >= 0) {
+        if tn_binding[scope] == name { return scope; };
+        let found = -1;
+        let count = 0;
+        for (0 ..< wu_aliases.len()) |k| {
+            let a = wu_aliases[k];
+            if tn_binding[a] == name and tn_within(a, scope) {
+                found = a;
+                count += 1;
+            };
+        };
+        if count == 1 { return found; };
+        if count > 1 { wutu_fail("Ambiguous element alias '" + word_text(name) + "'; reference it inside its own subtree", offset); };
+        scope = tn_parent[scope];
+    };
+    -1;
+}
+
+// A Utu island: in place (`__splice_N`), its alias names renamed; a value
+// without a range (a string literal) is written as it is.
+fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
+    if from < 0 { return source; };
+    let site = wu_site[0];
+    let text = dsl_body(site).slice(from, to);
+    let start = dsl_byte(site, from);
+    let e = parse_span(start, start + utf8_length(text));
+    if e < 0 {
+        let absolute = bytes_text(file_start[file_of_token(node_first[site])], start).len();
+        let shown = if source.len() > 100 { source.slice(0, 100); } else { source; };
+        wutu_fail("Invalid Utu interpolation at offset " + int_text(absolute) + ": " + shown, from);
+    };
+    let placeholder = dsl_splice(site, from, text);
+    let k = splice_start.len() - 1;
+    rename_aliases(e, e, k, owner);
+    placeholder;
+}
+
+fn rename_aliases(node: I32, root: I32, k: I32, owner: I32) void {
+    if is_kind(node, Node.Identifier) and is_reference(node) {
+        let name = word_of(node);
+        if not island_shadowed(node, name, root) {
+            let at = tok_start[node_first[node]];
+            let offset = bytes_text(dsl_inner_start(wu_site[0]), at).len();
+            let alias = resolve_alias(name, owner, offset);
+            if alias >= 0 {
+                splice_rename_k.push(k);
+                splice_rename_at.push(at);
+                splice_rename_to.push(intern_text(node_uid(alias)));
+            };
+        };
+        return;
+    };
+    if is_kind(node, Node.Identifier) { return; };
+    let c = first_child(node);
+    while (c >= 0) {
+        rename_aliases(c, root, k, owner);
+        c = next_sibling(c);
+    };
+}
+
+// Whether the island binds `name` around the identifier: a closure's
+// parameter, a let before it in a block, a loop's capture.
+fn island_shadowed(ident: I32, name: I32, root: I32) Bool {
+    let child = ident;
+    let p = parent_of(ident);
+    while (p >= 0) {
+        if is_kind(p, Node.Closure_expr) {
+            let list = first_child(p);
+            if is_kind(list, Node.Closure_param_list) {
+                let param = first_child(list);
+                while (param >= 0) {
+                    if word_of(first_child(param)) == name { return true; };
+                    param = next_sibling(param);
+                };
+            };
+            return false;
+        };
+        if is_kind(p, Node.Block) {
+            let q = parent_of(p);
+            if q >= 0 {
+                let cap = first_child(q);
+                while (cap >= 0) {
+                    if is_kind(cap, Node.Capture) {
+                        let c = first_child(cap);
+                        while (c >= 0) {
+                            if word_of(c) == name { return true; };
+                            c = next_sibling(c);
+                        };
+                    };
+                    cap = next_sibling(cap);
+                };
+            };
+            let s = first_child(p);
+            while (s >= 0 and s != child) {
+                if is_kind(s, Node.Bind_expr) and is_kind(first_child(s), Node.Identifier) and word_of(first_child(s)) == name { return true; };
+                s = next_sibling(s);
+            };
+        };
+        if p == root { return false; };
+        child = p;
+        p = parent_of(p);
+    };
+    false;
+}
+
+// ── Helpers: typed bindings to the reconciler, one per site ──
+
+fn wutu_helper(kind: Str) Str {
+    let w = intern_text(kind);
+    for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
+    let name = wutu_prefix() + kind;
+    let params = "";
+    let result = "void";
+    let js = "";
+    if kind == "style" and wu_reconcile[0] == 0 {
+        params = "Str";
+        js = "(s)=>{if([...document.querySelectorAll('style')].some(n=>n.textContent===s))return;const n=document.createElement('style');n.textContent=s;document.head.append(n);}";
+    } else if kind == "attr" {
+        params = "Browser.Element, Str, Str";
+        js = "(n,k,v)=>globalThis.__utuWutu.attr(n,k,v)";
+    } else if kind == "boolean" {
+        params = "Browser.Element, Str, Bool";
+        js = "(n,k,v)=>globalThis.__utuWutu.attr(n,k,!!v)";
+    } else if kind == "append" {
+        params = "Externref";
+        js = "(v)=>globalThis.__utuWutu.append(v)";
+    } else if kind == "node" {
+        params = "Browser.Node";
+        js = "(v)=>globalThis.__utuWutu.append(v)";
+    } else if kind == "event" {
+        params = "Browser.Element, Str, cl(Browser.Event) void";
+        js = "(n,e,h)=>globalThis.__utuWutu.listen(n,e,h)";
+    } else if kind == "leave" {
+        js = "()=>{globalThis.__utuWutu.leave()}";
+    } else if kind == "index" {
+        params = "U64";
+        js = "(i)=>globalThis.__utuWutu.pushCall(String(i))";
+    } else if kind == "call" {
+        params = "Str";
+        js = "(k)=>globalThis.__utuWutu.pushCall(k)";
+    } else if kind == "globalKey" {
+        params = "Str";
+        js = "(k)=>globalThis.__utuWutu.pushGlobal(k)";
+    } else if kind == "key" {
+        params = "Str";
+        js = "(k)=>globalThis.__utuWutu.pushKey(k)";
+    } else if kind == "unkey" {
+        js = "()=>globalThis.__utuWutu.popKey()";
+    } else if kind == "mount" {
+        params = "cl() Browser.HTMLElement, Str";
+        result = "Browser.HTMLElement";
+        js = "(f,k)=>globalThis.__utuWutu.mount(f,k)";
+    } else {
+        params = "Str";
+        js = "(s)=>globalThis.__utuWutu.style(s)";
+    };
+    wu_decls.push(intern_text("let " + name + ": fun(" + params + ") " + result + " = @es/\\ " + js + " \\/;"));
+    wu_declared_kind.push(w);
+    wu_declared_name.push(intern_text(name));
+    name;
+}
+
+// The reconciler's enter(), typed to give the element's own interface.
+fn wutu_enter(tag: Str, svg: Bool) Str {
+    let kind = "enter_" + tag;
+    let w = intern_text(kind);
+    for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
+    let type = if svg { "Browser.SVGElement"; } else { "Browser.HTML" + element_interface(tag) + "Element"; };
+    let name = wutu_prefix() + kind;
+    wu_decls.push(intern_text("let " + name + ": fun(Str, Bool, Str, Str) " + type + " = @es/\\ (t,s,i,k)=>globalThis.__utuWutu.enter(t,!!s,i,k) \\/;"));
+    wu_declared_kind.push(w);
+    wu_declared_name.push(intern_text(name));
+    name;
+}
+
+fn element_interface(tag: Str) Str {
+    if tag == "input" { return "Input"; };
+    if tag == "select" { return "Select"; };
+    if tag == "textarea" { return "TextArea"; };
+    if tag == "form" { return "Form"; };
+    if tag == "button" { return "Button"; };
+    if tag == "a" { return "Anchor"; };
+    if tag == "img" { return "Image"; };
+    if tag == "canvas" { return "Canvas"; };
+    if tag == "video" { return "Video"; };
+    if tag == "audio" { return "Audio"; };
+    if tag == "option" { return "Option"; };
+    if tag == "label" { return "Label"; };
+    if tag == "details" { return "Details"; };
+    if tag == "dialog" { return "Dialog"; };
+    if tag == "progress" { return "Progress"; };
+    if tag == "meter" { return "Meter"; };
+    if tag == "output" { return "Output"; };
+    "";
+}
+
+fn event_type(name: Str) Str {
+    if in_words("click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout", name) { return "MouseEvent"; };
+    if name == "wheel" { return "WheelEvent"; };
+    if in_words("keydown keyup keypress", name) { return "KeyboardEvent"; };
+    if in_words("pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture", name) { return "PointerEvent"; };
+    if in_words("focus blur focusin focusout", name) { return "FocusEvent"; };
+    if name == "beforeinput" { return "InputEvent"; };
+    if name == "submit" { return "SubmitEvent"; };
+    if in_words("drag dragstart dragend dragenter dragleave dragover drop", name) { return "DragEvent"; };
+    if in_words("touchstart touchend touchmove touchcancel", name) { return "TouchEvent"; };
+    if in_words("animationstart animationend animationiteration animationcancel", name) { return "AnimationEvent"; };
+    if in_words("transitionstart transitionend transitionrun transitioncancel", name) { return "TransitionEvent"; };
+    if in_words("copy cut paste", name) { return "ClipboardEvent"; };
+    "";
+}
+
+// ── Elements ──
+//
+// wutu_element gives the statements creating the element and its
+// children; listeners (its own and its children's) go to wx_events, to be
+// attached once their siblings exist: after the template's code, or after
+// an if's or a loop's fragment.
+
+mem wx_events: I32;   // listeners pending (words), in order
+
+fn wutu_element(n: I32, outer_svg: Bool) Str {
+    let tag = word_text(tn_text[n]);
+    let svg = outer_svg or tag == "svg";
+    let id = node_uid(n);
+    let reconcile = wu_reconcile[0] == 1;
+    let code = "";
+    let properties = "";
+    if reconcile {
+        let identity = js_string("v" + word_text(wu_view_hash[0]) + ":" + int_text(tn_index[n]));
+        code = code + "let " + id + " = " + wutu_enter(tag, svg) + "(" + js_string(tag) + ", " + (if svg { "true"; } else { "false"; }) + ", " + identity + ", \"\");\n";
+    } else {
+        let create = if svg { "createElementNS(\"http://www.w3.org/2000/svg\", "; } else { "createElement("; };
+        code = code + "let " + id + " = Browser.document." + create + js_string(tag) + ");\n";
+    };
+    // Classes, and the element's scoped CSS as one class.
+    let classes = "";
+    let nclasses = 0;
+    let css = "";
+    let i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 0 {
+            if nclasses > 0 { classes = classes + " "; };
+            classes = classes + word_text(ti_a[i]);
+            nclasses += 1;
+        };
+        if ti_kind[i] == 4 { css = css + word_text(ti_c[i]); };
+        i = ti_next[i];
+    };
+    if css.len() > 0 {
+        let key = "w" + wutu_hash(css);
+        wutu_style(key, "." + key + "{" + css + "}");
+        if nclasses > 0 { classes = classes + " "; };
+        classes = classes + key;
+        nclasses += 1;
+    };
+    let class_list = js_string(classes);
+    if nclasses > 0 {
+        code = code + (if reconcile { wutu_helper("attr") + "(" + id + ", \"class\", " + class_list + ");"; } else { id + ".setAttribute(\"class\", " + class_list + ");"; }) + "\n";
+    };
+    i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 1 {
+            let name = word_text(ti_a[i]);
+            let value = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+            let quoted = js_string(name);
+            let property = (ti_flags[i] & 1) != 0;
+            let dynamic = (ti_flags[i] & 2) != 0;
+            if property {
+                // An unchanged value is not assigned: selection and caret survive updates.
+                properties = properties + "if " + id + "." + name + " != (" + value + ") { " + id + "." + name + " = (" + value + "); };\n";
+            } else {
+                let boolean = is_boolean_attribute(name) and dynamic;
+                let merged = if name == "class" and nclasses > 0 { js_string(classes + " ") + ".concat((" + value + "))"; } else { ""; };
+                if reconcile {
+                    if boolean { code = code + wutu_helper("boolean") + "(" + id + ", " + quoted + ", (" + value + "));\n"; }
+                    else { code = code + wutu_helper("attr") + "(" + id + ", " + quoted + ", " + (if merged.len() > 0 { merged; } else { "(" + value + ")"; }) + ");\n"; };
+                } else if merged.len() > 0 {
+                    code = code + id + ".setAttribute(\"class\", " + merged + ");\n";
+                } else if boolean {
+                    code = code + "if (" + value + ") { " + id + ".setAttribute(" + quoted + ", \"\"); };\n";
+                } else {
+                    code = code + id + ".setAttribute(" + quoted + ", (" + value + "));\n";
+                };
+            };
+        };
+        i = ti_next[i];
+    };
+    i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 5 {
+            let value = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+            code = code + id + ".style.setProperty(" + js_string(word_text(ti_a[i])) + ", (" + value + "));\n";
+        };
+        i = ti_next[i];
+    };
+    let child_svg = svg and tag != "foreignObject";
+    let c = tn_first[n];
+    while (c >= 0) {
+        code = code + wutu_child(id, child_svg, c);
+        c = tn_next[c];
+    };
+    if reconcile { code = code + wutu_helper("leave") + "();\n"; };
+    code = code + properties;
+    i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 3 { code = code + wutu_binding(n, i); };
+        i = ti_next[i];
+    };
+    i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 2 {
+            let handler = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+            let name = word_text(ti_a[i]);
+            let prevent = if name == "submit" { "event.preventDefault();"; } else { ""; };
+            let type = event_type(name);
+            let shorthand = (ti_flags[i] & 1) != 0;
+            // `on mousemove { … }` gets `event: MouseEvent`, as HTMLElementEventMap types it.
+            let listener = if not shorthand { handler; }
+                else if type.len() > 0 { "cl(__wutu_event) void { alt __wutu_event { Browser." + type + " |event| => { " + prevent + " " + handler + "; }, ~> {}, }; }"; }
+                else { "cl(event) void { " + prevent + " " + handler + "; }"; };
+            wx_events.push(intern_text((if reconcile { wutu_helper("event") + "(" + id + ", " + js_string(name) + ", (" + listener + "));"; } else { id + ".addEventListener(" + js_string(name) + ", (" + listener + "));"; }) + "\n"));
+        };
+        i = ti_next[i];
+    };
+    code;
+}
+
+// `bind:value|checked|number`: write the property on render, read it back on input.
+fn wutu_binding(n: I32, i: I32) Str {
+    if wu_reconcile[0] == 0 { wutu_fail("bind requires an @reactive view in this source file", ti_at[i]); };
+    let id = node_uid(n);
+    let numeric = word_text(ti_a[i]) == "number";
+    let property = if numeric { "valueAsNumber"; } else { word_text(ti_a[i]); };
+    let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+    let sync = located_splice(wu_site[0], "if " + (if numeric { id + ".validity.valid and "; } else { ""; }) + id + "." + property + " != (" + target + ") { " + id + "." + property + " = (" + target + "); }", ti_at[i], ti_to[i]);
+    let event = if word_text(ti_a[i]) == "checked" { "change"; } else { "input"; };
+    // NaN != NaN: an unparsable number leaves the state as it is.
+    let update = located_splice(wu_site[0], if numeric { "if " + id + "." + property + " == " + id + "." + property + " { " + target + " = " + id + "." + property + "; }"; }
+        else { target + " = " + id + "." + property; }, ti_at[i], ti_to[i]);
+    wx_events.push(intern_text(wutu_helper("event") + "(" + id + ", \"" + event + "\", cl(event) void { " + update + "; });\n"));
+    sync + ";\n";
+}
+
+// ── Children ──
+
+// The statements for a list of children; their listeners after them.
+fn wutu_fragment(parent_id: Str, svg: Bool, first: I32) Str {
+    let mark = wx_events.len();
+    let body = "";
+    let c = first;
+    while (c >= 0) {
+        body = body + wutu_child(parent_id, svg, c);
+        c = tn_next[c];
+    };
+    for (mark ..< wx_events.len()) |k| { body = body + word_text(wx_events[k]); };
+    wx_events.resize(mark);
+    body;
+}
+
+// A child's statements (its listeners go to wx_events).
+fn wutu_child(parent_id: Str, svg: Bool, child: I32) Str {
+    let kind = tn_kind[child];
+    let reconcile = wu_reconcile[0] == 1;
+    if kind == 2 {
+        let condition = wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child);
+        let then = wutu_fragment(parent_id, svg, tn_first[child]);
+        let otherwise = wutu_fragment(parent_id, svg, tn_else[child]);
+        return "if (" + condition + ") { " + then + " } else { " + otherwise + " };\n";
+    };
+    if kind == 3 { return wutu_loop(parent_id, svg, child); };
+    if kind == 4 {
+        let code = wutu_element(child, svg);
+        let value = node_uid(child);
+        return code + (if reconcile { wutu_helper("node") + "(" + value + ");"; } else { parent_id + ".append(" + value + ");"; }) + "\n";
+    };
+    // Text and interpolated values; reconciled slots get a stable call key.
+    let value = "(" + wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child) + ")";
+    if not reconcile { return parent_id + ".append(" + value + ");\n"; };
+    let at = if tn_from[child] >= 0 { tn_from[child]; } else { 0; };
+    wutu_helper("call") + "(" + js_string("call:" + word_text(wu_view_hash[0]) + ":" + int_text(at)) + ");\n" + wutu_helper("append") + "(" + value + ");\n" + wutu_helper("unkey") + "();\n";
+}
+
+fn wutu_loop(parent_id: Str, svg: Bool, n: I32) Str {
+    let written = word_text(tn_captures[n]);
+    let comma = text_index(written, ",", 0);
+    let index = "";
+    let captures = written;
+    if comma >= 0 { index = trim_text(written.slice(comma + 1, written.len())); }
+    else {
+        index = wutu_prefix() + "index" + int_text(wu_node_count[0]);
+        wu_node_count[0] += 1;
+        captures = written + ", " + index;
+    };
+    let iterable = wutu_island(word_text(tn_text[n]), tn_from[n], tn_to[n], n);
+    let enter_key = "";
+    let leave_key = "";
+    let reconcile = wu_reconcile[0] == 1;
+    if reconcile and tn_key[n] >= 0 {
+        let push = wutu_helper(if tn_global[n] == 1 { "globalKey"; } else { "key"; });
+        enter_key = push + "(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ");";
+    } else if reconcile {
+        // Unkeyed iterations are known by the loop's site and position.
+        let site = js_string("loop:" + word_text(wu_view_hash[0]) + ":" + int_text(tn_from[n]));
+        enter_key = wutu_helper("call") + "(" + site + ");" + wutu_helper("index") + "(" + index + ");";
+    };
+    let fragment = wutu_fragment(parent_id, svg, tn_first[n]);
+    if reconcile {
+        let pop = wutu_helper("unkey") + "();";
+        leave_key = if tn_key[n] >= 0 { pop; } else { pop + pop; };
+    };
+    iterable + " each |" + captures + "| { " + enter_key + " " + fragment + " " + leave_key + " };\n";
+}
+
+// Whether an identifier refers to a value (not a field, member, or
+// parameter name, nor a binding being declared).
+fn is_reference(node: I32) Bool {
+    let p = parent_of(node);
+    if p < 0 { return true; };
+    if (is_kind(p, Node.Field_expr) or is_kind(p, Node.Optional_field_expr) or is_kind(p, Node.Type_member_expr)) and first_child(p) != node { return false; };
+    if (is_kind(p, Node.Field_init) or is_kind(p, Node.Bind_expr)) and first_child(p) == node { return false; };
+    not (is_kind(p, Node.Param) or is_kind(p, Node.Capture) or is_kind(p, Node.Closure_param) or is_kind(p, Node.Closure_param_list) or is_kind(p, Node.Self_param));
+}

@@ -147,6 +147,7 @@ enum(U8) Node:
     | For_sources
     | For_source
     | While_expr
+    | Splice           // utu written in a DSL body, in its expansion (dsl.utu)
 
 // Every keyword of the grammar, as interned word ids: each is its variant's
 // name with the first letter lowercased (`Flat_map` is `flat_map`). Where a

@@ -172,11 +172,12 @@ fn is_bounded_stage(op: I32) Bool {
 
 fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     // The stages, outermost last.
+    // (A DSL's splice may hold the stages before: `xs filter … ` then `each`.)
     let n = 0;
     let input = node;
     while (is_kind(input, Node.Iterator_expr)) {
         n += 1;
-        input = first_child(input);
+        input = past_splices(first_child(input));
     };
     let first_stage = st_node.len();
     for (0 ..< n) |i| {
@@ -191,7 +192,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     while (k >= 0) {
         st_node[first_stage + k] = s;
         st_op[first_stage + k] = iterator_op(s);
-        s = first_child(s);
+        s = past_splices(first_child(s));
         k -= 1;
     };
     let end_op = st_op[first_stage + n - 1];
@@ -2800,4 +2801,10 @@ fn bisect_test(node: I32, range: Bool, source: I32, start: I32, at: I32, et: I32
     let block = stage_block(node);
     coerce(check_block(block, bool_t, cx), bool_t, block);
     w_node(Op.Seq, vt_i32, 0, 0, m);
+}
+
+fn past_splices(node: I32) I32 {
+    let n = node;
+    while (n >= 0 and is_kind(n, Node.Splice)) { n = first_child(n); };
+    n;
 }

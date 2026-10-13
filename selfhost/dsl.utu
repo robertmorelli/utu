@@ -13,7 +13,11 @@
 
 // Expand every DSL site of the program's own files; then the sites the
 // expansions made, until none is left.
+mem dsl_reconcile: I32 = [0];
+
 fn expand_dsls() void {
+    // Any reactive template makes every one reconciled.
+    dsl_reconcile[0] = if wutu_reactive_program() { 1; } else { 0; };
     let rounds = 0;
     while (rounds < 16 and expand_dsl_round()) { rounds += 1; };
 }
@@ -68,9 +72,29 @@ fn expand_dsl_round() Bool {
             };
         };
     };
-    if not found { return expanded; };
     for (0 ..< ncontainers) |k| { json_expand_container(containers[k], json, count); };
-    true;
+    // Then the Wutu templates, until none is left (one may hold another).
+    let wutu = intern_text("wutu");
+    let more = true;
+    let guard = 0;
+    while (more and guard < 64) {
+        more = false;
+        guard += 1;
+        let now = node_kind.len();
+        for (0 ..< now) |n| {
+            if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == wutu {
+                more = true;
+                expanded = true;
+                try {
+                    expand_wutu(n, dsl_reconcile[0] == 1);
+                } catch {
+                    report_dsl_error(n);
+                    dsl_failed.push(n);
+                };
+            };
+        };
+    };
+    found or expanded;
 }
 
 // Whether a node is in an own file (not the standard library), and its
@@ -141,7 +165,11 @@ fn dsl_byte(site: I32, offset: I32) I32 {
 // reported there.
 
 mem dsl_file_site: I32;           // by file: the DSL site it was generated for, or -1
+mem dsl_file_from: I32;           // by file: the part of the site it stands for (bytes), or -1
+mem dsl_file_to: I32;
 mem dsl_current_site: I32 = [-1];
+mem dsl_current_from: I32 = [-1];
+mem dsl_current_to: I32 = [-1];
 
 // The site a generated node stands for, or -1.
 fn dsl_site_of(node: I32) I32 {
@@ -203,8 +231,15 @@ fn parse_generated_file(code: Str) I32 {
     for (0 ..< n) |i| { src[at + i] = copy[i]; };
     let k = dsl_file_site.len();
     dsl_file_site.resize(file + 1);
-    for (k ..< file + 1) |f| { dsl_file_site[f] = -1; };
+    dsl_file_from.resize(file + 1);
+    dsl_file_to.resize(file + 1);
+    for (k ..< file + 1) |f| {
+        dsl_file_site[f] = -1;
+        dsl_file_from[f] = -1;
+    };
     dsl_file_site[file] = dsl_current_site[0];
+    dsl_file_from[file] = dsl_current_from[0];
+    dsl_file_to[file] = dsl_current_to[0];
     parse_file(file);
 }
 
@@ -229,8 +264,26 @@ fn parses_as_expression(code: Str) Bool {
 // expansion is grafted, each placeholder becomes the expression parsed from
 // the body itself, so it keeps its place in the source.
 
-mem splice_start: I32;   // by splice: its span in src
+mem splice_start: I32;   // by splice: its span in src (-1 for generated code)
 mem splice_end: I32;
+mem splice_code: I32;    // by splice: generated code (a word), whose mistakes point at [from, to) of the body
+mem splice_from: I32;
+mem splice_to: I32;
+
+// Generated code that stands for one statement of the body (`bind:`): its
+// mistakes are reported at that statement, not the whole site.
+fn located_splice(site: I32, code: Str, from: I32, to: I32) Str {
+    let k = splice_start.len();
+    splice_start.push(-1);
+    splice_end.push(-1);
+    splice_code.resize(k + 1);
+    splice_from.resize(k + 1);
+    splice_to.resize(k + 1);
+    splice_code[k] = intern_text(code);
+    splice_from[k] = dsl_byte(site, from);
+    splice_to[k] = dsl_byte(site, to);
+    "__splice_" + int_text(k);
+}
 
 // The utu of `site`'s body at `offset` (`text` long), as a placeholder; -1
 // in splice_failed[0] when it does not parse.
@@ -239,14 +292,24 @@ fn dsl_splice(site: I32, offset: I32, text: Str) Str {
     let k = splice_start.len();
     splice_start.push(start);
     splice_end.push(start + utf8_length(text));
+    splice_code.resize(k + 1);
+    splice_code[k] = -1;
     "__splice_" + int_text(k);
 }
 
 fn utf8_length(text: Str) I32 {
     let n = 0;
-    for (0 ..< text.len()) |i| {
+    let i = 0;
+    while (i < text.len()) {
         let c = text.get(i);
-        n += if c < 128 { 1; } else if c < 2048 { 2; } else { 3; };
+        // A surrogate pair is one character, four bytes.
+        if c >= 55296 and c <= 56319 and i + 1 < text.len() and text.get(i + 1) >= 56320 and text.get(i + 1) <= 57343 {
+            n += 4;
+            i += 2;
+        } else {
+            n += if c < 128 { 1; } else if c < 2048 { 2; } else { 3; };
+            i += 1;
+        };
     };
     n;
 }
@@ -274,13 +337,14 @@ fn fill_splices(node: I32) void {
         let name = word_text(word_of(node));
         if text_at(name, 0, "__splice_") {
             let k = int_of(name.slice(9, name.len()));
-            let e = parse_span(splice_start[k], splice_end[k]);
+            let e = if splice_start[k] >= 0 { parse_span(splice_start[k], splice_end[k]); } else { parse_located(k); };
             if e >= 0 {
-                node_kind[node] = Node.Paren_expr.to_i32();
+                apply_renames(e, k);
+                // The placeholder becomes a splice around the expression: it
+                // keeps its own token, so what follows it is found after it.
+                node_kind[node] = Node.Splice.to_i32();
                 node_child[node] = e;
                 node_next[e] = -1;
-                node_first[node] = node_first[e];
-                node_last[node] = node_last[e];
             };
         };
         return;
@@ -291,6 +355,38 @@ fn fill_splices(node: I32) void {
         fill_splices(c);
         c = next;
     };
+}
+
+// A Wutu island's identifiers that name element aliases, renamed.
+fn apply_renames(node: I32, k: I32) void {
+    if is_kind(node, Node.Identifier) {
+        let at = tok_start[node_first[node]];
+        for (0 ..< splice_rename_k.len()) |r| {
+            if splice_rename_k[r] == k and splice_rename_at[r] == at { tok_word[node_first[node]] = splice_rename_to[r]; };
+        };
+        return;
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        apply_renames(c, k);
+        c = next_sibling(c);
+    };
+}
+
+// A located splice's code, parsed (its own placeholders filled).
+fn parse_located(k: I32) I32 {
+    dsl_current_from[0] = splice_from[k];
+    dsl_current_to[0] = splice_to[k];
+    let root = parse_generated_file("fn __expansion() void { " + word_text(splice_code[k]) + "; }");
+    dsl_current_from[0] = -1;
+    if root < 0 { return -1; };
+    let block = last_child(first_child(root));
+    let e = first_child(block);
+    node_child[root] = -1;
+    node_child[block] = -1;
+    node_next[e] = -1;
+    fill_splices(e);
+    e;
 }
 
 fn int_of(text: Str) I32 {

@@ -14,6 +14,8 @@ docs/self-hosting.md (Plan B).
 | names | `resolve.utu` | `scripts/selfhost-resolve-differential.mjs` |
 | checking and code | `check.utu` and the rest | `scripts/selfhost-run-differential.mjs` |
 | diagnostics | `diag.utu` | `scripts/selfhost-diagnostics-differential.mjs` |
+| host declarations | `abi.utu`, `foreign.utu` | the run and diagnostics differentials |
+| DSLs (`@json`, `@stored`, Wutu, `@utu`, `@css`) | `dsl.utu`, `json.utu`, `stored.utu`, `wutu_parse.utu`, `wutu.utu` | the run and diagnostics differentials |
 | host interface | `lib.utu` | all of them |
 
 ## Building
@@ -184,18 +186,17 @@ tables.
 `scripts/selfhost-run-differential.mjs` builds every program in
 `examples/`, `benchmarks/`, and `baselines/corpus` (for its exports and its
 tests), runs each zero-argument export and test, and compares what it does
-with what stage 0's builds did (`baselines/run-differential.json`). 819 of
-948 builds behave the same, and none differs; 126 use something not built
-yet (host declarations, the DSLs, recursive generators), which it reports
-rather than miscompiling. Three differ on purpose, where stage 0 accepts a
-program it should reject (a method of an unknown type, a module given too
-few type arguments). `--why=call_expr` lists the source of what is not
-built yet.
+with what stage 0's builds did (`baselines/run-differential.json`). 944 of
+948 builds behave the same, and none differs. Three differ on purpose,
+where stage 0 accepts a program it should reject (a method of an unknown
+type, a module given too few type arguments); one calls a method of an
+unknown type, which stage 0 builds and this compiler does not.
+`--why=call_expr` lists the source of what is not built.
 
 `scripts/selfhost-diagnostics-differential.mjs` does the same for programs
 that do not build: for those programs and the negative corpus, every
 diagnostic's kind, message, and span must be stage 0's
-(`baselines/diagnostics.json.gz`). 1051 of 1234 builds diagnose the same,
+(`baselines/diagnostics.json.gz`). 1202 of 1234 builds diagnose the same,
 and none differs. Thirty differ on purpose: a program that does not parse
 is reported at the furthest token the parser reached, where stage 0
 reported tree-sitter's error recovery; and a few of stage 0's quirks are
@@ -210,3 +211,39 @@ mistaken initializer) is counted under it: `(+1 caused by this)`.
 
 The check is behavior, not bytes: the compiler is a new design, so its
 wasm differs from stage 0's, but what every program does must not.
+
+## Host declarations
+
+`using Browser from std:Browser` (std:JS, std:Web, `npm:`, `node:`) reads
+the declaration ABI (docs/typescript-abi.md) the host passes as JSON text:
+a document's types once, and a view of it per import (std:JS and
+std:Browser share one). Nothing is parsed into a tree. A reference is an
+offset into the JSON with an environment of generic bindings, so `Map<K,
+V>` is Map's declaration with K and V bound, never a copy; a named
+declaration is closed (it sees only its own parameters' bindings). A host
+value's type is a foreign type whose identity is its canonical spelling:
+a standard library type by name, so a package's `Node` is the browser's.
+
+Operations are imports whose JavaScript is stage 0's, so a program does
+what its stage 0 build did, down to the errors the host throws: member
+reads and writes, calls (overloads chosen as stage 0 chooses them;
+generics bound from arguments, callbacks' results, string literals for
+`keyof` parameters, and the expected type), `new`, index reads and
+writes, records and arrays for declaration slots, identity comparison,
+the declared String and Number members of Str and F64, dynamic values read
+as primitives (checked with typeof), `await` on host promises, and `alt`
+narrowing with `instanceof`. A mem that `copy_in` or `view` reaches is the
+host's.
+
+## DSLs
+
+`@json`, `@stored`, Wutu (`@wutu`), `@utu`, and `@css` expand into utu
+source, as in stage 0, function by function: the text is parsed as a
+generated file and grafted into the tree before names are resolved (the
+expression in place of the site, the declarations first in its module or
+file). Utu written in a DSL body is not copied: the expansion holds a
+placeholder, which becomes a splice of the expression parsed from the body
+itself, so it keeps its place in the source and its surface. Mistakes in
+generated code are reported at the site (a `bind:` statement's, at the
+statement), and a DSL that does not expand ends the build with its one
+diagnostic, as in stage 0.

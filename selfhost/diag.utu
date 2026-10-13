@@ -373,6 +373,8 @@ fn diag_text(i: I32) Str {
 fn diag_start(i: I32) I32 {
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_a[i]; };
+    let f = located_file(i);
+    if f >= 0 { return dsl_file_from[f]; };
     let node = diag_at(i);
     if node < 0 { return -1; };
     tok_start[node_first[node]];
@@ -381,9 +383,19 @@ fn diag_start(i: I32) I32 {
 fn diag_end(i: I32) I32 {
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_b[i]; };
+    let f = located_file(i);
+    if f >= 0 { return dsl_file_to[f]; };
     let node = diag_at(i);
     if node < 0 { return -1; };
     tok_end[node_last[node] - 1];
+}
+
+// The generated file of located code a diagnostic is in, or -1.
+fn located_file(i: I32) I32 {
+    let node = diag_node[i];
+    if node < 0 or comptime_site(i) >= 0 { return -1; };
+    let file = file_of_token(node_first[node]);
+    if file < dsl_file_from.len() and dsl_file_from[file] >= 0 { file; } else { -1; };
 }
 
 // The node a diagnostic points at: its own, or its @comptime expression.

@@ -174,18 +174,18 @@ language stays as it is.
 3. **Types and checking.** Done for most of the language
    (`selfhost/types.utu`, `check.utu` and its companions): monomorphization
    on demand, checking and translation in one pass into a wasm-shaped IR,
-   intrinsics expanded from std's `@ir`. Remaining: host declarations
-   (std:JS, npm:), the DSLs, and recursive generators.
+   intrinsics expanded from std's `@ir`. Host declarations (std:JS,
+   std:Browser, npm:, node:) and the DSLs (@json, @stored, Wutu) included.
 4. **Lowerings**, as part of checking: operators through their std
    declarations, loops, `match`, `alt`, `promote`, tuples, mems, integer
    enums, distinct types, strings, `@es`, `@comptime`.
 5. **Codegen** straight to wasm bytes (`selfhost/wasm.utu`). The invariant
    is behavior, not bytes: every program does what stage 0's build of it
-   did (`scripts/selfhost-run-differential.mjs`); 819 of 948 builds so far,
-   none miscompiled. And every program that does not build is diagnosed as
+   did (`scripts/selfhost-run-differential.mjs`); 944 of 948 builds, none
+   miscompiled (three differ on purpose, one is not built). And every program that does not build is diagnosed as
    stage 0 diagnosed it, kinds, messages, and spans
-   (`scripts/selfhost-diagnostics-differential.mjs`); 1051 of 1234 builds
-   so far, none differing.
+   (`scripts/selfhost-diagnostics-differential.mjs`); 1202 of 1234 builds,
+   none differing (30 on purpose).
 6. **Bootstrap.** Done: stage 0 builds stage 1, stage 1 builds stage 2,
    stage 2 builds stage 3, and stages 2 and 3 are identical
    (`scripts/selfhost-bootstrap.mjs`, part of `bun run test`). Stage 2

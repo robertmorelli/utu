@@ -491,14 +491,26 @@ fn foreign_op(params: I32, result: I32, body: Str) I32 {
 
 // Text into src, as UTF-8.
 fn gen_text_utf8(text: Str) void {
-    for (0 ..< text.len()) |i| {
+    let i = 0;
+    while (i < text.len()) {
         let c = text.get(i);
+        i += 1;
+        // A surrogate pair is one character.
+        if c >= 55296 and c <= 56319 and i < text.len() and text.get(i) >= 56320 and text.get(i) <= 57343 {
+            c = 65536 + ((c - 55296) << 10) + (text.get(i) - 56320);
+            i += 1;
+        };
         if c < 128 { src.push(c); }
         else if c < 2048 {
             src.push(192 | (c >> 6));
             src.push(128 | (c & 63));
-        } else {
+        } else if c < 65536 {
             src.push(224 | (c >> 12));
+            src.push(128 | ((c >> 6) & 63));
+            src.push(128 | (c & 63));
+        } else {
+            src.push(240 | (c >> 18));
+            src.push(128 | ((c >> 12) & 63));
             src.push(128 | ((c >> 6) & 63));
             src.push(128 | (c & 63));
         };
@@ -859,7 +871,10 @@ fn ref_of_type(t: I32, doc: I32) Bool {
 }
 
 // Whether an argument is a closure: written, bound by a let, or typed one.
-fn closure_node(arg: I32) I32 {
+fn closure_node(written: I32) I32 {
+    // (in parentheses, or a DSL's splice, it is still the closure)
+    let arg = written;
+    while (is_kind(arg, Node.Paren_expr) or is_kind(arg, Node.Splice)) { arg = first_child(arg); };
     if is_kind(arg, Node.Closure_expr) { return arg; };
     if is_kind(arg, Node.Identifier) and decl_is(node_decl[arg], Decl.Local) {
         let let_node = decl_node[node_decl[arg]];

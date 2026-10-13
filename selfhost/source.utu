@@ -52,6 +52,13 @@ fn reset_program() void {
     node_parent.clear();
     splice_start.clear();
     splice_end.clear();
+    splice_code.clear();
+    splice_from.clear();
+    splice_to.clear();
+    splice_rename_k.clear();
+    splice_rename_at.clear();
+    splice_rename_to.clear();
+    wu_serial[0] = 0;
     dsl_file_site.clear();
     intern_keywords();
     for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
