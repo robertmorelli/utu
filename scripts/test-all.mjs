@@ -24,6 +24,7 @@ const commands = [
   ['node', './scripts/test-selfhost-mem-arrays.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs', '--optimize=size'],
+  ['node', './scripts/selfhost-run-differential.mjs', '--optimize=speed'],
   ['node', './scripts/selfhost-diagnostics-differential.mjs'],
   ['node', './scripts/selfhost-size-differential.mjs'],
   ['node', './scripts/test-source-warnings.mjs'],
