@@ -1,0 +1,212 @@
+// ── DSLs ─────────────────────────────────────────────────────────────────────
+//
+// `@json/\ decode T text \/` and the other standard DSLs expand into utu
+// source, as in stage 0: an expression in place of the site, and
+// declarations (a runtime, codecs) beside it, in its module or at the top
+// level of its file. The text is parsed as a generated file, and its nodes
+// are grafted into the tree before names are resolved: the expression
+// becomes the site's only child (the site, a parenthesis now, keeps its
+// span), and the declarations become the container's first items.
+//
+// Utu written inside a DSL body (an interpolation, a match arm) is copied
+// into the expansion as text, where it means what it meant at the site.
+
+// Expand every DSL site of the program's own files; then the sites the
+// expansions made, until none is left.
+fn expand_dsls() void {
+    let rounds = 0;
+    while (rounds < 16 and expand_dsl_round()) { rounds += 1; };
+}
+
+// One round: each container's json sites. Whether any was expanded.
+fn expand_dsl_round() Bool {
+    let json = intern_text("json");
+    let containers = Array[I32].new(64, -1);
+    let ncontainers = 0;
+    let found = false;
+    let count = node_kind.len();
+    for (0 ..< count) |n| {
+        if node_kind[n] == Node.Dsl_expr.to_i32() and word_of(first_child(n)) == json and dsl_in_program(n) {
+            found = true;
+            let c = dsl_container(n);
+            let seen = false;
+            for (0 ..< ncontainers) |k| { if containers[k] == c { seen = true; }; };
+            if not seen and ncontainers < 64 {
+                containers[ncontainers] = c;
+                ncontainers += 1;
+            };
+        };
+    };
+    if not found { return false; };
+    for (0 ..< ncontainers) |k| { json_expand_container(containers[k], json, count); };
+    true;
+}
+
+// Whether a node is in an own file (not the standard library), and its
+// expansion has not failed (an expanded site is a parenthesis).
+fn dsl_in_program(node: I32) Bool {
+    if not is_own_file(file_of_token(node_first[node])) { return false; };
+    for (0 ..< dsl_failed.len()) |i| { if dsl_failed[i] == node { return false; }; };
+    true;
+}
+
+// Sites whose expansion failed (reported): left as they are, and checked as mistakes.
+mem dsl_failed: I32;
+
+fn dsl_has_failed(node: I32) Bool {
+    for (0 ..< dsl_failed.len()) |i| { if dsl_failed[i] == node { return true; }; };
+    false;
+}
+
+// The module a node is in, or its file's root.
+fn dsl_container(node: I32) I32 {
+    let p = parent_of(node);
+    while (p >= 0) {
+        if is_kind(p, Node.Module_decl) or is_kind(p, Node.Source_file) { return p; };
+        p = parent_of(p);
+    };
+    file_root[file_of_token(node_first[node])];
+}
+
+// The body of a site: after `/\`, before `\/`, as written.
+fn dsl_inner_start(site: I32) I32 { tok_start[node_first[last_child(site)]] + 2; }
+
+fn dsl_inner_end(site: I32) I32 { tok_end[node_first[last_child(site)]] - 2; }
+
+fn dsl_body(site: I32) Str { bytes_text(dsl_inner_start(site), dsl_inner_end(site)); }
+
+// ── Mistakes ──
+//
+// A DSL's mistake names a place in its body (an offset from the body's
+// start, and a length); expanding stops there, and it is reported.
+
+mem dsl_err_message: I32 = [-1];   // a word
+mem dsl_err_offset: I32 = [0];
+mem dsl_err_length: I32 = [0];
+
+let dsl_throw: fun() void = @es/\ () => { throw new SyntaxError('utu dsl'); } \/;
+
+fn dsl_fail(message: Str, offset: I32, length: I32) void {
+    dsl_err_message[0] = intern_text(message);
+    dsl_err_offset[0] = offset;
+    dsl_err_length[0] = length;
+    dsl_throw();
+}
+
+fn report_dsl_error(site: I32) void {
+    let start = dsl_inner_start(site) + dsl_err_offset[0];
+    report3(Diag.DslError, site, dsl_err_message[0], start, start + dsl_err_length[0], -1);
+}
+
+// ── Grafting ──
+
+// Parse `code` (an expression) and make it the site's value.
+fn graft_expression(site: I32, code: Str) void {
+    let root = parse_generated_file("fn __expansion() void { " + code + "; }");
+    if root < 0 { return; };
+    let fn_ = first_child(root);
+    let block = last_child(fn_);
+    let expr = first_child(block);
+    // The expression leaves the generated file, which is left empty.
+    node_child[root] = -1;
+    node_child[block] = -1;
+    node_kind[site] = Node.Paren_expr.to_i32();
+    node_child[site] = expr;
+    node_next[expr] = -1;
+    // The tree changed: parents are found again.
+    node_parent.clear();
+}
+
+// Parse declarations and make them the container's first items.
+fn graft_declarations(container: I32, code: Str) void {
+    let root = parse_generated_file(code);
+    if root < 0 { return; };
+    let first = node_child[root];
+    if first < 0 { return; };
+    node_child[root] = -1;
+    let last = first;
+    while (node_next[last] >= 0) { last = node_next[last]; };
+    // After a module's name (and its type parameters).
+    if is_kind(container, Node.Module_decl) {
+        let at = first_child(container);
+        if is_kind(next_sibling(at), Node.Module_type_param_list) { at = next_sibling(at); };
+        node_next[last] = node_next[at];
+        node_next[at] = first;
+    } else {
+        node_next[last] = node_child[container];
+        node_child[container] = first;
+    };
+    node_parent.clear();
+}
+
+// A generated file of `code`, parsed: its root, or -1.
+fn parse_generated_file(code: Str) I32 {
+    let start = src.len();
+    gen_text_utf8(code);
+    let n = src.len() - start;
+    let copy = Array[I32].new(n + 1, 0);
+    for (0 ..< n) |i| { copy[i] = src[start + i]; };
+    src.resize(start);
+    let file = add_file(n, FileRole.Generated);
+    let at = file_start[file];
+    for (0 ..< n) |i| { src[at + i] = copy[i]; };
+    parse_file(file);
+}
+
+// The first item of a generated file of `code`, or -1.
+fn parse_generated(code: Str) I32 {
+    let root = parse_generated_file(code);
+    if root < 0 { -1; } else { first_child(root); };
+}
+
+// Whether `code` parses as an expression (the file it took is left empty).
+fn parses_as_expression(code: Str) Bool {
+    let root = parse_generated_file("fn __check() void { " + code + "; }");
+    if root < 0 { return false; };
+    node_child[root] = -1;
+    true;
+}
+
+// ── Text ──
+
+fn is_space_code(c: I32) Bool { c == 32 or c == 10 or c == 13 or c == 9; }
+
+fn is_word_code(c: I32) Bool { (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95; }
+
+fn is_upper_code(c: I32) Bool { c >= 65 and c <= 90; }
+
+fn is_lower_code(c: I32) Bool { c >= 97 and c <= 122; }
+
+fn text_at(text: Str, at: I32, part: Str) Bool {
+    if at < 0 or at + part.len() > text.len() { return false; };
+    for (0 ..< part.len()) |i| { if text.get(at + i) != part.get(i) { return false; }; };
+    true;
+}
+
+fn text_index(text: Str, part: Str, from: I32) I32 {
+    let i = from;
+    while (i + part.len() <= text.len()) {
+        if text_at(text, i, part) { return i; };
+        i += 1;
+    };
+    -1;
+}
+
+fn trim_end(text: Str) Str {
+    let n = text.len();
+    while (n > 0 and is_space_code(text.get(n - 1))) { n -= 1; };
+    text.slice(0, n);
+}
+
+fn without_spaces(text: Str) Str {
+    let out = "";
+    for (0 ..< text.len()) |i| { if not is_space_code(text.get(i)) { out = out + Str.from_code_point(text.get(i)); }; };
+    out;
+}
+
+// `text` with its first `find` replaced by `with`.
+fn replace_first(text: Str, find: Str, with: Str) Str {
+    let at = text_index(text, find, 0);
+    if at < 0 { return text; };
+    text.slice(0, at) + with + text.slice(at + find.len(), text.len());
+}

@@ -432,6 +432,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Defer_expr.to_i32() { return check_defer(node); };
     if kind == Node.Optional_field_expr.to_i32() { return check_field_get(node, expect, cx); };
     if kind == Node.Await_expr.to_i32() { return check_await(node, cx); };
+    if kind == Node.Dsl_expr.to_i32() and dsl_has_failed(node) { return error_value(); };
     if kind == Node.Dsl_expr.to_i32() and is_es(node) {
         // @es binds a typed let; anywhere else its type is unknown.
         report(Diag.InvalidDslUsage, node, -1);
@@ -1556,6 +1557,15 @@ fn compile(target: Target) I32 {
     reset_check();
     validate_program();
     keep_target_diagnostics(target);
+    // A DSL that does not expand ends the build, as in stage 0: the first
+    // the target has is its one diagnostic.
+    for (0 ..< diag_kind.len()) |i| {
+        if diag_kind[i] == Diag.DslError.to_i32() {
+            diag_move(i, 0);
+            diag_truncate(1);
+            return -1;
+        };
+    };
     // A file that does not parse ends the build; other mistakes do not stop
     // checking, which finds what else is wrong.
     for (0 ..< file_root.len()) |file| { if file_root[file] < 0 { return -1; }; };

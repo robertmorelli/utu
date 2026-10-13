@@ -46,6 +46,9 @@ mem missing_end: I32 = [0];
 fn reset_program() void {
     missing_import[0] = -1;
     reset_abi();
+    dsl_failed.clear();
+    jp_serial[0] = 0;
+    node_parent.clear();
     intern_keywords();
     for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
     tok_kind.clear();
@@ -76,7 +79,7 @@ fn reset_program() void {
 fn intern_text(text: Str) I32 {
     let start = src.len();
     let before = src.interned();
-    for (0 ..< text.len()) |c| { src.push(text.get(c)); };
+    gen_text_utf8(text);
     let id = src.intern(start, src.len());
     // Already interned: its bytes are elsewhere.
     if id < before { src.resize(start); };

@@ -37,7 +37,12 @@ fn reset_foreign() void {
     fty_env.clear();
     fty_view.clear();
     any_at[0] = -1;
-    boxed_at.clear();
+    // (resize keeps what a mem held before, so these are set, not cleared)
+    boxed_at.resize(2);
+    boxed_at[0] = -1;
+    boxed_at[1] = -1;
+    prim_at.resize(4);
+    for (0 ..< 4) |k| { prim_at[k] = -1; };
     reset_foreign_ops();
 }
 
@@ -305,10 +310,9 @@ fn union_type(d: Ref, union: I32, view: I32) I32 {
 mem boxed_at: I32;   // by primitive (0 F64, 1 Bool): the JSON `{"boxed":"F64"}`, once
 
 fn boxed_type(t: I32, view: I32) I32 {
-    boxed_at.resize(2);
     let k = if t == prelude(Prelude.F64) { 0; } else { 1; };
     let text = if k == 0 { "{\"boxed\":\"F64\"}"; } else { "{\"boxed\":\"Bool\"}"; };
-    if boxed_at[k] <= 0 {
+    if boxed_at[k] < 0 {
         let at = abi_reserve(text.len());
         for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };
         boxed_at[k] = at;
@@ -823,9 +827,8 @@ fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx
 mem prim_at: I32;   // 0 Str, 1 F64, 2 Bool, 3 void
 
 fn prim_ref(t: I32) I32 {
-    prim_at.resize(4);
     let k = if t == prelude(Prelude.Str) { 0; } else if t == prelude(Prelude.F64) { 1; } else if t == prelude(Prelude.Bool) { 2; } else { 3; };
-    if prim_at[k] <= 0 {
+    if prim_at[k] < 0 {
         let text = if k == 0 { "\"Str\""; } else if k == 1 { "\"F64\""; } else if k == 2 { "\"Bool\""; } else { "\"void\""; };
         let at = abi_reserve(text.len());
         for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };

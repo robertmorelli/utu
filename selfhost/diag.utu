@@ -187,7 +187,7 @@ fn diag_kind_of(i: I32) Str {
         or k == Diag.GeneratorArity or k == Diag.PruneOutside or k == Diag.PruneInClosure { return "invalid-for-source"; };
     if k == Diag.IteratorUnfinished or k == Diag.IteratorCaptures or k == Diag.IteratorTerminalInside or k == Diag.IteratorSource { return "invalid-iterator-usage"; };
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
-    if k == Diag.InvalidDslUsage { return "invalid-dsl-usage"; };
+    if k == Diag.InvalidDslUsage or k == Diag.DslError { return "invalid-dsl-usage"; };
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     "type-mismatch";
 }
@@ -320,6 +320,7 @@ fn diag_text(i: I32) Str {
     if k == Diag.ForeignReadonly { return "Cannot assign to readonly foreign property '" + w + "'"; };
     if k == Diag.ForeignRecordField { return "Unknown foreign property '" + w + "'"; };
     if k == Diag.ForeignRecordMissing { return "Missing foreign property '" + w + "'"; };
+    if k == Diag.DslError { return w; };
     if k == Diag.HostAltArm { return "Every arm of an alt over a host value must name a declared class"; };
     if k == Diag.HostAltClass { return word_text(view_prefix[a]) + "." + w + " is only a type; narrowing needs a declared runtime class"; };
     if k == Diag.ForeignNotArray { return type_text(a) + " is not an array type"; };
@@ -371,6 +372,7 @@ fn diag_text(i: I32) Str {
 // The span a diagnostic points at: its node's, as byte offsets.
 fn diag_start(i: I32) I32 {
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
+    if diag_kind[i] == Diag.DslError.to_i32() { return diag_a[i]; };
     let node = diag_at(i);
     if node < 0 { return -1; };
     tok_start[node_first[node]];
@@ -378,6 +380,7 @@ fn diag_start(i: I32) I32 {
 
 fn diag_end(i: I32) I32 {
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
+    if diag_kind[i] == Diag.DslError.to_i32() { return diag_b[i]; };
     let node = diag_at(i);
     if node < 0 { return -1; };
     tok_end[node_last[node] - 1];
