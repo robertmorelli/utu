@@ -122,6 +122,19 @@ fn module_of(decl: I32) I32 {
     d;
 }
 
+// How many type parameters a module has.
+fn module_arity(module: I32) I32 {
+    let list = next_sibling(first_child(decl_node[module]));
+    if not is_kind(list, Node.Module_type_param_list) { return 0; };
+    let n = 0;
+    let p = first_child(list);
+    while (p >= 0) {
+        n += 1;
+        p = next_sibling(p);
+    };
+    n;
+}
+
 fn is_generic(module: I32) Bool {
     module >= 0 and is_kind(next_sibling(first_child(decl_node[module])), Node.Module_type_param_list);
 }
@@ -231,7 +244,12 @@ fn type_path(node: I32, inst: I32) I32 {
         let decl = if decl_is(module, Decl.Module) { decl_a[module]; } else { node_decl[name_node(first_child(node))]; };
         if decl < 0 { return ty_error(); };
         let owner = module_of(decl);
-        return named(decl, instance(owner, type_args(next_sibling(first_child(node)), inst)));
+        let args = type_args(next_sibling(first_child(node)), inst);
+        if vl_len[args] != module_arity(owner) {
+            report(Diag.InvalidModuleArity, node, decl_name[owner]);
+            return ty_error();
+        };
+        return named(decl, instance(owner, args));
     };
     if kind == Node.Qualified_type_ref.to_i32() or kind == Node.Inline_module_type_path.to_i32() {
         let c = first_child(node);

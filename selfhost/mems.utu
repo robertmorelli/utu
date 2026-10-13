@@ -1,0 +1,401 @@
+// ── Mems ─────────────────────────────────────────────────────────────────────
+//
+// `mem name: U8;` is a resizable array of scalars that is its own linear
+// memory. Element i is at byte i << shift, so a read is one load with no
+// base pointer; its length is a mutable global; push, reserve, and resize
+// are small functions of their own, made when first used. Growing doubles,
+// or grows to what is needed when that is more.
+
+mem mem_memory: I32;   // by declaration: its memory, or -1 until used
+mem mem_len: I32;      // by declaration: its length global
+mem mem_helpers: I32;  // by declaration: its reserve function (push and resize follow), or -1
+
+fn reset_mems() void {
+    mem_memory.resize(decl_kind.len());
+    mem_len.resize(decl_kind.len());
+    mem_helpers.resize(decl_kind.len());
+    for (0 ..< decl_kind.len()) |d| {
+        mem_memory[d] = -1;
+        mem_len[d] = -1;
+        mem_helpers[d] = -1;
+    };
+}
+
+// What a mem stores: one of the storage kinds, by its shift (log2 of the
+// element size), whether narrow reads sign-extend, and the type values
+// read as.
+enum(U8) Storage:
+    | U8
+    | I8
+    | U16
+    | I16
+    | I32
+    | U32
+    | I64
+    | U64
+    | F32
+    | F64
+
+fn mem_storage(decl: I32) Storage {
+    let elem = next_sibling(first_child(decl_node[decl]));
+    storage_of_word(word_of(elem), node_decl[elem]);
+}
+
+fn storage_of_word(word: I32, decl: I32) Storage {
+    if word == Kw.count() { return Storage.U8; };
+    if word == Kw.count() + 1 { return Storage.I8; };
+    if word == Kw.count() + 2 { return Storage.U16; };
+    if word == Kw.count() + 3 { return Storage.I16; };
+    if decl_is(decl, Decl.IntEnum) {
+        let repr_node = after_qualifier(decl_node[decl]);
+        return storage_of_word(word_of(repr_node), node_decl[repr_node]);
+    };
+    let t = decl_type(decl, 0);
+    if decl_is(decl, Decl.Distinct) { t = decl_type(node_decl[last_child(decl_node[decl])], 0); };
+    if t == prelude(Prelude.U32) { return Storage.U32; };
+    if t == prelude(Prelude.I64) { return Storage.I64; };
+    if t == prelude(Prelude.U64) { return Storage.U64; };
+    if t == prelude(Prelude.F32) { return Storage.F32; };
+    if t == prelude(Prelude.F64) { return Storage.F64; };
+    Storage.I32;
+}
+
+// Whether a mem's element type is one a mem holds.
+fn mem_kind_ok(decl: I32) Bool {
+    let elem = next_sibling(first_child(decl_node[decl]));
+    let word = word_of(elem);
+    if builtin_type(word) { return true; };
+    let d = node_decl[elem];
+    if decl_is(d, Decl.IntEnum) or decl_is(d, Decl.Distinct) { return true; };
+    let t = decl_type(d, 0);
+    t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
+        or t == prelude(Prelude.F32) or t == prelude(Prelude.F64);
+}
+
+fn storage_shift(s: Storage) I32 {
+    if s == Storage.U8 or s == Storage.I8 { return 0; };
+    if s == Storage.U16 or s == Storage.I16 { return 1; };
+    if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { return 3; };
+    2;
+}
+
+fn storage_vt(s: Storage) I32 {
+    if s == Storage.I64 or s == Storage.U64 { return vt_i64; };
+    if s == Storage.F32 { return vt_f32; };
+    if s == Storage.F64 { return vt_f64; };
+    vt_i32;
+}
+
+fn load_opcode(s: Storage) I32 {
+    match s.to_i32() {
+        0 => 45, 1 => 44, 2 => 47, 3 => 46,
+        4 => 40, 5 => 40, 6 => 41, 7 => 41,
+        8 => 42, ~> 43,
+    };
+}
+
+fn store_opcode(s: Storage) I32 {
+    match s.to_i32() {
+        0 => 58, 1 => 58, 2 => 59, 3 => 59,
+        4 => 54, 5 => 54, 6 => 55, 7 => 55,
+        8 => 56, ~> 57,
+    };
+}
+
+// The type a mem's elements read as: I32 for the narrow kinds, else the
+// element type.
+fn mem_value_type(decl: I32) I32 {
+    let elem = next_sibling(first_child(decl_node[decl]));
+    if builtin_type(word_of(elem)) { return prelude(Prelude.I32); };
+    decl_type(node_decl[elem], 0);
+}
+
+fn mem_is_const(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Const.to_i32() or tok_word[node_first[decl_node[decl]] + 1] == Kw.Const.to_i32(); }
+
+fn mem_is_exported(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Export.to_i32(); }
+
+// The memory of a mem, made when first needed.
+fn memory_of(decl: I32) I32 {
+    if mem_memory[decl] >= 0 { return mem_memory[decl]; };
+    let m = memory_kind.len();
+    memory_kind.push(FuncKind.Defined.to_i32());
+    memory_pages.push(1);
+    memory_module_name.push(-1);
+    memory_field_name.push(if mem_is_exported(decl) { name_from_src(tok_start[node_first[first_child(decl_node[decl])]], tok_end[node_first[first_child(decl_node[decl])]]); } else { -1; });
+    mem_memory[decl] = m;
+    mem_len[decl] = add_global(vt_i32, true, w_i32_detached(0));
+    m;
+}
+
+// A constant node that is not on the stack (a global's initializer).
+fn w_i32_detached(value: I32) I32 {
+    w_i32(value);
+    w_pop();
+}
+
+// The address of element i (on the stack since `m`): i << shift.
+fn mem_address(s: Storage, m: I32) void {
+    let shift = storage_shift(s);
+    if shift > 0 {
+        w_i32(shift);
+        w_node(Op.Plain, vt_i32, 116, 0, m);
+    };
+}
+
+// `name[i]`.
+fn check_mem_index(node: I32, cx: Cx) I32 {
+    let decl = node_decl[first_child(node)];
+    if is_kind(node, Node.Slice_expr) {
+        report(Diag.MemIndex, node, decl_name[decl]);
+        return error_value();
+    };
+    let s = mem_storage(decl);
+    let mem_id = memory_of(decl);
+    let m = w_mark();
+    let i32_t = prelude(Prelude.I32);
+    coerce(check_expr(last_child(node), i32_t, cx), i32_t, last_child(node));
+    mem_address(s, m);
+    let t = mem_value_type(decl);
+    w_node(Op.Load, storage_vt(s), mem_id, load_opcode(s), m);
+    t;
+}
+
+// `name[i] = v`, `name[i] op= v`.
+fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
+    let decl = node_decl[first_child(target)];
+    if mem_is_const(decl) {
+        report(Diag.ConstMem, at, decl_name[decl]);
+        return error_value();
+    };
+    let s = mem_storage(decl);
+    let mem_id = memory_of(decl);
+    let t = mem_value_type(decl);
+    let i32_t = prelude(Prelude.I32);
+    let m = w_mark();
+    if op == Tok.Eq.to_i32() {
+        coerce(check_expr(last_child(target), i32_t, cx), i32_t, last_child(target));
+        mem_address(s, m);
+        coerce(check_expr(value, t, cx), t, value);
+        w_node(Op.Store, vt_none, mem_id, store_opcode(s), m);
+        return ty_void();
+    };
+    // The index once: at = i; name[at] = name[at] op v.
+    let at_local = new_local(vt_i32);
+    let mi = w_mark();
+    coerce(check_expr(last_child(target), i32_t, cx), i32_t, last_child(target));
+    w_node(Op.LocalSet, vt_none, at_local, 0, mi);
+    let ms = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, at_local, 0);
+    mem_address(s, ms);
+    let mg = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, at_local, 0);
+    mem_address(s, mg);
+    w_node(Op.Load, storage_vt(s), mem_id, load_opcode(s), mg);
+    apply_operator(compound_word(op, node_last[target]), t, value, at, cx, mg);
+    w_node(Op.Store, vt_none, mem_id, store_opcode(s), ms);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+// `name.len()`, `name.push(v)`, … The mem is `decl`; the call's arguments
+// are `args`.
+fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
+    let word = word_of(name);
+    let s = mem_storage(decl);
+    let mem_id = memory_of(decl);
+    let len_g = mem_len[decl];
+    let i32_t = prelude(Prelude.I32);
+    let m = w_mark();
+    let method = mem_method(word);
+    if method < 0 {
+        report(Diag.UnknownMethod, name, word);
+        return error_value();
+    };
+    let writes = method == MemMethod.Push.to_i32() or method == MemMethod.Reserve.to_i32() or method == MemMethod.Resize.to_i32()
+        or method == MemMethod.Clear.to_i32();
+    if writes and mem_is_const(decl) {
+        report(Diag.ConstMem, at, decl_name[decl]);
+        return error_value();
+    };
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    if method == MemMethod.Len.to_i32() {
+        w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
+        return i32_t;
+    };
+    if method == MemMethod.Cap.to_i32() {
+        w_leaf(Op.MemorySize, vt_i32, mem_id, 0);
+        w_i32(16 - storage_shift(s));
+        w_node(Op.Plain, vt_i32, 116, 0, m);
+        return i32_t;
+    };
+    if method == MemMethod.Clear.to_i32() {
+        w_i32(0);
+        w_node(Op.GlobalSet, vt_none, len_g, 0, m);
+        return ty_void();
+    };
+    let helpers = mem_helper_functions(decl);
+    if method == MemMethod.Push.to_i32() {
+        let t = mem_value_type(decl);
+        coerce(check_expr(a, t, cx), t, a);
+        w_node(Op.Call, vt_none, helpers + 1, 0, m);
+        return ty_void();
+    };
+    if method == MemMethod.Reserve.to_i32() or method == MemMethod.Resize.to_i32() {
+        coerce(check_expr(a, i32_t, cx), i32_t, a);
+        w_node(Op.Call, vt_none, if method == MemMethod.Reserve.to_i32() { helpers; } else { helpers + 2; }, 0, m);
+        return ty_void();
+    };
+    unsupported(at);
+}
+
+enum(U8) MemMethod:
+    | Len
+    | Cap
+    | Push
+    | Reserve
+    | Resize
+    | Clear
+    | Copy_in
+    | View
+    | Intern
+    | Interned
+    | Interned_start
+    | Interned_size
+    | Intern_reset
+
+mem mem_method_word: I32;   // by MemMethod: its word
+
+fn mem_method(word: I32) I32 {
+    if mem_method_word.len() == 0 {
+        for (0 ..< MemMethod.count()) |k| {
+            let name = MemMethod.name(MemMethod.from_i32(k));
+            mem_method_word.push(intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len())));
+        };
+    };
+    for (0 ..< MemMethod.count()) |k| { if mem_method_word[k] == word { return k; }; };
+    -1;
+}
+
+// reserve(n), push(v), resize(n) of a mem: three functions, consecutive.
+fn mem_helper_functions(decl: I32) I32 {
+    if mem_helpers[decl] >= 0 { return mem_helpers[decl]; };
+    let s = mem_storage(decl);
+    let mem_id = memory_of(decl);
+    let len_g = mem_len[decl];
+    let shift = storage_shift(s);
+    let vt = storage_vt(s);
+    let i32s = vl_one(vt_i32);
+    let none = vl_empty();
+    let ml = vl_begin();
+    vl_add(vt_i32);
+    vl_add(vt_i32);
+    // reserve(n): need = (n + per_page - 1) >> (16 - shift); size = memory.size;
+    // if need > size { if not grow(max(size, need - size)) { if not grow(need - size) { trap } } }
+    let reserve = helper(i32s, none, vl_end(ml), "mem.reserve");
+    let m = w_mark();
+    let mn = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_i32((1 << (16 - shift)) - 1);
+    w_node(Op.Plain, vt_i32, 106, 0, mn);
+    w_i32(16 - shift);
+    w_node(Op.Plain, vt_i32, 118, 0, mn);
+    w_node(Op.LocalSet, vt_none, 1, 0, mn);
+    let ms = w_mark();
+    w_leaf(Op.MemorySize, vt_i32, mem_id, 0);
+    w_node(Op.LocalSet, vt_none, 2, 0, ms);
+    let mif = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    w_node(Op.Plain, vt_i32, 75, 0, mc);
+    let then_ = w_mark();
+    let mg = w_mark();
+    // grow(select(size, need - size, size > need - size)) == -1 ?
+    let mgrow = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    let md = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    w_node(Op.Plain, vt_i32, 107, 0, md);
+    let mcmp = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    let md2 = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    w_node(Op.Plain, vt_i32, 107, 0, md2);
+    w_node(Op.Plain, vt_i32, 75, 0, mcmp);
+    w_node(Op.Select, vt_i32, 0, 0, mgrow);
+    w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow);
+    w_i32(-1);
+    w_node(Op.Plain, vt_i32, 70, 0, mgrow);
+    let inner = w_mark();
+    let mgrow2 = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    w_node(Op.Plain, vt_i32, 107, 0, mgrow2);
+    w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow2);
+    w_i32(-1);
+    w_node(Op.Plain, vt_i32, 70, 0, mgrow2);
+    let trap = w_mark();
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    w_node(Op.Seq, vt_none, 0, 0, trap);
+    w_node(Op.If, vt_none, 1, 0, inner);
+    w_node(Op.Seq, vt_none, 0, 0, inner);
+    w_node(Op.If, vt_none, 2, 0, mg);
+    w_node(Op.Seq, vt_none, 0, 0, then_);
+    w_node(Op.If, vt_none, 3, 0, mif);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    func_body[reserve] = w_pop();
+
+    // push(v): at = len; if at >= cap { reserve(at + 1) }; store at; len = at + 1
+    let mpl = vl_begin();
+    vl_add(vt_i32);
+    let pparams = vl_one(vt);
+    let push = helper(pparams, none, vl_end(mpl), "mem.push");
+    let p = w_mark();
+    let pa = w_mark();
+    w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
+    w_node(Op.LocalSet, vt_none, 1, 0, pa);
+    let pif = w_mark();
+    let pc = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_leaf(Op.MemorySize, vt_i32, mem_id, 0);
+    w_i32(16 - shift);
+    let pcap = w_mark() - 2;
+    w_node(Op.Plain, vt_i32, 116, 0, pcap);
+    w_node(Op.Plain, vt_i32, 79, 0, pc);
+    let pthen = w_mark();
+    let pr = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_i32(1);
+    w_node(Op.Plain, vt_i32, 106, 0, pr);
+    w_node(Op.Call, vt_none, reserve, 0, pr);
+    w_node(Op.Seq, vt_none, 0, 0, pthen);
+    w_node(Op.If, vt_none, 1, 0, pif);
+    let pst = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    mem_address(s, pst);
+    w_leaf(Op.LocalGet, vt, 0, 0);
+    w_node(Op.Store, vt_none, mem_id, store_opcode(s), pst);
+    let pl = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_i32(1);
+    w_node(Op.Plain, vt_i32, 106, 0, pl);
+    w_node(Op.GlobalSet, vt_none, len_g, 0, pl);
+    w_node(Op.Seq, vt_none, 0, 0, p);
+    func_body[push] = w_pop();
+
+    // resize(n): reserve(n); len = n
+    let resize = helper(i32s, none, none, "mem.resize");
+    let r = w_mark();
+    let rr = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_node(Op.Call, vt_none, reserve, 0, rr);
+    let rl = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_node(Op.GlobalSet, vt_none, len_g, 0, rl);
+    w_node(Op.Seq, vt_none, 0, 0, r);
+    func_body[resize] = w_pop();
+    mem_helpers[decl] = reserve;
+    reserve;
+}

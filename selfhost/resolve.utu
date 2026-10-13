@@ -62,6 +62,7 @@ export mem decl_node: I32;   // the node that declares it
 export mem decl_owner: I32;  // the declaration it is part of (module, struct, enum, function), or -1
 // Module: its promoted type (`&`), or -1. ModuleParam: its index. Fn: the
 // type it is a method or operator of, or -1. Alias: the module it names.
+// Field: its index.
 mem decl_a: I32;
 
 // The declaration a name node refers to, by node; -1 for none.
@@ -116,6 +117,16 @@ enum(U8) Diag:
     | InvalidDistinct
     | EnumValueRange
     | EnumValueTwice
+    | ImplicitStructInit
+    | UnknownField
+    | MissingField
+    | NullableAccess
+    | MemIndex
+    | ConstMem
+    | MemNotValue
+    | MemKind
+    | NonDefaultable
+    | InvalidModuleArity
 
 mem diag_kind: U8;
 mem diag_node: I32;
@@ -340,10 +351,13 @@ fn declare_type_item(item: I32, owner: I32) I32 {
 
 fn declare_fields(holder: I32, owner: I32) void {
     let c = first_child(holder);
+    let index = 0;
     while (c >= 0) {
         if is_kind(c, Node.Field) {
             let field = declare_named(Decl.Field, first_child(c), c, owner);
             add_member(owner, decl_name[field], Space.Member, field);
+            decl_a[field] = index;
+            index += 1;
         };
         c = next_sibling(c);
     };

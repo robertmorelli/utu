@@ -1,0 +1,506 @@
+// ── Data ─────────────────────────────────────────────────────────────────────
+//
+// Structs, arrays, and strings: building them, reading and writing their
+// parts, and the std intrinsics that are their operations.
+
+// ── Structs ──
+
+// The fields of a struct (or variant) declaration node, in order.
+fn field_count(decl: I32) I32 {
+    let n = 0;
+    let c = first_child(fields_holder(decl));
+    while (c >= 0) {
+        if is_kind(c, Node.Field) { n += 1; };
+        c = next_sibling(c);
+    };
+    n;
+}
+
+// The node whose Field children are a declaration's fields.
+fn fields_holder(decl: I32) I32 {
+    let node = decl_node[decl];
+    if is_kind(node, Node.Variant) { return next_sibling(first_child(node)); };
+    node;
+}
+
+fn field_type(field: I32, inst: I32) I32 { type_of(next_sibling(first_child(decl_node[field])), inst); }
+
+// `T { a: x, b: y }`: the fields in declaration order (each initializer
+// checked in that order), then struct.new.
+fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
+    let t = type_path(first_child(node), cx.inst);
+    let decl = ty_decl(t);
+    if not decl_is(decl, Decl.Struct) { return unsupported(node); };
+    let inits = next_sibling(first_child(node));
+    return build_struct(t, decl, inits, node, cx);
+}
+
+// `&{ a: x }`: the struct type expected.
+fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
+    let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+    let decl = if t >= 0 { ty_decl(t); } else { -1; };
+    if not decl_is(decl, Decl.Struct) {
+        report(Diag.ImplicitStructInit, node, -1);
+        return error_value();
+    };
+    build_struct(t, decl, next_sibling(first_child(node)), node, cx);
+}
+
+fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
+    // Each initializer names a field once, and each field has one.
+    let f = first_init;
+    while (f >= 0) {
+        let name = first_child(f);
+        let field = member(decl, word_of(name), Space.Member);
+        if not decl_is(field, Decl.Field) { report(Diag.UnknownField, name, word_of(name)); }
+        else {
+            node_decl[name] = field;
+            let other = first_init;
+            while (other != f) {
+                if word_of(first_child(other)) == word_of(name) {
+                    report(Diag.DuplicateField, f, word_of(name));
+                    other = f;
+                } else { other = next_sibling(other); };
+            };
+        };
+        f = next_sibling(f);
+    };
+    let m = w_mark();
+    let c = first_child(fields_holder(decl));
+    let missing = false;
+    while (c >= 0) {
+        if is_kind(c, Node.Field) {
+            let field = node_decl[first_child(c)];
+            let init = init_for(first_init, decl_name[field]);
+            let ft = field_type(field, ty_inst(t));
+            if init < 0 {
+                if not missing { report(Diag.MissingField, at, decl_name[field]); };
+                missing = true;
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+            } else {
+                coerce(check_expr(last_child(init), ft, cx), ft, last_child(init));
+            };
+        };
+        c = next_sibling(c);
+    };
+    let vt = repr(t);
+    w_node(Op.StructNew, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m);
+    t;
+}
+
+fn init_for(first_init: I32, word: I32) I32 {
+    let f = first_init;
+    while (f >= 0) {
+        if word_of(first_child(f)) == word { return f; };
+        f = next_sibling(f);
+    };
+    -1;
+}
+
+// A struct field of the value on the stack (of type `t`), named by node `name`.
+// Returns the field's declaration, or -1 after reporting.
+fn field_of(t: I32, name: I32) I32 {
+    if ty_is(t, Ty.Error) { return -1; };
+    let decl = ty_decl(t);
+    if decl_is(decl, Decl.Proto) { return -2; };
+    if ty_is(t, Ty.Nullable) {
+        report(Diag.NullableAccess, name, word_of(name));
+        return -1;
+    };
+    let field = member(decl, word_of(name), Space.Member);
+    if not decl_is(field, Decl.Field) or not decl_is(decl, Decl.Struct) {
+        report(Diag.UnknownField, name, word_of(name));
+        return -1;
+    };
+    node_decl[name] = field;
+    field;
+}
+
+// `x.f`: a field.
+fn check_field_get(node: I32, cx: Cx) I32 {
+    let base = first_child(node);
+    let name = last_child(node);
+    let m = w_mark();
+    let t = check_expr(base, -1, cx);
+    let field = field_of(t, name);
+    if field == -2 {
+        w_stack.resize(m);
+        return unsupported(node);
+    };
+    if field < 0 {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let ft = field_type(field, ty_inst(t));
+    w_node(Op.StructGet, repr(ft), vt_heap(repr(t)), decl_a[field], m);
+    ft;
+}
+
+// `x.f = v`, `x.f += v`.
+fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
+    let base = first_child(target);
+    let name = last_child(target);
+    let m = w_mark();
+    let t = check_expr(base, -1, cx);
+    let field = field_of(t, name);
+    if field == -2 {
+        w_stack.resize(m);
+        return unsupported(at);
+    };
+    if field < 0 {
+        check_expr(value, -1, cx);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let ft = field_type(field, ty_inst(t));
+    let heap = vt_heap(repr(t));
+    let index = decl_a[field];
+    if op == Tok.Eq.to_i32() {
+        coerce(check_expr(value, ft, cx), ft, value);
+    } else {
+        // Read the struct once: x.f = x.f op v.
+        let obj = w_pop();
+        let local = new_local(repr(t));
+        let mt = w_mark();
+        w_push(obj);
+        w_node(Op.LocalTee, repr(t), local, 0, mt);
+        let mg = w_mark();
+        w_leaf(Op.LocalGet, repr(t), local, 0);
+        w_node(Op.StructGet, repr(ft), heap, index, mg);
+        apply_operator(compound_word(op, node_last[target]), ft, value, at, cx, mg);
+    };
+    w_node(Op.StructSet, vt_none, heap, index, m);
+    ty_void();
+}
+
+// ── Arrays ──
+
+// `[a, b, c]`: an Array of the element type expected, else of the first's.
+fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
+    let elem = -1;
+    if expect >= 0 {
+        let e = if ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+        if is_array_type(e) { elem = inst_arg(ty_inst(e), 0); };
+    };
+    let first_elem = first_child(node);
+    if elem < 0 {
+        if first_elem < 0 {
+            report(Diag.TypeMismatch, node, -1);
+            return error_value();
+        };
+        elem = type_only(first_elem, -1, cx);
+    };
+    let t = array_of(elem);
+    let m = w_mark();
+    let c = first_elem;
+    while (c >= 0) {
+        coerce(check_expr(c, elem, cx), elem, c);
+        c = next_sibling(c);
+    };
+    let vt = repr(t);
+    w_node(Op.ArrayNewFixed, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m);
+    t;
+}
+
+// Array[elem], the type.
+fn array_of(elem: I32) I32 {
+    let module = lookup(known_word(Known.WordArray));
+    if not decl_is(module, Decl.Module) { return ty_error(); };
+    let m = vl_begin();
+    vl_add(elem);
+    named(decl_a[module], instance(module, vl_end(m)));
+}
+
+fn is_array_type(t: I32) Bool {
+    let decl = ty_decl(t);
+    decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == known_word(Known.WordArray);
+}
+
+// `a[i]`, `a[s, e]`, `a[i] = v`: the receiver's get_index, get_slice, set_index.
+fn check_index(node: I32, expect: I32, cx: Cx) I32 {
+    let base = first_child(node);
+    if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Mem) { return check_mem_index(node, cx); };
+    let word = if is_kind(node, Node.Slice_expr) { known_word(Known.GetSlice); } else { known_word(Known.GetIndex); };
+    let m = w_mark();
+    let t = check_expr(base, -1, cx);
+    if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
+    let decl = member(ty_decl(t), word, Space.Method);
+    if decl < 0 {
+        report(Diag.UnknownMethod, node, word);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let fi = fn_instance(decl, ty_inst(t));
+    let params = fi_params[fi];
+    let i = 1;
+    let a = next_sibling(base);
+    while (a >= 0) {
+        let pt = if i < vl_len[params] { vl_item(params, i); } else { -1; };
+        coerce(check_expr(a, pt, cx), pt, a);
+        i += 1;
+        a = next_sibling(a);
+    };
+    finish_call(fi, m, cx);
+}
+
+fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
+    let base = first_child(target);
+    if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Mem) { return check_mem_store(target, value, op, at, cx); };
+    let m = w_mark();
+    let t = check_expr(base, -1, cx);
+    if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
+    let set = member(ty_decl(t), known_word(Known.SetIndex), Space.Method);
+    if set < 0 {
+        report(Diag.UnknownMethod, target, known_word(Known.SetIndex));
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let fi = fn_instance(set, ty_inst(t));
+    let it = vl_item(fi_params[fi], 1);
+    let vt_ = vl_item(fi_params[fi], 2);
+    let index = last_child(target);
+    if op == Tok.Eq.to_i32() {
+        coerce(check_expr(index, it, cx), it, index);
+        coerce(check_expr(value, vt_, cx), vt_, value);
+        return finish_call(fi, m, cx);
+    };
+    // a[i] op= v: the array and index once each.
+    let arr = new_local(repr(t));
+    let idx = new_local(repr(it));
+    let obj = w_pop();
+    let ms = w_mark();
+    w_push(obj);
+    w_node(Op.LocalSet, vt_none, arr, 0, ms);
+    let mi = w_mark();
+    coerce(check_expr(index, it, cx), it, index);
+    w_node(Op.LocalSet, vt_none, idx, 0, mi);
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, repr(t), arr, 0);
+    w_leaf(Op.LocalGet, repr(it), idx, 0);
+    let get = member(ty_decl(t), known_word(Known.GetIndex), Space.Method);
+    let mg = w_mark();
+    w_leaf(Op.LocalGet, repr(t), arr, 0);
+    w_leaf(Op.LocalGet, repr(it), idx, 0);
+    finish_call(fn_instance(get, ty_inst(t)), mg, cx);
+    apply_operator(compound_word(op, node_last[target]), vt_, value, at, cx, mg);
+    finish_call(fi, mc, cx);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+// ── Intrinsics of data ──
+
+// The array type of an intrinsic's module (Array's `&` in the instance).
+fn intrinsic_array_heap(fi: I32) I32 {
+    let module = module_of(fi_decl[fi]);
+    vt_heap(repr(named(decl_a[module], fi_inst[fi])));
+}
+
+// Push an @ir element's children; false when one is not known.
+fn translate_kids(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
+    let c = x_child[x];
+    while (c >= 0) {
+        if not translate(c, decls, args, locals, direct, fi, -1) { return false; };
+        c = x_next[c];
+    };
+    true;
+}
+
+// The string and array tags. 1: done; 0: not one of them; -1: failed.
+fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) I32 {
+    let tag = x_tag[x];
+    if not is_data_tag(tag) { return 0; };
+    let m = w_mark();
+    if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
+    if tag == known_word(Known.IrStringConcat) { call_builtin(Builtin.Concat, m); }
+    else if tag == known_word(Known.IrStringEq) { call_builtin(Builtin.Equals, m); }
+    else if tag == known_word(Known.IrStringNe) {
+        call_builtin(Builtin.Equals, m);
+        w_node(Op.Plain, vt_i32, 69, 0, m);
+    }
+    else if tag == known_word(Known.IrStringMeasure) { call_builtin(Builtin.Length, m); }
+    else if tag == known_word(Known.IrStringSlice) { call_builtin(Builtin.Substring, m); }
+    else if tag == known_word(Known.IrStringGet) { call_builtin(Builtin.CharCodeAt, m); }
+    else if tag == known_word(Known.IrStringFromCodePoint) { call_builtin(Builtin.FromCodePoint, m); }
+    else if tag == known_word(Known.IrStringFromCodes) {
+        w_node(Op.Call, vt_extern, from_codes_helper(vt_heap(w_type[w_stack[m]])), 0, m);
+    }
+    else {
+        let heap = intrinsic_array_heap(fi);
+        let elem = ht_a[heap];
+        let ref = vt_ref(heap, true);
+        if tag == known_word(Known.IrArrayGet) { w_node(Op.ArrayGet, elem, heap, 0, m); }
+        else if tag == known_word(Known.IrArraySet) { w_node(Op.ArraySet, vt_none, heap, 0, m); }
+        else if tag == known_word(Known.IrArrayLen) { w_node(Op.ArrayLen, vt_i32, 0, 0, m); }
+        else if tag == known_word(Known.IrArrayNew) {
+            if w_stack.len() - m == 1 and not defaultable(inst_arg(fi_inst[fi], 0)) {
+                report(Diag.NonDefaultable, call_site[0], -1);
+            };
+            if w_stack.len() - m == 2 {
+                // (n, fill) → array.new takes the fill first.
+                let fill = w_pop();
+                let n = w_pop();
+                w_push(fill);
+                w_push(n);
+                w_node(Op.ArrayNew, vt_ref(heap, false), heap, 0, m);
+            } else {
+                w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, m);
+            };
+        }
+        else if tag == known_word(Known.IrArraySlice) { w_node(Op.Call, ref, array_slice_helper(heap), 0, m); }
+        else { w_node(Op.ArrayCopy, vt_none, heap, heap, m); };
+    };
+    1;
+}
+
+// Whether a type has a value to start from (a scalar, a nullable or host
+// reference): array.new_default fills arrays of those.
+fn defaultable(t: I32) Bool {
+    if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Closure) or ty_is(t, Ty.Error) { return true; };
+    let decl = ty_decl(t);
+    if decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Enum) or decl_is(decl, Decl.Variant) { return false; };
+    not is_array_type(t);
+}
+
+fn is_data_tag(tag: I32) Bool {
+    for (Known.IrStringConcat.to_i32() ... Known.IrArrayCopy.to_i32()) |k| { if known[k] == tag { return true; }; };
+    false;
+}
+
+// Whether an @ir tree reorders its operands, so its arguments must be
+// stored first (array.new takes its fill before its length).
+fn reorders(x: I32) Bool {
+    if x_tag[x] == known_word(Known.IrArrayNew) and x_children(x) == 2 { return true; };
+    let c = x_child[x];
+    while (c >= 0) {
+        if reorders(c) { return true; };
+        c = x_next[c];
+    };
+    false;
+}
+
+// ── Helper functions ──
+//
+// Operations too long to repeat at each use become functions of their own,
+// one per type. They are built here, with their own locals, outside the
+// function being checked.
+
+mem slice_helper: I32;   // pairs: array heap type, function
+mem codes_helper: I32;
+
+// A helper function's locals after its parameters: value types in local_types.
+fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {
+    let f = new_func(FuncKind.Defined, func_type(params, results));
+    func_debug_name[f] = name_add(name);
+    func_locals[f] = local_types.len();
+    func_local_count[f] = vl_len[locals];
+    for (0 ..< vl_len[locals]) |i| { local_types.push(vl_item(locals, i)); };
+    f;
+}
+
+// (src, start, end) → a new array of src[start ..< end).
+fn array_slice_helper(heap: I32) I32 {
+    let i = 0;
+    while (i < slice_helper.len()) {
+        if slice_helper[i] == heap { return slice_helper[i + 1]; };
+        i += 2;
+    };
+    let ref = vt_ref(heap, true);
+    let mp = vl_begin();
+    vl_add(ref);
+    vl_add(vt_i32);
+    vl_add(vt_i32);
+    let params = vl_end(mp);
+    let ml = vl_begin();
+    vl_add(vt_i32);
+    vl_add(ref);
+    let f = helper(params, vl_one(ref), vl_end(ml), "array.slice");
+    slice_helper.push(heap);
+    slice_helper.push(f);
+    // len = end - start; out = array.new_default(len); array.copy(out, 0, src, start, len); out
+    let m = w_mark();
+    let ms = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 2, 0);
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_node(Op.Plain, vt_i32, 107, 0, ms);
+    w_node(Op.LocalSet, vt_none, 3, 0, ms);
+    let mn = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mn);
+    w_node(Op.LocalSet, vt_none, 4, 0, mn);
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, ref, 4, 0);
+    w_i32(0);
+    w_leaf(Op.LocalGet, ref, 0, 0);
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_node(Op.ArrayCopy, vt_none, heap, heap, mc);
+    w_leaf(Op.LocalGet, ref, 4, 0);
+    w_node(Op.Seq, ref, 0, 0, m);
+    func_body[f] = w_pop();
+    f;
+}
+
+// (codes: Array[I32], count) → the string of the first `count` code units:
+// narrowed into an i16 array, then one fromCharCodeArray.
+fn from_codes_helper(heap: I32) I32 {
+    if codes_helper.len() > 0 { return codes_helper[0]; };
+    let units = code_units_type();
+    let uref = vt_ref(units, true);
+    let ref = vt_ref(heap, true);
+    let mp = vl_begin();
+    vl_add(ref);
+    vl_add(vt_i32);
+    let params = vl_end(mp);
+    let ml = vl_begin();
+    vl_add(uref);
+    vl_add(vt_i32);
+    let f = helper(params, vl_one(vt_extern), vl_end(ml), "Str.from_codes");
+    codes_helper.push(f);
+    let brk = 1;
+    let top = 2;
+    let m = w_mark();
+    // narrow = array.new_default(count)
+    let mn = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_node(Op.ArrayNewDefault, vt_ref(units, false), units, 0, mn);
+    w_node(Op.LocalSet, vt_none, 2, 0, mn);
+    // for i in 0 ..< count: narrow[i] = codes[i]
+    let mb = w_mark();
+    let mloop = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_node(Op.Plain, vt_i32, 79, 0, mc);
+    w_node(Op.BrIf, vt_none, brk, 0, mc);
+    let mset = w_mark();
+    w_leaf(Op.LocalGet, uref, 2, 0);
+    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    let mget = w_mark();
+    w_leaf(Op.LocalGet, ref, 0, 0);
+    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_node(Op.ArrayGet, vt_i32, heap, 0, mget);
+    w_node(Op.ArraySet, vt_none, units, 0, mset);
+    let mi = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_i32(1);
+    w_node(Op.Plain, vt_i32, 106, 0, mi);
+    w_node(Op.LocalSet, vt_none, 3, 0, mi);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, mloop);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+    let mr = w_mark();
+    w_leaf(Op.LocalGet, uref, 2, 0);
+    w_i32(0);
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    call_builtin(Builtin.FromCharCodeArray, mr);
+    w_node(Op.Seq, vt_extern, 0, 0, m);
+    func_body[f] = w_pop();
+    f;
+}
+
+fn reset_data() void {
+    slice_helper.clear();
+    codes_helper.clear();
+    reset_strings();
+}

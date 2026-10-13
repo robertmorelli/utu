@@ -334,6 +334,11 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Assert_expr.to_i32() { return check_assert(node, cx); };
     if kind == Node.Field_expr.to_i32() { return check_field(node, expect, cx); };
     if kind == Node.Type_member_expr.to_i32() { return check_type_member(node, expect, cx); };
+    if kind == Node.Struct_init.to_i32() { return check_struct_init(node, expect, cx); };
+    if kind == Node.Implicit_struct_init.to_i32() { return check_implicit_init(node, expect, cx); };
+    if kind == Node.Index_expr.to_i32() or kind == Node.Slice_expr.to_i32() { return check_index(node, expect, cx); };
+    if kind == Node.Array_expr.to_i32() { return check_array_lit(node, expect, cx); };
+    if kind == Node.Promoted_module_call_expr.to_i32() { return check_promoted_call(node, expect, cx); };
     unsupported(node);
 }
 
@@ -342,7 +347,11 @@ fn check_ident(node: I32, cx: Cx) I32 {
     if decl < 0 { return error_value(); };
     let k = decl_kind[decl];
     if k == Decl.Global.to_i32() { return global_get(decl, cx); };
-    if k == Decl.Fn.to_i32() or k == Decl.Mem.to_i32() or is_type_decl(decl) { return unsupported(node); };
+    if k == Decl.Mem.to_i32() {
+        report(Diag.MemNotValue, node, decl_name[decl]);
+        return error_value();
+    };
+    if k == Decl.Fn.to_i32() or is_type_decl(decl) { return unsupported(node); };
     let t = decl_ty[decl];
     w_leaf(Op.LocalGet, repr(t), decl_local[decl], 0);
     t;
@@ -370,6 +379,10 @@ fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
     };
     if is_kind(c, Node.Int_lit) { return int_literal(c, expect, false); };
     if is_kind(c, Node.Float_lit) { return float_literal(c, expect, false); };
+    if is_kind(c, Node.String_lit) or is_kind(c, Node.Multiline_string_lit) {
+        if not string_literal(c) { return unsupported(node); };
+        return prelude(Prelude.Str);
+    };
     unsupported(node);
 }
 
@@ -525,6 +538,8 @@ fn check_assign(node: I32, cx: Cx) I32 {
     let target = first_child(node);
     let value = last_child(node);
     let op = tok_kind[node_last[target]];
+    if is_kind(target, Node.Field_expr) and not is_module_path(target) { return check_field_set(target, value, op, node, cx); };
+    if is_kind(target, Node.Index_expr) { return check_index_set(target, value, op, node, cx); };
     if not is_kind(target, Node.Identifier) { return unsupported(node); };
     let decl = node_decl[target];
     if decl < 0 { return error_value(); };
@@ -737,6 +752,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         let base = first_child(callee);
         let name = last_child(callee);
         let module = node_decl[base];
+        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Mem) { return check_mem_method(module, name, args, node, cx); };
         if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
             let decl = node_decl[name];
             if not decl_is(decl, Decl.Fn) { return unsupported(node); };
@@ -745,8 +761,11 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         // A method: the receiver is its first argument.
         let rt = check_expr(base, -1, cx);
         if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
+        if decl_is(ty_decl(rt), Decl.Proto) { return unsupported(node); };
         let decl = member(ty_decl(rt), word_of(name), Space.Method);
         if decl < 0 {
+            // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
+            if has_foreign() { return unsupported(node); };
             report(Diag.UnknownMethod, name, word_of(name));
             return finish_error(args, m, cx);
         };
@@ -769,6 +788,8 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
 // Arguments checked and pushed, after any already pushed since `m`; then
 // the call (or the intrinsic, expanded).
 fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 {
+    call_site.resize(1);
+    call_site[0] = at;
     let params = fi_params[fi];
     let i = first_param;
     let a = if args >= 0 { first_child(args); } else { -1; };
@@ -824,6 +845,15 @@ fn function_of(fi: I32) I32 {
     f;
 }
 
+// Whether the program imports host declarations (std:JS, npm:…).
+fn has_foreign() Bool {
+    for (0 ..< import_target.len()) |i| { if import_target[i] == -2 { return true; }; };
+    false;
+}
+
+// The call being checked, for intrinsics' diagnostics.
+mem call_site: I32;
+
 // The arguments are on the stack since `m`: call the function, or expand it.
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     let result = fi_result[fi];
@@ -847,7 +877,7 @@ fn expand(fi: I32, m: I32, cx: Cx) I32 {
     w_stack.resize(m);
     // In order, once each?
     let uses = ident_uses(x, decls);
-    let direct = vl_len[uses] == n;
+    let direct = vl_len[uses] == n and not reorders(x);
     for (0 ..< vl_len[uses]) |i| { if vl_item(uses, i) != i { direct = false; }; };
     let locals = Array[I32].new(n, -1);
     if not direct {
@@ -920,6 +950,8 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
         push_number(t, if neg { 0 - value; } else { value; }, false);
         return true;
     };
+    let data = translate_data(x, decls, args, locals, direct, fi);
+    if data != 0 { return data > 0; };
     let opcode = tag_opcode(tag);
     if opcode < 0 { return false; };
     let m = w_mark();
@@ -952,14 +984,41 @@ fn opcode_result(op: I32) I32 {
     vt_v128;
 }
 
-// `x.f` (not called): a module's global.
-fn check_field(node: I32, expect: I32, cx: Cx) I32 {
+// `m.x`: `m` names a module.
+fn is_module_path(node: I32) Bool {
     let base = first_child(node);
-    let name = last_child(node);
-    if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module) and decl_is(node_decl[name], Decl.Global) {
-        return global_get(node_decl[name], cx);
+    is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module);
+}
+
+// `x.f` (not called): a module's global, or a field.
+fn check_field(node: I32, expect: I32, cx: Cx) I32 {
+    if is_module_path(node) {
+        let name = last_child(node);
+        if decl_is(node_decl[name], Decl.Global) { return global_get(node_decl[name], cx); };
+        return unsupported(node);
     };
-    unsupported(node);
+    check_field_get(node, cx);
+}
+
+// `M[A].f(…)`: a function of the instance M[A] (a static method of its type).
+fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
+    let name_at = first_child(node);
+    let args_types = next_sibling(name_at);
+    let name = next_sibling(args_types);
+    let args = next_sibling(name);
+    let decl = node_decl[name];
+    let module = node_decl[name_node(name_at)];
+    if decl_is(module, Decl.Module) and not decl_is(decl, Decl.Fn) { module = module_of(module); };
+    if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+    let owner = module_of(decl);
+    let targs = type_args(args_types, cx.inst);
+    if vl_len[targs] != module_arity(owner) {
+        report(Diag.InvalidModuleArity, node, decl_name[owner]);
+        return error_value();
+    };
+    let inst = instance(owner, targs);
+    let m = w_mark();
+    call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
 // `T.x` (not called): a module's global.
@@ -1160,6 +1219,8 @@ fn reset_check() void {
     };
     diag_expected.clear();
     diag_actual.clear();
+    reset_data();
+    reset_mems();
     fi_grow();
 }
 
@@ -1189,6 +1250,11 @@ fn compile(target: Target) I32 {
                     };
                 };
                 if target == Target.Normal and is_kind(item, Node.Export_main_decl) { entry_function(item, intern_text("main"), -1); };
+                if is_kind(item, Node.Mem_decl) {
+                    let d = node_decl[first_child(item)];
+                    if not mem_kind_ok(d) { report(Diag.MemKind, item, decl_name[d]); }
+                    else if mem_is_exported(d) { memory_of(d); };
+                };
                 if target == Target.Tests and is_kind(item, Node.Test_decl) {
                     entry_function(item, -1, tests);
                     tests += 1;

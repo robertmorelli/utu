@@ -1,0 +1,174 @@
+// ── Strings ──────────────────────────────────────────────────────────────────
+//
+// `Str` is a JavaScript string, an externref. Its operations call the JS
+// string builtins (`wasm:js-string`), and a literal is an immutable global
+// imported from the `'` module, named by its text: an engine given
+// `importedStringConstants: "'"` provides it, as it provides the builtins.
+
+enum(U8) Builtin:
+    | Concat
+    | Equals
+    | Length
+    | Substring
+    | CharCodeAt
+    | FromCodePoint
+    | FromCharCodeArray
+
+mem builtin_func: I32;   // by Builtin: its imported function, or -1
+mem word_string: I32;    // by word id (a literal's decoded text): its global, or -1
+
+fn reset_strings() void {
+    builtin_func.resize(Builtin.count());
+    for (0 ..< Builtin.count()) |b| { builtin_func[b] = -1; };
+    word_string.clear();
+}
+
+// (array (mut i16)): the code units fromCharCodeArray takes, its own group.
+fn code_units_type() I32 { array_type_single(vt_i16, true); }
+
+fn builtin(b: Builtin) I32 {
+    let i = b.to_i32();
+    if builtin_func[i] >= 0 { return builtin_func[i]; };
+    let m = vl_begin();
+    let result = vt_extern;
+    let name = "";
+    if b == Builtin.Concat { vl_add(vt_externref); vl_add(vt_externref); name = "concat"; }
+    else if b == Builtin.Equals { vl_add(vt_externref); vl_add(vt_externref); result = vt_i32; name = "equals"; }
+    else if b == Builtin.Length { vl_add(vt_externref); result = vt_i32; name = "length"; }
+    else if b == Builtin.Substring { vl_add(vt_externref); vl_add(vt_i32); vl_add(vt_i32); name = "substring"; }
+    else if b == Builtin.CharCodeAt { vl_add(vt_externref); vl_add(vt_i32); result = vt_i32; name = "charCodeAt"; }
+    else if b == Builtin.FromCodePoint { vl_add(vt_i32); name = "fromCodePoint"; }
+    else {
+        vl_add(vt_ref(code_units_type(), true));
+        vl_add(vt_i32);
+        vl_add(vt_i32);
+        name = "fromCharCodeArray";
+    };
+    let t = func_type_single(vl_end(m), vl_one(result));
+    let f = add_import_func(name_add("wasm:js-string"), name_add(name), t);
+    builtin_func[i] = f;
+    f;
+}
+
+// Call a builtin with the arguments on the stack since `m`.
+fn call_builtin(b: Builtin, m: I32) void {
+    let f = builtin(b);
+    let results = ht_b[func_type_of[f]];
+    w_node(Op.Call, vl_item(results, 0), f, 0, m);
+}
+
+// ── Literals ──
+
+mem lit_bytes: U8;   // a literal's text, decoded, as UTF-8
+
+// Push a string literal (or a multiline one) as a constant. False when its
+// text is not well-formed UTF-16 (a lone surrogate), which cannot be an import name.
+fn string_literal(node: I32) Bool {
+    lit_bytes.clear();
+    let ok = true;
+    if is_kind(node, Node.Multiline_string_lit) {
+        let line = first_child(node);
+        let first_line = true;
+        while (line >= 0) {
+            if not first_line { lit_bytes.push(10); };
+            first_line = false;
+            let t = node_first[line];
+            // Each line is its text after `\\`.
+            for (tok_start[t] + 2 ..< tok_end[t]) |i| { lit_bytes.push(src[i]); };
+            line = next_sibling(line);
+        };
+    } else {
+        let t = node_first[node];
+        ok = decode_string(tok_start[t] + 1, tok_end[t] - 1);
+    };
+    if not ok { return false; };
+    let start = src.len();
+    for (0 ..< lit_bytes.len()) |i| { src.push(lit_bytes[i]); };
+    let before = src.interned();
+    let word = src.intern(start, src.len());
+    if word < before { src.resize(start); };
+    w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0);
+    true;
+}
+
+// The global of a string constant whose text is word `word`.
+fn string_global(word: I32) I32 {
+    if word_string.len() <= word {
+        let old = word_string.len();
+        word_string.resize(word + 1);
+        for (old ..< word + 1) |w| { word_string[w] = -1; };
+    };
+    if word_string[word] >= 0 { return word_string[word]; };
+    let start = src.interned_start(word);
+    let g = add_import_global(name_add("'"), name_from_src(start, start + src.interned_size(word)), vt_extern);
+    word_string[word] = g;
+    g;
+}
+
+// JSON's escapes, from src[start ..< end_] into lit_bytes as UTF-8.
+fn decode_string(start: I32, end_: I32) Bool {
+    let i = start;
+    while (i < end_) {
+        let c = src[i];
+        if c != 92 {
+            lit_bytes.push(c);
+            i += 1;
+        } else {
+            let e = src[i + 1];
+            i += 2;
+            if e == 110 { lit_bytes.push(10); }
+            else if e == 116 { lit_bytes.push(9); }
+            else if e == 114 { lit_bytes.push(13); }
+            else if e == 98 { lit_bytes.push(8); }
+            else if e == 102 { lit_bytes.push(12); }
+            else if e == 117 {
+                let unit = hex4(i);
+                i += 4;
+                if unit >= 55296 and unit <= 56319 {
+                    // A high surrogate: a low one must follow.
+                    if i + 5 < end_ + 1 and src[i] == 92 and src[i + 1] == 117 {
+                        let low = hex4(i + 2);
+                        if low >= 56320 and low <= 57343 {
+                            i += 6;
+                            utf8_push(65536 + (unit - 55296) * 1024 + (low - 56320));
+                        } else { return false; };
+                    } else { return false; };
+                } else if unit >= 56320 and unit <= 57343 {
+                    return false;
+                } else {
+                    utf8_push(unit);
+                };
+            }
+            else { lit_bytes.push(e); };
+        };
+    };
+    true;
+}
+
+fn hex4(at: I32) I32 {
+    let v = 0;
+    for (at ..< at + 4) |i| {
+        let c = src[i];
+        v = v * 16 + if c >= 97 { c - 87; } else if c >= 65 { c - 55; } else { c - 48; };
+    };
+    v;
+}
+
+fn utf8_push(cp: I32) void {
+    if cp < 128 { lit_bytes.push(cp); return; };
+    if cp < 2048 {
+        lit_bytes.push(192 | (cp >> 6));
+        lit_bytes.push(128 | (cp & 63));
+        return;
+    };
+    if cp < 65536 {
+        lit_bytes.push(224 | (cp >> 12));
+        lit_bytes.push(128 | ((cp >> 6) & 63));
+        lit_bytes.push(128 | (cp & 63));
+        return;
+    };
+    lit_bytes.push(240 | (cp >> 18));
+    lit_bytes.push(128 | ((cp >> 12) & 63));
+    lit_bytes.push(128 | ((cp >> 6) & 63));
+    lit_bytes.push(128 | (cp & 63));
+}
