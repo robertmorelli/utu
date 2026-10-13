@@ -130,9 +130,14 @@ fn enum_name_helper(decl: I32) I32 {
         if name_helper_enum[i] == decl { return name_helper_enum[i + 1]; };
         i += 2;
     };
-    let f = helper(vl_one(vt_i32), vl_one(vt_extern), vl_empty(), "enum.name");
+    let tabled = name_table_span(decl) > 0;
+    let f = helper(vl_one(vt_i32), vl_one(vt_extern), if tabled { vl_one(vt_i32); } else { vl_empty(); }, "enum.name");
     name_helper_enum.push(decl);
     name_helper_enum.push(f);
+    if tabled {
+        enum_name_table(decl, f);
+        return f;
+    };
     let m = w_mark();
     let c = first_child(decl_node[decl]);
     while (c >= 0) {
@@ -156,6 +161,73 @@ fn enum_name_helper(decl: I32) I32 {
     w_node(Op.Seq, vt_extern, 0, 0, m);
     func_body[f] = w_pop();
     f;
+}
+
+// With four variants or more, values from lo to hi at most half gaps: the
+// names in a constant array (a global), and `(value - lo) <u len ? names[…] :
+// "?"`. A few bytes a variant, and no comparisons.
+mem name_table_lo: I32 = [0];
+
+// The number of values from the lowest variant's to the highest's, when the
+// names are a table (their lowest in name_table_lo); 0 when not.
+fn name_table_span(decl: I32) I32 {
+    let n = 0;
+    let lo = 0;
+    let hi = 0;
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) {
+            let v = variant_value[node_decl[first_child(c)]];
+            if n == 0 or v < lo { lo = v; };
+            if n == 0 or v > hi { hi = v; };
+            n += 1;
+        };
+        c = next_sibling(c);
+    };
+    let span = hi - lo + 1;
+    name_table_lo[0] = lo;
+    if n < 4 or span > n * 2 or span <= 0 { 0; } else { span; };
+}
+
+// Function f's body: the table's look-up, with its one local.
+fn enum_name_table(decl: I32, f: I32) void {
+    let span = name_table_span(decl);
+    let lo = name_table_lo[0];
+    let h = array_type(vt_extern, false);
+    let unknown = intern_text("?");
+    let mt = w_mark();
+    for (0 ..< span) |k| {
+        let name = unknown;
+        let v = first_child(decl_node[decl]);
+        while (v >= 0) {
+            if is_kind(v, Node.Variant) and variant_value[node_decl[first_child(v)]] == lo + k { name = decl_name[node_decl[first_child(v)]]; };
+            v = next_sibling(v);
+        };
+        text_constant(name);
+    };
+    w_node(Op.ArrayNewFixed, vt_ref(h, false), h, 0, mt);
+    let table = add_global(vt_ref(h, false), false, w_pop());
+    // at = value - lo; if at <u len { names[at] } else { "?" }
+    let m = w_mark();
+    let mc = w_mark();
+    let ma = w_mark();
+    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_i32(lo);
+    w_node(Op.Plain, vt_i32, 107, 0, ma);
+    w_node(Op.LocalTee, vt_i32, 1, 0, ma);
+    w_i32(span);
+    w_node(Op.Plain, vt_i32, 73, 0, mc);
+    let mt2 = w_mark();
+    let mg = w_mark();
+    w_leaf(Op.GlobalGet, vt_ref(h, false), table, 0);
+    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_node(Op.ArrayGet, vt_extern, h, 0, mg);
+    w_node(Op.Seq, vt_extern, 0, 0, mt2);
+    let me = w_mark();
+    text_constant(unknown);
+    w_node(Op.Seq, vt_extern, 0, 0, me);
+    w_node(Op.If, vt_extern, new_label(), 0, m);
+    func_body[f] = w_pop();
 }
 
 // A string constant whose text is word `word`.
