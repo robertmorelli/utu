@@ -1,8 +1,9 @@
 // `bun run test`: the compiler suite in both debug modes, the wasm
 // fingerprints at every optimization level, what every program does when run
 // (the run differential, at -Oz), the behavior fingerprints (diagnostics,
-// editor queries, graphs), utu's parser against tree-sitter, and the tool
-// tests, all at once. Each command's output prints when it finishes.
+// editor queries, graphs), utu's parser against tree-sitter, the self-hosted
+// lexer against stage 0, and the tool tests, all at once. Each command's
+// output prints when it finishes.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,7 @@ const commands = [
   ['node', './scripts/run-differential.mjs', '--optimize=size'],
   ['node', './scripts/behavior-fingerprints.mjs'],
   ['node', './scripts/syntax-differential.mjs', '--fuzz=10'],
+  ['node', './scripts/selfhost-lexer-differential.mjs', '--fuzz=20'],
   ['node', './scripts/test-source-warnings.mjs'],
   ['node', './scripts/test-query-features.mjs'],
   ['node', './scripts/test-wutu-stencils.mjs'],

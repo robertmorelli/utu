@@ -1,0 +1,377 @@
+// The utu lexer, in utu: source bytes in, tokens out.
+//
+// One pass over `src` (UTF-8) writes each token's kind and byte span into
+// three mems. The lexer does not know the grammar: every word is a `Word`
+// (the parser decides which are keywords, which are identifiers, and which
+// are type names), and the parser joins `std` `:` `Str` into a platform
+// path. Two operators exist only after an expression, `-o` (pipe) and `?.`
+// (optional field); the token before them says whether one has ended.
+//
+// Comments are tokens, so the parser can attach them to the tree.
+// The JavaScript compiler's parser is the reference: for every program it
+// accepts, these tokens are exactly the leaves of its syntax tree
+// (scripts/selfhost-lexer-differential.mjs).
+
+enum(U8) Tok:
+    | End
+    | Error
+    | Word
+    | Int
+    | Float
+    | String
+    | MultilineLine
+    | DslBody
+    | Comment
+    | LParen
+    | RParen
+    | LBrace
+    | RBrace
+    | LBracket
+    | RBracket
+    | Comma
+    | Semi
+    | Colon
+    | At
+    | Dot
+    | DotDotDot
+    | DotDotLt
+    | Pipe
+    | PipeEq
+    | Amp
+    | AmpEq
+    | Caret
+    | CaretEq
+    | Star
+    | StarEq
+    | Slash
+    | SlashEq
+    | Percent
+    | PercentEq
+    | Plus
+    | PlusEq
+    | Minus
+    | MinusEq
+    | MinusO
+    | Lt
+    | LtEq
+    | Shl
+    | ShlEq
+    | Gt
+    | GtEq
+    | Shr
+    | ShrEq
+    | Shr3
+    | Shr3Eq
+    | Eq
+    | EqEq
+    | FatArrow
+    | BangEq
+    | Question
+    | QuestionDot
+    | Tilde
+    | TildeArrow
+
+export mem src: U8;
+export mem tok_kind: U8;
+export mem tok_start: I32;
+export mem tok_end: I32;
+
+// ── Characters ───────────────────────────────────────────────────────────────
+
+fn is_digit(c: I32) Bool { c >= 48 and c <= 57; }
+
+fn is_word_start(c: I32) Bool {
+    (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c == 95;
+}
+
+fn is_word_char(c: I32) Bool { is_word_start(c) or is_digit(c); }
+
+fn is_hex(c: I32) Bool { is_digit(c) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70); }
+
+// The byte at `i`, or -1 past the end (`n` bytes).
+fn at(i: I32, n: I32) I32 {
+    if i < n { src[i]; } else { -1; };
+}
+
+// The length of the whitespace at `i`, or 0: JavaScript's `\s`, which is
+// what the grammar skips. ASCII tab through carriage return and space, and
+// the UTF-8 encodings of no-break space, ogham space mark, the en quad
+// through hair space, the line and paragraph separators, narrow no-break
+// space, medium mathematical space, ideographic space, and the byte order mark.
+fn space_at(i: I32, n: I32) I32 {
+    let c = at(i, n);
+    if c == 32 or (c >= 9 and c <= 13) { return 1; };
+    let b = at(i + 1, n);
+    let d = at(i + 2, n);
+    if c == 194 and b == 160 { return 2; };
+    if c == 225 and b == 154 and d == 128 { return 3; };
+    if c == 226 and b == 128 and ((d >= 128 and d <= 138) or d == 168 or d == 169 or d == 175) { return 3; };
+    if c == 226 and b == 129 and d == 159 { return 3; };
+    if c == 227 and b == 128 and d == 128 { return 3; };
+    if c == 239 and b == 187 and d == 191 { return 3; };
+    0;
+}
+
+// ── Tokens ───────────────────────────────────────────────────────────────────
+
+fn push(kind: Tok, start: I32, end_: I32) void {
+    tok_kind.push(kind.to_i32());
+    tok_start.push(start);
+    tok_end.push(end_);
+}
+
+// Whether the word src[start..end) is `text`.
+fn word_is(start: I32, end_: I32, text: Str) Bool {
+    if end_ - start != text.len() { return false; };
+    for (0 ..< text.len()) |k| {
+        if src[start + k] != text.get(k) { return false; };
+    };
+    true;
+}
+
+// Words after which an expression or a type begins, so a `-o`, `?.`, or
+// compound assignment cannot follow them: the keywords that begin an
+// expression (elsewhere they are identifiers: `x -o in` pipes to `in`), the
+// keyword operators, `else`, and `type` (`type &= …` declares the self type).
+fn begins_expression(start: I32, end_: I32) Bool {
+    word_is(start, end_, "if") or word_is(start, end_, "else") or word_is(start, end_, "match")
+        or word_is(start, end_, "loop") or word_is(start, end_, "alt") or word_is(start, end_, "promote")
+        or word_is(start, end_, "try") or word_is(start, end_, "for") or word_is(start, end_, "while")
+        or word_is(start, end_, "break") or word_is(start, end_, "continue") or word_is(start, end_, "defer")
+        or word_is(start, end_, "yield") or word_is(start, end_, "return") or word_is(start, end_, "let")
+        or word_is(start, end_, "cl") or word_is(start, end_, "new") or word_is(start, end_, "await")
+        or word_is(start, end_, "assert") or word_is(start, end_, "not") or word_is(start, end_, "and")
+        or word_is(start, end_, "or") or word_is(start, end_, "xor") or word_is(start, end_, "orelse")
+        or word_is(start, end_, "type");
+}
+
+// The end of the number at `i`: `1.5e-3` is a float, `0x1f`, `0b101`, `15` ints.
+fn number_end(i: I32, n: I32) I32 {
+    let j = i;
+    while (is_digit(at(j, n))) { j += 1; };
+    if at(j, n) == 46 and is_digit(at(j + 1, n)) {
+        j += 1;
+        while (is_digit(at(j, n))) { j += 1; };
+        let e = at(j, n);
+        if e == 101 or e == 69 {
+            let k = j + 1;
+            let sign = at(k, n);
+            if sign == 43 or sign == 45 { k += 1; };
+            if is_digit(at(k, n)) {
+                while (is_digit(at(k, n))) { k += 1; };
+                j = k;
+            };
+        };
+        return j;
+    };
+    if src[i] == 48 and at(i + 1, n) == 120 and is_hex(at(i + 2, n)) {
+        j = i + 2;
+        while (is_hex(at(j, n))) { j += 1; };
+        return j;
+    };
+    if src[i] == 48 and at(i + 1, n) == 98 and (at(i + 2, n) == 48 or at(i + 2, n) == 49) {
+        j = i + 2;
+        while (at(j, n) == 48 or at(j, n) == 49) { j += 1; };
+        return j;
+    };
+    j;
+}
+
+fn is_float(start: I32, end_: I32) Bool {
+    for (start ..< end_) |k| { if src[k] == 46 { return true; }; };
+    false;
+}
+
+// The end of the string literal at `i` (a `"`), or -1 when it is not closed on its line.
+fn string_end(i: I32, n: I32) I32 {
+    let j = i + 1;
+    while (j < n) {
+        let c = src[j];
+        if c == 34 { return j + 1; };
+        if c == 10 { return -1; };
+        if c == 92 {
+            if j + 1 >= n or src[j + 1] == 10 { return -1; };
+            j += 2;
+        } else {
+            j += 1;
+        };
+    };
+    -1;
+}
+
+// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
+fn dsl_end(i: I32, n: I32) I32 {
+    let j = i + 2;
+    let depth = 1;
+    while (j < n) {
+        let c = src[j];
+        j += 1;
+        if c == 47 and at(j, n) == 92 {
+            depth += 1;
+            j += 1;
+        } else if c == 92 and at(j, n) == 47 {
+            j += 1;
+            depth -= 1;
+            if depth == 0 { return j; };
+        };
+    };
+    -1;
+}
+
+fn line_end(i: I32, n: I32) I32 {
+    let j = i;
+    while (j < n and src[j] != 10) { j += 1; };
+    j;
+}
+
+// Punctuation at `i`: its kind and length. `after` says whether an expression just ended.
+fn punct(i: I32, n: I32, after: Bool) .{Tok, I32} {
+    let c = src[i];
+    let b = at(i + 1, n);
+    let d = at(i + 2, n);
+    if c == 40 { return .{Tok.LParen, 1}; };
+    if c == 41 { return .{Tok.RParen, 1}; };
+    if c == 123 { return .{Tok.LBrace, 1}; };
+    if c == 125 { return .{Tok.RBrace, 1}; };
+    if c == 91 { return .{Tok.LBracket, 1}; };
+    if c == 93 { return .{Tok.RBracket, 1}; };
+    if c == 44 { return .{Tok.Comma, 1}; };
+    if c == 59 { return .{Tok.Semi, 1}; };
+    if c == 58 { return .{Tok.Colon, 1}; };
+    if c == 64 { return .{Tok.At, 1}; };
+    if c == 46 {
+        if b == 46 and d == 46 { return .{Tok.DotDotDot, 3}; };
+        if b == 46 and d == 60 { return .{Tok.DotDotLt, 3}; };
+        return .{Tok.Dot, 1};
+    };
+    // A compound assignment follows its target (`type & = …` is the self type
+    // and `=`), and is never followed by `>` (`|x|=> …` closes a capture).
+    let assigns = after and d != 62;
+    if c == 124 { if assigns and b == 61 { return .{Tok.PipeEq, 2}; }; return .{Tok.Pipe, 1}; };
+    if c == 38 { if assigns and b == 61 { return .{Tok.AmpEq, 2}; }; return .{Tok.Amp, 1}; };
+    if c == 94 { if assigns and b == 61 { return .{Tok.CaretEq, 2}; }; return .{Tok.Caret, 1}; };
+    if c == 42 { if assigns and b == 61 { return .{Tok.StarEq, 2}; }; return .{Tok.Star, 1}; };
+    if c == 47 { if assigns and b == 61 { return .{Tok.SlashEq, 2}; }; return .{Tok.Slash, 1}; };
+    if c == 37 { if assigns and b == 61 { return .{Tok.PercentEq, 2}; }; return .{Tok.Percent, 1}; };
+    if c == 43 { if assigns and b == 61 { return .{Tok.PlusEq, 2}; }; return .{Tok.Plus, 1}; };
+    if c == 45 {
+        if after and b == 111 { return .{Tok.MinusO, 2}; };
+        if assigns and b == 61 { return .{Tok.MinusEq, 2}; };
+        return .{Tok.Minus, 1};
+    };
+    if c == 60 {
+        if after and b == 60 and d == 61 { return .{Tok.ShlEq, 3}; };
+        if b == 60 { return .{Tok.Shl, 2}; };
+        if b == 61 { return .{Tok.LtEq, 2}; };
+        return .{Tok.Lt, 1};
+    };
+    if c == 62 {
+        if after and b == 62 and d == 62 and at(i + 3, n) == 61 { return .{Tok.Shr3Eq, 4}; };
+        if b == 62 and d == 62 { return .{Tok.Shr3, 3}; };
+        if after and b == 62 and d == 61 { return .{Tok.ShrEq, 3}; };
+        if b == 62 { return .{Tok.Shr, 2}; };
+        if b == 61 { return .{Tok.GtEq, 2}; };
+        return .{Tok.Gt, 1};
+    };
+    if c == 61 {
+        if b == 62 { return .{Tok.FatArrow, 2}; };
+        if b == 61 { return .{Tok.EqEq, 2}; };
+        return .{Tok.Eq, 1};
+    };
+    if c == 33 and b == 61 { return .{Tok.BangEq, 2}; };
+    if c == 63 {
+        // `?.{I32}` after a parameter list is a nullable tuple type, not a field access.
+        if after and b == 46 and d != 123 { return .{Tok.QuestionDot, 2}; };
+        return .{Tok.Question, 1};
+    };
+    if c == 126 { if b == 62 { return .{Tok.TildeArrow, 2}; }; return .{Tok.Tilde, 1}; };
+    .{Tok.Error, 0};
+}
+
+// Lex the `n` bytes of `src`. Returns the number of tokens, the last of them
+// `End`, or `Error` (at the offending byte) when the source has a byte no
+// token can start with, or a string or DSL body that does not close.
+fn lex(n: I32) I32 {
+    tok_kind.clear();
+    tok_start.clear();
+    tok_end.clear();
+    let i = 0;
+    // Whether the last token (not a comment) ended an expression.
+    let after = false;
+    while (i < n) {
+        let space = space_at(i, n);
+        if space > 0 {
+            i += space;
+            continue;
+        };
+        let c = src[i];
+        let b = at(i + 1, n);
+        if c == 47 and b == 47 {
+            let j = line_end(i, n);
+            push(Tok.Comment, i, j);
+            i = j;
+            continue;
+        };
+        if c == 92 and b == 92 {
+            let j = line_end(i, n);
+            push(Tok.MultilineLine, i, j);
+            i = j;
+            after = true;
+            continue;
+        };
+        if c == 47 and b == 92 {
+            let j = dsl_end(i, n);
+            if j < 0 {
+                push(Tok.Error, i, i);
+                return tok_kind.len();
+            };
+            push(Tok.DslBody, i, j);
+            i = j;
+            after = true;
+            continue;
+        };
+        if is_word_start(c) {
+            let j = i + 1;
+            while (is_word_char(at(j, n))) { j += 1; };
+            push(Tok.Word, i, j);
+            after = not begins_expression(i, j);
+            i = j;
+            continue;
+        };
+        if is_digit(c) {
+            let j = number_end(i, n);
+            push(if is_float(i, j) { Tok.Float; } else { Tok.Int; }, i, j);
+            i = j;
+            after = true;
+            continue;
+        };
+        if c == 34 {
+            let j = string_end(i, n);
+            if j < 0 {
+                push(Tok.Error, i, i);
+                return tok_kind.len();
+            };
+            push(Tok.String, i, j);
+            i = j;
+            after = true;
+            continue;
+        };
+        let .{kind, length} = punct(i, n, after);
+        if length == 0 {
+            push(Tok.Error, i, i);
+            return tok_kind.len();
+        };
+        push(kind, i, i + length);
+        i += length;
+        after = kind == Tok.RParen or kind == Tok.RBracket or kind == Tok.RBrace;
+    };
+    push(Tok.End, n, n);
+    tok_kind.len();
+}
+
+export lib {
+    // Make room for `n` source bytes, which the host then writes into `src`.
+    fn source(n: I32) void { src.resize(n); }
+
+    fn tokens(n: I32) I32 { lex(n); }
+}
