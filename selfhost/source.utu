@@ -51,6 +51,7 @@ fn reset_program() void {
     jp_serial[0] = 0;
     st_serial[0] = 0;
     node_parent.clear();
+    dsl_cursor[0] = -1;
     splice_start.clear();
     splice_end.clear();
     splice_code.clear();

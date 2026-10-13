@@ -130,18 +130,40 @@ export async function loadProgram(utu, entry, host) {
   return files;
 }
 
-// The JSON of a declaration ABI's types, made once per document: std:JS and
-// std:Browser are views of one, and share it.
-const typesText = new WeakMap();
+// A declaration ABI's types as JSON bytes, and where each type starts in
+// them, made once per document (std:JS and std:Browser are views of one,
+// and share it). The compiler reads only the types a program uses.
+const typesJson = new WeakMap();
+
+function typesDocument(types) {
+  let made = typesJson.get(types);
+  if (!made) {
+    const parts = types.map(type => encoder.encode(JSON.stringify(type)));
+    const offsets = new Int32Array(parts.length);
+    const bytes = new Uint8Array(parts.reduce((n, part) => n + part.length + 1, 1));
+    let at = 0;
+    bytes[at++] = 0x5b;  // [
+    parts.forEach((part, k) => {
+      if (k > 0) bytes[at++] = 0x2c;  // ,
+      offsets[k] = at;
+      bytes.set(part, at);
+      at += part.length;
+    });
+    bytes[at++] = 0x5d;  // ]
+    made = { bytes: bytes.subarray(0, at), offsets };
+    typesJson.set(types, made);
+  }
+  return made;
+}
 
 /** Each host declaration document once, then each import's view of one. */
 async function loadForeign(utu, foreign, { stdlib, resolvePackage }) {
-  const write = text => {
-    const bytes = encoder.encode(text);
+  const writeBytes = bytes => {
     const at = utu.abi_room(bytes.length);
     new Uint8Array(utu.src.buffer).set(bytes, at);
     return at;
   };
+  const write = text => writeBytes(encoder.encode(text));
   const docs = new Map();
   for (const { i, raw, from, name } of foreign) {
     let abi;
@@ -154,8 +176,11 @@ async function loadForeign(utu, foreign, { stdlib, resolvePackage }) {
       continue;
     }
     if (!docs.has(abi.types)) {
-      if (!typesText.has(abi.types)) typesText.set(abi.types, JSON.stringify(abi.types));
-      docs.set(abi.types, utu.abi_doc(write(typesText.get(abi.types))));
+      const { bytes, offsets } = typesDocument(abi.types);
+      const at = writeBytes(bytes);
+      utu.abi_offsets_room(offsets.length);
+      new Int32Array(utu.abi_offsets.buffer, 0, offsets.length).set(offsets);
+      docs.set(abi.types, utu.abi_doc_at(at, offsets.length));
     }
     const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
     utu.abi_view(i, docs.get(abi.types), write(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals })));

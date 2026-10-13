@@ -48,6 +48,13 @@ export lib {
 
     fn abi_doc(at: I32) I32 { abi_add_doc(at); }
 
+    // The same, with where each type is (byte offsets from `at`, `n` of
+    // them, in abi_offsets after abi_offsets_room(n)): the document is then
+    // read only where it is used.
+    fn abi_offsets_room(n: I32) void { abi_offsets.resize(n); }
+
+    fn abi_doc_at(at: I32, n: I32) I32 { abi_add_doc_at(at, n); }
+
     fn abi_view(i: I32, doc: I32, at: I32) I32 {
         import_target[i] = -2;
         abi_add_view(i, doc, at);

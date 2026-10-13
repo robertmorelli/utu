@@ -359,21 +359,32 @@ fn validate_await(node: I32) void {
 // ── Parents ──
 //
 // The tree records children, not parents; validation and checking ask for
-// a node's parent now and then, so they are computed once.
+// a node's parent now and then, so they are computed as nodes are added:
+// a new node's children are new, and where a graft hangs a node somewhere
+// else, it says so (set_parent).
 
 mem node_parent: I32;
 
 fn parent_of(node: I32) I32 {
-    if node_parent.len() != node_kind.len() {
-        node_parent.resize(node_kind.len());
-        for (0 ..< node_kind.len()) |n| { node_parent[n] = -1; };
-        for (0 ..< node_kind.len()) |n| {
-            let c = node_child[n];
+    let n = node_kind.len();
+    let old = node_parent.len();
+    if old > n { node_parent.resize(n); }
+    else if old < n {
+        node_parent.resize(n);
+        for (old ..< n) |k| { node_parent[k] = -1; };
+        for (old ..< n) |k| {
+            let c = node_child[k];
             while (c >= 0) {
-                node_parent[c] = n;
+                node_parent[c] = k;
                 c = node_next[c];
             };
         };
     };
     node_parent[node];
+}
+
+// Node `child` is now under `parent`.
+fn set_parent(child: I32, parent: I32) void {
+    parent_of(child);
+    node_parent[child] = parent;
 }

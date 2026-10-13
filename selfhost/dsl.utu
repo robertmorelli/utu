@@ -154,10 +154,50 @@ fn report_dsl_error(site: I32) void {
 }
 
 // Where offset `offset` (in code units) of a site's body is in src (in bytes).
+// The byte of a UTF-16 offset in site's body, and the UTF-16 offset of a
+// byte: walked over the body's bytes, from the last answer when it is
+// before (expansions ask in order), so a body is read once, not per ask.
+mem dsl_cursor: I32 = [-1, 0, 0];   // site, byte, UTF-16 offset
+
 fn dsl_byte(site: I32, offset: I32) I32 {
-    let body = dsl_body(site);
-    dsl_inner_start(site) + utf8_length(body.slice(0, if offset < body.len() { offset; } else { body.len(); }));
+    let b = dsl_inner_start(site);
+    let u = 0;
+    if dsl_cursor[0] == site and dsl_cursor[2] <= offset {
+        b = dsl_cursor[1];
+        u = dsl_cursor[2];
+    };
+    let end_ = dsl_inner_end(site);
+    while (b < end_ and u < offset) {
+        let n = utf8_size(src[b]);
+        u += if n == 4 { 2; } else { 1; };
+        b += n;
+    };
+    dsl_cursor[0] = site;
+    dsl_cursor[1] = b;
+    dsl_cursor[2] = u;
+    b;
 }
+
+fn dsl_units(site: I32, at: I32) I32 {
+    let b = dsl_inner_start(site);
+    let u = 0;
+    if dsl_cursor[0] == site and dsl_cursor[1] <= at {
+        b = dsl_cursor[1];
+        u = dsl_cursor[2];
+    };
+    while (b < at) {
+        let n = utf8_size(src[b]);
+        u += if n == 4 { 2; } else { 1; };
+        b += n;
+    };
+    dsl_cursor[0] = site;
+    dsl_cursor[1] = b;
+    dsl_cursor[2] = u;
+    u;
+}
+
+// The length of the UTF-8 sequence a lead byte starts.
+fn utf8_size(b: I32) I32 { if b < 128 { 1; } else if b < 224 { 2; } else if b < 240 { 3; } else { 4; }; }
 
 // ── Grafting ──
 //
@@ -191,9 +231,8 @@ fn graft_expression(site: I32, code: Str) void {
     node_kind[site] = Node.Paren_expr.to_i32();
     node_child[site] = expr;
     node_next[expr] = -1;
+    set_parent(expr, site);
     fill_splices(expr);
-    // The tree changed: parents are found again.
-    node_parent.clear();
 }
 
 // Parse declarations and make them the container's first items.
@@ -215,7 +254,12 @@ fn graft_declarations(container: I32, code: Str) void {
         node_next[last] = node_child[container];
         node_child[container] = first;
     };
-    node_parent.clear();
+    let item = first;
+    while (item >= 0) {
+        set_parent(item, container);
+        if item == last { break; };
+        item = node_next[item];
+    };
 }
 
 // A generated file of `code`, parsed: its root, or -1.
@@ -345,6 +389,7 @@ fn fill_splices(node: I32) void {
                 node_kind[node] = Node.Splice.to_i32();
                 node_child[node] = e;
                 node_next[e] = -1;
+                set_parent(e, node);
             };
         };
         return;

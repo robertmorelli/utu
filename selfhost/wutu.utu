@@ -216,9 +216,10 @@ fn resolve_alias(name: I32, owner: I32, offset: I32) I32 {
 fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
     if from < 0 { return source; };
     let site = wu_site[0];
-    let text = dsl_body(site).slice(from, to);
     let start = dsl_byte(site, from);
-    let e = parse_span(start, start + utf8_length(text));
+    let stop = dsl_byte(site, to);
+    let text = bytes_text(start, stop);
+    let e = parse_span(start, stop);
     if e < 0 {
         let absolute = bytes_text(file_start[file_of_token(node_first[site])], start).len();
         let shown = if source.len() > 100 { source.slice(0, 100); } else { source; };
@@ -235,7 +236,7 @@ fn rename_aliases(node: I32, root: I32, k: I32, owner: I32) void {
         let name = word_of(node);
         if not island_shadowed(node, name, root) {
             let at = tok_start[node_first[node]];
-            let offset = bytes_text(dsl_inner_start(wu_site[0]), at).len();
+            let offset = dsl_units(wu_site[0], at);
             let alias = resolve_alias(name, owner, offset);
             if alias >= 0 {
                 splice_rename_k.push(k);

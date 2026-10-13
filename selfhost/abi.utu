@@ -8,11 +8,16 @@
 //
 // Nothing is parsed into a tree: a JSON value is the offset of its first
 // byte in src, and a reference into a document is such an offset, read
-// where it is needed. The one index built is each document's type offsets.
+// where it is needed. Three indexes keep that fast on a document of
+// megabytes (std:Browser's is 7): each document's type offsets; where each
+// object and array ends (found by bisection, not by scanning it); and, for
+// a large object, its keys (hashed, built when it is first looked into).
 
 mem abi_doc_types: I32;   // by document: its first entry in abi_type_at
 mem abi_doc_count: I32;   // by document: its number of types
 mem abi_type_at: I32;     // each type's JSON object, by document, in order
+mem abi_type_ready: U8;   // by entry of abi_type_at: 1 once its containers are indexed
+export mem abi_offsets: I32;   // where the host says a document's types are
 
 mem view_doc: I32;        // by view: its document
 mem view_json: I32;       // by view: its JSON object
@@ -20,6 +25,15 @@ mem view_prefix: I32;     // by view: its prefix, a word (`Browser`)
 mem view_import: I32;     // by view: the import it serves
 
 fn reset_abi() void {
+    jbr_open.clear();
+    jbr_close.clear();
+    jbr_table.clear();
+    abi_type_ready.clear();
+    jk_table.clear();
+    jk_obj.clear();
+    jk_key.clear();
+    jk_val.clear();
+    jk_indexed.clear();
     abi_doc_types.clear();
     abi_doc_count.clear();
     abi_type_at.clear();
@@ -39,12 +53,14 @@ fn abi_reserve(n: I32) I32 {
 
 // A document, its `types` array at `at`: index its types.
 fn abi_add_doc(at: I32) I32 {
+    jbrackets(at);
     let doc = abi_doc_types.len();
     abi_doc_types.push(abi_type_at.len());
     let n = 0;
     let t = jfirst(at);
     while (t >= 0) {
         abi_type_at.push(t);
+        abi_type_ready.push(1);
         n += 1;
         t = jnext(t);
     };
@@ -52,8 +68,22 @@ fn abi_add_doc(at: I32) I32 {
     doc;
 }
 
+// A document whose types the host has placed (abi_offsets): each type's
+// containers are indexed when it is first used.
+fn abi_add_doc_at(at: I32, n: I32) I32 {
+    let doc = abi_doc_types.len();
+    abi_doc_types.push(abi_type_at.len());
+    for (0 ..< n) |k| {
+        abi_type_at.push(at + abi_offsets[k]);
+        abi_type_ready.push(0);
+    };
+    abi_doc_count.push(n);
+    doc;
+}
+
 // A view of document `doc`, its JSON object at `at`, for import i.
 fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
+    jbrackets(at);
     let v = view_doc.len();
     view_doc.push(doc);
     view_json.push(at);
@@ -72,7 +102,12 @@ fn view_of_import(i: I32) I32 {
 // The JSON object of type n of document doc.
 fn abi_type(doc: I32, n: I32) I32 {
     if n < 0 or n >= abi_doc_count[doc] { return -1; };
-    abi_type_at[abi_doc_types[doc] + n];
+    let k = abi_doc_types[doc] + n;
+    if abi_type_ready[k] == 0 {
+        abi_type_ready[k] = 1;
+        jbrackets(abi_type_at[k]);
+    };
+    abi_type_at[k];
 }
 
 // ── JSON ──
@@ -89,6 +124,8 @@ fn jend(at: I32) I32 {
     let c = src[at];
     if c == 34 { return jstring_end(at); };
     if c == 123 or c == 91 {
+        let known = jbr_end(at);
+        if known >= 0 { return known; };
         // An object or array: to its matching bracket, past strings.
         let depth = 0;
         let i = at;
@@ -156,6 +193,11 @@ fn jstring_is_text(at: I32, text: Str) Bool {
 // The value of key `key` in the object at `at`, or -1.
 fn jget(at: I32, key: Str) I32 {
     if at < 0 or src[at] != 123 { return -1; };
+    if jkeyed(at) {
+        let w = intern_text(key);
+        let start = src.interned_start(w);
+        return jk_find(at, start, start + src.interned_size(w));
+    };
     let k = jfirst(at);
     while (k >= 0) {
         if jstring_is_text(k, key) { return jvalue(k); };
@@ -169,6 +211,7 @@ fn jget_word(at: I32, w: I32) I32 {
     if at < 0 or src[at] != 123 { return -1; };
     let start = src.interned_start(w);
     let end_ = start + src.interned_size(w);
+    if jkeyed(at) { return jk_find(at, start, end_); };
     let k = jfirst(at);
     while (k >= 0) {
         if jstring_is(k, start, end_) { return jvalue(k); };
@@ -220,3 +263,128 @@ fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1); }
 
 // A JSON value's text, as a word: the identity of a written reference.
 fn jtext_word(at: I32) I32 { src.intern(at, jend(at)); }
+
+// ── Where containers end ──
+//
+// For each object and array of a view, and of each type used: its start,
+// and the offset after its end, hashed by its start.
+mem jbr_open: I32;
+mem jbr_close: I32;
+mem jbr_table: I32;   // open addressing: entry, or -1
+mem jbr_stack: I32;
+
+fn jbrackets(at: I32) void {
+    if not (src[at] == 123 or src[at] == 91) { return; };
+    jbr_stack.clear();
+    let i = at;
+    while (true) {
+        let b = src[i];
+        if b == 34 { i = jstring_end(i); }
+        else {
+            if b == 123 or b == 91 {
+                jbr_stack.push(i);
+            } else if b == 125 or b == 93 {
+                jbr_put(jbr_stack[jbr_stack.len() - 1], i + 1);
+                jbr_stack.resize(jbr_stack.len() - 1);
+                if jbr_stack.len() == 0 { return; };
+            };
+            i += 1;
+        };
+    };
+}
+
+fn jbr_put(start: I32, end_: I32) void {
+    if (jbr_open.len() + 1) * 2 > jbr_table.len() { jbr_grow(); };
+    let mask = jbr_table.len() - 1;
+    let h = (start * -1640531535) & mask;
+    while (jbr_table[h] >= 0) { h = (h + 1) & mask; };
+    jbr_table[h] = jbr_open.len();
+    jbr_open.push(start);
+    jbr_close.push(end_);
+}
+
+fn jbr_grow() void {
+    let n = if jbr_table.len() == 0 { 4096; } else { jbr_table.len() * 2; };
+    jbr_table.resize(n);
+    for (0 ..< n) |i| { jbr_table[i] = -1; };
+    let mask = n - 1;
+    for (0 ..< jbr_open.len()) |e| {
+        let h = (jbr_open[e] * -1640531535) & mask;
+        while (jbr_table[h] >= 0) { h = (h + 1) & mask; };
+        jbr_table[h] = e;
+    };
+}
+
+// The end of the container at `at`, or -1 when it is not indexed.
+fn jbr_end(at: I32) I32 {
+    if jbr_table.len() == 0 { return -1; };
+    let mask = jbr_table.len() - 1;
+    let h = (at * -1640531535) & mask;
+    while (jbr_table[h] >= 0) {
+        let e = jbr_table[h];
+        if jbr_open[e] == at { return jbr_close[e]; };
+        h = (h + 1) & mask;
+    };
+    -1;
+}
+
+// ── Keys of large objects ──
+//
+// An object of more than jk_large bytes (a view's exports and names) has
+// its keys hashed the first time one is looked up: (object, key) → value.
+let jk_large: I32 = 4096;
+
+mem jk_table: I32;     // open addressing: entry, or -1
+mem jk_obj: I32;       // by entry: the object
+mem jk_key: I32;       // by entry: its key (a JSON string)
+mem jk_val: I32;       // by entry: the value
+mem jk_indexed: I32;   // the objects indexed
+
+fn jkeyed(at: I32) Bool {
+    for (0 ..< jk_indexed.len()) |i| { if jk_indexed[i] == at { return true; }; };
+    if jbr_end(at) < 0 or jend(at) - at <= jk_large { return false; };
+    jk_indexed.push(at);
+    let k = jfirst(at);
+    while (k >= 0) {
+        if (jk_obj.len() + 1) * 2 > jk_table.len() { jk_grow(); };
+        let mask = jk_table.len() - 1;
+        let h = jk_hash(at, k + 1, jstring_end(k) - 1) & mask;
+        while (jk_table[h] >= 0) { h = (h + 1) & mask; };
+        jk_table[h] = jk_obj.len();
+        jk_obj.push(at);
+        jk_key.push(k);
+        jk_val.push(jvalue(k));
+        k = jnext(k);
+    };
+    true;
+}
+
+fn jk_hash(obj: I32, start: I32, end_: I32) I32 {
+    let h = -2128831035 ^ obj;
+    for (start ..< end_) |i| { h = (h ^ src[i]) * 16777619; };
+    h;
+}
+
+fn jk_grow() void {
+    let n = if jk_table.len() == 0 { 1024; } else { jk_table.len() * 2; };
+    jk_table.resize(n);
+    for (0 ..< n) |i| { jk_table[i] = -1; };
+    let mask = n - 1;
+    for (0 ..< jk_obj.len()) |e| {
+        let h = jk_hash(jk_obj[e], jk_key[e] + 1, jstring_end(jk_key[e]) - 1) & mask;
+        while (jk_table[h] >= 0) { h = (h + 1) & mask; };
+        jk_table[h] = e;
+    };
+}
+
+// The value of key src[start ..< end_] in indexed object `obj`, or -1.
+fn jk_find(obj: I32, start: I32, end_: I32) I32 {
+    let mask = jk_table.len() - 1;
+    let h = jk_hash(obj, start, end_) & mask;
+    while (jk_table[h] >= 0) {
+        let e = jk_table[h];
+        if jk_obj[e] == obj and jstring_is(jk_key[e], start, end_) { return jk_val[e]; };
+        h = (h + 1) & mask;
+    };
+    -1;
+}
