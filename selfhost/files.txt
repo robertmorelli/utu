@@ -8,6 +8,7 @@ gen.utu
 types.utu
 ir.utu
 wasm.utu
+optimize.utu
 validate.utu
 check.utu
 control.utu

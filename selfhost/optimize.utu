@@ -1,0 +1,262 @@
+// ── Local cleanup ────────────────────────────────────────────────────────────
+//
+// Stage 0's wasm/optimize.js, for size and speed builds. Lowerings leave
+// copies and temporaries a hand-written program would not have (a
+// generator's parameters bound to the call's arguments, each `yield`'s value
+// held for the consumer). Three rewrites remove them, in each function:
+//
+//   copies       a local set once, to a parameter never assigned, is that
+//                parameter: its reads read the parameter
+//   temporaries  a local set once to a pure value and read once in the next
+//                statement, outside any loop and before anything assigns
+//                what the value reads, is that value: it moves to the read
+//   unused       a local never read is not stored (its value is kept, and
+//                dropped, when it has effects), and is no longer declared
+//
+// So a consumed generator compiles to what the equivalent loop compiles to.
+// Every local codegen makes is set before it is read, which is what makes
+// the first two sound. Nodes are rewritten in place: a store removed is an
+// empty Seq, which emits nothing.
+
+// The function's nodes, in walk order, each with its parent and its place there.
+mem opt_nodes: I32;
+mem opt_parent: I32;
+mem opt_place: I32;
+mem opt_refs: I32;     // by node: how many places in the live bodies hold it
+mem opt_gets: I32;     // by local: its reads
+mem opt_sets: I32;     // by local: its writes
+mem opt_get_at: I32;   // by local: the position (in opt_nodes) of a read
+mem opt_set_at: I32;   // by local: the position of a write
+mem opt_reads: I32;    // the locals a value being sunk reads
+
+fn optimize_module() void {
+    // A node held in two places (in one body or two) is rewritten for both,
+    // so a body with one is left as it is.
+    opt_refs.resize(w_op.len());
+    for (0 ..< w_op.len()) |n| { opt_refs[n] = 0; };
+    for (0 ..< func_kind.len()) |f| {
+        if optimizable(f) {
+            opt_collect(f, vl_len[ht_a[func_type_of[f]]] + func_local_count[f]);
+            for (0 ..< opt_nodes.len()) |k| { opt_refs[opt_nodes[k]] += 1; };
+        };
+    };
+    for (0 ..< func_kind.len()) |f| { if optimizable(f) { optimize_function(f); }; };
+}
+
+fn optimizable(f: I32) Bool { func_kind[f] == FuncKind.Defined.to_i32() and func_live[f] == 1 and func_body[f] >= 0; }
+
+fn optimize_function(f: I32) void {
+    let params = vl_len[ht_a[func_type_of[f]]];
+    let total = params + func_local_count[f];
+    opt_collect(f, total);
+    for (0 ..< opt_nodes.len()) |k| { if opt_refs[opt_nodes[k]] != 1 { return; }; };
+    while (propagate_copies(f, params) or sink_temporaries(params)) { opt_collect(f, total); };
+    remove_unused_locals(f, params, total);
+}
+
+// Walk the body, noting each node's parent, and each local's reads and writes.
+fn opt_collect(f: I32, total: I32) void {
+    opt_nodes.clear();
+    opt_parent.clear();
+    opt_place.clear();
+    opt_gets.resize(total);
+    opt_sets.resize(total);
+    opt_get_at.resize(total);
+    opt_set_at.resize(total);
+    for (0 ..< total) |l| {
+        opt_gets[l] = 0;
+        opt_sets[l] = 0;
+    };
+    opt_nodes.push(func_body[f]);
+    opt_parent.push(-1);
+    opt_place.push(-1);
+    let k = 0;
+    while (k < opt_nodes.len()) {
+        let node = opt_nodes[k];
+        let op = w_op[node];
+        if op == Op.LocalGet.to_i32() {
+            opt_gets[w_a[node]] += 1;
+            opt_get_at[w_a[node]] = k;
+        } else if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+            opt_sets[w_a[node]] += 1;
+            opt_set_at[w_a[node]] = k;
+        };
+        for (0 ..< w_count[node]) |i| {
+            opt_nodes.push(w_kid(node, i));
+            opt_parent.push(node);
+            opt_place.push(i);
+        };
+        k += 1;
+    };
+}
+
+// Computes a value without effects or traps, reading at most locals.
+fn opt_pure(node: I32) Bool {
+    let op = w_op[node];
+    if op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32() or op == Op.F64Const.to_i32()
+        or op == Op.LocalGet.to_i32() or op == Op.RefNull.to_i32() or op == Op.RefFunc.to_i32() or op == Op.Nop.to_i32() {
+        return true;
+    };
+    // An immutable field of a reference that cannot be null (a closure's
+    // capture, from its environment) neither traps nor changes.
+    let immutable_read = (op == Op.StructGet.to_i32() or op == Op.StructGetS.to_i32() or op == Op.StructGetU.to_i32())
+        and ht_fields[ht_a[w_a[node]] + w_b[node] * 2 + 1] == 0 and non_null(w_type[w_kid(node, 0)]);
+    let ok = op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefI31.to_i32() or op == Op.I31GetS.to_i32()
+        or op == Op.I31GetU.to_i32() or op == Op.Select.to_i32() or (op == Op.Plain.to_i32() and pure_opcode(w_a[node])) or immutable_read;
+    if not ok { return false; };
+    for (0 ..< w_count[node]) |i| { if not opt_pure(w_kid(node, i)) { return false; }; };
+    true;
+}
+
+// A numeric instruction that cannot trap (not a division, remainder, or
+// float-to-integer truncation).
+fn pure_opcode(code: I32) Bool {
+    if code < 69 or code > 196 { return false; };
+    if code >= 109 and code <= 112 { return false; };
+    if code >= 127 and code <= 130 { return false; };
+    if code >= 168 and code <= 171 { return false; };
+    if code >= 174 and code <= 177 { return false; };
+    true;
+}
+
+fn non_null(vt: I32) Bool { vt == vt_extern or (vt >= vt_defined and vt < vt_tuple and (vt - vt_defined) % 2 == 1); }
+
+fn single_value(vt: I32) Bool { vt != vt_none and vt != vt_unreachable and vt < vt_tuple; }
+
+fn set_kid(parent: I32, place: I32, node: I32) void { w_kids[w_first[parent] + place] = node; }
+
+// Make node `n` emit nothing.
+fn opt_erase(n: I32) void {
+    w_op[n] = Op.Seq.to_i32();
+    w_type[n] = vt_none;
+    w_count[n] = 0;
+}
+
+fn propagate_copies(f: I32, params: I32) Bool {
+    let changed = false;
+    for (params ..< opt_gets.len()) |l| {
+        if opt_sets[l] == 1 {
+            let write = opt_nodes[opt_set_at[l]];
+            let source = if w_count[write] == 1 { w_kid(write, 0); } else { -1; };
+            if w_op[write] == Op.LocalSet.to_i32() and source >= 0 and w_op[source] == Op.LocalGet.to_i32()
+                and w_a[source] < params and opt_sets[w_a[source]] == 0 and single_value(w_type[source]) {
+                for (0 ..< opt_nodes.len()) |k| {
+                    let n = opt_nodes[k];
+                    if w_op[n] == Op.LocalGet.to_i32() and w_a[n] == l and n != source {
+                        w_a[n] = w_a[source];
+                        w_type[n] = w_type[source];
+                        changed = true;
+                    };
+                };
+            };
+        };
+    };
+    changed;
+}
+
+fn sink_temporaries(params: I32) Bool {
+    let changed = false;
+    for (0 ..< opt_nodes.len()) |k| {
+        let block = opt_nodes[k];
+        let op = w_op[block];
+        if op == Op.Seq.to_i32() or op == Op.Block.to_i32() {
+            let i = 0;
+            while (i + 1 < w_count[block]) {
+                let write = w_kid(block, i);
+                let l = w_a[write];
+                if w_op[write] == Op.LocalSet.to_i32() and w_count[write] == 1 and l >= params and opt_sets[l] == 1 and opt_gets[l] == 1 {
+                    let value = w_kid(write, 0);
+                    let at = opt_get_at[l];
+                    let read = opt_nodes[at];
+                    if opt_pure(value) and single_value(w_type[value]) and opt_parent[at] >= 0 {
+                        opt_reads.clear();
+                        reads_of(value);
+                        if sink_visit(w_kid(block, i + 1), read, false) == 1 {
+                            set_kid(opt_parent[at], opt_place[at], value);
+                            opt_erase(write);
+                            opt_gets[l] = 0;
+                            opt_sets[l] = 0;
+                            changed = true;
+                            // The value's own read (if it is one) now sits where the sunk read was.
+                            if w_op[value] == Op.LocalGet.to_i32() and opt_gets[w_a[value]] == 1 {
+                                let v = opt_get_at[w_a[value]];
+                                opt_parent[v] = opt_parent[at];
+                                opt_place[v] = opt_place[at];
+                            };
+                        };
+                    };
+                };
+                i += 1;
+            };
+        };
+    };
+    changed;
+}
+
+fn reads_of(node: I32) void {
+    if w_op[node] == Op.LocalGet.to_i32() { opt_reads.push(w_a[node]); };
+    for (0 ..< w_count[node]) |i| { reads_of(w_kid(node, i)); };
+}
+
+// Whether `target` is reached in `node` (1) before anything assigns a local
+// the value reads, and not inside a loop (where the value would be computed
+// each time round); 2 when it cannot be, 0 when it is not there.
+fn sink_visit(node: I32, target: I32, in_loop: Bool) I32 {
+    if node == target { return if in_loop { 2; } else { 1; }; };
+    let looping = in_loop or w_op[node] == Op.Loop.to_i32();
+    for (0 ..< w_count[node]) |i| {
+        let r = sink_visit(w_kid(node, i), target, looping);
+        if r != 0 { return r; };
+    };
+    let op = w_op[node];
+    if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        for (0 ..< opt_reads.len()) |i| { if opt_reads[i] == w_a[node] { return 2; }; };
+    };
+    0;
+}
+
+fn remove_unused_locals(f: I32, params: I32, total: I32) void {
+    for (0 ..< opt_nodes.len()) |k| {
+        let n = opt_nodes[k];
+        let op = w_op[n];
+        if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
+            // A store with no operand takes its value from the stack (a
+            // multi-value result, taken apart): it is dropped there.
+            if w_count[n] == 0 {
+                // (A tee would leave it there: it is nothing.)
+                if op == Op.LocalTee.to_i32() { opt_erase(n); } else { w_op[n] = Op.Drop.to_i32(); };
+                continue;
+            };
+            let value = w_kid(n, 0);
+            if op == Op.LocalSet.to_i32() and opt_pure(value) {
+                opt_erase(n);
+            } else if op == Op.LocalSet.to_i32() and single_value(w_type[value]) {
+                w_op[n] = Op.Drop.to_i32();
+            } else if opt_parent[k] >= 0 {
+                set_kid(opt_parent[k], opt_place[k], value);
+            } else {
+                func_body[f] = value;
+            };
+        };
+    };
+    // Renumber the locals still read.
+    let first = func_locals[f];
+    let kept = 0;
+    let renumber = Array[I32].new(total, -1);
+    for (params ..< total) |l| {
+        if opt_gets[l] > 0 {
+            renumber[l] = params + kept;
+            local_types[first + kept] = local_types[first + l - params];
+            kept += 1;
+        };
+    };
+    if kept == total - params { return; };
+    func_local_count[f] = kept;
+    for (0 ..< opt_nodes.len()) |k| {
+        let n = opt_nodes[k];
+        let op = w_op[n];
+        if (op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params {
+            w_a[n] = renumber[w_a[n]];
+        };
+    };
+}

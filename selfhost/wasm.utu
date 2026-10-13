@@ -668,24 +668,41 @@ fn assign_indices() void {
         };
     };
     let n = ht_kind.len();
+    sweep_types();
     type_index.resize(n);
     type_order.clear();
+    type_alone.resize(n);
+    for (0 ..< n) |t| { type_alone[t] = 0; };
     for (0 ..< n) |t| { type_index[t] = -1; };
     // Singles that refer only to abstract types or earlier singles come first.
     for (0 ..< n) |t| {
-        if ht_single[t] == 1 and refers_only_to_placed(t) {
+        if type_live[t] == 1 and ht_single[t] == 1 and refers_only_to_placed(t) {
+            type_index[t] = type_order.len();
+            type_order.push(t);
+        };
+    };
+    // A function type of numbers and abstract references alone has no
+    // identity to keep (no cast tells two of them apart), so it is a single
+    // too: the one already there of the same signature, or one of its own.
+    for (0 ..< n) |t| {
+        if type_live[t] == 1 and ht_single[t] == 0 and plain_func(t) {
+            let twin = ht_lookup(Heap.Func.to_i32(), ht_a[t], ht_b[t], 1);
+            if twin >= 0 and type_index[twin] >= 0 { type_index[t] = type_index[twin]; }
+            else {
+                type_index[t] = type_order.len();
+                type_order.push(t);
+                type_alone[t] = 1;
+            };
+        };
+    };
+    for (0 ..< n) |t| {
+        if type_live[t] == 1 and ht_single[t] == 0 and type_index[t] < 0 {
             type_index[t] = type_order.len();
             type_order.push(t);
         };
     };
     for (0 ..< n) |t| {
-        if ht_single[t] == 0 {
-            type_index[t] = type_order.len();
-            type_order.push(t);
-        };
-    };
-    for (0 ..< n) |t| {
-        if type_index[t] < 0 {
+        if type_live[t] == 1 and type_index[t] < 0 {
             type_index[t] = type_order.len();
             type_order.push(t);
         };
@@ -716,6 +733,107 @@ fn assign_indices() void {
             next_g += 1;
         };
     };
+}
+
+// The types the module uses: those of its live functions (signatures,
+// locals, and every instruction's result and type immediate), globals, and
+// imports, and the types those refer to (fields, elements, parameters,
+// results, supertypes). Checking interns types it then does not use (a
+// generic's instances, a closure's environment when nothing captures), and
+// they are left out.
+mem type_live: U8;
+mem type_work: I32;
+
+fn sweep_types() void {
+    type_live.resize(ht_kind.len());
+    for (0 ..< ht_kind.len()) |t| { type_live[t] = 0; };
+    type_work.clear();
+    live_work.clear();
+    for (0 ..< func_kind.len()) |f| {
+        if func_live[f] == 1 {
+            mark_type(func_type_of[f]);
+            for (func_locals[f] ..< func_locals[f] + func_local_count[f]) |l| { mark_vt(local_types[l]); };
+            if func_body[f] >= 0 { live_work.push(func_body[f]); };
+        };
+    };
+    for (0 ..< glob_kind.len()) |g| {
+        if glob_live[g] == 1 {
+            mark_vt(glob_type[g]);
+            if glob_init[g] >= 0 { live_work.push(glob_init[g]); };
+        };
+    };
+    if tag_used[0] == 1 { mark_type(js_tag_type()); };
+    while (live_work.len() > 0) {
+        let node = live_work[live_work.len() - 1];
+        live_work.resize(live_work.len() - 1);
+        mark_vt(w_type[node]);
+        let op = w_op[node];
+        if op == Op.RefNull.to_i32() or op == Op.RefTest.to_i32() or op == Op.RefCast.to_i32() { mark_vt(w_a[node]); }
+        else if op == Op.CallRef.to_i32() or (op >= Op.StructNew.to_i32() and op <= Op.ArrayInitData.to_i32() and op != Op.ArrayLen.to_i32()) {
+            mark_type(w_a[node]);
+            if op == Op.ArrayCopy.to_i32() { mark_type(w_b[node]); };
+        };
+        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
+    };
+    while (type_work.len() > 0) {
+        let t = type_work[type_work.len() - 1];
+        type_work.resize(type_work.len() - 1);
+        let kind = ht_kind[t];
+        if kind == Heap.Func.to_i32() {
+            mark_list(ht_a[t]);
+            mark_list(ht_b[t]);
+        } else if kind == Heap.Array.to_i32() {
+            mark_vt(ht_a[t]);
+        } else {
+            for (0 ..< ht_b[t]) |i| { mark_vt(field_storage(t, i)); };
+        };
+        if ht_super[t] >= 0 { mark_type(ht_super[t]); };
+    };
+}
+
+fn mark_type(t: I32) void {
+    if t < 0 or type_live[t] == 1 { return; };
+    type_live[t] = 1;
+    type_work.push(t);
+}
+
+fn mark_vt(vt: I32) void {
+    if vt >= vt_tuple {
+        mark_list(vt - vt_tuple);
+        // A block with several results is typed by a function type.
+        mark_type(func_type(vl_empty(), vt - vt_tuple));
+    } else if vt >= vt_defined {
+        mark_type(vt_heap(vt));
+    };
+}
+
+fn mark_list(list: I32) void {
+    for (0 ..< vl_len[list]) |i| { mark_vt(vl_item(list, i)); };
+}
+
+// By type: 1 when encoded on its own though interned for the group (plain_func).
+mem type_alone: U8;
+
+fn plain_func(t: I32) Bool {
+    if ht_kind[t] != Heap.Func.to_i32() { return false; };
+    for (0 ..< vl_len[ht_a[t]]) |i| { if vl_item(ht_a[t], i) >= vt_defined { return false; }; };
+    for (0 ..< vl_len[ht_b[t]]) |i| { if vl_item(ht_b[t], i) >= vt_defined { return false; }; };
+    true;
+}
+
+// Whether type t is encoded on its own (not in the recursion group).
+fn encoded_single(t: I32) Bool { ht_single[t] == 1 or type_alone[t] == 1; }
+
+// The interned type of this shape, or -1.
+fn ht_lookup(kind: I32, a: I32, b: I32, single: I32) I32 {
+    let mask = ht_table.len() - 1;
+    let h = ht_key_hash(kind, a, b) & mask;
+    while (ht_table[h] >= 0) {
+        let t = ht_table[h];
+        if ht_kind[t] == kind and ht_a[t] == a and ht_b[t] == b and ht_single[t] == single { return t; };
+        h = (h + 1) & mask;
+    };
+    -1;
 }
 
 fn refers_only_to_placed(t: I32) Bool {
@@ -802,7 +920,7 @@ fn encode_types() void {
     let in_group = false;
     for (0 ..< type_order.len()) |i| {
         let t = type_order[i];
-        if ht_single[t] == 1 { groups += 1; in_group = false; }
+        if encoded_single(t) { groups += 1; in_group = false; }
         else if not in_group { groups += 1; in_group = true; };
     };
     if groups == 0 { return; };
@@ -810,14 +928,17 @@ fn encode_types() void {
     let i = 0;
     while (i < type_order.len()) {
         let t = type_order[i];
-        if ht_single[t] == 1 {
+        if encoded_single(t) {
             put_composite(t);
             i += 1;
         } else {
             let j = i;
-            while (j < type_order.len() and ht_single[type_order[j]] == 0) { j += 1; };
-            sec.push(78);
-            leb_u(false, j - i);
+            while (j < type_order.len() and not encoded_single(type_order[j])) { j += 1; };
+            // A group of one type is that type (2 bytes fewer).
+            if j - i > 1 {
+                sec.push(78);
+                leb_u(false, j - i);
+            };
             for (i ..< j) |k| { put_composite(type_order[k]); };
             i = j;
         };
@@ -1004,6 +1125,7 @@ fn encode_code() void {
         if is_live_defined(f) {
             code_bytes.clear();
             encode_locals(f);
+            mark_targets(func_body[f]);
             emit(func_body[f], f);
             code_bytes.push(11);
             leb_u(false, code_bytes.len());
@@ -1012,6 +1134,34 @@ fn encode_code() void {
     };
     flush_section(10);
 }
+
+// The labels a function's branches target (labels are numbered per function).
+mem label_targeted: U8;
+
+fn mark_targets(body: I32) void {
+    label_targeted.clear();
+    live_work.clear();
+    live_work.push(body);
+    while (live_work.len() > 0) {
+        let node = live_work[live_work.len() - 1];
+        live_work.resize(live_work.len() - 1);
+        let op = w_op[node];
+        if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() or op == Op.Rethrow.to_i32() { mark_target(w_a[node]); }
+        else if op == Op.BrTable.to_i32() { for (0 ..< w_b[node]) |i| { mark_target(w_aux[w_a[node] + i]); }; };
+        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
+    };
+}
+
+fn mark_target(label: I32) void {
+    if label >= label_targeted.len() {
+        let old = label_targeted.len();
+        label_targeted.resize(label + 1);
+        for (old ..< label + 1) |l| { label_targeted[l] = 0; };
+    };
+    label_targeted[label] = 1;
+}
+
+fn targeted(label: I32) Bool { label < label_targeted.len() and label_targeted[label] == 1; }
 
 // Locals after the parameters, run-length encoded by type.
 fn encode_locals(f: I32) void {
@@ -1082,6 +1232,7 @@ fn encode_names() void {
 fn encode_module() I32 {
     sweep();
     finish_mems();
+    if optimize_level[0] != 0 { optimize_module(); };
     write_host_json();
     assign_indices();
     out.clear();
@@ -1165,6 +1316,12 @@ fn emit(node: I32, f: I32) void {
     let b = w_b[node];
     if op == Op.Seq.to_i32() { emit_kids(node); return; };
     if op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+        // A block nothing branches to is its contents (a loop's `continue`
+        // target when nothing continues, …).
+        if not targeted(a) {
+            emit_kids(node);
+            return;
+        };
         op1(if op == Op.Block.to_i32() { 2; } else { 3; });
         block_type(w_type[node]);
         labels.push(a);

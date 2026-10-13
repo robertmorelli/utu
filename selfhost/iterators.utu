@@ -52,6 +52,7 @@ struct Pipe:
     | elem: I32          // the source's element type
 
 fn reset_iterators() void {
+    pure_words.clear();
     st_node.clear();
     st_op.clear();
     st_counter.clear();
@@ -170,14 +171,88 @@ fn is_bounded_stage(op: I32) Bool {
 
 // ── The pipeline ──
 
+// `(… collect(T))` as a pipeline's source, when its stages cannot observe
+// being interleaved with the stages that consume it (stage 0's
+// fusableCollect): its collect stage, or -1.
+fn fusable_collect(input: I32) I32 {
+    if not is_kind(input, Node.Paren_expr) { return -1; };
+    let inner = past_splices(first_child(input));
+    if not is_kind(inner, Node.Iterator_expr) or next_sibling(first_child(input)) >= 0 { return -1; };
+    if iterator_op(inner) != Kw.Collect.to_i32() { return -1; };
+    let s = past_splices(first_child(inner));
+    while (is_kind(s, Node.Iterator_expr)) {
+        if is_terminal(iterator_op(s)) or not pure_stage(s) { return -1; };
+        s = past_splices(first_child(s));
+    };
+    inner;
+}
+
+// A stage whose parts (all but its source) assign only their own locals,
+// call only conversions and reads, and neither await, nest a pipeline, use
+// a DSL, nor leave (return, break, continue, yield).
+fn pure_stage(stage: I32) Bool {
+    let lo = tok_start[node_first[stage]];
+    let hi = tok_end[node_last[stage] - 1];
+    let part = next_sibling(first_child(stage));
+    while (part >= 0) {
+        if not pure_tree(part, lo, hi) { return false; };
+        part = next_sibling(part);
+    };
+    true;
+}
+
+fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
+    let kind = node_kind[node];
+    if kind == Node.Await_expr.to_i32() or kind == Node.Dsl_expr.to_i32() or kind == Node.Iterator_expr.to_i32()
+        or kind == Node.Yield_expr.to_i32() or kind == Node.Return_expr.to_i32() or kind == Node.Break_expr.to_i32()
+        or kind == Node.Continue_expr.to_i32() or kind == Node.Promoted_module_call_expr.to_i32() {
+        return false;
+    };
+    if kind == Node.Assign_expr.to_i32() {
+        let target = first_child(node);
+        if not is_kind(target, Node.Identifier) { return false; };
+        let d = node_decl[target];
+        if d < 0 or decl_node[d] < 0 { return false; };
+        let at = tok_start[node_first[decl_node[d]]];
+        if at < lo or at >= hi { return false; };
+    };
+    if kind == Node.Call_expr.to_i32() {
+        let callee = first_child(node);
+        if not (is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Type_member_expr)) or not pure_method(word_of(last_child(callee))) { return false; };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        if not pure_tree(c, lo, hi) { return false; };
+        c = next_sibling(c);
+    };
+    true;
+}
+
+mem pure_words: I32;   // the methods pure_method allows, interned once per program
+
+fn pure_method(word: I32) Bool {
+    if pure_words.len() == 0 {
+        for (["to_i32", "to_u32", "to_i64", "to_u64", "to_f32", "to_f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)); };
+    };
+    for (0 ..< pure_words.len()) |i| { if pure_words[i] == word { return true; }; };
+    false;
+}
+
 fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     // The stages, outermost last.
     // (A DSL's splice may hold the stages before: `xs filter … ` then `each`.)
+    // `(xs … collect(T)) …` whose inner stages cannot tell is one pipeline,
+    // as in stage 0: the array is never made.
     let n = 0;
     let input = node;
-    while (is_kind(input, Node.Iterator_expr)) {
-        n += 1;
-        input = past_splices(first_child(input));
+    while (true) {
+        while (is_kind(input, Node.Iterator_expr)) {
+            n += 1;
+            input = past_splices(first_child(input));
+        };
+        let inner = fusable_collect(input);
+        if inner < 0 { break; };
+        input = past_splices(first_child(inner));
     };
     let first_stage = st_node.len();
     for (0 ..< n) |i| {
@@ -190,6 +265,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     let s = node;
     let k = n - 1;
     while (k >= 0) {
+        if not is_kind(s, Node.Iterator_expr) { s = past_splices(first_child(fusable_collect(s))); };
         st_node[first_stage + k] = s;
         st_op[first_stage + k] = iterator_op(s);
         s = past_splices(first_child(s));

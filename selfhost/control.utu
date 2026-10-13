@@ -179,7 +179,11 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
         if k == first or arm_values[k] < lo { lo = arm_values[k]; };
         if k == first or arm_values[k] > hi { hi = arm_values[k]; };
     };
-    let dense = vt == vt_i32 and n >= 3 and hi - lo < (n * 3 + 8).to_i64();
+    // A table is as fast as dispatch gets; a size build takes it only when
+    // it is the smaller (an arm of a chain is about 9 bytes, of a table
+    // about 5, and the table a byte per value from lo to hi).
+    let values = hi - lo + 1.to_i64();
+    let dense = vt == vt_i32 and n >= 3 and (if optimize_level[0] == 1 { values < (n * 4 - 8).to_i64(); } else { hi - lo < (n * 3 + 8).to_i64(); });
     if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop); };
     let end_ = new_label();
     let def = new_label();

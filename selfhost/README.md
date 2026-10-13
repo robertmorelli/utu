@@ -172,14 +172,24 @@ tables.
 - **@comptime**: a build for Target.Comptime exports the generated functions
   that evaluate each expression into a mem; the host runs it and gives the
   values back, which fill the mems as data segments.
-- **Encoding** (`wasm.utu`): a sweep from the exports finds what is reached;
-  indices are assigned (imports first) and only that is encoded. Types live
-  in one recursion group, except the function types host builtins need on
-  their own.
+- **Encoding** (`wasm.utu`): a sweep from the exports finds the functions
+  and globals reached, and a second the types they use (a generic's unused
+  instances, an environment nothing captures, are left out); indices are
+  assigned (imports first) and only that is encoded. Struct and array types
+  live in one recursion group, so casts tell them apart; a function type of
+  plain values needs no identity and is encoded on its own. A block or loop
+  nothing branches to is encoded as its contents.
+- **Size builds** (`optimize.utu`, the default, as stage 0's `-Oz`): host
+  member operations share one import per shape (`(self,k) => self[k]`, the
+  name a string constant); stage 0's local cleanup (copies, temporaries,
+  unused locals) runs on every function; a `match` takes a `br_table` only
+  when that is the smaller. Iterator pipelines fuse across a `collect` whose
+  stages cannot tell, and a captured variable is boxed only when a write
+  could be seen after the capture, both as in stage 0.
 - **The host contract** (`host.utu`): what the module needs from its host
-  (`@es` bodies, the exception tag) is in a custom section named `utu`, so a
-  compiled program is one file; `instantiateBuilt` in `scripts/selfhost.mjs`
-  builds its imports from it.
+  (`@es` bodies, closures, promises, hosted mems) is a JSON spec given
+  beside the module, not in it; `src/selfhost/loader.js` writes the least
+  JavaScript that provides it.
 
 ## How far it is
 
@@ -208,7 +218,10 @@ checking, and a mismatch that follows from another (a local typed by a
 mistaken initializer) is counted under it: `(+1 caused by this)`.
 
 The check is behavior, not bytes: the compiler is a new design, so its
-wasm differs from stage 0's, but what every program does must not.
+wasm differs from stage 0's, but what every program does must not. It is
+smaller: of the 280 programs both compilers build, 252 are smaller at -Oz,
+25 the same, and 3 larger by at most 3 bytes; 648,426 bytes in all against
+stage 0's 762,646 (15% less), built in a third of the time.
 
 ## Host declarations
 
