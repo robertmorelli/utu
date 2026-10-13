@@ -367,6 +367,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Tuple_expr.to_i32() { return check_tuple(node, expect, cx); };
     if kind == Node.Closure_expr.to_i32() { return check_closure(node, expect, cx); };
     if kind == Node.Yield_expr.to_i32() { return check_yield(node, cx); };
+    if kind == Node.Iterator_expr.to_i32() { return check_iterator(node, expect, cx); };
     unsupported(node);
 }
 
@@ -1337,6 +1338,7 @@ fn reset_check() void {
     reset_control();
     reset_closures();
     reset_generators();
+    reset_iterators();
     fi_grow();
 }
 

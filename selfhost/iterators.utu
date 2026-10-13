@@ -1,0 +1,2803 @@
+// ── Iterators ────────────────────────────────────────────────────────────────
+//
+// `xs map |x| { … } filter |x| { … } fold(0) |acc, x| { … }` is syntax, not
+// an object: the whole pipeline becomes one loop over the source (an array,
+// or a range `(a ..< b)`), each stage handing its value to the next, the
+// terminal accumulating. docs/iterators.md says what each operator does;
+// this follows stage 0's lowering (src/compiler/lower-iterators.js) step by
+// step, so evaluation order, indexes, cancellation, and the sort are the
+// same:
+//
+//   (source) (each stage's setup, in order)
+//   loop over [lo, hi)             ; while (i < hi and not stop) when a stage can stop it
+//     value = source[i]
+//     (stage 0's code, then stage 1's with its value, …, the terminal's)
+//   (cleanup: chains' remainders, reductions, sorts)
+//   (the result)
+//
+// A stage's index binding is the U64 count of values that reached it.
+// Stages that run their downstream more than once (chain's appended array,
+// flat_map of a short literal) check it again, reusing its locals and
+// without its setup again ("replay").
+
+// Per stage of the pipelines being checked (a stack: bodies hold pipelines).
+mem st_node: I32;
+mem st_op: I32;       // the operator's word
+mem st_counter: I32;  // its counter local, or -1
+mem st_ordinal: I32;  // its ordinal local (the counter before this value), or -1
+mem st_locals: I32;   // 16 per stage: locals of its own (limit, other, accumulator, buffers, …), or -1
+
+// Nodes to run before the loop and after it, per pipeline (stacks).
+mem iter_setup: I32;
+mem iter_cleanup: I32;
+
+struct Pipe:
+    | first_stage: I32   // its stages, in st_*: [first_stage, first_stage + count)
+    | count: I32
+    | first: I32         // the first stage the loop runs (after leading skip/take)
+    | range: Bool
+    | source: I32        // the source array's local (not for a range)
+    | lo: I32
+    | hi: I32
+    | stop: I32          // the stop flag's local, or -1
+    | stop_at: I32
+    | result: I32        // the result's local, or -1
+    | result_type: I32
+    | finish: I32        // the node of the result, or -1 (the result local)
+    | setup_start: I32
+    | cleanup_start: I32
+    | replay: Bool
+    | skip_loop: Bool
+    | bounded: Bool
+    | elem: I32          // the source's element type
+
+fn reset_iterators() void {
+    st_node.clear();
+    st_op.clear();
+    st_counter.clear();
+    st_ordinal.clear();
+    st_locals.clear();
+    iter_setup.clear();
+    iter_cleanup.clear();
+}
+
+// ── Small builders ──
+
+fn lg(local: I32) void { w_leaf(Op.LocalGet, cur_locals[local], local, 0); }
+
+fn ls(local: I32, m: I32) void { w_node(Op.LocalSet, vt_none, local, 0, m); }
+
+fn plain(opcode: I32, vt: I32, m: I32) void { w_node(Op.Plain, vt, opcode, 0, m); }
+
+fn seq_void(m: I32) void { w_node(Op.Seq, vt_none, 0, 0, m); }
+
+// local = local + 1
+fn incr(local: I32) void {
+    let m = w_mark();
+    lg(local);
+    w_i32(1);
+    plain(106, vt_i32, m);
+    ls(local, m);
+}
+
+// local = value
+fn set_i32(local: I32, value: I32) void {
+    let m = w_mark();
+    w_i32(value);
+    ls(local, m);
+}
+
+// Take the node on top of the stack into the pipeline's setup, or cleanup.
+fn to_setup(p: Pipe) void {
+    let n = w_pop();
+    if not p.replay { iter_setup.push(n); };
+}
+
+fn to_cleanup(p: Pipe) void {
+    let n = w_pop();
+    if not p.replay { iter_cleanup.push(n); };
+}
+
+// A local that lives across the loop: made once, kept on replays.
+fn stage_local(slot: I32, which: I32, vt: I32) I32 {
+    let at = slot * 16 + which;
+    if st_locals[at] < 0 { st_locals[at] = new_local(vt); };
+    st_locals[at];
+}
+
+fn stage_op(p: Pipe, k: I32) I32 { st_op[p.first_stage + k]; }
+
+fn stage_node(p: Pipe, k: I32) I32 { st_node[p.first_stage + k]; }
+
+// A stage's parts: its parameter `( … )` expressions and types, capture, block.
+fn stage_param(node: I32) I32 {
+    let c = next_sibling(first_child(node));
+    while (c >= 0) {
+        if not is_kind(c, Node.Capture) and not is_kind(c, Node.Block) and not is_type_node(node_kind[c]) { return c; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+fn stage_type(node: I32, which: I32) I32 {
+    let n = 0;
+    let c = next_sibling(first_child(node));
+    while (c >= 0) {
+        if is_type_node(node_kind[c]) {
+            if n == which { return c; };
+            n += 1;
+        };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+fn stage_capture(node: I32) I32 {
+    let c = first_child(node);
+    while (c >= 0) {
+        if is_kind(c, Node.Capture) { return c; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+fn stage_block(node: I32) I32 {
+    let c = first_child(node);
+    while (c >= 0) {
+        if is_kind(c, Node.Block) { return c; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+// The operator of an iterator stage: the word after its source.
+fn iterator_op(node: I32) I32 { tok_word[token_after(first_child(node))]; }
+
+fn is_terminal(op: I32) Bool {
+    op == Kw.Fold.to_i32() or op == Kw.Each.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
+        or op == Kw.Count_where.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32()
+        or op == Kw.Sum.to_i32() or op == Kw.Fast_sum.to_i32() or op == Kw.Product.to_i32() or op == Kw.Count.to_i32()
+        or op == Kw.Collect.to_i32() or op == Kw.Sort.to_i32() or op == Kw.Group_by.to_i32() or op == Kw.Distinct_by.to_i32()
+        or op == Kw.Partition.to_i32() or op == Kw.Batched.to_i32() or op == Kw.Windows.to_i32() or op == Kw.Min_by.to_i32()
+        or op == Kw.Max_by.to_i32() or op == Kw.First_where.to_i32() or op == Kw.Reduce.to_i32() or op == Kw.Bisect.to_i32();
+}
+
+// Stages that never pass on more values than they receive.
+fn is_bounded_stage(op: I32) Bool {
+    op == Kw.Map.to_i32() or op == Kw.Filter.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Take.to_i32()
+        or op == Kw.Skip_while.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Scan.to_i32() or op == Kw.Zip.to_i32();
+}
+
+// ── The pipeline ──
+
+fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
+    // The stages, outermost last.
+    let n = 0;
+    let input = node;
+    while (is_kind(input, Node.Iterator_expr)) {
+        n += 1;
+        input = first_child(input);
+    };
+    let first_stage = st_node.len();
+    for (0 ..< n) |i| {
+        st_node.push(-1);
+        st_op.push(-1);
+        st_counter.push(-1);
+        st_ordinal.push(-1);
+        for (0 ..< 16) |j| { st_locals.push(-1); };
+    };
+    let s = node;
+    let k = n - 1;
+    while (k >= 0) {
+        st_node[first_stage + k] = s;
+        st_op[first_stage + k] = iterator_op(s);
+        s = first_child(s);
+        k -= 1;
+    };
+    let end_op = st_op[first_stage + n - 1];
+    let t = -1;
+    if not is_terminal(end_op) {
+        report(Diag.IteratorUnfinished, node, end_op);
+        t = error_value();
+    } else if end_op == Kw.Bisect.to_i32() {
+        t = check_bisect(node, input, n, cx);
+    } else {
+        t = check_pipeline(node, input, first_stage, n, cx);
+    };
+    st_node.resize(first_stage);
+    st_op.resize(first_stage);
+    st_counter.resize(first_stage);
+    st_ordinal.resize(first_stage);
+    st_locals.resize(first_stage * 16);
+    t;
+}
+
+fn check_pipeline(node: I32, input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
+    let m = w_mark();
+    let p = Pipe {
+        first_stage: first_stage, count: n, first: 0, range: is_kind(input, Node.Range_expr), source: -1,
+        lo: new_local(vt_i32), hi: new_local(vt_i32), stop: -1, stop_at: -1, result: -1, result_type: ty_void(),
+        finish: -1, setup_start: iter_setup.len(), cleanup_start: iter_cleanup.len(), replay: false,
+        skip_loop: false, bounded: false, elem: prelude(Prelude.I32),
+    };
+    let i32_t = prelude(Prelude.I32);
+    // The source: lo = a; hi = b (+ 1); if hi < lo { hi = lo }, or the array and its length.
+    if p.range {
+        let a = first_child(input);
+        let b = last_child(input);
+        let ma = w_mark();
+        coerce(check_expr(a, i32_t, cx), i32_t, a);
+        ls(p.lo, ma);
+        let mb = w_mark();
+        coerce(check_expr(b, i32_t, cx), i32_t, b);
+        if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
+            w_i32(1);
+            plain(106, vt_i32, mb);
+        };
+        ls(p.hi, mb);
+        let mi = w_mark();
+        let mc = w_mark();
+        lg(p.hi);
+        lg(p.lo);
+        plain(72, vt_i32, mc);
+        let mt = w_mark();
+        let mv = w_mark();
+        lg(p.lo);
+        ls(p.hi, mv);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    } else {
+        let ms = w_mark();
+        let at = check_expr(input, -1, cx);
+        if not is_array_type(at) {
+            if not ty_is(at, Ty.Error) { report(Diag.IteratorSource, input, -1); };
+            w_stack.resize(m);
+            return error_value();
+        };
+        p.elem = inst_arg(ty_inst(at), 0);
+        p.source = new_local(repr(at));
+        ls(p.source, ms);
+        set_i32(p.lo, 0);
+        let mh = w_mark();
+        lg(p.source);
+        w_node(Op.ArrayLen, vt_i32, 0, 0, mh);
+        ls(p.hi, mh);
+    };
+    let source_setup = w_mark() - m;
+    // Leading skip and take narrow the range instead of counting values.
+    while (p.first < n - 1 and (stage_op(p, p.first) == Kw.Skip.to_i32() or stage_op(p, p.first) == Kw.Take.to_i32())) {
+        narrow(p, p.first, cx);
+        p.first += 1;
+    };
+    p.bounded = true;
+    for (p.first ..< n - 1) |j| { if not is_bounded_stage(stage_op(p, j)) { p.bounded = false; }; };
+    // Whether some stage can stop the loop early.
+    let stops = false;
+    for (p.first ..< n) |j| {
+        let op = stage_op(p, j);
+        if op == Kw.Take.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
+            or op == Kw.First_where.to_i32() or op == Kw.First_index.to_i32() or (op == Kw.Zip.to_i32() and j != p.first) {
+            stops = true;
+        };
+    };
+    if stops {
+        p.stop = new_local(vt_i32);
+        p.stop_at = new_local(vt_i32);
+        let mstop = w_mark();
+        set_i32(p.stop, 0);
+        set_i32(p.stop_at, -1);
+        seq_void(mstop);
+        // The stop flag comes first: a stage's setup may already stop.
+        iter_setup.push(w_pop());
+    };
+    // The loop body, from the first stage on; the stages add their setup and cleanup.
+    let value = new_local(if p.range { vt_i32; } else { repr(p.elem); });
+    let vtype = if p.range { i32_t; } else { p.elem; };
+    let index = new_local(vt_i32);
+    // In a stage's body, break leaves the loop and continue goes on to the next value.
+    let brk = new_label();
+    let next = new_label();
+    enter_loop(brk, next, -1, -1);
+    let mbody = w_mark();
+    stage_at(p, p.first, value, vtype, cx);
+    w_node(Op.Block, vt_none, next, 0, mbody);
+    let body = w_pop();
+    leave_loop();
+    // Setup: the source's, then the stages', in order.
+    for (p.setup_start ..< iter_setup.len()) |j| { w_push(iter_setup[j]); };
+    iter_setup.resize(p.setup_start);
+    if not p.skip_loop { iterate(p, index, value, body, brk); };
+    for (p.cleanup_start ..< iter_cleanup.len()) |j| { w_push(iter_cleanup[j]); };
+    iter_cleanup.resize(p.cleanup_start);
+    // The result.
+    let rt = p.result_type;
+    if p.finish >= 0 { w_push(p.finish); } else if p.result >= 0 { lg(p.result); };
+    w_node(Op.Seq, repr(rt), 0, 0, m);
+    rt;
+}
+
+// The loop over [lo, hi): value = element(i), then the stages.
+fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
+    let top = new_label();
+    set_i32(index, 0);
+    let mi = w_mark();
+    lg(p.lo);
+    ls(index, mi);
+    let mb = w_mark();
+    let ml = w_mark();
+    // while (i < hi and not stop)
+    let mc = w_mark();
+    lg(index);
+    lg(p.hi);
+    plain(78, vt_i32, mc);
+    w_node(Op.BrIf, vt_none, brk, 0, mc);
+    if p.stop >= 0 {
+        let ms = w_mark();
+        lg(p.stop);
+        w_node(Op.BrIf, vt_none, brk, 0, ms);
+    };
+    let mv = w_mark();
+    if p.range { lg(index); } else {
+        lg(p.source);
+        lg(index);
+        let heap = vt_heap(cur_locals[p.source]);
+        w_node(Op.ArrayGet, ht_a[heap], heap, 0, mv);
+    };
+    ls(value, mv);
+    incr(index);
+    w_push(body);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+}
+
+// `skip(n)` / `take(n)` before any other stage: narrow [lo, hi).
+fn narrow(p: Pipe, k: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let i32_t = prelude(Prelude.I32);
+    let limit = stage_local(p.first_stage + k, 0, vt_i32);
+    let m = w_mark();
+    let ml = w_mark();
+    let param = stage_param(node);
+    coerce(check_expr(param, i32_t, cx), i32_t, param);
+    ls(limit, ml);
+    if stage_op(p, k) == Kw.Skip.to_i32() {
+        // if limit > 0 { lo = if limit > hi - lo { hi } else { lo + limit } }
+        let mi = w_mark();
+        let mc = w_mark();
+        lg(limit);
+        w_i32(0);
+        plain(74, vt_i32, mc);
+        let mt = w_mark();
+        let ms = w_mark();
+        let mif = w_mark();
+        let mcc = w_mark();
+        lg(limit);
+        let md = w_mark();
+        lg(p.hi);
+        lg(p.lo);
+        plain(107, vt_i32, md);
+        plain(74, vt_i32, mcc);
+        let a = w_mark();
+        lg(p.hi);
+        w_node(Op.Seq, vt_i32, 0, 0, a);
+        let b = w_mark();
+        lg(p.lo);
+        lg(limit);
+        plain(106, vt_i32, b);
+        w_node(Op.Seq, vt_i32, 0, 0, b);
+        w_node(Op.If, vt_i32, new_label(), 0, mif);
+        ls(p.lo, ms);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    } else {
+        // if limit <= 0 { hi = lo } else if limit < hi - lo { hi = lo + limit }
+        let mi = w_mark();
+        let mc = w_mark();
+        lg(limit);
+        w_i32(0);
+        plain(76, vt_i32, mc);
+        let mt = w_mark();
+        let ms = w_mark();
+        lg(p.lo);
+        ls(p.hi, ms);
+        seq_void(mt);
+        let me = w_mark();
+        let mi2 = w_mark();
+        let mc2 = w_mark();
+        lg(limit);
+        let md = w_mark();
+        lg(p.hi);
+        lg(p.lo);
+        plain(107, vt_i32, md);
+        plain(72, vt_i32, mc2);
+        let mt2 = w_mark();
+        let ms2 = w_mark();
+        lg(p.lo);
+        lg(limit);
+        plain(106, vt_i32, ms2);
+        ls(p.hi, ms2);
+        seq_void(mt2);
+        w_node(Op.If, vt_none, new_label(), 0, mi2);
+        seq_void(me);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    };
+    seq_void(m);
+    to_setup(p);
+}
+
+// stop = true; if stop_at < k { stop_at = k }
+fn cancel(p: Pipe, k: I32) void {
+    let m = w_mark();
+    set_i32(p.stop, 1);
+    let mi = w_mark();
+    let mc = w_mark();
+    lg(p.stop_at);
+    w_i32(k);
+    plain(72, vt_i32, mc);
+    let mt = w_mark();
+    set_i32(p.stop_at, k);
+    seq_void(mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    seq_void(m);
+}
+
+// Bind a stage's captures: its values, then (optionally) its U64 index.
+// Returns false after reporting a wrong count.
+fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I32) Bool {
+    let capture = stage_capture(stage_node(p, k));
+    if capture < 0 { return nvalues == 0; };
+    let names = 0;
+    let c = first_child(capture);
+    while (c >= 0) {
+        names += 1;
+        c = next_sibling(c);
+    };
+    if names < nvalues or names > nvalues + 1 {
+        report(Diag.IteratorCaptures, capture, -1);
+        return false;
+    };
+    let j = 0;
+    c = first_child(capture);
+    while (c >= 0) {
+        let d = node_decl[c];
+        let m = w_mark();
+        if j < nvalues {
+            lg(values[j]);
+            decl_ty[d] = types[j];
+            bind_value(d, types[j], m);
+        } else {
+            // The index: this stage's ordinal, as U64.
+            lg(ordinal_of(p, k));
+            plain(173, vt_i64, m);
+            decl_ty[d] = prelude(Prelude.U64);
+            bind_value(d, prelude(Prelude.U64), m);
+        };
+        j += 1;
+        c = next_sibling(c);
+    };
+    true;
+}
+
+// A stage's ordinal and counter (made when first needed).
+fn ordinal_of(p: Pipe, k: I32) I32 {
+    let slot = p.first_stage + k;
+    if st_ordinal[slot] < 0 {
+        st_ordinal[slot] = new_local(vt_i32);
+        st_counter[slot] = new_local(vt_i32);
+        let m = w_mark();
+        set_i32(st_counter[slot], 0);
+        seq_void(m);
+        to_setup(p);
+    };
+    st_ordinal[slot];
+}
+
+fn counter_of(p: Pipe, k: I32) I32 {
+    ordinal_of(p, k);
+    st_counter[p.first_stage + k];
+}
+
+// Whether a stage reads its position: an index binding, or its operator.
+fn stage_counts(p: Pipe, k: I32, nvalues: I32) Bool {
+    let op = stage_op(p, k);
+    if op == Kw.Take.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Zip.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() { return true; };
+    let capture = stage_capture(stage_node(p, k));
+    if capture < 0 { return false; };
+    let names = 0;
+    let c = first_child(capture);
+    while (c >= 0) {
+        names += 1;
+        c = next_sibling(c);
+    };
+    names > nvalues;
+}
+
+// A stage's body checked with its captures bound; its value on the stack.
+fn stage_body(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I32, expect: I32, cx: Cx) I32 {
+    let m = w_mark();
+    if not bind_captures(p, k, values, types, nvalues) {
+        w_stack.resize(m);
+        return error_value();
+    };
+    let block = stage_block(stage_node(p, k));
+    let t = check_block(block, expect, cx);
+    if expect >= 0 { coerce(t, expect, block); };
+    let rt = if expect >= 0 { expect; } else { t; };
+    w_node(Op.Seq, repr(rt), 0, 0, m);
+    rt;
+}
+
+fn one(a: I32) Array[I32] {
+    let x = Array[I32].new(1, 0);
+    x[0] = a;
+    x;
+}
+
+fn two(a: I32, b: I32) Array[I32] {
+    let x = Array[I32].new(2, 0);
+    x[0] = a;
+    x[1] = b;
+    x;
+}
+
+// The code for stage k and everything after it, given its value (a local of type vt).
+fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
+    let m = w_mark();
+    let op = stage_op(p, k);
+    let nvalues = if op == Kw.Fold.to_i32() or op == Kw.Scan.to_i32() or op == Kw.Zip.to_i32() or op == Kw.Reduce.to_i32()
+        or op == Kw.Min_by.to_i32() or op == Kw.Max_by.to_i32() or op == Kw.Sort.to_i32() { 2; } else { 1; };
+    if k < p.count - 1 and is_terminal(op) {
+        report(Diag.IteratorTerminalInside, stage_node(p, k), op);
+        seq_void(m);
+        return;
+    };
+    // The head: this stage's ordinal, when it counts.
+    if stage_counts(p, k, nvalues) {
+        let ord = ordinal_of(p, k);
+        let counter = counter_of(p, k);
+        let mo = w_mark();
+        lg(counter);
+        ls(ord, mo);
+        incr(counter);
+    };
+    stage_code(p, k, op, value, vt, cx);
+    seq_void(m);
+}
+
+// The next stage's code inside a loop of this stage's own (repeat,
+// flat_map, chain), which the bodies' break and continue reach.
+fn downstream_in_loop(p: Pipe, k: I32, value: I32, vt: I32, brk: I32, cx: Cx) void {
+    let next = new_label();
+    enter_loop(brk, next, -1, -1);
+    let m = w_mark();
+    next_stage(p, k, value, vt, cx);
+    w_node(Op.Block, vt_none, next, 0, m);
+    leave_loop();
+}
+
+// Hand a value to the next stage.
+fn next_stage(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void { stage_at(p, k + 1, value, vt, cx); }
+
+fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let bool_t = prelude(Prelude.Bool);
+    let i32_t = prelude(Prelude.I32);
+    if op == Kw.Map.to_i32() {
+        let mm = w_mark();
+        let t = stage_body(p, k, one(value), one(vt), 1, -1, cx);
+        let mapped = new_local(repr(t));
+        ls(mapped, mm);
+        next_stage(p, k, mapped, t, cx);
+        return;
+    };
+    if op == Kw.Filter.to_i32() or op == Kw.Take_while.to_i32() {
+        let mi = w_mark();
+        stage_body(p, k, one(value), one(vt), 1, bool_t, cx);
+        let mt = w_mark();
+        next_stage(p, k, value, vt, cx);
+        seq_void(mt);
+        if op == Kw.Take_while.to_i32() {
+            let me = w_mark();
+            cancel(p, k);
+            seq_void(me);
+        };
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        return;
+    };
+    if op == Kw.Skip_while.to_i32() {
+        let skipping = stage_local(slot, 0, vt_i32);
+        if not p.replay {
+            set_i32(skipping, 1);
+            to_setup(p);
+        };
+        // if skipping { skipping = test }; if not skipping { next }
+        let mi = w_mark();
+        lg(skipping);
+        let mt = w_mark();
+        let ms = w_mark();
+        stage_body(p, k, one(value), one(vt), 1, bool_t, cx);
+        ls(skipping, ms);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        let mi2 = w_mark();
+        let mc = w_mark();
+        lg(skipping);
+        plain(69, vt_i32, mc);
+        let mt2 = w_mark();
+        next_stage(p, k, value, vt, cx);
+        seq_void(mt2);
+        w_node(Op.If, vt_none, new_label(), 0, mi2);
+        return;
+    };
+    if op == Kw.Skip.to_i32() or op == Kw.Take.to_i32() {
+        let limit = stage_local(slot, 0, vt_i32);
+        if not p.replay {
+            let ml = w_mark();
+            let param = stage_param(node);
+            coerce(check_expr(param, i32_t, cx), i32_t, param);
+            ls(limit, ml);
+            if op == Kw.Take.to_i32() {
+                // if limit <= 0 { cancel }
+                let mi = w_mark();
+                let mc = w_mark();
+                lg(limit);
+                w_i32(0);
+                plain(76, vt_i32, mc);
+                let mt = w_mark();
+                cancel(p, k);
+                seq_void(mt);
+                w_node(Op.If, vt_none, new_label(), 0, mi);
+                seq_void(ml);
+            };
+            to_setup(p);
+        };
+        let ord = st_ordinal[slot];
+        // take: if ordinal < limit { next }; if counter >= limit { cancel }
+        // skip: if ordinal >= limit { next }
+        let mi = w_mark();
+        let mc = w_mark();
+        lg(ord);
+        lg(limit);
+        plain(if op == Kw.Take.to_i32() { 72; } else { 78; }, vt_i32, mc);
+        let mt = w_mark();
+        next_stage(p, k, value, vt, cx);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        if op == Kw.Take.to_i32() {
+            let mi2 = w_mark();
+            let mc2 = w_mark();
+            lg(st_counter[slot]);
+            lg(limit);
+            plain(78, vt_i32, mc2);
+            let mt2 = w_mark();
+            cancel(p, k);
+            seq_void(mt2);
+            w_node(Op.If, vt_none, new_label(), 0, mi2);
+        };
+        return;
+    };
+    if op == Kw.Repeat.to_i32() {
+        let times = stage_local(slot, 0, vt_i32);
+        if not p.replay {
+            let mt = w_mark();
+            let param = stage_param(node);
+            coerce(check_expr(param, i32_t, cx), i32_t, param);
+            ls(times, mt);
+            to_setup(p);
+        };
+        // j = 0; while (j < times and not stop) { j += 1; next(value) }
+        let j = new_local(vt_i32);
+        set_i32(j, 0);
+        let brk = new_label();
+        let top = new_label();
+        let mb = w_mark();
+        let ml = w_mark();
+        let mc = w_mark();
+        lg(j);
+        lg(times);
+        plain(78, vt_i32, mc);
+        w_node(Op.BrIf, vt_none, brk, 0, mc);
+        if p.stop >= 0 {
+            let ms = w_mark();
+            lg(p.stop);
+            w_node(Op.BrIf, vt_none, brk, 0, ms);
+        };
+        incr(j);
+        downstream_in_loop(p, k, value, vt, brk, cx);
+        w_leaf(Op.Br, vt_unreachable, top, 0);
+        w_node(Op.Loop, vt_none, top, 0, ml);
+        w_node(Op.Block, vt_none, brk, 0, mb);
+        return;
+    };
+    if op == Kw.Chain.to_i32() {
+        check_chain(p, k, value, vt, cx);
+        return;
+    };
+    if op == Kw.Scan.to_i32() {
+        let param = stage_param(node);
+        let at = type_only(param, -1, cx);
+        let acc = stage_local(slot, 0, repr(at));
+        if not p.replay {
+            let ma = w_mark();
+            check_expr(param, -1, cx);
+            ls(acc, ma);
+            to_setup(p);
+        };
+        let ms = w_mark();
+        stage_body(p, k, two(acc, value), two(at, vt), 2, at, cx);
+        ls(acc, ms);
+        let mapped = new_local(repr(at));
+        let mm = w_mark();
+        lg(acc);
+        ls(mapped, mm);
+        next_stage(p, k, mapped, at, cx);
+        return;
+    };
+    if op == Kw.Flat_map.to_i32() {
+        check_flat_map(p, k, value, vt, cx);
+        return;
+    };
+    if op == Kw.Zip.to_i32() {
+        check_zip(p, k, value, vt, cx);
+        return;
+    };
+    terminal_code(p, k, op, value, vt, cx);
+}
+
+// `chain(other)`: after the stages before it finish, the other array's
+// values go through the rest of the pipeline. A stop upstream of the chain
+// does not stop the appended array.
+fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let param = stage_param(node);
+    let ot = type_only(param, -1, cx);
+    if not is_array_type(ot) {
+        if not ty_is(ot, Ty.Error) { report(Diag.IteratorSource, param, -1); };
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let other = stage_local(slot, 0, repr(ot));
+    if not p.replay {
+        let mo = w_mark();
+        check_expr(param, -1, cx);
+        ls(other, mo);
+        to_setup(p);
+    };
+    let item = new_local(repr(vt));
+    let mi = w_mark();
+    lg(value);
+    ls(item, mi);
+    next_stage(p, k, item, vt, cx);
+    if p.replay { return; };
+    // The remainder, once: the rest of the pipeline again over `other`.
+    let was = p.replay;
+    p.replay = true;
+    let m = w_mark();
+    if p.stop >= 0 {
+        // if stop_at <= k { stop = false; stop_at = -1 }
+        let mi2 = w_mark();
+        let mc = w_mark();
+        lg(p.stop_at);
+        w_i32(k);
+        plain(76, vt_i32, mc);
+        let mt = w_mark();
+        set_i32(p.stop, 0);
+        set_i32(p.stop_at, -1);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi2);
+    };
+    let j = new_local(vt_i32);
+    set_i32(j, 0);
+    let brk = new_label();
+    let top = new_label();
+    let mb = w_mark();
+    let ml = w_mark();
+    let mc = w_mark();
+    lg(j);
+    lg(other);
+    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
+    plain(78, vt_i32, mc);
+    w_node(Op.BrIf, vt_none, brk, 0, mc);
+    if p.stop >= 0 {
+        let ms = w_mark();
+        lg(p.stop);
+        w_node(Op.BrIf, vt_none, brk, 0, ms);
+    };
+    let item2 = new_local(repr(vt));
+    let mg = w_mark();
+    lg(other);
+    lg(j);
+    let heap = vt_heap(cur_locals[other]);
+    w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
+    ls(item2, mg);
+    incr(j);
+    downstream_in_loop(p, k, item2, vt, brk, cx);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+    seq_void(m);
+    // Chains run in reverse stage order, before the other cleanup: put it first.
+    let remainder = w_pop();
+    let at = p.cleanup_start;
+    iter_cleanup.push(0);
+    let i = iter_cleanup.len() - 1;
+    while (i > at) {
+        iter_cleanup[i] = iter_cleanup[i - 1];
+        i -= 1;
+    };
+    iter_cleanup[at] = remainder;
+    p.replay = was;
+}
+
+// `flat_map |x| { … }`: each element of the array the body returns goes on.
+// A body ending in an array literal of up to four elements passes them on
+// directly, without the array.
+fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let block = stage_block(node);
+    let lit = last_child(block);
+    let count = 0;
+    if is_kind(lit, Node.Array_expr) {
+        let c = first_child(lit);
+        while (c >= 0) {
+            count += 1;
+            c = next_sibling(c);
+        };
+    };
+    if is_kind(lit, Node.Array_expr) and count >= 1 and count <= 4 {
+        let m = w_mark();
+        if not bind_captures(p, k, one(value), one(vt), 1) {
+            seq_void(m);
+            return;
+        };
+        let c = first_child(block);
+        while (c != lit) {
+            discard(check_expr(c, ty_void(), cx));
+            c = next_sibling(c);
+        };
+        // The elements, in order, before any goes on; their type is the first's.
+        let et = -1;
+        let items = Array[I32].new(count, 0);
+        let i = 0;
+        c = first_child(lit);
+        while (c >= 0) {
+            let mi = w_mark();
+            let t = check_expr(c, et, cx);
+            if et < 0 { et = t; } else { coerce(t, et, c); };
+            items[i] = new_local(repr(et));
+            ls(items[i], mi);
+            i += 1;
+            c = next_sibling(c);
+        };
+        // The rest of the pipeline once per element, the setup only for the first.
+        let was = p.replay;
+        for (0 ..< count) |j| {
+            if j == 0 {
+                next_stage(p, k, items[0], et, cx);
+            } else {
+                p.replay = true;
+                let mi = w_mark();
+                if p.stop >= 0 {
+                    lg(p.stop);
+                    plain(69, vt_i32, mi);
+                } else {
+                    w_i32(1);
+                };
+                let mt = w_mark();
+                next_stage(p, k, items[j], et, cx);
+                seq_void(mt);
+                w_node(Op.If, vt_none, new_label(), 0, mi);
+            };
+        };
+        p.replay = was;
+        seq_void(m);
+        return;
+    };
+    // nested = body; j = 0; while (j < nested.len() and not stop) { item = nested[j]; j += 1; next(item) }
+    let mn = w_mark();
+    let nt = stage_body(p, k, one(value), one(vt), 1, -1, cx);
+    if not is_array_type(nt) {
+        if not ty_is(nt, Ty.Error) { report(Diag.IteratorSource, block, -1); };
+        w_stack.resize(mn);
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let nested = new_local(repr(nt));
+    ls(nested, mn);
+    let et = inst_arg(ty_inst(nt), 0);
+    let j = new_local(vt_i32);
+    set_i32(j, 0);
+    let brk = new_label();
+    let top = new_label();
+    let mb = w_mark();
+    let ml = w_mark();
+    let mc = w_mark();
+    lg(j);
+    lg(nested);
+    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
+    plain(78, vt_i32, mc);
+    w_node(Op.BrIf, vt_none, brk, 0, mc);
+    if p.stop >= 0 {
+        let ms = w_mark();
+        lg(p.stop);
+        w_node(Op.BrIf, vt_none, brk, 0, ms);
+    };
+    let item = new_local(repr(et));
+    let mg = w_mark();
+    lg(nested);
+    lg(j);
+    let heap = vt_heap(cur_locals[nested]);
+    w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
+    ls(item, mg);
+    incr(j);
+    downstream_in_loop(p, k, item, et, brk, cx);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+}
+
+// `zip(other) |a, b| { … }`: pairs with other's elements, stopping at the
+// shorter. As the first stage it narrows the loop; later, it stops it.
+fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let param = stage_param(node);
+    let ot = type_only(param, -1, cx);
+    if not is_array_type(ot) {
+        if not ty_is(ot, Ty.Error) { report(Diag.IteratorSource, param, -1); };
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let other = stage_local(slot, 0, repr(ot));
+    let et = inst_arg(ty_inst(ot), 0);
+    let first = k == p.first;
+    if not p.replay {
+        let mo = w_mark();
+        check_expr(param, -1, cx);
+        ls(other, mo);
+        to_setup(p);
+        let ms = w_mark();
+        if first {
+            // if other.len() < hi - lo { hi = lo + other.len() }
+            let mi = w_mark();
+            let mc = w_mark();
+            other_len(other);
+            let md = w_mark();
+            lg(p.hi);
+            lg(p.lo);
+            plain(107, vt_i32, md);
+            plain(72, vt_i32, mc);
+            let mt = w_mark();
+            let mh = w_mark();
+            lg(p.lo);
+            other_len(other);
+            plain(106, vt_i32, mh);
+            ls(p.hi, mh);
+            seq_void(mt);
+            w_node(Op.If, vt_none, new_label(), 0, mi);
+        } else {
+            // if other.len() == 0 { cancel }
+            let mi = w_mark();
+            let mc = w_mark();
+            other_len(other);
+            plain(69, vt_i32, mc);
+            let mt = w_mark();
+            cancel(p, k);
+            seq_void(mt);
+            w_node(Op.If, vt_none, new_label(), 0, mi);
+        };
+        seq_void(ms);
+        to_setup(p);
+    };
+    let ord = st_ordinal[slot];
+    let pair = new_local(repr(et));
+    let m = w_mark();
+    // pair = other[ordinal]; mapped = body(value, pair); next(mapped)
+    let then_ = w_mark();
+    let mp = w_mark();
+    lg(other);
+    lg(ord);
+    let heap = vt_heap(cur_locals[other]);
+    w_node(Op.ArrayGet, ht_a[heap], heap, 0, mp);
+    ls(pair, mp);
+    let mm = w_mark();
+    let t = stage_body(p, k, two(value, pair), two(vt, et), 2, -1, cx);
+    let mapped = new_local(repr(t));
+    ls(mapped, mm);
+    next_stage(p, k, mapped, t, cx);
+    if not first {
+        // if counter >= other.len() { cancel }
+        let mi = w_mark();
+        let mc = w_mark();
+        lg(st_counter[slot]);
+        other_len(other);
+        plain(78, vt_i32, mc);
+        let mt = w_mark();
+        cancel(p, k);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    };
+    seq_void(then_);
+    if not first {
+        // if ordinal >= other.len() { cancel } else { … }
+        let pair_code = w_pop();
+        let mi = w_mark();
+        let mc = w_mark();
+        lg(ord);
+        other_len(other);
+        plain(78, vt_i32, mc);
+        let mt = w_mark();
+        cancel(p, k);
+        seq_void(mt);
+        w_push(pair_code);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    };
+    seq_void(m);
+}
+
+fn other_len(local: I32) void {
+    let m = w_mark();
+    lg(local);
+    w_node(Op.ArrayLen, vt_i32, 0, 0, m);
+}
+
+// ── Terminals ──
+
+fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let bool_t = prelude(Prelude.Bool);
+    let i32_t = prelude(Prelude.I32);
+    if op == Kw.Fold.to_i32() {
+        let param = stage_param(node);
+        let rt = if p.replay { p.result_type; } else { type_only(param, -1, cx); };
+        let result = stage_local(slot, 0, repr(rt));
+        if not p.replay {
+            let mr = w_mark();
+            check_expr(param, -1, cx);
+            ls(result, mr);
+            to_setup(p);
+        };
+        p.result = result;
+        p.result_type = rt;
+        let ms = w_mark();
+        stage_body(p, k, two(result, value), two(rt, vt), 2, rt, cx);
+        ls(result, ms);
+        return;
+    };
+    if op == Kw.Each.to_i32() {
+        p.result_type = ty_void();
+        discard(stage_body(p, k, one(value), one(vt), 1, ty_void(), cx));
+        return;
+    };
+    if op == Kw.Sum.to_i32() or op == Kw.Product.to_i32() {
+        // An accumulator of the element's type: 0 (or 1), then += (or *=) each.
+        let result = stage_local(slot, 0, repr(vt));
+        if not p.replay {
+            let mr = w_mark();
+            push_number(vt, if op == Kw.Sum.to_i32() { 0; } else { 1; }, false);
+            ls(result, mr);
+            to_setup(p);
+        };
+        p.result = result;
+        p.result_type = vt;
+        let word = known_word(if op == Kw.Sum.to_i32() { Known.Add; } else { Known.Mul; });
+        let ma = w_mark();
+        lg(result);
+        accumulate(word, vt, value, node, cx, ma);
+        ls(result, ma);
+        return;
+    };
+    if op == Kw.Fast_sum.to_i32() {
+        // Four running sums, rotated every value: result, lane1, lane2, lane3.
+        let result = stage_local(slot, 0, repr(vt));
+        let l1 = stage_local(slot, 1, repr(vt));
+        let l2 = stage_local(slot, 2, repr(vt));
+        if not p.replay {
+            for ([result, l1, l2]) |l| {
+                let mr = w_mark();
+                push_number(vt, 0, false);
+                ls(l, mr);
+                to_setup(p);
+            };
+        };
+        let l3 = st_counter[slot];
+        if l3 < 0 {
+            l3 = new_local(repr(vt));
+            st_counter[slot] = l3;
+            let mr = w_mark();
+            push_number(vt, 0, false);
+            ls(l3, mr);
+            to_setup(p);
+        };
+        // step = result + value; result = l1; l1 = l2; l2 = l3; l3 = step
+        let step = new_local(repr(vt));
+        let ma = w_mark();
+        lg(result);
+        accumulate(known_word(Known.Add), vt, value, node, cx, ma);
+        ls(step, ma);
+        for ([result, l1, l2]) |l| {
+            let next = if l == result { l1; } else if l == l1 { l2; } else { l3; };
+            let mv = w_mark();
+            lg(next);
+            ls(l, mv);
+        };
+        let ms = w_mark();
+        lg(step);
+        ls(l3, ms);
+        // (result + l1) + (l2 + l3)
+        let mf = w_mark();
+        lg(result);
+        lg(l1);
+        add_values(vt, mf, node, cx);
+        let mg = w_mark();
+        lg(l2);
+        lg(l3);
+        add_values(vt, mg, node, cx);
+        add_values(vt, mf, node, cx);
+        p.finish = w_pop();
+        p.result_type = vt;
+        return;
+    };
+    if op == Kw.Count.to_i32() or op == Kw.Count_where.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
+        or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() {
+        let result = stage_local(slot, 0, vt_i32);
+        if not p.replay {
+            set_i32(result, if op == Kw.All.to_i32() { 1; } else if op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() { -1; } else { 0; });
+            to_setup(p);
+        };
+        p.result = result;
+        p.result_type = if op == Kw.Any.to_i32() or op == Kw.All.to_i32() { bool_t; } else { i32_t; };
+        if op == Kw.Count.to_i32() {
+            incr(result);
+            return;
+        };
+        let mi = w_mark();
+        stage_body(p, k, one(value), one(vt), 1, bool_t, cx);
+        if op == Kw.All.to_i32() { plain(69, vt_i32, mi); };
+        let mt = w_mark();
+        if op == Kw.Count_where.to_i32() { incr(result); }
+        else if op == Kw.Any.to_i32() { set_i32(result, 1); cancel(p, k); }
+        else if op == Kw.All.to_i32() { set_i32(result, 0); cancel(p, k); }
+        else {
+            let mo = w_mark();
+            lg(st_ordinal[slot]);
+            ls(result, mo);
+            if op == Kw.First_index.to_i32() { cancel(p, k); };
+        };
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        return;
+    };
+    if op == Kw.Collect.to_i32() {
+        let et = type_of(stage_type(node, 0), cx.inst);
+        let b = buffer(p, slot, et, stage_type(node, 0));
+        buffer_add(p, b, et, value, vt, node);
+        p.finish = buffer_done(b, et);
+        p.result_type = array_of(et);
+        return;
+    };
+    if op == Kw.Sort.to_i32() {
+        check_sort(p, k, value, vt, cx);
+        return;
+    };
+    if op == Kw.Partition.to_i32() {
+        check_partition(p, k, value, vt, cx);
+        return;
+    };
+    if op == Kw.Distinct_by.to_i32() or op == Kw.Group_by.to_i32() {
+        check_group(p, k, op, value, vt, cx);
+        return;
+    };
+    if op == Kw.Batched.to_i32() or op == Kw.Windows.to_i32() {
+        check_batches(p, k, op, value, vt, cx);
+        return;
+    };
+    check_found(p, k, op, value, vt, cx);
+}
+
+// value op= x, with the accumulator on the stack since `m`, through the
+// element type's operator.
+fn accumulate(word: I32, t: I32, value: I32, at: I32, cx: Cx, m: I32) void {
+    lg(value);
+    finish_operator(word, t, at, cx, m);
+}
+
+fn add_values(t: I32, m: I32, at: I32, cx: Cx) void { finish_operator(known_word(Known.Add), t, at, cx, m); }
+
+// Both operands on the stack since `m`: apply the type's operator.
+fn finish_operator(word: I32, t: I32, at: I32, cx: Cx, m: I32) void {
+    let decl = member(ty_decl(t), word, Space.Operator);
+    if decl < 0 {
+        report(Diag.UnknownOperator, at, word);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return;
+    };
+    finish_call(fn_instance(decl, ty_inst(t)), m, cx);
+}
+
+// ── Buffers ──
+//
+// A growable array a terminal fills: allocated once, at its bound, when
+// every stage keeps or shrinks the count and the element type has a zero;
+// otherwise grown by doubling with one bulk copy. Done: trimmed to its length.
+
+struct Buffer:
+    | array: I32
+    | length: I32
+    | capacity: I32
+    | once: Bool
+    | bounded: Bool   // its first allocation is hi - lo values
+
+// Whether a written type names one with a zero (`I32` … `Bool`, or `?T`).
+fn written_defaultable(type_node: I32) Bool {
+    if is_kind(type_node, Node.Nullable_type) { return true; };
+    let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
+    if not is_kind(name, Node.Type_ident) { return false; };
+    let w = word_of(name);
+    for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64, Prelude.Bool]) |pr| {
+        if w == intern_text(Prelude.name(pr)) { return true; };
+    };
+    false;
+}
+
+fn buffer(p: Pipe, slot: I32, et: I32, type_node: I32) Buffer { buffer_at(p, slot, 0, et, if p.bounded { type_node; } else { -1; }, p.bounded); }
+
+// A buffer in the stage's locals from `base` (three of them); `bounded`
+// when it may be allocated once at hi - lo (with a written type that has a zero).
+fn buffer_at(p: Pipe, slot: I32, base: I32, et: I32, type_node: I32, bounded: Bool) Buffer {
+    let at = array_of(et);
+    let vt = repr(at);
+    let b = Buffer { array: stage_local(slot, base, vt), length: stage_local(slot, base + 1, vt_i32), capacity: stage_local(slot, base + 2, vt_i32), once: false, bounded: bounded };
+    if p.replay { return b; };
+    let heap = vt_heap(vt);
+    let m = w_mark();
+    if bounded and type_node >= 0 and written_defaultable(type_node) {
+        b.once = true;
+        // capacity = hi - lo; array = new_default(capacity); length = 0
+        let mc = w_mark();
+        lg(p.hi);
+        lg(p.lo);
+        plain(107, vt_i32, mc);
+        ls(b.capacity, mc);
+        let ma = w_mark();
+        lg(b.capacity);
+        w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, ma);
+        ls(b.array, ma);
+        set_i32(b.length, 0);
+    } else {
+        let ma = w_mark();
+        w_node(Op.ArrayNewFixed, vt_ref(heap, false), heap, 0, ma);
+        ls(b.array, ma);
+        set_i32(b.length, 0);
+        set_i32(b.capacity, 0);
+    };
+    seq_void(m);
+    to_setup(p);
+    b;
+}
+
+fn buffer_add(p: Pipe, b: Buffer, et: I32, value: I32, vt: I32, at: I32) void {
+    let heap = vt_heap(cur_locals[b.array]);
+    let item = new_local(repr(et));
+    let m = w_mark();
+    let mi = w_mark();
+    lg(value);
+    coerce(vt, et, at);
+    ls(item, mi);
+    if not b.once {
+        // if length == capacity { capacity = if capacity == 0 { initial } else { capacity * 2 }; grow }
+        let mif = w_mark();
+        let mc = w_mark();
+        lg(b.length);
+        lg(b.capacity);
+        plain(70, vt_i32, mc);
+        let mt = w_mark();
+        let mcap = w_mark();
+        let mcc = w_mark();
+        lg(b.capacity);
+        plain(69, vt_i32, mcc);
+        let ma = w_mark();
+        if b.bounded {
+            // initial: hi - lo when positive, else 8
+            let mif2 = w_mark();
+            let md = w_mark();
+            lg(p.hi);
+            lg(p.lo);
+            plain(107, vt_i32, md);
+            w_i32(0);
+            plain(74, vt_i32, md);
+            let mx = w_mark();
+            lg(p.hi);
+            lg(p.lo);
+            plain(107, vt_i32, mx);
+            w_node(Op.Seq, vt_i32, 0, 0, mx);
+            let my = w_mark();
+            w_i32(8);
+            w_node(Op.Seq, vt_i32, 0, 0, my);
+            w_node(Op.If, vt_i32, new_label(), 0, mif2);
+        } else {
+            w_i32(8);
+        };
+        w_node(Op.Seq, vt_i32, 0, 0, ma);
+        let mb = w_mark();
+        lg(b.capacity);
+        w_i32(2);
+        plain(108, vt_i32, mb);
+        w_node(Op.Seq, vt_i32, 0, 0, mb);
+        w_node(Op.If, vt_i32, new_label(), 0, mcap);
+        ls(b.capacity, mcap);
+        // grown = new(capacity[, item]); copy; array = grown
+        let grown = new_local(cur_locals[b.array]);
+        let mg = w_mark();
+        if is_defaultable_type(et) {
+            lg(b.capacity);
+            w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mg);
+        } else {
+            lg(item);
+            lg(b.capacity);
+            w_node(Op.ArrayNew, vt_ref(heap, false), heap, 0, mg);
+        };
+        ls(grown, mg);
+        let mcp = w_mark();
+        lg(grown);
+        w_i32(0);
+        lg(b.array);
+        w_i32(0);
+        lg(b.length);
+        w_node(Op.ArrayCopy, vt_none, heap, heap, mcp);
+        let ms = w_mark();
+        lg(grown);
+        ls(b.array, ms);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mif);
+    };
+    // array[length] = item; length += 1
+    let mset = w_mark();
+    lg(b.array);
+    lg(b.length);
+    lg(item);
+    w_node(Op.ArraySet, vt_none, heap, 0, mset);
+    incr(b.length);
+    seq_void(m);
+}
+
+// Whether array.new_default can make an array of t (as stage 0's DEFAULTABLE, by type).
+fn is_defaultable_type(t: I32) Bool {
+    if ty_is(t, Ty.Nullable) { return true; };
+    t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
+        or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.Bool);
+}
+
+// if length == capacity { array } else { array.slice(0, length) }
+fn buffer_done(b: Buffer, et: I32) I32 {
+    let vt = cur_locals[b.array];
+    let heap = vt_heap(vt);
+    let m = w_mark();
+    let mc = w_mark();
+    lg(b.length);
+    lg(b.capacity);
+    plain(70, vt_i32, mc);
+    let mt = w_mark();
+    lg(b.array);
+    w_node(Op.Seq, vt, 0, 0, mt);
+    let me = w_mark();
+    let ms = w_mark();
+    lg(b.array);
+    w_i32(0);
+    lg(b.length);
+    w_node(Op.Call, vt, array_slice_helper(heap), 0, ms);
+    w_node(Op.Seq, vt, 0, 0, me);
+    w_node(Op.If, vt, new_label(), 0, m);
+    w_pop();
+}
+
+// ── Loops and conditions, for the code below ──
+
+struct WLoop:
+    | brk: I32
+    | top: I32
+    | mb: I32
+    | ml: I32
+
+fn loop_open() WLoop {
+    let brk = new_label();
+    let top = new_label();
+    let mb = w_mark();
+    WLoop { brk: brk, top: top, mb: mb, ml: w_mark() };
+}
+
+// Leave the loop unless the condition on the stack (since `m`) holds.
+fn loop_while(lp: WLoop, m: I32) void {
+    plain(69, vt_i32, m);
+    w_node(Op.BrIf, vt_none, lp.brk, 0, m);
+}
+
+fn loop_close(lp: WLoop) void {
+    w_leaf(Op.Br, vt_unreachable, lp.top, 0);
+    w_node(Op.Loop, vt_none, lp.top, 0, lp.ml);
+    w_node(Op.Block, vt_none, lp.brk, 0, lp.mb);
+}
+
+// Push `a < b` (signed i32) of two locals.
+fn lt(a: I32, b: I32) void {
+    let m = w_mark();
+    lg(a);
+    lg(b);
+    plain(72, vt_i32, m);
+}
+
+// The value of `cond ? a : b` for i32 values on the stack since `m`: a, b, cond.
+fn select_i32(m: I32) void { w_node(Op.Select, vt_i32, 0, 0, m); }
+
+// local = a op b, for locals and constants (opcode on i32).
+fn arith(target: I32, a: I32, opcode: I32, b: I32, b_is_const: Bool) void {
+    let m = w_mark();
+    lg(a);
+    if b_is_const { w_i32(b); } else { lg(b); };
+    plain(opcode, vt_i32, m);
+    ls(target, m);
+}
+
+fn array_get(arr: I32, index: I32) void {
+    let m = w_mark();
+    lg(arr);
+    lg(index);
+    let heap = vt_heap(cur_locals[arr]);
+    w_node(Op.ArrayGet, ht_a[heap], heap, 0, m);
+}
+
+// arr[index] = (the value on the stack since `m`, pushed after `array_set_begin`)
+fn array_set_begin(arr: I32, index: I32) I32 {
+    let m = w_mark();
+    lg(arr);
+    lg(index);
+    m;
+}
+
+fn array_set_end(arr: I32, m: I32) void {
+    let heap = vt_heap(cur_locals[arr]);
+    w_node(Op.ArraySet, vt_none, heap, 0, m);
+}
+
+// dst.copy_from(at, src, start, count): the four i32s from locals or expressions on the stack since `m`.
+fn array_copy(dst: I32, m: I32) void {
+    let heap = vt_heap(cur_locals[dst]);
+    w_node(Op.ArrayCopy, vt_none, heap, heap, m);
+}
+
+// ── The comparator ──
+
+// `{ let a = x; let b = y; body }` as a Bool on the stack: the stage's two
+// captures bound to locals x and y.
+fn compare(p: Pipe, k: I32, x: I32, y: I32, t: I32, cx: Cx) void {
+    let capture = stage_capture(stage_node(p, k));
+    let m = w_mark();
+    let a = first_child(capture);
+    let b = next_sibling(a);
+    let ma = w_mark();
+    lg(x);
+    decl_ty[node_decl[a]] = t;
+    bind_value(node_decl[a], t, ma);
+    let mb = w_mark();
+    lg(y);
+    decl_ty[node_decl[b]] = t;
+    bind_value(node_decl[b], t, mb);
+    let bool_t = prelude(Prelude.Bool);
+    let block = stage_block(stage_node(p, k));
+    coerce(check_block(block, bool_t, cx), bool_t, block);
+    w_node(Op.Seq, vt_i32, 0, 0, m);
+}
+
+// ── sort ──
+
+// `sort(T) |a, b| { a.key < b.key; }`: the collected values, stably sorted.
+fn check_sort(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let type_node = stage_type(node, 0);
+    let et = type_of(type_node, cx.inst);
+    let capture = stage_capture(node);
+    let names = 0;
+    let c = if capture >= 0 { first_child(capture); } else { -1; };
+    while (c >= 0) {
+        names += 1;
+        c = next_sibling(c);
+    };
+    if names != 2 {
+        report(Diag.IteratorCaptures, node, -1);
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    let b = buffer(p, slot, et, type_node);
+    buffer_add(p, b, et, value, vt, node);
+    p.result_type = array_of(et);
+    if p.replay { return; };
+    let result = new_local(cur_locals[b.array]);
+    let m = w_mark();
+    let order = scalar_order(stage_block(node), capture, et);
+    if order != 0 {
+        radix_sort(p, k, b, et, result, order < 0, cx);
+    } else {
+        merge_sort(p, k, b, et, result, cx);
+    };
+    seq_void(m);
+    to_cleanup(p);
+    // if result.len() == length { result } else { result.slice(0, length) }
+    let vtr = cur_locals[result];
+    let heap = vt_heap(vtr);
+    let mf = w_mark();
+    let mc = w_mark();
+    lg(result);
+    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
+    lg(b.length);
+    plain(70, vt_i32, mc);
+    let mt = w_mark();
+    lg(result);
+    w_node(Op.Seq, vtr, 0, 0, mt);
+    let me = w_mark();
+    lg(result);
+    w_i32(0);
+    lg(b.length);
+    w_node(Op.Call, vtr, array_slice_helper(heap), 0, me);
+    w_node(Op.If, vtr, new_label(), 0, mf);
+    p.finish = w_pop();
+}
+
+// `a < b` or `a > b` on the captures of a bare I32 or U32 sort: 1 ascending,
+// -1 descending, else 0 (equal values are indistinguishable, so a radix
+// sort gives what the stable sort gives).
+fn scalar_order(block: I32, capture: I32, et: I32) I32 {
+    if et != prelude(Prelude.I32) and et != prelude(Prelude.U32) { return 0; };
+    let e = first_child(block);
+    if e < 0 or next_sibling(e) >= 0 or not is_kind(e, Node.Binary_expr) { return 0; };
+    let l = first_child(e);
+    let r = last_child(e);
+    if not is_kind(l, Node.Identifier) or not is_kind(r, Node.Identifier) { return 0; };
+    let a = first_child(capture);
+    if node_decl[l] != node_decl[a] or node_decl[r] != node_decl[next_sibling(a)] { return 0; };
+    let op = tok_kind[token_after(l)];
+    if op == Tok.Lt.to_i32() { return 1; };
+    if op == Tok.Gt.to_i32() { return -1; };
+    0;
+}
+
+// Insertion-sorted runs of 24, then bottom-up merges through a second
+// buffer; already-ordered neighbouring runs are copied without comparing.
+// Leaves the sorted values in `result` (maybe longer than the length).
+fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
+    let vt = cur_locals[b.array];
+    let heap = vt_heap(vt);
+    let ev = ht_a[heap];
+    let n = b.length;
+    let a = new_local(vt);
+    let ma = w_mark();
+    lg(b.array);
+    ls(a, ma);
+    let mr = w_mark();
+    lg(a);
+    ls(result, mr);
+    // if n > 1 { … }
+    let mif = w_mark();
+    let mc = w_mark();
+    lg(n);
+    w_i32(1);
+    plain(74, vt_i32, mc);
+    let mt = w_mark();
+    let lo = new_local(vt_i32);
+    let hi = new_local(vt_i32);
+    let i = new_local(vt_i32);
+    let j = new_local(vt_i32);
+    let x = new_local(ev);
+    set_i32(lo, 0);
+    // while (lo < n) { insertion sort of [lo, hi) }
+    let runs = loop_open();
+    let mw = w_mark();
+    lg(lo);
+    lg(n);
+    plain(72, vt_i32, mw);
+    loop_while(runs, mw);
+    // hi = if lo + 24 < n { lo + 24 } else { n }
+    let mh = w_mark();
+    let ms = w_mark();
+    lg(lo);
+    w_i32(24);
+    plain(106, vt_i32, ms);
+    lg(n);
+    let mcc = w_mark();
+    lg(lo);
+    w_i32(24);
+    plain(106, vt_i32, mcc);
+    lg(n);
+    plain(72, vt_i32, mcc);
+    select_i32(ms);
+    ls(hi, mh);
+    arith(i, lo, 106, 1, true);
+    let ins = loop_open();
+    let mi = w_mark();
+    lg(i);
+    lg(hi);
+    plain(72, vt_i32, mi);
+    loop_while(ins, mi);
+    let mx = w_mark();
+    array_get(a, i);
+    ls(x, mx);
+    let mj = w_mark();
+    lg(i);
+    ls(j, mj);
+    // while (j > lo and less(x, a[j - 1])) { a[j] = a[j - 1]; j -= 1 }
+    let shift = loop_open();
+    let mjl = w_mark();
+    lg(j);
+    lg(lo);
+    plain(74, vt_i32, mjl);
+    loop_while(shift, mjl);
+    let prev = new_local(ev);
+    let jm1 = new_local(vt_i32);
+    arith(jm1, j, 107, 1, true);
+    let mp = w_mark();
+    array_get(a, jm1);
+    ls(prev, mp);
+    let mcmp = w_mark();
+    compare(p, k, x, prev, et, cx);
+    loop_while(shift, mcmp);
+    let mset = array_set_begin(a, j);
+    lg(prev);
+    array_set_end(a, mset);
+    arith(j, j, 107, 1, true);
+    loop_close(shift);
+    let mset2 = array_set_begin(a, j);
+    lg(x);
+    array_set_end(a, mset2);
+    arith(i, i, 106, 1, true);
+    loop_close(ins);
+    let mlo = w_mark();
+    lg(hi);
+    ls(lo, mlo);
+    loop_close(runs);
+    // from = a; to = new(n, a[0]); width = 24
+    let from = new_local(vt);
+    let to = new_local(vt);
+    let width = new_local(vt_i32);
+    let mf = w_mark();
+    lg(a);
+    ls(from, mf);
+    let mto = w_mark();
+    if is_defaultable_type(et) {
+        lg(n);
+        w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mto);
+    } else {
+        let zero = new_local(vt_i32);
+        set_i32(zero, 0);
+        array_get(a, zero);
+        lg(n);
+        w_node(Op.ArrayNew, vt_ref(heap, false), heap, 0, mto);
+    };
+    ls(to, mto);
+    set_i32(width, 24);
+    let mid = new_local(vt_i32);
+    let kk = new_local(vt_i32);
+    let left = new_local(ev);
+    let right = new_local(ev);
+    let passes = loop_open();
+    lt(width, n);
+    loop_while(passes, w_mark() - 1);
+    set_i32(lo, 0);
+    let merges = loop_open();
+    lt(lo, n);
+    loop_while(merges, w_mark() - 1);
+    // mid = if width < n - lo { lo + width } else { n }
+    let mm = w_mark();
+    let s1 = w_mark();
+    lg(lo);
+    lg(width);
+    plain(106, vt_i32, s1);
+    lg(n);
+    let c1 = w_mark();
+    lg(width);
+    let d1 = w_mark();
+    lg(n);
+    lg(lo);
+    plain(107, vt_i32, d1);
+    plain(72, vt_i32, c1);
+    select_i32(s1);
+    ls(mid, mm);
+    // hi = if width < n - mid { mid + width } else { n }
+    let mh2 = w_mark();
+    let s2 = w_mark();
+    lg(mid);
+    lg(width);
+    plain(106, vt_i32, s2);
+    lg(n);
+    let c2 = w_mark();
+    lg(width);
+    let d2 = w_mark();
+    lg(n);
+    lg(mid);
+    plain(107, vt_i32, d2);
+    plain(72, vt_i32, c2);
+    select_i32(s2);
+    ls(hi, mh2);
+    // if mid >= hi or not less(from[mid], from[mid - 1]) { copy } else { merge }
+    let mif2 = w_mark();
+    let mor = w_mark();
+    let mge = w_mark();
+    lg(mid);
+    lg(hi);
+    plain(78, vt_i32, mge);
+    let mthen_or = w_mark();
+    w_i32(1);
+    w_node(Op.Seq, vt_i32, 0, 0, mthen_or);
+    let melse_or = w_mark();
+    let fm = new_local(ev);
+    let fm1 = new_local(ev);
+    let mid1 = new_local(vt_i32);
+    arith(mid1, mid, 107, 1, true);
+    let g1 = w_mark();
+    array_get(from, mid);
+    ls(fm, g1);
+    let g2 = w_mark();
+    array_get(from, mid1);
+    ls(fm1, g2);
+    let mlc = w_mark();
+    compare(p, k, fm, fm1, et, cx);
+    plain(69, vt_i32, mlc);
+    w_node(Op.Seq, vt_i32, 0, 0, melse_or);
+    w_node(Op.If, vt_i32, new_label(), 0, mor);
+    let mcopy = w_mark();
+    let mcp = w_mark();
+    lg(to);
+    lg(lo);
+    lg(from);
+    lg(lo);
+    let dl = w_mark();
+    lg(hi);
+    lg(lo);
+    plain(107, vt_i32, dl);
+    array_copy(to, mcp);
+    seq_void(mcopy);
+    let mmerge = w_mark();
+    let mi0 = w_mark();
+    lg(lo);
+    ls(i, mi0);
+    let mj0 = w_mark();
+    lg(mid);
+    ls(j, mj0);
+    let mk0 = w_mark();
+    lg(lo);
+    ls(kk, mk0);
+    let both = loop_open();
+    lt(i, mid);
+    loop_while(both, w_mark() - 1);
+    lt(j, hi);
+    loop_while(both, w_mark() - 1);
+    let gl = w_mark();
+    array_get(from, i);
+    ls(left, gl);
+    let gr = w_mark();
+    array_get(from, j);
+    ls(right, gr);
+    let mpick = w_mark();
+    compare(p, k, right, left, et, cx);
+    let pt = w_mark();
+    let st1 = array_set_begin(to, kk);
+    lg(right);
+    array_set_end(to, st1);
+    arith(j, j, 106, 1, true);
+    seq_void(pt);
+    let pe = w_mark();
+    let st2 = array_set_begin(to, kk);
+    lg(left);
+    array_set_end(to, st2);
+    arith(i, i, 106, 1, true);
+    seq_void(pe);
+    w_node(Op.If, vt_none, new_label(), 0, mpick);
+    arith(kk, kk, 106, 1, true);
+    loop_close(both);
+    // to.copy_from(k, from, i, mid - i); to.copy_from(k + mid - i, from, j, hi - j)
+    let r1 = w_mark();
+    lg(to);
+    lg(kk);
+    lg(from);
+    lg(i);
+    let r1d = w_mark();
+    lg(mid);
+    lg(i);
+    plain(107, vt_i32, r1d);
+    array_copy(to, r1);
+    let r2 = w_mark();
+    lg(to);
+    let r2a = w_mark();
+    lg(kk);
+    lg(mid);
+    plain(106, vt_i32, r2a);
+    lg(i);
+    plain(107, vt_i32, r2a);
+    lg(from);
+    lg(j);
+    let r2d = w_mark();
+    lg(hi);
+    lg(j);
+    plain(107, vt_i32, r2d);
+    array_copy(to, r2);
+    seq_void(mmerge);
+    w_node(Op.If, vt_none, new_label(), 0, mif2);
+    let mlo2 = w_mark();
+    lg(hi);
+    ls(lo, mlo2);
+    loop_close(merges);
+    // swap from and to; width *= 2
+    let swap = new_local(vt);
+    let sw1 = w_mark();
+    lg(from);
+    ls(swap, sw1);
+    let sw2 = w_mark();
+    lg(to);
+    ls(from, sw2);
+    let sw3 = w_mark();
+    lg(swap);
+    ls(to, sw3);
+    arith(width, width, 108, 2, true);
+    loop_close(passes);
+    let mres = w_mark();
+    lg(from);
+    ls(result, mres);
+    seq_void(mt);
+    w_node(Op.If, vt_none, new_label(), 0, mif);
+}
+
+// Two 16-bit passes of a counting sort, for 512 values or more (signed keys
+// with their top bit flipped, so negatives come first); reversed for `>`.
+// Fewer values: the merge sort.
+fn radix_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, descending: Bool, cx: Cx) void {
+    let vt = cur_locals[b.array];
+    let heap = vt_heap(vt);
+    let n = b.length;
+    let mr = w_mark();
+    lg(b.array);
+    ls(result, mr);
+    let mif = w_mark();
+    let mc = w_mark();
+    lg(n);
+    w_i32(512);
+    plain(78, vt_i32, mc);
+    let mt = w_mark();
+    let a = new_local(vt);
+    let tmp = new_local(vt);
+    let counts_heap = vt_heap(repr(array_of(prelude(Prelude.I32))));
+    let counts = new_local(vt_ref(counts_heap, true));
+    let ma = w_mark();
+    lg(b.array);
+    ls(a, ma);
+    let mtmp = w_mark();
+    lg(n);
+    w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mtmp);
+    ls(tmp, mtmp);
+    radix_pass(n, a, tmp, counts, counts_heap, false, et == prelude(Prelude.I32));
+    radix_pass(n, tmp, a, counts, counts_heap, true, et == prelude(Prelude.I32));
+    if descending {
+        // reverse a in place
+        let i = new_local(vt_i32);
+        let half = new_local(vt_i32);
+        let v = new_local(ht_a[heap]);
+        let other = new_local(vt_i32);
+        set_i32(i, 0);
+        arith(half, n, 109, 2, true);
+        let rev = loop_open();
+        lt(i, half);
+        loop_while(rev, w_mark() - 1);
+        let g = w_mark();
+        array_get(a, i);
+        ls(v, g);
+        let mo = w_mark();
+        lg(n);
+        w_i32(1);
+        plain(107, vt_i32, mo);
+        lg(i);
+        plain(107, vt_i32, mo);
+        ls(other, mo);
+        let s1 = array_set_begin(a, i);
+        array_get(a, other);
+        array_set_end(a, s1);
+        let s2 = array_set_begin(a, other);
+        lg(v);
+        array_set_end(a, s2);
+        arith(i, i, 106, 1, true);
+        loop_close(rev);
+    };
+    let mres = w_mark();
+    lg(a);
+    ls(result, mres);
+    seq_void(mt);
+    let me = w_mark();
+    merge_sort(p, k, b, et, result, cx);
+    seq_void(me);
+    w_node(Op.If, vt_none, new_label(), 0, mif);
+}
+
+// One counting pass from `from` into `to` on a 16-bit digit (low, or high
+// with the sign flipped for signed keys).
+fn radix_pass(n: I32, from: I32, to: I32, counts: I32, counts_heap: I32, high: Bool, signed: Bool) void {
+    let mc = w_mark();
+    w_i32(65537);
+    w_node(Op.ArrayNewDefault, vt_ref(counts_heap, false), counts_heap, 0, mc);
+    ls(counts, mc);
+    let i = new_local(vt_i32);
+    let d = new_local(vt_i32);
+    let v = new_local(ht_a[vt_heap(cur_locals[from])]);
+    // counts[digit(from[i]) + 1] += 1
+    set_i32(i, 0);
+    let l1 = loop_open();
+    lt(i, n);
+    loop_while(l1, w_mark() - 1);
+    let gv = w_mark();
+    array_get(from, i);
+    ls(v, gv);
+    radix_digit(v, d, high, signed);
+    let d1 = new_local(vt_i32);
+    arith(d1, d, 106, 1, true);
+    let s = array_set_begin(counts, d1);
+    array_get(counts, d1);
+    w_i32(1);
+    plain(106, vt_i32, s + 2);
+    array_set_end(counts, s);
+    arith(i, i, 106, 1, true);
+    loop_close(l1);
+    // counts[digit] += counts[digit - 1], from 1
+    set_i32(d, 1);
+    let l2 = loop_open();
+    let c2 = w_mark();
+    lg(d);
+    w_i32(65537);
+    plain(72, vt_i32, c2);
+    loop_while(l2, c2);
+    let dm1 = new_local(vt_i32);
+    arith(dm1, d, 107, 1, true);
+    let s2 = array_set_begin(counts, d);
+    array_get(counts, d);
+    array_get(counts, dm1);
+    plain(106, vt_i32, s2 + 2);
+    array_set_end(counts, s2);
+    arith(d, d, 106, 1, true);
+    loop_close(l2);
+    // to[counts[digit]] = value; counts[digit] += 1
+    set_i32(i, 0);
+    let l3 = loop_open();
+    lt(i, n);
+    loop_while(l3, w_mark() - 1);
+    let gv2 = w_mark();
+    array_get(from, i);
+    ls(v, gv2);
+    radix_digit(v, d, high, signed);
+    let at = new_local(vt_i32);
+    let ga = w_mark();
+    array_get(counts, d);
+    ls(at, ga);
+    let s3 = array_set_begin(to, at);
+    lg(v);
+    array_set_end(to, s3);
+    let s4 = array_set_begin(counts, d);
+    lg(at);
+    w_i32(1);
+    plain(106, vt_i32, s4 + 2);
+    array_set_end(counts, s4);
+    arith(i, i, 106, 1, true);
+    loop_close(l3);
+}
+
+// d = v & 65535, or (v >>> 16) (^ 32768 when signed)
+fn radix_digit(v: I32, d: I32, high: Bool, signed: Bool) void {
+    let m = w_mark();
+    lg(v);
+    if high {
+        w_i32(16);
+        plain(118, vt_i32, m);
+        if signed {
+            w_i32(32768);
+            plain(115, vt_i32, m);
+        };
+    } else {
+        w_i32(65535);
+        plain(113, vt_i32, m);
+    };
+    ls(d, m);
+}
+
+// ── partition ──
+
+// `partition(T) |v| { test }`: [the values it holds for, the others].
+fn check_partition(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let type_node = stage_type(node, 0);
+    let et = type_of(type_node, cx.inst);
+    let yes = buffer_at(p, slot, 0, et, type_node, p.bounded);
+    let no = buffer_at(p, slot, 3, et, type_node, p.bounded);
+    let mi = w_mark();
+    stage_body(p, k, one(value), one(vt), 1, prelude(Prelude.Bool), cx);
+    let mt = w_mark();
+    buffer_add(p, yes, et, value, vt, node);
+    seq_void(mt);
+    let me = w_mark();
+    buffer_add(p, no, et, value, vt, node);
+    seq_void(me);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    // [yes, no]
+    let at = array_of(array_of(et));
+    let heap = vt_heap(repr(at));
+    let mf = w_mark();
+    w_push(buffer_done(yes, et));
+    w_push(buffer_done(no, et));
+    w_node(Op.ArrayNewFixed, vt_ref(heap, false), heap, 0, mf);
+    p.finish = w_pop();
+    p.result_type = at;
+}
+
+// ── Found ──
+
+// Push `M[args].new(…)` of a std module (Found, Group): the arguments are
+// on the stack since `m`.
+fn std_new(module_name: Str, args: I32, m: I32, cx: Cx) I32 {
+    let module = lookup(intern_text(module_name));
+    if not decl_is(module, Decl.Module) { return -1; };
+    let inst = instance(module, args);
+    let f = member(decl_a[module], intern_text("new"), Space.Method);
+    finish_call(fn_instance(f, inst), m, cx);
+}
+
+fn list1(t: I32) I32 {
+    let m = vl_begin();
+    vl_add(t);
+    vl_end(m);
+}
+
+fn list2(a: I32, b: I32) I32 {
+    let m = vl_begin();
+    vl_add(a);
+    vl_add(b);
+    vl_end(m);
+}
+
+// first_where, min_by, max_by, reduce: a ?Found[T].
+fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let type_node = stage_type(node, 0);
+    let et = type_of(type_node, cx.inst);
+    let module = lookup(intern_text("Found"));
+    let found_t = named(decl_a[module], instance(module, list1(et)));
+    let rt = nullable(found_t);
+    let result = stage_local(slot, 0, repr(rt));
+    if not p.replay {
+        let mr = w_mark();
+        w_leaf(Op.RefNull, repr(rt), heap_of(repr(rt)), 0);
+        ls(result, mr);
+        to_setup(p);
+    };
+    p.result = result;
+    p.result_type = rt;
+    let fheap = vt_heap(repr(found_t));
+    if op == Kw.First_where.to_i32() {
+        // if test { result = Found.new(value); stop }
+        let mi = w_mark();
+        stage_body(p, k, one(value), one(vt), 1, prelude(Prelude.Bool), cx);
+        let mt = w_mark();
+        let ms = w_mark();
+        lg(value);
+        coerce(vt, et, node);
+        std_new("Found", list1(et), ms, cx);
+        ls(result, ms);
+        cancel(p, k);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        return;
+    };
+    if op == Kw.Reduce.to_i32() and is_scalar_written(type_node) {
+        // A scalar accumulator in a local; the result made once, after.
+        let acc = stage_local(slot, 1, repr(et));
+        let has = stage_local(slot, 2, vt_i32);
+        if not p.replay {
+            let ma = w_mark();
+            push_number(et, 0, false);
+            ls(acc, ma);
+            set_i32(has, 0);
+            seq_void(ma);
+            to_setup(p);
+            let mc = w_mark();
+            lg(has);
+            let mt = w_mark();
+            let mn = w_mark();
+            lg(acc);
+            std_new("Found", list1(et), mn, cx);
+            ls(result, mn);
+            seq_void(mt);
+            w_node(Op.If, vt_none, new_label(), 0, mc);
+            to_cleanup(p);
+        };
+        // if has { acc = body(acc, value) } else { acc = value; has = true }
+        let mi = w_mark();
+        lg(has);
+        let mt = w_mark();
+        let mb = w_mark();
+        stage_body(p, k, two(acc, value), two(et, vt), 2, et, cx);
+        ls(acc, mb);
+        seq_void(mt);
+        let me = w_mark();
+        let mv = w_mark();
+        lg(value);
+        coerce(vt, et, node);
+        ls(acc, mv);
+        set_i32(has, 1);
+        seq_void(me);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        return;
+    };
+    // promote result { |found| => …, ~> { result = Found.new(value) } }
+    let found = new_local(repr(found_t));
+    let fv = new_local(repr(et));
+    let mi = w_mark();
+    let mc = w_mark();
+    lg(result);
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc);
+    let mt = w_mark();
+    let mn = w_mark();
+    lg(value);
+    coerce(vt, et, node);
+    std_new("Found", list1(et), mn, cx);
+    ls(result, mn);
+    seq_void(mt);
+    let me = w_mark();
+    let mf = w_mark();
+    lg(result);
+    ls(found, mf);
+    let mg = w_mark();
+    lg(found);
+    w_node(Op.StructGet, repr(et), fheap, 0, mg);
+    ls(fv, mg);
+    if op == Kw.Reduce.to_i32() {
+        // found.value = body(found.value, value)
+        let ms = w_mark();
+        lg(found);
+        stage_body(p, k, two(fv, value), two(et, vt), 2, et, cx);
+        w_node(Op.StructSet, vt_none, fheap, 0, ms);
+    } else {
+        // if body(…) { found.value = value }: min_by binds (value, best), max_by (best, value)
+        let mb = w_mark();
+        if op == Kw.Min_by.to_i32() { stage_body(p, k, two(value, fv), two(vt, et), 2, prelude(Prelude.Bool), cx); }
+        else { stage_body(p, k, two(fv, value), two(et, vt), 2, prelude(Prelude.Bool), cx); };
+        let mt2 = w_mark();
+        let ms = w_mark();
+        lg(found);
+        lg(value);
+        coerce(vt, et, node);
+        w_node(Op.StructSet, vt_none, fheap, 0, ms);
+        seq_void(mt2);
+        w_node(Op.If, vt_none, new_label(), 0, mb);
+    };
+    seq_void(me);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+}
+
+// A written type with a zero for reduce's accumulator: one of the numbers.
+fn is_scalar_written(type_node: I32) Bool {
+    let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
+    if not is_kind(name, Node.Type_ident) { return false; };
+    let w = word_of(name);
+    for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64]) |pr| {
+        if w == intern_text(Prelude.name(pr)) { return true; };
+    };
+    false;
+}
+
+// ── group_by and distinct_by ──
+
+// `distinct_by(T, K) |v| { key }` keeps the first value of each key;
+// `group_by(T, K)` gathers the values of each key into a Group. Integer
+// keys use an open-addressing table, others a linear one.
+fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let type_node = stage_type(node, 0);
+    let key_node = stage_type(node, 1);
+    let et = type_of(type_node, cx.inst);
+    let kt = type_of(key_node, cx.inst);
+    let grouping = op == Kw.Group_by.to_i32();
+    let gmodule = lookup(intern_text("Group"));
+    let group_t = if grouping { named(decl_a[gmodule], instance(gmodule, list2(kt, et))); } else { et; };
+    let keys = buffer_at(p, slot, 0, kt, -1, false);
+    let out = buffer_at(p, slot, 3, group_t, -1, false);
+    let lengths = if grouping { buffer_at(p, slot, 6, prelude(Prelude.I32), -1, false); } else { keys; };
+    let hashed = key_hash_kind(key_node);
+    let mask = stage_local(slot, 9, vt_i32);
+    let slots = stage_local(slot, 10, repr(array_of(prelude(Prelude.I32))));
+    let sheap = vt_heap(cur_locals[slots]);
+    if hashed > 0 and not p.replay {
+        let ms = w_mark();
+        set_i32(mask, 15);
+        let mn = w_mark();
+        w_i32(16);
+        w_node(Op.ArrayNewDefault, vt_ref(sheap, false), sheap, 0, mn);
+        ls(slots, mn);
+        seq_void(ms);
+        to_setup(p);
+    };
+    // key = body(value)
+    let key = new_local(repr(kt));
+    let mk = w_mark();
+    stage_body(p, k, one(value), one(vt), 1, kt, cx);
+    ls(key, mk);
+    let j = new_local(vt_i32);
+    let at = new_local(vt_i32);
+    if hashed > 0 {
+        // at = hash(key) & mask; j = -1
+        // while (j < 0) { probe = slots[at]; if probe == 0 { j = keys.length }
+        //   else if keys[probe - 1] == key { j = probe - 1 } else { at = (at + 1) & mask } }
+        key_hash(key, hashed, at, mask);
+        set_i32(j, -1);
+        let probe = new_local(vt_i32);
+        let lp = loop_open();
+        let mc = w_mark();
+        lg(j);
+        w_i32(0);
+        plain(72, vt_i32, mc);
+        loop_while(lp, mc);
+        let mp = w_mark();
+        array_get(slots, at);
+        ls(probe, mp);
+        let mi = w_mark();
+        let mz = w_mark();
+        lg(probe);
+        plain(69, vt_i32, mz);
+        let mt = w_mark();
+        let mj = w_mark();
+        lg(keys.length);
+        ls(j, mj);
+        seq_void(mt);
+        let me = w_mark();
+        let pm1 = new_local(vt_i32);
+        arith(pm1, probe, 107, 1, true);
+        let mi2 = w_mark();
+        let mkey = w_mark();
+        array_get(keys.array, pm1);
+        lg(key);
+        finish_operator(known_word(Known.Eq), kt, node, cx, mkey);
+        let mt2 = w_mark();
+        let mj2 = w_mark();
+        lg(pm1);
+        ls(j, mj2);
+        seq_void(mt2);
+        let me2 = w_mark();
+        let ma = w_mark();
+        lg(at);
+        w_i32(1);
+        plain(106, vt_i32, ma);
+        lg(mask);
+        plain(113, vt_i32, ma);
+        ls(at, ma);
+        seq_void(me2);
+        w_node(Op.If, vt_none, new_label(), 0, mi2);
+        seq_void(me);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        loop_close(lp);
+    } else {
+        // j = 0; while (j < keys.length) { if keys[j] == key { break }; j += 1 }
+        set_i32(j, 0);
+        let lp = loop_open();
+        lt(j, keys.length);
+        loop_while(lp, w_mark() - 1);
+        let mi = w_mark();
+        let mkey = w_mark();
+        array_get(keys.array, j);
+        lg(key);
+        finish_operator(known_word(Known.Eq), kt, node, cx, mkey);
+        let mt = w_mark();
+        w_leaf(Op.Br, vt_unreachable, lp.brk, 0);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        arith(j, j, 106, 1, true);
+        loop_close(lp);
+    };
+    // if j == keys.length { keys.add(key); [lengths.add(0); out.add(Group.new(key))] or out.add(value); insert }
+    let mnew = w_mark();
+    let mc = w_mark();
+    lg(j);
+    lg(keys.length);
+    plain(70, vt_i32, mc);
+    let mt = w_mark();
+    buffer_add(p, keys, kt, key, kt, node);
+    if grouping {
+        let zero = new_local(vt_i32);
+        set_i32(zero, 0);
+        buffer_add(p, lengths, prelude(Prelude.I32), zero, prelude(Prelude.I32), node);
+        let g = new_local(repr(group_t));
+        let mg = w_mark();
+        lg(key);
+        std_new("Group", list2(kt, et), mg, cx);
+        ls(g, mg);
+        buffer_add(p, out, group_t, g, group_t, node);
+    } else {
+        buffer_add(p, out, et, value, vt, node);
+    };
+    if hashed > 0 { insert_key(keys, slots, mask, at, hashed); };
+    seq_void(mt);
+    w_node(Op.If, vt_none, new_label(), 0, mnew);
+    p.result_type = array_of(group_t);
+    if not grouping {
+        p.finish = buffer_done(out, group_t);
+        return;
+    };
+    // group = out[j]; size = lengths[j]; grow group.values when full; append
+    let gheap = vt_heap(repr(group_t));
+    let vheap = vt_heap(repr(array_of(et)));
+    let group = new_local(repr(group_t));
+    let size = new_local(vt_i32);
+    let mg = w_mark();
+    array_get(out.array, j);
+    ls(group, mg);
+    let ms = w_mark();
+    array_get(lengths.array, j);
+    ls(size, ms);
+    let values = new_local(vt_ref(vheap, true));
+    let mv = w_mark();
+    lg(group);
+    w_node(Op.StructGet, vt_ref(vheap, true), gheap, 1, mv);
+    ls(values, mv);
+    let mif = w_mark();
+    let mcc = w_mark();
+    lg(size);
+    lg(values);
+    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
+    plain(70, vt_i32, mcc);
+    let mtt = w_mark();
+    let grown = new_local(vt_ref(vheap, true));
+    let mgr = w_mark();
+    if is_defaultable_type(et) {
+        grow_size(size);
+        w_node(Op.ArrayNewDefault, vt_ref(vheap, false), vheap, 0, mgr);
+    } else {
+        lg(value);
+        coerce(vt, et, node);
+        grow_size(size);
+        w_node(Op.ArrayNew, vt_ref(vheap, false), vheap, 0, mgr);
+    };
+    ls(grown, mgr);
+    let mcp = w_mark();
+    lg(grown);
+    w_i32(0);
+    lg(values);
+    w_i32(0);
+    lg(size);
+    w_node(Op.ArrayCopy, vt_none, vheap, vheap, mcp);
+    let mset = w_mark();
+    lg(group);
+    lg(grown);
+    w_node(Op.StructSet, vt_none, gheap, 1, mset);
+    let mv2 = w_mark();
+    lg(grown);
+    ls(values, mv2);
+    seq_void(mtt);
+    w_node(Op.If, vt_none, new_label(), 0, mif);
+    let mput = array_set_begin(values, size);
+    lg(value);
+    coerce(vt, et, node);
+    array_set_end(values, mput);
+    // lengths[j] += 1
+    let ml = array_set_begin(lengths.array, j);
+    array_get(lengths.array, j);
+    w_i32(1);
+    plain(106, vt_i32, ml + 2);
+    array_set_end(lengths.array, ml);
+    // Cleanup: each group's values trimmed to its length.
+    if not p.replay {
+        let mcl = w_mark();
+        let jj = new_local(vt_i32);
+        let gg = new_local(repr(group_t));
+        set_i32(jj, 0);
+        let lp = loop_open();
+        lt(jj, out.length);
+        loop_while(lp, w_mark() - 1);
+        let mgg = w_mark();
+        array_get(out.array, jj);
+        ls(gg, mgg);
+        let mtrim = w_mark();
+        lg(gg);
+        let msl = w_mark();
+        lg(gg);
+        w_node(Op.StructGet, vt_ref(vheap, true), gheap, 1, msl);
+        w_i32(0);
+        array_get(lengths.array, jj);
+        w_node(Op.Call, vt_ref(vheap, true), array_slice_helper(vheap), 0, msl);
+        w_node(Op.StructSet, vt_none, gheap, 1, mtrim);
+        arith(jj, jj, 106, 1, true);
+        loop_close(lp);
+        seq_void(mcl);
+        to_cleanup(p);
+    };
+    p.finish = buffer_done(out, group_t);
+}
+
+// if size == 0 { 4 } else { size * 2 }
+fn grow_size(size: I32) void {
+    let m = w_mark();
+    w_i32(4);
+    let mb = w_mark();
+    lg(size);
+    w_i32(2);
+    plain(108, vt_i32, mb);
+    lg(size);
+    plain(69, vt_i32, w_mark() - 1);
+    select_i32(m);
+}
+
+// 1: I32 or U32 keys, 2: I64 or U64, 0: others (by the written key type).
+fn key_hash_kind(key_node: I32) I32 {
+    let name = if is_kind(key_node, Node.Ref_type) { first_child(key_node); } else { key_node; };
+    if not is_kind(name, Node.Type_ident) { return 0; };
+    let w = word_of(name);
+    if w == intern_text("I32") or w == intern_text("U32") { return 1; };
+    if w == intern_text("I64") or w == intern_text("U64") { return 2; };
+    0;
+}
+
+// at = hash(key) & mask: h = (key, folded to 32 bits) * -1640531527; h ^ (h >>> 15).
+fn key_hash(key: I32, kind: I32, at: I32, mask: I32) void {
+    let h = new_local(vt_i32);
+    let mh = w_mark();
+    lg(key);
+    if kind == 2 {
+        lg(key);
+        w_leaf(Op.I64Const, vt_i64, 32, 0);
+        plain(136, vt_i64, w_mark() - 2);
+        plain(133, vt_i64, mh);
+        plain(167, vt_i32, mh);
+    };
+    w_i32(-1640531527);
+    plain(108, vt_i32, mh);
+    ls(h, mh);
+    let ma = w_mark();
+    lg(h);
+    lg(h);
+    w_i32(15);
+    plain(118, vt_i32, ma + 1);
+    plain(115, vt_i32, ma);
+    lg(mask);
+    plain(113, vt_i32, ma);
+    ls(at, ma);
+}
+
+// slots[at] = keys.length; past half full, the table doubles.
+fn insert_key(keys: Buffer, slots: I32, mask: I32, at: I32, kind: I32) void {
+    let ms = array_set_begin(slots, at);
+    lg(keys.length);
+    array_set_end(slots, ms);
+    let mi = w_mark();
+    let mc = w_mark();
+    lg(keys.length);
+    w_i32(2);
+    plain(108, vt_i32, mc);
+    lg(mask);
+    plain(74, vt_i32, mc);
+    let mt = w_mark();
+    let mm = w_mark();
+    lg(mask);
+    w_i32(2);
+    plain(108, vt_i32, mm);
+    w_i32(1);
+    plain(106, vt_i32, mm);
+    ls(mask, mm);
+    let sheap = vt_heap(cur_locals[slots]);
+    let mn = w_mark();
+    lg(mask);
+    w_i32(1);
+    plain(106, vt_i32, mn);
+    w_node(Op.ArrayNewDefault, vt_ref(sheap, false), sheap, 0, mn);
+    ls(slots, mn);
+    let g = new_local(vt_i32);
+    let pos = new_local(vt_i32);
+    let kv = new_local(ht_a[vt_heap(cur_locals[keys.array])]);
+    set_i32(g, 0);
+    let lp = loop_open();
+    lt(g, keys.length);
+    loop_while(lp, w_mark() - 1);
+    let mk = w_mark();
+    array_get(keys.array, g);
+    ls(kv, mk);
+    key_hash(kv, kind, pos, mask);
+    let probe = loop_open();
+    let mpc = w_mark();
+    array_get(slots, pos);
+    loop_while(probe, mpc);
+    let mpa = w_mark();
+    lg(pos);
+    w_i32(1);
+    plain(106, vt_i32, mpa);
+    lg(mask);
+    plain(113, vt_i32, mpa);
+    ls(pos, mpa);
+    loop_close(probe);
+    let mset = array_set_begin(slots, pos);
+    lg(g);
+    w_i32(1);
+    plain(106, vt_i32, mset + 2);
+    array_set_end(slots, mset);
+    arith(g, g, 106, 1, true);
+    loop_close(lp);
+    seq_void(mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+}
+
+// ── batched and windows ──
+
+// `batched(T, n)`: consecutive slices of n (the last may be short);
+// `windows(T, n)`: every full slice of n, one value apart. Directly on the
+// source (when it is the first stage over an array), with no loop at all.
+fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
+    let node = stage_node(p, k);
+    let slot = p.first_stage + k;
+    let type_node = stage_type(node, 0);
+    let et = type_of(type_node, cx.inst);
+    let width = stage_local(slot, 0, vt_i32);
+    if not p.replay {
+        // width = n; if width <= 0 { fatal }
+        let mw = w_mark();
+        let param = stage_param(node);
+        let i32_t = prelude(Prelude.I32);
+        coerce(check_expr(param, i32_t, cx), i32_t, param);
+        ls(width, mw);
+        let mi = w_mark();
+        lg(width);
+        w_i32(0);
+        plain(76, vt_i32, mi);
+        let mt = w_mark();
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+        seq_void(mw);
+        to_setup(p);
+    };
+    let direct = k == p.first and not p.range;
+    let data = -1;
+    let count = new_local(vt_i32);
+    let base = -1;
+    let items = Buffer { array: -1, length: -1, capacity: -1, once: false, bounded: false };
+    if direct {
+        p.skip_loop = true;
+        data = p.source;
+        base = p.lo;
+        arith(count, p.hi, 107, p.lo, false);
+        to_cleanup(p);
+    } else {
+        items = buffer_at(p, slot, 1, et, type_node, p.bounded);
+        buffer_add(p, items, et, value, vt, node);
+        data = items.array;
+        let mc = w_mark();
+        lg(items.length);
+        ls(count, mc);
+        to_cleanup(p);
+    };
+    let windows = op == Kw.Windows.to_i32();
+    let at = array_of(array_of(et));
+    let gheap = vt_heap(repr(at));
+    let vheap = vt_heap(cur_locals[data]);
+    let total = new_local(vt_i32);
+    let groups = new_local(repr(at));
+    let m = w_mark();
+    // total = windows: count >= width ? count - width + 1 : 0; batched: (count + width - 1) / width
+    let mt = w_mark();
+    if windows {
+        lg(count);
+        lg(width);
+        plain(107, vt_i32, mt);
+        w_i32(1);
+        plain(106, vt_i32, mt);
+        w_i32(0);
+        let mc = w_mark();
+        lg(count);
+        lg(width);
+        plain(78, vt_i32, mc);
+        select_i32(mt);
+    } else {
+        lg(count);
+        lg(width);
+        plain(106, vt_i32, mt);
+        w_i32(1);
+        plain(107, vt_i32, mt);
+        lg(width);
+        plain(109, vt_i32, mt);
+    };
+    ls(total, mt);
+    // groups = []; if total > 0 { groups = new(total, slice(0)) }
+    let mg = w_mark();
+    w_node(Op.ArrayNewFixed, vt_ref(gheap, false), gheap, 0, mg);
+    ls(groups, mg);
+    let mi = w_mark();
+    lg(total);
+    w_i32(0);
+    plain(74, vt_i32, mi);
+    let mtt = w_mark();
+    let zero = new_local(vt_i32);
+    set_i32(zero, 0);
+    let mn = w_mark();
+    slice_at(data, base, zero, width, count, vheap);
+    lg(total);
+    w_node(Op.ArrayNew, vt_ref(gheap, false), gheap, 0, mn);
+    ls(groups, mn);
+    seq_void(mtt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    // for j in 1 ..< total: groups[j] = slice(windows ? j : j * width)
+    let j = new_local(vt_i32);
+    let start = new_local(vt_i32);
+    set_i32(j, 1);
+    let lp = loop_open();
+    lt(j, total);
+    loop_while(lp, w_mark() - 1);
+    if windows { let ms = w_mark(); lg(j); ls(start, ms); } else { arith(start, j, 108, width, false); };
+    let mset = array_set_begin(groups, j);
+    slice_at(data, base, start, width, count, vheap);
+    array_set_end(groups, mset);
+    arith(j, j, 106, 1, true);
+    loop_close(lp);
+    seq_void(m);
+    to_cleanup(p);
+    p.result = groups;
+    p.result_type = at;
+}
+
+// data.slice(base + s, base + (if width > count - s { count } else { s + width })), base optional.
+fn slice_at(data: I32, base: I32, s: I32, width: I32, count: I32, heap: I32) void {
+    let m = w_mark();
+    lg(data);
+    let ma = w_mark();
+    if base >= 0 { lg(base); };
+    lg(s);
+    if base >= 0 { plain(106, vt_i32, ma); };
+    let mb = w_mark();
+    if base >= 0 { lg(base); };
+    let me = w_mark();
+    lg(count);
+    let mx = w_mark();
+    lg(s);
+    lg(width);
+    plain(106, vt_i32, mx);
+    let mc = w_mark();
+    lg(width);
+    lg(count);
+    lg(s);
+    plain(107, vt_i32, mc + 1);
+    plain(74, vt_i32, mc);
+    select_i32(me);
+    if base >= 0 { plain(106, vt_i32, mb); };
+    w_node(Op.Call, vt_ref(heap, true), array_slice_helper(heap), 0, m);
+}
+
+// ── bisect ──
+
+// `xs bisect |v| { test }`: the first index whose value the test does not
+// hold for, the values holding a true prefix. A branchless binary search:
+// the test runs about log2(n) + 1 times.
+fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
+    if n != 1 {
+        report(Diag.IteratorSource, node, -1);
+        return error_value();
+    };
+    let i32_t = prelude(Prelude.I32);
+    let m = w_mark();
+    let range = is_kind(input, Node.Range_expr);
+    let source = -1;
+    let start = new_local(vt_i32);
+    let count = new_local(vt_i32);
+    let et = i32_t;
+    if range {
+        let a = first_child(input);
+        let b = last_child(input);
+        let ma = w_mark();
+        coerce(check_expr(a, i32_t, cx), i32_t, a);
+        ls(start, ma);
+        let mb = w_mark();
+        coerce(check_expr(b, i32_t, cx), i32_t, b);
+        if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
+            w_i32(1);
+            plain(106, vt_i32, mb);
+        };
+        lg(start);
+        plain(107, vt_i32, mb);
+        ls(count, mb);
+        let mi = w_mark();
+        lg(count);
+        w_i32(0);
+        plain(72, vt_i32, mi);
+        let mt = w_mark();
+        set_i32(count, 0);
+        seq_void(mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    } else {
+        let ms = w_mark();
+        let at = check_expr(input, -1, cx);
+        if not is_array_type(at) {
+            if not ty_is(at, Ty.Error) { report(Diag.IteratorSource, input, -1); };
+            w_stack.resize(m);
+            return error_value();
+        };
+        et = inst_arg(ty_inst(at), 0);
+        source = new_local(repr(at));
+        ls(source, ms);
+        let mc = w_mark();
+        lg(source);
+        w_node(Op.ArrayLen, vt_i32, 0, 0, mc);
+        ls(count, mc);
+    };
+    // if n == 0 { 0 } else { search }
+    let mif = w_mark();
+    lg(count);
+    plain(69, vt_i32, mif);
+    let mt = w_mark();
+    w_i32(0);
+    w_node(Op.Seq, vt_i32, 0, 0, mt);
+    let me = w_mark();
+    let base = new_local(vt_i32);
+    let size = new_local(vt_i32);
+    let half = new_local(vt_i32);
+    let mid = new_local(vt_i32);
+    set_i32(base, 0);
+    let ms = w_mark();
+    lg(count);
+    ls(size, ms);
+    let lp = loop_open();
+    let mc = w_mark();
+    lg(size);
+    w_i32(1);
+    plain(74, vt_i32, mc);
+    loop_while(lp, mc);
+    arith(half, size, 118, 1, true);
+    arith(mid, base, 106, half, false);
+    // base = if pred(mid) { mid } else { base }
+    let mb = w_mark();
+    lg(mid);
+    lg(base);
+    bisect_test(node, range, source, start, mid, et, cx);
+    select_i32(mb);
+    ls(base, mb);
+    arith(size, size, 107, half, false);
+    loop_close(lp);
+    // base + (if pred(base) { 1 } else { 0 })
+    let mr = w_mark();
+    lg(base);
+    bisect_test(node, range, source, start, base, et, cx);
+    plain(106, vt_i32, mr);
+    w_node(Op.Seq, vt_i32, 0, 0, me);
+    w_node(Op.If, vt_i32, new_label(), 0, mif);
+    w_node(Op.Seq, vt_i32, 0, 0, m);
+    i32_t;
+}
+
+// The test at position `at`: { let v = (start + at, or source[at]); [let i = at as U64;] body }
+fn bisect_test(node: I32, range: Bool, source: I32, start: I32, at: I32, et: I32, cx: Cx) void {
+    let capture = stage_capture(node);
+    let m = w_mark();
+    let v = first_child(capture);
+    let mv = w_mark();
+    if range {
+        lg(start);
+        lg(at);
+        plain(106, vt_i32, mv);
+    } else {
+        array_get(source, at);
+    };
+    decl_ty[node_decl[v]] = et;
+    bind_value(node_decl[v], et, mv);
+    let idx = next_sibling(v);
+    if idx >= 0 {
+        let mi = w_mark();
+        lg(at);
+        plain(173, vt_i64, mi);
+        decl_ty[node_decl[idx]] = prelude(Prelude.U64);
+        bind_value(node_decl[idx], prelude(Prelude.U64), mi);
+    };
+    let bool_t = prelude(Prelude.Bool);
+    let block = stage_block(node);
+    coerce(check_block(block, bool_t, cx), bool_t, block);
+    w_node(Op.Seq, vt_i32, 0, 0, m);
+}

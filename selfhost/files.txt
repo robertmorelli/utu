@@ -11,6 +11,7 @@ check.utu
 control.utu
 closures.utu
 generators.utu
+iterators.utu
 strings.utu
 data.utu
 mems.utu

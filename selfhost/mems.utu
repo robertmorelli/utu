@@ -11,6 +11,7 @@ mem mem_len: I32;      // by declaration: its length global
 mem mem_helpers: I32;  // by declaration: its reserve function (push and resize follow), or -1
 
 fn reset_mems() void {
+    mem_method_word.clear();
     mem_memory.resize(decl_kind.len());
     mem_len.resize(decl_kind.len());
     mem_helpers.resize(decl_kind.len());
