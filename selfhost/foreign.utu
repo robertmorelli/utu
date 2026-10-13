@@ -471,11 +471,13 @@ fn reset_foreign_ops() void {
 }
 
 fn foreign_op(params: I32, result: I32, body: Str) I32 {
-    let key = intern_text(body + "|" + type_list_text(params) + "|" + type_text(result));
-    for (0 ..< fop_key.len()) |i| { if fop_key[i] == key { return fop_func[i]; }; };
+    // One import per body and wasm signature: operations on different
+    // types that lower alike are one import.
     let m = vl_begin();
     for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
     let ft = func_type(vl_end(m), vl_of_result(repr(result)));
+    let key = intern_text(body + "|" + ft.to_str());
+    for (0 ..< fop_key.len()) |i| { if fop_key[i] == key { return fop_func[i]; }; };
     let name = "__foreign_" + fop_key.len().to_str();
     let f = add_import_func(name_add("es"), name_add(name), ft);
     func_debug_name[f] = name_add(name);
@@ -522,6 +524,42 @@ fn foreign_call_op(params: I32, result: I32, body: Str, m: I32) I32 {
     let f = foreign_op(params, result, body);
     w_node(Op.Call, repr(result), f, 0, m);
     result;
+}
+
+// How builds are optimized, as stage 0's `optimize`: 0 none, 1 size (the
+// default), 2 speed.
+mem optimize_level: I32 = [1];
+
+// A member operation (a read, write, or call of member `key`; of a view's
+// root when `root`). Size-optimized builds share one import per shape, as
+// stage 0 does: `el.value` and `el.textContent` both call
+// `(self,k) => self[k]`, with the name a string constant, which JS string
+// builtins make free. Other builds keep one import per name.
+fn foreign_member_op(params: I32, result: I32, body: Str, m: I32, key: I32, root: Bool) I32 {
+    if optimize_level[0] != 1 { return foreign_call_op(params, result, body, m); };
+    let named = (if root { "globalThis["; } else { "self["; }) + js_key(key) + "]";
+    let at = text_index(body, named, 0);
+    if at < 0 or text_index(body, named, at + 1) >= 0 { return foreign_call_op(params, result, body, m); };
+    let shared = body.slice(0, at) + (if root { "globalThis[k]"; } else { "self[k]"; }) + body.slice(at + named.len(), body.len());
+    if root {
+        shared = if text_at(shared, 0, "()") { "(k)" + shared.slice(2, shared.len()); } else { "(k," + shared.slice(1, shared.len()); };
+    } else {
+        if not text_at(shared, 0, "(self") { return foreign_call_op(params, result, body, m); };
+        shared = "(self,k" + shared.slice(5, shared.len());
+    };
+    // The name, as a string constant, after the receiver (first, at a root).
+    let at_arg = if root { 0; } else { 1; };
+    let mt = vl_begin();
+    for (0 ..< vl_len[params]) |i| {
+        if i == at_arg { vl_add(prelude(Prelude.Str)); };
+        vl_add(vl_item(params, i));
+    };
+    if vl_len[params] == at_arg { vl_add(prelude(Prelude.Str)); };
+    let with_key = vl_end(mt);
+    let g = string_global(key);
+    let node = w_leaf(Op.GlobalGet, vt_extern, g, 0);
+    w_insert(m + at_arg, w_pop());
+    foreign_call_op(with_key, result, shared, m);
 }
 
 // A JS string literal of a word: `"value"`.
@@ -796,7 +834,7 @@ fn check_foreign_root(node: I32, view: I32, key: I32, expect: I32) I32 {
     let checked = result_checked[0] == 1;
     let access = member_access(view, key, true);
     let m = w_mark();
-    foreign_call_op(vl_empty(), t, word_text(access_prologue[0]) + "() => " + js_output(access, t, checked), m);
+    foreign_member_op(vl_empty(), t, word_text(access_prologue[0]) + "() => " + js_output(access, t, checked), m, key, true);
 }
 
 // `x.key`: the value of host type `owner` is on the stack since m.
@@ -808,7 +846,7 @@ fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
     };
     let t = foreign_result(member_ref(), view, expect);
     let checked = result_checked[0] == 1;
-    foreign_call_op(one_type(erased(owner, view)), t, "(self) => " + js_output(member_access(view, key, false), t, checked), m);
+    foreign_member_op(one_type(erased(owner, view)), t, "(self) => " + js_output(member_access(view, key, false), t, checked), m, key, false);
 }
 
 // `x.key = value`: the value of host type `owner` is on the stack since m.
@@ -830,7 +868,7 @@ fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx
     vl_add(erased(owner, view));
     vl_add(vt);
     let body = "(self,value) => { " + member_access(view, key, false) + " = " + js_argument(slot, "value", vt) + "; }";
-    foreign_call_op(vl_end(mt), ty_void(), body, m);
+    foreign_member_op(vl_end(mt), ty_void(), body, m, key, false);
 }
 
 // ── Arguments ──
@@ -1296,7 +1334,7 @@ fn literal_json(arg: I32) I32 {
 
 // A call of host function `fn_ref`, reached in JS as `access` (with its
 // receiver, of type `receiver`, on the stack since m; -1 for none).
-fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: I32, access: Str, prologue: Str, construct: Bool, m: I32, expect: I32, cx: Cx) I32 {
+fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: I32, key: I32, access: Str, prologue: Str, construct: Bool, m: I32, expect: I32, cx: Cx) I32 {
     let d = describe(fn_ref);
     let a = arg_nodes(args);
     let n = child_count(args);
@@ -1335,6 +1373,7 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
     let checked = result_checked[0] == 1;
     let self_ = if receiver >= 0 { if n > 0 { "self,"; } else { "self"; }; } else { ""; };
     let body = prologue + "(" + self_ + names + ") => " + js_output((if construct or use_ctors { "new "; } else { ""; }) + access + "(" + invocation + ")", t, checked);
+    if key >= 0 { return foreign_member_op(vl_end(mt), t, body, m, key, receiver < 0); };
     foreign_call_op(vl_end(mt), t, body, m);
 }
 
@@ -1353,14 +1392,14 @@ fn check_foreign_method(node: I32, owner: I32, key: I32, args: I32, m: I32, expe
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return unknown_member(first_child(node), view, owner, key);
     };
-    check_foreign_invoke(node, member_ref(), view, args, owner, member_access(view, key, false), "", false, m, expect, cx);
+    check_foreign_invoke(node, member_ref(), view, args, owner, key, member_access(view, key, false), "", false, m, expect, cx);
 }
 
 // `Browser.f(args)`, `new Browser.C(args)`: a function or class a view exports.
 fn check_foreign_root_call(node: I32, view: I32, key: I32, args: I32, construct: Bool, m: I32, expect: I32, cx: Cx) I32 {
     if not root_member(view, key) { return unknown_member(node, view, -1, key); };
     let access = member_access(view, key, true);
-    check_foreign_invoke(node, member_ref(), view, args, -1, access, word_text(access_prologue[0]), construct, m, expect, cx);
+    check_foreign_invoke(node, member_ref(), view, args, -1, key, access, word_text(access_prologue[0]), construct, m, expect, cx);
 }
 
 // `new Browser.C(args)`, `new Browser.Intl.NumberFormat(args)`.
@@ -1383,7 +1422,7 @@ fn check_new(node: I32, expect: I32, cx: Cx) I32 {
                 w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
                 return unknown_member(callee, view, t, key);
             };
-            return check_foreign_invoke(node, member_ref(), view, args, t, member_access(view, key, false), "", true, m, expect, cx);
+            return check_foreign_invoke(node, member_ref(), view, args, t, key, member_access(view, key, false), "", true, m, expect, cx);
         };
         w_stack.resize(m);
     };
@@ -1562,13 +1601,13 @@ fn check_foreign_primitive_get(node: I32, t: I32, host: I32, key: I32, m: I32, e
     foreign_member(host, key, view);
     let rt = foreign_result(member_ref(), view, expect);
     let checked = result_checked[0] == 1;
-    foreign_call_op(one_type(t), rt, "(self) => " + js_output(member_access(view, key, false), rt, checked), m);
+    foreign_member_op(one_type(t), rt, "(self) => " + js_output(member_access(view, key, false), rt, checked), m, key, false);
 }
 
 fn check_foreign_primitive_method(node: I32, t: I32, host: I32, key: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
     let view = fty_view[host];
     foreign_member(host, key, view);
-    check_foreign_invoke(node, member_ref(), view, args, t, member_access(view, key, false), "", false, m, expect, cx);
+    check_foreign_invoke(node, member_ref(), view, args, t, key, member_access(view, key, false), "", false, m, expect, cx);
 }
 
 // `x[k] = v` on a host value: x is on the stack since m.

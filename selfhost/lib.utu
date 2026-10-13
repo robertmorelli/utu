@@ -73,6 +73,15 @@ export lib {
     // are diagnostics.
     fn compile_program(target: I32) I32 { compile(Target.from_i32(target)); }
 
+    // The JSON of what the last module built needs from its host (empty for nothing).
+    fn host_json_size() I32 { host_json.len(); }
+
+    // Function names in the modules built (1), or none (0, the default).
+    fn set_debug_names(on: I32) void { debug_names[0] = on; }
+
+    // How builds are optimized: 0 none, 1 size (the default), 2 speed.
+    fn set_optimize(level: I32) void { optimize_level[0] = level; }
+
     fn file_count() I32 { file_root.len(); }
 
     fn diagnostic_count() I32 { diag_kind.len(); }

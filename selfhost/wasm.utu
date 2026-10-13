@@ -506,6 +506,17 @@ fn w_pop() I32 {
 
 fn w_push(id: I32) void { w_stack.push(id); }
 
+// Put node `id` on the stack at position `at`, after the ones before it.
+fn w_insert(at: I32, id: I32) void {
+    w_stack.push(id);
+    let i = w_stack.len() - 1;
+    while (i > at) {
+        w_stack[i] = w_stack[i - 1];
+        i -= 1;
+    };
+    w_stack[at] = id;
+}
+
 fn w_kid(node: I32, i: I32) I32 { w_kids[w_first[node] + i]; }
 
 fn w_i32(value: I32) I32 { w_leaf(Op.I32Const, vt_i32, value, 0); }
@@ -1076,21 +1087,19 @@ fn encode_module() I32 {
     encode_data_count();
     for (0 ..< code.len()) |i| { out.push(code[i]); };
     encode_data();
-    encode_names();
-    encode_host();
+    if debug_names[0] == 1 { encode_names(); };
     out.len();
 }
 
-// What the host provides the module (`@es` bodies, closures, …), as JSON:
-// a custom section named `utu`, read by the loader.
-mem host_json: U8;
+// What the host provides the module (`@es` bodies, closures, promises,
+// hosted mems), as JSON, beside the module rather than in it, as stage 0
+// keeps it: the host writes the glue for what the module imports, and the
+// module ships as small as its code.
+export mem host_json: U8;
 
-fn encode_host() void {
-    if host_json.len() == 0 { return; };
-    put_text("utu");
-    for (0 ..< host_json.len()) |i| { sec.push(host_json[i]); };
-    flush_section(0);
-}
+// Whether the module carries a name section (function names for stack
+// traces): off unless asked for, as stage 0 has none.
+mem debug_names: I32 = [0];
 
 // ── Instructions ──
 

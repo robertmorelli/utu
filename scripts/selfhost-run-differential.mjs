@@ -16,6 +16,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
+const OPTIMIZE = process.argv.find(arg => arg.startsWith('--optimize='))?.slice(11) ?? process.env.UTU_OPTIMIZE ?? 'none';
+// Workers see the environment, not the arguments.
+process.env.UTU_OPTIMIZE = OPTIMIZE;
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUN_TIMEOUT_MS = 8000;
 
@@ -94,6 +98,10 @@ async function main() {
       continue;
     }
     if (JSON.stringify(recorded[key]) === JSON.stringify(result)) { count.same++; continue; }
+    // A size build shares one import per member operation, so an engine's
+    // error names `self[k]` where stage 0's per-name import named the member.
+    if (OPTIMIZE === 'size'
+        && JSON.stringify(recorded[key]).replace(/self\.[A-Za-z_$][\w$]*/g, 'self[k]') === JSON.stringify(result)) { count.same++; continue; }
     count.differ++;
     differ.push(`DIFFERS ${key}\n  was ${JSON.stringify(recorded[key]).slice(0, 300)}\n  now ${JSON.stringify(result).slice(0, 300)}`);
   }
@@ -109,8 +117,11 @@ async function main() {
 
 async function worker() {
   process.on('unhandledRejection', () => {});
-  const { loadProgram, loadSelfhost, instantiateBuilt, compileProgram } = await import('./selfhost.mjs');
+  const { loadProgram, loadSelfhost, instantiateBuilt, compileProgram, builtModule } = await import('./selfhost.mjs');
   const utu = await loadSelfhost();
+  // Stage 0's runs were recorded at optimize: 'none'; how a program behaves
+  // must not depend on it, so --optimize=size checks the default builds.
+  utu.set_optimize({ none: 0, size: 1, speed: 2 }[OPTIMIZE]);
   parentPort.on('message', async ({ file, target }) => {
     const result = await run(file, target).catch(error => ({ crash: summarizeError(error) }));
     parentPort.postMessage(JSON.parse(JSON.stringify(result).split(workerData.ROOT).join('<root>')));
@@ -141,7 +152,7 @@ async function worker() {
       }
       return unsupported.size ? { unsupported: [...unsupported], snippets } : { diagnostics };
     }
-    const wasm = new Uint8Array(utu.out.buffer, 0, size).slice();
+    const { wasm, spec } = builtModule(utu, size);
     if (!WebAssembly.validate(wasm)) {
       try { await WebAssembly.compile(wasm); } catch (error) { return { emit: summarizeError(error) }; }
     }
@@ -149,7 +160,7 @@ async function worker() {
     try {
       // The exports as they are: stage 0's harness does not wrap async
       // ones in WebAssembly.promising, so neither does this.
-      ({ instance: { exports } } = await instantiateBuilt(wasm));
+      ({ instance: { exports } } = await instantiateBuilt(wasm, spec));
     } catch (error) {
       return { instantiate: summarizeError(error) };
     }

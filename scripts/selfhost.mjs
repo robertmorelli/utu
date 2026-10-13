@@ -180,7 +180,8 @@ export async function compileProgram(utu, target) {
   if (count > 0) {
     const size = utu.compile_program(2);
     if (size < 0) return -1;
-    const { instance } = await instantiateBuilt(new Uint8Array(utu.out.buffer, 0, size).slice());
+    const { wasm, spec } = builtModule(utu, size);
+    const { instance } = await instantiateBuilt(wasm, spec);
     for (let k = 0; k < count; k++) {
       const name = utu.comptime_name(k);
       const n = instance.exports[`__comptime_run_${name}`]();
@@ -193,14 +194,23 @@ export async function compileProgram(utu, target) {
 }
 
 /**
- * Instantiate a module the self-hosted compiler built: its imports come from
- * its `utu` custom section (what the host provides) and the engine's JS
- * string builtins.
+ * What the last compile built: the module's bytes, and the spec of what it
+ * needs from its host (`@es` bodies, closures, promises, hosted mems), which
+ * the compiler gives beside the module, as stage 0 does, not in it.
  */
-export async function instantiateBuilt(wasm) {
+export function builtModule(utu, size) {
+  const wasm = new Uint8Array(utu.out.buffer, 0, size).slice();
+  const n = utu.host_json_size();
+  const spec = n ? JSON.parse(new TextDecoder().decode(new Uint8Array(utu.host_json.buffer, 0, n))) : {};
+  return { wasm, spec };
+}
+
+/**
+ * Instantiate a module the self-hosted compiler built: its imports come from
+ * its spec (what the host provides) and the engine's JS string builtins.
+ */
+export async function instantiateBuilt(wasm, spec = {}) {
   const module = await WebAssembly.compile(wasm, JS_STRING_BUILTINS_COMPILE_OPTIONS);
-  const [section] = WebAssembly.Module.customSections(module, 'utu');
-  const spec = section ? JSON.parse(new TextDecoder().decode(section)) : {};
   const imports = await esImports(spec.es ?? {});
   if (spec.closures) imports.utu = closureImports(spec.closures, imports.utu ?? {});
   if (spec.mems) imports.utu = memoryImports(spec.mems, imports.utu ?? {});
@@ -244,13 +254,13 @@ export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) 
   if (stage === 1) return instance.exports;
   let compiler = instance.exports;
   for (let s = 2; s <= stage; s++) {
-    const bytes = await buildWith(compiler);
-    compiler = (await instantiateBuilt(bytes)).instance.exports;
+    const { wasm, spec } = await buildWith(compiler);
+    compiler = (await instantiateBuilt(wasm, spec)).instance.exports;
   }
   return compiler;
 }
 
-/** The self-hosted compiler's bytes, built by a loaded self-hosted compiler. */
+/** The self-hosted compiler (its bytes and host spec), built by a loaded self-hosted compiler. */
 export async function buildWith(compiler) {
   const { text } = joinSelfhost();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-stage-'));
@@ -260,7 +270,7 @@ export async function buildWith(compiler) {
     const files = await loadProgram(compiler, file);
     const size = await compileProgram(compiler, 0);
     if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
-    return new Uint8Array(compiler.out.buffer, 0, size).slice();
+    return builtModule(compiler, size);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

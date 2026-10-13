@@ -150,6 +150,7 @@ async function worker() {
   }
   const { loadProgram, loadSelfhost, compileProgram } = await import('./selfhost.mjs');
   const utu = await loadSelfhost();
+  utu.set_optimize(0);
   parentPort.on('message', async ({ file, target }) => {
     try {
       const files = await loadProgram(utu, file);
