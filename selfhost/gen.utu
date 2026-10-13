@@ -40,7 +40,16 @@ fn gen_span(start: I32, end_: I32) void {
 
 // Write the generated sources for the entry file's mems, and parse them as
 // one more file. Called before names are resolved.
+// Where each @comptime expression's text went in the generated file (a
+// span of src), and its @comptime node, so its mistakes are reported there.
+mem comptime_text_start: I32;
+mem comptime_text_end: I32;
+mem comptime_text_node: I32;
+
 fn generate_sources() void {
+    comptime_text_start.clear();
+    comptime_text_end.clear();
+    comptime_text_node.clear();
     let start = src.len();
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
@@ -60,6 +69,10 @@ fn generate_sources() void {
     let file = add_file(n, FileRole.Generated);
     let at = file_start[file];
     for (0 ..< n) |i| { src[at + i] = copy[i]; };
+    for (0 ..< comptime_text_start.len()) |k| {
+        comptime_text_start[k] += at - start;
+        comptime_text_end[k] += at - start;
+    };
     parse_file(file);
 }
 
@@ -79,7 +92,10 @@ fn generate_for_mem(item: I32) void {
         gen_template(";\nfn __comptime_run_$() I32 {\n    let values: Array[", name);
         gen_text(value);
         gen_text("] = ");
+        comptime_text_start.push(src.len());
+        comptime_text_node.push(init);
         gen_span(dsl_text_start(init), dsl_text_end(init));
+        comptime_text_end.push(src.len());
         gen_template(";\n    __comptime_$.clear();\n    for (values) |v| { __comptime_$.push(v); };\n    values.len();\n}\n", name);
     };
 }

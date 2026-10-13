@@ -157,15 +157,60 @@ enum(U8) Diag:
     | ProtoSignature
     | MemEmbed
     | MemView
+    | InvalidDslUsage
+    | MemNoMethod
+    | TupleLet
+    | GeneratorPassThrough
+    | GeneratorArity
+    | MemTwice
+    | MemClash
 
+// A diagnostic: its kind, the node it is about, a word, and up to three
+// more arguments (types, counts, declarations) its message is made from
+// (see diag.utu).
 mem diag_kind: U8;
 mem diag_node: I32;
 mem diag_word: I32;
+mem diag_a: I32;
+mem diag_b: I32;
+mem diag_c: I32;
 
-fn report(kind: Diag, node: I32, word: I32) void {
+fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1, -1, -1); }
+
+fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind, node, word, a, b, -1); }
+
+fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
+    // Once for a node: a name resolved, or a type read, twice is still one mistake.
+    if node >= 0 {
+        for (0 ..< diag_kind.len()) |i| {
+            if diag_node[i] == node and diag_kind[i] == kind.to_i32() and diag_word[i] == word { return; };
+        };
+    };
     diag_kind.push(kind.to_i32());
     diag_node.push(node);
     diag_word.push(word);
+    diag_a.push(a);
+    diag_b.push(b);
+    diag_c.push(c);
+}
+
+// Keep the first n diagnostics.
+fn diag_truncate(n: I32) void {
+    diag_kind.resize(n);
+    diag_node.resize(n);
+    diag_word.resize(n);
+    diag_a.resize(n);
+    diag_b.resize(n);
+    diag_c.resize(n);
+}
+
+fn diag_move(from: I32, to: I32) void {
+    diag_kind[to] = diag_kind[from];
+    diag_node[to] = diag_node[from];
+    diag_word[to] = diag_word[from];
+    diag_a[to] = diag_a[from];
+    diag_b[to] = diag_b[from];
+    diag_c[to] = diag_c[from];
 }
 
 // ── Members ──
@@ -282,9 +327,7 @@ fn reset_resolve() void {
     decl_owner.clear();
     decl_a.clear();
     node_decl.clear();
-    diag_kind.clear();
-    diag_node.clear();
-    diag_word.clear();
+    diag_truncate(0);
     bind_word.clear();
     bind_decl.clear();
     bind_prev.clear();
@@ -583,8 +626,14 @@ fn declare_entry_item(item: I32, first_entry: I32) void {
     let name = decl_name[decl];
     if name < 0 { return; };
     let hidden = lookup(name);
-    if hidden >= first_entry and hidden < decl {
-        report(Diag.DuplicateDeclaration, decl_node[decl], name);
+    // What is generated for a mem is generated again for its twin: the
+    // twin is the mistake.
+    if hidden >= first_entry and hidden < decl and file_role[file_of_token(node_first[item])] != FileRole.Generated.to_i32() {
+        // A mem's name is its own: reported at the mem.
+        if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name); }
+        else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); }
+        else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); }
+        else { report(Diag.DuplicateDeclaration, decl_node[decl], name); };
     };
     bind(name, decl);
     bind_variants(decl);
@@ -608,6 +657,12 @@ struct Walk:
     | headers: Bool   // registering methods and aliases, not resolving bodies
 
 fn resolve_names() I32 {
+    diag_truncate(0);
+    if missing_import[0] >= 0 {
+        report(Diag.UnknownImport, import_node[missing_import[0]], -1);
+        save_diagnostics();
+        return 1;
+    };
     intern_known();
     generate_sources();
     node_decl.resize(node_kind.len());
@@ -627,26 +682,38 @@ fn resolve_names() I32 {
 mem saved_kind: U8;
 mem saved_node: I32;
 mem saved_word: I32;
+mem saved_a: I32;
+mem saved_b: I32;
+mem saved_c: I32;
 
 fn save_diagnostics() void {
-    saved_kind.resize(diag_kind.len());
-    saved_node.resize(diag_kind.len());
-    saved_word.resize(diag_kind.len());
-    for (0 ..< diag_kind.len()) |i| {
+    let n = diag_kind.len();
+    saved_kind.resize(n);
+    saved_node.resize(n);
+    saved_word.resize(n);
+    saved_a.resize(n);
+    saved_b.resize(n);
+    saved_c.resize(n);
+    for (0 ..< n) |i| {
         saved_kind[i] = diag_kind[i];
         saved_node[i] = diag_node[i];
         saved_word[i] = diag_word[i];
+        saved_a[i] = diag_a[i];
+        saved_b[i] = diag_b[i];
+        saved_c[i] = diag_c[i];
     };
 }
 
 fn restore_diagnostics() void {
-    diag_kind.resize(saved_kind.len());
-    diag_node.resize(saved_kind.len());
-    diag_word.resize(saved_kind.len());
-    for (0 ..< saved_kind.len()) |i| {
+    let n = saved_kind.len();
+    diag_truncate(n);
+    for (0 ..< n) |i| {
         diag_kind[i] = saved_kind[i];
         diag_node[i] = saved_node[i];
         diag_word[i] = saved_word[i];
+        diag_a[i] = saved_a[i];
+        diag_b[i] = saved_b[i];
+        diag_c[i] = saved_c[i];
     };
 }
 
@@ -709,8 +776,9 @@ fn walk_item(item: I32, w: Walk) void {
     } else if kind == Node.Mem_decl.to_i32() {
         let t = next_sibling(first_child(item));
         walk_elem_type(t, w);
+        // An initializer list holds number literals, and names nothing.
         let init = next_sibling(t);
-        if init >= 0 { walk_expr(init, w); };
+        if init >= 0 and not is_kind(init, Node.Array_expr) { walk_expr(init, w); };
     } else if kind == Node.Distinct_decl.to_i32() {
         walk_elem_type(next_sibling(first_child(item)), w);
     } else if kind == Node.Export_main_decl.to_i32() {

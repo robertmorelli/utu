@@ -56,7 +56,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     while (f >= 0) {
         let name = first_child(f);
         let field = member(decl, word_of(name), Space.Member);
-        if not decl_is(field, Decl.Field) { report(Diag.UnknownField, name, word_of(name)); }
+        if not decl_is(field, Decl.Field) { report2(Diag.UnknownField, f, word_of(name), decl, -1); }
         else {
             node_decl[name] = field;
             let other = first_init;
@@ -79,7 +79,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
             let init = init_for(first_init, decl_name[field]);
             let ft = field_type(field, ty_inst(t));
             if init < 0 {
-                if not missing { report(Diag.MissingField, at, decl_name[field]); };
+                if not missing { report2(Diag.MissingField, at, decl_name[field], decl, -1); };
                 missing = true;
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
             } else {
@@ -109,12 +109,12 @@ fn field_of(t: I32, name: I32) I32 {
     let decl = ty_decl(t);
     if decl_is(decl, Decl.Proto) { return -2; };
     if ty_is(t, Ty.Nullable) {
-        report(Diag.NullableAccess, name, word_of(name));
+        report2(Diag.NullableAccess, parent_of(name), word_of(name), t, -1);
         return -1;
     };
     let field = member(decl, word_of(name), Space.Member);
     if not decl_is(field, Decl.Field) or not (decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Variant)) {
-        report(Diag.UnknownField, name, word_of(name));
+        report(Diag.UnknownField, parent_of(name), word_of(name));
         return -1;
     };
     node_decl[name] = field;
@@ -198,12 +198,12 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         if ty_is(elem, Ty.Fun) { elem = ty(Ty.Closure, ty_a[elem], ty_b[elem]); };
     };
     if ty_is(elem, Ty.Tuple) {
-        report(Diag.TupleMisplaced, node, -1);
+        report2(Diag.TupleMisplaced, node, -1, 3, -1);
         return error_value();
     };
     // A `fun` has no place in an array yet (a `cl` does).
     if ty_is(elem, Ty.Fun) {
-        report(Diag.FunInField, node, -1);
+        report2(Diag.FunInField, node, -1, elem, 1);
         return error_value();
     };
     if ty_is(elem, Ty.Error) { return error_value(); };
@@ -243,7 +243,7 @@ fn check_index(node: I32, expect: I32, cx: Cx) I32 {
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
     let decl = member(ty_decl(t), word, Space.Method);
     if decl < 0 {
-        report(Diag.UnknownMethod, node, word);
+        report2(Diag.UnknownOperator, node, word, t, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -268,7 +268,7 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
     let set = member(ty_decl(t), known_word(Known.SetIndex), Space.Method);
     if set < 0 {
-        report(Diag.UnknownMethod, target, known_word(Known.SetIndex));
+        report2(Diag.UnknownOperator, target, known_word(Known.SetIndex), t, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -353,7 +353,7 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         else if tag == known_word(Known.IrArrayLen) { w_node(Op.ArrayLen, vt_i32, 0, 0, m); }
         else if tag == known_word(Known.IrArrayNew) {
             if w_stack.len() - m == 1 and not defaultable(inst_arg(fi_inst[fi], 0)) {
-                report(Diag.NonDefaultable, call_site[0], -1);
+                report2(Diag.NonDefaultable, call_site[0], -1, inst_arg(fi_inst[fi], 0), -1);
             };
             if w_stack.len() - m == 2 {
                 // (n, fill) → array.new takes the fill first.

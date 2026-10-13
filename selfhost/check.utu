@@ -325,19 +325,50 @@ fn heap_of(vt: I32) I32 { vt_nullable(vt); }
 
 // ── Diagnostics ──
 
-mem diag_expected: I32;  // by diagnostic: the expected type, or -1
-mem diag_actual: I32;
 
 fn mismatch(at: I32, expected: I32, actual: I32) void {
-    report(Diag.TypeMismatch, at, -1);
-    note_types(expected, actual);
+    let site = value_site(at);
+    // A local whose type came of a mistake: that mistake's consequence.
+    if is_kind(site, Node.Identifier) and node_decl[site] >= 0 and decl_cause[node_decl[site]] >= 0 {
+        fold_into(decl_cause[node_decl[site]]);
+        return;
+    };
+    report2(Diag.TypeMismatch, site, -1, expected, actual);
 }
 
-fn note_types(expected: I32, actual: I32) void {
-    diag_expected.resize(diag_kind.len());
-    diag_actual.resize(diag_kind.len());
-    diag_expected[diag_kind.len() - 1] = expected;
-    diag_actual[diag_kind.len() - 1] = actual;
+// ── Consequences ──
+//
+// As in stage 0, a mismatch that follows from another (a local typed by a
+// mistaken initializer, a tuple or closure whose part is mistaken) is not
+// reported again: the first one counts it, `(+1 caused by this)`. For a
+// TypeMismatch, diag_c is that count (-1 for none).
+
+mem decl_cause: I32;  // by declaration (a let): the mismatch in its initializer, or -1
+
+fn fold_into(i: I32) void {
+    if i < 0 or i >= diag_kind.len() { return; };
+    diag_c[i] = if diag_c[i] < 0 { 1; } else { diag_c[i] + 1; };
+}
+
+// The first mismatch reported since diagnostic `from` at `node`'s value, or -1.
+fn mismatch_since(from: I32, node: I32) I32 {
+    let site = value_site(node);
+    for (from ..< diag_kind.len()) |i| {
+        if diag_kind[i] == Diag.TypeMismatch.to_i32() and diag_node[i] == site { return i; };
+    };
+    -1;
+}
+
+// The first mismatch reported since diagnostic `from`, or -1.
+fn any_mismatch_since(from: I32) I32 {
+    for (from ..< diag_kind.len()) |i| { if diag_kind[i] == Diag.TypeMismatch.to_i32() { return i; }; };
+    -1;
+}
+
+// Where a value comes from, to point at: a block's is its last expression's.
+fn value_site(node: I32) I32 {
+    if is_kind(node, Node.Block) and last_child(node) >= 0 { return value_site(last_child(node)); };
+    node;
 }
 
 // Something the compiler cannot do yet: reported, and checking goes on.
@@ -398,6 +429,11 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Defer_expr.to_i32() { return check_defer(node); };
     if kind == Node.Optional_field_expr.to_i32() { return check_field_get(node, cx); };
     if kind == Node.Await_expr.to_i32() { return check_await(node, cx); };
+    if kind == Node.Dsl_expr.to_i32() and is_es(node) {
+        // @es binds a typed let; anywhere else its type is unknown.
+        report(Diag.InvalidDslUsage, node, -1);
+        return error_value();
+    };
     unsupported(node);
 }
 
@@ -482,7 +518,7 @@ fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
     let v = int_value(node);
     if negate { v = 0 - v; };
     let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
-    if not fits(v, t, negate) { report(Diag.IntegerOutOfRange, node, -1); };
+    if not fits(v, t, negate) { report2(Diag.IntegerOutOfRange, node, -1, t, if negate { 1; } else { 0; }); };
     push_number(t, v, false);
     t;
 }
@@ -564,8 +600,10 @@ fn check_let(node: I32, cx: Cx) I32 {
         w_node(Op.Seq, vt_none, 0, 0, m);
         return ty_void();
     };
+    let before = diag_kind.len();
     let actual = check_expr(init, t, cx);
     if annotated { coerce(actual, t, init); } else { t = actual; };
+    decl_cause[decl] = any_mismatch_since(before);
     if ty_is(t, Ty.Null) {
         report(Diag.TypeMismatch, init, -1);
         t = ty_error();
@@ -619,8 +657,11 @@ fn global_of(decl: I32) I32 {
     if actual < 0 {
         w_stack.resize(m);
         decl_global[decl] = -2;
-        unsupported(init);
-        w_pop();
+        // Not a constant: validation has said so, unless it is one we cannot read yet.
+        if not invalid_global_initializer(node) {
+            unsupported(init);
+            w_pop();
+        };
         return -2;
     };
     coerce(actual, t, init);
@@ -658,6 +699,13 @@ fn check_assign(node: I32, cx: Cx) I32 {
     if decl < 0 { return error_value(); };
     if decl_is(decl, Decl.Global) or decl_is(decl, Decl.Fn) or decl_is(decl, Decl.Mem) {
         report(Diag.AssignmentToImmutable, target, word_of(target));
+        // The value is still checked against what it would replace.
+        if not decl_is(decl, Decl.Mem) {
+            let tt = type_only(target, -1, cx);
+            let m = w_mark();
+            coerce(check_expr(value, tt, cx), tt, value);
+            w_stack.resize(m);
+        };
         return error_value();
     };
     let t = decl_ty[decl];
@@ -774,14 +822,14 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     if is_scalar_kind(decl) {
         coerce(check_expr(right, t, cx), t, right);
         if scalar_compare(decl, word, m) { return prelude(Prelude.Bool); };
-        report(Diag.UnknownOperator, at, word);
+        report2(Diag.UnknownOperator, at, word, t, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
     let op = member(decl, word, Space.Operator);
     if op < 0 {
         check_expr(right, t, cx);
-        report(Diag.UnknownOperator, at, word);
+        report2(Diag.UnknownOperator, at, word, t, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -803,9 +851,7 @@ fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     let diags = diag_kind.len();
     let t = check_expr(node, expect, cx);
     w_stack.resize(m);
-    diag_kind.resize(diags);
-    diag_node.resize(diags);
-    diag_word.resize(diags);
+    diag_truncate(diags);
     t;
 }
 
@@ -852,7 +898,7 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
     if ty_is(t, Ty.Error) { return t; };
     let decl = member(ty_decl(t), word, Space.Operator);
     if decl < 0 {
-        report(Diag.UnknownOperator, node, word);
+        report2(Diag.UnknownOperator, node, word, t, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -881,7 +927,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
             if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, node, cx); };
             if ty_is(t, Ty.Error) { return finish_error(args, m, cx); };
-            report(Diag.NotCallable, callee, word_of(callee));
+            report2(Diag.NotCallable, node, word_of(callee), t, -1);
             return finish_error(args, m, cx);
         };
         let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
@@ -911,7 +957,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         if st >= 0 {
             let target = static_member(ty_decl(st), word_of(name));
             if not decl_is(target, Decl.Fn) {
-                report(Diag.UnknownMethod, name, word_of(name));
+                report2(Diag.UnknownMethod, node, word_of(name), st, -1);
                 return finish_error(args, m, cx);
             };
             return call_with(fn_instance(target, ty_inst(st)), args, 0, m, node, cx);
@@ -925,10 +971,14 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             if base >= 0 and args < 0 { return base; };
         };
         let decl = member(ty_decl(rt), word_of(name), Space.Method);
+        if ty_is(rt, Ty.Nullable) {
+            report2(Diag.NullableAccess, callee, word_of(name), rt, -1);
+            return finish_error(args, m, cx);
+        };
         if decl < 0 {
             // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
             if has_foreign() { return unsupported(node); };
-            report(Diag.UnknownMethod, name, word_of(name));
+            report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
             return finish_error(args, m, cx);
         };
         let fi = fn_instance(decl, ty_inst(rt));
@@ -943,8 +993,13 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         };
         let decl = node_decl[last_child(callee)];
         if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module)) and not has_foreign() {
-            report(Diag.UnknownMethod, last_child(callee), word_of(last_child(callee)));
+            report3(Diag.UnknownMethod, node, word_of(last_child(callee)), -1, -1, decl_name[owner_decl]);
             return finish_error(args, m, cx);
+        };
+        // `M.f(…)` with `let f: fun(…) R = @es/\ … \/` in module M.
+        if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
+            es_import(decl, last_child(decl_node[decl]), global_type(decl));
+            return call_es(decl, args, m, node, cx);
         };
         if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
         let owner_t = type_path(first_child(callee), cx.inst);
@@ -962,7 +1017,7 @@ fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, at, cx); };
     if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, at, cx); };
     if ty_is(t, Ty.Error) { return unsupported(at); };
-    report(Diag.NotCallable, callee, -1);
+    report2(Diag.NotCallable, at, -1, t, -1);
     finish_error(args, m, cx);
 }
 
@@ -985,7 +1040,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
         a = next_sibling(a);
     };
     if i != vl_len[params] {
-        report(Diag.WrongArity, at, -1);
+        report2(Diag.WrongArity, at, -1, vl_len[params] - first_param, i - first_param);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -996,7 +1051,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
 fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let t = decl_ty[decl];
     if not ty_is(t, Ty.Fun) {
-        report(Diag.NotCallable, at, decl_name[decl]);
+        report2(Diag.NotCallable, at, decl_name[decl], t, -1);
         return finish_error(args, m, cx);
     };
     if not check_args(ty_a[t], args, 0, at, cx) {
@@ -1034,7 +1089,7 @@ fn check_args(params: I32, args: I32, first: I32, at: I32, cx: Cx) Bool {
         a = next_sibling(a);
     };
     if i != vl_len[params] {
-        report(Diag.WrongArity, at, -1);
+        report2(Diag.WrongArity, at, -1, vl_len[params] - first, i - first);
         return false;
     };
     true;
@@ -1265,7 +1320,7 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     let owner = module_of(decl);
     let targs = type_args(args_types, cx.inst);
     if vl_len[targs] != module_arity(owner) {
-        report(Diag.InvalidModuleArity, node, decl_name[owner]);
+        report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[targs]);
         return error_value();
     };
     let inst = instance(owner, targs);
@@ -1342,12 +1397,12 @@ fn check_while(node: I32, cx: Cx) I32 {
 fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
     if not is_break and first_child(node) >= 0 { return check_continue_state(node, cx); };
     if loop_break.len() == 0 {
-        report(Diag.InvalidBreak, node, -1);
+        report2(Diag.InvalidBreak, node, -1, if is_break { BreakRule.BreakOutside.to_i32(); } else { BreakRule.ContinueOutside.to_i32(); }, -1);
         return error_value();
     };
     // A loop match moves on with `continue <state>`, never a plain continue.
     if not is_break and loop_state[loop_state.len() - 1] >= 0 {
-        report(Diag.InvalidBreak, node, -1);
+        report2(Diag.InvalidBreak, node, -1, BreakRule.ContinueWithoutState.to_i32(), -1);
         return error_value();
     };
     let label = if is_break { loop_break[loop_break.len() - 1]; } else { loop_continue[loop_continue.len() - 1]; };
@@ -1420,13 +1475,13 @@ fn reset_check() void {
     decl_local.resize(decl_kind.len());
     decl_ty.resize(decl_kind.len());
     decl_global.resize(decl_kind.len());
+    decl_cause.resize(decl_kind.len());
     for (0 ..< decl_kind.len()) |d| {
         decl_local[d] = -1;
         decl_ty[d] = 0;
         decl_global[d] = -1;
+        decl_cause[d] = -1;
     };
-    diag_expected.clear();
-    diag_actual.clear();
     reset_data();
     reset_mems();
     reset_host();
@@ -1445,6 +1500,7 @@ fn reset_check() void {
 // module's size in `out`, or -1 when there are diagnostics.
 fn compile(target: Target) I32 {
     restore_diagnostics();
+    if missing_import[0] >= 0 { return -1; };
     reset_wasm();
     reset_types();
     reset_ir_trees();
@@ -1453,7 +1509,9 @@ fn compile(target: Target) I32 {
     reset_check();
     validate_program();
     keep_target_diagnostics(target);
-    if diag_kind.len() > 0 { return -1; };
+    // A file that does not parse ends the build; other mistakes do not stop
+    // checking, which finds what else is wrong.
+    for (0 ..< file_root.len()) |file| { if file_root[file] < 0 { return -1; }; };
     let tests = 0;
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
@@ -1561,15 +1619,11 @@ fn keep_target_diagnostics(target: Target) void {
     let kept = 0;
     for (0 ..< diag_kind.len()) |i| {
         if in_target(diag_node[i], target) {
-            diag_kind[kept] = diag_kind[i];
-            diag_node[kept] = diag_node[i];
-            diag_word[kept] = diag_word[i];
+            diag_move(i, kept);
             kept += 1;
         };
     };
-    diag_kind.resize(kept);
-    diag_node.resize(kept);
-    diag_word.resize(kept);
+    diag_truncate(kept);
 }
 
 fn in_target(node: I32, target: Target) Bool {

@@ -12,6 +12,8 @@ docs/self-hosting.md (Plan B).
 | parser | `parse.utu` | `scripts/selfhost-parser-differential.mjs` |
 | sources (files, imports) | `source.utu` | all of them |
 | names | `resolve.utu` | `scripts/selfhost-resolve-differential.mjs` |
+| checking and code | `check.utu` and the rest | `scripts/selfhost-run-differential.mjs` |
+| diagnostics | `diag.utu` | `scripts/selfhost-diagnostics-differential.mjs` |
 | host interface | `lib.utu` | all of them |
 
 ## Building
@@ -182,14 +184,29 @@ tables.
 `scripts/selfhost-run-differential.mjs` builds every program in
 `examples/`, `benchmarks/`, and `baselines/corpus` (for its exports and its
 tests), runs each zero-argument export and test, and compares what it does
-with what stage 0's builds did (`baselines/run-differential.json`). 646 of
-948 builds behave the same; 294 use something not built yet (closures,
-iterators, generators, protocols, host declarations, the DSLs, `defer`,
-`await`), which it reports rather than miscompiling; and 5 differ, all
-checks that wait on those features (protocol conformance, `@embed`). Three
-differ on purpose, where stage 0 accepts a program it should reject (a
-method of an unknown type, a module given too few type arguments).
-`--why=call_expr` lists the source of what is not built yet.
+with what stage 0's builds did (`baselines/run-differential.json`). 819 of
+948 builds behave the same, and none differs; 126 use something not built
+yet (host declarations, the DSLs, recursive generators), which it reports
+rather than miscompiling. Three differ on purpose, where stage 0 accepts a
+program it should reject (a method of an unknown type, a module given too
+few type arguments). `--why=call_expr` lists the source of what is not
+built yet.
+
+`scripts/selfhost-diagnostics-differential.mjs` does the same for programs
+that do not build: for those programs and the negative corpus, every
+diagnostic's kind, message, and span must be stage 0's
+(`baselines/diagnostics.json.gz`). 1051 of 1234 builds diagnose the same,
+and none differs. Thirty differ on purpose: a program that does not parse
+is reported at the furthest token the parser reached, where stage 0
+reported tree-sitter's error recovery; and a few of stage 0's quirks are
+listed in the script with what this compiler does instead.
+
+A diagnostic is recorded as a kind, a node, and up to four arguments (a
+word, types, counts, declarations); `diag.utu` makes its name, message, and
+span when the host asks for them. As in stage 0, a missing import or a file
+that does not parse ends the build, any other mistake does not stop
+checking, and a mismatch that follows from another (a local typed by a
+mistaken initializer) is counted under it: `(+1 caused by this)`.
 
 The check is behavior, not bytes: the compiler is a new design, so its
 wasm differs from stage 0's, but what every program does must not.

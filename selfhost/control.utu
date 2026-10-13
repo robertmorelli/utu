@@ -6,27 +6,28 @@
 // ── match ──
 
 // A match pattern's value, as 64 bits (an integer, a float's bits, a Bool,
-// an integer enum's variant). Sets pattern_ok[0] = 0 when it is not one of
-// the scrutinee's type.
-mem pattern_ok: I32;
+// an integer enum's variant). When it is not one of the scrutinee's type,
+// pattern_fault[0] says why: 0 out of range, 1 not a Bool, 2 not an
+// integer, 3 of another kind, 4 not a variant (as MatchPattern's argument).
+mem pattern_fault: I32;
 
 fn pattern_value(lit: I32, t: I32) I64 {
     let c = first_child(lit);
     if is_kind(c, Node.Type_ident) {
         let variant = node_decl[next_sibling(c)];
         if not decl_is(variant, Decl.Variant) or named(decl_owner[variant], 0) != t {
-            pattern_ok[0] = 0;
+            pattern_fault[0] = 4;
             return 0;
         };
         return variant_value[variant].to_i64();
     };
     if is_kind(c, Node.Bool_lit) {
-        if t != prelude(Prelude.Bool) { pattern_ok[0] = 0; };
+        if t != prelude(Prelude.Bool) { pattern_fault[0] = 3; };
         return if tok_word[node_first[c]] == Kw.True.to_i32() { 1; } else { 0; };
     };
     let negate = tok_kind[node_first[lit]] == Tok.Minus.to_i32();
     if is_kind(c, Node.Float_lit) {
-        if not is_float(t) { pattern_ok[0] = 0; };
+        if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; };
         let text = "";
         for (tok_start[node_first[c]] ..< tok_end[node_first[c]]) |i| { text = text + Str.from_code_point(src[i]); };
         let f = parse_number(text);
@@ -41,8 +42,9 @@ fn pattern_value(lit: I32, t: I32) I64 {
         if t == prelude(Prelude.F32) { return f.to_f32().bits().to_i64(); };
         return f.bits();
     };
-    if t == prelude(Prelude.Bool) or (not is_numeric(t) and not decl_is(ty_decl(t), Decl.IntEnum)) { pattern_ok[0] = 0; };
-    if not fits(v, t, negate) { pattern_ok[0] = 0; };
+    if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v; };
+    if not is_numeric(t) and not decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };
+    if not fits(v, t, negate) { pattern_fault[0] = 0; };
     v;
 }
 
@@ -79,7 +81,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
     let d = ty_decl(st);
     if not (is_numeric(st) or st == prelude(Prelude.Bool) or decl_is(d, Decl.IntEnum)) {
-        report(Diag.MatchType, scrutinee, -1);
+        report2(Diag.MatchType, scrutinee, -1, st, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -90,18 +92,25 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let first_arm = arm_nodes.len();
     let default_ = -1;
     let c = next_sibling(scrutinee);
-    pattern_ok.resize(1);
+    pattern_fault.resize(1);
     while (c >= 0) {
         if is_kind(c, Node.Match_default) { default_ = c; }
         else if is_kind(c, Node.Match_arm) {
-            pattern_ok[0] = 1;
+            pattern_fault[0] = -1;
             let v = pattern_value(first_child(c), st);
-            if pattern_ok[0] == 0 { report(Diag.MatchPattern, c, -1); };
-            for (first_arm ..< arm_nodes.len()) |k| {
-                if arm_values[k] == v { report(Diag.DuplicatePattern, c, -1); };
+            let fault = pattern_fault[0];
+            if fault == 4 {
+                let p = first_child(first_child(c));
+                report2(Diag.UnknownVariant, c, word_of(next_sibling(p)), st, -1);
+            } else if fault >= 0 {
+                report2(Diag.MatchPattern, c, -1, fault, st);
+            } else {
+                for (first_arm ..< arm_nodes.len()) |k| {
+                    if arm_values[k] == v { report(Diag.DuplicatePattern, c, -1); };
+                };
+                arm_nodes.push(c);
+                arm_values.push(v);
             };
-            arm_nodes.push(c);
-            arm_values.push(v);
         };
         c = next_sibling(c);
     };
@@ -125,7 +134,7 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
         let t_ = false;
         let f_ = false;
         for (first_arm ..< last_arm) |k| { if arm_values[k] == 1 { t_ = true; } else { f_ = true; }; };
-        if not (t_ and f_) { report(Diag.NonExhaustive, node, -1); };
+        if not (t_ and f_) { report2(Diag.NonExhaustive, node, -1, 1, if t_ { 0; } else { 1; }); };
         return;
     };
     if decl_is(d, Decl.IntEnum) {
@@ -136,7 +145,7 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
                 let covered = false;
                 for (first_arm ..< last_arm) |k| { if arm_values[k] == v { covered = true; }; };
                 if not covered {
-                    report(Diag.NonExhaustive, node, decl_name[node_decl[first_child(c)]]);
+                    report2(Diag.NonExhaustive, node, decl_name[node_decl[first_child(c)]], 2, st);
                     return;
                 };
             };
@@ -144,7 +153,7 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
         };
         return;
     };
-    report(Diag.NonExhaustive, node, -1);
+    report2(Diag.NonExhaustive, node, -1, 0, st);
 }
 
 // Dispatch on local `s` to the arms (in arm_nodes from first to last), each
@@ -294,7 +303,7 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     let k = loop_state.len() - 1;
     while (k >= 0 and loop_state[k] < 0) { k -= 1; };
     if k < 0 {
-        report(Diag.InvalidBreak, node, -1);
+        report2(Diag.InvalidBreak, node, -1, BreakRule.ContinueStateOutside.to_i32(), -1);
         return error_value();
     };
     let t = loop_state_type[k];
@@ -318,7 +327,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     let et = check_expr(e, -1, cx);
     if ty_is(et, Ty.Error) { return finish_error(-1, m, cx); };
     if not ty_is(et, Ty.Nullable) {
-        report(Diag.NotNullable, e, -1);
+        report2(Diag.NotNullable, e, -1, et, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -363,7 +372,7 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     let at = check_expr(a, if expect >= 0 { nullable(expect); } else { -1; }, cx);
     if ty_is(at, Ty.Error) { return finish_error(-1, m, cx); };
     if not ty_is(at, Ty.Nullable) {
-        report(Diag.NotNullable, a, -1);
+        report2(Diag.NotNullable, a, -1, at, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -401,7 +410,7 @@ fn check_null_compare(node: I32, other: I32, equal: Bool, cx: Cx) I32 {
     let m = w_mark();
     let t = check_expr(other, -1, cx);
     if not ty_is(t, Ty.Nullable) and not ty_is(t, Ty.Error) and not vt_is_ref(repr(t)) {
-        report(Diag.NotNullable, other, -1);
+        report2(Diag.NotNullable, other, -1, t, -1);
     };
     w_node(Op.RefIsNull, vt_i32, 0, 0, m);
     if not equal { w_node(Op.Plain, vt_i32, 69, 0, m); };
@@ -454,11 +463,19 @@ fn check_tuple(node: I32, expect: I32, cx: Cx) I32 {
     let types = Array[I32].new(n, 0);
     let m = w_mark();
     let i = 0;
+    let folded = false;
     c = first_child(node);
     while (c >= 0) {
         let e = if expect >= 0 and ty_is(expect, Ty.Tuple) and i < vl_len[ty_a[expect]] { vl_item(ty_a[expect], i); } else { -1; };
+        let before = diag_kind.len();
         let t = check_expr(c, e, cx);
         types[i] = if e >= 0 { coerce(t, e, c); } else { t; };
+        // The tuple, of a mistaken part, is mistaken in consequence.
+        let part = mismatch_since(before, c);
+        if part >= 0 and not folded {
+            fold_into(part);
+            folded = true;
+        };
         i += 1;
         c = next_sibling(c);
     };
@@ -483,7 +500,7 @@ fn check_let_tuple(node: I32, cx: Cx) I32 {
         c = next_sibling(c);
     };
     if not ty_is(t, Ty.Tuple) or vl_len[ty_a[t]] != n {
-        report(Diag.TypeMismatch, init, -1);
+        report2(Diag.TupleLet, node, -1, t, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -588,7 +605,7 @@ fn check_for(node: I32, cx: Cx) I32 {
             kinds[i] = if tok_kind[token_after(lo)] == Tok.DotDotDot.to_i32() { 1; } else { 0; };
             let t = if is_number_literal(lo) and not is_number_literal(hi) { type_only(hi, -1, cx); } else { type_only(lo, -1, cx); };
             if not is_numeric(t) or is_float(t) {
-                report(Diag.InvalidForSource, s, -1);
+                report2(Diag.InvalidForSource, s, -1, 0, t);
                 w_stack.resize(m);
                 return error_value();
             };
@@ -606,7 +623,7 @@ fn check_for(node: I32, cx: Cx) I32 {
             let ma = w_mark();
             let at = check_expr(lo, -1, cx);
             if not is_array_type(at) {
-                if not ty_is(at, Ty.Error) { report(Diag.InvalidForSource, lo, -1); };
+                if not ty_is(at, Ty.Error) { report2(Diag.InvalidForSource, lo, -1, 0, at); };
                 w_stack.resize(m);
                 return error_value();
             };

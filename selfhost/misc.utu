@@ -76,7 +76,7 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
         return ty_b[t];
     };
     if ty_is(t, Ty.Error) { return unsupported(node); };
-    report(Diag.NotCallable, first, -1);
+    report2(Diag.NotCallable, first, -1, t, -1);
     error_value();
 }
 
@@ -96,7 +96,7 @@ fn pipe_method(node: I32, first: I32, names: Array[I32], nnames: I32, args: Arra
     let decl = member(ty_decl(rt), word_of(name), Space.Method);
     if decl < 0 {
         if has_foreign() { return unsupported(node); };
-        report(Diag.UnknownMethod, name, word_of(name));
+        report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
         return finish_error(-1, m, cx);
     };
     let fi = fn_instance(decl, ty_inst(rt));
@@ -118,7 +118,7 @@ fn pipe_call(fi: I32, args: Array[I32], count: I32, value: I32, first_param: I32
 // reporting a wrong count.
 fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first: I32, at: I32, cx: Cx) Bool {
     if first + count != vl_len[params] {
-        report(Diag.WrongArity, at, -1);
+        report2(Diag.WrongArity, at, -1, vl_len[params] - first, count);
         return false;
     };
     for (0 ..< count) |i| {
@@ -148,6 +148,8 @@ fn reset_defers() void {
 }
 
 fn check_defer(node: I32) I32 {
+    // One that leaves (reported in validation) would run itself without end.
+    if deferred_exit(first_child(node), false) >= 0 { return error_value(); };
     defer_node.push(first_child(node));
     w_leaf(Op.Nop, vt_none, 0, 0);
     ty_void();
@@ -208,7 +210,7 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
     let bt = check_expr(base, -1, cx);
     if ty_is(bt, Ty.Error) { return finish_error(-1, m, cx); };
     if not ty_is(bt, Ty.Nullable) {
-        report(Diag.NotNullable, base, -1);
+        report2(Diag.NotNullable, base, -1, bt, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -236,6 +238,11 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
 // A statement: an optional chain's guard, or the expression.
 fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
     let opt = leftmost_optional(stmt);
+    if opt >= 0 and expect >= 0 and not ty_is(expect, Ty.Void) {
+        // A statement whose value is used (a block's last) is not guarded.
+        report(Diag.OptionalOutsideStatement, opt, -1);
+        return error_value();
+    };
     if opt >= 0 { return check_optional_statement(stmt, opt, cx); };
     check_expr(stmt, expect, cx);
 }
@@ -287,7 +294,7 @@ fn check_await(node: I32, cx: Cx) I32 {
     let pt = check_expr(e, -1, cx);
     if ty_is(pt, Ty.Error) { return finish_error(-1, m, cx); };
     if not is_promise_type(pt) {
-        report(Diag.AwaitNotPromise, e, -1);
+        report2(Diag.AwaitNotPromise, node, -1, pt, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };

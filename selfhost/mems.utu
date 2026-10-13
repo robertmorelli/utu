@@ -159,14 +159,14 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
             let negate = is_kind(c, Node.Unary_expr);
             if is_kind(lit, Node.Int_lit) {
                 let v = int_value(lit);
-                store_value(s, if negate { 0 - v; } else { v; }, false, c, count);
+                store_value(decl, if negate { 0 - v; } else { v; }, false, init, count);
             } else if is_kind(lit, Node.Float_lit) {
                 let text = "";
                 for (tok_start[node_first[lit]] ..< tok_end[node_first[lit]]) |i| { text = text + Str.from_code_point(src[i]); };
                 let f = parse_number(text);
-                store_value(s, (if negate { 0.0 - f; } else { f; }).bits(), true, c, count);
+                store_value(decl, (if negate { 0.0 - f; } else { f; }).bits(), true, init, count);
             } else {
-                report(Diag.MemInitializer, c, decl_name[decl]);
+                report(Diag.MemInitializer, init, decl_name[decl]);
             };
             count += 1;
             c = next_sibling(c);
@@ -191,7 +191,7 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
                 let at = comptime_start[k] + i * value_size;
                 let lo = read_u32(at);
                 let v = if value_size == 8 { (read_u32(at + 4).to_i64() << 32) | (lo.to_i64() & 4294967295); } else { lo.to_i64(); };
-                store_value(s, v, s == Storage.F32 or s == Storage.F64, init, i);
+                store_value(decl, v, s == Storage.F32 or s == Storage.F64, init, i);
             };
         };
     };
@@ -206,8 +206,10 @@ fn read_u32(at: I32) I32 {
     comptime_bytes[at] | (comptime_bytes[at + 1] << 8) | (comptime_bytes[at + 2] << 16) | (comptime_bytes[at + 3] << 24);
 }
 
-// Append element `i`, value `v` (an integer, or a float's 64 bits), in storage `s`.
-fn store_value(s: Storage, v: I64, is_float: Bool, at: I32, i: I32) void {
+// Append element `i` of mem `decl`'s initializer `at`: `v`, an integer or
+// a float's 64 bits.
+fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
+    let s = mem_storage(decl);
     let size = 1 << storage_shift(s);
     if s == Storage.F32 or s == Storage.F64 {
         let f = if is_float { F64.from_bits(v); } else { v.to_f64(); };
@@ -225,7 +227,8 @@ fn store_value(s: Storage, v: I64, is_float: Bool, at: I32, i: I32) void {
     else if s == Storage.U32 { hi = 4294967295; }
     else { lo = 0 - 9223372036854775807 - 1; hi = 9223372036854775807; };
     if is_float or v < lo or v > hi {
-        report(Diag.MemElementRange, at, i);
+        let text = if is_float { F64.from_bits(v).to_str(); } else { v.to_str(); };
+        report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(text));
     };
     for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
 }
@@ -361,13 +364,13 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     let method = mem_method(word);
     if method < 0 {
-        report(Diag.UnknownMethod, name, word);
+        report(Diag.MemNoMethod, first_child(at), word);
         return error_value();
     };
     let writes = method == MemMethod.Push.to_i32() or method == MemMethod.Reserve.to_i32() or method == MemMethod.Resize.to_i32()
         or method == MemMethod.Clear.to_i32();
     if writes and mem_is_const(decl) {
-        report(Diag.ConstMem, at, decl_name[decl]);
+        report2(Diag.ConstMem, first_child(at), decl_name[decl], word, -1);
         return error_value();
     };
     let a = if args >= 0 { first_child(args); } else { -1; };
@@ -390,7 +393,7 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
     if method == MemMethod.Copy_in.to_i32() or method == MemMethod.View.to_i32() {
         // A view is a JS typed array: it needs std:JS's declarations.
         if method == MemMethod.View.to_i32() and not has_foreign() {
-            report(Diag.MemView, at, decl_name[decl]);
+            report2(Diag.MemView, first_child(at), decl_name[decl], mem_storage(decl).to_i32(), -1);
             return error_value();
         };
         return unsupported(at);
@@ -566,7 +569,7 @@ fn mem_helper_functions(decl: I32) I32 {
 fn call_interner(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
     let s = mem_storage(decl);
     if s != Storage.U8 and s != Storage.I8 {
-        report(Diag.InternNotBytes, at, decl_name[decl]);
+        report2(Diag.InternNotBytes, first_child(at), decl_name[decl], mem_method_word[method], -1);
         return error_value();
     };
     let f = generated_mem_fn(decl, method);

@@ -36,6 +36,16 @@ export lib {
     // The import is of host declarations (std:JS, npm:…), not a utu file.
     fn import_foreign(i: I32) void { import_target[i] = -2; }
 
+    // The host cannot read the import's file, whose path is `n` bytes the
+    // host writes at the offset returned. This ends the build.
+    fn import_missing(i: I32, n: I32) I32 {
+        missing_import[0] = i;
+        missing_start[0] = src.len();
+        src.resize(src.len() + n);
+        missing_end[0] = src.len();
+        missing_start[0];
+    }
+
     // Resolve every name. Returns the number of diagnostics.
     fn resolve() I32 { resolve_names(); }
 
@@ -95,7 +105,16 @@ export lib {
         at;
     }
 
-    fn diagnostic_kind(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
+    fn diagnostic_kind(i: I32) Str { diag_kind_name(i); }
+
+    fn diagnostic_message(i: I32) Str { diag_message(i); }
+
+    // Where a diagnostic points: a file, and byte offsets into the source.
+    fn diagnostic_file(i: I32) I32 { diag_file(i); }
+
+    fn diagnostic_start(i: I32) I32 { diag_start(i); }
+
+    fn diagnostic_end(i: I32) I32 { diag_end(i); }
 
     fn diagnostic_node(i: I32) I32 { diag_node[i]; }
 

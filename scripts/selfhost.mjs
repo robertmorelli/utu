@@ -108,7 +108,14 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
         file = add(key, text, role);
       } else {
         let text;
-        try { text = readFile(key); } catch { continue; }
+        try {
+          text = readFile(key);
+        } catch {
+          // A file that cannot be read ends the build, as in stage 0.
+          const bytes = new TextEncoder().encode(key);
+          new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
+          break;
+        }
         file = add(key, text, role);
       }
     }

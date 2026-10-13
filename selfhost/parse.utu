@@ -256,8 +256,13 @@ mem pending: I32;
 
 let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/;
 
-// Give up: the program is not one this parser accepts.
-fn fail() void {
+// Give up: the program is not one this parser accepts. The furthest token
+// any attempt failed at is where the error is reported.
+mem parse_furthest: I32 = [0];
+mem parse_error_at: I32 = [0];  // the token a failed parse reports
+
+fn fail(p: Parser) void {
+    if p.pos > parse_furthest[0] { parse_furthest[0] = p.pos; };
     syntax_error();
 }
 
@@ -303,12 +308,12 @@ fn shaped(p: Parser) Bool { shaped_at(p, 0); }
 fn advance(p: Parser) void { p.pos += 1; }
 
 fn expect(p: Parser, kind: Tok) void {
-    if not is(p, kind) { fail(); };
+    if not is(p, kind) { fail(p); };
     p.pos += 1;
 }
 
 fn expect_kw(p: Parser, kw: Kw) void {
-    if not is_kw(p, kw) { fail(); };
+    if not is_kw(p, kw) { fail(p); };
     p.pos += 1;
 }
 
@@ -367,41 +372,41 @@ fn restore(p: Parser, s: Save) void {
 // ── Words ──
 
 fn identifier(p: Parser) I32 {
-    if not shaped(p) { fail(); };
+    if not shaped(p) { fail(p); };
     leaf(p, Node.Identifier);
 }
 
 fn type_ident(p: Parser) I32 {
-    if not is_word(p) { fail(); };
+    if not is_word(p) { fail(p); };
     leaf(p, Node.Type_ident);
 }
 
 // A type name where no keyword can stand.
 fn unreserved_type_ident(p: Parser) I32 {
-    if is_keyword_id(word_id(p)) { fail(); };
+    if is_keyword_id(word_id(p)) { fail(p); };
     type_ident(p);
 }
 
 // `identifier` where the word is identifier-shaped, else `type_ident` (both fit here).
 fn identifier_or_type(p: Parser) I32 {
-    if not is_word(p) { fail(); };
+    if not is_word(p) { fail(p); };
     leaf(p, if shaped(p) { Node.Identifier; } else { Node.Type_ident; });
 }
 
 fn string_lit(p: Parser) I32 {
-    if not is(p, Tok.String) { fail(); };
+    if not is(p, Tok.String) { fail(p); };
     leaf(p, Node.String_lit);
 }
 
 fn number(p: Parser) I32 {
     if is(p, Tok.Int) { return leaf(p, Node.Int_lit); };
     if is(p, Tok.Float) { return leaf(p, Node.Float_lit); };
-    fail();
+    fail(p);
     -1;
 }
 
 fn int_lit(p: Parser) I32 {
-    if not is(p, Tok.Int) { fail(); };
+    if not is(p, Tok.Int) { fail(p); };
     leaf(p, Node.Int_lit);
 }
 
@@ -429,12 +434,12 @@ fn item(p: Parser) void {
         if after == Kw.Lib.to_i32() { export_lib_decl(p); return; };
         if after == Kw.Main.to_i32() { export_main_decl(p); return; };
         if after == Kw.Const.to_i32() or after == Kw.Mem.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
-        fail();
+        fail(p);
         return;
     };
     if w == Kw.Test.to_i32() { test_decl(p); return; };
     if w == Kw.Bench.to_i32() { bench_decl(p); return; };
-    fail();
+    fail(p);
 }
 
 fn module_item(p: Parser) void {
@@ -446,7 +451,7 @@ fn module_item(p: Parser) void {
     if w == Kw.Let.to_i32() { global_decl(p); expect(p, Tok.Semi); return; };
     if w == Kw.Test.to_i32() { test_decl(p); return; };
     if w == Kw.Bench.to_i32() { bench_decl(p); return; };
-    fail();
+    fail(p);
 }
 
 fn module_decl(p: Parser) I32 {
@@ -546,7 +551,7 @@ fn struct_or_enum(p: Parser) I32 {
     };
     if is_kw(p, Kw.Struct) { return struct_decl(p, at, first); };
     if is_kw(p, Kw.Enum) { return enum_decl(p, at, first); };
-    fail();
+    fail(p);
     -1;
 }
 
@@ -828,7 +833,7 @@ fn using_decl(p: Parser) I32 {
             // `std:Str`: a lowercase word, `:`, and a word starting with a letter, touching.
             if not (shaped(p) and src[tok_start[ptok[p.pos]]] != 95 and is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.Word)
                     and src[tok_start[ptok[p.pos + 2]]] != 95 and adjacent(p.pos, p.pos + 1) and adjacent(p.pos + 1, p.pos + 2)) {
-                fail();
+                fail(p);
             };
             let path = mark();
             p.pos += 3;
@@ -941,7 +946,7 @@ fn base_type(p: Parser) I32 {
 
 // The inside of a ref_type: a type name, `M.T`, `M[A]`, or `M[A].T`.
 fn ref_type(p: Parser) I32 {
-    if not is_word(p) { fail(); };
+    if not is_word(p) { fail(p); };
     let s = save(p);
     let at = mark();
     let first = p.pos;
@@ -1182,7 +1187,7 @@ fn iterator(p: Parser, left: I32, form: I32) I32 {
 fn pipe_target(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
-    if not is_word(p) { fail(); };
+    if not is_word(p) { fail(p); };
     if is_at(p, 1, Tok.LBracket) {
         let module = mark();
         module_name(p);
@@ -1197,7 +1202,7 @@ fn pipe_target(p: Parser) I32 {
         identifier_or_type(p);
     };
     // Stage 0 reads the first dot of `...` or `..<` as a path's next `.`, which then has no name.
-    if is(p, Tok.DotDotDot) or is(p, Tok.DotDotLt) { fail(); };
+    if is(p, Tok.DotDotDot) or is(p, Tok.DotDotLt) { fail(p); };
     if is(p, Tok.LParen) {
         advance(p);
         pipe_args(p);
@@ -1215,7 +1220,7 @@ fn pipe_args(p: Parser) I32 {
         let arg = mark();
         let start = p.pos;
         if is(p, Tok.Amp) {
-            if placeholder { fail(); };
+            if placeholder { fail(p); };
             placeholder = true;
             promoted_type(p);
             node(p, Node.Pipe_arg_placeholder, arg, start);
@@ -1232,7 +1237,7 @@ fn pipe_args(p: Parser) I32 {
 }
 
 fn prefix(p: Parser) I32 {
-    if at_end(p) { fail(); };
+    if at_end(p) { fail(p); };
     let at = mark();
     let first = p.pos;
     if is_word(p) {
@@ -1272,7 +1277,7 @@ fn prefix(p: Parser) I32 {
         return node(p, Node.Implicit_struct_init, at, first);
     };
     if is(p, Tok.At) { return dsl_expr(p); };
-    fail();
+    fail(p);
     -1;
 }
 
@@ -1315,7 +1320,7 @@ fn keyword_expression(p: Parser) I32 {
         let callee = prefix(p);
         while (is(p, Tok.Dot) or is(p, Tok.QuestionDot) or is(p, Tok.LBracket)) {
             callee = infix(p, callee, 13, false);
-            if callee < 0 { fail(); };
+            if callee < 0 { fail(p); };
         };
         expect(p, Tok.LParen);
         arg_list_or_none(p);
@@ -1352,7 +1357,7 @@ fn keyword_expression(p: Parser) I32 {
     if w == Kw.Try.to_i32() { return try_expr(p); };
     if w == Kw.For.to_i32() { return for_expr(p); };
     if w == Kw.While.to_i32() { return while_expr(p); };
-    fail();
+    fail(p);
     -1;
 }
 
@@ -1405,14 +1410,14 @@ fn word_expression(p: Parser) I32 {
         module_name(p);
         module_type_arg_list(p);
         expect(p, Tok.Dot);
-        if shaped(p) { fail(); };
+        if shaped(p) { fail(p); };
         type_ident(p);
         node(p, Node.Inline_module_type_path, at, first);
         expect(p, Tok.Dot);
         identifier_or_type(p);
         return node(p, Node.Type_member_expr, at, first);
     };
-    if not type_name or not is(p, Tok.Dot) { fail(); };
+    if not type_name or not is(p, Tok.Dot) { fail(p); };
     advance(p);
     if is_kw(p, Kw.Null) {
         advance(p);
@@ -1582,7 +1587,7 @@ fn dsl_expr(p: Parser) I32 {
     let first = p.pos;
     expect(p, Tok.At);
     identifier(p);
-    if not is(p, Tok.DslBody) { fail(); };
+    if not is(p, Tok.DslBody) { fail(p); };
     leaf(p, Node.Dsl_body);
     node(p, Node.Dsl_expr, at, first);
 }
@@ -1870,16 +1875,21 @@ fn intern_words(first: I32, last: I32) void {
 // their nodes. Returns the source file node, or -1 when the tokens do not
 // parse (and adds no nodes). Comments are the nodes after the source file.
 fn parse(first: I32, last: I32) I32 {
-    if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
+    if tok_kind[last - 1] != Tok.End.to_i32() {
+        parse_error_at[0] = last - 1;
+        return -1;
+    };
     intern_words(first, last);
     let before = node_kind.len();
     pending.clear();
+    parse_furthest[0] = 0;
     try {
         let root = source_file(Parser { pos: 0 });
         token_spans(before, root, first, last - 1);
         attach_comments(root);
         root;
     } catch {
+        parse_error_at[0] = ptok[parse_furthest[0]];
         restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
         -1;
     };

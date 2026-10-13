@@ -54,12 +54,12 @@ fn enum_values(decl: I32) void {
                 next = value;
             };
             variant_value[v] = next;
-            if own and (next < lo or next > hi) { report(Diag.EnumValueRange, c, decl_name[v]); };
+            if own and (next < lo or next > hi) { report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], next, repr_word); };
             if own {
                 let other = first;
                 while (other >= 0 and other != v) {
                     if variant_value[other] == next {
-                        report(Diag.EnumValueTwice, c, decl_name[v]);
+                        report3(Diag.EnumValueTwice, c, decl_name[v], decl_name[decl], decl_name[other], next);
                         other = v;
                     } else {
                         other = other + 1;
@@ -79,20 +79,97 @@ fn validate_program() void {
     validate_protocols();
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
-            report(Diag.ParseError, -1, file);
+            report2(Diag.ParseError, -1, file, file_error[file], -1);
         } else if is_own_file(file) {
             validate_tree(file_root[file]);
         };
     };
     validate_recursive_structs();
+    validate_module_members();
+}
+
+// ── Modules of one name ──
+//
+// Stage 0 hoists each module's members into one namespace, as `M__f`,
+// `M.m`, `M:op` (and `M` for its promoted type), so two modules of one
+// name (an own module named like one of the standard library's, say) may
+// not declare a member twice. The later declaration is reported.
+
+fn validate_module_members() void {
+    for (0 ..< decl_kind.len()) |b| {
+        // A generic module is instantiated (`M__I32`), not hoisted as itself.
+        if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) {
+            for (0 ..< decl_kind.len()) |a| {
+                if a != b and decl_is(a, Decl.Module) and not is_generic(a) and decl_name[a] == decl_name[b] and module_before(a, b) {
+                    let item = first_child(decl_node[b]);
+                    while (item >= 0) {
+                        let name = hoisted_name(b, item);
+                        if name.len() > 0 and module_declares(a, name) { report2(Diag.DuplicateDeclaration, item, -1, 4, b); };
+                        item = next_sibling(item);
+                    };
+                };
+            };
+        };
+    };
+}
+
+// Whether module a comes before module b in stage 0's program: the
+// standard library's first, then by place.
+fn module_before(a: I32, b: I32) Bool {
+    let fa = file_of_token(node_first[decl_node[a]]);
+    let fb = file_of_token(node_first[decl_node[b]]);
+    let pa = file_role[fa] == FileRole.Prelude.to_i32();
+    let pb = file_role[fb] == FileRole.Prelude.to_i32();
+    if pa != pb { return pa; };
+    decl_node[a] < decl_node[b];
+}
+
+fn module_declares(module: I32, name: Str) Bool {
+    let item = first_child(decl_node[module]);
+    while (item >= 0) {
+        if hoisted_name(module, item) == name { return true; };
+        item = next_sibling(item);
+    };
+    false;
+}
+
+// The name stage 0 gives item (of module m's declaration) once hoisted, or
+// "" for what it does not name (usings, comments, …).
+fn hoisted_name(m: I32, item: I32) Str {
+    let module = word_text(decl_name[m]);
+    if is_kind(item, Node.Op_decl) {
+        return hoisted_receiver(m, first_child(item)) + ":" + node_text(next_sibling(first_child(item)));
+    };
+    if is_kind(item, Node.Fn_decl) {
+        let name = first_child(item);
+        if next_sibling(first_child(name)) < 0 { return module + "__" + node_text(name); };
+        return hoisted_receiver(m, first_child(name)) + "." + node_text(last_child(name));
+    };
+    if is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl) or is_kind(item, Node.Proto_decl)
+        or is_kind(item, Node.Type_decl) or is_kind(item, Node.Distinct_decl) or is_kind(item, Node.Global_decl) {
+        let text = node_text(first_child(item));
+        if text == "&" { return module; };
+        return module + "__" + text;
+    };
+    "";
+}
+
+// A receiver, hoisted: `&` is the module's type, a type of the module is
+// `M__T`, and any other keeps its name.
+fn hoisted_receiver(m: I32, receiver: I32) Str {
+    let text = node_text(receiver);
+    if text == "&" { return word_text(decl_name[m]); };
+    let t = member(m, word_of(receiver), Space.Member);
+    if t >= 0 and not decl_is(t, Decl.Fn) and not decl_is(t, Decl.Global) { return word_text(decl_name[m]) + "__" + text; };
+    text;
 }
 
 fn validate_tree(node: I32) void {
     let kind = node_kind[node];
-    if kind == Node.Param_list.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration); }
-    else if kind == Node.Struct_decl.to_i32() { duplicate_names(node, Diag.DuplicateField); }
-    else if kind == Node.Field_list.to_i32() { duplicate_names(node, Diag.DuplicateField); }
-    else if kind == Node.Enum_decl.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration); }
+    if kind == Node.Param_list.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration, 1); }
+    else if kind == Node.Struct_decl.to_i32() { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(node)]); }
+    else if kind == Node.Field_list.to_i32() { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(parent_of(node))]); }
+    else if kind == Node.Enum_decl.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration, 2); }
     else if kind == Node.Block.to_i32() { duplicate_lets(node); }
     else if kind == Node.Nullable_type.to_i32() { validate_nullable(node); }
     else if kind == Node.Tuple_type.to_i32() { validate_tuple_type(node); }
@@ -109,8 +186,10 @@ fn validate_tree(node: I32) void {
     };
 }
 
-// Children that declare a name (parameters, fields, variants), each name once.
-fn duplicate_names(node: I32, kind: Diag) void {
+// Children that declare a name (parameters, fields, variants), each name
+// once. `what` is the diagnostic's argument: which names (1 parameters, 2
+// variants), or the type whose fields they are.
+fn duplicate_names(node: I32, kind: Diag, what: I32) void {
     let c = first_child(node);
     while (c >= 0) {
         let k = node_kind[c];
@@ -119,7 +198,7 @@ fn duplicate_names(node: I32, kind: Diag) void {
             let other = first_child(node);
             while (other != c) {
                 if node_kind[other] == k and word_of(first_child(other)) == word {
-                    report(kind, c, word);
+                    report2(kind, c, word, what, -1);
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -139,7 +218,7 @@ fn duplicate_lets(block: I32) void {
             let other = first_child(block);
             while (other != c) {
                 if is_kind(other, Node.Bind_expr) and is_kind(first_child(other), Node.Identifier) and word_of(first_child(other)) == word {
-                    report(Diag.DuplicateDeclaration, c, word);
+                    report2(Diag.DuplicateDeclaration, c, word, 3, -1);
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -171,23 +250,29 @@ fn validate_tuple_type(node: I32) void {
     if is_kind(parent, Node.Return_type) {
         let owner = parent_of(parent);
         if is_kind(owner, Node.Fn_decl) or is_kind(owner, Node.Func_type) or is_kind(owner, Node.Export_main_decl) { return; };
+        if is_kind(owner, Node.Closure_expr) or is_kind(owner, Node.Closure_type) {
+            report2(Diag.TupleMisplaced, node, -1, 2, -1);
+            return;
+        };
     };
-    report(Diag.TupleMisplaced, node, -1);
+    report2(Diag.TupleMisplaced, node, -1, if is_kind(parent, Node.Tuple_type) { 1; } else { 0; }, -1);
 }
 
 // A struct field holds no `fun` (use `cl`).
 fn validate_field_type(node: I32) void {
     let t = next_sibling(first_child(node));
-    if is_kind(t, Node.Func_type) { report(Diag.FunInField, node, -1); };
+    if is_kind(t, Node.Func_type) { report2(Diag.FunInField, t, -1, type_of(t, 0), 0); };
 }
 
 // A global's initializer is a literal (maybe negated).
 fn validate_global(node: I32) void {
+    if invalid_global_initializer(node) { report(Diag.InvalidGlobalInitializer, last_child(node), word_of(first_child(node))); };
+}
+
+fn invalid_global_initializer(node: I32) Bool {
     let init = last_child(node);
-    if is_kind(init, Node.Literal) { return; };
-    if is_kind(init, Node.Dsl_expr) { return; };
-    if is_kind(init, Node.Unary_expr) and tok_kind[node_first[init]] == Tok.Minus.to_i32() and is_kind(last_child(init), Node.Literal) { return; };
-    report(Diag.InvalidGlobalInitializer, init, word_of(first_child(node)));
+    if is_kind(init, Node.Literal) or is_kind(init, Node.Dsl_expr) { return false; };
+    not (is_kind(init, Node.Unary_expr) and tok_kind[node_first[init]] == Tok.Minus.to_i32() and is_kind(last_child(init), Node.Literal));
 }
 
 // A struct that reaches itself through fields of struct types (not
@@ -239,11 +324,16 @@ fn validate_yield(node: I32) void {
 // (return, or a break or continue not of a loop inside it).
 fn validate_defer(node: I32) void {
     if not is_kind(parent_of(node), Node.Block) {
-        report(Diag.InvalidDefer, node, -1);
+        report2(Diag.InvalidDefer, node, -1, BreakRule.DeferNotStatement.to_i32(), -1);
         return;
     };
     let exit = deferred_exit(first_child(node), false);
-    if exit >= 0 { report(Diag.InvalidDefer, exit, -1); };
+    if exit >= 0 {
+        let rule = if is_kind(exit, Node.Return_expr) { BreakRule.ReturnInDefer; }
+            else if is_kind(exit, Node.Break_expr) { BreakRule.BreakInDefer; }
+            else { BreakRule.ContinueInDefer; };
+        report2(Diag.InvalidDefer, exit, -1, rule.to_i32(), -1);
+    };
 }
 
 fn deferred_exit(node: I32, in_loop: Bool) I32 {

@@ -1,0 +1,389 @@
+// ── Diagnostics ──────────────────────────────────────────────────────────────
+//
+// A diagnostic's kind name, message, and span, made when the host asks, in
+// stage 0's words, from what was reported (see `report` in resolve.utu).
+
+// The text of a word.
+fn word_text(w: I32) Str {
+    if w < 0 { return ""; };
+    let start = src.interned_start(w);
+    bytes_text(start, start + src.interned_size(w));
+}
+
+// The text of src[start ..< end_] (UTF-8).
+fn bytes_text(start: I32, end_: I32) Str {
+    let text = "";
+    let i = start;
+    while (i < end_) {
+        let b = src[i];
+        let cp = b;
+        let n = 1;
+        if b >= 240 { cp = b & 7; n = 4; } else if b >= 224 { cp = b & 15; n = 3; } else if b >= 192 { cp = b & 31; n = 2; };
+        for (1 ..< n) |k| { cp = (cp << 6) | (src[i + k] & 63); };
+        text = text + Str.from_code_point(cp);
+        i += n;
+    };
+    text;
+}
+
+fn decl_text(d: I32) Str {
+    if d < 0 { return ""; };
+    word_text(decl_name[d]);
+}
+
+fn node_text(node: I32) Str {
+    if node < 0 { return ""; };
+    bytes_text(tok_start[node_first[node]], tok_end[node_last[node] - 1]);
+}
+
+fn int_text(v: I32) Str { v.to_str(); }
+
+fn pick(c: Bool, yes: Str, no: Str) Str {
+    if c { return yes; };
+    no;
+}
+
+// A type as stage 0 writes it: `I32`, `?Point`, `Array[I32]`, `fun(I32) Bool`, `.{I32, F64}`.
+fn type_text(t: I32) Str {
+    if t < 0 { return "unknown"; };
+    let kind = ty_kind[t];
+    if kind == Ty.Error.to_i32() { return "unknown"; };
+    if kind == Ty.Void.to_i32() { return "void"; };
+    if kind == Ty.Never.to_i32() { return "never"; };
+    if kind == Ty.Null.to_i32() { return "null"; };
+    if kind == Ty.Nullable.to_i32() { return "?" + type_text(ty_a[t]); };
+    if kind == Ty.Tuple.to_i32() { return ".{" + type_list_text(ty_a[t]) + "}"; };
+    if kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() {
+        return pick(kind == Ty.Fun.to_i32(), "fun(", "cl(") + type_list_text(ty_a[t]) + ") " + type_text(ty_b[t]);
+    };
+    let decl = ty_a[t];
+    let inst = ty_b[t];
+    let module = module_of(decl);
+    let name = decl_name[decl];
+    if decl_is(decl, Decl.TypeDecl) or (module >= 0 and decl_a[module] == decl) { name = decl_name[module]; };
+    let text = word_text(name);
+    if inst > 0 and module >= 0 and (decl_a[module] == decl) {
+        text = text + "[" + type_list_text(inst_args[inst]) + "]";
+    };
+    text;
+}
+
+fn type_list_text(list: I32) Str {
+    let text = "";
+    for (0 ..< vl_len[list]) |i| {
+        if i > 0 { text = text + ", "; };
+        text = text + type_text(vl_item(list, i));
+    };
+    text;
+}
+
+// The symbol of an operator word (add is `+`).
+fn operator_symbol(w: I32) Str {
+    if w == known_word(Known.Add) { return "+"; };
+    if w == known_word(Known.Sub) { return "-"; };
+    if w == known_word(Known.Mul) { return "*"; };
+    if w == known_word(Known.Div) { return "/"; };
+    if w == known_word(Known.Rem) { return "%"; };
+    if w == known_word(Known.Band) { return "&"; };
+    if w == known_word(Known.Bor) { return "|"; };
+    if w == known_word(Known.Bxor) { return "^"; };
+    if w == known_word(Known.Shl) { return "<<"; };
+    if w == known_word(Known.Shr) { return ">>"; };
+    if w == known_word(Known.Ushr) { return ">>>"; };
+    if w == known_word(Known.Eq) { return "=="; };
+    if w == known_word(Known.Ne) { return "!="; };
+    if w == known_word(Known.Lt) { return "<"; };
+    if w == known_word(Known.Le) { return "<="; };
+    if w == known_word(Known.Gt) { return ">"; };
+    if w == known_word(Known.Ge) { return ">="; };
+    if w == known_word(Known.Neg) { return "-"; };
+    if w == known_word(Known.Bnot) { return "~"; };
+    if w == known_word(Known.GetIndex) { return "[]"; };
+    if w == known_word(Known.GetSlice) { return "[,]"; };
+    if w == known_word(Known.SetIndex) { return "[]="; };
+    word_text(w);
+}
+
+// Where InvalidBreak's argument a says which rule was broken.
+enum(U8) BreakRule:
+    | BreakOutside
+    | ContinueOutside
+    | ContinueStateOutside
+    | ContinueWithoutState
+    | BreakInDefer
+    | ContinueInDefer
+    | ReturnInDefer
+    | DeferNotStatement
+
+// The JS typed array a mem's view is.
+fn view_array_name(s: Storage) Str {
+    if s == Storage.U8 { return "Uint8Array"; };
+    if s == Storage.I8 { return "Int8Array"; };
+    if s == Storage.U16 { return "Uint16Array"; };
+    if s == Storage.I16 { return "Int16Array"; };
+    if s == Storage.I32 { return "Int32Array"; };
+    if s == Storage.U32 { return "Uint32Array"; };
+    if s == Storage.I64 { return "BigInt64Array"; };
+    if s == Storage.U64 { return "BigUint64Array"; };
+    if s == Storage.F32 { return "Float32Array"; };
+    "Float64Array";
+}
+
+// The @comptime expression a diagnostic is in (its index in
+// comptime_text_*), or -1. Its expression was copied into a function of
+// the generated file, whose line 4 it starts on.
+fn comptime_site(i: I32) I32 {
+    let node = diag_node[i];
+    if node < 0 { return -1; };
+    let b = tok_start[node_first[node]];
+    for (0 ..< comptime_text_start.len()) |k| {
+        if b >= comptime_text_start[k] and b < comptime_text_end[k] { return k; };
+    };
+    -1;
+}
+
+// The kind's name, as stage 0 spells it.
+fn diag_kind_name(i: I32) Str {
+    if comptime_site(i) >= 0 { return "type-mismatch"; };
+    diag_kind_of(i);
+}
+
+fn diag_message(i: I32) Str {
+    let k = comptime_site(i);
+    if k < 0 { return diag_text(i); };
+    let line = 4;
+    for (comptime_text_start[k] ..< tok_start[node_first[diag_node[i]]]) |b| { if src[b] == 10 { line += 1; }; };
+    "@comptime: " + diag_text(i) + " (line " + int_text(line) + ")";
+}
+
+fn diag_kind_of(i: I32) Str {
+    let k = Diag.from_i32(diag_kind[i]);
+    if k == Diag.UnknownVariable { return "unknown-variable"; };
+    if k == Diag.UnknownType or k == Diag.NotAModule or k == Diag.UnknownModule or k == Diag.UnknownVariant or k == Diag.MemKind or k == Diag.InvalidDistinct or k == Diag.MemView { return "unknown-type"; };
+    if k == Diag.UnknownImport { return "unknown-import"; };
+    if k == Diag.DuplicateDeclaration or k == Diag.DuplicatePattern or k == Diag.MemTwice or k == Diag.MemClash or k == Diag.EnumValueTwice { return "duplicate-declaration"; };
+    if k == Diag.UnknownMethod or k == Diag.ProtoMissing or k == Diag.InternNotBytes or k == Diag.MemNoMethod { return "unknown-method"; };
+    if k == Diag.UnknownOperator { return "unknown-operator"; };
+    if k == Diag.WrongArity { return "wrong-arity"; };
+    if k == Diag.AssignmentToImmutable { return "assignment-to-immutable"; };
+    if k == Diag.InvalidBreak or k == Diag.InvalidDefer { return "invalid-break"; };
+    if k == Diag.Unsupported { return "unsupported"; };
+    if k == Diag.ParseError { return "parse-error"; };
+    if k == Diag.DuplicateField { return "duplicate-field"; };
+    if k == Diag.InvalidNullableType or k == Diag.BareNull { return "invalid-nullable-type"; };
+    if k == Diag.InvalidGlobalInitializer { return "invalid-global-initializer"; };
+    if k == Diag.RecursiveType { return "recursive-type"; };
+    if k == Diag.IntegerOutOfRange { return "integer-literal-out-of-range"; };
+    if k == Diag.UnknownField { return "unknown-field"; };
+    if k == Diag.MissingField { return "missing-field"; };
+    if k == Diag.NullableAccess { return "nullable-access"; };
+    if k == Diag.NonDefaultable { return "non-defaultable-type"; };
+    if k == Diag.InvalidModuleArity { return "invalid-module-arity"; };
+    if k == Diag.NotCallable { return "not-callable"; };
+    if k == Diag.NonExhaustive { return "non-exhaustive-match"; };
+    if k == Diag.InvalidForSource or k == Diag.GeneratorRecursion or k == Diag.YieldOutside or k == Diag.GeneratorReturnValue
+        or k == Diag.GeneratorCall or k == Diag.YieldInClosure or k == Diag.AwaitForSource or k == Diag.GeneratorPassThrough
+        or k == Diag.GeneratorArity { return "invalid-for-source"; };
+    if k == Diag.IteratorUnfinished or k == Diag.IteratorCaptures or k == Diag.IteratorTerminalInside or k == Diag.IteratorSource { return "invalid-iterator-usage"; };
+    if k == Diag.AwaitNotPromise { return "invalid-await"; };
+    if k == Diag.InvalidDslUsage { return "invalid-dsl-usage"; };
+    if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
+    "type-mismatch";
+}
+
+fn diag_text(i: I32) Str {
+    let k = Diag.from_i32(diag_kind[i]);
+    let w = word_text(diag_word[i]);
+    let a = diag_a[i];
+    let b = diag_b[i];
+    let node = diag_node[i];
+    if k == Diag.UnknownVariable { return "Unknown variable '" + w + "'"; };
+    if k == Diag.UnknownType { return "Unknown type '" + w + "'"; };
+    if k == Diag.UnknownImport {
+        let path = import_path[missing_import[0]];
+        let spelled = bytes_text(tok_start[node_first[path]] + 1, tok_end[node_last[path] - 1] - 1);
+        return "Cannot import \"" + spelled + "\": file not found (" + bytes_text(missing_start[0], missing_end[0]) + ")";
+    };
+    if k == Diag.UnknownModule { return "Module '" + w + "' not found"; };
+    if k == Diag.DuplicateDeclaration {
+        if a == 4 { return "Duplicate top-level declaration '" + hoisted_name(b, node) + "'"; };
+        let what = pick(a == 1, "parameter", pick(a == 2, "variant", pick(a == 3, "local binding", "top-level declaration")));
+        return "Duplicate " + what + " '" + w + "'";
+    };
+    if k == Diag.MemTwice { return "mem " + w + " is declared twice"; };
+    if k == Diag.MemClash { return "mem " + w + " has the same name as a top-level function or global"; };
+    if k == Diag.DuplicatePattern { return "Duplicate match pattern '" + node_text(first_child(node)) + "'"; };
+    if k == Diag.TupleLet {
+        if not ty_is(a, Ty.Tuple) { return "let .{…} takes apart a tuple, but this value is " + type_text(a); };
+        return "This tuple has " + int_text(vl_len[ty_a[a]]) + " values (" + type_text(a) + "); name each one in let .{…}";
+    };
+    if k == Diag.NotNullable { return "Type mismatch: expected nullable, got " + type_text(a); };
+    if k == Diag.TypeMismatch {
+        let caused = if diag_c[i] > 0 { " (+" + int_text(diag_c[i]) + " caused by this)"; } else { ""; };
+        if a >= 0 and b >= 0 { return "Type mismatch: expected " + type_text(a) + ", got " + type_text(b) + caused; };
+        return "Type mismatch";
+    };
+    if k == Diag.UnknownMethod {
+        if a >= 0 and ty_is(a, Ty.Nullable) { return "Unknown method '" + type_text(ty_a[a]) + "." + w + "'"; };
+        if a >= 0 { return "Unknown method '" + type_text(a) + "." + w + "'"; };
+        if diag_c[i] >= 0 { return "Unknown method '" + word_text(diag_c[i]) + "." + w + "'"; };
+        return "Unknown method '" + w + "'";
+    };
+    if k == Diag.UnknownOperator {
+        if a < 0 { return "Cannot resolve operator for unknown"; };
+        let t = type_text(a);
+        return t + " has no '" + operator_symbol(diag_word[i]) + "' operator (" + t + "." + w + ")";
+    };
+    if k == Diag.WrongArity {
+        return "Wrong arity: expected " + int_text(a) + ", got " + int_text(b);
+    };
+    if k == Diag.AssignmentToImmutable { return "Cannot assign to immutable '" + w + "'"; };
+    if k == Diag.InvalidBreak or k == Diag.InvalidDefer {
+        let r = BreakRule.from_i32(if a < 0 { 0; } else { a; });
+        if r == BreakRule.BreakOutside { return "break must appear inside a loop"; };
+        if r == BreakRule.ContinueOutside { return "continue must appear inside a loop"; };
+        if r == BreakRule.ContinueStateOutside { return "continue with a state only works inside loop match"; };
+        if r == BreakRule.ContinueWithoutState { return "continue in a loop match needs the next state: continue <value>"; };
+        if r == BreakRule.BreakInDefer { return "break cannot appear inside deferred code"; };
+        if r == BreakRule.ContinueInDefer { return "continue cannot appear inside deferred code"; };
+        if r == BreakRule.ReturnInDefer { return "return cannot appear inside deferred code"; };
+        return "defer must be a statement in a block";
+    };
+    if k == Diag.DuplicateField {
+        if a >= 0 { return "Duplicate field '" + w + "' in " + decl_text(a); };
+        return "Duplicate field '" + w + "'";
+    };
+    if k == Diag.InvalidNullableType { return "Scalar type '" + w + "' cannot be nullable"; };
+    if k == Diag.BareNull { return "Bare null requires a nullable type context"; };
+    if k == Diag.TupleMisplaced {
+        if a == 1 { return "A tuple cannot hold another tuple"; };
+        if a == 2 { return "A closure is a JS function and cannot return a tuple; use a fn or fun"; };
+        if a == 3 { return "Tuples cannot be stored in arrays; take them apart with `let .{a, b} = …` first"; };
+        return "A tuple type is only a function result: `fn f() .{I32, F64}`; take it apart with `let .{a, b} = f();`";
+    };
+    if k == Diag.FunInField {
+        let t = type_text(a);
+        let as_cl = "cl" + t.slice(3, t.len());
+        return t + " cannot be stored in " + pick(b == 1, "an array", "a struct field") + " yet; use " + as_cl + " instead (a fun converts to it)";
+    };
+    if k == Diag.InvalidGlobalInitializer { return "Global '" + w + "' requires a literal constant initializer"; };
+    if k == Diag.RecursiveType { return "Recursive type '" + w + "' must use a nullable or indirect field"; };
+    if k == Diag.IntegerOutOfRange { return "Integer literal " + pick(b == 1, "-", "") + node_text(node) + " is out of range for " + type_text(a); };
+    if k == Diag.InvalidDistinct {
+        return "type " + w + " = distinct " + node_text(last_child(node)) + ": a distinct type wraps one of I32, U32, I64, U64, F32, F64";
+    };
+    if k == Diag.EnumValueRange { return word_text(a) + "." + w + " = " + int_text(b) + " does not fit in " + word_text(diag_c[i]); };
+    if k == Diag.EnumValueTwice { return word_text(a) + "." + w + " and " + word_text(a) + "." + word_text(b) + " are both " + int_text(diag_c[i]); };
+    if k == Diag.UnknownField {
+        if a >= 0 { return "Unknown field '" + w + "' for " + decl_text(a); };
+        return "Unknown field '" + w + "'";
+    };
+    if k == Diag.MissingField { return "Missing field '" + w + "' for " + decl_text(a); };
+    if k == Diag.NullableAccess { return "Cannot access field '" + w + "' on nullable " + type_text(a); };
+    if k == Diag.MemIndex { return "mem " + w + " takes one index: " + w + "[i]"; };
+    if k == Diag.ConstMem {
+        if a >= 0 { return "mem " + w + " is const; it has no " + word_text(a); };
+        return "mem " + w + " is const; it cannot be written";
+    };
+    if k == Diag.MemNotValue { return "mem " + w + " is not a value; use " + w + "[i], " + w + "[i] = v, or " + w + ".len()"; };
+    if k == Diag.MemKind {
+        return "mem " + w + " stores " + node_text(next_sibling(first_child(node))) + "; a mem holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64";
+    };
+    if k == Diag.NonDefaultable {
+        let t = type_text(a);
+        return "Array element type '" + t + "' has no default value; use Array[" + t + "].new(length, fill)";
+    };
+    if k == Diag.InvalidModuleArity { return "Module '" + w + "' expects " + int_text(a) + " type argument(s), got " + int_text(b); };
+    if k == Diag.NotCallable { return "Cannot call value of type " + type_text(a); };
+    if k == Diag.NonExhaustive {
+        // a: 0 integer match, 1 Bool match, 2 integer enum match, 3 alt
+        if a == 1 { return "Missing Bool case '" + pick(b == 1, "true", "false") + "' in match"; };
+        if a == 2 { return "Missing variant '" + w + "' in match over " + type_text(b); };
+        if a == 3 { return "Missing variant '" + w + "' in alt over enum " + type_text(b); };
+        return "Match over " + type_text(b) + " requires a default arm";
+    };
+    if k == Diag.MatchType { return "match needs an integer, float, or Bool value, got " + type_text(a) + "; use alt for enums or if/else for other values"; };
+    if k == Diag.MatchPattern {
+        let p = node_text(first_child(node));
+        if a == 1 { return "Pattern " + p + " is not a Bool; use true or false"; };
+        if a == 2 { return "Pattern " + p + " is not an integer, so it cannot match values of type " + type_text(b); };
+        if a == 3 { return "Pattern " + p + " cannot match values of type " + type_text(b); };
+        return "Pattern " + p + " is out of range for " + type_text(b) + " and can never match";
+    };
+    if k == Diag.UnknownVariant { return type_text(a) + " has no variant " + w; };
+    if k == Diag.InvalidForSource {
+        if a == 1 { return "a generator loop binds one value: for (gen()) |value| { … }"; };
+        return "for can only iterate an array, got " + type_text(b) + "; count with a range like 0..<n";
+    };
+    if k == Diag.GeneratorPassThrough { return "a recursive generator passes its own values straight through: `for (" + w + "(…)) |v| { yield v; }`"; };
+    if k == Diag.GeneratorArity { return w + " expects " + int_text(a) + " argument(s), got " + int_text(b); };
+    if k == Diag.GeneratorRecursion { return "generator " + w + " consumes itself; generators expand inline, so they cannot recurse"; };
+    if k == Diag.YieldOutside { return "yield can only appear in a generator: declare the function with `yield T` as its return type"; };
+    if k == Diag.YieldInClosure { return "yield cannot appear inside a closure; the generator expands into its consumer"; };
+    if k == Diag.GeneratorReturnValue { return "a generator ends with `return;`, without a value"; };
+    if k == Diag.GeneratorCall { return w + " is a generator: consume it with `for (" + w + "(…)) |value| { … }`"; };
+    if k == Diag.AwaitForSource { return "await for iterates a generator call: `await for (ticks()) |t| { … }`"; };
+    if k == Diag.IteratorUnfinished { return "Iterator pipeline must end with fold, each, collect(Type), or a scalar terminal; found " + w; };
+    if k == Diag.IteratorCaptures { return w + " expects " + int_text(a) + " value binding(s) and an optional index"; };
+    if k == Diag.OptionalOutsideStatement { return "'?.' is only allowed in statements; use promote or orelse for a value"; };
+    if k == Diag.AwaitNotPromise { return "Cannot await non-promise " + type_text(a); };
+    if k == Diag.ProtoMissing {
+        return decl_text(a) + " does not implement protocol " + pick(b == 1, "getter", "method") + " '" + word_text(diag_c[i]) + "." + w + "'";
+    };
+    if k == Diag.ProtoSignature { return "Implementation '" + word_text(a) + "[" + word_text(b) + "]." + w + "' does not match the protocol signature"; };
+    if k == Diag.MemElementRange { return "mem " + w + ": element " + int_text(b) + " (" + word_text(diag_c[i]) + ") does not fit in " + Storage.name(mem_storage(a)); };
+    if k == Diag.MemInitializer { return "mem " + w + ": an initializer list holds number literals; compute other values with @comptime"; };
+    if k == Diag.MemEmbed { return "mem " + w + ": @embed cannot read " + bytes_text(dsl_text_start(node), dsl_text_end(node)) + ": ENOENT"; };
+    if k == Diag.MemView { return w + ".view() returns a JS." + view_array_name(Storage.from_i32(a)) + "; add `using JS from std:JS;`"; };
+    if k == Diag.MemNoMethod {
+        return "mem " + node_text(first_child(node)) + " has no method '" + w + "'; it has len, cap, push, reserve, resize, clear, copy_in, view, intern, interned, interned_start, interned_size, intern_reset";
+    };
+    if k == Diag.InternNotBytes { return "mem " + w + "." + word_text(a) + ": only byte mems (U8, I8) intern spans"; };
+    if k == Diag.InvalidDslUsage { return "@es DSL must appear on the right-hand side of a typed let binding (let X: T = @es/\\...\\/)"; };
+    if k == Diag.ParseError {
+        // Its row and column (in bytes), from 1.
+        let at = tok_start[a];
+        let row = 1;
+        let line = file_start[diag_word[i]];
+        for (file_start[diag_word[i]] ..< at) |b| {
+            if src[b] == 10 {
+                row += 1;
+                line = b + 1;
+            };
+        };
+        return "Parse error at " + int_text(row) + ":" + int_text(at - line + 1);
+    };
+    if k == Diag.Unsupported { return "not supported yet"; };
+    Diag.name(k);
+}
+
+// The span a diagnostic points at: its node's, as byte offsets.
+fn diag_start(i: I32) I32 {
+    if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
+    let node = diag_at(i);
+    if node < 0 { return -1; };
+    tok_start[node_first[node]];
+}
+
+fn diag_end(i: I32) I32 {
+    if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
+    let node = diag_at(i);
+    if node < 0 { return -1; };
+    tok_end[node_last[node] - 1];
+}
+
+// The node a diagnostic points at: its own, or its @comptime expression.
+fn diag_at(i: I32) I32 {
+    let k = comptime_site(i);
+    if k >= 0 { return comptime_text_node[k]; };
+    diag_node[i];
+}
+
+fn diag_file(i: I32) I32 {
+    let node = diag_at(i);
+    if node < 0 {
+        if diag_kind[i] == Diag.ParseError.to_i32() { return diag_word[i]; };
+        return -1;
+    };
+    file_of_token(node_first[node]);
+}

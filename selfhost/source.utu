@@ -29,15 +29,22 @@ mem file_role: U8;
 mem file_tok: I32;      // first token
 mem file_tok_end: I32;  // after its last (End or Error)
 mem file_root: I32;     // its source file node, or -1 until it parses
+mem file_error: I32;    // the token its parse error is at, or -1
 
 // `using M from "…"`, in the order files are parsed.
 mem import_file: I32;   // the file that imports
 mem import_node: I32;   // the using declaration
 mem import_path: I32;   // the node naming the file (a string or platform path)
-mem import_target: I32; // the file it names, once the host binds it, else -1
+mem import_target: I32; // the file it names, once the host binds it, else -1 (-2: host declarations)
+// The import the host could not read, which ends the build (as in stage
+// 0), or -1; and the path the host looked for, a span of src.
+mem missing_import: I32 = [-1];
+mem missing_start: I32 = [0];
+mem missing_end: I32 = [0];
 
 // Forget every file, and start a program.
 fn reset_program() void {
+    missing_import[0] = -1;
     intern_keywords();
     for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
     tok_kind.clear();
@@ -55,6 +62,7 @@ fn reset_program() void {
     file_tok.clear();
     file_tok_end.clear();
     file_root.clear();
+    file_error.clear();
     import_file.clear();
     import_node.clear();
     import_path.clear();
@@ -86,6 +94,7 @@ fn add_file(n: I32, role: FileRole) I32 {
     file_tok.push(tok_kind.len());
     file_tok_end.push(tok_kind.len());
     file_root.push(-1);
+    file_error.push(-1);
     file;
 }
 
@@ -98,7 +107,7 @@ fn parse_file(file: I32) I32 {
     file_tok_end[file] = last;
     let root = parse(first, last);
     file_root[file] = root;
-    if root >= 0 { list_imports(file, root); };
+    if root >= 0 { list_imports(file, root); } else { file_error[file] = parse_error_at[0]; };
     root;
 }
 
@@ -131,6 +140,18 @@ fn file_of_token(t: I32) I32 {
 }
 
 // ── Tree helpers ──
+
+// The number of a node's children (0 for no node).
+fn child_count(node: I32) I32 {
+    if node < 0 { return 0; };
+    let n = 0;
+    let c = first_child(node);
+    while (c >= 0) {
+        n += 1;
+        c = next_sibling(c);
+    };
+    n;
+}
 
 fn last_child(node: I32) I32 {
     let c = node_child[node];

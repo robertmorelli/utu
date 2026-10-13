@@ -19,4 +19,5 @@ data.utu
 mems.utu
 host.utu
 enums.utu
+diag.utu
 lib.utu

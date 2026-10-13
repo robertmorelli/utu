@@ -367,7 +367,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     else if ty_is(result, Ty.Void) {
         // Unlike a function's, a void closure's body ends without a value.
         if not ty_is(actual, Ty.Void) and not ty_is(actual, Ty.Never) and not ty_is(actual, Ty.Error) {
+            let before = diag_kind.len();
             mismatch(body_node, result, actual);
+            // Of the type expected, the closure is then mistaken in consequence.
+            if ret_node < 0 and expected >= 0 { fold_into(mismatch_since(before, body_node)); };
         };
         drop_value(actual);
     }

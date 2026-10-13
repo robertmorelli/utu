@@ -248,7 +248,7 @@ fn type_path(node: I32, inst: I32) I32 {
         let owner = module_of(decl);
         let args = type_args(next_sibling(first_child(node)), inst);
         if vl_len[args] != module_arity(owner) {
-            report(Diag.InvalidModuleArity, node, decl_name[owner]);
+            report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[args]);
             return ty_error();
         };
         return named(decl, instance(owner, args));
@@ -259,16 +259,14 @@ fn type_path(node: I32, inst: I32) I32 {
         if member_decl < 0 { return ty_error(); };
         let owner = module_of(member_decl);
         let at = 0;
-        let named_by = lookup(word_of(name_node(c)));
         if is_kind(c, Node.Instantiated_module_ref) {
             at = instance(owner, type_args(next_sibling(first_child(c)), inst));
         } else if is_kind(next_sibling(c), Node.Module_type_arg_list) {
             at = instance(owner, type_args(next_sibling(c), inst));
-        } else if decl_is(named_by, Decl.Alias) {
-            // `ints.Box` with `using boxy[I32] |ints|`: Box in boxy[I32].
-            at = alias_instance(named_by);
         } else {
-            at = instance_for(owner, inst);
+            // `ints.Box` with `using boxy[I32] |ints|`: Box in boxy[I32].
+            let named_by = lookup(word_of(name_node(c)));
+            at = if decl_is(named_by, Decl.Alias) { alias_instance(named_by); } else { instance_for(owner, inst); };
         };
         return named(member_decl, at);
     };

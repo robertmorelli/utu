@@ -454,7 +454,7 @@ fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues
         c = next_sibling(c);
     };
     if names < nvalues or names > nvalues + 1 {
-        report(Diag.IteratorCaptures, capture, -1);
+        report2(Diag.IteratorCaptures, stage_node(p, p.count - 1), stage_op(p, k), nvalues, -1);
         return false;
     };
     let j = 0;
@@ -1212,7 +1212,7 @@ fn add_values(t: I32, m: I32, at: I32, cx: Cx) void { finish_operator(known_word
 fn finish_operator(word: I32, t: I32, at: I32, cx: Cx, m: I32) void {
     let decl = member(ty_decl(t), word, Space.Operator);
     if decl < 0 {
-        report(Diag.UnknownOperator, at, word);
+        if not ty_is(t, Ty.Error) { report2(Diag.UnknownOperator, at, word, t, -1); };
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return;
     };

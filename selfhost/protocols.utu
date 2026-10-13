@@ -88,7 +88,7 @@ fn proto_field_get(node: I32, t: I32, name: I32, m: I32, cx: Cx) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownField, name, word_of(name));
+        report(Diag.UnknownField, parent_of(name), word_of(name));
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -130,7 +130,7 @@ fn proto_field_set(t: I32, name: I32, value: I32, m: I32, cx: Cx) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownField, name, word_of(name));
+        report(Diag.UnknownField, parent_of(name), word_of(name));
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -176,7 +176,7 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or not is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownMethod, name, word_of(name));
+        report2(Diag.UnknownMethod, at, word_of(name), t, -1);
         return finish_error(args, m, cx);
     };
     let rt = proto_member_type(pm);
@@ -202,7 +202,8 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         p = next_sibling(p);
     };
     if a >= 0 or p >= 0 {
-        report(Diag.WrongArity, at, word_of(name));
+        let want = if is_kind(list, Node.Type_list) { child_count(list); } else { 0; };
+        report2(Diag.WrongArity, at, -1, want, child_count(args));
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -283,14 +284,14 @@ fn conforms(t: I32, proto: I32) void {
                     i += 2;
                 };
                 if found < 0 {
-                    report(Diag.ProtoMissing, decl_node[t], word);
+                    report3(Diag.ProtoMissing, decl_node[t], word, t, 0, decl_name[proto]);
                 } else if not same_signature(found, m) {
-                    report(Diag.ProtoSignature, decl_node[found], word);
+                    report3(Diag.ProtoSignature, decl_node[found], word, decl_name[proto], decl_name[t], -1);
                 };
             } else {
                 let field = member(t, word, Space.Member);
                 if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), 0) != type_of(last_child(m), 0) {
-                    report(Diag.ProtoMissing, decl_node[t], word);
+                    report3(Diag.ProtoMissing, decl_node[t], word, t, 1, decl_name[proto]);
                 };
             };
         };

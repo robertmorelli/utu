@@ -130,7 +130,7 @@ async function worker() {
         const kind = utu.diagnostic_kind(i);
         const node = utu.diagnostic_node(i);
         const what = node < 0 ? 'file' : utu.node_kind_name(new Uint8Array(utu.node_kind.buffer)[node]);
-        if (kind === 'Unsupported') {
+        if (kind === 'unsupported') {
           unsupported.add(what);
           if (what === workerData.why) {
             const first = new Int32Array(utu.node_first.buffer)[node];

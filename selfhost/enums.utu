@@ -82,7 +82,7 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
     let a = if args >= 0 { first_child(args); } else { -1; };
     if word == conversion_word(false, base) {
         if a < 0 or next_sibling(a) >= 0 {
-            report(Diag.WrongArity, at, word);
+            report2(Diag.WrongArity, at, -1, 1, child_count(args));
             return error_value();
         };
         coerce(check_expr(a, base, cx), base, a);
@@ -95,7 +95,7 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
     };
     if word == known_word(Known.Name) {
         if a < 0 or next_sibling(a) >= 0 {
-            report(Diag.WrongArity, at, word);
+            report2(Diag.WrongArity, at, -1, 1, child_count(args));
             return error_value();
         };
         coerce(check_expr(a, t, cx), t, a);
@@ -215,7 +215,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     let variant = alt_variant(pattern, ty_decl(st));
     let m = w_mark();
     if variant < 0 {
-        report(Diag.UnknownVariant, pattern, word_of(pattern));
+        report2(Diag.UnknownVariant, pattern, word_of(pattern), st, -1);
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return ty_error();
     };
@@ -269,7 +269,7 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
                 a = next_sibling(a);
             };
             if not covered {
-                report(Diag.NonExhaustive, node, decl_name[v]);
+                report2(Diag.NonExhaustive, node, decl_name[v], 3, named(enum_decl, 0));
                 return;
             };
         };

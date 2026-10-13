@@ -75,12 +75,48 @@ fn generator_decls(gen: I32) I32 {
     vl_end(m);
 }
 
+// Whether generator `gen`'s body has a `for (gen(…))` of its own.
+fn delegates_to_itself(gen: I32) Bool { calls_generator(last_child(decl_node[gen]), gen); }
+
+fn calls_generator(node: I32, gen: I32) Bool {
+    if is_kind(node, Node.For_expr) {
+        let call = generator_call(node);
+        if call >= 0 and node_decl[first_child(call)] == gen { return true; };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        if calls_generator(c, gen) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+// `for (g(…)) |v| { yield v; }`: the loop yields each value, and nothing else.
+fn is_delegation(loop_: I32) Bool {
+    let capture = next_sibling(first_child(loop_));
+    if not is_kind(capture, Node.Capture) or next_sibling(first_child(capture)) >= 0 { return false; };
+    let body = last_child(loop_);
+    let y = first_child(body);
+    if y < 0 or next_sibling(y) >= 0 or not is_kind(y, Node.Yield_expr) { return false; };
+    let v = first_child(y);
+    is_kind(v, Node.Identifier) and first_child(v) < 0 and word_of(v) == word_of(first_child(capture));
+}
+
 // `for (gen(args)) |x| { body }`.
 fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     let gen = node_decl[first_child(call)];
     // A generator that consumes itself would expand without end.
     for (0 ..< gen_decl.len()) |i| {
         if gen_decl[i] == gen {
+            // One that delegates to itself in its own body is recursive, and
+            // passes its values straight through.
+            if delegates_to_itself(gen) {
+                if not is_delegation(node) {
+                    report(Diag.GeneratorPassThrough, node, decl_name[gen]);
+                    return error_value();
+                };
+                return unsupported(node);
+            };
             report(Diag.GeneratorRecursion, node, decl_name[gen]);
             return error_value();
         };
@@ -91,7 +127,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     if is_kind(capture, Node.Capture) {
         let name = first_child(capture);
         if next_sibling(name) >= 0 {
-            report(Diag.InvalidForSource, capture, -1);
+            report2(Diag.InvalidForSource, node, -1, 1, -1);
             return error_value();
         };
         cap = node_decl[name];
@@ -130,7 +166,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         p = next_sibling(p);
     };
     if a >= 0 or p >= 0 {
-        report(Diag.WrongArity, call, decl_name[gen]);
+        report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args));
         w_stack.resize(m);
         return error_value();
     };
