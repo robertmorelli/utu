@@ -1,0 +1,148 @@
+// ── Sources ──────────────────────────────────────────────────────────────────
+//
+// A program is files: the entry, the files it imports, theirs, and the
+// standard library's prelude. All of them share `src` (bytes), the token
+// mems, and the node mems, one after another, so a token or node id names
+// one place in the whole program and a word id one name in every file.
+//
+// The compiler does not read files. The host adds each one (`add_file`,
+// then writes its bytes into `src`), and after it is parsed, reads the
+// imports it names (`import_*`), finds those files, adds them, and binds
+// each import to its file. Paths and file systems stay the host's business;
+// the compiler sees only bytes.
+
+enum(U8) FileRole:
+    | Entry
+    | Import
+    | Prelude
+
+mem file_start: I32;    // first byte in `src`
+mem file_end: I32;      // the end byte after its last
+mem file_role: U8;
+mem file_tok: I32;      // first token
+mem file_tok_end: I32;  // after its last (End or Error)
+mem file_root: I32;     // its source file node, or -1 until it parses
+
+// `using M from "…"`, in the order files are parsed.
+mem import_file: I32;   // the file that imports
+mem import_node: I32;   // the using declaration
+mem import_path: I32;   // the node naming the file (a string or platform path)
+mem import_target: I32; // the file it names, once the host binds it, else -1
+
+// Forget every file, and start a program.
+fn reset_program() void {
+    intern_keywords();
+    for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
+    tok_kind.clear();
+    tok_start.clear();
+    tok_end.clear();
+    tok_word.clear();
+    node_kind.clear();
+    node_first.clear();
+    node_last.clear();
+    node_child.clear();
+    node_next.clear();
+    file_start.clear();
+    file_end.clear();
+    file_role.clear();
+    file_tok.clear();
+    file_tok_end.clear();
+    file_root.clear();
+    import_file.clear();
+    import_node.clear();
+    import_path.clear();
+    import_target.clear();
+    reset_resolve();
+}
+
+// Intern a name that is not in any file (pushed onto `src`).
+fn intern_text(text: Str) I32 {
+    let start = src.len();
+    for (0 ..< text.len()) |c| { src.push(text.get(c)); };
+    src.intern(start, src.len());
+}
+
+// Room for a file of `n` bytes, which the host then writes at file_start.
+fn add_file(n: I32, role: FileRole) I32 {
+    let file = file_start.len();
+    let start = src.len();
+    src.resize(start + n + 1);
+    src[start + n] = end_byte;
+    file_start.push(start);
+    file_end.push(start + n);
+    file_role.push(role.to_i32());
+    file_tok.push(tok_kind.len());
+    file_tok_end.push(tok_kind.len());
+    file_root.push(-1);
+    file;
+}
+
+// Lex and parse a file the host has written, and list its imports. Returns
+// its source file node, or -1 when it does not lex or parse.
+fn parse_file(file: I32) I32 {
+    let first = tok_kind.len();
+    file_tok[file] = first;
+    let last = lex(file_start[file], file_end[file]);
+    file_tok_end[file] = last;
+    let root = parse(first, last);
+    file_root[file] = root;
+    if root >= 0 { list_imports(file, root); };
+    root;
+}
+
+fn list_imports(file: I32, root: I32) void {
+    let item = node_child[root];
+    while (item >= 0) {
+        if node_kind[item] == Node.Using_decl.to_i32() {
+            let path = last_child(item);
+            let kind = node_kind[path];
+            if kind == Node.String_lit.to_i32() or kind == Node.Platform_path.to_i32() {
+                import_file.push(file);
+                import_node.push(item);
+                import_path.push(path);
+                import_target.push(-1);
+            };
+        };
+        item = node_next[item];
+    };
+}
+
+// The file a token is in.
+fn file_of_token(t: I32) I32 {
+    let lo = 0;
+    let hi = file_tok.len() - 1;
+    while (lo < hi) {
+        let mid = (lo + hi + 1) / 2;
+        if file_tok[mid] <= t { lo = mid; } else { hi = mid - 1; };
+    };
+    lo;
+}
+
+// ── Tree helpers ──
+
+fn last_child(node: I32) I32 {
+    let c = node_child[node];
+    let last = -1;
+    while (c >= 0) {
+        if node_kind[c] != Node.Comment.to_i32() { last = c; };
+        c = node_next[c];
+    };
+    last;
+}
+
+// The first child of `node` that is not a comment, or -1.
+fn first_child(node: I32) I32 { skip_comments(node_child[node]); }
+
+// The sibling after `node` that is not a comment, or -1.
+fn next_sibling(node: I32) I32 { skip_comments(node_next[node]); }
+
+fn skip_comments(node: I32) I32 {
+    let c = node;
+    while (c >= 0 and node_kind[c] == Node.Comment.to_i32()) { c = node_next[c]; };
+    c;
+}
+
+fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.to_i32(); }
+
+// The word id of a node that is one word (an identifier, a type name), else -1.
+fn word_of(node: I32) I32 { tok_word[node_first[node]]; }

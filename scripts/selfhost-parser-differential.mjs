@@ -58,8 +58,8 @@ process.exit(differ ? 1 : 0);
 /** The self-hosted parser's named nodes for `text`, in preorder, or null when it rejects the source. */
 function parse(text) {
   const bytes = new TextEncoder().encode(text);
-  utu.source(bytes.length);
-  new Uint8Array(utu.src.buffer).set(bytes);
+  const at = utu.source(bytes.length);
+  new Uint8Array(utu.src.buffer).set(bytes, at);
   const root = utu.nodes(bytes.length);
   if (root < 0) return null;
   const view = (mem, Type) => new Type(mem.buffer);
@@ -70,7 +70,7 @@ function parse(text) {
   const next = view(utu.node_next, Int32Array);
   const starts = view(utu.tok_start, Int32Array);
   const ends = view(utu.tok_end, Int32Array);
-  const utf16 = utf16Offsets(bytes);
+  const utf16 = utf16Offsets(bytes, at);
   const out = [];
   const visit = (node, depth) => {
     let start = utf16[starts[first[node]]];
@@ -113,15 +113,16 @@ function compare(tree, nodes, text) {
   return null;
 }
 
-function utf16Offsets(bytes) {
-  const out = new Int32Array(bytes.length + 1);
+/** UTF-16 offset of every byte offset in `src` from `at` on (the source's bytes and its end). */
+function utf16Offsets(bytes, at) {
+  const out = new Int32Array(at + bytes.length + 1);
   let unit = 0;
   for (let i = 0; i < bytes.length; i++) {
-    out[i] = unit;
+    out[at + i] = unit;
     const b = bytes[i];
     if (b < 0x80 || b >= 0xc0) unit += b >= 0xf0 ? 2 : 1;
   }
-  out[bytes.length] = unit;
+  out[at + bytes.length] = unit;
   return out;
 }
 

@@ -1836,10 +1836,10 @@ fn while_expr(p: Parser) I32 {
 
 // ── Running the parser ───────────────────────────────────────────────────────
 
-// Intern every keyword (behind the source, after the end byte), then every
-// word token, so a word's id is its keyword's when it is one.
-fn intern_words(n: I32) void {
-    src.resize(n + 1);
+// Intern every keyword, at the start of `src`, so a word's id is its
+// keyword's when it is one. Files follow.
+fn intern_keywords() void {
+    src.clear();
     src.intern_reset();
     for (0 ..< Kw.count()) |k| {
         let name = Kw.name(Kw.from_i32(k));
@@ -1850,50 +1850,53 @@ fn intern_words(n: I32) void {
         };
         src.intern(start, src.len());
     };
-    tok_word.clear();
+}
+
+// Intern the word tokens from `first` up to `last`, and list those the
+// parser reads (all but comments) in `ptok`.
+fn intern_words(first: I32, last: I32) void {
     ptok.clear();
-    for (0 ..< tok_kind.len()) |t| {
+    tok_word.resize(first);
+    for (first ..< last) |t| {
         let kind = tok_kind[t];
         tok_word.push(if kind == Tok.Word.to_i32() { src.intern(tok_start[t], tok_end[t]); } else { -1; });
         if kind != Tok.Comment.to_i32() { ptok.push(t); };
     };
     // Lookahead past the end reads the End token again.
-    for (0 ..< 4) |k| { ptok.push(tok_kind.len() - 1); };
+    for (0 ..< 4) |k| { ptok.push(last - 1); };
 }
 
-// Parse the `n` bytes of `src`. Returns the source file node, or -1 when the
-// source does not lex or does not parse. Comments are the nodes after it.
-fn parse(n: I32) I32 {
-    let count = lex(n);
-    if tok_kind[count - 1] != Tok.End.to_i32() { return -1; };
-    intern_words(n);
-    node_kind.clear();
-    node_first.clear();
-    node_last.clear();
-    node_child.clear();
-    node_next.clear();
+// Parse the tokens from `first` up to `last` (the last of them `End`), adding
+// their nodes. Returns the source file node, or -1 when the tokens do not
+// parse (and adds no nodes). Comments are the nodes after the source file.
+fn parse(first: I32, last: I32) I32 {
+    if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
+    intern_words(first, last);
+    let before = node_kind.len();
     pending.clear();
     try {
         let root = source_file(Parser { pos: 0 });
-        token_spans(root);
+        token_spans(before, root, first, last - 1);
         attach_comments(root);
         root;
     } catch {
+        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
         -1;
     };
 }
 
-// Node spans in the lexer's tokens (with comments) rather than the parser's.
-// The source file spans every token before the end.
-fn token_spans(root: I32) void {
-    for (0 ..< node_kind.len()) |id| {
-        let first = node_first[id];
-        let last = node_last[id];
-        node_first[id] = ptok[first];
-        node_last[id] = if last > first { ptok[last - 1] + 1; } else { ptok[first]; };
+// Node spans in the lexer's tokens (with comments) rather than the parser's,
+// for the nodes from `before` on. The source file spans every token from
+// `first` up to `end_` (the End token).
+fn token_spans(before: I32, root: I32, first: I32, end_: I32) void {
+    for (before ..< node_kind.len()) |id| {
+        let a = node_first[id];
+        let b = node_last[id];
+        node_first[id] = ptok[a];
+        node_last[id] = if b > a { ptok[b - 1] + 1; } else { ptok[a]; };
     };
-    node_first[root] = 0;
-    node_last[root] = tok_kind.len() - 1;
+    node_first[root] = first;
+    node_last[root] = end_;
 }
 
 // Put each comment in the smallest node whose first and last tokens surround
@@ -1903,7 +1906,7 @@ struct Comments:
     | next: I32
 
 fn attach_comments(root: I32) void {
-    let comments = Comments { next: 0 };
+    let comments = Comments { next: node_first[root] };
     skip_to_comment(comments);
     attach_within(root, comments);
 }

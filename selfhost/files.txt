@@ -1,3 +1,5 @@
 lex.utu
 parse.utu
+source.utu
+resolve.utu
 lib.utu

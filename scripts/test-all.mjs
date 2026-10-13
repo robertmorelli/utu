@@ -2,7 +2,7 @@
 // fingerprints at every optimization level, what every program does when run
 // (the run differential, at -Oz), the behavior fingerprints (diagnostics,
 // editor queries, graphs), utu's parser against tree-sitter, the self-hosted
-// lexer and parser against stage 0, and the tool tests, all at once. Each command's
+// lexer, parser, and name resolution against stage 0, and the tool tests, all at once. Each command's
 // output prints when it finishes.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -17,6 +17,7 @@ const commands = [
   ['node', './scripts/syntax-differential.mjs', '--fuzz=10'],
   ['node', './scripts/selfhost-lexer-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
+  ['node', './scripts/selfhost-resolve-differential.mjs'],
   ['node', './scripts/test-source-warnings.mjs'],
   ['node', './scripts/test-query-features.mjs'],
   ['node', './scripts/test-wutu-stencils.mjs'],

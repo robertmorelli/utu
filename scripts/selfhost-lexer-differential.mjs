@@ -70,26 +70,26 @@ process.exit(differ ? 1 : 0);
 /** The lexer's tokens for `text`: `{ kind, start, end }`, offsets in UTF-16 code units. */
 function lex(text) {
   const bytes = new TextEncoder().encode(text);
-  lexer.source(bytes.length);
-  new Uint8Array(lexer.src.buffer).set(bytes);
+  const at = lexer.source(bytes.length);
+  new Uint8Array(lexer.src.buffer).set(bytes, at);
   const count = lexer.tokens(bytes.length);
   const kinds = new Uint8Array(lexer.tok_kind.buffer, 0, count);
   const starts = new Int32Array(lexer.tok_start.buffer, 0, count);
   const ends = new Int32Array(lexer.tok_end.buffer, 0, count);
-  const utf16 = utf16Offsets(bytes);
+  const utf16 = utf16Offsets(bytes, at);
   return Array.from({ length: count }, (_, i) => ({ kind: kinds[i], start: utf16[starts[i]], end: utf16[ends[i]] }));
 }
 
-/** UTF-16 offset of every UTF-8 byte offset (and of the end). */
-function utf16Offsets(bytes) {
-  const out = new Int32Array(bytes.length + 1);
+/** UTF-16 offset of every byte offset in `src` from `at` on (the source's bytes and its end). */
+function utf16Offsets(bytes, at) {
+  const out = new Int32Array(at + bytes.length + 1);
   let unit = 0;
   for (let i = 0; i < bytes.length; i++) {
-    out[i] = unit;
+    out[at + i] = unit;
     const b = bytes[i];
     if (b < 0x80 || b >= 0xc0) unit += b >= 0xf0 ? 2 : 1;
   }
-  out[bytes.length] = unit;
+  out[at + bytes.length] = unit;
   return out;
 }
 

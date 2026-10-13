@@ -494,19 +494,16 @@ fn dsl_end(i: I32, n: I32) I32 {
     -1;
 }
 
-// Lex the `n` bytes of `src` (followed by the end byte). Returns the number
-// of tokens, the last of them `End`, or `Error` (at the start of the token
-// that cannot be lexed: a byte no token starts with, or a string or DSL body
-// that does not close).
-fn lex(n: I32) I32 {
-    tok_kind.clear();
-    tok_start.clear();
-    tok_end.clear();
-    let i = 0;
-    let j = 0;
+// Lex the bytes of `src` from `first` to the end byte at `n`, appending
+// their tokens. The last token is `End`, or `Error` (at the start of the
+// token that cannot be lexed: a byte no token starts with, or a string or
+// DSL body that does not close). Returns the number of tokens.
+fn lex(first: I32, n: I32) I32 {
+    let i = first;
+    let j = first;
     let start = start_before;
     let state = start;
-    let next = dfa[start * 256 + src[0]];
+    let next = dfa[start * 256 + src[first]];
     loop match next {
         0 => {
             push(Tok.Error.to_i32(), i, i);

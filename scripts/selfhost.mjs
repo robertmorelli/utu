@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject } from '../src/index.js';
+import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject, PLATFORM_SOURCES } from '../src/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'selfhost');
@@ -59,6 +59,58 @@ export async function buildSelfhost() {
     primary?.row ? `${placeOf(parts, primary.row)}: ${relocate(message)}` : relocate(message));
   if (errors.length) throw new Error(errors.join('\n'));
   return { doc, wasm: emitBinary(doc) };
+}
+
+const ROLE = { entry: 0, import: 1, prelude: 2 };
+
+/**
+ * Give the self-hosted compiler a program: the entry file, the standard
+ * library's prelude, and every file they import, then resolve its names.
+ * Returns each file's key (path or `std:` name), and the decoder for byte
+ * offsets in `src`.
+ */
+export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(file, 'utf8'), stdlib = PLATFORM_SOURCES } = {}) {
+  utu.reset();
+  const files = [];
+  const byKey = new Map();
+  const add = (key, text, role) => {
+    const bytes = new TextEncoder().encode(text);
+    const file = utu.file_add(bytes.length, role);
+    new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
+    files.push({ key, role, text, offset: utu.file_offset(file), bytes });
+    byKey.set(key, file);
+    utu.file_parse(file);
+    return file;
+  };
+  add(entry, readFile(entry), ROLE.entry);
+  const prelude = stdlib.get('std:Prelude');
+  if (typeof prelude === 'string') add('std:Prelude', prelude, ROLE.prelude);
+  for (let i = 0; i < utu.import_count(); i++) {
+    const from = files[utu.import_from(i)];
+    const raw = new TextDecoder().decode(new Uint8Array(utu.src.buffer, utu.import_path_start(i), utu.import_path_end(i) - utu.import_path_start(i)));
+    const platform = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(raw);
+    if (/^"?(npm|node):/.test(raw) || platform && typeof stdlib.get(raw) === 'function') {
+      utu.import_foreign(i);
+      continue;
+    }
+    const key = platform ? raw : path.resolve(path.dirname(from.key), JSON.parse(raw));
+    let file = byKey.get(key);
+    if (file === undefined) {
+      const role = from.role === ROLE.prelude ? ROLE.prelude : ROLE.import;
+      if (platform) {
+        const text = stdlib.get(key);
+        if (typeof text !== 'string') continue;
+        file = add(key, text, role);
+      } else {
+        let text;
+        try { text = readFile(key); } catch { continue; }
+        file = add(key, text, role);
+      }
+    }
+    utu.import_bind(i, file);
+  }
+  files.diagnostics = utu.resolve();
+  return files;
 }
 
 /** The self-hosted compiler's exports. */

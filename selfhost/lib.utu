@@ -1,18 +1,62 @@
 // ── The host interface ───────────────────────────────────────────────────────
 //
-// The host writes a source into `src`, runs the lexer or the parser, and
-// reads the token and node mems.
+// The host starts a program, adds its files (writing each one's bytes into
+// `src` at `file_offset`), parses them, binds the imports each names to the
+// files it adds for them, and resolves the program's names. It reads
+// tokens, nodes, and what names refer to from the exported mems.
 
 export lib {
-    // Make room for `n` source bytes, which the host then writes into `src`.
-    fn source(n: I32) void {
-        src.resize(n + 1);
-        src[n] = end_byte;
+    fn reset() void { reset_program(); }
+
+    // Room for a file of `n` bytes; `role` is a FileRole. Returns the file.
+    fn file_add(n: I32, role: I32) I32 { add_file(n, FileRole.from_i32(role)); }
+
+    // Where the host writes the file's bytes in `src`.
+    fn file_offset(file: I32) I32 { file_start[file]; }
+
+    // Lex and parse a file. Returns its source file node, or -1.
+    fn file_parse(file: I32) I32 { parse_file(file); }
+
+    fn file_first_token(file: I32) I32 { file_tok[file]; }
+
+    fn file_end_token(file: I32) I32 { file_tok_end[file]; }
+
+    fn import_count() I32 { import_file.len(); }
+
+    fn import_from(i: I32) I32 { import_file[i]; }
+
+    // The byte span of the import's path (a string with its quotes, or a
+    // platform path like `std:Array`).
+    fn import_path_start(i: I32) I32 { tok_start[node_first[import_path[i]]]; }
+
+    fn import_path_end(i: I32) I32 { tok_end[node_last[import_path[i]] - 1]; }
+
+    fn import_bind(i: I32, file: I32) void { import_target[i] = file; }
+
+    // The import is of host declarations (std:JS, npm:…), not a utu file.
+    fn import_foreign(i: I32) void { import_target[i] = -2; }
+
+    // Resolve every name. Returns the number of diagnostics.
+    fn resolve() I32 { resolve_names(); }
+
+    fn node_count() I32 { node_kind.len(); }
+
+    fn diagnostic_kind(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
+
+    fn diagnostic_node(i: I32) I32 { diag_node[i]; }
+
+    fn decl_kind_name(decl: I32) Str { Decl.name(Decl.from_i32(decl_kind[decl])); }
+
+    // The lexer and parser alone, on one source (for their differentials):
+    // the host writes `n` bytes at the returned offset.
+    fn source(n: I32) I32 {
+        reset_program();
+        file_start[add_file(n, FileRole.Entry)];
     }
 
-    fn tokens(n: I32) I32 { lex(n); }
+    fn tokens(n: I32) I32 { lex(file_start[0], file_end[0]); }
 
-    fn nodes(n: I32) I32 { parse(n); }
+    fn nodes(n: I32) I32 { parse_file(0); }
 
     // A node kind's name in tree-sitter's spelling.
     fn node_kind_name(kind: I32) Str {

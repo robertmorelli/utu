@@ -165,7 +165,12 @@ language stays as it is.
    `parse.utu`): the lexer's tokens are the leaves of stage 0's syntax
    tree, and the parser's nodes are its named nodes, comments included, on
    every source and on millions of mutants.
-2. **Modules, imports, instantiation, name resolution.**
+2. **Modules, imports, name resolution.** Done (`selfhost/source.utu`,
+   `resolve.utu`): the host loads files and binds imports; every name a
+   declaration settles resolves to the one stage 0's go-to-definition
+   names (`baselines/definitions.json.gz`). Generic modules are not copied:
+   the tree is shared, and instantiation happens in type checking, per
+   instance.
 3. **The type graph.** The largest piece; diagnostics must match Plan A's on
    the negative corpus.
 4. **Lowerings**: generators, iterators, mems, integer enums, distinct types,

@@ -10,7 +10,9 @@ docs/self-hosting.md (Plan B).
 |---|---|---|
 | lexer | `lex.utu` | `scripts/selfhost-lexer-differential.mjs` |
 | parser | `parse.utu` | `scripts/selfhost-parser-differential.mjs` |
-| host interface | `lib.utu` | both |
+| sources (files, imports) | `source.utu` | all of them |
+| names | `resolve.utu` | `scripts/selfhost-resolve-differential.mjs` |
+| host interface | `lib.utu` | all of them |
 
 ## Building
 
@@ -78,3 +80,45 @@ preorder, with the same spans and depths. At `--fuzz=2000`, on four seeds,
 all 1,226,613 sources agree each time. On the 24,000-line program it lexes
 and parses (275,791 nodes) in 26 ms; stage 0 takes 147 ms. With a comment
 on every line, 28 ms.
+
+## Sources
+
+A program is files: the entry, what it imports, and the standard library's
+prelude. They share `src`, the token mems, and the node mems, one after
+another, so a token or node id names one place in the program and a word
+id one name in every file (keywords are interned first, so a keyword's id
+is its `Kw`).
+
+The compiler reads no files. The host adds each one (`file_add`, then
+writes its bytes at `file_offset`), parses it, reads the paths of the
+imports it names (`import_*`), and binds each to the file it adds for it,
+or marks it foreign (host declarations: `std:JS`, `npm:…`).
+`loadProgram` in `scripts/selfhost.mjs` is that host.
+
+## Names
+
+Every declaration gets an id (`decl_*`: kind, word, node, owner), and every
+name node that refers to one records it (`node_decl`). Lexical scopes are a
+stack of bindings: `word_top[word]` is the innermost binding of a word, and
+each binding remembers the one it hides, so a lookup is one load and
+leaving a scope pops back to a mark. Members (a module's types, functions,
+and globals; fields; variants; methods and operators of a type) are one
+hash table keyed by owner, word, and space; methods are registered before
+any body is resolved.
+
+The program scope holds every module of every file (the prelude's first,
+so anything else hides them), every alias (`using M[A] |Alias|`), the
+members of opened instances (`using M[A];`), and the entry file's own
+declarations, with an enum's variants beside it. A module adds its type
+parameters and members; functions, blocks, loops, iterator stages, arms,
+catches, and closures add theirs. Names only a type settles (`x.field`,
+`x.method()`) are left to type checking.
+
+The differential compares every identifier and type name in every
+program's own files with stage 0's go-to-definition, recorded in
+`baselines/definitions.json.gz`: all 27,520 that resolution settles agree.
+Where stage 0 answers for a node its lowerings made rather than for the
+name (an iterator capture is a `let` spanning the pipeline, a module name
+in a path answers for the path), the script says how it compares. On the
+96,000-line program, loading, parsing, and resolving 1.1 million nodes
+takes 115 ms; resolving alone, 12.
