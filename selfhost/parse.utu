@@ -1887,7 +1887,7 @@ fn while_expr(p: Parser) I32 {
 // Intern every keyword, at the start of `src`, so a word's id is its
 // keyword's when it is one. Files follow.
 fn intern_keywords() void {
-    src.clear();
+    src.resize(abi_kept[0]);
     src.intern_reset();
     for (0 ..< Kw.count()) |k| {
         let name = Kw.name(Kw.from_i32(k));

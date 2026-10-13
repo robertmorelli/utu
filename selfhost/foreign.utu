@@ -425,12 +425,8 @@ fn foreign_member(t: I32, key: I32, view: I32) Bool {
 fn root_member(view: I32, key: I32) Bool {
     let at = jget_word(jget(view_json[view], "exports"), key);
     if at < 0 { return false; };
-    let readonly = true;
-    let g = jfirst(jget(view_json[view], "mutableGlobals"));
-    while (g >= 0) {
-        if jstring_is(g, src.interned_start(key), src.interned_start(key) + src.interned_size(key)) { readonly = false; };
-        g = jnext(g);
-    };
+    let start = src.interned_start(key);
+    let readonly = not jarray_has(jget(view_json[view], "mutableGlobals"), start, start + src.interned_size(key));
     found_member(view_doc[view], at, -1, readonly);
 }
 
@@ -782,7 +778,9 @@ fn member_access(view: I32, key: I32, root: Bool) Str {
     if not root { return "self[" + js_key(key) + "]"; };
     let spec = jget(view_json[view], "moduleSpecifier");
     if not jis_string(spec) { return "globalThis[" + js_key(key) + "]"; };
-    let alias = "__abi" + int_text(view) + "_" + hex_name(word_text(key));
+    // Named by the import (numbered in the program), not the view, which
+    // may have been kept from an earlier program.
+    let alias = "__abi" + int_text(view_import[view]) + "_" + hex_name(word_text(key));
     access_prologue[0] = intern_text("import { " + js_key(key) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ");
     alias;
 }
@@ -1249,14 +1247,22 @@ fn literal_members(r: Ref) I32 {
 }
 
 fn union_has_literal(union: I32, arg: I32) Bool {
-    let text = node_text(arg);
+    let lo = tok_start[node_first[arg]];
+    let hi = tok_end[node_last[arg] - 1];
     let m = jfirst(union);
     while (m >= 0) {
         let literal = jget(m, "literal");
-        if literal >= 0 and bytes_text(literal, jend(literal)) == text { return true; };
+        if literal >= 0 and bytes_equal(literal, jend(literal), lo, hi) { return true; };
         m = jnext(m);
     };
     false;
+}
+
+// Whether src[a ..< a_end] and src[b ..< b_end] are the same bytes.
+fn bytes_equal(a: I32, a_end: I32, b: I32, b_end: I32) Bool {
+    if a_end - a != b_end - b { return false; };
+    for (0 ..< a_end - a) |i| { if src[a + i] != src[b + i] { return false; }; };
+    true;
 }
 
 // Generic bindings from the arguments: a parameter slot takes its
@@ -1570,7 +1576,7 @@ fn is_foreign_or_nullable(t: I32) Bool { is_foreign(t) or (t >= 0 and ty_is(t, T
 
 // A view of a document (for spelling the types it makes).
 fn view_of_doc(doc: I32) I32 {
-    for (0 ..< view_doc.len()) |v| { if view_doc[v] == doc { return v; }; };
+    for (0 ..< view_doc.len()) |v| { if view_doc[v] == doc and view_live(v) { return v; }; };
     0;
 }
 
@@ -1587,7 +1593,7 @@ fn primitive_host_type(t: I32, key: I32) I32 {
     if name.len() == 0 { return -1; };
     let w = intern_text(name);
     for (0 ..< view_doc.len()) |v| {
-        let at = jget_word(jget(view_json[v], "names"), w);
+        let at = if view_live(v) { jget_word(jget(view_json[v], "names"), w); } else { -1; };
         if at >= 0 {
             let host = foreign_type(Ref { doc: view_doc[v], at: at, env: -1 }, v);
             if is_foreign(host) and foreign_member(host, key, v) { return host; };
@@ -1641,7 +1647,7 @@ fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
     if member(ty_decl(native), key, Space.Method) >= 0 { return -1; };
     let w = intern_text("Array");
     for (0 ..< view_doc.len()) |v| {
-        let at = jget_word(jget(view_json[v], "names"), w);
+        let at = if view_live(v) { jget_word(jget(view_json[v], "names"), w); } else { -1; };
         if at >= 0 and ref_of_type(elem, view_doc[v]) {
             let params = jget(abi_type(view_doc[v], jint(at)), "parameters");
             let m = vl_begin();

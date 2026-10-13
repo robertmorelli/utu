@@ -22,7 +22,11 @@ export mem abi_offsets: I32;   // where the host says a document's types are
 mem view_doc: I32;        // by view: its document
 mem view_json: I32;       // by view: its JSON object
 mem view_prefix: I32;     // by view: its prefix, a word (`Browser`)
-mem view_import: I32;     // by view: the import it serves
+mem view_import: I32;     // by view: the import it serves, or -1
+
+// The bytes of src that host declarations sealed with abi_seal fill (from
+// 0), kept from program to program; 0 when none are.
+mem abi_kept: I32 = [0];
 
 fn reset_abi() void {
     jbr_open.clear();
@@ -92,6 +96,10 @@ fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
     view_import.push(import_);
     v;
 }
+
+// Whether view v serves an import of this program (a view kept from
+// earlier programs may serve none).
+fn view_live(v: I32) Bool { view_import[v] >= 0; }
 
 // The view an import declares, or -1.
 fn view_of_import(i: I32) I32 {
@@ -340,10 +348,12 @@ mem jk_key: I32;       // by entry: its key (a JSON string)
 mem jk_val: I32;       // by entry: the value
 mem jk_indexed: I32;   // the objects indexed
 
+// (An array of strings is indexed the same way, each string its own key and value.)
 fn jkeyed(at: I32) Bool {
     for (0 ..< jk_indexed.len()) |i| { if jk_indexed[i] == at { return true; }; };
     if jbr_end(at) < 0 or jend(at) - at <= jk_large { return false; };
     jk_indexed.push(at);
+    let object = src[at] == 123;
     let k = jfirst(at);
     while (k >= 0) {
         if (jk_obj.len() + 1) * 2 > jk_table.len() { jk_grow(); };
@@ -353,10 +363,22 @@ fn jkeyed(at: I32) Bool {
         jk_table[h] = jk_obj.len();
         jk_obj.push(at);
         jk_key.push(k);
-        jk_val.push(jvalue(k));
+        jk_val.push(if object { jvalue(k); } else { k; });
         k = jnext(k);
     };
     true;
+}
+
+// Whether array `at` holds the string src[start ..< end_].
+fn jarray_has(at: I32, start: I32, end_: I32) Bool {
+    if at < 0 or src[at] != 91 { return false; };
+    if jkeyed(at) { return jk_find(at, start, end_) >= 0; };
+    let g = jfirst(at);
+    while (g >= 0) {
+        if jstring_is(g, start, end_) { return true; };
+        g = jnext(g);
+    };
+    false;
 }
 
 fn jk_hash(obj: I32, start: I32, end_: I32) I32 {

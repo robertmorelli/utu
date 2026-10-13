@@ -27,8 +27,7 @@ export async function loadNodeCompiler({ wasm, spec } = {}) {
   if (!wasm) {
     const base = COMPILER_WASM.replace(/\.wasm$/, '');
     if (!fs.existsSync(COMPILER_WASM)) throw new Error(`${COMPILER_WASM} is missing: run \`bun run build\``);
-    const sources = currentSources();
-    if (sources && sources !== readOr(`${base}.sources`, '').trim()) {
+    if (!builtFromCurrentSources(`${base}.sources`)) {
       throw new Error(`${COMPILER_WASM} was built from other sources than selfhost/: run \`bun run build\``);
     }
     wasm = fs.readFileSync(COMPILER_WASM);
@@ -42,17 +41,48 @@ export function sourcesHash(text) {
   return createHash('sha256').update(text).digest('hex');
 }
 
-/** The hash of selfhost/'s sources as they are, when they are here (in the repository). */
-function currentSources() {
-  const dir = path.join(ROOT, 'selfhost');
-  const list = readOr(path.join(dir, 'files.txt'), null);
+const SELFHOST = path.join(ROOT, 'selfhost');
+
+/** selfhost/'s source files (with files.txt), or null outside the repository. */
+function sourceFiles() {
+  const list = readOr(path.join(SELFHOST, 'files.txt'), null);
   if (list == null) return null;
-  // As scripts/selfhost.mjs joins them.
-  const text = list.split('\n').map(line => line.trim()).filter(Boolean).map(name => {
-    const part = fs.readFileSync(path.join(dir, name), 'utf8');
+  return list.split('\n').map(line => line.trim()).filter(Boolean);
+}
+
+/** The hash of selfhost/'s sources as they are, as scripts/selfhost.mjs joins them. */
+function currentSources(files) {
+  return sourcesHash(files.map(name => {
+    const part = fs.readFileSync(path.join(SELFHOST, name), 'utf8');
     return part.endsWith('\n') ? part : `${part}\n`;
-  }).join('');
-  return sourcesHash(text);
+  }).join(''));
+}
+
+/** Each source's time and size: when all are as recorded, the sources are. */
+function sourceStamps(files) {
+  return Object.fromEntries([...files, 'files.txt'].map(name => {
+    const s = fs.statSync(path.join(SELFHOST, name));
+    return [name, [s.mtimeMs, s.size]];
+  }));
+}
+
+/** What the build records of its sources: their hash, and their stamps. */
+export function sourcesRecord(text) {
+  const files = sourceFiles();
+  return { hash: sourcesHash(text), stamps: files ? sourceStamps(files) : {} };
+}
+
+// Whether the compiler at `record` was built from selfhost/ as it is (true
+// outside the repository): by the files' stamps, and when one differs (a
+// checkout, a touch) by their hash.
+function builtFromCurrentSources(record) {
+  const files = sourceFiles();
+  if (!files) return true;
+  let recorded;
+  try { recorded = JSON.parse(fs.readFileSync(record, 'utf8')); } catch { return false; }
+  const now = sourceStamps(files);
+  if (JSON.stringify(now) === JSON.stringify(recorded.stamps)) return true;
+  return currentSources(files) === recorded.hash;
 }
 
 function readOr(file, fallback) {

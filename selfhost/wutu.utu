@@ -30,8 +30,23 @@ fn wutu_prefix() Str { word_text(wu_prefix[0]); }
 fn wutu_reactive_program() Bool {
     for (0 ..< node_kind.len()) |n| {
         if node_kind[n] == Node.Dsl_expr.to_i32() {
-            let body = dsl_body(n);
-            if text_index(body, "@reactive", 0) >= 0 or text_index(body, "@island", 0) >= 0 { return true; };
+            let lo = dsl_inner_start(n);
+            let hi = dsl_inner_end(n);
+            if bytes_contain(lo, hi, "@reactive") or bytes_contain(lo, hi, "@island") { return true; };
+        };
+    };
+    false;
+}
+
+// Whether src[lo ..< hi] contains `needle` (ASCII), read in place.
+fn bytes_contain(lo: I32, hi: I32, needle: Str) Bool {
+    let n = needle.len();
+    let first = needle.get(0);
+    for (lo ..< hi - n + 1) |i| {
+        if src[i] == first {
+            let k = 1;
+            while (k < n and src[i + k] == needle.get(k)) { k += 1; };
+            if k == n { return true; };
         };
     };
     false;

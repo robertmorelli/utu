@@ -875,7 +875,12 @@ fn plan_mems() void {
             };
         };
     };
-    // The host's first, then by uses (most first; in declaration order on a tie).
+    // The host's first, then the entry file's (each is a memory of the
+    // module, used or not; another file's is made only when used), each
+    // group by uses (most first; in declaration order on a tie).
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Mem) and file_role[file_of_token(node_first[decl_node[d]])] == FileRole.Entry.to_i32() { uses[d] += 1 << 24; };
+    };
     let budget = max_memories;
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Mem) and (mem_hosted[d] == 1 or mem_is_exported(d)) {
@@ -924,7 +929,7 @@ fn check_mem_host_op(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx)
 fn mem_view_type(decl: I32) I32 {
     let w = intern_text(view_array_name(mem_storage(decl)));
     for (0 ..< view_doc.len()) |v| {
-        let t = foreign_named_type(v, w);
+        let t = if view_live(v) { foreign_named_type(v, w); } else { -1; };
         if t >= 0 { return t; };
     };
     foreign_any(0);

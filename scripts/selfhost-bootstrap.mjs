@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { buildWith, instantiateBuilt, joinSelfhost, loadSelfhost } from './selfhost.mjs';
-import { sourcesHash } from '../src/selfhost/node.js';
+import { sourcesRecord } from '../src/selfhost/node.js';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 16);
 
@@ -43,14 +43,14 @@ export async function bootstrap({ log = console.log } = {}) {
 
 /**
  * Write a built compiler: NAME.wasm, and beside it NAME.host.json (its
- * spec) and NAME.sources (the hash of the sources it was built from, so a
+ * spec) and NAME.sources (the hash, times and sizes of the sources it was built from, so a
  * compiler older than selfhost/ is not loaded).
  */
 export function writeCompiler(out, { wasm, spec }) {
   const base = out.replace(/\.wasm$/, '');
   fs.writeFileSync(out, wasm);
   fs.writeFileSync(`${base}.host.json`, JSON.stringify(spec));
-  fs.writeFileSync(`${base}.sources`, `${sourcesHash(joinSelfhost().text)}\n`);
+  fs.writeFileSync(`${base}.sources`, `${JSON.stringify(sourcesRecord(joinSelfhost().text))}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

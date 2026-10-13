@@ -43,10 +43,16 @@ mem missing_import: I32 = [-1];
 mem missing_start: I32 = [0];
 mem missing_end: I32 = [0];
 
-// Forget every file, and start a program.
+// Forget every file, and start a program. Host declarations the host has
+// sealed (abi_kept) stay, with what is known of them: they are the same
+// documents, at the same offsets, so their indexes still hold.
 fn reset_program() void {
     missing_import[0] = -1;
-    reset_abi();
+    if abi_kept[0] > 0 {
+        for (0 ..< view_import.len()) |v| { view_import[v] = -1; };
+    } else {
+        reset_abi();
+    };
     dsl_failed.clear();
     jp_serial[0] = 0;
     st_serial[0] = 0;
@@ -87,6 +93,13 @@ fn reset_program() void {
     import_target.clear();
     node_parent.clear();
     reset_resolve();
+    // Words are interned anew for each program; kept views spell theirs again.
+    if abi_kept[0] > 0 {
+        for (0 ..< view_prefix.len()) |v| {
+            let p = jget(view_json[v], "prefix");
+            view_prefix[v] = if p >= 0 { jstring_word(p); } else { -1; };
+        };
+    };
 }
 
 // Intern a name that is not in any file (pushed onto `src`).

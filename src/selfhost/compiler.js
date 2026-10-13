@@ -76,7 +76,7 @@ function readTests(utu) {
  */
 export async function loadProgram(utu, entry, host) {
   const { readFile, resolvePath = defaultResolvePath, stdlib } = host;
-  utu.reset();
+  startProgram(utu);
   const files = [];
   const byKey = new Map();
   const add = (key, text, role) => {
@@ -156,15 +156,69 @@ function typesDocument(types) {
   return made;
 }
 
-/** Each host declaration document once, then each import's view of one. */
+// What each loaded compiler keeps of host declarations from program to
+// program: the documents and views written at the start of its source and
+// sealed (with what it learns of them: where their containers end, their
+// large objects' keys), and those to keep from the next full start on.
+const resident = new WeakMap();
+
+function residentOf(utu) {
+  let state = resident.get(utu);
+  if (!state) resident.set(utu, state = { docs: new Map(), views: new Map(), wanted: new Set(), rebuild: false });
+  return state;
+}
+
+/**
+ * Start a program. While the declarations the compiler holds are all a
+ * program needs, it keeps them; when one needed one it did not hold (written
+ * after the program's files, so not kept), the next start writes every
+ * declaration wanted so far first, and seals them.
+ */
+function startProgram(utu) {
+  const state = residentOf(utu);
+  if (!state.rebuild && state.docs.size) {
+    utu.reset_keep();
+    return;
+  }
+  utu.reset();
+  state.docs.clear();
+  state.views.clear();
+  for (const abi of state.wanted) {
+    const view = writeView(utu, abi, writeDoc(utu, abi, state.docs));
+    state.views.set(abi, utu.abi_resident_view(view.doc, view.at));
+  }
+  if (state.wanted.size) utu.abi_seal();
+  state.rebuild = false;
+}
+
+function writeBytes(utu, bytes) {
+  const at = utu.abi_room(bytes.length);
+  new Uint8Array(utu.src.buffer).set(bytes, at);
+  return at;
+}
+
+/** A declaration ABI's document (its types), once per compiler state. */
+function writeDoc(utu, abi, docs) {
+  if (!docs.has(abi.types)) {
+    const { bytes, offsets } = typesDocument(abi.types);
+    const at = writeBytes(utu, bytes);
+    utu.abi_offsets_room(offsets.length);
+    new Int32Array(utu.abi_offsets.buffer, 0, offsets.length).set(offsets);
+    docs.set(abi.types, utu.abi_doc_at(at, offsets.length));
+  }
+  return docs.get(abi.types);
+}
+
+/** An import's view of its document: its prefix, exports, names, mutable globals. */
+function writeView(utu, abi, doc) {
+  const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
+  return { doc, at: writeBytes(utu, encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals }))) };
+}
+
+/** Each import's host declarations: kept from before, or written now. */
 async function loadForeign(utu, foreign, { stdlib, resolvePackage }) {
-  const writeBytes = bytes => {
-    const at = utu.abi_room(bytes.length);
-    new Uint8Array(utu.src.buffer).set(bytes, at);
-    return at;
-  };
-  const write = text => writeBytes(encoder.encode(text));
-  const docs = new Map();
+  const state = residentOf(utu);
+  const docs = new Map(state.docs);
   for (const { i, raw, from, name } of foreign) {
     let abi;
     try {
@@ -175,15 +229,14 @@ async function loadForeign(utu, foreign, { stdlib, resolvePackage }) {
       // Unreadable declarations leave the import unresolved, which is reported.
       continue;
     }
-    if (!docs.has(abi.types)) {
-      const { bytes, offsets } = typesDocument(abi.types);
-      const at = writeBytes(bytes);
-      utu.abi_offsets_room(offsets.length);
-      new Int32Array(utu.abi_offsets.buffer, 0, offsets.length).set(offsets);
-      docs.set(abi.types, utu.abi_doc_at(at, offsets.length));
+    if (state.views.has(abi)) {
+      utu.abi_bind(i, state.views.get(abi));
+      continue;
     }
-    const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
-    utu.abi_view(i, docs.get(abi.types), write(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals })));
+    const view = writeView(utu, abi, writeDoc(utu, abi, docs));
+    utu.abi_view(i, view.doc, view.at);
+    state.wanted.add(abi);
+    state.rebuild = true;
   }
 }
 
