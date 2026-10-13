@@ -21,6 +21,7 @@ const commands = [
   ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-resolve-differential.mjs'],
   ['node', './scripts/selfhost-bootstrap.mjs'],
+  ['node', './scripts/test-selfhost-mem-arrays.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs', '--optimize=size'],
   ['node', './scripts/selfhost-diagnostics-differential.mjs'],
@@ -28,6 +29,7 @@ const commands = [
   ['node', './scripts/test-query-features.mjs'],
   ['node', './scripts/test-wutu-stencils.mjs'],
   ['node', './scripts/test-wutu-cli.mjs'],
+  ['node', './scripts/test-utu-cli.mjs'],
   ['node', './scripts/test-vscode-extension.mjs'],
 ];
 

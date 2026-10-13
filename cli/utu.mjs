@@ -1,300 +1,205 @@
 #!/usr/bin/env node
+// cli/utu.mjs — the utu command line, on the self-hosted compiler.
+//
+//   utu check <file.utu>                 report what is wrong
+//   utu run <file.utu> [-O…]             build, then call main
+//   utu test <file.utu> [-O…]            build the tests, then run each
+//   utu build <file.utu> [-o dir] [-O…]  NAME.wasm and NAME.mjs (its loader)
+//   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
+//
+// -Oz (the default) builds the smallest module, -O3 the fastest, -O0 the
+// module as code generation leaves it. `display` and `graph` show stage 0's
+// IR and graphs, so they use stage 0.
 
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import os from 'node:os';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createCompiler, initParser, formatDiagnostics, emitBinary, renderHighlightedSource } from '../src/index.js';
-import { glueModuleSource, liveGlueFields, runtimeIsEmpty } from '../src/runtime/host-imports.js';
+import { fileURLToPath } from 'node:url';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { formatDiagnostics } from '../src/selfhost/format.js';
+import { glueSource, loaderSource } from '../src/selfhost/loader.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const RUNTIME = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
 
-const DISPLAY_FILTERS = new Map([
-  ['display:tests', new Set(['ir-test'])],
-  ['display:benches', new Set(['ir-bench'])],
-  ['display:modules', new Set(['ir-module'])],
-  ['display:exports', new Set(['ir-export-lib', 'ir-export-main'])],
-]);
+const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'display:modules', 'display:exports', 'display:debug', 'graph']);
 
 async function main() {
-  const [command, fileArg] = process.argv.slice(2);
-  const flags = new Set(process.argv.slice(4));
-
-  if (!command || command === '-h' || command === '--help') {
-    usage(0);
+  const [command, fileArg, ...rest] = process.argv.slice(2);
+  if (!command || command === '-h' || command === '--help') usage(0);
+  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest);
+  const commands = { check, run, test, build, 'build-exe': buildExe };
+  if (!commands[command]) {
+    console.error(`unknown command: ${command}`);
+    usage(1);
   }
-
   if (!fileArg) {
     console.error('missing file');
     usage(1);
   }
-
-  const file = path.resolve(process.cwd(), fileArg);
+  const file = path.resolve(fileArg);
   try {
     await fs.access(file);
   } catch {
     console.error(`${fileArg}: file not found`);
     process.exit(1);
   }
-  const optimize = flags.has('-O3') ? 'speed' : flags.has('-O0') ? 'none' : 'size';
-  const compiler = await makeCompiler(command === 'build-exe' ? 'normal' : 'analysis', optimize);
-
-  if (command === 'check') {
-    await checkFile(compiler, file);
-    return;
-  }
-
-  if (command === 'display' || DISPLAY_FILTERS.has(command)) {
-    await displayFile(compiler, file, DISPLAY_FILTERS.get(command), { showLineNumbers: command !== 'display' && !flags.has('--noln') });
-    return;
-  }
-
-  if (command === 'display:debug') {
-    await displayDebugFile(compiler, file, { showLineNumbers: false });
-    return;
-  }
-
-  if (command === 'graph') {
-    await writeGraph(compiler, file, process.argv.slice(4));
-    return;
-  }
-
-  if (command === 'build-exe') {
-    await buildExe(compiler, file, process.argv.slice(4));
-    return;
-  }
-
-  console.error(`unknown command: ${command}`);
-  usage(1);
+  const optimize = rest.includes('-O3') ? 'speed' : rest.includes('-O0') ? 'none' : 'size';
+  const out = option(rest, '-o') ?? option(rest, '--out');
+  await commands[command](file, { optimize, out, utu: await loadNodeCompiler() });
 }
 
-async function makeCompiler(target = 'analysis', optimize = 'size') {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  return createCompiler({
-    parser,
-    target,
-    optimize,
-    readFile: (file) => fs.readFile(file, 'utf8'),
-    readBinaryFile: (file) => fs.readFile(file),
-    resolvePath: (fromFile, importPath) => path.resolve(path.dirname(fromFile), importPath),
-    resolvePackage: lazyPackageResolver(),
+/** A file as the user would write it: relative to here, unless that is longer. */
+function displayPath(key) {
+  if (key.startsWith('std:')) return key;
+  const relative = path.relative(process.cwd(), key);
+  return relative.length < key.length ? relative : key;
+}
+
+function option(args, name) {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+}
+
+/** Build, printing the diagnostics; exits on errors. */
+async function buildOrExit(utu, file, options) {
+  const result = await compileFile(utu, file, options);
+  if (result.diagnostics.length) {
+    const files = new Map(result.files.map(f => [f.key, f.text]));
+    // In file order, then by position.
+    const order = new Map(result.files.map((f, i) => [f.key, i]));
+    const sorted = result.diagnostics.toSorted((a, b) => (order.get(a.file) ?? -1) - (order.get(b.file) ?? -1) || (a.start ?? 0) - (b.start ?? 0));
+    console.error(formatDiagnostics(sorted, files, {
+      color: process.stderr.isTTY, relative: displayPath,
+    }));
+  }
+  if (!result.wasm) process.exit(1);
+  return result;
+}
+
+async function check(file, { utu }) {
+  // Both builds: what the program exports, and its tests.
+  await buildOrExit(utu, file, { target: 'normal' });
+  await buildOrExit(utu, file, { target: 'test' });
+  console.log('ok');
+}
+
+async function run(file, { utu, optimize }) {
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize });
+  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  if (typeof exports.main !== 'function') {
+    console.error(`${displayPath(file)}: no \`export main\``);
+    process.exit(1);
+  }
+  const result = await exports.main();
+  if (result !== undefined) console.log(result);
+}
+
+async function test(file, { utu, optimize }) {
+  const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize });
+  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  const paint = (code, text) => process.stdout.isTTY ? `\x1b[${code}m${text}\x1b[0m` : text;
+  let failed = 0;
+  for (const { export: name, name: title } of tests) {
+    const started = performance.now();
+    try {
+      await exports[name]();
+      console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${(performance.now() - started).toFixed(1)} ms)`)}`);
+    } catch (error) {
+      failed++;
+      console.log(`${paint('31', 'FAIL')} ${title}: ${String(error?.message ?? error).split('\n')[0]}`);
+    }
+  }
+  console.log(`${tests.length - failed} passed, ${failed} failed`);
+  if (failed) process.exitCode = 1;
+}
+
+/** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
+async function build(file, { utu, optimize, out }) {
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize });
+  const name = path.basename(file, '.utu');
+  const dir = path.resolve(out ?? '.');
+  await fs.mkdir(dir, { recursive: true });
+  const glue = glueSource(spec);
+  const { build: bundle } = await import('esbuild');
+  const loader = loaderSource(spec, wasm, {
+    runtime: RUNTIME, glue: glue ? './glue.mjs' : null, streaming: false,
+    wasm: `await (typeof process === 'object' && process.versions?.node ? import('node:fs/promises').then(fs => fs.readFile(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url))) : fetch(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url)).then(r => r.arrayBuffer()))`,
   });
+  // The loader bundled with the runtime pieces and the glue it imports.
+  await bundle({
+    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: `${name}.mjs`, loader: 'js' },
+    plugins: glue ? [virtualGlue(glue)] : [],
+    outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: true, format: 'esm', platform: 'neutral',
+    target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
+  });
+  await fs.writeFile(path.join(dir, `${name}.wasm`), wasm);
+  const js = await fs.stat(path.join(dir, `${name}.mjs`));
+  console.log(`${displayPath(path.join(dir, `${name}.wasm`))}  ${wasm.length} bytes`);
+  console.log(`${displayPath(path.join(dir, `${name}.mjs`))}   ${js.size} bytes`);
 }
 
-// TypeScript is only needed when a program imports "npm:…" or "node:…".
-function lazyPackageResolver() {
-  let resolver;
-  return async (specifier, request) => {
-    resolver ??= (await import('../tools/dts/packages.mjs')).nodePackageResolver({ root: process.cwd() });
-    return resolver(specifier, request);
+/** The glue module, given to esbuild without being written. */
+function virtualGlue(source) {
+  return {
+    name: 'utu-glue',
+    setup(build) {
+      build.onResolve({ filter: /^\.\/glue\.mjs$/ }, args => ({ path: path.join(args.resolveDir, '__utu_glue.mjs'), namespace: 'utu-glue' }));
+      build.onLoad({ filter: /.*/, namespace: 'utu-glue' }, args => ({ contents: source, loader: 'js', resolveDir: path.dirname(args.path) }));
+    },
   };
 }
 
-async function checkFile(compiler, file) {
-  try {
-    const analysis = await compiler.analyzeFile(file);
-    await printDiagnostics(analysis.artifacts.diagnostics, analysis);
-    const { artifacts } = analysis;
-    process.exitCode = artifacts.diagnostics.some(d => d.severity === 'error') ? 1 : 0;
-  } catch (error) {
-    const diagnostics = error.artifacts?.diagnostics ?? [];
-    if (diagnostics.length > 0) {
-      await printDiagnostics(diagnostics, { snapshot: error.snapshot });
-    } else {
-      console.error(error?.stack || error?.message || String(error));
-    }
-    process.exitCode = 1;
-  }
-}
-
-async function displayFile(compiler, file, sectionTags = null, options = {}) {
-  const source = await fs.readFile(file, 'utf8');
-  const { snapshot } = await compiler.analyzeFile(file);
-  renderSource(file, source, snapshot, sectionTags, {
-    showLineNumbers: options.showLineNumbers ?? sectionTags != null,
-    showDiagnostics: false,
-  });
-}
-
-async function displayDebugFile(compiler, file, options = {}) {
-  const source = await fs.readFile(file, 'utf8');
-  const analysis = await compiler.analyzeFile(file);
-  const { artifacts } = analysis;
-  if (artifacts.diagnostics.length) {
-    await printDiagnostics(artifacts.diagnostics, analysis);
-    process.exitCode = 1;
-    return;
-  }
-  renderSource(file, source, snapshot, null, {
-    showLineNumbers: options.showLineNumbers ?? false,
-    showDiagnostics: false,
-  });
-}
-
-// `utu graph <file> [-o out.html]` — render the compiler's graphs over the
-// source they came from. Self-contained: no assets, no network.
-async function writeGraph(compiler, file, args) {
-  const { renderGraphHtml } = await import('../src/compiler/graph-html.js');
-  const outFlag = args.indexOf('-o') >= 0 ? args.indexOf('-o') : args.indexOf('--out');
-  const out = outFlag >= 0
-    ? path.resolve(args[outFlag + 1])
-    : path.resolve(`${path.basename(file, '.utu')}.graph.html`);
-
-  const source = await fs.readFile(file, 'utf8');
-  let doc;
-  try {
-    ({ doc } = await compiler.analyzeFile(file));
-  } catch (error) {
-    doc = error.doc ?? null;
-    if (!doc) throw error;
-  }
-  await fs.writeFile(out, renderGraphHtml(doc, source, file));
-  console.error(`wrote ${out}`);
-}
-
-async function buildExe(compiler, file, args) {
-  const outFlag = args.indexOf('-o') >= 0 ? args.indexOf('-o') : args.indexOf('--out');
-  const out = outFlag >= 0 ? path.resolve(args[outFlag + 1]) : path.resolve(path.basename(file, '.utu'));
-  const analysis = await compiler.analyzeFile(file);
-  const { doc, artifacts } = analysis;
-  if (artifacts.diagnostics.length) {
-    await printDiagnostics(artifacts.diagnostics, analysis);
-    // Warnings are reported; only errors stop the build.
-    if (artifacts.diagnostics.some(d => d.severity !== 'warning')) process.exit(1);
-  }
-
-  const wasm = emitBinary(doc);
-  const root = doc.body.firstChild;
-  const importSpec = JSON.parse(root?.dataset?.dslImportsJs || '{}');
-  const declaredClosures = JSON.parse(root?.dataset?.closureRuntime || 'null');
-  const mems = JSON.parse(root?.dataset?.mems || '[]').filter(mem => mem.host);
-  // Build inside the project when it has dependencies, so `bun build` resolves
-  // an `@es` body's bare specifiers exactly as the project's own source would
-  // and bundles the result into the executable. Projects without dependencies
-  // build in a temp directory as before.
-  const dir = await buildDirectory();
-  // Only bindings the binary actually imports reach the glue, so a declared but
-  // unused `@es` body costs neither bytes nor a package load.
-  const live = await liveGlueFields(wasm);
-  const glue = glueModuleSource(importSpec, live);
-  const fields = Object.fromEntries(Object.entries(importSpec).map(([module, bindings]) =>
-    [module, Object.fromEntries(Object.keys(bindings).filter(name => live.has(name)).map(name => [name, '']))]));
-  const closureSpec = { new: !!declaredClosures?.new && live.has('closure_new'),
-    calls: (declaredClosures?.calls ?? []).filter(name => live.has(name)) };
+/** A standalone executable: bun compiles the loader, the glue, and the module. */
+async function buildExe(file, { utu, optimize, out }) {
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize });
+  const target = path.resolve(out ?? path.basename(file, '.utu'));
+  // In the project when it has dependencies, so an `@es` body's imports
+  // resolve as its own source's would, and bun bundles them in.
+  const dir = await buildDirectory(path.dirname(file));
+  const glue = glueSource(spec);
   if (glue) await fs.writeFile(path.join(dir, 'glue.mjs'), glue);
-  const tmp = path.join(dir, 'runner.mjs');
-  await fs.writeFile(tmp, runnerSource(wasm, fields, closureSpec, Boolean(glue), mems, live.has('js_tag')));
-
-  const result = spawnSync('bun', ['build', tmp, '--compile', '--outfile', out], {
-    cwd: process.cwd(),
-    stdio: 'inherit',
+  const loader = loaderSource(spec, wasm, {
+    runtime: RUNTIME, glue: glue ? './glue.mjs' : null,
+    wasm: `Uint8Array.from(atob(${JSON.stringify(Buffer.from(wasm).toString('base64'))}), c => c.charCodeAt(0))`,
   });
+  const runner = path.join(dir, 'runner.mjs');
+  await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  if (result !== undefined) console.log(result);\n}\n`);
+  const result = spawnSync('bun', ['build', runner, '--compile', '--outfile', target], { cwd: process.cwd(), stdio: 'inherit' });
+  await fs.rm(dir, { recursive: true, force: true });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
-  console.error(`wrote ${out}`);
+  console.error(`wrote ${displayPath(target)}`);
 }
 
-/** Choose a directory `bun build` can resolve the glue module's imports from. */
-async function buildDirectory() {
-  const nested = path.join(process.cwd(), 'node_modules', '.utu');
-  try {
-    await fs.access(path.join(process.cwd(), 'node_modules'));
-    await fs.mkdir(nested, { recursive: true });
-    return nested;
-  } catch {
-    return await fs.mkdtemp(path.join(os.tmpdir(), 'utu-cli-'));
+async function buildDirectory(from) {
+  for (let dir = from; ; dir = path.dirname(dir)) {
+    try {
+      await fs.access(path.join(dir, 'node_modules'));
+      const nested = path.join(dir, 'node_modules', '.utu', `exe-${process.pid}`);
+      await fs.mkdir(nested, { recursive: true });
+      return nested;
+    } catch {}
+    if (path.dirname(dir) === dir) return fs.mkdtemp(path.join(os.tmpdir(), 'utu-exe-'));
   }
-}
-
-// The launcher is standalone generated source compiled by `bun build --compile`.
-// It imports the runtime by absolute path rather than reimplementing it — that
-// module is dependency-free, so bundling it pulls in nothing else, and the exe
-// cannot drift from what `buildImportObject` does.
-//
-// The `@es` glue is a sibling module rather than inline source: a static import
-// is what lets `bun build` see an `@es` body's npm dependencies and bundle them
-// into the executable.
-// Only the pieces the program uses are imported, so a binary that needs no
-// closures and no promises carries none of that runtime.
-function runnerSource(wasm, importSpec, closureSpec, hasGlue, mems = [], catches = false) {
-  const runtime = JSON.stringify(path.join(ROOT, 'src', 'runtime', 'host-imports.js'));
-  const needsRuntime = !runtimeIsEmpty(closureSpec, null);
-  const parts = [
-    hasGlue && `import { importObjectFromGlue } from ${runtime};`,
-    hasGlue && `import * as glue from './glue.mjs';`,
-    needsRuntime && `import { closureImports } from ${runtime};`,
-    mems.length && `import { memoryImports } from ${runtime};`,
-    catches && `import { exceptionImports } from ${runtime};`,
-  ].filter(Boolean);
-  return `#!/usr/bin/env bun
-${parts.join('\n')}
-const wasmBase64 = ${JSON.stringify(Buffer.from(wasm).toString('base64'))};
-const bytes = Uint8Array.from(atob(wasmBase64), c => c.charCodeAt(0));
-${hasGlue
-    ? `const imports = importObjectFromGlue(${JSON.stringify(importSpec)}, glue);`
-    : 'const imports = {};'}
-${needsRuntime
-    ? `imports.utu = closureImports(${JSON.stringify(closureSpec)});`
-    : ''}
-${mems.length ? `imports.utu = memoryImports(${JSON.stringify(mems)}, imports.utu ?? {});` : ''}
-${catches ? 'imports.utu = exceptionImports(imports.utu ?? {});' : ''}
-const compiled = await WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" });
-const instance = await WebAssembly.instantiate(compiled, imports);
-if (typeof instance.exports.main === 'function') {
-  const result = instance.exports.main();
-  if (result !== undefined) console.log(result);
-}
-`;
-}
-
-function renderSource(file, source, snapshot, sectionTags = null, options = {}) {
-  const rendered = renderHighlightedSource({
-    file,
-    source,
-    snapshot,
-    sectionTags,
-    showLineNumbers: options.showLineNumbers ?? true,
-    showDiagnostics: options.showDiagnostics ?? false,
-  });
-  if (rendered) console.log(rendered);
-}
-
-/** `source` holds the analysis snapshot, built only if there is something to print. */
-async function printDiagnostics(diagnostics, source) {
-  if (!diagnostics?.length) {
-    console.log('ok');
-    return;
-  }
-
-  console.log(await formatDiagnostics(diagnostics, { readFile: (file) => fs.readFile(file, 'utf8'), snapshot: source?.snapshot }));
-}
-
-async function printSourceLine(file, start, end) {
-  const source = await fs.readFile(file, 'utf8');
-  const lineStart = source.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
-  const nextNewline = source.indexOf('\n', start);
-  const lineEnd = nextNewline === -1 ? source.length : nextNewline;
-  const line = source.slice(lineStart, lineEnd);
-  const colStart = Math.max(0, start - lineStart);
-  const colEnd = Math.max(colStart + 1, Math.min(line.length, end - lineStart));
-  const lineNo = source.slice(0, lineStart).split('\n').length;
-
-  console.log(`\n${file}:${lineNo}:${colStart + 1}`);
-  console.log(line);
-  console.log(`${' '.repeat(colStart)}\x1b[31m${'^'.repeat(Math.max(1, colEnd - colStart))}\x1b[0m`);
 }
 
 function usage(code) {
-  console.log(`usage:
-  bun cli/utu.mjs check <file.utu>
-  bun cli/utu.mjs display <file.utu>
-  bun cli/utu.mjs display:tests <file.utu> [--noln]
-  bun cli/utu.mjs display:benches <file.utu> [--noln]
-  bun cli/utu.mjs display:modules <file.utu> [--noln]
-  bun cli/utu.mjs display:exports <file.utu> [--noln]
-  bun cli/utu.mjs display:debug <file.utu>
-  bun cli/utu.mjs build-exe <file.utu> [-o out] [-Oz | -O3 | -O0]   (-Oz: smallest, default; -O3: fastest; -O0: codegen output as is, fastest build)`);
+  console.log(`usage: utu <command> <file.utu> [options]
+
+  check <file>                 report what is wrong with the program
+  run <file> [-O…]             build it, then call its main
+  test <file> [-O…]            build its tests, then run each
+  build <file> [-o dir] [-O…]  NAME.wasm, and NAME.mjs that loads it
+  build-exe <file> [-o out]    a standalone executable (needs bun)
+
+  -Oz  the smallest module (the default)
+  -O3  the fastest module
+  -O0  the module as code generation leaves it
+
+  display[:tests|:benches|:modules|:exports|:debug] <file>, graph <file> [-o out.html]
+                               stage 0's IR and graphs`);
   process.exit(code);
 }
 
