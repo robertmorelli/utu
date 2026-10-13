@@ -26,9 +26,7 @@ counts. Compare equivalent programs within the same run for size regressions.
 ## Focused compiler regressions
 
 - `compiler-quality-tests.mjs`: closure hygiene and ABI, dead-code size equality,
-  invalid emission options, and Binaryen cleanup on construction, validation,
-  optimization, binary-emission, and text-emission failures. Failure injection
-  restores the original Binaryen constructor even if an assertion fails.
+  and invalid modules reported with the engine's reason.
 - `parser-lifecycle-tests.mjs`: owned versus borrowed CST lifetime, cleanup on
   conversion failure, diamond imports, and cycles without duplicate reads.
 - `range-index-tests.mjs`: half-open interval semantics, empty/invalid ranges,

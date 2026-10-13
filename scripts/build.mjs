@@ -254,8 +254,8 @@ function nodeBranchStubPlugin() {
   return {
     name: 'utu-node-branch-stubs',
     setup(buildApi) {
-      // Both bare and `node:`-prefixed spellings — binaryen switched to the
-      // prefixed form, and an unmatched one fails the bundle outright.
+      // Both bare and `node:`-prefixed spellings; dependencies use either,
+      // and an unmatched one fails the bundle outright.
       buildApi.onResolve({ filter: /^(node:)?(module|fs|fs\/promises|path|url|os)$/ }, ({ path: importPath }) => ({
         path: importPath.replace(/^node:/, ''),
         namespace: 'utu-node-stub',

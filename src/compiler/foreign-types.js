@@ -71,7 +71,7 @@ export class ForeignABI {
       decl.setAttribute('data-display-name', `${this.schemas[foreign.index].prefix}.${this.display(foreign.index, foreign.ref)}`);
       const repr = createSyntheticNode(doc, 'ir-wasm-ref', site, 'foreign-abi', 'foreign-representation');
       repr.setAttribute('type-repr', 'wasm-externref'); decl.appendChild(repr);
-      entry = { typeName: name, typeRepr: 'wasm-externref', kind: 'wasm-ref', refBinaryen: 'externref', decl,
+      entry = { typeName: name, typeRepr: 'wasm-externref', kind: 'wasm-ref', refWasm: 'externref', decl,
         foreign: this.values.get(name), fields: [], abi: this };
       this.entries.set(name, entry);
       const ref = entry.foreign.ref;

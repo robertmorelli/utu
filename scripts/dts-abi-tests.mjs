@@ -224,8 +224,6 @@ try {
     assert.equal(messages.length, 2);
   });
   await test('closures capture host strings without unlowered public GC types', async () => {
-    const binaryen = (await import('binaryen')).default;
-    const closedWorld = binaryen.getClosedWorld();
     const { instance } = await compile(`
       struct Box: | text: Str
       export lib {
@@ -236,7 +234,6 @@ try {
     const text = 'captured 🌱\u0000\ud800';
     assert.equal(instance.exports.capture(text)(), text);
     assert.equal(instance.exports.boxed(text)(), text);
-    assert.equal(binaryen.getClosedWorld(), closedWorld);
   });
   console.log(`${passed} ABI infrastructure tests passed`);
 } finally { parser.delete(); }

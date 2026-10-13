@@ -15,4 +15,4 @@ bun run bench:tiny
 
 This is a smoke benchmark, not a language shootout. It measures one scalar loop
 in Bun's current WebAssembly engine. Rust receives LLVM optimization while utu
-currently emits validated Binaryen output without a general optimization pass.
+emits its own wasm with only a local cleanup pass, no general optimizer.

@@ -63,12 +63,10 @@ function borrows its input tree and leaves its lifetime to the caller, which
 supports incremental parsing. Compiler-created parser trees use the owned path
 for source files, preludes, and embedded UTU DSLs.
 
-`buildModule` transfers a Binaryen module to its caller only on success. Failed
-construction disposes it. `emitBinary` and `emitText` own the returned module and
-always dispose it, including failures in validation, optimization, emission, or
-artifact reporting. Optimization temporarily changes Binaryen's global settings
-and restores them on both success and failure. Invalid output modes fail before
-allocating a module.
+`buildModule` returns a module of the wasm backend (`src/compiler/wasm/`, see
+docs/wasm-backend.md): plain JavaScript objects, with nothing to dispose.
+`emitBinary` encodes it and has the engine validate the bytes; `emitText` prints
+it.
 
 ## Source indexes and imports
 

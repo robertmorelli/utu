@@ -6,8 +6,8 @@ import { emitBinary } from '../src/index.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // One test per file, so the runner can spread them across workers. Codegen is
-// validated at -O0; `wasm-fingerprints.mjs --optimized` runs Binaryen's
-// optimizer over every example.
+// validated at -O0; `wasm-fingerprints.mjs --optimized` builds every example
+// at -Oz and -O3 too.
 export function registerExamplesConformanceTests({ test, assertNoErrors, makeCompiler }) {
   for (const file of utuFiles(path.join(ROOT, 'examples'))) {
     const name = path.relative(ROOT, file);

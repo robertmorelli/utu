@@ -2,7 +2,7 @@
 //
 //   node scripts/wasm-fingerprints.mjs --record        record .tmp/wasm-fingerprints.json
 //   node scripts/wasm-fingerprints.mjs                 compare against it
-//   ... --optimized       also check -Oz and -O3 (Binaryen's optimizer runs; slower)
+//   ... --optimized       also check -Oz and -O3 (with the local cleanup)
 //   ... --only=substring  just the matching programs
 //   ... --jobs=N          worker threads (default: one per core)
 //   ... --corpus          also the programs in .tmp/corpus (the syntax corpus)

@@ -4,7 +4,7 @@
 // its length, and on first use small helpers for push/reserve/resize. Element
 // i lives at byte i << shift, so a read is one load with no base pointer and
 // no explicit bounds check (the engine's guard pages bound the memory).
-import { binaryen } from './types.js';
+import { wasm } from './types.js';
 
 // The largest memory whose byte size still fits in an i32 (4 GiB - 64 KiB).
 const MAX_PAGES = 65535;
@@ -32,25 +32,20 @@ export function readMems(root) {
 }
 
 /**
- * A module that already declares every mem's memory. binaryen.js can set only
- * one memory through its API, so the memories come from text.
+ * A module that declares every mem's memory. A host mem (copy_in, view) is
+ * created by the host and imported.
  */
 export function moduleWithMemories(mems) {
-  if (!mems.length) return new binaryen.Module();
-  // A host mem (copy_in, view) is created by the host and imported, and text
-  // requires imports before definitions.
-  const ordered = [...mems.filter(mem => mem.host), ...mems.filter(mem => !mem.host)];
-  const memories = ordered.map(({ name, export: exported, host, data }) => {
-    const exportClause = exported ? ` (export "${name}")` : '';
-    const pages = initialPages(data);
-    return host
-      ? `(memory $${name}${exportClause} (import "utu" "mem_${name}") ${pages} ${MAX_PAGES})`
-      : `(memory $${name}${exportClause} ${pages} ${MAX_PAGES})`;
-  });
+  const m = new wasm.Module();
+  for (const { name, export: exported, host, data } of mems) {
+    m.addMemory({
+      name, initial: initialPages(data), maximum: MAX_PAGES, exported: Boolean(exported),
+      import: host ? { module: 'utu', base: `mem_${name}` } : null,
+    });
+  }
   // An initialized mem is filled by an active data segment at instantiation.
-  const segments = mems.filter(mem => mem.data).map(({ name, data }) =>
-    `(data (memory $${name}) (i32.const 0) "${[...base64Bytes(data)].map(byte => `\\${byte.toString(16).padStart(2, '0')}`).join('')}")`);
-  return binaryen.parseText(`(module ${memories.join(' ')} ${segments.join(' ')})`);
+  for (const { name, data } of mems) if (data) m.addDataSegment(name, 0, base64Bytes(data));
+  return m;
 }
 
 function base64Bytes(text) {
@@ -64,10 +59,10 @@ export function initialPages(data) {
 
 export function declareMemoryGlobals(m, mems) {
   for (const { name, host, count = 0 } of mems) {
-    m.addGlobal(lengthGlobal(name), binaryen.i32, true, m.i32.const(count));
+    m.addGlobal(lengthGlobal(name), wasm.i32, true, m.i32.const(count));
     if (!host) continue;
-    m.addFunctionImport(`__mem_copy_in_${name}`, 'utu', `mem_copy_in_${name}`, binaryen.externref, binaryen.i32);
-    m.addFunctionImport(`__mem_view_${name}`, 'utu', `mem_view_${name}`, binaryen.createType([binaryen.i32, binaryen.i32]), binaryen.externref);
+    m.addFunctionImport(`__mem_copy_in_${name}`, 'utu', `mem_copy_in_${name}`, wasm.externref, wasm.i32);
+    m.addFunctionImport(`__mem_view_${name}`, 'utu', `mem_view_${name}`, wasm.createType([wasm.i32, wasm.i32]), wasm.externref);
   }
 }
 
@@ -87,14 +82,14 @@ export function emitMemIntrinsic(opNode, argNodes, ctx, emitExpr) {
   switch (opNode.localName) {
     case 'ir-mem-get': return ops[kind.load](0, 1 << kind.shift, address(args[0]), name);
     case 'ir-mem-set': return ops[kind.store](0, 1 << kind.shift, address(args[0]), args[1], name);
-    case 'ir-mem-len': return m.global.get(lengthGlobal(name), binaryen.i32);
+    case 'ir-mem-len': return m.global.get(lengthGlobal(name), wasm.i32);
     case 'ir-mem-cap': return capacity(m, name, kind);
     case 'ir-mem-clear': return m.global.set(lengthGlobal(name), m.i32.const(0));
-    case 'ir-mem-copy-in': return m.global.set(lengthGlobal(name), m.call(`__mem_copy_in_${name}`, args, binaryen.i32));
-    case 'ir-mem-view': return m.call(`__mem_view_${name}`, args, binaryen.externref);
-    case 'ir-mem-push': return m.call(ensureHelpers(ctx, name, kind).push, args, binaryen.none);
-    case 'ir-mem-reserve': return m.call(ensureHelpers(ctx, name, kind).reserve, args, binaryen.none);
-    case 'ir-mem-resize': return m.call(ensureHelpers(ctx, name, kind).resize, args, binaryen.none);
+    case 'ir-mem-copy-in': return m.global.set(lengthGlobal(name), m.call(`__mem_copy_in_${name}`, args, wasm.i32));
+    case 'ir-mem-view': return m.call(`__mem_view_${name}`, args, wasm.externref);
+    case 'ir-mem-push': return m.call(ensureHelpers(ctx, name, kind).push, args, wasm.none);
+    case 'ir-mem-reserve': return m.call(ensureHelpers(ctx, name, kind).reserve, args, wasm.none);
+    case 'ir-mem-resize': return m.call(ensureHelpers(ctx, name, kind).resize, args, wasm.none);
     default: throw new Error(`codegen: no mem intrinsic <${opNode.localName}>`);
   }
 }
@@ -116,7 +111,7 @@ function ensureHelpers(ctx, name, kind) {
   if (!HELPERS.has(m)) HELPERS.set(m, new Map());
   const added = HELPERS.get(m);
   if (added.has(name)) return added.get(name);
-  const i32 = binaryen.i32;
+  const i32 = wasm.i32;
   const helpers = { reserve: `__mem_reserve_${name}`, push: `__mem_push_${name}`, resize: `__mem_resize_${name}` };
   added.set(name, helpers);
 
@@ -125,7 +120,7 @@ function ensureHelpers(ctx, name, kind) {
   const perPage = 1 << (16 - kind.shift);
   const need = m.i32.shr_u(m.i32.add(m.local.get(0, i32), m.i32.const(perPage - 1)), m.i32.const(16 - kind.shift));
   const grew = delta => m.i32.ne(m.memory.grow(delta, name), m.i32.const(-1));
-  m.addFunction(helpers.reserve, i32, binaryen.none, [i32, i32], m.block(null, [
+  m.addFunction(helpers.reserve, i32, wasm.none, [i32, i32], m.block(null, [
     m.local.set(1, need),
     m.local.set(2, m.memory.size(name)),
     m.if(m.i32.gt_u(m.local.get(1, i32), m.local.get(2, i32)), m.block(null, [
@@ -138,19 +133,19 @@ function ensureHelpers(ctx, name, kind) {
   ]));
 
   // push(v): reserve one more when full, store at len, then len += 1.
-  const valueType = binaryen[kind.type];
+  const valueType = wasm[kind.type];
   const address = index => (kind.shift ? m.i32.shl(index, m.i32.const(kind.shift)) : index);
-  m.addFunction(helpers.push, valueType, binaryen.none, [i32], m.block(null, [
+  m.addFunction(helpers.push, valueType, wasm.none, [i32], m.block(null, [
     m.local.set(1, m.global.get(lengthGlobal(name), i32)),
     m.if(m.i32.ge_u(m.local.get(1, i32), capacity(m, name, kind)),
-      m.call(helpers.reserve, [m.i32.add(m.local.get(1, i32), m.i32.const(1))], binaryen.none)),
+      m.call(helpers.reserve, [m.i32.add(m.local.get(1, i32), m.i32.const(1))], wasm.none)),
     m[kind.type][kind.store](0, 1 << kind.shift, address(m.local.get(1, i32)), m.local.get(0, valueType), name),
     m.global.set(lengthGlobal(name), m.i32.add(m.local.get(1, i32), m.i32.const(1))),
   ]));
 
   // resize(n): reserve(n), then len = n. Elements keep whatever they held.
-  m.addFunction(helpers.resize, i32, binaryen.none, [], m.block(null, [
-    m.call(helpers.reserve, [m.local.get(0, i32)], binaryen.none),
+  m.addFunction(helpers.resize, i32, wasm.none, [], m.block(null, [
+    m.call(helpers.reserve, [m.local.get(0, i32)], wasm.none),
     m.global.set(lengthGlobal(name), m.local.get(0, i32)),
   ]));
   return helpers;

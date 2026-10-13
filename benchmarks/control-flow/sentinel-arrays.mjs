@@ -7,8 +7,13 @@
 // Both still pay the engine's array.get bounds check: WasmGC has no
 // unchecked array access, so a sentinel can only replace the loop's own
 // `i < len` compare, never the hidden one.
-import binaryen from 'binaryen';
 import { gzipSync } from 'node:zlib';
+
+// This measurement compiles hand-written wasm text with Binaryen's optimizer,
+// which the compiler does not depend on.
+const { default: binaryen } = await import('binaryen').catch(() => {
+  throw new Error('sentinel-arrays.mjs needs Binaryen: npm install --no-save binaryen');
+});
 
 const FEATURES = binaryen.Features.GC | binaryen.Features.ReferenceTypes | binaryen.Features.BulkMemory | binaryen.Features.SignExt | binaryen.Features.NontrappingFPToInt | binaryen.Features.MutableGlobals | binaryen.Features.Multivalue;
 const N = 1 << 20;            // elements per array

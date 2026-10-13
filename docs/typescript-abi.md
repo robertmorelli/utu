@@ -263,8 +263,8 @@ Builds optimize for size (`-Oz`, the default) or speed (`-O3`); pass
 reads and writes, method calls, and global reads share one import per shape,
 such as `(self,k) => self[k]`, with the name passed from Wasm as a string
 constant; JS string builtins make those constants free. Under `-O3`, each name
-keeps its own import, so every JavaScript access site stays monomorphic, and
-Binaryen skips its shrinking pass. Named package imports are never shared,
+keeps its own import, so every JavaScript access site stays monomorphic.
+Named package imports are never shared,
 because bundlers need them for tree shaking.
 
 | App | `-Oz` total gzip | `-O3` total gzip |

@@ -1,28 +1,28 @@
-// codegen/types.js — utu type strings / registry reprs → binaryen type ids
+// codegen/types.js — utu type strings / registry reprs → wasm types
 //
 // The compiler stamps `data-type-name` strings like "I32", "F64", "Bool", "void",
-// "?Foo", or a struct/array name. This module maps those strings to the
-// numeric type ids used by binaryen.js.
+// "?Foo", or a struct/array name. This module maps those strings to the wasm
+// types of the backend (../wasm/types.js).
 //
-// Binaryen exposes five scalar namespaces and a small set of builtin ref
-// type ids. The stdlib declares which family/builtin a type uses; this file
-// validates those declared names and indexes binaryen by them.
+// Wasm has five scalar types and a small set of builtin reference types. The
+// stdlib declares which family/builtin a type uses; this file validates those
+// declared names and looks the wasm types up by them.
 //
 // Entry points:
-//   utuToBinaryenType(typeStr)
+//   builtinWasmType(typeStr)
 //     Minimal fallback for compiler-only type spellings like `void`.
 //   makeTypeMapper(structTypes)
-//     Returns a `(typeStr) => binaryen type id` closure that resolves type
+//     Returns a `(typeStr) => wasm type` closure that resolves type
 //     names through the registry built by `buildModule()` (see ./index.js).
 //
 // Reference types still throw when unknown — we want the gap to surface the
 // moment a test exercises an un-implemented type rather than silently emit
 // garbage.
 
-import binaryen from 'binaryen';
+import { wasm } from '../wasm/index.js';
 import { tupleParts } from '../type-strings.js';
 import { typeNodeToStr, fnReturnType, declaredTypeStr } from '../ir-helpers.js';
-import { WASM_REF_BINARYEN_TYPES, WASM_SCALAR_FAMILIES } from '../link-type-decls.js';
+import { WASM_REF_TYPES, WASM_SCALAR_FAMILIES } from '../link-type-decls.js';
 
 // The registry owns this; re-exported so codegen keeps one type-related import.
 export { collectScalarKinds } from '../link-type-decls.js';
@@ -30,33 +30,33 @@ import { unwrapNullable } from '../type-strings.js';
 
 // Re-export so codegen modules can import everything type-related from one
 // place without crossing a directory boundary on every line.
-export { typeNodeToStr, fnReturnType, declaredTypeStr, binaryen };
+export { typeNodeToStr, fnReturnType, declaredTypeStr, wasm };
 
-export function utuToBinaryenType(typeStr) {
-  if (!typeStr) return binaryen.none;
-  if (typeStr === 'void') return binaryen.none;
+export function builtinWasmType(typeStr) {
+  if (!typeStr) return wasm.none;
+  if (typeStr === 'void') return wasm.none;
   throw new Error(`codegen: unsupported builtin type "${typeStr}"`);
 }
 
-export function scalarFamilyToBinaryenType(family) {
+export function scalarFamilyToWasmType(family) {
   assertScalarFamily(family);
-  return binaryen[family];
+  return wasm[family];
 }
 
-export function refBinaryenNameToType(name) {
-  assertRefBinaryenName(name);
-  return binaryen[name];
+export function refNameToWasmType(name) {
+  assertRefName(name);
+  return wasm[name];
 }
 
 export function assertScalarFamily(family) {
-  if (!WASM_SCALAR_FAMILIES.has(family) || binaryen[family] == null) {
+  if (!WASM_SCALAR_FAMILIES.has(family) || wasm[family] == null) {
     throw new Error(`codegen: unsupported wasm scalar family "${family}"`);
   }
 }
 
-export function assertRefBinaryenName(name) {
-  if (!WASM_REF_BINARYEN_TYPES.has(name) || binaryen[name] == null) {
-    throw new Error(`codegen: unsupported binaryen ref type "${name}"`);
+export function assertRefName(name) {
+  if (!WASM_REF_TYPES.has(name) || wasm[name] == null) {
+    throw new Error(`codegen: unsupported wasm ref type "${name}"`);
   }
 }
 
@@ -66,15 +66,15 @@ export function assertRefBinaryenName(name) {
  *
  * @param {Map<string, StructTypeInfo>} structTypes  from buildHeapTypes()
  *   for the StructTypeInfo shape.
- * @returns {(typeStr: string) => number}  binaryen type id
+ * @returns {(typeStr: string) => number}  wasm type id
  */
 export function makeTypeMapper(structTypes) {
   return function toType(typeStr) {
-    if (!typeStr) return binaryen.none;
-    if (typeStr === 'void' || typeStr === 'never') return binaryen.none;
+    if (!typeStr) return wasm.none;
+    if (typeStr === 'void' || typeStr === 'never') return wasm.none;
     // A tuple is a wasm multi-value type.
     const tuple = tupleParts(typeStr);
-    if (tuple) return binaryen.createType(tuple.map(toType));
+    if (tuple) return wasm.createType(tuple.map(toType));
 
     // Nullable prefix: "?Foo" — strip and use the nullable ref form.
     let nullable = false;
@@ -92,7 +92,7 @@ export function makeTypeMapper(structTypes) {
 
     if (info.scalarFamily) {
       if (nullable) throw new Error(`codegen: scalar type "${name}" cannot be nullable`);
-      return info.binaryenType;
+      return info.wasmType;
     }
 
     if (info.refType != null) return nullable ? info.nullableRefType : info.refType;
@@ -102,7 +102,7 @@ export function makeTypeMapper(structTypes) {
 }
 
 /**
- * Build a `(typeName) => binaryenNamespace | null` lookup against the
+ * Build a `(typeName) => wasmNamespace | null` lookup against the
  * stdlib-sourced type registry.  Consumed anywhere codegen needs to pick a
  * `m[ns]` namespace (literal constants, numeric comparisons, arithmetic)
  * from a utu type name.  Returns null for non-scalar names.
@@ -118,7 +118,7 @@ export function makeScalarNamespaceLookup(structTypes) {
   return function scalarNamespaceOf(typeStr) {
     if (!typeStr) return null;
     const name = unwrapNullable(typeStr);
-    return structTypes.get(name)?.binaryenNamespace ?? null;
+    return structTypes.get(name)?.wasmNamespace ?? null;
   };
 }
 

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import binaryen from 'binaryen';
+import { exportFunctions } from './wasm-exports.mjs';
 import { createCompiler, emitBinary, initParser, instantiateLowered } from '../src/index.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -92,16 +92,7 @@ function compileRust(source, output, safe = false) {
 }
 
 function addSafeRustExport(bytes) {
-  const module = binaryen.readBinary(bytes);
-  const names = Array.from({ length: module.getNumFunctions() }, (_, index) =>
-    binaryen.getFunctionInfo(module.getFunctionByIndex(index)).name);
-  const run = names.find(name => name.includes('run17h'));
-  if (!run) throw new Error('rust-safe.rs: retained run function not found');
-  module.addFunctionExport(run, 'run');
-  module.runPasses(['strip']);
-  const emitted = module.emitBinary();
-  module.dispose();
-  return emitted;
+  return exportFunctions(bytes, [['run17h', 'run']]);
 }
 
 async function compileUtu() {

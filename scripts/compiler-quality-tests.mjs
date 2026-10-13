@@ -1,7 +1,7 @@
 import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
 import { lowerClosures } from '../src/compiler/lower-closures.js';
-import { emitBinary, emitText, buildModule, JS_STRING_BUILTINS_COMPILE_OPTIONS } from '../src/compiler/codegen/index.js';
-import { binaryen } from '../src/compiler/codegen/types.js';
+import { emitBinary, emitText, JS_STRING_BUILTINS_COMPILE_OPTIONS } from '../src/compiler/codegen/index.js';
+import { wasm } from '../src/compiler/wasm/index.js';
 
 export function registerCompilerQualityTests({ test, assert, assertEq, assertThrows, makeCompiler, assertNoErrors }) {
   const compile = (ROOT, source, name) => compileAndInstantiate({
@@ -124,36 +124,11 @@ export function registerCompilerQualityTests({ test, assert, assertEq, assertThr
     assertEq(instance.exports.run(), 42);
   });
 
-  // Failure injection exercises native resource ownership, where a thrown
-  // optimizer/emitter previously leaked a Binaryen module in long-lived IDEs.
-  for (const phase of ['construction', 'validation', 'optimization', 'binary', 'text']) {
-    test(`compiler: Binaryen module disposed after ${phase} failure`, async ({ ROOT }) => {
-      const { doc } = await compile(ROOT, 'export lib { fn run() I32 { 42; } }', `quality-dispose-${phase}.utu`);
-      const Original = binaryen.Module;
-      const optimize = binaryen.getOptimizeLevel();
-      const shrink = binaryen.getShrinkLevel();
-      let disposed = 0;
-      binaryen.Module = function () {
-        const module = new Original();
-        const dispose = module.dispose.bind(module);
-        module.dispose = () => { disposed++; dispose(); };
-        const method = { construction: 'setFeatures', validation: 'validate', optimization: 'optimize', binary: 'emitBinary', text: 'emitText' }[phase];
-        module[method] = () => { throw new Error(`injected ${phase}`); };
-        return module;
-      };
-      try {
-        assertThrows(() => phase === 'text' ? emitText(doc) : phase === 'construction' ? buildModule(doc) : emitBinary(doc), `injected ${phase}`);
-        assertEq(disposed, 1);
-        assertEq(binaryen.getOptimizeLevel(), optimize);
-        assertEq(binaryen.getShrinkLevel(), shrink);
-      } finally {
-        binaryen.Module = Original;
-      }
-    });
-  }
-
-  test('compiler: invalid emission mode fails before module construction', () => {
-    assertThrows(() => emitBinary(null, { stringMode: 'typo' }), 'unknown stringMode');
+  test('compiler: an invalid module is reported with the engine\'s reason', () => {
+    const m = new wasm.Module();
+    m.addFunction('bad', wasm.none, wasm.i32, [], m.f64.const(1));
+    m.addFunctionExport('bad', 'bad');
+    assertThrows(() => m.emitBinary(), 'wasm validation failed');
     assert(Object.isFrozen(JS_STRING_BUILTINS_COMPILE_OPTIONS.builtins));
   });
 }

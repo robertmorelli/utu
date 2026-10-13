@@ -83,6 +83,14 @@ Done, each change checked against the invariants below:
    switch rather than closures.
 4. **Tooling**: `-O0` builds; parallel tests; per-pass timings
    (`UTU_TIMINGS=1`).
+5. **Types and facts** (docs/fact-store.md): types are interned in a type
+   table; the type graph keeps its facts in columns; the program is
+   analyzed once, as written, and lowerings record the facts of what they
+   build (typed builders), so the lowered program is not analyzed again.
+6. **utu's own wasm backend** (`src/compiler/wasm/`, docs/wasm-backend.md)
+   replaces Binaryen: codegen builds modules with the same interface, and
+   the backend encodes them, sweeps what exports do not reach, and lowers
+   strings to the JS string builtins. Emitting is 10-40x faster.
 
 What we learned that changes the plan:
 
@@ -90,18 +98,27 @@ What we learned that changes the plan:
   ~17 attributes and are cloned constantly (`expressionFromSource`, module
   instantiation), so per-attribute columns make every clone scan every
   column. Columns belong in the utu port, where facts are typed fields.
-- Binaryen's optimizer barely matters for speed (jpl: within noise to +10%),
-  so `-O0` is the development default; `-O3` stays for shipping.
+- Binaryen's optimizer barely mattered for speed (jpl: within noise to
+  +10%), so it is gone. `-Oz` and `-O3` run a local cleanup (copies,
+  temporaries, unused locals), which keeps consumed generators zero-cost;
+  `-Oz` binaries are 10-25% larger than Binaryen's.
 - The two semantic rebuilds after lowering (operators and closures; alt and
-  promote) are now the largest cost, ~40% of a large build. Each rebuilds
-  the type graph from scratch because lowerings edit the tree.
+  promote) were the largest cost, ~40% of a large build. Typed builders
+  removed them.
 
 ### The invariants
 
 Every change keeps all of these identical:
 
-- `scripts/wasm-fingerprints.mjs [--optimized]`: the wasm of every program
-  under `examples/` and `benchmarks/` at `-O0`, `-Oz`, and `-O3`.
+- `scripts/wasm-fingerprints.mjs [--optimized] [--corpus]`: the wasm of
+  every program under `examples/` and `benchmarks/` (and the syntax corpus)
+  at `-O0`, `-Oz`, and `-O3`. Re-recorded once, when the backend replaced
+  Binaryen.
+- `scripts/run-differential.mjs [--optimize=…]`: what every program does
+  when run (each zero-argument export and test: results, traps, output),
+  recorded with Binaryen; the new backend matches it at every level.
+- Debug builds analyze the lowered program from scratch and compare what
+  codegen will ask with the facts the lowerings carried.
 - `scripts/behavior-fingerprints.mjs`: for every `.utu` file and the
   negative corpus, the diagnostics (raw and formatted), the editor's range
   entries, every editor query (explain, definition, references, call
@@ -113,18 +130,13 @@ Every change keeps all of these identical:
 
 ### Next
 
-1. **Passes onto node accessors.** Replace selector strings and `dataset`
-   reads in passes with accessors by node kind (`callArgs(call)`,
-   `fnBody(fn)`, …) and attribute fields. This is what the port needs (each
-   accessor becomes a column read in utu) and it removes most of the
-   remaining DOM-layer cost. Hottest first: the type graph, bindings, call
-   and control-flow graphs, the backend plan, then the lowerings.
-2. **Lowerings produce typed nodes.** Once facts are read through
-   accessors, a lowering can record the facts of what it creates (types,
-   bindings, call targets) instead of the compiler re-solving the whole
-   program; debug builds cross-check against a full rebuild.
-3. **Facts out of attributes.** Analyses read graph facts, not projected
-   `data-*` attributes; the projection remains only for the editor views.
+1. **Passes onto node accessors.** Replace the remaining selector strings
+   in passes with accessors by node kind (`childOf`, `argsOf`, …). This is
+   what the port needs (each accessor becomes a column read in utu).
+2. **Facts out of attributes.** The surface analysis still seeds types from
+   `data-type-name` and the earlier lowerings copy types through
+   attributes; analyses should read graph facts, with the projection only
+   for the editor views.
 
 ## Plan B: the compiler in utu
 
@@ -151,10 +163,10 @@ mem per hot column.
    the negative corpus.
 4. **Lowerings**: generators, iterators, mems, integer enums, distinct types,
    tuples, closures, operators, alt and promote.
-5. **Codegen** straight to wasm bytes, including the WasmGC type section.
-   Binaryen stays as a host-side optimizer that reads those bytes. The
-   invariant is the same: byte-identical wasm against Plan A on every
-   program, before optimization.
+5. **Codegen** straight to wasm bytes, including the WasmGC type section,
+   as `src/compiler/wasm/` does in JavaScript (interned types, expression
+   trees, an encoder). The invariant is the same: byte-identical wasm
+   against Plan A on every program.
 6. **Bootstrap.** Plan A builds the utu compiler (stage 1), stage 1 builds
    stage 2, stage 2 builds stage 3, and stages 2 and 3 must be identical.
    The bundle ships stage 2; the JavaScript compiler stays as stage 0.
@@ -163,7 +175,6 @@ mem per hot column.
 
 - The TypeScript `.d.ts` linker, which uses TypeScript's own compiler; utu
   reads the JSON ABI it produces.
-- Binaryen's optimizer.
 - The CLI, the VS Code extension, file and process I/O (through `copy_in`
   and `view`).
 - DSL expanders (`@json`, Wutu, CSS, `@stored`) at first. They turn text into

@@ -10,10 +10,9 @@ Status legend (right-hand margin on each item):
 - **STUB** — the codegen path exists and throws an explicit "not yet implemented" error; lowering plan is fixed
 - **PLAN** — no code yet; lowering plan is fixed but the IR may not even reach codegen
 
-Wasm dialect: WasmGC + reference types + bulk memory + mutable globals.
-Today's binaryen feature flags (`codegen/index.js`) only enable
-`MutableGlobals | BulkMemory`; everything reference-typed will require flipping
-on `GC | ReferenceTypes` (and `SIMD128` for V128) before it can validate.
+Wasm dialect: WasmGC + reference types + bulk memory + mutable globals,
+emitted by utu's own backend (docs/wasm-backend.md), which has no feature
+flags: a module uses what its code uses.
 
 ---
 
@@ -537,7 +536,7 @@ which form the user wrote.
 (struct.get $T $field <expr>)
 ```
 
-Stamped with the field's binaryen type at heap-type registration time
+Stamped with the field's wasm type at heap-type registration time
 (`buildHeapTypes` in `codegen/heap-types.js`); `emitFieldGet` looks up the
 field index by name and emits `struct.get` with `signed=false`.
 
@@ -851,9 +850,9 @@ e.g. `<ir-i32-add/>` into `m.i32.add`.
 
 ### `@wat/\ body \/`                                                     **PLAN**
 
-Raw WAT injection. The plugin parses the WAT to a binaryen expression ref
-(via `module.parseText`) and returns it for inline use. Useful for
-prototyping ops binaryen.js doesn't yet bind.
+Raw WAT injection. The plugin would parse the WAT to backend expressions
+and return them for inline use. Useful for prototyping ops codegen does not
+yet emit.
 
 ---
 
@@ -906,28 +905,11 @@ ir-fn's name is fully mangled and every type ref is concrete.
 
 ---
 
-## 17. Cross-cutting: feature flags                                      **DONE / PLAN**
+## 17. Cross-cutting: feature flags                                      **DONE**
 
-`codegen/index.js` sets binaryen features. Today:
-
-```js
-m.setFeatures(binaryen.Features.MutableGlobals | binaryen.Features.BulkMemory);
-```
-
-When ref types land:
-
-```js
-m.setFeatures(
-  binaryen.Features.MutableGlobals |
-  binaryen.Features.BulkMemory     |
-  binaryen.Features.ReferenceTypes |
-  binaryen.Features.GC             |
-  binaryen.Features.SIMD128            // only if V128 used
-);
-```
-
-Setting features early matters — binaryen rejects ref-typed expressions
-under the default flag set.
+There are none. The backend (docs/wasm-backend.md) emits WasmGC, reference
+types, exception handling, multi-memory, multi-value, and SIMD as the code
+uses them, and the engine validates the result.
 
 ---
 
@@ -940,7 +922,7 @@ WebAssembly.instantiate → call):
   - exercises: `+ - * & ^ << `, free-fn `call`, multi-let, wrapper inlining
 - `codegen: control flow (if/while)`
   - exercises: `if/else` expression form, `while`, mutable locals,
-    binaryen `block` typing for void body statements
+    block typing for void body statements
 - `codegen: match lowers dense patterns to br_table and sparse to if/else`
   - exercises: both `emitMatchTable` and `emitMatchChain` paths
 

@@ -1,4 +1,4 @@
-// codegen/fn.js — emit a single ir-fn into the binaryen Module
+// codegen/fn.js — emit a single ir-fn into the wasm Module
 //
 // emitFn(fn, ctx) reads:
 //   • params from <ir-param-list>
@@ -6,14 +6,14 @@
 //   • body from <ir-block>
 //
 // Locals (ir-let) are appended to a per-fn list as they're encountered, so the
-// binaryen function gets the right `varTypes` array.  Each binding (param or
+// wasm function gets the right `varTypes` array.  Each binding (param or
 // let) is registered in `locals` keyed by node id, matching the data-binding-id
 // stamped by resolveBindings.
 //
 // Type resolution goes through `ctx.toType` (built by codegen/index.js) so
 // struct names resolve to ref types alongside scalars.
 
-import { binaryen, fnReturnType, declaredTypeStr } from './types.js';
+import { wasm, fnReturnType, declaredTypeStr } from './types.js';
 import { emitExpr } from './expr.js';
 import { noteFunction } from './explainability.js';
 import { bodyOf, childOf, paramsOf, selfParamOf } from '../ir-helpers.js';
@@ -61,8 +61,8 @@ export function emitFn(fn, ctx) {
     locals,
     debugExprs: [],
     addLocal(typeStr) {
-      // A Utu type name, or a binaryen type for codegen-private locals.
-      const tId = typeof typeStr === 'number' ? typeStr : ctx.toType(typeStr);
+      // A Utu type name, or a wasm type for codegen-private locals.
+      const tId = typeof typeStr === 'string' ? ctx.toType(typeStr) : typeStr;
       const idx = paramTypes.length + varTypes.length;
       varTypes.push(tId);
       return idx;
@@ -72,14 +72,14 @@ export function emitFn(fn, ctx) {
   // ── Body ──────────────────────────────────────────────────────────────────
   const body = bodyOf(fn);
   let bodyExpr = body ? emitExpr(body, fnCtx) : m.nop();
-  const bodyType = binaryen.getExpressionType(bodyExpr);
-  if (retType === binaryen.none && bodyType !== binaryen.none && bodyType !== binaryen.unreachable) {
+  const bodyType = wasm.getExpressionType(bodyExpr);
+  if (retType === wasm.none && bodyType !== wasm.none && bodyType !== wasm.unreachable) {
     bodyExpr = m.drop(bodyExpr);
   }
 
   const funcRef = m.addFunction(
     name,
-    binaryen.createType(paramTypes),
+    wasm.createType(paramTypes),
     retType,
     varTypes,
     bodyExpr,

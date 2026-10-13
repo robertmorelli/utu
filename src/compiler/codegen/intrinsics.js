@@ -1,4 +1,4 @@
-// codegen/intrinsics.js — primitive IR ops → binaryen module methods
+// codegen/intrinsics.js — primitive IR ops → wasm module methods
 //
 // Every stdlib scalar module wraps a wasm op as a one-statement function.
 // Two flavours:
@@ -22,7 +22,7 @@
 //
 // Reference / i31 / v128 / string ops are not yet supported; they throw.
 
-import { binaryen } from './types.js';
+import { wasm } from './types.js';
 import { emitArrayIntrinsic } from './arrays.js';
 import { emitStringIntrinsic } from './strings.js';
 import { paramsOf, selfParamOf } from '../ir-helpers.js';
@@ -100,12 +100,12 @@ export function describeIntrinsicWrapper(fn, scalarKinds) {
 
 /**
  * Emit a scalar-intrinsic IR tag (e.g. <ir-i32-add>) by recursing into
- * its children and dispatching to the matching binaryen method.  Used by
+ * its children and dispatching to the matching wasm method.  Used by
  * emitExpr for tags inside wrapper bodies (see codegen/expr.js dispatch).
  *
  * @param {Element}  opNode    e.g. <ir-i32-add>
  * @param {object}   ctx       codegen context (module, scalarKinds, …)
- * @param {Function} emitExpr  recursive IR→binaryen emitter
+ * @param {Function} emitExpr  recursive IR→wasm emitter
  */
 export function emitScalarIntrinsic(opNode, ctx, emitExpr) {
   const intr = matchScalarIntrinsic(opNode.localName, ctx.scalarKinds);
@@ -115,21 +115,19 @@ export function emitScalarIntrinsic(opNode, ctx, emitExpr) {
 }
 
 function emitScalar(node, intr, args, ctx) {
-  if (intr.namespace === 'v128' && ctx.requirements) ctx.requirements.conservativeSweep = true;
   if (intr.kind === 'v128' && intr.op === 'const') return emitV128Const(node, ctx.module);
   const space = ctx.module[intr.namespace];
-  // Conversions are nested by source type in binaryen: convert_s_i32 → convert_s.i32.
+  // Conversions are nested by source type in wasm: convert_s_i32 → convert_s.i32.
   const split = intr.op.lastIndexOf('_');
   const holder = typeof space?.[intr.op] === 'function' ? space : space?.[intr.op.slice(0, split)];
   const fn = holder === space ? space?.[intr.op] : holder?.[intr.op.slice(split + 1)];
   if (typeof fn !== 'function') throw new Error(
-    `codegen: binaryen has no ${intr.namespace}.${intr.op} for tag <${node.localName}>`);
+    `codegen: wasm has no ${intr.namespace}.${intr.op} for tag <${node.localName}>`);
   return fn.call(holder, ...args);
 }
 
 export function emitRefIntrinsic(opNode, ctx, emitExpr) {
   if (!EMITTED_REF_OPS.has(opNode.localName)) return null;
-  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const args = [...opNode.children].map(child => emitExpr(child, ctx));
   switch (opNode.localName) {
     case 'ir-i31-new': return ctx.module.ref.i31(args[0]);
@@ -143,7 +141,7 @@ export function emitRefIntrinsic(opNode, ctx, emitExpr) {
     case 'ir-promise-then':
     case 'ir-promise-catch': {
       const field = opNode.localName === 'ir-promise-then' ? 'promise_then' : 'promise_catch';
-      return ctx.module.call(`__utu_${field}`, args, binaryen.none);
+      return ctx.module.call(`__utu_${field}`, args, wasm.none);
     }
     default:
       return null;
@@ -171,7 +169,7 @@ function emitV128Const(opNode, m) {
  * @param {{op:Element, params:string[]}} intr
  * @param {Element[]} callArgNodes  IR arg nodes from the call site
  * @param {object}    ctx           codegen context at the call site
- * @param {Function}  emitExpr      recursive IR→binaryen emitter
+ * @param {Function}  emitExpr      recursive IR→wasm emitter
  */
 export function emitWrapperBody(intr, callArgNodes, ctx, emitExpr) {
   const argByName = new Map();
@@ -189,7 +187,7 @@ export function emitWrapperBody(intr, callArgNodes, ctx, emitExpr) {
  * @param {Element}  opNode    e.g. <ir-i32-add>
  * @param {Element[]} argNodes IR arg nodes
  * @param {object}   ctx       codegen context
- * @param {Function} emitExpr  recursive IR→binaryen emitter
+ * @param {Function} emitExpr  recursive IR→wasm emitter
  */
 export function emitIntrinsic(opNode, argNodes, ctx, emitExpr) {
   const arr = emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr);

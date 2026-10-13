@@ -91,7 +91,7 @@ import {
  *   Reads the UTF-8 contents of a file at the given path.
  *   The implementation is host-specific (fs, vscode.workspace.fs, fetch, …).
  * @property {(path: string, fromPath: string) => string} resolvePath
- * @property {'size' | 'speed' | 'none'} [optimize] -Oz (default) shares host-call imports and shrinks; -O3 specializes them; -O0 specializes them and skips Binaryen's optimizer
+ * @property {'size' | 'speed' | 'none'} [optimize] -Oz (default) shares host-call imports and shrinks; -O3 specializes them; -O0 specializes them and skips the local cleanup
  * @property {(specifier: string, request: { prefix: string, from: string }) => Promise<object>} [resolvePackage]
  *   Link `using X from "npm:pkg"` / `"node:mod"` to a declaration graph. Node
  *   hosts can use tools/dts/packages.mjs; other hosts inject their own.
@@ -452,7 +452,7 @@ ${types.map(type => `    fn __utu_comptime_len_${type}(values: Array[${type}]) I
 `;
     const virtual = `${file.replace(/\.utu$/, '')}.comptime.utu`;
     const nested = createCompiler({
-      // Only the values matter: skip Binaryen's optimizer.
+      // Only the values matter: skip the local cleanup.
       ...env, target: 'normal', optimize: 'none',
       readFile: path => (path === virtual ? Promise.resolve(program) : readFile(path)),
     });

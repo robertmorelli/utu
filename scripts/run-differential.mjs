@@ -5,11 +5,14 @@
 //   node scripts/run-differential.mjs             compare against it
 //   ... --only=substring   just the matching programs
 //   ... --jobs=N           worker threads (default: one per core)
+//   ... --optimize=LEVEL   build at none (default), size, or speed, each with
+//                          its own record
 //
 // Each program under examples/, benchmarks/, and .tmp/corpus is built for its
 // `normal` and `test` targets; every exported function that takes no
 // arguments is called, and its result (or trap), plus what it printed, is
-// recorded. A call that runs longer than a few seconds is recorded as such.
+// recorded. Programs that run longer than a few seconds (after building, which
+// may take longer when the machine is busy) are recorded as such.
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,8 +20,9 @@ import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RECORD = path.join(ROOT, '.tmp', 'run-differential.json');
-const TIMEOUT_MS = 8000;
+const recordFor = optimize => path.join(ROOT, '.tmp', `run-differential${optimize === 'none' ? '' : `.${optimize}`}.json`);
+const BUILD_TIMEOUT_MS = 120_000;
+const RUN_TIMEOUT_MS = 8000;
 
 if (isMainThread) await main();
 else await worker();
@@ -26,6 +30,8 @@ else await worker();
 async function main() {
   const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   const record = process.argv.includes('--record');
+  const optimize = flag('optimize') ?? 'none';
+  const RECORD = recordFor(optimize);
   const only = flag('only');
   const files = [
     ...await programs(path.join(ROOT, 'examples')),
@@ -40,11 +46,16 @@ async function main() {
   await Promise.all(Array.from({ length: jobs }, async () => {
     let thread = null;
     for (let job = queue.shift(); job; job = queue.shift()) {
-      thread ??= new Worker(fileURLToPath(import.meta.url), { workerData: { ROOT } });
+      thread ??= new Worker(fileURLToPath(import.meta.url), { workerData: { ROOT, optimize } });
       const key = `${path.relative(ROOT, job.file)} ${job.target}`;
       const outcome = await new Promise(resolve => {
-        const timer = setTimeout(() => resolve({ timeout: true }), TIMEOUT_MS);
-        thread.once('message', value => { clearTimeout(timer); resolve({ value }); });
+        let timer = setTimeout(() => resolve({ timeout: true }), BUILD_TIMEOUT_MS);
+        thread.on('message', message => {
+          clearTimeout(timer);
+          // Built: from here the program itself runs.
+          if (message === 'running') timer = setTimeout(() => resolve({ timeout: true }), RUN_TIMEOUT_MS);
+          else resolve({ value: message });
+        });
         thread.once('error', error => { clearTimeout(timer); resolve({ value: `worker error: ${error.message}` }); });
         thread.postMessage(job);
       });
@@ -86,7 +97,7 @@ async function worker() {
   const parser = await initParser({ wasmDir: `${workerData.ROOT}/` });
   const compilers = {};
   const compilerFor = target => compilers[target] ??= createCompiler({
-    parser, target, optimize: 'none',
+    parser, target, optimize: workerData.optimize,
     readFile: file => fs.readFile(file, 'utf8'),
     readBinaryFile: file => fs.readFile(file),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
@@ -120,6 +131,7 @@ async function worker() {
       return { instantiate: summarizeError(error) };
     }
     const calls = {};
+    parentPort.postMessage('running');
     for (const [name, value] of Object.entries(instance.exports).sort(([a], [b]) => a.localeCompare(b))) {
       if (typeof value !== 'function' || value.length !== 0) continue;
       printed.length = 0;

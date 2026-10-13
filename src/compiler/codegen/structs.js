@@ -10,7 +10,7 @@
 // Recursive expression emission is injected by expr.js, keeping this module a
 // leaf in the codegen dependency graph.
 
-import { binaryen } from './types.js';
+import { wasm } from './types.js';
 import { childOf } from '../ir-helpers.js';
 
 // ── Emit helpers ─────────────────────────────────────────────────────────────
@@ -23,7 +23,6 @@ import { childOf } from '../ir-helpers.js';
  * doesn't have to match wasm slot order.
  */
 export function emitStructInit(node, ctx, emitExpr) {
-  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const typeName = ctx.typeOf(node) ?? node.getAttribute('type-name');
   if (!typeName) throw new Error('codegen: ir-struct-init has no type');
   const info = ctx.structTypes.get(typeName);
@@ -68,7 +67,6 @@ function emitTagConst(ctx, tagType, tagValue) {
  * before operator lowering, so binary ops over fields work too).
  */
 export function emitFieldGet(node, ctx, emitExpr) {
-  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const recv = node.children[0];
   if (!recv) throw new Error('codegen: ir-field-access has no receiver');
   const recvType = ctx.typeOf(recv);
@@ -96,7 +94,7 @@ export function emitFieldGet(node, ctx, emitExpr) {
   return ctx.module.struct.get(
     field.index,
     recvExpr,
-    field.binaryenType,
+    field.wasmType,
     /*signed=*/false,
   );
 }
@@ -108,7 +106,6 @@ export function emitFieldGet(node, ctx, emitExpr) {
  * treat this as a void expression.
  */
 export function emitFieldSet(assignNode, ctx, emitExpr) {
-  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const lhs = assignNode.children[0];
   const rhs = assignNode.children[1];
   if (!lhs || !rhs) throw new Error('codegen: ir-assign field-set missing lhs/rhs');
@@ -140,12 +137,6 @@ export function emitFieldSet(assignNode, ctx, emitExpr) {
   );
 }
 
-/**
- * `T.null` — emit a typed null reference.
- * Binaryen's `ref.null` expects a *nullable ref type*, not a heap type, so
- * we hand it the registry's `nullableRefType`. Throws for unknown types
- * (string/array null support arrives when those types are registered too).
- */
 function emitProtocolFieldGet(node, recv, protocol, fieldName, ctx, emitExpr) {
   const m = ctx.module;
   const receiverType = ctx.toType(protocol);
@@ -157,7 +148,7 @@ function emitProtocolFieldGet(node, recv, protocol, fieldName, ctx, emitExpr) {
   if (!implementations.length) throw new Error(`codegen: protocol ${protocol}.${fieldName} has no field implementations`);
   for (const { info, field } of implementations.reverse()) {
     const concrete = info.refType;
-    const value = m.struct.get(field.index, m.ref.cast(getReceiver(), concrete), field.binaryenType, false);
+    const value = m.struct.get(field.index, m.ref.cast(getReceiver(), concrete), field.wasmType, false);
     dispatch = m.if(m.ref.test(getReceiver(), concrete), value, dispatch);
   }
   return m.block(null, [m.local.set(receiverSlot, emitExpr(recv, ctx)), dispatch], resultType);
@@ -183,7 +174,7 @@ function emitProtocolFieldSet(lhs, rhs, recv, protocol, fieldName, ctx, emitExpr
     m.local.set(receiverSlot, emitExpr(recv, ctx)),
     m.local.set(valueSlot, emitExpr(rhs, ctx)),
     dispatch,
-  ], binaryen.none);
+  ], wasm.none);
 }
 
 function protocolFieldImplementations(ctx, protocol, fieldName) {
@@ -211,8 +202,12 @@ function resolvedField(node, info, ctx = null) {
   return info.fieldIndex.get(node.getAttribute('field'));
 }
 
+/**
+ * `T.null` — a typed null reference. `ref.null` takes the *nullable ref
+ * type*, so it gets the registry's `nullableRefType`. Throws for unknown
+ * types.
+ */
 export function emitNullRef(node, ctx) {
-  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const typeName = node.getAttribute('type-name');
   if (!typeName) throw new Error('codegen: ir-null-ref missing type-name attribute');
   const info = ctx.structTypes.get(typeName);

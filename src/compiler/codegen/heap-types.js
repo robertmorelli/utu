@@ -3,17 +3,17 @@
 // Consumes the type registry produced by `link-type-decls.js`. This file does
 // NOT re-walk declaration AST and does NOT inspect raw `ir-wasm-*` nodes —
 // every fact (fields, variants, tag type, array elem/mut, scalar family,
-// ref binaryen name) is read directly off registry entries.
+// ref wasm name) is read directly off registry entries.
 //
 // Output: a `Map<typeName, info>` where each `info` extends the registry
-// entry with the binaryen handles codegen needs (heapType, refType,
-// nullableRefType, binaryenType, fieldIndex).
+// entry with the wasm handles codegen needs (heapType, refType,
+// nullableRefType, wasmType, fieldIndex).
 
 import {
-  binaryen,
-  refBinaryenNameToType,
-  scalarFamilyToBinaryenType,
-  utuToBinaryenType,
+  wasm,
+  refNameToWasmType,
+  scalarFamilyToWasmType,
+  builtinWasmType,
 } from './types.js';
 import { callableParts } from '../type-strings.js';
 import { unwrapNullable } from '../type-strings.js';
@@ -24,8 +24,8 @@ export function buildHeapTypes(root, typeIndex) {
   const directTypes = collectDirectTypes(typeIndex);
   const directRefKinds = new Map(
     [...directTypes]
-      .filter(([, info]) => info.refBinaryen != null)
-      .map(([name, info]) => [name, info.refBinaryen]),
+      .filter(([, info]) => info.refWasm != null)
+      .map(([name, info]) => [name, info.refWasm]),
   );
   const directScalarKinds = new Map(
     [...directTypes]
@@ -38,7 +38,7 @@ export function buildHeapTypes(root, typeIndex) {
   const registry = new Map(directTypes);
   if (entries.length === 0) return registry;
 
-  const tb = new binaryen.TypeBuilder(entries.length);
+  const tb = new wasm.TypeBuilder(entries.length);
   const slotByName = new Map(entries.map((entry, slot) => [entry.typeName, slot]));
 
   for (const entry of entries) {
@@ -46,7 +46,7 @@ export function buildHeapTypes(root, typeIndex) {
       tb.setArrayType(
         entry.slot,
         builderValueType(entry.arrayElem, tb, slotByName, directRefKinds, directScalarKinds),
-        binaryen.notPacked,
+        wasm.notPacked,
         entry.arrayMutable,
       );
       continue;
@@ -55,7 +55,7 @@ export function buildHeapTypes(root, typeIndex) {
       entry.slot,
       entry.fields.map((field) => ({
         type: builderValueType(field.type, tb, slotByName, directRefKinds, directScalarKinds),
-        packedType: binaryen.notPacked,
+        packedType: wasm.notPacked,
         mutable: true,
       })),
     );
@@ -77,8 +77,8 @@ export function buildHeapTypes(root, typeIndex) {
     registry.set(entry.typeName, {
       ...entry,
       heapType,
-      refType: binaryen.getTypeFromHeapType(heapType, false),
-      nullableRefType: binaryen.getTypeFromHeapType(heapType, true),
+      refType: wasm.getTypeFromHeapType(heapType, false),
+      nullableRefType: wasm.getTypeFromHeapType(heapType, true),
       fieldIndex: new Map(),
     });
   }
@@ -89,7 +89,7 @@ export function buildHeapTypes(root, typeIndex) {
       entry.fields.map((field, index) => [field.name, {
         index,
         type: field.type,
-        binaryenType: finalValueType(field.type, registry),
+        wasmType: finalValueType(field.type, registry),
       }]),
     );
   }
@@ -104,9 +104,9 @@ function collectDirectTypes(typeIndex) {
       refs.set(name, {
         ...entry,
         heapType: null,
-        refBinaryen: 'anyref',
-        refType: binaryen.anyref,
-        nullableRefType: binaryen.anyref,
+        refWasm: 'anyref',
+        refType: wasm.anyref,
+        nullableRefType: wasm.anyref,
         fieldIndex: new Map(),
       });
       continue;
@@ -114,14 +114,14 @@ function collectDirectTypes(typeIndex) {
     if (entry.kind === 'wasm-scalar') {
       refs.set(name, {
         ...entry,
-        binaryenType: scalarFamilyToBinaryenType(entry.scalarFamily),
-        binaryenNamespace: entry.scalarFamily,
+        wasmType: scalarFamilyToWasmType(entry.scalarFamily),
+        wasmNamespace: entry.scalarFamily,
         fieldIndex: new Map(),
       });
       continue;
     }
     if (entry.kind === 'wasm-ref') {
-      const type = refBinaryenNameToType(entry.refBinaryen);
+      const type = refNameToWasmType(entry.refWasm);
       refs.set(name, {
         ...entry,
         heapType: null,
@@ -135,23 +135,23 @@ function collectDirectTypes(typeIndex) {
 }
 
 function builderValueType(typeStr, tb, slotByName, directRefKinds, directScalarKinds) {
-  if (!typeStr) return binaryen.none;
+  if (!typeStr) return wasm.none;
   const nullable = typeStr.startsWith('?');
   const name = unwrapNullable(typeStr);
   const callable = callableFieldType(name);
   if (callable != null) return callable;
   const scalarFamily = directScalarKinds.get(name);
-  const scalar = scalarFamily ? scalarFamilyToBinaryenType(scalarFamily) : null;
+  const scalar = scalarFamily ? scalarFamilyToWasmType(scalarFamily) : null;
   if (scalar != null) return scalar;
   try {
-    return utuToBinaryenType(typeStr);
+    return builtinWasmType(typeStr);
   } catch {}
   const slot = slotByName.get(name);
   if (slot != null) {
     return tb.getTempRefType(tb.getTempHeapType(slot), nullable);
   }
-  const refBinaryen = directRefKinds.get(name);
-  const direct = refBinaryen ? refBinaryenNameToType(refBinaryen) : null;
+  const refWasm = directRefKinds.get(name);
+  const direct = refWasm ? refNameToWasmType(refWasm) : null;
   if (direct != null) return direct;
   throw new Error(`codegen: unsupported heap field type "${typeStr}"`);
 }
@@ -168,7 +168,7 @@ function builderValueType(typeStr, tb, slotByName, directRefKinds, directScalarK
 function callableFieldType(name) {
   const parts = callableParts(name);
   if (!parts) return null;
-  if (parts.kind === 'cl') return binaryen.externref;
+  if (parts.kind === 'cl') return wasm.externref;
   throw new Error(
     `codegen: "${name}" cannot be a field type — a function reference has no ` +
     `representation inside a heap type yet; declare the field as ` +
@@ -177,9 +177,9 @@ function callableFieldType(name) {
 }
 
 function finalValueType(typeStr, registry) {
-  if (!typeStr) return binaryen.none;
+  if (!typeStr) return wasm.none;
   try {
-    return utuToBinaryenType(typeStr);
+    return builtinWasmType(typeStr);
   } catch {}
 
   const name = unwrapNullable(typeStr);
@@ -189,7 +189,7 @@ function finalValueType(typeStr, registry) {
   if (!info) throw new Error(`codegen: unsupported heap field type "${typeStr}"`);
   if (info.scalarFamily) {
     if (typeStr.startsWith('?')) throw new Error(`codegen: scalar field type "${typeStr}" cannot be nullable`);
-    return info.binaryenType;
+    return info.wasmType;
   }
   return typeStr.startsWith('?') ? info.nullableRefType : info.refType;
 }

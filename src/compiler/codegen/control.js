@@ -18,7 +18,7 @@
 // Supported rec-alt is lowered earlier to ordinary control-flow IR, so any
 // ir-alt reaching this file is a residual unsupported case.
 
-import { binaryen } from './types.js';
+import { wasm } from './types.js';
 import { nextLabel } from './labels.js';
 import { emitDeferred } from './bindings.js';
 import { childOf, childrenOf } from '../ir-helpers.js';
@@ -30,7 +30,7 @@ function loopDeferred(ctx, emitExpr, depth = ctx.loops?.length ?? 0) {
 
 /** Wrap a branch so the deferred statements run first; the branch stays last. */
 function afterDeferred(m, deferred, exit) {
-  return deferred.length ? m.block(null, [...deferred, exit], binaryen.unreachable) : exit;
+  return deferred.length ? m.block(null, [...deferred, exit], wasm.unreachable) : exit;
 }
 
 // ── if / else ────────────────────────────────────────────────────────────────
@@ -44,12 +44,12 @@ export function emitIf(node, ctx, emitExpr) {
   let elseExpr = elseBranch ? emitExpr(elseBranch, ctx) : undefined;
   // Branches whose values cannot meet (a value vs. none, or unrelated scalars)
   // are statements: their values are discarded rather than merged.
-  const type = expr => binaryen.getExpressionType(expr);
-  const valued = expr => ![binaryen.none, binaryen.unreachable].includes(type(expr));
-  const scalar = expr => [binaryen.i32, binaryen.i64, binaryen.f32, binaryen.f64, binaryen.v128].includes(type(expr));
+  const type = expr => wasm.getExpressionType(expr);
+  const valued = expr => ![wasm.none, wasm.unreachable].includes(type(expr));
+  const scalar = expr => [wasm.i32, wasm.i64, wasm.f32, wasm.f64, wasm.v128].includes(type(expr));
   const discard = expr => valued(expr) ? m.drop(expr) : expr;
   if (!elseExpr) thenExpr = discard(thenExpr);
-  else if (valued(thenExpr) !== valued(elseExpr) && type(thenExpr) !== binaryen.unreachable && type(elseExpr) !== binaryen.unreachable
+  else if (valued(thenExpr) !== valued(elseExpr) && type(thenExpr) !== wasm.unreachable && type(elseExpr) !== wasm.unreachable
     || valued(thenExpr) && valued(elseExpr) && type(thenExpr) !== type(elseExpr) && (scalar(thenExpr) || scalar(elseExpr))) {
     thenExpr = discard(thenExpr); elseExpr = discard(elseExpr);
   }
@@ -68,7 +68,7 @@ const tagged = new WeakSet();
 export function emitTry(node, ctx, emitExpr) {
   const m = ctx.module;
   if (!tagged.has(m)) {
-    m.addTagImport(JS_TAG, 'utu', 'js_tag', binaryen.externref, binaryen.none);
+    m.addTagImport(JS_TAG, 'utu', 'js_tag', wasm.externref, wasm.none);
     tagged.add(m);
   }
   const [body, handler] = [...node.children];
@@ -76,24 +76,24 @@ export function emitTry(node, ctx, emitExpr) {
   let handlerExpr = emitExpr(handler, ctx);
   // An unnamed exception is still on the stack and must be popped.
   if (!handler.querySelector(':scope > ir-let > ir-caught')) {
-    handlerExpr = m.block(null, [m.drop(emitCaught(m)), handlerExpr], binaryen.getExpressionType(handlerExpr));
+    handlerExpr = m.block(null, [m.drop(emitCaught(m)), handlerExpr], wasm.getExpressionType(handlerExpr));
   }
-  const type = expr => binaryen.getExpressionType(expr);
+  const type = expr => wasm.getExpressionType(expr);
   if (ctx.typeOf(node) === 'void' || !ctx.typeOf(node)) {
-    if (![binaryen.none, binaryen.unreachable].includes(type(bodyExpr))) bodyExpr = m.drop(bodyExpr);
-    if (![binaryen.none, binaryen.unreachable].includes(type(handlerExpr))) handlerExpr = m.drop(handlerExpr);
+    if (![wasm.none, wasm.unreachable].includes(type(bodyExpr))) bodyExpr = m.drop(bodyExpr);
+    if (![wasm.none, wasm.unreachable].includes(type(handlerExpr))) handlerExpr = m.drop(handlerExpr);
   }
   return m.try(null, bodyExpr, [JS_TAG], [handlerExpr], null);
 }
 
 export function emitCaught(m) {
-  return binaryen._BinaryenPop(m.ptr, binaryen.externref);
+  return m.pop(wasm.externref);
 }
 
 /** A loop body is a statement: whatever value its last expression has is dropped. */
 function discardValue(m, expr) {
-  const type = binaryen.getExpressionType(expr);
-  return type === binaryen.none || type === binaryen.unreachable ? expr : m.drop(expr);
+  const type = wasm.getExpressionType(expr);
+  return type === wasm.none || type === wasm.unreachable ? expr : m.drop(expr);
 }
 
 // ── while ───────────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ export function emitWhile(node, ctx, emitExpr) {
   try {
     const exitIfFalse = m.br(brk, m.i32.eqz(emitExpr(cond, ctx)));
     const bodyExpr    = discardValue(m, emitExpr(body, ctx));
-    const loop = m.loop(cnt, m.block(null, [exitIfFalse, bodyExpr, m.br(cnt)], binaryen.none));
-    return m.block(brk, [loop], binaryen.none);
+    const loop = m.loop(cnt, m.block(null, [exitIfFalse, bodyExpr, m.br(cnt)], wasm.none));
+    return m.block(brk, [loop], wasm.none);
   } finally {
     ctx.loops.pop();
   }
@@ -179,7 +179,7 @@ export function emitFor(node, ctx, emitExpr) {
   ctx.loops ??= [];
   ctx.loops.push({ brk, cnt, next });
   try {
-    const bodyExpr = m.block(next, [discardValue(m, emitExpr(body, ctx))], binaryen.none);
+    const bodyExpr = m.block(next, [discardValue(m, emitExpr(body, ctx))], wasm.none);
     const exits = ranges.map(range => m.br(brk, m.i32.eqz(condition(range))));
     // A zip loop ends when any inclusive source reaches its bound. Exiting
     // before increment also prevents MAX_VALUE from wrapping forever.
@@ -193,14 +193,14 @@ export function emitFor(node, ctx, emitExpr) {
       ...inclusiveExits,
       ...increments,
       m.br(cnt),
-    ], binaryen.none));
+    ], wasm.none));
     return m.block(brk, [
       ...ranges.flatMap(range => [
         m.local.set(range.cursorIndex, emitExpr(range.start, ctx)),
         m.local.set(range.endIndex, emitExpr(range.end, ctx)),
       ]),
       loop,
-    ], binaryen.none);
+    ], wasm.none);
   } finally {
     ctx.loops.pop();
   }
@@ -292,10 +292,10 @@ function emitUnrolledWhile(loop, ctx, emitExpr) {
     const enough = ops.ge_u(remaining, ops.const(loop.width === 'i64' ? BigInt(UNROLL) : UNROLL));
     return m.block(brk, [m.loop(cnt, m.block(null, [
       m.br(brk, m.i32.eqz(emitExpr(loop.cond, ctx))),
-      m.if(enough, m.block(null, [...four, m.br(cnt)], binaryen.none)),
+      m.if(enough, m.block(null, [...four, m.br(cnt)], wasm.none)),
       single,
       m.br(cnt),
-    ], binaryen.none))], binaryen.none);
+    ], wasm.none))], wasm.none);
   } finally {
     ctx.loops.pop();
   }
@@ -316,7 +316,7 @@ function emitUnrolledFor(range, body, { brk, cnt, label }, ctx, emitExpr) {
     const next = `__for_next_${label}_${copy++}`;
     entry.next = next;
     return [
-      m.block(next, [discardValue(m, emitExpr(body, ctx))], binaryen.none),
+      m.block(next, [discardValue(m, emitExpr(body, ctx))], wasm.none),
       m.local.set(range.cursorIndex, ops.add(cursor(), ops.const(one))),
     ];
   };
@@ -327,15 +327,15 @@ function emitUnrolledFor(range, body, { brk, cnt, label }, ctx, emitExpr) {
     const enough = ops.ge_u(remaining, ops.const(range.width === 'i64' ? BigInt(UNROLL) : UNROLL));
     const loop = m.loop(cnt, m.block(null, [
       m.br(brk, m.i32.eqz(ops[range.unsigned ? 'lt_u' : 'lt_s'](cursor(), bound()))),
-      m.if(enough, m.block(null, [...four, m.br(cnt)], binaryen.none)),
+      m.if(enough, m.block(null, [...four, m.br(cnt)], wasm.none)),
       ...single,
       m.br(cnt),
-    ], binaryen.none));
+    ], wasm.none));
     return m.block(brk, [
       m.local.set(range.cursorIndex, emitExpr(range.start, ctx)),
       m.local.set(range.endIndex, emitExpr(range.end, ctx)),
       loop,
-    ], binaryen.none);
+    ], wasm.none);
   } finally {
     ctx.loops.pop();
   }
@@ -349,8 +349,8 @@ export function emitReturn(node, ctx, emitExpr) {
   const value = child ? emitExpr(child, ctx) : undefined;
   if (!ctx.defers?.some(frame => frame.deferred.length)) return m.return(value);
   // The value is computed before deferred code runs, as in other languages.
-  const type = value === undefined ? binaryen.none : binaryen.getExpressionType(value);
-  if (value === undefined || type === binaryen.none || type === binaryen.unreachable) {
+  const type = value === undefined ? wasm.none : wasm.getExpressionType(value);
+  if (value === undefined || type === wasm.none || type === wasm.unreachable) {
     return afterDeferred(m, [...(value === undefined ? [] : [value]), ...emitDeferred(ctx, ctx.defers, emitExpr)], m.return());
   }
   const slot = ctx.addLocal(ctx.typeOf(child));
@@ -441,7 +441,7 @@ export function emitLoopMatch(node, ctx, emitExpr) {
         const expr = emitExpr(child, c);
         return bodies.has(child) ? discardValue(m, expr) : expr;
       };
-      return m.block(exit, [init, m.loop(dispatch, discardValue(m, emitMatch(node, ctx, read)))], binaryen.none);
+      return m.block(exit, [init, m.loop(dispatch, discardValue(m, emitMatch(node, ctx, read)))], wasm.none);
     }
 
     // Arms are laid out in source order, so authors can make hot transitions
@@ -481,13 +481,13 @@ export function emitLoopMatch(node, ctx, emitExpr) {
       for (let arm = 0; arm < arms.length; arm++) {
         at = { copy, arm };
         const body = discardValue(m, emitExpr(armBody(arms[arm]), ctx));
-        chain = m.block(null, [m.block(labels[copy][arm], [chain], binaryen.none), body, m.br(exit)], binaryen.unreachable);
+        chain = m.block(null, [m.block(labels[copy][arm], [chain], wasm.none), body, m.br(exit)], wasm.unreachable);
       }
     }
     at = null;
     const tail = defaultArm ? discardValue(m, emitExpr(armBody(defaultArm), ctx)) : m.unreachable();
-    const loopBody = m.block(null, [m.block(DEFAULT, [chain], binaryen.none), tail], binaryen.none);
-    return m.block(exit, [init, m.loop(dispatch, loopBody)], binaryen.none);
+    const loopBody = m.block(null, [m.block(DEFAULT, [chain], wasm.none), tail], wasm.none);
+    return m.block(exit, [init, m.loop(dispatch, loopBody)], wasm.none);
   } finally {
     ctx.loops.pop();
   }
@@ -588,24 +588,24 @@ function emitMatchTable(m, ctx, scrut, sorted, defArm, min, retType, emitExpr) {
 
   // Wrap each arm: (block $arm_i {chain})  then  (br $result armBody)
   for (let i = 0; i < sorted.length; i++) {
-    const armBlock = m.block(labels[i], [chain], binaryen.none);
+    const armBlock = m.block(labels[i], [chain], wasm.none);
     const body     = emitExpr(armBody(sorted[i].arm), ctx);
-    const brOut    = retType === binaryen.none ? brAndUnreachable(m, RESULT) : m.br(RESULT, undefined, body);
+    const brOut    = retType === wasm.none ? brAndUnreachable(m, RESULT) : m.br(RESULT, undefined, body);
     chain = m.block(null,
-      retType === binaryen.none ? [armBlock, body, brOut] : [armBlock, brOut],
-      binaryen.unreachable);
+      retType === wasm.none ? [armBlock, body, brOut] : [armBlock, brOut],
+      wasm.unreachable);
   }
 
   // Wrap with $default block + default body.
-  const defBlock = m.block(DEFAULT, [chain], binaryen.none);
+  const defBlock = m.block(DEFAULT, [chain], wasm.none);
   const defBody  = defArm ? emitExpr(armBody(defArm), ctx) : null;
   const tail = defBody == null
     ? [defBlock, m.unreachable()]
-    : retType === binaryen.none
+    : retType === wasm.none
       ? [defBlock, defBody, brAndUnreachable(m, RESULT)]
       : [defBlock, m.br(RESULT, undefined, defBody)];
 
-  return m.block(RESULT, [m.block(null, tail, binaryen.unreachable)], retType);
+  return m.block(RESULT, [m.block(null, tail, wasm.unreachable)], retType);
 }
 
 // if/else fallback for sparse patterns.
@@ -655,7 +655,7 @@ function emitMatchChain(m, ctx, scrut, sorted, defArm, retType, emitExpr) {
 //     default body
 //
 // All three follow the same skeleton as emitMatchTable; only the dispatch
-// instruction at the bottom differs.  Once binaryen exposes br_on_cast /
+// instruction at the bottom differs.  Once wasm exposes br_on_cast /
 // br_on_null bindings (or we drop down to raw expression refs), the work is
 // largely a copy-paste of the table layout above.
 

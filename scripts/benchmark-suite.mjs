@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { transform } from 'esbuild';
-import binaryen from 'binaryen';
+import { exportFunctions } from './wasm-exports.mjs';
 import { createCompiler, emitBinary, initParser, instantiateLowered } from '../src/index.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -104,7 +104,7 @@ console.log('Rust/utu Wasm benchmark suite (including forbid(unsafe_code) Rust)'
 console.log(`  engine: Bun ${Bun.version} (${process.arch})`);
 console.log(`  samples: ${SAMPLES}, warmups: ${WARMUPS}`);
 console.log('  Rust: rustc stable -O3 + LTO + simd128 + bulk-memory');
-console.log('  utu: Binaryen -O3/max-shrink then -Oz; string lowering only when required\n');
+console.log('  utu: -Oz (local cleanup); strings through the JS string builtins\n');
 
 const rows = [];
 for (const spec of cases) {
@@ -197,18 +197,7 @@ function compileRust(stem, { safe = false } = {}) {
 function addSafeRustExports(bytes, stem) {
   const required = stem === 'strings' ? ['base_ptr', 'piece_ptr', 'run']
     : stem === 'analyzer' ? ['input_ptr', 'run'] : ['run'];
-  const module = binaryen.readBinary(bytes);
-  const names = Array.from({ length: module.getNumFunctions() }, (_, index) =>
-    binaryen.getFunctionInfo(module.getFunctionByIndex(index)).name);
-  for (const exported of required) {
-    const internal = names.find(name => name.includes(`${exported}17h`));
-    if (!internal) throw new Error(`${stem}-safe.rs: retained function ${exported} not found`);
-    module.addFunctionExport(internal, exported);
-  }
-  module.runPasses(['strip']);
-  const emitted = module.emitBinary();
-  module.dispose();
-  return emitted;
+  return exportFunctions(bytes, required.map(exported => [`${exported}17h`, exported]));
 }
 
 function asciiPiece(length) {

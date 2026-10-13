@@ -19,7 +19,7 @@ export function emitLit(node, ctx) {
     return emitNullLiteral(node, ctx);
   }
 
-  // Pick the binaryen numeric namespace from the stdlib-built scalar registry.
+  // Pick the wasm numeric namespace from the stdlib-built scalar registry.
   const ns = ctx.scalarNamespaceOf(type);
   if (!ns) throw new Error(`codegen: unsupported literal type "${type}" for kind "${kind}"`);
 
@@ -28,7 +28,7 @@ export function emitLit(node, ctx) {
       if (raw === 'true' || raw === 'false') return m.i32.const(raw === 'true' ? 1 : 0);
       return m.i32.const(parseInt32Literal(raw));
     },
-    // binaryen >= 131 takes a single BigInt; the old (lowBits, highBits) pair
+    // wasm >= 131 takes a single BigInt; the old (lowBits, highBits) pair
     // is rejected outright rather than silently mis-encoded.
     i64: () => m.i64.const(parseInt64Literal(raw)),
     f32: () => m.f32.const(Number(raw)),

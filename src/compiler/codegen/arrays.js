@@ -1,6 +1,5 @@
 
 export function emitArrayIntrinsic(opNode, argNodes, ctx, emitExpr) {
-  if (opNode.localName.startsWith('ir-array-') && ctx.requirements) ctx.requirements.conservativeSweep = true;
   switch (opNode.localName) {
     case 'ir-array-new':   return emitArrayNew(argNodes, ctx, emitExpr);
     case 'ir-array-get':   return emitArrayGet(argNodes, ctx, emitExpr);
@@ -25,7 +24,7 @@ function emitArrayGet([selfNode, indexNode], ctx, emitExpr) {
   return ctx.module.array.get(
     castArrayRef(selfNode, ctx, emitExpr),
     emitExpr(indexNode, ctx),
-    elementBinaryenType(info, ctx),
+    elementWasmType(info, ctx),
     false,
   );
 }
@@ -82,7 +81,7 @@ function emitArraySlice([selfNode, startNode, endNode], ctx, emitExpr) {
           indexOps.eqz(m.local.get(lenSlot, lenType)),
           m.array.new_fixed(info.heapType, []),
           m.array.new(info.heapType, m.local.get(lenSlot, lenType),
-            m.array.get(m.local.get(selfSlot, info.refType), m.local.get(startSlot, startType), elementBinaryenType(info, ctx), false)),
+            m.array.get(m.local.get(selfSlot, info.refType), m.local.get(startSlot, startType), elementWasmType(info, ctx), false)),
         )),
       m.array.copy(
         m.local.get(outSlot, info.refType),
@@ -144,13 +143,12 @@ function arrayInfoFromType(typeName, ctx) {
   return info;
 }
 
-export function elementBinaryenType(info, ctx) {
+export function elementWasmType(info, ctx) {
   return ctx.toType(info.elem ?? '');
 }
 
 /** `[a, b, c]` with a native array type: one `array.new_fixed`. */
 export function emitArrayLiteral(node, ctx, emitExpr) {
-  if (ctx.requirements) ctx.requirements.conservativeSweep = true;
   const info = arrayInfoFromNode(node, ctx);
   return ctx.module.array.new_fixed(info.heapType, [...node.children].map(child => emitExpr(child, ctx)));
 }

@@ -10,8 +10,13 @@
 //               its own branch — true threaded code
 //
 // Program: acc += i; i++; if i < n goto 0 — opcodes 1, 2, 3, then 0 = halt.
-import binaryen from 'binaryen';
 import { gzipSync } from 'node:zlib';
+
+// This measurement compiles hand-written wasm text with Binaryen's optimizer,
+// which the compiler does not depend on.
+const { default: binaryen } = await import('binaryen').catch(() => {
+  throw new Error('dispatch-shapes.mjs needs Binaryen: npm install --no-save binaryen');
+});
 
 const N = Number(process.env.N ?? 10_000_000);
 const ROUNDS = Number(process.env.ROUNDS ?? 15);

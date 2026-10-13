@@ -294,7 +294,7 @@ function usage(code) {
   bun cli/utu.mjs display:modules <file.utu> [--noln]
   bun cli/utu.mjs display:exports <file.utu> [--noln]
   bun cli/utu.mjs display:debug <file.utu>
-  bun cli/utu.mjs build-exe <file.utu> [-o out] [-Oz | -O3 | -O0]   (-Oz: smallest, default; -O3: fastest; -O0: no Binaryen optimizer, fastest build)`);
+  bun cli/utu.mjs build-exe <file.utu> [-o out] [-Oz | -O3 | -O0]   (-Oz: smallest, default; -O3: fastest; -O0: codegen output as is, fastest build)`);
   process.exit(code);
 }
 

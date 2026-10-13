@@ -178,7 +178,9 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       for (const unused of ['charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
         assert(!encoded.includes(unused), `midpoint insertion retained unrelated string builtin ${unused}`);
       }
-      assert(binary.length <= 192, `midpoint insertion module exceeded its size ceiling: ${binary.length} bytes`);
+      // Three imports, four signatures, and the loop as written (there is no
+      // loop-restructuring optimizer).
+      assert(binary.length <= 212, `midpoint insertion module exceeded its size ceiling: ${binary.length} bytes`);
     });
   });
 
@@ -219,16 +221,14 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertEq(sourceMap.version, 3, 'expected source map v3');
       assert(sourceMap.sources?.length > 0, 'expected source map sources');
       assert(sourceMap.sources.includes(file), 'expected source map to reference source file');
-      // Binaryen always emits one ';' per function as a group separator, so a
-      // length>0 check is too weak — it would pass even with zero real
-      // mappings. Strip group/segment separators and require at least one
-      // actual VLQ segment character.
+      // A length>0 check is too weak: separators alone would pass it. Strip
+      // group/segment separators and require at least one VLQ segment.
       const vlqChars = sourceMap.mappings.replace(/[;,]/g, '');
       assert(vlqChars.length > 0, `expected at least one VLQ segment in mappings, got ${JSON.stringify(sourceMap.mappings)}`);
     });
   });
 
-  test('codegen: source maps survive stringMode=native and degrade-but-survive stringMode=lowered for string-using code', async ({ ROOT }) => {
+  test('codegen: source maps cover string-using code', async ({ ROOT }) => {
     const { emitBinary } = await import('../src/compiler/codegen/index.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map_strings.utu', `
@@ -238,24 +238,13 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     `, async (file) => {
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-
-      // native: full-fidelity mappings — every emitted expr should carry loc.
-      const native = emitBinary(doc, { sourceMap: true, stringMode: 'native' });
-      const nativeMap = JSON.parse(native.sourceMap);
-      assertEq(nativeMap.version, 3);
-      assert(nativeMap.sources.includes(file), 'native: source file must appear in sources');
-      const nativeSegments = nativeMap.mappings.replace(/[;,]/g, '');
-      assert(nativeSegments.length > 0, 'native: expected at least one VLQ segment');
-
-      // lowered: passes synthesise Externref/magic-import ops without debug
-      // info — but the original ops in untouched functions should still have
-      // mappings, so the source file must still appear and mappings must
-      // still parse. This pins the documented caveat in JSDoc.
-      const lowered = emitBinary(doc, { sourceMap: true, stringMode: 'lowered' });
-      const loweredMap = JSON.parse(lowered.sourceMap);
-      assertEq(loweredMap.version, 3, 'lowered: source map must still parse');
-      assert(Array.isArray(loweredMap.sources), 'lowered: sources field must exist');
-      assert(typeof loweredMap.mappings === 'string', 'lowered: mappings field must exist');
+      // Strings are emitted as calls to the JS string builtins directly, so
+      // their code keeps its debug locations.
+      const { sourceMap } = emitBinary(doc, { sourceMap: true });
+      const map = JSON.parse(sourceMap);
+      assertEq(map.version, 3);
+      assert(map.sources.includes(file), 'source file must appear in sources');
+      assert(map.mappings.replace(/[;,]/g, '').length > 0, 'expected at least one VLQ segment');
     });
   });
 

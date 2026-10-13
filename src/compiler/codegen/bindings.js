@@ -1,6 +1,6 @@
 // codegen/bindings.js — locals, blocks, lets, and assignments
 
-import { binaryen } from './types.js';
+import { wasm } from './types.js';
 import { nextLabel } from './labels.js';
 import { emitFieldSet } from './structs.js';
 import { emitFunRef } from './closures.js';
@@ -56,7 +56,7 @@ export function emitBlock(node, ctx, emitExpr) {
   const blockType = inferredType === 'null' || expectedType === 'void' ? expectedType : inferredType;
   const valueType = blockType && blockType !== 'void'
     ? ctx.toType(blockType)
-    : binaryen.none;
+    : wasm.none;
 
   // A compiler-generated block may be the target of breaks (generators). It
   // joins the loop stack as a break-only target that plain break/continue skip.
@@ -81,12 +81,12 @@ export function emitBlock(node, ctx, emitExpr) {
       const childIsVoid = isVoidStatement(child) || !childType || childType === 'void';
       // Discard non-tail results (and a tail result in a void block) so the
       // block stays well-typed.
-      const keep = isLast ? valueType !== binaryen.none || childIsVoid : childIsVoid;
+      const keep = isLast ? valueType !== wasm.none || childIsVoid : childIsVoid;
       exprs.push(keep ? e : ctx.module.drop(e));
     }
     if (frame.deferred.length) {
       // Falling off the end runs this block's deferred code after its value.
-      if (valueType !== binaryen.none && exprs.length) {
+      if (valueType !== wasm.none && exprs.length) {
         const slot = ctx.addLocal(blockType);
         exprs.push(ctx.module.local.set(slot, exprs.pop()), ...emitDeferred(ctx, [frame], emitExpr), ctx.module.local.get(slot, valueType));
       } else {
@@ -110,8 +110,8 @@ export function emitDeferred(ctx, frames, emitExpr) {
   for (const frame of [...frames].reverse()) {
     for (const node of [...frame.deferred].reverse()) {
       const expr = emitExpr(node, ctx);
-      const type = binaryen.getExpressionType(expr);
-      out.push(type === binaryen.none || type === binaryen.unreachable ? expr : ctx.module.drop(expr));
+      const type = wasm.getExpressionType(expr);
+      out.push(type === wasm.none || type === wasm.unreachable ? expr : ctx.module.drop(expr));
     }
   }
   return out;

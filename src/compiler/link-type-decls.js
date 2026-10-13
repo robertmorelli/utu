@@ -161,7 +161,7 @@ const REPRESENTATIONS = [
   ['ir-wasm-scalar', 'wasm-scalar', (repr, name) => ({
     scalarKind: name, scalarFamily: parseScalarRepr(repr, name),
   })],
-  ['ir-wasm-ref', 'wasm-ref', (repr, name) => ({ refBinaryen: parseRefRepr(repr, name) })],
+  ['ir-wasm-ref', 'wasm-ref', (repr, name) => ({ refWasm: parseRefRepr(repr, name) })],
   ['ir-wasm-array', 'wasm-array', parseArrayRepr],
 ];
 
@@ -230,7 +230,7 @@ function readTagType(decl) {
 }
 
 export const WASM_SCALAR_FAMILIES = new Set(['i32', 'i64', 'f32', 'f64', 'v128']);
-export const WASM_REF_BINARYEN_TYPES = new Set(['externref', 'stringref', 'i31ref', 'anyref']);
+export const WASM_REF_TYPES = new Set(['externref', 'stringref', 'i31ref', 'anyref']);
 
 function requiredAttr(node, attr, typeName) {
   const value = node.getAttribute(attr);
