@@ -75,6 +75,7 @@ async function main() {
   }));
 
   const keys = Object.keys(results).sort();
+  if (flag('json')) await fs.writeFile(flag('json'), JSON.stringify(Object.fromEntries(keys.map(key => [key, results[key]])), null, 1));
   const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0 };
   const differ = [];
   const reasons = new Map();
@@ -111,7 +112,7 @@ async function main() {
 
 async function worker() {
   process.on('unhandledRejection', () => {});
-  const { loadProgram, loadSelfhost, instantiateBuilt } = await import('./selfhost.mjs');
+  const { loadProgram, loadSelfhost, instantiateBuilt, compileProgram } = await import('./selfhost.mjs');
   const utu = await loadSelfhost();
   parentPort.on('message', async ({ file, target }) => {
     const result = await run(file, target).catch(error => ({ crash: summarizeError(error) }));
@@ -120,7 +121,7 @@ async function worker() {
 
   async function run(file, target) {
     const files = loadProgram(utu, file);
-    const size = utu.compile_program(target === 'test' ? 1 : 0);
+    const size = await compileProgram(utu, target === 'test' ? 1 : 0);
     if (size < 0) {
       const diagnostics = [];
       const unsupported = new Set();

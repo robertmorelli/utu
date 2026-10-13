@@ -114,7 +114,7 @@ fn mem_is_const(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Co
 
 fn mem_is_exported(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Export.to_i32(); }
 
-// The memory of a mem, made when first needed.
+// The memory of a mem, made when first needed, with its initial contents.
 fn memory_of(decl: I32) I32 {
     if mem_memory[decl] >= 0 { return mem_memory[decl]; };
     let m = memory_kind.len();
@@ -123,8 +123,128 @@ fn memory_of(decl: I32) I32 {
     memory_module_name.push(-1);
     memory_field_name.push(if mem_is_exported(decl) { name_from_src(tok_start[node_first[first_child(decl_node[decl])]], tok_end[node_first[first_child(decl_node[decl])]]); } else { -1; });
     mem_memory[decl] = m;
-    mem_len[decl] = add_global(vt_i32, true, w_i32_detached(0));
+    let count = mem_initial_data(decl, m);
+    mem_len[decl] = add_global(vt_i32, true, w_i32_detached(count));
     m;
+}
+
+// ── Initial contents ──
+//
+// `mem prec: U8 = [0, 1, 1, 2];` and `const mem dfa: U8 = @comptime/\ build() \/;`
+// fill the mem from a data segment when the module is instantiated, and set
+// its length. Each value must fit the storage kind.
+
+mem comptime_mem: I32;      // the @comptime mems, in order
+mem comptime_start: I32;    // their values, from the host: bytes in comptime_bytes, or -1 until given
+mem comptime_count: I32;
+export mem comptime_bytes: U8;
+
+// The values of the mem's initializer as a data segment of memory `m`;
+// returns their number.
+fn mem_initial_data(decl: I32, m: I32) I32 {
+    let node = decl_node[decl];
+    let elem = next_sibling(first_child(node));
+    let init = last_child(node);
+    if init == elem { return 0; };
+    let s = mem_storage(decl);
+    let d = data_memory.len();
+    data_memory.push(m);
+    data_start.push(data_bytes.len());
+    let count = 0;
+    if is_kind(init, Node.Array_expr) {
+        let c = first_child(init);
+        while (c >= 0) {
+            let lit = if is_kind(c, Node.Unary_expr) { first_child(last_child(c)); } else { first_child(c); };
+            let negate = is_kind(c, Node.Unary_expr);
+            if is_kind(lit, Node.Int_lit) {
+                let v = int_value(lit);
+                store_value(s, if negate { 0 - v; } else { v; }, false, c, count);
+            } else if is_kind(lit, Node.Float_lit) {
+                let text = "";
+                for (tok_start[node_first[lit]] ..< tok_end[node_first[lit]]) |i| { text = text + Str.from_code_point(src[i]); };
+                let f = parse_number(text);
+                store_value(s, (if negate { 0.0 - f; } else { f; }).bits(), true, c, count);
+            } else {
+                report(Diag.MemInitializer, c, decl_name[decl]);
+            };
+            count += 1;
+            c = next_sibling(c);
+        };
+    } else {
+        let k = comptime_index(decl);
+        if k >= 0 and comptime_start[k] >= 0 {
+            let value_size = if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
+            count = comptime_count[k];
+            for (0 ..< count) |i| {
+                let at = comptime_start[k] + i * value_size;
+                let lo = read_u32(at);
+                let v = if value_size == 8 { (read_u32(at + 4).to_i64() << 32) | (lo.to_i64() & 4294967295); } else { lo.to_i64(); };
+                store_value(s, v, s == Storage.F32 or s == Storage.F64, init, i);
+            };
+        };
+    };
+    data_len.push(data_bytes.len() - data_start[d]);
+    // Enough pages for the data.
+    let pages = (data_len[d] + 65535) / 65536;
+    if pages > memory_pages[m] { memory_pages[m] = pages; };
+    count;
+}
+
+fn read_u32(at: I32) I32 {
+    comptime_bytes[at] | (comptime_bytes[at + 1] << 8) | (comptime_bytes[at + 2] << 16) | (comptime_bytes[at + 3] << 24);
+}
+
+// Append element `i`, value `v` (an integer, or a float's 64 bits), in storage `s`.
+fn store_value(s: Storage, v: I64, is_float: Bool, at: I32, i: I32) void {
+    let size = 1 << storage_shift(s);
+    if s == Storage.F32 or s == Storage.F64 {
+        let f = if is_float { F64.from_bits(v); } else { v.to_f64(); };
+        let bits = if s == Storage.F32 { f.to_f32().bits().to_i64(); } else { f.bits(); };
+        for (0 ..< size) |k| { data_bytes.push((bits >> (k * 8).to_i64()).to_i32() & 255); };
+        return;
+    };
+    let lo: I64 = 0;
+    let hi: I64 = 0;
+    if s == Storage.U8 { hi = 255; }
+    else if s == Storage.I8 { lo = -128; hi = 127; }
+    else if s == Storage.U16 { hi = 65535; }
+    else if s == Storage.I16 { lo = -32768; hi = 32767; }
+    else if s == Storage.I32 { lo = -2147483648; hi = 2147483647; }
+    else if s == Storage.U32 { hi = 4294967295; }
+    else { lo = 0 - 9223372036854775807 - 1; hi = 9223372036854775807; };
+    if is_float or v < lo or v > hi {
+        report(Diag.MemElementRange, at, i);
+    };
+    for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
+}
+
+fn comptime_index(decl: I32) I32 {
+    for (0 ..< comptime_mem.len()) |k| { if comptime_mem[k] == decl { return k; }; };
+    -1;
+}
+
+// The @comptime mems of the program, found once names are resolved.
+fn find_comptime_mems() void {
+    comptime_mem.clear();
+    comptime_start.clear();
+    comptime_count.clear();
+    comptime_bytes.clear();
+    for (0 ..< file_root.len()) |file| {
+        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
+            let item = first_child(file_root[file]);
+            while (item >= 0) {
+                if is_kind(item, Node.Mem_decl) {
+                    let init = last_child(item);
+                    if is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Comptime) {
+                        comptime_mem.push(node_decl[first_child(item)]);
+                        comptime_start.push(-1);
+                        comptime_count.push(0);
+                    };
+                };
+                item = next_sibling(item);
+            };
+        };
+    };
 }
 
 // A constant node that is not on the stack (a global's initializer).
@@ -233,6 +353,8 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
         w_node(Op.GlobalSet, vt_none, len_g, 0, m);
         return ty_void();
     };
+    if method >= MemMethod.Intern.to_i32() { return call_interner(decl, method, args, at, m, cx); };
+    if method == MemMethod.Copy_in.to_i32() or method == MemMethod.View.to_i32() { return unsupported(at); };
     let helpers = mem_helper_functions(decl);
     if method == MemMethod.Push.to_i32() {
         let t = mem_value_type(decl);
@@ -398,4 +520,16 @@ fn mem_helper_functions(decl: I32) I32 {
     func_body[resize] = w_pop();
     mem_helpers[decl] = reserve;
     reserve;
+}
+
+// `src.intern(a, b)` and the rest: the mem's generated interner.
+fn call_interner(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
+    let s = mem_storage(decl);
+    if s != Storage.U8 and s != Storage.I8 {
+        report(Diag.InternNotBytes, at, decl_name[decl]);
+        return error_value();
+    };
+    let f = generated_mem_fn(decl, method);
+    if f < 0 { return unsupported(at); };
+    call_with(fn_instance(f, 0), args, 0, m, at, cx);
 }

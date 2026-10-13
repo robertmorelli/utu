@@ -123,46 +123,73 @@ in a path answers for the path), the script says how it compares. On the
 96,000-line program, loading, parsing, and resolving 1.1 million nodes
 takes 115 ms; resolving alone, 12.
 
-## The rest of the compiler (planned)
+## Self-hosting
+
+The compiler compiles itself. `scripts/selfhost-bootstrap.mjs` builds stage 1
+(this source, built by stage 0, the JavaScript compiler), stage 2 (built by
+stage 1), and stage 3 (built by stage 2), and checks that stages 2 and 3 are
+the same bytes. Stage 0 takes 3.9 s to build the compiler; stage 2 builds it
+in 57 ms. Every differential runs on any stage (`UTU_STAGE=2 node
+scripts/selfhost-…`), and stage 2 agrees with stage 1 everywhere.
+
+## Checking and code
 
 The tree is never rewritten. Everything after names reads it and writes new
-tables:
+tables.
 
-- **Types** (`types.utu`): every type is an interned id (`ty_*`), so
-  types compare as ints: a named type is a declaration and a module
-  instance (`Array[I32]` is Array's promoted type in the instance
-  `Array[I32]`), and nullable, tuple, `fun`, and `cl` types are built from
-  ids. Instances (`inst_*`) are interned the same way. A type's wasm
-  representation comes from the declarations: a module's `type & = @ir/\
-  <ir-wasm-scalar type-repr="wasm-i32"/> \/` says what `I32` is.
-- **Checking** (`check.utu`, with `validate.utu` for rules about
-  declarations): monomorphization on demand. Starting from
-  the exports (or tests), each function is checked once per instance it is
-  called in, against the types its module's arguments give its
-  parameters, and translated as it is checked into a wasm-shaped IR (the
-  `w_*` mems): typed nodes, children built before parents, as the parser
-  builds its tree. Calls enqueue the instances they reach, so only what is
-  reached is compiled. Expected types flow down (literals, `null`,
-  closures, `&{…}` read them); the language's surface constructs (operators
-  through their std declarations, loops, iterators, generators, `defer`)
-  become IR as they are checked. Diagnostics are collected, with an error
-  type that stops cascades.
-- **Intrinsics**: a function whose body is `@ir/\ … \/` (std's scalar
-  operators, array access) is expanded where it is called: the XML is
-  parsed once into a small tree and translated per call.
-- **Encoding** (`wasm.utu`): once every function is checked, a sweep from
-  the exports finds what is reached, indices are assigned (imports first),
-  and only that is encoded. Every function of the program's own files is
-  checked, reached or not, so its mistakes are reported; the standard
-  library's are checked when reached. Types live in one recursion group,
-  except the function types host builtins need on their own.
-- **The host contract**: what the module needs from its host (`@es`
-  bodies, closures, promises, host-created mems) is a custom section of
-  the module, so a compiled program is one file, and a small loader builds
-  its imports from it.
+- **Types** (`types.utu`): every type is an interned id (`ty_*`), so types
+  compare as ints: a named type is a declaration and a module instance
+  (`Array[I32]` is Array's promoted type in the instance `Array[I32]`);
+  nullable, tuple, `fun`, and `cl` types are built from ids. Instances
+  (`inst_*`) are interned the same way. A type's wasm representation comes
+  from the declarations: a module's `type & = @ir/\ <ir-wasm-scalar
+  type-repr="wasm-i32"/> \/` says what `I32` is.
+- **Checking** (`check.utu`, with `control.utu`, `data.utu`, `enums.utu`,
+  `mems.utu`, `strings.utu`, `host.utu`): monomorphization on demand. Each
+  function is checked once per instance it is reached in, against the types
+  its module's arguments give it, and translated as it is checked into a
+  wasm-shaped IR (`w_*`): typed nodes, children built before parents.
+  Expected types flow down (literals, `null`, `&{…}`, array literals read
+  them); a statement is checked as Void, so its value is dropped. Every
+  function of the program's own files is checked, reached or not; the
+  standard library's when reached. Diagnostics are collected, and the
+  error type that follows one stops cascades (it never appears without
+  one).
+- **Rules about declarations** (`validate.utu`): duplicates, nullable
+  scalars, tuples, `fun` fields, recursive structs, integer enum values,
+  distinct bases, global initializers.
+- **Intrinsics** (`ir.utu`): a function whose body is `@ir/\ … \/` (std's
+  operators, conversions, array and string access) is expanded where it is
+  called; its XML is parsed once into a small tree.
+- **Generated sources** (`gen.utu`): what is easiest to say in utu is said in
+  utu. A byte mem's interner (stage 0's, so ids match) and each `@comptime`
+  mem's evaluation are written as source, added as a file, and resolved and
+  checked like the rest.
+- **@comptime**: a build for Target.Comptime exports the generated functions
+  that evaluate each expression into a mem; the host runs it and gives the
+  values back, which fill the mems as data segments.
+- **Encoding** (`wasm.utu`): a sweep from the exports finds what is reached;
+  indices are assigned (imports first) and only that is encoded. Types live
+  in one recursion group, except the function types host builtins need on
+  their own.
+- **The host contract** (`host.utu`): what the module needs from its host
+  (`@es` bodies, the exception tag) is in a custom section named `utu`, so a
+  compiled program is one file; `instantiateBuilt` in `scripts/selfhost.mjs`
+  builds its imports from it.
 
-The check for all of it is behavior, not bytes: every program in
-`examples/`, `benchmarks/`, and `baselines/corpus` must do what
-`baselines/run-differential*.json` recorded stage 0's builds doing, and
-report the diagnostics stage 0 reported. Then the compiler compiles
-itself, and that compiler compiles itself to the same bytes.
+## How far it is
+
+`scripts/selfhost-run-differential.mjs` builds every program in
+`examples/`, `benchmarks/`, and `baselines/corpus` (for its exports and its
+tests), runs each zero-argument export and test, and compares what it does
+with what stage 0's builds did (`baselines/run-differential.json`). 646 of
+948 builds behave the same; 294 use something not built yet (closures,
+iterators, generators, protocols, host declarations, the DSLs, `defer`,
+`await`), which it reports rather than miscompiling; and 5 differ, all
+checks that wait on those features (protocol conformance, `@embed`). Three
+differ on purpose, where stage 0 accepts a program it should reject (a
+method of an unknown type, a module given too few type arguments).
+`--why=call_expr` lists the source of what is not built yet.
+
+The check is behavior, not bytes: the compiler is a new design, so its
+wasm differs from stage 0's, but what every program does must not.

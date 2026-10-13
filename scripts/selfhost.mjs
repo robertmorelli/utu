@@ -61,7 +61,9 @@ export async function buildSelfhost() {
   const errors = collectAnalysisDiagnostics(doc).filter(diagnostic => diagnostic.severity === 'error').map(({ message, primary }) =>
     primary?.row ? `${placeOf(parts, primary.row)}: ${relocate(message)}` : relocate(message));
   if (errors.length) throw new Error(errors.join('\n'));
-  return { doc, wasm: emitBinary(doc) };
+  // With a source map, the binary also names its functions, so a trap in
+  // the compiler says where it happened.
+  return { doc, wasm: emitBinary(doc, { sourceMap: true }).binary };
 }
 
 const ROLE = { entry: 0, import: 1, prelude: 2 };
@@ -117,6 +119,29 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
 }
 
 /**
+ * Compile the loaded program for a target (0: exports, 1: tests). A program
+ * with @comptime mems is first built for evaluating them; that build runs
+ * here, and its values go back to the compiler as the mems' contents.
+ * Returns the module's size in `out`, or -1 when there are diagnostics.
+ */
+export async function compileProgram(utu, target) {
+  const count = utu.comptime_mems();
+  if (count > 0) {
+    const size = utu.compile_program(2);
+    if (size < 0) return -1;
+    const { instance } = await instantiateBuilt(new Uint8Array(utu.out.buffer, 0, size).slice());
+    for (let k = 0; k < count; k++) {
+      const name = utu.comptime_name(k);
+      const n = instance.exports[`__comptime_run_${name}`]();
+      const bytes = new Uint8Array(instance.exports[`__comptime_${name}`].buffer, 0, n * utu.comptime_value_size(k)).slice();
+      const at = utu.comptime_set(k, n);
+      new Uint8Array(utu.comptime_bytes.buffer).set(bytes, at);
+    }
+  }
+  return utu.compile_program(target);
+}
+
+/**
  * Instantiate a module the self-hosted compiler built: its imports come from
  * its `utu` custom section (what the host provides) and the engine's JS
  * string builtins.
@@ -151,11 +176,36 @@ async function esImports(spec) {
   return importObjectFromGlue(spec, await import(pathToFileURL(file).href));
 }
 
-/** The self-hosted compiler's exports. */
-export async function loadSelfhost() {
+/**
+ * The self-hosted compiler's exports. Stage 1 is the compiler as stage 0
+ * builds it; stage 2, as stage 1 builds it (the compiler built by itself).
+ */
+export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) } = {}) {
   const { doc, wasm } = await buildSelfhost();
   const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
-  return instance.exports;
+  if (stage === 1) return instance.exports;
+  let compiler = instance.exports;
+  for (let s = 2; s <= stage; s++) {
+    const bytes = await buildWith(compiler);
+    compiler = (await instantiateBuilt(bytes)).instance.exports;
+  }
+  return compiler;
+}
+
+/** The self-hosted compiler's bytes, built by a loaded self-hosted compiler. */
+export async function buildWith(compiler) {
+  const { text } = joinSelfhost();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-stage-'));
+  const file = path.join(dir, 'utu.utu');
+  fs.writeFileSync(file, text);
+  try {
+    const files = loadProgram(compiler, file);
+    const size = await compileProgram(compiler, 0);
+    if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
+    return new Uint8Array(compiler.out.buffer, 0, size).slice();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

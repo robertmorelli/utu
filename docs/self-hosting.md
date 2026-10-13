@@ -171,17 +171,23 @@ language stays as it is.
    names (`baselines/definitions.json.gz`). Generic modules are not copied:
    the tree is shared, and instantiation happens in type checking, per
    instance.
-3. **The type graph.** The largest piece; diagnostics must match Plan A's on
-   the negative corpus.
-4. **Lowerings**: generators, iterators, mems, integer enums, distinct types,
-   tuples, closures, operators, alt and promote.
-5. **Codegen** straight to wasm bytes, including the WasmGC type section,
-   as `src/compiler/wasm/` does in JavaScript (interned types, expression
-   trees, an encoder). The invariant is the same: byte-identical wasm
-   against Plan A on every program.
-6. **Bootstrap.** Plan A builds the utu compiler (stage 1), stage 1 builds
-   stage 2, stage 2 builds stage 3, and stages 2 and 3 must be identical.
-   The bundle ships stage 2; the JavaScript compiler stays as stage 0.
+3. **Types and checking.** Done for most of the language
+   (`selfhost/types.utu`, `check.utu` and its companions): monomorphization
+   on demand, checking and translation in one pass into a wasm-shaped IR,
+   intrinsics expanded from std's `@ir`. Remaining: closures, iterators,
+   generators, protocols, `defer`, `await`, host declarations (std:JS,
+   npm:), and the DSLs.
+4. **Lowerings**, as part of checking: operators through their std
+   declarations, loops, `match`, `alt`, `promote`, tuples, mems, integer
+   enums, distinct types, strings, `@es`, `@comptime`.
+5. **Codegen** straight to wasm bytes (`selfhost/wasm.utu`). The invariant
+   is behavior, not bytes: every program does what stage 0's build of it
+   did (`scripts/selfhost-run-differential.mjs`); 646 of 948 builds so far,
+   none miscompiled.
+6. **Bootstrap.** Done: stage 0 builds stage 1, stage 1 builds stage 2,
+   stage 2 builds stage 3, and stages 2 and 3 are identical
+   (`scripts/selfhost-bootstrap.mjs`, part of `bun run test`). Stage 2
+   builds the compiler in 57 ms; stage 0 takes 3.9 s.
 
 ### Stays in JavaScript
 

@@ -40,7 +40,7 @@ fn enum_values(decl: I32) void {
     if repr_word == Kw.count() + 2 { hi = 65535; };                 // U16
     if repr_word == Kw.count() + 3 { lo = -32768; hi = 32767; };    // I16
     if repr_word == known_word(Known.WordI32) { lo = -2147483648; };
-    let own = file_role[file_of_token(node_first[node])] != FileRole.Prelude.to_i32();
+    let own = is_own_file(file_of_token(node_first[node]));
     let next = 0;
     let first = -1;
     let c = first_child(node);
@@ -79,7 +79,7 @@ fn validate_program() void {
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
             report(Diag.ParseError, -1, file);
-        } else if file_role[file] != FileRole.Prelude.to_i32() {
+        } else if is_own_file(file) {
             validate_tree(file_root[file]);
         };
     };
@@ -190,7 +190,7 @@ fn validate_global(node: I32) void {
 // nullable, not arrays) can never be built.
 fn validate_recursive_structs() void {
     for (0 ..< decl_kind.len()) |d| {
-        if decl_is(d, Decl.Struct) and file_role[file_of_token(node_first[decl_node[d]])] != FileRole.Prelude.to_i32()
+        if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]]))
             and not is_generic(module_of(d)) and reaches_struct(d, d, 0) {
             report(Diag.RecursiveType, decl_node[d], decl_name[d]);
         };

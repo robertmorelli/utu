@@ -54,7 +54,7 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     fi_inst.push(inst);
     fi_func.push(-1);
     fi_ir.push(-1);
-    let sig = signature(decl, inst);
+    signature(decl, inst);
     fi_params.push(sig_params[0]);
     fi_result.push(sig_result[0]);
     let body = fn_body(decl);
@@ -186,7 +186,9 @@ fn param_decls(decl: I32) I32 {
 // ── Checking functions ──
 
 fn new_local(vt: I32) I32 {
-    cur_locals.push(vt);
+    // A value that never arrives (an expression that does not complete, or
+    // none) still gets a local of some type; nothing reads it.
+    cur_locals.push(if vt == vt_none or vt == vt_unreachable or vt >= vt_tuple { vt_i32; } else { vt; });
     cur_locals.len() - 1;
 }
 
@@ -503,6 +505,12 @@ fn check_let(node: I32, cx: Cx) I32 {
     if ty_is(t, Ty.Null) {
         report(Diag.TypeMismatch, init, -1);
         t = ty_error();
+    };
+    decl_ty[decl] = t;
+    if ty_is(t, Ty.Void) or ty_is(t, Ty.Never) {
+        // Nothing to hold: the expression runs, and the name has no value.
+        w_node(Op.Seq, repr(t), 0, 0, m);
+        return ty_void();
     };
     let local = new_local(repr(t));
     decl_local[decl] = local;
@@ -1249,6 +1257,7 @@ fn check_assert(node: I32, cx: Cx) I32 {
 enum(U8) Target:
     | Normal
     | Tests
+    | Comptime
 
 fn reset_check() void {
     fi_decl.clear();
@@ -1281,6 +1290,7 @@ fn reset_check() void {
 // Check the program from its entry points, and encode it. Returns the
 // module's size in `out`, or -1 when there are diagnostics.
 fn compile(target: Target) I32 {
+    restore_diagnostics();
     reset_wasm();
     reset_types();
     reset_ir_trees();
@@ -1304,10 +1314,10 @@ fn compile(target: Target) I32 {
                     };
                 };
                 if target == Target.Normal and is_kind(item, Node.Export_main_decl) { entry_function(item, intern_text("main"), -1); };
+                // Every mem of the entry file is a memory of the module, as in stage 0.
                 if is_kind(item, Node.Mem_decl) {
                     let d = node_decl[first_child(item)];
-                    if not mem_kind_ok(d) { report(Diag.MemKind, item, decl_name[d]); }
-                    else if mem_is_exported(d) { memory_of(d); };
+                    if not mem_kind_ok(d) { report(Diag.MemKind, item, decl_name[d]); } else { memory_of(d); };
                 };
                 if target == Target.Tests and is_kind(item, Node.Test_decl) {
                     entry_function(item, -1, tests);
@@ -1316,10 +1326,23 @@ fn compile(target: Target) I32 {
                 item = next_sibling(item);
             };
         };
+        // A @comptime build exports the generated functions that evaluate
+        // each expression, and the mems they leave the values in.
+        if target == Target.Comptime and file_role[file] == FileRole.Generated.to_i32() and file_root[file] >= 0 {
+            let item = first_child(file_root[file]);
+            while (item >= 0) {
+                if is_kind(item, Node.Fn_decl) and has_prefix(word_of(last_child(first_child(item))), "__comptime_run_") {
+                    let fi = fn_instance(node_decl[last_child(first_child(item))], 0);
+                    func_field_name[function_of(fi)] = fn_debug_name(fi_decl[fi]);
+                };
+                if is_kind(item, Node.Mem_decl) and mem_is_exported(node_decl[first_child(item)]) { memory_of(node_decl[first_child(item)]); };
+                item = next_sibling(item);
+            };
+        };
     };
     // Every function of the program's own files is checked, reached or not.
     for (0 ..< file_root.len()) |file| {
-        if file_role[file] != FileRole.Prelude.to_i32() and file_root[file] >= 0 {
+        if is_own_file(file) and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
             let entry = file_role[file] == FileRole.Entry.to_i32();
             while (item >= 0) {
@@ -1345,6 +1368,13 @@ fn compile(target: Target) I32 {
     };
     if diag_kind.len() > 0 { return -1; };
     encode_module();
+}
+
+fn has_prefix(word: I32, prefix: Str) Bool {
+    if src.interned_size(word) < prefix.len() { return false; };
+    let start = src.interned_start(word);
+    for (0 ..< prefix.len()) |i| { if src[start + i] != prefix.get(i) { return false; }; };
+    true;
 }
 
 // Enqueue a function declaration (or those of an `export lib`).
@@ -1388,6 +1418,7 @@ fn keep_target_diagnostics(target: Target) void {
 
 fn in_target(node: I32, target: Target) Bool {
     if node < 0 { return true; };
+    if target == Target.Comptime and not is_own_file(file_of_token(node_first[node])) { return true; };
     let t = node_first[node];
     let file = file_of_token(t);
     if file_role[file] != FileRole.Entry.to_i32() { return true; };
@@ -1397,6 +1428,7 @@ fn in_target(node: I32, target: Target) Bool {
             let kind = node_kind[item];
             if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
             if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };
+            if kind == Node.Mem_decl.to_i32() and target == Target.Comptime { return true; };
             if kind == Node.Bench_decl.to_i32() { return false; };
             return true;
         };

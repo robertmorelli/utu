@@ -1,0 +1,136 @@
+// ── Generated sources ────────────────────────────────────────────────────────
+//
+// Some of the language is written in the language: the compiler writes utu
+// source for it and adds it to the program as a file of its own, which is
+// parsed and resolved with the rest and checked when it is used.
+//
+// - A byte mem's interner (`src.intern(a, b)`, `src.interned()`, …): an
+//   open-addressing table of FNV-1a hashes over hidden mems, the one stage 0
+//   writes, so ids are the same.
+// - A `@comptime` mem's evaluation: a function that runs the expression into
+//   an exported mem the host reads after running a build of the program
+//   made for it (compile with Target.Comptime).
+
+// The generated file being written.
+mem gen_file: I32;   // [0]: its first byte in src, or -1
+
+fn gen_text(text: Str) void { for (0 ..< text.len()) |i| { src.push(text.get(i)); }; }
+
+// `text` with each `$` replaced by word `name`.
+fn gen_template(text: Str, name: I32) void {
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i);
+        if c == 36 { gen_word(name); } else { src.push(c); };
+    };
+}
+
+fn gen_word(word: I32) void {
+    let start = src.interned_start(word);
+    for (start ..< start + src.interned_size(word)) |i| { src.push(src[i]); };
+}
+
+// Bytes of `src` itself (copied through a buffer: pushing may move nothing,
+// but reads and writes of one mem must not overlap).
+fn gen_span(start: I32, end_: I32) void {
+    let n = end_ - start;
+    let copy = Array[I32].new(n, 0);
+    for (0 ..< n) |i| { copy[i] = src[start + i]; };
+    for (0 ..< n) |i| { src.push(copy[i]); };
+}
+
+// Write the generated sources for the entry file's mems, and parse them as
+// one more file. Called before names are resolved.
+fn generate_sources() void {
+    let start = src.len();
+    for (0 ..< file_root.len()) |file| {
+        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
+            let item = first_child(file_root[file]);
+            while (item >= 0) {
+                if is_kind(item, Node.Mem_decl) { generate_for_mem(item); };
+                item = next_sibling(item);
+            };
+        };
+    };
+    let n = src.len() - start;
+    if n == 0 { return; };
+    // The text becomes a file: its bytes, then the end byte.
+    let copy = Array[I32].new(n, 0);
+    for (0 ..< n) |i| { copy[i] = src[start + i]; };
+    src.resize(start);
+    let file = add_file(n, FileRole.Generated);
+    let at = file_start[file];
+    for (0 ..< n) |i| { src[at + i] = copy[i]; };
+    parse_file(file);
+}
+
+fn generate_for_mem(item: I32) void {
+    let name = word_of(first_child(item));
+    let elem = next_sibling(first_child(item));
+    let w = word_of(elem);
+    let byte_mem = w == Kw.count() or w == Kw.count() + 1;
+    if byte_mem { gen_template(interner_template(), name); };
+    let init = last_child(item);
+    if init != elem and is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Comptime) {
+        // export mem __comptime_NAME: V;
+        // fn __comptime_run_NAME() I32 { let values: Array[V] = EXPR; … }
+        let value = comptime_value_name(elem);
+        gen_template("\nexport mem __comptime_$: ", name);
+        gen_text(value);
+        gen_template(";\nfn __comptime_run_$() I32 {\n    let values: Array[", name);
+        gen_text(value);
+        gen_text("] = ");
+        gen_span(dsl_text_start(init), dsl_text_end(init));
+        gen_template(";\n    __comptime_$.clear();\n    for (values) |v| { __comptime_$.push(v); };\n    values.len();\n}\n", name);
+    };
+}
+
+// The type a @comptime mem's expression gives an Array of: I32 for the
+// narrow kinds and integer enums, else the element type.
+fn comptime_value_name(elem: I32) Str {
+    let w = word_of(elem);
+    if builtin_type(w) { return "I32"; };
+    let d = node_decl[elem];
+    if decl_is(d, Decl.IntEnum) { return "I32"; };
+    let text = "";
+    for (tok_start[node_first[elem]] ..< tok_end[node_first[elem]]) |i| { text = text + Str.from_code_point(src[i]); };
+    text;
+}
+
+fn interner_template() Str {
+    "\nmem __$_slots: I32;\nmem __$_starts: I32;\nmem __$_sizes: I32;\nmem __$_hashes: I32;\n"
+    + "fn __mem_$_intern_reset() void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n"
+    + "    __$_starts.clear();\n    __$_sizes.clear();\n    __$_hashes.clear();\n}\n"
+    + "fn __mem_$_interned() I32 { __$_starts.len(); }\n"
+    + "fn __mem_$_interned_start(id: I32) I32 { __$_starts[id]; }\n"
+    + "fn __mem_$_interned_size(id: I32) I32 { __$_sizes[id]; }\n"
+    + "fn __mem_$_intern_same(a: I32, b: I32, size: I32) Bool {\n    for (0 ..< size) |k| {\n"
+    + "        if $[a + k] != $[b + k] { return false; };\n    };\n    true;\n}\n"
+    + "fn __mem_$_intern_rehash() void {\n    let size = __$_slots.len() * 2;\n    __$_slots.resize(size);\n"
+    + "    for (0 ..< size) |slot| { __$_slots[slot] = 0; };\n    let mask = size - 1;\n"
+    + "    for (0 ..< __$_starts.len()) |id| {\n        let slot = __$_hashes[id] & mask;\n"
+    + "        while (__$_slots[slot] != 0) { slot = (slot + 1) & mask; };\n        __$_slots[slot] = id + 1;\n    };\n}\n"
+    + "fn __mem_$_intern(start: I32, stop: I32) I32 {\n    if __$_slots.len() == 0 { __mem_$_intern_reset(); };\n"
+    + "    let hash = -2128831035;\n    for (start ..< stop) |k| { hash = (hash ^ ($[k] & 255)) * 16777619; };\n"
+    + "    let size = stop - start;\n    let mask = __$_slots.len() - 1;\n    let slot = hash & mask;\n"
+    + "    while (__$_slots[slot] != 0) {\n        let id = __$_slots[slot] - 1;\n"
+    + "        if __$_hashes[id] == hash and __$_sizes[id] == size and __mem_$_intern_same(__$_starts[id], start, size) { return id; };\n"
+    + "        slot = (slot + 1) & mask;\n    };\n    let id = __$_starts.len();\n    __$_starts.push(start);\n"
+    + "    __$_sizes.push(size);\n    __$_hashes.push(hash);\n    __$_slots[slot] = id + 1;\n"
+    + "    if (id + 1) * 2 > __$_slots.len() { __mem_$_intern_rehash(); };\n    id;\n}\n";
+}
+
+// The generated function `__mem_NAME_METHOD` of a mem, or -1.
+fn generated_mem_fn(mem_decl: I32, method: I32) I32 {
+    let start = src.len();
+    gen_text("__mem_");
+    gen_word(decl_name[mem_decl]);
+    gen_text("_");
+    gen_word(mem_method_word[method]);
+    let before = src.interned();
+    let word = src.intern(start, src.len());
+    // A new word names nothing (and keeps its bytes, which it now refers to).
+    if word >= before { return -1; };
+    src.resize(start);
+    let decl = lookup(word);
+    if decl_is(decl, Decl.Fn) { decl; } else { -1; };
+}

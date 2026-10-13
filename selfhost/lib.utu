@@ -46,7 +46,35 @@ export lib {
     // are diagnostics.
     fn compile_program(target: I32) I32 { compile(Target.from_i32(target)); }
 
+    fn file_count() I32 { file_root.len(); }
+
     fn diagnostic_count() I32 { diag_kind.len(); }
+
+    // @comptime: how many mems the host evaluates (with a Comptime build,
+    // calling `__comptime_run_NAME` and reading memory `__comptime_NAME`).
+    fn comptime_mems() I32 { comptime_mem.len(); }
+
+    fn comptime_name(k: I32) Str {
+        let w = decl_name[comptime_mem[k]];
+        let text = "";
+        for (src.interned_start(w) ..< src.interned_start(w) + src.interned_size(w)) |i| { text = text + Str.from_code_point(src[i]); };
+        text;
+    }
+
+    // The size of each value the host reads: 8 for 64-bit kinds, else 4.
+    fn comptime_value_size(k: I32) I32 {
+        let s = mem_storage(comptime_mem[k]);
+        if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
+    }
+
+    // Room for `count` values of mem k; the host writes them at the offset returned, in comptime_bytes.
+    fn comptime_set(k: I32, count: I32) I32 {
+        let at = comptime_bytes.len();
+        comptime_bytes.resize(at + count * comptime_value_size(k));
+        comptime_start[k] = at;
+        comptime_count[k] = count;
+        at;
+    }
 
     fn diagnostic_kind(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
 

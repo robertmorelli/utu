@@ -136,6 +136,9 @@ enum(U8) Diag:
     | DuplicatePattern
     | NotNullable
     | InvalidForSource
+    | InternNotBytes
+    | MemInitializer
+    | MemElementRange
 
 mem diag_kind: U8;
 mem diag_node: I32;
@@ -524,7 +527,7 @@ fn declare_program() void {
         };
     };
     for (0 ..< file_root.len()) |file| {
-        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
+        if declares_items(file) and file_root[file] >= 0 {
             let first_entry = decl_kind.len();
             let item = first_child(file_root[file]);
             while (item >= 0) {
@@ -587,6 +590,8 @@ struct Walk:
     | headers: Bool   // registering methods and aliases, not resolving bodies
 
 fn resolve_names() I32 {
+    intern_known();
+    generate_sources();
     node_decl.resize(node_kind.len());
     for (0 ..< node_kind.len()) |n| { node_decl[n] = -1; };
     word_top.resize(src.interned());
@@ -594,14 +599,44 @@ fn resolve_names() I32 {
     declare_program();
     walk_program(true);
     walk_program(false);
+    find_comptime_mems();
+    save_diagnostics();
     diag_kind.len();
 }
 
+// Resolution's diagnostics, kept so each build (exports, tests, @comptime)
+// starts from them and drops what is outside it.
+mem saved_kind: U8;
+mem saved_node: I32;
+mem saved_word: I32;
+
+fn save_diagnostics() void {
+    saved_kind.resize(diag_kind.len());
+    saved_node.resize(diag_kind.len());
+    saved_word.resize(diag_kind.len());
+    for (0 ..< diag_kind.len()) |i| {
+        saved_kind[i] = diag_kind[i];
+        saved_node[i] = diag_node[i];
+        saved_word[i] = diag_word[i];
+    };
+}
+
+fn restore_diagnostics() void {
+    diag_kind.resize(saved_kind.len());
+    diag_node.resize(saved_kind.len());
+    diag_word.resize(saved_kind.len());
+    for (0 ..< saved_kind.len()) |i| {
+        diag_kind[i] = saved_kind[i];
+        diag_node[i] = saved_node[i];
+        diag_word[i] = saved_word[i];
+    };
+}
+
 fn walk_program(headers: Bool) void {
-    for ([FileRole.Prelude, FileRole.Import, FileRole.Entry]) |role| {
+    for ([FileRole.Prelude, FileRole.Import, FileRole.Entry, FileRole.Generated]) |role| {
         for (0 ..< file_root.len()) |file| {
             if file_role[file] == role.to_i32() and file_root[file] >= 0 {
-                let entry = role == FileRole.Entry;
+                let entry = declares_items(file);
                 let item = first_child(file_root[file]);
                 while (item >= 0) {
                     if is_kind(item, Node.Module_decl) {
