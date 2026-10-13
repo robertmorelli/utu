@@ -25,4 +25,5 @@ diag.utu
 dsl.utu
 json.utu
 json_runtime.utu
+stored.utu
 lib.utu

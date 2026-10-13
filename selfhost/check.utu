@@ -1685,13 +1685,18 @@ fn keep_target_diagnostics(target: Target) void {
 
 fn in_target(node: I32, target: Target) Bool {
     if node < 0 { return true; };
+    // Code a DSL generated is in its site's surface.
+    let site = dsl_site_of(node);
+    if site >= 0 { return in_target(site, target); };
     if target == Target.Comptime and not is_own_file(file_of_token(node_first[node])) { return true; };
     let t = node_first[node];
     let file = file_of_token(t);
     if file_role[file] != FileRole.Entry.to_i32() { return true; };
+    // By place in the file (a DSL's splices are re-read tokens, after the file's).
+    let at = tok_start[t];
     let item = first_child(file_root[file]);
     while (item >= 0) {
-        if node_first[item] <= t and t < node_last[item] {
+        if node_last[item] > node_first[item] and tok_start[node_first[item]] <= at and at < tok_end[node_last[item] - 1] {
             let kind = node_kind[item];
             if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
             if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };

@@ -1953,3 +1953,28 @@ fn attach_within(parent: I32, comments: Comments) void {
         };
     };
 }
+
+// An expression from tokens [first, last), the last an End token: its node,
+// or -1. (A DSL's expansion takes the utu written in its body this way, at
+// its place in the source.)
+fn parse_expression(first: I32, last: I32) I32 {
+    if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
+    intern_words(first, last);
+    let before = node_kind.len();
+    pending.clear();
+    try {
+        let p = Parser { pos: 0 };
+        let e = expression(p);
+        if not at_end(p) { fail(p); };
+        for (before ..< node_kind.len()) |id| {
+            let a = node_first[id];
+            let b = node_last[id];
+            node_first[id] = ptok[a];
+            node_last[id] = if b > a { ptok[b - 1] + 1; } else { ptok[a]; };
+        };
+        e;
+    } catch {
+        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
+        -1;
+    };
+}

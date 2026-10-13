@@ -18,8 +18,39 @@ fn expand_dsls() void {
     while (rounds < 16 and expand_dsl_round()) { rounds += 1; };
 }
 
-// One round: each container's json sites. Whether any was expanded.
+// One round, in stage 0's order: @utu and @css, then @stored, then each
+// container's @json sites. Whether any was expanded.
 fn expand_dsl_round() Bool {
+    let utu = intern_text("utu");
+    let css = intern_text("css");
+    let stored = intern_text("stored");
+    let expanded = false;
+    let before = node_kind.len();
+    for (0 ..< before) |n| {
+        if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) {
+            let w = word_of(first_child(n));
+            if w == utu or w == css {
+                expanded = true;
+                try {
+                    if w == utu { expand_utu(n); } else { expand_css(n); };
+                } catch {
+                    report_dsl_error(n);
+                    dsl_failed.push(n);
+                };
+            };
+        };
+    };
+    for (0 ..< before) |n| {
+        if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == stored {
+            expanded = true;
+            try {
+                expand_stored(n);
+            } catch {
+                report_dsl_error(n);
+                dsl_failed.push(n);
+            };
+        };
+    };
     let json = intern_text("json");
     let containers = Array[I32].new(64, -1);
     let ncontainers = 0;
@@ -37,7 +68,7 @@ fn expand_dsl_round() Bool {
             };
         };
     };
-    if not found { return false; };
+    if not found { return expanded; };
     for (0 ..< ncontainers) |k| { json_expand_container(containers[k], json, count); };
     true;
 }
@@ -94,14 +125,33 @@ fn dsl_fail(message: Str, offset: I32, length: I32) void {
 }
 
 fn report_dsl_error(site: I32) void {
-    let start = dsl_inner_start(site) + dsl_err_offset[0];
+    let start = dsl_byte(site, dsl_err_offset[0]);
     report3(Diag.DslError, site, dsl_err_message[0], start, start + dsl_err_length[0], -1);
 }
 
+// Where offset `offset` (in code units) of a site's body is in src (in bytes).
+fn dsl_byte(site: I32, offset: I32) I32 {
+    let body = dsl_body(site);
+    dsl_inner_start(site) + utf8_length(body.slice(0, if offset < body.len() { offset; } else { body.len(); }));
+}
+
 // ── Grafting ──
+//
+// Generated code points at the site that needed it: a mistake in it is
+// reported there.
+
+mem dsl_file_site: I32;           // by file: the DSL site it was generated for, or -1
+mem dsl_current_site: I32 = [-1];
+
+// The site a generated node stands for, or -1.
+fn dsl_site_of(node: I32) I32 {
+    let file = file_of_token(node_first[node]);
+    if file < dsl_file_site.len() { dsl_file_site[file]; } else { -1; };
+}
 
 // Parse `code` (an expression) and make it the site's value.
 fn graft_expression(site: I32, code: Str) void {
+    dsl_current_site[0] = site;
     let root = parse_generated_file("fn __expansion() void { " + code + "; }");
     if root < 0 { return; };
     let fn_ = first_child(root);
@@ -113,6 +163,7 @@ fn graft_expression(site: I32, code: Str) void {
     node_kind[site] = Node.Paren_expr.to_i32();
     node_child[site] = expr;
     node_next[expr] = -1;
+    fill_splices(expr);
     // The tree changed: parents are found again.
     node_parent.clear();
 }
@@ -150,6 +201,10 @@ fn parse_generated_file(code: Str) I32 {
     let file = add_file(n, FileRole.Generated);
     let at = file_start[file];
     for (0 ..< n) |i| { src[at + i] = copy[i]; };
+    let k = dsl_file_site.len();
+    dsl_file_site.resize(file + 1);
+    for (k ..< file + 1) |f| { dsl_file_site[f] = -1; };
+    dsl_file_site[file] = dsl_current_site[0];
     parse_file(file);
 }
 
@@ -165,6 +220,83 @@ fn parses_as_expression(code: Str) Bool {
     if root < 0 { return false; };
     node_child[root] = -1;
     true;
+}
+
+// ── Splices ──
+//
+// Utu written in a DSL body (an interpolation, a match arm, a default) goes
+// into the expansion as a placeholder name, `__splice_N`; once the
+// expansion is grafted, each placeholder becomes the expression parsed from
+// the body itself, so it keeps its place in the source.
+
+mem splice_start: I32;   // by splice: its span in src
+mem splice_end: I32;
+
+// The utu of `site`'s body at `offset` (`text` long), as a placeholder; -1
+// in splice_failed[0] when it does not parse.
+fn dsl_splice(site: I32, offset: I32, text: Str) Str {
+    let start = dsl_byte(site, offset);
+    let k = splice_start.len();
+    splice_start.push(start);
+    splice_end.push(start + utf8_length(text));
+    "__splice_" + int_text(k);
+}
+
+fn utf8_length(text: Str) I32 {
+    let n = 0;
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i);
+        n += if c < 128 { 1; } else if c < 2048 { 2; } else { 3; };
+    };
+    n;
+}
+
+// Whether the utu at src[start ..< end_] parses as an expression.
+fn splice_parses(site: I32, offset: I32, text: Str) Bool {
+    let start = dsl_byte(site, offset);
+    parse_span(start, start + utf8_length(text)) >= 0;
+}
+
+// The expression written at src[start ..< end_], parsed in place, or -1.
+fn parse_span(start: I32, end_: I32) I32 {
+    let saved = src[end_];
+    src[end_] = end_byte;
+    let first = tok_kind.len();
+    let last = lex(start, end_);
+    src[end_] = saved;
+    parse_expression(first, last);
+}
+
+// Replace the placeholders under `node` with their expressions.
+fn fill_splices(node: I32) void {
+    if node < 0 { return; };
+    if is_kind(node, Node.Identifier) {
+        let name = word_text(word_of(node));
+        if text_at(name, 0, "__splice_") {
+            let k = int_of(name.slice(9, name.len()));
+            let e = parse_span(splice_start[k], splice_end[k]);
+            if e >= 0 {
+                node_kind[node] = Node.Paren_expr.to_i32();
+                node_child[node] = e;
+                node_next[e] = -1;
+                node_first[node] = node_first[e];
+                node_last[node] = node_last[e];
+            };
+        };
+        return;
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        let next = next_sibling(c);
+        fill_splices(c);
+        c = next;
+    };
+}
+
+fn int_of(text: Str) I32 {
+    let v = 0;
+    for (0 ..< text.len()) |i| { v = v * 10 + (text.get(i) - 48); };
+    v;
 }
 
 // ── Text ──

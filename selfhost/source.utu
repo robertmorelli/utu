@@ -48,7 +48,11 @@ fn reset_program() void {
     reset_abi();
     dsl_failed.clear();
     jp_serial[0] = 0;
+    st_serial[0] = 0;
     node_parent.clear();
+    splice_start.clear();
+    splice_end.clear();
+    dsl_file_site.clear();
     intern_keywords();
     for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
     tok_kind.clear();
@@ -132,13 +136,15 @@ fn list_imports(file: I32, root: I32) void {
     };
 }
 
-// The file a token is in.
+// The file a token is in: the one whose bytes it is (a DSL's expansion
+// re-reads utu written in a file, after other files' tokens).
 fn file_of_token(t: I32) I32 {
+    let at = tok_start[t];
     let lo = 0;
-    let hi = file_tok.len() - 1;
+    let hi = file_start.len() - 1;
     while (lo < hi) {
         let mid = (lo + hi + 1) / 2;
-        if file_tok[mid] <= t { lo = mid; } else { hi = mid - 1; };
+        if file_start[mid] <= at { lo = mid; } else { hi = mid - 1; };
     };
     lo;
 }

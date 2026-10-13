@@ -1,0 +1,246 @@
+// ── @stored, @utu, @css ──────────────────────────────────────────────────────
+//
+// `@stored/\ Type "key" [manual] [validate fn] default \/`: typed local
+// storage, as stage 0 writes it (src/compiler/stored.js). Incoming JSON is
+// validated in the host before it is converted, so bad data never
+// half-updates state; a valid value is copied field by field into the
+// state, which keeps references views hold current.
+//
+// `@utu/\ expr \/` is the expression; `@css/\ … \/` is the text, as a Str.
+
+// `@utu/\ e \/`: e.
+fn expand_utu(site: I32) void {
+    let body = dsl_body(site);
+    if not splice_parses(site, 0, body) {
+        dsl_fail("standard dsls (utu): could not parse DSL body as expression", 0, 1);
+    };
+    graft_expression(site, dsl_splice(site, 0, body));
+}
+
+// `@css/\ … \/`: the stylesheet's text (no `/` in the literal, so `*/`
+// before a line break cannot spell the DSL's end).
+fn expand_css(site: I32) void {
+    let literal = js_string(dsl_body(site));
+    let safe = "";
+    for (0 ..< literal.len()) |i| {
+        let c = literal.get(i);
+        if c == 47 { safe = safe + "\\u002f"; } else { safe = safe + Str.from_code_point(c); };
+    };
+    graft_expression(site, "{let value:fun() Str=@es/\\ ()=>" + safe + " \\/;value();}");
+}
+
+// ── @stored ──
+
+mem st_serial: I32 = [0];
+mem st_seq: I32 = [0];
+mem st_type_at: I32 = [0];
+mem st_type_len: I32 = [0];
+
+fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]); }
+
+fn expand_stored(site: I32) void {
+    let prefix = "__stored" + int_text(st_serial[0]) + "_";
+    st_serial[0] += 1;
+    st_seq[0] = 0;
+    graft_expression(site, stored_code(site, prefix));
+}
+
+fn is_stored_scalar(type: Str) Bool { type == "Str" or type == "Bool" or type == "I32" or type == "F64"; }
+
+// Check that a type can be stored (scalars, arrays, acyclic local structs).
+fn stored_shape(written: Str, visiting: I32, file: I32) void {
+    let type = trim_text(written);
+    if type.len() == 0 { stored_fail("Unsupported type in stored schema"); };
+    if is_stored_scalar(type) { return; };
+    if text_at(type, 0, "Array[") {
+        stored_shape(type.slice(6, type.len() - 1), visiting, file);
+        return;
+    };
+    let w = intern_text(type);
+    if visiting >= 0 and list_has(visiting, w) { stored_fail("Stored schemas must be acyclic"); };
+    let node = stored_struct(type, file);
+    if node < 0 { stored_fail("Unsupported stored type " + type + "; use local structs, Array, Str, Bool, I32, or F64"); };
+    let next = list_with(visiting, w);
+    let f = first_child(node);
+    while (f >= 0) {
+        if is_kind(f, Node.Field) { stored_shape(field_type_text(f), next, file); };
+        f = next_sibling(f);
+    };
+}
+
+// The file's struct of that name (the last, in order), or -1.
+fn stored_struct(type: Str, file: I32) I32 {
+    let w = intern_text(type);
+    let found = find_declared(file_root[file], w);
+    if found >= 0 and is_kind(found, Node.Struct_decl) { found; } else { -1; };
+}
+
+fn trim_text(text: Str) Str {
+    let i = 0;
+    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    trim_end(text.slice(i, text.len()));
+}
+
+fn stored_fresh(prefix: Str) Str {
+    let name = prefix + int_text(st_seq[0]);
+    st_seq[0] += 1;
+    name;
+}
+
+// A JS predicate that `v` matches the type.
+fn stored_validate(type: Str, v: Str, file: I32) Str {
+    let t = trim_text(type);
+    if text_at(t, 0, "Array[") { return "Array.isArray(" + v + ")&&" + v + ".length<=100000&&" + v + ".every(v=>" + stored_validate(t.slice(6, t.len() - 1), "v", file) + ")"; };
+    if t == "Str" { return "typeof " + v + "==='string'"; };
+    if t == "Bool" { return "typeof " + v + "==='boolean'"; };
+    if t == "I32" { return "Number.isInteger(" + v + ")&&" + v + ">=-2147483648&&" + v + "<=2147483647"; };
+    if t == "F64" { return "typeof " + v + "==='number'&&Number.isFinite(" + v + ")"; };
+    let node = stored_struct(t, file);
+    let fields = "";
+    let first = true;
+    let f = first_child(node);
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            if not first { fields = fields + "&&"; };
+            fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")";
+            first = false;
+        };
+        f = next_sibling(f);
+    };
+    v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")&&" + fields;
+}
+
+// Utu converting validated JS data `v` into a native value.
+fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
+    let t = trim_text(type);
+    if text_at(t, 0, "Array[") {
+        let element = t.slice(6, t.len() - 1);
+        let array = stored_fresh(prefix);
+        let length = stored_fresh(prefix);
+        let i = stored_fresh(prefix);
+        let item = stored_fresh(prefix);
+        return "{let " + length + ":F64=" + v + ".length;let " + array + ":Array[" + element + "]=[];\n        if " + length + ">0.0 {let " + item + "=" + stored_decode(element, v + "[0]", file, prefix) + ";" + array
+            + "=Array[" + element + "].new(" + length + ".to_i32()," + item + ");let " + i + ":I32=1;while(" + i + "<" + length + ".to_i32()){" + array + "[" + i + "]="
+            + stored_decode(element, v + "[" + i + ".to_f64()]", file, prefix) + ";" + i + "+=1;};};" + array + ";}";
+    };
+    if t == "I32" { return "{let " + prefix + "number:F64=" + v + ";" + prefix + "number.to_i32();}"; };
+    if is_stored_scalar(t) { return v; };
+    let node = stored_struct(t, file);
+    let fields = "";
+    let first = true;
+    let f = first_child(node);
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            if not first { fields = fields + ", "; };
+            fields = fields + field_name(f) + ": " + stored_decode(field_type_text(f), v + "." + field_name(f), file, prefix);
+            first = false;
+        };
+        f = next_sibling(f);
+    };
+    t + " { " + fields + " }";
+}
+
+// Utu converting native value `v` into plain JS data.
+fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
+    let t = trim_text(type);
+    if text_at(t, 0, "Array[") {
+        let array = stored_fresh(prefix);
+        let item = stored_fresh(prefix);
+        return "{let " + array + "=Browser.Array();" + v + " each |" + item + "|{" + array + ".push(" + stored_encode(t.slice(6, t.len() - 1), item, file, prefix) + ");};" + array + ";}";
+    };
+    if is_stored_scalar(t) { return v; };
+    let node = stored_struct(t, file);
+    let fields = "";
+    let first = true;
+    let f = first_child(node);
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            if not first { fields = fields + ", "; };
+            fields = fields + field_name(f) + ": " + stored_encode(field_type_text(f), v + "." + field_name(f), file, prefix);
+            first = false;
+        };
+        f = next_sibling(f);
+    };
+    "&{ " + fields + " }";
+}
+
+fn stored_code(site: I32, prefix: Str) Str {
+    let raw = dsl_body(site);
+    let file = file_of_token(node_first[site]);
+    // Type "key" [manual] [validate fn] default
+    let i = 0;
+    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+    let type_start = i;
+    if i >= raw.len() or not is_upper_code(raw.get(i)) { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    while (i < raw.len() and is_word_code(raw.get(i))) { i += 1; };
+    let type = raw.slice(type_start, i);
+    let gap = i;
+    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+    if i == gap or i >= raw.len() or raw.get(i) != 34 { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    let key_start = i;
+    i += 1;
+    while (i < raw.len() and raw.get(i) != 34 and raw.get(i) != 10) { i += 1; };
+    if i >= raw.len() or raw.get(i) != 34 or i == key_start + 1 { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    i += 1;
+    let key = raw.slice(key_start, i);
+    let gap2 = i;
+    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+    if i == gap2 or i >= raw.len() { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    // Modifiers.
+    let manual = false;
+    let validator = "";
+    let validator_at = 0;
+    let more = true;
+    while (more) {
+        more = false;
+        if text_at(raw, i, "manual") and i + 6 < raw.len() and is_space_code(raw.get(i + 6)) {
+            manual = true;
+            i += 6;
+            while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+            more = true;
+        } else if text_at(raw, i, "validate") and i + 8 < raw.len() and is_space_code(raw.get(i + 8)) {
+            let j = i + 8;
+            while (j < raw.len() and is_space_code(raw.get(j))) { j += 1; };
+            if j < raw.len() and (is_lower_code(raw.get(j)) or raw.get(j) == 95) {
+                let k = j;
+                while (k < raw.len() and is_word_code(raw.get(k))) { k += 1; };
+                if k < raw.len() and is_space_code(raw.get(k)) {
+                    validator = raw.slice(j, k);
+                    validator_at = j;
+                    i = k;
+                    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+                    more = true;
+                };
+            };
+        };
+    };
+    let default_source = raw.slice(i, raw.len());
+    st_type_at[0] = type_start;
+    st_type_len[0] = type.len();
+    stored_shape(type, -1, file);
+    if is_stored_scalar(type) or text_at(type, 0, "Array[") {
+        stored_fail("@stored state must be a struct so updates can apply in place; wrap " + type + " in a struct field");
+    };
+    if not splice_parses(site, i, default_source) { dsl_fail("Invalid @stored default expression", i, trim_end(default_source).len()); };
+    let fallback = dsl_splice(site, i, default_source);
+    if validator.len() > 0 { validator = dsl_splice(site, validator_at, validator); };
+    let state = prefix + "state";
+    let data = prefix + "data";
+    let load = prefix + "load";
+    let register = prefix + "register";
+    let apply_raw = prefix + "decode";
+    let node = stored_struct(type, file);
+    let copies = "";
+    let f = first_child(node);
+    while (f >= 0) {
+        if is_kind(f, Node.Field) { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; "; };
+        f = next_sibling(f);
+    };
+    let check = if validator.len() > 0 { "if not " + validator + "(candidate) {candidate=" + fallback + ";};"; } else { ""; };
+    "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1||!("
+        + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="
+        + prefix + "check(raw);let candidate:" + type + "=" + fallback + ";\n      if json.len()>0 {let " + data + "=Browser.JSON.parse(json);candidate=" + stored_decode(type, data, file, prefix) + ";};\n      " + check + "\n      "
+        + trim_end(copies) + "\n    };\n    let " + load + ":fun(Str) Str=@es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n    "
+        + apply_raw + "(" + load + "(" + key + "));\n    let " + register + ":fun(Str,cl() Str, Bool,cl(Str) void) void=@es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;\n    "
+        + register + "(" + key + ",cl() Str {Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true"; } else { "false"; }) + "," + apply_raw + ");\n    " + state + ";}";
+}

@@ -21,6 +21,7 @@ mem jp_serial: I32 = [0];  // for each site's fresh names (`__json0_`)
 mem jc_type_at: I32 = [0];
 mem jc_type_len: I32 = [0];
 mem jc_pending: I32;       // functions the current site generated, as words
+mem jc_site: I32 = [-1];   // the site being expanded
 
 fn json_expand_container(container: I32, json: I32, count: I32) void {
     jp_container[0] = container;
@@ -41,6 +42,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
             let prefix = "__json" + int_text(jp_serial[0]) + "_";
             jp_serial[0] += 1;
             jc_pending.clear();
+            jc_site[0] = n;
             try {
                 graft_expression(n, json_expand_site(n, prefix));
                 for (0 ..< jc_pending.len()) |k| { jp_functions.push(jc_pending[k]); };
@@ -56,6 +58,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
     let names = "";
     for (0 ..< jp_name_words.len()) |k| { names = names + word_text(jp_name_words[k]); };
     source = source + "fn __json_names() Str {\n    " + js_string(names) + ";\n}\n";
+    dsl_current_site[0] = first_site;
     graft_declarations(container, source);
 }
 
@@ -110,11 +113,11 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     if kind == 0 or kind == 1 {
         dsl_fail("@json " + op + " works on a struct, enum, or Array; wrap " + type + " in a struct field", type_start, type.len());
     };
-    if not parses_as_expression(expr) {
+    if not splice_parses(site, expr_start, expr) {
         let what = if op == "encode" { "value"; } else { "text"; };
         dsl_fail("Invalid " + what + " expression", expr_start, trim_end(expr).len());
     };
-    let input = "(" + expr + ")";
+    let input = dsl_splice(site, expr_start, expr);
     let r = prefix + "reader";
     let w = prefix + "writer";
     let value = prefix + "value";
@@ -841,10 +844,10 @@ fn fresh_name(prefix: Str, name: Str) Str {
 
 // A slice of the body as utu: in parentheses, once it parses.
 fn json_splice(text: Str, start: I32, what: Str) Str {
-    if not parses_as_expression(text) {
+    if not splice_parses(jc_site[0], start, text) {
         dsl_fail("Invalid " + what + " in @json match", start, if text.len() > 1 { text.len(); } else { 1; });
     };
-    "(" + text + ")";
+    dsl_splice(jc_site[0], start, text);
 }
 
 fn json_match(site: I32, raw: Str, prefix: Str) Str {

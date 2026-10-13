@@ -390,7 +390,13 @@ fn diag_end(i: I32) I32 {
 fn diag_at(i: I32) I32 {
     let k = comptime_site(i);
     if k >= 0 { return comptime_text_node[k]; };
-    diag_node[i];
+    let node = diag_node[i];
+    // Code a DSL generated: its site.
+    if node >= 0 {
+        let site = dsl_site_of(node);
+        if site >= 0 { return site; };
+    };
+    node;
 }
 
 fn diag_file(i: I32) I32 {
