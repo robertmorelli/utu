@@ -53,6 +53,7 @@ fn type_text(t: I32) Str {
     if kind == Ty.Null.to_i32() { return "null"; };
     if kind == Ty.Nullable.to_i32() { return "?" + type_text(ty_a[t]); };
     if kind == Ty.Tuple.to_i32() { return ".{" + type_list_text(ty_a[t]) + "}"; };
+    if kind == Ty.Foreign.to_i32() { return foreign_text(t); };
     if kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() {
         return pick(kind == Ty.Fun.to_i32(), "fun(", "cl(") + type_list_text(ty_a[t]) + ") " + type_text(ty_b[t]);
     };
@@ -315,6 +316,14 @@ fn diag_text(i: I32) Str {
         if a == 1 { return "a generator loop binds one value: for (gen()) |value| { … }"; };
         return "for can only iterate an array, got " + type_text(b) + "; count with a range like 0..<n";
     };
+    if k == Diag.UnknownForeignMember { return "Unknown foreign member '" + word_text(view_prefix[a]) + "." + word_text(diag_c[i]) + w + "'"; };
+    if k == Diag.ForeignReadonly { return "Cannot assign to readonly foreign property '" + w + "'"; };
+    if k == Diag.ForeignRecordField { return "Unknown foreign property '" + w + "'"; };
+    if k == Diag.ForeignRecordMissing { return "Missing foreign property '" + w + "'"; };
+    if k == Diag.HostAltArm { return "Every arm of an alt over a host value must name a declared class"; };
+    if k == Diag.HostAltClass { return word_text(view_prefix[a]) + "." + w + " is only a type; narrowing needs a declared runtime class"; };
+    if k == Diag.ForeignNotArray { return type_text(a) + " is not an array type"; };
+    if k == Diag.ForeignOverload { return "No declaration overload accepts " + int_text(a) + " arguments"; };
     if k == Diag.PruneInClosure { return "prune cannot appear inside a closure"; };
     if k == Diag.PruneOutside { return "prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself"; };
     if k == Diag.GeneratorPassThrough { return "a recursive generator passes its own values straight through: `for (" + w + "(…)) |v| { yield v; }`"; };

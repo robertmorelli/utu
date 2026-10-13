@@ -1,0 +1,1836 @@
+// ── Host declarations: types ─────────────────────────────────────────────────
+//
+// A reference into a declaration ABI is read where it is written: a
+// document, the offset of the JSON value, and an environment of generic
+// bindings (`Map<K, V>` is Map's declaration, with K and V bound), so no
+// declaration is ever copied or expanded. References are:
+//
+//   "Str" "F64" "Bool" "void" "any" "unknown" "null" "undefined" "never" …
+//   3                                    a type of the document, by index
+//   {"template": 3, "arguments": [r…]}   a generic type, instantiated
+//   {"parameter": "T", "constraint": r}  a generic parameter
+//   {"literal": "x", "base": "Str"}      a literal type
+//   {"indexed": r, "key": r}             T[K]
+//   {"symbol": "iterator"}               a well-known symbol
+//
+// and a type's declaration is an object with `name`, `properties`, `calls`,
+// `constructors`, `indexes`, `bases`, `parameters`, `union`, `element`, `lib`.
+//
+// A host value's type is Ty.Foreign, whose identity is a word: its
+// canonical spelling (a standard library type by its name, `lib:Node`, so a
+// package's `Node` is the browser's; any other by document and index). Its
+// reference is kept beside it, to read its declaration when it is used.
+
+struct Ref:
+    | doc: I32
+    | at: I32    // a JSON value in src
+    | env: I32   // its bindings: a list of (parameter word, at, env) triples, or -1
+
+mem fty_doc: I32;    // by type (Ty.Foreign): its reference
+mem fty_at: I32;
+mem fty_env: I32;
+mem fty_view: I32;   // the view that named it first, for its spelling
+
+fn reset_foreign() void {
+    fty_doc.clear();
+    fty_at.clear();
+    fty_env.clear();
+    fty_view.clear();
+    any_at[0] = -1;
+    boxed_at.clear();
+    reset_foreign_ops();
+}
+
+fn ref_of(t: I32) Ref { Ref { doc: fty_doc[t], at: fty_at[t], env: fty_env[t] }; }
+
+fn is_foreign(t: I32) Bool { t >= 0 and ty_is(t, Ty.Foreign); }
+
+// ── Reading references ──
+
+// Whether the reference is the JSON string `text`.
+fn ref_is(r: Ref, text: Str) Bool { jstring_is_text(r.at, text); }
+
+// A generic parameter's binding, or -1 (its at), with its env in bind_env[0].
+mem bind_env: I32 = [0];
+
+fn binding_of(env: I32, word: I32) I32 {
+    if env < 0 { return -1; };
+    let i = 0;
+    while (i < vl_len[env]) {
+        if vl_item(env, i) == word {
+            bind_env[0] = vl_item(env, i + 2);
+            return vl_item(env, i + 1);
+        };
+        i += 3;
+    };
+    -1;
+}
+
+// What a reference denotes, past parameters (to their binding, or their
+// constraint) and indexed access (to the property): a reference whose JSON
+// is a string, a number, a template, a literal, or a symbol.
+fn resolved(r: Ref) Ref {
+    let at = r.at;
+    if jis_object(at) {
+        let p = jget(at, "parameter");
+        if p >= 0 {
+            let bound = binding_of(r.env, jstring_word(p));
+            if bound >= 0 { return resolved(Ref { doc: r.doc, at: bound, env: bind_env[0] }); };
+            let c = jget(at, "constraint");
+            if c >= 0 { return resolved(Ref { doc: r.doc, at: c, env: r.env }); };
+            return Ref { doc: r.doc, at: any_ref(), env: -1 };
+        };
+        let indexed = jget(at, "indexed");
+        if indexed >= 0 {
+            // The key, past its parameter: `M[K]` with K bound to "click".
+            let key = jget(resolved(Ref { doc: r.doc, at: jget(at, "key"), env: r.env }).at, "literal");
+            let object = describe(Ref { doc: r.doc, at: indexed, env: r.env });
+            if key >= 0 {
+                let prop = jget_word(jget(object.at, "properties"), jstring_word(key));
+                if prop >= 0 { return resolved(Ref { doc: r.doc, at: jget(prop, "type"), env: object.env }); };
+            };
+            let index = jfirst(jget(object.at, "indexes"));
+            if index >= 0 { return resolved(Ref { doc: r.doc, at: jget(index, "type"), env: object.env }); };
+            return Ref { doc: r.doc, at: any_ref(), env: -1 };
+        };
+    };
+    if jis_object(at) {
+        // A generic instance is its declaration with its parameters bound.
+        let template = jget(at, "template");
+        if template >= 0 {
+            let params = jget(abi_type(r.doc, jint(template)), "parameters");
+            let args = jget(at, "arguments");
+            let m = vl_begin();
+            let p = jfirst(params);
+            let a = jfirst(args);
+            while (p >= 0) {
+                vl_add(jstring_word(p));
+                vl_add(if a >= 0 { a; } else { any_ref(); });
+                vl_add(if a >= 0 { r.env; } else { -1; });
+                p = jnext(p);
+                if a >= 0 { a = jnext(a); };
+            };
+            return Ref { doc: r.doc, at: template, env: vl_end(m) };
+        };
+    };
+    if jis_number(at) { return Ref { doc: r.doc, at: at, env: closed_env(abi_type(r.doc, jint(at)), r.env) }; };
+    r;
+}
+
+// The bindings a numbered type sees. A named declaration (one with bases)
+// is closed: it sees only its own parameters' bindings, whatever its
+// context binds; an anonymous one (a signature, an object type) sees its
+// context's.
+fn closed_env(decl: I32, env: I32) I32 {
+    if env < 0 or jget(decl, "bases") < 0 { return env; };
+    let params = jget(decl, "parameters");
+    if params < 0 { return -1; };
+    let m = vl_begin();
+    let i = 0;
+    while (i < vl_len[env]) {
+        let p = jfirst(params);
+        while (p >= 0) {
+            if jstring_word(p) == vl_item(env, i) {
+                vl_add(vl_item(env, i));
+                vl_add(vl_item(env, i + 1));
+                vl_add(vl_item(env, i + 2));
+            };
+            p = jnext(p);
+        };
+        i += 3;
+    };
+    let out = vl_end(m);
+    if vl_len[out] == 0 { -1; } else { out; };
+}
+
+// The JSON text `"any"`, written once into src.
+mem any_at: I32 = [-1];
+
+fn any_ref() I32 {
+    if any_at[0] < 0 {
+        let at = abi_reserve(5);
+        let text = "\"any\"";
+        for (0 ..< 5) |k| { src[at + k] = text.get(k); };
+        any_at[0] = at;
+    };
+    any_at[0];
+}
+
+// A reference's declaration: the object to read members from (a type of
+// the document, a template's declaration with its arguments bound), or the
+// resolved reference itself when it has none (a string, a literal).
+fn describe(r: Ref) Ref {
+    let x = resolved(r);
+    if jis_number(x.at) { return Ref { doc: x.doc, at: abi_type(x.doc, jint(x.at)), env: x.env }; };
+    x;
+}
+
+// Whether a reference is dynamic: `any` or `unknown`.
+fn ref_dynamic(r: Ref) Bool {
+    let x = resolved(r);
+    ref_is(x, "any") or ref_is(x, "unknown");
+}
+
+// A member of a declaration's object, by key (a field of the JSON object).
+fn desc_get(d: Ref, key: Str) I32 { if jis_object(d.at) { jget(d.at, key); } else { -1; }; }
+
+// ── Canonical spelling ──
+
+fn canonical(r: Ref) Str {
+    let x = resolved(r);
+    let at = x.at;
+    if jis_string(at) { return bytes_text(at + 1, jstring_end(at) - 1); };
+    if jis_number(at) {
+        let decl = abi_type(x.doc, jint(at));
+        let lib = jget(decl, "lib");
+        let text = if lib >= 0 { "lib:" + bytes_text(lib + 1, jstring_end(lib) - 1); } else { "d" + int_text(x.doc) + ":" + int_text(jint(at)); };
+        let params = jget(decl, "parameters");
+        if jlen(params) > 0 {
+            // A generic declaration: with its arguments (`any` where unbound).
+            text = text + "<";
+            let p = jfirst(params);
+            let first = true;
+            while (p >= 0) {
+                if not first { text = text + ","; };
+                let bound = binding_of(x.env, jstring_word(p));
+                text = text + if bound >= 0 { canonical(Ref { doc: x.doc, at: bound, env: bind_env[0] }); } else { "any"; };
+                first = false;
+                p = jnext(p);
+            };
+            return text + ">";
+        };
+        // An anonymous declaration may mention its context's parameters.
+        if x.env >= 0 and jget(decl, "bases") < 0 { text = text + env_text(x); };
+        return text;
+    };
+    bytes_text(at, jend(at));
+}
+
+// The bindings a reference's spelling depends on.
+fn env_text(r: Ref) Str {
+    let text = "{";
+    let i = 0;
+    while (i < vl_len[r.env]) {
+        text = text + word_text(vl_item(r.env, i)) + "=" + canonical(Ref { doc: r.doc, at: vl_item(r.env, i + 1), env: vl_item(r.env, i + 2) }) + ";";
+        i += 3;
+    };
+    text + "}";
+}
+
+// The host value type a reference names (no primitive, no union).
+fn foreign_named(r: Ref, view: I32) I32 {
+    let w = intern_text(canonical(r));
+    let t = ty(Ty.Foreign, w, 0);
+    if t >= fty_doc.len() {
+        let n = fty_doc.len();
+        fty_doc.resize(t + 1);
+        fty_at.resize(t + 1);
+        fty_env.resize(t + 1);
+        fty_view.resize(t + 1);
+        for (n ..< t + 1) |k| { fty_doc[k] = -1; };
+    };
+    if fty_doc[t] < 0 {
+        let x = resolved(r);
+        fty_doc[t] = x.doc;
+        fty_at[t] = x.at;
+        fty_env[t] = x.env;
+        fty_view[t] = view;
+    };
+    t;
+}
+
+// The dynamic host type: `any`.
+fn foreign_any(view: I32) I32 { foreign_named(Ref { doc: view_doc[view], at: any_ref(), env: -1 }, view); }
+
+fn is_dynamic(t: I32) Bool { is_foreign(t) and ref_dynamic(ref_of(t)); }
+
+// The type a declaration reference has in utu: Str, F64, Bool, void, a host
+// value type, or a nullable one (from a union with null or undefined).
+fn foreign_type(r: Ref, view: I32) I32 {
+    let x = resolved(r);
+    let at = x.at;
+    if jis_string(at) {
+        if ref_is(x, "never") or ref_is(x, "void") { return ty_void(); };
+        if ref_is(x, "Str") { return prelude(Prelude.Str); };
+        if ref_is(x, "F64") { return prelude(Prelude.F64); };
+        if ref_is(x, "Bool") { return prelude(Prelude.Bool); };
+        if ref_is(x, "unknown") { return foreign_any(view); };
+        return foreign_named(x, view);
+    };
+    if jis_object(at) {
+        let base = jget(at, "base");
+        if base >= 0 { return foreign_type(Ref { doc: x.doc, at: base, env: -1 }, view); };
+        if jget(at, "symbol") >= 0 { return foreign_named(x, view); };
+    };
+    let d = describe(x);
+    let union = desc_get(d, "union");
+    if union >= 0 { return union_type(d, union, view); };
+    foreign_named(x, view);
+}
+
+// A union: `any` absorbs it; null and undefined make it nullable; members
+// of one type (literal strings) are that type.
+fn union_type(d: Ref, union: I32, view: I32) I32 {
+    let present = -1;
+    let npresent = 0;
+    let absent = false;
+    let same = -2;
+    let m = jfirst(union);
+    while (m >= 0) {
+        let r = Ref { doc: d.doc, at: m, env: d.env };
+        if ref_dynamic(r) { return foreign_any(view); };
+        if ref_is(r, "null") or ref_is(r, "undefined") { absent = true; }
+        else if not ref_is(r, "never") {
+            npresent += 1;
+            if present < 0 { present = m; };
+            let x = resolved(r);
+            let t = if jis_string(x.at) or jget(x.at, "base") >= 0 { foreign_type(r, view); } else { -1; };
+            if same == -2 { same = t; } else if same != t { same = -1; };
+        };
+        m = jnext(m);
+    };
+    if absent {
+        let value = if npresent == 1 { foreign_type(Ref { doc: d.doc, at: present, env: d.env }, view); } else { foreign_named(d, view); };
+        if ty_is(value, Ty.Nullable) { return value; };
+        // A nullable number or Bool is a host value until it is promoted.
+        if value == prelude(Prelude.F64) or value == prelude(Prelude.Bool) { return nullable(boxed_type(value, view)); };
+        return nullable(value);
+    };
+    if same >= 0 { return same; };
+    if npresent == 1 { return foreign_type(Ref { doc: d.doc, at: present, env: d.env }, view); };
+    foreign_named(d, view);
+}
+
+// `?F64` from the host: a JS number or null, held as a host value.
+mem boxed_at: I32;   // by primitive (0 F64, 1 Bool): the JSON `{"boxed":"F64"}`, once
+
+fn boxed_type(t: I32, view: I32) I32 {
+    boxed_at.resize(2);
+    let k = if t == prelude(Prelude.F64) { 0; } else { 1; };
+    let text = if k == 0 { "{\"boxed\":\"F64\"}"; } else { "{\"boxed\":\"Bool\"}"; };
+    if boxed_at[k] <= 0 {
+        let at = abi_reserve(text.len());
+        for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };
+        boxed_at[k] = at;
+    };
+    foreign_named(Ref { doc: view_doc[view], at: boxed_at[k], env: -1 }, view);
+}
+
+// The primitive a boxed type holds, or -1.
+fn boxed_primitive(t: I32) I32 {
+    if not is_foreign(t) { return -1; };
+    let b = jget(fty_at[t], "boxed");
+    if b < 0 { return -1; };
+    if jstring_is_text(b, "F64") { prelude(Prelude.F64); } else { prelude(Prelude.Bool); };
+}
+
+// ── Spelling ──
+
+// `Browser.HTMLInputElement`, `Browser.Map<Str, F64>`.
+fn foreign_text(t: I32) Str {
+    let view = fty_view[t];
+    let prefix = if view >= 0 { word_text(view_prefix[view]) + "."; } else { ""; };
+    prefix + display(ref_of(t), 0);
+}
+
+fn display(r: Ref, depth: I32) Str {
+    if depth > 4 { return "…"; };
+    let at = r.at;
+    if jis_string(at) { return bytes_text(at + 1, jstring_end(at) - 1); };
+    if jis_object(at) {
+        let literal = jget(at, "literal");
+        if literal >= 0 { return bytes_text(literal, jend(literal)); };
+        let boxed = jget(at, "boxed");
+        if boxed >= 0 { return bytes_text(boxed + 1, jstring_end(boxed) - 1); };
+        let p = jget(at, "parameter");
+        if p >= 0 {
+            let bound = binding_of(r.env, jstring_word(p));
+            if bound >= 0 { return display(Ref { doc: r.doc, at: bound, env: bind_env[0] }, depth + 1); };
+            let c = jget(at, "constraint");
+            if c >= 0 and not jstring_is_text(c, "any") and not jstring_is_text(c, "unknown") {
+                return display(Ref { doc: r.doc, at: c, env: r.env }, depth + 1);
+            };
+            return bytes_text(p + 1, jstring_end(p) - 1);
+        };
+    };
+    if jis_number(at) and jlen(jget(abi_type(r.doc, jint(at)), "parameters")) > 0 { return display_generic(r, depth); };
+    let d = describe(r);
+    if jis_object(d.at) {
+        let union = jget(d.at, "union");
+        if union >= 0 and jget(d.at, "name") < 0 {
+            let text = "";
+            let m = jfirst(union);
+            while (m >= 0) {
+                if text.len() > 0 { text = text + " | "; };
+                text = text + display(Ref { doc: d.doc, at: m, env: d.env }, depth + 1);
+                m = jnext(m);
+            };
+            return text;
+        };
+        return decl_name_text(d.at);
+    };
+    bytes_text(at, jend(at));
+}
+
+fn decl_name_text(decl: I32) Str {
+    let name = jget(decl, "name");
+    if name < 0 { return ""; };
+    bytes_text(name + 1, jstring_end(name) - 1);
+}
+
+// ── Members ──
+//
+// A member of a host value (its declaration's property, or a string index
+// signature's), or of a view's root (an export). Found, its type is in
+// member_ref, and whether it is read-only in member_readonly.
+
+mem member_doc: I32 = [0];
+mem member_at: I32 = [0];
+mem member_env: I32 = [0];
+mem member_readonly: I32 = [0];
+
+fn member_ref() Ref { Ref { doc: member_doc[0], at: member_at[0], env: member_env[0] }; }
+
+fn found_member(doc: I32, at: I32, env: I32, readonly: Bool) Bool {
+    member_doc[0] = doc;
+    member_at[0] = at;
+    member_env[0] = env;
+    member_readonly[0] = if readonly { 1; } else { 0; };
+    true;
+}
+
+// Member `key` (a word) of host type t.
+fn foreign_member(t: I32, key: I32, view: I32) Bool {
+    let d = describe(ref_of(t));
+    let prop = jget_word(desc_get(d, "properties"), key);
+    if prop >= 0 { return found_member(d.doc, jget(prop, "type"), d.env, jis_true(jget(prop, "readonly"))); };
+    // A string index signature makes every other name a property (`dataset.id`).
+    let index = jfirst(desc_get(d, "indexes"));
+    while (index >= 0) {
+        if foreign_type(Ref { doc: d.doc, at: jget(index, "key"), env: d.env }, view) == prelude(Prelude.Str) {
+            return found_member(d.doc, jget(index, "type"), d.env, jis_true(jget(index, "readonly")));
+        };
+        index = jnext(index);
+    };
+    // A dynamic value has every member, of dynamic type.
+    if ref_dynamic(ref_of(t)) { return found_member(d.doc, any_ref(), -1, false); };
+    false;
+}
+
+// Export `key` of a view.
+fn root_member(view: I32, key: I32) Bool {
+    let at = jget_word(jget(view_json[view], "exports"), key);
+    if at < 0 { return false; };
+    let readonly = true;
+    let g = jfirst(jget(view_json[view], "mutableGlobals"));
+    while (g >= 0) {
+        if jstring_is(g, src.interned_start(key), src.interned_start(key) + src.interned_size(key)) { readonly = false; };
+        g = jnext(g);
+    };
+    found_member(view_doc[view], at, -1, readonly);
+}
+
+// A view's type named `key` (`Browser.HTMLElement`), as written in source:
+// a bare generic (`Browser.Map`) is its instance of `any` arguments.
+fn foreign_named_type(view: I32, key: I32) I32 {
+    let at = jget_word(jget(view_json[view], "names"), key);
+    if at < 0 { return -1; };
+    let doc = view_doc[view];
+    let params = jget(abi_type(doc, jint(at)), "parameters");
+    let env = -1;
+    if jlen(params) > 0 {
+        let m = vl_begin();
+        let p = jfirst(params);
+        while (p >= 0) {
+            vl_add(jstring_word(p));
+            vl_add(any_ref());
+            vl_add(-1);
+            p = jnext(p);
+        };
+        env = vl_end(m);
+    };
+    foreign_type(Ref { doc: doc, at: at, env: env }, view);
+}
+
+// ── Operations ──
+//
+// An operation on host values is an imported function whose body is the
+// JavaScript stage 0 writes for it (src/compiler/foreign-abi.js), one per
+// signature and body: `(self) => self["value"]`.
+
+mem fop_key: I32;    // by operation: its signature and body, a word
+mem fop_func: I32;   // and its imported function
+
+fn reset_foreign_ops() void {
+    fop_key.clear();
+    fop_func.clear();
+}
+
+fn foreign_op(params: I32, result: I32, body: Str) I32 {
+    let key = intern_text(body + "|" + type_list_text(params) + "|" + type_text(result));
+    for (0 ..< fop_key.len()) |i| { if fop_key[i] == key { return fop_func[i]; }; };
+    let m = vl_begin();
+    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
+    let ft = func_type(vl_end(m), vl_of_result(repr(result)));
+    let name = "__foreign_" + fop_key.len().to_str();
+    let f = add_import_func(name_add("es"), name_add(name), ft);
+    func_debug_name[f] = name_add(name);
+    let start = src.len();
+    gen_text_utf8(body);
+    es_func.push(f);
+    es_start.push(start);
+    es_end.push(src.len());
+    fop_key.push(key);
+    fop_func.push(f);
+    f;
+}
+
+// Text into src, as UTF-8.
+fn gen_text_utf8(text: Str) void {
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i);
+        if c < 128 { src.push(c); }
+        else if c < 2048 {
+            src.push(192 | (c >> 6));
+            src.push(128 | (c & 63));
+        } else {
+            src.push(224 | (c >> 12));
+            src.push(128 | ((c >> 6) & 63));
+            src.push(128 | (c & 63));
+        };
+    };
+}
+
+// The operation's call, its arguments pushed since m.
+fn foreign_call_op(params: I32, result: I32, body: Str, m: I32) I32 {
+    let f = foreign_op(params, result, body);
+    w_node(Op.Call, repr(result), f, 0, m);
+    result;
+}
+
+// A JS string literal of a word: `"value"`.
+fn js_key(w: I32) Str { js_string(word_text(w)); }
+
+fn js_string(text: Str) Str {
+    let out = "\"";
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i);
+        if c == 34 { out = out + "\\\""; }
+        else if c == 92 { out = out + "\\\\"; }
+        else if c == 10 { out = out + "\\n"; }
+        else { out = out + Str.from_code_point(c); };
+    };
+    out + "\"";
+}
+
+fn typeof_name(t: I32) Str {
+    if t == prelude(Prelude.F64) { return "number"; };
+    if t == prelude(Prelude.Str) { return "string"; };
+    if t == prelude(Prelude.Bool) { return "boolean"; };
+    "";
+}
+
+// A value from JS as a utu type: Bool as 1 or 0, absence as null; checked
+// (for a dynamic value read as a primitive) after testing its typeof.
+fn js_output(expr: Str, t: I32, checked: Bool) Str {
+    if checked and typeof_name(t).len() > 0 {
+        let value = if t == prelude(Prelude.Bool) { "+v"; } else { "v"; };
+        let name = typeof_name(t);
+        return "(v => typeof v === " + js_string(name) + " ? " + value + " : (() => { throw new TypeError(" + js_string("expected " + name) + "); })())(" + expr + ")";
+    };
+    if t == prelude(Prelude.Bool) { return "(" + expr + ") ? 1 : 0"; };
+    if ty_is(t, Ty.Nullable) { return "(" + expr + ") ?? null"; };
+    expr;
+}
+
+// A utu value to JS: Bool as a boolean.
+fn js_input(name: Str, t: I32) Str { if t == prelude(Prelude.Bool) { "!!" + name; } else { name; }; }
+
+// A value for a declaration slot: absent as undefined where the slot
+// admits undefined but not null.
+fn js_argument(slot: Ref, name: Str, t: I32) Str {
+    if ty_is(t, Ty.Nullable) {
+        let union = desc_get(describe(slot), "union");
+        if union >= 0 and union_has(slot, union, "undefined") and not union_has(slot, union, "null") { return name + " ?? undefined"; };
+    };
+    js_input(name, t);
+}
+
+fn union_has(slot: Ref, union: I32, text: Str) Bool {
+    let m = jfirst(union);
+    while (m >= 0) {
+        if jstring_is_text(m, text) { return true; };
+        m = jnext(m);
+    };
+    false;
+}
+
+// The result an operation gives: a dynamic one becomes the primitive its
+// context expects, checked (result_checked[0] = 1).
+mem result_checked: I32 = [0];
+
+fn foreign_result(r: Ref, view: I32, expect: I32) I32 {
+    result_checked[0] = 0;
+    let wanted = if expect >= 0 and typeof_name(expect).len() > 0 { expect; } else { -1; };
+    if ref_dynamic(r) {
+        if wanted >= 0 {
+            result_checked[0] = 1;
+            return wanted;
+        };
+        return foreign_any(view);
+    };
+    let t = foreign_type(r, view);
+    if is_dynamic(t) and wanted >= 0 {
+        result_checked[0] = 1;
+        return wanted;
+    };
+    t;
+}
+
+// ── Assignability ──
+//
+// As in stage 0 (src/compiler/type-rules.js): a host type is any of its
+// bases; `any` meets every host value (and Str, and closures, which are JS
+// values too); `Function` takes closures, `Object` any host value; a generic
+// instance of `any` arguments takes any instance; a declared interface
+// takes a value with its required members; a union takes its members.
+
+fn is_host_value(t: I32) Bool { is_foreign(t) or t == prelude(Prelude.Str) or ty_is(t, Ty.Closure); }
+
+fn host_assignable(actual: I32, expected: I32) Bool {
+    if actual == expected { return true; };
+    if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return true; };
+    if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) { return true; };
+    if ty_is(actual, Ty.Nullable) and not ty_is(expected, Ty.Nullable) { return false; };
+    let a = if ty_is(actual, Ty.Nullable) { ty_a[actual]; } else { actual; };
+    let e = if ty_is(expected, Ty.Nullable) { ty_a[expected]; } else { expected; };
+    if a == e { return true; };
+    if is_foreign(a) and is_foreign(e) and has_base(a, e, 0) { return true; };
+    if is_foreign(e) {
+        let host = is_host_value(a);
+        if host and (is_dynamic(e) or is_dynamic(a)) { return true; };
+        let name = decl_name_text(describe(ref_of(e)).at);
+        if name == "Function" and ty_is(a, Ty.Closure) { return true; };
+        if (name == "Object" or name == "object" or name == "{}") and (is_foreign(a) or ty_is(a, Ty.Closure)) { return true; };
+        if is_foreign(a) and same_template_any(a, e) { return true; };
+        if is_foreign(a) and structurally(a, e) { return true; };
+        let union = desc_get(describe(ref_of(e)), "union");
+        if union >= 0 {
+            let m = jfirst(union);
+            while (m >= 0) {
+                let mt = foreign_type(Ref { doc: fty_doc[e], at: m, env: fty_env[e] }, fty_view[e]);
+                if mt != e and not ty_is(mt, Ty.Void) and mt != prelude(Prelude.F64) and mt != prelude(Prelude.Bool)
+                    and host_assignable(a, if ty_is(mt, Ty.Nullable) { ty_a[mt]; } else { mt; }) { return true; };
+                m = jnext(m);
+            };
+        };
+    };
+    // Externref (std) holds any host value.
+    if decl_is(ty_decl(e), Decl.TypeDecl) and repr(e) == vt_externref and is_host_value(a) { return true; };
+    false;
+}
+
+// Whether host type t has base b (through its bases' bases).
+fn has_base(t: I32, b: I32, depth: I32) Bool {
+    if depth > 32 { return false; };
+    let d = describe(ref_of(t));
+    let base = jfirst(desc_get(d, "bases"));
+    while (base >= 0) {
+        let bt = foreign_type(Ref { doc: d.doc, at: base, env: d.env }, fty_view[t]);
+        if bt == b or (is_foreign(bt) and has_base(bt, b, depth + 1)) { return true; };
+        base = jnext(base);
+    };
+    false;
+}
+
+// `Map<Str, F64>` is a `Map<any, any>`.
+fn same_template_any(a: I32, e: I32) Bool {
+    let ra = ref_of(a);
+    let re = ref_of(e);
+    if not jis_number(ra.at) or not jis_number(re.at) or ra.doc != re.doc or jint(ra.at) != jint(re.at) or re.env < 0 or ra.env < 0 { return false; };
+    let i = 0;
+    while (i < vl_len[re.env]) {
+        let x = Ref { doc: re.doc, at: vl_item(re.env, i + 1), env: vl_item(re.env, i + 2) };
+        let y = Ref { doc: ra.doc, at: vl_item(ra.env, i + 1), env: vl_item(ra.env, i + 2) };
+        if not ref_dynamic(x) and canonical(x) != canonical(y) { return false; };
+        i += 3;
+    };
+    true;
+}
+
+// A declared interface is structural: a value whose type has every required
+// member satisfies it (`Set` is an `Iterable`).
+fn structurally(a: I32, e: I32) Bool {
+    let want = describe(ref_of(e));
+    if desc_get(want, "union") >= 0 or ref_dynamic(ref_of(e)) or jlen(desc_get(want, "calls")) > 0 or jlen(desc_get(want, "constructors")) > 0 { return false; };
+    let required = 0;
+    let p = jfirst(desc_get(want, "properties"));
+    while (p >= 0) {
+        if not jis_true(jget(jvalue(p), "optional")) {
+            required += 1;
+            if not has_member_named(a, jstring_word(p), 0) { return false; };
+        };
+        p = jnext(p);
+    };
+    required > 0;
+}
+
+fn has_member_named(t: I32, key: I32, depth: I32) Bool {
+    if depth > 32 { return false; };
+    let d = describe(ref_of(t));
+    if jget_word(desc_get(d, "properties"), key) >= 0 { return true; };
+    let base = jfirst(desc_get(d, "bases"));
+    while (base >= 0) {
+        let bt = foreign_type(Ref { doc: d.doc, at: base, env: d.env }, fty_view[t]);
+        if is_foreign(bt) and has_member_named(bt, key, depth + 1) { return true; };
+        base = jnext(base);
+    };
+    false;
+}
+
+// A value of host type `actual` where `expected` is wanted (on the stack):
+// whether it is one (coerce then accepts it), converting a dynamic value
+// read as a primitive, and a boxed number or Bool read as one.
+fn host_coerce(actual: I32, expected: I32) Bool {
+    if not (is_host_value(actual) or is_host_value(expected) or ty_is(actual, Ty.Nullable) and is_foreign(ty_a[actual])) { return false; };
+    if host_assignable(actual, expected) { return true; };
+    let a = actual;
+    if is_dynamic(a) and typeof_name(expected).len() > 0 {
+        foreign_unbox(a, expected, true);
+        return true;
+    };
+    let boxed = boxed_primitive(a);
+    if boxed >= 0 and boxed == expected {
+        foreign_unbox(a, expected, false);
+        return true;
+    };
+    false;
+}
+
+fn foreign_unbox(from: I32, to: I32, checked: Bool) void {
+    let v = w_pop();
+    let m = w_mark();
+    w_push(v);
+    let mt = vl_begin();
+    vl_add(nullable(foreign_any(fty_view[from])));
+    foreign_call_op(vl_end(mt), to, "(value) => " + js_output("value", to, checked), m);
+}
+
+// ── Checking ──
+
+// How a member is reached in JS: `self["key"]`, or a root's
+// `globalThis["key"]` (a package's, its import), and the prologue that
+// imports it.
+mem access_prologue: I32 = [0];   // a word: the prologue's text ("" for none)
+
+fn member_access(view: I32, key: I32, root: Bool) Str {
+    access_prologue[0] = intern_text("");
+    if not root { return "self[" + js_key(key) + "]"; };
+    let spec = jget(view_json[view], "moduleSpecifier");
+    if not jis_string(spec) { return "globalThis[" + js_key(key) + "]"; };
+    let alias = "__abi" + int_text(view) + "_" + hex_name(word_text(key));
+    access_prologue[0] = intern_text("import { " + js_key(key) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ");
+    alias;
+}
+
+fn hex_name(text: Str) Str {
+    let out = "";
+    for (0 ..< text.len()) |i| {
+        if i > 0 { out = out + "_"; };
+        out = out + hex_of(text.get(i));
+    };
+    out;
+}
+
+fn hex_of(v: I32) Str {
+    let digits = "0123456789abcdef";
+    let out = "";
+    let x = v;
+    if x == 0 { return "0"; };
+    while (x > 0) {
+        out = Str.from_code_point(digits.get(x & 15)) + out;
+        x = x >> 4;
+    };
+    out;
+}
+
+fn unknown_member(at: I32, view: I32, owner: I32, key: I32) I32 {
+    let owner_text = if owner >= 0 { decl_name_text(describe(ref_of(owner)).at) + "."; } else { ""; };
+    report3(Diag.UnknownForeignMember, at, key, view, -1, intern_text(owner_text));
+    error_value();
+}
+
+// The parameter list of one value type (a receiver), erased as stage 0
+// erases host values: every one is `?any`.
+fn erased(t: I32, view: I32) I32 {
+    if is_foreign(t) or ty_is(t, Ty.Nullable) and is_foreign(ty_a[t]) { return nullable(foreign_any(view)); };
+    t;
+}
+
+fn one_type(t: I32) I32 {
+    let m = vl_begin();
+    vl_add(t);
+    vl_end(m);
+}
+
+// `Browser.document`: an export of a view, read.
+fn check_foreign_root(node: I32, view: I32, key: I32, expect: I32) I32 {
+    if not root_member(view, key) { return unknown_member(node, view, -1, key); };
+    let t = foreign_result(member_ref(), view, expect);
+    let checked = result_checked[0] == 1;
+    let access = member_access(view, key, true);
+    let m = w_mark();
+    foreign_call_op(vl_empty(), t, word_text(access_prologue[0]) + "() => " + js_output(access, t, checked), m);
+}
+
+// `x.key`: the value of host type `owner` is on the stack since m.
+fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
+    let view = fty_view[owner];
+    if not foreign_member(owner, key, view) {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return unknown_member(node, view, owner, key);
+    };
+    let t = foreign_result(member_ref(), view, expect);
+    let checked = result_checked[0] == 1;
+    foreign_call_op(one_type(erased(owner, view)), t, "(self) => " + js_output(member_access(view, key, false), t, checked), m);
+}
+
+// `x.key = value`: the value of host type `owner` is on the stack since m.
+fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx) I32 {
+    let view = fty_view[owner];
+    if not foreign_member(owner, key, view) {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return unknown_member(node, view, owner, key);
+    };
+    if member_readonly[0] == 1 {
+        report2(Diag.ForeignReadonly, node, key, -1, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return error_value();
+    };
+    let slot = member_ref();
+    let vt = accept(slot, value, view, cx);
+    coerce(check_expr(value, vt, cx), vt, value);
+    let mt = vl_begin();
+    vl_add(erased(owner, view));
+    vl_add(vt);
+    let body = "(self,value) => { " + member_access(view, key, false) + " = " + js_argument(slot, "value", vt) + "; }";
+    foreign_call_op(vl_end(mt), ty_void(), body, m);
+}
+
+// ── Arguments ──
+
+// JSON text written into src once per compile: a primitive's reference.
+mem prim_at: I32;   // 0 Str, 1 F64, 2 Bool, 3 void
+
+fn prim_ref(t: I32) I32 {
+    prim_at.resize(4);
+    let k = if t == prelude(Prelude.Str) { 0; } else if t == prelude(Prelude.F64) { 1; } else if t == prelude(Prelude.Bool) { 2; } else { 3; };
+    if prim_at[k] <= 0 {
+        let text = if k == 0 { "\"Str\""; } else if k == 1 { "\"F64\""; } else if k == 2 { "\"Bool\""; } else { "\"void\""; };
+        let at = abi_reserve(text.len());
+        for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };
+        prim_at[k] = at;
+    };
+    prim_at[k];
+}
+
+// A utu type as a declaration reference (for a generic binding), or false.
+mem typed_ref_doc: I32 = [0];
+mem typed_ref_at: I32 = [0];
+mem typed_ref_env: I32 = [0];
+
+fn ref_of_type(t: I32, doc: I32) Bool {
+    if is_foreign(t) {
+        typed_ref_doc[0] = fty_doc[t];
+        typed_ref_at[0] = fty_at[t];
+        typed_ref_env[0] = fty_env[t];
+        return true;
+    };
+    if t == prelude(Prelude.Str) or t == prelude(Prelude.F64) or t == prelude(Prelude.Bool) {
+        typed_ref_doc[0] = doc;
+        typed_ref_at[0] = prim_ref(t);
+        typed_ref_env[0] = -1;
+        return true;
+    };
+    false;
+}
+
+// Whether an argument is a closure: written, bound by a let, or typed one.
+fn closure_node(arg: I32) I32 {
+    if is_kind(arg, Node.Closure_expr) { return arg; };
+    if is_kind(arg, Node.Identifier) and decl_is(node_decl[arg], Decl.Local) {
+        let let_node = decl_node[node_decl[arg]];
+        if is_kind(let_node, Node.Bind_expr) and is_kind(last_child(let_node), Node.Closure_expr) { return last_child(let_node); };
+    };
+    -1;
+}
+
+fn is_closure_arg(arg: I32, cx: Cx) Bool {
+    closure_node(arg) >= 0 or (not is_kind(arg, Node.Literal) and ty_is(type_only(arg, -1, cx), Ty.Closure));
+}
+
+fn is_record(arg: I32) Bool { is_kind(arg, Node.Implicit_struct_init); }
+
+// `[…]` with no written type, which its slot makes a JS array.
+fn is_untyped_array(arg: I32) Bool { is_kind(arg, Node.Array_expr); }
+
+// The element a JS array must hold for an array, array-like, or iterable slot, or -1.
+mem element_env: I32 = [0];
+
+fn element_of(slot: Ref, depth: I32) I32 {
+    if depth > 8 { return -1; };
+    let d = describe(slot);
+    if ref_dynamic(slot) {
+        element_env[0] = -1;
+        return any_ref();
+    };
+    let element = desc_get(d, "element");
+    if element >= 0 {
+        element_env[0] = d.env;
+        return element;
+    };
+    let index = jfirst(desc_get(d, "indexes"));
+    while (index >= 0) {
+        if jstring_is_text(jget(index, "key"), "F64") {
+            element_env[0] = d.env;
+            return jget(index, "type");
+        };
+        index = jnext(index);
+    };
+    let union = desc_get(d, "union");
+    let m = jfirst(union);
+    while (m >= 0) {
+        if not jstring_is_text(m, "null") and not jstring_is_text(m, "undefined") and not jstring_is_text(m, "never") {
+            let found = element_of(Ref { doc: d.doc, at: m, env: d.env }, depth + 1);
+            if found >= 0 { return found; };
+        };
+        m = jnext(m);
+    };
+    -1;
+}
+
+// The type an argument takes in a declaration slot: a union's member the
+// argument is, a callback's closure type, the argument's own type in a
+// dynamic slot; else the slot's type.
+fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
+    let s = resolved(slot);
+    if ref_dynamic(s) {
+        if is_null_literal(arg) { return nullable(foreign_any(view)); };
+        if is_untyped_array(arg) { return foreign_any(view); };
+        let c = closure_node(arg);
+        if c >= 0 { return dynamic_callback(c, view, cx); };
+        let t = type_only(arg, -1, cx);
+        if ty_is(t, Ty.Error) or ty_is(t, Ty.Null) { return foreign_any(view); };
+        return t;
+    };
+    let d = describe(s);
+    let union = desc_get(d, "union");
+    if union >= 0 { return accept_union(s, d, union, arg, view, cx); };
+    if jlen(desc_get(d, "calls")) > 0 and is_closure_arg(arg, cx) { return callback_type(d, arg, view, cx); };
+    if decl_name_text(d.at) == "Function" and is_closure_arg(arg, cx) { return type_only(arg, -1, cx); };
+    foreign_type(s, view);
+}
+
+fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
+    let nullable_ = false;
+    let n = 0;
+    let only = -1;
+    let m = jfirst(union);
+    while (m >= 0) {
+        if jstring_is_text(m, "null") or jstring_is_text(m, "undefined") or jstring_is_text(m, "never") { nullable_ = true; }
+        else {
+            n += 1;
+            only = m;
+        };
+        m = jnext(m);
+    };
+    if is_null_literal(arg) and nullable_ { return foreign_type(s, view); };
+    let t = if is_null_literal(arg) { ty_null(); } else { type_only(arg, -1, cx); };
+    // A member the argument's shape picks: an array-like for `[…]`, a
+    // callable for a closure, an object with its fields for `&{…}`.
+    m = jfirst(union);
+    while (m >= 0) {
+        if not (jstring_is_text(m, "null") or jstring_is_text(m, "undefined") or jstring_is_text(m, "never")) {
+            let r = Ref { doc: d.doc, at: m, env: d.env };
+            let md = describe(r);
+            let picked = if is_untyped_array(arg) { element_of(r, 0) >= 0; }
+                else if is_closure_arg(arg, cx) { jlen(desc_get(md, "calls")) > 0 or decl_name_text(md.at) == "Function"; }
+                else if is_record(arg) { jlen(desc_get(md, "calls")) == 0 and record_fits(md, arg); }
+                else { false; };
+            if picked { return wrap_nullable(accept(r, arg, view, cx), nullable_, t); };
+        };
+        m = jnext(m);
+    };
+    let int_literal = is_kind(arg, Node.Literal) and is_kind(first_child(arg), Node.Int_lit);
+    m = jfirst(union);
+    while (m >= 0) {
+        if not (jstring_is_text(m, "null") or jstring_is_text(m, "undefined") or jstring_is_text(m, "never")) {
+            let mt = wrap_nullable(accept(Ref { doc: d.doc, at: m, env: d.env }, arg, view, cx), nullable_, t);
+            let plain = if ty_is(mt, Ty.Nullable) { ty_a[mt]; } else { mt; };
+            if int_literal and plain == prelude(Prelude.F64) { return mt; };
+            if is_dynamic(t) and typeof_name(plain).len() > 0 { return plain; };
+            if t >= 0 and not ty_is(t, Ty.Error) and assignable_to(t, mt) { return t; };
+        };
+        m = jnext(m);
+    };
+    if n == 1 { return wrap_nullable(accept(Ref { doc: d.doc, at: only, env: d.env }, arg, view, cx), nullable_, t); };
+    foreign_type(s, view);
+}
+
+fn wrap_nullable(t: I32, nullable_: Bool, arg_type: I32) I32 {
+    if nullable_ and not ty_is(t, Ty.Nullable) and (ty_is(arg_type, Ty.Null) or ty_is(arg_type, Ty.Nullable)) { return nullable(t); };
+    t;
+}
+
+// Whether a type is assignable to another without converting (for picking).
+fn assignable_to(actual: I32, expected: I32) Bool {
+    if actual == expected or ty_is(actual, Ty.Never) { return true; };
+    if ty_is(expected, Ty.Nullable) and (ty_a[expected] == actual or ty_is(actual, Ty.Null)) { return true; };
+    if ty_is(actual, Ty.Fun) and ty_is(expected, Ty.Closure) and ty_a[actual] == ty_a[expected] and ty_b[actual] == ty_b[expected] { return true; };
+    if ty_is(actual, Ty.Closure) and ty_is(expected, Ty.Closure) and vl_len[ty_a[actual]] == vl_len[ty_a[expected]] { return true; };
+    host_assignable(actual, expected);
+}
+
+// Whether `&{…}` fits an object declaration: each field a property (or an index signature).
+fn record_fits(d: Ref, arg: I32) Bool {
+    let props = desc_get(d, "properties");
+    let indexed = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(d);
+    let f = first_child(arg);
+    while (f >= 0) {
+        if is_kind(f, Node.Field_init) and jget_word(props, word_of(first_child(f))) < 0 and not indexed { return false; };
+        f = next_sibling(f);
+    };
+    true;
+}
+
+// A closure given to a dynamic slot receives dynamic arguments.
+fn dynamic_callback(c: I32, view: I32, cx: Cx) I32 {
+    let m = vl_begin();
+    let list = first_child(c);
+    if is_kind(list, Node.Closure_param_list) {
+        let p = first_child(list);
+        while (p >= 0) {
+            let tn = next_sibling(first_child(p));
+            vl_add(if tn >= 0 { type_of(tn, cx.inst); } else { foreign_any(view); });
+            p = next_sibling(p);
+        };
+    };
+    ty(Ty.Closure, vl_end(m), closure_written_result(c, cx));
+}
+
+// A closure's written result type, or -1 (inferred from its body).
+fn closure_written_result(c: I32, cx: Cx) I32 {
+    let k = first_child(c);
+    while (k >= 0) {
+        if is_kind(k, Node.Return_type) { return type_of(k, cx.inst); };
+        k = next_sibling(k);
+    };
+    -1;
+}
+
+// A JS callback slot's closure type: as many parameters as the closure has
+// (JS passes the rest anyway), typed by the declaration; its own result
+// where the host ignores or does not type the result.
+fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
+    let sig = jfirst(desc_get(d, "calls"));
+    let c = closure_node(arg);
+    if c < 0 { return type_only(arg, -1, cx); };
+    let list = first_child(c);
+    let own = if is_kind(list, Node.Closure_param_list) { first_child(list); } else { -1; };
+    let receiver = own >= 0 and word_text(word_of(first_child(own))) == "this";
+    let arity = if is_kind(list, Node.Closure_param_list) { child_count(list); } else { 0; };
+    if receiver { arity -= 1; };
+    let params = jget(sig, "params");
+    let m = vl_begin();
+    if receiver {
+        let r = jget(sig, "receiver");
+        vl_add(if r >= 0 { foreign_type(Ref { doc: d.doc, at: r, env: d.env }, view); } else { foreign_any(view); });
+        own = next_sibling(own);
+    };
+    let fixed = 0;
+    let rest = -1;
+    let p = jfirst(params);
+    while (p >= 0) {
+        if jis_true(jget(p, "rest")) { rest = p; } else { fixed += 1; };
+        p = jnext(p);
+    };
+    for (0 ..< arity) |i| {
+        let r = callback_slot(d, params, i, fixed, rest);
+        let annotated = param_annotation(own, cx);
+        let t = if annotated >= 0 and ref_dynamic(r) { annotated; } else { foreign_type(r, view); };
+        // An optional parameter is never absent when the host calls back.
+        if i < fixed and jis_true(jget(jitem(params, i), "optional")) and ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+        vl_add(t);
+        if own >= 0 { own = next_sibling(own); };
+    };
+    let result = Ref { doc: d.doc, at: jget(sig, "result"), env: d.env };
+    let x = resolved(result);
+    let loose = ref_is(x, "void") or ref_dynamic(x) or jget(x.at, "parameter") >= 0;
+    let ret = if loose { closure_written_result(c, cx); } else { foreign_type(result, view); };
+    ty(Ty.Closure, vl_end(m), ret);
+}
+
+// Parameter i of a callback signature: a fixed one's, or its rest's element.
+fn callback_slot(d: Ref, params: I32, i: I32, fixed: I32, rest: I32) Ref {
+    if i < fixed { return Ref { doc: d.doc, at: jget(jitem(params, i), "type"), env: d.env }; };
+    if rest >= 0 {
+        let e = element_of(Ref { doc: d.doc, at: jget(rest, "type"), env: d.env }, 0);
+        if e >= 0 { return Ref { doc: d.doc, at: e, env: element_env[0] }; };
+    };
+    Ref { doc: d.doc, at: any_ref(), env: -1 };
+}
+
+// A closure parameter's written type, or -1.
+fn param_annotation(param: I32, cx: Cx) I32 {
+    if param < 0 or next_sibling(first_child(param)) < 0 { return -1; };
+    type_of(next_sibling(first_child(param)), cx.inst);
+}
+
+// ── Calls ──
+
+// The arguments of a call, as nodes (from its argument list, or none).
+fn arg_nodes(args: I32) Array[I32] {
+    let n = child_count(args);
+    let out = Array[I32].new(n + 1, -1);
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    for (0 ..< n) |i| {
+        out[i] = a;
+        a = next_sibling(a);
+    };
+    out;
+}
+
+// Parameter i's slot of a signature: its type, a rest parameter's element.
+fn sig_slot(sig: I32, i: I32, env: I32, doc: I32) Ref {
+    let params = jget(sig, "params");
+    let np = jlen(params);
+    if np == 0 { return Ref { doc: doc, at: any_ref(), env: -1 }; };
+    let p = jitem(params, if i < np - 1 { i; } else { np - 1; });
+    if jis_true(jget(p, "rest")) {
+        let e = element_of(Ref { doc: doc, at: jget(p, "type"), env: env }, 0);
+        if e >= 0 { return Ref { doc: doc, at: e, env: element_env[0] }; };
+        return Ref { doc: doc, at: any_ref(), env: -1 };
+    };
+    if i >= np { return Ref { doc: doc, at: any_ref(), env: -1 }; };
+    Ref { doc: doc, at: jget(p, "type"), env: env };
+}
+
+// The overload the arguments fit best (the first of the best), or -1.
+fn pick_signature(sigs: I32, args: Array[I32], n: I32, d: Ref, view: I32, cx: Cx) I32 {
+    let best = -1;
+    let best_score = -1000000;
+    let s = jfirst(sigs);
+    while (s >= 0) {
+        let params = jget(s, "params");
+        let np = jlen(params);
+        let required = 0;
+        let p = jfirst(params);
+        while (p >= 0) {
+            if not jis_true(jget(p, "optional")) and not jis_true(jget(p, "rest")) { required += 1; };
+            p = jnext(p);
+        };
+        let rest = np > 0 and jis_true(jget(jitem(params, np - 1), "rest"));
+        if n >= required and (rest or n <= np) {
+            let score = 0;
+            for (0 ..< n) |i| { score += arg_score(s, i, args[i], d, view, cx); };
+            if score > best_score {
+                best = s;
+                best_score = score;
+            };
+        };
+        s = jnext(s);
+    };
+    best;
+}
+
+fn arg_score(sig: I32, i: I32, arg: I32, d: Ref, view: I32, cx: Cx) I32 {
+    let params = jget(sig, "params");
+    let np = jlen(params);
+    if np == 0 { return -100; };
+    let p = jitem(params, if i < np - 1 { i; } else { np - 1; });
+    let ptype = jget(p, "type");
+    let string_arg = is_kind(arg, Node.Literal) and is_kind(first_child(arg), Node.String_lit);
+    // A literal-constrained parameter (`K extends keyof M`) takes a matching string literal.
+    let param = jget(ptype, "parameter");
+    if param >= 0 {
+        let literals = literal_members(Ref { doc: d.doc, at: jget(ptype, "constraint"), env: d.env });
+        if literals >= 0 {
+            if not string_arg { return -100; };
+            if union_has_literal(literals, arg) { return 5; };
+            return -100;
+        };
+    };
+    let literal = jget(ptype, "literal");
+    if literal >= 0 {
+        if string_arg and node_text(arg) == bytes_text(literal, jend(literal)) { return 10; };
+        return -10;
+    };
+    let slot = sig_slot(sig, i, d.env, d.doc);
+    if is_untyped_array(arg) {
+        if element_of(slot, 0) >= 0 { return 3; };
+        return -100;
+    };
+    if closure_node(arg) >= 0 {
+        if jlen(desc_get(describe(slot), "calls")) > 0 or ref_dynamic(slot) { return 2; };
+        return 0;
+    };
+    let t = type_only(arg, -1, cx);
+    if not ty_is(t, Ty.Error) and assignable_to(t, accept(slot, arg, view, cx)) { return 2; };
+    0;
+}
+
+// A constraint's union of literal members, or -1.
+fn literal_members(r: Ref) I32 {
+    if r.at < 0 { return -1; };
+    let d = describe(r);
+    let union = desc_get(d, "union");
+    let m = jfirst(union);
+    while (m >= 0) {
+        if jget(m, "literal") >= 0 { return union; };
+        m = jnext(m);
+    };
+    -1;
+}
+
+fn union_has_literal(union: I32, arg: I32) Bool {
+    let text = node_text(arg);
+    let m = jfirst(union);
+    while (m >= 0) {
+        let literal = jget(m, "literal");
+        if literal >= 0 and bytes_text(literal, jend(literal)) == text { return true; };
+        m = jnext(m);
+    };
+    false;
+}
+
+// Generic bindings from the arguments: a parameter slot takes its
+// argument's type (a string literal, where its constraint asks for
+// literals); a callback slot's result parameter takes the closure's result.
+fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
+    let m = vl_begin();
+    let i = 0;
+    while (i < vl_len_safe(d.env)) {
+        vl_add(vl_item(d.env, i));
+        i += 1;
+    };
+    for (0 ..< n) |k| {
+        let slot = sig_slot(sig, k, d.env, d.doc);
+        let p = jget(slot.at, "parameter");
+        if p >= 0 and not bound_in_pending(m, jstring_word(p)) {
+            let literals = literal_members(Ref { doc: d.doc, at: jget(slot.at, "constraint"), env: d.env });
+            if literals >= 0 and is_kind(args[k], Node.Literal) and is_kind(first_child(args[k]), Node.String_lit) {
+                vl_add(jstring_word(p));
+                vl_add(literal_json(args[k]));
+                vl_add(-1);
+            } else if not is_null_literal(args[k]) and closure_node(args[k]) < 0 {
+                let t = type_only(args[k], -1, cx);
+                if ref_of_type(t, d.doc) {
+                    vl_add(jstring_word(p));
+                    vl_add(typed_ref_at[0]);
+                    vl_add(typed_ref_env[0]);
+                };
+            };
+        };
+        // A callback's result parameter (`map<U>(f: (x: T) => U)`) takes the closure's result.
+        let c = closure_node(args[k]);
+        let call = jfirst(desc_get(describe(slot), "calls"));
+        if c >= 0 and call >= 0 {
+            let rp = jget(jget(call, "result"), "parameter");
+            if rp >= 0 and not bound_in_pending(m, jstring_word(rp)) {
+                let ret = closure_written_result(c, cx);
+                if ret < 0 {
+                    let expected = callback_type(describe(slot), args[k], view_of_doc(d.doc), cx);
+                    let actual = type_only(c, expected, cx);
+                    if ty_is(actual, Ty.Closure) { ret = ty_b[actual]; };
+                };
+                if ret >= 0 and ref_of_type(ret, d.doc) {
+                    vl_add(jstring_word(rp));
+                    vl_add(typed_ref_at[0]);
+                    vl_add(typed_ref_env[0]);
+                };
+            };
+        };
+    };
+    let env = vl_end(m);
+    if vl_len[env] == 0 { -1; } else { env; };
+}
+
+fn vl_len_safe(list: I32) I32 { if list < 0 { 0; } else { vl_len[list]; }; }
+
+// Whether the pending list (begun at m) binds parameter word w.
+fn bound_in_pending(m: I32, w: I32) Bool {
+    let i = m;
+    while (i + 2 < vl_pending.len()) {
+        if vl_pending[i] == w { return true; };
+        i += 3;
+    };
+    false;
+}
+
+// `{"literal":"input","base":"Str"}` for a string literal argument, in src.
+fn literal_json(arg: I32) I32 {
+    let text = "{\"literal\":" + node_text(arg) + ",\"base\":\"Str\"}";
+    let at = abi_reserve(text.len());
+    let k = 0;
+    for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };
+    at;
+}
+
+// A call of host function `fn_ref`, reached in JS as `access` (with its
+// receiver, of type `receiver`, on the stack since m; -1 for none).
+fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: I32, access: Str, prologue: Str, construct: Bool, m: I32, expect: I32, cx: Cx) I32 {
+    let d = describe(fn_ref);
+    let a = arg_nodes(args);
+    let n = child_count(args);
+    let calls = desc_get(d, "calls");
+    let ctors = desc_get(d, "constructors");
+    let use_ctors = construct or (jlen(calls) == 0 and jlen(ctors) > 0);
+    let sig = pick_signature(if use_ctors { ctors; } else { calls; }, a, n, d, view, cx);
+    let dynamic = ref_dynamic(fn_ref);
+    if sig < 0 and not dynamic {
+        report2(Diag.ForeignOverload, node, -1, n, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return error_value();
+    };
+    let env = if sig >= 0 { unify_args(sig, a, n, d, cx); } else { -1; };
+    let bound = Ref { doc: d.doc, at: d.at, env: env };
+    let mt = vl_begin();
+    if receiver >= 0 { vl_add(erased(receiver, view)); };
+    let names = "";
+    let invocation = "";
+    for (0 ..< n) |i| {
+        let slot = if sig >= 0 { sig_slot(sig, i, env, d.doc); } else { Ref { doc: d.doc, at: any_ref(), env: -1 }; };
+        let pt = accept(slot, a[i], view, cx);
+        coerce(check_expr(a[i], pt, cx), pt, a[i]);
+        vl_add(erased(pt, view));
+        let name = "p" + int_text(i);
+        if i > 0 {
+            names = names + ",";
+            invocation = invocation + ",";
+        };
+        names = names + name;
+        invocation = invocation + if receiver_closure(a[i]) { "function (...a) { return " + name + "(this, ...a); }"; } else { js_argument(slot, name, pt); };
+    };
+    if sig >= 0 { env = bind_from_context(jget(sig, "result"), d.doc, env, expect); };
+    let result_ref = if sig >= 0 { Ref { doc: d.doc, at: jget(sig, "result"), env: env }; } else { Ref { doc: d.doc, at: any_ref(), env: -1 }; };
+    let t = foreign_result(result_ref, view, expect);
+    let checked = result_checked[0] == 1;
+    let self_ = if receiver >= 0 { if n > 0 { "self,"; } else { "self"; }; } else { ""; };
+    let body = prologue + "(" + self_ + names + ") => " + js_output((if construct or use_ctors { "new "; } else { ""; }) + access + "(" + invocation + ")", t, checked);
+    foreign_call_op(vl_end(mt), t, body, m);
+}
+
+// `cl(this, event) {…}` receives the JS receiver first.
+fn receiver_closure(arg: I32) Bool {
+    let c = closure_node(arg);
+    if c < 0 { return false; };
+    let list = first_child(c);
+    is_kind(list, Node.Closure_param_list) and first_child(list) >= 0 and word_text(word_of(first_child(first_child(list)))) == "this";
+}
+
+// `x.m(args)`: x, of host type `owner`, is on the stack since m.
+fn check_foreign_method(node: I32, owner: I32, key: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let view = fty_view[owner];
+    if not foreign_member(owner, key, view) {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return unknown_member(first_child(node), view, owner, key);
+    };
+    check_foreign_invoke(node, member_ref(), view, args, owner, member_access(view, key, false), "", false, m, expect, cx);
+}
+
+// `Browser.f(args)`, `new Browser.C(args)`: a function or class a view exports.
+fn check_foreign_root_call(node: I32, view: I32, key: I32, args: I32, construct: Bool, m: I32, expect: I32, cx: Cx) I32 {
+    if not root_member(view, key) { return unknown_member(node, view, -1, key); };
+    let access = member_access(view, key, true);
+    check_foreign_invoke(node, member_ref(), view, args, -1, access, word_text(access_prologue[0]), construct, m, expect, cx);
+}
+
+// `new Browser.C(args)`, `new Browser.Intl.NumberFormat(args)`.
+fn check_new(node: I32, expect: I32, cx: Cx) I32 {
+    let callee = first_child(node);
+    let args = next_sibling(callee);
+    let m = w_mark();
+    if is_kind(callee, Node.Type_member_expr) {
+        let owner = node_decl[first_child(callee)];
+        if decl_is(owner, Decl.Foreign) and decl_a[owner] >= 0 {
+            return check_foreign_root_call(node, decl_a[owner], word_of(last_child(callee)), args, true, m, expect, cx);
+        };
+    };
+    if is_kind(callee, Node.Field_expr) {
+        let t = check_base(callee, cx);
+        if is_foreign(t) {
+            let view = fty_view[t];
+            let key = word_of(last_child(callee));
+            if not foreign_member(t, key, view) {
+                w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+                return unknown_member(callee, view, t, key);
+            };
+            return check_foreign_invoke(node, member_ref(), view, args, t, member_access(view, key, false), "", true, m, expect, cx);
+        };
+        w_stack.resize(m);
+    };
+    unsupported(node);
+}
+
+// `x[k]` on a host value: its index signature (or a symbol-keyed member).
+fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let view = fty_view[owner];
+    let d = describe(ref_of(owner));
+    let kt = check_expr(key_node, -1, cx);
+    let info = -1;
+    let index = jfirst(desc_get(d, "indexes"));
+    while (index >= 0) {
+        if info < 0 and foreign_type(Ref { doc: d.doc, at: jget(index, "key"), env: d.env }, view) == kt { info = index; };
+        index = jnext(index);
+    };
+    if info < 0 { info = jfirst(desc_get(d, "indexes")); };
+    if info < 0 and not ref_dynamic(ref_of(owner)) {
+        report2(Diag.UnknownOperator, node, known_word(Known.GetIndex), owner, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let r = if info >= 0 { Ref { doc: d.doc, at: jget(info, "type"), env: d.env }; } else { Ref { doc: d.doc, at: any_ref(), env: -1 }; };
+    let t = foreign_result(r, view, expect);
+    let checked = result_checked[0] == 1;
+    let mt = vl_begin();
+    vl_add(erased(owner, view));
+    vl_add(erased(kt, view));
+    foreign_call_op(vl_end(mt), t, "(self,key) => " + js_output("self[key]", t, checked), m);
+}
+
+// `&{ a: x, b: y }` where a host object is expected: a JS object.
+fn check_foreign_record(node: I32, t: I32, cx: Cx) I32 {
+    let view = fty_view[t];
+    let d = describe(ref_of(t));
+    let props = desc_get(d, "properties");
+    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t));
+    let m = w_mark();
+    let mt = vl_begin();
+    let names = "";
+    let fields = "";
+    let i = 0;
+    let f = next_sibling(first_child(node));
+    while (f >= 0) {
+        if is_kind(f, Node.Field_init) {
+            let key = word_of(first_child(f));
+            let prop = jget_word(props, key);
+            if prop < 0 and not open { report2(Diag.ForeignRecordField, f, key, -1, -1); };
+            let slot = if prop >= 0 { Ref { doc: d.doc, at: jget(prop, "type"), env: d.env }; }
+                else { index_slot(d); };
+            let value = last_child(f);
+            let pt = accept(slot, value, view, cx);
+            coerce(check_expr(value, pt, cx), pt, value);
+            vl_add(erased(pt, view));
+            let name = "p" + int_text(i);
+            if i > 0 {
+                names = names + ",";
+                fields = fields + ",";
+            };
+            names = names + name;
+            fields = fields + "[" + js_key(key) + "]:" + js_argument(slot, name, pt);
+            i += 1;
+        };
+        f = next_sibling(f);
+    };
+    // Every required property is given.
+    let p = jfirst(props);
+    while (p >= 0) {
+        if not jis_true(jget(jvalue(p), "optional")) and not record_names(node, p) { report2(Diag.ForeignRecordMissing, node, jstring_word(p), -1, -1); };
+        p = jnext(p);
+    };
+    foreign_call_op(vl_end(mt), t, "(" + names + ") => ({" + fields + "})", m);
+}
+
+fn index_slot(d: Ref) Ref {
+    let index = jfirst(desc_get(d, "indexes"));
+    if index >= 0 { return Ref { doc: d.doc, at: jget(index, "type"), env: d.env }; };
+    Ref { doc: d.doc, at: any_ref(), env: -1 };
+}
+
+fn record_names(node: I32, key: I32) Bool {
+    let f = next_sibling(first_child(node));
+    while (f >= 0) {
+        if is_kind(f, Node.Field_init) and jstring_is(key, src.interned_start(word_of(first_child(f))), src.interned_start(word_of(first_child(f))) + src.interned_size(word_of(first_child(f)))) { return true; };
+        f = next_sibling(f);
+    };
+    false;
+}
+
+// `[a, b]` where a host array (or array-like) is expected: a JS array, or
+// the typed array a typed-array slot names.
+fn check_foreign_array(node: I32, t: I32, cx: Cx) I32 {
+    let view = fty_view[t];
+    let e = element_of(ref_of(t), 0);
+    let m = w_mark();
+    if e < 0 {
+        report2(Diag.ForeignNotArray, node, -1, t, -1);
+        return error_value();
+    };
+    let slot = Ref { doc: fty_doc[t], at: e, env: element_env[0] };
+    let mt = vl_begin();
+    let names = "";
+    let items = "";
+    let i = 0;
+    let c = first_child(node);
+    while (c >= 0) {
+        let pt = accept(slot, c, view, cx);
+        coerce(check_expr(c, pt, cx), pt, c);
+        vl_add(erased(pt, view));
+        let name = "p" + int_text(i);
+        if i > 0 {
+            names = names + ",";
+            items = items + ",";
+        };
+        names = names + name;
+        items = items + js_input(name, pt);
+        i += 1;
+        c = next_sibling(c);
+    };
+    let lib = jget(describe(ref_of(t)).at, "lib");
+    let typed = if lib >= 0 { bytes_text(lib + 1, jstring_end(lib) - 1); } else { ""; };
+    let value = if is_typed_array(typed) { "new globalThis." + typed + "([" + items + "])"; } else { "[" + items + "]"; };
+    foreign_call_op(vl_end(mt), t, "(" + names + ") => " + value, m);
+}
+
+fn is_typed_array(name: Str) Bool {
+    name == "Int8Array" or name == "Uint8Array" or name == "Uint8ClampedArray" or name == "Int16Array" or name == "Uint16Array"
+        or name == "Int32Array" or name == "Uint32Array" or name == "Float16Array" or name == "Float32Array" or name == "Float64Array"
+        or name == "BigInt64Array" or name == "BigUint64Array";
+}
+
+// `a == b`, `a != b` on host values: JavaScript's identity, `===`.
+fn check_foreign_equal(left_t: I32, right: I32, equal: Bool, m: I32, cx: Cx) I32 {
+    let rt = check_expr(right, -1, cx);
+    let view = if is_foreign(left_t) { fty_view[left_t]; } else { fty_view[ty_a[left_t]]; };
+    let mt = vl_begin();
+    vl_add(erased(left_t, view));
+    vl_add(erased(rt, view));
+    let same = if equal { "==="; } else { "!=="; };
+    foreign_call_op(vl_end(mt), prelude(Prelude.Bool), "(a,b) => " + js_output("a " + same + " b", prelude(Prelude.Bool), false), m);
+}
+
+fn is_foreign_or_nullable(t: I32) Bool { is_foreign(t) or (t >= 0 and ty_is(t, Ty.Nullable) and is_foreign(ty_a[t])); }
+
+// A view of a document (for spelling the types it makes).
+fn view_of_doc(doc: I32) I32 {
+    for (0 ..< view_doc.len()) |v| { if view_doc[v] == doc { return v; }; };
+    0;
+}
+
+// ── Str and F64 ──
+//
+// utu's strings and numbers are JS strings and numbers, so the declared
+// `String` and `Number` members apply to them, where utu has none of its
+// own: `s.toLowerCase()`, `x.toFixed(2)`. Any imported view will do.
+
+// The host type (String, Number) whose member `key` a value of type t
+// reads, or -1.
+fn primitive_host_type(t: I32, key: I32) I32 {
+    let name = if t == prelude(Prelude.Str) { "String"; } else if t == prelude(Prelude.F64) { "Number"; } else { ""; };
+    if name.len() == 0 { return -1; };
+    let w = intern_text(name);
+    for (0 ..< view_doc.len()) |v| {
+        let at = jget_word(jget(view_json[v], "names"), w);
+        if at >= 0 {
+            let host = foreign_type(Ref { doc: view_doc[v], at: at, env: -1 }, v);
+            if is_foreign(host) and foreign_member(host, key, v) { return host; };
+        };
+    };
+    -1;
+}
+
+fn check_foreign_primitive_get(node: I32, t: I32, host: I32, key: I32, m: I32, expect: I32) I32 {
+    let view = fty_view[host];
+    foreign_member(host, key, view);
+    let rt = foreign_result(member_ref(), view, expect);
+    let checked = result_checked[0] == 1;
+    foreign_call_op(one_type(t), rt, "(self) => " + js_output(member_access(view, key, false), rt, checked), m);
+}
+
+fn check_foreign_primitive_method(node: I32, t: I32, host: I32, key: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let view = fty_view[host];
+    foreign_member(host, key, view);
+    check_foreign_invoke(node, member_ref(), view, args, t, member_access(view, key, false), "", false, m, expect, cx);
+}
+
+// `x[k] = v` on a host value: x is on the stack since m.
+fn check_foreign_index_set(node: I32, owner: I32, key_node: I32, value: I32, m: I32, cx: Cx) I32 {
+    let view = fty_view[owner];
+    let d = describe(ref_of(owner));
+    let kt = check_expr(key_node, -1, cx);
+    let info = -1;
+    let index = jfirst(desc_get(d, "indexes"));
+    while (index >= 0) {
+        if info < 0 and foreign_type(Ref { doc: d.doc, at: jget(index, "key"), env: d.env }, view) == kt { info = index; };
+        index = jnext(index);
+    };
+    if info < 0 { info = jfirst(desc_get(d, "indexes")); };
+    let slot = if info >= 0 { Ref { doc: d.doc, at: jget(info, "type"), env: d.env }; } else { Ref { doc: d.doc, at: any_ref(), env: -1 }; };
+    let vt = accept(slot, value, view, cx);
+    coerce(check_expr(value, vt, cx), vt, value);
+    let mt = vl_begin();
+    vl_add(erased(owner, view));
+    vl_add(erased(kt, view));
+    vl_add(erased(vt, view));
+    foreign_call_op(vl_end(mt), ty_void(), "(self,key,value) => { self[key] = " + js_argument(slot, "value", vt) + "; }", m);
+}
+
+// The JS array type an array literal is as the receiver of method `key`
+// native arrays lack (`["a", "b"].forEach(…)`), or -1.
+fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
+    let elem = type_only(first_child(literal), -1, cx);
+    if ty_is(elem, Ty.Error) { return -1; };
+    let native = array_of(elem);
+    if member(ty_decl(native), key, Space.Method) >= 0 { return -1; };
+    let w = intern_text("Array");
+    for (0 ..< view_doc.len()) |v| {
+        let at = jget_word(jget(view_json[v], "names"), w);
+        if at >= 0 and ref_of_type(elem, view_doc[v]) {
+            let params = jget(abi_type(view_doc[v], jint(at)), "parameters");
+            let m = vl_begin();
+            vl_add(jstring_word(jfirst(params)));
+            vl_add(typed_ref_at[0]);
+            vl_add(typed_ref_env[0]);
+            let t = foreign_type(Ref { doc: view_doc[v], at: at, env: vl_end(m) }, v);
+            if is_foreign(t) and foreign_member(t, key, v) { return t; };
+        };
+    };
+    -1;
+}
+
+// ── Closures bound by let ──
+
+// The type the first host call that `let`-bound closure `decl` is passed
+// to gives it, or -1.
+fn first_host_use(decl: I32, let_node: I32, cx: Cx) I32 {
+    let s = next_sibling(let_node);
+    while (s >= 0) {
+        let t = host_use_in(s, decl, cx);
+        if t >= 0 { return t; };
+        s = next_sibling(s);
+    };
+    -1;
+}
+
+fn host_use_in(node: I32, decl: I32, cx: Cx) I32 {
+    if is_kind(node, Node.Call_expr) {
+        let args = next_sibling(first_child(node));
+        let a = if args >= 0 { first_child(args); } else { -1; };
+        let i = 0;
+        while (a >= 0) {
+            if is_kind(a, Node.Identifier) and node_decl[a] == decl {
+                let t = host_argument_type(node, i, cx);
+                if t >= 0 { return t; };
+            };
+            i += 1;
+            a = next_sibling(a);
+        };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        let t = host_use_in(c, decl, cx);
+        if t >= 0 { return t; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+// The type argument i of a call of a host function takes, or -1.
+fn host_argument_type(call: I32, i: I32, cx: Cx) I32 {
+    let callee = first_child(call);
+    let args = next_sibling(callee);
+    let view = -1;
+    if is_kind(callee, Node.Type_member_expr) {
+        let owner = node_decl[first_child(callee)];
+        if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 { return -1; };
+        view = decl_a[owner];
+        if not root_member(view, word_of(last_child(callee))) { return -1; };
+    } else if is_kind(callee, Node.Field_expr) {
+        let m = w_mark();
+        let diags = diag_kind.len();
+        let rt = check_base(callee, cx);
+        w_stack.resize(m);
+        diag_truncate(diags);
+        if not is_foreign(rt) { return -1; };
+        view = fty_view[rt];
+        if not foreign_member(rt, word_of(last_child(callee)), view) { return -1; };
+    } else {
+        return -1;
+    };
+    let d = describe(member_ref());
+    let a = arg_nodes(args);
+    let n = child_count(args);
+    let calls = desc_get(d, "calls");
+    let sig = pick_signature(if jlen(calls) == 0 { desc_get(d, "constructors"); } else { calls; }, a, n, d, view, cx);
+    if sig < 0 { return -1; };
+    let env = unify_args(sig, a, n, d, cx);
+    accept(sig_slot(sig, i, env, d.doc), a[i], view, cx);
+}
+
+
+// A generic declaration's spelling with its arguments: `Map<Str, F64>`, `Str[]`.
+fn display_generic(r: Ref, depth: I32) Str {
+    let decl = abi_type(r.doc, jint(r.at));
+    let base = decl_name_text(decl);
+    let cut = base.len();
+    for (0 ..< base.len()) |i| {
+        if base.get(i) == 60 and cut == base.len() { cut = i; };
+    };
+    base = base.slice(0, cut);
+    let args = "";
+    let n = 0;
+    let p = jfirst(jget(decl, "parameters"));
+    while (p >= 0) {
+        if n > 0 { args = args + ", "; };
+        let bound = binding_of(r.env, jstring_word(p));
+        args = args + if bound >= 0 { display(Ref { doc: r.doc, at: bound, env: bind_env[0] }, depth + 1); } else { "any"; };
+        n += 1;
+        p = jnext(p);
+    };
+    if n == 1 and base.len() >= 2 and base.slice(base.len() - 2, base.len()) == "[]" { return args + "[]"; };
+    base + "<" + args + ">";
+}
+
+// The value type of a host promise type (`Promise<T>`'s T), or -1.
+fn host_promise_value(t: I32) I32 {
+    if not is_foreign(t) { return -1; };
+    let r = resolved(ref_of(t));
+    if not jis_number(r.at) { return -1; };
+    let decl = abi_type(r.doc, jint(r.at));
+    let lib = jget(decl, "lib");
+    let named = if lib >= 0 { bytes_text(lib + 1, jstring_end(lib) - 1); } else { decl_name_text(decl); };
+    if not (named == "Promise" or named.len() > 8 and named.slice(0, 8) == "Promise<") { return -1; };
+    let p = jfirst(jget(decl, "parameters"));
+    if p < 0 { return foreign_any(fty_view[t]); };
+    let bound = binding_of(r.env, jstring_word(p));
+    if bound < 0 { return foreign_any(fty_view[t]); };
+    foreign_type(Ref { doc: r.doc, at: bound, env: bind_env[0] }, fty_view[t]);
+}
+
+// A generic parameter only the result mentions takes the type the context
+// expects, within its constraint, as in TypeScript:
+// `let input: ?Browser.HTMLInputElement = document.querySelector("#q")`.
+fn bind_from_context(result: I32, doc: I32, env: I32, expect: I32) I32 {
+    if expect < 0 { return env; };
+    let wanted = if ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+    if not is_foreign(wanted) { return env; };
+    let out = env;
+    if jget(result, "parameter") >= 0 { out = bind_open(result, doc, out, wanted); };
+    if jis_number(result) {
+        let m = jfirst(jget(abi_type(doc, jint(result)), "union"));
+        while (m >= 0) {
+            if jget(m, "parameter") >= 0 { out = bind_open(m, doc, out, wanted); };
+            m = jnext(m);
+        };
+    };
+    out;
+}
+
+fn bind_open(param: I32, doc: I32, env: I32, wanted: I32) I32 {
+    let w = jstring_word(jget(param, "parameter"));
+    if binding_of(env, w) >= 0 { return env; };
+    let c = jget(param, "constraint");
+    if c >= 0 {
+        let ct = foreign_type(Ref { doc: doc, at: c, env: env }, fty_view[wanted]);
+        if not is_dynamic(ct) and not host_assignable(wanted, ct) { return env; };
+    };
+    let m = vl_begin();
+    for (0 ..< vl_len_safe(env)) |i| { vl_add(vl_item(env, i)); };
+    vl_add(w);
+    vl_add(fty_at[wanted]);
+    vl_add(fty_env[wanted]);
+    vl_end(m);
+}
+
+// The first of F64, Str, Bool with a native method `key`, or -1.
+fn native_owner(key: I32) I32 {
+    for ([Prelude.F64, Prelude.Str, Prelude.Bool]) |p| {
+        let t = prelude(p);
+        if member(ty_decl(t), key, Space.Method) >= 0 { return t; };
+    };
+    -1;
+}
+
+// ── alt over host values ──
+//
+// `alt value { Browser.HTMLInputElement |input| => a, ~> b }` tests each arm
+// with `instanceof` against the declared runtime class: one import per
+// class, which gives the value or null.
+
+fn check_host_alt(node: I32, st: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let s = new_local(repr(st));
+    w_node(Op.LocalSet, vt_none, s, 0, m);
+    let mr = w_mark();
+    let default_ = -1;
+    let c = next_sibling(first_child(node));
+    while (c >= 0) {
+        if is_kind(c, Node.Alt_default) { default_ = c; };
+        c = next_sibling(c);
+    };
+    let t = host_alt_arms(next_sibling(first_child(node)), s, st, expect, default_, cx);
+    w_node(Op.Seq, repr(t), 0, 0, m);
+    t;
+}
+
+fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
+    let a = arm;
+    while (a >= 0 and not is_kind(a, Node.Alt_arm)) { a = next_sibling(a); };
+    if a < 0 {
+        if default_ >= 0 { return check_expr(first_child(default_), expect, cx); };
+        if expect >= 0 and not ty_is(expect, Ty.Void) {
+            w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+            return ty_never();
+        };
+        w_leaf(Op.Nop, vt_none, 0, 0);
+        return ty_void();
+    };
+    let pattern = first_child(a);
+    let owner = if is_kind(pattern, Node.Qualified_type_ref) { node_decl[name_node(first_child(pattern))]; } else { -1; };
+    if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 {
+        report(Diag.HostAltArm, a, -1);
+        return error_value();
+    };
+    let view = decl_a[owner];
+    let class = word_of(name_node(last_child(pattern)));
+    let narrowed = foreign_named_type(view, class);
+    if narrowed < 0 or jget_word(jget(view_json[view], "exports"), class) < 0 {
+        report2(Diag.HostAltClass, a, class, view, -1);
+        return error_value();
+    };
+    let m = w_mark();
+    // tested = (value instanceof C ? value : null)
+    let tested = new_local(vt_externref);
+    let mt = w_mark();
+    w_leaf(Op.LocalGet, repr(st), s, 0);
+    let access = member_access(view, class, true);
+    let params = one_type(erased(st, view));
+    foreign_call_op(params, nullable(narrowed), word_text(access_prologue[0]) + "(value) => value instanceof " + access + " ? value : null", mt);
+    w_node(Op.LocalSet, vt_none, tested, 0, mt);
+    // if tested != null: bind, then the arm; else the next arms.
+    let mi = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_externref, tested, 0);
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc);
+    w_node(Op.Plain, vt_i32, 69, 0, mc);
+    let mthen = w_mark();
+    let c = next_sibling(pattern);
+    if is_kind(c, Node.Identifier) {
+        let d = node_decl[c];
+        decl_ty[d] = narrowed;
+        let mb = w_mark();
+        w_leaf(Op.LocalGet, vt_externref, tested, 0);
+        bind_value(d, narrowed, mb);
+        c = next_sibling(c);
+    };
+    let t1 = check_expr(c, expect, cx);
+    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
+    if t >= 0 { coerce(t1, t, c); };
+    w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mthen);
+    let me = w_mark();
+    let t2 = host_alt_arms(next_sibling(a), s, st, if t >= 0 { t; } else { -1; }, default_, cx);
+    if t < 0 { t = t2; } else { coerce(t2, t, a); };
+    w_node(Op.Seq, repr(t), 0, 0, me);
+    w_node(Op.If, repr(t), new_label(), 0, mi);
+    w_node(Op.Seq, repr(t), 0, 0, m);
+    t;
+}

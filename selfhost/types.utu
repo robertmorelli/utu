@@ -20,6 +20,7 @@ enum(U8) Ty:
     | Tuple     // a: list of types
     | Fun       // a: list of parameter types, b: result type
     | Closure   // a: list of parameter types, b: result type
+    | Foreign   // a host value (foreign.utu); a: its canonical spelling, a word
 
 mem ty_kind: U8;
 mem ty_a: I32;
@@ -255,6 +256,16 @@ fn type_path(node: I32, inst: I32) I32 {
     };
     if kind == Node.Qualified_type_ref.to_i32() or kind == Node.Inline_module_type_path.to_i32() {
         let c = first_child(node);
+        // `Browser.HTMLElement`: a type a view of host declarations names.
+        let host = if name_node(c) >= 0 { node_decl[name_node(c)]; } else { -1; };
+        if decl_is(host, Decl.Foreign) and decl_a[host] >= 0 {
+            let t = foreign_named_type(decl_a[host], word_of(name_node(last_child(node))));
+            if t < 0 {
+                report(Diag.UnknownType, node, word_of(name_node(last_child(node))));
+                return ty_error();
+            };
+            return t;
+        };
         let member_decl = node_decl[name_node(last_child(node))];
         if member_decl < 0 { return ty_error(); };
         let owner = module_of(member_decl);
@@ -354,7 +365,7 @@ fn repr(t: I32) I32 {
     if kind == Ty.Never.to_i32() { return vt_unreachable; };
     if kind == Ty.Nullable.to_i32() { return vt_nullable(repr(ty_a[t])); };
     if kind == Ty.Fun.to_i32() { return vt_ref(fun_heap(t), true); };
-    if kind == Ty.Closure.to_i32() { return vt_externref; };
+    if kind == Ty.Closure.to_i32() or kind == Ty.Foreign.to_i32() { return vt_externref; };
     if kind == Ty.Tuple.to_i32() {
         let m = vl_begin();
         let list = ty_a[t];
@@ -447,6 +458,7 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
 }
 
 fn reset_types() void {
+    reset_foreign();
     ty_kind.clear();
     ty_a.clear();
     ty_b.clear();

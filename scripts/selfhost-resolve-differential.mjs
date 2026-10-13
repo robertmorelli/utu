@@ -75,7 +75,7 @@ for (const entry of Object.keys(baseline).sort()) {
   programs++;
   const definitions = new Map(Object.entries(baseline[entry]).map(([key, value]) =>
     [key, value && { file: value[0], start: value[1], end: value[2], localName: value[3] }]));
-  compare(entry, definitions);
+  await compare(entry, definitions);
 }
 const seconds = ((performance.now() - started) / 1000).toFixed(1);
 for (const line of shown) console.log(line);
@@ -87,8 +87,8 @@ console.log(`${programs} programs: ${totals.same} names resolve as stage 0's, ${
   + `${totals.diagnostics} diagnostics, in ${seconds} s`);
 process.exit(totals.differ ? 1 : 0);
 
-function compare(entry, definitions) {
-  const files = loadProgram(utu, path.join(ROOT, entry));
+async function compare(entry, definitions) {
+  const files = await loadProgram(utu, path.join(ROOT, entry));
   const count = utu.node_count();
   totals.diagnostics += files.diagnostics;
   const view = (mem, Type) => new Type(mem.buffer);

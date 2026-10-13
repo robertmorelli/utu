@@ -293,6 +293,12 @@ fn check_await(node: I32, cx: Cx) I32 {
     let m = w_mark();
     let pt = check_expr(e, -1, cx);
     if ty_is(pt, Ty.Error) { return finish_error(-1, m, cx); };
+    // A host promise (`Promise<Response>`): its value, as utu has it.
+    let host = host_promise_value(pt);
+    if host >= 0 {
+        w_node(Op.Call, repr(host), await_import(host), 0, m);
+        return host;
+    };
     if not is_promise_type(pt) {
         report2(Diag.AwaitNotPromise, node, -1, pt, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);

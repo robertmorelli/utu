@@ -166,6 +166,14 @@ enum(U8) Diag:
     | MemClash
     | PruneOutside
     | PruneInClosure
+    | UnknownForeignMember
+    | ForeignReadonly
+    | ForeignOverload
+    | ForeignRecordField
+    | ForeignRecordMissing
+    | ForeignNotArray
+    | HostAltArm
+    | HostAltClass
 
 // A diagnostic: its kind, the node it is about, a word, and up to three
 // more arguments (types, counts, declarations) its message is made from
@@ -577,6 +585,7 @@ fn declare_program() void {
     for (0 ..< import_file.len()) |i| {
         if import_target[i] == -2 {
             let m = declare_named(Decl.Foreign, first_child(import_node[i]), import_node[i], -1);
+            decl_a[m] = view_of_import(i);
             bind(decl_name[m], m);
         };
     };

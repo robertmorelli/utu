@@ -45,6 +45,7 @@ mem missing_end: I32 = [0];
 // Forget every file, and start a program.
 fn reset_program() void {
     missing_import[0] = -1;
+    reset_abi();
     intern_keywords();
     for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
     tok_kind.clear();

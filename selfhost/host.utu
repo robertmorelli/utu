@@ -8,14 +8,16 @@
 // src/runtime/host-imports.js reads: `{"es":{"es":{"__es_0":"…"}}}`.
 
 mem decl_es: I32;     // by declaration: its imported function, or -1
-mem es_func: I32;     // the @es imports, in order
-mem es_body: I32;     // the DSL node of each
+mem es_func: I32;     // the @es imports (and host declarations' operations), in order
+mem es_start: I32;    // the JS of each: a span of src
+mem es_end: I32;
 
 fn reset_host() void {
     decl_es.resize(decl_kind.len());
     for (0 ..< decl_kind.len()) |d| { decl_es[d] = -1; };
     es_func.clear();
-    es_body.clear();
+    es_start.clear();
+    es_end.clear();
 }
 
 // Whether a node is `@es/\ … \/`.
@@ -30,7 +32,8 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w));
     decl_es[decl] = f;
     es_func.push(f);
-    es_body.push(dsl);
+    es_start.push(dsl_text_start(dsl));
+    es_end.push(dsl_text_end(dsl));
     f;
 }
 
@@ -136,7 +139,7 @@ fn write_es_json() void {
             for (0 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]); };
             json_byte(34);
             json_byte(58);
-            json_string(dsl_text_start(es_body[i]), dsl_text_end(es_body[i]));
+            json_string(es_start[i], es_end[i]);
         };
     };
     json_text("}}");

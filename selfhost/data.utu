@@ -42,6 +42,7 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
 // `&{ a: x }`: the struct type expected.
 fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
     let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+    if is_foreign(t) { return check_foreign_record(node, t, cx); };
     let decl = if t >= 0 { ty_decl(t); } else { -1; };
     if not decl_is(decl, Decl.Struct) {
         report(Diag.ImplicitStructInit, node, -1);
@@ -122,10 +123,13 @@ fn field_of(t: I32, name: I32) I32 {
 }
 
 // `x.f`: a field.
-fn check_field_get(node: I32, cx: Cx) I32 {
+fn check_field_get(node: I32, expect: I32, cx: Cx) I32 {
     let name = last_child(node);
     let m = w_mark();
     let t = check_base(node, cx);
+    if is_foreign(t) { return check_foreign_get(node, t, word_of(name), m, expect); };
+    let host = primitive_host_type(t, word_of(name));
+    if host >= 0 { return check_foreign_primitive_get(node, t, host, word_of(name), m, expect); };
     let field = field_of(t, name);
     if field == -2 { return proto_field_get(node, t, name, m, cx); };
     if field < 0 {
@@ -142,6 +146,10 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let name = last_child(target);
     let m = w_mark();
     let t = check_base(target, cx);
+    if is_foreign(t) {
+        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        return check_foreign_set(target, t, word_of(name), value, m, cx);
+    };
     let field = field_of(t, name);
     if field == -2 {
         if op != Tok.Eq.to_i32() { return unsupported(at); };
@@ -181,6 +189,7 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     let elem = -1;
     if expect >= 0 {
         let e = if ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+        if is_foreign(e) { return check_foreign_array(node, e, cx); };
         if is_array_type(e) { elem = inst_arg(ty_inst(e), 0); };
     };
     let first_elem = first_child(node);
@@ -286,6 +295,7 @@ fn check_index(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_expr(base, -1, cx);
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_foreign(t) and not is_kind(node, Node.Slice_expr) { return check_foreign_index(node, t, last_child(node), m, expect, cx); };
     let decl = member(ty_decl(t), word, Space.Method);
     if decl < 0 {
         report2(Diag.UnknownOperator, node, word, t, -1);
@@ -311,6 +321,10 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_expr(base, -1, cx);
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_foreign(t) {
+        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        return check_foreign_index_set(target, t, last_child(target), value, m, cx);
+    };
     let set = member(ty_decl(t), known_word(Known.SetIndex), Space.Method);
     if set < 0 {
         report2(Diag.UnknownOperator, target, known_word(Known.SetIndex), t, -1);

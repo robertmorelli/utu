@@ -120,7 +120,7 @@ async function worker() {
   });
 
   async function run(file, target) {
-    const files = loadProgram(utu, file);
+    const files = await loadProgram(utu, file);
     const size = await compileProgram(utu, target === 'test' ? 1 : 0);
     if (size < 0) {
       const diagnostics = [];

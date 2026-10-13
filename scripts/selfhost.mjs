@@ -68,13 +68,28 @@ export async function buildSelfhost() {
 
 const ROLE = { entry: 0, import: 1, prelude: 2 };
 
+// The JSON of a declaration ABI's types, made once per document: std:JS and
+// std:Browser are views of one, and share it.
+const typesText = new WeakMap();
+let packageResolver = null;
+
+/** A foreign import's declaration ABI: a platform module's, or a package's. */
+async function foreignABI(raw, prefix, from, stdlib) {
+  if (/^"?(npm|node):/.test(raw)) {
+    packageResolver ??= (await import('../tools/dts/packages.mjs')).nodePackageResolver({ root: ROOT });
+    return packageResolver(JSON.parse(raw), { prefix, from });
+  }
+  const generated = await stdlib.get(raw)();
+  return generated.abi;
+}
+
 /**
  * Give the self-hosted compiler a program: the entry file, the standard
  * library's prelude, and every file they import, then resolve its names.
  * Returns each file's key (path or `std:` name), and the decoder for byte
- * offsets in `src`.
+ * offsets in `src`. Host declarations (std:Browser, npm:…) are read here.
  */
-export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(file, 'utf8'), stdlib = PLATFORM_SOURCES } = {}) {
+export async function loadProgram(utu, entry, { readFile = file => fs.readFileSync(file, 'utf8'), stdlib = PLATFORM_SOURCES } = {}) {
   utu.reset();
   const files = [];
   const byKey = new Map();
@@ -87,6 +102,7 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
     utu.file_parse(file);
     return file;
   };
+  const foreign = [];
   add(entry, readFile(entry), ROLE.entry);
   const prelude = stdlib.get('std:Prelude');
   if (typeof prelude === 'string') add('std:Prelude', prelude, ROLE.prelude);
@@ -96,6 +112,7 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
     const platform = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(raw);
     if (/^"?(npm|node):/.test(raw) || platform && typeof stdlib.get(raw) === 'function') {
       utu.import_foreign(i);
+      foreign.push({ i, raw, from: from.key });
       continue;
     }
     const key = platform ? raw : path.resolve(path.dirname(from.key), JSON.parse(raw));
@@ -120,6 +137,24 @@ export function loadProgram(utu, entry, { readFile = file => fs.readFileSync(fil
       }
     }
     utu.import_bind(i, file);
+  }
+  // Each document once, then each import's view of one.
+  const write = text => {
+    const bytes = new TextEncoder().encode(text);
+    const at = utu.abi_room(bytes.length);
+    new Uint8Array(utu.src.buffer).set(bytes, at);
+    return at;
+  };
+  const docs = new Map();
+  for (const { i, raw, from } of foreign) {
+    let abi;
+    try { abi = await foreignABI(raw, undefined, from, stdlib); } catch { continue; }
+    if (!docs.has(abi.types)) {
+      if (!typesText.has(abi.types)) typesText.set(abi.types, JSON.stringify(abi.types));
+      docs.set(abi.types, utu.abi_doc(write(typesText.get(abi.types))));
+    }
+    const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
+    utu.abi_view(i, docs.get(abi.types), write(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals })));
   }
   files.diagnostics = utu.resolve();
   // @embed: the files' bytes, read relative to the entry file.
@@ -220,7 +255,7 @@ export async function buildWith(compiler) {
   const file = path.join(dir, 'utu.utu');
   fs.writeFileSync(file, text);
   try {
-    const files = loadProgram(compiler, file);
+    const files = await loadProgram(compiler, file);
     const size = await compileProgram(compiler, 0);
     if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
     return new Uint8Array(compiler.out.buffer, 0, size).slice();

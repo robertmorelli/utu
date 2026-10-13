@@ -36,6 +36,18 @@ export lib {
     // The import is of host declarations (std:JS, npm:…), not a utu file.
     fn import_foreign(i: I32) void { import_target[i] = -2; }
 
+    // Host declarations: a document's `types` array, `n` bytes the host
+    // writes at the offset abi_room returns, then each import's view of one
+    // (its prefix, module specifier, exports, names, mutable globals).
+    fn abi_room(n: I32) I32 { abi_reserve(n); }
+
+    fn abi_doc(at: I32) I32 { abi_add_doc(at); }
+
+    fn abi_view(i: I32, doc: I32, at: I32) I32 {
+        import_target[i] = -2;
+        abi_add_view(i, doc, at);
+    }
+
     // The host cannot read the import's file, whose path is `n` bytes the
     // host writes at the offset returned. This ends the build.
     fn import_missing(i: I32, n: I32) I32 {
@@ -106,6 +118,7 @@ export lib {
     }
 
     fn diagnostic_kind(i: I32) Str { diag_kind_name(i); }
+
 
     fn diagnostic_message(i: I32) Str { diag_message(i); }
 

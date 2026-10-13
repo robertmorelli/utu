@@ -179,6 +179,7 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     let st = check_expr(scrutinee, -1, cx);
     let enum_decl = ty_decl(st);
     if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_foreign_or_nullable(st) { return check_host_alt(node, st, m, expect, cx); };
     if not decl_is(enum_decl, Decl.Enum) {
         report(Diag.AltNotEnum, scrutinee, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);

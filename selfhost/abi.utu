@@ -1,0 +1,222 @@
+// ── Host declarations: ABI documents ─────────────────────────────────────────
+//
+// `using Browser from std:Browser` (or `npm:…`, `node:…`) imports a JSON
+// declaration ABI (docs/typescript-abi.md), which the host writes into src
+// as text: a document, its `types` array, once, and a view of it per import
+// (its prefix, module specifier, exports, names, mutable globals). std:JS
+// and std:Browser are views of one document, so their types are shared.
+//
+// Nothing is parsed into a tree: a JSON value is the offset of its first
+// byte in src, and a reference into a document is such an offset, read
+// where it is needed. The one index built is each document's type offsets.
+
+mem abi_doc_types: I32;   // by document: its first entry in abi_type_at
+mem abi_doc_count: I32;   // by document: its number of types
+mem abi_type_at: I32;     // each type's JSON object, by document, in order
+
+mem view_doc: I32;        // by view: its document
+mem view_json: I32;       // by view: its JSON object
+mem view_prefix: I32;     // by view: its prefix, a word (`Browser`)
+mem view_import: I32;     // by view: the import it serves
+
+fn reset_abi() void {
+    abi_doc_types.clear();
+    abi_doc_count.clear();
+    abi_type_at.clear();
+    view_doc.clear();
+    view_json.clear();
+    view_prefix.clear();
+    view_import.clear();
+}
+
+// Room for `n` bytes of JSON at the end of src; returns their offset.
+fn abi_reserve(n: I32) I32 {
+    let at = src.len();
+    src.resize(at + n + 1);
+    src[at + n] = 0;
+    at;
+}
+
+// A document, its `types` array at `at`: index its types.
+fn abi_add_doc(at: I32) I32 {
+    let doc = abi_doc_types.len();
+    abi_doc_types.push(abi_type_at.len());
+    let n = 0;
+    let t = jfirst(at);
+    while (t >= 0) {
+        abi_type_at.push(t);
+        n += 1;
+        t = jnext(t);
+    };
+    abi_doc_count.push(n);
+    doc;
+}
+
+// A view of document `doc`, its JSON object at `at`, for import i.
+fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
+    let v = view_doc.len();
+    view_doc.push(doc);
+    view_json.push(at);
+    let p = jget(at, "prefix");
+    view_prefix.push(if p >= 0 { jstring_word(p); } else { -1; });
+    view_import.push(import_);
+    v;
+}
+
+// The view an import declares, or -1.
+fn view_of_import(i: I32) I32 {
+    for (0 ..< view_import.len()) |v| { if view_import[v] == i { return v; }; };
+    -1;
+}
+
+// The JSON object of type n of document doc.
+fn abi_type(doc: I32, n: I32) I32 {
+    if n < 0 or n >= abi_doc_count[doc] { return -1; };
+    abi_type_at[abi_doc_types[doc] + n];
+}
+
+// ── JSON ──
+//
+// Values are offsets of their first byte. jend gives the offset after one.
+
+fn jws(at: I32) I32 {
+    let i = at;
+    while (src[i] == 32 or src[i] == 10 or src[i] == 13 or src[i] == 9) { i += 1; };
+    i;
+}
+
+fn jend(at: I32) I32 {
+    let c = src[at];
+    if c == 34 { return jstring_end(at); };
+    if c == 123 or c == 91 {
+        // An object or array: to its matching bracket, past strings.
+        let depth = 0;
+        let i = at;
+        while (true) {
+            let b = src[i];
+            if b == 34 { i = jstring_end(i); }
+            else {
+                if b == 123 or b == 91 { depth += 1; }
+                else if b == 125 or b == 93 {
+                    depth -= 1;
+                    if depth == 0 { return i + 1; };
+                };
+                i += 1;
+            };
+        };
+    };
+    // A number, true, false, or null.
+    let i = at;
+    while (not (src[i] == 44 or src[i] == 125 or src[i] == 93 or src[i] == 32 or src[i] == 10 or src[i] == 0)) { i += 1; };
+    i;
+}
+
+fn jstring_end(at: I32) I32 {
+    let i = at + 1;
+    while (src[i] != 34) {
+        if src[i] == 92 { i += 2; } else { i += 1; };
+    };
+    i + 1;
+}
+
+// The first item of an array, or the first key of an object (-1 when empty).
+fn jfirst(at: I32) I32 {
+    if at < 0 or not (src[at] == 123 or src[at] == 91) { return -1; };
+    let i = jws(at + 1);
+    if src[i] == 93 or src[i] == 125 { return -1; };
+    i;
+}
+
+// The item (or key) after the one at `at`, -1 after the last. For an
+// object, `at` is a key and the next is the next key.
+fn jnext(at: I32) I32 {
+    let i = jws(jend(at));
+    if src[i] == 58 { i = jws(jend(jws(i + 1))); };
+    if src[i] == 44 { return jws(i + 1); };
+    -1;
+}
+
+// An object entry's value, given its key.
+fn jvalue(key: I32) I32 { jws(jws(jstring_end(key)) + 1); }
+
+// Whether the string at `at` is the bytes src[start ..< end_] (without escapes).
+fn jstring_is(at: I32, start: I32, end_: I32) Bool {
+    let n = end_ - start;
+    if src[at + 1 + n] != 34 { return false; };
+    for (0 ..< n) |k| { if src[at + 1 + k] != src[start + k] { return false; }; };
+    true;
+}
+
+fn jstring_is_text(at: I32, text: Str) Bool {
+    if src[at] != 34 or src[at + 1 + text.len()] != 34 { return false; };
+    for (0 ..< text.len()) |k| { if src[at + 1 + k] != text.get(k) { return false; }; };
+    true;
+}
+
+// The value of key `key` in the object at `at`, or -1.
+fn jget(at: I32, key: Str) I32 {
+    if at < 0 or src[at] != 123 { return -1; };
+    let k = jfirst(at);
+    while (k >= 0) {
+        if jstring_is_text(k, key) { return jvalue(k); };
+        k = jnext(k);
+    };
+    -1;
+}
+
+// The value of the key that is word w's text, or -1.
+fn jget_word(at: I32, w: I32) I32 {
+    if at < 0 or src[at] != 123 { return -1; };
+    let start = src.interned_start(w);
+    let end_ = start + src.interned_size(w);
+    let k = jfirst(at);
+    while (k >= 0) {
+        if jstring_is(k, start, end_) { return jvalue(k); };
+        k = jnext(k);
+    };
+    -1;
+}
+
+fn jlen(at: I32) I32 {
+    if at < 0 { return 0; };
+    let n = 0;
+    let i = jfirst(at);
+    while (i >= 0) {
+        n += 1;
+        i = jnext(i);
+    };
+    n;
+}
+
+fn jitem(at: I32, index: I32) I32 {
+    if at < 0 { return -1; };
+    let i = jfirst(at);
+    for (0 ..< index) |_k| { if i >= 0 { i = jnext(i); }; };
+    i;
+}
+
+fn jis_number(at: I32) Bool { at >= 0 and ((src[at] >= 48 and src[at] <= 57) or src[at] == 45); }
+
+fn jis_string(at: I32) Bool { at >= 0 and src[at] == 34; }
+
+fn jis_object(at: I32) Bool { at >= 0 and src[at] == 123; }
+
+fn jis_true(at: I32) Bool { at >= 0 and src[at] == 116; }
+
+fn jint(at: I32) I32 {
+    let i = at;
+    let negative = src[i] == 45;
+    if negative { i += 1; };
+    let v = 0;
+    while (src[i] >= 48 and src[i] <= 57) {
+        v = v * 10 + (src[i] - 48);
+        i += 1;
+    };
+    if negative { 0 - v; } else { v; };
+}
+
+// A string's text as a word (escapes kept as written; names have none).
+fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1); }
+
+// A JSON value's text, as a word: the identity of a written reference.
+fn jtext_word(at: I32) I32 { src.intern(at, jend(at)); }
