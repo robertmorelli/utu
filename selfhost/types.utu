@@ -359,7 +359,23 @@ mem struct_heap: I32;
 mem struct_next: I32;      // the next entry for the same declaration, or -1
 mem struct_first: I32;     // by declaration: its first entry, or -1
 
+// By type: its representation once known, else -2 (types are interned, so
+// it is asked of the same ids again and again).
+mem repr_memo: I32;
+
 fn repr(t: I32) I32 {
+    if t < repr_memo.len() and repr_memo[t] != -2 { return repr_memo[t]; };
+    let r = repr_of(t);
+    if t >= repr_memo.len() {
+        let old = repr_memo.len();
+        repr_memo.resize(ty_kind.len());
+        for (old ..< repr_memo.len()) |k| { repr_memo[k] = -2; };
+    };
+    repr_memo[t] = r;
+    r;
+}
+
+fn repr_of(t: I32) I32 {
     let kind = ty_kind[t];
     if kind == Ty.Void.to_i32() { return vt_none; };
     if kind == Ty.Never.to_i32() { return vt_unreachable; };
@@ -460,6 +476,7 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
 fn reset_types() void {
     reset_foreign();
     ty_kind.clear();
+    repr_memo.clear();
     ty_a.clear();
     ty_b.clear();
     ty_table.clear();

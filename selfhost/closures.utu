@@ -89,7 +89,32 @@ fn mark_boxes(body: I32) void {
     find_closures(body, body);
 }
 
+// By node: 1 when a closure is in it (itself included), counted once for
+// the nodes there are; find_closures skips what has none.
+mem closure_below: U8;
+
+fn has_closure(node: I32) Bool {
+    if closure_below.len() != node_kind.len() {
+        closure_below.resize(node_kind.len());
+        for (0 ..< node_kind.len()) |n| { closure_below[n] = 0; };
+        for (0 ..< file_root.len()) |f| { if file_root[f] >= 0 { mark_closures_below(file_root[f]); }; };
+    };
+    closure_below[node] == 1;
+}
+
+fn mark_closures_below(node: I32) Bool {
+    let found = node_kind[node] == Node.Closure_expr.to_i32();
+    let c = node_child[node];
+    while (c >= 0) {
+        if mark_closures_below(c) { found = true; };
+        c = node_next[c];
+    };
+    if found { closure_below[node] = 1; };
+    found;
+}
+
 fn find_closures(node: I32, body: I32) void {
+    if not has_closure(node) { return; };
     // `let f = cl(…) { … f(…) … };`: the closure captures f before f has a
     // value, so f is a box, filled once the closure exists.
     if is_kind(node, Node.Bind_expr) and is_kind(last_child(node), Node.Closure_expr) and is_kind(first_child(node), Node.Identifier) {
