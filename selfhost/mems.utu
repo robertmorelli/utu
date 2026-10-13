@@ -9,16 +9,22 @@
 mem mem_memory: I32;   // by declaration: its memory, or -1 until used
 mem mem_len: I32;      // by declaration: its length global
 mem mem_helpers: I32;  // by declaration: its reserve function (push and resize follow), or -1
+mem mem_hosted: I32;   // by declaration: 1 when the host makes its memory (it uses copy_in or view), 0 not, -1 unknown
+mem mem_host_ops: I32; // by declaration: its copy_in import (view follows), or -1
 
 fn reset_mems() void {
     mem_method_word.clear();
     mem_memory.resize(decl_kind.len());
     mem_len.resize(decl_kind.len());
     mem_helpers.resize(decl_kind.len());
+    mem_hosted.resize(decl_kind.len());
+    mem_host_ops.resize(decl_kind.len());
     for (0 ..< decl_kind.len()) |d| {
         mem_memory[d] = -1;
         mem_len[d] = -1;
         mem_helpers[d] = -1;
+        mem_hosted[d] = -1;
+        mem_host_ops[d] = -1;
     };
 }
 
@@ -119,9 +125,18 @@ fn mem_is_exported(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw
 fn memory_of(decl: I32) I32 {
     if mem_memory[decl] >= 0 { return mem_memory[decl]; };
     let m = memory_kind.len();
-    memory_kind.push(FuncKind.Defined.to_i32());
+    // A mem that copy_in or view reaches from JS is the host's (utu.mem_NAME).
+    let hosted = mem_is_hosted(decl);
+    memory_kind.push(if hosted { FuncKind.Import.to_i32(); } else { FuncKind.Defined.to_i32(); });
     memory_pages.push(1);
-    memory_module_name.push(-1);
+    memory_module_name.push(if hosted { name_add("utu"); } else { -1; });
+    if hosted {
+        memory_field_name.push(name_add("mem_" + word_text(decl_name[decl])));
+        mem_memory[decl] = m;
+        let count = mem_initial_data(decl, m);
+        mem_len[decl] = add_global(vt_i32, true, w_i32_detached(count));
+        return m;
+    };
     memory_field_name.push(if mem_is_exported(decl) { name_from_src(tok_start[node_first[first_child(decl_node[decl])]], tok_end[node_first[first_child(decl_node[decl])]]); } else { -1; });
     mem_memory[decl] = m;
     let count = mem_initial_data(decl, m);
@@ -396,7 +411,7 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
             report2(Diag.MemView, first_child(at), decl_name[decl], mem_storage(decl).to_i32(), -1);
             return error_value();
         };
-        return unsupported(at);
+        return check_mem_host_op(decl, method, args, at, m, cx);
     };
     let helpers = mem_helper_functions(decl);
     if method == MemMethod.Push.to_i32() {
@@ -575,4 +590,84 @@ fn call_interner(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx) I32
     let f = generated_mem_fn(decl, method);
     if f < 0 { return unsupported(at); };
     call_with(fn_instance(f, 0), args, 0, m, at, cx);
+}
+
+// ── Mems the host makes ──
+//
+// copy_in and view reach a mem from JS, so its memory is the host's
+// (src/runtime/host-imports.js memoryImports): utu.mem_NAME, with
+// utu.mem_copy_in_NAME(bytes) → new length and utu.mem_view_NAME(a, b) →
+// a typed array over [a, b).
+
+fn mem_is_hosted(decl: I32) Bool {
+    if mem_hosted[decl] < 0 {
+        mem_hosted[decl] = 0;
+        mem_method(-1);
+        let copy_in = mem_method_word[MemMethod.Copy_in.to_i32()];
+        let view = mem_method_word[MemMethod.View.to_i32()];
+        for (0 ..< node_kind.len()) |n| {
+            if node_kind[n] == Node.Call_expr.to_i32() {
+                let callee = node_child[n];
+                if is_kind(callee, Node.Field_expr) and is_kind(first_child(callee), Node.Identifier) and node_decl[first_child(callee)] == decl {
+                    let w = word_of(last_child(callee));
+                    if w == copy_in or w == view { mem_hosted[decl] = 1; };
+                };
+            };
+        };
+    };
+    mem_hosted[decl] == 1;
+}
+
+fn check_mem_host_op(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
+    memory_of(decl);
+    if mem_host_ops[decl] < 0 {
+        let name = word_text(decl_name[decl]);
+        mem_host_ops[decl] = add_import_func(name_add("utu"), name_add("mem_copy_in_" + name), func_type(vl_one(vt_externref), vl_of_result(vt_i32)));
+        let mp = vl_begin();
+        vl_add(vt_i32);
+        vl_add(vt_i32);
+        add_import_func(name_add("utu"), name_add("mem_view_" + name), func_type(vl_end(mp), vl_of_result(vt_externref)));
+    };
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    if method == MemMethod.Copy_in.to_i32() {
+        let t = check_expr(a, -1, cx);
+        if not is_host_value(t) and not ty_is(t, Ty.Error) { mismatch(a, foreign_any(0), t); };
+        w_node(Op.Call, vt_i32, mem_host_ops[decl], 0, m);
+        w_node(Op.GlobalSet, vt_none, mem_len[decl], 0, m);
+        return ty_void();
+    };
+    let i32_t = prelude(Prelude.I32);
+    coerce(check_expr(a, i32_t, cx), i32_t, a);
+    let b = next_sibling(a);
+    coerce(check_expr(b, i32_t, cx), i32_t, b);
+    w_node(Op.Call, vt_externref, mem_host_ops[decl] + 1, 0, m);
+    mem_view_type(decl);
+}
+
+// The typed array a view of the mem is: JS.Uint8Array, JS.Float64Array, ….
+fn mem_view_type(decl: I32) I32 {
+    let w = intern_text(view_array_name(mem_storage(decl)));
+    for (0 ..< view_doc.len()) |v| {
+        let t = foreign_named_type(v, w);
+        if t >= 0 { return t; };
+    };
+    foreign_any(0);
+}
+
+fn write_mems_json() void {
+    let any = false;
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 { any = true; };
+    };
+    if not any { return; };
+    json_text("\"mems\":[");
+    let first = true;
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 {
+            if not first { json_byte(44); };
+            first = false;
+            json_text("{\"name\":\"" + word_text(decl_name[d]) + "\",\"kind\":\"" + Storage.name(mem_storage(d)) + "\",\"host\":true}");
+        };
+    };
+    json_byte(93);
 }

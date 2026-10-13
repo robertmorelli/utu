@@ -244,6 +244,7 @@ mem memory_kind: U8;       // FuncKind
 mem memory_pages: I32;
 mem memory_module_name: I32;
 mem memory_field_name: I32;  // import: field name; defined: export name, or -1
+mem memory_index: I32;       // by memory: its index (imported ones first)
 
 mem data_memory: I32;      // its memory
 mem data_start: I32;       // bytes, in data_bytes
@@ -639,6 +640,20 @@ mem type_index: I32;   // by heap type
 mem type_order: I32;   // heap types in index order
 
 fn assign_indices() void {
+    memory_index.resize(memory_kind.len());
+    let next_m = 0;
+    for (0 ..< memory_kind.len()) |m| {
+        if memory_kind[m] == FuncKind.Import.to_i32() {
+            memory_index[m] = next_m;
+            next_m += 1;
+        };
+    };
+    for (0 ..< memory_kind.len()) |m| {
+        if memory_kind[m] != FuncKind.Import.to_i32() {
+            memory_index[m] = next_m;
+            next_m += 1;
+        };
+    };
     let n = ht_kind.len();
     type_index.resize(n);
     type_order.clear();
@@ -901,7 +916,7 @@ fn encode_exports() void {
     let count = 0;
     for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 { count += 1; }; };
     for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] >= 0 { count += 1; }; };
-    for (0 ..< memory_kind.len()) |m| { if memory_field_name[m] >= 0 { count += 1; }; };
+    for (0 ..< memory_kind.len()) |m| { if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.to_i32() { count += 1; }; };
     if count == 0 { return; };
     leb_u(false, count);
     for (0 ..< func_kind.len()) |f| {
@@ -915,7 +930,7 @@ fn encode_exports() void {
         if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.to_i32() {
             put_name(false, memory_field_name[m]);
             sec.push(2);
-            leb_u(false, m);
+            leb_u(false, memory_index[m]);
         };
     };
     for (0 ..< glob_kind.len()) |g| {
@@ -987,7 +1002,7 @@ fn encode_data() void {
     if data_memory.len() == 0 { return; };
     leb_u(false, data_memory.len());
     for (0 ..< data_memory.len()) |d| {
-        let m = data_memory[d];
+        let m = if data_memory[d] < 0 { -1; } else { memory_index[data_memory[d]]; };
         if m < 0 {
             sec.push(1);
         } else if m == 0 {
@@ -1184,14 +1199,15 @@ fn emit(node: I32, f: I32) void {
         op1(b);
         // memarg: alignment (with bit 6 set when a memory index follows), the memory, offset 0
         let align = natural_align(b);
-        if a == 0 { leb_u(true, align); } else { leb_u(true, align | 64); leb_u(true, a); };
+        let mi = memory_index[a];
+        if mi == 0 { leb_u(true, align); } else { leb_u(true, align | 64); leb_u(true, mi); };
         leb_u(true, 0);
     }
-    else if op == Op.MemorySize.to_i32() { op1(63); leb_u(true, a); }
-    else if op == Op.MemoryGrow.to_i32() { op1(64); leb_u(true, a); }
-    else if op == Op.MemoryCopy.to_i32() { op1(252); leb_u(true, 10); leb_u(true, a); leb_u(true, b); }
-    else if op == Op.MemoryFill.to_i32() { op1(252); leb_u(true, 11); leb_u(true, a); }
-    else if op == Op.MemoryInit.to_i32() { op1(252); leb_u(true, 8); leb_u(true, b); leb_u(true, a); }
+    else if op == Op.MemorySize.to_i32() { op1(63); leb_u(true, memory_index[a]); }
+    else if op == Op.MemoryGrow.to_i32() { op1(64); leb_u(true, memory_index[a]); }
+    else if op == Op.MemoryCopy.to_i32() { op1(252); leb_u(true, 10); leb_u(true, memory_index[a]); leb_u(true, memory_index[b]); }
+    else if op == Op.MemoryFill.to_i32() { op1(252); leb_u(true, 11); leb_u(true, memory_index[a]); }
+    else if op == Op.MemoryInit.to_i32() { op1(252); leb_u(true, 8); leb_u(true, b); leb_u(true, memory_index[a]); }
     else if op == Op.StructNew.to_i32() { op_fb(0); leb_u(true, type_index[a]); }
     else if op == Op.StructNewDefault.to_i32() { op_fb(1); leb_u(true, type_index[a]); }
     else if op == Op.StructGet.to_i32() { op_fb(2); leb_u(true, type_index[a]); leb_u(true, b); }

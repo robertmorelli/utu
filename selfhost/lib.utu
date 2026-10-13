@@ -33,6 +33,11 @@ export lib {
 
     fn import_bind(i: I32, file: I32) void { import_target[i] = file; }
 
+    // The name a `using` gives the module it imports (`Fs` of `using Fs from "node:fs"`).
+    fn import_name_start(i: I32) I32 { tok_start[node_first[name_node(first_child(import_node[i]))]]; }
+
+    fn import_name_end(i: I32) I32 { tok_end[node_last[name_node(first_child(import_node[i]))] - 1]; }
+
     // The import is of host declarations (std:JS, npm:…), not a utu file.
     fn import_foreign(i: I32) void { import_target[i] = -2; }
 

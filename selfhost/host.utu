@@ -108,6 +108,7 @@ fn write_host_json() void {
     json_part(0);
     json_part(1);
     json_part(2);
+    json_part(3);
     json_byte(125);
     // Nothing to say: no section.
     if host_json.len() == 2 { host_json.clear(); };
@@ -119,7 +120,7 @@ fn json_part(k: I32) void {
     let before = host_json.len();
     if before > 1 { json_byte(44); };
     let start = host_json.len();
-    if k == 0 { write_es_json(); } else if k == 1 { write_closure_json(); } else { write_promise_json(); };
+    if k == 0 { write_es_json(); } else if k == 1 { write_closure_json(); } else if k == 2 { write_promise_json(); } else { write_mems_json(); };
     if host_json.len() == start { host_json.resize(before); };
 }
 

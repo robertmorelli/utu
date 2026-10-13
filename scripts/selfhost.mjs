@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject, PLATFORM_SOURCES, JS_STRING_BUILTINS_COMPILE_OPTIONS } from '../src/index.js';
-import { importObjectFromEval, importObjectFromGlue, glueModuleSource, exceptionImports, closureImports, promiseImports, awaitImports, promisifyExports } from '../src/runtime/host-imports.js';
+import { importObjectFromEval, importObjectFromGlue, glueModuleSource, exceptionImports, closureImports, promiseImports, awaitImports, promisifyExports, memoryImports } from '../src/runtime/host-imports.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'selfhost');
@@ -112,7 +112,8 @@ export async function loadProgram(utu, entry, { readFile = file => fs.readFileSy
     const platform = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(raw);
     if (/^"?(npm|node):/.test(raw) || platform && typeof stdlib.get(raw) === 'function') {
       utu.import_foreign(i);
-      foreign.push({ i, raw, from: from.key });
+      const name = new TextDecoder().decode(new Uint8Array(utu.src.buffer, utu.import_name_start(i), utu.import_name_end(i) - utu.import_name_start(i)));
+      foreign.push({ i, raw, from: from.key, name });
       continue;
     }
     const key = platform ? raw : path.resolve(path.dirname(from.key), JSON.parse(raw));
@@ -146,9 +147,9 @@ export async function loadProgram(utu, entry, { readFile = file => fs.readFileSy
     return at;
   };
   const docs = new Map();
-  for (const { i, raw, from } of foreign) {
+  for (const { i, raw, from, name } of foreign) {
     let abi;
-    try { abi = await foreignABI(raw, undefined, from, stdlib); } catch { continue; }
+    try { abi = await foreignABI(raw, name, from, stdlib); } catch { continue; }
     if (!docs.has(abi.types)) {
       if (!typesText.has(abi.types)) typesText.set(abi.types, JSON.stringify(abi.types));
       docs.set(abi.types, utu.abi_doc(write(typesText.get(abi.types))));
@@ -202,6 +203,7 @@ export async function instantiateBuilt(wasm) {
   const spec = section ? JSON.parse(new TextDecoder().decode(section)) : {};
   const imports = await esImports(spec.es ?? {});
   if (spec.closures) imports.utu = closureImports(spec.closures, imports.utu ?? {});
+  if (spec.mems) imports.utu = memoryImports(spec.mems, imports.utu ?? {});
   if (spec.promises) {
     imports.utu = promiseImports(spec.promises, imports.utu ?? {});
     imports.utu = awaitImports(spec.promises, imports.utu);
