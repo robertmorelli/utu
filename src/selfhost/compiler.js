@@ -74,8 +74,13 @@ function readTests(utu) {
  * declarations (std:Browser, npm:…) are read here, and @embed files.
  * Returns each file's key (path or `std:` name), text and bytes.
  */
-export async function loadProgram(utu, entry, host) {
-  const { readFile, resolvePath = defaultResolvePath, stdlib } = host;
+export async function loadProgram(utu, entry, host, texts = new Map()) {
+  const { resolvePath = defaultResolvePath, stdlib } = host;
+  // Each file read once, though a program may be started twice.
+  const readFile = async file => {
+    if (!texts.has(file)) texts.set(file, await host.readFile(file));
+    return texts.get(file);
+  };
   startProgram(utu);
   const files = [];
   const byKey = new Map();
@@ -124,7 +129,9 @@ export async function loadProgram(utu, entry, host) {
     }
     utu.import_bind(i, file);
   }
-  await loadForeign(utu, foreign, host);
+  // Host declarations the compiler does not hold yet: start again with them
+  // written first, where they stay for the programs after.
+  if (!await bindForeign(utu, foreign, host)) return loadProgram(utu, entry, host, texts);
   files.diagnostics = utu.resolve();
   await loadEmbeds(utu, entry, host);
   return files;
@@ -159,7 +166,7 @@ export function typesDocument(types) {
 // What each loaded compiler keeps of host declarations from program to
 // program: the documents and views written at the start of its source and
 // sealed (with what it learns of them: where their containers end, their
-// large objects' keys), and those to keep from the next full start on.
+// large objects' keys), and all those wanted so far.
 const resident = new WeakMap();
 
 function residentOf(utu) {
@@ -169,10 +176,9 @@ function residentOf(utu) {
 }
 
 /**
- * Start a program. While the declarations the compiler holds are all a
- * program needs, it keeps them; when one needed one it did not hold (written
- * after the program's files, so not kept), the next start writes every
- * declaration wanted so far first, and seals them.
+ * Start a program, keeping the declarations the compiler holds; or, when
+ * a program wanted one it does not hold, writing every one wanted so far
+ * first, and sealing them.
  */
 function startProgram(utu) {
   const state = residentOf(utu);
@@ -233,10 +239,15 @@ function writeView(utu, decl, doc) {
   return { doc, at: writeBytes(utu, decl.view) };
 }
 
-/** Each import's host declarations: kept from before, or written now. */
-async function loadForeign(utu, foreign, { stdlib, resolvePackage }) {
+/**
+ * Bind each import to its host declarations, which the compiler holds
+ * (written at the program's start). False when some it does not: they are
+ * then wanted, and the program must start again.
+ */
+async function bindForeign(utu, foreign, { stdlib, resolvePackage }) {
   const state = residentOf(utu);
-  const docs = new Map(state.docs);
+  const bindings = [];
+  let missing = false;
   for (const { i, raw, from, name } of foreign) {
     let decl;
     try {
@@ -249,15 +260,16 @@ async function loadForeign(utu, foreign, { stdlib, resolvePackage }) {
       // Unreadable declarations leave the import unresolved, which is reported.
       continue;
     }
-    if (state.views.has(decl)) {
-      utu.abi_bind(i, state.views.get(decl));
-      continue;
+    if (!state.views.has(decl)) {
+      state.wanted.add(decl);
+      state.rebuild = true;
+      missing = true;
     }
-    const view = writeView(utu, decl, writeDoc(utu, decl, docs));
-    utu.abi_view(i, view.doc, view.at);
-    state.wanted.add(decl);
-    state.rebuild = true;
+    bindings.push([i, decl]);
   }
+  if (missing) return false;
+  for (const [i, decl] of bindings) utu.abi_bind(i, state.views.get(decl));
+  return true;
 }
 
 /** @embed: the files' bytes, read relative to the entry file. */
