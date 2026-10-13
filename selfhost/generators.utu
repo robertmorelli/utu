@@ -26,6 +26,7 @@ mem gen_cx_inst: I32;   // the consumer's checking context
 mem gen_cx_fi: I32;
 mem gen_cx_result: I32;
 mem gen_decl: I32;      // the generator's declaration
+mem gen_defers: I32;    // the defers pending when the generation began
 
 fn reset_generators() void {
     gen_whole.clear();
@@ -36,6 +37,7 @@ fn reset_generators() void {
     gen_cx_fi.clear();
     gen_cx_result.clear();
     gen_decl.clear();
+    gen_defers.clear();
 }
 
 // Whether a function declaration is a generator (its result is `yield T`).
@@ -142,6 +144,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     gen_cx_fi.push(cx.fi);
     gen_cx_result.push(cx.result);
     gen_decl.push(gen);
+    gen_defers.push(defer_node.len());
     let mb = w_mark();
     mark_boxes(fn_body(gen));
     // The generator's own loops are its; the consumer's loops are not in reach.
@@ -157,6 +160,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     gen_cx_fi.resize(k);
     gen_cx_result.resize(k);
     gen_decl.resize(k);
+    gen_defers.resize(k);
     for (0 ..< vl_len[decls]) |i| {
         decl_local[vl_item(decls, i)] = saved_local[i];
         decl_ty[vl_item(decls, i)] = saved_ty[i];
@@ -212,8 +216,9 @@ fn check_yield(node: I32, cx: Cx) I32 {
     // The consumer's body, as part of the consumer: its loops and its result.
     let ccx = Cx { inst: gen_cx_inst[k], fi: gen_cx_fi[k], result: gen_cx_result[k] };
     // Its break and continue reach this expansion, not the generator's loops.
-    let saved = loop_break.len();
     enter_loop(gen_whole[k], resume, -1, -1);
+    // break leaves the whole generation, so it runs the generator's defers.
+    loop_break_defers[loop_break_defers.len() - 1] = gen_defers[k];
     // While the body is checked, it is outside this expansion (a yield in
     // it belongs to an outer one).
     let decl = gen_decl[k];

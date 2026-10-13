@@ -123,10 +123,9 @@ fn field_of(t: I32, name: I32) I32 {
 
 // `x.f`: a field.
 fn check_field_get(node: I32, cx: Cx) I32 {
-    let base = first_child(node);
     let name = last_child(node);
     let m = w_mark();
-    let t = check_expr(base, -1, cx);
+    let t = check_base(node, cx);
     let field = field_of(t, name);
     if field == -2 {
         w_stack.resize(m);
@@ -143,10 +142,9 @@ fn check_field_get(node: I32, cx: Cx) I32 {
 
 // `x.f = v`, `x.f += v`.
 fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
-    let base = first_child(target);
     let name = last_child(target);
     let m = w_mark();
-    let t = check_expr(base, -1, cx);
+    let t = check_base(target, cx);
     let field = field_of(t, name);
     if field == -2 {
         w_stack.resize(m);
@@ -199,6 +197,8 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         };
         if elem < 0 { return unsupported(node); };
         if has_null { elem = nullable(elem); };
+        // A fun cannot be stored; inferred, the elements are closures of it.
+        if ty_is(elem, Ty.Fun) { elem = ty(Ty.Closure, ty_a[elem], ty_b[elem]); };
     };
     if ty_is(elem, Ty.Tuple) {
         report(Diag.TupleMisplaced, node, -1);
@@ -329,6 +329,8 @@ fn translate_kids(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
 // The string and array tags. 1: done; 0: not one of them; -1: failed.
 fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) I32 {
     let tag = x_tag[x];
+    let other = translate_other(x, tag, decls, args, locals, direct, fi);
+    if other != 0 { return other; };
     if not is_data_tag(tag) { return 0; };
     let m = w_mark();
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
@@ -381,6 +383,51 @@ fn defaultable(t: I32) Bool {
     if decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Enum) or decl_is(decl, Decl.Variant) { return false; };
     not is_array_type(t);
 }
+
+// I31, reference equality, promise subscriptions, v128 constants.
+fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) I32 {
+    let k = -1;
+    for (Known.IrI31New.to_i32() ... Known.IrV128Const.to_i32()) |i| { if known[i] == tag { k = i; }; };
+    if k < 0 { return 0; };
+    let m = w_mark();
+    if k == Known.IrV128Const.to_i32() {
+        // bytes="b0,…,b15" in w_aux as four little-endian words
+        let a = x_attr(x, intern_text("bytes"));
+        if a < 0 { return -1; };
+        let at = w_aux.len();
+        for (0 ..< 4) |i| { w_aux.push(0); };
+        let i = attr_start[a];
+        let byte = 0;
+        let value = 0;
+        while (i <= attr_end[a]) {
+            if i == attr_end[a] or src[i] == 44 {
+                w_aux[at + byte / 4] = w_aux[at + byte / 4] | (value << ((byte % 4) * 8));
+                byte += 1;
+                value = 0;
+            } else {
+                value = value * 10 + src[i] - 48;
+            };
+            i += 1;
+        };
+        w_leaf(Op.V128Const, vt_v128, at, 0);
+        return 1;
+    };
+    if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
+    if k == Known.IrI31New.to_i32() { w_node(Op.RefI31, vt_ref_i31(), 0, 0, m); }
+    else if k == Known.IrI31GetS.to_i32() { w_node(Op.I31GetS, vt_i32, 0, 0, m); }
+    else if k == Known.IrI31GetU.to_i32() { w_node(Op.I31GetU, vt_i32, 0, 0, m); }
+    else if k == Known.IrRefEq.to_i32() { w_node(Op.RefEq, vt_i32, 0, 0, m); }
+    else if k == Known.IrRefNe.to_i32() {
+        w_node(Op.RefEq, vt_i32, 0, 0, m);
+        w_node(Op.Plain, vt_i32, 69, 0, m);
+    }
+    else if k == Known.IrPromiseThen.to_i32() { w_node(Op.Call, vt_none, promise_op(false), 0, m); }
+    else { w_node(Op.Call, vt_none, promise_op(true), 0, m); };
+    1;
+}
+
+// (ref i31), the value ref.i31 makes: a nullable i31 local holds it.
+fn vt_ref_i31() I32 { vt_i31ref; }
 
 fn is_data_tag(tag: I32) Bool {
     for (Known.IrStringConcat.to_i32() ... Known.IrArrayCopy.to_i32()) |k| { if known[k] == tag { return true; }; };

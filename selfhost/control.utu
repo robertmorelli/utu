@@ -279,15 +279,9 @@ fn loop_match(s: I32, st: I32, first: I32, last: I32, default_: I32, cx: Cx) I32
     let top = new_label();
     let m = w_mark();
     let ml = w_mark();
-    loop_break.push(brk);
-    loop_continue.push(top);
-    loop_state.push(s);
-    loop_state_type.push(st);
+    enter_loop(brk, top, s, st);
     dispatch(s, st, first, last, default_, -1, cx, true);
-    loop_break.resize(loop_break.len() - 1);
-    loop_continue.resize(loop_continue.len() - 1);
-    loop_state.resize(loop_state.len() - 1);
-    loop_state_type.resize(loop_state_type.len() - 1);
+    leave_loop();
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, m);
     ty_void();
@@ -527,6 +521,8 @@ fn reset_control() void {
 // Enter and leave a loop: its break and continue labels, and (for a loop
 // match) its state.
 fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) void {
+    loop_defers.push(defer_node.len());
+    loop_break_defers.push(defer_node.len());
     loop_break.push(brk);
     loop_continue.push(next);
     loop_state.push(state);
@@ -534,6 +530,8 @@ fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) void {
 }
 
 fn leave_loop() void {
+    loop_defers.resize(loop_defers.len() - 1);
+    loop_break_defers.resize(loop_break_defers.len() - 1);
     loop_break.resize(loop_break.len() - 1);
     loop_continue.resize(loop_continue.len() - 1);
     loop_state.resize(loop_state.len() - 1);

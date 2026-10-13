@@ -207,6 +207,10 @@ fn check_function(fi: I32) void {
     loop_continue.clear();
     loop_state.clear();
     loop_state_type.clear();
+    loop_defers.clear();
+    loop_break_defers.clear();
+    defer_node.clear();
+    function_defers[0] = 0;
     let params = fi_params[fi];
     let decls = param_decls(decl);
     for (0 ..< vl_len[decls]) |i| {
@@ -236,22 +240,38 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     for (cur_params[0] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
 }
 
-// Statements of a block; its value is its last one's.
+// Statements of a block; its value is its last one's. Its defers run at
+// its end, after its value.
 fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
+    let defers = defer_node.len();
+    defer_marks.push(defers);
     let c = first_child(block);
     let t = ty_void();
     while (c >= 0) {
         let next = next_sibling(c);
         if next < 0 {
-            t = check_expr(c, expect, cx);
+            t = check_statement(c, expect, cx);
         } else {
             // A statement's value is dropped: it is checked as Void, so
             // branches of different types are fine there.
-            coerce(check_expr(c, ty_void(), cx), ty_void(), c);
+            coerce(check_statement(c, ty_void(), cx), ty_void(), c);
         };
         c = next;
     };
+    if defer_node.len() > defers {
+        let vt = repr(t);
+        if vt != vt_none and vt != vt_unreachable {
+            let local = new_local(vt);
+            w_node(Op.LocalSet, vt_none, local, 0, w_mark() - 1);
+            run_defers(defers, cx);
+            w_leaf(Op.LocalGet, vt, local, 0);
+        } else if vt != vt_unreachable {
+            run_defers(defers, cx);
+        };
+        defer_node.resize(defers);
+    };
+    defer_marks.resize(defer_marks.len() - 1);
     w_node(Op.Seq, repr(t), 0, 0, m);
     t;
 }
@@ -368,6 +388,10 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     if kind == Node.Closure_expr.to_i32() { return check_closure(node, expect, cx); };
     if kind == Node.Yield_expr.to_i32() { return check_yield(node, cx); };
     if kind == Node.Iterator_expr.to_i32() { return check_iterator(node, expect, cx); };
+    if kind == Node.Pipe_expr.to_i32() { return check_pipe(node, expect, cx); };
+    if kind == Node.Defer_expr.to_i32() { return check_defer(node); };
+    if kind == Node.Optional_field_expr.to_i32() { return check_field_get(node, cx); };
+    if kind == Node.Await_expr.to_i32() { return check_await(node, cx); };
     unsupported(node);
 }
 
@@ -619,7 +643,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
     let target = first_child(node);
     let value = last_child(node);
     let op = tok_kind[node_last[target]];
-    if is_kind(target, Node.Field_expr) and not is_module_path(target) { return check_field_set(target, value, op, node, cx); };
+    if (is_kind(target, Node.Field_expr) and not is_module_path(target)) or is_kind(target, Node.Optional_field_expr) { return check_field_set(target, value, op, node, cx); };
     if is_kind(target, Node.Index_expr) { return check_index_set(target, value, op, node, cx); };
     if not is_kind(target, Node.Identifier) { return unsupported(node); };
     let decl = node_decl[target];
@@ -855,18 +879,27 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
         return call_with(fi, args, 0, m, node, cx);
     };
-    if is_kind(callee, Node.Field_expr) {
+    if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) {
         let base = first_child(callee);
         let name = last_child(callee);
         let module = node_decl[base];
         if is_kind(base, Node.Identifier) and decl_is(module, Decl.Mem) { return check_mem_method(module, name, args, node, cx); };
+        // `ints.make(…)` with `using M[A] |ints|`: M's function in M[A].
+        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Module) {
+            let target = static_member(decl_a[module], word_of(name));
+            if not decl_is(target, Decl.Fn) {
+                report(Diag.UnknownMethod, name, word_of(name));
+                return finish_error(args, m, cx);
+            };
+            return call_with(fn_instance(target, alias_instance(module)), args, 0, m, node, cx);
+        };
         if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
             let decl = node_decl[name];
             if not decl_is(decl, Decl.Fn) { return unsupported(node); };
             return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
         };
         // A method: the receiver is its first argument.
-        let rt = check_expr(base, -1, cx);
+        let rt = check_base(callee, cx);
         if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
         if decl_is(ty_decl(rt), Decl.Proto) { return unsupported(node); };
         if is_scalar_kind(ty_decl(rt)) {
@@ -891,6 +924,10 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             if r >= 0 { return r; };
         };
         let decl = node_decl[last_child(callee)];
+        if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module)) and not has_foreign() {
+            report(Diag.UnknownMethod, last_child(callee), word_of(last_child(callee)));
+            return finish_error(args, m, cx);
+        };
         if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
         let owner_t = type_path(first_child(callee), cx.inst);
         let inst = if is_kind(first_child(callee), Node.Type_ident) and decl_is(node_decl[first_child(callee)], Decl.Module) {
@@ -1273,7 +1310,10 @@ fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
         return error_value();
     };
     let label = if is_break { loop_break[loop_break.len() - 1]; } else { loop_continue[loop_continue.len() - 1]; };
+    let m = w_mark();
+    run_defers(if is_break { loop_break_defers[loop_break_defers.len() - 1]; } else { loop_defers[loop_defers.len() - 1]; }, cx);
     w_leaf(Op.Br, vt_unreachable, label, 0);
+    w_node(Op.Seq, vt_unreachable, 0, 0, m);
     ty_never();
 }
 
@@ -1286,6 +1326,21 @@ fn check_return(node: I32, cx: Cx) I32 {
         coerce(check_expr(value, cx.result, cx), cx.result, value);
     } else if not ty_is(cx.result, Ty.Void) {
         mismatch(node, cx.result, ty_void());
+    };
+    if defer_node.len() > function_defers[0] {
+        // The value first, then every pending defer of the function.
+        let vt = repr(cx.result);
+        let mr = w_mark();
+        if value >= 0 and vt != vt_none and vt != vt_unreachable {
+            let local = new_local(vt);
+            w_node(Op.LocalSet, vt_none, local, 0, m);
+            run_defers(function_defers[0], cx);
+            w_leaf(Op.LocalGet, vt, local, 0);
+        } else {
+            run_defers(function_defers[0], cx);
+        };
+        w_node(Op.Return, vt_unreachable, 0, 0, m);
+        return ty_never();
     };
     w_node(Op.Return, vt_unreachable, 0, 0, m);
     ty_never();
@@ -1339,6 +1394,9 @@ fn reset_check() void {
     reset_closures();
     reset_generators();
     reset_iterators();
+    reset_defers();
+    reset_optional();
+    reset_promises();
     fi_grow();
 }
 
@@ -1527,6 +1585,10 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     loop_continue.clear();
     loop_state.clear();
     loop_state_type.clear();
+    loop_defers.clear();
+    loop_break_defers.clear();
+    defer_node.clear();
+    function_defers[0] = 0;
     c = first_child(item);
     let i = 0;
     while (c >= 0) {

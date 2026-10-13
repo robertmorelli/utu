@@ -148,9 +148,11 @@ async function worker() {
     if (!WebAssembly.validate(wasm)) {
       try { await WebAssembly.compile(wasm); } catch (error) { return { emit: summarizeError(error) }; }
     }
-    let instance;
+    let exports;
     try {
-      ({ instance } = await instantiateBuilt(wasm));
+      // The exports as they are: stage 0's harness does not wrap async
+      // ones in WebAssembly.promising, so neither does this.
+      ({ instance: { exports } } = await instantiateBuilt(wasm));
     } catch (error) {
       return { instantiate: summarizeError(error) };
     }
@@ -158,7 +160,7 @@ async function worker() {
     const printed = [];
     const log = console.log;
     parentPort.postMessage('running');
-    for (const [name, value] of Object.entries(instance.exports).sort(([a], [b]) => a.localeCompare(b))) {
+    for (const [name, value] of Object.entries(exports).sort(([a], [b]) => a.localeCompare(b))) {
       if (typeof value !== 'function' || value.length !== 0) continue;
       printed.length = 0;
       console.log = (...args) => printed.push(args.map(String).join(' '));

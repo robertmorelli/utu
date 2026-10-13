@@ -449,6 +449,7 @@ enum(U16) Op:
     | Try         // a: label; children: body (Seq), catch (Seq) for the JS tag
     | Throw
     | Rethrow     // a: label of the try
+    | V128Const   // a: four words in w_aux
 
 mem w_op: U16;
 mem w_type: I32;   // its value type (vt_none for none)
@@ -1228,6 +1229,11 @@ fn emit(node: I32, f: I32) void {
     else if op == Op.I31GetS.to_i32() { op_fb(29); }
     else if op == Op.I31GetU.to_i32() { op_fb(30); }
     else if op == Op.Throw.to_i32() { op1(8); leb_u(true, 0); }
+    else if op == Op.V128Const.to_i32() {
+        op1(253);
+        leb_u(true, 12);
+        for (0 ..< 4) |i| { put_u32le(true, w_aux[a + i]); };
+    }
     else if op == Op.Rethrow.to_i32() { op1(9); leb_u(true, depth_of(a)); }
     else { fatal; };
 }

@@ -207,6 +207,8 @@ mem saved_marks: I32;   // per saved function: its locals' start in saved_locals
 mem saved_loops: I32;   // the loop stacks' entries, four per loop
 
 fn save_function() void {
+    saved_marks.push(function_defers[0]);
+    function_defers[0] = defer_node.len();
     saved_marks.push(saved_locals.len());
     for (0 ..< cur_locals.len()) |i| { saved_locals.push(cur_locals[i]); };
     saved_marks.push(cur_params[0]);
@@ -217,8 +219,12 @@ fn save_function() void {
         saved_loops.push(loop_continue[i]);
         saved_loops.push(loop_state[i]);
         saved_loops.push(loop_state_type[i]);
+        saved_loops.push(loop_defers[i]);
+        saved_loops.push(loop_break_defers[i]);
     };
     cur_locals.clear();
+    loop_defers.clear();
+    loop_break_defers.clear();
     loop_break.clear();
     loop_continue.clear();
     loop_state.clear();
@@ -232,7 +238,8 @@ fn restore_function() void {
     let label = saved_marks[n - 2];
     let params = saved_marks[n - 3];
     let locals_at = saved_marks[n - 4];
-    saved_marks.resize(n - 4);
+    function_defers[0] = saved_marks[n - 5];
+    saved_marks.resize(n - 5);
     cur_locals.clear();
     for (locals_at ..< saved_locals.len()) |i| { cur_locals.push(saved_locals[i]); };
     saved_locals.resize(locals_at);
@@ -242,13 +249,17 @@ fn restore_function() void {
     loop_continue.clear();
     loop_state.clear();
     loop_state_type.clear();
+    loop_defers.clear();
+    loop_break_defers.clear();
     let i = loops_at;
     while (i < saved_loops.len()) {
         loop_break.push(saved_loops[i]);
         loop_continue.push(saved_loops[i + 1]);
         loop_state.push(saved_loops[i + 2]);
         loop_state_type.push(saved_loops[i + 3]);
-        i += 4;
+        loop_defers.push(saved_loops[i + 4]);
+        loop_break_defers.push(saved_loops[i + 5]);
+        i += 6;
     };
     saved_loops.resize(loops_at);
 }

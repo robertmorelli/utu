@@ -98,7 +98,9 @@ fn validate_tree(node: I32) void {
     else if kind == Node.Field.to_i32() { validate_field_type(node); }
     else if kind == Node.Global_decl.to_i32() { validate_global(node); }
     else if kind == Node.Distinct_decl.to_i32() { validate_distinct(node); }
-    else if kind == Node.Yield_expr.to_i32() { validate_yield(node); };
+    else if kind == Node.Yield_expr.to_i32() { validate_yield(node); }
+    else if kind == Node.Defer_expr.to_i32() { validate_defer(node); }
+    else if kind == Node.Await_expr.to_i32() { validate_await(node); };
     let c = first_child(node);
     while (c >= 0) {
         validate_tree(c);
@@ -230,6 +232,37 @@ fn validate_yield(node: I32) void {
         p = parent_of(p);
     };
     report(Diag.YieldOutside, node, -1);
+}
+
+// A defer is a statement of a block, and its code does not leave it
+// (return, or a break or continue not of a loop inside it).
+fn validate_defer(node: I32) void {
+    if not is_kind(parent_of(node), Node.Block) {
+        report(Diag.InvalidDefer, node, -1);
+        return;
+    };
+    let exit = deferred_exit(first_child(node), false);
+    if exit >= 0 { report(Diag.InvalidDefer, exit, -1); };
+}
+
+fn deferred_exit(node: I32, in_loop: Bool) I32 {
+    if node < 0 or is_kind(node, Node.Closure_expr) { return -1; };
+    if is_kind(node, Node.Return_expr) { return node; };
+    if (is_kind(node, Node.Break_expr) or is_kind(node, Node.Continue_expr)) and not in_loop { return node; };
+    let looping = in_loop or is_kind(node, Node.While_expr) or is_kind(node, Node.For_expr) or is_kind(node, Node.Loop_match_expr);
+    let c = first_child(node);
+    while (c >= 0) {
+        let found = deferred_exit(c, looping);
+        if found >= 0 { return found; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+// `await for (…)` iterates a generator call.
+fn validate_await(node: I32) void {
+    let e = first_child(node);
+    if is_kind(e, Node.For_expr) and generator_call(e) < 0 { report(Diag.AwaitForSource, node, -1); };
 }
 
 // ── Parents ──

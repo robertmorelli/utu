@@ -149,6 +149,10 @@ enum(U8) Diag:
     | IteratorSource
     | IteratorCaptures
     | IteratorTerminalInside
+    | OptionalOutsideStatement
+    | AwaitNotPromise
+    | InvalidDefer
+    | AwaitForSource
 
 mem diag_kind: U8;
 mem diag_node: I32;

@@ -102,14 +102,22 @@ fn is_space(c: I32) Bool { c == 32 or c == 10 or c == 9 or c == 13; }
 fn write_host_json() void {
     host_json.clear();
     json_byte(123);
-    write_es_json();
-    if host_json.len() > 1 and host_json[host_json.len() - 1] != 123 { json_byte(44); };
-    let before = host_json.len();
-    write_closure_json();
-    if host_json.len() == before and host_json[host_json.len() - 1] == 44 { host_json.resize(host_json.len() - 1); };
+    json_part(0);
+    json_part(1);
+    json_part(2);
     json_byte(125);
     // Nothing to say: no section.
     if host_json.len() == 2 { host_json.clear(); };
+}
+
+// One part of the host section (es, closures, promises), after a comma
+// when another came before it.
+fn json_part(k: I32) void {
+    let before = host_json.len();
+    if before > 1 { json_byte(44); };
+    let start = host_json.len();
+    if k == 0 { write_es_json(); } else if k == 1 { write_closure_json(); } else { write_promise_json(); };
+    if host_json.len() == start { host_json.resize(before); };
 }
 
 fn write_es_json() void {

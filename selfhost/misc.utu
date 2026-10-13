@@ -1,0 +1,407 @@
+// ── Pipes, defer, optional chains, promises ──────────────────────────────────
+
+// ── Pipes ──
+//
+// `x -o f` is f(x); `x -o f(a, &, b)` is f(a, x, b), with x evaluated where
+// the placeholder stands. As in stage 0, `x -o f(a, b)` (arguments, no
+// placeholder) is f(a, b): x is not passed, nor evaluated. The target is a
+// path: a function, a module's, a type's static function, or a method of a
+// value (`x -o list.push(&)`).
+
+fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
+    let value = first_child(node);
+    let target = last_child(node);
+    // The arguments: their nodes, -2 for the piped value.
+    let args_node = last_child(target);
+    let has_args = is_kind(args_node, Node.Pipe_args);
+    let n = 0;
+    let list = if has_args { first_child(args_node); } else { -1; };
+    let a = if list >= 0 { first_child(list); } else { -1; };
+    while (a >= 0) {
+        n += 1;
+        a = next_sibling(a);
+    };
+    let args = Array[I32].new(if has_args { n; } else { 1; }, -2);
+    if has_args {
+        let i = 0;
+        a = first_child(list);
+        while (a >= 0) {
+            args[i] = if is_kind(a, Node.Pipe_arg) { first_child(a); } else { -2; };
+            i += 1;
+            a = next_sibling(a);
+        };
+    };
+    let count = if has_args { n; } else { 1; };
+    // The path: its first part, then names.
+    let first = first_child(target);
+    let names = Array[I32].new(8, -1);
+    let nnames = 0;
+    let c = next_sibling(first);
+    while (c >= 0 and (is_kind(c, Node.Identifier) or is_kind(c, Node.Type_ident))) {
+        names[nnames] = c;
+        nnames += 1;
+        c = next_sibling(c);
+    };
+    let m = w_mark();
+    let last = if nnames > 0 { names[nnames - 1]; } else { first; };
+    let decl = node_decl[last];
+    // A function by name, or a module's or type's.
+    if decl_is(decl, Decl.Fn) {
+        let inst = 0;
+        if is_kind(first, Node.Instantiated_module_ref) { inst = ty_inst(type_path(first, cx.inst)); }
+        else {
+            let owner = node_decl[first];
+            if decl_is(owner, Decl.Alias) { inst = alias_instance(owner); }
+            else { inst = instance_for(module_of(decl), cx.inst); };
+            if nnames > 0 and not decl_is(owner, Decl.Module) and not is_type_decl(owner) and owner >= 0 {
+                // `x -o value.method(…)`: a method of a value.
+                return pipe_method(node, first, names, nnames, args, count, value, m, cx);
+            };
+        };
+        let fi = fn_instance(decl, inst);
+        return pipe_call(fi, args, count, value, 0, m, node, cx);
+    };
+    if nnames > 0 { return pipe_method(node, first, names, nnames, args, count, value, m, cx); };
+    // A fun or cl value.
+    let t = type_only(first, -1, cx);
+    if ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure) {
+        if ty_is(t, Ty.Closure) { check_expr(first, t, cx); };
+        pipe_args_check(ty_a[t], args, count, value, 0, node, cx);
+        if ty_is(t, Ty.Fun) {
+            check_expr(first, t, cx);
+            w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m);
+        } else {
+            w_node(Op.Call, repr(ty_b[t]), closure_call(t), 0, m);
+        };
+        return ty_b[t];
+    };
+    if ty_is(t, Ty.Error) { return unsupported(node); };
+    report(Diag.NotCallable, first, -1);
+    error_value();
+}
+
+// `x -o a.b.method(…)`: the value `a.b`, then its method.
+fn pipe_method(node: I32, first: I32, names: Array[I32], nnames: I32, args: Array[I32], count: I32, value: I32, m: I32, cx: Cx) I32 {
+    // The receiver: the path but its last name, read as fields.
+    let rt = check_expr(first, -1, cx);
+    for (0 ..< nnames - 1) |i| {
+        let field = field_of(rt, names[i]);
+        if field < 0 { return finish_error(-1, m, cx); };
+        let ft = field_type(field, ty_inst(rt));
+        let mg = w_mark() - 1;
+        w_node(Op.StructGet, repr(ft), vt_heap(repr(rt)), decl_a[field], mg);
+        rt = ft;
+    };
+    let name = names[nnames - 1];
+    let decl = member(ty_decl(rt), word_of(name), Space.Method);
+    if decl < 0 {
+        if has_foreign() { return unsupported(node); };
+        report(Diag.UnknownMethod, name, word_of(name));
+        return finish_error(-1, m, cx);
+    };
+    let fi = fn_instance(decl, ty_inst(rt));
+    coerce(rt, vl_item(fi_params[fi], 0), first);
+    pipe_call(fi, args, count, value, 1, m, node, cx);
+}
+
+fn pipe_call(fi: I32, args: Array[I32], count: I32, value: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 {
+    call_site.resize(1);
+    call_site[0] = at;
+    if not pipe_args_check(fi_params[fi], args, count, value, first_param, at, cx) {
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    finish_call(fi, m, cx);
+}
+
+// The arguments in order, the piped value at its placeholder; false after
+// reporting a wrong count.
+fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first: I32, at: I32, cx: Cx) Bool {
+    if first + count != vl_len[params] {
+        report(Diag.WrongArity, at, -1);
+        return false;
+    };
+    for (0 ..< count) |i| {
+        let pt = vl_item(params, first + i);
+        let e = if args[i] == -2 { value; } else { args[i]; };
+        coerce(check_expr(e, pt, cx), pt, e);
+    };
+    true;
+}
+
+// ── defer ──
+//
+// `defer e;` runs e when its block exits: at its end (after its value),
+// at a return (after the returned value), or a break or continue out of
+// it, in the reverse order of the defers. The deferred expression is
+// checked again at each exit.
+
+mem defer_node: I32;      // the pending defers, innermost last
+mem defer_marks: I32;     // per open block: where its defers start
+mem function_defers: I32; // [0]: where the current function's defers start
+
+fn reset_defers() void {
+    defer_node.clear();
+    defer_marks.clear();
+    function_defers.resize(1);
+    function_defers[0] = 0;
+}
+
+fn check_defer(node: I32) I32 {
+    defer_node.push(first_child(node));
+    w_leaf(Op.Nop, vt_none, 0, 0);
+    ty_void();
+}
+
+// Run the defers from `from` (an index in defer_node) on, newest first.
+fn run_defers(from: I32, cx: Cx) void {
+    let i = defer_node.len() - 1;
+    while (i >= from) {
+        discard(check_expr(defer_node[i], ty_void(), cx));
+        i -= 1;
+    };
+}
+
+// The defers between here and a loop being left (loop_defers holds their
+// start per loop).
+mem loop_defers: I32;        // per loop: the defers a continue runs from
+mem loop_break_defers: I32;  // per loop: the defers a break runs from
+
+// ── Optional chains ──
+
+mem optional_node: I32;   // `a?.b` nodes being checked as a present value
+mem optional_local: I32;  // the local holding it
+mem optional_type: I32;   // its type (not nullable)
+
+fn reset_optional() void {
+    optional_node.clear();
+    optional_local.clear();
+    optional_type.clear();
+    loop_defers.clear();
+    loop_break_defers.clear();
+}
+
+fn optional_override(node: I32) I32 {
+    for (0 ..< optional_node.len()) |i| { if optional_node[i] == node { return i; }; };
+    -1;
+}
+
+// The leftmost `?.` of a statement not yet being checked as present: one
+// whose base has none.
+fn leftmost_optional(node: I32) I32 {
+    if is_kind(node, Node.Closure_expr) { return -1; };
+    let c = first_child(node);
+    while (c >= 0) {
+        let found = leftmost_optional(c);
+        if found >= 0 { return found; };
+        c = next_sibling(c);
+    };
+    if is_kind(node, Node.Optional_field_expr) and optional_override(node) < 0 { return node; };
+    -1;
+}
+
+// A statement with `a?.b` in it runs only when a is present:
+//   promote a { |o| => (the statement, with o.b for a?.b), ~> {}, }
+fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
+    let base = first_child(opt);
+    let m = w_mark();
+    let bt = check_expr(base, -1, cx);
+    if ty_is(bt, Ty.Error) { return finish_error(-1, m, cx); };
+    if not ty_is(bt, Ty.Nullable) {
+        report(Diag.NotNullable, base, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let s = new_local(repr(bt));
+    w_node(Op.LocalSet, vt_none, s, 0, m);
+    let mi = w_mark();
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, repr(bt), s, 0);
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc);
+    w_node(Op.Plain, vt_i32, 69, 0, mc);
+    let mt = w_mark();
+    optional_node.push(opt);
+    optional_local.push(s);
+    optional_type.push(ty_a[bt]);
+    discard(check_statement(stmt, ty_void(), cx));
+    optional_node.resize(optional_node.len() - 1);
+    optional_local.resize(optional_local.len() - 1);
+    optional_type.resize(optional_type.len() - 1);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+// A statement: an optional chain's guard, or the expression.
+fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
+    let opt = leftmost_optional(stmt);
+    if opt >= 0 { return check_optional_statement(stmt, opt, cx); };
+    check_expr(stmt, expect, cx);
+}
+
+// The base of a field access, pushed: `a` of `a.b`, or the present value
+// of `a?.b` in its guarded statement.
+fn check_base(field_node: I32, cx: Cx) I32 {
+    if is_kind(field_node, Node.Optional_field_expr) {
+        let i = optional_override(field_node);
+        if i < 0 {
+            report(Diag.OptionalOutsideStatement, field_node, -1);
+            return error_value();
+        };
+        let t = optional_type[i];
+        w_leaf(Op.LocalGet, repr(t), optional_local[i], 0);
+        return t;
+    };
+    check_expr(first_child(field_node), -1, cx);
+}
+
+// ── Promises ──
+//
+// `Promise[T]` is a JS promise (an externref). `await p` calls the host's
+// `utu.await_N`, which the host wraps in WebAssembly.Suspending; exports
+// that can reach an await are wrapped in WebAssembly.promising.
+
+mem await_types: I32;   // pairs: value type, its import
+mem promise_ops: I32;   // [then, catch] imports, or -1
+
+fn reset_promises() void {
+    await_types.clear();
+    promise_ops.resize(2);
+    promise_ops[0] = -1;
+    promise_ops[1] = -1;
+}
+
+fn is_promise_type(t: I32) Bool {
+    let decl = ty_decl(t);
+    decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise");
+}
+
+fn check_await(node: I32, cx: Cx) I32 {
+    let e = first_child(node);
+    if is_kind(e, Node.For_expr) {
+        // `await for (gen()) |x| { … }`: the generator's body may await.
+        return check_expr(e, ty_void(), cx);
+    };
+    let m = w_mark();
+    let pt = check_expr(e, -1, cx);
+    if ty_is(pt, Ty.Error) { return finish_error(-1, m, cx); };
+    if not is_promise_type(pt) {
+        report(Diag.AwaitNotPromise, e, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    let t = inst_arg(ty_inst(pt), 0);
+    w_node(Op.Call, repr(t), await_import(t), 0, m);
+    t;
+}
+
+fn await_import(t: I32) I32 {
+    let vt = repr(t);
+    let i = 0;
+    while (i < await_types.len()) {
+        if await_types[i] == vt { return await_types[i + 1]; };
+        i += 2;
+    };
+    let f = add_import_func(name_add("utu"), name_add("await_" + (await_types.len() / 2).to_str()),
+        func_type(vl_one(vt_externref), vl_of_result(vt)));
+    await_types.push(vt);
+    await_types.push(f);
+    f;
+}
+
+// utu.promise_then(p, f) / promise_catch(p, f): (externref, externref) → ()
+fn promise_op(catching: Bool) I32 {
+    let k = if catching { 1; } else { 0; };
+    if promise_ops[k] >= 0 { return promise_ops[k]; };
+    let m = vl_begin();
+    vl_add(vt_externref);
+    vl_add(vt_externref);
+    let f = add_import_func(name_add("utu"), name_add(if catching { "promise_catch"; } else { "promise_then"; }), func_type(vl_end(m), vl_empty()));
+    promise_ops[k] = f;
+    f;
+}
+
+// The promise imports and the exports that can await, for the host section.
+fn write_promise_json() void {
+    let awaits = false;
+    let i = 1;
+    while (i < await_types.len()) {
+        if func_live[await_types[i]] == 1 { awaits = true; };
+        i += 2;
+    };
+    let ops = (promise_ops[0] >= 0 and func_live[promise_ops[0]] == 1) or (promise_ops[1] >= 0 and func_live[promise_ops[1]] == 1);
+    if not awaits and not ops { return; };
+    json_text("\"promises\":{\"awaits\":[");
+    let first = true;
+    i = 1;
+    while (i < await_types.len()) {
+        let f = await_types[i];
+        if func_live[f] == 1 {
+            if not first { json_byte(44); };
+            first = false;
+            json_byte(34);
+            // The host names the import await_<type>; ours is await_N, so give the suffix.
+            let name = func_field_name[f];
+            for (6 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]); };
+            json_byte(34);
+        };
+        i += 2;
+    };
+    json_text("],\"ops\":[");
+    first = true;
+    for ([0, 1]) |k| {
+        if promise_ops[k] >= 0 and func_live[promise_ops[k]] == 1 {
+            if not first { json_byte(44); };
+            first = false;
+            json_text(if k == 0 { "\"promise_then\""; } else { "\"promise_catch\""; });
+        };
+    };
+    json_text("],\"asyncExports\":[");
+    write_async_exports();
+    json_text("]}");
+}
+
+// Exports that reach an await, through calls: they must be entered through
+// WebAssembly.promising for the stack to suspend.
+mem awaiting: U8;
+
+fn write_async_exports() void {
+    let n = func_kind.len();
+    awaiting.resize(n);
+    for (0 ..< n) |f| { awaiting[f] = 0; };
+    let i = 1;
+    while (i < await_types.len()) {
+        awaiting[await_types[i]] = 1;
+        i += 2;
+    };
+    // To a fixpoint: a function awaits when it calls one that does.
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (0 ..< n) |f| {
+            if awaiting[f] == 0 and func_live[f] == 1 and func_body[f] >= 0 and calls_awaiting(func_body[f]) {
+                awaiting[f] = 1;
+                changed = true;
+            };
+        };
+    };
+    let first = true;
+    for (0 ..< n) |f| {
+        if awaiting[f] == 1 and func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 {
+            if not first { json_byte(44); };
+            first = false;
+            json_byte(34);
+            let name = func_field_name[f];
+            for (0 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]); };
+            json_byte(34);
+        };
+    };
+}
+
+fn calls_awaiting(node: I32) Bool {
+    let op = w_op[node];
+    if (op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32()) and awaiting[w_a[node]] == 1 { return true; };
+    for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true; }; };
+    false;
+}

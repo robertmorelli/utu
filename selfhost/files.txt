@@ -12,6 +12,7 @@ control.utu
 closures.utu
 generators.utu
 iterators.utu
+misc.utu
 strings.utu
 data.utu
 mems.utu
