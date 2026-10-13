@@ -235,9 +235,22 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
     ty_void();
 }
 
+// Whether the program has an `a?.b` anywhere, counted once for the nodes
+// there are ([0]: how many nodes were looked at, [1]: 1 when one was found).
+mem optionals_seen: I32 = [0, 0];
+
+fn has_optionals() Bool {
+    if optionals_seen[0] != node_kind.len() {
+        optionals_seen[1] = 0;
+        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.to_i32() { optionals_seen[1] = 1; }; };
+        optionals_seen[0] = node_kind.len();
+    };
+    optionals_seen[1] == 1;
+}
+
 // A statement: an optional chain's guard, or the expression.
 fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
-    let opt = leftmost_optional(stmt);
+    let opt = if has_optionals() { leftmost_optional(stmt); } else { -1; };
     if opt >= 0 and expect >= 0 and not ty_is(expect, Ty.Void) {
         // A statement whose value is used (a block's last) is not guarded.
         report(Diag.OptionalOutsideStatement, opt, -1);
@@ -383,6 +396,8 @@ fn write_async_exports() void {
     let n = func_kind.len();
     awaiting.resize(n);
     for (0 ..< n) |f| { awaiting[f] = 0; };
+    // Nothing awaits: no export is async.
+    if await_types.len() < 2 { return; };
     let i = 1;
     while (i < await_types.len()) {
         awaiting[await_types[i]] = 1;

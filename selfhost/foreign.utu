@@ -489,30 +489,43 @@ fn foreign_op(params: I32, result: I32, body: Str) I32 {
 
 // Text into src, as UTF-8.
 fn gen_text_utf8(text: Str) void {
+    // Room for the most it can take (3 bytes a code unit), written in
+    // place, then the length it took.
+    let n = text.len();
+    let j = src.len();
+    src.resize(j + n * 3);
     let i = 0;
-    while (i < text.len()) {
+    while (i < n) {
         let c = text.get(i);
         i += 1;
-        // A surrogate pair is one character.
-        if c >= 55296 and c <= 56319 and i < text.len() and text.get(i) >= 56320 and text.get(i) <= 57343 {
-            c = 65536 + ((c - 55296) << 10) + (text.get(i) - 56320);
-            i += 1;
-        };
-        if c < 128 { src.push(c); }
-        else if c < 2048 {
-            src.push(192 | (c >> 6));
-            src.push(128 | (c & 63));
-        } else if c < 65536 {
-            src.push(224 | (c >> 12));
-            src.push(128 | ((c >> 6) & 63));
-            src.push(128 | (c & 63));
+        if c < 128 {
+            src[j] = c;
+            j += 1;
         } else {
-            src.push(240 | (c >> 18));
-            src.push(128 | ((c >> 12) & 63));
-            src.push(128 | ((c >> 6) & 63));
-            src.push(128 | (c & 63));
+            // A surrogate pair is one character.
+            if c >= 55296 and c <= 56319 and i < n and text.get(i) >= 56320 and text.get(i) <= 57343 {
+                c = 65536 + ((c - 55296) << 10) + (text.get(i) - 56320);
+                i += 1;
+            };
+            if c < 2048 {
+                src[j] = 192 | (c >> 6);
+                src[j + 1] = 128 | (c & 63);
+                j += 2;
+            } else if c < 65536 {
+                src[j] = 224 | (c >> 12);
+                src[j + 1] = 128 | ((c >> 6) & 63);
+                src[j + 2] = 128 | (c & 63);
+                j += 3;
+            } else {
+                src[j] = 240 | (c >> 18);
+                src[j + 1] = 128 | ((c >> 12) & 63);
+                src[j + 2] = 128 | ((c >> 6) & 63);
+                src[j + 3] = 128 | (c & 63);
+                j += 4;
+            };
         };
     };
+    src.resize(j);
 }
 
 // The operation's call, its arguments pushed since m.

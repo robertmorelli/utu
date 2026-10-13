@@ -12,18 +12,34 @@ fn word_text(w: I32) Str {
 
 // The text of src[start ..< end_] (UTF-8).
 fn bytes_text(start: I32, end_: I32) Str {
-    let text = "";
+    if end_ <= start { return ""; };
+    // Code units into an array (no more of them than bytes), made a string once.
+    let codes = Array[I32].new(end_ - start, 0);
+    let k = 0;
     let i = start;
     while (i < end_) {
         let b = src[i];
-        let cp = b;
-        let n = 1;
-        if b >= 240 { cp = b & 7; n = 4; } else if b >= 224 { cp = b & 15; n = 3; } else if b >= 192 { cp = b & 31; n = 2; };
-        for (1 ..< n) |k| { cp = (cp << 6) | (src[i + k] & 63); };
-        text = text + Str.from_code_point(cp);
-        i += n;
+        if b < 128 {
+            codes[k] = b;
+            k += 1;
+            i += 1;
+        } else {
+            let cp = b;
+            let n = 1;
+            if b >= 240 { cp = b & 7; n = 4; } else if b >= 224 { cp = b & 15; n = 3; } else if b >= 192 { cp = b & 31; n = 2; };
+            for (1 ..< n) |m| { cp = (cp << 6) | (src[i + m] & 63); };
+            if cp >= 65536 {
+                codes[k] = 55296 + ((cp - 65536) >> 10);
+                codes[k + 1] = 56320 + ((cp - 65536) & 1023);
+                k += 2;
+            } else {
+                codes[k] = cp;
+                k += 1;
+            };
+            i += n;
+        };
     };
-    text;
+    Str.from_codes(codes, k);
 }
 
 fn decl_text(d: I32) Str {
