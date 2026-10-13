@@ -185,14 +185,15 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     };
     let first_elem = first_child(node);
     if elem < 0 {
-        if first_elem < 0 { return unsupported(node); };
+        // `[]` with nothing to say what it holds: its elements are never read.
+        if first_elem < 0 { elem = prelude(Prelude.I32); };
         let c = first_elem;
         let has_null = false;
         while (c >= 0) {
             if is_null_literal(c) { has_null = true; } else if elem < 0 { elem = type_only(c, -1, cx); };
             c = next_sibling(c);
         };
-        if elem < 0 { return unsupported(node); };
+        if elem < 0 { elem = prelude(Prelude.I32); };
         if has_null { elem = nullable(elem); };
         // A fun cannot be stored; inferred, the elements are closures of it.
         if ty_is(elem, Ty.Fun) { elem = ty(Ty.Closure, ty_a[elem], ty_b[elem]); };
@@ -226,6 +227,50 @@ fn array_of(elem: I32) I32 {
     let m = vl_begin();
     vl_add(elem);
     named(decl_a[module], instance(module, vl_end(m)));
+}
+
+fn is_empty_array(node: I32) Bool { is_kind(node, Node.Array_expr) and first_child(node) < 0; }
+
+// `let xs = [];`: the type a later use in its block gives it (an array
+// assigned to it, or the parameter it is passed as), or -1.
+fn later_array_type(decl: I32, let_node: I32, cx: Cx) I32 {
+    let s = next_sibling(let_node);
+    while (s >= 0) {
+        let t = array_use_type(s, decl, cx);
+        if t >= 0 { return t; };
+        s = next_sibling(s);
+    };
+    -1;
+}
+
+fn array_use_type(node: I32, decl: I32, cx: Cx) I32 {
+    if is_kind(node, Node.Assign_expr) and is_kind(first_child(node), Node.Identifier) and node_decl[first_child(node)] == decl
+        and not is_empty_array(last_child(node)) {
+        let t = type_only(last_child(node), -1, cx);
+        if is_array_type(t) { return t; };
+    };
+    if is_kind(node, Node.Call_expr) and is_kind(first_child(node), Node.Identifier) and decl_is(node_decl[first_child(node)], Decl.Fn) {
+        let f = node_decl[first_child(node)];
+        let args = next_sibling(first_child(node));
+        let a = if args >= 0 { first_child(args); } else { -1; };
+        let list = param_list_of(f);
+        let p = if list >= 0 { first_child(list); } else { -1; };
+        while (a >= 0 and p >= 0) {
+            if is_kind(a, Node.Identifier) and node_decl[a] == decl {
+                let t = type_of(next_sibling(first_child(p)), instance_for(module_of(f), cx.inst));
+                if is_array_type(t) { return t; };
+            };
+            a = next_sibling(a);
+            p = next_sibling(p);
+        };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        let t = array_use_type(c, decl, cx);
+        if t >= 0 { return t; };
+        c = next_sibling(c);
+    };
+    -1;
 }
 
 fn is_array_type(t: I32) Bool {

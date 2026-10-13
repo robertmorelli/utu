@@ -574,6 +574,7 @@ fn check_let(node: I32, cx: Cx) I32 {
     let init = last_child(node);
     let annotated = next_sibling(name) != init;
     let t = if annotated { type_of(next_sibling(name), cx.inst); } else { -1; };
+    if not annotated and is_empty_array(init) { t = later_array_type(decl, node, cx); };
     if is_es(init) and annotated {
         decl_ty[decl] = t;
         es_import(decl, init, t);
