@@ -845,6 +845,9 @@ fn register_method(item: I32, w: Walk) void {
     let receiver = first_child(name);
     let method = last_child(name);
     if receiver == method { return; };
+    // `fn T.m` with no type T: stage 0 takes it for a function named T.m,
+    // and says nothing of T (a call `T.m(…)` reports it).
+    if is_kind(receiver, Node.Type_ident) and lookup(word_of(receiver)) < 0 and not builtin_type(word_of(receiver)) { return; };
     let owner = walk_type_name(receiver, w);
     let decl = node_decl[method];
     decl_a[decl] = owner;

@@ -21,9 +21,6 @@ const RUN_TIMEOUT_MS = 8000;
 
 // Where the self-hosted compiler deliberately differs from stage 0, and why.
 const INTENDED = {
-  // `fn Box.make` with no type Box: stage 0 says nothing when the method is
-  // never called (here, only from an export the test build leaves out).
-  'baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu test': 'a method of an unknown type is reported',
   // `Pair[I32]` of `mod Pair[A, B]`: stage 0 builds it, reading B as nothing.
   'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal': 'a module given too few type arguments is reported',
   'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test': 'a module given too few type arguments is reported',

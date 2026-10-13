@@ -186,18 +186,15 @@ tables.
 `scripts/selfhost-run-differential.mjs` builds every program in
 `examples/`, `benchmarks/`, and `baselines/corpus` (for its exports and its
 tests), runs each zero-argument export and test, and compares what it does
-with what stage 0's builds did (`baselines/run-differential.json`). 944 of
-948 builds behave the same, and none differs. Three differ on purpose,
-where stage 0 accepts a program it should reject (a method of an unknown
-type, a module given too few type arguments); one calls a method of an
-unknown type, which stage 0 builds and this compiler does not.
-`--why=call_expr` lists the source of what is not built.
+with what stage 0's builds did (`baselines/run-differential.json`). 946 of
+948 builds behave the same, and none differs; the other two differ on
+purpose, where stage 0 builds a module given too few type arguments.
 
 `scripts/selfhost-diagnostics-differential.mjs` does the same for programs
 that do not build: for those programs and the negative corpus, every
 diagnostic's kind, message, and span must be stage 0's
-(`baselines/diagnostics.json.gz`). 1202 of 1234 builds diagnose the same,
-and none differs. Thirty differ on purpose: a program that does not parse
+(`baselines/diagnostics.json.gz`). 1206 of 1234 builds diagnose the same,
+and none differs. The others differ on purpose: a program that does not parse
 is reported at the furthest token the parser reached, where stage 0
 reported tree-sitter's error recovery; and a few of stage 0's quirks are
 listed in the script with what this compiler does instead.

@@ -1059,6 +1059,11 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             if r >= 0 { return r; };
         };
         let decl = node_decl[last_child(callee)];
+        // `T.f(…)` with no type T (reported): stage 0 still calls `fn T.f` by its name.
+        if owner_decl < 0 and decl < 0 {
+            let named = method_of_unknown(word_of(first_child(callee)), word_of(last_child(callee)));
+            if named >= 0 { return call_with(fn_instance(named, 0), args, 0, m, node, cx); };
+        };
         if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module)) and not has_foreign() {
             report3(Diag.UnknownMethod, node, word_of(last_child(callee)), -1, -1, decl_name[owner_decl]);
             return finish_error(args, m, cx);
@@ -1786,4 +1791,16 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     cur_params[0] = cur_locals.len();
     mark_boxes(last_child(item));
     finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result }, -1);
+}
+
+// `fn T.f` of an own file whose receiver T names no type, or -1.
+fn method_of_unknown(receiver: I32, name: I32) I32 {
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Fn) and decl_a[d] < 0 and is_kind(decl_node[d], Node.Fn_decl) {
+            let fn_name = first_child(decl_node[d]);
+            if next_sibling(first_child(fn_name)) >= 0 and word_of(first_child(fn_name)) == receiver and word_of(last_child(fn_name)) == name
+                and is_own_file(file_of_token(node_first[fn_name])) { return d; };
+        };
+    };
+    -1;
 }
