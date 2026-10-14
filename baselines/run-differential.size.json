@@ -4880,6 +4880,50 @@
  "examples/queries/iterators.utu test": {
   "calls": {}
  },
+ "examples/templates.utu normal": {
+  "calls": {
+   "blocks": {
+    "result": "yes and 42",
+    "printed": []
+   },
+   "empty": {
+    "result": "",
+    "printed": []
+   },
+   "escapes": {
+    "result": "a ` backtick, a ${ that is text, $5, $x, tab\tend",
+    "printed": []
+   },
+   "greeting": {
+    "result": "Ada is 36 years old and 1.65 m tall",
+    "printed": []
+   },
+   "multiline": {
+    "result": "first line\nsecond line true",
+    "printed": []
+   },
+   "nested": {
+    "result": "[inner 3]",
+    "printed": []
+   },
+   "plain": {
+    "result": "no substitutions",
+    "printed": []
+   },
+   "point": {
+    "result": "p = (3, -4)",
+    "printed": []
+   }
+  }
+ },
+ "examples/templates.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
  "examples/working/arrays_and_for.utu normal": {
   "calls": {
    "main": {

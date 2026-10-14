@@ -3,6 +3,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
     _expr: ($) =>
       choice(
         $.literal,
+        $.template_string,
         $.identifier,
         $.tuple_expr,
         $.array_expr,

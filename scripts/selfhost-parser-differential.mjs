@@ -24,7 +24,7 @@ const inputs = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 
 const INSERTS = [' -o ', '-o', '?.', '?', ' in ', ' type ', ' test ', ' and ', ' not ', ' return ', ' fatal ',
   '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//',
-  ' map ', ' fold(0) ', '.{', '[', ']', '(', ')', '{', '}', ',', ';', ':', ' let ', ' if ', ' else ', ' cl() ', '&', '.'];
+  ' map ', ' fold(0) ', '.{', '[', ']', '(', ')', '{', '}', ',', ';', ':', ' let ', ' if ', ' else ', ' cl() ', '&', '.', '`', '${', '` ${x} `', '$'];
 
 const utu = await loadSelfhost();
 const names = new Map();

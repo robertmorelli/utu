@@ -510,6 +510,7 @@ orelse
 3.14      1.0e-9              // float
 "hello"                       // string
 \\multiline                   // multiline string (each line prefixed \\)
+`x is ${x}`                   // template string: see below
 true  false  null
 
 // struct init
@@ -633,6 +634,34 @@ label: { ... }
 ```
 
 ---
+
+## Template strings
+
+```
+`Hello, ${name}! You are ${age} years old.`
+```
+
+A template string is text between backticks, with `${expr}` wherever a value
+goes. It is a `Str`: its pieces joined with `+`, left to right, where each
+`${expr}` is `expr.to_str()` and text is a string literal. So the example is
+
+```
+"Hello, " + name.to_str() + "! You are " + age.to_str() + " years old."
+```
+
+Empty text is left out (`${x}` alone is `x.to_str()`, ` `` ` is `""`).
+
+- `I32`, `U32`, `I64`, `U64`, `F32`, `F64` and `Bool` have `to_str` (as
+  JavaScript's `String()` writes them), and so does `Str` (the string
+  itself, at no cost). A type takes part by
+  having one: `fn Point.to_str |self| () Str { ... }`.
+- A value with no `to_str` is an error at its `${…}`: `Unknown method
+  'P.to_str'`. A nullable one is too; unwrap it first (`${x orelse "none"}`).
+- Any expression fits in `${…}`, braces, blocks and other template strings
+  included.
+- The text may span lines. Escapes are a string's (`\n`, `\t`, `\"`,
+  `\uXXXX`, …), plus `` \` `` and `\$`; a `$` not followed by `{` is
+  text (`$5`), and `\${` is the text `${`.
 
 ## Builtin static methods
 

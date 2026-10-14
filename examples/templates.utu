@@ -1,0 +1,34 @@
+// Template strings: `text ${expr} text`. Each `${expr}` is `expr.to_str()`,
+// and the pieces are joined with `+`.
+
+struct Point:
+    | x : I32
+    | y : I32
+
+// A type takes part in templates by having a to_str.
+fn Point.to_str |self| () Str {
+    `(${self.x}, ${self.y})`;
+}
+
+fn describe(name: Str, age: I32, height: F64) Str {
+    `${name} is ${age} years old and ${height} m tall`;
+}
+
+export lib {
+    fn greeting() Str { describe("Ada", 36, 1.65); }
+    fn point() Str { `p = ${Point { x: 3, y: -4 }}`; }
+    fn nested() Str { `[${`inner ${1 + 2}`}]`; }
+    fn blocks() Str { `${if 2 > 1 { "yes"; } else { "no"; }} and ${{ let n = 6; n * 7; }}`; }
+    fn escapes() Str { `a \` backtick, a \${ that is text, $5, $${"x"}, tab\tend`; }
+    fn multiline() Str {
+        `first line
+second line ${true}`;
+    }
+    fn plain() Str { `no substitutions`; }
+    fn empty() Str { ``; }
+}
+
+test "a template is its pieces joined" {
+    assert `${1}${2}` == "12";
+    assert `x${""}y` == "xy";
+}

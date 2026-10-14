@@ -1994,6 +1994,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "template_string"
+        },
+        {
+          "type": "SYMBOL",
           "name": "identifier"
         },
         {
@@ -5223,6 +5227,128 @@
           {
             "type": "STRING",
             "value": "\""
+          }
+        ]
+      }
+    },
+    "template_string": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "template_full"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "template_head"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_expr"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "template_middle"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "_expr"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "SYMBOL",
+              "name": "template_tail"
+            }
+          ]
+        }
+      ]
+    },
+    "template_full": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "`"
+          },
+          {
+            "type": "PATTERN",
+            "value": "([^`$\\\\]|\\\\[^\\n]|\\$+([^`{$\\\\]|\\\\[^\\n]))*\\$*"
+          },
+          {
+            "type": "STRING",
+            "value": "`"
+          }
+        ]
+      }
+    },
+    "template_head": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "`"
+          },
+          {
+            "type": "PATTERN",
+            "value": "([^`$\\\\]|\\\\[^\\n]|\\$+([^`{$\\\\]|\\\\[^\\n]))*\\$*"
+          },
+          {
+            "type": "STRING",
+            "value": "${"
+          }
+        ]
+      }
+    },
+    "template_middle": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "}"
+          },
+          {
+            "type": "PATTERN",
+            "value": "([^`$\\\\]|\\\\[^\\n]|\\$+([^`{$\\\\]|\\\\[^\\n]))*\\$*"
+          },
+          {
+            "type": "STRING",
+            "value": "${"
+          }
+        ]
+      }
+    },
+    "template_tail": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "}"
+          },
+          {
+            "type": "PATTERN",
+            "value": "([^`$\\\\]|\\\\[^\\n]|\\$+([^`{$\\\\]|\\\\[^\\n]))*\\$*"
+          },
+          {
+            "type": "STRING",
+            "value": "`"
           }
         ]
       }

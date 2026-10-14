@@ -403,6 +403,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     match Node.from_i32(node_kind[node]) {
         Node.Identifier => check_ident(node, cx),
         Node.Literal => check_literal(node, expect, cx),
+        Node.Template_string => check_template(node, cx),
         Node.Paren_expr => check_expr(first_child(node), expect, cx),
         Node.Splice => check_expr(first_child(node), expect, cx),
         Node.Binary_expr => check_binary(node, expect, cx),
@@ -508,6 +509,61 @@ fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
         return prelude(Prelude.Str);
     };
     unsupported(node);
+}
+
+// `text ${e} text`: its pieces joined with Str's `+`, left to right, each
+// `e` as `e.to_str()`, and empty text left out (as stage 0 desugars it).
+fn check_template(node: I32, cx: Cx) I32 {
+    let str_t = prelude(Prelude.Str);
+    let add = fn_instance(member(ty_decl(str_t), known_word(Known.Add), Space.Operator), ty_inst(str_t));
+    let m = w_mark();
+    let pieces = 0;
+    let c = first_child(node);
+    while (c >= 0) {
+        let joined = true;
+        if is_kind(c, Node.Template_full) or is_kind(c, Node.Template_head) or is_kind(c, Node.Template_middle) or is_kind(c, Node.Template_tail) {
+            let t = node_first[c];
+            // After its backtick or `}`; before its backtick or `${`.
+            let start = tok_start[t] + 1;
+            let end_ = tok_end[t] - if src[tok_end[t] - 1] == 96 { 1; } else { 2; };
+            joined = end_ > start;
+            if joined and not template_text(start, end_) { return unsupported(node); };
+        } else {
+            template_value(c, cx);
+        };
+        if joined {
+            pieces += 1;
+            if pieces > 1 { finish_call(add, m, cx); };
+        };
+        c = next_sibling(c);
+    };
+    if pieces == 0 {
+        lit_bytes.clear();
+        push_lit_bytes();
+    };
+    str_t;
+}
+
+// `${e}`: `e.to_str()`.
+fn template_value(e: I32, cx: Cx) void {
+    let m = w_mark();
+    let rt = check_expr(e, -1, cx);
+    if ty_is(rt, Ty.Error) { return; };
+    let word = known_word(Known.ToStr);
+    if ty_is(rt, Ty.Nullable) {
+        report2(Diag.NullableAccess, e, word, rt, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return;
+    };
+    let decl = member(ty_decl(rt), word, Space.Method);
+    if decl < 0 {
+        report2(Diag.UnknownMethod, e, word, rt, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return;
+    };
+    let fi = fn_instance(decl, ty_inst(rt));
+    coerce(rt, vl_item(fi_params[fi], 0), e);
+    finish_call(fi, m, cx);
 }
 
 // An integer literal's value, as 64 bits.

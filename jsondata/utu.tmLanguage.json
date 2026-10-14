@@ -105,6 +105,41 @@
         {
           "name": "string.quoted.double.utu",
           "match": "\"(?:\\\\.|[^\"\\\\])*\""
+        },
+        {
+          "name": "string.template.utu",
+          "begin": "`",
+          "end": "`",
+          "patterns": [
+            {
+              "name": "constant.character.escape.utu",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.template.expression.utu",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.definition.template-expression.begin.utu"
+                }
+              },
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.definition.template-expression.end.utu"
+                }
+              },
+              "contentName": "meta.embedded.line.utu",
+              "patterns": [
+                {
+                  "include": "#templateBraces"
+                },
+                {
+                  "include": "$self"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -390,6 +425,18 @@
               "name": "entity.other.attribute-name.class.css"
             }
           ]
+        }
+      ]
+    },
+    "templateBraces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#templateBraces"
+        },
+        {
+          "include": "$self"
         }
       ]
     }

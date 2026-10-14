@@ -254,6 +254,7 @@
  "examples/protocols.utu": 469,
  "examples/queries/indexes.utu": 6251,
  "examples/queries/iterators.utu": 4621,
+ "examples/templates.utu": 740,
  "examples/working/arrays_and_for.utu": 163,
  "examples/working/closures.utu": 151,
  "examples/working/hello.utu": 37,

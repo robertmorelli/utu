@@ -82,13 +82,27 @@ fn string_literal(node: I32) Bool {
         ok = decode_string(tok_start[t] + 1, tok_end[t] - 1);
     };
     if not ok { return false; };
+    push_lit_bytes();
+    true;
+}
+
+// A template string's text, src[start ..< end_], with its escapes, as a
+// constant. False as for string_literal.
+fn template_text(start: I32, end_: I32) Bool {
+    lit_bytes.clear();
+    if not decode_string(start, end_) { return false; };
+    push_lit_bytes();
+    true;
+}
+
+// The text in lit_bytes, as a constant.
+fn push_lit_bytes() void {
     let start = src.len();
     for (0 ..< lit_bytes.len()) |i| { src.push(lit_bytes[i]); };
     let before = src.interned();
     let word = src.intern(start, src.len());
     if word < before { src.resize(start); };
     w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0);
-    true;
 }
 
 // The global of a string constant whose text is word `word`.

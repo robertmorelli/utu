@@ -75,4 +75,7 @@ mod Str {
             <ir-ident name="end_"/>
         </ir-string-slice-wtf16> \/;
     }
+
+    // The string itself: what `${s}` in a template string calls.
+    fn &.to_str |self| () & { @ir/\ <ir-ident name="self"/> \/; }
 }

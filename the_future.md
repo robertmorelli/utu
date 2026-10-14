@@ -287,6 +287,9 @@ This should be treated as a meaningful language-shaping priority, not a small su
 
 ## String interpolation
 
+**Landed:** template strings, `` `x is ${x}` ``: each `${e}` is `e.to_str()`,
+and the pieces are joined with `+` (new_spec2.md, "Template strings").
+
 Users coming from JS, Dart, Python, or Rust expect template-literal style string interpolation.
 
 Without it, formatting feels like a constant chore.
@@ -507,7 +510,7 @@ The public performance story should be:
 
 The practical order of importance is:
 
-1. reduce remaining weirdness (expression orientation, string interpolation)
+1. reduce remaining weirdness (expression orientation; string interpolation has landed)
 2. make docs approachable and explicit
 3. make tooling unbelievably robust (LSP, incremental, formatter, test framework)
 4. build an excellent stdlib

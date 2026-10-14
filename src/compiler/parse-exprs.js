@@ -4,7 +4,7 @@ import { stamp, el } from './parse-helpers.js';
 import {
   walkArgList, walkAssignExpr, walkBinaryExpr, walkCallExpr, walkElseExpr,
   walkFieldExpr, walkOptionalFieldExpr, walkIdentifier, walkIndexExpr, walkLiteral, walkModCallExpr,
-  walkNullExpr, walkParenExpr, walkPipeExpr, walkRangeExpr, walkSliceExpr, walkTypeMemberExpr,
+  walkNullExpr, walkParenExpr, walkPipeExpr, walkRangeExpr, walkSliceExpr, walkTemplateString, walkTypeMemberExpr,
   walkUnaryExpr,
 } from './parse-exprs-basic.js';
 import {
@@ -34,6 +34,7 @@ export const walkers = {
     return node;
   },
   'literal':                     walkLiteral,
+  'template_string':             walkTemplateString,
   'identifier':                  walkIdentifier,
   'paren_expr':                  walkParenExpr,
   'range_expr':                  walkRangeExpr,

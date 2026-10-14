@@ -24,10 +24,11 @@ const inputs = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 
 // Words and operators whose lexing depends on what precedes them.
 const INSERTS = [' -o ', '-o', '?.', '?', ' in ', ' type ', ' test ', ' and ', ' not ', ' return ', ' fatal ',
-  '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//'];
+  '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//', '`', '${', '` ${x} `', '$'];
 
 // Token kinds, in selfhost/lex.utu's order.
-const KINDS = ['End', 'Error', 'Word', 'Int', 'Float', 'String', 'MultilineLine', 'DslBody', 'Comment'];
+const KINDS = ['End', 'Error', 'Word', 'Int', 'Float', 'String', 'MultilineLine', 'DslBody', 'Comment',
+  'TemplateFull', 'TemplateHead', 'TemplateMiddle', 'TemplateTail'];
 const PUNCT = KINDS.length;
 
 const lexer = await loadSelfhost();
@@ -114,6 +115,10 @@ function expectedKind(leaf, text) {
     case 'string_lit': return 'String';
     case 'multiline_string_line': return 'MultilineLine';
     case 'dsl_body': return 'DslBody';
+    case 'template_full': return 'TemplateFull';
+    case 'template_head': return 'TemplateHead';
+    case 'template_middle': return 'TemplateMiddle';
+    case 'template_tail': return 'TemplateTail';
     case 'identifier': case 'type_ident': return 'Word';
     default: break;
   }

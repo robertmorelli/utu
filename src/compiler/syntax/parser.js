@@ -106,6 +106,8 @@ const WORD = /[A-Za-z_][A-Za-z0-9_]*/y;
 const FLOAT = /[0-9]+\.[0-9]+(?:[eE][+-]?[0-9]+)?/y;
 const INT = /0x[0-9a-fA-F]+|0b[01]+|[0-9]+/y;
 const STRING = /"(?:[^"\\\n]|\\[^\n])*"/y;
+// A template string's text, up to a backtick or `${` (the grammar's TEMPLATE_TEXT).
+const TEMPLATE_TEXT = /(?:[^`$\\]|\\[^\n]|\$+(?:[^`{$\\]|\\[^\n]))*\$*/y;
 const PLATFORM_PATH = /[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*/y;
 const SPACE = /\s/;
 
@@ -952,6 +954,7 @@ class Parser {
     if (word !== null) return this.wordExpression(word);
     if (c >= '0' && c <= '9') return this.node('literal', [this.number()]);
     if (c === '"') return this.node('literal', [this.stringLit()]);
+    if (c === '`') return this.templateString();
     if (source.startsWith('\\\\', this.pos)) return this.node('literal', [this.multilineString()]);
     const punct = this.punct();
     switch (punct) {
@@ -995,6 +998,38 @@ class Parser {
     const node = this.number();
     if (node.type !== 'int_lit') this.fail();
     return node;
+  }
+
+  /**
+   * `text ${expr} text`: its text pieces are tokens (template_full, or
+   * template_head, template_middle…, template_tail), each from its opening
+   * backtick or `}` through its closing backtick or `${`.
+   */
+  templateString() {
+    const source = this.source;
+    const parts = [];
+    let start = this.pos;
+    for (;;) {
+      TEMPLATE_TEXT.lastIndex = start + 1;
+      TEMPLATE_TEXT.exec(source);
+      let end = TEMPLATE_TEXT.lastIndex;
+      // `$${`: the text's last `$` begins the `${`.
+      if (source[end] === '{' && end > start + 1 && source[end - 1] === '$') end--;
+      const first = source[start] === '`';
+      if (source[end] === '`') {
+        parts.push(this.leaf(first ? 'template_full' : 'template_tail', start, end + 1, true));
+        this.pos = end + 1;
+        this.skip();
+        return this.node('template_string', parts);
+      }
+      if (!source.startsWith('${', end)) this.fail();
+      parts.push(this.leaf(first ? 'template_head' : 'template_middle', start, end + 2, true));
+      this.pos = end + 2;
+      this.skip();
+      parts.push(this.expression());
+      if (source[this.pos] !== '}') this.fail();
+      start = this.pos;
+    }
   }
 
   multilineString() {
@@ -1065,7 +1100,7 @@ class Parser {
     if (c === undefined) return false;
     const word = this.word();
     if (word !== null) return !ITERATOR_FORMS.has(word) && !BINARY.has(word) && word !== 'orelse';
-    if ((c >= '0' && c <= '9') || c === '"') return true;
+    if ((c >= '0' && c <= '9') || c === '"' || c === '`') return true;
     if (this.source.startsWith('\\\\', this.pos)) return true;
     return ['-', '~', '(', '[', '.', '{', '&', '@'].includes(this.punct(true));
   }
