@@ -331,16 +331,19 @@ fn total(s: Stream[I32]) I32 {
 ```
 
 The loop suspends at each value, as `await` does (so it needs JSPI too).
-`continue` goes on to the next value; `break` ends the loop and closes the
-stream (its iterator's `return`, awaited), as JS's `for await` does. It is
+`continue` goes on to the next value; `break` or `return` ends the loop and
+closes the stream (its iterator's `return`, awaited), as JS's `for await`
+does. It is
 
 ```
-let it = s.iterator();
+let it = s.iterator(); defer s.close(it);
 while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
-s.close(it);
 ```
 
-so any type with those methods can be read the same way.
+so any type with those methods can be read the same way (`next` returns a
+promise, `done` a `Bool`). As with any `defer`, an exception thrown out of
+the body does not close the stream. A stream is read once: reading it again
+gives nothing.
 
 Streams are made and changed by std:Stream; each change is a new stream that
 reads the old one as it is read:
@@ -693,16 +696,19 @@ goes. It is a `Str`: its pieces joined with `+`, left to right, where each
 Empty text is left out (`${x}` alone is `x.to_str()`, ` `` ` is `""`).
 
 - `I32`, `U32`, `I64`, `U64`, `F32`, `F64` and `Bool` have `to_str` (as
-  JavaScript's `String()` writes them), and so does `Str` (the string
-  itself, at no cost). A type takes part by
-  having one: `fn Point.to_str |self| () Str { ... }`.
+  JavaScript's `String()` writes them; an `F32` as the shortest decimal
+  that reads back as the same `F32`, so `0.1` and not `0.10000000149…`),
+  and so does `Str` (the string itself, at no cost). A type takes part by
+  having one, as `x.to_str()` would call it: `fn Point.to_str |self| () Str { ... }`.
 - A value with no `to_str` is an error at its `${…}`: `Unknown method
   'P.to_str'`. A nullable one is too; unwrap it first (`${x orelse "none"}`).
 - Any expression fits in `${…}`, braces, blocks and other template strings
   included.
-- The text may span lines. Escapes are a string's (`\n`, `\t`, `\"`,
-  `\uXXXX`, …), plus `` \` `` and `\$`; a `$` not followed by `{` is
-  text (`$5`), and `\${` is the text `${`.
+- The text may span lines (a line break is as the file has it). Escapes are
+  a string's: `\n`, `\t`, `\r`, `\b`, `\f`, `\uXXXX` (four hexadecimal
+  digits, or it is an error), and `\c` for any other c is c (so `` \` ``,
+  `\$`, `\"`, `\\`). A `$` not followed by `{` is text (`$5`), and `\${` is
+  the text `${`.
 
 ## Builtin static methods
 
@@ -862,13 +868,19 @@ fn triangle(n: I32) I32 {
 
 - The parameters are locals, named as in utu (`$x`) or numbered; `(local …)`
   declarations come first. Instructions are flat or folded, as in any WAT.
-- It takes and returns `I32`, `U32`, `I64`, `U64`, `F32`, `F64`, `Bool` (each
-  `i32`, `i64`, `f32` or `f64`) or `V128` (`v128`), and is a plain function
-  (no `|self|`, not a generator).
+- It takes and returns `I32`, `U32`, `I64`, `U64`, `F32`, `F64`, `Bool`,
+  `M32`, `M64` (each `i32`, `i64`, `f32` or `f64`), or `V128`, `M128`
+  (`v128`), written out (not a module's type parameter), and is a plain
+  function (no `|self|`, not a generator); `export main` may be one. A
+  `Bool` it returns is 0 or 1: the code is trusted to leave one.
 - Every numeric and vector instruction, constants, locals, `block`, `loop`,
   `if`/`else`, `br`, `br_if`, `br_table`, `return`, `select`, `drop`,
   `unreachable`, `nop`. A @wat function computes on its arguments: it has no
-  memories, globals, calls or references.
+  memories, globals, calls or references. A block has at most one result
+  (no `(param …)`, no `(type …)`: those would need types in the module).
+- Numbers are written as WAT writes them (`0xff`, `1_000`, `0x1.8p3`,
+  `nan:0x200000`); a float is rounded once, to the nearest, and one beyond
+  its type's range is a mistake.
 - It is checked as the engine checks it (each instruction's operand types,
   labels, what the body leaves), and a mistake is reported at its place in
   the text: `i64.add needs an i64, not an i32`.

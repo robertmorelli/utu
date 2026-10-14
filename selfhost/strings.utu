@@ -119,8 +119,14 @@ fn string_global(word: I32) I32 {
     g;
 }
 
-// JSON's escapes, from src[start ..< end_] into lit_bytes as UTF-8.
+// Where decode_string last found a `\u` without four hexadecimal digits (a
+// byte in src), or -1.
+vec bad_escape: I32 = [-1];
+
+// JSON's escapes, and `\c` as c for any other c, from src[start ..< end_]
+// into lit_bytes as UTF-8. False at a bad escape, or a lone surrogate.
 fn decode_string(start: I32, end_: I32) Bool {
+    bad_escape[0] = -1;
     let i = start;
     while (i < end_) {
         let c = src[i];
@@ -136,12 +142,20 @@ fn decode_string(start: I32, end_: I32) Bool {
             else if e == 98 { lit_bytes.push(8); }
             else if e == 102 { lit_bytes.push(12); }
             else if e == 117 {
-                let unit = hex4(i);
+                let unit = if i + 4 <= end_ { hex4(i); } else { -1; };
+                if unit < 0 {
+                    bad_escape[0] = i - 2;
+                    return false;
+                };
                 i += 4;
                 if unit >= 55296 and unit <= 56319 {
                     // A high surrogate: a low one must follow.
-                    if i + 5 < end_ + 1 and src[i] == 92 and src[i + 1] == 117 {
+                    if i + 6 <= end_ and src[i] == 92 and src[i + 1] == 117 {
                         let low = hex4(i + 2);
+                        if low < 0 {
+                            bad_escape[0] = i;
+                            return false;
+                        };
                         if low >= 56320 and low <= 57343 {
                             i += 6;
                             utf8_push(65536 + (unit - 55296) * 1024 + (low - 56320));
@@ -159,11 +173,14 @@ fn decode_string(start: I32, end_: I32) Bool {
     true;
 }
 
+// The four hexadecimal digits at src[at], or -1.
 fn hex4(at: I32) I32 {
     let v = 0;
     for (at ..< at + 4) |i| {
         let c = src[i];
-        v = v * 16 + if c >= 97 { c - 87; } else if c >= 65 { c - 55; } else { c - 48; };
+        let d = if c >= 48 and c <= 57 { c - 48; } else if c >= 97 and c <= 102 { c - 87; } else if c >= 65 and c <= 70 { c - 55; } else { -1; };
+        if d < 0 { return -1; };
+        v = v * 16 + d;
     };
     v;
 }

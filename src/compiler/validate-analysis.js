@@ -3,6 +3,7 @@ import { DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';
 import { typeEntryDecl } from './link-type-decls.js';
 import { retainedGraphs } from './graph-store.js';
 import { nodesOf } from './program-index.js';
+import { INVALID_ESCAPE_MESSAGE } from './string-escapes.js';
 
 export function validateAnalysis(doc, typeIndex) {
   const root = doc.body.firstChild;
@@ -25,6 +26,7 @@ export function validateAnalysis(doc, typeIndex) {
   validateNullableTypes(root, typeIndex, ctx.program);
   validateNullLiterals(root, ctx.program);
   validateIntegerLiterals(root, ctx.program);
+  validateStringEscapes(root, ctx.program);
   validateArrayDefaultConstruction(root, typeIndex, ctx.program);
   validateFunctionReferenceStorage(root, ctx.program);
   validateTuples(root);
@@ -297,6 +299,14 @@ function validateIntegerLiterals(root, program) {
     stampDiagnostic(literal, DIAGNOSTIC_KINDS.INTEGER_LITERAL_OUT_OF_RANGE,
       `Integer literal ${sourceNegation ? '-' : ''}${value} is out of range for ${type}`,
       { type, value: `${sourceNegation ? '-' : ''}${value}`, min: String(range[0]), max: String(range[1]) });
+  }
+}
+
+// A string or template whose `\u` lacks its digits (marked by the walk).
+function validateStringEscapes(root, program) {
+  for (const literal of program ? nodesOf(program, 'ir-lit') : root.querySelectorAll('ir-lit')) {
+    if (literal.getAttribute('data-invalid-escape') !== 'true') continue;
+    stampDiagnostic(literal, DIAGNOSTIC_KINDS.INVALID_ESCAPE, INVALID_ESCAPE_MESSAGE);
   }
 }
 

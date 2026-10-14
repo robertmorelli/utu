@@ -77,12 +77,12 @@ fn find_wat() I32 {
     wat_site.len();
 }
 
-// The function whose whole body site `n` is, or -1.
+// The function (or `export main`) whose whole body site `n` is, or -1.
 fn wat_function_of(n: I32) I32 {
     let block = parent_of(n);
     if block < 0 or not is_kind(block, Node.Block) or first_child(block) != n or next_sibling(n) >= 0 { return -1; };
     let f = parent_of(block);
-    if f >= 0 and is_kind(f, Node.Fn_decl) and last_child(f) == block { f; } else { -1; };
+    if f >= 0 and (is_kind(f, Node.Fn_decl) or is_kind(f, Node.Export_main_decl)) and last_child(f) == block { f; } else { -1; };
 }
 
 // The site of the @wat function whose body is `block`, or -1.

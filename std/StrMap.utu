@@ -42,9 +42,13 @@ mod StrMap[V] {
     /// `key`'s value is now `value`.
     fn &.set |self| (key: Str, value: V) void {
         let h = hash(key);
-        if (self.count + 1) * 2 > self.keys.len() { self.grow(value); };
-        let i = self.slot(key, h);
-        if self.full[i] == 0 {
+        let i = if self.keys.len() > 0 { self.slot(key, h); } else { -1; };
+        if i < 0 or self.full[i] == 0 {
+            // A new key: room for it first.
+            if (self.count + 1) * 2 > self.keys.len() {
+                self.grow(value);
+                i = self.slot(key, h);
+            };
             self.full[i] = 1;
             self.keys[i] = key;
             self.hashes[i] = h;
@@ -53,7 +57,8 @@ mod StrMap[V] {
         self.values[i] = value;
     }
 
-    /// Removes `key`; whether it had one.
+    /// Removes `key`; whether it had one. (Its value stays referenced until
+    /// another key takes its slot: a map has no empty value of V to put there.)
     fn &.remove |self| (key: Str) Bool {
         if self.count == 0 { return false; };
         let mask = self.keys.len() - 1;

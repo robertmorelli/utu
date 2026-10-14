@@ -218,6 +218,7 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     };
     if ty_is(elem, Ty.Error) { return error_value(); };
     let t = array_of(elem);
+    if child_count(node) > max_new_fixed { return long_array_literal(node, t, elem, cx); };
     let m = w_mark();
     let c = first_elem;
     while (c >= 0) {
@@ -226,6 +227,47 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     };
     let vt = repr(t);
     w_node(Op.ArrayNewFixed, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m);
+    t;
+}
+
+// The most elements array.new_fixed may make (wasm's limit).
+let max_new_fixed: I32 = 10000;
+
+// A longer literal: an array of its length, each run of elements made by
+// array.new_fixed and copied into it, in order.
+fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
+    let vt = repr(t);
+    let heap = vt_heap(vt);
+    let all = new_local(vt);
+    let part = new_local(vt);
+    let m = w_mark();
+    let ma = w_mark();
+    w_leaf(Op.I32Const, vt_i32, child_count(node), 0);
+    w_node(Op.ArrayNewDefault, vt, heap, 0, ma);
+    w_node(Op.LocalSet, vt_none, all, 0, ma);
+    let c = first_child(node);
+    let at = 0;
+    while (c >= 0) {
+        let mp = w_mark();
+        let n = 0;
+        while (c >= 0 and n < max_new_fixed) {
+            coerce(check_expr(c, elem, cx), elem, c);
+            c = next_sibling(c);
+            n += 1;
+        };
+        w_node(Op.ArrayNewFixed, vt, heap, 0, mp);
+        w_node(Op.LocalSet, vt_none, part, 0, mp);
+        let mc = w_mark();
+        w_leaf(Op.LocalGet, vt, all, 0);
+        w_leaf(Op.I32Const, vt_i32, at, 0);
+        w_leaf(Op.LocalGet, vt, part, 0);
+        w_leaf(Op.I32Const, vt_i32, 0, 0);
+        w_leaf(Op.I32Const, vt_i32, n, 0);
+        w_node(Op.ArrayCopy, vt_none, heap, heap, mc);
+        at += n;
+    };
+    w_leaf(Op.LocalGet, vt, all, 0);
+    w_node(Op.Seq, vt, 0, 0, m);
     t;
 }
 

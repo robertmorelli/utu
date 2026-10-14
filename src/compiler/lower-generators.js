@@ -34,6 +34,16 @@ export function lowerGenerators(doc, parser, createDocument) {
   if (!root) return;
   const generators = new Map([...root.querySelectorAll('ir-fn[data-generator="true"]')].map(fn => [fn.getAttribute('name'), fn]));
 
+  // A generator expands into its consumers, before DSLs do: a @wat body,
+  // whose code is a whole function's, is reported here.
+  for (const fn of generators.values()) {
+    const body = childOf(fn, 'ir-block');
+    const only = body?.children.length === 1 ? body.firstElementChild : null;
+    if (only?.localName === 'ir-dsl' && only.getAttribute('name') === 'wat') {
+      throw compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, 'a @wat function is a plain function: fn f(x: I32) I32 { @wat/\\ … \\/; }', only);
+    }
+  }
+
   for (const misplaced of root.querySelectorAll('ir-yield')) {
     if (!misplaced.closest('ir-fn[data-generator="true"]')) {
       throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'yield can only appear in a generator: declare the function with `yield T` as its return type', misplaced);
@@ -46,8 +56,9 @@ export function lowerGenerators(doc, parser, createDocument) {
   // `await for (…)` parses as an await of the loop; the loop is the point.
   // Over a generator call it is the generator's loop; over anything else, a
   // stream's (streamLoop).
+  // Inner loops first: lowering one copies its body, inner loops and all.
   let streams = 0;
-  for (const awaited of [...root.querySelectorAll('ir-await')]) {
+  for (const awaited of [...root.querySelectorAll('ir-await')].reverse()) {
     const loop = awaited.firstElementChild;
     if (loop?.localName !== 'ir-for' || awaited.children.length !== 1) continue;
     awaited.replaceWith(generatorCall(loop, generators) ? loop : streamLoop(loop, `__stream${streams++}_`, parser, createDocument));
@@ -194,12 +205,11 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
 /**
  * `await for (s) |v| { body }` over a Stream[T] (std:Stream) is
  *
- *   { let it = s.iterator();
- *     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
- *     s.close(it); }
+ *   { let it = s.iterator(); defer s.close(it);
+ *     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; }; }
  *
- * so `break` and `continue` in the body are the loop's, and v has the type
- * of s's values.
+ * so `break` and `continue` in the body are the loop's, v has the type of
+ * s's values, and leaving by `return` closes the stream too.
  */
 function streamLoop(loop, prefix, parser, createDocument) {
   const sources = [...childrenOf(loop, 'ir-for-source')];
@@ -212,9 +222,9 @@ function streamLoop(loop, prefix, parser, createDocument) {
   const splice = node => { const key = `${prefix}splice${splices.size}`; splices.set(key, node); return key; };
   const [stream, iterator, result] = ['stream', 'iterator', 'result'].map(name => prefix + name);
   const value = names[0] ?? `${prefix}value`;
-  const code = `{ let ${stream} = ${splice(sources[0].firstElementChild)}; let ${iterator} = ${stream}.iterator(); `
+  const code = `{ let ${stream} = ${splice(sources[0].firstElementChild)}; let ${iterator} = ${stream}.iterator(); defer ${stream}.close(${iterator}); `
     + `while (true) { let ${result} = await ${stream}.next(${iterator}); if ${stream}.done(${result}) { break; }; `
-    + `let ${value} = ${stream}.value(${result}); ${splice(childOf(loop, 'ir-block'))}; }; ${stream}.close(${iterator}); }`;
+    + `let ${value} = ${stream}.value(${result}); ${splice(childOf(loop, 'ir-block'))}; }; }`;
   return expressionFromSource(parser, code, loop, splices, { createDocument });
 }
 

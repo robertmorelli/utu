@@ -56,16 +56,57 @@ try {
     ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; t; }', "Unknown method 'I32.iterator'"],
     ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`'],
     ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'a stream loop binds one value: await for (s) |value| { … }'],
+    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', "Cannot access field 'iterator' on nullable ?Stream[I32]"],
   ];
   for (const [i, [body, message]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);
     await fs.writeFile(file, `export lib { ${body} }\n`);
     const built = await both(file);
-    // Stage 0 counts the calls the first one's failure causes (`(+4 caused by this)`).
-    assert.equal(built.stage0.errors?.[0].replace(/ \(\+\d+ caused by this\)$/, ''), message, `stage 0: ${body}`);
+    // Stage 0 counts the calls the first one's failure causes (`(+4 caused by this)`), and names Stream[I32] Stream__I32.
+    assert.equal(built.stage0.errors?.[0].replace(/ \(\+\d+ caused by this\)$/, '').replace(/(\w)__(\w+)/g, '$1[$2]'), message, `stage 0: ${body}`);
     assert.deepEqual(built.selfhost.errors, [message], `self-hosted: ${body}`);
   }
-  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, and ${cases.length} mistakes reported alike`);
+  // Nested loops; a type of its own with the stream's methods (not
+  // externrefs); and the source's `return()`, called when the loop is left
+  // early, by break or by return.
+  const file = path.join(dir, 'more.utu');
+  await fs.writeFile(file, `struct Counter:
+    | n : I32
+struct It:
+    | at : I32
+fn Counter.iterator |self| () It { It { at: 0 }; }
+let resolved: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;
+fn Counter.next |self| (it: It) Promise[I32] { it.at += 1; resolved(it.at); }
+fn Counter.done |self| (r: I32) Bool { r > self.n; }
+fn Counter.value |self| (r: I32) I32 { r * 10; }
+fn Counter.close |self| (it: It) void { }
+let source: fun() Stream[I32] = @es/\\ () => { const s = (async function* () { yield 1; yield 2; yield 3; })(); const ret = s.return.bind(s); s.return = v => { globalThis.__returns = (globalThis.__returns ?? 0) + 1; return ret(v); }; return s; } \\/;
+let closed: fun() I32 = @es/\\ () => { const n = globalThis.__returns ?? 0; globalThis.__returns = 0; return n; } \\/;
+fn first(s: Stream[I32]) I32 { await for (s) |v| { return v; }; 0; }
+export lib {
+    fn nested() I32 {
+        let t = 0;
+        await for (Stream[I32].of([1, 2])) |a| { await for (Stream[I32].of([10, 20])) |b| { t += a * b; }; };
+        t;
+    }
+    fn custom() I32 { let t = 0; await for (Counter { n: 3 }) |v| { t += v; }; t; }
+    fn returned() I32 { first(source()) * 10 + closed(); }
+    fn broken() I32 { await for (source()) |v| { break; }; closed(); }
+    fn finished() I32 { let t = 0; await for (source()) |v| { t += v; }; t * 10 + closed(); }
+}
+`);
+  const more = await both(file);
+  for (const compiler of ['stage0', 'selfhost']) {
+    const { exports, errors } = more[compiler];
+    assert.ok(exports, `${compiler}: ${errors}`);
+    assert.equal(await exports.nested(), 90, `${compiler}: nested loops`);
+    assert.equal(await exports.custom(), 60, `${compiler}: a type with the stream's methods`);
+    assert.equal(await exports.returned(), 11, `${compiler}: return closes the stream`);
+    assert.equal(await exports.broken(), 1, `${compiler}: break closes the stream`);
+    // (Run out, it is closed too, which a finished generator ignores.)
+    assert.equal(await exports.finished(), 61, `${compiler}: a stream run out`);
+  }
+  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, nested loops, types with the methods, closing on break and return, and ${cases.length} mistakes reported alike`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

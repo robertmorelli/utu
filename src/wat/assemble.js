@@ -182,7 +182,7 @@ function tokenize(text) {
   let i = 0;
   while (i < text.length) {
     const c = text[i];
-    if (/\s/.test(c)) { i++; continue; }
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
     if (text.startsWith(';;', i)) {
       const end = text.indexOf('\n', i);
       i = end < 0 ? text.length : end;
@@ -206,7 +206,7 @@ function tokenize(text) {
     }
     if (c === '"') throw new WatError('a @wat function has no strings', i, i + 1);
     const start = i;
-    while (i < text.length && !/[\s()";]/.test(text[i])) i++;
+    while (i < text.length && !/[ \t\n\r()";]/.test(text[i])) i++;
     if (i === start) throw new WatError(`unexpected '${c}'`, i, i + 1);
     tokens.push({ text: text.slice(start, i), start, end: i });
   }
@@ -264,7 +264,9 @@ function immediateAtoms(name, atoms, at) {
   return 1;
 }
 
-const isLabel = text => text !== undefined && (text.startsWith('$') || /^\d+$/.test(text));
+const isLabel = text => text !== undefined && (text.startsWith('$') || U32.test(text));
+
+const needs = (name, n) => `${name} needs ${n} immediate${n === 1 ? '' : 's'}`;
 
 function flatten(items) {
   const out = [];
@@ -287,7 +289,8 @@ function flatten(items) {
       const rest = [];
       let j = i + 1;
       while (j < nodes.length && nodes[j].atom !== undefined) rest.push(nodes[j++]);
-      const n = Math.min(immediateAtoms(name, rest, node), rest.length);
+      const n = immediateAtoms(name, rest, node);
+      if (rest.length < n) throw new WatError(needs(name, n), node.start, (rest.at(-1) ?? node).end);
       const imms = nodes.slice(i + 1, i + 1 + n);
       i += 1 + n;
       // A block's `(result t)`, a select's.
@@ -329,19 +332,14 @@ function flatten(items) {
     }
     if (!OPS.has(name) && !CONTROL.has(name)) throw new WatError(unknown(name), node.list[0].start, node.list[0].end);
     const atoms = [];
-    let j = 0;
-    while (j < parts.length && parts[j].atom !== undefined) atoms.push(parts[j++]);
+    while (atoms.length < parts.length && parts[atoms.length].atom !== undefined) atoms.push(parts[atoms.length]);
     const n = immediateAtoms(name, atoms, node.list[0]);
-    if (atoms.length !== n) {
-      const extra = atoms[n] ?? atoms.at(-1) ?? node;
-      throw new WatError(atoms.length > n ? `${name} takes ${n} immediate${n === 1 ? '' : 's'}; operands are folded: (${name} (…))` : `${name} needs ${n} immediate${n === 1 ? '' : 's'}`, extra.start, extra.end);
-    }
-    const imms = [...atoms];
+    if (atoms.length < n) throw new WatError(needs(name, n), node.list[0].start, (atoms.at(-1) ?? node.list[0]).end);
+    const imms = atoms.slice(0, n);
+    let j = n;
     while (j < parts.length && (head(parts[j]) === 'result') && name === 'select') imms.push(parts[j++]);
-    for (const child of parts.slice(j)) {
-      if (!child.list) throw new WatError(`the operands of a folded ${name} are folded too`, child.start, child.end);
-      folded(child);
-    }
+    // Its operands, folded or flat, come before it.
+    plain(parts, j);
     out.push({ name, imms, start: node.start, end: node.end });
   };
   plain(items, k);
@@ -381,7 +379,7 @@ export function assembleWat({ params, result, text, method = false }) {
   const wasmType = type => UTU_TYPES[type];
   const wrong = [...params.map(param => param.type), result].find(type => type !== 'void' && !wasmType(type));
   if (wrong !== undefined) {
-    return { error: { message: `a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, or V128, not ${wrong}`, start: null, end: null } };
+    return { error: { message: `a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, V128, M32, M64, or M128, not ${wrong}`, start: null, end: null } };
   }
   return assembleFunction({
     params: params.map(param => ({ name: param.name, type: wasmType(param.type) })),
@@ -396,6 +394,8 @@ export function assembleFunction({ params, result, text }) {
   try {
     return { code: assemble(params, result, text) };
   } catch (error) {
+    // Folded instructions are read recursively: thousands deep exhaust the stack.
+    if (error instanceof RangeError) return { error: { message: 'this @wat body nests too deeply', start: 0, end: Math.min(text.length, 1) } };
     if (!(error instanceof WatError)) throw error;
     return { error: { message: error.message, start: error.start, end: error.end } };
   }
@@ -442,9 +442,10 @@ function assemble(params, result, text) {
   const popAll = (wanted, at, what) => { for (const t of [...wanted].reverse()) pop(t, at, what); };
   const unreachable = () => { stack.length = frame().height; frame().unreachable = true; };
   const labelTypes = f => (f.kind === 'loop' ? [] : f.out);
-  const depthOf = atom => {
-    if (/^\d+$/.test(atom.atom)) {
-      const depth = Number(atom.atom);
+  const depthOf = (atom, at) => {
+    if (!atom) throw new WatError(`${at.name} names a block: ${at.name} $label (or a depth)`, at.start, at.end);
+    if (U32.test(atom.atom)) {
+      const depth = u32(atom);
       if (depth >= frames.length) throw new WatError(`there is no block ${depth} deep here`, atom.start, atom.end);
       return depth;
     }
@@ -453,7 +454,7 @@ function assemble(params, result, text) {
   };
   const local = (atom, at) => {
     if (!atom) throw new WatError(`${at.name} names a local: ${at.name} $x`, at.start, at.end);
-    const index = /^\d+$/.test(atom.atom) ? Number(atom.atom) : names.get(atom.atom);
+    const index = U32.test(atom.atom) ? u32(atom) : names.get(atom.atom);
     if (index === undefined || index >= types.length) throw new WatError(`there is no local ${atom.atom}`, atom.start, atom.end);
     return index;
   };
@@ -483,6 +484,7 @@ function assemble(params, result, text) {
       case 'else': {
         const f = frame();
         if (f.kind !== 'if' || f.sawElse) throw new WatError('else belongs to an if', ins.start, ins.end);
+        closingLabel(imms[0], f);
         endFrame(ins);
         f.sawElse = true;
         f.unreachable = false;
@@ -493,6 +495,7 @@ function assemble(params, result, text) {
       case 'end': {
         const f = frame();
         if (f.kind === 'function') throw new WatError('this end closes no block', ins.start, ins.end);
+        closingLabel(imms[0], f);
         if (f.kind === 'if' && !f.sawElse && f.out.length) throw new WatError(`an if with a result has an else`, ins.start, ins.end);
         endFrame(ins);
         frames.pop();
@@ -501,7 +504,7 @@ function assemble(params, result, text) {
         break;
       }
       case 'br': case 'br_if': {
-        const depth = depthOf(imms[0]);
+        const depth = depthOf(imms[0], ins);
         if (name === 'br_if') pop('i32', ins, 'br_if');
         const wanted = labelTypes(frames[frames.length - 1 - depth]);
         popAll(wanted, ins, name);
@@ -510,7 +513,7 @@ function assemble(params, result, text) {
         break;
       }
       case 'br_table': {
-        const depths = imms.map(atom => depthOf(atom));
+        const depths = imms.map(atom => depthOf(atom, ins));
         pop('i32', ins, 'br_table');
         const wanted = labelTypes(frames[frames.length - 1 - depths.at(-1)]);
         for (const d of depths) {
@@ -526,7 +529,9 @@ function assemble(params, result, text) {
       case 'return': popAll(frames[0].out, ins, 'return'); code.push(0x0f); unreachable(); break;
       case 'drop': pop(null, ins, 'drop'); code.push(0x1a); break;
       case 'select': {
-        const typed = imms.find(imm => head(imm) === 'result');
+        const results = imms.filter(imm => head(imm) === 'result');
+        if (results.length > 1 || results[0]?.list.length > 2) throw new WatError('select has one result type: (result t)', results[0].start, results.at(-1).end);
+        const typed = results[0];
         pop('i32', ins, 'select');
         const want = typed ? valtype(typed.list[1]) : null;
         const b = pop(want, ins, 'select');
@@ -561,6 +566,13 @@ function assemble(params, result, text) {
 
 const article = t => `${t === 'v128' ? 'a' : 'an'} ${t}`;
 
+/** An `end` or `else` may repeat its block's label, and only that. */
+function closingLabel(atom, f) {
+  if (atom && atom.atom !== f.label) {
+    throw new WatError(f.label ? `this closes ${f.label}, not ${atom.atom}` : `this ${f.kind} has no label to repeat`, atom.start, atom.end);
+  }
+}
+
 function valtype(node) {
   if (node?.atom && node.atom in VALTYPE) return node.atom;
   throw new WatError(`'${node?.atom ?? '(…)'}' is not a type: i32, i64, f32, f64, or v128`, node?.start ?? 0, node?.end ?? 0);
@@ -588,15 +600,13 @@ function immediate(kind, imms, at) {
   if (kind === 'f64') return floatBytes(atom, 64);
   if (kind.startsWith('lane')) {
     const lanes = Number(kind.slice(4));
-    const lane = Number(atom.atom);
-    if (!/^\d+$/.test(atom.atom) || lane >= lanes) throw new WatError(`a lane is 0 to ${lanes - 1}`, atom.start, atom.end);
-    return [lane];
+    if (!U32.test(atom.atom) || u32(atom) >= lanes) throw new WatError(`a lane is 0 to ${lanes - 1}`, atom.start, atom.end);
+    return [u32(atom)];
   }
   if (kind === 'shuffle') {
     return imms.map(lane => {
-      const n = Number(lane.atom);
-      if (!/^\d+$/.test(lane.atom) || n > 31) throw new WatError('a shuffle lane is 0 to 31', lane.start, lane.end);
-      return n;
+      if (!U32.test(lane.atom) || u32(lane) > 31) throw new WatError('a shuffle lane is 0 to 31', lane.start, lane.end);
+      return u32(lane);
     });
   }
   if (kind === 'v128') {
@@ -616,12 +626,28 @@ function immediate(kind, imms, at) {
   throw new WatError(`what follows ${at.name}`, at.start, at.end);
 }
 
+// WAT's digits: an underscore only between two of them.
+const DIGITS = '[0-9](?:_?[0-9])*';
+const HEX_DIGITS = '[0-9a-fA-F](?:_?[0-9a-fA-F])*';
+const U32 = new RegExp(`^(?:${DIGITS}|0x${HEX_DIGITS})$`);
+const INTEGER = new RegExp(`^([+-]?)(${DIGITS}|0x${HEX_DIGITS})$`);
+const DECIMAL_FLOAT = new RegExp(`^(${DIGITS})(?:\\.(${DIGITS})?)?(?:[eE]([+-]?${DIGITS}))?$`);
+const HEX_FLOAT = new RegExp(`^0x(${HEX_DIGITS})(?:\\.(${HEX_DIGITS})?)?(?:[pP]([+-]?${DIGITS}))?$`);
+const NAN_PAYLOAD = new RegExp(`^nan:0x(${HEX_DIGITS})$`);
+
+const digits = text => text.replaceAll('_', '');
+
+/** An index (a local, a lane, a depth): decimal or `0x…`. */
+function u32(atom) {
+  return Number(BigInt(digits(atom.atom)));
+}
+
 /** An integer of `bits` bits, signed or unsigned, as WAT writes them (`-1`, `0xff`, `1_000`). */
 function integer(atom, bits) {
-  const text = atom?.atom ?? '';
-  const match = /^([+-]?)(0x[0-9a-fA-F_]+|[0-9][0-9_]*)$/.exec(text);
-  if (!match || /__|_$|x_/.test(text)) throw new WatError(`'${text}' is not an integer`, atom?.start ?? 0, atom?.end ?? 0);
-  let v = BigInt(match[2].replaceAll('_', ''));
+  const text = atom.atom;
+  const match = INTEGER.exec(text);
+  if (!match) throw new WatError(`'${text}' is not an integer`, atom.start, atom.end);
+  let v = BigInt(digits(match[2]));
   if (match[1] === '-') v = -v;
   const min = -(1n << BigInt(bits - 1));
   const max = (1n << BigInt(bits)) - 1n;
@@ -629,32 +655,79 @@ function integer(atom, bits) {
   return v;
 }
 
-/** A float's little-endian bytes: decimal, hex (`0x1.8p3`), `inf`, `nan`, `nan:0x…`. */
+/**
+ * A float's little-endian bytes: decimal (`1.5e3`), hex (`0x1.8p3`), `inf`,
+ * `nan`, `nan:0x…`; rounded once, to the nearest (ties to even), and an
+ * error when that is beyond the type's range, as wasm-tools has it.
+ */
 function floatBytes(atom, bits) {
-  const text = (atom?.atom ?? '').replaceAll('_', '');
-  const bytes = new Uint8Array(bits / 8);
-  const view = new DataView(bytes.buffer);
-  const sign = text.startsWith('-') ? -1 : 1;
+  const text = atom.atom;
+  const mant = bits === 32 ? 23 : 52;
+  const sign = text.startsWith('-') ? 1n << BigInt(bits - 1) : 0n;
   const body = text.replace(/^[+-]/, '');
-  const write = v => (bits === 32 ? view.setFloat32(0, v, true) : view.setFloat64(0, v, true));
-  if (body === 'inf') write(sign * Infinity);
-  else if (body === 'nan' || body.startsWith('nan:0x')) {
-    const payload = body === 'nan' ? (bits === 32 ? 1n << 22n : 1n << 51n) : BigInt(body.slice(4));
-    const exponent = bits === 32 ? 0xffn << 23n : 0x7ffn << 52n;
-    const signBit = sign < 0 ? 1n << BigInt(bits - 1) : 0n;
-    const word = signBit | exponent | payload;
-    if (bits === 32) view.setUint32(0, Number(word), true); else view.setBigUint64(0, word, true);
-  } else if (/^0x[0-9a-fA-F]*(\.[0-9a-fA-F]*)?(p[+-]?\d+)?$/.test(body) && body !== '0x') {
-    const [, mantissa, exponent] = /^0x([0-9a-fA-F.]*)(?:p([+-]?\d+))?$/.exec(body);
-    const [whole, fraction = ''] = mantissa.split('.');
-    const v = parseInt(`${whole || '0'}${fraction}`, 16) * 2 ** (Number(exponent ?? 0) - 4 * fraction.length);
-    write(sign * v);
-  } else if (/^\d+(\.\d*)?([eE][+-]?\d+)?$/.test(body)) {
-    write(sign * Number(body));
+  const exponentAll = bits === 32 ? 0xffn << 23n : 0x7ffn << 52n;
+  let word;
+  if (body === 'inf') word = exponentAll;
+  else if (body === 'nan') word = exponentAll | 1n << BigInt(mant - 1);
+  else if (NAN_PAYLOAD.test(body)) {
+    const payload = BigInt(`0x${digits(NAN_PAYLOAD.exec(body)[1])}`);
+    if (payload === 0n || payload >= 1n << BigInt(mant)) throw new WatError(`a NaN's payload is 1 to 0x${((1n << BigInt(mant)) - 1n).toString(16)}`, atom.start, atom.end);
+    word = exponentAll | payload;
   } else {
-    throw new WatError(`'${atom?.atom}' is not a number`, atom?.start ?? 0, atom?.end ?? 0);
+    // The value as num / den, both exact.
+    let num, den = 1n, exp;
+    const hex = HEX_FLOAT.exec(body);
+    const dec = hex ? null : DECIMAL_FLOAT.exec(body);
+    if (hex) {
+      const fraction = digits(hex[2] ?? '');
+      num = BigInt(`0x${digits(hex[1])}${fraction}`);
+      exp = Number(digits(hex[3] ?? '0')) - 4 * fraction.length;
+      // Far past the range either way: no need to build the number.
+      if (num !== 0n && exp + num.toString(2).length > 2000) throw outOfRange(atom, bits);
+      if (exp + num.toString(2).length < -2000) num = 0n;
+      else if (exp >= 0) num <<= BigInt(exp); else den = 1n << BigInt(-exp);
+    } else if (dec) {
+      const fraction = digits(dec[2] ?? '');
+      num = BigInt(`${digits(dec[1])}${fraction}`);
+      exp = Number(digits(dec[3] ?? '0')) - fraction.length;
+      if (num !== 0n && exp + num.toString().length > 400) throw outOfRange(atom, bits);
+      if (exp + num.toString().length < -400) num = 0n;
+      else if (exp >= 0) num *= 10n ** BigInt(exp); else den = 10n ** BigInt(-exp);
+    } else {
+      throw new WatError(`'${text}' is not a number`, atom.start, atom.end);
+    }
+    word = roundFloat(num, den, bits);
+    if (word === null) throw outOfRange(atom, bits);
   }
-  return [...bytes];
+  word |= sign;
+  const bytes = [];
+  for (let b = 0; b < bits / 8; b++) { bytes.push(Number(word & 0xffn)); word >>= 8n; }
+  return bytes;
+}
+
+const outOfRange = (atom, bits) => new WatError(`${atom.atom} is beyond the range of an f${bits}`, atom.start, atom.end);
+
+/** num / den (> 0, or 0) as the bits of the nearest f32 or f64, or null when it rounds to infinity. */
+function roundFloat(num, den, bits) {
+  if (num === 0n) return 0n;
+  const mant = bits === 32 ? 23 : 52;
+  const bias = bits === 32 ? 127 : 1023;
+  const length = x => x.toString(2).length;
+  // 2^e <= num / den < 2^(e+1); below the normals, the subnormals' scale.
+  let e = length(num) - length(den);
+  if ((e >= 0 ? num : num << BigInt(-e)) < (e >= 0 ? den << BigInt(e) : den)) e--;
+  e = Math.max(e, 1 - bias);
+  const shift = mant - e;
+  const n = shift >= 0 ? num << BigInt(shift) : num;
+  const d = shift >= 0 ? den : den << BigInt(-shift);
+  let q = n / d;
+  const twice = 2n * (n - q * d);
+  if (twice > d || (twice === d && (q & 1n))) q++;
+  if (q === 1n << BigInt(mant + 1)) { q >>= 1n; e++; }
+  // A subnormal (or zero, rounded down): no exponent.
+  if (q < 1n << BigInt(mant)) return q;
+  if (e > bias) return null;
+  return (BigInt(e + bias) << BigInt(mant)) | (q - (1n << BigInt(mant)));
 }
 
 function leb128(n) {

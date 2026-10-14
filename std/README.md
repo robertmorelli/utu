@@ -35,7 +35,7 @@ read a key back.
 Each function ships only when a program uses it; most are one call to the
 host's own (JavaScript's string methods, `Math`).
 
-- `Str` (prelude): `index_of`, `last_index_of`, `contains`, `starts_with`,
+- `Str` (prelude): `index_of(part, from)`, `last_index_of`, `contains`, `starts_with`,
   `ends_with`, `trim` (and `_start`, `_end`), `to_upper`, `to_lower`,
   `repeat`, `replace` (every occurrence), `pad_start`, `pad_end`, `split`
   (to `Array[Str]`), `sep.join(parts)`, `parse_i32(fallback)`, `parse_f64()`
@@ -48,6 +48,9 @@ host's own (JavaScript's string methods, `Math`).
 - `std:Random` — `Random.new(seed)` (or `Random.from_host()`), xoshiro128**
   in utu: `bits`, `int(low, high)` (unbiased), `float`, `chance(p)`. The
   same seed gives the same numbers on every host.
+- `std:Stream` (prelude) — `Stream[T]`, a JS async iterable read with
+  `await for (s) |v| { … }`: `from_js`, `of`, `generate`, `take`, `skip`,
+  `filter`, `map`, `chain`. A stream is read once.
 - `std:Console` — `using console from std:Console;` then `console.log(text)`,
   `warn`, `error`.
 - `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,

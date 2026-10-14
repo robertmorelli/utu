@@ -1,6 +1,7 @@
 import { wasm } from './types.js';
 import { nextLabel } from './labels.js';
 import { arrayInfoFromNode, elementWasmType } from './arrays.js';
+import { decodeEscapes } from '../string-escapes.js';
 
 export function emitStringLiteral(node, ctx) {
   const raw = decodeStringLiteral(node.getAttribute('value') ?? '');
@@ -79,9 +80,5 @@ function stringConst(m, raw) {
 function decodeStringLiteral(raw) {
   // Multiline literals: each line's text after `\\`, joined by newlines.
   if (/^\s*\\\\/.test(raw)) return raw.split('\n').map(line => line.replace(/^\s*\\\\/, '')).join('\n');
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
+  return decodeEscapes(raw.slice(1, -1)) ?? '';
 }

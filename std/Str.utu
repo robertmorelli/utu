@@ -144,9 +144,9 @@ mod Str {
         f(self, count);
     }
 
-    /// Every occurrence of `part` replaced by `with`.
+    /// Every occurrence of `part` replaced by `with`, as it is (a `$` in it is a `$`).
     fn &.replace |self| (part: &, with: &) & {
-        let f: fun(&, &, &) & = @es/\ (s, p, w) => s.replaceAll(p, w) \/;
+        let f: fun(&, &, &) & = @es/\ (s, p, w) => s.replaceAll(p, () => w) \/;
         f(self, part, with);
     }
 
@@ -195,14 +195,17 @@ mod Str {
         out;
     }
 
-    /// The decimal or hexadecimal (`0x…`) integer the string is, or `fallback`
-    /// when it is not one, or does not fit in an I32.
+    /// The integer the string is, or `fallback` when it is not one or does not
+    /// fit in an I32: white space around it, then a sign (`+` or `-`) if any,
+    /// then decimal digits or hexadecimal ones after `0x`.
     fn &.parse_i32 |self| (fallback: I32) I32 {
         let f: fun(&, I32) I32 = @es/\ (s, d) => { const m = /^([+-]?)(0x[0-9a-f]+|\d+)$/i.exec(s.trim()); if (!m) return d; const v = (m[1] === '-' ? -1 : 1) * Number(m[2]); return v >= -2147483648 && v <= 2147483647 ? v : d; } \/;
         f(self, fallback);
     }
 
-    /// The number the string is, or NaN when it is not one (`F64.is_nan`).
+    /// The number the string is, or NaN when it is not one (`F64.is_nan`), as
+    /// JavaScript's `Number` reads it after the white space around it: so
+    /// also `0x…`, `0b…`, `0o…`, and `Infinity`, but not `inf`.
     fn &.parse_f64 |self| () F64 {
         let f: fun(&) F64 = @es/\ (s) => { const t = s.trim(); return t === '' ? NaN : Number(t); } \/;
         f(self);

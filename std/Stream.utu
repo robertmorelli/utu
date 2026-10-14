@@ -1,38 +1,40 @@
-// std/Stream.utu — Stream[T]
-//
-// & is a JavaScript async iterable, held as an externref: an async
-// generator, a ReadableStream, a Node stream, anything with
-// [Symbol.asyncIterator]. As with Promise[T], nothing is wrapped: a stream
-// utu returns is one JS iterates with `for await`, and one from the host is
-// the object itself.
-//
-//   await for (stream) |value| { … }   each value, as the stream gives it
-//
-// That suspends at each value (JSPI), as `await` does. `break` ends the
-// loop and closes the stream (its iterator's `return`), as JS's `for await`
-// does.
-//
-// A host value that is async iterable becomes a stream with from_js, which
-// names the type of its values: `Stream[Str].from_js(lines)`.
+//! `Stream[T]`: a JavaScript async iterable, held as an externref. An async
+//! generator, a `ReadableStream`, a Node stream: anything with
+//! `[Symbol.asyncIterator]`. As with `Promise[T]`, nothing is wrapped: a
+//! stream utu returns is one JS reads with `for await`, and one from the host
+//! is the object itself.
+//!
+//! ```
+//! await for (stream) |value| { … }   // each value, as the stream gives it
+//! ```
+//!
+//! That suspends at each value (JSPI), as `await` does. Leaving the loop
+//! early, by `break` or `return`, closes the stream (its iterator's
+//! `return`), as JS's `for await` does. A stream is read once: reading it
+//! again gives nothing.
+//!
+//! A host value that is async iterable becomes a stream with `from_js`, which
+//! names the type of its values: `Stream[Str].from_js(lines)`. Its values are
+//! not checked against that type.
 
 mod Stream[T1] {
     type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
 
     // ── Making streams ───────────────────────────────────────────────────────
 
-    // An async iterable host value, as a stream of T1.
+    /// An async iterable host value (not an array: see @of), as a stream of T1.
     fn from_js(iterable: Externref) & {
         let adopt: fun(Externref) & = @es/\ (s) => s \/;
         adopt(iterable);
     }
 
-    // The values of an array, in order.
+    /// The values of an array, in order.
     fn of(values: Array[T1]) & {
         let make: fun(I32, cl(I32) T1) & = @es/\ (n, at) => (async function* () { for (let i = 0; i < n; i++) yield at(i); })() \/;
         make(values.len(), cl(i) { values[i]; });
     }
 
-    // `count` values, each `make(i)` for i from 0.
+    /// `count` values, each `make(i)` for i from 0, made as they are read.
     fn generate(count: I32, make: cl(I32) T1) & {
         let gen: fun(I32, cl(I32) T1) & = @es/\ (n, at) => (async function* () { for (let i = 0; i < n; i++) yield at(i); })() \/;
         gen(count, make);
@@ -41,31 +43,31 @@ mod Stream[T1] {
     // ── Transforming ─────────────────────────────────────────────────────────
     // Each is a new stream that reads this one as it is read.
 
-    // The first `n` values.
+    /// The first `n` values.
     fn &.take |self| (n: I32) & {
         let f: fun(&, I32) & = @es/\ (s, n) => (async function* () { if (n <= 0) return; let i = 0; for await (const v of s) { yield v; if (++i >= n) return; } })() \/;
         f(self, n);
     }
 
-    // All but the first `n` values.
+    /// All but the first `n` values.
     fn &.skip |self| (n: I32) & {
         let f: fun(&, I32) & = @es/\ (s, n) => (async function* () { let i = 0; for await (const v of s) if (i++ >= n) yield v; })() \/;
         f(self, n);
     }
 
-    // The values `keep` is true of.
+    /// The values `keep` is true of.
     fn &.filter |self| (keep: cl(T1) Bool) & {
         let f: fun(&, cl(T1) Bool) & = @es/\ (s, keep) => (async function* () { for await (const v of s) if (keep(v)) yield v; })() \/;
         f(self, keep);
     }
 
-    // Each value, changed by `f`.
+    /// Each value, changed by `f` (to a value of the same type).
     fn &.map |self| (f: cl(T1) T1) & {
         let m: fun(&, cl(T1) T1) & = @es/\ (s, f) => (async function* () { for await (const v of s) yield f(v); })() \/;
         m(self, f);
     }
 
-    // This stream's values, then `other`'s.
+    /// This stream's values, then `other`'s.
     fn &.chain |self| (other: &) & {
         let f: fun(&, &) & = @es/\ (a, b) => (async function* () { yield* a; yield* b; })() \/;
         f(self, other);
@@ -74,9 +76,10 @@ mod Stream[T1] {
     // ── What `await for` calls ───────────────────────────────────────────────
     // `await for (s) |v| { body }` is
     //
-    //   let it = s.iterator();
+    //   let it = s.iterator(); defer s.close(it);
     //   while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body };
-    //   s.close(it);
+    //
+    // Any type with these methods is read the same way.
 
     fn &.iterator |self| () Externref {
         let f: fun(&) Externref = @es/\ (s) => s[Symbol.asyncIterator]() \/;
@@ -98,7 +101,7 @@ mod Stream[T1] {
         f(result);
     }
 
-    // Settles once the stream has finished closing (its `finally` blocks run).
+    /// Settles once the stream has finished closing (its `finally` blocks run).
     fn &.close |self| (iterator: Externref) void {
         let f: fun(Externref) Promise[Externref] = @es/\ (it) => Promise.resolve(it.return?.()) \/;
         await f(iterator);

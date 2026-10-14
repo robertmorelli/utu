@@ -12,6 +12,20 @@ import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/
 import { assembleFunction, watInstructions } from '../src/wat/assemble.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The function bodies of a module's code section. */
+function codeBodies(bytes) {
+  let at = 8;
+  const leb = () => { let v = 0, shift = 0, b; do { b = bytes[at++]; v |= (b & 127) << shift; shift += 7; } while (b & 128); return v >>> 0; };
+  const bodies = [];
+  while (at < bytes.length) {
+    const id = bytes[at++];
+    const end = leb() + at;
+    if (id === 10) for (let i = 0, n = leb(); i < n; i++) { const size = leb(); bodies.push(bytes.subarray(at, at + size)); at += size; }
+    at = end;
+  }
+  return bodies;
+}
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-wat-'));
 try {
   // Every instruction, in a function whose parameters it takes.
@@ -38,15 +52,7 @@ try {
     execFileSync('wasm-tools', ['parse', path.join(dir, 'all.wat'), '-o', path.join(dir, 'all.wasm')], { stdio: 'ignore' });
     const bytes = await fs.readFile(path.join(dir, 'all.wasm'));
     assert.ok(WebAssembly.validate(bytes));
-    let at = 8;
-    const leb = () => { let v = 0, shift = 0, b; do { b = bytes[at++]; v |= (b & 127) << shift; shift += 7; } while (b & 128); return v >>> 0; };
-    const bodies = [];
-    while (at < bytes.length) {
-      const id = bytes[at++];
-      const end = leb() + at;
-      if (id === 10) for (let i = 0, n = leb(); i < n; i++) { const size = leb(); bodies.push(bytes.subarray(at, at + size)); at += size; }
-      at = end;
-    }
+    const bodies = codeBodies(bytes);
     functions.forEach((f, i) => assert.deepEqual([...f.code], [...bodies[i]], `${f.name}: as wasm-tools assembles it`));
     checked = 'each as wasm-tools assembles it';
   } catch (error) {
@@ -63,6 +69,55 @@ try {
     const module = Uint8Array.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, ...section(1, typeSec), ...section(3, funcSec), ...section(10, codeSec)]);
     assert.ok(WebAssembly.validate(module), 'every instruction, in one module');
   }
+
+  // The text as WAT writes it, assembled as wasm-tools assembles it: numbers
+  // in every spelling, floats rounded once, operands flat inside a folded
+  // instruction, and labels repeated at their end.
+  const accepted = [
+    [['i32'], 'i32', 'local.get 0x0 i32.const 1_000 i32.add'],
+    [['v128'], 'i32', 'local.get 0 i32x4.extract_lane 0x3'],
+    [['i32'], 'i32', '(i32.add (local.get 0) i32.const 1)'],
+    [[], 'f32', 'f32.const 1.00000005960464477539062500000001'],
+    [[], 'f32', 'f32.const 0x1.0000010000000000001p0'],
+    [[], 'f64', 'f64.const 0x1000p-1080'],
+    [[], 'f64', 'f64.const 0x1P3'],
+    [[], 'f64', 'f64.const 1e-400'],
+    [[], 'f64', 'f64.const 1.7976931348623157e308'],
+    [[], 'f32', 'f32.const -nan:0x7fffff'],
+    [[], 'f32', 'f32.const 3.4028235e38'],
+    [[], 'i32', 'block $a (result i32) i32.const 1 end $a'],
+    [[], 'i32', 'i32.const 1 if $t (result i32) i32.const 2 else $t i32.const 3 end $t'],
+  ];
+  for (const [params, result, text] of accepted) {
+    const assembled = assembleFunction({ params: params.map((type, i) => ({ name: `p${i}`, type })), result, text });
+    assert.ok(assembled.code, `${text}: ${assembled.error?.message}`);
+    if (checked.startsWith('each')) {
+      await fs.writeFile(path.join(dir, 'one.wat'), `(module (func ${params.map(t => `(param ${t})`).join(' ')} (result ${result}) ${text}))`);
+      execFileSync('wasm-tools', ['parse', path.join(dir, 'one.wat'), '-o', path.join(dir, 'one.wasm')], { stdio: 'ignore' });
+      const [body] = codeBodies(await fs.readFile(path.join(dir, 'one.wasm')));
+      assert.deepEqual([...body], [...assembled.code], `${text}: as wasm-tools assembles it`);
+    }
+  }
+  // And what is not WAT, or not this function's, is a mistake at its place.
+  const rejected = [
+    ['f32.const 1e39', '1e39 is beyond the range of an f32'],
+    ['f64.const 1e309', '1e309 is beyond the range of an f64'],
+    ['f32.const nan:0x0', "a NaN's payload is 1 to 0x7fffff"],
+    ['f64.const nan:0x', "'nan:0x' is not a number"],
+    ['f32.const 1__0', "'1__0' is not a number"],
+    ['i32.const', 'i32.const needs 1 immediate'],
+    ['v128.const i32x4 1 2 drop', 'v128.const needs 5 immediates'],
+    ['nop br', 'br needs 1 immediate'],
+    ['block end $b', 'this block has no label to repeat'],
+    ['block $a end $b', 'this closes $a, not $b'],
+    ['i32.const 1 i32.const 2 i32.const 1 select (result i32 i32)', 'select has one result type: (result t)'],
+  ];
+  for (const [text, message] of rejected) {
+    const assembled = assembleFunction({ params: [], result: null, text });
+    assert.equal(assembled.error?.message, message, text);
+  }
+  const deep = assembleFunction({ params: [], result: 'i32', text: `${'(i32.eqz '.repeat(20000)}(i32.const 0)${')'.repeat(20000)}` });
+  assert.ok(deep.code || deep.error.message === 'this @wat body nests too deeply', 'deep nesting is code or a mistake, never a crash');
 
   // examples/wat.utu in both compilers.
   const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
@@ -92,14 +147,24 @@ try {
     for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, `${compiler}: ${name}`);
   }
 
+  // `export main` may be a @wat function.
+  const mainFile = path.join(dir, 'main.utu');
+  await fs.writeFile(mainFile, 'export main() I32 { @wat/\\ i32.const 37 \\/; }\n');
+  for (const [compiler, build] of [['stage0', stage0], ['selfhost', selfhost]]) {
+    const { exports, errors } = await build(mainFile);
+    assert.equal(exports?.main(), 37, `${compiler}: ${errors}`);
+  }
+
   // Mistakes: each at its place.
   const mistakes = [
     ['fn f(x: I32) I32 { @wat/\\ (i64.add (local.get $x) (local.get $x)) \\/; }', '1:27 i64.add needs an i64, not an i32'],
     ['fn f(x: I32) I32 {\n    @wat/\\\n        local.get $x\n        i32.lodd\n    \\/;\n}', "4:9 unknown instruction 'i32.lodd'"],
     ['fn f(x: I32) I32 { @wat/\\ (i32.load (local.get $x)) \\/; }', '1:28 i32.load: a @wat function computes on its arguments; it has no memories, globals, calls, or references'],
     ['fn f(x: I32) I32 { @wat/\\ local.get $x local.get $x \\/; }', '1:40 the function returns i32, but its body leaves 1 more value'],
-    ['fn f(x: Str) I32 { @wat/\\ i32.const 1 \\/; }', '1:20 a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, or V128, not Str'],
+    ['fn f(x: Str) I32 { @wat/\\ i32.const 1 \\/; }', '1:20 a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, V128, M32, M64, or M128, not Str'],
     ['fn f() I32 { let y = 1; @wat/\\ i32.const 1 \\/; }', "1:25 @wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
+    ['let w: I32 = @wat/\\ i32.const 1 \\/;', "1:14 @wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
+    ['fn f(x: I32) I32 { @wat/\\ v128.const i32x4 1 2 \\/; }', '1:27 v128.const needs 5 immediates'],
   ];
   for (const [i, [source, want]] of mistakes.entries()) {
     const file = path.join(dir, `mistake${i}.utu`);
@@ -109,7 +174,15 @@ try {
     const theirs = await stage0(file);
     assert.equal(theirs.errors?.[0], want.replace(/^\d+:\d+ /, ''), `stage 0: ${source}`);
   }
-  console.log(`wat: ${functions.length} instructions (${checked}), examples/wat.utu alike in both compilers, ${mistakes.length} mistakes at their places`);
+  // A generator is not one, whether or not it is called (it expands into its consumers).
+  for (const call of ['0', 'let s = 0; for (g(3)) |v| { s += v; }; s']) {
+    const file = path.join(dir, 'generator.utu');
+    await fs.writeFile(file, `fn g(n: I32) yield I32 { @wat/\\ local.get $n \\/; }\nexport lib { fn t() I32 { ${call}; } }\n`);
+    const shape = 'a @wat function is a plain function: fn f(x: I32) I32 { @wat/\\ … \\/; }';
+    assert.deepEqual((await selfhost(file)).errors?.map(e => e.replace(/^\d+:\d+ /, '')), [shape], `self-hosted: ${call}`);
+    assert.equal((await stage0(file)).errors?.[0], shape, `stage 0: ${call}`);
+  }
+  console.log(`wat: ${functions.length} instructions (${checked}), ${accepted.length} spellings as wasm-tools has them, ${rejected.length} mistakes the assembler finds, examples/wat.utu and a @wat main alike in both compilers, ${mistakes.length} mistakes at their places`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

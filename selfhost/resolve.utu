@@ -180,6 +180,8 @@ enum(U8) Diag:
     | AwaitForCapture
     | WatPlace
     | WatHost
+    | EntrySurface
+    | InvalidEscape
 
 // A diagnostic: its kind, the node it is about, a word, and up to three
 // more arguments (types, counts, declarations) its message is made from
@@ -612,8 +614,27 @@ fn declare_program() void {
                 declare_entry_item(item, first_entry);
                 item = next_sibling(item);
             };
+            if file_role[file] == FileRole.Entry.to_i32() { check_entry_surface(file_root[file]); };
         };
     };
+}
+
+// A program has one `export lib` or one `export main`, not both.
+fn check_entry_surface(root: I32) void {
+    let lib = -1;
+    let main = -1;
+    let item = first_child(root);
+    while (item >= 0) {
+        if is_kind(item, Node.Export_lib_decl) {
+            if lib >= 0 { report2(Diag.EntrySurface, lib, -1, 0, -1); return; };
+            lib = item;
+        } else if is_kind(item, Node.Export_main_decl) {
+            if main >= 0 { report2(Diag.EntrySurface, main, -1, 1, -1); return; };
+            main = item;
+        };
+        item = next_sibling(item);
+    };
+    if lib >= 0 and main >= 0 { report2(Diag.EntrySurface, lib, -1, 2, -1); };
 }
 
 fn declare_entry_item(item: I32, first_entry: I32) void {

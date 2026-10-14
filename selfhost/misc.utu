@@ -142,6 +142,7 @@ vec function_defers: I32; // [0]: where the current function's defers start
 
 fn reset_defers() void {
     defer_node.clear();
+    stream_closes.clear();
     defer_marks.clear();
     function_defers.resize(1);
     function_defers[0] = 0;
@@ -159,7 +160,8 @@ fn check_defer(node: I32) I32 {
 fn run_defers(from: I32, cx: Cx) void {
     let i = defer_node.len() - 1;
     while (i >= from) {
-        discard(check_expr(defer_node[i], ty_void(), cx));
+        if defer_node[i] < 0 { close_stream(-defer_node[i] - 1, cx); }
+        else { discard(check_expr(defer_node[i], ty_void(), cx)); };
         i -= 1;
     };
 }
@@ -323,12 +325,13 @@ fn check_await(node: I32, cx: Cx) I32 {
     t;
 }
 
-// `await for (s) |v| { body }` over a Stream[T] (std:Stream), as stage 0
-// lowers it:
+// `await for (s) |v| { body }` over a Stream[T] (std:Stream), or any type
+// with its methods, as stage 0 lowers it:
 //
-//   { let it = s.iterator();
-//     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
-//     s.close(it); }
+//   { let it = s.iterator(); defer s.close(it);
+//     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; }; }
+//
+// So a `return` in the body closes the stream too, as a `break` does.
 fn check_stream_for(node: I32, cx: Cx) I32 {
     let sources = first_child(node);
     let source = first_child(first_child(sources));
@@ -340,6 +343,10 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     let m = w_mark();
     let st = check_expr(source, -1, cx);
     if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
+    if ty_is(st, Ty.Nullable) {
+        report2(Diag.NullableAccess, node, intern_text("iterator"), st, -1);
+        return finish_error(-1, m, cx);
+    };
     let s = new_local(repr(st));
     w_node(Op.LocalSet, vt_none, s, 0, m);
     // Not a stream: its first call is reported, as stage 0 does.
@@ -350,31 +357,41 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     let value_fi = stream_method(st, "value", node);
     let close_fi = stream_method(st, "close", node);
     if next_fi < 0 or done_fi < 0 or value_fi < 0 or close_fi < 0 { return finish_error(-1, m, cx); };
-    let it = new_local(vt_externref);
     let mi = w_mark();
-    stream_call(it_fi, s, -1, cx);
+    let it_t = stream_call(it_fi, s, st, -1, -1, node, cx);
+    if ty_is(it_t, Ty.Error) { return finish_error(-1, m, cx); };
+    let it = new_local(repr(it_t));
     w_node(Op.LocalSet, vt_none, it, 0, mi);
+    // What `next` promises: the result `done` and `value` read.
+    let pt = fi_result[next_fi];
+    let host = host_promise_value(pt);
+    let rt = if host >= 0 { host; } else if is_promise_type(pt) { inst_arg(ty_inst(pt), 0); } else { -1; };
+    if rt < 0 {
+        report2(Diag.AwaitNotPromise, node, -1, pt, -1);
+        return finish_error(-1, m, cx);
+    };
+    defer_node.push(-(stream_closes.len() / 6) - 1);
+    for ([close_fi, s, st, it, it_t, node]) |x| { stream_closes.push(x); };
     let brk = new_label();
     let top = new_label();
     let mb = w_mark();
     let ml = w_mark();
-    let r = new_local(vt_externref);
+    let r = new_local(repr(rt));
     let mr = w_mark();
-    stream_call(next_fi, s, it, cx);
-    w_node(Op.Call, vt_externref, await_import(prelude(Prelude.Externref)), 0, mr);
+    stream_call(next_fi, s, st, it, it_t, node, cx);
+    w_node(Op.Call, repr(rt), await_import(rt), 0, mr);
     w_node(Op.LocalSet, vt_none, r, 0, mr);
     let md = w_mark();
-    stream_call(done_fi, s, r, cx);
+    coerce(stream_call(done_fi, s, st, r, rt, node, cx), prelude(Prelude.Bool), node);
     w_node(Op.BrIf, vt_none, brk, 0, md);
-    let t = fi_result[value_fi];
+    let mv = w_mark();
+    let t = stream_call(value_fi, s, st, r, rt, node, cx);
     let v = new_local(repr(t));
     if is_kind(capture, Node.Capture) and first_child(capture) >= 0 {
         let d = node_decl[first_child(capture)];
         decl_ty[d] = t;
         decl_local[d] = v;
     };
-    let mv = w_mark();
-    stream_call(value_fi, s, r, cx);
     w_node(Op.LocalSet, vt_none, v, 0, mv);
     enter_loop(brk, top, -1, -1);
     discard(check_block(block, ty_void(), cx));
@@ -382,10 +399,20 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, mb);
-    let mc = w_mark();
-    stream_call(close_fi, s, it, cx);
+    defer_node.resize(defer_node.len() - 1);
+    discard(stream_call(close_fi, s, st, it, it_t, node, cx));
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
+}
+
+// The streams being read, six each (close's instance, the stream's local
+// and type, the iterator's local and type, the loop): a pending defer -k-1
+// closes stream k.
+vec stream_closes: I32;
+
+fn close_stream(k: I32, cx: Cx) void {
+    let i = k * 6;
+    discard(stream_call(stream_closes[i], stream_closes[i + 1], stream_closes[i + 2], stream_closes[i + 3], stream_closes[i + 4], stream_closes[i + 5], cx));
 }
 
 // The function instance of a stream's method `name`, or -1 (reported, as
@@ -400,11 +427,23 @@ fn stream_method(st: I32, name: Str, at: I32) I32 {
     fn_instance(decl, ty_inst(st));
 }
 
-// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s.
-fn stream_call(fi: I32, s: I32, x: I32, cx: Cx) void {
+// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s;
+// st and xt are their types. Its result's type.
+fn stream_call(fi: I32, s: I32, st: I32, x: I32, xt: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
+    let params = fi_params[fi];
+    let given = if x >= 0 { 2; } else { 1; };
+    if vl_len[params] != given {
+        report2(Diag.WrongArity, at, -1, if vl_len[params] > 0 { vl_len[params] - 1; } else { 0; }, given - 1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
     w_leaf(Op.LocalGet, cur_locals[s], s, 0);
-    if x >= 0 { w_leaf(Op.LocalGet, cur_locals[x], x, 0); };
+    coerce(st, vl_item(params, 0), at);
+    if x >= 0 {
+        w_leaf(Op.LocalGet, cur_locals[x], x, 0);
+        coerce(xt, vl_item(params, 1), at);
+    };
     finish_call(fi, m, cx);
 }
 

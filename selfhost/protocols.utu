@@ -59,10 +59,14 @@ fn method_impls(proto: I32, word: I32) I32 {
             let name = first_child(decl_node[d]);
             if word_of(last_child(name)) == word {
                 let args = next_sibling(first_child(name));
-                if is_kind(args, Node.Module_type_arg_list) {
-                    let t = decl_type(node_decl[name_node(first_child(first_child(args)))], 0);
-                    vl_add(d);
-                    vl_add(ty_decl(t));
+                // (`P[Nope]`, of no type, was reported: it implements nothing.)
+                let named_decl = if is_kind(args, Node.Module_type_arg_list) { node_decl[name_node(first_child(first_child(args)))]; } else { -1; };
+                if named_decl >= 0 {
+                    let t = decl_type(named_decl, 0);
+                    if ty_decl(t) >= 0 {
+                        vl_add(d);
+                        vl_add(ty_decl(t));
+                    };
                 };
             };
         };

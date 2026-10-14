@@ -2,6 +2,7 @@
 
 import { stamp, el, text, namedChildren, append, walkChildren } from './parse-helpers.js';
 import { T } from './ir-tags.js';
+import { decodeEscapes } from './string-escapes.js';
 
 const LITERAL_KINDS = new Map([
   ['int_lit', 'int'], ['float_lit', 'float'], ['string_lit', 'string'],
@@ -17,6 +18,7 @@ export function walkLiteral(n, doc, source, dispatch) {
     : (value === 'true' || value === 'false' ? 'bool' : 'null');
   node.setAttribute('kind', kind);
   node.setAttribute('value', value);
+  if (kind === 'string' && decodeEscapes(value.slice(1, -1)) === null) node.setAttribute('data-invalid-escape', 'true');
   return node;
 }
 
@@ -43,10 +45,17 @@ export function walkTemplateString(n, doc, source, dispatch) {
   for (const child of namedChildren(n)) {
     if (/^template_(full|head|middle|tail)$/.test(child.type)) {
       const raw = text(child);
-      const value = decodeTemplateText(raw.slice(1, raw.endsWith('${') ? -2 : -1));
-      if (value) join(literal(value, child));
+      const value = decodeEscapes(raw.slice(1, raw.endsWith('${') ? -2 : -1));
+      if (value === null) {
+        const bad = literal('', child);
+        bad.setAttribute('data-invalid-escape', 'true');
+        join(bad);
+      } else if (value) {
+        join(literal(value, child));
+      }
       continue;
     }
+    if (child.type === 'comment') continue;
     const member = stamp(el(T.FIELD_ACCESS, doc), child);
     member.appendChild(dispatch(child, doc, source));
     member.setAttribute('field', 'to_str');
@@ -57,24 +66,6 @@ export function walkTemplateString(n, doc, source, dispatch) {
     join(call);
   }
   return joined ?? literal('', n);
-}
-
-/** A template string's text with its escapes: JSON's, and any other character as itself (\` and \$). */
-function decodeTemplateText(raw) {
-  const ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' };
-  let out = '';
-  for (let i = 0; i < raw.length;) {
-    if (raw[i] !== '\\') { out += raw[i++]; continue; }
-    const e = raw[i + 1];
-    i += 2;
-    if (e === 'u') {
-      out += String.fromCharCode(parseInt(raw.slice(i, i + 4), 16));
-      i += 4;
-    } else {
-      out += ESCAPES[e] ?? e;
-    }
-  }
-  return out;
 }
 
 export function walkIdentifier(n, doc, source, dispatch) {

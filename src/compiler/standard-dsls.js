@@ -82,14 +82,17 @@ function expandWatDsl({ doc, node, body }) {
 function bodyPoint(site, { start, end }) {
   if (start == null) return site;
   const from = Number(site.getAttribute('data-body-inner-start')) + start;
-  const lines = (site.ownerDocument.__utuSourceText ?? '').slice(0, from).split('\n');
+  const to = from + (end - start);
+  const source = site.ownerDocument.__utuSourceText ?? '';
+  const lines = source.slice(0, from).split('\n');
+  const endLines = source.slice(0, to).split('\n');
   const point = site.cloneNode(false);
   point.setAttribute('data-start', from);
-  point.setAttribute('data-end', from + (end - start));
+  point.setAttribute('data-end', to);
   point.setAttribute('data-row', lines.length);
   point.setAttribute('data-col', lines.at(-1).length + 1);
-  point.setAttribute('data-end-row', point.getAttribute('data-row'));
-  point.setAttribute('data-end-col', Number(point.getAttribute('data-col')) + (end - start));
+  point.setAttribute('data-end-row', endLines.length);
+  point.setAttribute('data-end-col', endLines.at(-1).length + 1);
   return point;
 }
 

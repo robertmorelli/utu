@@ -147,8 +147,35 @@ export function elementWasmType(info, ctx) {
   return ctx.toType(info.elem ?? '');
 }
 
-/** `[a, b, c]` with a native array type: one `array.new_fixed`. */
+// The most elements one array.new_fixed may make (wasm's limit).
+const MAX_NEW_FIXED = 10000;
+
+/**
+ * `[a, b, c]` with a native array type: one `array.new_fixed`. A longer
+ * literal is an array of its length, each run of elements made by
+ * array.new_fixed and copied into it, in order.
+ */
 export function emitArrayLiteral(node, ctx, emitExpr) {
   const info = arrayInfoFromNode(node, ctx);
-  return ctx.module.array.new_fixed(info.heapType, [...node.children].map(child => emitExpr(child, ctx)));
+  const m = ctx.module;
+  const elements = [...node.children].map(child => emitExpr(child, ctx));
+  if (elements.length <= MAX_NEW_FIXED) return m.array.new_fixed(info.heapType, elements);
+  const typeName = ctx.typeOf(node) ?? '';
+  const all = ctx.addLocal(typeName);
+  const part = ctx.addLocal(typeName);
+  const body = [];
+  for (let at = 0; at < elements.length; at += MAX_NEW_FIXED) {
+    const run = elements.slice(at, at + MAX_NEW_FIXED);
+    body.push(m.local.set(part, m.array.new_fixed(info.heapType, run)));
+    // A struct array has no default element: it starts filled with the first.
+    if (at === 0) {
+      body.push(m.local.set(all, hasDefault(info)
+        ? m.array.new_default(info.heapType, m.i32.const(elements.length))
+        : m.array.new(info.heapType, m.i32.const(elements.length),
+          m.array.get(m.local.get(part, info.refType), m.i32.const(0), elementWasmType(info, ctx), false))));
+    }
+    body.push(m.array.copy(m.local.get(all, info.refType), m.i32.const(at), m.local.get(part, info.refType), m.i32.const(0), m.i32.const(run.length)));
+  }
+  body.push(m.local.get(all, info.refType));
+  return m.block(null, body, info.refType);
 }

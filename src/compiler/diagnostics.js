@@ -13,6 +13,7 @@ export const DIAGNOSTIC_KINDS = {
   NON_DEFAULTABLE_TYPE: 'non-defaultable-type',
   INVALID_NULLABLE_TYPE: 'invalid-nullable-type',
   INTEGER_LITERAL_OUT_OF_RANGE: 'integer-literal-out-of-range',
+  INVALID_ESCAPE: 'invalid-escape',
   UNKNOWN_TYPE: 'unknown-type',
   UNKNOWN_VARIABLE: 'unknown-variable',
   UNKNOWN_FIELD: 'unknown-field',
