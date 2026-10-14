@@ -74,8 +74,11 @@ async function buildOrExit(utu, file, options) {
     // In file order, then by position.
     const order = new Map(result.files.map((f, i) => [f.key, i]));
     const sorted = result.diagnostics.toSorted((a, b) => (order.get(a.file) ?? -1) - (order.get(b.file) ?? -1) || (a.start ?? 0) - (b.start ?? 0));
+    // Colored as the compiler reads it: it still holds this build's program.
+    const { highlighter } = await import('../src/selfhost/highlight.js');
     console.error(formatDiagnostics(sorted, files, {
-      color: process.stderr.isTTY, relative: displayPath,
+      color: process.stderr.isTTY || process.env.FORCE_COLOR === '1', relative: displayPath,
+      highlight: highlighter(utu, result.files),
     }));
   }
   if (!result.wasm) process.exit(1);

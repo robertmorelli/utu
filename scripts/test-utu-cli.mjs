@@ -33,12 +33,19 @@ export main() I32 {
   r = utu('check', 'bad.utu');
   assert.equal(r.status, 1);
   assert.equal(r.stderr.trim(), `bad.utu:3:25: error: Type mismatch: expected I32, got Str
+ 2 | export main() I32 {
  3 |     let x: I32 = add(1, "two");
    |                         ^^^^^
 
 bad.utu:4:9: error: Unknown variable 'missing'
+ 3 |     let x: I32 = add(1, "two");
  4 |     x + missing;
    |         ^^^^^^^`);
+  // On a terminal, colored as the compiler reads it: \`add\` a function, \`I32\` a type, the string a string.
+  const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1' } }).stderr;
+  assert.match(colored, /\x1b\[34madd\x1b\[0m/);
+  assert.match(colored, /\x1b\[36mI32\x1b\[0m/);
+  assert.match(colored, /\x1b\[32m"two"\x1b\[0m/);
 
   r = utu('run', 'good.utu');
   assert.equal(r.status, 0, r.stderr);

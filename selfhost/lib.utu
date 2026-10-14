@@ -227,6 +227,9 @@ export lib {
 
     fn decl_count() I32 { decl_kind.len(); }
 
+    // Word ids below this are keywords (tok_word names a word token's word).
+    fn keyword_count() I32 { Kw.count(); }
+
     // An expression's type as the last build checked it ("" when it was not).
     fn node_type(n: I32) Str {
         if n >= node_ty.len() { return ""; };
