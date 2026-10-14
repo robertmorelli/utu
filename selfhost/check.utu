@@ -400,58 +400,63 @@ fn error_value() I32 {
 // ── Expressions ──
 
 fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
-    let kind = node_kind[node];
-    if kind == Node.Identifier.to_i32() { return check_ident(node, cx); };
-    if kind == Node.Literal.to_i32() { return check_literal(node, expect, cx); };
-    if kind == Node.Paren_expr.to_i32() or kind == Node.Splice.to_i32() { return check_expr(first_child(node), expect, cx); };
-    if kind == Node.Binary_expr.to_i32() { return check_binary(node, expect, cx); };
-    if kind == Node.Unary_expr.to_i32() { return check_unary(node, expect, cx); };
-    if kind == Node.Call_expr.to_i32() { return check_call(node, expect, cx); };
-    if kind == Node.Block.to_i32() { return check_block(node, expect, cx); };
-    if kind == Node.Block_expr.to_i32() { return check_labeled(node, expect, cx); };
-    if kind == Node.Bind_expr.to_i32() { return check_let(node, cx); };
-    if kind == Node.Assign_expr.to_i32() { return check_assign(node, cx); };
-    if kind == Node.If_expr.to_i32() { return check_if(node, expect, cx); };
-    if kind == Node.While_expr.to_i32() { return check_while(node, cx); };
-    if kind == Node.For_expr.to_i32() { return check_for(node, cx); };
-    if kind == Node.Return_expr.to_i32() { return check_return(node, cx); };
-    if kind == Node.Break_expr.to_i32() { return check_break(node, true, cx); };
-    if kind == Node.Continue_expr.to_i32() { return check_break(node, false, cx); };
-    if kind == Node.Fatal_expr.to_i32() {
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return ty_never();
+    match Node.from_i32(node_kind[node]) {
+        Node.Identifier => check_ident(node, cx),
+        Node.Literal => check_literal(node, expect, cx),
+        Node.Paren_expr => check_expr(first_child(node), expect, cx),
+        Node.Splice => check_expr(first_child(node), expect, cx),
+        Node.Binary_expr => check_binary(node, expect, cx),
+        Node.Unary_expr => check_unary(node, expect, cx),
+        Node.Call_expr => check_call(node, expect, cx),
+        Node.Block => check_block(node, expect, cx),
+        Node.Block_expr => check_labeled(node, expect, cx),
+        Node.Bind_expr => check_let(node, cx),
+        Node.Assign_expr => check_assign(node, cx),
+        Node.If_expr => check_if(node, expect, cx),
+        Node.While_expr => check_while(node, cx),
+        Node.For_expr => check_for(node, cx),
+        Node.Return_expr => check_return(node, cx),
+        Node.Break_expr => check_break(node, true, cx),
+        Node.Continue_expr => check_break(node, false, cx),
+        Node.Fatal_expr => {
+            w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+            ty_never();
+        },
+        Node.Assert_expr => check_assert(node, cx),
+        Node.Field_expr => check_field(node, expect, cx),
+        Node.Type_member_expr => check_type_member(node, expect, cx),
+        Node.Struct_init => check_struct_init(node, expect, cx),
+        Node.Implicit_struct_init => check_implicit_init(node, expect, cx),
+        Node.Index_expr => check_index(node, expect, cx),
+        Node.Slice_expr => check_index(node, expect, cx),
+        Node.Array_expr => check_array_lit(node, expect, cx),
+        Node.Promoted_module_call_expr => check_promoted_call(node, expect, cx),
+        Node.Alt_expr => check_alt(node, expect, cx),
+        Node.Match_expr => check_match(node, expect, cx),
+        Node.Loop_match_expr => check_match(node, expect, cx),
+        Node.Promote_expr => check_promote(node, expect, cx),
+        Node.Else_expr => check_orelse(node, expect, cx),
+        Node.Null_expr => check_null_expr(node, cx),
+        Node.Try_expr => check_try(node, expect, cx),
+        Node.Tuple_expr => check_tuple(node, expect, cx),
+        Node.Closure_expr => check_closure(node, expect, cx),
+        Node.Yield_expr => check_yield(node, cx),
+        Node.New_expr => check_new(node, expect, cx),
+        Node.Prune_expr => check_prune(node),
+        Node.Iterator_expr => check_iterator(node, expect, cx),
+        Node.Pipe_expr => check_pipe(node, expect, cx),
+        Node.Defer_expr => check_defer(node),
+        Node.Optional_field_expr => check_field_get(node, expect, cx),
+        Node.Await_expr => check_await(node, cx),
+        Node.Dsl_expr => {
+            // (@es binds a typed let; anywhere else its type is unknown.)
+            if dsl_has_failed(node) { error_value(); } else if is_es(node) {
+                report(Diag.InvalidDslUsage, node, -1);
+                error_value();
+            } else { unsupported(node); };
+        },
+        ~> unsupported(node),
     };
-    if kind == Node.Assert_expr.to_i32() { return check_assert(node, cx); };
-    if kind == Node.Field_expr.to_i32() { return check_field(node, expect, cx); };
-    if kind == Node.Type_member_expr.to_i32() { return check_type_member(node, expect, cx); };
-    if kind == Node.Struct_init.to_i32() { return check_struct_init(node, expect, cx); };
-    if kind == Node.Implicit_struct_init.to_i32() { return check_implicit_init(node, expect, cx); };
-    if kind == Node.Index_expr.to_i32() or kind == Node.Slice_expr.to_i32() { return check_index(node, expect, cx); };
-    if kind == Node.Array_expr.to_i32() { return check_array_lit(node, expect, cx); };
-    if kind == Node.Promoted_module_call_expr.to_i32() { return check_promoted_call(node, expect, cx); };
-    if kind == Node.Alt_expr.to_i32() { return check_alt(node, expect, cx); };
-    if kind == Node.Match_expr.to_i32() or kind == Node.Loop_match_expr.to_i32() { return check_match(node, expect, cx); };
-    if kind == Node.Promote_expr.to_i32() { return check_promote(node, expect, cx); };
-    if kind == Node.Else_expr.to_i32() { return check_orelse(node, expect, cx); };
-    if kind == Node.Null_expr.to_i32() { return check_null_expr(node, cx); };
-    if kind == Node.Try_expr.to_i32() { return check_try(node, expect, cx); };
-    if kind == Node.Tuple_expr.to_i32() { return check_tuple(node, expect, cx); };
-    if kind == Node.Closure_expr.to_i32() { return check_closure(node, expect, cx); };
-    if kind == Node.Yield_expr.to_i32() { return check_yield(node, cx); };
-    if kind == Node.New_expr.to_i32() { return check_new(node, expect, cx); };
-    if kind == Node.Prune_expr.to_i32() { return check_prune(node); };
-    if kind == Node.Iterator_expr.to_i32() { return check_iterator(node, expect, cx); };
-    if kind == Node.Pipe_expr.to_i32() { return check_pipe(node, expect, cx); };
-    if kind == Node.Defer_expr.to_i32() { return check_defer(node); };
-    if kind == Node.Optional_field_expr.to_i32() { return check_field_get(node, expect, cx); };
-    if kind == Node.Await_expr.to_i32() { return check_await(node, cx); };
-    if kind == Node.Dsl_expr.to_i32() and dsl_has_failed(node) { return error_value(); };
-    if kind == Node.Dsl_expr.to_i32() and is_es(node) {
-        // @es binds a typed let; anywhere else its type is unknown.
-        report(Diag.InvalidDslUsage, node, -1);
-        return error_value();
-    };
-    unsupported(node);
 }
 
 fn check_ident(node: I32, cx: Cx) I32 {

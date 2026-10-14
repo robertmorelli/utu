@@ -1103,6 +1103,12 @@ fn iterator_form(w: I32) I32 {
 // Extend `left` by one postfix or infix operation, or return -1.
 fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     let k = kind_at(p, 0);
+    // What most often follows an expression ends it.
+    if k == Tok.Semi.to_i32() or k == Tok.RParen.to_i32() or k == Tok.Comma.to_i32() or k == Tok.RBrace.to_i32()
+        or k == Tok.LBrace.to_i32() or k == Tok.RBracket.to_i32() or k == Tok.Colon.to_i32() or k == Tok.FatArrow.to_i32()
+        or k == Tok.End.to_i32() {
+        return -1;
+    };
     let w = word_id(p);
     // Postfix: calls, fields, indexes (precedence 14).
     if binds(14, min, or_equal) {
@@ -1325,13 +1331,14 @@ fn prefix(p: Parser) I32 {
 }
 
 // Keywords that begin an expression; elsewhere these words are identifiers.
+// (Keywords are the first words interned: any other is past them.)
 fn is_expression_keyword(w: I32) Bool {
-    w == Kw.If.to_i32() or w == Kw.Match.to_i32() or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32()
+    w < Kw.count() and (w == Kw.If.to_i32() or w == Kw.Match.to_i32() or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32()
         or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32()
         or w == Kw.Break.to_i32() or w == Kw.Continue.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Yield.to_i32()
         or w == Kw.Return.to_i32() or w == Kw.Let.to_i32() or w == Kw.Cl.to_i32() or w == Kw.Fatal.to_i32()
         or w == Kw.Prune.to_i32() or w == Kw.New.to_i32() or w == Kw.Await.to_i32() or w == Kw.Assert.to_i32()
-        or w == Kw.Not.to_i32() or w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32();
+        or w == Kw.Not.to_i32() or w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32());
 }
 
 fn keyword_expression(p: Parser) I32 {

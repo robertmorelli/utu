@@ -1384,91 +1384,95 @@ fn emit(node: I32, f: I32) void {
         return;
     };
     emit_kids(node);
-    if op == Op.Nop.to_i32() { op1(1); }
-    else if op == Op.Unreachable.to_i32() { op1(0); }
-    else if op == Op.Br.to_i32() { op1(12); leb_u(true, depth_of(a)); }
-    else if op == Op.BrIf.to_i32() { op1(13); leb_u(true, depth_of(a)); }
-    else if op == Op.BrTable.to_i32() {
-        op1(14);
-        leb_u(true, b - 1);
-        for (0 ..< b) |i| { leb_u(true, depth_of(w_aux[a + i])); };
-    }
-    else if op == Op.Return.to_i32() { op1(15); }
-    else if op == Op.Drop.to_i32() { op1(26); }
-    else if op == Op.Select.to_i32() { op1(27); }
-    else if op == Op.Call.to_i32() { op1(16); leb_u(true, func_index[a]); }
-    else if op == Op.ReturnCall.to_i32() { op1(18); leb_u(true, func_index[a]); }
-    else if op == Op.CallRef.to_i32() { op1(20); leb_u(true, type_index[a]); }
-    else if op == Op.LocalGet.to_i32() { op1(32); leb_u(true, a); }
-    else if op == Op.LocalSet.to_i32() { op1(33); leb_u(true, a); }
-    else if op == Op.LocalTee.to_i32() { op1(34); leb_u(true, a); }
-    else if op == Op.GlobalGet.to_i32() { op1(35); leb_u(true, glob_index[a]); }
-    else if op == Op.GlobalSet.to_i32() { op1(36); leb_u(true, glob_index[a]); }
-    else if op == Op.I32Const.to_i32() { op1(65); leb_s(true, a); }
-    else if op == Op.I64Const.to_i32() { op1(66); leb_s64(true, a, b); }
-    else if op == Op.F32Const.to_i32() { op1(67); put_u32le(true, a); }
-    else if op == Op.F64Const.to_i32() { op1(68); put_u32le(true, a); put_u32le(true, b); }
-    else if op == Op.Plain.to_i32() {
-        if a < 256 { op1(a); } else { op1(a >> 8); leb_u(true, a & 255); };
-    }
-    else if op == Op.Load.to_i32() or op == Op.Store.to_i32() {
-        op1(b);
-        // memarg: alignment (with bit 6 set when a memory index follows), the memory, offset 0
-        let align = natural_align(b);
-        let mi = memory_index[a];
-        if mi == 0 { leb_u(true, align); } else { leb_u(true, align | 64); leb_u(true, mi); };
-        leb_u(true, 0);
-    }
-    else if op == Op.MemorySize.to_i32() { op1(63); leb_u(true, memory_index[a]); }
-    else if op == Op.MemoryGrow.to_i32() { op1(64); leb_u(true, memory_index[a]); }
-    else if op == Op.MemoryCopy.to_i32() { op1(252); leb_u(true, 10); leb_u(true, memory_index[a]); leb_u(true, memory_index[b]); }
-    else if op == Op.MemoryFill.to_i32() { op1(252); leb_u(true, 11); leb_u(true, memory_index[a]); }
-    else if op == Op.MemoryInit.to_i32() { op1(252); leb_u(true, 8); leb_u(true, b); leb_u(true, memory_index[a]); }
-    else if op == Op.StructNew.to_i32() { op_fb(0); leb_u(true, type_index[a]); }
-    else if op == Op.StructNewDefault.to_i32() { op_fb(1); leb_u(true, type_index[a]); }
-    else if op == Op.StructGet.to_i32() { op_fb(2); leb_u(true, type_index[a]); leb_u(true, b); }
-    else if op == Op.StructGetS.to_i32() { op_fb(3); leb_u(true, type_index[a]); leb_u(true, b); }
-    else if op == Op.StructGetU.to_i32() { op_fb(4); leb_u(true, type_index[a]); leb_u(true, b); }
-    else if op == Op.StructSet.to_i32() { op_fb(5); leb_u(true, type_index[a]); leb_u(true, b); }
-    else if op == Op.ArrayNew.to_i32() { op_fb(6); leb_u(true, type_index[a]); }
-    else if op == Op.ArrayNewDefault.to_i32() { op_fb(7); leb_u(true, type_index[a]); }
-    else if op == Op.ArrayNewFixed.to_i32() { op_fb(8); leb_u(true, type_index[a]); leb_u(true, w_count[node]); }
-    else if op == Op.ArrayNewData.to_i32() { op_fb(9); leb_u(true, type_index[a]); leb_u(true, b); }
-    else if op == Op.ArrayGet.to_i32() { op_fb(11); leb_u(true, type_index[a]); }
-    else if op == Op.ArrayGetS.to_i32() { op_fb(12); leb_u(true, type_index[a]); }
-    else if op == Op.ArrayGetU.to_i32() { op_fb(13); leb_u(true, type_index[a]); }
-    else if op == Op.ArraySet.to_i32() { op_fb(14); leb_u(true, type_index[a]); }
-    else if op == Op.ArrayLen.to_i32() { op_fb(15); }
-    else if op == Op.ArrayFill.to_i32() { op_fb(16); leb_u(true, type_index[a]); }
-    else if op == Op.ArrayCopy.to_i32() { op_fb(17); leb_u(true, type_index[a]); leb_u(true, type_index[b]); }
-    else if op == Op.ArrayInitData.to_i32() { op_fb(18); leb_u(true, type_index[a]); leb_u(true, b); }
-    else if op == Op.RefNull.to_i32() { op1(208); put_heap(true, a); }
-    else if op == Op.RefIsNull.to_i32() { op1(209); }
-    else if op == Op.RefFunc.to_i32() {
-        op1(210);
-        leb_u(true, func_index[a]);
-        if func_declared[a] == 0 {
-            func_declared[a] = 1;
-            declared.push(a);
-        };
-    }
-    else if op == Op.RefEq.to_i32() { op1(211); }
-    else if op == Op.RefAsNonNull.to_i32() { op1(212); }
-    else if op == Op.RefTest.to_i32() { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 21; } else { 20; }); put_heap(true, a); }
-    else if op == Op.RefCast.to_i32() { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 23; } else { 22; }); put_heap(true, a); }
-    else if op == Op.AnyConvertExtern.to_i32() { op_fb(26); }
-    else if op == Op.ExternConvertAny.to_i32() { op_fb(27); }
-    else if op == Op.RefI31.to_i32() { op_fb(28); }
-    else if op == Op.I31GetS.to_i32() { op_fb(29); }
-    else if op == Op.I31GetU.to_i32() { op_fb(30); }
-    else if op == Op.Throw.to_i32() { op1(8); leb_u(true, 0); }
-    else if op == Op.V128Const.to_i32() {
-        op1(253);
-        leb_u(true, 12);
-        for (0 ..< 4) |i| { put_u32le(true, w_aux[a + i]); };
-    }
-    else if op == Op.Rethrow.to_i32() { op1(9); leb_u(true, depth_of(a)); }
-    else { fatal; };
+    match Op.from_i32(op) {
+        Op.Nop => { op1(1); },
+        Op.Unreachable => { op1(0); },
+        Op.Br => { op1(12); leb_u(true, depth_of(a)); },
+        Op.BrIf => { op1(13); leb_u(true, depth_of(a)); },
+        Op.BrTable => {
+            op1(14);
+            leb_u(true, b - 1);
+            for (0 ..< b) |i| { leb_u(true, depth_of(w_aux[a + i])); };
+        },
+        Op.Return => { op1(15); },
+        Op.Drop => { op1(26); },
+        Op.Select => { op1(27); },
+        Op.Call => { op1(16); leb_u(true, func_index[a]); },
+        Op.ReturnCall => { op1(18); leb_u(true, func_index[a]); },
+        Op.CallRef => { op1(20); leb_u(true, type_index[a]); },
+        Op.LocalGet => { op1(32); leb_u(true, a); },
+        Op.LocalSet => { op1(33); leb_u(true, a); },
+        Op.LocalTee => { op1(34); leb_u(true, a); },
+        Op.GlobalGet => { op1(35); leb_u(true, glob_index[a]); },
+        Op.GlobalSet => { op1(36); leb_u(true, glob_index[a]); },
+        Op.I32Const => { op1(65); leb_s(true, a); },
+        Op.I64Const => { op1(66); leb_s64(true, a, b); },
+        Op.F32Const => { op1(67); put_u32le(true, a); },
+        Op.F64Const => { op1(68); put_u32le(true, a); put_u32le(true, b); },
+        Op.Plain => { if a < 256 { op1(a); } else { op1(a >> 8); leb_u(true, a & 255); }; },
+        Op.Load => { memory_access(a, b); },
+        Op.Store => { memory_access(a, b); },
+        Op.MemorySize => { op1(63); leb_u(true, memory_index[a]); },
+        Op.MemoryGrow => { op1(64); leb_u(true, memory_index[a]); },
+        Op.MemoryCopy => { op1(252); leb_u(true, 10); leb_u(true, memory_index[a]); leb_u(true, memory_index[b]); },
+        Op.MemoryFill => { op1(252); leb_u(true, 11); leb_u(true, memory_index[a]); },
+        Op.MemoryInit => { op1(252); leb_u(true, 8); leb_u(true, b); leb_u(true, memory_index[a]); },
+        Op.StructNew => { op_fb(0); leb_u(true, type_index[a]); },
+        Op.StructNewDefault => { op_fb(1); leb_u(true, type_index[a]); },
+        Op.StructGet => { op_fb(2); leb_u(true, type_index[a]); leb_u(true, b); },
+        Op.StructGetS => { op_fb(3); leb_u(true, type_index[a]); leb_u(true, b); },
+        Op.StructGetU => { op_fb(4); leb_u(true, type_index[a]); leb_u(true, b); },
+        Op.StructSet => { op_fb(5); leb_u(true, type_index[a]); leb_u(true, b); },
+        Op.ArrayNew => { op_fb(6); leb_u(true, type_index[a]); },
+        Op.ArrayNewDefault => { op_fb(7); leb_u(true, type_index[a]); },
+        Op.ArrayNewFixed => { op_fb(8); leb_u(true, type_index[a]); leb_u(true, w_count[node]); },
+        Op.ArrayNewData => { op_fb(9); leb_u(true, type_index[a]); leb_u(true, b); },
+        Op.ArrayGet => { op_fb(11); leb_u(true, type_index[a]); },
+        Op.ArrayGetS => { op_fb(12); leb_u(true, type_index[a]); },
+        Op.ArrayGetU => { op_fb(13); leb_u(true, type_index[a]); },
+        Op.ArraySet => { op_fb(14); leb_u(true, type_index[a]); },
+        Op.ArrayLen => { op_fb(15); },
+        Op.ArrayFill => { op_fb(16); leb_u(true, type_index[a]); },
+        Op.ArrayCopy => { op_fb(17); leb_u(true, type_index[a]); leb_u(true, type_index[b]); },
+        Op.ArrayInitData => { op_fb(18); leb_u(true, type_index[a]); leb_u(true, b); },
+        Op.RefNull => { op1(208); put_heap(true, a); },
+        Op.RefIsNull => { op1(209); },
+        Op.RefFunc => {
+            op1(210);
+            leb_u(true, func_index[a]);
+            if func_declared[a] == 0 {
+                func_declared[a] = 1;
+                declared.push(a);
+            };
+        },
+        Op.RefEq => { op1(211); },
+        Op.RefAsNonNull => { op1(212); },
+        Op.RefTest => { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 21; } else { 20; }); put_heap(true, a); },
+        Op.RefCast => { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 23; } else { 22; }); put_heap(true, a); },
+        Op.AnyConvertExtern => { op_fb(26); },
+        Op.ExternConvertAny => { op_fb(27); },
+        Op.RefI31 => { op_fb(28); },
+        Op.I31GetS => { op_fb(29); },
+        Op.I31GetU => { op_fb(30); },
+        Op.Throw => { op1(8); leb_u(true, 0); },
+        Op.V128Const => {
+            op1(253);
+            leb_u(true, 12);
+            for (0 ..< 4) |i| { put_u32le(true, w_aux[a + i]); };
+        },
+        Op.Rethrow => { op1(9); leb_u(true, depth_of(a)); },
+        ~> { fatal; },
+    };
+}
+
+// A load or store (opcode `code`) of memory m, and its memarg: the
+// alignment (with bit 6 set when a memory index follows), the memory, offset 0.
+fn memory_access(m: I32, code: I32) void {
+    op1(code);
+    let align = natural_align(code);
+    let mi = memory_index[m];
+    if mi == 0 { leb_u(true, align); } else { leb_u(true, align | 64); leb_u(true, mi); };
+    leb_u(true, 0);
 }
 
 // The natural alignment (log2 of the access size) of a load or store opcode.
