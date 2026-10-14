@@ -1,6 +1,6 @@
 // Mems as WasmGC arrays behave as mems as memories.
 //
-// A module has at most 100 memories (JavaScriptCore's limit), so the mems
+// A module has at most 24 memories (see max_memories in selfhost/mems.utu), so the mems
 // used least in a program with more are arrays. The same operations, on
 // every storage kind, run once with the mems as memories and once with 120
 // mems named more often ahead of them (so they are arrays); the results must
@@ -68,7 +68,7 @@ try {
   }
   const [memories, arrays] = results;
   assert.equal(memories.memories, KINDS.length);
-  assert.equal(arrays.memories, 100);
+  assert.equal(arrays.memories, 24);
   // The mems exercised are arrays: their contents come from the start function.
   assert.equal(memories.start, null);
   assert.notEqual(arrays.start, null);

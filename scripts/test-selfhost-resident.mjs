@@ -4,7 +4,9 @@
 // learned of them) for the programs after; anything kept wrongly would make
 // a program's build depend on the ones before it. Programs that import
 // std:Browser, std:JS, std:Web, node: modules, or nothing are built in turns
-// on one compiler, and each must come out as it does on a fresh one.
+// on one compiler, and each must come out as it does on a fresh one. The
+// suite runs it with V8 optimizing early (--wasm-tiering-budget), where a
+// compiler with too many memories crashed (see max_memories in selfhost/mems.utu).
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

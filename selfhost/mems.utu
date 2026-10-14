@@ -2,9 +2,9 @@
 //
 // `mem name: U8;` is a resizable array of scalars, its own linear memory:
 // element i is at byte i << shift, so a read is one load with no base
-// pointer. An engine may allow few memories (JavaScriptCore: 100), so a
-// module has at most max_memories: the mems the host reaches (exported, or
-// used with copy_in or view) have theirs, then the mems used most; the rest
+// pointer. Engines allow few memories, so a module has at most
+// max_memories: the mems the host reaches (exported, or used with copy_in
+// or view) have theirs, then the mems used most; the rest
 // are WasmGC arrays in globals (slower in a tight loop, by a fifth or so,
 // and gone when unused).
 //
@@ -850,8 +850,13 @@ fn mem_is_hosted(decl: I32) Bool {
     mem_hosted[decl] == 1;
 }
 
-// The most memories a module has (JavaScriptCore's limit).
-let max_memories: I32 = 100;
+// The most memories a module has. JavaScriptCore allows 100. V8 reserves
+// 10 GiB of address space for each (so a stray access lands in a guard
+// region) and 512 GiB in all; a memory past that has none, may move when it
+// grows, and optimized code can then read a stale one (a crash, in Node 25).
+// At 24, the compiler and a module it built fit in one process together
+// (and the compiler builds no slower than with 100).
+let max_memories: I32 = 24;
 
 // Which mems are memories, in one pass over the program: what the host
 // reaches (copy_in, view, export), and how often each mem is named.
