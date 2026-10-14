@@ -30,7 +30,7 @@ const SHAPES = `mod shapes {
 `;
 const MAIN = `using shapes |Point| from "./_shapes.utu";
 
-/// Twice the sum
+/// Twice the *sum*
 /// of a point's coordinates.
 fn twice(p: Point) I32 {
     let total = p.sum();
@@ -89,7 +89,7 @@ try {
   assert.match(local.contents.value, /total: I32/);
   const fn = await ask('textDocument/hover', at(MAIN, 'twice(Point'));
   assert.match(fn.contents.value, /fn twice\(p: Point\) I32/);
-  assert.match(fn.contents.value, /Twice the sum\nof a point's coordinates\./);
+  assert.match(fn.contents.value, /Twice the \*\*sum\*\*\nof a point's coordinates\./);
   const param = await ask('textDocument/hover', at(MAIN, 'p.sum'));
   assert.doesNotMatch(param.contents.value, /Twice/, 'a parameter has no doc comment of its function');
 

@@ -881,6 +881,30 @@ assembles them, and the compiler puts the code in the module.
 
 ---
 
+## Doc comments
+
+```
+//! Plane geometry: *points* and the distances between them.
+
+/// The Euclidean distance between `a` and `b`:
+/// $ d(a, b) = sqrt((a_x - b_x)^2 + (a_y - b_y)^2) $
+/// See @Point.
+fn distance(a: Point, b: Point) F64 { … }
+```
+
+`///` lines just before a declaration (a function, type, field, variant,
+module, global, …) document it; `//!` lines at the top of a file document
+the file. Their text is [Typst](https://typst.app) markup: `*strong*`,
+`_emphasis_`, `` `code` ``, lists, `$math$`, `#link("…")[…]`; `@Name`
+refers to the declaration named so.
+
+`tools/utudoc/utudoc.mjs <paths…> -o docs.pdf` typesets a codebase from
+them, with each declaration's signature colored as the compiler reads it
+and its names linked to their declarations. The editor shows them on
+hover, as Markdown.
+
+---
+
 ## Tests and benchmarks
 
 ```

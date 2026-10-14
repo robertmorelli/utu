@@ -39,6 +39,7 @@ const commands = [
   ['node', './scripts/test-utu-cli.mjs'],
   ['node', './scripts/test-lsp.mjs'],
   ['node', './scripts/test-grep.mjs'],
+  ['node', './scripts/test-utudoc.mjs'],
   ['node', './scripts/test-vscode-extension.mjs'],
 ];
 

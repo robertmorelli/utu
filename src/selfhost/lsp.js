@@ -14,6 +14,7 @@
 
 import { compile } from './compiler.js';
 import { programIndex } from './query.js';
+import { docComments, typstToMarkdown } from './docs.js';
 
 const SEMANTIC_TYPES = ['namespace', 'type', 'enum', 'enumMember', 'struct', 'property', 'function', 'method', 'variable', 'parameter', 'interface', 'typeParameter'];
 const SEMANTIC_MODIFIERS = ['declaration'];
@@ -352,7 +353,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       head = signature(text.slice(span.start, span.end));
     }
     if (!head) return null;
-    const docs = span && text != null && !LOCAL_KINDS.has(kind) ? docComment(text, span.start) : '';
+    const docs = LOCAL_KINDS.has(kind) ? '' : typstToMarkdown(docComments(utu, program.files).declaration(decl));
     const where = span?.file.startsWith('std:') ? ` · ${span.file}` : '';
     return `\`\`\`utu\n${head}\n\`\`\`\n*${kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}*${where}${docs ? `\n\n---\n\n${docs}` : ''}`;
   }
@@ -459,19 +460,6 @@ function collapse(text) {
   return line.length > 160 ? `${line.slice(0, 157)}...` : line;
 }
 
-/** The `///` lines just above `start`, as markdown. */
-function docComment(text, start) {
-  const lines = text.slice(0, start).split('\n');
-  // Only a declaration that begins its line (after `export`, `tag`, …) has one.
-  if (!/^\s*([a-z]+\s+)*$/.test(lines.pop())) return '';
-  const out = [];
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim();
-    if (!line.startsWith('///')) break;
-    out.unshift(line.slice(line.startsWith('/// ') ? 4 : 3));
-  }
-  return out.join('\n');
-}
 
 /** The module a declaration is in, or -1. */
 function moduleOf(index, decl) {
