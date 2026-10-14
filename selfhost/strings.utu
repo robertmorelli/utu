@@ -14,8 +14,8 @@ enum(U8) Builtin:
     | FromCodePoint
     | FromCharCodeArray
 
-mem builtin_func: I32;   // by Builtin: its imported function, or -1
-mem word_string: I32;    // by word id (a literal's decoded text): its global, or -1
+vec builtin_func: I32;   // by Builtin: its imported function, or -1
+vec word_string: I32;    // by word id (a literal's decoded text): its global, or -1
 
 fn reset_strings() void {
     builtin_func.resize(Builtin.count());
@@ -59,7 +59,7 @@ fn call_builtin(b: Builtin, m: I32) void {
 
 // ── Literals ──
 
-mem lit_bytes: U8;   // a literal's text, decoded, as UTF-8
+vec lit_bytes: U8;   // a literal's text, decoded, as UTF-8
 
 // Push a string literal (or a multiline one) as a constant. False when its
 // text is not well-formed UTF-16 (a lone surrogate), which cannot be an import name.

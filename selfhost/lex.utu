@@ -104,10 +104,10 @@ let end_byte: I32 = 255;
 // kind_of[state]; one backed off from it has kind back_kind[state]. The
 // start state that follows is after_of (0: before, 1: after, 2: the same,
 // 3: member, 4: type).
-const mem dfa: U8 = @comptime/\ build().tabs \/;
-const mem kind_of: U8 = @comptime/\ build().kinds \/;
-const mem back_kind: U8 = @comptime/\ build().backs \/;
-const mem after_of: U8 = @comptime/\ build().afters \/;
+const vec dfa: U8 = @comptime/\ build().tabs \/;
+const vec kind_of: U8 = @comptime/\ build().kinds \/;
+const vec back_kind: U8 = @comptime/\ build().backs \/;
+const vec after_of: U8 = @comptime/\ build().afters \/;
 
 export mem src: U8;
 export mem tok_kind: U8;

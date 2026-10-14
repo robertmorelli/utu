@@ -121,7 +121,7 @@ fn enum_variant_value(variant: I32) I32 {
     named(decl_owner[variant], 0);
 }
 
-mem name_helper_enum: I32;   // pairs: enum declaration, function
+vec name_helper_enum: I32;   // pairs: enum declaration, function
 
 // (value) → its variant's name, or "?": one comparison per variant.
 fn enum_name_helper(decl: I32) I32 {
@@ -166,7 +166,7 @@ fn enum_name_helper(decl: I32) I32 {
 // With four variants or more, values from lo to hi at most half gaps: the
 // names in a constant array (a global), and `(value - lo) <u len ? names[…] :
 // "?"`. A few bytes a variant, and no comparisons.
-mem name_table_lo: I32 = [0];
+vec name_table_lo: I32 = [0];
 
 // The number of values from the lowest variant's to the highest's, when the
 // names are a table (their lowest in name_table_lo); 0 when not.

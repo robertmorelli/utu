@@ -13,7 +13,7 @@
 
 // Expand every DSL site of the program's own files; then the sites the
 // expansions made, until none is left.
-mem dsl_reconcile: I32 = [0];
+vec dsl_reconcile: I32 = [0];
 
 fn expand_dsls() void {
     // Any reactive template makes every one reconciled.
@@ -111,7 +111,7 @@ fn expand_dsl_round() Bool {
 
 // The DSL sites (`@name/\ … \/`), in node order: each parse notes those it
 // made (note_dsl_sites). The kept prelude's are the first.
-mem dsl_sites: I32;
+vec dsl_sites: I32;
 
 fn note_dsl_sites(from: I32) void {
     for (from ..< node_kind.len()) |n| { if node_kind[n] == Node.Dsl_expr.to_i32() { dsl_sites.push(n); }; };
@@ -128,7 +128,7 @@ fn dsl_in_program(node: I32) Bool {
 }
 
 // Sites whose expansion failed (reported): left as they are, and checked as mistakes.
-mem dsl_failed: I32;
+vec dsl_failed: I32;
 
 fn dsl_has_failed(node: I32) Bool {
     for (0 ..< dsl_failed.len()) |i| { if dsl_failed[i] == node { return true; }; };
@@ -157,9 +157,9 @@ fn dsl_body(site: I32) Str { bytes_text(dsl_inner_start(site), dsl_inner_end(sit
 // A DSL's mistake names a place in its body (an offset from the body's
 // start, and a length); expanding stops there, and it is reported.
 
-mem dsl_err_message: I32 = [-1];   // a word
-mem dsl_err_offset: I32 = [0];
-mem dsl_err_length: I32 = [0];
+vec dsl_err_message: I32 = [-1];   // a word
+vec dsl_err_offset: I32 = [0];
+vec dsl_err_length: I32 = [0];
 
 let dsl_throw: fun() void = @es/\ () => { throw new SyntaxError('utu dsl'); } \/;
 
@@ -179,7 +179,7 @@ fn report_dsl_error(site: I32) void {
 // The byte of a UTF-16 offset in site's body, and the UTF-16 offset of a
 // byte: walked over the body's bytes, from the last answer when it is
 // before (expansions ask in order), so a body is read once, not per ask.
-mem dsl_cursor: I32 = [-1, 0, 0];   // site, byte, UTF-16 offset
+vec dsl_cursor: I32 = [-1, 0, 0];   // site, byte, UTF-16 offset
 
 fn dsl_byte(site: I32, offset: I32) I32 {
     let b = dsl_inner_start(site);
@@ -226,12 +226,12 @@ fn utf8_size(b: I32) I32 { if b < 128 { 1; } else if b < 224 { 2; } else if b < 
 // Generated code points at the site that needed it: a mistake in it is
 // reported there.
 
-mem dsl_file_site: I32;           // by file: the DSL site it was generated for, or -1
-mem dsl_file_from: I32;           // by file: the part of the site it stands for (bytes), or -1
-mem dsl_file_to: I32;
-mem dsl_current_site: I32 = [-1];
-mem dsl_current_from: I32 = [-1];
-mem dsl_current_to: I32 = [-1];
+vec dsl_file_site: I32;           // by file: the DSL site it was generated for, or -1
+vec dsl_file_from: I32;           // by file: the part of the site it stands for (bytes), or -1
+vec dsl_file_to: I32;
+vec dsl_current_site: I32 = [-1];
+vec dsl_current_from: I32 = [-1];
+vec dsl_current_to: I32 = [-1];
 
 // The site a generated node stands for, or -1.
 fn dsl_site_of(node: I32) I32 {
@@ -330,11 +330,11 @@ fn parses_as_expression(code: Str) Bool {
 // expansion is grafted, each placeholder becomes the expression parsed from
 // the body itself, so it keeps its place in the source.
 
-mem splice_start: I32;   // by splice: its span in src (-1 for generated code)
-mem splice_end: I32;
-mem splice_code: I32;    // by splice: generated code (a word), whose mistakes point at [from, to) of the body
-mem splice_from: I32;
-mem splice_to: I32;
+vec splice_start: I32;   // by splice: its span in src (-1 for generated code)
+vec splice_end: I32;
+vec splice_code: I32;    // by splice: generated code (a word), whose mistakes point at [from, to) of the body
+vec splice_from: I32;
+vec splice_to: I32;
 
 // Generated code that stands for one statement of the body (`bind:`): its
 // mistakes are reported at that statement, not the whole site.

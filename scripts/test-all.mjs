@@ -21,7 +21,7 @@ const commands = [
   ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-resolve-differential.mjs'],
   ['node', './scripts/selfhost-bootstrap.mjs'],
-  ['node', './scripts/test-selfhost-mem-arrays.mjs'],
+  ['node', './scripts/test-vec.mjs'],
   // Optimized early, as an editor's long session would have it.
   ['node', '--wasm-tiering-budget=1000', './scripts/test-selfhost-resident.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs'],

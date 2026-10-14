@@ -158,6 +158,7 @@ export class Module {
     this.memories = [];
     this.memoriesByName = new Map();
     this.dataSegments = [];
+    this.arrayInits = [];
     this.exports = [];
     this.debugFiles = [];
     this.stringConstants = new Map();
@@ -214,9 +215,23 @@ export class Module {
     this.memoriesByName.set(name, memory);
   }
 
-  /** Bytes copied into `memory` at `offset` when the module is instantiated. */
+  /**
+   * Bytes copied into `memory` at `offset` when the module is instantiated;
+   * with no memory, a passive segment an instruction copies from. Returns
+   * the segment's index.
+   */
   addDataSegment(memory, offset, bytes) {
     this.dataSegments.push({ memory, offset, bytes });
+    return this.dataSegments.length - 1;
+  }
+
+  /**
+   * When the module starts, `count` elements of the array in `global` (of
+   * `heapType`) are copied from passive data segment `segment`. A start
+   * function does it, for the globals the exports reach (see encode.js).
+   */
+  addArrayInit(global, heapType, segment, count) {
+    this.arrayInits.push({ global, heapType, segment, count });
   }
 
   addFunctionExport(internalName, externalName) {
@@ -442,6 +457,8 @@ export class Module {
       len: value => expr('array.len', i32, [value]),
       copy: (destination, destinationIndex, source, sourceIndex, length) =>
         expr('array.copy', none, [destination, destinationIndex, source, sourceIndex, length]),
+      init_data: (heapType, segment, array, index, offset, length) =>
+        expr('array.init_data', none, [array, index, offset, length], { heapType, segment }),
     };
     m.tuple = {
       make: operands => expr('tuple.make', createType(operands.map(operand => operand.type)), [...operands]),

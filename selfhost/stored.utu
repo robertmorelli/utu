@@ -31,10 +31,10 @@ fn expand_css(site: I32) void {
 
 // ── @stored ──
 
-mem st_serial: I32 = [0];
-mem st_seq: I32 = [0];
-mem st_type_at: I32 = [0];
-mem st_type_len: I32 = [0];
+vec st_serial: I32 = [0];
+vec st_seq: I32 = [0];
+vec st_type_at: I32 = [0];
+vec st_type_len: I32 = [0];
 
 fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]); }
 

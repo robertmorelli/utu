@@ -179,7 +179,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.UnknownType or k == Diag.NotAModule or k == Diag.UnknownModule or k == Diag.UnknownVariant or k == Diag.MemKind or k == Diag.InvalidDistinct or k == Diag.MemView { return "unknown-type"; };
     if k == Diag.UnknownImport { return "unknown-import"; };
     if k == Diag.DuplicateDeclaration or k == Diag.DuplicatePattern or k == Diag.MemTwice or k == Diag.MemClash or k == Diag.EnumValueTwice { return "duplicate-declaration"; };
-    if k == Diag.UnknownMethod or k == Diag.ProtoMissing or k == Diag.InternNotBytes or k == Diag.MemNoMethod { return "unknown-method"; };
+    if k == Diag.UnknownMethod or k == Diag.ProtoMissing or k == Diag.InternNotBytes or k == Diag.MemNoMethod or k == Diag.VecHost { return "unknown-method"; };
     if k == Diag.UnknownOperator { return "unknown-operator"; };
     if k == Diag.WrongArity { return "wrong-arity"; };
     if k == Diag.AssignmentToImmutable { return "assignment-to-immutable"; };
@@ -210,7 +210,8 @@ fn diag_kind_of(i: I32) Str {
 
 fn diag_text(i: I32) Str {
     let k = Diag.from_i32(diag_kind[i]);
-    let w = word_text(diag_word[i]);
+    let word = diag_word[i];
+    let w = word_text(word);
     let a = diag_a[i];
     let b = diag_b[i];
     let node = diag_node[i];
@@ -227,8 +228,8 @@ fn diag_text(i: I32) Str {
         let what = pick(a == 1, "parameter", pick(a == 2, "variant", pick(a == 3, "local binding", "top-level declaration")));
         return "Duplicate " + what + " '" + w + "'";
     };
-    if k == Diag.MemTwice { return "mem " + w + " is declared twice"; };
-    if k == Diag.MemClash { return "mem " + w + " has the same name as a top-level function or global"; };
+    if k == Diag.MemTwice { return mem_word(word) + " " + w + " is declared twice"; };
+    if k == Diag.MemClash { return mem_word(word) + " " + w + " has the same name as a top-level function or global"; };
     if k == Diag.DuplicatePattern { return "Duplicate match pattern '" + node_text(first_child(node)) + "'"; };
     if k == Diag.TupleLet {
         if not ty_is(a, Ty.Tuple) { return "let .{…} takes apart a tuple, but this value is " + type_text(a); };
@@ -297,14 +298,15 @@ fn diag_text(i: I32) Str {
     };
     if k == Diag.MissingField { return "Missing field '" + w + "' for " + decl_text(a); };
     if k == Diag.NullableAccess { return "Cannot access field '" + w + "' on nullable " + type_text(a); };
-    if k == Diag.MemIndex { return "mem " + w + " takes one index: " + w + "[i]"; };
+    if k == Diag.MemIndex { return mem_word(word) + " " + w + " takes one index: " + w + "[i]"; };
     if k == Diag.ConstMem {
-        if a >= 0 { return "mem " + w + " is const; it has no " + word_text(a); };
-        return "mem " + w + " is const; it cannot be written";
+        if a >= 0 { return mem_word(word) + " " + w + " is const; it has no " + word_text(a); };
+        return mem_word(word) + " " + w + " is const; it cannot be written";
     };
-    if k == Diag.MemNotValue { return "mem " + w + " is not a value; use " + w + "[i], " + w + "[i] = v, or " + w + ".len()"; };
+    if k == Diag.MemNotValue { return mem_word(word) + " " + w + " is not a value; use " + w + "[i], " + w + "[i] = v, or " + w + ".len()"; };
     if k == Diag.MemKind {
-        return "mem " + w + " stores " + node_text(next_sibling(first_child(node))) + "; a mem holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64";
+        let kw = mem_word(word);
+        return kw + " " + w + " stores " + node_text(next_sibling(first_child(node))) + "; a " + kw + " holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64";
     };
     if k == Diag.NonDefaultable {
         let t = type_text(a);
@@ -359,14 +361,21 @@ fn diag_text(i: I32) Str {
         return decl_text(a) + " does not implement protocol " + pick(b == 1, "getter", "method") + " '" + word_text(diag_c[i]) + "." + w + "'";
     };
     if k == Diag.ProtoSignature { return "Implementation '" + word_text(a) + "[" + word_text(b) + "]." + w + "' does not match the protocol signature"; };
-    if k == Diag.MemElementRange { return "mem " + w + ": element " + int_text(b) + " (" + word_text(diag_c[i]) + ") does not fit in " + Storage.name(mem_storage(a)); };
-    if k == Diag.MemInitializer { return "mem " + w + ": an initializer list holds number literals; compute other values with @comptime"; };
-    if k == Diag.MemEmbed { return "mem " + w + ": @embed cannot read " + bytes_text(dsl_text_start(node), dsl_text_end(node)) + ": ENOENT"; };
+    if k == Diag.MemElementRange { return mem_word(word) + " " + w + ": element " + int_text(b) + " (" + word_text(diag_c[i]) + ") does not fit in " + Storage.name(mem_storage(a)); };
+    if k == Diag.MemInitializer { return mem_word(word) + " " + w + ": an initializer list holds number literals; compute other values with @comptime"; };
+    if k == Diag.MemEmbed { return mem_word(word) + " " + w + ": @embed cannot read " + bytes_text(dsl_text_start(node), dsl_text_end(node)) + ": ENOENT"; };
     if k == Diag.MemView { return w + ".view() returns a JS." + view_array_name(Storage.from_i32(a)) + "; add `using JS from std:JS;`"; };
     if k == Diag.MemNoMethod {
+        let name = word_of(first_child(node));
+        if mem_word(name) == "vec" { return "vec " + node_text(first_child(node)) + " has no method '" + w + "'; it has len, cap, push, reserve, resize, clear, intern, interned, interned_start, interned_size, intern_reset"; };
         return "mem " + node_text(first_child(node)) + " has no method '" + w + "'; it has len, cap, push, reserve, resize, clear, copy_in, view, intern, interned, interned_start, interned_size, intern_reset";
     };
-    if k == Diag.InternNotBytes { return "mem " + w + "." + word_text(a) + ": only byte mems (U8, I8) intern spans"; };
+    if k == Diag.InternNotBytes {
+        let kw = mem_word(word);
+        return kw + " " + w + "." + word_text(a) + ": only byte " + kw + "s (U8, I8) intern spans";
+    };
+    if k == Diag.TooManyMems { return "mem " + w + " is one mem too many: a module has at most " + int_text(max_memories) + " memories; declare the others as vec"; };
+    if k == Diag.VecHost { return "vec " + node_text(first_child(node)) + " has no method '" + w + "': the host cannot see a vec; declare it as a mem"; };
     if k == Diag.InvalidDslUsage { return "@es DSL must appear on the right-hand side of a typed let binding (let X: T = @es/\\...\\/)"; };
     if k == Diag.ParseError {
         // What the parser wanted, and what it found.

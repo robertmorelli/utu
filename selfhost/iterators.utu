@@ -21,15 +21,15 @@
 // without its setup again ("replay").
 
 // Per stage of the pipelines being checked (a stack: bodies hold pipelines).
-mem st_node: I32;
-mem st_op: I32;       // the operator's word
-mem st_counter: I32;  // its counter local, or -1
-mem st_ordinal: I32;  // its ordinal local (the counter before this value), or -1
-mem st_locals: I32;   // 16 per stage: locals of its own (limit, other, accumulator, buffers, …), or -1
+vec st_node: I32;
+vec st_op: I32;       // the operator's word
+vec st_counter: I32;  // its counter local, or -1
+vec st_ordinal: I32;  // its ordinal local (the counter before this value), or -1
+vec st_locals: I32;   // 16 per stage: locals of its own (limit, other, accumulator, buffers, …), or -1
 
 // Nodes to run before the loop and after it, per pipeline (stacks).
-mem iter_setup: I32;
-mem iter_cleanup: I32;
+vec iter_setup: I32;
+vec iter_cleanup: I32;
 
 struct Pipe:
     | first_stage: I32   // its stages, in st_*: [first_stage, first_stage + count)
@@ -228,7 +228,7 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
     true;
 }
 
-mem pure_words: I32;   // the methods pure_method allows, interned once per program
+vec pure_words: I32;   // the methods pure_method allows, interned once per program
 
 fn pure_method(word: I32) Bool {
     if pure_words.len() == 0 {

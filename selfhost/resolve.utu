@@ -56,14 +56,14 @@ enum(U8) Decl:
     | Caught
     | Main
 
-mem decl_kind: U8;
-mem decl_name: I32;   // word id, or -1
+vec decl_kind: U8;
+vec decl_name: I32;   // word id, or -1
 export mem decl_node: I32;   // the node that declares it
 export mem decl_owner: I32;  // the declaration it is part of (module, struct, enum, function), or -1
 // Module: its promoted type (`&`), or -1. ModuleParam: its index. Fn: the
 // type it is a method or operator of, or -1. Alias: the module it names.
 // Field: its index.
-mem decl_a: I32;
+vec decl_a: I32;
 
 // The declaration a name node refers to, by node; -1 for none.
 export mem node_decl: I32;
@@ -175,16 +175,18 @@ enum(U8) Diag:
     | HostAltArm
     | HostAltClass
     | DslError
+    | TooManyMems
+    | VecHost
 
 // A diagnostic: its kind, the node it is about, a word, and up to three
 // more arguments (types, counts, declarations) its message is made from
 // (see diag.utu).
-mem diag_kind: U8;
-mem diag_node: I32;
-mem diag_word: I32;
-mem diag_a: I32;
-mem diag_b: I32;
-mem diag_c: I32;
+vec diag_kind: U8;
+vec diag_node: I32;
+vec diag_word: I32;
+vec diag_a: I32;
+vec diag_b: I32;
+vec diag_c: I32;
 
 fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1, -1, -1); }
 
@@ -233,10 +235,10 @@ enum(U8) Space:
 
 // Open addressing; a slot is empty when its key is -1. `member_fill[0]`
 // counts the slots in use.
-mem member_owner: I32;
-mem member_key: I32;
-mem member_decl: I32;
-mem member_fill: I32;
+vec member_owner: I32;
+vec member_key: I32;
+vec member_decl: I32;
+vec member_fill: I32;
 
 fn member_slot(owner: I32, key: I32) I32 {
     let mask = member_key.len() - 1;
@@ -299,10 +301,10 @@ fn member(owner: I32, name: I32, space: Space) I32 {
 
 // ── Scopes ──
 
-mem bind_word: I32;
-mem bind_decl: I32;
-mem bind_prev: I32;  // the binding this one hides, or -1
-mem word_top: I32;   // by word id: the innermost binding, or -1
+vec bind_word: I32;
+vec bind_decl: I32;
+vec bind_prev: I32;  // the binding this one hides, or -1
+vec word_top: I32;   // by word id: the innermost binding, or -1
 
 fn bind(word: I32, decl: I32) void {
     if word < 0 { return; };
@@ -693,12 +695,12 @@ fn resolve_names() I32 {
 
 // Resolution's diagnostics, kept so each build (exports, tests, @comptime)
 // starts from them and drops what is outside it.
-mem saved_kind: U8;
-mem saved_node: I32;
-mem saved_word: I32;
-mem saved_a: I32;
-mem saved_b: I32;
-mem saved_c: I32;
+vec saved_kind: U8;
+vec saved_node: I32;
+vec saved_word: I32;
+vec saved_a: I32;
+vec saved_b: I32;
+vec saved_c: I32;
 
 fn save_diagnostics() void {
     let n = diag_kind.len();

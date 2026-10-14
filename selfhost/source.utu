@@ -23,30 +23,30 @@ fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or f
 // Files whose top-level declarations are the program's (not only modules).
 fn declares_items(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Generated.to_i32(); }
 
-mem file_start: I32;    // first byte in `src`
-mem file_end: I32;      // the end byte after its last
-mem file_role: U8;
-mem file_tok: I32;      // first token
-mem file_tok_end: I32;  // after its last (End or Error)
-mem file_root: I32;     // its source file node, or -1 until it parses
-mem file_error: I32;    // the token its parse error is at, or -1
-mem file_wanted: I32;   // and the word of what the parser wanted there, or -1
+vec file_start: I32;    // first byte in `src`
+vec file_end: I32;      // the end byte after its last
+vec file_role: U8;
+vec file_tok: I32;      // first token
+vec file_tok_end: I32;  // after its last (End or Error)
+vec file_root: I32;     // its source file node, or -1 until it parses
+vec file_error: I32;    // the token its parse error is at, or -1
+vec file_wanted: I32;   // and the word of what the parser wanted there, or -1
 
 // `using M from "…"`, in the order files are parsed.
-mem import_file: I32;   // the file that imports
-mem import_node: I32;   // the using declaration
-mem import_path: I32;   // the node naming the file (a string or platform path)
-mem import_target: I32; // the file it names, once the host binds it, else -1 (-2: host declarations)
+vec import_file: I32;   // the file that imports
+vec import_node: I32;   // the using declaration
+vec import_path: I32;   // the node naming the file (a string or platform path)
+vec import_target: I32; // the file it names, once the host binds it, else -1 (-2: host declarations)
 // The import the host could not read, which ends the build (as in stage
 // 0), or -1; and the path the host looked for, a span of src.
-mem missing_import: I32 = [-1];
-mem missing_start: I32 = [0];
-mem missing_end: I32 = [0];
+vec missing_import: I32 = [-1];
+vec missing_start: I32 = [0];
+vec missing_end: I32 = [0];
 
 // What the host sealed (see `seal` in lib.utu) besides host declarations:
 // the standard library's prelude, parsed. Its words, tokens, nodes, files,
 // imports, and DSL sites are the first of each, by count.
-mem kept: I32 = [0, 0, 0, 0, 0, 0];
+vec kept: I32 = [0, 0, 0, 0, 0, 0];
 
 // Keep nothing for the programs that follow.
 fn unseal() void {

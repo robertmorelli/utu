@@ -57,6 +57,7 @@ export function walkMemDecl(n, doc, source, dispatch) {
   if (kind) node.setAttribute('kind', text(kind));
   if (n.childForFieldName('export')) node.setAttribute('export', 'true');
   if (n.childForFieldName('const')) node.setAttribute('const', 'true');
+  if (n.childForFieldName('vec')) node.setAttribute('vec', 'true');
   const init = n.childForFieldName('init');
   if (init) node.appendChild(dispatch(init, doc, source));
   return node;

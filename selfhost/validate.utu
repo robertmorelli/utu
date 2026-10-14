@@ -21,7 +21,7 @@ fn validate_distinct(node: I32) void {
 // A variant's value counts up from 0, or from the previous `= n`; each fits
 // the representation, and no two are equal.
 
-mem variant_value: I32;  // by declaration (a variant of an integer enum): its value
+vec variant_value: I32;  // by declaration (a variant of an integer enum): its value
 
 fn int_enum_values() void {
     variant_value.resize(decl_kind.len());
@@ -176,7 +176,7 @@ fn validate_tree(node: I32) void {
     validate_within(node);
 }
 
-mem validated_kinds: U8;  // by Node: 1 for those validate_node checks
+vec validated_kinds: U8;  // by Node: 1 for those validate_node checks
 
 fn validate_within(node: I32) void {
     if validated_kinds[node_kind[node]] == 1 { validate_node(node); };
@@ -381,7 +381,7 @@ fn validate_await(node: I32) void {
 // a new node's children are new, and where a graft hangs a node somewhere
 // else, it says so (set_parent).
 
-mem node_parent: I32;
+vec node_parent: I32;
 
 fn parent_of(node: I32) I32 {
     let n = node_kind.len();

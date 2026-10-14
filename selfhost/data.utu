@@ -508,8 +508,8 @@ fn reorders(x: I32) Bool {
 // one per type. They are built here, with their own locals, outside the
 // function being checked.
 
-mem slice_helper: I32;   // pairs: array heap type, function
-mem codes_helper: I32;
+vec slice_helper: I32;   // pairs: array heap type, function
+vec codes_helper: I32;
 
 // A helper function's locals after its parameters: value types in local_types.
 fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {

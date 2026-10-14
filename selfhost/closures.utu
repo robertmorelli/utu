@@ -16,10 +16,10 @@
 // the closures share: they see each other's writes and the function's, as
 // stage 0 arranges.
 
-mem decl_boxed: U8;          // by declaration: 1 when its local holds a box
-mem box_types: I32;          // pairs: value type, its box struct type
-mem closure_calls: I32;      // pairs: wasm function type of the call, its import
-mem closure_new_func: I32;   // [0]: the closure_new import, or -1
+vec decl_boxed: U8;          // by declaration: 1 when its local holds a box
+vec box_types: I32;          // pairs: value type, its box struct type
+vec closure_calls: I32;      // pairs: wasm function type of the call, its import
+vec closure_new_func: I32;   // [0]: the closure_new import, or -1
 
 fn reset_closures() void {
     decl_boxed.resize(decl_kind.len());
@@ -76,7 +76,7 @@ fn collect_captures(node: I32, closure: I32) void {
 }
 
 // The start of the list being built (vl_begin's mark), for collect_captures.
-mem capture_mark: I32;
+vec capture_mark: I32;
 
 fn vl_pending_mark() I32 { capture_mark[capture_mark.len() - 1]; }
 
@@ -91,7 +91,7 @@ fn mark_boxes(body: I32) void {
 
 // By node: 1 when a closure is in it (itself included), counted once for
 // the nodes there are; find_closures skips what has none.
-mem closure_below: U8;
+vec closure_below: U8;
 
 fn has_closure(node: I32) Bool {
     if closure_below.len() != node_kind.len() {
@@ -261,9 +261,9 @@ fn box_params(decls: I32, params: I32) I32 {
 
 // ── Setting the enclosing function aside ──
 
-mem saved_locals: I32;
-mem saved_marks: I32;   // per saved function: its locals' start in saved_locals, cur_params, next_label, loop entries' start
-mem saved_loops: I32;   // the loop stacks' entries, four per loop
+vec saved_locals: I32;
+vec saved_marks: I32;   // per saved function: its locals' start in saved_locals, cur_params, next_label, loop entries' start
+vec saved_loops: I32;   // the loop stacks' entries, four per loop
 
 fn save_function() void {
     saved_marks.push(function_defers[0]);

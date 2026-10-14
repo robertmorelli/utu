@@ -11,6 +11,7 @@
 import { expandType, isNumeric, none, signatureType, unreachable } from './types.js';
 
 export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sourceMapUrl) } = {}) {
+  addStartFunction(module);
   const live = liveElements(module);
   const index = assignIndices(module, live);
   const types = collectTypes(module, live);
@@ -46,6 +47,7 @@ export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sour
     ...index.memories.filter(memory => memory.exported).map(memory => ({ name: memory.name, kind: 2, index: index.memory.get(memory.name) })),
   ];
   if (exports.length) section(out, 7, w => w.vec(exports, entry => { w.name(entry.name); w.byte(entry.kind); w.u32(entry.index); }));
+  if (module.start) section(out, 8, w => w.u32(index.function.get(module.start)));
   // Functions used as values must be declared.
   if (live.referenced.size) {
     section(out, 9, w => {
@@ -55,6 +57,9 @@ export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sour
       w.vec([...live.referenced].map(fn => index.function.get(fn.name)).sort((a, b) => a - b), i => w.u32(i));
     });
   }
+  // Instructions that name a data segment need the count first.
+  const passive = module.dataSegments.some(segment => segment.memory == null);
+  if (passive) section(out, 12, w => w.u32(module.dataSegments.length));
   const debug = [];
   if (defined.length) {
     const w = new Writer(1 << 16);
@@ -79,6 +84,14 @@ export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sour
   }
   if (module.dataSegments.length) {
     section(out, 11, w => w.vec(module.dataSegments, segment => {
+      if (segment.memory == null) {
+        // Passive; empty when what it fills is unused.
+        const bytes = segment.used === false ? [] : segment.bytes;
+        w.byte(1);
+        w.u32(bytes.length);
+        w.bytes(bytes);
+        return;
+      }
       const memory = index.memory.get(segment.memory);
       if (memory === 0) w.byte(0);
       else { w.byte(2); w.u32(memory); }
@@ -104,6 +117,20 @@ export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sour
 
 // ── What the exports reach ───────────────────────────────────────────────────
 
+// The arrays with initial contents (Module.addArrayInit) that the exports
+// reach are filled by a start function; the others' segments are left empty.
+export function addStartFunction(module) {
+  if (!module.arrayInits.length || module.start) return;
+  const live = liveElements(module);
+  const inits = module.arrayInits.filter(init => live.globals.has(module.globalsByName.get(init.global)));
+  for (const init of module.arrayInits) module.dataSegments[init.segment].used = inits.includes(init);
+  if (!inits.length) return;
+  const m = module;
+  m.addFunction('__start', none, none, [], m.block(null, inits.map(({ global, heapType, segment, count }) =>
+    m.array.init_data(heapType, segment, m.global.get(global), m.i32.const(0), m.i32.const(0), m.i32.const(count)))));
+  m.start = '__start';
+}
+
 export function liveElements(module) {
   const functions = new Set();
   const globals = new Set();
@@ -126,6 +153,7 @@ export function liveElements(module) {
     if (global.init) pending.push(global.init);
   };
   for (const entry of module.exports) useFunction(entry.internal);
+  if (module.start) useFunction(module.start);
   while (pending.length) {
     const stack = [pending.pop()];
     while (stack.length) {
@@ -563,6 +591,10 @@ class CodeWriter {
         w.byte(GC); w.u32(14); w.u32(this.typeIndexOf(e.kids[0].type.heap));
         return;
       case 'array.len': if (this.operands(e.kids)) { w.byte(GC); w.u32(15); } return;
+      case 'array.init_data':
+        if (!this.operands(e.kids)) return;
+        w.byte(GC); w.u32(18); w.u32(this.typeIndexOf(e.heapType)); w.u32(e.segment);
+        return;
       case 'array.copy':
         if (!this.operands(e.kids)) return;
         w.byte(GC); w.u32(17); w.u32(this.typeIndexOf(e.kids[0].type.heap)); w.u32(this.typeIndexOf(e.kids[2].type.heap));

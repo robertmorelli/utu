@@ -7,10 +7,10 @@
 // The bodies go into the module's `utu` custom section as JSON, in the form
 // src/runtime/host-imports.js reads: `{"es":{"es":{"__es_0":"…"}}}`.
 
-mem decl_es: I32;     // by declaration: its imported function, or -1
-mem es_func: I32;     // the @es imports (and host declarations' operations), in order
-mem es_start: I32;    // the JS of each: a span of src
-mem es_end: I32;
+vec decl_es: I32;     // by declaration: its imported function, or -1
+vec es_func: I32;     // the @es imports (and host declarations' operations), in order
+vec es_start: I32;    // the JS of each: a span of src
+vec es_end: I32;
 
 fn reset_host() void {
     decl_es.resize(decl_kind.len());

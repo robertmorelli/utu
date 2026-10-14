@@ -154,7 +154,7 @@ const ITERATOR_FORMS = new Map([
 // Every keyword in the grammar. Where tree-sitter's lexer may produce any of
 // them (it shares lex states between parse states), a name cannot be one:
 // module type parameters and the type names of match and alt patterns.
-const KEYWORDS = new Set(['mod', 'using', 'tag', 'rec', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'export', 'const',
+const KEYWORDS = new Set(['mod', 'using', 'tag', 'rec', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'vec', 'export', 'const',
   'type', 'distinct', 'lib', 'main', 'test', 'bench', 'measure', 'in', 'out', 'get', 'set', 'yield', 'void', 'fun', 'cl',
   'from', ...ITERATOR_FORMS.keys(), 'await', 'new', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote',
   'try', 'catch', 'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'prune', 'true',
@@ -380,7 +380,7 @@ class Parser {
       case 'proto': return [this.protoDecl()];
       case 'fn': return [this.fnOrOpDecl()];
       case 'let': return [this.globalDecl(), this.expectPunct(';')];
-      case 'mem': case 'const': return [this.memDecl(), this.expectPunct(';')];
+      case 'mem': case 'vec': case 'const': return [this.memDecl(), this.expectPunct(';')];
       case 'type': return [this.distinctDecl(), this.expectPunct(';')];
       case 'export': {
         const after = this.peekWordAfter('export');
@@ -662,9 +662,12 @@ class Parser {
 
   memDecl() {
     const pairs = [];
-    if (this.isWord('export')) pairs.push([this.token('export'), 'export']);
+    const exported = this.isWord('export');
+    if (exported) pairs.push([this.token('export'), 'export']);
     if (this.isWord('const')) pairs.push([this.token('const'), 'const']);
-    pairs.push([this.expectKeyword('mem')], [this.identifier()], [this.expectPunct(':')], [this.typeIdent()]);
+    // A vec is never exported: the host cannot see it.
+    pairs.push(!exported && this.isWord('vec') ? [this.token('vec'), 'vec'] : [this.expectKeyword('mem')]);
+    pairs.push([this.identifier()], [this.expectPunct(':')], [this.typeIdent()]);
     if (this.isPunct('=')) pairs.push([this.token('=')], [this.expression(), 'init']);
     return this.fielded('mem_decl', pairs);
   }

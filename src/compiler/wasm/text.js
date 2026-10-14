@@ -4,10 +4,11 @@
 // functions, globals, and memories by their names, types by index, labels
 // and locals as written.
 
-import { assignIndices, collectTypes, liveElements } from './encode.js';
+import { addStartFunction, assignIndices, collectTypes, liveElements } from './encode.js';
 import { expandType, none, unreachable } from './types.js';
 
 export function printModule(module) {
+  addStartFunction(module);
   const live = liveElements(module);
   const index = assignIndices(module, live);
   const groups = collectTypes(module, live);
@@ -36,12 +37,13 @@ export function printModule(module) {
   }
   for (const segment of module.dataSegments) {
     const bytes = [...segment.bytes].map(byte => `\\${byte.toString(16).padStart(2, '0')}`).join('');
-    lines.push(` (data (memory $${segment.memory}) (i32.const ${segment.offset}) "${bytes}")`);
+    lines.push(segment.memory == null ? ` (data "${bytes}")` : ` (data (memory $${segment.memory}) (i32.const ${segment.offset}) "${bytes}")`);
   }
   for (const global of index.globals.filter(global => !global.import)) {
     lines.push(` (global $${global.name} ${p.globalType(global)} ${p.expression(global.init, '').trimStart()})`);
   }
   for (const entry of module.exports) lines.push(` (export ${quote(entry.name)} (func $${entry.internal}))`);
+  if (module.start) lines.push(` (start $${module.start})`);
   if (live.referenced.size) lines.push(` (elem declare func ${[...live.referenced].map(fn => `$${fn.name}`).join(' ')})`);
   for (const fn of index.functions.filter(fn => !fn.import)) lines.push(p.function(fn));
   lines.push(')');
@@ -178,6 +180,7 @@ class Printer {
       case 'array.new': case 'array.new_default': return `${e.op} ${this.heapType(e.heapType)}`;
       case 'array.new_fixed': return `array.new_fixed ${this.heapType(e.heapType)} ${e.kids.length}`;
       case 'array.get': case 'array.set': return `${e.op} ${this.heapType(e.kids[0].type.heap ?? e.kids[0].type)}`;
+      case 'array.init_data': return `array.init_data ${this.heapType(e.heapType)} ${e.segment}`;
       case 'array.copy': return `array.copy ${this.heapType(e.kids[0].type.heap ?? e.kids[0].type)} ${this.heapType(e.kids[2].type.heap ?? e.kids[2].type)}`;
       case 'tuple.make': return `tuple.make ${e.kids.length}`;
       case 'tuple.extract': return `tuple.extract ${expandType(e.kids[0].type).length} ${e.index}`;

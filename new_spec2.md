@@ -720,10 +720,35 @@ first.
 
 A `mem` is not a value: it cannot be stored, passed, or returned, and a local
 or parameter of the same name hides it. Only top-level declarations are
-allowed, because each one is a memory of the module. The host reads and writes
+allowed, because each one is a memory of the module, and a module has at most
+100 memories (the JS API's limit): a program with more mems does not compile.
+Declare the others as `vec`. The host reads and writes
 an `export mem` through its `ArrayBuffer` (for example `TextEncoder.encodeInto`),
 re-creating views after the memory grows. Measurements:
 `benchmarks/control-flow/README.md`.
+
+---
+
+## Growable arrays (`vec`)
+
+A top-level `vec` is the same array as a `mem`, held in a WasmGC array instead
+of a memory. A program may declare any number; the host cannot see one.
+
+```
+vec node_kind: U8;                     // an array, starts empty
+const vec dfa: U8 = @comptime/\ build_dfa() \/;
+```
+
+It has a mem's element kinds, initializers, methods, and `const`, except
+`copy_in` and `view`, and it is never exported. Element `i` is `array[i]`.
+Its capacity (`cap()`) is the array's length: its initial contents' count,
+and when it must grow, the larger of what is needed and twice what it was
+(the elements are copied to the new array). Wasm checks each access against
+the capacity: past it, an access traps; past `len()` but within it, an
+access reads or writes whatever is there.
+
+An index or stored value is evaluated before the array is read, so
+`v[f()] = g()` reaches the array as `f` and `g` left it, though they push to `v`.
 
 ---
 

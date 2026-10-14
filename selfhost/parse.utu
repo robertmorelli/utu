@@ -163,6 +163,7 @@ enum(U8) Kw:
     | Fn
     | Let
     | Mem
+    | Vec
     | Export
     | Const
     | Type
@@ -253,17 +254,17 @@ export mem node_first: I32;
 export mem node_last: I32;
 export mem node_child: I32;
 export mem node_next: I32;
-mem pending: I32;
+vec pending: I32;
 
 let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/;
 
 // Give up: the program is not one this parser accepts. The furthest token
 // any attempt failed at is where the error is reported, with what the
 // attempts that got that far wanted there.
-mem parse_furthest: I32 = [0];
-mem parse_expected: I32;        // at the furthest token: Tok kinds, and keywords as kw_wanted + their word
-mem parse_error_at: I32 = [0];  // the token a failed parse reports
-mem parse_error_wanted: I32 = [-1];  // and the word of what it wanted there ("';' or '}'"), or -1
+vec parse_furthest: I32 = [0];
+vec parse_expected: I32;        // at the furthest token: Tok kinds, and keywords as kw_wanted + their word
+vec parse_error_at: I32 = [0];  // the token a failed parse reports
+vec parse_error_wanted: I32 = [-1];  // and the word of what it wanted there ("';' or '}'"), or -1
 
 let kw_wanted: I32 = 1000;
 
@@ -470,7 +471,7 @@ fn item(p: Parser) void {
     if w == Kw.Proto.to_i32() { proto_decl(p); return; };
     if w == Kw.Fn.to_i32() { fn_or_op_decl(p); return; };
     if w == Kw.Let.to_i32() { global_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Mem.to_i32() or w == Kw.Const.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Mem.to_i32() or w == Kw.Vec.to_i32() or w == Kw.Const.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
     if w == Kw.Type.to_i32() { distinct_decl(p); expect(p, Tok.Semi); return; };
     if w == Kw.Export.to_i32() {
         let after = tok_word[ptok[p.pos + 1]];
@@ -820,9 +821,11 @@ fn global_decl(p: Parser) I32 {
 fn mem_decl(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
-    if is_kw(p, Kw.Export) { advance(p); };
+    let exported = is_kw(p, Kw.Export);
+    if exported { advance(p); };
     if is_kw(p, Kw.Const) { advance(p); };
-    expect_kw(p, Kw.Mem);
+    // A vec is never exported: the host cannot see it.
+    if not exported and is_kw(p, Kw.Vec) { advance(p); } else { expect_kw(p, Kw.Mem); };
     identifier(p);
     expect(p, Tok.Colon);
     type_ident(p);
@@ -1973,7 +1976,7 @@ fn token_spans(before: I32, root: I32, first: I32, end_: I32) void {
 // in source order, so one walk down the tree places them all. Only the
 // parser's differential asks for them (comment_nodes): nothing compiling a
 // program reads them, so its tree is without them, and walking it skips none.
-mem comment_nodes: I32 = [0];
+vec comment_nodes: I32 = [0];
 
 struct Comments:
     | next: I32

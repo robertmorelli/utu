@@ -13,20 +13,20 @@
 // object and array ends (found by bisection, not by scanning it); and, for
 // a large object, its keys (hashed, built when it is first looked into).
 
-mem abi_doc_types: I32;   // by document: its first entry in abi_type_at
-mem abi_doc_count: I32;   // by document: its number of types
-mem abi_type_at: I32;     // each type's JSON object, by document, in order
-mem abi_type_ready: U8;   // by entry of abi_type_at: 1 once its containers are indexed
+vec abi_doc_types: I32;   // by document: its first entry in abi_type_at
+vec abi_doc_count: I32;   // by document: its number of types
+vec abi_type_at: I32;     // each type's JSON object, by document, in order
+vec abi_type_ready: U8;   // by entry of abi_type_at: 1 once its containers are indexed
 export mem abi_offsets: I32;   // where the host says a document's types are
 
-mem view_doc: I32;        // by view: its document
-mem view_json: I32;       // by view: its JSON object
-mem view_prefix: I32;     // by view: its prefix, a word (`Browser`)
-mem view_import: I32;     // by view: the import it serves, or -1
+vec view_doc: I32;        // by view: its document
+vec view_json: I32;       // by view: its JSON object
+vec view_prefix: I32;     // by view: its prefix, a word (`Browser`)
+vec view_import: I32;     // by view: the import it serves, or -1
 
 // The bytes of src that host declarations sealed with abi_seal fill (from
 // 0), kept from program to program; 0 when none are.
-mem abi_kept: I32 = [0];
+vec abi_kept: I32 = [0];
 
 fn reset_abi() void {
     jbr_open.clear();
@@ -276,10 +276,10 @@ fn jtext_word(at: I32) I32 { src.intern(at, jend(at)); }
 //
 // For each object and array of a view, and of each type used: its start,
 // and the offset after its end, hashed by its start.
-mem jbr_open: I32;
-mem jbr_close: I32;
-mem jbr_table: I32;   // open addressing: entry, or -1
-mem jbr_stack: I32;
+vec jbr_open: I32;
+vec jbr_close: I32;
+vec jbr_table: I32;   // open addressing: entry, or -1
+vec jbr_stack: I32;
 
 fn jbrackets(at: I32) void {
     if not (src[at] == 123 or src[at] == 91) { return; };
@@ -342,11 +342,11 @@ fn jbr_end(at: I32) I32 {
 // its keys hashed the first time one is looked up: (object, key) → value.
 let jk_large: I32 = 4096;
 
-mem jk_table: I32;     // open addressing: entry, or -1
-mem jk_obj: I32;       // by entry: the object
-mem jk_key: I32;       // by entry: its key (a JSON string)
-mem jk_val: I32;       // by entry: the value
-mem jk_indexed: I32;   // the objects indexed
+vec jk_table: I32;     // open addressing: entry, or -1
+vec jk_obj: I32;       // by entry: the object
+vec jk_key: I32;       // by entry: its key (a JSON string)
+vec jk_val: I32;       // by entry: the value
+vec jk_indexed: I32;   // the objects indexed
 
 // (An array of strings is indexed the same way, each string its own key and value.)
 fn jkeyed(at: I32) Bool {

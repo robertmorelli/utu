@@ -1,5 +1,9 @@
 // Memory arrays: `mem name: U8;` at the top level declares a resizable array
-// of scalars that is its own wasm linear memory.
+// of scalars that is its own wasm linear memory. A module has at most 100
+// memories (the JS API's limit), so a program declares at most 100 mems.
+// `vec name: U8;` declares the same array as a WasmGC array instead: any
+// number of them, but the host cannot see one (no export, copy_in, or view),
+// and its capacity is the array's length (codegen/memories.js).
 //
 //   name[i]              read element i (narrow kinds widen to I32)
 //   name[i] = v          write element i (narrow kinds keep the low bits)
@@ -76,6 +80,8 @@ const VIEWS = {
   U32: 'Uint32Array', I64: 'BigInt64Array', U64: 'BigUint64Array', F32: 'Float32Array', F64: 'Float64Array',
 };
 const SCOPES = 'ir-fn, ir-closure, ir-export-main, ir-test, ir-bench';
+// The memories a module may have (the JS API's limit).
+const MAX_MEMORIES = 100;
 
 export async function lowerMems(doc, parser, createDocument, { readBinaryFile = null, resolvePath = null, evaluateComptime = null } = {}) {
   const root = doc.body.firstChild;
@@ -89,17 +95,25 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
   for (const decl of decls) {
     const name = decl.getAttribute('name');
     const declared = decl.getAttribute('kind');
+    const vec = decl.getAttribute('vec') === 'true';
+    const word = vec ? 'vec' : 'mem';
     const kind = MEM_KINDS[declared] ? declared : intEnums[declared];
     if (!kind) {
       throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_TYPE,
-        `mem ${name} stores ${declared}; a mem holds an integer enum, a distinct type, or one of ${Object.keys(MEM_KINDS).join(', ')}`, decl);
+        `${word} ${name} stores ${declared}; a ${word} holds an integer enum, a distinct type, or one of ${Object.keys(MEM_KINDS).join(', ')}`, decl);
     }
-    if (mems.has(name)) throw compilerError(DIAGNOSTIC_KINDS.DUPLICATE_DECLARATION, `mem ${name} is declared twice`, decl);
+    if (mems.has(name)) throw compilerError(DIAGNOSTIC_KINDS.DUPLICATE_DECLARATION, `${word} ${name} is declared twice`, decl);
     if (root.querySelector(`:scope > ir-fn[name="${name}"], :scope > ir-global[name="${name}"]`)) {
-      throw compilerError(DIAGNOSTIC_KINDS.DUPLICATE_DECLARATION, `mem ${name} has the same name as a top-level function or global`, decl);
+      throw compilerError(DIAGNOSTIC_KINDS.DUPLICATE_DECLARATION, `${word} ${name} has the same name as a top-level function or global`, decl);
     }
     mems.set(name, { name, kind, value: MEM_KINDS[declared] ?? declared, export: decl.getAttribute('export') === 'true',
-      constant: decl.getAttribute('const') === 'true', prefix: `__mem_${name}_`, decl });
+      constant: decl.getAttribute('const') === 'true', prefix: `__mem_${name}_`, decl, vec, word });
+  }
+  // Each mem is a memory of the module: at most MAX_MEMORIES of them.
+  const memories = [...mems.values()].filter(mem => !mem.vec);
+  if (memories.length > MAX_MEMORIES) {
+    throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+      `mem ${memories[MAX_MEMORIES].name} is one mem too many: a module has at most ${MAX_MEMORIES} memories; declare the others as vec`, memories[MAX_MEMORIES].decl);
   }
   // Every @comptime mem of the program is evaluated by one extra compilation.
   const comptime = [...mems.values()].filter(mem => mem.decl.firstElementChild?.localName === 'ir-dsl'
@@ -133,23 +147,27 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
     if (!mem || hidden.has(access)) continue;
     if (INTERN_METHODS.has(method)) {
       if (mem.kind !== 'U8' && mem.kind !== 'I8') {
-        throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_METHOD, `mem ${mem.name}.${method}: only byte mems (U8, I8) intern spans`, access);
+        throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_METHOD, `${mem.word} ${mem.name}.${method}: only byte ${mem.word}s (U8, I8) intern spans`, access);
       }
       mem.interner = true;
       continue;
     }
     if (!HOST_METHODS.has(method)) continue;
+    if (mem.vec) {
+      throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_METHOD,
+        `vec ${mem.name} has no method '${method}': the host cannot see a vec; declare it as a mem`, access);
+    }
     mem.host = true;
     if (method === 'view' && !jsName) {
       throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_TYPE,
         `${mem.name}.view() returns a JS.${VIEWS[mem.kind]}; add \`using JS from std:JS;\``, access);
     }
   }
-  // An interning mem gets four hidden I32 mems and the functions that use them.
+  // An interning mem gets four hidden I32 vecs and the functions that use them.
   for (const mem of [...mems.values()].filter(mem => mem.interner)) {
     for (const part of ['slots', 'starts', 'sizes', 'hashes']) {
       const name = `__${mem.name}_${part}`;
-      mems.set(name, { name, kind: 'I32', value: 'I32', prefix: `__mem_${name}_`, decl: mem.decl, hidden: true });
+      mems.set(name, { name, kind: 'I32', value: 'I32', prefix: `__mem_${name}_`, decl: mem.decl, hidden: true, vec: true, word: 'vec' });
     }
   }
   for (const mem of mems.values()) {
@@ -165,8 +183,8 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
       ?.replaceWith(foreignTypeRef(doc, VIEWS[mem.kind], view));
     mem.decl.replaceWith(...decls);
   }
-  root.setAttribute('data-mems', JSON.stringify([...mems.values()].map(({ name, kind, export: exported, host, data, count }) =>
-    ({ name, kind, export: exported, host: Boolean(host), ...(data ? { data, count } : {}) }))));
+  root.setAttribute('data-mems', JSON.stringify([...mems.values()].map(({ name, kind, export: exported, host, data, count, vec }) =>
+    ({ name, kind, export: exported, host: Boolean(host), ...(vec ? { vec: true } : {}), ...(data ? { data, count } : {}) }))));
 
   // The wrappers declared parameters of their own.
   hidden = shadowedUses(root, new Set(mems.keys()));
@@ -188,7 +206,7 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
       const mem = memOf(target.firstElementChild);
       if (!mem) continue;
       const index = indexOf(target, mem);
-      if (mem.constant) throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name} is const; it cannot be written`, node);
+      if (mem.constant) throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `${mem.word} ${mem.name} is const; it cannot be written`, node);
       const op = node.getAttribute('op') ?? '=';
       replace(node, op === '='
         ? `${mem.prefix}set(${splice(index)}, ${splice(value)})`
@@ -207,10 +225,10 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
       const method = callee.getAttribute('field');
       if (!METHODS.has(method)) {
         throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_METHOD,
-          `mem ${mem.name} has no method '${method}'; it has ${[...METHODS].join(', ')}`, callee);
+          `${mem.word} ${mem.name} has no method '${method}'; it has ${[...METHODS].filter(m => !mem.vec || !HOST_METHODS.has(m)).join(', ')}`, callee);
       }
       if (mem.constant && WRITES.has(method)) {
-        throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name} is const; it has no ${method}`, callee);
+        throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `${mem.word} ${mem.name} is const; it has no ${method}`, callee);
       }
       const args = [...(childOf(node, 'ir-arg-list')?.children ?? [])];
       replace(node, `${mem.prefix}${method}(${args.map(splice).join(', ')})`, splices);
@@ -219,7 +237,7 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
 
   for (const slice of root.querySelectorAll('ir-slice')) {
     const mem = memOf(slice.firstElementChild);
-    if (mem) throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name} takes one index: ${mem.name}[i]`, slice);
+    if (mem) throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `${mem.word} ${mem.name} takes one index: ${mem.name}[i]`, slice);
   }
   // Rewriting cloned the operands it spliced in, so mark their uses again.
   hidden = shadowedUses(root, new Set(mems.keys()));
@@ -227,14 +245,14 @@ export async function lowerMems(doc, parser, createDocument, { readBinaryFile = 
     const mem = memOf(ident);
     if (mem && ident.closest(SCOPES)) {
       throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH,
-        `mem ${mem.name} is not a value; use ${mem.name}[i], ${mem.name}[i] = v, or ${mem.name}.len()`, ident);
+        `${mem.word} ${mem.name} is not a value; use ${mem.name}[i], ${mem.name}[i] = v, or ${mem.name}.len()`, ident);
     }
   }
 }
 
 /** The initializer's values: numbers, BigInts for 64-bit kinds, or raw bytes for @embed. */
 async function initialValues(mem, init, { doc, readBinaryFile, resolvePath }) {
-  const fail = message => compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name}: ${message}`, init);
+  const fail = message => compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `${mem.word} ${mem.name}: ${message}`, init);
   if (init.localName === 'ir-array-lit') {
     return [...init.children].map(element => {
       let negate = false, lit = element;
@@ -297,7 +315,7 @@ function comptimeProgram(doc, parser) {
 
 function encode(mem, values, init) {
   if (values.bytes) return values.bytes;
-  const fail = message => compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name}: ${message}`, init);
+  const fail = message => compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `${mem.word} ${mem.name}: ${message}`, init);
   const size = 1 << SHIFTS[mem.kind];
   const view = new DataView(new ArrayBuffer(values.length * size));
   values.forEach((value, i) => {
@@ -391,7 +409,7 @@ function foreignTypeRef(doc, name, site) {
 
 function indexOf(node, mem) {
   if (node.children.length !== 2) {
-    throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `mem ${mem.name} takes one index: ${mem.name}[i]`, node);
+    throw compilerError(DIAGNOSTIC_KINDS.TYPE_MISMATCH, `${mem.word} ${mem.name} takes one index: ${mem.name}[i]`, node);
   }
   return node.children[1];
 }
@@ -424,8 +442,8 @@ function shadowedUses(root, memNames) {
   return hidden;
 }
 
-function wrappers({ name, kind, value, prefix, host }, jsName) {
-  const op = (tag, ...args) => `@ir/\\ <ir-mem-${tag} mem="${name}" kind="${kind}">${args.map(arg => `<ir-ident name="${arg}"/>`).join('')}</ir-mem-${tag}> \\/;`;
+function wrappers({ name, kind, value, prefix, host, vec }, jsName) {
+  const op = (tag, ...args) => `@ir/\\ <ir-mem-${tag} mem="${name}" kind="${kind}"${vec ? ' vec="true"' : ''}>${args.map(arg => `<ir-ident name="${arg}"/>`).join('')}</ir-mem-${tag}> \\/;`;
   return `
 fn ${prefix}get(i: I32) ${value} { ${op('get', 'i')} }
 fn ${prefix}set(i: I32, v: ${value}) void { ${op('set', 'i', 'v')} }

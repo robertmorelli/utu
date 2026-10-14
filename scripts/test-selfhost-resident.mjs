@@ -6,7 +6,7 @@
 // std:Browser, std:JS, std:Web, node: modules, or nothing are built in turns
 // on one compiler, and each must come out as it does on a fresh one. The
 // suite runs it with V8 optimizing early (--wasm-tiering-budget), where a
-// compiler with too many memories crashed (see max_memories in selfhost/mems.utu).
+// compiler with dozens of memories crashed Node 25 (V8 14.1).
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

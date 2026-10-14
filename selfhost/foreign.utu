@@ -26,10 +26,10 @@ struct Ref:
     | at: I32    // a JSON value in src
     | env: I32   // its bindings: a list of (parameter word, at, env) triples, or -1
 
-mem fty_doc: I32;    // by type (Ty.Foreign): its reference
-mem fty_at: I32;
-mem fty_env: I32;
-mem fty_view: I32;   // the view that named it first, for its spelling
+vec fty_doc: I32;    // by type (Ty.Foreign): its reference
+vec fty_at: I32;
+vec fty_env: I32;
+vec fty_view: I32;   // the view that named it first, for its spelling
 
 fn reset_foreign() void {
     fty_doc.clear();
@@ -56,7 +56,7 @@ fn is_foreign(t: I32) Bool { t >= 0 and ty_is(t, Ty.Foreign); }
 fn ref_is(r: Ref, text: Str) Bool { jstring_is_text(r.at, text); }
 
 // A generic parameter's binding, or -1 (its at), with its env in bind_env[0].
-mem bind_env: I32 = [0];
+vec bind_env: I32 = [0];
 
 fn binding_of(env: I32, word: I32) I32 {
     if env < 0 { return -1; };
@@ -149,7 +149,7 @@ fn closed_env(decl: I32, env: I32) I32 {
 }
 
 // The JSON text `"any"`, written once into src.
-mem any_at: I32 = [-1];
+vec any_at: I32 = [-1];
 
 fn any_ref() I32 {
     if any_at[0] < 0 {
@@ -307,7 +307,7 @@ fn union_type(d: Ref, union: I32, view: I32) I32 {
 }
 
 // `?F64` from the host: a JS number or null, held as a host value.
-mem boxed_at: I32;   // by primitive (0 F64, 1 Bool): the JSON `{"boxed":"F64"}`, once
+vec boxed_at: I32;   // by primitive (0 F64, 1 Bool): the JSON `{"boxed":"F64"}`, once
 
 fn boxed_type(t: I32, view: I32) I32 {
     let k = if t == prelude(Prelude.F64) { 0; } else { 1; };
@@ -388,10 +388,10 @@ fn decl_name_text(decl: I32) Str {
 // signature's), or of a view's root (an export). Found, its type is in
 // member_ref, and whether it is read-only in member_readonly.
 
-mem member_doc: I32 = [0];
-mem member_at: I32 = [0];
-mem member_env: I32 = [0];
-mem member_readonly: I32 = [0];
+vec member_doc: I32 = [0];
+vec member_at: I32 = [0];
+vec member_env: I32 = [0];
+vec member_readonly: I32 = [0];
 
 fn member_ref() Ref { Ref { doc: member_doc[0], at: member_at[0], env: member_env[0] }; }
 
@@ -458,8 +458,8 @@ fn foreign_named_type(view: I32, key: I32) I32 {
 // JavaScript stage 0 writes for it (src/compiler/foreign-abi.js), one per
 // signature and body: `(self) => self["value"]`.
 
-mem fop_key: I32;    // by operation: its signature and body, a word
-mem fop_func: I32;   // and its imported function
+vec fop_key: I32;    // by operation: its signature and body, a word
+vec fop_func: I32;   // and its imported function
 
 fn reset_foreign_ops() void {
     fop_key.clear();
@@ -537,7 +537,7 @@ fn foreign_call_op(params: I32, result: I32, body: Str, m: I32) I32 {
 
 // How builds are optimized, as stage 0's `optimize`: 0 none, 1 size (the
 // default), 2 speed.
-mem optimize_level: I32 = [1];
+vec optimize_level: I32 = [1];
 
 // A member operation (a read, write, or call of member `key`; of a view's
 // root when `root`). Size-optimized builds share one import per shape, as
@@ -630,7 +630,7 @@ fn union_has(slot: Ref, union: I32, text: Str) Bool {
 
 // The result an operation gives: a dynamic one becomes the primitive its
 // context expects, checked (result_checked[0] = 1).
-mem result_checked: I32 = [0];
+vec result_checked: I32 = [0];
 
 fn foreign_result(r: Ref, view: I32, expect: I32) I32 {
     result_checked[0] = 0;
@@ -784,7 +784,7 @@ fn foreign_unbox(from: I32, to: I32, checked: Bool) void {
 // How a member is reached in JS: `self["key"]`, or a root's
 // `globalThis["key"]` (a package's, its import), and the prologue that
 // imports it.
-mem access_prologue: I32 = [0];   // a word: the prologue's text ("" for none)
+vec access_prologue: I32 = [0];   // a word: the prologue's text ("" for none)
 
 fn member_access(view: I32, key: I32, root: Bool) Str {
     access_prologue[0] = intern_text("");
@@ -892,7 +892,7 @@ fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx
 // ── Arguments ──
 
 // JSON text written into src once per compile: a primitive's reference.
-mem prim_at: I32;   // 0 Str, 1 F64, 2 Bool, 3 void
+vec prim_at: I32;   // 0 Str, 1 F64, 2 Bool, 3 void
 
 fn prim_ref(t: I32) I32 {
     let k = if t == prelude(Prelude.Str) { 0; } else if t == prelude(Prelude.F64) { 1; } else if t == prelude(Prelude.Bool) { 2; } else { 3; };
@@ -906,9 +906,9 @@ fn prim_ref(t: I32) I32 {
 }
 
 // A utu type as a declaration reference (for a generic binding), or false.
-mem typed_ref_doc: I32 = [0];
-mem typed_ref_at: I32 = [0];
-mem typed_ref_env: I32 = [0];
+vec typed_ref_doc: I32 = [0];
+vec typed_ref_at: I32 = [0];
+vec typed_ref_env: I32 = [0];
 
 fn ref_of_type(t: I32, doc: I32) Bool {
     if is_foreign(t) {
@@ -949,7 +949,7 @@ fn is_record(arg: I32) Bool { is_kind(arg, Node.Implicit_struct_init); }
 fn is_untyped_array(arg: I32) Bool { is_kind(arg, Node.Array_expr); }
 
 // The element a JS array must hold for an array, array-like, or iterable slot, or -1.
-mem element_env: I32 = [0];
+vec element_env: I32 = [0];
 
 fn element_of(slot: Ref, depth: I32) I32 {
     if depth > 8 { return -1; };

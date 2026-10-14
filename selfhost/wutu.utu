@@ -6,23 +6,23 @@
 // (`@reactive`, `@island`), every one goes through the reconciler in
 // std:Wutu, so components can join a view.
 
-mem wu_reconcile: I32 = [0];
-mem wu_site: I32 = [-1];
-mem wu_serial: I32 = [0];
-mem wu_node_count: I32 = [0];
-mem wu_aliases: I32;        // elements with an `as` alias, in order
-mem wu_style_key: I32;      // the site's stylesheets: keys and CSS (words), in order
-mem wu_style_css: I32;
-mem wu_decls: I32;          // the site's helper bindings (words), in order
-mem wu_declared_kind: I32;  // which helpers it has (words), and their names
-mem wu_declared_name: I32;
-mem wu_prefix: I32 = [-1];  // a word
-mem wu_view_hash: I32 = [-1];
+vec wu_reconcile: I32 = [0];
+vec wu_site: I32 = [-1];
+vec wu_serial: I32 = [0];
+vec wu_node_count: I32 = [0];
+vec wu_aliases: I32;        // elements with an `as` alias, in order
+vec wu_style_key: I32;      // the site's stylesheets: keys and CSS (words), in order
+vec wu_style_css: I32;
+vec wu_decls: I32;          // the site's helper bindings (words), in order
+vec wu_declared_kind: I32;  // which helpers it has (words), and their names
+vec wu_declared_name: I32;
+vec wu_prefix: I32 = [-1];  // a word
+vec wu_view_hash: I32 = [-1];
 
 // Island renames: by splice, identifiers that name element aliases.
-mem splice_rename_k: I32;
-mem splice_rename_at: I32;   // the identifier's byte offset
-mem splice_rename_to: I32;   // the alias's element (a word)
+vec splice_rename_k: I32;
+vec splice_rename_at: I32;   // the identifier's byte offset
+vec splice_rename_to: I32;   // the alias's element (a word)
 
 fn wutu_prefix() Str { word_text(wu_prefix[0]); }
 
@@ -34,7 +34,7 @@ fn wutu_reactive_program() Bool {
 }
 
 // Whether the kept nodes have a reactive site: 1 or 0, or -1 until asked.
-mem kept_reactive: I32 = [-1];
+vec kept_reactive: I32 = [-1];
 
 fn reactive_sites(first: I32, last: I32) Bool {
     for (first ..< last) |k| {
@@ -435,7 +435,7 @@ fn event_type(name: Str) Str {
 // attached once their siblings exist: after the template's code, or after
 // an if's or a loop's fragment.
 
-mem wx_events: I32;   // listeners pending (words), in order
+vec wx_events: I32;   // listeners pending (words), in order
 
 fn wutu_element(n: I32, outer_svg: Bool) Str {
     let tag = word_text(tn_text[n]);

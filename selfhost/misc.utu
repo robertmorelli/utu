@@ -136,9 +136,9 @@ fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first:
 // it, in the reverse order of the defers. The deferred expression is
 // checked again at each exit.
 
-mem defer_node: I32;      // the pending defers, innermost last
-mem defer_marks: I32;     // per open block: where its defers start
-mem function_defers: I32; // [0]: where the current function's defers start
+vec defer_node: I32;      // the pending defers, innermost last
+vec defer_marks: I32;     // per open block: where its defers start
+vec function_defers: I32; // [0]: where the current function's defers start
 
 fn reset_defers() void {
     defer_node.clear();
@@ -166,14 +166,14 @@ fn run_defers(from: I32, cx: Cx) void {
 
 // The defers between here and a loop being left (loop_defers holds their
 // start per loop).
-mem loop_defers: I32;        // per loop: the defers a continue runs from
-mem loop_break_defers: I32;  // per loop: the defers a break runs from
+vec loop_defers: I32;        // per loop: the defers a continue runs from
+vec loop_break_defers: I32;  // per loop: the defers a break runs from
 
 // ── Optional chains ──
 
-mem optional_node: I32;   // `a?.b` nodes being checked as a present value
-mem optional_local: I32;  // the local holding it
-mem optional_type: I32;   // its type (not nullable)
+vec optional_node: I32;   // `a?.b` nodes being checked as a present value
+vec optional_local: I32;  // the local holding it
+vec optional_type: I32;   // its type (not nullable)
 
 fn reset_optional() void {
     optional_node.clear();
@@ -237,7 +237,7 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
 
 // Whether the program has an `a?.b` anywhere, counted once for the nodes
 // there are ([0]: how many nodes were looked at, [1]: 1 when one was found).
-mem optionals_seen: I32 = [0, 0];
+vec optionals_seen: I32 = [0, 0];
 
 fn has_optionals() Bool {
     if optionals_seen[0] != node_kind.len() {
@@ -282,8 +282,8 @@ fn check_base(field_node: I32, cx: Cx) I32 {
 // `utu.await_N`, which the host wraps in WebAssembly.Suspending; exports
 // that can reach an await are wrapped in WebAssembly.promising.
 
-mem await_types: I32;   // pairs: value type, its import
-mem promise_ops: I32;   // [then, catch] imports, or -1
+vec await_types: I32;   // pairs: value type, its import
+vec promise_ops: I32;   // [then, catch] imports, or -1
 
 fn reset_promises() void {
     await_types.clear();
@@ -390,7 +390,7 @@ fn write_promise_json() void {
 
 // Exports that reach an await, through calls: they must be entered through
 // WebAssembly.promising for the stack to suspend.
-mem awaiting: U8;
+vec awaiting: U8;
 
 fn write_async_exports() void {
     let n = func_kind.len();

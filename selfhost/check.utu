@@ -11,23 +11,23 @@
 // down: an integer literal becomes the integer or float type expected of
 // it, `null` the nullable type.
 
-mem fi_decl: I32;
-mem fi_inst: I32;
-mem fi_func: I32;     // its wasm function, or -1 for an intrinsic
-mem fi_params: I32;   // a list of parameter types (self first)
-mem fi_result: I32;
-mem fi_ir: I32;       // an intrinsic's @ir tree, else -1
-mem fi_table: I32;    // open addressing over (decl, inst), -1 empty
-mem fi_queue: I32;    // instances to check, in order
+vec fi_decl: I32;
+vec fi_inst: I32;
+vec fi_func: I32;     // its wasm function, or -1 for an intrinsic
+vec fi_params: I32;   // a list of parameter types (self first)
+vec fi_result: I32;
+vec fi_ir: I32;       // an intrinsic's @ir tree, else -1
+vec fi_table: I32;    // open addressing over (decl, inst), -1 empty
+vec fi_queue: I32;    // instances to check, in order
 
 // The function being checked.
-mem decl_local: I32;  // by declaration: its local
-mem decl_ty: I32;     // by declaration: its type (locals and parameters)
-mem cur_locals: I32;  // value types of its locals, parameters first
-mem cur_params: I32;  // [0]: how many of them are parameters
-mem next_label: I32;  // [0]
-mem loop_break: I32;  // per enclosing loop, innermost last
-mem loop_continue: I32;
+vec decl_local: I32;  // by declaration: its local
+vec decl_ty: I32;     // by declaration: its type (locals and parameters)
+vec cur_locals: I32;  // value types of its locals, parameters first
+vec cur_params: I32;  // [0]: how many of them are parameters
+vec next_label: I32;  // [0]
+vec loop_break: I32;  // per enclosing loop, innermost last
+vec loop_continue: I32;
 
 // Where checking is.
 struct Cx:
@@ -106,8 +106,8 @@ fn fn_debug_name(decl: I32) I32 {
 }
 
 // A function's parameter types (self first) and result type, in an instance.
-mem sig_params: I32;  // [0]
-mem sig_result: I32;  // [0]
+vec sig_params: I32;  // [0]
+vec sig_result: I32;  // [0]
 
 fn signature(decl: I32, inst: I32) void {
     let node = decl_node[decl];
@@ -344,7 +344,7 @@ fn mismatch(at: I32, expected: I32, actual: I32) void {
 // reported again: the first one counts it, `(+1 caused by this)`. For a
 // TypeMismatch, diag_c is that count (-1 for none).
 
-mem decl_cause: I32;  // by declaration (a let): the mismatch in its initializer, or -1
+vec decl_cause: I32;  // by declaration (a let): the mismatch in its initializer, or -1
 
 fn fold_into(i: I32) void {
     if i < 0 or i >= diag_kind.len() { return; };
@@ -644,7 +644,7 @@ fn check_let(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-mem decl_global: I32;  // by declaration: its wasm global, or -1
+vec decl_global: I32;  // by declaration: its wasm global, or -1
 
 fn global_type(decl: I32) I32 {
     let t = type_of(next_sibling(first_child(decl_node[decl])), 0);
@@ -1213,7 +1213,7 @@ fn has_foreign() Bool {
 }
 
 // The call being checked, for intrinsics' diagnostics.
-mem call_site: I32;
+vec call_site: I32;
 
 // The arguments are on the stack since `m`: call the function, or expand it.
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
@@ -1579,7 +1579,7 @@ fn reset_check() void {
 // module's size in `out`, or -1 when there are diagnostics.
 
 // A test build's tests, in the order of their exports (`__test_0`, …).
-mem test_node: I32;
+vec test_node: I32;
 
 fn compile(target: Target) I32 {
     restore_diagnostics();
@@ -1591,6 +1591,7 @@ fn compile(target: Target) I32 {
     find_prelude_types();
     reset_check();
     validate_program();
+    count_memories();
     keep_target_diagnostics(target);
     // A DSL that does not expand ends the build, as in stage 0: the first
     // the target has is its one diagnostic.

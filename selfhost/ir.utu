@@ -7,15 +7,15 @@
 // is parsed once into a small tree (`x_*`); its tag and attribute names are
 // interned words, so they compare with the names below as ints.
 
-mem x_tag: I32;        // the tag's word id
-mem x_attr_first: I32; // its first attribute, in attr_*
-mem x_attr_count: I32;
-mem x_child: I32;      // first child element, or -1
-mem x_next: I32;       // next sibling element, or -1
-mem attr_name: I32;    // word id
-mem attr_start: I32;   // the value's bytes in src
-mem attr_end: I32;
-mem x_cache: I32;      // by DSL node: its parsed root, -2 before parsing, -1 when it does not parse
+vec x_tag: I32;        // the tag's word id
+vec x_attr_first: I32; // its first attribute, in attr_*
+vec x_attr_count: I32;
+vec x_child: I32;      // first child element, or -1
+vec x_next: I32;       // next sibling element, or -1
+vec attr_name: I32;    // word id
+vec attr_start: I32;   // the value's bytes in src
+vec attr_end: I32;
+vec x_cache: I32;      // by DSL node: its parsed root, -2 before parsing, -1 when it does not parse
 
 fn reset_ir_trees() void {
     x_tag.clear();
@@ -150,8 +150,8 @@ fn x_children(x: I32) I32 {
 // Interned when checking starts, after everything in the files, so each
 // has a word id; `word_opcode` maps a tag's word to its wasm opcode.
 
-mem known: I32;        // by Known: its word id
-mem word_opcode: I32;  // by word id: the opcode of an `ir-…` tag, or -1
+vec known: I32;        // by Known: its word id
+vec word_opcode: I32;  // by word id: the opcode of an `ir-…` tag, or -1
 
 enum(U8) Known:
     | IrIdent
@@ -252,7 +252,7 @@ fn opcode_table() Str {
 }
 
 // Sealed with the prelude (see `seal` in lib.utu): its words are kept, and so the same ids.
-mem known_kept: I32 = [0];
+vec known_kept: I32 = [0];
 
 fn intern_known() void {
     if known_kept[0] == 1 { return; };

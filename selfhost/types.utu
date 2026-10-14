@@ -22,14 +22,14 @@ enum(U8) Ty:
     | Closure   // a: list of parameter types, b: result type
     | Foreign   // a host value (foreign.utu); a: its canonical spelling, a word
 
-mem ty_kind: U8;
-mem ty_a: I32;
-mem ty_b: I32;
-mem ty_table: I32;   // open addressing over types, -1 empty
+vec ty_kind: U8;
+vec ty_a: I32;
+vec ty_b: I32;
+vec ty_table: I32;   // open addressing over types, -1 empty
 
-mem inst_module: I32;
-mem inst_args: I32;  // a list of types
-mem inst_table: I32;
+vec inst_module: I32;
+vec inst_args: I32;  // a list of types
+vec inst_table: I32;
 
 fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 40503; }
 
@@ -154,7 +154,7 @@ fn instance_for(module: I32, inst: I32) I32 {
 // The scalar types and Bool, Str, …, found by name in the program scope
 // when checking starts.
 
-mem prelude_ty: I32;   // by Prelude
+vec prelude_ty: I32;   // by Prelude
 
 enum(U8) Prelude:
     | I32
@@ -353,15 +353,15 @@ fn open_instance(module: I32) I32 {
 // What a type is in wasm. Every reference is nullable, so locals and
 // fields of any type have a default.
 
-mem struct_of_decl: I32;   // (decl, inst) pairs → heap type, searched linearly per decl
-mem struct_inst: I32;
-mem struct_heap: I32;
-mem struct_next: I32;      // the next entry for the same declaration, or -1
-mem struct_first: I32;     // by declaration: its first entry, or -1
+vec struct_of_decl: I32;   // (decl, inst) pairs → heap type, searched linearly per decl
+vec struct_inst: I32;
+vec struct_heap: I32;
+vec struct_next: I32;      // the next entry for the same declaration, or -1
+vec struct_first: I32;     // by declaration: its first entry, or -1
 
 // By type: its representation once known, else -2 (types are interned, so
 // it is asked of the same ids again and again).
-mem repr_memo: I32;
+vec repr_memo: I32;
 
 fn repr(t: I32) I32 {
     if t < repr_memo.len() and repr_memo[t] != -2 { return repr_memo[t]; };

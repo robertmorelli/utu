@@ -12,7 +12,7 @@
 //   made for it (compile with Target.Comptime).
 
 // The generated file being written.
-mem gen_file: I32;   // [0]: its first byte in src, or -1
+vec gen_file: I32;   // [0]: its first byte in src, or -1
 
 fn gen_text(text: Str) void { for (0 ..< text.len()) |i| { src.push(text.get(i)); }; }
 
@@ -42,9 +42,9 @@ fn gen_span(start: I32, end_: I32) void {
 // one more file. Called before names are resolved.
 // Where each @comptime expression's text went in the generated file (a
 // span of src), and its @comptime node, so its mistakes are reported there.
-mem comptime_text_start: I32;
-mem comptime_text_end: I32;
-mem comptime_text_node: I32;
+vec comptime_text_start: I32;
+vec comptime_text_end: I32;
+vec comptime_text_node: I32;
 
 fn generate_sources() void {
     comptime_text_start.clear();
@@ -102,18 +102,44 @@ fn generate_for_mem(item: I32) void {
 
 // The type a @comptime mem's expression gives an Array of: I32 for the
 // narrow kinds and integer enums, else the element type.
+// The value type a @comptime mem's expression builds an array of, as in
+// stage 0: an integer enum's or a distinct type's representation; then I32
+// for the storage kinds narrower than it (U8, I8, U16, I16).
 fn comptime_value_name(elem: I32) Str {
     let w = word_of(elem);
-    if builtin_type(w) { return "I32"; };
-    let d = node_decl[elem];
-    if decl_is(d, Decl.IntEnum) { return "I32"; };
+    let repr = representation_word(w);
+    let kind = if repr >= 0 { repr; } else { w; };
+    if builtin_type(kind) { return "I32"; };
+    if repr >= 0 { return word_text(repr); };
     let text = "";
     for (tok_start[node_first[elem]] ..< tok_end[node_first[elem]]) |i| { text = text + Str.from_code_point(src[i]); };
     text;
 }
 
+// The word of what type `w` is represented as when it is an integer enum
+// (`enum(U8) w`) or a distinct type (`type w = distinct U32`) declared at
+// the top of a file, else -1. Sources are generated before names are
+// resolved, so the declaration is found by its name.
+fn representation_word(w: I32) I32 {
+    for (0 ..< file_root.len()) |file| {
+        let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
+        while (item >= 0) {
+            if is_kind(item, Node.Enum_decl) {
+                let c = first_child(item);
+                if is_kind(c, Node.Nom_qualifier) { c = next_sibling(c); };
+                let name = next_sibling(c);
+                if is_kind(c, Node.Type_ident) and is_kind(name, Node.Type_ident) and word_of(name) == w { return word_of(c); };
+            } else if is_kind(item, Node.Distinct_decl) and word_of(first_child(item)) == w {
+                return word_of(last_child(item));
+            };
+            item = next_sibling(item);
+        };
+    };
+    -1;
+}
+
 fn interner_template() Str {
-    "\nmem __$_slots: I32;\nmem __$_starts: I32;\nmem __$_sizes: I32;\nmem __$_hashes: I32;\n"
+    "\nvec __$_slots: I32;\nvec __$_starts: I32;\nvec __$_sizes: I32;\nvec __$_hashes: I32;\n"
     + "fn __mem_$_intern_reset() void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n"
     + "    __$_starts.clear();\n    __$_sizes.clear();\n    __$_hashes.clear();\n}\n"
     + "fn __mem_$_interned() I32 { __$_starts.len(); }\n"

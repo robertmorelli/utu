@@ -5,44 +5,44 @@
 // items (classes, attributes, events, two-way bindings, CSS, style values).
 // Ranges are offsets in the template's text (the body, inside `/\ … \/`).
 
-mem tn_kind: I32;       // 0 text, 1 expression, 2 if, 3 for, 4 element
-mem tn_start: I32;
-mem tn_parent: I32;
-mem tn_first: I32;      // first child, or -1
-mem tn_next: I32;       // next sibling, or -1
-mem tn_else: I32;       // if: first node of its otherwise branch, or -1
-mem tn_text: I32;       // text: the quoted literal; expression: its source; if: its condition; for: its iterable; element: its tag (words)
-mem tn_from: I32;       // its range, or -1
-mem tn_to: I32;
-mem tn_captures: I32;   // for: its captures (a word)
-mem tn_key: I32;        // for: its key's source (a word), or -1
-mem tn_key_from: I32;
-mem tn_key_to: I32;
-mem tn_global: I32;     // for: whether its key is global
-mem tn_binding: I32;    // element: its `as` alias (a word), or -1
-mem tn_index: I32;      // element: its number, in order
-mem tn_items: I32;      // element: its first item, or -1
-mem tn_items_last: I32;
+vec tn_kind: I32;       // 0 text, 1 expression, 2 if, 3 for, 4 element
+vec tn_start: I32;
+vec tn_parent: I32;
+vec tn_first: I32;      // first child, or -1
+vec tn_next: I32;       // next sibling, or -1
+vec tn_else: I32;       // if: first node of its otherwise branch, or -1
+vec tn_text: I32;       // text: the quoted literal; expression: its source; if: its condition; for: its iterable; element: its tag (words)
+vec tn_from: I32;       // its range, or -1
+vec tn_to: I32;
+vec tn_captures: I32;   // for: its captures (a word)
+vec tn_key: I32;        // for: its key's source (a word), or -1
+vec tn_key_from: I32;
+vec tn_key_to: I32;
+vec tn_global: I32;     // for: whether its key is global
+vec tn_binding: I32;    // element: its `as` alias (a word), or -1
+vec tn_index: I32;      // element: its number, in order
+vec tn_items: I32;      // element: its first item, or -1
+vec tn_items_last: I32;
 
-mem ti_kind: I32;       // 0 class, 1 attribute, 2 event, 3 two-way binding, 4 CSS, 5 style value
-mem ti_next: I32;
-mem ti_a: I32;          // a name or property (a word)
-mem ti_b: I32;          // a value, handler, or CSS source (a word)
-mem ti_c: I32;          // CSS: its scoped form (a word)
-mem ti_flags: I32;      // attribute: 1 property, 2 dynamic; event: 1 shorthand
-mem ti_from: I32;       // its range, or -1
-mem ti_to: I32;
-mem ti_at: I32;         // where its statement starts
+vec ti_kind: I32;       // 0 class, 1 attribute, 2 event, 3 two-way binding, 4 CSS, 5 style value
+vec ti_next: I32;
+vec ti_a: I32;          // a name or property (a word)
+vec ti_b: I32;          // a value, handler, or CSS source (a word)
+vec ti_c: I32;          // CSS: its scoped form (a word)
+vec ti_flags: I32;      // attribute: 1 property, 2 dynamic; event: 1 shorthand
+vec ti_from: I32;       // its range, or -1
+vec ti_to: I32;
+vec ti_at: I32;         // where its statement starts
 
 // The template's header.
-mem tw_reactive: I32 = [0];
-mem tw_scope: I32 = [-1];     // `@island "name"`: the quoted name (a word), or -1
-mem tw_style_value: I32;      // `@style = e;`: the sources (words), and their ranges
-mem tw_style_from: I32;
-mem tw_style_to: I32;
-mem tw_global: I32;           // `@document { … }` blocks (words)
+vec tw_reactive: I32 = [0];
+vec tw_scope: I32 = [-1];     // `@island "name"`: the quoted name (a word), or -1
+vec tw_style_value: I32;      // `@style = e;`: the sources (words), and their ranges
+vec tw_style_from: I32;
+vec tw_style_to: I32;
+vec tw_global: I32;           // `@document { … }` blocks (words)
 
-mem wp_at: I32 = [0];
+vec wp_at: I32 = [0];
 
 fn wutu_fail(message: Str, offset: I32) void { dsl_fail(message, offset, 1); }
 
@@ -342,8 +342,8 @@ fn skip_dsl(text: Str, start: I32) I32 {
 }
 
 // An expression read: its source, and its range, here.
-mem wx_from: I32 = [0];
-mem wx_to: I32 = [0];
+vec wx_from: I32 = [0];
+vec wx_to: I32 = [0];
 
 // `= expression;`: up to the statement's semicolon.
 fn wp_bare_expression(text: Str) Str {

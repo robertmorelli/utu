@@ -19,14 +19,14 @@
 // empty Seq, which emits nothing.
 
 // The function's nodes, in walk order, each with its parent and its place there.
-mem opt_nodes: I32;
-mem opt_parent: I32;
-mem opt_place: I32;
-mem opt_gets: I32;     // by local: its reads
-mem opt_sets: I32;     // by local: its writes
-mem opt_get_at: I32;   // by local: the position (in opt_nodes) of a read
-mem opt_set_at: I32;   // by local: the position of a write
-mem opt_reads: I32;    // the locals a value being sunk reads
+vec opt_nodes: I32;
+vec opt_parent: I32;
+vec opt_place: I32;
+vec opt_gets: I32;     // by local: its reads
+vec opt_sets: I32;     // by local: its writes
+vec opt_get_at: I32;   // by local: the position (in opt_nodes) of a read
+vec opt_set_at: I32;   // by local: the position of a write
+vec opt_reads: I32;    // the locals a value being sunk reads
 
 fn optimize_module() void {
     for (0 ..< func_kind.len()) |f| { if optimizable(f) { optimize_function(f); }; };

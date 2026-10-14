@@ -6372,6 +6372,16 @@
             "named": true
           }
         ]
+      },
+      "vec": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "vec",
+            "named": false
+          }
+        ]
       }
     },
     "children": {
@@ -10812,6 +10822,10 @@
   },
   {
     "type": "using",
+    "named": false
+  },
+  {
+    "type": "vec",
     "named": false
   },
   {

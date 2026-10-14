@@ -1,7 +1,7 @@
 # The utu compiler, in utu
 
-A new compiler, written in utu from the start: flat data in mems, no DOM, no
-string-typed facts. The JavaScript compiler (tagged `stage0`) is the
+A new compiler, written in utu from the start: flat data in vecs and mems,
+no DOM, no string-typed facts. The JavaScript compiler (tagged `stage0`) is the
 reference: every piece here is checked against what it does, and the
 finished compiler must reproduce `baselines/` exactly. The plan is in
 docs/self-hosting.md (Plan B).
@@ -20,8 +20,10 @@ docs/self-hosting.md (Plan B).
 
 ## Building
 
-The compiler keeps its data in mems, and a mem is a top-level declaration
-of one program (an imported file brings only its modules). So the files
+The compiler keeps its data in vecs (WasmGC arrays) and, for what the host
+reads (the source, tokens, nodes, output), mems (memories): 19 memories in
+all. Each is a top-level declaration of one program (an imported file
+brings only its modules). So the files
 are one program: `scripts/selfhost.mjs` joins those listed in `files.txt`,
 in order, and compiles the result as one file. Errors name the file and
 line they came from. `node scripts/selfhost.mjs --out=utu.wasm` writes the

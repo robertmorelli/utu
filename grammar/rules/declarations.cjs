@@ -112,11 +112,21 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // `const mem` rejects writes. An initializer fills it when the module is
     // instantiated: `= [1, 2, 3]`, `= @embed/\ file.bin \/`, or
     // `= @comptime/\ build() \/`, which runs build() during compilation.
-    mem_decl: ($) => seq(
-      optional(field('export', 'export')),
-      optional(field('const', 'const')),
-      'mem', $.identifier, ':', $.type_ident,
-      optional(seq('=', field('init', $._expr))),
+    // `vec name: U8;` is the same array as a WasmGC array instead of a
+    // memory: a module may have any number, but the host cannot see one, so
+    // it is never exported.
+    mem_decl: ($) => choice(
+      seq(
+        optional(field('export', 'export')),
+        optional(field('const', 'const')),
+        'mem', $.identifier, ':', $.type_ident,
+        optional(seq('=', field('init', $._expr))),
+      ),
+      seq(
+        optional(field('const', 'const')),
+        field('vec', 'vec'), $.identifier, ':', $.type_ident,
+        optional(seq('=', field('init', $._expr))),
+      ),
     ),
 
     // Using: cross-file imports and within-file aliases

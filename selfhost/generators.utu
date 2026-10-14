@@ -18,16 +18,16 @@
 // consumer body expands the same generator again inside it.
 
 // The expansions being checked, innermost last: what each yield needs.
-mem gen_whole: I32;     // the label a `return;` in the generator and a `break` in the body leave
-mem gen_capture: I32;   // the consumer's capture declaration, or -1
-mem gen_body: I32;      // the consumer's block
-mem gen_type: I32;      // the yielded type
-mem gen_cx_inst: I32;   // the consumer's checking context
-mem gen_cx_fi: I32;
-mem gen_cx_result: I32;
-mem gen_decl: I32;      // the generator's declaration
-mem gen_defers: I32;    // the defers pending when the generation began
-mem gen_rec: I32;       // for a recursive generation, its index in rec_*; else -1
+vec gen_whole: I32;     // the label a `return;` in the generator and a `break` in the body leave
+vec gen_capture: I32;   // the consumer's capture declaration, or -1
+vec gen_body: I32;      // the consumer's block
+vec gen_type: I32;      // the yielded type
+vec gen_cx_inst: I32;   // the consumer's checking context
+vec gen_cx_fi: I32;
+vec gen_cx_result: I32;
+vec gen_decl: I32;      // the generator's declaration
+vec gen_defers: I32;    // the defers pending when the generation began
+vec gen_rec: I32;       // for a recursive generation, its index in rec_*; else -1
 
 fn reset_generators() void {
     gen_whole.clear();
@@ -315,14 +315,14 @@ fn generator_return(node: I32) I32 {
 // still arrive in depth-first order.
 
 // The recursive generations being checked: their item arrays' locals.
-mem rec_kind: I32;
-mem rec_val: I32;
-mem rec_top: I32;
-mem rec_args: I32;    // a list of the parameters' array locals
-mem rec_elem: I32;    // the yielded type
-mem rec_params: I32;  // a list of the parameters' types
-mem prune_flag: I32;  // the innermost recursive consumer's `pruned` local
-mem prune_loop: I32;  // and its loop
+vec rec_kind: I32;
+vec rec_val: I32;
+vec rec_top: I32;
+vec rec_args: I32;    // a list of the parameters' array locals
+vec rec_elem: I32;    // the yielded type
+vec rec_params: I32;  // a list of the parameters' types
+vec prune_flag: I32;  // the innermost recursive consumer's `pruned` local
+vec prune_loop: I32;  // and its loop
 
 fn rec_array_heap(vt: I32) I32 { array_type(storage(vt), true); }
 

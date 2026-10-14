@@ -11,17 +11,17 @@
 // table of the field and variant names they read and write.
 
 // The container being expanded: its types, names, and generated functions.
-mem jp_container: I32 = [-1];
-mem jp_name_words: I32;    // the name table, in order
-mem jp_defined: I32;       // words of the functions generated (or the container's own)
-mem jp_functions: I32;     // the generated functions' sources, as words, in order
-mem jp_serial: I32 = [0];  // for each site's fresh names (`__json0_`)
+vec jp_container: I32 = [-1];
+vec jp_name_words: I32;    // the name table, in order
+vec jp_defined: I32;       // words of the functions generated (or the container's own)
+vec jp_functions: I32;     // the generated functions' sources, as words, in order
+vec jp_serial: I32 = [0];  // for each site's fresh names (`__json0_`)
 
 // The type span of the site being expanded, for a codec's mistakes.
-mem jc_type_at: I32 = [0];
-mem jc_type_len: I32 = [0];
-mem jc_pending: I32;       // functions the current site generated, as words
-mem jc_site: I32 = [-1];   // the site being expanded
+vec jc_type_at: I32 = [0];
+vec jc_type_len: I32 = [0];
+vec jc_pending: I32;       // functions the current site generated, as words
+vec jc_site: I32 = [-1];   // the site being expanded
 
 fn json_expand_container(container: I32, json: I32, count: I32) void {
     jp_container[0] = container;
@@ -581,7 +581,7 @@ fn object_writer(holder: I32, value: Str, opens: Bool) Str {
 //
 // Patterns list only what the program needs; other fields are skipped.
 
-mem sc_at: I32 = [0];
+vec sc_at: I32 = [0];
 
 // Past spaces and `//` comments.
 fn sc_ws(raw: Str) I32 {
@@ -610,7 +610,7 @@ fn sc_expect(raw: Str, text: Str) void {
 }
 
 // Source up to the first of `stops` at nesting depth 0 (sc_until_start says where it began).
-mem sc_until_start: I32 = [0];
+vec sc_until_start: I32 = [0];
 
 fn sc_until(raw: Str, stops: Str) Str {
     sc_ws(raw);
@@ -662,18 +662,18 @@ fn sc_string(raw: Str) Str {
 }
 
 // Patterns: object (its fields' patterns, linked), capture, or literal.
-mem pat_kind: I32;          // 0 object, 1 capture, 2 literal
-mem pat_start: I32;
-mem pat_name: I32;          // capture: its name; a field: its key (words)
-mem pat_name_start: I32;
-mem pat_type: I32;          // capture: its type (a word)
-mem pat_type_start: I32;
-mem pat_fallback: I32;      // capture: `= default` text (a word), or -1
-mem pat_fallback_start: I32;
-mem pat_text: I32;          // literal: as written (a word)
-mem pat_first: I32;         // object: its first field's pattern, or -1
-mem pat_next: I32;          // a field's next field, or -1
-mem pat_key: I32;           // a field's key (a word)
+vec pat_kind: I32;          // 0 object, 1 capture, 2 literal
+vec pat_start: I32;
+vec pat_name: I32;          // capture: its name; a field: its key (words)
+vec pat_name_start: I32;
+vec pat_type: I32;          // capture: its type (a word)
+vec pat_type_start: I32;
+vec pat_fallback: I32;      // capture: `= default` text (a word), or -1
+vec pat_fallback_start: I32;
+vec pat_text: I32;          // literal: as written (a word)
+vec pat_first: I32;         // object: its first field's pattern, or -1
+vec pat_next: I32;          // a field's next field, or -1
+vec pat_key: I32;           // a field's key (a word)
 
 fn new_pattern(kind: I32, start: I32) I32 {
     let p = pat_kind.len();
@@ -833,11 +833,11 @@ fn pattern_optional(p: I32) Bool {
 }
 
 // The site's fresh names, and an arm's captures.
-mem jm_serial: I32 = [0];
-mem cap_name: I32;     // by capture: its name (a word)
-mem cap_local: I32;    // its local (a word)
-mem cap_pat: I32;      // its pattern
-mem jm_declare: I32;   // the current arm's declarations, as words
+vec jm_serial: I32 = [0];
+vec cap_name: I32;     // by capture: its name (a word)
+vec cap_local: I32;    // its local (a word)
+vec cap_pat: I32;      // its pattern
+vec jm_declare: I32;   // the current arm's declarations, as words
 
 fn fresh_name(prefix: Str, name: Str) Str {
     let text = prefix + name + int_text(jm_serial[0]);
