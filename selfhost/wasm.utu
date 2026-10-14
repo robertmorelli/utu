@@ -611,14 +611,24 @@ vec func_live: U8;
 vec glob_live: U8;
 vec live_work: I32;
 vec node_holders: I32;  // by node: how many places in the live code hold it
+vec func_uses: I32;     // by function: the calls and references to it in the live code
+vec glob_uses: I32;     // by global: the reads and writes of it
 
 fn sweep() void {
     node_holders.resize(w_op.len());
     for (0 ..< w_op.len()) |n| { node_holders[n] = 0; };
     func_live.resize(func_kind.len());
     glob_live.resize(glob_kind.len());
-    for (0 ..< func_kind.len()) |f| { func_live[f] = 0; };
-    for (0 ..< glob_kind.len()) |g| { glob_live[g] = 0; };
+    func_uses.resize(func_kind.len());
+    glob_uses.resize(glob_kind.len());
+    for (0 ..< func_kind.len()) |f| {
+        func_live[f] = 0;
+        func_uses[f] = 0;
+    };
+    for (0 ..< glob_kind.len()) |g| {
+        glob_live[g] = 0;
+        glob_uses[g] = 0;
+    };
     live_work.clear();
     for (0 ..< func_kind.len()) |f| {
         if func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 { mark_func(f); };
@@ -654,16 +664,26 @@ fn scan_live(node: I32) void {
     };
     node_holders[node] += 1;
     let op = w_op[node];
-    if op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.RefFunc.to_i32() { mark_func(w_a[node]); }
-    else if op == Op.GlobalGet.to_i32() or op == Op.GlobalSet.to_i32() { mark_global(w_a[node]); };
+    if op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.RefFunc.to_i32() {
+        func_uses[w_a[node]] += 1;
+        mark_func(w_a[node]);
+    } else if op == Op.GlobalGet.to_i32() or op == Op.GlobalSet.to_i32() {
+        glob_uses[w_a[node]] += 1;
+        mark_global(w_a[node]);
+    };
     for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
 }
 
 // Final indices: types (singles that need nothing defined after them, then
 // the recursion group, then the other singles), functions (imports first),
-// globals (imports first).
+// globals (imports first). Functions and globals are ordered by how often
+// the code names them, most first: an index under 128 takes one byte.
 vec type_index: I32;   // by heap type
 vec type_order: I32;   // heap types in index order
+vec func_order: I32;   // live functions in index order
+vec glob_order: I32;   // live globals in index order
+vec func_imported: I32 = [0];  // how many of func_order are imports
+vec glob_imported: I32 = [0];
 
 fn assign_indices() void {
     memory_index.resize(memory_kind.len());
@@ -720,31 +740,68 @@ fn assign_indices() void {
             type_order.push(t);
         };
     };
-    let next_f = 0;
-    for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Import.to_i32() and func_live[f] == 1 {
-            func_index[f] = next_f;
-            next_f += 1;
+    func_order.clear();
+    for ([FuncKind.Import, FuncKind.Defined]) |kind| {
+        sort_items.clear();
+        for (0 ..< func_kind.len()) |f| {
+            if func_kind[f] == kind.to_i32() and func_live[f] == 1 { sort_items.push(f); };
         };
+        sort_keys.resize(func_uses.len());
+        for (0 ..< func_uses.len()) |f| { sort_keys[f] = func_uses[f]; };
+        sort_by_keys();
+        for (0 ..< sort_items.len()) |i| {
+            func_index[sort_items[i]] = func_order.len();
+            func_order.push(sort_items[i]);
+        };
+        if kind == FuncKind.Import { func_imported[0] = func_order.len(); };
     };
-    for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Defined.to_i32() and func_live[f] == 1 {
-            func_index[f] = next_f;
-            next_f += 1;
+    glob_order.clear();
+    for ([FuncKind.Import, FuncKind.Defined]) |kind| {
+        sort_items.clear();
+        for (0 ..< glob_kind.len()) |g| {
+            if glob_kind[g] == kind.to_i32() and glob_live[g] == 1 { sort_items.push(g); };
         };
+        sort_keys.resize(glob_uses.len());
+        for (0 ..< glob_uses.len()) |g| { sort_keys[g] = glob_uses[g]; };
+        sort_by_keys();
+        for (0 ..< sort_items.len()) |i| {
+            glob_index[sort_items[i]] = glob_order.len();
+            glob_order.push(sort_items[i]);
+        };
+        if kind == FuncKind.Import { glob_imported[0] = glob_order.len(); };
     };
-    let next_g = 0;
-    for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Import.to_i32() and glob_live[g] == 1 {
-            glob_index[g] = next_g;
-            next_g += 1;
+}
+
+// sort_items by sort_keys[item], greatest first; equal keys keep their
+// order. A merge sort, bottom up, through sort_spare.
+vec sort_items: I32;
+vec sort_keys: I32;
+vec sort_spare: I32;
+
+fn sort_by_keys() void {
+    let n = sort_items.len();
+    sort_spare.resize(n);
+    let width = 1;
+    while (width < n) {
+        let lo = 0;
+        while (lo < n) {
+            let mid = if lo + width < n { lo + width; } else { n; };
+            let hi = if mid + width < n { mid + width; } else { n; };
+            let i = lo;
+            let j = mid;
+            for (lo ..< hi) |k| {
+                if j >= hi or (i < mid and sort_keys[sort_items[i]] >= sort_keys[sort_items[j]]) {
+                    sort_spare[k] = sort_items[i];
+                    i += 1;
+                } else {
+                    sort_spare[k] = sort_items[j];
+                    j += 1;
+                };
+            };
+            lo = hi;
         };
-    };
-    for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Defined.to_i32() and glob_live[g] == 1 {
-            glob_index[g] = next_g;
-            next_g += 1;
-        };
+        for (0 ..< n) |k| { sort_items[k] = sort_spare[k]; };
+        width *= 2;
     };
 }
 
@@ -960,20 +1017,17 @@ fn encode_types() void {
 }
 
 fn encode_imports() void {
-    let count = 0;
-    for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Import.to_i32() and func_live[f] == 1 { count += 1; }; };
-    for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Import.to_i32() and glob_live[g] == 1 { count += 1; }; };
+    let count = func_imported[0] + glob_imported[0];
     for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.to_i32() { count += 1; }; };
     if tag_used[0] == 1 { count += 1; };
     if count == 0 { return; };
     leb_u(false, count);
-    for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Import.to_i32() and func_live[f] == 1 {
-            put_name(false, func_module_name[f]);
-            put_name(false, func_field_name[f]);
-            sec.push(0);
-            leb_u(false, type_index[func_type_of[f]]);
-        };
+    for (0 ..< func_imported[0]) |i| {
+        let f = func_order[i];
+        put_name(false, func_module_name[f]);
+        put_name(false, func_field_name[f]);
+        sec.push(0);
+        leb_u(false, type_index[func_type_of[f]]);
     };
     if tag_used[0] == 1 {
         put_text("utu");
@@ -990,14 +1044,13 @@ fn encode_imports() void {
             put_limits(memory_pages[m]);
         };
     };
-    for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Import.to_i32() and glob_live[g] == 1 {
-            put_name(false, glob_module_name[g]);
-            put_name(false, glob_field_name[g]);
-            sec.push(3);
-            put_valtype(false, glob_type[g]);
-            sec.push(glob_mutable[g]);
-        };
+    for (0 ..< glob_imported[0]) |i| {
+        let g = glob_order[i];
+        put_name(false, glob_module_name[g]);
+        put_name(false, glob_field_name[g]);
+        sec.push(3);
+        put_valtype(false, glob_type[g]);
+        sec.push(glob_mutable[g]);
     };
     flush_section(2);
 }
@@ -1017,16 +1070,11 @@ fn put_limits(pages: I32) void {
     leb_u(false, 65536);
 }
 
-fn is_live_defined(f: I32) Bool { func_kind[f] == FuncKind.Defined.to_i32() and func_live[f] == 1; }
-
 fn encode_functions() void {
-    let count = 0;
-    for (0 ..< func_kind.len()) |f| { if is_live_defined(f) { count += 1; }; };
+    let count = func_order.len() - func_imported[0];
     if count == 0 { return; };
     leb_u(false, count);
-    for (0 ..< func_kind.len()) |f| {
-        if is_live_defined(f) { leb_u(false, type_index[func_type_of[f]]); };
-    };
+    for (func_imported[0] ..< func_order.len()) |i| { leb_u(false, type_index[func_type_of[func_order[i]]]); };
     flush_section(3);
 }
 
@@ -1042,19 +1090,17 @@ fn encode_memories() void {
 }
 
 fn encode_globals() void {
-    let count = 0;
-    for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.to_i32() and glob_live[g] == 1 { count += 1; }; };
+    let count = glob_order.len() - glob_imported[0];
     if count == 0 { return; };
     leb_u(false, count);
-    for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Defined.to_i32() and glob_live[g] == 1 {
-            put_valtype(false, glob_type[g]);
-            sec.push(glob_mutable[g]);
-            code_bytes.clear();
-            emit(glob_init[g], -1);
-            for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]); };
-            sec.push(11);
-        };
+    for (glob_imported[0] ..< glob_order.len()) |k| {
+        let g = glob_order[k];
+        put_valtype(false, glob_type[g]);
+        sec.push(glob_mutable[g]);
+        code_bytes.clear();
+        emit(glob_init[g], -1);
+        for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]); };
+        sec.push(11);
     };
     flush_section(6);
 }
@@ -1073,10 +1119,18 @@ fn mark_late(f: I32) void {
     // (It and what it uses were made after the sweep sized these.)
     let funcs = func_live.len();
     func_live.resize(func_kind.len());
-    for (funcs ..< func_kind.len()) |g| { func_live[g] = 0; };
+    func_uses.resize(func_kind.len());
+    for (funcs ..< func_kind.len()) |g| {
+        func_live[g] = 0;
+        func_uses[g] = 0;
+    };
     let globs = glob_live.len();
     glob_live.resize(glob_kind.len());
-    for (globs ..< glob_kind.len()) |g| { glob_live[g] = 0; };
+    glob_uses.resize(glob_kind.len());
+    for (globs ..< glob_kind.len()) |g| {
+        glob_live[g] = 0;
+        glob_uses[g] = 0;
+    };
     mark_func(f);
     while (live_work.len() > 0) {
         let node = live_work[live_work.len() - 1];
@@ -1137,17 +1191,17 @@ fn encode_data_count() void {
 }
 
 fn encode_code() void {
-    let count = 0;
-    for (0 ..< func_kind.len()) |f| { if is_live_defined(f) { count += 1; }; };
+    let count = func_order.len() - func_imported[0];
     if count == 0 { return; };
     leb_u(false, count);
-    for (0 ..< func_kind.len()) |f| {
-        if is_live_defined(f) and func_code[f] >= 0 {
+    for (func_imported[0] ..< func_order.len()) |n| {
+        let f = func_order[n];
+        if func_code[f] >= 0 {
             // Assembled already: locals, instructions, and end.
             let k = func_code[f];
             leb_u(false, wat_len[k]);
             for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]); };
-        } else if is_live_defined(f) {
+        } else {
             code_bytes.clear();
             encode_locals(f);
             mark_targets(func_body[f]);
@@ -1238,13 +1292,12 @@ fn encode_names() void {
     put_text("name");
     code_bytes.clear();
     leb_u(true, count);
-    // In index order: imports, then defined functions.
-    for ([FuncKind.Import, FuncKind.Defined]) |kind| {
-        for (0 ..< func_kind.len()) |f| {
-            if func_kind[f] == kind.to_i32() and func_live[f] == 1 and func_debug_name[f] >= 0 {
-                leb_u(true, func_index[f]);
-                put_name(true, func_debug_name[f]);
-            };
+    // In index order.
+    for (0 ..< func_order.len()) |i| {
+        let f = func_order[i];
+        if func_debug_name[f] >= 0 {
+            leb_u(true, i);
+            put_name(true, func_debug_name[f]);
         };
     };
     sec.push(1);

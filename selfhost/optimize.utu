@@ -10,6 +10,8 @@
 //   temporaries  a local set once to a pure value and read once in the next
 //                statement, outside any loop and before anything assigns
 //                what the value reads, is that value: it moves to the read
+//   tees         a local stored and then read first by the next statement
+//                is stored there, by a tee (two bytes fewer)
 //   unused       a local never read is not stored (its value is kept, and
 //                dropped, when it has effects), and is no longer declared
 //
@@ -42,6 +44,7 @@ fn optimize_function(f: I32) void {
     // rewritten for both, so a body with one is left as it is.
     for (0 ..< opt_nodes.len()) |k| { if node_holders[opt_nodes[k]] != 1 { return; }; };
     while (propagate_copies(f, params) or sink_temporaries(params)) { opt_collect(f, total); };
+    if tee_stores() { opt_collect(f, total); };
     remove_unused_locals(f, params, total);
 }
 
@@ -184,6 +187,62 @@ fn sink_temporaries(params: I32) Bool {
     changed;
 }
 
+// `local.set x (v)` then a statement whose first instruction is `local.get
+// x` is `local.tee x (v)` there. When that was the local's one read, it is
+// then never read, and the value takes the tee's place (remove_unused_locals).
+fn tee_stores() Bool {
+    let changed = false;
+    for (0 ..< opt_nodes.len()) |k| {
+        let block = opt_nodes[k];
+        let op = w_op[block];
+        if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+            for (0 ..< w_count[block]) |i| {
+                let write = w_kid(block, i);
+                if w_op[write] == Op.LocalSet.to_i32() and w_count[write] == 1 and tee_into(block, i + 1, write) {
+                    changed = true;
+                };
+            };
+        };
+    };
+    changed;
+}
+
+// Whether the first instruction from kid `from` of `parent` on reads what
+// `write` (kid `from - 1`) stores: the read becomes the tee, and the store
+// nothing.
+fn tee_into(parent: I32, from: I32, write: I32) Bool {
+    let holder = parent;
+    let place = from;
+    while (true) {
+        // Kids that emit nothing are passed over.
+        while (place < w_count[holder] and emits_nothing(w_kid(holder, place))) { place += 1; };
+        if place >= w_count[holder] { return false; };
+        let node = w_kid(holder, place);
+        let op = w_op[node];
+        if op == Op.LocalGet.to_i32() {
+            if w_a[node] != w_a[write] { return false; };
+            set_kid(holder, place, write);
+            w_op[write] = Op.LocalTee.to_i32();
+            w_type[write] = w_type[node];
+            // The read is now nothing, where the store was.
+            opt_erase(node);
+            set_kid(parent, from - 1, node);
+            return true;
+        };
+        // A block's contents come after its opcode, which a value cannot cross.
+        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or w_count[node] == 0 { return false; };
+        holder = node;
+        place = 0;
+    };
+    false;
+}
+
+fn emits_nothing(node: I32) Bool {
+    if w_op[node] != Op.Seq.to_i32() { return false; };
+    for (0 ..< w_count[node]) |i| { if not emits_nothing(w_kid(node, i)) { return false; }; };
+    true;
+}
+
 fn reads_of(node: I32) void {
     if w_op[node] == Op.LocalGet.to_i32() { opt_reads.push(w_a[node]); };
     for (0 ..< w_count[node]) |i| { reads_of(w_kid(node, i)); };
@@ -207,7 +266,11 @@ fn sink_visit(node: I32, target: I32, in_loop: Bool) I32 {
 }
 
 fn remove_unused_locals(f: I32, params: I32, total: I32) void {
-    for (0 ..< opt_nodes.len()) |k| {
+    // Inner stores first: one moved out of its parent leaves the parent's
+    // place in opt_parent stale for anything it holds.
+    let k = opt_nodes.len();
+    while (k > 0) {
+        k -= 1;
         let n = opt_nodes[k];
         let op = w_op[n];
         if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
