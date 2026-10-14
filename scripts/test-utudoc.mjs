@@ -31,6 +31,15 @@ export lib {
     fn norm(x: F64, y: F64) F64 { distance(Point { x: x, y: y }, Point { x: 0.0, y: 0.0 }); }
 }
 `);
+  await fs.writeFile(path.join(dir, 'shapes.utu'), `mod shapes {
+    /// A shape. Mail a@b.com; \`inline @Point\` stays code.
+    /// = Notes
+    /// More.
+    struct &:
+        /// The width.
+        | w : F64
+}
+`);
   await fs.writeFile(path.join(dir, 'broken.utu'), 'fn (\n');
   const run = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'utudoc', 'utudoc.mjs'), dir, '-o', path.join(dir, 'docs.pdf'), '--title', 'Geometry'], { encoding: 'utf8' });
   assert.match(run.stderr, /skipping .*broken\.utu, which does not parse/);
@@ -47,6 +56,22 @@ export lib {
   // `@Name` resolves; a name nothing declares is code.
   assert.match(typ, new RegExp(`See #link\\(<${label('distance')}>\\)\\[#raw\\("distance"\\)\\]`));
   assert.match(typ, /and #raw\("nowhere"\)/);
+  // A module's own type, \`struct &\`, and its fields are documented; code
+  // stays code, an address's \`@\` is the character, and a heading in a doc
+  // comment is below its declaration's.
+  assert.ok(label('&'), 'struct &');
+  assert.match(typ, /A shape\. Mail a\\@b\.com; `inline @Point` stays code\./);
+  assert.match(typ, /^===== Notes$/m);
+  assert.match(typ, /The width\./);
+  // A doc comment reads no file: typst's root holds only the document.
+  const other = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-doc-read-'));
+  await fs.writeFile(path.join(other, 'reads.utu'), '/// #read("/etc/hosts")\nfn f() I32 { 1; }\n');
+  const reads = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'utudoc', 'utudoc.mjs'), other, '-o', path.join(other, 'docs.pdf')], { encoding: 'utf8' });
+  await fs.rm(other, { recursive: true, force: true });
+  if (!/not installed/.test(reads.stdout)) {
+    assert.equal(reads.status, 1);
+    assert.match(reads.stderr, /file not found/);
+  }
   if (run.status === 0 && !/not installed/.test(run.stdout)) {
     const pdf = await fs.readFile(path.join(dir, 'docs.pdf'));
     assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');

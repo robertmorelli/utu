@@ -47,6 +47,10 @@ const KEYWORDS = ['mod', 'using', 'struct', 'proto', 'enum', 'fn', 'let', 'mem',
 // What the prelude offers every program by name: its modules and types.
 const PRELUDE_KINDS = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct']);
 
+// lex.utu's Tok kinds completion offers nothing in: strings, DSL bodies,
+// comments, and a template's text.
+const QUIET_TOKENS = new Set([5, 6, 7, 8, 9, 10, 11, 12]);
+
 // The name written where one is being typed, for completion's build.
 const PLACEHOLDER = '__utu_completing';
 
@@ -60,6 +64,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   let queue = Promise.resolve();
   let refreshTimer = null;
   const published = new Set();  // keys with diagnostics shown
+  const unopened = new Map();    // key → the files not open its last build showed mistakes in
   let shutdown = false;
 
   // One build at a time: the compiler holds one program.
@@ -101,17 +106,35 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     const doc = docs.get(key);
     if (!doc) return;
     const lines = lineStarts(doc.text);
-    const diagnostics = program.diagnostics
-      .filter(d => d.file === key || d.file == null)
-      .map(d => ({
-        range: d.file === key ? range(lines, d.start, d.end) : range(lines, 0, 0),
-        severity: d.severity === 'warning' ? 2 : 1,
-        source: 'utu',
-        code: d.kind,
-        message: d.message,
-      }));
-    if (diagnostics.length) published.add(key); else if (!published.delete(key)) return;
-    send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: doc.uri, version: doc.version, diagnostics } });
+    const diagnostic = (d, lines, here) => ({
+      range: here ? range(lines, d.start, d.end) : range(lines, 0, 0),
+      severity: d.severity === 'warning' ? 2 : 1,
+      source: 'utu',
+      code: d.kind,
+      message: d.message,
+    });
+    const diagnostics = program.diagnostics.filter(d => d.file === key || d.file == null).map(d => diagnostic(d, lines, d.file === key));
+    if (diagnostics.length) published.add(key);
+    if (diagnostics.length || published.delete(key)) {
+      send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: doc.uri, version: doc.version, diagnostics } });
+    }
+    // Mistakes in a file the editor has not opened (one this imports) are
+    // shown on it, until a build of this no longer finds them.
+    const others = new Map();
+    for (const d of program.diagnostics) {
+      if (d.file == null || d.file === key || docs.has(d.file) || !toUri(d.file)) continue;
+      if (!others.has(d.file)) others.set(d.file, []);
+      others.get(d.file).push(d);
+    }
+    for (const [file, list] of others) {
+      const text = program.files.find(f => f.key === file)?.text ?? '';
+      const fileLines = lineStarts(text);
+      send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: toUri(file), diagnostics: list.map(d => diagnostic(d, fileLines, true)) } });
+    }
+    for (const file of unopened.get(key) ?? []) {
+      if (!others.has(file) && !docs.has(file)) send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: toUri(file), diagnostics: [] } });
+    }
+    unopened.set(key, new Set(others.keys()));
   }
 
   // After an edit: the file edited, then every other open file (which may import it).
@@ -131,8 +154,44 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     const program = await build(key);
     const text = textOf(program, key);
     if (text == null) return null;
-    const offset = params.position ? offsetAt(lineStarts(text), params.position) : 0;
+    const offset = params.position ? offsetAt(lineStarts(text), params.position, text.length) : 0;
     return { key, program, text, offset, decl: params.position ? program.index.declarationAt(key, offset) : -1 };
+  }
+
+  /**
+   * The name at a request's position, when renaming it is allowed: it is
+   * spelled as a name, and declared in a file the editor can change (not
+   * the standard library's). Else null.
+   */
+  function renamed(q) {
+    if (q.decl < 0) return null;
+    const { index } = q.program;
+    const name = index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end);
+    const spelling = name ? q.text.slice(name.start, name.end) : '';
+    if (!/^[A-Za-z_]\w*$/.test(spelling)) return null;
+    // An alias is this file's to rename, whatever it names.
+    if (index.declarations(q.key).some(d => d.kind === 'Alias' && index.text(index.definition(d.decl) ?? name) === spelling)) return name;
+    const definition = index.definition(q.decl);
+    return definition && toUri(definition.file) && !definition.file.startsWith('std:') ? name : null;
+  }
+
+  /**
+   * Where the name at a request's position (`name`) is written. An import's
+   * alias (`using shapes |Point| …`) is its file's own name for the module
+   * or its type: each place this file spells it so, whatever it resolves
+   * to there (the alias, the type, the module). Any other name: its
+   * references, as it is spelled (not the `&` a module declares its type by).
+   */
+  function occurrences(q, name) {
+    const { index } = q.program;
+    const spelling = q.text.slice(name.start, name.end);
+    const alias = index.declarations(q.key).find(d => d.kind === 'Alias' && index.text(index.definition(d.decl) ?? name) === spelling);
+    if (alias) {
+      return index.names(q.key)
+        .filter(n => index.text(n.at) === spelling && (n.decl === alias.decl || index.text(index.definition(n.decl) ?? n.at) !== spelling))
+        .map(n => n.at);
+    }
+    return index.references(q.decl).filter(place => index.text(place) === spelling);
   }
 
   /** A place as an LSP location, or null when no editor can open its file. */
@@ -196,23 +255,21 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
 
     'textDocument/prepareRename': async params => {
       const q = await at(params);
-      if (!q || q.decl < 0) return null;
-      const definition = q.program.index.definition(q.decl);
-      // Only what is declared in a file the editor can change.
-      if (!definition || !toUri(definition.file) || definition.file.startsWith('std:')) return null;
-      const name = q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end);
+      const name = q && renamed(q);
       return name ? { range: range(lineStarts(q.text), name.start, name.end), placeholder: q.text.slice(name.start, name.end) } : null;
     },
 
     'textDocument/rename': async params => {
       const q = await at(params);
-      if (!q || q.decl < 0) return null;
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName)) throw responseError(-32602, `'${params.newName}' is not a name`);
+      const name = q && renamed(q);
+      if (!name) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName) || KEYWORDS.includes(params.newName)) {
+        throw responseError(-32602, `'${params.newName}' is not a name`);
+      }
       const changes = {};
-      for (const place of q.program.index.references(q.decl)) {
+      for (const place of occurrences(q, name)) {
         const where = location(q.program, place);
-        if (!where) continue;
-        (changes[where.uri] ??= []).push({ range: where.range, newText: params.newName });
+        if (where) (changes[where.uri] ??= []).push({ range: where.range, newText: params.newName });
       }
       return { changes };
     },
@@ -228,8 +285,11 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
         if (!(kind in SYMBOL_KIND)) continue;
         const name = index.definition(decl);
         if (!name || name.file !== q.key) continue;
+        // A module's own type (`struct &`) is known by the module's name.
+        const ownerName = owner >= 0 && index.kind(owner) === 'Module' ? index.definition(owner) : null;
+        const text = index.text(name) === '&' && ownerName ? index.text(ownerName) : index.text(name);
         const symbol = {
-          name: index.text(name), kind: SYMBOL_KIND[kind],
+          name: text, kind: SYMBOL_KIND[kind],
           range: range(lines, Math.min(span.start, name.start), Math.max(span.end, name.end)),
           selectionRange: range(lines, name.start, name.end), children: [],
         };
@@ -244,7 +304,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       const key = toKey(params.textDocument.uri);
       const text = docs.get(key)?.text;
       if (text == null) return [];
-      const offset = offsetAt(lineStarts(text), params.position);
+      const offset = offsetAt(lineStarts(text), params.position, text.length);
       return complete(key, text, offset);
     },
 
@@ -280,6 +340,9 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
    * where the one being typed is (and a `;` after it, when that is needed).
    */
   async function complete(key, text, offset) {
+    // Nothing is written in a comment, a string, or a DSL's body.
+    const token = (await build(key)).index.tokenAt(key, offset);
+    if (token && QUIET_TOKENS.has(token.kind)) return [];
     let start = offset;
     while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1])) start--;
     const member = text[start - 1] === '.';
@@ -295,7 +358,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     const item = (decl, kind) => {
       const name = label(decl);
       const span = index.span(decl);
-      const source = span ? textOf(program, span.file) : null;
+      // (Spans are the patched text's.)
+      const source = span ? program.files.find(f => f.key === span.file)?.text ?? null : null;
       const detail = LOCAL_KINDS.has(kind) ? index.type(decl) : source != null ? signature(source.slice(span.start, span.end)) : '';
       return { label: name, kind: COMPLETION_KIND[kind] ?? 6, ...(detail ? { detail } : {}) };
     };
@@ -370,7 +434,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       const doc = docs.get(key);
       if (!doc) return;
       // Full sync: the last change is the whole text.
-      const change = params.contentChanges[params.contentChanges.length - 1];
+      const change = params.contentChanges?.at(-1);
       if (change && change.range == null) doc.text = change.text;
       doc.version = params.textDocument.version;
       generation++;
@@ -387,23 +451,25 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   return {
     /** Answer one message from the editor. Resolves when `exit` should end the process (with its code). */
     async handle(message) {
-      if (message.method === 'exit') return { exit: shutdown ? 0 : 1 };
-      if (message.id == null) {
-        await notify(message);
+      if (message?.method === 'exit') return { exit: shutdown ? 0 : 1 };
+      if (message?.id == null) {
+        // A notification the server cannot follow is dropped: it has no one to answer.
+        try { await notify(message ?? {}); } catch (error) { log(`${message?.method}: ${error?.stack ?? error}`); }
         return null;
       }
       const answer = requests[message.method];
-      if (!answer) {
-        send({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `${message.method} is not supported` } });
-        return null;
-      }
+      const fail = (code, text) => send({ jsonrpc: '2.0', id: message.id, error: { code, message: text } });
+      if (shutdown) return fail(-32600, 'the server is shut down'), null;
+      if (!answer) return fail(-32601, `${message.method} is not supported`), null;
       try {
         const result = message.method === 'initialize' || message.method === 'shutdown'
-          ? await answer(message.params)
-          : await serial(() => answer(message.params));
+          ? await answer(message.params ?? {})
+          : await serial(() => answer(message.params ?? {}));
         send({ jsonrpc: '2.0', id: message.id, result: result ?? null });
       } catch (error) {
-        send({ jsonrpc: '2.0', id: message.id, error: error.code ? error : { code: -32603, message: String(error?.message ?? error) } });
+        // A response error is a number and a message; anything else thrown is internal.
+        if (typeof error?.code === 'number') fail(error.code, error.message);
+        else fail(error instanceof TypeError ? -32602 : -32603, String(error?.message ?? error));
         log(`${message.method}: ${error?.stack ?? error}`);
       }
       return null;
@@ -433,9 +499,12 @@ function positionAt(lines, offset) {
   return { line: lo, character: offset - lines[lo] };
 }
 
-function offsetAt(lines, { line, character }) {
-  if (line >= lines.length) return lines[lines.length - 1];
-  return lines[line] + character;
+/** A position's offset; one past its line's end is its end, one past the text's is the text's. */
+function offsetAt(lines, { line, character }, length = Infinity) {
+  if (line < 0) return 0;
+  if (line >= lines.length) return length === Infinity ? lines[lines.length - 1] : length;
+  const end = line + 1 < lines.length ? lines[line + 1] - 1 : length;
+  return lines[line] + Math.max(0, Math.min(character, end - lines[line]));
 }
 
 function range(lines, start, end) {
@@ -443,7 +512,8 @@ function range(lines, start, end) {
 }
 
 /** A declaration's first line, without its body: `fn area(self: Shape) F64`. */
-function signature(text) {
+function signature(source) {
+  const text = source.replace(/\/\/[^\n]*/g, '');
   let depth = 0;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];

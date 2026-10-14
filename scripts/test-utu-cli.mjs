@@ -46,6 +46,17 @@ bad.utu:4:9: error: Unknown variable 'missing'
   assert.match(colored, /\x1b\[34madd\x1b\[0m/);
   assert.match(colored, /\x1b\[36mI32\x1b\[0m/);
   assert.match(colored, /\x1b\[32m"two"\x1b\[0m/);
+  // NO_COLOR wins; FORCE_COLOR=0 is no.
+  for (const env of [{ NO_COLOR: '1', FORCE_COLOR: '1' }, { FORCE_COLOR: '0' }]) {
+    const plain = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...env } }).stderr;
+    assert.ok(!plain.includes('\x1b['), JSON.stringify(env));
+  }
+  // The underline is under the code, past wide characters.
+  await fs.writeFile(path.join(dir, 'wide.utu'), 'export main() I32 {\n    let s: Str = "漢字"; nope;\n}\n');
+  assert.match(utu('check', 'wide.utu').stderr, /^ {3}\| {26}\^{4}$/m);
+  // A file that ends early says so.
+  await fs.writeFile(path.join(dir, 'short.utu'), 'export main() I32 {\n');
+  assert.match(utu('check', 'short.utu').stderr, /error: Syntax error: unexpected end of the file/);
 
   r = utu('run', 'good.utu');
   assert.equal(r.status, 0, r.stderr);

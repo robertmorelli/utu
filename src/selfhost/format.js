@@ -16,6 +16,25 @@ import { paintLine } from './highlight.js';
 const LONG = 6;
 
 /**
+ * How many columns a terminal gives `text`: a tab four, a wide (East
+ * Asian, emoji) character two, a combining mark none, any other one.
+ */
+function columns(text) {
+  let n = 0;
+  for (const c of text) {
+    const cp = c.codePointAt(0);
+    if (c === '\t') n += 4;
+    else if ((cp >= 0x300 && cp <= 0x36f) || (cp >= 0x200b && cp <= 0x200f) || (cp >= 0xfe00 && cp <= 0xfe0f)) continue;
+    else if ((cp >= 0x1100 && cp <= 0x115f) || (cp >= 0x2e80 && cp <= 0xa4cf) || (cp >= 0xac00 && cp <= 0xd7a3)
+      || (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xfe30 && cp <= 0xfe4f) || (cp >= 0xff00 && cp <= 0xff60)
+      || (cp >= 0xffe0 && cp <= 0xffe6) || (cp >= 0x1f300 && cp <= 0x1f64f) || (cp >= 0x1f900 && cp <= 0x1f9ff)
+      || (cp >= 0x20000 && cp <= 0x3fffd)) n += 2;
+    else n += 1;
+  }
+  return n;
+}
+
+/**
  * Each diagnostic with where it is and its lines, underlined. `files` maps
  * a file key to its text; `relative` shortens a key for display;
  * `highlight(key, start, end)` gives the colored pieces of a range.
@@ -56,8 +75,8 @@ export function formatDiagnostics(diagnostics, files, { color = false, relative 
       const from = row.line === first ? d.start - starts[row.line] : raw.length - raw.trimStart().length;
       const to = row.line === last ? Math.min(raw.length, Math.max(from + 1, d.end - starts[row.line])) : raw.length;
       if (to <= from && row.line !== first) continue;
-      const pad = tabs(raw.slice(0, from)).length;
-      const width = Math.max(1, tabs(raw.slice(0, to)).length - pad);
+      const pad = columns(raw.slice(0, from));
+      const width = Math.max(1, columns(raw.slice(0, to)) - pad);
       out.push(`${bar('')} ${' '.repeat(pad)}${paint('1;31', '^'.repeat(width))}`);
     }
     return out.join('\n');

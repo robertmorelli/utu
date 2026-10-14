@@ -17,12 +17,16 @@
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { compile } from '../../src/selfhost/compiler.js';
 import { loadNodeCompiler, nodeHost } from '../../src/selfhost/node.js';
 import { programIndex } from '../../src/selfhost/query.js';
 import { highlighter } from '../../src/selfhost/highlight.js';
 import { docComments } from '../../src/selfhost/docs.js';
+
+// The level a doc comment's `= Heading` takes: below any declaration's.
+const DOC_HEADING = 5;
 
 // What a section documents, and what goes under its parent.
 const TOP = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct', 'Fn', 'Main', 'Global', 'Mem']);
@@ -51,7 +55,15 @@ async function main() {
       await walk(path.join(target, entry.name));
     }
   };
-  for (const target of args) await walk(target);
+  for (const target of args) {
+    try {
+      await walk(target);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      console.error(`utudoc: there is no ${target}`);
+      process.exit(2);
+    }
+  }
   entries.sort();
 
   const utu = await loadNodeCompiler();
@@ -129,14 +141,22 @@ async function main() {
   const ownNames = new Map(plans.map(({ file, items }) => [file.key, new Map(items
     .filter(item => shown.has(label(file.key, item.definition.start)))
     .map(item => [item.name, label(file.key, item.definition.start)]))]));
-  const references = (key, doc) => doc.replace(/(^|[^\w@\\])@([A-Za-z_]\w*)/g, (_, before, name) => {
-    const target = ownNames.get(key).get(name) ?? named.get(name)?.[0];
-    return `${before}${target ? `#link(<${target}>)[#raw(${typstString(name)})]` : `#raw(${typstString(name)})`}`;
-  });
+  // Outside code (raw text keeps its `@`): `@Name` is a link, any other `@`
+  // (an address's) is the character. A heading in a doc comment is under
+  // its declaration's, out of the outline (see the show rule below).
+  const references = (key, doc) => doc.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((piece, i) => (i % 2 ? piece : piece
+    .replace(/(^|[^\w@\\])@([A-Za-z_]\w*)/g, (_, before, name) => {
+      const target = ownNames.get(key).get(name) ?? named.get(name)?.[0];
+      return `${before}${target ? `#link(<${target}>)[#raw(${typstString(name)})]` : `#raw(${typstString(name)})`}`;
+    })
+    .replace(/([\w.])@/g, '$1\\@')
+    .replace(/^(=+) /gm, (_, level) => `${'='.repeat(DOC_HEADING + level.length - 1)} `))).join('');
 
   for (const { file, items, fileDoc } of plans) {
     const lines = [`= ${typstText(path.relative(base, file.key) || path.basename(file.key))} <${label(file.key, -1)}>`, ''];
-    if (fileDoc) lines.push(references(file.key, fileDoc), '');
+    // Each doc comment is marked with where it is, for typst's errors (which name a line of the .typ).
+    const from = (start) => `// ${displayPath(file.key)}:${file.text.slice(0, start).split('\n').length}`;
+    if (fileDoc) lines.push(`// ${displayPath(file.key)}:1`, references(file.key, fileDoc), '');
     const children = new Map();
     for (const item of items) {
       if (item.parent >= 0) {
@@ -149,7 +169,7 @@ async function main() {
       const heading = '='.repeat(Math.min(depth, 4));
       lines.push(`${heading} #raw(${typstString(item.name)}) #h(0.5em) #text(size: 0.7em, fill: luma(120), smallcaps[${kindName(item.kind)}]) <${label(file.key, item.definition.start)}>`);
       lines.push(`#block(fill: luma(246), inset: (x: 8pt, y: 6pt), radius: 3pt, width: 100%, breakable: true)[${signatureMarkup(file, item, labels, shown)}]`);
-      if (item.doc) lines.push('', references(file.key, item.doc));
+      if (item.doc) lines.push('', from(item.span.start), references(file.key, item.doc));
       lines.push('');
       for (const child of children.get(item.decl) ?? []) write(child, depth + 1);
     };
@@ -162,6 +182,9 @@ async function main() {
     '#set page(numbering: "1", margin: (x: 2cm, y: 2.2cm))',
     '#set text(size: 10pt)',
     '#set heading(numbering: "1.1")',
+    `#show heading.where(level: ${DOC_HEADING}): set heading(numbering: none, outlined: false)`,
+    `#show heading.where(level: ${DOC_HEADING + 1}): set heading(numbering: none, outlined: false)`,
+    `#show heading.where(level: ${DOC_HEADING + 2}): set heading(numbering: none, outlined: false)`,
     '#show heading.where(level: 1): it => { pagebreak(weak: true); it; v(0.3em) }',
     '#show raw: set text(size: 9pt)',
     '#show link: set text(fill: rgb("#1c5fbf"))',
@@ -173,13 +196,19 @@ async function main() {
     ...[...sections.values()].filter(Boolean),
   ].join('\n');
   await fs.writeFile(typFile, document);
-  const typst = spawnSync('typst', ['compile', '--root', '/', typFile, out], { encoding: 'utf8' });
+  // Typst reads only the document: its root is a directory holding nothing
+  // else, so a doc comment cannot `#read` the machine's files.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'utudoc-'));
+  await fs.copyFile(typFile, path.join(root, 'docs.typ'));
+  const typst = spawnSync('typst', ['compile', '--root', root, 'docs.typ', out], { encoding: 'utf8', cwd: root });
+  await fs.rm(root, { recursive: true, force: true });
   if (typst.error) {
     console.log(`wrote ${displayPath(typFile)} (typst is not installed: \`typst compile ${displayPath(typFile)}\` makes the PDF)`);
     return;
   }
   if (typst.status !== 0) {
-    process.stderr.write(typst.stderr);
+    // (Its errors name the copy: they are the .typ's lines, each doc comment marked with where it is.)
+    process.stderr.write(typst.stderr.replaceAll('docs.typ', displayPath(typFile)));
     console.error(`typst could not typeset ${displayPath(typFile)}: a doc comment's Typst is wrong where it says`);
     process.exit(1);
   }
@@ -195,7 +224,8 @@ function documentable(index, key) {
     const definition = index.definition(decl);
     if (!definition || definition.file !== key) continue;
     const name = index.text(definition);
-    if (!/^[A-Za-z_]\w*$/.test(name)) continue;
+    // (A module's own type is `&`.)
+    if (!/^[A-Za-z_]\w*$/.test(name) && name !== '&') continue;
     const parent = owner >= 0 && kept.has(owner) && MEMBER.has(kind) ? owner : -1;
     if (parent < 0 && (!TOP.has(kind) || owner >= 0 && index.kind(owner) !== 'Module')) continue;
     kept.add(decl);

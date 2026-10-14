@@ -5,6 +5,11 @@
 // straight from its memories: go to definition and find references cost a
 // pass over the nodes, with no build.
 
+const COMMENT = 8;  // lex.utu's Tok.Comment
+
+// The words a declaration begins with, before what it names.
+const DECLARING = new Set(['export', 'mod', 'struct', 'tag', 'enum', 'proto', 'fn', 'type', 'distinct', 'let', 'const', 'mem', 'vec', 'using']);
+
 /** Queries over the program loaded last (`files` is what loadProgram returned). */
 export function programIndex(utu, files) {
   const view = (mem, Type) => new Type(mem.buffer);
@@ -12,6 +17,7 @@ export function programIndex(utu, files) {
   const last = view(utu.node_last, Int32Array);
   const tokStart = view(utu.tok_start, Int32Array);
   const tokEnd = view(utu.tok_end, Int32Array);
+  const tokKind = view(utu.tok_kind, Uint8Array);
   const nodeDecl = view(utu.node_decl, Int32Array);
   const declNode = view(utu.decl_node, Int32Array);
   const declOwner = view(utu.decl_owner, Int32Array);
@@ -63,6 +69,21 @@ export function programIndex(utu, files) {
     return namingNodes;
   };
   const named = n => nodeDecl[n] >= 0 && first[n] < last[n] && last[n] - first[n] === 1;
+  // A declaration with no name node resolving to it (`struct &:`): the
+  // first token after its keywords, when that is a name or `&`.
+  const decoder = new TextDecoder();
+  const nameToken = node => {
+    for (let t = first[node]; t < last[node]; t++) {
+      if (tokKind[t] === COMMENT) continue;
+      const file = fileOf(tokStart[t]);
+      if (!file) return null;
+      const text = decoder.decode(file.bytes.subarray(tokStart[t] - file.offset, tokEnd[t] - file.offset));
+      if (DECLARING.has(text)) continue;
+      if (text !== '&' && !/^[A-Za-z_]\w*$/.test(text)) return null;
+      return { file: file.key, start: toUnits(file, tokStart[t]), end: toUnits(file, tokEnd[t]) };
+    }
+    return null;
+  };
 
   return {
     /** Where node `n` is: its file key and UTF-16 offsets, or null (a node of no file). */
@@ -81,7 +102,7 @@ export function programIndex(utu, files) {
       const owner = declNode[decl];
       if (owner < 0) return null;
       const best = naming()[decl];
-      return place(best >= 0 ? best : owner);
+      return best >= 0 ? place(best) : nameToken(owner) ?? place(owner);
     },
     /** Every name resolving to `decl`, the declaring one first when `includeDeclaration`. */
     references(decl, { includeDeclaration = true } = {}) {
@@ -138,6 +159,18 @@ export function programIndex(utu, files) {
       // A name node may wrap another of the same token: each place once.
       out.sort((a, b) => a.at.start - b.at.start);
       return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start);
+    },
+    /** The token of file `key` that `offset` (UTF-16) is inside: { kind (lex.utu's Tok), start, end }, or null. */
+    tokenAt(key, offset) {
+      const f = files.findIndex(file => file.key === key);
+      if (f < 0) return null;
+      for (let t = utu.file_first_token(f), end = utu.file_end_token(f); t < end; t++) {
+        const start = toUnits(files[f], tokStart[t]);
+        if (start >= offset) return null;
+        const stop = toUnits(files[f], tokEnd[t]);
+        if (offset < stop || (offset === stop && tokKind[t] === COMMENT)) return { kind: tokKind[t], start, end: stop };
+      }
+      return null;
     },
     /** The text of a place. */
     text(at) {

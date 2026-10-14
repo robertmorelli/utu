@@ -83,6 +83,9 @@ export function typstToMarkdown(typst) {
     if (fenced) { out.push(line); continue; }
     const pieces = line.split(/(`[^`]*`)/);
     const converted = pieces.map((piece, i) => (i % 2 ? piece : piece
+      // An escaped character (`\*`) is itself: kept aside from the rest.
+      .replace(/\\(.)/g, (_, c) => `\uE000${c.codePointAt(0)}\uE001`)
+      .replace(/</g, '&lt;')
       .replace(/^(=+) /, (_, level) => `${'#'.repeat(level.length)} `)
       .replace(/^(\s*)\+ /, '$11. ')
       .replace(/#link\("([^"]*)"\)\[([^\]]*)\]/g, '[$2]($1)')
@@ -90,7 +93,9 @@ export function typstToMarkdown(typst) {
       .replace(/\$([^$]+)\$/g, '`$1`')
       .replace(/(^|[^\w*])\*([^*\n]+)\*(?=[^\w*]|$)/g, '$1**$2**')
       .replace(/(^|[^\w])_([^_\n]+)_(?=[^\w]|$)/g, '$1*$2*')
-      .replace(/@([A-Za-z_][\w.-]*)/g, '`$1`'))).join('');
+      // `@Name` is a reference; an address's `@` is not.
+      .replace(/(^|[^\w@])@([A-Za-z_]\w*)/g, '$1`$2`')
+      .replace(/\uE000(\d+)\uE001/g, (_, c) => `\\${String.fromCodePoint(Number(c))}`))).join('');
     out.push(converted);
   }
   return out.join('\n');

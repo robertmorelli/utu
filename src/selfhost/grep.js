@@ -36,7 +36,7 @@ export function parsePattern(utu, pattern) {
   for (const [prefix, suffix] of [['fn __utu_pattern() void { ', '; }'], ['', '']]) {
     const tree = parseSource(utu, `${prefix}${holes}${suffix}`);
     if (!tree) continue;
-    if (!prefix) return tree.children;
+    if (!prefix) return tree.children.length ? tree.children : null;
     const block = tree.children[0]?.children.at(-1);
     if (block?.children.length) return block.children;
   }
@@ -135,7 +135,10 @@ export function matchProgram(utu, files, pattern, { where = {} } = {}) {
     if (i === ps.length) return j === ns.length;
     const p = ps[i];
     if (p.many !== undefined) {
+      // A run named twice is the same code both times.
+      const bound = env.get(`...${p.many}`);
       for (let k = j; k <= ns.length; k++) {
+        if (bound && (bound.length !== k - j || bound.some((b, i) => code(b) !== code(ns[j + i])))) continue;
         const saved = new Map(env);
         if (p.many !== '_') env.set(`...${p.many}`, ns.slice(j, k));
         if (matchList(ps, ns, env, i + 1, k)) return true;
@@ -215,6 +218,10 @@ export function findReferences(utu, files, name) {
 export async function grep(utu, entries, hostFor, { pattern = null, where = {}, references = null } = {}) {
   const parsed = pattern ? parsePattern(utu, pattern) : null;
   if (pattern && !parsed) return { matches: [], error: `the pattern is not utu: ${pattern}` };
+  const holes = new Set([...(pattern ?? '').matchAll(/\$(?:\.\.\.)?([A-Za-z_]\w*)/g)].map(m => m[1]));
+  const stray = Object.keys(where).find(name => !holes.has(name));
+  if (stray !== undefined) return { matches: [], error: `--where names $${stray}, which the pattern has not` };
+  const skipped = new Set();
   const seen = new Set();
   const matches = [];
   const add = match => {
@@ -227,6 +234,8 @@ export async function grep(utu, entries, hostFor, { pattern = null, where = {}, 
     for (const target of ['normal', 'test']) {
       const built = await compile(utu, entry, { ...hostFor(entry), target, optimize: 'none' });
       for (const file of built.files) texts.set(file.key, file.text);
+      // A file that does not parse has no tree to search.
+      for (const d of built.diagnostics) if (d.kind === 'parse-error' && d.file != null) skipped.add(d.file);
       if (parsed) for (const match of matchProgram(utu, built.files, parsed, { where })) add(match);
       if (!references) continue;
       for (const { kind, definition, references: refs } of findReferences(utu, built.files, references)) {
@@ -236,5 +245,5 @@ export async function grep(utu, entries, hostFor, { pattern = null, where = {}, 
     }
   }
   matches.sort((a, b) => a.at.file.localeCompare(b.at.file) || a.at.start - b.at.start);
-  return { matches, texts };
+  return { matches, texts, skipped: [...skipped] };
 }

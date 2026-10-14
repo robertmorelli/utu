@@ -68,7 +68,19 @@ try {
   // Nothing found: exit 1; a pattern that is not utu: exit 2.
   assert.equal(run('nothing($x)').status, 1);
   assert.equal(run('if if').status, 2);
-  console.log('grep: holes, recurring holes, runs, type filters, statements, references by resolution, exit status');
+  assert.equal(run(';').status, 2, 'an empty pattern');
+  assert.equal(run('$x + 1', '--where', 'zz: I32').status, 2, 'a filter on a hole the pattern has not');
+  const cli = (...args) => spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'grep', ...args], { encoding: 'utf8' });
+  const missing = cli('$x', path.join(dir, 'nothere.utu'));
+  assert.equal(missing.status, 2);
+  assert.match(missing.stderr, /there is no/);
+  // A file that does not parse is said to be skipped.
+  await fs.writeFile(path.join(dir, 'broken.utu'), 'fn broken( {\n');
+  assert.match(cli('$x', path.join(dir, 'broken.utu')).stderr, /broken\.utu: skipped: it does not parse/);
+  // A run named twice is the same code both times.
+  await fs.writeFile(path.join(dir, 'runs.utu'), 'fn f(a: I32, b: I32) I32 { a + b; }\nfn g() I32 { f(1, 2) + f(3, 4); }\nfn h() I32 { f(1, 2) + f(1, 2); }\n');
+  assert.deepEqual(JSON.parse(cli('f($...a) + f($...a)', '--json', path.join(dir, 'runs.utu')).stdout).map(m => m.line), [3]);
+  console.log('grep: holes, recurring holes and runs, type filters, statements, references by resolution, exit status, skipped and missing files');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

@@ -77,7 +77,7 @@ async function buildOrExit(utu, file, options) {
     // Colored as the compiler reads it: it still holds this build's program.
     const { highlighter } = await import('../src/selfhost/highlight.js');
     console.error(formatDiagnostics(sorted, files, {
-      color: process.stderr.isTTY || process.env.FORCE_COLOR === '1', relative: displayPath,
+      color: colored(process.stderr), relative: displayPath,
       highlight: highlighter(utu, result.files),
     }));
   }
@@ -106,7 +106,7 @@ async function run(file, { utu, optimize }) {
 async function test(file, { utu, optimize }) {
   const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
-  const paint = (code, text) => process.stdout.isTTY ? `\x1b[${code}m${text}\x1b[0m` : text;
+  const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   let failed = 0;
   for (const { export: name, name: title } of tests) {
     const started = performance.now();
@@ -223,20 +223,33 @@ async function lsp() {
   });
   let buffer = Buffer.alloc(0);
   let pending = Promise.resolve();
+  let shutDown = false;
   process.stdin.on('data', chunk => {
     buffer = Buffer.concat([buffer, chunk]);
     for (;;) {
       const end = buffer.indexOf('\r\n\r\n');
       if (end < 0) return;
-      const length = Number(/Content-Length: *(\d+)/i.exec(buffer.subarray(0, end).toString('ascii'))?.[1]);
+      const length = Number(/Content-Length: *(\d+)/i.exec(buffer.subarray(0, end).toString('ascii'))?.[1] ?? 0);
       if (buffer.length < end + 4 + length) return;
-      const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString('utf8'));
+      const body = buffer.subarray(end + 4, end + 4 + length).toString('utf8');
       buffer = buffer.subarray(end + 4 + length);
+      let message;
+      try {
+        message = JSON.parse(body);
+      } catch {
+        write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'the message is not JSON' } });
+        continue;
+      }
+      if (message?.method === 'shutdown') shutDown = true;
       // In order: an edit is seen before the questions after it.
-      pending = pending.then(() => server.handle(message)).then(result => { if (result?.exit != null) process.exit(result.exit); });
+      pending = pending
+        .then(() => server.handle(message))
+        .then(result => { if (result?.exit != null) process.exit(result.exit); })
+        .catch(error => process.stderr.write(`[utu lsp] ${error?.stack ?? error}\n`));
     }
   });
-  process.stdin.on('end', () => process.exit(0));
+  // The editor gone without asking: as `exit` would, after what is pending.
+  process.stdin.on('end', () => pending.then(() => process.exit(shutDown ? 0 : 1)));
 }
 
 /**
@@ -272,19 +285,28 @@ async function grepCommand(args) {
       await walk(path.join(target, entry.name));
     }
   };
-  for (const target of rest) await walk(target);
+  for (const target of rest) {
+    try {
+      await walk(target);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      console.error(`utu grep: there is no ${target}`);
+      process.exit(2);
+    }
+  }
   const hosts = new Map();
   const hostFor = file => {
     const root = path.dirname(file);
     if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
     return hosts.get(root);
   };
-  const { matches, texts, error } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
+  const { matches, texts, error, skipped = [] } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
   if (error) {
     console.error(error);
     process.exit(2);
   }
-  const color = process.stdout.isTTY;
+  for (const file of skipped) console.error(`${displayPath(file)}: skipped: it does not parse (utu check ${displayPath(file)})`);
+  const color = colored(process.stdout);
   const paint = (code, text) => (color ? `\x1b[${code}m${text}\x1b[0m` : text);
   const located = matches.map(match => {
     const text = texts.get(match.at.file) ?? '';
@@ -307,6 +329,17 @@ async function grepCommand(args) {
     }
   }
   if (!matches.length) process.exitCode = 1;
+}
+
+/**
+ * Whether to color what goes to `stream`: NO_COLOR (set, not empty) says
+ * no, FORCE_COLOR says yes (unless it is `0` or `false`), else a terminal.
+ */
+function colored(stream) {
+  if (process.env.NO_COLOR) return false;
+  const force = process.env.FORCE_COLOR;
+  if (force != null && force !== '') return force !== '0' && force !== 'false';
+  return !!stream.isTTY;
 }
 
 function usage(code) {

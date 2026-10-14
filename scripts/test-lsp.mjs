@@ -112,10 +112,30 @@ try {
   const rename = await ask('textDocument/rename', { ...at(MAIN, 'total'), newName: 'sum2' });
   assert.equal(rename.changes[main].length, 2);
   assert.equal(await ask('textDocument/prepareRename', at(MAIN, 'I32')), null, 'the standard library is not renamed');
+  // An import's alias is renamed where this file spells it: the alias, a
+  // type written with it, a call through it (not the module's own \`&\`).
+  const alias = await ask('textDocument/rename', { ...at(MAIN, 'Point) I32'), newName: 'Spot' });
+  assert.deepEqual(Object.keys(alias.changes), [main]);
+  assert.deepEqual(alias.changes[main].map(e => e.range.start.line), [0, 4, 10, 14]);
+  // A rename the editor may not make is an error, with its reason.
+  const refused = async (position, newName) => {
+    const n = sent.length;
+    await server.handle({ jsonrpc: '2.0', id: ++id, method: 'textDocument/rename', params: { ...position, newName } });
+    return sent.slice(n).find(m => m.id === id).error;
+  };
+  assert.deepEqual(await refused(at(MAIN, 'total'), 'let'), { code: -32602, message: "'let' is not a name" });
+  assert.equal((await refused(at(MAIN, 'I32'), 'Int')).code, -32602, 'the standard library is not renamed');
+
+  // A position past its line's end is its end, not the next line's start.
+  assert.equal(await ask('textDocument/hover', { textDocument: { uri: main }, position: { line: 2, character: 99 } }), null);
 
   // The outline, and semantic tokens (five numbers each).
   const symbols = await ask('textDocument/documentSymbol', { textDocument: { uri: main } });
   assert.deepEqual(symbols.map(s => s.name), ['twice', 'run']);
+  // A module's own type is known by the module's name.
+  const outline = await ask('textDocument/documentSymbol', { textDocument: { uri: shapes } });
+  assert.deepEqual(outline.map(s => [s.name, s.children.map(c => c.name)]), [['shapes', ['shapes', 'new', 'sum']]]);
+  assert.deepEqual(outline[0].children[0].selectionRange.start, { line: 2, character: 11 });
   const tokens = await ask('textDocument/semanticTokens/full', { textDocument: { uri: main } });
   assert.equal(tokens.data.length % 5, 0);
   assert.ok(tokens.data.length >= 5 * 10);
@@ -131,6 +151,9 @@ try {
   assert.ok((await completing(MAIN.replace('total * 2;', 'total.to¦\n    total * 2;'), '¦')).includes('to_str'), "an I32's methods");
   const names = await completing(MAIN.replace('total * 2;', 'to¦\n    total * 2;'), '¦');
   for (const name of ['total', 'p', 'twice', 'Point', 'Str', 'let']) assert.ok(names.includes(name), name);
+  // Nothing is offered in a comment or a string.
+  assert.deepEqual(await completing(MAIN.replace('total * 2;', '// to¦\n    total * 2;'), '¦'), []);
+  assert.deepEqual(await completing(MAIN.replace('total * 2;', 'let s = "to¦";\n    total * 2;'), '¦'), []);
 
   // Diagnostics as the text changes, and cleared when it is fixed.
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN.replace('total * 2', 'total * nope') }] });
@@ -139,6 +162,15 @@ try {
   assert.equal(diagnostics().length, 1, "the tests' build is checked too");
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
   assert.deepEqual(diagnostics(), []);
+
+  // A mistake in an import the editor has not opened is shown on it.
+  await fs.writeFile(path.join(dir, '_shapes.utu'), SHAPES.replace('self.x + self.y', 'self.x + nope'));
+  await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
+  const onImport = sent.filter(m => m.method === 'textDocument/publishDiagnostics' && m.params.uri === shapes).at(-1);
+  assert.deepEqual(onImport.params.diagnostics.map(d => [d.message, d.range.start.line]), [["Unknown variable 'nope'", 12]]);
+  await fs.writeFile(path.join(dir, '_shapes.utu'), SHAPES);
+  await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
+  assert.deepEqual(sent.filter(m => m.method === 'textDocument/publishDiagnostics' && m.params.uri === shapes).at(-1).params.diagnostics, [], 'and cleared when fixed');
 
   // An edit to an open import shows in the file that imports it.
   await tell('textDocument/didOpen', { textDocument: { uri: shapes, languageId: 'utu', version: 1, text: SHAPES } });
@@ -169,12 +201,20 @@ try {
   write({ id: 1, method: 'initialize', params: { capabilities: {} } });
   write({ method: 'textDocument/didOpen', params: { textDocument: { uri: main, languageId: 'utu', version: 1, text: MAIN } } });
   write({ id: 2, method: 'textDocument/definition', params: at(MAIN, 'twice(Point') });
-  write({ id: 3, method: 'shutdown' });
+  // What is not a message, or a notification it cannot follow, is not the end of it.
+  child.stdin.write('Content-Length: 5\r\n\r\n{bad}');
+  write({ method: 'textDocument/didOpen', params: {} });
+  write({ id: 3, method: 'textDocument/hover', params: at(MAIN, 'total * 2') });
+  write({ id: 4, method: 'shutdown' });
+  write({ id: 5, method: 'textDocument/hover', params: at(MAIN, 'total * 2') });
   write({ method: 'exit' });
   assert.equal(await exited, 0);
   assert.deepEqual(answers.find(a => a.id === 2).result, twiceDef);
+  assert.equal(answers.find(a => a.id === null).error.code, -32700);
+  assert.match(answers.find(a => a.id === 3).result.contents.value, /total: I32/);
+  assert.equal(answers.find(a => a.id === 5).error.code, -32600, 'nothing is answered after shutdown');
 
-  console.log('lsp: hover, definitions, references, rename, symbols, tokens, completion, and diagnostics as text changes; `utu lsp` on stdio');
+  console.log('lsp: hover, definitions, references, rename (aliases, refusals), symbols, tokens, completion (not in comments or strings), diagnostics as text changes and in unopened imports; `utu lsp` on stdio, past bad messages');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }
