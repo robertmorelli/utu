@@ -564,9 +564,19 @@ fn lex(first: I32, n: I32) I32 {
             return tok_kind.len();
         },
         ~> {
-            state = next;
-            j += 1;
-            next = dfa[state * 256 + src[j]];
+            // A state to move to. The bytes of a word, a number, a comment,
+            // or spaces are many in a row, and mostly keep the state: those
+            // go round here, each read independent of the one before.
+            while (next > 6) {
+                state = next;
+                j += 1;
+                let row = state * 256;
+                next = dfa[row + src[j]];
+                while (next == state) {
+                    j += 1;
+                    next = dfa[row + src[j]];
+                };
+            };
             continue next;
         },
     };

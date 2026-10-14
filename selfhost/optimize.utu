@@ -22,7 +22,6 @@
 mem opt_nodes: I32;
 mem opt_parent: I32;
 mem opt_place: I32;
-mem opt_refs: I32;     // by node: how many places in the live bodies hold it
 mem opt_gets: I32;     // by local: its reads
 mem opt_sets: I32;     // by local: its writes
 mem opt_get_at: I32;   // by local: the position (in opt_nodes) of a read
@@ -30,16 +29,6 @@ mem opt_set_at: I32;   // by local: the position of a write
 mem opt_reads: I32;    // the locals a value being sunk reads
 
 fn optimize_module() void {
-    // A node held in two places (in one body or two) is rewritten for both,
-    // so a body with one is left as it is.
-    opt_refs.resize(w_op.len());
-    for (0 ..< w_op.len()) |n| { opt_refs[n] = 0; };
-    for (0 ..< func_kind.len()) |f| {
-        if optimizable(f) {
-            opt_collect(f, vl_len[ht_a[func_type_of[f]]] + func_local_count[f]);
-            for (0 ..< opt_nodes.len()) |k| { opt_refs[opt_nodes[k]] += 1; };
-        };
-    };
     for (0 ..< func_kind.len()) |f| { if optimizable(f) { optimize_function(f); }; };
 }
 
@@ -49,7 +38,9 @@ fn optimize_function(f: I32) void {
     let params = vl_len[ht_a[func_type_of[f]]];
     let total = params + func_local_count[f];
     opt_collect(f, total);
-    for (0 ..< opt_nodes.len()) |k| { if opt_refs[opt_nodes[k]] != 1 { return; }; };
+    // A node held in two places (in one body or two; see sweep) would be
+    // rewritten for both, so a body with one is left as it is.
+    for (0 ..< opt_nodes.len()) |k| { if node_holders[opt_nodes[k]] != 1 { return; }; };
     while (propagate_copies(f, params) or sink_temporaries(params)) { opt_collect(f, total); };
     remove_unused_locals(f, params, total);
 }

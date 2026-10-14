@@ -607,8 +607,11 @@ fn flush_section(id: I32) void {
 mem func_live: U8;
 mem glob_live: U8;
 mem live_work: I32;
+mem node_holders: I32;  // by node: how many places in the live code hold it
 
 fn sweep() void {
+    node_holders.resize(w_op.len());
+    for (0 ..< w_op.len()) |n| { node_holders[n] = 0; };
     func_live.resize(func_kind.len());
     glob_live.resize(glob_kind.len());
     for (0 ..< func_kind.len()) |f| { func_live[f] = 0; };
@@ -640,6 +643,13 @@ fn mark_global(g: I32) void {
 }
 
 fn scan_live(node: I32) void {
+    // (Late functions, see mark_late, have nodes made after the sweep.)
+    if node >= node_holders.len() {
+        let old = node_holders.len();
+        node_holders.resize(w_op.len());
+        for (old ..< w_op.len()) |n| { node_holders[n] = 0; };
+    };
+    node_holders[node] += 1;
     let op = w_op[node];
     if op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.RefFunc.to_i32() { mark_func(w_a[node]); }
     else if op == Op.GlobalGet.to_i32() or op == Op.GlobalSet.to_i32() { mark_global(w_a[node]); };

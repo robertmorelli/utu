@@ -164,7 +164,30 @@ fn hoisted_receiver(m: I32, receiver: I32) Str {
     text;
 }
 
+// Validate each node of the tree, in order: those of the kinds validate_node
+// checks (most nodes are not).
 fn validate_tree(node: I32) void {
+    if validated_kinds.len() == 0 {
+        validated_kinds.resize(Node.count());
+        for (0 ..< Node.count()) |k| { validated_kinds[k] = 0; };
+        for ([Node.Param_list, Node.Struct_decl, Node.Field_list, Node.Enum_decl, Node.Block, Node.Nullable_type, Node.Tuple_type,
+            Node.Field, Node.Global_decl, Node.Distinct_decl, Node.Yield_expr, Node.Defer_expr, Node.Await_expr]) |k| { validated_kinds[k.to_i32()] = 1; };
+    };
+    validate_within(node);
+}
+
+mem validated_kinds: U8;  // by Node: 1 for those validate_node checks
+
+fn validate_within(node: I32) void {
+    if validated_kinds[node_kind[node]] == 1 { validate_node(node); };
+    let c = node_child[node];
+    while (c >= 0) {
+        if node_child[c] >= 0 { validate_within(c); } else if validated_kinds[node_kind[c]] == 1 { validate_node(c); };
+        c = node_next[c];
+    };
+}
+
+fn validate_node(node: I32) void {
     let kind = node_kind[node];
     if kind == Node.Param_list.to_i32() { duplicate_names(node, Diag.DuplicateDeclaration, 1); }
     else if kind == Node.Struct_decl.to_i32() { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(node)]); }
@@ -179,11 +202,6 @@ fn validate_tree(node: I32) void {
     else if kind == Node.Yield_expr.to_i32() { validate_yield(node); }
     else if kind == Node.Defer_expr.to_i32() { validate_defer(node); }
     else if kind == Node.Await_expr.to_i32() { validate_await(node); };
-    let c = first_child(node);
-    while (c >= 0) {
-        validate_tree(c);
-        c = next_sibling(c);
-    };
 }
 
 // Children that declare a name (parameters, fields, variants), each name
