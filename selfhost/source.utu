@@ -45,8 +45,8 @@ mem missing_end: I32 = [0];
 
 // What the host sealed (see `seal` in lib.utu) besides host declarations:
 // the standard library's prelude, parsed. Its words, tokens, nodes, files,
-// and imports are the first of each, by count.
-mem kept: I32 = [0, 0, 0, 0, 0];
+// imports, and DSL sites are the first of each, by count.
+mem kept: I32 = [0, 0, 0, 0, 0, 0];
 
 // Keep nothing for the programs that follow.
 fn unseal() void {
@@ -112,6 +112,7 @@ fn reset_program() void {
     import_node.resize(imports);
     import_path.resize(imports);
     import_target.resize(imports);
+    dsl_sites.resize(kept[5]);
     reset_resolve();
     // Words are interned anew for each program; kept views spell theirs again.
     if abi_kept[0] > 0 {

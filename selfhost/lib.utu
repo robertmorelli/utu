@@ -26,6 +26,7 @@ export lib {
         kept[2] = node_kind.len();
         kept[3] = file_start.len();
         kept[4] = import_file.len();
+        kept[5] = dsl_sites.len();
         kept_reactive[0] = -1;
     }
 

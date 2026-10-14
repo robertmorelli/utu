@@ -865,8 +865,16 @@ fn plan_mems() void {
     let copy_in = mem_method_word[MemMethod.Copy_in.to_i32()];
     let view = mem_method_word[MemMethod.View.to_i32()];
     let uses = Array[I32].new(decl_kind.len(), 0);
-    for (0 ..< decl_kind.len()) |d| { if decl_is(d, Decl.Mem) { mem_hosted[d] = 0; }; };
-    for (0 ..< node_kind.len()) |n| {
+    // The kept prelude's nodes name only its own declarations: when it
+    // declares no mem, they name none.
+    let first = kept[2];
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Mem) {
+            mem_hosted[d] = 0;
+            if decl_node[d] < kept[2] { first = 0; };
+        };
+    };
+    for (first ..< node_kind.len()) |n| {
         let kind = node_kind[n];
         if kind == Node.Identifier.to_i32() {
             let d = node_decl[n];

@@ -30,7 +30,9 @@ fn expand_dsl_round() Bool {
     let stored = intern_text("stored");
     let expanded = false;
     let before = node_kind.len();
-    for (own_nodes() ..< before) |n| {
+    let k = own_sites();
+    while (k < dsl_sites.len() and dsl_sites[k] < before) {
+        let n = dsl_sites[k];
         if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) {
             let w = word_of(first_child(n));
             if w == utu or w == css {
@@ -43,8 +45,11 @@ fn expand_dsl_round() Bool {
                 };
             };
         };
+        k += 1;
     };
-    for (own_nodes() ..< before) |n| {
+    k = own_sites();
+    while (k < dsl_sites.len() and dsl_sites[k] < before) {
+        let n = dsl_sites[k];
         if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == stored {
             expanded = true;
             try {
@@ -54,25 +59,29 @@ fn expand_dsl_round() Bool {
                 dsl_failed.push(n);
             };
         };
+        k += 1;
     };
     let json = intern_text("json");
     let containers = Array[I32].new(64, -1);
     let ncontainers = 0;
     let found = false;
     let count = node_kind.len();
-    for (own_nodes() ..< count) |n| {
+    k = own_sites();
+    while (k < dsl_sites.len() and dsl_sites[k] < count) {
+        let n = dsl_sites[k];
         if node_kind[n] == Node.Dsl_expr.to_i32() and word_of(first_child(n)) == json and dsl_in_program(n) {
             found = true;
             let c = dsl_container(n);
             let seen = false;
-            for (0 ..< ncontainers) |k| { if containers[k] == c { seen = true; }; };
+            for (0 ..< ncontainers) |i| { if containers[i] == c { seen = true; }; };
             if not seen and ncontainers < 64 {
                 containers[ncontainers] = c;
                 ncontainers += 1;
             };
         };
+        k += 1;
     };
-    for (0 ..< ncontainers) |k| { json_expand_container(containers[k], json, count); };
+    for (0 ..< ncontainers) |i| { json_expand_container(containers[i], json, count); };
     // Then the Wutu templates, until none is left (one may hold another).
     let wutu = intern_text("wutu");
     let more = true;
@@ -81,7 +90,9 @@ fn expand_dsl_round() Bool {
         more = false;
         guard += 1;
         let now = node_kind.len();
-        for (own_nodes() ..< now) |n| {
+        k = own_sites();
+        while (k < dsl_sites.len() and dsl_sites[k] < now) {
+            let n = dsl_sites[k];
             if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == wutu {
                 more = true;
                 expanded = true;
@@ -92,14 +103,21 @@ fn expand_dsl_round() Bool {
                     dsl_failed.push(n);
                 };
             };
+            k += 1;
         };
     };
     found or expanded;
 }
 
-// Where the nodes that may be the program's own start: the kept prelude's
-// (the first) are the standard library's.
-fn own_nodes() I32 { kept[2]; }
+// The DSL sites (`@name/\ … \/`), in node order: each parse notes those it
+// made (note_dsl_sites). The kept prelude's are the first.
+mem dsl_sites: I32;
+
+fn note_dsl_sites(from: I32) void {
+    for (from ..< node_kind.len()) |n| { if node_kind[n] == Node.Dsl_expr.to_i32() { dsl_sites.push(n); }; };
+}
+
+fn own_sites() I32 { kept[5]; }
 
 // Whether a node is in an own file (not the standard library), and its
 // expansion has not failed (an expanded site is a parenthesis).

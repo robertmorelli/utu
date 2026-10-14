@@ -1932,6 +1932,7 @@ fn parse(first: I32, last: I32) I32 {
         let root = source_file(Parser { pos: 0 });
         token_spans(before, root, first, last - 1);
         if comment_nodes[0] == 1 { attach_comments(root); };
+        note_dsl_sites(before);
         root;
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]];
@@ -2022,6 +2023,7 @@ fn parse_expression(first: I32, last: I32) I32 {
             node_first[id] = ptok[a];
             node_last[id] = if b > a { ptok[b - 1] + 1; } else { ptok[a]; };
         };
+        note_dsl_sites(before);
         e;
     } catch {
         restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
