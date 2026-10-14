@@ -29,3 +29,28 @@ To intern spans of a byte mem without copying them, use the mem's own
 `begin()`, `byte(b)` for each byte (from a mem, an array, or a string), then
 `finish()`; the same bytes always get the same id. `size`, `byte_at`, and `ascii`
 read a key back.
+
+## Everyday modules
+
+Each function ships only when a program uses it; most are one call to the
+host's own (JavaScript's string methods, `Math`).
+
+- `Str` (prelude): `index_of`, `last_index_of`, `contains`, `starts_with`,
+  `ends_with`, `trim` (and `_start`, `_end`), `to_upper`, `to_lower`,
+  `repeat`, `replace` (every occurrence), `pad_start`, `pad_end`, `split`
+  (to `Array[Str]`), `sep.join(parts)`, `parse_i32(fallback)`, `parse_f64()`
+  (NaN when it is not a number).
+- `F64` (prelude): `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`,
+  `exp`, `ln`, `log2`, `log10`, `pow`, `cbrt`, `hypot`, `is_nan`,
+  `is_finite`; `F64.pi()`, `F64.e()`, `F64.inf()`, `F64.nan()`.
+- `std:StrMap` — `StrMap[V]`, Str keys to any values: `set`, `get(key,
+  missing)`, `has`, `remove`, `len`, `keys`. Open addressing, no tombstones.
+- `std:Random` — `Random.new(seed)` (or `Random.from_host()`), xoshiro128**
+  in utu: `bits`, `int(low, high)` (unbiased), `float`, `chance(p)`. The
+  same seed gives the same numbers on every host.
+- `std:Console` — `using console from std:Console;` then `console.log(text)`,
+  `warn`, `error`.
+- `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,
+  for measuring) and `time.epoch_ms()`.
+
+Their doc comments are Typst: `node tools/utudoc/utudoc.mjs std -o std.pdf`.

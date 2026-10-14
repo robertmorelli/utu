@@ -565,7 +565,7 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
     `, async (file) => {
       const { doc, artifacts } = await compiler.analyzeFile(file);
       assertEq(artifacts.diagnostics.length, 0, JSON.stringify(artifacts.diagnostics.map(d => d.message)));
-      const cond = doc.body.firstChild.querySelector('ir-while')?.firstElementChild;
+      const cond = doc.body.firstChild.querySelector('ir-fn[name*="spin"] ir-while')?.firstElementChild;
       assertEq(cond?.getAttribute('value'), 'true', 'an absent condition becomes a literal true');
     });
   });

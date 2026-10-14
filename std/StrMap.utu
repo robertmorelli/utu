@@ -1,0 +1,136 @@
+//! Str keys to values of any type: `using StrMap from std:StrMap;`.
+//!
+//! ```
+//! let ages = StrMap[I32].new();
+//! ages.set("ada", 36);
+//! ages.get("ada", 0);     // 36
+//! ages.get("bob", 0);     // 0: absent
+//! ```
+//!
+//! Open addressing over a power-of-two table, at most half full; a key's
+//! hash (FNV-1a over its code units) is one call to the host, and kept.
+
+mod StrMap[V] {
+    struct &:
+        | keys : Array[Str]
+        | full : Array[I32]
+        | hashes : Array[I32]
+        | values : Array[V]
+        | count : I32
+
+    /// An empty map.
+    fn &.new() & {
+        &{ keys: Array[Str].new(0, ""), full: Array[I32].new(0, 0), hashes: Array[I32].new(0, 0), values: [], count: 0 };
+    }
+
+    /// How many keys it has.
+    fn &.len |self| () I32 { self.count; }
+
+    /// Whether it has `key`.
+    fn &.has |self| (key: Str) Bool {
+        if self.count == 0 { return false; };
+        self.full[self.slot(key, hash(key))] != 0;
+    }
+
+    /// The value of `key`, or `missing` when it has none.
+    fn &.get |self| (key: Str, missing: V) V {
+        if self.count == 0 { return missing; };
+        let i = self.slot(key, hash(key));
+        if self.full[i] == 0 { missing; } else { self.values[i]; };
+    }
+
+    /// `key`'s value is now `value`.
+    fn &.set |self| (key: Str, value: V) void {
+        let h = hash(key);
+        if (self.count + 1) * 2 > self.keys.len() { self.grow(value); };
+        let i = self.slot(key, h);
+        if self.full[i] == 0 {
+            self.full[i] = 1;
+            self.keys[i] = key;
+            self.hashes[i] = h;
+            self.count += 1;
+        };
+        self.values[i] = value;
+    }
+
+    /// Removes `key`; whether it had one.
+    fn &.remove |self| (key: Str) Bool {
+        if self.count == 0 { return false; };
+        let mask = self.keys.len() - 1;
+        let i = self.slot(key, hash(key));
+        if self.full[i] == 0 { return false; };
+        // Backward-shift deletion: later keys of the run move up, so no tombstones.
+        let j = i;
+        while (true) {
+            j = (j + 1) & mask;
+            if self.full[j] == 0 { break; };
+            let home = self.hashes[j] & mask;
+            // Move j's key to the hole at i unless its home lies in (i, j].
+            let stays = if i <= j { home > i and home <= j; } else { home > i or home <= j; };
+            if not stays {
+                self.keys[i] = self.keys[j];
+                self.hashes[i] = self.hashes[j];
+                self.values[i] = self.values[j];
+                i = j;
+            };
+        };
+        self.full[i] = 0;
+        self.keys[i] = "";
+        self.count -= 1;
+        true;
+    }
+
+    /// Its keys, in no particular order.
+    fn &.keys |self| () Array[Str] {
+        let out = Array[Str].new(self.count, "");
+        let k = 0;
+        for (0 ..< self.keys.len()) |i| {
+            if self.full[i] != 0 {
+                out[k] = self.keys[i];
+                k += 1;
+            };
+        };
+        out;
+    }
+
+    // The slot of `key` (hash `h`), or the empty one where it would go.
+    fn &.slot |self| (key: Str, h: I32) I32 {
+        let mask = self.keys.len() - 1;
+        let i = h & mask;
+        while (true) {
+            if self.full[i] == 0 { return i; };
+            if self.hashes[i] == h and self.keys[i] == key { return i; };
+            i = (i + 1) & mask;
+        };
+        i;
+    }
+
+    // Twice the room (16 at first); `fill` fills the new values.
+    fn &.grow |self| (fill: V) void {
+        let old_keys = self.keys;
+        let old_full = self.full;
+        let old_hashes = self.hashes;
+        let old_values = self.values;
+        let n = if old_keys.len() == 0 { 16; } else { old_keys.len() * 2; };
+        self.keys = Array[Str].new(n, "");
+        self.full = Array[I32].new(n, 0);
+        self.hashes = Array[I32].new(n, 0);
+        self.values = Array[V].new(n, fill);
+        let mask = n - 1;
+        for (0 ..< old_keys.len()) |i| {
+            if old_full[i] != 0 {
+                let j = old_hashes[i] & mask;
+                while (self.full[j] != 0) { j = (j + 1) & mask; };
+                self.full[j] = 1;
+                self.keys[j] = old_keys[i];
+                self.hashes[j] = old_hashes[i];
+                self.values[j] = old_values[i];
+            };
+        };
+    }
+
+    fn hash(key: Str) I32 {
+        let f: fun(Str) I32 = @es/\ (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h | 0; } \/;
+        f(key);
+    }
+}

@@ -1,0 +1,74 @@
+// stdlib.utu — the everyday standard library: text, math, maps, random
+// numbers, the console, and clocks.
+
+using console from std:Console;
+using Random from std:Random;
+using StrMap from std:StrMap;
+using time from std:Time;
+
+// Words counted, in a map from each word to how often it occurs.
+fn word_counts(text: Str) StrMap[I32] {
+    let counts = StrMap[I32].new();
+    for (text.to_lower().replace(",", "").split(" ")) |word| {
+        if word.len() > 0 { counts.set(word, counts.get(word, 0) + 1); };
+    };
+    counts;
+}
+
+export lib {
+    fn text() Str {
+        let s = "  Hello, World  ";
+        let t = s.trim();
+        `${t.to_upper()}|${t.index_of("o", 5)}|${t.last_index_of("o")}|${t.contains("World")}|${t.starts_with("Hell")}|${t.ends_with("x")}`;
+    }
+    fn pieces() Str { "-".join("a,b,,c".split(",")) + "|" + ", ".join("xyz".split("")); }
+    fn padded() Str { `${"7".pad_start(3, "0")}|${"ab".pad_end(4, ".")}|${"ab".repeat(3)}|${s_trims()}`; }
+    fn parsed() I32 { "42".parse_i32(0) + " -0x10 ".parse_i32(0) + "nope".parse_i32(1000) + "99999999999".parse_i32(-1); }
+    fn floats() F64 { "2.5".parse_f64() + (if "x".parse_f64().is_nan() { 10.0; } else { 0.0; }); }
+    fn math() F64 {
+        let x = F64.pi() / 6.0;
+        let sine = x.sin() * 1000.0;
+        let two: F64 = 2.0;
+        let one: F64 = 1.0;
+        let three: F64 = 3.0;
+        let eight: F64 = 8.0;
+        let thousand: F64 = 1000.0;
+        F64.nearest(sine) + two.pow(10.0) + three.hypot(4.0) + one.exp().ln() + eight.cbrt() + thousand.log10() + one.atan2(1.0).tan();
+    }
+    fn specials() I32 {
+        let n = 0;
+        if F64.nan().is_nan() { n += 1; };
+        if not F64.inf().is_finite() { n += 10; };
+        if 1.5.is_finite() { n += 100; };
+        n;
+    }
+    fn words() Str {
+        let counts = word_counts("the cat, the hat, the bat");
+        `${counts.len()} ${counts.get("the", 0)} ${counts.get("cat", 0)} ${counts.get("dog", -1)} ${counts.has("hat")}`;
+    }
+    fn removals() I32 {
+        let m = StrMap[I32].new();
+        for (0 ..< 200) |i| { m.set(`k${i}`, i); };
+        for (0 ..< 200) |i| { if i % 3 == 0 { m.remove(`k${i}`); }; };
+        let sum = 0;
+        for (0 ..< 200) |i| { sum += m.get(`k${i}`, 0); };
+        if m.keys().len() != m.len() { return -1; };
+        sum * 1000 + m.len();
+    }
+    fn dice() I32 {
+        let r = Random.new(42);
+        let counts = [0, 0, 0, 0, 0, 0];
+        for (0 ..< 6000) |i| { let d = r.int(0, 6); counts[d] = counts[d] + 1; };
+        let ok = 0;
+        for (counts) |c| { if c > 900 and c < 1100 { ok += 1; }; };
+        let same = Random.new(7).bits() == Random.new(7).bits();
+        ok + (if same { 10; } else { 0; }) + (if r.float() < 1.0 { 100; } else { 0; });
+    }
+    fn logged() I32 {
+        console.log("to stdout");
+        let start = time.now();
+        if time.now() >= start and time.epoch_ms() > 1.0e12 { 1; } else { 0; };
+    }
+}
+
+fn s_trims() Str { `[${"  x ".trim_start()}][${" x  ".trim_end()}]`; }

@@ -21,8 +21,16 @@ export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sour
   const enc = { module, index, typeIndex, typeOf: type => tupleBlockType(type, typeIndex) };
 
   section(out, 1, w => writeTypes(w, types, typeIndex));
+  // `@es` imports are numbered as the DSLs were expanded, the standard
+  // library's among them; the live ones are numbered again, in order, so
+  // their names stay short. The host's glue follows (module.importRenames).
+  module.importRenames = new Map();
+  for (const fn of index.functions) {
+    if (fn.import?.module === 'es' && /^__es_\d+$/.test(fn.import.base)) module.importRenames.set(fn.import.base, `__es_${module.importRenames.size}`);
+  }
+  const base = entry => (entry.module === 'es' && module.importRenames.get(entry.base)) || entry.base;
   const imports = [
-    ...index.functions.filter(fn => fn.import).map(fn => ({ ...fn.import, kind: 0, write: w => w.u32(typeIndex.get(fn.type)) })),
+    ...index.functions.filter(fn => fn.import).map(fn => ({ ...fn.import, base: base(fn.import), kind: 0, write: w => w.u32(typeIndex.get(fn.type)) })),
     ...index.globals.filter(global => global.import).map(global => ({ ...global.import, kind: 3, write: w => { valueType(w, global.type, typeIndex); w.byte(global.mutable ? 1 : 0); } })),
     ...index.memories.filter(memory => memory.import).map(memory => ({ ...memory.import, kind: 2, write: w => limits(w, memory) })),
     ...index.tags.map(tag => ({ ...tag.import, kind: 4, write: w => { w.byte(0); w.u32(typeIndex.get(tag.type)); } })),

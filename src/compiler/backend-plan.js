@@ -98,7 +98,10 @@ export function buildBackendPlan(doc, typeIndex, program = null, { facts = null,
     callTargets,
     functionsByName: index.functions,
     functionsById: new Map([...index.functions.values()].filter(fn => fn.id).map(fn => [fn.id, fn])),
-    emittableFunctions: (index.byKind.get('ir-fn') ?? []).filter(fn => fn.parentElement === root),
+    // A standard library function's operators are lowered when something
+    // reaches it; one an analysis keeps unreached still has them, and is left out.
+    emittableFunctions: (index.byKind.get('ir-fn') ?? []).filter(fn => fn.parentElement === root
+      && !((fn.getAttribute('data-source-file') ?? '').startsWith('std:') && fn.querySelector('ir-binary, ir-unary, ir-index, ir-slice'))),
     exports: (index.byKind.get('ir-fn') ?? []).filter(fn =>
       fn.parentElement === root && fn.getAttribute('data-export') !== null),
     runtime,

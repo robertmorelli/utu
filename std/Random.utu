@@ -1,0 +1,82 @@
+//! Seeded random numbers: `using Random from std:Random;`.
+//!
+//! xoshiro128\*\* (Blackman and Vigna), in utu: the same seed gives the
+//! same numbers on every host, and nothing crosses to JavaScript (unless
+//! the seed comes from the host, with `from_host`).
+//!
+//! ```
+//! let r = Random.new(42);
+//! r.int(1, 7);   // a die
+//! r.float();     // in [0, 1)
+//! ```
+
+mod Random {
+    struct &:
+        | a : I32
+        | b : I32
+        | c : I32
+        | d : I32
+
+    /// A generator seeded with `seed`: the state is filled by splitmix32, so
+    /// nearby seeds give unrelated numbers.
+    fn &.new(seed: I32) & { seeded(seed); }
+
+    /// A generator seeded from the host's randomness (`crypto.getRandomValues`).
+    fn &.from_host() & {
+        let seed: fun() I32 = @es/\ () => crypto.getRandomValues(new Int32Array(1))[0] \/;
+        seeded(seed());
+    }
+
+    /// The next 32 random bits.
+    fn &.bits |self| () I32 {
+        let result = rotl(self.b * 5, 7) * 9;
+        let t = self.b << 9;
+        self.c = self.c ^ self.a;
+        self.d = self.d ^ self.b;
+        self.b = self.b ^ self.c;
+        self.a = self.a ^ self.d;
+        self.c = self.c ^ t;
+        self.d = rotl(self.d, 11);
+        result;
+    }
+
+    /// A number in [0, 1), with 32 random bits.
+    fn &.float |self| () F64 {
+        self.bits().to_u32().to_f64() / 4294967296.0;
+    }
+
+    /// An integer in [`low`, `high`), every one equally likely (empty: `low`).
+    fn &.int |self| (low: I32, high: I32) I32 {
+        if high <= low { return low; };
+        let span = (high - low).to_u32().to_u64();
+        // Lemire's method: a multiply, and a retry only when a value would be biased.
+        let product = self.bits().to_u32().to_u64() * span;
+        let fraction = product.to_u32();
+        if fraction < span.to_u32() {
+            let threshold = (0.to_u32() - span.to_u32()) % span.to_u32();
+            while (fraction < threshold) {
+                product = self.bits().to_u32().to_u64() * span;
+                fraction = product.to_u32();
+            };
+        };
+        low + (product >> 32.to_u64()).to_i32();
+    }
+
+    /// True with probability `p`.
+    fn &.chance |self| (p: F64) Bool { self.float() < p; }
+
+    fn seeded(seed: I32) & {
+        let s = seed + -1640531527;
+        &{ a: mix(s), b: mix(s + -1640531527), c: mix(s - 1013904242), d: mix(s + 626627285) };
+    }
+
+    // splitmix32's output function.
+    fn mix(x: I32) I32 {
+        let z = x;
+        z = (z ^ (z >>> 16)) * -2048144789;
+        z = (z ^ (z >>> 13)) * -1028477387;
+        z ^ (z >>> 16);
+    }
+
+    fn rotl(x: I32, k: I32) I32 { (x << k) | (x >>> (32 - k)); }
+}

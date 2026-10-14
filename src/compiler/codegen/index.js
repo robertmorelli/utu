@@ -202,8 +202,31 @@ export function emitBinary(doc, { artifacts = null, sourceMap = false } = {}) {
   const sourceMapUrl = sourceMap ? (sourceMap === true ? 'module.wasm.map' : sourceMap) : undefined;
   const emitted = m.emitBinary(sourceMapUrl);
   const binary = sourceMap ? emitted.binary : emitted;
+  renameGlue(doc.body.firstChild, m.module?.importRenames ?? m.importRenames);
   noteBinarySize(artifacts, doc.body.firstChild, binary.length);
   return sourceMap ? { binary, sourceMap: emitted.sourceMap } : binary;
+}
+
+/**
+ * The `@es` bodies the host binds, under the names the binary imports them
+ * by (see encode.js): from the spec as expansion wrote it, kept aside, so
+ * emitting again renames from the same names.
+ */
+function renameGlue(root, renames) {
+  if (!root || !renames) return;
+  const original = root.getAttribute('data-dsl-imports-js-expanded') ?? root.getAttribute('data-dsl-imports-js');
+  if (original == null) return;
+  root.setAttribute('data-dsl-imports-js-expanded', original);
+  let spec;
+  try { spec = JSON.parse(original); } catch { return; }
+  const es = spec?.es;
+  if (!es) return;
+  const renamed = {};
+  for (const [name, body] of Object.entries(es)) {
+    if (!/^__es_\d+$/.test(name)) renamed[name] = body;
+    else if (renames.has(name)) renamed[renames.get(name)] = body;
+  }
+  root.setAttribute('data-dsl-imports-js', JSON.stringify({ ...spec, es: renamed }));
 }
 
 /**

@@ -3747,7 +3747,7 @@
   "calls": {}
  },
  "baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal": {
-  "emit": "Error: codegen: unsupported type \"Array__I32\" (no stdlib type-def or heap type match)"
+  "emit": "Error: codegen: unsupported type \"Array__Str\" (no stdlib type-def or heap type match)"
  },
  "baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test": {
   "calls": {}
@@ -4878,6 +4878,59 @@
   }
  },
  "examples/queries/iterators.utu test": {
+  "calls": {}
+ },
+ "examples/stdlib.utu normal": {
+  "calls": {
+   "dice": {
+    "result": 116,
+    "printed": []
+   },
+   "floats": {
+    "result": 12.5,
+    "printed": []
+   },
+   "logged": {
+    "result": 1,
+    "printed": [
+     "to stdout"
+    ]
+   },
+   "math": {
+    "result": 1536,
+    "printed": []
+   },
+   "padded": {
+    "result": "007|ab..|ababab|[x ][ x]",
+    "printed": []
+   },
+   "parsed": {
+    "result": 1025,
+    "printed": []
+   },
+   "pieces": {
+    "result": "a-b--c|x, y, z",
+    "printed": []
+   },
+   "removals": {
+    "result": 13267133,
+    "printed": []
+   },
+   "specials": {
+    "result": 111,
+    "printed": []
+   },
+   "text": {
+    "result": "HELLO, WORLD|8|8|true|true|false",
+    "printed": []
+   },
+   "words": {
+    "result": "4 3 1 -1 true",
+    "printed": []
+   }
+  }
+ },
+ "examples/stdlib.utu test": {
   "calls": {}
  },
  "examples/streams.utu normal": {

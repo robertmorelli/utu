@@ -13,7 +13,11 @@ export function expandDsls(doc, { dsls = {}, debugAssertions = false } = {}) {
   const artifacts = createDslArtifactState();
   // A replacement may itself contain DSL literals (DSLs nested in DSLs), so
   // expansion drains a worklist instead of one snapshot of the tree.
-  const queue = [...root.querySelectorAll(T.DSL)];
+  // The program's own sites first: names they are given (`__es_0`, …) stay
+  // short however many the standard library has.
+  const sites = [...root.querySelectorAll(T.DSL)];
+  const library = site => (site.getAttribute('data-source-file') ?? '').startsWith('std:');
+  const queue = [...sites.filter(site => !library(site)), ...sites.filter(library)];
   const enqueueNested = (replacement) => {
     queue.push(...replacement.querySelectorAll(T.DSL));
     if (replacement.localName === T.DSL) queue.push(replacement);

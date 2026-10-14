@@ -81,6 +81,13 @@ function scalarIntrinsicCases() {
     ...integerCases({ type: 'U64', signed: false, bigint: true, div: 9223372036854775807n, rem: 1n, shr: 4611686018427387904n, ushr: 4611686018427387904n }),
     ...floatCases('F32', 0),
     ...floatCases('F64'),
+    // F64's constants (its math methods are host calls, tested in test-stdlib.mjs).
+    ...typedCases('F64', 'F64', [
+      ['pi', { params: '', expr: 'F64.pi()', args: [] }, Math.PI],
+      ['e', { params: '', expr: 'F64.e()', args: [] }, Math.E],
+      ['inf', { params: '', expr: 'F64.inf()', args: [] }, Infinity],
+      ['nan', { params: '', expr: 'if F64.nan().is_nan() { 1.0; } else { 0.0; }', args: [] }, 1],
+    ], null, 'F64'),
   ];
 }
 

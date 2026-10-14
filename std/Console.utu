@@ -1,0 +1,23 @@
+//! The host's console: `using console from std:Console;`, then
+//! `console.log("hello")`. Text in, nothing out; each function ships only
+//! when used.
+
+mod console {
+    /// A line on standard output (`console.log`).
+    fn log(text: Str) void {
+        let f: fun(Str) void = @es/\ (s) => console.log(s) \/;
+        f(text);
+    }
+
+    /// A line on standard error, as a warning (`console.warn`).
+    fn warn(text: Str) void {
+        let f: fun(Str) void = @es/\ (s) => console.warn(s) \/;
+        f(text);
+    }
+
+    /// A line on standard error (`console.error`).
+    fn error(text: Str) void {
+        let f: fun(Str) void = @es/\ (s) => console.error(s) \/;
+        f(text);
+    }
+}
