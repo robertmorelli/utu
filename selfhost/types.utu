@@ -183,16 +183,12 @@ fn find_prelude_types() void {
     };
 }
 
-fn is_prelude(t: I32, p: Prelude) Bool { t == prelude(p); }
-
 fn is_numeric(t: I32) Bool {
     t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
         or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.M32) or t == prelude(Prelude.M64);
 }
 
 fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64); }
-
-fn is_64(t: I32) Bool { t == prelude(Prelude.I64) or t == prelude(Prelude.U64) or t == prelude(Prelude.M64); }
 
 // ── Types from syntax ──
 
@@ -353,7 +349,7 @@ fn open_instance(module: I32) I32 {
 // What a type is in wasm. Every reference is nullable, so locals and
 // fields of any type have a default.
 
-vec struct_of_decl: I32;   // (decl, inst) pairs → heap type, searched linearly per decl
+// Each declaration's instances' heap types: a chain of entries per declaration.
 vec struct_inst: I32;
 vec struct_heap: I32;
 vec struct_next: I32;      // the next entry for the same declaration, or -1
@@ -444,7 +440,6 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
     let super = if decl_is(decl, Decl.Variant) { struct_heap_of(decl_owner[decl], inst); } else { -1; };
     let h = struct_type(super, decl_is(decl, Decl.Enum));
     let entry = struct_inst.len();
-    struct_of_decl.push(decl);
     struct_inst.push(inst);
     struct_heap.push(h);
     struct_next.push(struct_first[decl]);
@@ -483,7 +478,6 @@ fn reset_types() void {
     inst_module.clear();
     inst_args.clear();
     inst_table.clear();
-    struct_of_decl.clear();
     struct_inst.clear();
     struct_heap.clear();
     struct_next.clear();

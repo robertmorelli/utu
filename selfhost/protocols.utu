@@ -88,7 +88,7 @@ fn proto_member_type(pm: I32) I32 {
 }
 
 // `p.x`: the field x of whichever implementing type p is.
-fn proto_field_get(node: I32, t: I32, name: I32, m: I32, cx: Cx) I32 {
+fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {

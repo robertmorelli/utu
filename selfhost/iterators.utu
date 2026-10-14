@@ -279,7 +279,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     } else if end_op == Kw.Bisect.to_i32() {
         t = check_bisect(node, input, n, cx);
     } else {
-        t = check_pipeline(node, input, first_stage, n, cx);
+        t = check_pipeline(input, first_stage, n, cx);
     };
     st_node.resize(first_stage);
     st_op.resize(first_stage);
@@ -289,7 +289,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-fn check_pipeline(node: I32, input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
+fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let m = w_mark();
     let p = Pipe {
         first_stage: first_stage, count: n, first: 0, range: is_kind(input, Node.Range_expr), source: -1,
@@ -340,7 +340,6 @@ fn check_pipeline(node: I32, input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         w_node(Op.ArrayLen, vt_i32, 0, 0, mh);
         ls(p.hi, mh);
     };
-    let source_setup = w_mark() - m;
     // Leading skip and take narrow the range instead of counting values.
     while (p.first < n - 1 and (stage_op(p, p.first) == Kw.Skip.to_i32() or stage_op(p, p.first) == Kw.Take.to_i32())) {
         narrow(p, p.first, cx);
@@ -1253,7 +1252,7 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let et = type_of(stage_type(node, 0), cx.inst);
         let b = buffer(p, slot, et, stage_type(node, 0));
         buffer_add(p, b, et, value, vt, node);
-        p.finish = buffer_done(b, et);
+        p.finish = buffer_done(b);
         p.result_type = array_of(et);
         return;
     };
@@ -1450,7 +1449,7 @@ fn is_defaultable_type(t: I32) Bool {
 }
 
 // if length == capacity { array } else { array.slice(0, length) }
-fn buffer_done(b: Buffer, et: I32) I32 {
+fn buffer_done(b: Buffer) I32 {
     let vt = cur_locals[b.array];
     let heap = vt_heap(vt);
     let m = w_mark();
@@ -2106,8 +2105,8 @@ fn check_partition(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let at = array_of(array_of(et));
     let heap = vt_heap(repr(at));
     let mf = w_mark();
-    w_push(buffer_done(yes, et));
-    w_push(buffer_done(no, et));
+    w_push(buffer_done(yes));
+    w_push(buffer_done(no));
     w_node(Op.ArrayNewFixed, vt_ref(heap, false), heap, 0, mf);
     p.finish = w_pop();
     p.result_type = at;
@@ -2403,7 +2402,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     w_node(Op.If, vt_none, new_label(), 0, mnew);
     p.result_type = array_of(group_t);
     if not grouping {
-        p.finish = buffer_done(out, group_t);
+        p.finish = buffer_done(out);
         return;
     };
     // group = out[j]; size = lengths[j]; grow group.values when full; append
@@ -2493,7 +2492,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         seq_void(mcl);
         to_cleanup(p);
     };
-    p.finish = buffer_done(out, group_t);
+    p.finish = buffer_done(out);
 }
 
 // if size == 0 { 4 } else { size * 2 }

@@ -55,23 +55,6 @@ fn abi_reserve(n: I32) I32 {
     at;
 }
 
-// A document, its `types` array at `at`: index its types.
-fn abi_add_doc(at: I32) I32 {
-    jbrackets(at);
-    let doc = abi_doc_types.len();
-    abi_doc_types.push(abi_type_at.len());
-    let n = 0;
-    let t = jfirst(at);
-    while (t >= 0) {
-        abi_type_at.push(t);
-        abi_type_ready.push(1);
-        n += 1;
-        t = jnext(t);
-    };
-    abi_doc_count.push(n);
-    doc;
-}
-
 // A document whose types the host has placed (abi_offsets): each type's
 // containers are indexed when it is first used.
 fn abi_add_doc_at(at: I32, n: I32) I32 {
@@ -268,9 +251,6 @@ fn jint(at: I32) I32 {
 
 // A string's text as a word (escapes kept as written; names have none).
 fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1); }
-
-// A JSON value's text, as a word: the identity of a written reference.
-fn jtext_word(at: I32) I32 { src.intern(at, jend(at)); }
 
 // ── Where containers end ──
 //

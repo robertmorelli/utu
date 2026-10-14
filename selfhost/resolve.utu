@@ -1141,7 +1141,7 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
         Node.Optional_field_expr => { walk_field(node, w); },
         Node.Type_member_expr => {
             let base = first_child(node);
-            let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base, w); } else { walk_type_path(base, w); };
+            let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base); } else { walk_type_path(base, w); };
             let name = next_sibling(base);
             node_decl[name] = static_member(owner, word_of(name));
         },
@@ -1391,7 +1391,7 @@ fn walk_pipe_target(target: I32, w: Walk) void {
         if decl < 0 { report(Diag.UnknownVariable, c, word_of(c)); } else { node_decl[c] = decl; };
         owner = decl;
     } else {
-        owner = walk_owner_name(c, w);
+        owner = walk_owner_name(c);
     };
     c = next_sibling(c);
     while (c >= 0 and (is_kind(c, Node.Identifier) or is_kind(c, Node.Type_ident))) {
@@ -1413,7 +1413,7 @@ fn walk_pipe_args(args: I32, w: Walk) void {
 }
 
 // The type or module a name before `.` names: `Tag` in `Tag.Leaf`, `M` in `M.f`.
-fn walk_owner_name(node: I32, w: Walk) I32 {
+fn walk_owner_name(node: I32) I32 {
     let word = word_of(node);
     let decl = lookup(word);
     if decl < 0 or not is_type_decl(decl) {

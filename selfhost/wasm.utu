@@ -613,6 +613,7 @@ vec live_work: I32;
 vec node_holders: I32;  // by node: how many places in the live code hold it
 vec func_uses: I32;     // by function: the calls and references to it in the live code
 vec glob_uses: I32;     // by global: the reads and writes of it
+vec glob_sets: I32;     // by global: the writes of it
 
 fn sweep() void {
     node_holders.resize(w_op.len());
@@ -621,6 +622,7 @@ fn sweep() void {
     glob_live.resize(glob_kind.len());
     func_uses.resize(func_kind.len());
     glob_uses.resize(glob_kind.len());
+    glob_sets.resize(glob_kind.len());
     for (0 ..< func_kind.len()) |f| {
         func_live[f] = 0;
         func_uses[f] = 0;
@@ -628,6 +630,7 @@ fn sweep() void {
     for (0 ..< glob_kind.len()) |g| {
         glob_live[g] = 0;
         glob_uses[g] = 0;
+        glob_sets[g] = 0;
     };
     live_work.clear();
     for (0 ..< func_kind.len()) |f| {
@@ -669,6 +672,7 @@ fn scan_live(node: I32) void {
         mark_func(w_a[node]);
     } else if op == Op.GlobalGet.to_i32() or op == Op.GlobalSet.to_i32() {
         glob_uses[w_a[node]] += 1;
+        if op == Op.GlobalSet.to_i32() { glob_sets[w_a[node]] += 1; };
         mark_global(w_a[node]);
     };
     for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
@@ -707,39 +711,7 @@ fn assign_indices() void {
     type_alone.resize(n);
     for (0 ..< n) |t| { type_alone[t] = 0; };
     for (0 ..< n) |t| { type_index[t] = -1; };
-    // Singles that refer only to abstract types or earlier singles come first.
-    for (0 ..< n) |t| {
-        if type_live[t] == 1 and ht_single[t] == 1 and refers_only_to_placed(t) {
-            type_index[t] = type_order.len();
-            type_order.push(t);
-        };
-    };
-    // A function type of numbers and abstract references alone has no
-    // identity to keep (no cast tells two of them apart), so it is a single
-    // too: the one already there of the same signature, or one of its own.
-    for (0 ..< n) |t| {
-        if type_live[t] == 1 and ht_single[t] == 0 and plain_func(t) {
-            let twin = ht_lookup(Heap.Func.to_i32(), ht_a[t], ht_b[t], 1);
-            if twin >= 0 and type_index[twin] >= 0 { type_index[t] = type_index[twin]; }
-            else {
-                type_index[t] = type_order.len();
-                type_order.push(t);
-                type_alone[t] = 1;
-            };
-        };
-    };
-    for (0 ..< n) |t| {
-        if type_live[t] == 1 and ht_single[t] == 0 and type_index[t] < 0 {
-            type_index[t] = type_order.len();
-            type_order.push(t);
-        };
-    };
-    for (0 ..< n) |t| {
-        if type_live[t] == 1 and type_index[t] < 0 {
-            type_index[t] = type_order.len();
-            type_order.push(t);
-        };
-    };
+    order_types(n);
     func_order.clear();
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
         sort_items.clear();
@@ -759,7 +731,7 @@ fn assign_indices() void {
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
         sort_items.clear();
         for (0 ..< glob_kind.len()) |g| {
-            if glob_kind[g] == kind.to_i32() and glob_live[g] == 1 { sort_items.push(g); };
+            if glob_kind[g] == kind.to_i32() and glob_live[g] == 1 and not glob_folded(g) { sort_items.push(g); };
         };
         sort_keys.resize(glob_uses.len());
         for (0 ..< glob_uses.len()) |g| { sort_keys[g] = glob_uses[g]; };
@@ -770,6 +742,142 @@ fn assign_indices() void {
         };
         if kind == FuncKind.Import { glob_imported[0] = glob_order.len(); };
     };
+}
+
+// Types are numbered so the most used take the shortest indices (a heap
+// type under 64 is one byte), as far as what they refer to allows: a type
+// encoded on its own comes after the types it names, and the recursion
+// group is one run, a supertype before its subtypes. Each of those is a
+// unit (the group's is n); a unit ranks as its most used type, or as the
+// best unit that has to come after it, and the best ready unit goes next.
+vec type_unit: I32;   // by heap type: its unit, or -1 (not encoded: dead, or a twin's)
+vec type_twin: I32;   // by heap type: the single of the same plain signature it is, or -1
+vec unit_rank: I32;   // by unit
+vec unit_placed: U8;
+vec type_refs: I32;   // the heap types a type names (refs_of)
+
+fn order_types(n: I32) void {
+    type_unit.resize(n);
+    type_twin.resize(n);
+    unit_rank.resize(n + 1);
+    unit_placed.resize(n + 1);
+    for (0 ..< n + 1) |u| {
+        unit_rank[u] = -1;
+        unit_placed[u] = 0;
+    };
+    for (0 ..< n) |t| {
+        type_twin[t] = -1;
+        type_unit[t] = -1;
+        if type_live[t] == 1 {
+            if ht_single[t] == 1 { type_unit[t] = t; }
+            else if plain_func(t) {
+                // A function type of numbers and abstract references alone
+                // has no identity to keep (no cast tells two of them apart),
+                // so it is a single too: the one of the same signature, or
+                // one of its own.
+                let twin = ht_lookup(Heap.Func.to_i32(), ht_a[t], ht_b[t], 1);
+                if twin >= 0 and type_live[twin] == 1 { type_twin[t] = twin; }
+                else {
+                    type_alone[t] = 1;
+                    type_unit[t] = t;
+                };
+            } else { type_unit[t] = n; };
+        };
+        if type_unit[t] >= 0 and type_uses[t] > unit_rank[type_unit[t]] { unit_rank[type_unit[t]] = type_uses[t]; };
+    };
+    // A unit others need first ranks with the best of them.
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (0 ..< n) |t| {
+            let u = type_unit[t];
+            if u >= 0 {
+                refs_of(t);
+                for (0 ..< type_refs.len()) |i| {
+                    let v = unit_of(type_refs[i]);
+                    if v >= 0 and v != u and unit_rank[v] < unit_rank[u] {
+                        unit_rank[v] = unit_rank[u];
+                        changed = true;
+                    };
+                };
+            };
+        };
+    };
+    while (true) {
+        let best = -1;
+        for (0 ..< n + 1) |u| {
+            if unit_placed[u] == 0 and unit_rank[u] >= 0 and (best < 0 or unit_rank[u] > unit_rank[best]) and unit_ready(u, n) { best = u; };
+        };
+        if best < 0 { break; };
+        unit_placed[best] = 1;
+        if best < n { place_type(best); } else { place_group(n); };
+    };
+    // (Nothing is left unless units need each other, which interning prevents.)
+    if unit_placed[n] == 0 { place_group(n); };
+    for (0 ..< n) |t| { if type_unit[t] == t and type_index[t] < 0 { place_type(t); }; };
+    for (0 ..< n) |t| { if type_twin[t] >= 0 { type_index[t] = type_index[type_twin[t]]; }; };
+}
+
+fn unit_of(t: I32) I32 { if type_twin[t] >= 0 { type_unit[type_twin[t]]; } else { type_unit[t]; }; }
+
+fn place_type(t: I32) void {
+    type_index[t] = type_order.len();
+    type_order.push(t);
+}
+
+// Whether every type unit u names, outside it, has its index.
+fn unit_ready(u: I32, n: I32) Bool {
+    for (0 ..< n) |t| {
+        if type_unit[t] == u {
+            refs_of(t);
+            for (0 ..< type_refs.len()) |i| {
+                let v = unit_of(type_refs[i]);
+                if v >= 0 and v != u and unit_placed[v] == 0 { return false; };
+            };
+        };
+    };
+    true;
+}
+
+// The group's types, the most used first, each after its supertype.
+fn place_group(n: I32) void {
+    while (true) {
+        let best = -1;
+        for (0 ..< n) |t| {
+            if type_unit[t] == n and type_index[t] < 0 and (ht_super[t] < 0 or type_index[ht_super[t]] >= 0)
+                and (best < 0 or type_uses[t] > type_uses[best]) { best = t; };
+        };
+        if best < 0 { return; };
+        place_type(best);
+    };
+}
+
+// The heap types type t names, into type_refs.
+fn refs_of(t: I32) void {
+    type_refs.clear();
+    let kind = ht_kind[t];
+    if kind == Heap.Func.to_i32() {
+        refs_of_list(ht_a[t]);
+        refs_of_list(ht_b[t]);
+    } else if kind == Heap.Array.to_i32() {
+        type_ref_of(ht_a[t]);
+    } else {
+        for (0 ..< ht_b[t]) |i| { type_ref_of(field_storage(t, i)); };
+    };
+    if ht_super[t] >= 0 { type_refs.push(ht_super[t]); };
+}
+
+fn refs_of_list(list: I32) void { for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)); }; }
+
+fn type_ref_of(vt: I32) void { if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)); }; }
+
+// A global nothing writes, of an integer constant: it is not in the
+// module, and each read is the constant (as short as the read, mostly, and
+// a constant to the engine).
+fn glob_folded(g: I32) Bool {
+    if glob_kind[g] != FuncKind.Defined.to_i32() or glob_field_name[g] >= 0 or glob_sets[g] != 0 or glob_init[g] < 0 { return false; };
+    let op = w_op[glob_init[g]];
+    op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32();
 }
 
 // sort_items by sort_keys[item], greatest first; equal keys keep their
@@ -812,11 +920,16 @@ fn sort_by_keys() void {
 // generic's instances, a closure's environment when nothing captures), and
 // they are left out.
 vec type_live: U8;
+vec type_uses: I32;  // by heap type: how often the module names it
 vec type_work: I32;
 
 fn sweep_types() void {
     type_live.resize(ht_kind.len());
-    for (0 ..< ht_kind.len()) |t| { type_live[t] = 0; };
+    type_uses.resize(ht_kind.len());
+    for (0 ..< ht_kind.len()) |t| {
+        type_live[t] = 0;
+        type_uses[t] = 0;
+    };
     type_work.clear();
     live_work.clear();
     for (0 ..< func_kind.len()) |f| {
@@ -862,7 +975,9 @@ fn sweep_types() void {
 }
 
 fn mark_type(t: I32) void {
-    if t < 0 or type_live[t] == 1 { return; };
+    if t < 0 { return; };
+    type_uses[t] += 1;
+    if type_live[t] == 1 { return; };
     type_live[t] = 1;
     type_work.push(t);
 }
@@ -905,21 +1020,6 @@ fn ht_lookup(kind: I32, a: I32, b: I32, single: I32) I32 {
     };
     -1;
 }
-
-fn refers_only_to_placed(t: I32) Bool {
-    let kind = ht_kind[t];
-    if kind == Heap.Func.to_i32() { return list_placed(ht_a[t]) and list_placed(ht_b[t]); };
-    if kind == Heap.Array.to_i32() { return vt_placed(ht_a[t]); };
-    for (0 ..< ht_b[t]) |i| { if not vt_placed(field_storage(t, i)) { return false; }; };
-    ht_super[t] < 0 or type_index[ht_super[t]] >= 0;
-}
-
-fn list_placed(list: I32) Bool {
-    for (0 ..< vl_len[list]) |i| { if not vt_placed(vl_item(list, i)) { return false; }; };
-    true;
-}
-
-fn vt_placed(vt: I32) Bool { vt < vt_defined or type_index[vt_heap(vt)] >= 0; }
 
 fn put_valtype(in_body: Bool, vt: I32) void {
     if vt == vt_i32 { put(in_body, 127); }
@@ -1127,9 +1227,11 @@ fn mark_late(f: I32) void {
     let globs = glob_live.len();
     glob_live.resize(glob_kind.len());
     glob_uses.resize(glob_kind.len());
+    glob_sets.resize(glob_kind.len());
     for (globs ..< glob_kind.len()) |g| {
         glob_live[g] = 0;
         glob_uses[g] = 0;
+        glob_sets[g] = 0;
     };
     mark_func(f);
     while (live_work.len() > 0) {
@@ -1400,6 +1502,10 @@ fn emit(node: I32, f: I32) void {
     let a = w_a[node];
     let b = w_b[node];
     if op == Op.Seq.to_i32() { emit_kids(node); return; };
+    if op == Op.GlobalGet.to_i32() and glob_folded(a) {
+        emit(glob_init[a], f);
+        return;
+    };
     if op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
         // A block nothing branches to is its contents (a loop's `continue`
         // target when nothing continues, …).
@@ -1471,7 +1577,7 @@ fn emit(node: I32, f: I32) void {
         Op.LocalGet => { op1(32); leb_u(true, a); },
         Op.LocalSet => { op1(33); leb_u(true, a); },
         Op.LocalTee => { op1(34); leb_u(true, a); },
-        Op.GlobalGet => { op1(35); leb_u(true, glob_index[a]); },
+        Op.GlobalGet => { op1(35); leb_u(true, glob_index[a]); },  // (or its constant: see emit)
         Op.GlobalSet => { op1(36); leb_u(true, glob_index[a]); },
         Op.I32Const => { op1(65); leb_s(true, a); },
         Op.I64Const => { op1(66); leb_s64(true, a, b); },

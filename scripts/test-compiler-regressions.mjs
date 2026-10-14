@@ -58,6 +58,23 @@ try {
     }
   }
 
+  // An @ir function named as a value, in the middle of another function's
+  // locals, which its making once overwrote (stage 0 cannot build this).
+  const valued = await selfhost(await write(`fn plus(a: I32, b: I32) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }
+fn apply(f: fun(I32, I32) I32, a: I32, b: I32) I32 { f(a, b); }
+export lib {
+    fn run() F64 {
+        let s = "text";
+        let x: F64 = 1.5;
+        let r = apply(plus, 1, 2);
+        let z: F64 = 10.0;
+        r.to_f64() * 1000.0 + x * 100.0 + z + s.len().to_f64();
+    }
+}
+`));
+  assert.equal(valued.exports?.run(), 3164, valued.errors?.join('\n'));
+  checked++;
+
   // Mistakes the self-hosted compiler reports (stage 0's words, where it has them).
   const mistakes = [
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'entry surface: multiple export lib declarations'],

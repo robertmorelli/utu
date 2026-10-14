@@ -56,7 +56,7 @@ fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
 
 // `x.to_i32()` of a scalar kind (x on the stack since `m`): the same value,
 // now of its base type. Returns -1 when `word` is no such method.
-fn scalar_method(decl: I32, word: I32, m: I32) I32 {
+fn scalar_method(decl: I32, word: I32) I32 {
     let base = scalar_base(decl);
     if word != conversion_word(true, base) { return -1; };
     base;

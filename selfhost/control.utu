@@ -410,7 +410,7 @@ fn is_null_literal(node: I32) Bool {
 }
 
 // `x == null`, `x != null` (either side): ref.is_null.
-fn check_null_compare(node: I32, other: I32, equal: Bool, cx: Cx) I32 {
+fn check_null_compare(other: I32, equal: Bool, cx: Cx) I32 {
     let m = w_mark();
     let t = check_expr(other, -1, cx);
     if not ty_is(t, Ty.Nullable) and not ty_is(t, Ty.Error) and not vt_is_ref(repr(t)) {

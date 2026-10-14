@@ -11,9 +11,6 @@
 //   an exported mem the host reads after running a build of the program
 //   made for it (compile with Target.Comptime).
 
-// The generated file being written.
-vec gen_file: I32;   // [0]: its first byte in src, or -1
-
 fn gen_text(text: Str) void { for (0 ..< text.len()) |i| { src.push(text.get(i)); }; }
 
 // `text` with each `$` replaced by word `name`.

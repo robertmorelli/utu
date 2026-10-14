@@ -73,23 +73,16 @@ export lib {
     fn import_foreign(i: I32) void { import_target[i] = -2; }
 
     // Host declarations: a document's `types` array, `n` bytes the host
-    // writes at the offset abi_room returns, then each import's view of one
-    // (its prefix, module specifier, exports, names, mutable globals).
+    // writes at the offset abi_room returns, with where each type is (byte
+    // offsets from `at`, `n` of them, in abi_offsets after
+    // abi_offsets_room(n)), so the document is read only where it is used;
+    // then each import's view of one (its prefix, module specifier, exports,
+    // names, mutable globals).
     fn abi_room(n: I32) I32 { abi_reserve(n); }
 
-    fn abi_doc(at: I32) I32 { abi_add_doc(at); }
-
-    // The same, with where each type is (byte offsets from `at`, `n` of
-    // them, in abi_offsets after abi_offsets_room(n)): the document is then
-    // read only where it is used.
     fn abi_offsets_room(n: I32) void { abi_offsets.resize(n); }
 
     fn abi_doc_at(at: I32, n: I32) I32 { abi_add_doc_at(at, n); }
-
-    fn abi_view(i: I32, doc: I32, at: I32) I32 {
-        import_target[i] = -2;
-        abi_add_view(i, doc, at);
-    }
 
     // The host cannot read the import's file, whose path is `n` bytes the
     // host writes at the offset returned. This ends the build.
@@ -270,21 +263,6 @@ export lib {
         let root = parse_file(0);
         comment_nodes[0] = 0;
         root;
-    }
-
-    // A module with one exported function, `answer`, returning 42: a check
-    // of the encoder alone.
-    fn debug_answer_module() I32 {
-        reset_wasm();
-        let f = new_func(FuncKind.Defined, func_type(vl_empty(), vl_one(vt_i32)));
-        let m = w_mark();
-        w_i32(40);
-        w_i32(2);
-        w_node(Op.Plain, vt_i32, 106, 0, m);
-        func_body[f] = w_pop();
-        func_field_name[f] = name_add("answer");
-        func_debug_name[f] = name_add("answer");
-        encode_module();
     }
 
     // A node kind's name in tree-sitter's spelling.

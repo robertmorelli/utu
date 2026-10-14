@@ -254,7 +254,7 @@
  "examples/protocols.utu": 472,
  "examples/queries/indexes.utu": 6254,
  "examples/queries/iterators.utu": 4624,
- "examples/stdlib.utu": 5112,
+ "examples/stdlib.utu": 5156,
  "examples/streams.utu": 1247,
  "examples/templates.utu": 740,
  "examples/wat.utu": 339,

@@ -43,7 +43,7 @@ fn optimize_function(f: I32) void {
     // A node held in two places (in one body or two; see sweep) would be
     // rewritten for both, so a body with one is left as it is.
     for (0 ..< opt_nodes.len()) |k| { if node_holders[opt_nodes[k]] != 1 { return; }; };
-    while (propagate_copies(f, params) or sink_temporaries(params)) { opt_collect(f, total); };
+    while (propagate_copies(params) or sink_temporaries(params)) { opt_collect(f, total); };
     if tee_stores() { opt_collect(f, total); };
     remove_unused_locals(f, params, total);
 }
@@ -126,7 +126,7 @@ fn opt_erase(n: I32) void {
     w_count[n] = 0;
 }
 
-fn propagate_copies(f: I32, params: I32) Bool {
+fn propagate_copies(params: I32) Bool {
     let changed = false;
     for (params ..< opt_gets.len()) |l| {
         if opt_sets[l] == 1 {

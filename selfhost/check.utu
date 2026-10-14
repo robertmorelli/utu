@@ -494,7 +494,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
         return es_read(decl, t);
     };
     if decl_es[decl] >= 0 { return es_read(decl, decl_ty[decl]); };
-    if k == Decl.Global.to_i32() { return global_get(decl, cx); };
+    if k == Decl.Global.to_i32() { return global_get(decl); };
     if k == Decl.Fn.to_i32() { return fn_value(decl, cx); };
     if k == Decl.Mem.to_i32() {
         report(Diag.MemNotValue, node, decl_name[decl]);
@@ -749,7 +749,7 @@ fn fn_value(decl: I32, cx: Cx) I32 {
     t;
 }
 
-fn global_get(decl: I32, cx: Cx) I32 {
+fn global_get(decl: I32) I32 {
     let g = global_of(decl);
     if g < 0 { return error_value(); };
     let t = decl_ty[decl];
@@ -902,7 +902,7 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
     let word = operator_word(token_after(left));
     if word == Kw.And.to_i32() or word == Kw.Or.to_i32() { return check_logical(node, word, cx); };
     if (word == known_word(Known.Eq) or word == known_word(Known.Ne)) and (is_null_literal(left) or is_null_literal(right)) {
-        return check_null_compare(node, if is_null_literal(left) { right; } else { left; }, word == known_word(Known.Eq), cx);
+        return check_null_compare(if is_null_literal(left) { right; } else { left; }, word == known_word(Known.Eq), cx);
     };
     let bool_t = prelude(Prelude.Bool);
     if word == Kw.Xor.to_i32() {
@@ -1125,7 +1125,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
         if is_foreign(rt) { return check_foreign_method(node, rt, word_of(name), args, m, expect, cx); };
         if decl_is(ty_decl(rt), Decl.Proto) { return proto_call(rt, name, args, m, node, cx); };
         if is_scalar_kind(ty_decl(rt)) {
-            let base = scalar_method(ty_decl(rt), word_of(name), m);
+            let base = scalar_method(ty_decl(rt), word_of(name));
             if base >= 0 and args < 0 { return base; };
         };
         let decl = member(ty_decl(rt), word_of(name), Space.Method);
@@ -1300,16 +1300,20 @@ fn function_of(fi: I32) I32 {
     let f = new_func(FuncKind.Defined, func_type(vl_end(mv), vl_of_result(repr(fi_result[fi]))));
     fi_func[fi] = f;
     func_debug_name[f] = fn_debug_name(fi_decl[fi]);
-    let saved = cur_locals.len();
+    // (A function being checked names it as a value: its locals are kept aside.)
+    let saved = Array[I32].new(cur_locals.len(), 0);
+    for (0 ..< cur_locals.len()) |i| { saved[i] = cur_locals[i]; };
     cur_locals.clear();
     for (0 ..< vl_len[params]) |i| { new_local(repr(vl_item(params, i))); };
     let m = w_mark();
     for (0 ..< vl_len[params]) |i| { w_leaf(Op.LocalGet, repr(vl_item(params, i)), i, 0); };
-    expand(fi, m, Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] });
+    expand(fi, m);
     func_body[f] = w_pop();
     func_locals[f] = local_types.len();
     func_local_count[f] = cur_locals.len() - vl_len[params];
     for (vl_len[params] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
+    cur_locals.clear();
+    for (0 ..< saved.len()) |i| { cur_locals.push(saved[i]); };
     f;
 }
 
@@ -1325,7 +1329,7 @@ vec call_site: I32;
 // The arguments are on the stack since `m`: call the function, or expand it.
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     let result = fi_result[fi];
-    if fi_ir[fi] >= 0 { return expand(fi, m, cx); };
+    if fi_ir[fi] >= 0 { return expand(fi, m); };
     w_node(Op.Call, repr(result), fi_func[fi], 0, m);
     result;
 }
@@ -1336,7 +1340,7 @@ fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
 // is the argument for p: moved in place when every parameter is used once
 // and in order, else read from a local each argument is stored in first.
 
-fn expand(fi: I32, m: I32, cx: Cx) I32 {
+fn expand(fi: I32, m: I32) I32 {
     let x = fi_ir[fi];
     let decls = param_decls(fi_decl[fi]);
     let n = vl_len[decls];
@@ -1360,7 +1364,7 @@ fn expand(fi: I32, m: I32, cx: Cx) I32 {
     };
     let pre = w_mark() - m;
     let result_vt = repr(fi_result[fi]);
-    let ok = translate(x, decls, args, locals, direct, fi, result_vt);
+    let ok = translate(x, decls, args, locals, direct, fi);
     if not ok {
         w_stack.resize(m);
         report(Diag.Unsupported, decl_node[fi_decl[fi]], -1);
@@ -1399,7 +1403,7 @@ fn param_index(x: I32, decls: I32) I32 {
 }
 
 // Push the IR of an @ir element; false when it is not one the compiler knows.
-fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32, result_vt: I32) Bool {
+fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
     let tag = x_tag[x];
     if tag == known_word(Known.IrIdent) {
         let i = param_index(x, decls);
@@ -1425,7 +1429,7 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     let m = w_mark();
     let c = x_child[x];
     while (c >= 0) {
-        if not translate(c, decls, args, locals, direct, fi, -1) { return false; };
+        if not translate(c, decls, args, locals, direct, fi) { return false; };
         c = x_next[c];
     };
     w_node(Op.Plain, opcode_result(opcode), opcode, 0, m);
@@ -1485,7 +1489,7 @@ fn is_module_path(node: I32) Bool {
 fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     if is_module_path(node) {
         let name = last_child(node);
-        if decl_is(node_decl[name], Decl.Global) { return global_get(node_decl[name], cx); };
+        if decl_is(node_decl[name], Decl.Global) { return global_get(node_decl[name]); };
         return unsupported(node);
     };
     check_field_get(node, expect, cx);
@@ -1517,7 +1521,7 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let owner = node_decl[first_child(node)];
     if decl_is(owner, Decl.Foreign) and decl_a[owner] >= 0 { return check_foreign_root(node, decl_a[owner], word_of(last_child(node)), expect); };
     let decl = node_decl[last_child(node)];
-    if decl_is(decl, Decl.Global) { return global_get(decl, cx); };
+    if decl_is(decl, Decl.Global) { return global_get(decl); };
     if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl); };
     unsupported(node);
 }
@@ -1612,7 +1616,6 @@ fn check_return(node: I32, cx: Cx) I32 {
     if defer_node.len() > function_defers[0] {
         // The value first, then every pending defer of the function.
         let vt = repr(cx.result);
-        let mr = w_mark();
         if value >= 0 and vt != vt_none and vt != vt_unreachable {
             let local = new_local(vt);
             w_node(Op.LocalSet, vt_none, local, 0, m);
@@ -1863,7 +1866,6 @@ fn in_target(node: I32, target: Target) Bool {
 fn entry_function(item: I32, name: I32, test_index: I32) void {
     let m = vl_begin();
     let result = ty_void();
-    let cx_inst = 0;
     let c = first_child(item);
     while (c >= 0) {
         if is_kind(c, Node.Param_list) {

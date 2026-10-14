@@ -309,20 +309,6 @@ fn parse_generated_file(code: Str) I32 {
     parse_file(file);
 }
 
-// The first item of a generated file of `code`, or -1.
-fn parse_generated(code: Str) I32 {
-    let root = parse_generated_file(code);
-    if root < 0 { -1; } else { first_child(root); };
-}
-
-// Whether `code` parses as an expression (the file it took is left empty).
-fn parses_as_expression(code: Str) Bool {
-    let root = parse_generated_file("fn __check() void { " + code + "; }");
-    if root < 0 { return false; };
-    node_child[root] = -1;
-    true;
-}
-
 // ── Splices ──
 //
 // Utu written in a DSL body (an interpolation, a match arm, a default) goes

@@ -83,7 +83,7 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     let raw = dsl_body(site);
     let i = 0;
     while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
-    if text_at(raw, i, "match") and (i + 5 >= raw.len() or not is_word_code(raw.get(i + 5))) { return json_match(site, raw, prefix); };
+    if text_at(raw, i, "match") and (i + 5 >= raw.len() or not is_word_code(raw.get(i + 5))) { return json_match(raw, prefix); };
     // `decode|encode|error`, a type (with nested brackets), then the expression.
     let op = if text_at(raw, i, "decode") { "decode"; } else if text_at(raw, i, "encode") { "encode"; } else if text_at(raw, i, "error") { "error"; } else { ""; };
     let after = i + op.len();
@@ -663,7 +663,6 @@ fn sc_string(raw: Str) Str {
 
 // Patterns: object (its fields' patterns, linked), capture, or literal.
 vec pat_kind: I32;          // 0 object, 1 capture, 2 literal
-vec pat_start: I32;
 vec pat_name: I32;          // capture: its name; a field: its key (words)
 vec pat_name_start: I32;
 vec pat_type: I32;          // capture: its type (a word)
@@ -675,10 +674,9 @@ vec pat_first: I32;         // object: its first field's pattern, or -1
 vec pat_next: I32;          // a field's next field, or -1
 vec pat_key: I32;           // a field's key (a word)
 
-fn new_pattern(kind: I32, start: I32) I32 {
+fn new_pattern(kind: I32) I32 {
     let p = pat_kind.len();
     pat_kind.push(kind);
-    pat_start.push(start);
     pat_name.push(-1);
     pat_name_start.push(0);
     pat_type.push(-1);
@@ -693,10 +691,10 @@ fn new_pattern(kind: I32, start: I32) I32 {
 }
 
 fn parse_pattern(raw: Str) I32 {
-    let start = sc_ws(raw);
+    sc_ws(raw);
     if sc_peek(raw, "{") {
         sc_expect(raw, "{");
-        let p = new_pattern(0, start);
+        let p = new_pattern(0);
         let last = -1;
         while (not sc_peek(raw, "}")) {
             let key_start = sc_ws(raw);
@@ -728,7 +726,7 @@ fn parse_pattern(raw: Str) I32 {
         let type_start = sc_ws(raw);
         let type = sc_capture_type(raw);
         if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at[0], 1); };
-        let p = new_pattern(1, start);
+        let p = new_pattern(1);
         pat_name[p] = intern_text(name);
         pat_name_start[p] = name_start;
         pat_type[p] = intern_text(type);
@@ -744,7 +742,7 @@ fn parse_pattern(raw: Str) I32 {
     if token.len() == 0 { token = sc_number(raw); };
     if token.len() == 0 { token = sc_keyword(raw); };
     if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at[0], 1); };
-    let p = new_pattern(2, start);
+    let p = new_pattern(2);
     pat_text[p] = intern_text(token);
     p;
 }
@@ -853,10 +851,9 @@ fn json_splice(text: Str, start: I32, what: Str) Str {
     dsl_splice(jc_site[0], start, text);
 }
 
-fn json_match(site: I32, raw: Str, prefix: Str) Str {
+fn json_match(raw: Str, prefix: Str) Str {
     jm_serial[0] = 0;
     pat_kind.clear();
-    pat_start.clear();
     pat_name.clear();
     pat_name_start.clear();
     pat_type.clear();
