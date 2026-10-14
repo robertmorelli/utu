@@ -1646,9 +1646,11 @@ fn compile(target: Target) I32 {
             };
         };
     };
-    // Every function of the program's own files is checked, reached or not.
+    // Every function of the program's own files is checked, reached or not;
+    // a @comptime build checks only what its expressions reach (the build it
+    // is for checks the rest).
     for (0 ..< file_root.len()) |file| {
-        if is_own_file(file) and file_root[file] >= 0 {
+        if target != Target.Comptime and is_own_file(file) and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
             let entry = file_role[file] == FileRole.Entry.to_i32();
             while (item >= 0) {

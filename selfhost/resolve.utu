@@ -1104,113 +1104,127 @@ fn walk_expr(node: I32, w: Walk) void {
 }
 
 fn walk_compound(node: I32, kind: I32, w: Walk) void {
-    if kind == Node.Block.to_i32() {
-        let mark = scope_mark();
-        walk_children(node, w);
-        scope_pop(mark);
-    } else if kind == Node.Bind_expr.to_i32() {
-        walk_bind(node, w);
-    } else if kind == Node.Field_expr.to_i32() or kind == Node.Optional_field_expr.to_i32() {
-        let base = first_child(node);
-        walk_expr(base, w);
-        // `m.f` with `m` a module: its member.
-        let module = node_decl[base];
-        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
+    match Node.from_i32(kind) {
+        Node.Block => {
+            let mark = scope_mark();
+            walk_children(node, w);
+            scope_pop(mark);
+        },
+        Node.Bind_expr => { walk_bind(node, w); },
+        Node.Field_expr => { walk_field(node, w); },
+        Node.Optional_field_expr => { walk_field(node, w); },
+        Node.Type_member_expr => {
+            let base = first_child(node);
+            let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base, w); } else { walk_type_path(base, w); };
             let name = next_sibling(base);
-            node_decl[name] = member(module, word_of(name), Space.Member);
-        };
-    } else if kind == Node.Type_member_expr.to_i32() {
-        let base = first_child(node);
-        let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base, w); } else { walk_type_path(base, w); };
-        let name = next_sibling(base);
-        node_decl[name] = static_member(owner, word_of(name));
-    } else if kind == Node.Promoted_module_call_expr.to_i32() {
-        let name_at = first_child(node);
-        let module = walk_module_name(name_at);
-        let args = next_sibling(name_at);
-        walk_types(args, w);
-        let name = next_sibling(args);
-        node_decl[name] = static_member(module, word_of(name));
-        walk_expr(next_sibling(name), w);
-    } else if kind == Node.Null_expr.to_i32() {
-        walk_type_name(first_child(node), w);
-    } else if kind == Node.Struct_init.to_i32() {
-        let t = first_child(node);
-        let decl = walk_type_path(t, w);
-        walk_field_inits(next_sibling(t), decl, w);
-    } else if kind == Node.Implicit_struct_init.to_i32() {
-        walk_field_inits(next_sibling(first_child(node)), -1, w);
-    } else if kind == Node.Closure_expr.to_i32() {
-        walk_closure(node, w);
-    } else if kind == Node.For_expr.to_i32() {
-        let c = first_child(node);
-        walk_for_sources(c, w);
-        let mark = scope_mark();
-        c = next_sibling(c);
-        if is_kind(c, Node.Capture) {
-            bind_capture(c, Decl.Capture);
+            node_decl[name] = static_member(owner, word_of(name));
+        },
+        Node.Promoted_module_call_expr => {
+            let name_at = first_child(node);
+            let module = walk_module_name(name_at);
+            let args = next_sibling(name_at);
+            walk_types(args, w);
+            let name = next_sibling(args);
+            node_decl[name] = static_member(module, word_of(name));
+            walk_expr(next_sibling(name), w);
+        },
+        Node.Null_expr => { walk_type_name(first_child(node), w); },
+        Node.Struct_init => {
+            let t = first_child(node);
+            let decl = walk_type_path(t, w);
+            walk_field_inits(next_sibling(t), decl, w);
+        },
+        Node.Implicit_struct_init => { walk_field_inits(next_sibling(first_child(node)), -1, w); },
+        Node.Closure_expr => { walk_closure(node, w); },
+        Node.For_expr => {
+            let c = first_child(node);
+            walk_for_sources(c, w);
+            let mark = scope_mark();
             c = next_sibling(c);
-        };
-        walk_expr(c, w);
-        scope_pop(mark);
-    } else if kind == Node.Iterator_expr.to_i32() {
-        walk_iterator(node, w);
-    } else if kind == Node.Alt_expr.to_i32() {
-        let c = first_child(node);
-        walk_expr(c, w);
-        c = next_sibling(c);
-        while (c >= 0) {
-            if is_kind(c, Node.Alt_arm) { walk_alt_arm(c, w); } else { walk_children(c, w); };
-            c = next_sibling(c);
-        };
-    } else if kind == Node.Promote_expr.to_i32() {
-        let c = first_child(node);
-        walk_expr(c, w);
-        let binding = next_sibling(c);
-        let mark = scope_mark();
-        let d = declare_named(Decl.Promoted, binding, node, -1);
-        bind(decl_name[d], d);
-        let arm = next_sibling(binding);
-        walk_expr(arm, w);
-        scope_pop(mark);
-        walk_expr(next_sibling(arm), w);
-    } else if kind == Node.Try_expr.to_i32() {
-        let body = first_child(node);
-        walk_expr(body, w);
-        let c = next_sibling(body);
-        let mark = scope_mark();
-        if is_kind(c, Node.Identifier) {
-            let d = declare_named(Decl.Caught, c, node, -1);
-            bind(decl_name[d], d);
-            c = next_sibling(c);
-        };
-        walk_expr(c, w);
-        scope_pop(mark);
-    } else if kind == Node.Match_expr.to_i32() or kind == Node.Loop_match_expr.to_i32() {
-        let c = first_child(node);
-        walk_expr(c, w);
-        c = next_sibling(c);
-        while (c >= 0) {
-            if is_kind(c, Node.Match_arm) {
-                walk_match_lit(first_child(c), w);
-                walk_expr(next_sibling(first_child(c)), w);
-            } else {
-                walk_children(c, w);
+            if is_kind(c, Node.Capture) {
+                bind_capture(c, Decl.Capture);
+                c = next_sibling(c);
             };
+            walk_expr(c, w);
+            scope_pop(mark);
+        },
+        Node.Iterator_expr => { walk_iterator(node, w); },
+        Node.Alt_expr => {
+            let c = first_child(node);
+            walk_expr(c, w);
             c = next_sibling(c);
+            while (c >= 0) {
+                if is_kind(c, Node.Alt_arm) { walk_alt_arm(c, w); } else { walk_children(c, w); };
+                c = next_sibling(c);
+            };
+        },
+        Node.Promote_expr => {
+            let c = first_child(node);
+            walk_expr(c, w);
+            let binding = next_sibling(c);
+            let mark = scope_mark();
+            let d = declare_named(Decl.Promoted, binding, node, -1);
+            bind(decl_name[d], d);
+            let arm = next_sibling(binding);
+            walk_expr(arm, w);
+            scope_pop(mark);
+            walk_expr(next_sibling(arm), w);
+        },
+        Node.Try_expr => {
+            let body = first_child(node);
+            walk_expr(body, w);
+            let c = next_sibling(body);
+            let mark = scope_mark();
+            if is_kind(c, Node.Identifier) {
+                let d = declare_named(Decl.Caught, c, node, -1);
+                bind(decl_name[d], d);
+                c = next_sibling(c);
+            };
+            walk_expr(c, w);
+            scope_pop(mark);
+        },
+        Node.Match_expr => { walk_match(node, w); },
+        Node.Loop_match_expr => { walk_match(node, w); },
+        Node.Block_expr => {
+            // A label is not a variable.
+            walk_expr(last_child(node), w);
+        },
+        Node.Pipe_expr => {
+            walk_expr(first_child(node), w);
+            walk_pipe_target(last_child(node), w);
+        },
+        Node.Unary_expr => { walk_expr(last_child(node), w); },
+        Node.Dsl_expr => {},
+        Node.Literal => {},
+        Node.Multiline_string_lit => {},
+        ~> { walk_children(node, w); },
+    };
+}
+
+// `a.f`, `a?.f`; with `a` a module (`m.f`), its member.
+fn walk_field(node: I32, w: Walk) void {
+    let base = first_child(node);
+    walk_expr(base, w);
+    let module = node_decl[base];
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
+        let name = next_sibling(base);
+        node_decl[name] = member(module, word_of(name), Space.Member);
+    };
+}
+
+// `match e { p => a, … }` and `loop match`.
+fn walk_match(node: I32, w: Walk) void {
+    let c = first_child(node);
+    walk_expr(c, w);
+    c = next_sibling(c);
+    while (c >= 0) {
+        if is_kind(c, Node.Match_arm) {
+            walk_match_lit(first_child(c), w);
+            walk_expr(next_sibling(first_child(c)), w);
+        } else {
+            walk_children(c, w);
         };
-    } else if kind == Node.Block_expr.to_i32() {
-        // A label is not a variable.
-        walk_expr(last_child(node), w);
-    } else if kind == Node.Pipe_expr.to_i32() {
-        walk_expr(first_child(node), w);
-        walk_pipe_target(last_child(node), w);
-    } else if kind == Node.Unary_expr.to_i32() {
-        walk_expr(last_child(node), w);
-    } else if kind == Node.Dsl_expr.to_i32() or kind == Node.Literal.to_i32() or kind == Node.Multiline_string_lit.to_i32() {
-        return;
-    } else {
-        walk_children(node, w);
+        c = next_sibling(c);
     };
 }
 
