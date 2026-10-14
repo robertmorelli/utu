@@ -300,6 +300,10 @@ fn is_promise_type(t: I32) Bool {
 }
 
 fn check_await(node: I32, cx: Cx) I32 {
+    if in_closure(node) {
+        report(Diag.AwaitInClosure, node, -1);
+        return error_value();
+    };
     let e = first_child(node);
     if is_kind(e, Node.For_expr) {
         // `await for (gen()) |x| { … }`: the generator's body may await.
@@ -323,6 +327,17 @@ fn check_await(node: I32, cx: Cx) I32 {
     let t = inst_arg(ty_inst(pt), 0);
     w_node(Op.Call, repr(t), await_import(t), 0, m);
     t;
+}
+
+// Whether node is in a closure's body (before any function's).
+fn in_closure(node: I32) Bool {
+    let p = parent_of(node);
+    while (p >= 0) {
+        if is_kind(p, Node.Closure_expr) { return true; };
+        if is_kind(p, Node.Fn_decl) { return false; };
+        p = parent_of(p);
+    };
+    false;
 }
 
 // `await for (s) |v| { body }` over a Stream[T] (std:Stream), or any type
@@ -514,8 +529,12 @@ fn write_promise_json() void {
 }
 
 // Exports that reach an await, through calls: they must be entered through
-// WebAssembly.promising for the stack to suspend.
+// WebAssembly.promising for the stack to suspend. A call through a
+// reference (a closure, a `fun`) may reach any function taken as a value:
+// it awaits when one of those does.
 vec awaiting: U8;
+vec taken: U8;              // by function: named by ref.func
+vec taken_awaits: U8 = [0];
 
 fn write_async_exports() void {
     let n = func_kind.len();
@@ -528,11 +547,19 @@ fn write_async_exports() void {
         awaiting[await_types[i]] = 1;
         i += 2;
     };
+    taken.resize(n);
+    for (0 ..< n) |f| { taken[f] = 0; };
+    for (0 ..< n) |f| { if func_live[f] == 1 and func_body[f] >= 0 { mark_taken(func_body[f]); }; };
+    taken_awaits[0] = 0;
     // To a fixpoint: a function awaits when it calls one that does.
     let changed = true;
     while (changed) {
         changed = false;
         for (0 ..< n) |f| {
+            if awaiting[f] == 1 and taken[f] == 1 and taken_awaits[0] == 0 {
+                taken_awaits[0] = 1;
+                changed = true;
+            };
             if awaiting[f] == 0 and func_live[f] == 1 and func_body[f] >= 0 and calls_awaiting(func_body[f]) {
                 awaiting[f] = 1;
                 changed = true;
@@ -552,9 +579,15 @@ fn write_async_exports() void {
     };
 }
 
+fn mark_taken(node: I32) void {
+    if w_op[node] == Op.RefFunc.to_i32() { taken[w_a[node]] = 1; };
+    for (0 ..< w_count[node]) |i| { mark_taken(w_kid(node, i)); };
+}
+
 fn calls_awaiting(node: I32) Bool {
     let op = w_op[node];
     if (op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32()) and awaiting[w_a[node]] == 1 { return true; };
+    if op == Op.CallRef.to_i32() and taken_awaits[0] == 1 { return true; };
     for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true; }; };
     false;
 }

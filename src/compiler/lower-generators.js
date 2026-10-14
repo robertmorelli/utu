@@ -53,6 +53,14 @@ export function lowerGenerators(doc, parser, createDocument) {
     }
   }
 
+  // A closure is called through the host (a JS function), and JSPI cannot
+  // suspend through JavaScript frames.
+  for (const awaited of root.querySelectorAll('ir-await')) {
+    if (awaited.closest('ir-closure')) {
+      throw compilerError(DIAGNOSTIC_KINDS.INVALID_AWAIT, 'a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)', awaited);
+    }
+  }
+
   // `await for (…)` parses as an await of the loop; the loop is the point.
   // Over a generator call it is the generator's loop; over anything else, a
   // stream's (streamLoop).

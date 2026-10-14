@@ -205,6 +205,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
     if k == Diag.EntrySurface { return "entry-surface-conflict"; };
     if k == Diag.InvalidEscape { return "invalid-escape"; };
+    if k == Diag.AwaitInClosure { return "invalid-await"; };
     if k == Diag.InvalidDslUsage or k == Diag.DslError or k == Diag.WatPlace or k == Diag.WatHost { return "invalid-dsl-usage"; };
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     "type-mismatch";
@@ -342,6 +343,7 @@ fn diag_text(i: I32) Str {
     if k == Diag.ForeignRecordMissing { return "Missing foreign property '" + w + "'"; };
     if k == Diag.DslError { return w; };
     if k == Diag.WatPlace { return "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"; };
+    if k == Diag.AwaitInClosure { return "a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)"; };
     if k == Diag.InvalidEscape { return "Invalid escape: \\u takes four hexadecimal digits"; };
     if k == Diag.EntrySurface {
         if a == 0 { return "entry surface: multiple export lib declarations"; };

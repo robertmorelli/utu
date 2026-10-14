@@ -316,6 +316,12 @@ operator, so `await a + b` is `(await a) + b`, as in JS.
 >
 > The cost is a host requirement: `await` needs a JSPI-capable host (Chrome
 > 126+, Node 23+, Bun). `.then` does not, and is the portable floor.
+>
+> A closure (`cl`) does not await: it is a host function (so JS can call it),
+> and JSPI cannot suspend a stack through JavaScript frames. An `await` in a
+> closure's body is an error; await in a function, and pass it as a `fun`
+> value where one is wanted (a `fun` is called inside wasm, and may await). A
+> closure that calls a function that awaits fails when it runs.
 
 ### Streams
 

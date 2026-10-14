@@ -57,6 +57,7 @@ try {
     ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`'],
     ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'a stream loop binds one value: await for (s) |value| { … }'],
     ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', "Cannot access field 'iterator' on nullable ?Stream[I32]"],
+    ['fn f(s: Stream[I32]) I32 { let g = cl() I32 { let t = 0; await for (s) |v| { t += v; }; t; }; g(); }', 'a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)'],
   ];
   for (const [i, [body, message]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);
@@ -83,6 +84,7 @@ fn Counter.close |self| (it: It) void { }
 let source: fun() Stream[I32] = @es/\\ () => { const s = (async function* () { yield 1; yield 2; yield 3; })(); const ret = s.return.bind(s); s.return = v => { globalThis.__returns = (globalThis.__returns ?? 0) + 1; return ret(v); }; return s; } \\/;
 let closed: fun() I32 = @es/\\ () => { const n = globalThis.__returns ?? 0; globalThis.__returns = 0; return n; } \\/;
 fn first(s: Stream[I32]) I32 { await for (s) |v| { return v; }; 0; }
+fn apply(f: fun(Stream[I32]) I32, s: Stream[I32]) I32 { f(s) * 100; }
 export lib {
     fn nested() I32 {
         let t = 0;
@@ -93,6 +95,7 @@ export lib {
     fn returned() I32 { first(source()) * 10 + closed(); }
     fn broken() I32 { await for (source()) |v| { break; }; closed(); }
     fn finished() I32 { let t = 0; await for (source()) |v| { t += v; }; t * 10 + closed(); }
+    fn passed() I32 { apply(first, source()) + closed(); }
 }
 `);
   const more = await both(file);
@@ -105,8 +108,9 @@ export lib {
     assert.equal(await exports.broken(), 1, `${compiler}: break closes the stream`);
     // (Run out, it is closed too, which a finished generator ignores.)
     assert.equal(await exports.finished(), 61, `${compiler}: a stream run out`);
+    assert.equal(await exports.passed(), 101, `${compiler}: a function that awaits, called as a fun value`);
   }
-  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, nested loops, types with the methods, closing on break and return, and ${cases.length} mistakes reported alike`);
+  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, nested loops, types with the methods, closing on break and return, awaiting through a fun value, and ${cases.length} mistakes reported alike`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }
