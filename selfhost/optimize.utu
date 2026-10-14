@@ -3,7 +3,7 @@
 // Stage 0's wasm/optimize.js, for size and speed builds. Lowerings leave
 // copies and temporaries a hand-written program would not have (a
 // generator's parameters bound to the call's arguments, each `yield`'s value
-// held for the consumer). Three rewrites remove them, in each function:
+// held for the consumer). Four rewrites remove them, in each function:
 //
 //   copies       a local set once, to a parameter never assigned, is that
 //                parameter: its reads read the parameter

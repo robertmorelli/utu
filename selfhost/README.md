@@ -184,15 +184,22 @@ tables.
 - **Encoding** (`wasm.utu`): a sweep from the exports finds the functions
   and globals reached, and a second the types they use (a generic's unused
   instances, an environment nothing captures, are left out); indices are
-  assigned (imports first) and only that is encoded. Struct and array types
-  live in one recursion group, so casts tell them apart; a function type of
-  plain values needs no identity and is encoded on its own. A block or loop
-  nothing branches to is encoded as its contents.
+  assigned (imports first) and only that is encoded. Indices are bytes
+  saved: the 128 functions and globals named most take the one-byte
+  indices (the rest keep the program's order, which compresses better),
+  and types are numbered by use, the most used under 64, as far as what
+  each refers to allows. Struct and array types live in one recursion
+  group, so casts tell them apart; a function type of plain values needs
+  no identity and is encoded on its own. A block or loop nothing branches
+  to is encoded as its contents, and a while loop's exit block is left out
+  (`loop (if (not c) body (br 0))`). A global nothing writes, of an integer
+  constant, is that constant where it is read.
 - **Size builds** (`optimize.utu`, the default, as stage 0's `-Oz`): host
   member operations share one import per shape (`(self,k) => self[k]`, the
   name a string constant); stage 0's local cleanup (copies, temporaries,
-  unused locals) runs on every function; a `match` takes a `br_table` only
-  when that is the smaller. Iterator pipelines fuse across a `collect` whose
+  unused locals) runs on every function, and a store the next statement
+  reads first is a `local.tee`; a `match` takes a `br_table` only when that
+  is the smaller. Iterator pipelines fuse across a `collect` whose
   stages cannot tell, and a captured variable is boxed only when a write
   could be seen after the capture, both as in stage 0.
 - **The host contract** (`host.utu`): what the module needs from its host
@@ -205,14 +212,14 @@ tables.
 `scripts/selfhost-run-differential.mjs` builds every program in
 `examples/`, `benchmarks/`, and `baselines/corpus` (for its exports and its
 tests), runs each zero-argument export and test, and compares what it does
-with what stage 0's builds did (`baselines/run-differential.json`). 946 of
-948 builds behave the same, and none differs; the other two differ on
+with what stage 0's builds did (`baselines/run-differential.json`). 954 of
+956 builds behave the same, and none differs; the other two differ on
 purpose, where stage 0 builds a module given too few type arguments.
 
 `scripts/selfhost-diagnostics-differential.mjs` does the same for programs
 that do not build: for those programs and the negative corpus, every
 diagnostic's kind, message, and span must be stage 0's
-(`baselines/diagnostics.json.gz`). 1202 of 1234 builds diagnose the same,
+(`baselines/diagnostics.json.gz`). 1208 of 1242 builds diagnose the same,
 and none differs. The others differ on purpose: a program that does not parse
 is reported at the furthest token the parser reached, with what it wanted
 there (`Syntax error: expected ';', got 'x'`), where stage 0 reported
@@ -228,9 +235,9 @@ mistaken initializer) is counted under it: `(+1 caused by this)`.
 
 The check is behavior, not bytes: the compiler is a new design, so its
 wasm differs from stage 0's, but what every program does must not. It is
-smaller: of the 280 programs both compilers build, 252 are smaller at -Oz,
-25 the same, and 3 larger by at most 3 bytes; 648,426 bytes in all against
-stage 0's 762,646 (15% less), built in a third of the time.
+smaller: of the 284 programs both compilers build, 262 are smaller at -Oz,
+20 the same, and 2 larger by at most 3 bytes; 640,865 bytes in all against
+stage 0's 770,087 (16.8% less), built in a third of the time.
 
 ## Host declarations
 

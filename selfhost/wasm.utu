@@ -680,8 +680,9 @@ fn scan_live(node: I32) void {
 
 // Final indices: types (singles that need nothing defined after them, then
 // the recursion group, then the other singles), functions (imports first),
-// globals (imports first). Functions and globals are ordered by how often
-// the code names them, most first: an index under 128 takes one byte.
+// globals (imports first). The functions and globals the code names most
+// take the indices under 128 (one byte); the others keep the program's
+// order, in which related code sits together and compresses better.
 vec type_index: I32;   // by heap type
 vec type_order: I32;   // heap types in index order
 vec func_order: I32;   // live functions in index order
@@ -720,7 +721,7 @@ fn assign_indices() void {
         };
         sort_keys.resize(func_uses.len());
         for (0 ..< func_uses.len()) |f| { sort_keys[f] = func_uses[f]; };
-        sort_by_keys();
+        most_used_first(128 - func_order.len());
         for (0 ..< sort_items.len()) |i| {
             func_index[sort_items[i]] = func_order.len();
             func_order.push(sort_items[i]);
@@ -735,7 +736,7 @@ fn assign_indices() void {
         };
         sort_keys.resize(glob_uses.len());
         for (0 ..< glob_uses.len()) |g| { sort_keys[g] = glob_uses[g]; };
-        sort_by_keys();
+        most_used_first(128 - glob_order.len());
         for (0 ..< sort_items.len()) |i| {
             glob_index[sort_items[i]] = glob_order.len();
             glob_order.push(sort_items[i]);
@@ -880,11 +881,37 @@ fn glob_folded(g: I32) Bool {
     op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32();
 }
 
-// sort_items by sort_keys[item], greatest first; equal keys keep their
-// order. A merge sort, bottom up, through sort_spare.
+// The `room` items of sort_items with the greatest sort_keys first (the
+// greatest first), then the others as they were.
 vec sort_items: I32;
 vec sort_keys: I32;
 vec sort_spare: I32;
+vec sort_rest: I32;
+
+fn most_used_first(room: I32) void {
+    sort_rest.clear();
+    for (0 ..< sort_items.len()) |i| { sort_rest.push(sort_items[i]); };
+    sort_by_keys();
+    let front = if room < sort_items.len() { if room > 0 { room; } else { 0; }; } else { sort_items.len(); };
+    // The front is the first `front` of the sorted ones; the rest follow in their order.
+    let n = front;
+    for (0 ..< sort_rest.len()) |i| {
+        let item = sort_rest[i];
+        if not in_front(item, front) {
+            sort_items[n] = item;
+            n += 1;
+        };
+    };
+}
+
+// Whether `item` is among the first `front` of sort_items.
+fn in_front(item: I32, front: I32) Bool {
+    for (0 ..< front) |i| { if sort_items[i] == item { return true; }; };
+    false;
+}
+
+// sort_items by sort_keys[item], greatest first; equal keys keep their
+// order. A merge sort, bottom up, through sort_spare.
 
 fn sort_by_keys() void {
     let n = sort_items.len();
@@ -1333,16 +1360,19 @@ fn mark_targets(body: I32) void {
     };
 }
 
+// (Counted to 2: once, or more.)
 fn mark_target(label: I32) void {
     if label >= label_targeted.len() {
         let old = label_targeted.len();
         label_targeted.resize(label + 1);
         for (old ..< label + 1) |l| { label_targeted[l] = 0; };
     };
-    label_targeted[label] = 1;
+    if label_targeted[label] < 2 { label_targeted[label] += 1; };
 }
 
-fn targeted(label: I32) Bool { label < label_targeted.len() and label_targeted[label] == 1; }
+fn targeted(label: I32) Bool { targets(label) > 0; }
+
+fn targets(label: I32) I32 { if label < label_targeted.len() { label_targeted[label]; } else { 0; }; }
 
 // Locals after the parameters, run-length encoded by type.
 fn encode_locals(f: I32) void {
@@ -1484,6 +1514,45 @@ fn inverse_comparison(code: I32) I32 {
     -1;
 }
 
+// A while loop as lowerings make it, `block (loop (br_if $block (c)) body
+// (br $loop))`, with nothing else leaving the block: the block is not
+// needed, as `loop (if (not c) body (br $loop))` (two bytes fewer, and
+// three when c was negated to leave).
+fn exits_only_loop(block: I32) Bool {
+    if w_type[block] != vt_none or w_count[block] != 1 or targets(w_a[block]) != 1 { return false; };
+    let lp = w_kid(block, 0);
+    if w_op[lp] != Op.Loop.to_i32() or w_type[lp] != vt_none or w_count[lp] < 2 { return false; };
+    let exit = w_kid(lp, 0);
+    let back = w_kid(lp, w_count[lp] - 1);
+    w_op[exit] == Op.BrIf.to_i32() and w_a[exit] == w_a[block] and w_count[exit] == 1
+        and w_op[back] == Op.Br.to_i32() and w_a[back] == w_a[lp] and w_count[back] == 0;
+}
+
+fn emit_while(block: I32, f: I32) void {
+    let lp = w_kid(block, 0);
+    let leave = w_kid(w_kid(lp, 0), 0);
+    op1(3);
+    block_type(vt_none);
+    labels.push(w_a[lp]);
+    // Round again while the condition to leave does not hold.
+    if w_op[leave] == Op.Plain.to_i32() and w_a[leave] == 69 and w_count[leave] == 1 {
+        emit(w_kid(leave, 0), f);
+    } else if w_op[leave] == Op.Plain.to_i32() and inverse_comparison(w_a[leave]) >= 0 {
+        emit_kids(leave);
+        op1(inverse_comparison(w_a[leave]));
+    } else {
+        emit(leave, f);
+        op1(69);
+    };
+    op1(4);
+    block_type(vt_none);
+    labels.push(-1);
+    for (1 ..< w_count[lp]) |i| { emit(w_kid(lp, i), f); };
+    labels.resize(labels.len() - 2);
+    op1(11);
+    op1(11);
+}
+
 fn emit_kids(node: I32) void {
     for (0 ..< w_count[node]) |i| { emit(w_kid(node, i), -1); };
 }
@@ -1502,6 +1571,10 @@ fn emit(node: I32, f: I32) void {
     let a = w_a[node];
     let b = w_b[node];
     if op == Op.Seq.to_i32() { emit_kids(node); return; };
+    if op == Op.Block.to_i32() and exits_only_loop(node) {
+        emit_while(node, f);
+        return;
+    };
     if op == Op.GlobalGet.to_i32() and glob_folded(a) {
         emit(glob_init[a], f);
         return;

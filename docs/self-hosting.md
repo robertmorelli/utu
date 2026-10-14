@@ -198,11 +198,11 @@ language stays as it is.
    builds, runs, definitions, references), and the web playground use it;
    stage 0 serves only its IR and graph views.
 8. **Better than stage 0.** Compiling, warm: deltablue 0.9 ms (stage 0:
-   56), jpl 5.5 ms (561), foundry 17 ms (1,466). At -Oz, of the 280 programs
-   both build, 252 are smaller, 25 the same, 3 larger by at most 3 bytes:
-   15% smaller in all (`scripts/selfhost-size-differential.mjs`). At -O3,
-   programs run as fast as stage 0's or faster. The compiler is 383 KB of
-   wasm (93 KB brotli); stage 0's bundle is 1.97 MB and a parser.
+   56), jpl 5.5 ms (561), foundry 17 ms (1,466). At -Oz, of the 284 programs
+   both build, 262 are smaller, 20 the same, 2 larger by at most 3 bytes:
+   16.8% smaller in all (`scripts/selfhost-size-differential.mjs`). At -O3,
+   programs run as fast as stage 0's or faster. The compiler is 372 KB of
+   wasm (96 KB brotli); stage 0's bundle is 1.97 MB and a parser.
 
 ### Stays in JavaScript
 
