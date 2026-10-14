@@ -317,6 +317,46 @@ operator, so `await a + b` is `(await a) + b`, as in JS.
 > The cost is a host requirement: `await` needs a JSPI-capable host (Chrome
 > 126+, Node 23+, Bun). `.then` does not, and is the portable floor.
 
+### Streams
+
+`Stream[T]` (std:Stream, in the prelude) is a real JavaScript async iterable,
+held as an externref, as `Promise[T]` is a real promise. `await for` reads one:
+
+```
+fn total(s: Stream[I32]) I32 {
+    let sum = 0;
+    await for (s) |v| { sum += v; };
+    sum;
+}
+```
+
+The loop suspends at each value, as `await` does (so it needs JSPI too).
+`continue` goes on to the next value; `break` ends the loop and closes the
+stream (its iterator's `return`, awaited), as JS's `for await` does. It is
+
+```
+let it = s.iterator();
+while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
+s.close(it);
+```
+
+so any type with those methods can be read the same way.
+
+Streams are made and changed by std:Stream; each change is a new stream that
+reads the old one as it is read:
+
+```
+Stream[I32].of([1, 2, 3])                  // an array's values
+Stream[I32].generate(10, cl(i) { i * i; })  // count values, each made from its index
+s.take(n)  s.skip(n)  s.filter(cl(v) { … })  s.map(cl(v) { … })  s.chain(other)
+Stream[Str].from_js(lines)                  // a host async iterable, its values typed
+```
+
+A stream utu returns to JS is the async iterable itself (`for await (const v
+of exports.numbers())`). A host value that is async iterable (an async
+generator, a `ReadableStream`, a Node stream) is adopted with `from_js`, which
+names the type of its values.
+
 ---
 
 ## Modules
@@ -585,6 +625,7 @@ fn squares(n: I32) yield I32 {
 }
 for (squares(10)) |x| { ... };
 await for (ticks()) |t| { ... };   // the generator body may `await`
+await for (stream) |v| { ... };    // a Stream[T]'s values (see Streams)
 // The body expands inline at the consuming loop: in the loop body, `break`
 // ends the generation and `continue` resumes after the current yield; in the
 // generator, `return;` ends it. Generators are not values (they cannot be

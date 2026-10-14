@@ -1,0 +1,59 @@
+// streams.utu — Stream[T] is a real JavaScript async iterable
+//
+// `await for (s) |v| { … }` reads a stream's values, suspending at each (JSPI,
+// as `await` does). A stream utu makes is one JS can `for await` over, and a
+// host's async iterable (an async generator, a ReadableStream, a Node stream)
+// becomes a stream with Stream[T].from_js.
+
+let words: fun() Externref = @es/\ () => (async function* () {
+    for (const w of ["alpha", "beta", "gamma", "delta"]) {
+        await new Promise(r => setTimeout(r, 1));
+        yield w;
+    }
+})() \/;
+
+// Track whether a stream was closed (its iterator's `return` called).
+let closing: fun(Externref) Externref = @es/\ (s) => {
+    globalThis.__closed = false;
+    return (async function* () { try { yield* s; } finally { globalThis.__closed = true; } })();
+} \/;
+let closed: fun() Bool = @es/\ () => globalThis.__closed === true \/;
+
+fn total(s: Stream[I32]) I32 {
+    let sum = 0;
+    await for (s) |v| { sum += v; };
+    sum;
+}
+
+export lib {
+    // Made, transformed, and read in utu.
+    fn evens() I32 {
+        total(Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { v % 2 == 0; }).map(cl(v) { v * 10; }));
+    }
+
+    fn pieces() I32 {
+        let s = Stream[I32].generate(5, cl(i) { i * i; }).skip(1).take(3).chain(Stream[I32].of([100]));
+        total(s);
+    }
+
+    // A host async generator, adopted.
+    fn joined() Str {
+        let out = "";
+        await for (Stream[Str].from_js(words())) |w| {
+            if w == "beta" { continue; };
+            out = `${out}${w} `;
+        };
+        out;
+    }
+
+    // `break` closes the stream, as JS's `for await` does.
+    fn stopped() Bool {
+        await for (Stream[Str].from_js(closing(words()))) |w| {
+            if w == "beta" { break; };
+        };
+        closed();
+    }
+
+    // A stream handed to JS is the async iterable itself.
+    fn handed() Stream[I32] { Stream[I32].of([7, 8, 9]); }
+}

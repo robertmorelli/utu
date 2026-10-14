@@ -38,6 +38,9 @@ const INTENDED = {
   // two, and reports a literal of the merged module's out of range.
   ...both('baselines/corpus/7e83ae64a131f755c065e24dfd0da2700a8194d4.utu', 'a module named like a standard one keeps its own members'),
   ...both('baselines/corpus/c02ee1fa0bf1ffbd68045c13ca9ab0871d172597.utu', 'a module named like a standard one keeps its own members'),
+  // `await for ([1, 2])`: an array is no stream. Stage 0 names its type
+  // as it mangles it, `Array__I32`.
+  ...both('baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu', 'a type is named as it is written'),
 };
 
 if (isMainThread) await main();

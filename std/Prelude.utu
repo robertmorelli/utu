@@ -20,6 +20,7 @@
 //
 // Compiler directives:
 //   Promise[T]        — a real JavaScript promise, held as an externref
+//   Stream[T]         — a real JavaScript async iterable, read with `await for`
 //   LiteralDefaults   — `<ir-literal-defaults>` map for type inference
 
 using I32              from std:I32;
@@ -38,6 +39,7 @@ using Externref        from std:Externref;
 using I31              from std:I31;
 using Array            from std:Array;
 using Promise          from std:Promise;
+using Stream           from std:Stream;
 using LiteralDefaults from std:LiteralDefaults;
 using Found from std:Found;
 using Group from std:Group;

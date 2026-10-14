@@ -168,7 +168,14 @@ colouring: the host suspends the wasm stack, so the compiler needs no CPS or
 state-machine transform at all. `await` requires a JSPI-capable host (Chrome
 126+, Node 23+, Bun); `.then` does not.
 
-Still open: async generators, async streams, and `for await`.
+**Landed:** streams. `Stream[T]` is a real JS async iterable, read with
+`await for (s) |v| { … }`, made and changed by std:Stream (`of`, `generate`,
+`map`, `filter`, `take`, `skip`, `chain`, `from_js`); a generator's body may
+await, and `await for` reads it too.
+
+Still open: a stream made by utu code that awaits between values (an async
+generator handed to JS), which needs a closure entered through
+`WebAssembly.promising`.
 
 Utu should have first-class `async` / `await`.
 

@@ -23,6 +23,7 @@ const commands = [
   ['node', './scripts/selfhost-bootstrap.mjs'],
   ['node', './scripts/test-vec.mjs'],
   ['node', './scripts/test-templates.mjs'],
+  ['node', './scripts/test-streams.mjs'],
   // Optimized early, as an editor's long session would have it.
   ['node', '--wasm-tiering-budget=1000', './scripts/test-selfhost-resident.mjs'],
   ['node', './scripts/selfhost-run-differential.mjs'],

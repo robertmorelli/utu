@@ -11,6 +11,8 @@ vec decl_es: I32;     // by declaration: its imported function, or -1
 vec es_func: I32;     // the @es imports (and host declarations' operations), in order
 vec es_start: I32;    // the JS of each: a span of src
 vec es_end: I32;
+vec es_made_decl: I32;  // each binding's imports, one a type: (declaration, import) pairs
+vec es_made_func: I32;
 
 fn reset_host() void {
     decl_es.resize(decl_kind.len());
@@ -18,6 +20,8 @@ fn reset_host() void {
     es_func.clear();
     es_start.clear();
     es_end.clear();
+    es_made_decl.clear();
+    es_made_func.clear();
 }
 
 // Whether a node is `@es/\ … \/`.
@@ -25,12 +29,22 @@ fn is_es(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(
 
 // The imported function of an @es binding of type `t`.
 fn es_import(decl: I32, dsl: I32, t: I32) I32 {
-    if decl_es[decl] >= 0 { return decl_es[decl]; };
     let ft = es_signature(t);
+    if decl_es[decl] >= 0 and func_type_of[decl_es[decl]] == ft { return decl_es[decl]; };
+    // In a module's instances a binding has a type each, and an import each:
+    // decl_es is the current instance's.
+    for (0 ..< es_made_decl.len()) |k| {
+        if es_made_decl[k] == decl and func_type_of[es_made_func[k]] == ft {
+            decl_es[decl] = es_made_func[k];
+            return es_made_func[k];
+        };
+    };
     let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), ft);
     let w = decl_name[decl];
     func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w));
     decl_es[decl] = f;
+    es_made_decl.push(decl);
+    es_made_func.push(f);
     es_func.push(f);
     es_start.push(dsl_text_start(dsl));
     es_end.push(dsl_text_end(dsl));

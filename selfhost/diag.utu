@@ -199,7 +199,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.NotCallable { return "not-callable"; };
     if k == Diag.NonExhaustive { return "non-exhaustive-match"; };
     if k == Diag.InvalidForSource or k == Diag.GeneratorRecursion or k == Diag.YieldOutside or k == Diag.GeneratorReturnValue
-        or k == Diag.GeneratorCall or k == Diag.YieldInClosure or k == Diag.AwaitForSource or k == Diag.GeneratorPassThrough
+        or k == Diag.GeneratorCall or k == Diag.YieldInClosure or k == Diag.AwaitForSource or k == Diag.AwaitForCapture or k == Diag.GeneratorPassThrough
         or k == Diag.GeneratorArity or k == Diag.PruneOutside or k == Diag.PruneInClosure { return "invalid-for-source"; };
     if k == Diag.IteratorUnfinished or k == Diag.IteratorCaptures or k == Diag.IteratorTerminalInside or k == Diag.IteratorSource { return "invalid-iterator-usage"; };
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
@@ -352,7 +352,8 @@ fn diag_text(i: I32) Str {
     if k == Diag.YieldInClosure { return "yield cannot appear inside a closure; the generator expands into its consumer"; };
     if k == Diag.GeneratorReturnValue { return "a generator ends with `return;`, without a value"; };
     if k == Diag.GeneratorCall { return w + " is a generator: consume it with `for (" + w + "(…)) |value| { … }`"; };
-    if k == Diag.AwaitForSource { return "await for iterates a generator call: `await for (ticks()) |t| { … }`"; };
+    if k == Diag.AwaitForSource { return "await for reads a generator call or a stream: `await for (ticks()) |t| { … }`"; };
+    if k == Diag.AwaitForCapture { return "a stream loop binds one value: await for (s) |value| { … }"; };
     if k == Diag.IteratorUnfinished { return "Iterator pipeline must end with fold, each, collect(Type), or a scalar terminal; found " + w; };
     if k == Diag.IteratorCaptures { return w + " expects " + int_text(a) + " value binding(s) and an optional index"; };
     if k == Diag.OptionalOutsideStatement { return "'?.' is only allowed in statements; use promote or orelse for a value"; };

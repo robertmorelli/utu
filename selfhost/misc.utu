@@ -301,7 +301,8 @@ fn check_await(node: I32, cx: Cx) I32 {
     let e = first_child(node);
     if is_kind(e, Node.For_expr) {
         // `await for (gen()) |x| { … }`: the generator's body may await.
-        return check_expr(e, ty_void(), cx);
+        if generator_call(e) >= 0 { return check_expr(e, ty_void(), cx); };
+        return check_stream_for(e, cx);
     };
     let m = w_mark();
     let pt = check_expr(e, -1, cx);
@@ -320,6 +321,91 @@ fn check_await(node: I32, cx: Cx) I32 {
     let t = inst_arg(ty_inst(pt), 0);
     w_node(Op.Call, repr(t), await_import(t), 0, m);
     t;
+}
+
+// `await for (s) |v| { body }` over a Stream[T] (std:Stream), as stage 0
+// lowers it:
+//
+//   { let it = s.iterator();
+//     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
+//     s.close(it); }
+fn check_stream_for(node: I32, cx: Cx) I32 {
+    let sources = first_child(node);
+    let source = first_child(first_child(sources));
+    let capture = next_sibling(sources);
+    let block = last_child(node);
+    // More than one source, or value, is reported (validate_await).
+    if next_sibling(first_child(sources)) >= 0 or next_sibling(source) >= 0 { return error_value(); };
+    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 and next_sibling(first_child(capture)) >= 0 { return error_value(); };
+    let m = w_mark();
+    let st = check_expr(source, -1, cx);
+    if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
+    let s = new_local(repr(st));
+    w_node(Op.LocalSet, vt_none, s, 0, m);
+    // Not a stream: its first call is reported, as stage 0 does.
+    let it_fi = stream_method(st, "iterator", node);
+    if it_fi < 0 { return finish_error(-1, m, cx); };
+    let next_fi = stream_method(st, "next", node);
+    let done_fi = stream_method(st, "done", node);
+    let value_fi = stream_method(st, "value", node);
+    let close_fi = stream_method(st, "close", node);
+    if next_fi < 0 or done_fi < 0 or value_fi < 0 or close_fi < 0 { return finish_error(-1, m, cx); };
+    let it = new_local(vt_externref);
+    let mi = w_mark();
+    stream_call(it_fi, s, -1, cx);
+    w_node(Op.LocalSet, vt_none, it, 0, mi);
+    let brk = new_label();
+    let top = new_label();
+    let mb = w_mark();
+    let ml = w_mark();
+    let r = new_local(vt_externref);
+    let mr = w_mark();
+    stream_call(next_fi, s, it, cx);
+    w_node(Op.Call, vt_externref, await_import(prelude(Prelude.Externref)), 0, mr);
+    w_node(Op.LocalSet, vt_none, r, 0, mr);
+    let md = w_mark();
+    stream_call(done_fi, s, r, cx);
+    w_node(Op.BrIf, vt_none, brk, 0, md);
+    let t = fi_result[value_fi];
+    let v = new_local(repr(t));
+    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 {
+        let d = node_decl[first_child(capture)];
+        decl_ty[d] = t;
+        decl_local[d] = v;
+    };
+    let mv = w_mark();
+    stream_call(value_fi, s, r, cx);
+    w_node(Op.LocalSet, vt_none, v, 0, mv);
+    enter_loop(brk, top, -1, -1);
+    discard(check_block(block, ty_void(), cx));
+    leave_loop();
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, brk, 0, mb);
+    let mc = w_mark();
+    stream_call(close_fi, s, it, cx);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    ty_void();
+}
+
+// The function instance of a stream's method `name`, or -1 (reported, as
+// stage 0 reports a call of a method its type lacks).
+fn stream_method(st: I32, name: Str, at: I32) I32 {
+    let word = intern_text(name);
+    let decl = member(ty_decl(st), word, Space.Method);
+    if decl < 0 {
+        report2(Diag.UnknownMethod, at, word, st, -1);
+        return -1;
+    };
+    fn_instance(decl, ty_inst(st));
+}
+
+// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s.
+fn stream_call(fi: I32, s: I32, x: I32, cx: Cx) void {
+    let m = w_mark();
+    w_leaf(Op.LocalGet, cur_locals[s], s, 0);
+    if x >= 0 { w_leaf(Op.LocalGet, cur_locals[x], x, 0); };
+    finish_call(fi, m, cx);
 }
 
 fn await_import(t: I32) I32 {

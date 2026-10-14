@@ -2210,7 +2210,7 @@
   "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
  },
  "baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu normal": {
-  "compile": "Error: await for iterates a generator call: `await for (ticks()) |t| { … }`"
+  "diagnostics": true
  },
  "baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu test": {
   "calls": {}
@@ -2291,7 +2291,7 @@
  "baselines/corpus/92bdddcf5c08d35f41d4854afa9e6d2f4e5db40f.utu normal": {
   "calls": {
    "main": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "result": "ce9682d5f1fade3ea673bd5af612080071baa8ef1ba624074d152a925350de98",
     "printed": []
    }
   }
@@ -2299,15 +2299,15 @@
  "baselines/corpus/92bdddcf5c08d35f41d4854afa9e6d2f4e5db40f.utu test": {
   "calls": {
    "__test_0": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "result": null,
     "printed": []
    },
    "__test_1": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "result": null,
     "printed": []
    },
    "__test_2": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "result": null,
     "printed": []
    }
   }
@@ -2859,7 +2859,7 @@
  "baselines/corpus/b4c9fa7f06cb55abd426f42e5df18258b0e1e6ef.utu normal": {
   "calls": {
    "main": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "result": 48,
     "printed": []
    }
   }
@@ -3942,7 +3942,7 @@
  "baselines/corpus/f7634dde2c8f203ea558721b69c5c37b261367a1.utu normal": {
   "calls": {
    "main": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "throws": "TypeError: Failed to parse URL from items.json",
     "printed": []
    }
   }
@@ -4104,7 +4104,7 @@
  "examples/browser-pantry/main.utu normal": {
   "calls": {
    "main": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "throws": "TypeError: Failed to parse URL from items.json",
     "printed": []
    }
   }
@@ -4839,7 +4839,7 @@
  "examples/promises.utu normal": {
   "calls": {
    "main": {
-    "throws": "SuspendError: trying to suspend without WebAssembly.promising",
+    "result": 48,
     "printed": []
    }
   }
@@ -4878,6 +4878,33 @@
   }
  },
  "examples/queries/iterators.utu test": {
+  "calls": {}
+ },
+ "examples/streams.utu normal": {
+  "calls": {
+   "evens": {
+    "result": 120,
+    "printed": []
+   },
+   "handed": {
+    "result": "object",
+    "printed": []
+   },
+   "joined": {
+    "result": "alpha gamma delta ",
+    "printed": []
+   },
+   "pieces": {
+    "result": 114,
+    "printed": []
+   },
+   "stopped": {
+    "result": 1,
+    "printed": []
+   }
+  }
+ },
+ "examples/streams.utu test": {
   "calls": {}
  },
  "examples/templates.utu normal": {

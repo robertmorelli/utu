@@ -368,10 +368,16 @@ fn deferred_exit(node: I32, in_loop: Bool) I32 {
     -1;
 }
 
-// `await for (…)` iterates a generator call.
+// `await for (…)` reads a generator call, or one stream (with one value bound).
 fn validate_await(node: I32) void {
     let e = first_child(node);
-    if is_kind(e, Node.For_expr) and generator_call(e) < 0 { report(Diag.AwaitForSource, node, -1); };
+    if not is_kind(e, Node.For_expr) or generator_call(e) >= 0 { return; };
+    let source = first_child(first_child(e));
+    if next_sibling(source) >= 0 or next_sibling(first_child(source)) >= 0 { report(Diag.AwaitForSource, e, -1); return; };
+    let capture = next_sibling(first_child(e));
+    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 and next_sibling(first_child(capture)) >= 0 {
+        report(Diag.AwaitForCapture, e, -1);
+    };
 }
 
 // ── Parents ──

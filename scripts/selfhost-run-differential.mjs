@@ -158,8 +158,8 @@ async function worker() {
     }
     let exports;
     try {
-      // The exports as they are: stage 0's harness does not wrap async
-      // ones in WebAssembly.promising, so neither does this.
+      // The exports as they are; each is called through WebAssembly.promising,
+      // as stage 0's harness calls them.
       ({ instance: { exports } } = await instantiateBuilt(wasm, spec));
     } catch (error) {
       return { instantiate: summarizeError(error) };
@@ -173,7 +173,7 @@ async function worker() {
       printed.length = 0;
       console.log = (...args) => printed.push(args.map(String).join(' '));
       try {
-        const result = await value();
+        const result = await WebAssembly.promising(value)();
         calls[name] = { result: summarize(result), printed: [...printed] };
       } catch (error) {
         calls[name] = { throws: summarizeError(error), printed: [...printed] };

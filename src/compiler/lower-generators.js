@@ -44,12 +44,13 @@ export function lowerGenerators(doc, parser, createDocument) {
   }
 
   // `await for (…)` parses as an await of the loop; the loop is the point.
+  // Over a generator call it is the generator's loop; over anything else, a
+  // stream's (streamLoop).
+  let streams = 0;
   for (const awaited of [...root.querySelectorAll('ir-await')]) {
     const loop = awaited.firstElementChild;
     if (loop?.localName !== 'ir-for' || awaited.children.length !== 1) continue;
-    const call = generatorCall(loop, generators);
-    if (!call) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'await for iterates a generator call: `await for (ticks()) |t| { … }`', awaited);
-    awaited.replaceWith(loop);
+    awaited.replaceWith(generatorCall(loop, generators) ? loop : streamLoop(loop, `__stream${streams++}_`, parser, createDocument));
   }
 
   // A generator that delegates to itself is recursive: it runs on an explicit
@@ -188,6 +189,33 @@ function expandLoop(loop, generators, prefix, parser, createDocument) {
   const statements = childOf(expanded, 'ir-block') ?? expanded;
   labeledBlock(statements.lastElementChild, whole);
   return expanded;
+}
+
+/**
+ * `await for (s) |v| { body }` over a Stream[T] (std:Stream) is
+ *
+ *   { let it = s.iterator();
+ *     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
+ *     s.close(it); }
+ *
+ * so `break` and `continue` in the body are the loop's, and v has the type
+ * of s's values.
+ */
+function streamLoop(loop, prefix, parser, createDocument) {
+  const sources = [...childrenOf(loop, 'ir-for-source')];
+  if (sources.length !== 1 || sources[0].children.length !== 1 || sources[0].getAttribute('op')) {
+    throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`', loop);
+  }
+  const names = (childOf(loop, 'ir-capture')?.getAttribute('names') ?? '').split(',').filter(Boolean);
+  if (names.length > 1) throw compilerError(DIAGNOSTIC_KINDS.INVALID_FOR_SOURCE, 'a stream loop binds one value: await for (s) |value| { … }', loop);
+  const splices = new Map();
+  const splice = node => { const key = `${prefix}splice${splices.size}`; splices.set(key, node); return key; };
+  const [stream, iterator, result] = ['stream', 'iterator', 'result'].map(name => prefix + name);
+  const value = names[0] ?? `${prefix}value`;
+  const code = `{ let ${stream} = ${splice(sources[0].firstElementChild)}; let ${iterator} = ${stream}.iterator(); `
+    + `while (true) { let ${result} = await ${stream}.next(${iterator}); if ${stream}.done(${result}) { break; }; `
+    + `let ${value} = ${stream}.value(${result}); ${splice(childOf(loop, 'ir-block'))}; }; ${stream}.close(${iterator}); }`;
+  return expressionFromSource(parser, code, loop, splices, { createDocument });
 }
 
 const SCALARS = new Set(['I32', 'U32', 'I64', 'U64', 'M32', 'M64', 'M128', 'F32', 'F64', 'V128', 'Bool']);

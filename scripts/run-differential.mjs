@@ -10,9 +10,10 @@
 //
 // Each program under examples/, benchmarks/, and baselines/corpus is built for its
 // `normal` and `test` targets; every exported function that takes no
-// arguments is called, and its result (or trap), plus what it printed, is
-// recorded. Programs that run longer than a few seconds (after building, which
-// may take longer when the machine is busy) are recorded as such.
+// arguments is called (through WebAssembly.promising, so one that awaits
+// runs), and its result (or trap), plus what it printed, is recorded.
+// Programs that run longer than a few seconds (after building, which may
+// take longer when the machine is busy) are recorded as such.
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -139,7 +140,9 @@ async function worker() {
       printed.length = 0;
       console.log = (...args) => printed.push(args.map(String).join(' '));
       try {
-        const result = await value();
+        // Entered as a host enters an async export, so a program that
+        // awaits runs (a function that does not is called the same).
+        const result = await WebAssembly.promising(value)();
         calls[name] = { result: summarize(result), printed: [...printed] };
       } catch (error) {
         calls[name] = { throws: summarizeError(error), printed: [...printed] };
