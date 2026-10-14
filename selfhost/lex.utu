@@ -469,10 +469,20 @@ fn build() Machine {
 
 // ── Lexing ───────────────────────────────────────────────────────────────────
 
-fn push(kind: I32, start: I32, end_: I32) void {
-    tok_kind.push(kind);
-    tok_start.push(start);
-    tok_end.push(end_);
+// Token t, written in the room lex reserved; the one after it.
+fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
+    tok_kind[t] = kind;
+    tok_start[t] = start;
+    tok_end[t] = end_;
+    t + 1;
+}
+
+// The tokens up to t are the mems' contents; their number.
+fn tokens_end(t: I32) I32 {
+    tok_kind.resize(t);
+    tok_start.resize(t);
+    tok_end.resize(t);
+    t;
 }
 
 // The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
@@ -499,6 +509,12 @@ fn dsl_end(i: I32, n: I32) I32 {
 // token that cannot be lexed: a byte no token starts with, or a string or
 // DSL body that does not close). Returns the number of tokens.
 fn lex(first: I32, n: I32) I32 {
+    // Room for the most tokens there can be: one a byte, and the last.
+    let t = tok_kind.len();
+    let room = t + n - first + 2;
+    tok_kind.reserve(room);
+    tok_start.reserve(room);
+    tok_end.reserve(room);
     let i = first;
     let j = first;
     let start = start_before;
@@ -506,11 +522,10 @@ fn lex(first: I32, n: I32) I32 {
     let next = dfa[start * 256 + src[first]];
     loop match next {
         0 => {
-            push(Tok.Error.to_i32(), i, i);
-            return tok_kind.len();
+            return tokens_end(put_token(t, Tok.Error.to_i32(), i, i));
         },
         1 => {
-            push(kind_of[state], i, j);
+            t = put_token(t, kind_of[state], i, j);
             let after = after_of[state];
             if after == 0 { start = start_before; } else if after == 1 { start = start_after; }
             else if after == 3 { start = start_member; } else if after == 4 { start = start_type; };
@@ -521,7 +536,7 @@ fn lex(first: I32, n: I32) I32 {
         },
         2 => {
             j -= 1;
-            push(back_kind[state], i, j);
+            t = put_token(t, back_kind[state], i, j);
             let after = after_of[state];
             start = if after == 1 { start_after; } else if after == 3 { start_member; } else { start_before; };
             i = j;
@@ -531,7 +546,7 @@ fn lex(first: I32, n: I32) I32 {
         },
         3 => {
             j -= 2;
-            push(back_kind[state], i, j);
+            t = put_token(t, back_kind[state], i, j);
             let after = after_of[state];
             start = if after == 1 { start_after; } else if after == 3 { start_member; } else { start_before; };
             i = j;
@@ -549,10 +564,9 @@ fn lex(first: I32, n: I32) I32 {
         5 => {
             j = dsl_end(i, n);
             if j < 0 {
-                push(Tok.Error.to_i32(), i, i);
-                return tok_kind.len();
+                return tokens_end(put_token(t, Tok.Error.to_i32(), i, i));
             };
-            push(Tok.DslBody.to_i32(), i, j);
+            t = put_token(t, Tok.DslBody.to_i32(), i, j);
             start = start_after;
             i = j;
             state = start;
@@ -560,8 +574,7 @@ fn lex(first: I32, n: I32) I32 {
             continue next;
         },
         6 => {
-            push(Tok.End.to_i32(), n, n);
-            return tok_kind.len();
+            return tokens_end(put_token(t, Tok.End.to_i32(), n, n));
         },
         ~> {
             // A state to move to. The bytes of a word, a number, a comment,

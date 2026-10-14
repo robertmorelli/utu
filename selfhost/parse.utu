@@ -1903,15 +1903,20 @@ fn intern_keywords() void {
 // Intern the word tokens from `first` up to `last`, and list those the
 // parser reads (all but comments) in `ptok`.
 fn intern_words(first: I32, last: I32) void {
-    ptok.clear();
-    tok_word.resize(first);
+    tok_word.resize(last);
+    ptok.resize(last - first + 4);
+    let p = 0;
     for (first ..< last) |t| {
         let kind = tok_kind[t];
-        tok_word.push(if kind == Tok.Word.to_i32() { src.intern(tok_start[t], tok_end[t]); } else { -1; });
-        if kind != Tok.Comment.to_i32() { ptok.push(t); };
+        tok_word[t] = if kind == Tok.Word.to_i32() { src.intern(tok_start[t], tok_end[t]); } else { -1; };
+        if kind != Tok.Comment.to_i32() {
+            ptok[p] = t;
+            p += 1;
+        };
     };
     // Lookahead past the end reads the End token again.
-    for (0 ..< 4) |k| { ptok.push(last - 1); };
+    for (0 ..< 4) |k| { ptok[p + k] = last - 1; };
+    ptok.resize(p + 4);
 }
 
 // Parse the tokens from `first` up to `last` (the last of them `End`), adding
