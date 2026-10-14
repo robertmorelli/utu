@@ -5,8 +5,10 @@
 // a program's build depend on the ones before it. Programs that import
 // std:Browser, std:JS, std:Web, node: modules, or nothing are built in turns
 // on one compiler, and each must come out as it does on a fresh one. The
-// suite runs it with V8 optimizing early (--wasm-tiering-budget), where a
-// compiler with dozens of memories crashed Node 25 (V8 14.1).
+// suite runs it with V8 optimizing early (--wasm-tiering-budget): on arm64,
+// Node 24 and 25 (V8 before 14.8.125) can miscompile a memory load at
+// `i << shift` (V8 bug 496301615), which crashed a compiler whose hot tables
+// were memories.
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
