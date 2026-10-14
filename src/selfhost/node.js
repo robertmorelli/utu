@@ -106,8 +106,9 @@ export function nodeHost({ root = process.cwd(), stdlib = nodeStdlib() } = {}) {
   let packages;
   return {
     stdlib,
-    readFile: file => fs.promises.readFile(file, 'utf8'),
-    readBinaryFile: file => fs.promises.readFile(file),
+    // Files are small and read whole: a sync read costs a fraction of an async one.
+    readFile: async file => fs.readFileSync(file, 'utf8'),
+    readBinaryFile: async file => fs.readFileSync(file),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
     // TypeScript is only needed when a program imports "npm:…" or "node:…".
     resolvePackage: async (specifier, request) => {
