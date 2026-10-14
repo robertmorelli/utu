@@ -1050,6 +1050,8 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
             report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
             return finish_error(args, m, cx);
         };
+        // What the name means, for an editor (as a field's is recorded).
+        node_decl[name] = decl;
         let fi = fn_instance(decl, ty_inst(rt));
         coerce(rt, vl_item(fi_params[fi], 0), base);
         return call_with(fi, args, 1, m, node, cx);

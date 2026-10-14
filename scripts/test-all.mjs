@@ -34,6 +34,7 @@ const commands = [
   ['node', './scripts/test-wutu-stencils.mjs'],
   ['node', './scripts/test-wutu-cli.mjs'],
   ['node', './scripts/test-utu-cli.mjs'],
+  ['node', './scripts/test-lsp.mjs'],
   ['node', './scripts/test-vscode-extension.mjs'],
 ];
 

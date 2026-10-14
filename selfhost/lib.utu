@@ -193,6 +193,26 @@ export lib {
 
     fn decl_kind_name(decl: I32) Str { Decl.name(Decl.from_i32(decl_kind[decl])); }
 
+    fn decl_count() I32 { decl_kind.len(); }
+
+    // A local's or parameter's type, as the last build checked it ("" when
+    // it was not checked: not a local, or in a function no export reaches).
+    fn decl_checked_type(decl: I32) Str {
+        if decl >= decl_local.len() { return ""; };
+        if decl_local[decl] < 0 { return ""; };
+        type_text(decl_ty[decl]);
+    }
+
+    // The declaration of that type (a struct, an enum, a scalar's type;
+    // through `?`), or -1: what `x.` can name.
+    fn decl_checked_type_decl(decl: I32) I32 {
+        if decl >= decl_local.len() { return -1; };
+        if decl_local[decl] < 0 { return -1; };
+        let t = decl_ty[decl];
+        if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+        ty_decl(t);
+    }
+
     // The lexer and parser alone, on one source (for their differentials):
     // the host writes `n` bytes at the returned offset.
     fn source(n: I32) I32 {

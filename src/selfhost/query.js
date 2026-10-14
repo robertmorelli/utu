@@ -14,6 +14,7 @@ export function programIndex(utu, files) {
   const tokEnd = view(utu.tok_end, Int32Array);
   const nodeDecl = view(utu.node_decl, Int32Array);
   const declNode = view(utu.decl_node, Int32Array);
+  const declOwner = view(utu.decl_owner, Int32Array);
   const count = utu.node_count();
   const units = new Map();
 
@@ -45,6 +46,22 @@ export function programIndex(utu, files) {
     if (!file) return null;
     return { file: file.key, start: toUnits(file, start), end: toUnits(file, tokEnd[last[node] - 1]) };
   };
+  // By declaration: the first name inside it that resolves to it (its own
+  // name), or -1. One pass over the nodes, made when first asked.
+  let namingNodes = null;
+  const naming = () => {
+    if (namingNodes) return namingNodes;
+    namingNodes = new Int32Array(utu.decl_count()).fill(-1);
+    for (let n = 0; n < count; n++) {
+      const d = nodeDecl[n];
+      if (d < 0 || d >= namingNodes.length || !named(n) || declNode[d] < 0) continue;
+      const s = tokStart[first[n]];
+      if (s < tokStart[first[declNode[d]]] || s >= tokEnd[last[declNode[d]] - 1]) continue;
+      const best = namingNodes[d];
+      if (best < 0 || s < tokStart[first[best]]) namingNodes[d] = n;
+    }
+    return namingNodes;
+  };
   const named = n => nodeDecl[n] >= 0 && first[n] < last[n] && last[n] - first[n] === 1;
 
   return {
@@ -61,14 +78,7 @@ export function programIndex(utu, files) {
     definition(decl) {
       const owner = declNode[decl];
       if (owner < 0) return null;
-      const lo = tokStart[first[owner]];
-      const hi = tokEnd[last[owner] - 1];
-      let best = -1;
-      for (let n = 0; n < count; n++) {
-        if (nodeDecl[n] !== decl || !named(n)) continue;
-        const s = tokStart[first[n]];
-        if (s >= lo && s < hi && (best < 0 || s < tokStart[first[best]])) best = n;
-      }
+      const best = naming()[decl];
       return place(best >= 0 ? best : owner);
     },
     /** Every name resolving to `decl`, the declaring one first when `includeDeclaration`. */
@@ -84,6 +94,48 @@ export function programIndex(utu, files) {
         if (declaring) out.unshift(at); else out.push(at);
       }
       return out;
+    },
+    /** Where the whole of declaration `decl` is (its node), or null. */
+    span(decl) {
+      return declNode[decl] >= 0 ? place(declNode[decl]) : null;
+    },
+    /** What declaration `decl` declares: `Fn`, `Struct`, `Local`, … (resolve.utu's Decl). */
+    kind(decl) {
+      return utu.decl_kind_name(decl);
+    },
+    /** The declaration `decl` is part of (module, struct, enum, function), or -1. */
+    owner(decl) {
+      return declOwner[decl];
+    },
+    /** A local's or parameter's type as the last build checked it, or ''. */
+    type(decl) {
+      return utu.decl_checked_type(decl);
+    },
+    /** The declaration of a local's type (what `x.` names the members of), or -1. */
+    typeDeclaration(decl) {
+      return utu.decl_checked_type_decl(decl);
+    },
+    /** Every declaration made in file `key` (in every file, for null), each with its kind and owner. */
+    declarations(key = null) {
+      const out = [];
+      for (let d = 0, n = utu.decl_count(); d < n; d++) {
+        if (declNode[d] < 0) continue;
+        const at = place(declNode[d]);
+        if (at && (key == null || at.file === key)) out.push({ decl: d, kind: utu.decl_kind_name(d), owner: declOwner[d], span: at });
+      }
+      return out;
+    },
+    /** Every name in file `key` that resolves, with its declaration, in source order. */
+    names(key) {
+      const out = [];
+      for (let n = 0; n < count; n++) {
+        if (!named(n)) continue;
+        const at = place(n);
+        if (at && at.file === key) out.push({ decl: nodeDecl[n], at });
+      }
+      // A name node may wrap another of the same token: each place once.
+      out.sort((a, b) => a.at.start - b.at.start);
+      return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start);
     },
     /** The text of a place. */
     text(at) {

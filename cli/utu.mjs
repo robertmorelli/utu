@@ -6,6 +6,7 @@
 //   utu test <file.utu> [-O…]            build the tests, then run each
 //   utu build <file.utu> [-o dir] [-O…]  NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
+//   utu lsp                              a language server, on stdin and stdout
 //
 // -Oz (the default) builds the smallest module, -O3 the fastest, -O0 the
 // module as code generation leaves it. `display` and `graph` show stage 0's
@@ -29,6 +30,7 @@ async function main() {
   const [command, fileArg, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') usage(0);
   if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest);
+  if (command === 'lsp') return lsp();
   const commands = { check, run, test, build, 'build-exe': buildExe };
   if (!commands[command]) {
     console.error(`unknown command: ${command}`);
@@ -185,6 +187,53 @@ async function buildDirectory(from) {
   }
 }
 
+/** The language server (src/selfhost/lsp.js), speaking LSP's framing on stdin and stdout. */
+async function lsp() {
+  const { createLanguageServer } = await import('../src/selfhost/lsp.js');
+  const { nodeHost } = await import('../src/selfhost/node.js');
+  const { fileURLToPath, pathToFileURL } = await import('node:url');
+  const { existsSync } = await import('node:fs');
+  const hosts = new Map();
+  const write = message => {
+    const body = Buffer.from(JSON.stringify(message));
+    process.stdout.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]));
+  };
+  const server = createLanguageServer({
+    utu: await loadNodeCompiler(),
+    // One host per directory: packages resolve from where the program is.
+    hostFor: key => {
+      const root = key.startsWith('std:') ? process.cwd() : path.dirname(key);
+      if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
+      return hosts.get(root);
+    },
+    toKey: uri => uri.startsWith('file:') ? fileURLToPath(uri) : uri,
+    // The standard library's files, where this repository has them.
+    toUri: key => {
+      if (!key.startsWith('std:')) return pathToFileURL(key).href;
+      const file = path.join(ROOT, 'std', `${key.slice(4)}.utu`);
+      return existsSync(file) ? pathToFileURL(file).href : null;
+    },
+    send: write,
+    log: text => process.stderr.write(`[utu lsp] ${text}\n`),
+  });
+  let buffer = Buffer.alloc(0);
+  let pending = Promise.resolve();
+  process.stdin.on('data', chunk => {
+    buffer = Buffer.concat([buffer, chunk]);
+    for (;;) {
+      const end = buffer.indexOf('\r\n\r\n');
+      if (end < 0) return;
+      const length = Number(/Content-Length: *(\d+)/i.exec(buffer.subarray(0, end).toString('ascii'))?.[1]);
+      if (buffer.length < end + 4 + length) return;
+      const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString('utf8'));
+      buffer = buffer.subarray(end + 4 + length);
+      // In order: an edit is seen before the questions after it.
+      pending = pending.then(() => server.handle(message)).then(result => { if (result?.exit != null) process.exit(result.exit); });
+    }
+  });
+  process.stdin.on('end', () => process.exit(0));
+}
+
 function usage(code) {
   console.log(`usage: utu <command> <file.utu> [options]
 
@@ -193,6 +242,7 @@ function usage(code) {
   test <file> [-O…]            build its tests, then run each
   build <file> [-o dir] [-O…]  NAME.wasm, and NAME.mjs that loads it
   build-exe <file> [-o out]    a standalone executable (needs bun)
+  lsp                          a language server on stdin and stdout
 
   -Oz  the smallest module (the default)
   -O3  the fastest module

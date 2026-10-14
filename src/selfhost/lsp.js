@@ -1,0 +1,488 @@
+// src/selfhost/lsp.js — a language server on the self-hosted compiler.
+//
+// Every answer comes from a build of the program whose entry is the file
+// asked about: its diagnostics (both builds `utu check` makes, the exports'
+// and the tests'), and what its names resolve to (query.js). A build takes
+// milliseconds, so there is nothing incremental: the compiler holds one
+// program, and a question about another file, or after an edit, builds again.
+//
+// Nothing here touches a file system or a stream. The host gives the
+// compiler, `hostFor(key)` (a compile host for a program whose entry is file
+// `key`, as nodeHost makes), `toKey(uri)` and `toUri(key)` (null for a file
+// an editor cannot open), and `send(message)`; it calls `handle(message)`
+// with each message the editor sends.
+
+import { compile } from './compiler.js';
+import { programIndex } from './query.js';
+
+const SEMANTIC_TYPES = ['namespace', 'type', 'enum', 'enumMember', 'struct', 'property', 'function', 'method', 'variable', 'parameter', 'interface', 'typeParameter'];
+const SEMANTIC_MODIFIERS = ['declaration'];
+
+// resolve.utu's Decl kinds as an editor names them.
+const SEMANTIC_KIND = {
+  Module: 'namespace', Foreign: 'namespace', ModuleParam: 'typeParameter', Struct: 'struct', Enum: 'enum', IntEnum: 'enum',
+  Variant: 'enumMember', Field: 'property', Proto: 'interface', ProtoMember: 'method', TypeDecl: 'type', Distinct: 'type',
+  Alias: 'type', Fn: 'function', Main: 'function', Global: 'variable', Mem: 'variable', Param: 'parameter', SelfParam: 'parameter',
+  ClosureParam: 'parameter', Local: 'variable', Capture: 'variable', ArmBinding: 'variable', Promoted: 'variable', Caught: 'variable',
+};
+
+// LSP's SymbolKind, for the declarations an outline shows.
+const SYMBOL_KIND = {
+  Module: 2, Foreign: 2, Struct: 23, Enum: 10, IntEnum: 10, Variant: 22, Field: 8, Proto: 11, ProtoMember: 6,
+  TypeDecl: 5, Distinct: 5, Fn: 12, Main: 12, Global: 13, Mem: 18,
+};
+
+// LSP's CompletionItemKind.
+const COMPLETION_KIND = {
+  Module: 9, Foreign: 9, ModuleParam: 25, Struct: 22, Enum: 13, IntEnum: 13, Variant: 20, Field: 5, Proto: 8, ProtoMember: 2,
+  TypeDecl: 7, Distinct: 7, Alias: 9, Fn: 3, Main: 3, Global: 6, Mem: 6, Param: 6, SelfParam: 6, ClosureParam: 6, Local: 6,
+  Capture: 6, ArmBinding: 6, Promoted: 6, Caught: 6,
+};
+
+const KEYWORDS = ['mod', 'using', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'vec', 'export', 'const', 'type', 'distinct',
+  'test', 'bench', 'fun', 'cl', 'await', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote', 'try', 'catch',
+  'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'yield', 'true', 'false', 'null'];
+
+// What the prelude offers every program by name: its modules and types.
+const PRELUDE_KINDS = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct']);
+
+// The name written where one is being typed, for completion's build.
+const PLACEHOLDER = '__utu_completing';
+
+// Declarations of values that live in a function: their hover shows the type checked.
+const LOCAL_KINDS = new Set(['Param', 'SelfParam', 'ClosureParam', 'Local', 'Capture', 'ArmBinding', 'Promoted', 'Caught']);
+
+export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = () => {} }) {
+  const docs = new Map();  // key → { uri, text, version }
+  let generation = 0;
+  let current = null;      // the program the compiler holds: { key, generation, index, files, diagnostics }
+  let queue = Promise.resolve();
+  let refreshTimer = null;
+  const published = new Set();  // keys with diagnostics shown
+  let shutdown = false;
+
+  // One build at a time: the compiler holds one program.
+  const serial = work => {
+    const run = queue.then(work);
+    queue = run.catch(() => {});
+    return run;
+  };
+
+  /** The text a program sees for a file: the editor's when it is open, or `patch`'s. */
+  function overlay(host, patch) {
+    const text = file => patch?.key === file ? patch.text : docs.get(file)?.text;
+    return { ...host, readFile: file => { const t = text(file); return t != null ? Promise.resolve(t) : host.readFile(file); } };
+  }
+
+  // The program with entry `key`, built (unless the compiler holds it). With
+  // `patch` ({ key, text }), one file's text is another for this build only.
+  async function build(key, patch = null) {
+    if (!patch && current && current.key === key && current.generation === generation) return current;
+    const host = overlay(hostFor(key), patch);
+    const started = performance.now();
+    // The tests' build first: the program built last is the one queried.
+    const tests = patch ? null : await compile(utu, key, { ...host, target: 'test', optimize: 'none' });
+    const normal = await compile(utu, key, { ...host, target: 'normal', optimize: 'none' });
+    const seen = new Set();
+    const diagnostics = [...normal.diagnostics, ...tests?.diagnostics ?? []].filter(d => {
+      const id = `${d.file}\0${d.start}\0${d.end}\0${d.message}`;
+      return !seen.has(id) && seen.add(id);
+    });
+    const program = { key, generation: patch ? -1 : generation, files: normal.files, index: programIndex(utu, normal.files), diagnostics };
+    current = program;
+    log(`built ${key}${patch ? ' (patched)' : ''} in ${(performance.now() - started).toFixed(1)} ms`);
+    return program;
+  }
+
+  const textOf = (program, key) => docs.get(key)?.text ?? program.files.find(f => f.key === key)?.text ?? null;
+
+  function publish(key, program) {
+    const doc = docs.get(key);
+    if (!doc) return;
+    const lines = lineStarts(doc.text);
+    const diagnostics = program.diagnostics
+      .filter(d => d.file === key || d.file == null)
+      .map(d => ({
+        range: d.file === key ? range(lines, d.start, d.end) : range(lines, 0, 0),
+        severity: d.severity === 'warning' ? 2 : 1,
+        source: 'utu',
+        code: d.kind,
+        message: d.message,
+      }));
+    if (diagnostics.length) published.add(key); else if (!published.delete(key)) return;
+    send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: doc.uri, version: doc.version, diagnostics } });
+  }
+
+  // After an edit: the file edited, then every other open file (which may import it).
+  function scheduleRefresh(first) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => serial(async () => {
+      for (const key of [first, ...[...docs.keys()].filter(k => k !== first)]) {
+        if (!docs.has(key)) continue;
+        try { publish(key, await build(key)); } catch (error) { log(`build ${key}: ${error?.stack ?? error}`); }
+      }
+    }), 20);
+  }
+
+  /** The program for a request's document, and the offset of its position. */
+  async function at(params) {
+    const key = toKey(params.textDocument.uri);
+    const program = await build(key);
+    const text = textOf(program, key);
+    if (text == null) return null;
+    const offset = params.position ? offsetAt(lineStarts(text), params.position) : 0;
+    return { key, program, text, offset, decl: params.position ? program.index.declarationAt(key, offset) : -1 };
+  }
+
+  /** A place as an LSP location, or null when no editor can open its file. */
+  function location(program, place) {
+    if (!place) return null;
+    const uri = toUri(place.file);
+    const text = textOf(program, place.file);
+    if (!uri || text == null) return null;
+    return { uri, range: range(lineStarts(text), place.start, place.end) };
+  }
+
+  const requests = {
+    initialize: () => ({
+      capabilities: {
+        textDocumentSync: { openClose: true, change: 1, save: false },
+        definitionProvider: true,
+        referencesProvider: true,
+        documentHighlightProvider: true,
+        hoverProvider: true,
+        renameProvider: { prepareProvider: true },
+        documentSymbolProvider: true,
+        completionProvider: { triggerCharacters: ['.'] },
+        semanticTokensProvider: { legend: { tokenTypes: SEMANTIC_TYPES, tokenModifiers: SEMANTIC_MODIFIERS }, full: true },
+      },
+      serverInfo: { name: 'utu' },
+    }),
+
+    shutdown: () => { shutdown = true; return null; },
+
+    'textDocument/definition': async params => {
+      const q = await at(params);
+      if (!q || q.decl < 0) return null;
+      return location(q.program, q.program.index.definition(q.decl));
+    },
+
+    'textDocument/references': async params => {
+      const q = await at(params);
+      if (!q || q.decl < 0) return [];
+      const includeDeclaration = params.context?.includeDeclaration ?? true;
+      return q.program.index.references(q.decl, { includeDeclaration }).map(place => location(q.program, place)).filter(Boolean);
+    },
+
+    'textDocument/documentHighlight': async params => {
+      const q = await at(params);
+      if (!q || q.decl < 0) return [];
+      const lines = lineStarts(q.text);
+      const definition = q.program.index.definition(q.decl);
+      return q.program.index.references(q.decl)
+        .filter(place => place.file === q.key)
+        .map(place => ({ range: range(lines, place.start, place.end), kind: definition && place.start === definition.start && place.file === definition.file ? 3 : 2 }));
+    },
+
+    'textDocument/hover': async params => {
+      const q = await at(params);
+      if (!q || q.decl < 0) return null;
+      const contents = hover(q.program, q.decl);
+      if (!contents) return null;
+      const name = q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end);
+      return { contents: { kind: 'markdown', value: contents }, ...(name ? { range: range(lineStarts(q.text), name.start, name.end) } : {}) };
+    },
+
+    'textDocument/prepareRename': async params => {
+      const q = await at(params);
+      if (!q || q.decl < 0) return null;
+      const definition = q.program.index.definition(q.decl);
+      // Only what is declared in a file the editor can change.
+      if (!definition || !toUri(definition.file) || definition.file.startsWith('std:')) return null;
+      const name = q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end);
+      return name ? { range: range(lineStarts(q.text), name.start, name.end), placeholder: q.text.slice(name.start, name.end) } : null;
+    },
+
+    'textDocument/rename': async params => {
+      const q = await at(params);
+      if (!q || q.decl < 0) return null;
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName)) throw responseError(-32602, `'${params.newName}' is not a name`);
+      const changes = {};
+      for (const place of q.program.index.references(q.decl)) {
+        const where = location(q.program, place);
+        if (!where) continue;
+        (changes[where.uri] ??= []).push({ range: where.range, newText: params.newName });
+      }
+      return { changes };
+    },
+
+    'textDocument/documentSymbol': async params => {
+      const q = await at(params);
+      if (!q) return [];
+      const lines = lineStarts(q.text);
+      const { index } = q.program;
+      const symbols = new Map();
+      const roots = [];
+      for (const { decl, kind, owner, span } of index.declarations(q.key)) {
+        if (!(kind in SYMBOL_KIND)) continue;
+        const name = index.definition(decl);
+        if (!name || name.file !== q.key) continue;
+        const symbol = {
+          name: index.text(name), kind: SYMBOL_KIND[kind],
+          range: range(lines, Math.min(span.start, name.start), Math.max(span.end, name.end)),
+          selectionRange: range(lines, name.start, name.end), children: [],
+        };
+        symbols.set(decl, symbol);
+        const parent = symbols.get(owner);
+        (parent ? parent.children : roots).push(symbol);
+      }
+      return roots;
+    },
+
+    'textDocument/completion': async params => {
+      const key = toKey(params.textDocument.uri);
+      const text = docs.get(key)?.text;
+      if (text == null) return [];
+      const offset = offsetAt(lineStarts(text), params.position);
+      return complete(key, text, offset);
+    },
+
+    'textDocument/semanticTokens/full': async params => {
+      const q = await at(params);
+      if (!q) return { data: [] };
+      const lines = lineStarts(q.text);
+      const { index } = q.program;
+      const declared = new Map();
+      const data = [];
+      let line = 0, character = 0;
+      for (const { decl, at: place } of index.names(q.key)) {
+        const type = SEMANTIC_TYPES.indexOf(SEMANTIC_KIND[index.kind(decl)]);
+        if (type < 0) continue;
+        const start = positionAt(lines, place.start);
+        const end = positionAt(lines, place.end);
+        if (end.line !== start.line) continue;
+        if (!declared.has(decl)) declared.set(decl, index.definition(decl));
+        const definition = declared.get(decl);
+        const modifiers = definition && definition.file === q.key && definition.start === place.start ? 1 : 0;
+        data.push(start.line - line, start.line === line ? start.character - character : start.character, end.character - start.character, type, modifiers);
+        line = start.line;
+        character = start.character;
+      }
+      return { data };
+    },
+  };
+
+  /**
+   * What may be written at `offset`: after `x.`, the members of x's type (or
+   * of the module x names); elsewhere, the names in scope and the keywords.
+   * The text there rarely parses, so the build is of the text with a name
+   * where the one being typed is (and a `;` after it, when that is needed).
+   */
+  async function complete(key, text, offset) {
+    let start = offset;
+    while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1])) start--;
+    const member = text[start - 1] === '.';
+    let program = null;
+    for (const tail of ['', ';', ');', ' }']) {
+      const patched = `${text.slice(0, start)}${PLACEHOLDER}${tail}${text.slice(offset)}`;
+      program = await build(key, { key, text: patched });
+      if (!program.diagnostics.some(d => d.kind === 'parse-error')) break;
+    }
+    const { index } = program;
+    const all = index.declarations();
+    const label = decl => { const d = index.definition(decl); return d ? index.text(d) : ''; };
+    const item = (decl, kind) => {
+      const name = label(decl);
+      const span = index.span(decl);
+      const source = span ? textOf(program, span.file) : null;
+      const detail = LOCAL_KINDS.has(kind) ? index.type(decl) : source != null ? signature(source.slice(span.start, span.end)) : '';
+      return { label: name, kind: COMPLETION_KIND[kind] ?? 6, ...(detail ? { detail } : {}) };
+    };
+    const items = new Map();
+    const add = (decl, kind) => {
+      const name = label(decl);
+      if (name && name !== PLACEHOLDER && /^[A-Za-z_]\w*$/.test(name) && !items.has(name)) items.set(name, item(decl, kind));
+    };
+    if (member) {
+      let r = start - 1;
+      while (r > 0 && /\s/.test(text[r - 1])) r--;
+      const receiver = index.declarationAt(key, r - 1 >= 0 ? r - 1 : 0);
+      if (receiver < 0) return [];
+      const rkind = index.kind(receiver);
+      // `M.`: what module M holds. `x.`: the fields of x's type, and its module's methods.
+      const owner = rkind === 'Module' ? receiver : LOCAL_KINDS.has(rkind) || rkind === 'Global' ? index.typeDeclaration(receiver) : -1;
+      if (owner < 0) return [];
+      const module = rkind === 'Module' ? receiver : moduleOf(index, owner);
+      for (const { decl, kind, owner: o } of all) {
+        if (o === owner && (kind === 'Field' || kind === 'Variant' || kind === 'Fn' || kind === 'Global')) add(decl, kind);
+        else if (o === module && module !== owner && kind === 'Fn' && (rkind === 'Module' || isMethod(index, program, decl))) add(decl, kind);
+        else if (o === module && rkind === 'Module' && (kind === 'Struct' || kind === 'Enum' || kind === 'TypeDecl' || kind === 'Global')) add(decl, kind);
+      }
+      return [...items.values()];
+    }
+    // The locals of the function the cursor is in, declared before it.
+    const fns = all.filter(d => d.span.file === key && (d.kind === 'Fn' || d.kind === 'Main') && d.span.start <= start && start <= d.span.end);
+    const within = fns.sort((a, b) => (a.span.end - a.span.start) - (b.span.end - b.span.start))[0];
+    // What this file declares, and what the prelude does (imports are named by their alias).
+    const prelude = new Set(program.files.filter(f => f.role === 2).map(f => f.key));
+    for (const { decl, kind, owner, span } of all) {
+      if (span.file !== key && !(prelude.has(span.file) && PRELUDE_KINDS.has(kind))) continue;
+      if (span.file === key && LOCAL_KINDS.has(kind)) {
+        if (within && span.start >= within.span.start && span.start < start) add(decl, kind);
+      } else if (span.file === key ? owner < 0 || index.kind(owner) === 'Module' && !LOCAL_KINDS.has(kind) && kind !== 'Field' && kind !== 'Variant' : owner < 0 && kind !== 'Main') {
+        add(decl, kind);
+      }
+    }
+    for (const word of KEYWORDS) if (!items.has(word)) items.set(word, { label: word, kind: 14 });
+    return [...items.values()];
+  }
+
+  /** What hovering a name shows: its declaration, its type, its doc comment. */
+  function hover(program, decl) {
+    const { index } = program;
+    const kind = index.kind(decl);
+    const definition = index.definition(decl);
+    const span = index.span(decl);
+    const text = span ? textOf(program, span.file) : null;
+    let head;
+    if (LOCAL_KINDS.has(kind)) {
+      const type = index.type(decl);
+      head = `${definition ? index.text(definition) : '?'}${type ? `: ${type}` : ''}`;
+    } else if (span && text != null) {
+      head = signature(text.slice(span.start, span.end));
+    }
+    if (!head) return null;
+    const docs = span && text != null && !LOCAL_KINDS.has(kind) ? docComment(text, span.start) : '';
+    const where = span?.file.startsWith('std:') ? ` · ${span.file}` : '';
+    return `\`\`\`utu\n${head}\n\`\`\`\n*${kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}*${where}${docs ? `\n\n---\n\n${docs}` : ''}`;
+  }
+
+  async function notify(message) {
+    const { method, params } = message;
+    if (method === 'textDocument/didOpen') {
+      const { uri, text, version } = params.textDocument;
+      docs.set(toKey(uri), { uri, text, version });
+      generation++;
+      scheduleRefresh(toKey(uri));
+    } else if (method === 'textDocument/didChange') {
+      const key = toKey(params.textDocument.uri);
+      const doc = docs.get(key);
+      if (!doc) return;
+      // Full sync: the last change is the whole text.
+      const change = params.contentChanges[params.contentChanges.length - 1];
+      if (change && change.range == null) doc.text = change.text;
+      doc.version = params.textDocument.version;
+      generation++;
+      scheduleRefresh(key);
+    } else if (method === 'textDocument/didClose') {
+      const key = toKey(params.textDocument.uri);
+      const doc = docs.get(key);
+      docs.delete(key);
+      generation++;
+      if (doc && published.delete(key)) send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: doc.uri, diagnostics: [] } });
+    }
+  }
+
+  return {
+    /** Answer one message from the editor. Resolves when `exit` should end the process (with its code). */
+    async handle(message) {
+      if (message.method === 'exit') return { exit: shutdown ? 0 : 1 };
+      if (message.id == null) {
+        await notify(message);
+        return null;
+      }
+      const answer = requests[message.method];
+      if (!answer) {
+        send({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `${message.method} is not supported` } });
+        return null;
+      }
+      try {
+        const result = message.method === 'initialize' || message.method === 'shutdown'
+          ? await answer(message.params)
+          : await serial(() => answer(message.params));
+        send({ jsonrpc: '2.0', id: message.id, result: result ?? null });
+      } catch (error) {
+        send({ jsonrpc: '2.0', id: message.id, error: error.code ? error : { code: -32603, message: String(error?.message ?? error) } });
+        log(`${message.method}: ${error?.stack ?? error}`);
+      }
+      return null;
+    },
+    /** Builds and answers still running (for tests). */
+    idle: () => new Promise(resolve => setTimeout(() => resolve(queue), 30)),
+  };
+}
+
+function responseError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+/** Where each line of `text` starts (UTF-16 offsets). */
+function lineStarts(text) {
+  const starts = [0];
+  for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) starts.push(i + 1);
+  return starts;
+}
+
+function positionAt(lines, offset) {
+  let lo = 0, hi = lines.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (lines[mid] <= offset) lo = mid; else hi = mid - 1;
+  }
+  return { line: lo, character: offset - lines[lo] };
+}
+
+function offsetAt(lines, { line, character }) {
+  if (line >= lines.length) return lines[lines.length - 1];
+  return lines[line] + character;
+}
+
+function range(lines, start, end) {
+  return { start: positionAt(lines, start), end: positionAt(lines, end) };
+}
+
+/** A declaration's first line, without its body: `fn area(self: Shape) F64`. */
+function signature(text) {
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth--;
+    else if (depth === 0 && (c === '{' || c === ';')) return collapse(text.slice(0, i));
+    else if (depth === 0 && c === '=' && text[i + 1] === '>') return collapse(text.slice(0, i));
+  }
+  return collapse(text);
+}
+
+function collapse(text) {
+  const line = text.replace(/\s+/g, ' ').trim();
+  return line.length > 160 ? `${line.slice(0, 157)}...` : line;
+}
+
+/** The `///` lines just above `start`, as markdown. */
+function docComment(text, start) {
+  const lines = text.slice(0, start).split('\n');
+  // Only a declaration that begins its line (after `export`, `tag`, …) has one.
+  if (!/^\s*([a-z]+\s+)*$/.test(lines.pop())) return '';
+  const out = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith('///')) break;
+    out.unshift(line.slice(line.startsWith('/// ') ? 4 : 3));
+  }
+  return out.join('\n');
+}
+
+/** The module a declaration is in, or -1. */
+function moduleOf(index, decl) {
+  let d = decl;
+  while (d >= 0 && index.kind(d) !== 'Module') d = index.owner(d);
+  return d;
+}
+
+/** A function called on a value: `fn &.f |self| …`. */
+function isMethod(index, program, decl) {
+  const span = index.span(decl);
+  const text = span && (program.files.find(f => f.key === span.file)?.text);
+  return text != null && /^\s*(export\s+)?fn\s+[^\s(]*\.[A-Za-z_]\w*\s*\|/.test(text.slice(span.start, span.end));
+}
