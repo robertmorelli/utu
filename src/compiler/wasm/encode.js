@@ -65,6 +65,12 @@ export function encodeModule(module, { sourceMapUrl = null, names = Boolean(sour
     const w = new Writer(1 << 16);
     w.u32(defined.length);
     for (const fn of defined) {
+      // A @wat function's code is assembled already: its locals, instructions, and end.
+      if (fn.code) {
+        w.u32(fn.code.length);
+        w.bytes(fn.code);
+        continue;
+      }
       const body = new Writer();
       const code = new CodeWriter(body, enc, fn);
       code.function();

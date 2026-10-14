@@ -912,6 +912,17 @@
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
+ "examples/wat.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "ae6fa08df81f4c86",
+  "queries": "879257e3376f52c7",
+  "graphs": "ab92628fc5039cdc"
+ },
+ "examples/wat.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
  "examples/working/arrays_and_for.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",

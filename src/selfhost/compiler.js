@@ -123,7 +123,50 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   if (!await bindForeign(utu, foreign, host)) return loadProgram(utu, entry, host, texts);
   files.diagnostics = utu.resolve();
   await loadEmbeds(utu, entry, host);
+  await assembleWat(utu);
   return files;
+}
+
+/**
+ * @wat functions: each one's text, assembled (src/wat/assemble.js, loaded
+ * only when a program has one) from its parameters and result as written,
+ * and given back as its code, or as the mistake that stops it.
+ */
+async function assembleWat(utu) {
+  const count = utu.wat_count();
+  if (count === 0) return;
+  const { assembleWat: assemble } = await import('../wat/assemble.js');
+  const kind = n => utu.node_kind_name(new Uint8Array(utu.node_kind.buffer)[n]);
+  const children = n => {
+    const child = new Int32Array(utu.node_child.buffer);
+    const next = new Int32Array(utu.node_next.buffer);
+    const out = [];
+    for (let c = child[n]; c >= 0; c = next[c]) out.push(c);
+    return out;
+  };
+  const text = n => {
+    const first = new Int32Array(utu.node_first.buffer)[n];
+    const last = new Int32Array(utu.node_last.buffer)[n];
+    return textAt(utu.src, new Int32Array(utu.tok_start.buffer)[first], new Int32Array(utu.tok_end.buffer)[last - 1]);
+  };
+  for (let k = 0; k < count; k++) {
+    const parts = children(utu.wat_function(k));
+    const params = parts.filter(n => kind(n) === 'param_list').flatMap(children)
+      .map(param => { const [name, type] = [children(param)[0], children(param).at(-1)]; return { name: text(name), type: text(type) }; });
+    const returns = parts.find(n => kind(n) === 'return_type');
+    const result = kind(children(returns)[0]) === 'void_type' ? 'void' : text(returns);
+    const method = parts.some(n => kind(n) === 'self_param') || kind(children(returns)[0]) === 'yield_type';
+    const assembled = assemble({ params, result, method, text: textAt(utu.src, utu.wat_text_start(k), utu.wat_text_end(k)) });
+    if (assembled.code) {
+      const at = utu.wat_set(k, assembled.code.length);
+      new Uint8Array(utu.wat_bytes.buffer).set(assembled.code, at);
+    } else {
+      const { message, start, end } = assembled.error;
+      const bytes = encoder.encode(message);
+      const at = utu.wat_fail(k, start ?? -1, end ?? -1, bytes.length);
+      new Uint8Array(utu.src.buffer).set(bytes, at);
+    }
+  }
 }
 
 const PLATFORM_PATH = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;

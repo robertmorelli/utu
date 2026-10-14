@@ -83,6 +83,7 @@ fn reset_program() void {
     splice_rename_to.clear();
     wu_serial[0] = 0;
     dsl_file_site.clear();
+    reset_wat();
     if kept[0] > 0 { intern_kept(); } else {
         intern_keywords();
         for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };

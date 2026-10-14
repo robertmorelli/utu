@@ -4951,6 +4951,33 @@
    }
   }
  },
+ "examples/wat.utu normal": {
+  "calls": {
+   "dotted": {
+    "result": 50,
+    "printed": []
+   },
+   "extended": {
+    "result": -1,
+    "printed": []
+   },
+   "rotated": {
+    "result": 3,
+    "printed": []
+   },
+   "signed": {
+    "result": -2.5,
+    "printed": []
+   },
+   "summed": {
+    "result": 5050,
+    "printed": []
+   }
+  }
+ },
+ "examples/wat.utu test": {
+  "calls": {}
+ },
  "examples/working/arrays_and_for.utu normal": {
   "calls": {
    "main": {

@@ -203,7 +203,7 @@ fn diag_kind_of(i: I32) Str {
         or k == Diag.GeneratorArity or k == Diag.PruneOutside or k == Diag.PruneInClosure { return "invalid-for-source"; };
     if k == Diag.IteratorUnfinished or k == Diag.IteratorCaptures or k == Diag.IteratorTerminalInside or k == Diag.IteratorSource { return "invalid-iterator-usage"; };
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
-    if k == Diag.InvalidDslUsage or k == Diag.DslError { return "invalid-dsl-usage"; };
+    if k == Diag.InvalidDslUsage or k == Diag.DslError or k == Diag.WatPlace or k == Diag.WatHost { return "invalid-dsl-usage"; };
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     "type-mismatch";
 }
@@ -339,6 +339,8 @@ fn diag_text(i: I32) Str {
     if k == Diag.ForeignRecordField { return "Unknown foreign property '" + w + "'"; };
     if k == Diag.ForeignRecordMissing { return "Missing foreign property '" + w + "'"; };
     if k == Diag.DslError { return w; };
+    if k == Diag.WatPlace { return "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"; };
+    if k == Diag.WatHost { return "@wat needs a host that assembles it (src/wat/assemble.js)"; };
     if k == Diag.HostAltArm { return "Every arm of an alt over a host value must name a declared class"; };
     if k == Diag.HostAltClass { return word_text(view_prefix[a]) + "." + w + " is only a type; narrowing needs a declared runtime class"; };
     if k == Diag.ForeignNotArray { return type_text(a) + " is not an array type"; };

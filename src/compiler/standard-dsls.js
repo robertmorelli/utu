@@ -3,12 +3,12 @@ import { callableParts } from './type-strings.js';
 import { parseXmlFragment } from './ir-document.js';
 import { parseToIR } from './parse.js';
 import { T } from './ir-tags.js';
-import { createSyntheticNode, firstTypeChild, typeNodeToStr } from './ir-helpers.js';
+import { createSyntheticNode, declaredTypeStr, firstTypeChild, fnReturnType, paramsOf, selfParamOf, typeNodeToStr } from './ir-helpers.js';
+import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
+import { assembleWat } from '../wat/assemble.js';
 
 export function createStandardDsls({ parser, createDocument }) {
   return {
-    // @wat is first-class but not yet implemented.
-    // Return null so expand-dsls skips the node rather than throwing.
     css: {
       expand({body}) {
         const css=stencilCss(stripDslDelims(body));
@@ -21,7 +21,7 @@ export function createStandardDsls({ parser, createDocument }) {
       },
     },
     es:  { expand: expandEsDsl, allowResidual: true },
-    wat: { expand() { return null; } },
+    wat: { expand: expandWatDsl },
     utu: {
       expand({ body }) {
         const inner = stripDslDelims(body);
@@ -55,6 +55,42 @@ export function createStandardDsls({ parser, createDocument }) {
       },
     },
   };
+}
+
+// A function whose whole body is `@wat/\ … \/`: its code, assembled
+// (src/wat/assemble.js), which codegen emits as the function's body.
+function expandWatDsl({ doc, node, body }) {
+  if (!node) return null;
+  const block = node.parentElement;
+  const fn = block?.parentElement;
+  if (block?.localName !== T.BLOCK || fn?.localName !== T.FN || block.children.length !== 1) {
+    throw compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }", node);
+  }
+  const result = assembleWat({
+    params: paramsOf(fn).map(param => ({ name: param.getAttribute('name'), type: declaredTypeStr(param) })),
+    result: fnReturnType(fn),
+    text: stripDslDelims(body),
+    method: !!selfParamOf(fn) || fn.getAttribute('data-generator') === 'true',
+  });
+  if (result.error) throw compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, result.error.message, bodyPoint(node, result.error));
+  const code = createSyntheticNode(doc, 'ir-wat-code', node, 'expand-dsls', 'wat-code');
+  code.setAttribute('code', [...result.code].map(byte => byte.toString(16).padStart(2, '0')).join(''));
+  return { node: code };
+}
+
+/** A place in a DSL body (offsets from the inner start), as a node diagnostics can point at; the site when there is none. */
+function bodyPoint(site, { start, end }) {
+  if (start == null) return site;
+  const from = Number(site.getAttribute('data-body-inner-start')) + start;
+  const lines = (site.ownerDocument.__utuSourceText ?? '').slice(0, from).split('\n');
+  const point = site.cloneNode(false);
+  point.setAttribute('data-start', from);
+  point.setAttribute('data-end', from + (end - start));
+  point.setAttribute('data-row', lines.length);
+  point.setAttribute('data-col', lines.at(-1).length + 1);
+  point.setAttribute('data-end-row', point.getAttribute('data-row'));
+  point.setAttribute('data-end-col', Number(point.getAttribute('data-col')) + (end - start));
+  return point;
 }
 
 function stripDslDelims(body) {

@@ -256,6 +256,7 @@
  "examples/queries/iterators.utu": 4621,
  "examples/streams.utu": 1254,
  "examples/templates.utu": 740,
+ "examples/wat.utu": 339,
  "examples/working/arrays_and_for.utu": 163,
  "examples/working/closures.utu": 151,
  "examples/working/hello.utu": 37,

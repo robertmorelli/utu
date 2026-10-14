@@ -230,6 +230,7 @@ vec func_module_name: I32; // import: module name (a span in names), else -1
 vec func_field_name: I32;  // import: field name; defined: export name, or -1
 vec func_debug_name: I32;  // for the name section, or -1
 vec func_index: I32;       // its index in the module, once encoding assigns them
+vec func_code: I32;        // a @wat function: its site (host.utu), whose code is its body; else -1
 vec local_types: I32;
 
 vec glob_kind: U8;         // FuncKind
@@ -306,6 +307,7 @@ fn new_func(kind: FuncKind, t: I32) I32 {
     func_field_name.push(-1);
     func_debug_name.push(-1);
     func_index.push(-1);
+    func_code.push(-1);
     f;
 }
 
@@ -353,6 +355,7 @@ fn reset_wasm() void {
     func_field_name.clear();
     func_debug_name.clear();
     func_index.clear();
+    func_code.clear();
     local_types.clear();
     glob_kind.clear();
     glob_type.clear();
@@ -1139,7 +1142,12 @@ fn encode_code() void {
     if count == 0 { return; };
     leb_u(false, count);
     for (0 ..< func_kind.len()) |f| {
-        if is_live_defined(f) {
+        if is_live_defined(f) and func_code[f] >= 0 {
+            // Assembled already: locals, instructions, and end.
+            let k = func_code[f];
+            leb_u(false, wat_len[k]);
+            for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]); };
+        } else if is_live_defined(f) {
             code_bytes.clear();
             encode_locals(f);
             mark_targets(func_body[f]);

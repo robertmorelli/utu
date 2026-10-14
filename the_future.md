@@ -423,7 +423,8 @@ Ideal experience:
 
 The standard built-ins that should ship working:
 
-- `@wat` — currently a stub; needs the same end-to-end treatment `@es` got
+- `@wat` — **landed**: a function whose body is WebAssembly text (numeric,
+  vector and control instructions, checked and assembled; new_spec2.md)
 
 Future first-class DSLs:
 
@@ -524,7 +525,7 @@ The practical order of importance is:
 5. make async/await first-class
 6. add async generators, closures, iteration, and pattern-matching depth
 7. make TS def imports and npm usage first-class
-8. keep DSLs powerful, but hide the common cases behind stdlib (and finish `@wat`)
+8. keep DSLs powerful, but hide the common cases behind stdlib (`@wat` has landed)
 9. build strong platform libraries for browser, node, bun, and JS-hosted edge runtimes
 10. ship the dev shell (dev server, doc generator, reproducible builds)
 11. keep pushing toward tiny bundles and excellent interop-heavy performance

@@ -68,7 +68,9 @@ fn fn_instance(decl: I32, inst: I32) I32 {
         let f = new_func(FuncKind.Defined, func_type(vl_end(m), vl_of_result(repr(fi_result[id]))));
         fi_func[id] = f;
         func_debug_name[f] = fn_debug_name(decl);
-        fi_queue.push(id);
+        // A @wat function's body is its code, which the host assembled.
+        let wat = wat_of(body);
+        if wat >= 0 { func_code[f] = wat; } else { fi_queue.push(id); };
     };
     id;
 }
@@ -454,6 +456,9 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
             if dsl_has_failed(node) { error_value(); } else if is_es(node) {
                 report(Diag.InvalidDslUsage, node, -1);
                 error_value();
+            } else if is_wat(node) {
+                report(Diag.WatPlace, node, -1);
+                error_value();
             } else { unsupported(node); };
         },
         ~> unsupported(node),
@@ -636,7 +641,8 @@ fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
     let text = "";
     for (tok_start[t] ..< tok_end[t]) |i| { text = text + Str.from_code_point(src[i]); };
     let f = parse_number(text);
-    if negate { f = 0.0 - f; };
+    // Negated, not subtracted from 0.0: `-0.0` is negative zero.
+    if negate { f = -f; };
     let ft = if expect >= 0 and is_float(expect) { expect; } else { prelude(Prelude.F64); };
     push_number(ft, f.bits(), true);
     ft;
@@ -1650,6 +1656,7 @@ fn compile(target: Target) I32 {
     reset_check();
     validate_program();
     count_memories();
+    report_wat();
     keep_target_diagnostics(target);
     // A DSL that does not expand ends the build, as in stage 0: the first
     // the target has is its one diagnostic.

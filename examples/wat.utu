@@ -1,0 +1,52 @@
+// wat.utu — @wat: a function written in WebAssembly text
+//
+// A function whose whole body is `@wat/\ … \/` is that WAT, over its
+// parameters (by their names). It is checked as the engine would check it,
+// and assembled into the module as the function's body: for instructions
+// utu has no syntax for (rotations, copysign, sign extension, SIMD lanes)
+// and hand-written loops.
+
+fn rotl(x: I32, k: I32) I32 {
+    @wat/\ local.get $x local.get $k i32.rotl \/;
+}
+
+fn copysign(x: F64, sign: F64) F64 {
+    @wat/\ (f64.copysign (local.get $x) (local.get $sign)) \/;
+}
+
+// Folded or flat, with locals and labels.
+fn triangle(n: I32) I32 {
+    @wat/\
+        (local $acc i32) (local $i i32)
+        (block $done
+          (loop $next
+            (br_if $done (i32.gt_s (local.get $i) (local.get $n)))
+            (local.set $acc (i32.add (local.get $acc) (local.get $i)))
+            (local.set $i (i32.add (local.get $i) (i32.const 1)))
+            (br $next)))
+        local.get $acc
+    \/;
+}
+
+// Four lanes at once.
+fn dot4(a: I32, b: I32, c: I32, d: I32) I32 {
+    @wat/\
+        (local $v v128)
+        (local.set $v (i32x4.mul
+            (v128.const i32x4 1 2 3 4)
+            (i32x4.replace_lane 3 (i32x4.replace_lane 2 (i32x4.replace_lane 1
+                (i32x4.splat (local.get $a)) (local.get $b)) (local.get $c)) (local.get $d))))
+        (i32.add (i32.add (i32x4.extract_lane 0 (local.get $v)) (i32x4.extract_lane 1 (local.get $v)))
+                 (i32.add (i32x4.extract_lane 2 (local.get $v)) (i32x4.extract_lane 3 (local.get $v))))
+    \/;
+}
+
+fn low_byte_signed(x: I32) I32 { @wat/\ (i32.extend8_s (local.get $x)) \/; }
+
+export lib {
+    fn rotated() I32 { rotl(-2147483647, 1); }
+    fn signed() F64 { copysign(2.5, -0.0); }
+    fn summed() I32 { triangle(100); }
+    fn dotted() I32 { dot4(1, 1, 1, 1) + dot4(0, 0, 0, 10); }
+    fn extended() I32 { low_byte_signed(255); }
+}

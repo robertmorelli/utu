@@ -191,6 +191,38 @@ export lib {
 
     fn diagnostic_node(i: I32) I32 { diag_node[i]; }
 
+    // @wat functions (host.utu): how many the loaded program has; site k's
+    // function (its node: name, parameters, result) and text (between `/\`
+    // and `\/`, in src). The host gives back k's code (`n` bytes it writes
+    // at the offset returned, in wat_bytes), or a mistake: `n` bytes of
+    // message it writes at the offset returned, in src, and where it is in
+    // the text (UTF-16 offsets; -1 for the function's signature).
+    fn wat_count() I32 { find_wat(); }
+
+    fn wat_function(k: I32) I32 { wat_function_of(wat_site[k]); }
+
+    fn wat_text_start(k: I32) I32 { dsl_inner_start(wat_site[k]); }
+
+    fn wat_text_end(k: I32) I32 { dsl_inner_end(wat_site[k]); }
+
+    fn wat_set(k: I32, n: I32) I32 {
+        let at = wat_bytes.len();
+        wat_bytes.resize(at + n);
+        wat_start[k] = at;
+        wat_len[k] = n;
+        at;
+    }
+
+    fn wat_fail(k: I32, from: I32, to: I32, n: I32) I32 {
+        let at = src.len();
+        src.resize(at + n);
+        wat_message[k] = at;
+        wat_message_end[k] = at + n;
+        wat_from[k] = from;
+        wat_to[k] = to;
+        at;
+    }
+
     fn decl_kind_name(decl: I32) Str { Decl.name(Decl.from_i32(decl_kind[decl])); }
 
     fn decl_count() I32 { decl_kind.len(); }

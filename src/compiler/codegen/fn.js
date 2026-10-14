@@ -69,6 +69,17 @@ export function emitFn(fn, ctx) {
     },
   };
 
+  // A @wat function's body is its code, assembled (standard-dsls.js).
+  const wat = bodyOf(fn)?.children.length === 1 && bodyOf(fn).firstElementChild.localName === 'ir-wat-code'
+    ? bodyOf(fn).firstElementChild : null;
+  if (wat) {
+    const hex = wat.getAttribute('code');
+    const funcRef = m.addFunction(name, wasm.createType(paramTypes), retType, [], m.nop());
+    funcRef.code = Uint8Array.from(hex.match(/../g), byte => parseInt(byte, 16));
+    noteFunction(ctx.artifacts, fn, name, retType);
+    return { name, retType };
+  }
+
   // ── Body ──────────────────────────────────────────────────────────────────
   const body = bodyOf(fn);
   let bodyExpr = body ? emitExpr(body, fnCtx) : m.nop();

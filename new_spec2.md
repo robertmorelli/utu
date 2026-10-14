@@ -829,11 +829,55 @@ An index or stored value is evaluated before the array is read, so
 let PI: F64 = 3.14159;
 
 // DSL expressions — @name/\ body \/
-// builtins: @es (JavaScript), @utu (utu source), @ir (raw IR xml), @wat (WAT)
+// builtins: @es (JavaScript), @utu (utu source), @ir (raw IR xml), @wat (WAT, below)
 // body is raw text handed to the named DSL module at compile time
 let foo: fun(I32, Str) F64 = @es/\ return a + b \/;
 let value: F64 = @utu/\ some.utu.expr \/;
 ```
+
+---
+
+### WebAssembly text (`@wat`)
+
+A function whose whole body is `@wat/\ … \/` is written in WebAssembly text:
+
+```
+fn rotl(x: I32, k: I32) I32 {
+    @wat/\ local.get $x local.get $k i32.rotl \/;
+}
+
+fn triangle(n: I32) I32 {
+    @wat/\
+        (local $acc i32) (local $i i32)
+        (block $done
+          (loop $next
+            (br_if $done (i32.gt_s (local.get $i) (local.get $n)))
+            (local.set $acc (i32.add (local.get $acc) (local.get $i)))
+            (local.set $i (i32.add (local.get $i) (i32.const 1)))
+            (br $next)))
+        local.get $acc
+    \/;
+}
+```
+
+- The parameters are locals, named as in utu (`$x`) or numbered; `(local …)`
+  declarations come first. Instructions are flat or folded, as in any WAT.
+- It takes and returns `I32`, `U32`, `I64`, `U64`, `F32`, `F64`, `Bool` (each
+  `i32`, `i64`, `f32` or `f64`) or `V128` (`v128`), and is a plain function
+  (no `|self|`, not a generator).
+- Every numeric and vector instruction, constants, locals, `block`, `loop`,
+  `if`/`else`, `br`, `br_if`, `br_table`, `return`, `select`, `drop`,
+  `unreachable`, `nop`. A @wat function computes on its arguments: it has no
+  memories, globals, calls or references.
+- It is checked as the engine checks it (each instruction's operand types,
+  labels, what the body leaves), and a mistake is reported at its place in
+  the text: `i64.add needs an i64, not an i32`.
+- The function is the code written, in the module as written; calls to it
+  are calls.
+
+The assembler (src/wat/assemble.js) runs in the compiler's host, not in the
+compiler: the self-hosted compiler finds the @wat functions, its driver
+assembles them, and the compiler puts the code in the module.
 
 ---
 
