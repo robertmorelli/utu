@@ -7,16 +7,27 @@
 
 export lib {
     fn reset() void {
-        abi_kept[0] = 0;
+        unseal();
         reset_program();
     }
 
-    // Start a program, keeping the host declarations sealed (abi_seal).
+    // Start a program, keeping what is sealed.
     fn reset_keep() void { reset_program(); }
 
-    // The host declarations written since reset() stay for the programs
-    // that follow (reset_keep), with what is learned of them.
-    fn abi_seal() void { abi_kept[0] = src.len(); }
+    // What the host has given since reset() (host declarations, and the
+    // standard library's prelude, its files added and parsed) stays for the
+    // programs that follow (reset_keep), with what is learned of it.
+    fn seal() void {
+        intern_known();
+        known_kept[0] = 1;
+        abi_kept[0] = src.len();
+        kept[0] = src.interned();
+        kept[1] = tok_kind.len();
+        kept[2] = node_kind.len();
+        kept[3] = file_start.len();
+        kept[4] = import_file.len();
+        kept_reactive[0] = -1;
+    }
 
     // A view of a document, its JSON at `at`, serving no import yet; and
     // binding a view to import i.
@@ -184,13 +195,19 @@ export lib {
     // The lexer and parser alone, on one source (for their differentials):
     // the host writes `n` bytes at the returned offset.
     fn source(n: I32) I32 {
+        unseal();
         reset_program();
         file_start[add_file(n, FileRole.Entry)];
     }
 
     fn tokens(n: I32) I32 { lex(file_start[0], file_end[0]); }
 
-    fn nodes(n: I32) I32 { parse_file(0); }
+    fn nodes(n: I32) I32 {
+        comment_nodes[0] = 1;
+        let root = parse_file(0);
+        comment_nodes[0] = 0;
+        root;
+    }
 
     // A module with one exported function, `answer`, returning 42: a check
     // of the encoder alone.

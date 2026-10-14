@@ -791,11 +791,18 @@ fn member_access(view: I32, key: I32, root: Bool) Str {
     if not root { return "self[" + js_key(key) + "]"; };
     let spec = jget(view_json[view], "moduleSpecifier");
     if not jis_string(spec) { return "globalThis[" + js_key(key) + "]"; };
-    // Named by the import (numbered in the program), not the view, which
-    // may have been kept from an earlier program.
-    let alias = "__abi" + int_text(view_import[view]) + "_" + hex_name(word_text(key));
+    // Named by the import (numbered among the program's host declaration
+    // imports), not the view, which may have been kept from an earlier program.
+    let alias = "__abi" + int_text(foreign_ordinal(view_import[view])) + "_" + hex_name(word_text(key));
     access_prologue[0] = intern_text("import { " + js_key(key) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ");
     alias;
+}
+
+// Which of the program's imports of host declarations import i is (0 for the first).
+fn foreign_ordinal(i: I32) I32 {
+    let k = 0;
+    for (0 ..< i) |j| { if import_target[j] == -2 { k += 1; }; };
+    k;
 }
 
 fn hex_name(text: Str) Str {

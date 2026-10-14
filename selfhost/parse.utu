@@ -1916,7 +1916,7 @@ fn intern_words(first: I32, last: I32) void {
 
 // Parse the tokens from `first` up to `last` (the last of them `End`), adding
 // their nodes. Returns the source file node, or -1 when the tokens do not
-// parse (and adds no nodes). Comments are the nodes after the source file.
+// parse (and adds no nodes).
 fn parse(first: I32, last: I32) I32 {
     parse_error_wanted[0] = -1;
     if tok_kind[last - 1] != Tok.End.to_i32() {
@@ -1931,7 +1931,7 @@ fn parse(first: I32, last: I32) I32 {
     try {
         let root = source_file(Parser { pos: 0 });
         token_spans(before, root, first, last - 1);
-        attach_comments(root);
+        if comment_nodes[0] == 1 { attach_comments(root); };
         root;
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]];
@@ -1957,7 +1957,11 @@ fn token_spans(before: I32, root: I32, first: I32, end_: I32) void {
 
 // Put each comment in the smallest node whose first and last tokens surround
 // it, among its children in order (stage 0's attachComments). Comments come
-// in source order, so one walk down the tree places them all.
+// in source order, so one walk down the tree places them all. Only the
+// parser's differential asks for them (comment_nodes): nothing compiling a
+// program reads them, so its tree is without them, and walking it skips none.
+mem comment_nodes: I32 = [0];
+
 struct Comments:
     | next: I32
 

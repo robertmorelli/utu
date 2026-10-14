@@ -30,7 +30,7 @@ fn expand_dsl_round() Bool {
     let stored = intern_text("stored");
     let expanded = false;
     let before = node_kind.len();
-    for (0 ..< before) |n| {
+    for (own_nodes() ..< before) |n| {
         if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) {
             let w = word_of(first_child(n));
             if w == utu or w == css {
@@ -44,7 +44,7 @@ fn expand_dsl_round() Bool {
             };
         };
     };
-    for (0 ..< before) |n| {
+    for (own_nodes() ..< before) |n| {
         if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == stored {
             expanded = true;
             try {
@@ -60,7 +60,7 @@ fn expand_dsl_round() Bool {
     let ncontainers = 0;
     let found = false;
     let count = node_kind.len();
-    for (0 ..< count) |n| {
+    for (own_nodes() ..< count) |n| {
         if node_kind[n] == Node.Dsl_expr.to_i32() and word_of(first_child(n)) == json and dsl_in_program(n) {
             found = true;
             let c = dsl_container(n);
@@ -81,7 +81,7 @@ fn expand_dsl_round() Bool {
         more = false;
         guard += 1;
         let now = node_kind.len();
-        for (0 ..< now) |n| {
+        for (own_nodes() ..< now) |n| {
             if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == wutu {
                 more = true;
                 expanded = true;
@@ -96,6 +96,10 @@ fn expand_dsl_round() Bool {
     };
     found or expanded;
 }
+
+// Where the nodes that may be the program's own start: the kept prelude's
+// (the first) are the standard library's.
+fn own_nodes() I32 { kept[2]; }
 
 // Whether a node is in an own file (not the standard library), and its
 // expansion has not failed (an expanded site is a parenthesis).
@@ -456,14 +460,11 @@ fn text_at(text: Str, at: I32, part: Str) Bool {
     true;
 }
 
-fn text_index(text: Str, part: Str, from: I32) I32 {
-    let i = from;
-    while (i + part.len() <= text.len()) {
-        if text_at(text, i, part) { return i; };
-        i += 1;
-    };
-    -1;
-}
+// Where `part` first is in `text`, from `from` on, or -1 (JavaScript's
+// search, which a scan of code units here is many times slower than).
+fn text_index(text: Str, part: Str, from: I32) I32 { if from > text.len() { -1; } else { str_index(text, part, from); }; }
+
+let str_index: fun(Str, Str, I32) I32 = @es/\ (t, p, f) => t.indexOf(p, f) \/;
 
 fn trim_end(text: Str) Str {
     let n = text.len();

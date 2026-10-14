@@ -81,26 +81,15 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
     if (!texts.has(file)) texts.set(file, await host.readFile(file));
     return texts.get(file);
   };
-  startProgram(utu);
-  const files = [];
-  const byKey = new Map();
-  const add = (key, text, role) => {
-    const bytes = encoder.encode(text);
-    const file = utu.file_add(bytes.length, role);
-    new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
-    files.push({ key, role, text, offset: utu.file_offset(file), bytes });
-    byKey.set(key, file);
-    utu.file_parse(file);
-    return file;
-  };
+  const prelude = startProgram(utu, stdlib);
+  const files = [...prelude.files];
+  const byKey = new Map(prelude.byKey);
   const foreign = [];
-  add(entry, await readFile(entry), ROLE.entry);
-  const prelude = stdlib.get('std:Prelude');
-  if (typeof prelude === 'string') add('std:Prelude', prelude, ROLE.prelude);
+  addFile(utu, files, byKey, entry, await readFile(entry), ROLE.entry);
   for (let i = 0; i < utu.import_count(); i++) {
     const from = files[utu.import_from(i)];
     const raw = textAt(utu.src, utu.import_path_start(i), utu.import_path_end(i));
-    const platform = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/.test(raw);
+    const platform = PLATFORM_PATH.test(raw);
     if (/^"?(npm|node):/.test(raw) || platform && typeof stdlib.get(raw) === 'function') {
       utu.import_foreign(i);
       foreign.push({ i, raw, from: from.key, name: textAt(utu.src, utu.import_name_start(i), utu.import_name_end(i)) });
@@ -113,7 +102,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
       if (platform) {
         const text = stdlib.get(key);
         if (typeof text !== 'string') continue;
-        file = add(key, text, role);
+        file = addFile(utu, files, byKey, key, text, role);
       } else {
         let text;
         try {
@@ -124,7 +113,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
           new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
           break;
         }
-        file = add(key, text, role);
+        file = addFile(utu, files, byKey, key, text, role);
       }
     }
     utu.import_bind(i, file);
@@ -135,6 +124,19 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   files.diagnostics = utu.resolve();
   await loadEmbeds(utu, entry, host);
   return files;
+}
+
+const PLATFORM_PATH = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;
+
+/** Add a file to the program, and parse it. Returns its index. */
+function addFile(utu, files, byKey, key, text, role) {
+  const bytes = encoder.encode(text);
+  const file = utu.file_add(bytes.length, role);
+  new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
+  files.push({ key, role, text, offset: utu.file_offset(file), bytes });
+  byKey.set(key, file);
+  utu.file_parse(file);
+  return file;
 }
 
 // A declaration ABI's types as JSON bytes, and where each type starts in
@@ -163,28 +165,30 @@ export function typesDocument(types) {
   return made;
 }
 
-// What each loaded compiler keeps of host declarations from program to
-// program: the documents and views written at the start of its source and
-// sealed (with what it learns of them: where their containers end, their
-// large objects' keys), and all those wanted so far.
+// What each loaded compiler keeps from program to program: the host
+// declarations' documents and views (with what it learns of them: where
+// their containers end, their large objects' keys), and all those wanted so
+// far; and the standard library's prelude, parsed. Both are written at the
+// start of its source and sealed.
 const resident = new WeakMap();
 
 function residentOf(utu) {
   let state = resident.get(utu);
-  if (!state) resident.set(utu, state = { docs: new Map(), views: new Map(), wanted: new Set(), rebuild: false });
+  if (!state) resident.set(utu, state = { docs: new Map(), views: new Map(), wanted: new Set(), prelude: null, rebuild: false });
   return state;
 }
 
 /**
- * Start a program, keeping the declarations the compiler holds; or, when
- * a program wanted one it does not hold, writing every one wanted so far
- * first, and sealing them.
+ * Start a program, keeping what the compiler holds; or, when a program
+ * wanted host declarations it does not hold (or the prelude is another),
+ * writing every one wanted so far and the prelude first, and sealing them.
+ * Returns the prelude's files.
  */
-function startProgram(utu) {
+function startProgram(utu, stdlib) {
   const state = residentOf(utu);
-  if (!state.rebuild && state.docs.size) {
+  if (!state.rebuild && state.prelude?.files.every(file => stdlib.get(file.key) === file.text)) {
     utu.reset_keep();
-    return;
+    return state.prelude;
   }
   utu.reset();
   state.docs.clear();
@@ -193,8 +197,26 @@ function startProgram(utu) {
     const view = writeView(utu, decl, writeDoc(utu, decl, state.docs));
     state.views.set(decl, utu.abi_resident_view(view.doc, view.at));
   }
-  if (state.wanted.size) utu.abi_seal();
+  state.prelude = seatPrelude(utu, stdlib);
+  utu.seal();
   state.rebuild = false;
+  return state.prelude;
+}
+
+/** std:Prelude and the standard library files it imports, added and parsed. */
+function seatPrelude(utu, stdlib) {
+  const files = [];
+  const byKey = new Map();
+  const text = stdlib.get('std:Prelude');
+  if (typeof text !== 'string') return { files, byKey };
+  addFile(utu, files, byKey, 'std:Prelude', text, ROLE.prelude);
+  for (let i = 0; i < utu.import_count(); i++) {
+    const key = textAt(utu.src, utu.import_path_start(i), utu.import_path_end(i));
+    const text = stdlib.get(key);
+    if (!PLATFORM_PATH.test(key) || typeof text !== 'string') continue;
+    utu.import_bind(i, byKey.get(key) ?? addFile(utu, files, byKey, key, text, ROLE.prelude));
+  }
+  return { files, byKey };
 }
 
 function writeBytes(utu, bytes) {

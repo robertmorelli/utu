@@ -36,7 +36,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
         item = next_sibling(item);
     };
     let first_site = -1;
-    for (0 ..< count) |n| {
+    for (own_nodes() ..< count) |n| {
         if node_kind[n] == Node.Dsl_expr.to_i32() and word_of(first_child(n)) == json and dsl_in_program(n) and dsl_container(n) == container {
             if first_site < 0 { first_site = n; };
             let prefix = "__json" + int_text(jp_serial[0]) + "_";

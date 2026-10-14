@@ -43,9 +43,23 @@ mem missing_import: I32 = [-1];
 mem missing_start: I32 = [0];
 mem missing_end: I32 = [0];
 
-// Forget every file, and start a program. Host declarations the host has
-// sealed (abi_kept) stay, with what is known of them: they are the same
-// documents, at the same offsets, so their indexes still hold.
+// What the host sealed (see `seal` in lib.utu) besides host declarations:
+// the standard library's prelude, parsed. Its words, tokens, nodes, files,
+// and imports are the first of each, by count.
+mem kept: I32 = [0, 0, 0, 0, 0];
+
+// Keep nothing for the programs that follow.
+fn unseal() void {
+    abi_kept[0] = 0;
+    for (0 ..< kept.len()) |k| { kept[k] = 0; };
+    kept_reactive[0] = -1;
+    known_kept[0] = 0;
+}
+
+// Forget every file, and start a program. What the host has sealed stays,
+// with what is known of it: host declarations (abi_kept) are the same
+// documents at the same offsets, so their indexes still hold; the prelude's
+// files are the same tokens and nodes, its words the same ids.
 fn reset_program() void {
     missing_import[0] = -1;
     if abi_kept[0] > 0 {
@@ -56,7 +70,8 @@ fn reset_program() void {
     dsl_failed.clear();
     jp_serial[0] = 0;
     st_serial[0] = 0;
-    node_parent.clear();
+    // The kept nodes' parents are the same (nothing grafts into the prelude).
+    if node_parent.len() > kept[2] { node_parent.resize(kept[2]); };
     dsl_cursor[0] = -1;
     splice_start.clear();
     splice_end.clear();
@@ -68,30 +83,35 @@ fn reset_program() void {
     splice_rename_to.clear();
     wu_serial[0] = 0;
     dsl_file_site.clear();
-    intern_keywords();
-    for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
-    tok_kind.clear();
-    tok_start.clear();
-    tok_end.clear();
-    tok_word.clear();
-    node_kind.clear();
-    node_first.clear();
-    node_last.clear();
-    node_child.clear();
-    node_next.clear();
-    file_start.clear();
-    file_end.clear();
-    file_role.clear();
-    file_tok.clear();
-    file_tok_end.clear();
-    file_root.clear();
-    file_error.clear();
-    file_wanted.clear();
-    import_file.clear();
-    import_node.clear();
-    import_path.clear();
-    import_target.clear();
-    node_parent.clear();
+    if kept[0] > 0 { intern_kept(); } else {
+        intern_keywords();
+        for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
+    };
+    let tokens = kept[1];
+    tok_kind.resize(tokens);
+    tok_start.resize(tokens);
+    tok_end.resize(tokens);
+    tok_word.resize(tokens);
+    let nodes = kept[2];
+    node_kind.resize(nodes);
+    node_first.resize(nodes);
+    node_last.resize(nodes);
+    node_child.resize(nodes);
+    node_next.resize(nodes);
+    let files = kept[3];
+    file_start.resize(files);
+    file_end.resize(files);
+    file_role.resize(files);
+    file_tok.resize(files);
+    file_tok_end.resize(files);
+    file_root.resize(files);
+    file_error.resize(files);
+    file_wanted.resize(files);
+    let imports = kept[4];
+    import_file.resize(imports);
+    import_node.resize(imports);
+    import_path.resize(imports);
+    import_target.resize(imports);
     reset_resolve();
     // Words are interned anew for each program; kept views spell theirs again.
     if abi_kept[0] > 0 {
@@ -100,6 +120,21 @@ fn reset_program() void {
             view_prefix[v] = if p >= 0 { jstring_word(p); } else { -1; };
         };
     };
+}
+
+// The kept words again, and only those: interned anew in order, each is
+// its old id (the keywords first, as intern_keywords made them).
+fn intern_kept() void {
+    let n = kept[0];
+    let starts = Array[I32].new(n, 0);
+    let ends = Array[I32].new(n, 0);
+    for (0 ..< n) |w| {
+        starts[w] = src.interned_start(w);
+        ends[w] = starts[w] + src.interned_size(w);
+    };
+    src.resize(abi_kept[0]);
+    src.intern_reset();
+    for (0 ..< n) |w| { src.intern(starts[w], ends[w]); };
 }
 
 // Intern a name that is not in any file (pushed onto `src`).
@@ -190,27 +225,21 @@ fn child_count(node: I32) I32 {
     n;
 }
 
+// A compiled program's tree has no comments (see attach_comments), so a
+// node's children are its children.
 fn last_child(node: I32) I32 {
     let c = node_child[node];
     let last = -1;
     while (c >= 0) {
-        if node_kind[c] != Node.Comment.to_i32() { last = c; };
+        last = c;
         c = node_next[c];
     };
     last;
 }
 
-// The first child of `node` that is not a comment, or -1.
-fn first_child(node: I32) I32 { skip_comments(node_child[node]); }
+fn first_child(node: I32) I32 { node_child[node]; }
 
-// The sibling after `node` that is not a comment, or -1.
-fn next_sibling(node: I32) I32 { skip_comments(node_next[node]); }
-
-fn skip_comments(node: I32) I32 {
-    let c = node;
-    while (c >= 0 and node_kind[c] == Node.Comment.to_i32()) { c = node_next[c]; };
-    c;
-}
+fn next_sibling(node: I32) I32 { node_next[node]; }
 
 fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.to_i32(); }
 

@@ -251,7 +251,11 @@ fn opcode_table() Str {
     + "v128-any-true 64851";
 }
 
+// Sealed with the prelude (see `seal` in lib.utu): its words are kept, and so the same ids.
+mem known_kept: I32 = [0];
+
 fn intern_known() void {
+    if known_kept[0] == 1 { return; };
     word_opcode.clear();
     known.resize(Known.count());
     let names = ["ir-ident", "ir-lit", "name", "kind", "value", "type-name", "type-repr", "main",

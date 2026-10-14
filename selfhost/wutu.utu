@@ -28,28 +28,34 @@ fn wutu_prefix() Str { word_text(wu_prefix[0]); }
 
 // Whether any DSL of the program asks for a reactive view.
 fn wutu_reactive_program() Bool {
-    for (0 ..< node_kind.len()) |n| {
-        if node_kind[n] == Node.Dsl_expr.to_i32() {
-            let lo = dsl_inner_start(n);
-            let hi = dsl_inner_end(n);
-            if bytes_contain(lo, hi, "@reactive") or bytes_contain(lo, hi, "@island") { return true; };
-        };
+    // The kept prelude's sites are the same from program to program.
+    if kept_reactive[0] < 0 { kept_reactive[0] = if reactive_sites(0, kept[2]) { 1; } else { 0; }; };
+    kept_reactive[0] == 1 or reactive_sites(kept[2], node_kind.len());
+}
+
+// Whether the kept nodes have a reactive site: 1 or 0, or -1 until asked.
+mem kept_reactive: I32 = [-1];
+
+fn reactive_sites(first: I32, last: I32) Bool {
+    for (first ..< last) |n| {
+        if node_kind[n] == Node.Dsl_expr.to_i32() and reactive_body(dsl_inner_start(n), dsl_inner_end(n)) { return true; };
     };
     false;
 }
 
-// Whether src[lo ..< hi] contains `needle` (ASCII), read in place.
-fn bytes_contain(lo: I32, hi: I32, needle: Str) Bool {
-    let n = needle.len();
-    let first = needle.get(0);
-    for (lo ..< hi - n + 1) |i| {
-        if src[i] == first {
-            let k = 1;
-            while (k < n and src[i + k] == needle.get(k)) { k += 1; };
-            if k == n { return true; };
-        };
+// Whether src[lo ..< hi] has `@reactive` or `@island`, read in place.
+fn reactive_body(lo: I32, hi: I32) Bool {
+    for (lo ..< hi) |i| {
+        if src[i] == 64 and (bytes_at(i + 1, hi, "reactive") or bytes_at(i + 1, hi, "island")) { return true; };
     };
     false;
+}
+
+// Whether src[at ..< hi] starts with `text` (ASCII).
+fn bytes_at(at: I32, hi: I32, text: Str) Bool {
+    if at + text.len() > hi { return false; };
+    for (0 ..< text.len()) |k| { if src[at + k] != text.get(k) { return false; }; };
+    true;
 }
 
 // FNV-1a over the text's code units, base 36: stable class names and view identities.
