@@ -189,7 +189,7 @@ language stays as it is.
 6. **Bootstrap.** Done: stage 0 builds stage 1, stage 1 builds stage 2,
    stage 2 builds stage 3, and stages 2 and 3 are identical
    (`scripts/selfhost-bootstrap.mjs`, part of `bun run test`). Stage 2
-   builds the compiler in 57 ms; stage 0 takes 3.9 s.
+   builds the compiler in 38 ms; stage 0 takes 3.9 s.
 7. **Shipped.** `bun run build` makes `dist/utu.wasm` by the bootstrap
    (always from stage 0; it is never checked in) and `dist/selfhost/utu.js`,
    its JavaScript API (`src/selfhost/`: the driver for any host, name
@@ -197,12 +197,12 @@ language stays as it is.
    `run`, `test`, `build`, `build-exe`), the VS Code extension (diagnostics,
    builds, runs, definitions, references), and the web playground use it;
    stage 0 serves only its IR and graph views.
-8. **Better than stage 0.** Compiling, warm: deltablue 3.8 ms (stage 0:
-   56), jpl 14 ms (561), foundry 35 ms (1,466). At -Oz, of the 280 programs
+8. **Better than stage 0.** Compiling, warm: deltablue 0.9 ms (stage 0:
+   56), jpl 5.5 ms (561), foundry 17 ms (1,466). At -Oz, of the 280 programs
    both build, 252 are smaller, 25 the same, 3 larger by at most 3 bytes:
    15% smaller in all (`scripts/selfhost-size-differential.mjs`). At -O3,
-   programs run as fast as stage 0's or faster. The compiler is 378 KB of
-   wasm (92 KB brotli); stage 0's bundle is 1.97 MB and a parser.
+   programs run as fast as stage 0's or faster. The compiler is 383 KB of
+   wasm (93 KB brotli); stage 0's bundle is 1.97 MB and a parser.
 
 ### Stays in JavaScript
 
