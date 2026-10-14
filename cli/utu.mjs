@@ -7,6 +7,7 @@
 //   utu build <file.utu> [-o dir] [-O…]  NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
 //   utu lsp                              a language server, on stdin and stdout
+//   utu grep <pattern> <paths…>          utu code by syntax, names, and types
 //
 // -Oz (the default) builds the smallest module, -O3 the fastest, -O0 the
 // module as code generation leaves it. `display` and `graph` show stage 0's
@@ -31,6 +32,7 @@ async function main() {
   if (!command || command === '-h' || command === '--help') usage(0);
   if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest);
   if (command === 'lsp') return lsp();
+  if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, build, 'build-exe': buildExe };
   if (!commands[command]) {
     console.error(`unknown command: ${command}`);
@@ -234,6 +236,76 @@ async function lsp() {
   process.stdin.on('end', () => process.exit(0));
 }
 
+/**
+ * `utu grep '$v.push($x)' src/ --where 'x: I32'`, `utu grep --refs name src/`:
+ * each match as `file:line:col: line`, or JSON. Exits 1 when nothing matches.
+ */
+async function grepCommand(args) {
+  const { grep } = await import('../src/selfhost/grep.js');
+  const { nodeHost } = await import('../src/selfhost/node.js');
+  const where = {};
+  let references = null;
+  let json = false;
+  const rest = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--where') {
+      const [name, ...type] = (args[++i] ?? '').split(':');
+      where[name.trim().replace(/^\$/, '')] = type.join(':').trim();
+    } else if (args[i] === '--refs') references = args[++i];
+    else if (args[i] === '--json') json = true;
+    else rest.push(args[i]);
+  }
+  const pattern = references ? null : rest.shift();
+  if ((!pattern && !references) || !rest.length) {
+    console.error("usage: utu grep <pattern> <paths…> [--where 'x: Type'] [--json]\n       utu grep --refs <name> <paths…>");
+    process.exit(2);
+  }
+  const entries = [];
+  const walk = async target => {
+    const stat = await fs.stat(target);
+    if (stat.isFile()) { if (target.endsWith('.utu')) entries.push(path.resolve(target)); return; }
+    for (const entry of await fs.readdir(target, { withFileTypes: true })) {
+      if (['node_modules', 'dist', '.git'].includes(entry.name) || entry.name.startsWith('.')) continue;
+      await walk(path.join(target, entry.name));
+    }
+  };
+  for (const target of rest) await walk(target);
+  const hosts = new Map();
+  const hostFor = file => {
+    const root = path.dirname(file);
+    if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
+    return hosts.get(root);
+  };
+  const { matches, texts, error } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
+  if (error) {
+    console.error(error);
+    process.exit(2);
+  }
+  const color = process.stdout.isTTY;
+  const paint = (code, text) => (color ? `\x1b[${code}m${text}\x1b[0m` : text);
+  const located = matches.map(match => {
+    const text = texts.get(match.at.file) ?? '';
+    const lineStart = text.lastIndexOf('\n', match.at.start - 1) + 1;
+    const line = text.slice(0, match.at.start).split('\n').length;
+    const lineEnd = text.indexOf('\n', match.at.start);
+    return { ...match, line, column: match.at.start - lineStart + 1, source: text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd), lineStart };
+  });
+  if (json) {
+    console.log(JSON.stringify(located.map(({ at, line, column, kind, declaration, bindings }) => ({
+      file: at.file, line, column, start: at.start, end: at.end, kind, declaration, bindings,
+    })), null, 2));
+  } else {
+    for (const m of located) {
+      const from = m.at.start - m.lineStart;
+      const to = Math.min(m.source.length, m.at.end - m.lineStart);
+      const shown = `${m.source.slice(0, from)}${paint('1;31', m.source.slice(from, to))}${m.source.slice(to)}`.trim();
+      const tag = m.kind ? ` ${paint('2', m.declaration ? `${m.kind.toLowerCase()} declared` : m.kind.toLowerCase())}` : '';
+      console.log(`${paint('35', displayPath(m.at.file))}:${paint('32', m.line)}:${m.column}:${tag} ${shown}`);
+    }
+  }
+  if (!matches.length) process.exitCode = 1;
+}
+
 function usage(code) {
   console.log(`usage: utu <command> <file.utu> [options]
 
@@ -243,6 +315,8 @@ function usage(code) {
   build <file> [-o dir] [-O…]  NAME.wasm, and NAME.mjs that loads it
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
+  grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']
+  grep --refs <name> <paths…>  a name's declaration and every use, by what it resolves to
 
   -Oz  the smallest module (the default)
   -O3  the fastest module

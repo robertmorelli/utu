@@ -401,7 +401,17 @@ fn error_value() I32 {
 
 // ── Expressions ──
 
+// Each expression's type as it was last checked, or -1: for queries
+// (`utu grep`, the editor), which the compiler does not read.
+vec node_ty: I32;
+
 fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
+    let t = check_node(node, expect, cx);
+    if node < node_ty.len() { node_ty[node] = t; };
+    t;
+}
+
+fn check_node(node: I32, expect: I32, cx: Cx) I32 {
     match Node.from_i32(node_kind[node]) {
         Node.Identifier => check_ident(node, cx),
         Node.Literal => check_literal(node, expect, cx),
@@ -1619,6 +1629,8 @@ fn reset_check() void {
     decl_ty.resize(decl_kind.len());
     decl_global.resize(decl_kind.len());
     decl_cause.resize(decl_kind.len());
+    node_ty.resize(node_kind.len());
+    for (0 ..< node_kind.len()) |n| { node_ty[n] = -1; };
     for (0 ..< decl_kind.len()) |d| {
         decl_local[d] = -1;
         decl_ty[d] = 0;

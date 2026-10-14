@@ -65,6 +65,8 @@ export function programIndex(utu, files) {
   const named = n => nodeDecl[n] >= 0 && first[n] < last[n] && last[n] - first[n] === 1;
 
   return {
+    /** Where node `n` is: its file key and UTF-16 offsets, or null (a node of no file). */
+    at: place,
     /** The declaration the name at `offset` (UTF-16) of file `key` resolves to, or -1. */
     declarationAt(key, offset) {
       for (let n = 0; n < count; n++) {

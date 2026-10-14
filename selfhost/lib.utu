@@ -227,6 +227,13 @@ export lib {
 
     fn decl_count() I32 { decl_kind.len(); }
 
+    // An expression's type as the last build checked it ("" when it was not).
+    fn node_type(n: I32) Str {
+        if n >= node_ty.len() { return ""; };
+        if node_ty[n] < 0 { return ""; };
+        type_text(node_ty[n]);
+    }
+
     // A local's or parameter's type, as the last build checked it ("" when
     // it was not checked: not a local, or in a function no export reaches).
     fn decl_checked_type(decl: I32) Str {
