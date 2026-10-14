@@ -412,7 +412,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     let head;
     if (LOCAL_KINDS.has(kind)) {
       const type = index.type(decl);
-      head = `${definition ? index.text(definition) : '?'}${type ? `: ${type}` : ''}`;
+      // (A @wat function's body is not checked: its parameters are as written.)
+      head = type || !span || text == null ? `${definition ? index.text(definition) : '?'}${type ? `: ${type}` : ''}` : signature(text.slice(span.start, span.end));
     } else if (span && text != null) {
       head = signature(text.slice(span.start, span.end));
     }

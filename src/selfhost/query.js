@@ -7,6 +7,9 @@
 
 const COMMENT = 8;  // lex.utu's Tok.Comment
 
+// The characters of a WAT identifier after its `$`.
+const WAT_ID = /[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/;
+
 // The words a declaration begins with, before what it names.
 const DECLARING = new Set(['export', 'mod', 'struct', 'tag', 'enum', 'proto', 'fn', 'type', 'distinct', 'let', 'const', 'mem', 'vec', 'using']);
 
@@ -69,6 +72,51 @@ export function programIndex(utu, files) {
     return namingNodes;
   };
   const named = n => nodeDecl[n] >= 0 && first[n] < last[n] && last[n] - first[n] === 1;
+  // A @wat function's parameters, used in its text as `$x`: by declaration,
+  // the places of those names (after the `$`). Found when first asked.
+  let watPlaces = null;
+  const watUses = () => {
+    if (watPlaces) return watPlaces;
+    watPlaces = new Map();
+    const src = new Uint8Array(utu.src.buffer);
+    for (let k = 0, n = utu.wat_count?.() ?? 0; k < n; k++) {
+      const fnNode = utu.wat_function(k);
+      let fn = -1;
+      for (let d = 0, count = utu.decl_count(); d < count && fn < 0; d++) if (declNode[d] === fnNode) fn = d;
+      const params = new Map();
+      for (let d = 0, count = utu.decl_count(); d < count; d++) {
+        if (declOwner[d] !== fn || utu.decl_kind_name(d) !== 'Param') continue;
+        const at = place(naming()[d] >= 0 ? naming()[d] : declNode[d]);
+        if (at) params.set(files.find(f => f.key === at.file)?.text.slice(at.start, at.end), d);
+      }
+      const start = utu.wat_text_start(k);
+      const end = utu.wat_text_end(k);
+      const file = fileOf(start);
+      if (!file || !params.size) continue;
+      for (let b = start; b < end; b++) {
+        const c = src[b];
+        // Comments: `;; …` to the line's end, `(; … ;)` nested.
+        if (c === 59 && src[b + 1] === 59) { while (b < end && src[b] !== 10) b++; continue; }
+        if (c === 40 && src[b + 1] === 59) {
+          let depth = 0;
+          for (; b < end; b++) {
+            if (src[b] === 40 && src[b + 1] === 59) { depth++; b++; } else if (src[b] === 59 && src[b + 1] === 41) { depth--; b++; if (!depth) break; }
+          }
+          continue;
+        }
+        if (c !== 36) continue;
+        let e = b + 1;
+        while (e < end && WAT_ID.test(String.fromCharCode(src[e]))) e++;
+        const decl = params.get(new TextDecoder().decode(src.subarray(b + 1, e)));
+        if (decl !== undefined) {
+          if (!watPlaces.has(decl)) watPlaces.set(decl, []);
+          watPlaces.get(decl).push({ file: file.key, start: toUnits(file, b + 1), end: toUnits(file, e) });
+        }
+        b = e - 1;
+      }
+    }
+    return watPlaces;
+  };
   // A declaration with no name node resolving to it (`struct &:`): the
   // first token after its keywords, when that is a name or `&`.
   const decoder = new TextDecoder();
@@ -95,6 +143,10 @@ export function programIndex(utu, files) {
         const at = place(n);
         if (at && at.file === key && at.start <= offset && offset <= at.end) return nodeDecl[n];
       }
+      for (const [decl, places] of watUses()) {
+        // (On its `$` too.)
+        if (places.some(at => at.file === key && at.start - 1 <= offset && offset <= at.end)) return decl;
+      }
       return -1;
     },
     /** Where declaration `decl` names what it declares. */
@@ -116,7 +168,7 @@ export function programIndex(utu, files) {
         if (declaring && !includeDeclaration) continue;
         if (declaring) out.unshift(at); else out.push(at);
       }
-      return out;
+      return [...out, ...watUses().get(decl) ?? []];
     },
     /** Where the whole of declaration `decl` is (its node), or null. */
     span(decl) {
@@ -156,6 +208,7 @@ export function programIndex(utu, files) {
         const at = place(n);
         if (at && at.file === key) out.push({ decl: nodeDecl[n], at });
       }
+      for (const [decl, places] of watUses()) for (const at of places) if (at.file === key) out.push({ decl, at });
       // A name node may wrap another of the same token: each place once.
       out.sort((a, b) => a.at.start - b.at.start);
       return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start);

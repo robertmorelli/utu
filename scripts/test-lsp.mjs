@@ -163,6 +163,17 @@ try {
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
   assert.deepEqual(diagnostics(), []);
 
+  // A @wat function's parameter is named in its text as `$x`: renamed,
+  // referenced, and hovered there too (with its type as written).
+  const WAT = 'fn rotl(x: I32, k: I32) I32 {\n    @wat/\\ local.get $x ;; not $x in a comment\n      local.get $k i32.rotl \\/;\n}\nexport lib { fn t() I32 { rotl(1, 2); } }\n';
+  const wat = pathToFileURL(path.join(dir, 'wat.utu')).href;
+  await fs.writeFile(path.join(dir, 'wat.utu'), WAT);
+  await tell('textDocument/didOpen', { textDocument: { uri: wat, languageId: 'utu', version: 1, text: WAT } });
+  const watRename = await ask('textDocument/rename', { ...at(WAT, 'x:', 0, wat), newName: 'y' });
+  assert.deepEqual(watRename.changes[wat].map(e => [e.range.start.line, e.range.start.character]), [[0, 8], [1, 22]]);
+  const watHover = await ask('textDocument/hover', at(WAT, '$x', 0, wat));
+  assert.match(watHover.contents.value, /x: I32/);
+
   // A mistake in an import the editor has not opened is shown on it.
   await fs.writeFile(path.join(dir, '_shapes.utu'), SHAPES.replace('self.x + self.y', 'self.x + nope'));
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
