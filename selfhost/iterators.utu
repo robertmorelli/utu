@@ -184,6 +184,15 @@ fn stage_param(node: I32) I32 {
     -1;
 }
 
+/// `local = n`, of a stage's `(n)` (an I32).
+fn param_i32(node: I32, local: I32, cx: Cx) void {
+    let m = w_mark();
+    let param = stage_param(node);
+    let i32_t = prelude(Prelude.I32);
+    coerce(check_expr(param, i32_t, cx), i32_t, param);
+    ls(local, m);
+}
+
 fn stage_type(node: I32, which: I32) I32 {
     let n = 0;
     let c = next_sibling(first_child(node));
@@ -463,45 +472,26 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
 fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     let top = new_label();
     set_i32(index, 0);
-    let mi = w_mark();
-    lg(p.lo);
-    ls(index, mi);
+    copy_local(index, p.lo);
     let mb = w_mark();
+    let lp = WLoop { brk: brk, top: top, mb: mb, ml: mb };
     // while (i < hi and not stop)
-    let mc = w_mark();
     lg(index);
     lg(p.hi);
-    plain(i32_ge_s, vt_i32, mc);
-    w_node(Op.BrIf, vt_none, brk, 0, mc);
-    if p.stop >= 0 {
-        let ms = w_mark();
-        lg(p.stop);
-        w_node(Op.BrIf, vt_none, brk, 0, ms);
-    };
+    exit_at_end(p, lp, mb);
     let mv = w_mark();
-    if p.range { lg(index); } else {
-        lg(p.source);
-        lg(index);
-        let heap = vt_heap(cur_locals[p.source]);
-        w_node(Op.ArrayGet, ht_a[heap], heap, 0, mv);
-    };
+    if p.range { lg(index); } else { array_get(p.source, index); };
     ls(value, mv);
     incr(index);
     w_push(body);
-    w_leaf(Op.Br, vt_unreachable, top, 0);
-    w_node(Op.Loop, vt_none, top, 0, mb);
-    w_node(Op.Block, vt_none, brk, 0, mb);
+    loop_close(lp);
 }
 
 /// `skip(n)` / `take(n)` before any other stage: narrow `[lo, hi)`.
 fn narrow(p: Pipe, k: I32, cx: Cx) void {
-    let node = stage_node(p, k);
-    let i32_t = prelude(Prelude.I32);
     let limit = stage_local(p.first_stage + k, 0, vt_i32);
     let m = w_mark();
-    let param = stage_param(node);
-    coerce(check_expr(param, i32_t, cx), i32_t, param);
-    ls(limit, m);
+    param_i32(stage_node(p, k), limit, cx);
     if stage_op(p, k) == Kw.Skip.to_i32() {
         // if limit > 0 { lo = if limit > hi - lo { hi } else { lo + limit } }
         let mi = w_mark();
@@ -710,6 +700,34 @@ fn downstream_in_loop(p: Pipe, k: I32, value: I32, vt: I32, brk: I32, cx: Cx) vo
     leave_loop();
 }
 
+/// Leave the loop once a count reaches its bound (both on the stack since
+/// `m`) or the pipeline has stopped.
+fn exit_at_end(p: Pipe, lp: WLoop, m: I32) void {
+    plain(i32_ge_s, vt_i32, m);
+    br_if(lp.brk, m);
+    exit_if_stopped(p, lp.brk);
+}
+
+/// The rest of the pipeline over each element (of type `et`) of an array
+/// local: `j = 0; while (j < array.len() and not stop) { item = array[j];
+/// j += 1; next(item) }`.
+fn each_in_array(p: Pipe, k: I32, array: I32, et: I32, cx: Cx) void {
+    let j = new_local(vt_i32);
+    set_i32(j, 0);
+    let lp = loop_open();
+    let m = w_mark();
+    lg(j);
+    other_len(array);
+    exit_at_end(p, lp, m);
+    let item = new_local(repr(et));
+    let mg = w_mark();
+    array_get(array, j);
+    ls(item, mg);
+    incr(j);
+    downstream_in_loop(p, k, item, et, lp.brk, cx);
+    loop_close(lp);
+}
+
 /// Hand a value to the next stage.
 fn next_stage(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void { stage_at(p, k + 1, value, vt, cx); }
 
@@ -733,13 +751,13 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         stage_body(p, k, one(value), one(vt), 1, bool_t, cx);
         let mt = w_mark();
         next_stage(p, k, value, vt, cx);
-        seq_void(mt);
         if op == Kw.Take_while.to_i32() {
-            let me = w_mark();
+            let me = else_begin(mt);
             cancel(p, k);
-            seq_void(me);
+            end_if(mi, me);
+        } else {
+            end_if(mi, mt);
         };
-        w_node(Op.If, vt_none, new_label(), 0, mi);
         return;
     };
     if op == Kw.Skip_while.to_i32() {
@@ -768,9 +786,7 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let limit = stage_local(slot, 0, vt_i32);
         if not p.replay {
             let ml = w_mark();
-            let param = stage_param(node);
-            coerce(check_expr(param, i32_t, cx), i32_t, param);
-            ls(limit, ml);
+            param_i32(node, limit, cx);
             if op == Kw.Take.to_i32() {
                 // if limit <= 0 { cancel }
                 let mi = w_mark();
@@ -804,32 +820,20 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     if op == Kw.Repeat.to_i32() {
         let times = stage_local(slot, 0, vt_i32);
         if not p.replay {
-            let mt = w_mark();
-            let param = stage_param(node);
-            coerce(check_expr(param, i32_t, cx), i32_t, param);
-            ls(times, mt);
+            param_i32(node, times, cx);
             to_setup(p);
         };
         // j = 0; while (j < times and not stop) { j += 1; next(value) }
         let j = new_local(vt_i32);
         set_i32(j, 0);
-        let brk = new_label();
-        let top = new_label();
-        let mb = w_mark();
+        let lp = loop_open();
+        let m = w_mark();
         lg(j);
         lg(times);
-        plain(i32_ge_s, vt_i32, mb);
-        w_node(Op.BrIf, vt_none, brk, 0, mb);
-        if p.stop >= 0 {
-            let ms = w_mark();
-            lg(p.stop);
-            w_node(Op.BrIf, vt_none, brk, 0, ms);
-        };
+        exit_at_end(p, lp, m);
         incr(j);
-        downstream_in_loop(p, k, value, vt, brk, cx);
-        w_leaf(Op.Br, vt_unreachable, top, 0);
-        w_node(Op.Loop, vt_none, top, 0, mb);
-        w_node(Op.Block, vt_none, brk, 0, mb);
+        downstream_in_loop(p, k, value, vt, lp.brk, cx);
+        loop_close(lp);
         return;
     };
     if op == Kw.Chain.to_i32() {
@@ -871,70 +875,28 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
 /// values go through the rest of the pipeline. A stop upstream of the chain
 /// does not stop the appended array.
 fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
-    let node = stage_node(p, k);
-    let slot = p.first_stage + k;
-    let param = stage_param(node);
-    let ot = type_only(param, -1, cx);
-    if not is_array_type(ot) {
-        if not ty_is(ot, Ty.Error) { report(Diag.IteratorSource, param, -1); };
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return;
-    };
-    let other = stage_local(slot, 0, repr(ot));
-    if not p.replay {
-        let mo = w_mark();
-        check_expr(param, -1, cx);
-        ls(other, mo);
-        to_setup(p);
-    };
+    let ot = other_array(p, k, cx);
+    if ot < 0 { return; };
+    let other = stage_local(p.first_stage + k, 0, repr(ot));
     let item = new_local(repr(vt));
-    let mi = w_mark();
-    lg(value);
-    ls(item, mi);
+    copy_local(item, value);
     next_stage(p, k, item, vt, cx);
     if p.replay { return; };
     // The remainder, once: the rest of the pipeline again over `other`.
-    let was = p.replay;
     p.replay = true;
     let m = w_mark();
     if p.stop >= 0 {
         // if stop_at <= k { stop = false; stop_at = -1 }
-        let mi2 = w_mark();
+        let mi = w_mark();
         lg(p.stop_at);
         w_i32(k);
-        plain(i32_le_s, vt_i32, mi2);
+        plain(i32_le_s, vt_i32, mi);
         let mt = w_mark();
         set_i32(p.stop, 0);
         set_i32(p.stop_at, -1);
-        end_if(mi2, mt);
+        end_if(mi, mt);
     };
-    let j = new_local(vt_i32);
-    set_i32(j, 0);
-    let brk = new_label();
-    let top = new_label();
-    let mb = w_mark();
-    lg(j);
-    lg(other);
-    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
-    plain(i32_ge_s, vt_i32, mb);
-    w_node(Op.BrIf, vt_none, brk, 0, mb);
-    if p.stop >= 0 {
-        let ms = w_mark();
-        lg(p.stop);
-        w_node(Op.BrIf, vt_none, brk, 0, ms);
-    };
-    let item2 = new_local(repr(vt));
-    let mg = w_mark();
-    lg(other);
-    lg(j);
-    let heap = vt_heap(cur_locals[other]);
-    w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
-    ls(item2, mg);
-    incr(j);
-    downstream_in_loop(p, k, item2, vt, brk, cx);
-    w_leaf(Op.Br, vt_unreachable, top, 0);
-    w_node(Op.Loop, vt_none, top, 0, mb);
-    w_node(Op.Block, vt_none, brk, 0, mb);
+    each_in_array(p, k, other, vt, cx);
     seq_void(m);
     // Chains run in reverse stage order, before the other cleanup: put it first.
     let remainder = w_pop();
@@ -946,7 +908,27 @@ fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         i -= 1;
     };
     iter_cleanup[at] = remainder;
-    p.replay = was;
+    p.replay = false;
+}
+
+/// A stage's `(other)` array, in its stage local 0 (set in the setup):
+/// its type, or -1 when it is not an array (reported).
+fn other_array(p: Pipe, k: I32, cx: Cx) I32 {
+    let param = stage_param(stage_node(p, k));
+    let ot = type_only(param, -1, cx);
+    if not is_array_type(ot) {
+        if not ty_is(ot, Ty.Error) { report(Diag.IteratorSource, param, -1); };
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return -1;
+    };
+    let other = stage_local(p.first_stage + k, 0, repr(ot));
+    if not p.replay {
+        let m = w_mark();
+        check_expr(param, -1, cx);
+        ls(other, m);
+        to_setup(p);
+    };
+    ot;
 }
 
 /// `flat_map |x| { … }`: each element of the array the body returns goes on.
@@ -956,15 +938,8 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let block = stage_block(node);
     let lit = last_child(block);
-    let count = 0;
-    if is_kind(lit, Node.Array_expr) {
-        let c = first_child(lit);
-        while (c >= 0) {
-            count += 1;
-            c = next_sibling(c);
-        };
-    };
-    if is_kind(lit, Node.Array_expr) and count >= 1 and count <= 4 {
+    let count = if is_kind(lit, Node.Array_expr) { child_count(lit); } else { 0; };
+    if count >= 1 and count <= 4 {
         let m = w_mark();
         if not bind_captures(p, k, one(value), one(vt), 1) {
             seq_void(m);
@@ -1012,7 +987,7 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         seq_void(m);
         return;
     };
-    // nested = body; j = 0; while (j < nested.len() and not stop) { item = nested[j]; j += 1; next(item) }
+    // nested = body; then each of its elements goes on
     let mn = w_mark();
     let nt = stage_body(p, k, one(value), one(vt), 1, -1, cx);
     if not is_array_type(nt) {
@@ -1023,56 +998,19 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     };
     let nested = new_local(repr(nt));
     ls(nested, mn);
-    let et = inst_arg(ty_inst(nt), 0);
-    let j = new_local(vt_i32);
-    set_i32(j, 0);
-    let brk = new_label();
-    let top = new_label();
-    let mb = w_mark();
-    lg(j);
-    lg(nested);
-    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
-    plain(i32_ge_s, vt_i32, mb);
-    w_node(Op.BrIf, vt_none, brk, 0, mb);
-    if p.stop >= 0 {
-        let ms = w_mark();
-        lg(p.stop);
-        w_node(Op.BrIf, vt_none, brk, 0, ms);
-    };
-    let item = new_local(repr(et));
-    let mg = w_mark();
-    lg(nested);
-    lg(j);
-    let heap = vt_heap(cur_locals[nested]);
-    w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
-    ls(item, mg);
-    incr(j);
-    downstream_in_loop(p, k, item, et, brk, cx);
-    w_leaf(Op.Br, vt_unreachable, top, 0);
-    w_node(Op.Loop, vt_none, top, 0, mb);
-    w_node(Op.Block, vt_none, brk, 0, mb);
+    each_in_array(p, k, nested, inst_arg(ty_inst(nt), 0), cx);
 }
 
 /// `zip(other) |a, b| { … }`: pairs with other's elements, stopping at the
 /// shorter. As the first stage it narrows the loop; later, it stops it.
 fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
-    let node = stage_node(p, k);
     let slot = p.first_stage + k;
-    let param = stage_param(node);
-    let ot = type_only(param, -1, cx);
-    if not is_array_type(ot) {
-        if not ty_is(ot, Ty.Error) { report(Diag.IteratorSource, param, -1); };
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return;
-    };
+    let ot = other_array(p, k, cx);
+    if ot < 0 { return; };
     let other = stage_local(slot, 0, repr(ot));
     let et = inst_arg(ty_inst(ot), 0);
     let first = k == p.first;
     if not p.replay {
-        let mo = w_mark();
-        check_expr(param, -1, cx);
-        ls(other, mo);
-        to_setup(p);
         let ms = w_mark();
         if first {
             // if other.len() < hi - lo { hi = lo + other.len() }
@@ -2601,10 +2539,7 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     if not p.replay {
         // width = n; if width <= 0 { fatal }
         let mw = w_mark();
-        let param = stage_param(node);
-        let i32_t = prelude(Prelude.I32);
-        coerce(check_expr(param, i32_t, cx), i32_t, param);
-        ls(width, mw);
+        param_i32(node, width, cx);
         let mi = w_mark();
         lg(width);
         w_i32(0);
