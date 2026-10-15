@@ -166,7 +166,7 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
         w_push(obj);
         w_node(Op.LocalTee, repr(t), local, 0, mt);
         let mg = w_mark();
-        w_leaf(Op.LocalGet, repr(t), local, 0);
+        w_get(repr(t), local);
         w_node(Op.StructGet, repr(ft), heap, index, mg);
         apply_operator(compound_word(op, node_last[target]), ft, value, at, cx, mg);
     };
@@ -251,15 +251,15 @@ fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
         w_node(Op.ArrayNewFixed, vt, heap, 0, mp);
         w_node(Op.LocalSet, vt_none, part, 0, mp);
         let mc = w_mark();
-        w_leaf(Op.LocalGet, vt, all, 0);
+        w_get(vt, all);
         w_leaf(Op.I32Const, vt_i32, at, 0);
-        w_leaf(Op.LocalGet, vt, part, 0);
+        w_get(vt, part);
         w_leaf(Op.I32Const, vt_i32, 0, 0);
         w_leaf(Op.I32Const, vt_i32, n, 0);
         w_node(Op.ArrayCopy, vt_none, heap, heap, mc);
         at += n;
     };
-    w_leaf(Op.LocalGet, vt, all, 0);
+    w_get(vt, all);
     w_node(Op.Seq, vt, 0, 0, m);
     t;
 }
@@ -389,12 +389,12 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     coerce(check_expr(index, it, cx), it, index);
     w_node(Op.LocalSet, vt_none, idx, 0, mi);
     let mc = w_mark();
-    w_leaf(Op.LocalGet, repr(t), arr, 0);
-    w_leaf(Op.LocalGet, repr(it), idx, 0);
+    w_get(repr(t), arr);
+    w_get(repr(it), idx);
     let get = member(ty_decl(t), known_word(Known.GetIndex), Space.Method);
     let mg = w_mark();
-    w_leaf(Op.LocalGet, repr(t), arr, 0);
-    w_leaf(Op.LocalGet, repr(it), idx, 0);
+    w_get(repr(t), arr);
+    w_get(repr(it), idx);
     finish_call(fn_instance(get, ty_inst(t)), mg, cx);
     apply_operator(compound_word(op, node_last[target]), vt_, value, at, cx, mg);
     finish_call(fi, mc, cx);
@@ -432,7 +432,7 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
     else if tag == known_word(Known.IrStringEq) { call_builtin(Builtin.Equals, m); }
     else if tag == known_word(Known.IrStringNe) {
         call_builtin(Builtin.Equals, m);
-        w_node(Op.Plain, vt_i32, 69, 0, m);
+        w_i32_op(i32_eqz, m);
     }
     else if tag == known_word(Known.IrStringMeasure) { call_builtin(Builtin.Length, m); }
     else if tag == known_word(Known.IrStringSlice) { call_builtin(Builtin.Substring, m); }
@@ -507,21 +507,19 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
         return 1;
     };
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
-    if k == Known.IrI31New.to_i32() { w_node(Op.RefI31, vt_ref_i31(), 0, 0, m); }
+    // (A `ref.i31` makes a `(ref i31)`: a nullable i31 local holds it.)
+    if k == Known.IrI31New.to_i32() { w_node(Op.RefI31, vt_i31ref, 0, 0, m); }
     else if k == Known.IrI31GetS.to_i32() { w_node(Op.I31GetS, vt_i32, 0, 0, m); }
     else if k == Known.IrI31GetU.to_i32() { w_node(Op.I31GetU, vt_i32, 0, 0, m); }
     else if k == Known.IrRefEq.to_i32() { w_node(Op.RefEq, vt_i32, 0, 0, m); }
     else if k == Known.IrRefNe.to_i32() {
         w_node(Op.RefEq, vt_i32, 0, 0, m);
-        w_node(Op.Plain, vt_i32, 69, 0, m);
+        w_i32_op(i32_eqz, m);
     }
     else if k == Known.IrPromiseThen.to_i32() { w_node(Op.Call, vt_none, promise_op(false), 0, m); }
     else { w_node(Op.Call, vt_none, promise_op(true), 0, m); };
     1;
 }
-
-/// `(ref i31)`, the value `ref.i31` makes: a nullable i31 local holds it.
-fn vt_ref_i31() I32 { vt_i31ref; }
 
 fn is_data_tag(tag: I32) Bool {
     for (Known.IrStringConcat.to_i32() ... Known.IrArrayCopy.to_i32()) |k| { if known[k] == tag { return true; }; };
@@ -548,6 +546,7 @@ fn reorders(x: I32) Bool {
 
 /// The slice helpers made so far, in pairs: an array heap type, its function.
 vec slice_helper: I32;
+/// The `Str.from_codes` helper, once made: one, as its codes are always an `Array[I32]`.
 vec codes_helper: I32;
 
 /// A helper function's locals after its parameters: value types in `local_types`.
@@ -582,22 +581,22 @@ fn array_slice_helper(heap: I32) I32 {
     // len = end - start; out = array.new_default(len); array.copy(out, 0, src, start, len); out
     let m = w_mark();
     let ms = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_node(Op.Plain, vt_i32, 107, 0, ms);
+    w_get(vt_i32, 2);
+    w_get(vt_i32, 1);
+    w_i32_op(i32_sub, ms);
     w_node(Op.LocalSet, vt_none, 3, 0, ms);
     let mn = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_get(vt_i32, 3);
     w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mn);
     w_node(Op.LocalSet, vt_none, 4, 0, mn);
     let mc = w_mark();
-    w_leaf(Op.LocalGet, ref, 4, 0);
+    w_get(ref, 4);
     w_i32(0);
-    w_leaf(Op.LocalGet, ref, 0, 0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_get(ref, 0);
+    w_get(vt_i32, 1);
+    w_get(vt_i32, 3);
     w_node(Op.ArrayCopy, vt_none, heap, heap, mc);
-    w_leaf(Op.LocalGet, ref, 4, 0);
+    w_get(ref, 4);
     w_node(Op.Seq, ref, 0, 0, m);
     func_body[f] = w_pop();
     f;
@@ -624,37 +623,37 @@ fn from_codes_helper(heap: I32) I32 {
     let m = w_mark();
     // narrow = array.new_default(count)
     let mn = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_get(vt_i32, 1);
     w_node(Op.ArrayNewDefault, vt_ref(units, false), units, 0, mn);
     w_node(Op.LocalSet, vt_none, 2, 0, mn);
     // for i in 0 ..< count: narrow[i] = codes[i]
     let mb = w_mark();
     let mloop = w_mark();
     let mc = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 3, 0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_node(Op.Plain, vt_i32, 79, 0, mc);
+    w_get(vt_i32, 3);
+    w_get(vt_i32, 1);
+    w_i32_op(i32_ge_u, mc);
     w_node(Op.BrIf, vt_none, brk, 0, mc);
     let mset = w_mark();
-    w_leaf(Op.LocalGet, uref, 2, 0);
-    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_get(uref, 2);
+    w_get(vt_i32, 3);
     let mget = w_mark();
-    w_leaf(Op.LocalGet, ref, 0, 0);
-    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_get(ref, 0);
+    w_get(vt_i32, 3);
     w_node(Op.ArrayGet, vt_i32, heap, 0, mget);
     w_node(Op.ArraySet, vt_none, units, 0, mset);
     let mi = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 3, 0);
+    w_get(vt_i32, 3);
     w_i32(1);
-    w_node(Op.Plain, vt_i32, 106, 0, mi);
+    w_i32_op(i32_add, mi);
     w_node(Op.LocalSet, vt_none, 3, 0, mi);
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, mloop);
     w_node(Op.Block, vt_none, brk, 0, mb);
     let mr = w_mark();
-    w_leaf(Op.LocalGet, uref, 2, 0);
+    w_get(uref, 2);
     w_i32(0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_get(vt_i32, 1);
     call_builtin(Builtin.FromCharCodeArray, mr);
     w_node(Op.Seq, vt_extern, 0, 0, m);
     func_body[f] = w_pop();

@@ -84,11 +84,7 @@ fn protocol_member(proto: I32, word: I32) I32 {
 }
 
 /// The type of a protocol getter or setter, or a method's result.
-fn proto_member_type(pm: I32) I32 {
-    let node = decl_node[pm];
-    if is_kind(node, Node.Proto_method) { return type_of(last_child(node), 0); };
-    type_of(last_child(node), 0);
-}
+fn proto_member_type(pm: I32) I32 { type_of(last_child(decl_node[pm]), 0); }
 
 /// `p.x`: the field x of whichever implementing type p is.
 fn proto_field_get(t: I32, name: I32, m: I32) I32 {
@@ -102,36 +98,9 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     let ft = proto_member_type(pm);
     let r = new_local(vt_anyref);
     w_node(Op.LocalSet, vt_none, r, 0, m);
-    let impls = implementers(proto);
-    proto_field_chain(impls, 0, r, word_of(name), ft);
+    proto_field_chain(implementers(proto), 0, r, word_of(name), ft, -1);
     w_node(Op.Seq, repr(ft), 0, 0, m);
     ft;
-}
-
-/// The `if ref.test` chain reading field `word` of receiver local `r`, from
-/// implementer `i` on; past the last, `unreachable`.
-fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32) void {
-    if i == vl_len[impls] {
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return;
-    };
-    let d = vl_item(impls, i);
-    let vt = repr(named(d, 0));
-    let field = member(d, word, Space.Member);
-    let m = w_mark();
-    let mc = w_mark();
-    w_leaf(Op.LocalGet, vt_anyref, r, 0);
-    w_node(Op.RefTest, vt_i32, vt_nullable(vt) + 1, 0, mc);
-    let mt = w_mark();
-    let mg = w_mark();
-    w_leaf(Op.LocalGet, vt_anyref, r, 0);
-    w_node(Op.RefCast, vt_nullable(vt) + 1, vt_nullable(vt) + 1, 0, mg);
-    w_node(Op.StructGet, repr(ft), vt_heap(vt), decl_a[field], mg);
-    w_node(Op.Seq, repr(ft), 0, 0, mt);
-    let me = w_mark();
-    proto_field_chain(impls, i + 1, r, word, ft);
-    w_node(Op.Seq, repr(ft), 0, 0, me);
-    w_node(Op.If, repr(ft), new_label(), 0, m);
 }
 
 /// `p.x = v`: the field x of whichever implementing type p is.
@@ -150,34 +119,52 @@ fn proto_field_set(t: I32, name: I32, value: I32, m: I32, cx: Cx) I32 {
     let mv = w_mark();
     coerce(check_expr(value, ft, cx), ft, value);
     w_node(Op.LocalSet, vt_none, v, 0, mv);
-    proto_set_chain(implementers(proto), 0, r, v, word_of(name), ft);
+    proto_field_chain(implementers(proto), 0, r, word_of(name), ft, v);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
 }
 
-fn proto_set_chain(impls: I32, i: I32, r: I32, v: I32, word: I32, ft: I32) void {
+/// The `if ref.test` chain reading field `word` of receiver local `r` (or,
+/// when `v` is a local, writing `v` to it), from implementer `i` on; past
+/// the last, `unreachable`.
+fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32, v: I32) void {
     if i == vl_len[impls] {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return;
     };
     let d = vl_item(impls, i);
-    let vt = repr(named(d, 0));
-    let field = member(d, word, Space.Member);
+    let heap = vt_heap(repr(named(d, 0)));
+    let field = decl_a[member(d, word, Space.Member)];
+    let result = if v >= 0 { vt_none; } else { repr(ft); };
     let m = w_mark();
-    let mc = w_mark();
-    w_leaf(Op.LocalGet, vt_anyref, r, 0);
-    w_node(Op.RefTest, vt_i32, vt_nullable(vt) + 1, 0, mc);
-    let mt = w_mark();
-    let ms = w_mark();
-    w_leaf(Op.LocalGet, vt_anyref, r, 0);
-    w_node(Op.RefCast, vt_nullable(vt) + 1, vt_nullable(vt) + 1, 0, ms);
-    w_leaf(Op.LocalGet, repr(ft), v, 0);
-    w_node(Op.StructSet, vt_none, vt_heap(vt), decl_a[field], ms);
-    w_node(Op.Seq, vt_none, 0, 0, mt);
+    let mt = proto_test_cast(r, heap);
+    let mf = w_stack.len() - 1;
+    if v >= 0 {
+        w_get(repr(ft), v);
+        w_node(Op.StructSet, vt_none, heap, field, mf);
+    } else {
+        w_node(Op.StructGet, repr(ft), heap, field, mf);
+    };
+    w_node(Op.Seq, result, 0, 0, mt);
     let me = w_mark();
-    proto_set_chain(impls, i + 1, r, v, word, ft);
-    w_node(Op.Seq, vt_none, 0, 0, me);
-    w_node(Op.If, vt_none, new_label(), 0, m);
+    proto_field_chain(impls, i + 1, r, word, ft, v);
+    w_node(Op.Seq, result, 0, 0, me);
+    w_node(Op.If, result, new_label(), 0, m);
+}
+
+/// An arm's head in a protocol's dispatch: `ref.test` of receiver local `r`
+/// against implementer type `heap`, then (the arm's start, returned) `r`
+/// cast to it.
+fn proto_test_cast(r: I32, heap: I32) I32 {
+    let vt = vt_ref(heap, false);
+    let mc = w_mark();
+    w_get(vt_anyref, r);
+    w_node(Op.RefTest, vt_i32, vt, 0, mc);
+    let mt = w_mark();
+    let mcast = w_mark();
+    w_get(vt_anyref, r);
+    w_node(Op.RefCast, vt, vt, 0, mcast);
+    mt;
 }
 
 /// `p.foo(args)`: the receiver is on the stack since `m`.
@@ -227,17 +214,10 @@ fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array
         return;
     };
     let f = vl_item(impls, i * 2);
-    let d = vl_item(impls, i * 2 + 1);
-    let vt = repr(named(d, 0));
     let m = w_mark();
-    let mc = w_mark();
-    w_leaf(Op.LocalGet, vt_anyref, r, 0);
-    w_node(Op.RefTest, vt_i32, vt_nullable(vt) + 1, 0, mc);
-    let mt = w_mark();
-    let mcall = w_mark();
-    w_leaf(Op.LocalGet, vt_anyref, r, 0);
-    w_node(Op.RefCast, vt_nullable(vt) + 1, vt_nullable(vt) + 1, 0, mcall);
-    for (0 ..< n) |k| { w_leaf(Op.LocalGet, repr(types[k]), locals[k], 0); };
+    let mt = proto_test_cast(r, vt_heap(repr(named(vl_item(impls, i * 2 + 1), 0))));
+    let mcall = w_stack.len() - 1;
+    for (0 ..< n) |k| { w_get(repr(types[k]), locals[k]); };
     finish_call(fn_instance(f, 0), mcall, cx);
     w_node(Op.Seq, repr(rt), 0, 0, mt);
     let me = w_mark();

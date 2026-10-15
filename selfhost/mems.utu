@@ -241,7 +241,7 @@ fn array_access(decl: I32, m: I32, op: Op, vt: I32) void {
     };
     let ma = w_mark();
     w_mem_array(decl);
-    for (0 ..< n) |k| { w_leaf(Op.LocalGet, w_type[operands[k]], locals[k], 0); };
+    for (0 ..< n) |k| { w_get(w_type[operands[k]], locals[k]); };
     w_node(op, vt, h, 0, ma);
     w_node(Op.Seq, vt, 0, 0, m);
 }
@@ -515,18 +515,18 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     w_node(Op.LocalSet, vt_none, at_local, 0, mi);
     let ms = w_mark();
     if not in_array {
-        w_leaf(Op.LocalGet, vt_i32, at_local, 0);
+        w_get(vt_i32, at_local);
         mem_address(s, ms);
     };
     let mg = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, at_local, 0);
+    w_get(vt_i32, at_local);
     if in_array { array_access(decl, mg, array_get_op(s), storage_vt(s)); } else {
         mem_address(s, mg);
         w_node(Op.Load, storage_vt(s), mem_id, load_opcode(s), mg);
     };
     apply_operator(compound_word(op, node_last[target]), t, value, at, cx, mg);
     if in_array {
-        w_leaf(Op.LocalGet, vt_i32, at_local, 0);
+        w_get(vt_i32, at_local);
         w_insert(ms, w_pop());
         array_access(decl, ms, Op.ArraySet, vt_none);
     } else { w_node(Op.Store, vt_none, mem_id, store_opcode(s), ms); };

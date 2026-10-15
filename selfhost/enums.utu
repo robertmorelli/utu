@@ -148,9 +148,9 @@ fn enum_name_helper(decl: I32) I32 {
             let v = node_decl[first_child(c)];
             let mi = w_mark();
             let mc = w_mark();
-            w_leaf(Op.LocalGet, vt_i32, 0, 0);
+            w_get(vt_i32, 0);
             w_i32(variant_value[v]);
-            w_node(Op.Plain, vt_i32, 70, 0, mc);
+            w_i32_op(i32_eq, mc);
             let mt = w_mark();
             let mr = w_mark();
             text_constant(decl_name[v]);
@@ -214,16 +214,16 @@ fn enum_name_table(decl: I32, f: I32) void {
     let m = w_mark();
     let mc = w_mark();
     let ma = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_get(vt_i32, 0);
     w_i32(lo);
-    w_node(Op.Plain, vt_i32, 107, 0, ma);
+    w_i32_op(i32_sub, ma);
     w_node(Op.LocalTee, vt_i32, 1, 0, ma);
     w_i32(span);
-    w_node(Op.Plain, vt_i32, 73, 0, mc);
+    w_i32_op(i32_lt_u, mc);
     let mt2 = w_mark();
     let mg = w_mark();
     w_leaf(Op.GlobalGet, vt_ref(h, false), table, 0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_get(vt_i32, 1);
     w_node(Op.ArrayGet, vt_extern, h, 0, mg);
     w_node(Op.Seq, vt_extern, 0, 0, mt2);
     let me = w_mark();
@@ -300,7 +300,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     let vt_ = named(variant, ty_inst(st));
     let vrepr = repr(vt_);
     let mc = w_mark();
-    w_leaf(Op.LocalGet, repr(st), s, 0);
+    w_get(repr(st), s);
     w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc);
     // The arm: bind, then its expression.
     let mt = w_mark();
@@ -311,7 +311,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
         decl_local[d] = local;
         decl_ty[d] = vt_;
         let mb = w_mark();
-        w_leaf(Op.LocalGet, repr(st), s, 0);
+        w_get(repr(st), s);
         w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb);
         w_node(Op.LocalSet, vt_none, local, 0, mb);
         c = next_sibling(c);

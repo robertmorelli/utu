@@ -241,9 +241,9 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
     w_node(Op.LocalSet, vt_none, s, 0, m);
     let mi = w_mark();
     let mc = w_mark();
-    w_leaf(Op.LocalGet, repr(bt), s, 0);
+    w_get(repr(bt), s);
     w_node(Op.RefIsNull, vt_i32, 0, 0, mc);
-    w_node(Op.Plain, vt_i32, 69, 0, mc);
+    w_i32_op(i32_eqz, mc);
     let mt = w_mark();
     optional_node.push(opt);
     optional_local.push(s);
@@ -293,7 +293,7 @@ fn check_base(field_node: I32, cx: Cx) I32 {
             return error_value();
         };
         let t = optional_type[i];
-        w_leaf(Op.LocalGet, repr(t), optional_local[i], 0);
+        w_get(repr(t), optional_local[i]);
         return t;
     };
     check_expr(first_child(field_node), -1, cx);
@@ -482,10 +482,10 @@ fn stream_call(fi: I32, s: I32, st: I32, x: I32, xt: I32, at: I32, cx: Cx) I32 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
-    w_leaf(Op.LocalGet, cur_locals[s], s, 0);
+    w_get(cur_locals[s], s);
     coerce(st, vl_item(params, 0), at);
     if x >= 0 {
-        w_leaf(Op.LocalGet, cur_locals[x], x, 0);
+        w_get(cur_locals[x], x);
         coerce(xt, vl_item(params, 1), at);
     };
     finish_call(fi, m, cx);
