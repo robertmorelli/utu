@@ -22,7 +22,8 @@ vec abi_doc_count: I32;
 vec abi_type_at: I32;
 /// By entry of abi_type_at: 1 once its containers are indexed.
 vec abi_type_ready: U8;
-export mem abi_offsets: I32;   // where the host says a document's types are
+/// Where the host says a document's types are (offsets into its text).
+export mem abi_offsets: I32;
 
 /// By view: its document.
 vec view_doc: I32;
@@ -63,6 +64,14 @@ fn abi_reserve(n: I32) I32 {
     let at = src.len();
     src.resize(at + n + 1);
     src[at + n] = 0;
+    at;
+}
+
+/// JSON `text` the compiler makes (a reference no document has), written
+/// into src: its offset.
+fn abi_text(text: Str) I32 {
+    let at = abi_reserve(text.len());
+    for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };
     at;
 }
 
@@ -268,6 +277,9 @@ fn jint(at: I32) I32 {
 
 /// A string's text as a word (escapes kept as written; names have none).
 fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1); }
+
+/// A string's text (escapes kept as written).
+fn jstring_text(at: I32) Str { bytes_text(at + 1, jstring_end(at) - 1); }
 
 //! = Where containers end
 //!
