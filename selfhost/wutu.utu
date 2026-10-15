@@ -1,39 +1,47 @@
-// ── Wutu: the expander ───────────────────────────────────────────────────────
-//
-// Stage 0's wutu.js: each @wutu template becomes ordinary utu that builds
-// the DOM through the Browser declarations. Static templates create
-// elements directly; when any template of the program is reactive
-// (`@reactive`, `@island`), every one goes through the reconciler in
-// std:Wutu, so components can join a view.
+//! = Wutu: the expander
+//!
+//! Stage 0's `wutu.js`: each `@wutu` template becomes ordinary utu that builds
+//! the DOM through the Browser declarations. Static templates create
+//! elements directly; when any template of the program is reactive
+//! (`@reactive`, `@island`), every one goes through the reconciler in
+//! std:Wutu, so components can join a view.
 
 vec wu_reconcile: I32 = [0];
 vec wu_site: I32 = [-1];
 vec wu_serial: I32 = [0];
 vec wu_node_count: I32 = [0];
-vec wu_aliases: I32;        // elements with an `as` alias, in order
-vec wu_style_key: I32;      // the site's stylesheets: keys and CSS (words), in order
+/// Elements with an `as` alias, in order.
+vec wu_aliases: I32;
+/// The site's stylesheets: keys and CSS (words), in order.
+vec wu_style_key: I32;
 vec wu_style_css: I32;
-vec wu_decls: I32;          // the site's helper bindings (words), in order
-vec wu_declared_kind: I32;  // which helpers it has (words), and their names
+/// The site's helper bindings (words), in order.
+vec wu_decls: I32;
+/// Which helpers it has (words), and their names.
+vec wu_declared_kind: I32;
 vec wu_declared_name: I32;
-vec wu_prefix: I32 = [-1];  // a word
+/// A word.
+vec wu_prefix: I32 = [-1];
 vec wu_view_hash: I32 = [-1];
 
 // Island renames: by splice, identifiers that name element aliases.
 vec splice_rename_k: I32;
-vec splice_rename_at: I32;   // the identifier's byte offset
-vec splice_rename_to: I32;   // the alias's element (a word)
+/// The identifier's byte offset.
+vec splice_rename_at: I32;
+/// The alias's element (a word).
+vec splice_rename_to: I32;
 
+/// The prefix of the site's generated names, `__wutu_N_`: one its body does not use.
 fn wutu_prefix() Str { word_text(wu_prefix[0]); }
 
-// Whether any DSL of the program asks for a reactive view.
+/// Whether any DSL of the program asks for a reactive view.
 fn wutu_reactive_program() Bool {
     // The kept prelude's sites are the same from program to program.
     if kept_reactive[0] < 0 { kept_reactive[0] = if reactive_sites(0, own_sites()) { 1; } else { 0; }; };
     kept_reactive[0] == 1 or reactive_sites(own_sites(), dsl_sites.len());
 }
 
-// Whether the kept nodes have a reactive site: 1 or 0, or -1 until asked.
+/// Whether the kept nodes have a reactive site: 1 or 0, or -1 until asked.
 vec kept_reactive: I32 = [-1];
 
 fn reactive_sites(first: I32, last: I32) Bool {
@@ -44,7 +52,7 @@ fn reactive_sites(first: I32, last: I32) Bool {
     false;
 }
 
-// Whether src[lo ..< hi] has `@reactive` or `@island`, read in place.
+/// Whether `src[lo ..< hi]` has `@reactive` or `@island`, read in place.
 fn reactive_body(lo: I32, hi: I32) Bool {
     for (lo ..< hi) |i| {
         if src[i] == 64 and (bytes_at(i + 1, hi, "reactive") or bytes_at(i + 1, hi, "island")) { return true; };
@@ -52,14 +60,14 @@ fn reactive_body(lo: I32, hi: I32) Bool {
     false;
 }
 
-// Whether src[at ..< hi] starts with `text` (ASCII).
+/// Whether `src[at ..< hi]` starts with `text` (ASCII).
 fn bytes_at(at: I32, hi: I32, text: Str) Bool {
     if at + text.len() > hi { return false; };
     for (0 ..< text.len()) |k| { if src[at + k] != text.get(k) { return false; }; };
     true;
 }
 
-// FNV-1a over the text's code units, base 36: stable class names and view identities.
+/// FNV-1a over the text's code units, base 36: stable class names and view identities.
 fn wutu_hash(text: Str) Str {
     let n = -2128831035;
     for (0 ..< text.len()) |i| { n = (n ^ text.get(i)) * 16777619; };
@@ -74,7 +82,7 @@ fn wutu_hash(text: Str) Str {
     out;
 }
 
-// A JS string literal safe inside `@es/\ … \/`: no `/` next to a `\`.
+/// A JS string literal safe inside `@es/\ … \/`: no `/` next to a `\`.
 fn es_string(text: Str) Str {
     let json = js_string(text);
     let out = "";
@@ -87,8 +95,12 @@ fn es_string(text: Str) Str {
     out;
 }
 
-// ── A site ──
+//! = A site
 
+/// Expand one `@wutu` site in place: a block that creates its elements,
+/// installs its CSS and attaches its listeners, and whose value is the root
+/// element. With `reconcile`, each element goes through `std:Wutu`'s
+/// reconciler, and a reactive template mounts a view.
 fn expand_wutu(site: I32, reconcile: Bool) void {
     let whole = bytes_text(tok_start[node_first[last_child(site)]], tok_end[node_first[last_child(site)]]);
     let prefix = "";
@@ -146,7 +158,7 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
     graft_expression(site, "{ " + (if reconcile { "wutu.init();"; } else { ""; }) + " " + value + "; }");
 }
 
-// Lines that begin with `# ` are comments.
+/// The CSS without its comment lines (those that begin with `# `).
 fn without_hash_lines(css: Str) Str {
     let out = "";
     let i = 0;
@@ -168,6 +180,7 @@ fn without_hash_lines(css: Str) Str {
     out;
 }
 
+/// Add stylesheet `key` to the site's; a repeated key replaces the CSS.
 fn wutu_style(key: Str, css: Str) void {
     let w = intern_text(key);
     for (0 ..< wu_style_key.len()) |k| {
@@ -180,7 +193,7 @@ fn wutu_style(key: Str, css: Str) void {
     wu_style_css.push(intern_text(css));
 }
 
-// Number the elements and collect their aliases, in order.
+/// Number the elements and collect their aliases, in order.
 fn wutu_prepare(n: I32) void {
     if tn_kind[n] == 4 {
         tn_index[n] = wu_node_count[0];
@@ -199,9 +212,10 @@ fn wutu_prepare(n: I32) void {
     };
 }
 
+/// The local that holds template element n.
 fn node_uid(n: I32) Str { wutu_prefix() + "node" + int_text(tn_index[n]); }
 
-// Whether template node n is node `ancestor` or under it.
+/// Whether template node n is node `ancestor` or under it.
 fn tn_within(n: I32, ancestor: I32) Bool {
     let x = n;
     while (x >= 0) {
@@ -211,8 +225,8 @@ fn tn_within(n: I32, ancestor: I32) Bool {
     false;
 }
 
-// The element an identifier names, seen from `owner`: an enclosing
-// element's own alias, or one alias inside an enclosing subtree; else -1.
+/// The element an identifier names, seen from `owner`: an enclosing
+/// element's own alias, or one alias inside an enclosing subtree; else -1.
 fn resolve_alias(name: I32, owner: I32, offset: I32) I32 {
     let scope = owner;
     while (scope >= 0) {
@@ -233,8 +247,8 @@ fn resolve_alias(name: I32, owner: I32, offset: I32) I32 {
     -1;
 }
 
-// A Utu island: in place (`__splice_N`), its alias names renamed; a value
-// without a range (a string literal) is written as it is.
+/// A Utu island: in place (`__splice_N`), its alias names renamed; a value
+/// without a range (a string literal) is written as it is.
 fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
     if from < 0 { return source; };
     let site = wu_site[0];
@@ -276,8 +290,8 @@ fn rename_aliases(node: I32, root: I32, k: I32, owner: I32) void {
     };
 }
 
-// Whether the island binds `name` around the identifier: a closure's
-// parameter, a let before it in a block, a loop's capture.
+/// Whether the island binds `name` around the identifier: a closure's
+/// parameter, a let before it in a block, a loop's capture.
 fn island_shadowed(ident: I32, name: I32, root: I32) Bool {
     let child = ident;
     let p = parent_of(ident);
@@ -321,8 +335,10 @@ fn island_shadowed(ident: I32, name: I32, root: I32) Bool {
     false;
 }
 
-// ── Helpers: typed bindings to the reconciler, one per site ──
+//! = Helpers: typed bindings to the reconciler, one per site
 
+/// The site's typed binding of reconciler helper `kind` (`attr`, `append`,
+/// `style`, …): declared in @wu_decls when first asked for, then by name.
 fn wutu_helper(kind: Str) Str {
     let w = intern_text(kind);
     for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
@@ -378,7 +394,7 @@ fn wutu_helper(kind: Str) Str {
     name;
 }
 
-// The reconciler's enter(), typed to give the element's own interface.
+/// The reconciler's `enter()`, typed to give the element's own interface.
 fn wutu_enter(tag: Str, svg: Bool) Str {
     let kind = "enter_" + tag;
     let w = intern_text(kind);
@@ -391,6 +407,8 @@ fn wutu_enter(tag: Str, svg: Bool) Str {
     name;
 }
 
+/// What goes between `HTML` and `Element` in the interface of a tag the
+/// `Browser` declarations type more closely; empty for the rest.
 fn element_interface(tag: Str) Str {
     if tag == "input" { return "Input"; };
     if tag == "select" { return "Select"; };
@@ -412,6 +430,8 @@ fn element_interface(tag: Str) Str {
     "";
 }
 
+/// The `Browser` event type a listener of event `name` takes, or empty for
+/// a plain `Event`.
 fn event_type(name: Str) Str {
     if in_words("click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout", name) { return "MouseEvent"; };
     if name == "wheel" { return "WheelEvent"; };
@@ -428,15 +448,18 @@ fn event_type(name: Str) Str {
     "";
 }
 
-// ── Elements ──
-//
-// wutu_element gives the statements creating the element and its
-// children; listeners (its own and its children's) go to wx_events, to be
-// attached once their siblings exist: after the template's code, or after
-// an if's or a loop's fragment.
+//! = Elements
+//!
+//! wutu_element gives the statements creating the element and its
+//! children; listeners (its own and its children's) go to wx_events, to be
+//! attached once their siblings exist: after the template's code, or after
+//! an if's or a loop's fragment.
 
-vec wx_events: I32;   // listeners pending (words), in order
+/// Listeners pending (words), in order.
+vec wx_events: I32;
 
+/// The statements that create template element n and its children (SVG ones
+/// under `svg` or inside one); its listeners go to @wx_events.
 fn wutu_element(n: I32, outer_svg: Bool) Str {
     let tag = word_text(tn_text[n]);
     let svg = outer_svg or tag == "svg";
@@ -544,7 +567,7 @@ fn wutu_element(n: I32, outer_svg: Bool) Str {
     code;
 }
 
-// `bind:value|checked|number`: write the property on render, read it back on input.
+/// `bind:value|checked|number`: write the property on render, read it back on input.
 fn wutu_binding(n: I32, i: I32) Str {
     if wu_reconcile[0] == 0 { wutu_fail("bind requires an @reactive view in this source file", ti_at[i]); };
     let id = node_uid(n);
@@ -560,9 +583,9 @@ fn wutu_binding(n: I32, i: I32) Str {
     sync + ";\n";
 }
 
-// ── Children ──
+//! = Children
 
-// The statements for a list of children; their listeners after them.
+/// The statements for a list of children; their listeners after them.
 fn wutu_fragment(parent_id: Str, svg: Bool, first: I32) Str {
     let mark = wx_events.len();
     let body = "";
@@ -576,7 +599,7 @@ fn wutu_fragment(parent_id: Str, svg: Bool, first: I32) Str {
     body;
 }
 
-// A child's statements (its listeners go to wx_events).
+/// A child's statements (its listeners go to `wx_events`).
 fn wutu_child(parent_id: Str, svg: Bool, child: I32) Str {
     let kind = tn_kind[child];
     let reconcile = wu_reconcile[0] == 1;
@@ -599,6 +622,9 @@ fn wutu_child(parent_id: Str, svg: Bool, child: I32) Str {
     wutu_helper("call") + "(" + js_string("call:" + word_text(wu_view_hash[0]) + ":" + int_text(at)) + ");\n" + wutu_helper("append") + "(" + value + ");\n" + wutu_helper("unkey") + "();\n";
 }
 
+/// A `for` in a template: its fragment for each item. Reconciled, an item
+/// is known by its `key`, else by the loop's site and its index (the second
+/// capture as written, else one made up).
 fn wutu_loop(parent_id: Str, svg: Bool, n: I32) Str {
     let written = word_text(tn_captures[n]);
     let comma = text_index(written, ",", 0);
@@ -630,8 +656,8 @@ fn wutu_loop(parent_id: Str, svg: Bool, n: I32) Str {
     iterable + " each |" + captures + "| { " + enter_key + " " + fragment + " " + leave_key + " };\n";
 }
 
-// Whether an identifier refers to a value (not a field, member, or
-// parameter name, nor a binding being declared).
+/// Whether an identifier refers to a value (not a field, member, or
+/// parameter name, nor a binding being declared).
 fn is_reference(node: I32) Bool {
     let p = parent_of(node);
     if p < 0 { return true; };

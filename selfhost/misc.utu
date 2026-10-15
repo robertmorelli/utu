@@ -1,13 +1,22 @@
-// ── Pipes, defer, optional chains, promises ──────────────────────────────────
+//! = Pipes, defer, optional chains, promises
+//!
+//! Four lowerings that need little of their own: `x -o f(a, &)` is a call;
+//! `defer` code runs at each exit of its block, newest first; a statement
+//! with `a?.b` in it runs only when `a` is present; and `await` (with
+//! `await for` over a stream) calls the host's suspending imports. Each
+//! section below opens with its rules.
 
-// ── Pipes ──
-//
-// `x -o f` is f(x); `x -o f(a, &, b)` is f(a, x, b), with x evaluated where
-// the placeholder stands. As in stage 0, `x -o f(a, b)` (arguments, no
-// placeholder) is f(a, b): x is not passed, nor evaluated. The target is a
-// path: a function, a module's, a type's static function, or a method of a
-// value (`x -o list.push(&)`).
+//! = Pipes
+//!
+//! `x -o f` is f(x); `x -o f(a, &, b)` is f(a, x, b), with x evaluated where
+//! the placeholder stands. As in stage 0, `x -o f(a, b)` (arguments, no
+//! placeholder) is f(a, b): x is not passed, nor evaluated. The target is a
+//! path: a function, a module's, a type's static function, or a method of a
+//! value (`x -o list.push(&)`).
 
+/// `x -o target`: a call of the target, `x` its only argument, or passed
+/// (and evaluated) where `&` stands among the written ones. With arguments
+/// and no `&`, `x` is neither passed nor evaluated.
 fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
     let value = first_child(node);
     let target = last_child(node);
@@ -80,7 +89,7 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
     error_value();
 }
 
-// `x -o a.b.method(…)`: the value `a.b`, then its method.
+/// `x -o a.b.method(…)`: the value `a.b`, then its method.
 fn pipe_method(node: I32, first: I32, names: Array[I32], nnames: I32, args: Array[I32], count: I32, value: I32, m: I32, cx: Cx) I32 {
     // The receiver: the path but its last name, read as fields.
     let rt = check_expr(first, -1, cx);
@@ -114,8 +123,8 @@ fn pipe_call(fi: I32, args: Array[I32], count: I32, value: I32, first_param: I32
     finish_call(fi, m, cx);
 }
 
-// The arguments in order, the piped value at its placeholder; false after
-// reporting a wrong count.
+/// The arguments in order, the piped value at its placeholder; false after
+/// reporting a wrong count.
 fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first: I32, at: I32, cx: Cx) Bool {
     if first + count != vl_len[params] {
         report2(Diag.WrongArity, at, -1, vl_len[params] - first, count);
@@ -129,16 +138,19 @@ fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first:
     true;
 }
 
-// ── defer ──
-//
-// `defer e;` runs e when its block exits: at its end (after its value),
-// at a return (after the returned value), or a break or continue out of
-// it, in the reverse order of the defers. The deferred expression is
-// checked again at each exit.
+//! = defer
+//!
+//! `defer e;` runs e when its block exits: at its end (after its value),
+//! at a return (after the returned value), or a break or continue out of
+//! it, in the reverse order of the defers. The deferred expression is
+//! checked again at each exit.
 
-vec defer_node: I32;      // the pending defers, innermost last
-vec defer_marks: I32;     // per open block: where its defers start
-vec function_defers: I32; // [0]: where the current function's defers start
+/// The pending defers, innermost last.
+vec defer_node: I32;
+/// Per open block: where its defers start.
+vec defer_marks: I32;
+/// At `[0]`: where the current function's defers start.
+vec function_defers: I32;
 
 fn reset_defers() void {
     defer_node.clear();
@@ -148,6 +160,8 @@ fn reset_defers() void {
     function_defers[0] = 0;
 }
 
+/// `defer e;`: noted, for @run_defers to check at each exit of its block.
+/// It emits nothing where it is written.
 fn check_defer(node: I32) I32 {
     // One that leaves (reported in validation) would run itself without end.
     if deferred_exit(first_child(node), false) >= 0 { return error_value(); };
@@ -156,7 +170,7 @@ fn check_defer(node: I32) I32 {
     ty_void();
 }
 
-// Run the defers from `from` (an index in defer_node) on, newest first.
+/// Run the defers from `from` (an index in `defer_node`) on, newest first.
 fn run_defers(from: I32, cx: Cx) void {
     let i = defer_node.len() - 1;
     while (i >= from) {
@@ -168,14 +182,19 @@ fn run_defers(from: I32, cx: Cx) void {
 
 // The defers between here and a loop being left (loop_defers holds their
 // start per loop).
-vec loop_defers: I32;        // per loop: the defers a continue runs from
-vec loop_break_defers: I32;  // per loop: the defers a break runs from
+/// Per loop: the defers a continue runs from.
+vec loop_defers: I32;
+/// Per loop: the defers a break runs from.
+vec loop_break_defers: I32;
 
-// ── Optional chains ──
+//! = Optional chains
 
-vec optional_node: I32;   // `a?.b` nodes being checked as a present value
-vec optional_local: I32;  // the local holding it
-vec optional_type: I32;   // its type (not nullable)
+/// `a?.b` nodes being checked as a present value
+vec optional_node: I32;
+/// The local holding it.
+vec optional_local: I32;
+/// Its type (not nullable).
+vec optional_type: I32;
 
 fn reset_optional() void {
     optional_node.clear();
@@ -190,8 +209,8 @@ fn optional_override(node: I32) I32 {
     -1;
 }
 
-// The leftmost `?.` of a statement not yet being checked as present: one
-// whose base has none.
+/// The leftmost `?.` of a statement not yet being checked as present: one
+/// whose base has none.
 fn leftmost_optional(node: I32) I32 {
     if is_kind(node, Node.Closure_expr) { return -1; };
     let c = first_child(node);
@@ -204,8 +223,10 @@ fn leftmost_optional(node: I32) I32 {
     -1;
 }
 
-// A statement with `a?.b` in it runs only when a is present:
-//   promote a { |o| => (the statement, with o.b for a?.b), ~> {}, }
+/// A statement with `a?.b` in it runs only when a is present:
+/// ```
+/// promote a { |o| => (the statement, with o.b for a?.b), ~> {}, }
+/// ```
 fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
     let base = first_child(opt);
     let m = w_mark();
@@ -237,8 +258,8 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// Whether the program has an `a?.b` anywhere, counted once for the nodes
-// there are ([0]: how many nodes were looked at, [1]: 1 when one was found).
+/// Whether the program has an `a?.b` anywhere, counted once for the nodes
+/// there are (`[0]`: how many nodes were looked at, `[1]`: 1 when one was found).
 vec optionals_seen: I32 = [0, 0];
 
 fn has_optionals() Bool {
@@ -250,7 +271,7 @@ fn has_optionals() Bool {
     optionals_seen[1] == 1;
 }
 
-// A statement: an optional chain's guard, or the expression.
+/// A statement: an optional chain's guard, or the expression.
 fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
     let opt = if has_optionals() { leftmost_optional(stmt); } else { -1; };
     if opt >= 0 and expect >= 0 and not ty_is(expect, Ty.Void) {
@@ -262,8 +283,8 @@ fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
     check_expr(stmt, expect, cx);
 }
 
-// The base of a field access, pushed: `a` of `a.b`, or the present value
-// of `a?.b` in its guarded statement.
+/// The base of a field access, pushed: `a` of `a.b`, or the present value
+/// of `a?.b` in its guarded statement.
 fn check_base(field_node: I32, cx: Cx) I32 {
     if is_kind(field_node, Node.Optional_field_expr) {
         let i = optional_override(field_node);
@@ -278,14 +299,16 @@ fn check_base(field_node: I32, cx: Cx) I32 {
     check_expr(first_child(field_node), -1, cx);
 }
 
-// ── Promises ──
-//
-// `Promise[T]` is a JS promise (an externref). `await p` calls the host's
-// `utu.await_N`, which the host wraps in WebAssembly.Suspending; exports
-// that can reach an await are wrapped in WebAssembly.promising.
+//! = Promises
+//!
+//! `Promise[T]` is a JS promise (an externref). `await p` calls the host's
+//! `utu.await_N`, which the host wraps in WebAssembly.Suspending; exports
+//! that can reach an await are wrapped in WebAssembly.promising.
 
-vec await_types: I32;   // pairs: value type, its import
-vec promise_ops: I32;   // [then, catch] imports, or -1
+/// Pairs: value type, its import.
+vec await_types: I32;
+/// [then, catch] imports, or -1.
+vec promise_ops: I32;
 
 fn reset_promises() void {
     await_types.clear();
@@ -299,6 +322,9 @@ fn is_promise_type(t: I32) Bool {
     decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise");
 }
 
+/// `await p`: the host's `utu.await_N` for the promise's value type, which
+/// suspends. `await for` reads a generator or a stream. Reported in a
+/// closure, which the host calls where the stack cannot suspend.
 fn check_await(node: I32, cx: Cx) I32 {
     if in_closure(node) {
         report(Diag.AwaitInClosure, node, -1);
@@ -329,7 +355,7 @@ fn check_await(node: I32, cx: Cx) I32 {
     t;
 }
 
-// Whether node is in a closure's body (before any function's).
+/// Whether node is in a closure's body (before any function's).
 fn in_closure(node: I32) Bool {
     let p = parent_of(node);
     while (p >= 0) {
@@ -340,13 +366,15 @@ fn in_closure(node: I32) Bool {
     false;
 }
 
-// `await for (s) |v| { body }` over a Stream[T] (std:Stream), or any type
-// with its methods, as stage 0 lowers it:
-//
-//   { let it = s.iterator(); defer s.close(it);
-//     while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; }; }
-//
-// So a `return` in the body closes the stream too, as a `break` does.
+/// `await for (s) |v| { body }` over a `Stream[T]` (`std:Stream`), or any type
+/// with its methods, as stage 0 lowers it:
+///
+/// ```
+/// { let it = s.iterator(); defer s.close(it);
+///   while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; }; }
+/// ```
+///
+/// So a `return` in the body closes the stream too, as a `break` does.
 fn check_stream_for(node: I32, cx: Cx) I32 {
     let sources = first_child(node);
     let source = first_child(first_child(sources));
@@ -420,18 +448,19 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// The streams being read, six each (close's instance, the stream's local
-// and type, the iterator's local and type, the loop): a pending defer -k-1
-// closes stream k.
+/// The streams being read, six each (close's instance, the stream's local
+/// and type, the iterator's local and type, the loop): a pending defer -k-1
+/// closes stream k.
 vec stream_closes: I32;
 
+/// Close stream k of @stream_closes: its `close` method, with its iterator.
 fn close_stream(k: I32, cx: Cx) void {
     let i = k * 6;
     discard(stream_call(stream_closes[i], stream_closes[i + 1], stream_closes[i + 2], stream_closes[i + 3], stream_closes[i + 4], stream_closes[i + 5], cx));
 }
 
-// The function instance of a stream's method `name`, or -1 (reported, as
-// stage 0 reports a call of a method its type lacks).
+/// The function instance of a stream's method `name`, or -1 (reported, as
+/// stage 0 reports a call of a method its type lacks).
 fn stream_method(st: I32, name: Str, at: I32) I32 {
     let word = intern_text(name);
     let decl = member(ty_decl(st), word, Space.Method);
@@ -442,8 +471,8 @@ fn stream_method(st: I32, name: Str, at: I32) I32 {
     fn_instance(decl, ty_inst(st));
 }
 
-// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s;
-// st and xt are their types. Its result's type.
+/// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s;
+/// st and xt are their types. Its result's type.
 fn stream_call(fi: I32, s: I32, st: I32, x: I32, xt: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     let params = fi_params[fi];
@@ -476,7 +505,7 @@ fn await_import(t: I32) I32 {
     f;
 }
 
-// utu.promise_then(p, f) / promise_catch(p, f): (externref, externref) → ()
+/// `utu.promise_then(p, f)` / `promise_catch(p, f)`: `(externref, externref) → ()`
 fn promise_op(catching: Bool) I32 {
     let k = if catching { 1; } else { 0; };
     if promise_ops[k] >= 0 { return promise_ops[k]; };
@@ -488,7 +517,7 @@ fn promise_op(catching: Bool) I32 {
     f;
 }
 
-// The promise imports and the exports that can await, for the host section.
+/// The promise imports and the exports that can await, for the host section.
 fn write_promise_json() void {
     let awaits = false;
     let i = 1;
@@ -528,14 +557,17 @@ fn write_promise_json() void {
     json_text("]}");
 }
 
-// Exports that reach an await, through calls: they must be entered through
-// WebAssembly.promising for the stack to suspend. A call through a
-// reference (a closure, a `fun`) may reach any function taken as a value:
-// it awaits when one of those does.
+/// Exports that reach an await, through calls: they must be entered through
+/// WebAssembly.promising for the stack to suspend. A call through a
+/// reference (a closure, a `fun`) may reach any function taken as a value:
+/// it awaits when one of those does.
 vec awaiting: U8;
-vec taken: U8;              // by function: named by ref.func
+/// By function: named by ref.func.
+vec taken: U8;
 vec taken_awaits: U8 = [0];
 
+/// Mark @awaiting, to a fixpoint over the encoded bodies, and write the
+/// exports among them as a JSON list of names.
 fn write_async_exports() void {
     let n = func_kind.len();
     awaiting.resize(n);
@@ -584,6 +616,8 @@ fn mark_taken(node: I32) void {
     for (0 ..< w_count[node]) |i| { mark_taken(w_kid(node, i)); };
 }
 
+/// Whether an encoded body calls a function that awaits, or calls through a
+/// reference when any function taken as a value awaits.
 fn calls_awaiting(node: I32) Bool {
     let op = w_op[node];
     if (op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32()) and awaiting[w_a[node]] == 1 { return true; };

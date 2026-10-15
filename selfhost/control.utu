@@ -1,14 +1,14 @@
-// ── Control ──────────────────────────────────────────────────────────────────
-//
-// match and loop match, nullable values (promote, orelse, T.null, == null),
-// for over arrays, try and catch, and tuples.
+//! = Control
+//!
+//! `match` and `loop match`, nullable values (`promote`, `orelse`, `T.null`,
+//! `== null`), `for` over ranges and arrays, `try` and `catch`, and tuples.
 
-// ── match ──
+//! = match
 
-// A match pattern's value, as 64 bits (an integer, a float's bits, a Bool,
-// an integer enum's variant). When it is not one of the scrutinee's type,
-// pattern_fault[0] says why: 0 out of range, 1 not a Bool, 2 not an
-// integer, 3 of another kind, 4 not a variant (as MatchPattern's argument).
+/// A match pattern's value, as 64 bits (an integer, a float's bits, a Bool,
+/// an integer enum's variant). When it is not one of the scrutinee's type,
+/// `pattern_fault[0]` says why: 0 out of range, 1 not a Bool, 2 not an
+/// integer, 3 of another kind, 4 not a variant (as MatchPattern's argument).
 vec pattern_fault: I32;
 
 fn pattern_value(lit: I32, t: I32) I64 {
@@ -48,7 +48,7 @@ fn pattern_value(lit: I32, t: I32) I64 {
     v;
 }
 
-// Push the comparison of local `s` (of type `t`) with a pattern's value.
+/// Push the comparison of local `s` (of type `t`) with a pattern's value.
 fn push_pattern_test(s: I32, t: I32, v: I64) void {
     let vt = repr(t);
     let m = w_mark();
@@ -68,11 +68,11 @@ fn push_pattern_test(s: I32, t: I32, v: I64) void {
     };
 }
 
-// The arms of a match, with their values (in arm_values) and the default.
+/// The arms of a match, with their values (in `arm_values`) and the default.
 vec arm_nodes: I32;
 vec arm_values: I64;
 
-// `match e { p => a, …, ~> d }` and `loop match`.
+/// `match e { p => a, …, ~> d }` and `loop match`.
 fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let looping = is_kind(node, Node.Loop_match_expr);
     let scrutinee = first_child(node);
@@ -128,6 +128,8 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
+/// A match without a default must cover every value: both Bools, or every
+/// variant of an integer enum; of any other type it cannot.
 fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
     let d = ty_decl(st);
     if st == prelude(Prelude.Bool) {
@@ -156,20 +158,22 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
     report2(Diag.NonExhaustive, node, -1, 0, st);
 }
 
-// Dispatch on local `s` to the arms (in arm_nodes from first to last), each
-// value coerced to the result, else the default (or a trap when every value
-// has an arm). With `in_loop`, arm values are dropped and a finished arm
-// leaves the loop match (loop_break's top).
-//
-// Dense integer patterns become one br_table:
-//   block $end
-//     block $default  block $arm_n-1 … block $arm_0
-//       br_table (s - lo)
-//     end  arm_0  br $end
-//     …
-//   end  default
-//   end
-// Others, a chain of ifs.
+/// Dispatch on local `s` to the arms (in `arm_nodes` from first to last), each
+/// value coerced to the result, else the default (or a trap when every value
+/// has an arm). With `in_loop`, arm values are dropped and a finished arm
+/// leaves the loop match (`loop_break`'s top).
+///
+/// Dense integer patterns become one `br_table`:
+/// ```
+/// block $end
+///   block $default  block $arm_n-1 … block $arm_0
+///     br_table (s - lo)
+///   end  arm_0  br $end
+///   …
+/// end  default
+/// end
+/// ```
+/// Others, a chain of ifs.
 fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool) I32 {
     let vt = repr(st);
     let n = last - first;
@@ -231,8 +235,8 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     result;
 }
 
-// An arm's expression as the match's value (or dropped in a loop match).
-// `t` is the result so far (-1 when not yet known); returns it.
+/// An arm's expression as the match's value (or dropped in a loop match).
+/// `t` is the result so far (-1 when not yet known); returns it.
 fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     let e = last_child(arm);
     if in_loop {
@@ -248,6 +252,7 @@ fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     actual;
 }
 
+/// The default arm, as @arm_body does an arm (`unreachable` when there is none).
 fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     if default_ < 0 {
         // Every value has an arm; another can only come from from_i32.
@@ -257,6 +262,8 @@ fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     arm_body(default_, t, cx, in_loop);
 }
 
+/// Arms `k` to `last` as a chain of ifs comparing `s` with each value, the
+/// default last.
 fn arm_chain(s: I32, st: I32, k: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool) I32 {
     if k == last {
         let m = w_mark();
@@ -282,11 +289,14 @@ fn arm_chain(s: I32, st: I32, k: I32, last: I32, default_: I32, expect: I32, cx:
     result;
 }
 
-// `loop match s { … }`: the dispatch inside a loop; `continue v` sets the
-// state and dispatches again, `break` (or an arm that finishes) leaves.
-//   block $break  loop $top  (dispatch)  end  end
-vec loop_state: I32;   // per enclosing loop: a loop match's state local, else -1
+/// Per enclosing loop: a loop match's state local, else -1.
+vec loop_state: I32;
 
+/// `loop match s { … }`: the dispatch inside a loop; `continue v` sets the
+/// state and dispatches again, `break` (or an arm that finishes) leaves.
+/// ```
+/// block $break  loop $top  (dispatch)  end  end
+/// ```
 fn loop_match(s: I32, st: I32, first: I32, last: I32, default_: I32, cx: Cx) I32 {
     let brk = new_label();
     let top = new_label();
@@ -302,7 +312,7 @@ fn loop_match(s: I32, st: I32, first: I32, last: I32, default_: I32, cx: Cx) I32
 
 vec loop_state_type: I32;
 
-// `continue v` in a loop match: the next state, then dispatch again.
+/// `continue v` in a loop match: the next state, then dispatch again.
 fn check_continue_state(node: I32, cx: Cx) I32 {
     let k = loop_state.len() - 1;
     while (k >= 0 and loop_state[k] < 0) { k -= 1; };
@@ -319,9 +329,9 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     ty_never();
 }
 
-// ── Nullable values ──
+//! = Nullable values
 
-// `promote e { |x| => a, ~> b, }`: a with x the value when there is one, else b.
+/// `promote e { |x| => a, ~> b, }`: a with x the value when there is one, else b.
 fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     let e = first_child(node);
     let binding = next_sibling(e);
@@ -368,7 +378,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// `a orelse b`: a's value when there is one, else b.
+/// `a orelse b`: a's value when there is one, else b.
 fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     let a = first_child(node);
     let b = last_child(node);
@@ -397,7 +407,7 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// `T.null`.
+/// `T.null`.
 fn check_null_expr(node: I32, cx: Cx) I32 {
     let t = nullable(type_path(first_child(node), cx.inst));
     let vt = repr(t);
@@ -405,11 +415,12 @@ fn check_null_expr(node: I32, cx: Cx) I32 {
     t;
 }
 
+/// Whether a node is the literal `null`.
 fn is_null_literal(node: I32) Bool {
     is_kind(node, Node.Literal) and first_child(node) < 0 and tok_word[node_first[node]] == Kw.Null.to_i32();
 }
 
-// `x == null`, `x != null` (either side): ref.is_null.
+/// `x == null`, `x != null` (either side): `ref.is_null`.
 fn check_null_compare(other: I32, equal: Bool, cx: Cx) I32 {
     let m = w_mark();
     let t = check_expr(other, -1, cx);
@@ -421,9 +432,9 @@ fn check_null_compare(other: I32, equal: Bool, cx: Cx) I32 {
     prelude(Prelude.Bool);
 }
 
-// ── try ──
+//! = try
 
-// `try { a } catch |e| { b }`: b runs when a throws, with e what was thrown.
+/// `try { a } catch |e| { b }`: b runs when a throws, with e what was thrown.
 fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     use_js_tag();
     let body_ = first_child(node);
@@ -454,9 +465,9 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// ── Tuples ──
+//! = Tuples
 
-// `.{a, b}`: several values at once.
+/// `.{a, b}`: several values at once.
 fn check_tuple(node: I32, expect: I32, cx: Cx) I32 {
     let n = 0;
     let c = first_child(node);
@@ -490,7 +501,7 @@ fn check_tuple(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// `let .{a, b} = e;`: e's values into a and b (the last is on top).
+/// `let .{a, b} = e;`: e's values into a and b (the last is on top).
 fn check_let_tuple(node: I32, cx: Cx) I32 {
     let pattern = first_child(node);
     let init = last_child(node);
@@ -537,10 +548,10 @@ fn reset_control() void {
     loop_state_type.clear();
 }
 
-// ── for ──
+//! = for
 
-// Enter and leave a loop: its break and continue labels, and (for a loop
-// match) its state.
+/// Enter and leave a loop: its break and continue labels, and (for a loop
+/// match) its state.
 fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) void {
     loop_defers.push(defer_node.len());
     loop_break_defers.push(defer_node.len());
@@ -559,16 +570,18 @@ fn leave_loop() void {
     loop_state_type.resize(loop_state_type.len() - 1);
 }
 
-// `for (a ..< b, xs) |i, x| { … }`: each source read once; zipped sources
-// stop at the shortest. A range counts from its start (to its end, or
-// through it for `...`); an array gives its elements.
-//   (each source's start)
-//   block $break  loop $top
-//     (br_if $break when a source is done) …
-//     (each capture = its source's current value)
-//     block $next  body  end
-//     (each source steps)  br $top
-//   end  end
+/// `for (a ..< b, xs) |i, x| { … }`: each source read once; zipped sources
+/// stop at the shortest. A range counts from its start (to its end, or
+/// through it for `...`); an array gives its elements.
+/// ```
+/// (each source's start)
+/// block $break  loop $top
+///   (br_if $break when a source is done) …
+///   (each capture = its source's current value)
+///   block $next  body  end
+///   (each source steps)  br $top
+/// end  end
+/// ```
 fn check_for(node: I32, cx: Cx) I32 {
     let call = generator_call(node);
     if call >= 0 { return check_generator_loop(node, call, cx); };
@@ -718,28 +731,30 @@ fn check_for(node: I32, cx: Cx) I32 {
 
 fn w_type_of_local(local: I32) I32 { cur_locals[local]; }
 
-// ── Unrolling (speed builds, as stage 0's -O3) ──
-//
-// `for (a ..< b) |i| { … }` with a small body: while four or more values
-// remain, four copies of the body run without a test between them; then
-// the rest one at a time. Each copy has its own `continue` label, so
-// continue still skips one value.
-//
-//   block $brk
-//     loop $top
-//       br_if $brk (i >= end)
-//       if (end - i) >=u 4 { 4 × (block $next_k { body }; i += 1); br $top }
-//       block $next { body }; i += 1
-//       br $top
+//! = Unrolling (speed builds, as stage 0's -O3)
+//!
+//! `for (a ..< b) |i| { … }` with a small body: while four or more values
+//! remain, four copies of the body run without a test between them; then
+//! the rest one at a time. Each copy has its own `continue` label, so
+//! continue still skips one value.
+//!
+//! ```
+//! block $brk
+//!   loop $top
+//!     br_if $brk (i >= end)
+//!     if (end - i) >=u 4 { 4 × (block $next_k { body }; i += 1); br $top }
+//!     block $next { body }; i += 1
+//!     br $top
+//! ```
 
 let unroll_copies: I32 = 4;
 let unroll_max_nodes: I32 = 64;
 
-// A body worth unrolling: small, and neither looping, allocating, nor
-// branching many ways (those got slower unrolled, measured on V8 in stage 0).
+/// A body worth unrolling: small, and neither looping, allocating, nor
+/// branching many ways (those got slower unrolled, measured on V8 in stage 0).
 fn unrollable(block: I32) Bool { unroll_nodes(block) <= unroll_max_nodes; }
 
-// The nodes of a body, or more than the most when it may not be unrolled.
+/// The nodes of a body, or more than the most when it may not be unrolled.
 fn unroll_nodes(node: I32) I32 {
     let kind = node_kind[node];
     if kind == Node.For_expr.to_i32() or kind == Node.While_expr.to_i32() or kind == Node.Loop_match_expr.to_i32()
@@ -764,6 +779,7 @@ fn unroll_nodes(node: I32) I32 {
     total;
 }
 
+/// A method that allocates, which keeps a loop body from being unrolled.
 fn allocating_method(word: I32) Bool {
     for (["slice", "get_slice", "new", "new_default", "copy_from", "push"]) |name| {
         if word == intern_text(name) { return true; };
@@ -771,6 +787,7 @@ fn allocating_method(word: I32) Bool {
     false;
 }
 
+/// The unrolled loop of `for (a ..< b) |i|`, counting in local `counter` to local `end_`.
 fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, brk: I32, top: I32, cx: Cx) void {
     let wide = vt == vt_i64;
     let mb = w_mark();
@@ -800,7 +817,7 @@ fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, br
     w_node(Op.Block, vt_none, brk, 0, mb);
 }
 
-// One iteration: the body (its continue goes to the end of this copy), then i += 1.
+/// One iteration: the body (its continue goes to the end of this copy), then i += 1.
 fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) void {
     let next = new_label();
     let mn = w_mark();

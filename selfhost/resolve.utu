@@ -1,34 +1,35 @@
-// ── Names ────────────────────────────────────────────────────────────────────
-//
-// Name resolution: every declaration in the program gets an id, and every
-// name in the tree that refers to one records it (`node_decl`). Names that
-// only a type can settle (`x.field`, `x.method()`) are left to type checking.
-//
-// Declarations are rows of the `decl_*` mems. Lexical scopes are a stack of
-// bindings: `word_top` holds, for each word id, its innermost binding, and
-// each binding remembers the one it hides, so a lookup is one load and
-// leaving a scope pops back to a mark.
-//
-// Members (a module's types, functions, and globals; a struct's fields; an
-// enum's variants; methods and operators of a type) are a hash table keyed
-// by owner, word, and space.
-//
-// The program's names:
-//
-// - The program scope: every module of every file (the prelude's first, so
-//   anything else hides them), every `using … |Alias|`, and the entry file's
-//   own declarations.
-// - A module: its type parameters and its members, which also see `&`.
-// - A function: its parameters; a block: its `let`s, from each on; a `for`,
-//   an iterator stage, an `alt` or `promote` arm, a `catch`, a closure: what
-//   it captures or binds.
-//
-// Imported files contribute their modules and aliases, not their other
-// top-level declarations (nor their tests, benches, or exports).
-//
-// Methods are registered before any body is resolved, so `T.method` finds
-// methods declared anywhere.
+//! = Names
+//!
+//! Name resolution: every declaration in the program gets an id, and every
+//! name in the tree that refers to one records it (`node_decl`). Names that
+//! only a type can settle (`x.field`, `x.method()`) are left to type checking.
+//!
+//! Declarations are rows of the `decl_*` mems. Lexical scopes are a stack of
+//! bindings: `word_top` holds, for each word id, its innermost binding, and
+//! each binding remembers the one it hides, so a lookup is one load and
+//! leaving a scope pops back to a mark.
+//!
+//! Members (a module's types, functions, and globals; a struct's fields; an
+//! enum's variants; methods and operators of a type) are a hash table keyed
+//! by owner, word, and space.
+//!
+//! The program's names:
+//!
+//! - The program scope: every module of every file (the prelude's first, so
+//!   anything else hides them), every `using … |Alias|`, and the entry file's
+//!   own declarations.
+//! - A module: its type parameters and its members, which also see `&`.
+//! - A function: its parameters; a block: its `let`s, from each on; a `for`,
+//!   an iterator stage, an `alt` or `promote` arm, a `catch`, a closure: what
+//!   it captures or binds.
+//!
+//! Imported files contribute their modules and aliases, not their other
+//! top-level declarations (nor their tests, benches, or exports).
+//!
+//! Methods are registered before any body is resolved, so `T.method` finds
+//! methods declared anywhere.
 
+/// What a declaration is: the kind of each row of the `decl_` tables.
 enum(U8) Decl:
     | Module
     | Foreign
@@ -56,18 +57,23 @@ enum(U8) Decl:
     | Caught
     | Main
 
+/// By declaration (its id): its Decl.
 vec decl_kind: U8;
-vec decl_name: I32;   // word id, or -1
-export mem decl_node: I32;   // the node that declares it
-export mem decl_owner: I32;  // the declaration it is part of (module, struct, enum, function), or -1
-// Module: its promoted type (`&`), or -1. ModuleParam: its index. Fn: the
-// type it is a method or operator of, or -1. Alias: the module it names.
-// Field: its index.
+/// Its name's word id, or -1.
+vec decl_name: I32;
+/// The node that declares it.
+export mem decl_node: I32;
+/// The declaration it is part of (module, struct, enum, function), or -1.
+export mem decl_owner: I32;
+/// Module: its promoted type (`&`), or -1. ModuleParam: its index. Fn: the
+/// type it is a method or operator of, or -1. Alias: the module it names.
+/// Field: its index.
 vec decl_a: I32;
 
-// The declaration a name node refers to, by node; -1 for none.
+/// The declaration a name node refers to, by node; -1 for none.
 export mem node_decl: I32;
 
+/// A new declaration: its id.
 fn declare(kind: Decl, name: I32, node: I32, owner: I32) I32 {
     let id = decl_kind.len();
     decl_kind.push(kind.to_i32());
@@ -80,7 +86,7 @@ fn declare(kind: Decl, name: I32, node: I32, owner: I32) I32 {
 
 fn decl_is(decl: I32, kind: Decl) Bool { decl >= 0 and decl_kind[decl] == kind.to_i32(); }
 
-// Whether a declaration names a type (a module names its promoted type).
+/// Whether a declaration names a type (a module names its promoted type).
 fn is_type_decl(decl: I32) Bool {
     let k = decl_kind[decl];
     k == Decl.Module.to_i32() or k == Decl.Foreign.to_i32() or k == Decl.ModuleParam.to_i32() or k == Decl.Struct.to_i32()
@@ -89,8 +95,9 @@ fn is_type_decl(decl: I32) Bool {
         or k == Decl.Alias.to_i32();
 }
 
-// ── Diagnostics ──
+//! = Diagnostics
 
+/// Every mistake the compiler reports; `diag.utu` gives each its message.
 enum(U8) Diag:
     | UnknownVariable
     | UnknownType
@@ -184,9 +191,9 @@ enum(U8) Diag:
     | InvalidEscape
     | AwaitInClosure
 
-// A diagnostic: its kind, the node it is about, a word, and up to three
-// more arguments (types, counts, declarations) its message is made from
-// (see diag.utu).
+/// A diagnostic: its kind, the node it is about, a word, and up to three
+/// more arguments (types, counts, declarations) its message is made from
+/// (see `diag.utu`).
 vec diag_kind: U8;
 vec diag_node: I32;
 vec diag_word: I32;
@@ -198,6 +205,7 @@ fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1,
 
 fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind, node, word, a, b, -1); }
 
+/// Report a mistake (once per node, kind, and word).
 fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
     // Once for a node: a name resolved, or a type read, twice is still one mistake.
     if node >= 0 {
@@ -213,7 +221,7 @@ fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
     diag_c.push(c);
 }
 
-// Keep the first n diagnostics.
+/// Keep the first n diagnostics.
 fn diag_truncate(n: I32) void {
     diag_kind.resize(n);
     diag_node.resize(n);
@@ -232,15 +240,18 @@ fn diag_move(from: I32, to: I32) void {
     diag_c[to] = diag_c[from];
 }
 
-// ── Members ──
+//! = Members
 
+/// The namespaces of a type's or module's members: a method may share a
+/// field's name.
 enum(U8) Space:
     | Member
     | Method
     | Operator
 
-// Open addressing; a slot is empty when its key is -1. `member_fill[0]`
-// counts the slots in use.
+/// The member table, by slot: owner, key (word × 4 + Space), declaration.
+/// Open addressing; a slot is empty when its key is -1. `member_fill[0]`
+/// counts the slots in use.
 vec member_owner: I32;
 vec member_key: I32;
 vec member_decl: I32;
@@ -262,7 +273,7 @@ fn members_reset(capacity: I32) void {
     member_fill[0] = 0;
 }
 
-// Add a member; returns the declaration already there under that name, or -1.
+/// Add a member; returns the declaration already there under that name, or -1.
 fn add_member(owner: I32, name: I32, space: Space, decl: I32) I32 {
     if name < 0 { return -1; };
     if (member_fill[0] + 1) * 2 > member_key.len() { grow_members(); };
@@ -299,19 +310,24 @@ fn grow_members() void {
     };
 }
 
+/// The member of `owner` named `name` in `space`, or -1.
 fn member(owner: I32, name: I32, space: Space) I32 {
     if owner < 0 or name < 0 { return -1; };
     let h = member_slot(owner, name * 4 + space.to_i32());
     if member_key[h] < 0 { -1; } else { member_decl[h]; };
 }
 
-// ── Scopes ──
+//! = Scopes
 
+/// The bindings in scope, innermost last: each one's word and declaration.
 vec bind_word: I32;
 vec bind_decl: I32;
-vec bind_prev: I32;  // the binding this one hides, or -1
-vec word_top: I32;   // by word id: the innermost binding, or -1
+/// The binding this one hides, or -1.
+vec bind_prev: I32;
+/// By word id: the innermost binding, or -1.
+vec word_top: I32;
 
+/// Bring `decl` into scope as `word`, hiding what that word named.
 fn bind(word: I32, decl: I32) void {
     if word < 0 { return; };
     bind_word.push(word);
@@ -320,6 +336,7 @@ fn bind(word: I32, decl: I32) void {
     word_top[word] = bind_decl.len() - 1;
 }
 
+/// Where the scope stands: @scope_pop goes back to it.
 fn scope_mark() I32 { bind_decl.len(); }
 
 fn scope_pop(mark: I32) void {
@@ -333,6 +350,7 @@ fn scope_pop(mark: I32) void {
     bind_prev.resize(mark);
 }
 
+/// The declaration `word` names in scope, or -1.
 fn lookup(word: I32) I32 {
     if word < 0 { return -1; };
     let b = word_top[word];
@@ -354,10 +372,10 @@ fn reset_resolve() void {
     members_reset(1024);
 }
 
-// ── Declaring ────────────────────────────────────────────────────────────────
+//! = Declaring
 
-// The word node naming a declaration: an identifier or type name, itself or
-// inside a module name. -1 for `&`.
+/// The word node naming a declaration: an identifier or type name, itself or
+/// inside a module name. -1 for `&`.
 fn name_node(node: I32) I32 {
     if is_kind(node, Node.Module_name) or is_kind(node, Node.Module_ref) or is_kind(node, Node.Captured_module_name) {
         return name_node(first_child(node));
@@ -370,8 +388,8 @@ fn name_word(node: I32) I32 {
     if n < 0 { -1; } else { word_of(n); };
 }
 
-// A declaration named by `name_at` (or by its module when that is `&`),
-// recorded on its name node.
+/// A declaration named by `name_at` (or by its module when that is `&`),
+/// recorded on its name node.
 fn declare_named(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
     let word = name_word(name_at);
     if word < 0 and owner >= 0 and decl_is(owner, Decl.Module) { word = decl_name[owner]; };
@@ -381,14 +399,14 @@ fn declare_named(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
     decl;
 }
 
-// The first child that is not a nominal qualifier.
+/// The first child that is not a nominal qualifier.
 fn after_qualifier(node: I32) I32 {
     let c = first_child(node);
     if is_kind(c, Node.Nom_qualifier) { next_sibling(c); } else { c; };
 }
 
-// An enum's name node: after its qualifier, and after its representation
-// when it is an integer enum (`enum(U8) Tag`).
+/// An enum's name node: after its qualifier, and after its representation
+/// when it is an integer enum (`enum(U8) Tag`).
 fn enum_name(node: I32) I32 {
     let c = after_qualifier(node);
     let after = next_sibling(c);
@@ -397,8 +415,8 @@ fn enum_name(node: I32) I32 {
 
 fn is_int_enum(node: I32) Bool { enum_name(node) != after_qualifier(node); }
 
-// Declare a type-like item (struct, enum, proto, type) and its parts.
-// Returns the declaration, or -1 when `item` is not one.
+/// Declare a type-like item (struct, enum, proto, type) and its parts.
+/// Returns the declaration, or -1 when `item` is not one.
 fn declare_type_item(item: I32, owner: I32) I32 {
     let kind = node_kind[item];
     if kind == Node.Struct_decl.to_i32() {
@@ -455,7 +473,7 @@ fn declare_fields(holder: I32, owner: I32) void {
     };
 }
 
-// Whether a type item declares `&`, its module's promoted type.
+/// Whether a type item declares `&`, its module's promoted type.
 fn names_promoted(item: I32) Bool {
     let kind = node_kind[item];
     let name_at = if kind == Node.Enum_decl.to_i32() { enum_name(item); }
@@ -464,13 +482,14 @@ fn names_promoted(item: I32) Bool {
     is_kind(name_at, Node.Promoted_type);
 }
 
-// A free function's name, or -1 for a method or operator.
+/// A free function's name, or -1 for a method or operator.
 fn free_fn_word(item: I32) I32 {
     if not is_kind(item, Node.Fn_decl) { return -1; };
     let name = first_child(first_child(item));
     if is_kind(name, Node.Identifier) and next_sibling(name) < 0 { word_of(name); } else { -1; };
 }
 
+/// A function: named when free; a method or operator is found as its type's member.
 fn declare_fn(item: I32, owner: I32) I32 {
     let decl = declare(Decl.Fn, free_fn_word(item), item, owner);
     if is_kind(item, Node.Fn_decl) {
@@ -518,7 +537,7 @@ fn declare_module(item: I32) I32 {
     decl;
 }
 
-// A module's type parameters and members, in scope for its body.
+/// A module's type parameters and members, in scope for its body.
 fn bind_module(module: I32) void {
     let item = decl_node[module];
     let c = next_sibling(first_child(item));
@@ -533,7 +552,7 @@ fn bind_module(module: I32) void {
     bind_module_members(module);
 }
 
-// A module's members (and the variants of its enums), by their names.
+/// A module's members (and the variants of its enums), by their names.
 fn bind_module_members(module: I32) void {
     // In declaration order: each declaration's id follows the module's.
     let d = module + 1;
@@ -547,14 +566,15 @@ fn bind_module_members(module: I32) void {
     };
 }
 
+/// Whether `decl` is inside `module` (at any depth).
 fn is_part_of(decl: I32, module: I32) Bool {
     let o = decl_owner[decl];
     while (o >= 0 and o != module) { o = decl_owner[o]; };
     o == module;
 }
 
-// A `using … |Alias|` declares the alias. `using M[A];` (no alias, no
-// file) opens an instance: M's members are in scope by their own names.
+/// A `using … |Alias|` declares the alias. `using M[A];` (no alias, no
+/// file) opens an instance: M's members are in scope by their own names.
 fn declare_alias(item: I32) void {
     let c = first_child(item);
     let opens = false;
@@ -572,8 +592,8 @@ fn declare_alias(item: I32) void {
     if opens and decl_is(module, Decl.Module) { bind_module_members(module); };
 }
 
-// The program scope, from the prelude up: modules, then aliases, then the
-// entry file's own declarations, each hiding what came before.
+/// The program scope, from the prelude up: modules, then aliases, then the
+/// entry file's own declarations, each hiding what came before.
 fn declare_program() void {
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry]) |role| {
         for (0 ..< file_root.len()) |file| {
@@ -620,7 +640,7 @@ fn declare_program() void {
     };
 }
 
-// A program has one `export lib` or one `export main`, not both.
+/// A program has one `export lib` or one `export main`, not both.
 fn check_entry_surface(root: I32) void {
     let lib = -1;
     let main = -1;
@@ -678,7 +698,7 @@ fn declare_entry_item(item: I32, first_entry: I32) void {
     bind_variants(decl);
 }
 
-// An enum's variants are types too, named where the enum is.
+/// An enum's variants are types too, named where the enum is.
 fn bind_variants(decl: I32) void {
     if not decl_is(decl, Decl.Enum) { return; };
     let d = decl + 1;
@@ -688,13 +708,17 @@ fn bind_variants(decl: I32) void {
     };
 }
 
-// ── Resolving ────────────────────────────────────────────────────────────────
+//! = Resolving
 
-// Where the walk is.
+/// Where the walk is.
 struct Walk:
-    | module: I32     // the module being walked, or -1
-    | headers: Bool   // registering methods and aliases, not resolving bodies
+    /// The module being walked, or -1.
+    | module: I32
+    /// Registering methods and aliases, not resolving bodies.
+    | headers: Bool
 
+/// Resolution, after parsing: `@`-DSLs expanded, every declaration declared,
+/// method headers then bodies walked. Returns the number of diagnostics.
 fn resolve_names() I32 {
     diag_truncate(0);
     if missing_import[0] >= 0 {
@@ -718,8 +742,8 @@ fn resolve_names() I32 {
     diag_kind.len();
 }
 
-// Resolution's diagnostics, kept so each build (exports, tests, @comptime)
-// starts from them and drops what is outside it.
+/// Resolution's diagnostics, kept so each build (exports, tests, `@comptime`)
+/// starts from them and drops what is outside it.
 vec saved_kind: U8;
 vec saved_node: I32;
 vec saved_word: I32;
@@ -758,6 +782,8 @@ fn restore_diagnostics() void {
     };
 }
 
+/// Each file's items, prelude first: modules with their members in scope.
+/// The header pass (`headers`) registers methods and aliases; the next resolves bodies.
 fn walk_program(headers: Bool) void {
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry, FileRole.Generated]) |role| {
         for (0 ..< file_root.len()) |file| {
@@ -845,8 +871,8 @@ fn walk_item(item: I32, w: Walk) void {
     };
 }
 
-// `using M[…] |A| from …`: the module it names, its type arguments, and for
-// an import, that the module is in the file imported.
+/// `using M[…] |A| from …`: the module it names, its type arguments, and for
+/// an import, that the module is in the file imported.
 fn walk_using(item: I32, w: Walk) void {
     let name_at = first_child(item);
     let n = name_node(name_at);
@@ -865,8 +891,8 @@ fn walk_using(item: I32, w: Walk) void {
     };
 }
 
-// `fn T.name`, `fn &.name`, `fn P[T].name`: a method of T (or of the
-// promoted type), found by `T.name` and by calls on a T.
+/// `fn T.name`, `fn &.name`, `fn P[T].name`: a method of T (or of the
+/// promoted type), found by `T.name` and by calls on a T.
 fn register_method(item: I32, w: Walk) void {
     let name = first_child(item);
     let receiver = first_child(name);
@@ -891,7 +917,7 @@ fn register_method(item: I32, w: Walk) void {
     if owner >= 0 { add_member(owner, word_of(method), Space.Method, decl); };
 }
 
-// `fn T:add |a, b|`: an operator of T.
+/// `fn T:add |a, b|`: an operator of T.
 fn register_operator(item: I32, w: Walk) void {
     let receiver = first_child(item);
     let op = next_sibling(receiver);
@@ -901,8 +927,8 @@ fn register_operator(item: I32, w: Walk) void {
     if owner >= 0 { add_member(owner, word_of(op), Space.Operator, decl); };
 }
 
-// The type a type name names, recorded on it: a module stands for its
-// promoted type, an alias for its module's. Reports unknown names.
+/// The type a type name names, recorded on it: a module stands for its
+/// promoted type, an alias for its module's. Reports unknown names.
 fn walk_type_name(node: I32, w: Walk) I32 {
     if is_kind(node, Node.Promoted_type) {
         let t = if w.module >= 0 { decl_a[w.module]; } else { -1; };
@@ -921,18 +947,18 @@ fn walk_type_name(node: I32, w: Walk) I32 {
     t;
 }
 
-// A module (or an alias of one) stands for its promoted type, when it has one.
+/// A module (or an alias of one) stands for its promoted type, when it has one.
 fn promoted(decl: I32) I32 {
     let d = decl;
     if decl_is(d, Decl.Alias) and decl_a[d] >= 0 { d = decl_a[d]; };
     if decl_is(d, Decl.Module) and decl_a[d] >= 0 { decl_a[d]; } else { decl; };
 }
 
-// Names the language provides without a declaration: the narrow element
-// kinds of mems and integer enums, interned after the keywords.
+/// Names the language provides without a declaration: the narrow element
+/// kinds of mems and integer enums, interned after the keywords.
 fn builtin_type(word: I32) Bool { word >= Kw.count() and word < Kw.count() + 4; }
 
-// Element kinds of mems and bases of distinct types: builtin names or types.
+/// Element kinds of mems and bases of distinct types: builtin names or types.
 fn walk_elem_type(node: I32, w: Walk) void {
     if not builtin_type(word_of(node)) { walk_type_name(node, w); };
 }
@@ -959,8 +985,8 @@ fn walk_type(node: I32, w: Walk) void {
     if kind != Node.Void_type.to_i32() { walk_types(node, w); };
 }
 
-// A path to a type: `M[A]`, `M.T`, `M[A].T`, or a name. Returns the
-// declaration it names (a module's promoted type for `M[A]`).
+/// A path to a type: `M[A]`, `M.T`, `M[A].T`, or a name. Returns the
+/// declaration it names (a module's promoted type for `M[A]`).
 fn walk_type_path(node: I32, w: Walk) I32 {
     let kind = node_kind[node];
     if kind == Node.Type_ident.to_i32() or kind == Node.Promoted_type.to_i32() { return walk_type_name(node, w); };
@@ -994,7 +1020,7 @@ fn walk_type_path(node: I32, w: Walk) I32 {
     -1;
 }
 
-// A module name: the module (through an alias), recorded on it.
+/// A module name: the module (through an alias), recorded on it.
 fn walk_module_name(node: I32) I32 {
     let n = name_node(node);
     let word = word_of(n);
@@ -1076,7 +1102,7 @@ fn walk_fn(item: I32, w: Walk) void {
     scope_pop(mark);
 }
 
-// `fn T:op |a, b| R { … }`: the captures are its parameters.
+/// `fn T:op |a, b| R { … }`: the captures are its parameters.
 fn walk_op(item: I32, w: Walk) void {
     let op = next_sibling(first_child(item));
     let decl = node_decl[op];
@@ -1108,7 +1134,7 @@ fn walk_children(node: I32, w: Walk) void {
     };
 }
 
-// Bind each name of a capture (`|a, b|`) to the capture.
+/// Bind each name of a capture (`|a, b|`) to the capture.
 fn bind_capture(capture: I32, kind: Decl) void {
     let n = first_child(capture);
     while (n >= 0) {
@@ -1228,7 +1254,7 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
     };
 }
 
-// `a.f`, `a?.f`; with `a` a module (`m.f`), its member.
+/// `a.f`, `a?.f`; with `a` a module (`m.f`), its member.
 fn walk_field(node: I32, w: Walk) void {
     let base = first_child(node);
     walk_expr(base, w);
@@ -1239,7 +1265,7 @@ fn walk_field(node: I32, w: Walk) void {
     };
 }
 
-// `match e { p => a, … }` and `loop match`.
+/// `match e { p => a, … }` and `loop match`.
 fn walk_match(node: I32, w: Walk) void {
     let c = first_child(node);
     walk_expr(c, w);
@@ -1255,8 +1281,8 @@ fn walk_match(node: I32, w: Walk) void {
     };
 }
 
-// `let x: T = e;`, `let .{a, b} = e;`. The name is in scope after the
-// initializer, except for a closure, which may call itself.
+/// `let x: T = e;`, `let .{a, b} = e;`. The name is in scope after the
+/// initializer, except for a closure, which may call itself.
 fn walk_bind(node: I32, w: Walk) void {
     let c = first_child(node);
     let init = last_child(node);
@@ -1314,8 +1340,8 @@ fn walk_for_sources(sources: I32, w: Walk) void {
     };
 }
 
-// `xs map |x| { … }`, `xs fold(0) |acc, x| { … }`, `xs collect(T)`: the
-// parameters and types, then the block with the capture in scope.
+/// `xs map |x| { … }`, `xs fold(0) |acc, x| { … }`, `xs collect(T)`: the
+/// parameters and types, then the block with the capture in scope.
 fn walk_iterator(node: I32, w: Walk) void {
     let c = first_child(node);
     walk_expr(c, w);
@@ -1341,8 +1367,8 @@ fn is_type_node(kind: I32) Bool {
         or kind == Node.Promoted_type.to_i32();
 }
 
-// `Variant |x| => e`: the variant (by its type when it is qualified), then
-// the arm with the binding in scope.
+/// `Variant |x| => e`: the variant (by its type when it is qualified), then
+/// the arm with the binding in scope.
 fn walk_alt_arm(arm: I32, w: Walk) void {
     let pattern = first_child(arm);
     if is_kind(pattern, Node.Qualified_type_ref) { walk_type_path(pattern, w); }
@@ -1361,7 +1387,7 @@ fn walk_alt_arm(arm: I32, w: Walk) void {
     scope_pop(mark);
 }
 
-// `Tag.Leaf` in a match: the integer enum and its variant.
+/// `Tag.Leaf` in a match: the integer enum and its variant.
 fn walk_match_lit(lit: I32, w: Walk) void {
     let t = first_child(lit);
     if is_kind(t, Node.Type_ident) {
@@ -1371,6 +1397,7 @@ fn walk_match_lit(lit: I32, w: Walk) void {
     };
 }
 
+/// `T { a: e, … }`: each field name recorded as `owner`'s field.
 fn walk_field_inits(first_init: I32, owner: I32, w: Walk) void {
     let f = first_init;
     while (f >= 0) {
@@ -1381,7 +1408,7 @@ fn walk_field_inits(first_init: I32, owner: I32, w: Walk) void {
     };
 }
 
-// `x -o f`, `x -o M.f(a, &)`, `x -o T.method`.
+/// `x -o f`, `x -o M.f(a, &)`, `x -o T.method`.
 fn walk_pipe_target(target: I32, w: Walk) void {
     let c = first_child(target);
     let owner = -1;
@@ -1413,7 +1440,7 @@ fn walk_pipe_args(args: I32, w: Walk) void {
     };
 }
 
-// The type or module a name before `.` names: `Tag` in `Tag.Leaf`, `M` in `M.f`.
+/// The type or module a name before `.` names: `Tag` in `Tag.Leaf`, `M` in `M.f`.
 fn walk_owner_name(node: I32) I32 {
     let word = word_of(node);
     let decl = lookup(word);
@@ -1426,8 +1453,8 @@ fn walk_owner_name(node: I32) I32 {
     decl;
 }
 
-// What `T.name` names: a member of a module (or of its promoted type: a
-// method or variant), a variant, or a method.
+/// What `T.name` names: a member of a module (or of its promoted type: a
+/// method or variant), a variant, or a method.
 fn static_member(owner: I32, word: I32) I32 {
     if owner < 0 { return -1; };
     let found = member(owner, word, Space.Member);

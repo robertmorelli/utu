@@ -1,8 +1,9 @@
-// ── @json: the runtime ───────────────────────────────────────────────────────
-//
-// The reader and writer every container's generated codecs share: stage 0's
-// RUNTIME (src/compiler/json.js), word for word, as utu text.
+//! = `@json`: the runtime
+//!
+//! The reader and writer every container's generated codecs share: stage 0's
+//! RUNTIME (src/compiler/json.js), word for word, as utu text.
 
+/// The runtime, as utu source text.
 fn json_runtime() Str {
     \\
     \\struct JsonReader__:

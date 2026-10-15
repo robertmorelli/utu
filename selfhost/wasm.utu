@@ -1,16 +1,16 @@
-// ── Wasm ─────────────────────────────────────────────────────────────────────
-//
-// The module being built, and its binary encoding. Checking adds types,
-// functions, globals, memories, and data as it reaches them, and builds each
-// function's body as a tree of IR nodes (`w_*`) shaped like wasm: a node is
-// an instruction, its children are its operands (or a block's statements).
-// Encoding happens once everything is known, so indices are final.
+//! = Wasm
+//!
+//! The module being built, and its binary encoding. Checking adds types,
+//! functions, globals, memories, and data as it reaches them, and builds each
+//! function's body as a tree of IR nodes (`w_*`) shaped like wasm: a node is
+//! an instruction, its children are its operands (or a block's statements).
+//! Encoding happens once everything is known, so indices are final.
 
-// ── Value types ──
-//
-// A value type is an id: numbers and abstract references below vt_defined;
-// a reference to a defined type `h` is vt_defined + 2h (nullable) or + 2h + 1
-// (non-null); a multi-value result is vt_tuple + a list of value types.
+//! = Value types
+//!
+//! A value type is an id: numbers and abstract references below vt_defined;
+//! a reference to a defined type `h` is vt_defined + 2h (nullable) or + 2h + 1
+//! (non-null); a multi-value result is vt_tuple + a list of value types.
 
 let vt_none: I32 = 0;
 let vt_i32: I32 = 1;
@@ -18,24 +18,34 @@ let vt_i64: I32 = 2;
 let vt_f32: I32 = 3;
 let vt_f64: I32 = 4;
 let vt_v128: I32 = 5;
-let vt_externref: I32 = 6;     // (ref null extern)
-let vt_extern: I32 = 7;        // (ref extern)
-let vt_i31ref: I32 = 8;        // (ref null i31)
-let vt_funcref: I32 = 9;       // (ref null func)
-let vt_eqref: I32 = 10;        // (ref null eq)
-let vt_anyref: I32 = 11;       // (ref null any)
-let vt_unreachable: I32 = 12;  // an expression that does not complete
-let vt_i8: I32 = 13;           // packed, in fields and array elements
+/// (ref null extern).
+let vt_externref: I32 = 6;
+/// (ref extern).
+let vt_extern: I32 = 7;
+/// (ref null i31).
+let vt_i31ref: I32 = 8;
+/// (ref null func).
+let vt_funcref: I32 = 9;
+/// (ref null eq).
+let vt_eqref: I32 = 10;
+/// (ref null any).
+let vt_anyref: I32 = 11;
+/// An expression that does not complete.
+let vt_unreachable: I32 = 12;
+/// Packed, in fields and array elements.
+let vt_i8: I32 = 13;
 let vt_i16: I32 = 14;
 let vt_defined: I32 = 16;
 let vt_tuple: I32 = 268435456;
 
+/// The value type of a reference to defined type `heap`.
 fn vt_ref(heap: I32, nullable: Bool) I32 { vt_defined + heap * 2 + if nullable { 0; } else { 1; }; }
 
 fn vt_is_ref(vt: I32) Bool { (vt >= vt_externref and vt <= vt_anyref) or (vt >= vt_defined and vt < vt_tuple); }
 
 fn vt_heap(vt: I32) I32 { (vt - vt_defined) / 2; }
 
+/// The nullable form of a reference type (other types as they are).
 fn vt_nullable(vt: I32) I32 {
     if vt == vt_extern { return vt_externref; };
     if vt >= vt_defined and vt < vt_tuple { return vt - (vt - vt_defined) % 2; };
@@ -44,16 +54,18 @@ fn vt_nullable(vt: I32) I32 {
 
 fn vt_tuple_of(list: I32) I32 { vt_tuple + list; }
 
-// ── Lists of value types ──
-//
-// Interned, so a list is an id and equal lists are equal ids (function
-// signatures compare as ints).
+//! = Lists of value types
+//!
+//! Interned, so a list is an id and equal lists are equal ids (function
+//! signatures compare as ints).
 
 vec vl_start: I32;
 vec vl_len: I32;
 vec vl_items: I32;
-vec vl_table: I32;   // open addressing over list ids, -1 empty
-vec vl_pending: I32; // the list being built
+/// Open addressing over list ids, -1 empty.
+vec vl_table: I32;
+/// The list being built.
+vec vl_pending: I32;
 
 fn vl_hash(start: I32, len: I32) I32 {
     let h = len * 31;
@@ -68,11 +80,13 @@ fn vl_same(list: I32, start: I32, len: I32) Bool {
     true;
 }
 
-// Start a list; push its items with vl_add, then vl_end.
+/// Start a list; push its items with @vl_add, then @vl_end.
 fn vl_begin() I32 { vl_pending.len(); }
 
 fn vl_add(vt: I32) void { vl_pending.push(vt); }
 
+/// The list pushed since `mark`, interned: the id of an equal list when
+/// there is one.
 fn vl_end(mark: I32) I32 {
     let len = vl_pending.len() - mark;
     if (vl_start.len() + 1) * 2 > vl_table.len() { vl_grow(); };
@@ -119,14 +133,14 @@ fn vl_one(vt: I32) I32 {
 
 fn vl_empty() I32 { vl_end(vl_begin()); }
 
-// The value types of a result: none, one, or a tuple's.
+/// The value types of a result: none, one, or a tuple's.
 fn vl_of_result(vt: I32) I32 {
     if vt >= vt_tuple { return vt - vt_tuple; };
     if vt == vt_none or vt == vt_unreachable { return vl_empty(); };
     vl_one(vt);
 }
 
-// ── Defined (heap) types ──
+//! = Defined (heap) types
 
 enum(U8) Heap:
     | Struct
@@ -134,15 +148,21 @@ enum(U8) Heap:
     | Func
 
 vec ht_kind: U8;
-vec ht_a: I32;       // Struct: first field (in ht_fields); Array: element; Func: parameters (a list)
-vec ht_b: I32;       // Struct: field count; Array: 1 when mutable; Func: results (a list)
-vec ht_super: I32;   // supertype, or -1
-vec ht_open: U8;     // 1 when other types may extend it (not final)
-vec ht_single: U8;   // 1 when it is its own recursion group (imports need these)
-vec ht_fields: I32;  // per field: storage type, then 1 when mutable
+/// Struct: first field (in ht_fields); Array: element; Func: parameters (a list)
+vec ht_a: I32;
+/// Struct: field count; Array: 1 when mutable; Func: results (a list)
+vec ht_b: I32;
+/// Supertype, or -1.
+vec ht_super: I32;
+/// 1 when other types may extend it (not final)
+vec ht_open: U8;
+/// 1 when it is its own recursion group (imports need these)
+vec ht_single: U8;
+/// Per field: storage type, then 1 when mutable.
+vec ht_fields: I32;
 
-// Function types are interned by signature; arrays by element; structs are
-// nominal (two structs with the same fields are different types).
+/// Function types are interned by signature; arrays by element; structs are
+/// nominal (two structs with the same fields are different types).
 vec ht_table: I32;   // open addressing over func and array types, -1 empty
 
 fn ht_new(kind: Heap, a: I32, b: I32) I32 {
@@ -158,6 +178,9 @@ fn ht_new(kind: Heap, a: I32, b: I32) I32 {
 
 fn ht_key_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 31 + a) * 16777619) ^ (b * 40503); }
 
+/// The function or array type of this shape (`a` and `b` as in @ht_a and
+/// @ht_b), made when it is new. A `single` one is a different type from
+/// the same shape in the recursion group.
 fn ht_intern(kind: Heap, a: I32, b: I32, single: Bool) I32 {
     if (ht_kind.len() + 1) * 2 > ht_table.len() { ht_grow(); };
     let mask = ht_table.len() - 1;
@@ -190,16 +213,16 @@ fn ht_grow() void {
 
 fn func_type(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, false); }
 
-// A function type in a recursion group of its own, as imports of host
-// builtins need.
+/// A function type in a recursion group of its own, as imports of host
+/// builtins need.
 fn func_type_single(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, true); }
 
 fn array_type(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1; } else { 0; }, false); }
 
 fn array_type_single(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1; } else { 0; }, true); }
 
-// A new struct type; add its fields with struct_field, all of them before
-// another struct is started.
+/// A new struct type; add its fields with @struct_field, all of them before
+/// another struct is started.
 fn struct_type(super: I32, open: Bool) I32 {
     let id = ht_new(Heap.Struct, ht_fields.len(), 0);
     ht_super[id] = super;
@@ -215,46 +238,63 @@ fn struct_field(t: I32, storage: I32, mutable: Bool) void {
 
 fn field_storage(t: I32, i: I32) I32 { ht_fields[ht_a[t] + i * 2]; }
 
-// ── The module ──
+//! = The module
 
 enum(U8) FuncKind:
     | Defined
     | Import
 
 vec func_kind: U8;
-vec func_type_of: I32;     // a Func heap type
-vec func_body: I32;        // the body's IR node, or -1
-vec func_locals: I32;      // first local (after the parameters) in local_types
+/// A Func heap type.
+vec func_type_of: I32;
+/// The body's IR node, or -1.
+vec func_body: I32;
+/// First local (after the parameters) in local_types.
+vec func_locals: I32;
 vec func_local_count: I32;
-vec func_module_name: I32; // import: module name (a span in names), else -1
-vec func_field_name: I32;  // import: field name; defined: export name, or -1
-vec func_debug_name: I32;  // for the name section, or -1
-vec func_index: I32;       // its index in the module, once encoding assigns them
-vec func_code: I32;        // a @wat function: its site (host.utu), whose code is its body; else -1
+/// Import: module name (a span in names), else -1.
+vec func_module_name: I32;
+/// Import: field name; defined: export name, or -1.
+vec func_field_name: I32;
+/// For the name section, or -1.
+vec func_debug_name: I32;
+/// Its index in the module, once encoding assigns them.
+vec func_index: I32;
+/// A @wat function: its site (host.utu), whose code is its body; else -1.
+vec func_code: I32;
 vec local_types: I32;
 
-vec glob_kind: U8;         // FuncKind
+/// FuncKind
+vec glob_kind: U8;
 vec glob_type: I32;
 vec glob_mutable: U8;
-vec glob_init: I32;        // defined: a constant IR node
+/// Defined: a constant IR node.
+vec glob_init: I32;
 vec glob_module_name: I32;
-vec glob_field_name: I32;  // import: field name; defined: export name, or -1
+/// Import: field name; defined: export name, or -1.
+vec glob_field_name: I32;
 vec glob_index: I32;
 
-vec memory_kind: U8;       // FuncKind
+/// FuncKind
+vec memory_kind: U8;
 vec memory_pages: I32;
 vec memory_module_name: I32;
-vec memory_field_name: I32;  // import: field name; defined: export name, or -1
-vec memory_index: I32;       // by memory: its index (imported ones first)
+/// Import: field name; defined: export name, or -1.
+vec memory_field_name: I32;
+/// By memory: its index (imported ones first).
+vec memory_index: I32;
 
-vec data_memory: I32;      // its memory
-vec data_start: I32;       // bytes, in data_bytes
+/// Its memory.
+vec data_memory: I32;
+/// Bytes, in data_bytes.
+vec data_start: I32;
 vec data_len: I32;
 vec data_bytes: U8;
 
-vec tag_used: U8;          // [0]: 1 when the JS exception tag is imported
+/// At `[0]`: 1 when the JS exception tag is imported.
+vec tag_used: U8;
 
-// Names (import and export names, debug names): spans of bytes.
+/// Names (import and export names, debug names): spans of bytes.
 vec names: U8;
 vec name_start: I32;
 vec name_len: I32;
@@ -267,7 +307,7 @@ fn name_add(text: Str) I32 {
     id;
 }
 
-// A name from bytes of `src`.
+/// A name from bytes of `src`.
 fn name_from_src(start: I32, end_: I32) I32 {
     let id = name_start.len();
     name_start.push(names.len());
@@ -276,7 +316,8 @@ fn name_from_src(start: I32, end_: I32) I32 {
     id;
 }
 
-// Code units of a Str, as UTF-8 (surrogate pairs combined).
+/// A UTF-16 code unit, as UTF-8 in @names. A surrogate is three bytes of
+/// its own: pairs are not combined.
 fn utf8_push_names(unit: I32) void {
     if unit < 128 { names.push(unit); return; };
     if unit < 2048 {
@@ -296,6 +337,7 @@ fn add_import_func(module: I32, field: I32, t: I32) I32 {
     f;
 }
 
+/// A function of type `t` (a `Func` heap type), with no body yet.
 fn new_func(kind: FuncKind, t: I32) I32 {
     let f = func_kind.len();
     func_kind.push(kind.to_i32());
@@ -311,6 +353,7 @@ fn new_func(kind: FuncKind, t: I32) I32 {
     f;
 }
 
+/// A defined global, its initializer the constant IR node `init`.
 fn add_global(t: I32, mutable: Bool, init: I32) I32 {
     let g = glob_kind.len();
     glob_kind.push(FuncKind.Defined.to_i32());
@@ -331,6 +374,7 @@ fn add_import_global(module: I32, field: I32, t: I32) I32 {
     g;
 }
 
+/// Forgets the module being built.
 fn reset_wasm() void {
     start_func[0] = -1;
     vl_start.clear();
@@ -383,12 +427,14 @@ fn reset_wasm() void {
     ht_grow();
 }
 
-// ── IR ──
-//
-// A node is an instruction; its children are its operands, in order, or a
-// block's statements. Nodes are built children first: each new node takes
-// the nodes on the `w_stack` since a mark as its children.
+//! = IR
+//!
+//! A node is an instruction; its children are its operands, in order, or a
+//! block's statements. Nodes are built children first: each new node takes
+//! the nodes on the `w_stack` since a mark as its children.
 
+/// An IR node's instruction, and what its @w_a and @w_b hold. `Plain` is
+/// any instruction with no immediates, by its opcode.
 enum(U16) Op:
     | Nop
     | Unreachable
@@ -457,15 +503,21 @@ enum(U16) Op:
     | Rethrow     // a: label of the try
     | V128Const   // a: four words in w_aux
 
+/// By IR node: its instruction. The other `w_*` vecs are its other columns.
 vec w_op: U16;
-vec w_type: I32;   // its value type (vt_none for none)
+/// Its value type (vt_none for none).
+vec w_type: I32;
 vec w_a: I32;
 vec w_b: I32;
-vec w_first: I32;  // its first child, in w_kids
-vec w_count: I32;  // its number of children
+/// Its first child, in w_kids.
+vec w_first: I32;
+/// Its number of children.
+vec w_count: I32;
 vec w_kids: I32;
-vec w_aux: I32;    // br_table targets
-vec w_stack: I32;  // nodes built and not yet taken
+/// Br_table targets.
+vec w_aux: I32;
+/// Nodes built and not yet taken.
+vec w_stack: I32;
 
 fn reset_ir() void {
     w_op.clear();
@@ -481,7 +533,7 @@ fn reset_ir() void {
 
 fn w_mark() I32 { w_stack.len(); }
 
-// A node of the nodes built since `mark`, pushed in their place.
+/// A node of the nodes built since `mark`, pushed in their place.
 fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
     let id = w_op.len();
     // A block with several results is typed by a function type, which must
@@ -502,7 +554,7 @@ fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
 
 fn w_leaf(op: Op, vt: I32, a: I32, b: I32) I32 { w_node(op, vt, a, b, w_stack.len()); }
 
-// Take the node on top of the stack.
+/// Take the node on top of the stack.
 fn w_pop() I32 {
     let id = w_stack[w_stack.len() - 1];
     w_stack.resize(w_stack.len() - 1);
@@ -511,7 +563,7 @@ fn w_pop() I32 {
 
 fn w_push(id: I32) void { w_stack.push(id); }
 
-// Put node `id` on the stack at position `at`, after the ones before it.
+/// Put node `id` on the stack at position `at`, after the ones before it.
 fn w_insert(at: I32, id: I32) void {
     w_stack.push(id);
     let i = w_stack.len() - 1;
@@ -526,11 +578,13 @@ fn w_kid(node: I32, i: I32) I32 { w_kids[w_first[node] + i]; }
 
 fn w_i32(value: I32) I32 { w_leaf(Op.I32Const, vt_i32, value, 0); }
 
-// ── Encoding ──
+//! = Encoding
 
 export mem out: U8;
-vec sec: U8;    // the section being written
-vec code_bytes: U8;   // the function body being written
+/// The section being written.
+vec sec: U8;
+/// The function body being written.
+vec code_bytes: U8;
 
 fn leb_u(in_body: Bool, value: I32) void {
     let v = value;
@@ -541,7 +595,7 @@ fn leb_u(in_body: Bool, value: I32) void {
     };
 }
 
-// Where bytes go: the section, or (when `in_body`) the function body.
+/// Where bytes go: the section, or (when `in_body`) the function body.
 fn put(in_body: Bool, b: I32) void { if in_body { code_bytes.push(b); } else { sec.push(b); }; }
 
 fn leb_s(in_body: Bool, value: I32) void {
@@ -587,7 +641,7 @@ fn put_u32le(in_body: Bool, v: I32) void {
     put(in_body, (v >>> 24) & 255);
 }
 
-// Write the section in `sec` to `out` with its id and size.
+/// Write the section in `sec` to `out` with its id and size.
 fn flush_section(id: I32) void {
     if sec.len() == 0 { return; };
     out.push(id);
@@ -602,19 +656,25 @@ fn flush_section(id: I32) void {
     sec.clear();
 }
 
-// ── What the exports reach ──
-//
-// Checking translates every function of the program's own files, so their
-// mistakes are reported; only what the exports reach is encoded.
+//! = What the exports reach
+//!
+//! Checking translates every function of the program's own files, so their
+//! mistakes are reported; only what the exports reach is encoded.
 
 vec func_live: U8;
 vec glob_live: U8;
 vec live_work: I32;
-vec node_holders: I32;  // by node: how many places in the live code hold it
-vec func_uses: I32;     // by function: the calls and references to it in the live code
-vec glob_uses: I32;     // by global: the reads and writes of it
-vec glob_sets: I32;     // by global: the writes of it
+/// By node: how many places in the live code hold it.
+vec node_holders: I32;
+/// By function: the calls and references to it in the live code.
+vec func_uses: I32;
+/// By global: the reads and writes of it.
+vec glob_uses: I32;
+/// By global: the writes of it.
+vec glob_sets: I32;
 
+/// Marks the functions and globals the exports reach, and counts their
+/// uses (@func_uses, @glob_uses, @glob_sets) and each node's holders.
 fn sweep() void {
     node_holders.resize(w_op.len());
     for (0 ..< w_op.len()) |n| { node_holders[n] = 0; };
@@ -683,11 +743,16 @@ fn scan_live(node: I32) void {
 // globals (imports first). The functions and globals the code names most
 // take the indices under 128 (one byte); the others keep the program's
 // order, in which related code sits together and compresses better.
-vec type_index: I32;   // by heap type
-vec type_order: I32;   // heap types in index order
-vec func_order: I32;   // live functions in index order
-vec glob_order: I32;   // live globals in index order
-vec func_imported: I32 = [0];  // how many of func_order are imports
+/// By heap type.
+vec type_index: I32;
+/// Heap types in index order.
+vec type_order: I32;
+/// Live functions in index order.
+vec func_order: I32;
+/// Live globals in index order.
+vec glob_order: I32;
+/// How many of func_order are imports.
+vec func_imported: I32 = [0];
 vec glob_imported: I32 = [0];
 
 fn assign_indices() void {
@@ -751,12 +816,18 @@ fn assign_indices() void {
 // group is one run, a supertype before its subtypes. Each of those is a
 // unit (the group's is n); a unit ranks as its most used type, or as the
 // best unit that has to come after it, and the best ready unit goes next.
-vec type_unit: I32;   // by heap type: its unit, or -1 (not encoded: dead, or a twin's)
-vec type_twin: I32;   // by heap type: the single of the same plain signature it is, or -1
-vec unit_rank: I32;   // by unit
+/// By heap type: its unit, or -1 (not encoded: dead, or a twin's).
+vec type_unit: I32;
+/// By heap type: the single of the same plain signature it is, or -1.
+vec type_twin: I32;
+/// By unit.
+vec unit_rank: I32;
 vec unit_placed: U8;
-vec type_refs: I32;   // the heap types a type names (refs_of)
+/// The heap types a type names (refs_of).
+vec type_refs: I32;
 
+/// The live heap types (of the `n` there are), in @type_order: numbered as
+/// the comment above @type_unit says.
 fn order_types(n: I32) void {
     type_unit.resize(n);
     type_twin.resize(n);
@@ -826,7 +897,7 @@ fn place_type(t: I32) void {
     type_order.push(t);
 }
 
-// Whether every type unit u names, outside it, has its index.
+/// Whether every type unit u names, outside it, has its index.
 fn unit_ready(u: I32, n: I32) Bool {
     for (0 ..< n) |t| {
         if type_unit[t] == u {
@@ -840,7 +911,7 @@ fn unit_ready(u: I32, n: I32) Bool {
     true;
 }
 
-// The group's types, the most used first, each after its supertype.
+/// The group's types, the most used first, each after its supertype.
 fn place_group(n: I32) void {
     while (true) {
         let best = -1;
@@ -853,7 +924,7 @@ fn place_group(n: I32) void {
     };
 }
 
-// The heap types type t names, into type_refs.
+/// The heap types type `t` names, into @type_refs.
 fn refs_of(t: I32) void {
     type_refs.clear();
     let kind = ht_kind[t];
@@ -872,9 +943,9 @@ fn refs_of_list(list: I32) void { for (0 ..< vl_len[list]) |i| { type_ref_of(vl_
 
 fn type_ref_of(vt: I32) void { if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)); }; }
 
-// A global nothing writes, of an integer constant: it is not in the
-// module, and each read is the constant (as short as the read, mostly, and
-// a constant to the engine).
+/// A global nothing writes, of an integer constant: it is not in the
+/// module, and each read is the constant (as short as the read, mostly, and
+/// a constant to the engine).
 fn glob_folded(g: I32) Bool {
     if glob_kind[g] != FuncKind.Defined.to_i32() or glob_field_name[g] >= 0 or glob_sets[g] != 0 or glob_init[g] < 0 { return false; };
     let op = w_op[glob_init[g]];
@@ -888,6 +959,8 @@ vec sort_keys: I32;
 vec sort_spare: I32;
 vec sort_rest: I32;
 
+/// Reorders @sort_items by @sort_keys: the `room` greatest first, then the
+/// others in the order they were.
 fn most_used_first(room: I32) void {
     sort_rest.clear();
     for (0 ..< sort_items.len()) |i| { sort_rest.push(sort_items[i]); };
@@ -904,7 +977,7 @@ fn most_used_first(room: I32) void {
     };
 }
 
-// Whether `item` is among the first `front` of sort_items.
+/// Whether `item` is among the first `front` of @sort_items.
 fn in_front(item: I32, front: I32) Bool {
     for (0 ..< front) |i| { if sort_items[i] == item { return true; }; };
     false;
@@ -947,7 +1020,8 @@ fn sort_by_keys() void {
 // generic's instances, a closure's environment when nothing captures), and
 // they are left out.
 vec type_live: U8;
-vec type_uses: I32;  // by heap type: how often the module names it
+/// By heap type: how often the module names it.
+vec type_uses: I32;
 vec type_work: I32;
 
 fn sweep_types() void {
@@ -1023,9 +1097,10 @@ fn mark_list(list: I32) void {
     for (0 ..< vl_len[list]) |i| { mark_vt(vl_item(list, i)); };
 }
 
-// By type: 1 when encoded on its own though interned for the group (plain_func).
+/// By type: 1 when encoded on its own though interned for the group (@plain_func).
 vec type_alone: U8;
 
+/// A function type that names no defined type, so it can be encoded on its own.
 fn plain_func(t: I32) Bool {
     if ht_kind[t] != Heap.Func.to_i32() { return false; };
     for (0 ..< vl_len[ht_a[t]]) |i| { if vl_item(ht_a[t], i) >= vt_defined { return false; }; };
@@ -1033,10 +1108,10 @@ fn plain_func(t: I32) Bool {
     true;
 }
 
-// Whether type t is encoded on its own (not in the recursion group).
+/// Whether type t is encoded on its own (not in the recursion group).
 fn encoded_single(t: I32) Bool { ht_single[t] == 1 or type_alone[t] == 1; }
 
-// The interned type of this shape, or -1.
+/// The interned type of this shape, or -1.
 fn ht_lookup(kind: I32, a: I32, b: I32, single: I32) I32 {
     let mask = ht_table.len() - 1;
     let h = ht_key_hash(kind, a, b) & mask;
@@ -1068,7 +1143,7 @@ fn put_valtype(in_body: Bool, vt: I32) void {
     };
 }
 
-// A heap type operand (ref.null, ref.test, …): a defined type's index, or an abstract heap type.
+/// A heap type operand (`ref.null`, `ref.test`, …): a defined type's index, or an abstract heap type.
 fn put_heap(in_body: Bool, vt: I32) void {
     if vt >= vt_defined { leb_s(in_body, type_index[vt_heap(vt)]); }
     else if vt == vt_externref or vt == vt_extern { put(in_body, 111); }
@@ -1182,10 +1257,10 @@ fn encode_imports() void {
     flush_section(2);
 }
 
-// The JS exception tag's type: one externref.
+/// The JS exception tag's type: one externref.
 fn js_tag_type() I32 { func_type_single(vl_one(vt_externref), vl_empty()); }
 
-// Import the JS exception tag (for try and throw).
+/// Import the JS exception tag (for `try` and `throw`).
 fn use_js_tag() void {
     js_tag_type();
     tag_used[0] = 1;
@@ -1232,7 +1307,7 @@ fn encode_globals() void {
     flush_section(6);
 }
 
-// The function run when the module is instantiated, or -1.
+/// The function run when the module is instantiated, or -1.
 vec start_func: I32 = [-1];
 
 fn encode_start() void {
@@ -1241,7 +1316,7 @@ fn encode_start() void {
     flush_section(8);
 }
 
-// Mark what a function made after the sweep reaches.
+/// Mark what a function made after the @sweep reaches.
 fn mark_late(f: I32) void {
     // (It and what it uses were made after the sweep sized these.)
     let funcs = func_live.len();
@@ -1299,7 +1374,7 @@ fn encode_exports() void {
     flush_section(7);
 }
 
-// Functions named by ref.func must be declared: one declarative segment.
+/// Functions named by `ref.func` must be declared: one declarative segment.
 vec declared: I32;   // functions, deduplicated by func_declared
 vec func_declared: U8;
 
@@ -1319,6 +1394,8 @@ fn encode_data_count() void {
     flush_section(12);
 }
 
+/// The code section: each live function's locals and body, or a `@wat`
+/// function's code as the host assembled it.
 fn encode_code() void {
     let count = func_order.len() - func_imported[0];
     if count == 0 { return; };
@@ -1360,7 +1437,7 @@ fn mark_targets(body: I32) void {
     };
 }
 
-// (Counted to 2: once, or more.)
+/// One more branch to `label` in @label_targeted, counted to 2: once, or more.
 fn mark_target(label: I32) void {
     if label >= label_targeted.len() {
         let old = label_targeted.len();
@@ -1374,7 +1451,7 @@ fn targeted(label: I32) Bool { targets(label) > 0; }
 
 fn targets(label: I32) I32 { if label < label_targeted.len() { label_targeted[label]; } else { 0; }; }
 
-// Locals after the parameters, run-length encoded by type.
+/// Locals after the parameters, run-length encoded by type.
 fn encode_locals(f: I32) void {
     let first = func_locals[f];
     let n = func_local_count[f];
@@ -1416,7 +1493,7 @@ fn encode_data() void {
     flush_section(11);
 }
 
-// The name section: function names, for stack traces.
+/// The name section: function names, for stack traces.
 fn encode_names() void {
     let count = 0;
     for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_debug_name[f] >= 0 { count += 1; }; };
@@ -1438,7 +1515,9 @@ fn encode_names() void {
     flush_section(0);
 }
 
-// The module's bytes, in `out`. Returns their number.
+/// The module's bytes, in `out`: the live code (see @sweep), cleaned up
+/// (@optimize_module) when optimizing, numbered (@assign_indices), and
+/// encoded section by section. Returns their number.
 fn encode_module() I32 {
     sweep();
     finish_mems();
@@ -1475,19 +1554,20 @@ fn encode_module() I32 {
     out.len();
 }
 
-// What the host provides the module (`@es` bodies, closures, promises,
-// hosted mems), as JSON, beside the module rather than in it, as stage 0
-// keeps it: the host writes the glue for what the module imports, and the
-// module ships as small as its code.
+/// What the host provides the module (`@es` bodies, closures, promises,
+/// hosted mems), as JSON, beside the module rather than in it, as stage 0
+/// keeps it: the host writes the glue for what the module imports, and the
+/// module ships as small as its code.
 export mem host_json: U8;
 
-// Whether the module carries a name section (function names for stack
-// traces): off unless asked for, as stage 0 has none.
+/// Whether the module carries a name section (function names for stack
+/// traces): off unless asked for, as stage 0 has none.
 vec debug_names: I32 = [0];
 
-// ── Instructions ──
+//! = Instructions
 
-vec labels: I32;  // the labels of the blocks around the instruction being encoded
+/// The labels of the blocks around the instruction being encoded.
+vec labels: I32;
 
 fn depth_of(label: I32) I32 {
     let i = labels.len() - 1;
@@ -1507,17 +1587,18 @@ fn block_type(vt: I32) void {
     put_valtype(true, vt);
 }
 
-// i32 and i64 eq/ne, lt/ge, gt/le (signed and unsigned): the opposite, or -1.
+/// `i32` and `i64` `eq`/`ne`, `lt`/`ge`, `gt`/`le` (signed and unsigned): the opposite, or -1.
 fn inverse_comparison(code: I32) I32 {
     if code >= 70 and code <= 79 { return [71, 70, 78, 79, 76, 77, 74, 75, 72, 73][code - 70]; };
     if code >= 81 and code <= 90 { return [82, 81, 89, 90, 87, 88, 85, 86, 83, 84][code - 81]; };
     -1;
 }
 
-// A while loop as lowerings make it, `block (loop (br_if $block (c)) body
-// (br $loop))`, with nothing else leaving the block: the block is not
-// needed, as `loop (if (not c) body (br $loop))` (two bytes fewer, and
-// three when c was negated to leave).
+/// A while loop as lowerings make it,
+/// `block (loop (br_if $block (c)) body (br $loop))`, with nothing else
+/// leaving the block: the block is not needed, as
+/// `loop (if (not c) body (br $loop))` (two bytes fewer, and
+/// three when c was negated to leave).
 fn exits_only_loop(block: I32) Bool {
     if w_type[block] != vt_none or w_count[block] != 1 or targets(w_a[block]) != 1 { return false; };
     let lp = w_kid(block, 0);
@@ -1564,8 +1645,8 @@ fn op_fb(sub: I32) void {
     leb_u(true, sub);
 }
 
-// Encode a node into `body`. `f` is the function (unused here; kept for
-// the locals of a function the caller may need).
+/// Encode a node into @code_bytes. `f` is the function (only passed along:
+/// kept for the locals of a function a lowering may need).
 fn emit(node: I32, f: I32) void {
     let op = w_op[node];
     let a = w_a[node];
@@ -1712,8 +1793,8 @@ fn emit(node: I32, f: I32) void {
     };
 }
 
-// A load or store (opcode `code`) of memory m, and its memarg: the
-// alignment (with bit 6 set when a memory index follows), the memory, offset 0.
+/// A load or store (opcode `code`) of memory m, and its memarg: the
+/// alignment (with bit 6 set when a memory index follows), the memory, offset 0.
 fn memory_access(m: I32, code: I32) void {
     op1(code);
     let align = natural_align(code);
@@ -1722,7 +1803,7 @@ fn memory_access(m: I32, code: I32) void {
     leb_u(true, 0);
 }
 
-// The natural alignment (log2 of the access size) of a load or store opcode.
+/// The natural alignment (log2 of the access size) of a load or store opcode.
 fn natural_align(opcode: I32) I32 {
     // i32.load 40, i64.load 41, f32.load 42, f64.load 43, then the narrow
     // loads (8: 44 45 48 49 52 53; 16: 46 47 50 51 54 55; 32: 52 53 in i64),

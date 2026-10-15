@@ -1,36 +1,48 @@
-// ── Iterators ────────────────────────────────────────────────────────────────
-//
-// `xs map |x| { … } filter |x| { … } fold(0) |acc, x| { … }` is syntax, not
-// an object: the whole pipeline becomes one loop over the source (an array,
-// or a range `(a ..< b)`), each stage handing its value to the next, the
-// terminal accumulating. docs/iterators.md says what each operator does;
-// this follows stage 0's lowering (src/compiler/lower-iterators.js) step by
-// step, so evaluation order, indexes, cancellation, and the sort are the
-// same:
-//
-//   (source) (each stage's setup, in order)
-//   loop over [lo, hi)             ; while (i < hi and not stop) when a stage can stop it
-//     value = source[i]
-//     (stage 0's code, then stage 1's with its value, …, the terminal's)
-//   (cleanup: chains' remainders, reductions, sorts)
-//   (the result)
-//
-// A stage's index binding is the U64 count of values that reached it.
-// Stages that run their downstream more than once (chain's appended array,
-// flat_map of a short literal) check it again, reusing its locals and
-// without its setup again ("replay").
+//! = Iterators
+//!
+//! `xs map |x| { … } filter |x| { … } fold(0) |acc, x| { … }` is syntax, not
+//! an object: the whole pipeline becomes one loop over the source (an array,
+//! or a range `(a ..< b)`), each stage handing its value to the next, the
+//! terminal accumulating. `docs/iterators.md` says what each operator does;
+//! this follows stage 0's lowering (`src/compiler/lower-iterators.js`) step by
+//! step, so evaluation order, indexes, cancellation, and the sort are the
+//! same:
+//!
+//! ```
+//! (source) (each stage's setup, in order)
+//! loop over [lo, hi)             ; while (i < hi and not stop) when a stage can stop it
+//!   value = source[i]
+//!   (stage 0's code, then stage 1's with its value, …, the terminal's)
+//! (cleanup: chains' remainders, reductions, sorts)
+//! (the result)
+//! ```
+//!
+//! A stage's index binding is the `U64` count of values that reached it.
+//! Stages that run their downstream more than once (`chain`'s appended array,
+//! `flat_map` of a short literal) check it again, reusing its locals and
+//! without its setup again ("replay").
 
 // Per stage of the pipelines being checked (a stack: bodies hold pipelines).
+/// By stage: its `Iterator_expr` node. The `st_*` vecs are rows by stage, a
+/// stack, since a stage's body may hold a pipeline of its own.
 vec st_node: I32;
-vec st_op: I32;       // the operator's word
-vec st_counter: I32;  // its counter local, or -1
-vec st_ordinal: I32;  // its ordinal local (the counter before this value), or -1
-vec st_locals: I32;   // 16 per stage: locals of its own (limit, other, accumulator, buffers, …), or -1
+/// The operator's word.
+vec st_op: I32;
+/// Its counter local, or -1.
+vec st_counter: I32;
+/// Its ordinal local (the counter before this value), or -1.
+vec st_ordinal: I32;
+/// 16 per stage: locals of its own (limit, other, accumulator, buffers, …), or -1
+vec st_locals: I32;
 
 // Nodes to run before the loop and after it, per pipeline (stacks).
 vec iter_setup: I32;
 vec iter_cleanup: I32;
 
+/// A pipeline being checked: its stages (rows of the `st_*` vecs), its loop's
+/// locals, and where its setup and cleanup start on @iter_setup and
+/// @iter_cleanup. `stop_at` is the furthest stage that stopped the loop, so a
+/// `chain` downstream of it still runs its appended array.
 struct Pipe:
     | first_stage: I32   // its stages, in st_*: [first_stage, first_stage + count)
     | count: I32
@@ -62,7 +74,7 @@ fn reset_iterators() void {
     iter_cleanup.clear();
 }
 
-// ── Small builders ──
+//! = Small builders
 
 fn lg(local: I32) void { w_leaf(Op.LocalGet, cur_locals[local], local, 0); }
 
@@ -72,7 +84,7 @@ fn plain(opcode: I32, vt: I32, m: I32) void { w_node(Op.Plain, vt, opcode, 0, m)
 
 fn seq_void(m: I32) void { w_node(Op.Seq, vt_none, 0, 0, m); }
 
-// local = local + 1
+/// `local = local + 1`
 fn incr(local: I32) void {
     let m = w_mark();
     lg(local);
@@ -81,14 +93,14 @@ fn incr(local: I32) void {
     ls(local, m);
 }
 
-// local = value
+/// `local = value`
 fn set_i32(local: I32, value: I32) void {
     let m = w_mark();
     w_i32(value);
     ls(local, m);
 }
 
-// Take the node on top of the stack into the pipeline's setup, or cleanup.
+/// Take the node on top of the stack into the pipeline's setup, or cleanup.
 fn to_setup(p: Pipe) void {
     let n = w_pop();
     if not p.replay { iter_setup.push(n); };
@@ -99,7 +111,7 @@ fn to_cleanup(p: Pipe) void {
     if not p.replay { iter_cleanup.push(n); };
 }
 
-// A local that lives across the loop: made once, kept on replays.
+/// A local that lives across the loop: made once, kept on replays.
 fn stage_local(slot: I32, which: I32, vt: I32) I32 {
     let at = slot * 16 + which;
     if st_locals[at] < 0 { st_locals[at] = new_local(vt); };
@@ -110,7 +122,7 @@ fn stage_op(p: Pipe, k: I32) I32 { st_op[p.first_stage + k]; }
 
 fn stage_node(p: Pipe, k: I32) I32 { st_node[p.first_stage + k]; }
 
-// A stage's parts: its parameter `( … )` expressions and types, capture, block.
+/// A stage's parts: its parameter `( … )` expressions and types, capture, block.
 fn stage_param(node: I32) I32 {
     let c = next_sibling(first_child(node));
     while (c >= 0) {
@@ -151,9 +163,10 @@ fn stage_block(node: I32) I32 {
     -1;
 }
 
-// The operator of an iterator stage: the word after its source.
+/// The operator of an iterator stage: the word after its source.
 fn iterator_op(node: I32) I32 { tok_word[token_after(first_child(node))]; }
 
+/// Operators that end a pipeline.
 fn is_terminal(op: I32) Bool {
     op == Kw.Fold.to_i32() or op == Kw.Each.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
         or op == Kw.Count_where.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32()
@@ -163,17 +176,17 @@ fn is_terminal(op: I32) Bool {
         or op == Kw.Max_by.to_i32() or op == Kw.First_where.to_i32() or op == Kw.Reduce.to_i32() or op == Kw.Bisect.to_i32();
 }
 
-// Stages that never pass on more values than they receive.
+/// Stages that never pass on more values than they receive.
 fn is_bounded_stage(op: I32) Bool {
     op == Kw.Map.to_i32() or op == Kw.Filter.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Take.to_i32()
         or op == Kw.Skip_while.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Scan.to_i32() or op == Kw.Zip.to_i32();
 }
 
-// ── The pipeline ──
+//! = The pipeline
 
-// `(… collect(T))` as a pipeline's source, when its stages cannot observe
-// being interleaved with the stages that consume it (stage 0's
-// fusableCollect): its collect stage, or -1.
+/// `(… collect(T))` as a pipeline's source, when its stages cannot observe
+/// being interleaved with the stages that consume it (stage 0's
+/// `fusableCollect`): its collect stage, or -1.
 fn fusable_collect(input: I32) I32 {
     if not is_kind(input, Node.Paren_expr) { return -1; };
     let inner = past_splices(first_child(input));
@@ -187,9 +200,9 @@ fn fusable_collect(input: I32) I32 {
     inner;
 }
 
-// A stage whose parts (all but its source) assign only their own locals,
-// call only conversions and reads, and neither await, nest a pipeline, use
-// a DSL, nor leave (return, break, continue, yield).
+/// A stage whose parts (all but its source) assign only their own locals,
+/// call only conversions and reads, and neither await, nest a pipeline, use
+/// a DSL, nor leave (return, break, continue, yield).
 fn pure_stage(stage: I32) Bool {
     let lo = tok_start[node_first[stage]];
     let hi = tok_end[node_last[stage] - 1];
@@ -228,7 +241,8 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
     true;
 }
 
-vec pure_words: I32;   // the methods pure_method allows, interned once per program
+/// The methods pure_method allows, interned once per program.
+vec pure_words: I32;
 
 fn pure_method(word: I32) Bool {
     if pure_words.len() == 0 {
@@ -238,6 +252,8 @@ fn pure_method(word: I32) Bool {
     false;
 }
 
+/// An `Iterator_expr`: its whole pipeline, from the outermost stage, checked
+/// and written as one loop (or a binary search, for `bisect`). Its type.
 fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     // The stages, outermost last.
     // (A DSL's splice may hold the stages before: `xs filter … ` then `each`.)
@@ -289,6 +305,8 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
+/// The loop of a pipeline over `input` (an array or a range), its stages
+/// pushed on the `st_*` vecs from `first_stage`. Its result's type.
 fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let m = w_mark();
     let p = Pipe {
@@ -392,7 +410,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     rt;
 }
 
-// The loop over [lo, hi): value = element(i), then the stages.
+/// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
 fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     let top = new_label();
     set_i32(index, 0);
@@ -427,7 +445,7 @@ fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     w_node(Op.Block, vt_none, brk, 0, mb);
 }
 
-// `skip(n)` / `take(n)` before any other stage: narrow [lo, hi).
+/// `skip(n)` / `take(n)` before any other stage: narrow `[lo, hi)`.
 fn narrow(p: Pipe, k: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let i32_t = prelude(Prelude.I32);
@@ -502,7 +520,7 @@ fn narrow(p: Pipe, k: I32, cx: Cx) void {
     to_setup(p);
 }
 
-// stop = true; if stop_at < k { stop_at = k }
+/// `stop = true; if stop_at < k { stop_at = k }`
 fn cancel(p: Pipe, k: I32) void {
     let m = w_mark();
     set_i32(p.stop, 1);
@@ -518,8 +536,8 @@ fn cancel(p: Pipe, k: I32) void {
     seq_void(m);
 }
 
-// Bind a stage's captures: its values, then (optionally) its U64 index.
-// Returns false after reporting a wrong count.
+/// Bind a stage's captures: its values, then (optionally) its U64 index.
+/// Returns false after reporting a wrong count.
 fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I32) Bool {
     let capture = stage_capture(stage_node(p, k));
     if capture < 0 { return nvalues == 0; };
@@ -555,7 +573,7 @@ fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues
     true;
 }
 
-// A stage's ordinal and counter (made when first needed).
+/// A stage's ordinal and counter (made when first needed).
 fn ordinal_of(p: Pipe, k: I32) I32 {
     let slot = p.first_stage + k;
     if st_ordinal[slot] < 0 {
@@ -574,7 +592,7 @@ fn counter_of(p: Pipe, k: I32) I32 {
     st_counter[p.first_stage + k];
 }
 
-// Whether a stage reads its position: an index binding, or its operator.
+/// Whether a stage reads its position: an index binding, or its operator.
 fn stage_counts(p: Pipe, k: I32, nvalues: I32) Bool {
     let op = stage_op(p, k);
     if op == Kw.Take.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Zip.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() { return true; };
@@ -589,7 +607,7 @@ fn stage_counts(p: Pipe, k: I32, nvalues: I32) Bool {
     names > nvalues;
 }
 
-// A stage's body checked with its captures bound; its value on the stack.
+/// A stage's body checked with its captures bound; its value on the stack.
 fn stage_body(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     if not bind_captures(p, k, values, types, nvalues) {
@@ -617,7 +635,7 @@ fn two(a: I32, b: I32) Array[I32] {
     x;
 }
 
-// The code for stage k and everything after it, given its value (a local of type vt).
+/// The code for stage `k` and everything after it, given its value (a local of type `vt`).
 fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let m = w_mark();
     let op = stage_op(p, k);
@@ -641,8 +659,8 @@ fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     seq_void(m);
 }
 
-// The next stage's code inside a loop of this stage's own (repeat,
-// flat_map, chain), which the bodies' break and continue reach.
+/// The next stage's code inside a loop of this stage's own (repeat,
+/// flat_map, chain), which the bodies' break and continue reach.
 fn downstream_in_loop(p: Pipe, k: I32, value: I32, vt: I32, brk: I32, cx: Cx) void {
     let next = new_label();
     enter_loop(brk, next, -1, -1);
@@ -652,9 +670,11 @@ fn downstream_in_loop(p: Pipe, k: I32, value: I32, vt: I32, brk: I32, cx: Cx) vo
     leave_loop();
 }
 
-// Hand a value to the next stage.
+/// Hand a value to the next stage.
 fn next_stage(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void { stage_at(p, k + 1, value, vt, cx); }
 
+/// The code of non-terminal stage `k`, by its operator, ending in the next
+/// stage's (@next_stage).
 fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -822,9 +842,9 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     terminal_code(p, k, op, value, vt, cx);
 }
 
-// `chain(other)`: after the stages before it finish, the other array's
-// values go through the rest of the pipeline. A stop upstream of the chain
-// does not stop the appended array.
+/// `chain(other)`: after the stages before it finish, the other array's
+/// values go through the rest of the pipeline. A stop upstream of the chain
+/// does not stop the appended array.
 fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -908,9 +928,9 @@ fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     p.replay = was;
 }
 
-// `flat_map |x| { … }`: each element of the array the body returns goes on.
-// A body ending in an array literal of up to four elements passes them on
-// directly, without the array.
+/// `flat_map |x| { … }`: each element of the array the body returns goes on.
+/// A body ending in an array literal of up to four elements passes them on
+/// directly, without the array.
 fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let block = stage_block(node);
@@ -1015,8 +1035,8 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     w_node(Op.Block, vt_none, brk, 0, mb);
 }
 
-// `zip(other) |a, b| { … }`: pairs with other's elements, stopping at the
-// shorter. As the first stage it narrows the loop; later, it stops it.
+/// `zip(other) |a, b| { … }`: pairs with other's elements, stopping at the
+/// shorter. As the first stage it narrows the loop; later, it stops it.
 fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -1120,8 +1140,10 @@ fn other_len(local: I32) void {
     w_node(Op.ArrayLen, vt_i32, 0, 0, m);
 }
 
-// ── Terminals ──
+//! = Terminals
 
+/// The code of the terminal stage, `k`: what it does with each value, and the
+/// setup and cleanup that make its result.
 fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -1275,8 +1297,8 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     check_found(p, k, op, value, vt, cx);
 }
 
-// value op= x, with the accumulator on the stack since `m`, through the
-// element type's operator.
+/// `value op= x`, with the accumulator on the stack since `m`, through the
+/// element type's operator.
 fn accumulate(word: I32, t: I32, value: I32, at: I32, cx: Cx, m: I32) void {
     lg(value);
     finish_operator(word, t, at, cx, m);
@@ -1284,7 +1306,7 @@ fn accumulate(word: I32, t: I32, value: I32, at: I32, cx: Cx, m: I32) void {
 
 fn add_values(t: I32, m: I32, at: I32, cx: Cx) void { finish_operator(known_word(Known.Add), t, at, cx, m); }
 
-// Both operands on the stack since `m`: apply the type's operator.
+/// Both operands on the stack since `m`: apply the type's operator.
 fn finish_operator(word: I32, t: I32, at: I32, cx: Cx, m: I32) void {
     let decl = member(ty_decl(t), word, Space.Operator);
     if decl < 0 {
@@ -1295,12 +1317,15 @@ fn finish_operator(word: I32, t: I32, at: I32, cx: Cx, m: I32) void {
     finish_call(fn_instance(decl, ty_inst(t)), m, cx);
 }
 
-// ── Buffers ──
-//
-// A growable array a terminal fills: allocated once, at its bound, when
-// every stage keeps or shrinks the count and the element type has a zero;
-// otherwise grown by doubling with one bulk copy. Done: trimmed to its length.
+//! = Buffers
+//!
+//! A growable array a terminal fills: allocated once, at its bound, when
+//! every stage keeps or shrinks the count and the element type has a zero;
+//! otherwise grown by doubling with one bulk copy. Done: trimmed to its length.
 
+/// A growing array in a stage's locals: the array, how many values it holds,
+/// and its capacity. `once` when it was allocated whole (`hi - lo` values)
+/// and never grows.
 struct Buffer:
     | array: I32
     | length: I32
@@ -1308,7 +1333,7 @@ struct Buffer:
     | once: Bool
     | bounded: Bool   // its first allocation is hi - lo values
 
-// Whether a written type names one with a zero (`I32` … `Bool`, or `?T`).
+/// Whether a written type names one with a zero (`I32` … `Bool`, or `?T`).
 fn written_defaultable(type_node: I32) Bool {
     if is_kind(type_node, Node.Nullable_type) { return true; };
     let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
@@ -1322,8 +1347,8 @@ fn written_defaultable(type_node: I32) Bool {
 
 fn buffer(p: Pipe, slot: I32, et: I32, type_node: I32) Buffer { buffer_at(p, slot, 0, et, if p.bounded { type_node; } else { -1; }, p.bounded); }
 
-// A buffer in the stage's locals from `base` (three of them); `bounded`
-// when it may be allocated once at hi - lo (with a written type that has a zero).
+/// A buffer in the stage's locals from `base` (three of them); `bounded`
+/// when it may be allocated once at `hi - lo` (with a written type that has a zero).
 fn buffer_at(p: Pipe, slot: I32, base: I32, et: I32, type_node: I32, bounded: Bool) Buffer {
     let at = array_of(et);
     let vt = repr(at);
@@ -1356,6 +1381,7 @@ fn buffer_at(p: Pipe, slot: I32, base: I32, et: I32, type_node: I32, bounded: Bo
     b;
 }
 
+/// Appends `value` (of type `vt`, as `et`), doubling the array when it is full.
 fn buffer_add(p: Pipe, b: Buffer, et: I32, value: I32, vt: I32, at: I32) void {
     let heap = vt_heap(cur_locals[b.array]);
     let item = new_local(repr(et));
@@ -1441,14 +1467,14 @@ fn buffer_add(p: Pipe, b: Buffer, et: I32, value: I32, vt: I32, at: I32) void {
     seq_void(m);
 }
 
-// Whether array.new_default can make an array of t (as stage 0's DEFAULTABLE, by type).
+/// Whether `array.new_default` can make an array of `t` (as stage 0's `DEFAULTABLE`, by type).
 fn is_defaultable_type(t: I32) Bool {
     if ty_is(t, Ty.Nullable) { return true; };
     t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
         or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.Bool);
 }
 
-// if length == capacity { array } else { array.slice(0, length) }
+/// `if length == capacity { array } else { array.slice(0, length) }`
 fn buffer_done(b: Buffer) I32 {
     let vt = cur_locals[b.array];
     let heap = vt_heap(vt);
@@ -1471,8 +1497,10 @@ fn buffer_done(b: Buffer) I32 {
     w_pop();
 }
 
-// ── Loops and conditions, for the code below ──
+//! = Loops and conditions, for the code below
 
+/// A loop being written: `block $brk (loop $top … br $top)`, from @loop_open
+/// to @loop_close.
 struct WLoop:
     | brk: I32
     | top: I32
@@ -1486,7 +1514,7 @@ fn loop_open() WLoop {
     WLoop { brk: brk, top: top, mb: mb, ml: w_mark() };
 }
 
-// Leave the loop unless the condition on the stack (since `m`) holds.
+/// Leave the loop unless the condition on the stack (since `m`) holds.
 fn loop_while(lp: WLoop, m: I32) void {
     plain(69, vt_i32, m);
     w_node(Op.BrIf, vt_none, lp.brk, 0, m);
@@ -1498,7 +1526,7 @@ fn loop_close(lp: WLoop) void {
     w_node(Op.Block, vt_none, lp.brk, 0, lp.mb);
 }
 
-// Push `a < b` (signed i32) of two locals.
+/// Push `a < b` (signed i32) of two locals.
 fn lt(a: I32, b: I32) void {
     let m = w_mark();
     lg(a);
@@ -1506,10 +1534,10 @@ fn lt(a: I32, b: I32) void {
     plain(72, vt_i32, m);
 }
 
-// The value of `cond ? a : b` for i32 values on the stack since `m`: a, b, cond.
+/// The value of `cond ? a : b` for i32 values on the stack since `m`: `a`, `b`, `cond`.
 fn select_i32(m: I32) void { w_node(Op.Select, vt_i32, 0, 0, m); }
 
-// local = a op b, for locals and constants (opcode on i32).
+/// `local = a op b`, for locals and constants (`opcode` on i32).
 fn arith(target: I32, a: I32, opcode: I32, b: I32, b_is_const: Bool) void {
     let m = w_mark();
     lg(a);
@@ -1526,7 +1554,7 @@ fn array_get(arr: I32, index: I32) void {
     w_node(Op.ArrayGet, ht_a[heap], heap, 0, m);
 }
 
-// arr[index] = (the value on the stack since `m`, pushed after `array_set_begin`)
+/// `arr[index] =` (the value on the stack since `m`, pushed after this, then @array_set_end).
 fn array_set_begin(arr: I32, index: I32) I32 {
     let m = w_mark();
     lg(arr);
@@ -1539,16 +1567,16 @@ fn array_set_end(arr: I32, m: I32) void {
     w_node(Op.ArraySet, vt_none, heap, 0, m);
 }
 
-// dst.copy_from(at, src, start, count): the four i32s from locals or expressions on the stack since `m`.
+/// `dst.copy_from(at, src, start, count)`: the four i32s from locals or expressions on the stack since `m`.
 fn array_copy(dst: I32, m: I32) void {
     let heap = vt_heap(cur_locals[dst]);
     w_node(Op.ArrayCopy, vt_none, heap, heap, m);
 }
 
-// ── The comparator ──
+//! = The comparator
 
-// `{ let a = x; let b = y; body }` as a Bool on the stack: the stage's two
-// captures bound to locals x and y.
+/// `{ let a = x; let b = y; body }` as a Bool on the stack: the stage's two
+/// captures bound to locals `x` and `y`.
 fn compare(p: Pipe, k: I32, x: I32, y: I32, t: I32, cx: Cx) void {
     let capture = stage_capture(stage_node(p, k));
     let m = w_mark();
@@ -1568,9 +1596,9 @@ fn compare(p: Pipe, k: I32, x: I32, y: I32, t: I32, cx: Cx) void {
     w_node(Op.Seq, vt_i32, 0, 0, m);
 }
 
-// ── sort ──
+//! = sort
 
-// `sort(T) |a, b| { a.key < b.key; }`: the collected values, stably sorted.
+/// `sort(T) |a, b| { a.key < b.key; }`: the collected values, stably sorted.
 fn check_sort(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -1623,9 +1651,9 @@ fn check_sort(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     p.finish = w_pop();
 }
 
-// `a < b` or `a > b` on the captures of a bare I32 or U32 sort: 1 ascending,
-// -1 descending, else 0 (equal values are indistinguishable, so a radix
-// sort gives what the stable sort gives).
+/// `a < b` or `a > b` on the captures of a bare I32 or U32 sort: 1 ascending,
+/// -1 descending, else 0 (equal values are indistinguishable, so a radix
+/// sort gives what the stable sort gives).
 fn scalar_order(block: I32, capture: I32, et: I32) I32 {
     if et != prelude(Prelude.I32) and et != prelude(Prelude.U32) { return 0; };
     let e = first_child(block);
@@ -1641,9 +1669,9 @@ fn scalar_order(block: I32, capture: I32, et: I32) I32 {
     0;
 }
 
-// Insertion-sorted runs of 24, then bottom-up merges through a second
-// buffer; already-ordered neighbouring runs are copied without comparing.
-// Leaves the sorted values in `result` (maybe longer than the length).
+/// Insertion-sorted runs of 24, then bottom-up merges through a second
+/// buffer; already-ordered neighbouring runs are copied without comparing.
+/// Leaves the sorted values in `result` (maybe longer than the length).
 fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     let vt = cur_locals[b.array];
     let heap = vt_heap(vt);
@@ -1925,9 +1953,9 @@ fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     w_node(Op.If, vt_none, new_label(), 0, mif);
 }
 
-// Two 16-bit passes of a counting sort, for 512 values or more (signed keys
-// with their top bit flipped, so negatives come first); reversed for `>`.
-// Fewer values: the merge sort.
+/// Two 16-bit passes of a counting sort, for 512 values or more (signed keys
+/// with their top bit flipped, so negatives come first); reversed for `>`.
+/// Fewer values: the merge sort.
 fn radix_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, descending: Bool, cx: Cx) void {
     let vt = cur_locals[b.array];
     let heap = vt_heap(vt);
@@ -1994,8 +2022,8 @@ fn radix_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, descending: Bool
     w_node(Op.If, vt_none, new_label(), 0, mif);
 }
 
-// One counting pass from `from` into `to` on a 16-bit digit (low, or high
-// with the sign flipped for signed keys).
+/// One counting pass from `from` into `to` on a 16-bit digit (low, or high
+/// with the sign flipped for signed keys).
 fn radix_pass(n: I32, from: I32, to: I32, counts: I32, counts_heap: I32, high: Bool, signed: Bool) void {
     let mc = w_mark();
     w_i32(65537);
@@ -2064,7 +2092,7 @@ fn radix_pass(n: I32, from: I32, to: I32, counts: I32, counts_heap: I32, high: B
     loop_close(l3);
 }
 
-// d = v & 65535, or (v >>> 16) (^ 32768 when signed)
+/// `d = v & 65535`, or `v >>> 16` (`^ 32768` when signed).
 fn radix_digit(v: I32, d: I32, high: Bool, signed: Bool) void {
     let m = w_mark();
     lg(v);
@@ -2082,9 +2110,9 @@ fn radix_digit(v: I32, d: I32, high: Bool, signed: Bool) void {
     ls(d, m);
 }
 
-// ── partition ──
+//! = partition
 
-// `partition(T) |v| { test }`: [the values it holds for, the others].
+/// `partition(T) |v| { test }`: `[the values it holds for, the others]`.
 fn check_partition(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -2112,10 +2140,10 @@ fn check_partition(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     p.result_type = at;
 }
 
-// ── Found ──
+//! = Found
 
-// Push `M[args].new(…)` of a std module (Found, Group): the arguments are
-// on the stack since `m`.
+/// Push `M[args].new(…)` of a std module (Found, Group): the arguments are
+/// on the stack since `m`.
 fn std_new(module_name: Str, args: I32, m: I32, cx: Cx) I32 {
     let module = lookup(intern_text(module_name));
     if not decl_is(module, Decl.Module) { return -1; };
@@ -2137,7 +2165,7 @@ fn list2(a: I32, b: I32) I32 {
     vl_end(m);
 }
 
-// first_where, min_by, max_by, reduce: a ?Found[T].
+/// `first_where`, `min_by`, `max_by`, `reduce`: a `?Found[T]`.
 fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -2257,7 +2285,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     w_node(Op.If, vt_none, new_label(), 0, mi);
 }
 
-// A written type with a zero for reduce's accumulator: one of the numbers.
+/// A written type with a zero for reduce's accumulator: one of the numbers.
 fn is_scalar_written(type_node: I32) Bool {
     let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
     if not is_kind(name, Node.Type_ident) { return false; };
@@ -2268,11 +2296,11 @@ fn is_scalar_written(type_node: I32) Bool {
     false;
 }
 
-// ── group_by and distinct_by ──
+//! = group_by and distinct_by
 
-// `distinct_by(T, K) |v| { key }` keeps the first value of each key;
-// `group_by(T, K)` gathers the values of each key into a Group. Integer
-// keys use an open-addressing table, others a linear one.
+/// `distinct_by(T, K) |v| { key }` keeps the first value of each key;
+/// `group_by(T, K)` gathers the values of each key into a Group. Integer
+/// keys use an open-addressing table, others a linear one.
 fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -2495,7 +2523,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     p.finish = buffer_done(out);
 }
 
-// if size == 0 { 4 } else { size * 2 }
+/// The value `if size == 0 { 4 } else { size * 2 }` of local `size`.
 fn grow_size(size: I32) void {
     let m = w_mark();
     w_i32(4);
@@ -2508,7 +2536,7 @@ fn grow_size(size: I32) void {
     select_i32(m);
 }
 
-// 1: I32 or U32 keys, 2: I64 or U64, 0: others (by the written key type).
+/// 1: I32 or U32 keys, 2: I64 or U64, 0: others (by the written key type).
 fn key_hash_kind(key_node: I32) I32 {
     let name = if is_kind(key_node, Node.Ref_type) { first_child(key_node); } else { key_node; };
     if not is_kind(name, Node.Type_ident) { return 0; };
@@ -2518,7 +2546,7 @@ fn key_hash_kind(key_node: I32) I32 {
     0;
 }
 
-// at = hash(key) & mask: h = (key, folded to 32 bits) * -1640531527; h ^ (h >>> 15).
+/// `at = hash(key) & mask`: `h = (key, folded to 32 bits) * -1640531527; h ^ (h >>> 15)`.
 fn key_hash(key: I32, kind: I32, at: I32, mask: I32) void {
     let h = new_local(vt_i32);
     let mh = w_mark();
@@ -2544,7 +2572,7 @@ fn key_hash(key: I32, kind: I32, at: I32, mask: I32) void {
     ls(at, ma);
 }
 
-// slots[at] = keys.length; past half full, the table doubles.
+/// `slots[at] = keys.length`; past half full, the table doubles.
 fn insert_key(keys: Buffer, slots: I32, mask: I32, at: I32, kind: I32) void {
     let ms = array_set_begin(slots, at);
     lg(keys.length);
@@ -2605,11 +2633,11 @@ fn insert_key(keys: Buffer, slots: I32, mask: I32, at: I32, kind: I32) void {
     w_node(Op.If, vt_none, new_label(), 0, mi);
 }
 
-// ── batched and windows ──
+//! = batched and windows
 
-// `batched(T, n)`: consecutive slices of n (the last may be short);
-// `windows(T, n)`: every full slice of n, one value apart. Directly on the
-// source (when it is the first stage over an array), with no loop at all.
+/// `batched(T, n)`: consecutive slices of n (the last may be short);
+/// `windows(T, n)`: every full slice of n, one value apart. Directly on the
+/// source (when it is the first stage over an array), with no loop at all.
 fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
@@ -2722,7 +2750,7 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     p.result_type = at;
 }
 
-// data.slice(base + s, base + (if width > count - s { count } else { s + width })), base optional.
+/// `data.slice(base + s, base + (if width > count - s { count } else { s + width }))`, `base` optional.
 fn slice_at(data: I32, base: I32, s: I32, width: I32, count: I32, heap: I32) void {
     let m = w_mark();
     lg(data);
@@ -2749,11 +2777,11 @@ fn slice_at(data: I32, base: I32, s: I32, width: I32, count: I32, heap: I32) voi
     w_node(Op.Call, vt_ref(heap, true), array_slice_helper(heap), 0, m);
 }
 
-// ── bisect ──
+//! = bisect
 
-// `xs bisect |v| { test }`: the first index whose value the test does not
-// hold for, the values holding a true prefix. A branchless binary search:
-// the test runs about log2(n) + 1 times.
+/// `xs bisect |v| { test }`: the first index whose value the test does not
+/// hold for, the values holding a true prefix. A branchless binary search:
+/// the test runs about `log2(n) + 1` times.
 fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     if n != 1 {
         report(Diag.IteratorSource, node, -1);
@@ -2849,7 +2877,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     i32_t;
 }
 
-// The test at position `at`: { let v = (start + at, or source[at]); [let i = at as U64;] body }
+/// The test at position `at`: `{ let v = (start + at, or source[at]); [let i = at as U64;] body }`.
 fn bisect_test(node: I32, range: Bool, source: I32, start: I32, at: I32, et: I32, cx: Cx) void {
     let capture = stage_capture(node);
     let m = w_mark();
@@ -2878,6 +2906,7 @@ fn bisect_test(node: I32, range: Bool, source: I32, start: I32, at: I32, et: I32
     w_node(Op.Seq, vt_i32, 0, 0, m);
 }
 
+/// The node a DSL's splices hold, past any of them.
 fn past_splices(node: I32) I32 {
     let n = node;
     while (n >= 0 and is_kind(n, Node.Splice)) { n = first_child(n); };

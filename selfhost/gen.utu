@@ -1,19 +1,20 @@
-// ── Generated sources ────────────────────────────────────────────────────────
-//
-// Some of the language is written in the language: the compiler writes utu
-// source for it and adds it to the program as a file of its own, which is
-// parsed and resolved with the rest and checked when it is used.
-//
-// - A byte mem's interner (`src.intern(a, b)`, `src.interned()`, …): an
-//   open-addressing table of FNV-1a hashes over hidden mems, the one stage 0
-//   writes, so ids are the same.
-// - A `@comptime` mem's evaluation: a function that runs the expression into
-//   an exported mem the host reads after running a build of the program
-//   made for it (compile with Target.Comptime).
+//! = Generated sources
+//!
+//! Some of the language is written in the language: the compiler writes utu
+//! source for it and adds it to the program as a file of its own, which is
+//! parsed and resolved with the rest and checked when it is used.
+//!
+//! - A byte mem's interner (`src.intern(a, b)`, `src.interned()`, …): an
+//!   open-addressing table of FNV-1a hashes over hidden mems, the one stage 0
+//!   writes, so ids are the same.
+//! - A `@comptime` mem's evaluation: a function that runs the expression into
+//!   an exported mem the host reads after running a build of the program
+//!   made for it (compile with `Target.Comptime`).
 
+/// Appends `text` to `src`, where the generated file is written.
 fn gen_text(text: Str) void { for (0 ..< text.len()) |i| { src.push(text.get(i)); }; }
 
-// `text` with each `$` replaced by word `name`.
+/// `text` with each `$` replaced by word `name`.
 fn gen_template(text: Str, name: I32) void {
     for (0 ..< text.len()) |i| {
         let c = text.get(i);
@@ -21,13 +22,14 @@ fn gen_template(text: Str, name: I32) void {
     };
 }
 
+/// Appends the text of word id `word`.
 fn gen_word(word: I32) void {
     let start = src.interned_start(word);
     for (start ..< start + src.interned_size(word)) |i| { src.push(src[i]); };
 }
 
-// Bytes of `src` itself (copied through a buffer: pushing may move nothing,
-// but reads and writes of one mem must not overlap).
+/// Bytes of `src` itself (copied through a buffer: pushing may move nothing,
+/// but reads and writes of one mem must not overlap).
 fn gen_span(start: I32, end_: I32) void {
     let n = end_ - start;
     let copy = Array[I32].new(n, 0);
@@ -35,14 +37,14 @@ fn gen_span(start: I32, end_: I32) void {
     for (0 ..< n) |i| { src.push(copy[i]); };
 }
 
-// Write the generated sources for the entry file's mems, and parse them as
-// one more file. Called before names are resolved.
-// Where each @comptime expression's text went in the generated file (a
-// span of src), and its @comptime node, so its mistakes are reported there.
+// Where each `@comptime` expression's text went in the generated file (a
+// span of `src`), and its `@comptime` node, so its mistakes are reported there.
 vec comptime_text_start: I32;
 vec comptime_text_end: I32;
 vec comptime_text_node: I32;
 
+/// Writes the generated sources for the entry file's mems, and parses them as
+/// one more file. Called before names are resolved.
 fn generate_sources() void {
     comptime_text_start.clear();
     comptime_text_end.clear();
@@ -73,6 +75,8 @@ fn generate_sources() void {
     parse_file(file);
 }
 
+/// A mem declaration's generated source: its interner when it holds bytes,
+/// and its `@comptime` evaluation when it has one.
 fn generate_for_mem(item: I32) void {
     let name = word_of(first_child(item));
     let elem = next_sibling(first_child(item));
@@ -97,11 +101,9 @@ fn generate_for_mem(item: I32) void {
     };
 }
 
-// The type a @comptime mem's expression gives an Array of: I32 for the
-// narrow kinds and integer enums, else the element type.
-// The value type a @comptime mem's expression builds an array of, as in
-// stage 0: an integer enum's or a distinct type's representation; then I32
-// for the storage kinds narrower than it (U8, I8, U16, I16).
+/// The value type a `@comptime` mem's expression builds an array of, as in
+/// stage 0: an integer enum's or a distinct type's representation; then `I32`
+/// for the storage kinds narrower than it (`U8`, `I8`, `U16`, `I16`).
 fn comptime_value_name(elem: I32) Str {
     let w = word_of(elem);
     let repr = representation_word(w);
@@ -113,10 +115,10 @@ fn comptime_value_name(elem: I32) Str {
     text;
 }
 
-// The word of what type `w` is represented as when it is an integer enum
-// (`enum(U8) w`) or a distinct type (`type w = distinct U32`) declared at
-// the top of a file, else -1. Sources are generated before names are
-// resolved, so the declaration is found by its name.
+/// The word of what type `w` is represented as when it is an integer enum
+/// (`enum(U8) w`) or a distinct type (`type w = distinct U32`) declared at
+/// the top of a file, else -1. Sources are generated before names are
+/// resolved, so the declaration is found by its name.
 fn representation_word(w: I32) I32 {
     for (0 ..< file_root.len()) |file| {
         let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
@@ -135,6 +137,8 @@ fn representation_word(w: I32) I32 {
     -1;
 }
 
+/// A byte mem's interner, its name written `$`: the same table stage 0
+/// generates, so word ids agree between the two compilers.
 fn interner_template() Str {
     "\nvec __$_slots: I32;\nvec __$_starts: I32;\nvec __$_sizes: I32;\nvec __$_hashes: I32;\n"
     + "fn __mem_$_intern_reset() void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n"
@@ -158,7 +162,7 @@ fn interner_template() Str {
     + "    if (id + 1) * 2 > __$_slots.len() { __mem_$_intern_rehash(); };\n    id;\n}\n";
 }
 
-// The generated function `__mem_NAME_METHOD` of a mem, or -1.
+/// The generated function `__mem_NAME_METHOD` of a mem, or -1.
 fn generated_mem_fn(mem_decl: I32, method: I32) I32 {
     let start = src.len();
     gen_text("__mem_");

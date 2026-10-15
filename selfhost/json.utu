@@ -1,28 +1,37 @@
-// ── @json ────────────────────────────────────────────────────────────────────
-//
-// Typed JSON, as stage 0 writes it (src/compiler/json.js), function by
-// function: `@json/\ decode T text \/` (→ ?T), `@json/\ error T text \/` (→
-// Str, "" when it matches), `@json/\ encode T value \/` (→ Str), and
-// `@json/\ match text { pattern => value, …, ~> fallback }`.
-//
-// Each type gets a generated reader and writer that run in wasm, over the
-// string's code units; each container (a module, or a file's top level)
-// gets the runtime (json_runtime.utu), the codecs its sites use, and a name
-// table of the field and variant names they read and write.
+//! = `@json`
+//!
+//! Typed JSON, as stage 0 writes it (`src/compiler/json.js`), function by
+//! function: `@json/\ decode T text \/` (→ ?T), `@json/\ error T text \/` (→
+//! Str, "" when it matches), `@json/\ encode T value \/` (→ Str), and
+//! `@json/\ match text { pattern => value, …, ~> fallback }`.
+//!
+//! Each type gets a generated reader and writer that run in wasm, over the
+//! string's code units; each container (a module, or a file's top level)
+//! gets the runtime (`json_runtime.utu`), the codecs its sites use, and a name
+//! table of the field and variant names they read and write.
 
-// The container being expanded: its types, names, and generated functions.
+/// The container being expanded: its types, names, and generated functions.
 vec jp_container: I32 = [-1];
-vec jp_name_words: I32;    // the name table, in order
-vec jp_defined: I32;       // words of the functions generated (or the container's own)
-vec jp_functions: I32;     // the generated functions' sources, as words, in order
-vec jp_serial: I32 = [0];  // for each site's fresh names (`__json0_`)
+/// The name table, in order.
+vec jp_name_words: I32;
+/// Words of the functions generated (or the container's own)
+vec jp_defined: I32;
+/// The generated functions' sources, as words, in order.
+vec jp_functions: I32;
+/// A counter for each site's fresh names (`__json0_`).
+vec jp_serial: I32 = [0];
 
-// The type span of the site being expanded, for a codec's mistakes.
+/// The type span of the site being expanded, for a codec's mistakes.
 vec jc_type_at: I32 = [0];
 vec jc_type_len: I32 = [0];
-vec jc_pending: I32;       // functions the current site generated, as words
-vec jc_site: I32 = [-1];   // the site being expanded
+/// Functions the current site generated, as words.
+vec jc_pending: I32;
+/// The site being expanded.
+vec jc_site: I32 = [-1];
 
+/// Each `@json` site in `container` replaced by its expansion, then the
+/// runtime (unless the container has it), the generated codecs, and the name
+/// table added to the container.
 fn json_expand_container(container: I32, json: I32, count: I32) void {
     jp_container[0] = container;
     jp_name_words.clear();
@@ -65,7 +74,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
     graft_declarations(container, source);
 }
 
-// `offset, length` of a name in the container's table.
+/// `offset, length` of a name in the container's table.
 fn name_ref(name: Str) Str {
     let w = intern_text(name);
     let offset = 0;
@@ -77,8 +86,9 @@ fn name_ref(name: Str) Str {
     int_text(offset) + ", " + int_text(name.len());
 }
 
-// ── A site ──
+//! = A site
 
+/// The utu expression a `@json` site stands for; its codecs go to @jc_pending.
 fn json_expand_site(site: I32, prefix: Str) Str {
     let raw = dsl_body(site);
     let i = 0;
@@ -140,7 +150,7 @@ fn first_non_space(text: Str) I32 {
     i;
 }
 
-// `?Name`, `Name`, `Name[…]`: what may follow decode, encode, or error.
+/// `?Name`, `Name`, `Name[…]`: what may follow decode, encode, or error.
 fn is_written_type(type: Str) Bool {
     let i = 0;
     if i < type.len() and type.get(i) == 63 { i += 1; };
@@ -150,10 +160,10 @@ fn is_written_type(type: Str) Bool {
     type.get(i) == 91 and type.get(type.len() - 1) == 93;
 }
 
-// ── Shapes ──
-//
-// 0 scalar, 1 optional, 2 array, 3 struct, 4 enum. A codec's mistakes point
-// at the site's type.
+//! = Shapes
+//!
+//! 0 scalar, 1 optional, 2 array, 3 struct, 4 enum. A codec's mistakes point
+//! at the site's type.
 
 fn json_fail(message: Str) void { dsl_fail(message, jc_type_at[0], jc_type_len[0]); }
 
@@ -161,6 +171,8 @@ fn is_json_scalar(type: Str) Bool {
     type == "I32" or type == "U32" or type == "I64" or type == "F32" or type == "F64" or type == "Bool" or type == "Str";
 }
 
+/// 0 a scalar, 1 nullable, 2 an array, 3 a struct, 4 an enum; a type JSON
+/// cannot have is reported.
 fn shape_kind(written: Str) I32 {
     let type = without_spaces(written);
     if is_json_scalar(type) { return 0; };
@@ -195,8 +207,8 @@ fn shape_kind(written: Str) I32 {
     4;
 }
 
-// The struct or enum declaration a type names in the container (any of
-// the file's, at its top level), or -1.
+/// The struct or enum declaration a type names in the container (any of
+/// the file's, at its top level), or -1.
 fn declared_type(type: Str) I32 {
     let w = intern_text(type);
     if is_kind(jp_container[0], Node.Module_decl) {
@@ -210,7 +222,7 @@ fn declared_type(type: Str) I32 {
     find_declared(jp_container[0], w);
 }
 
-// The last of that name in the file, in order, as stage 0's table keeps it.
+/// The last of that name in the file, in order, as stage 0's table keeps it.
 fn find_declared(node: I32, w: I32) I32 {
     let found = -1;
     let c = first_child(node);
@@ -234,19 +246,21 @@ fn variant_fields(variant: I32) I32 {
     -1;
 }
 
-// A struct's fields (or a variant's): the node whose Field children they are.
+/// A struct's fields (or a variant's): the node whose Field children they are.
 fn fields_holder_of(node: I32) I32 { if is_kind(node, Node.Variant) { variant_fields(node); } else { node; }; }
 
 fn field_name(field: I32) Str { word_text(word_of(first_child(field))); }
 
 fn field_type_text(field: I32) Str { without_spaces(node_text(next_sibling(first_child(field)))); }
 
+/// The element type of `Array[T]`, or `T` of `?T`.
 fn inner_type(type: Str) Str {
     let t = without_spaces(type);
     if t.get(0) == 63 { return t.slice(1, t.len()); };
     t.slice(6, t.len() - 1);
 }
 
+/// A type as a function-name part: `?` is `opt_`, other punctuation `_`.
 fn mangle(type: Str) Str {
     let out = "";
     for (0 ..< type.len()) |i| {
@@ -282,8 +296,8 @@ fn scalar_write(type: Str, v: Str, w: Str) Str {
     "__json_put_str(" + w + ", " + v + ");";
 }
 
-// Generate a function once, by name, unless the container already has it:
-// whether to generate it now.
+/// Generate a function once, by name, unless the container already has it:
+/// whether to generate it now.
 fn json_define(name: Str) Bool {
     let w = intern_text(name);
     for (0 ..< jp_defined.len()) |k| { if jp_defined[k] == w { return false; }; };
@@ -293,10 +307,10 @@ fn json_define(name: Str) Bool {
 
 fn json_emit(source: Str) void { jc_pending.push(intern_text(source)); }
 
-// ── Defaults ──
+//! = Defaults
 
-// A value of the type to start a field with; the struct or enum ones are
-// generated functions. A type that contains itself has none.
+/// A value of the type to start a field with; the struct or enum ones are
+/// generated functions. A type that contains itself has none.
 fn json_zero(written: Str, visiting: I32) Str {
     let type = without_spaces(written);
     let kind = shape_kind(type);
@@ -341,7 +355,7 @@ fn construct_fields(holder: I32, visiting: I32) Str {
     out;
 }
 
-// Whether every field has a default without a type it is inside.
+/// Whether every field has a default without a type it is inside.
 fn fields_constructible(holder: I32, visiting: I32) Bool {
     let f = if holder >= 0 { first_child(holder); } else { -1; };
     while (f >= 0) {
@@ -351,6 +365,8 @@ fn fields_constructible(holder: I32, visiting: I32) Bool {
     true;
 }
 
+/// Whether a value of `type` can be made without a type it is inside
+/// (`visiting`, a list of words).
 fn constructible(type: Str, visiting: I32) Bool {
     let kind = shape_kind(type);
     if kind <= 2 { return true; };
@@ -379,9 +395,9 @@ fn list_with(list: I32, w: I32) I32 {
     vl_end(m);
 }
 
-// ── Readers ──
+//! = Readers
 
-// An expression reading a value of `type` from reader `r`.
+/// An expression reading a value of `type` from reader `r`.
 fn json_read(written: Str, r: Str) Str {
     let type = without_spaces(written);
     let kind = shape_kind(type);
@@ -417,6 +433,7 @@ fn fields_result(holder: I32) Str {
     out;
 }
 
+/// The source of a generated reader of `Array[T]`, which grows by doubling.
 fn array_reader(name: Str, type: Str) Str {
     let element = inner_type(type);
     let read = json_read(element, "r");
@@ -425,9 +442,9 @@ fn array_reader(name: Str, type: Str) Str {
         + ";\n            if count == items.len() {\n                let grown = Array[" + element + "].new(count * 2, first);\n                grown.copy_from(0, items, 0, count);\n                items = grown;\n            };\n            items[count] = item;\n            count += 1;\n        };\n        out = if count == items.len() { items; } else { items.slice(0, count); };\n    };\n    out;\n}";
 }
 
-// The body of an object reader: one local per field, matched by name, then
-// required-field checks and `result`. With `open`, it reads the `{` and
-// the first field; otherwise the object is already open (after a kind).
+/// The body of an object reader: one local per field, matched by name, then
+/// required-field checks and `result`. With `open`, it reads the `{` and
+/// the first field; otherwise the object is already open (after a kind).
 fn fields_reader(holder: I32, result: Str, open: Bool) Str {
     let locals = "";
     let matcher = "";
@@ -450,6 +467,8 @@ fn fields_reader(holder: I32, result: Str, open: Bool) Str {
     locals + "\n" + start + "\n    while (more) {\n        __json_span(r);\n        __json_colon(r);\n        " + matcher + "\n        more = __json_next(r, 125);\n    };\n" + required + "    " + result + ";";
 }
 
+/// Whether some variant of an enum has fields (it is then read and written
+/// as an object with a `kind`, else as a string).
 fn is_tagged(node: I32) Bool {
     let v = first_child(node);
     while (v >= 0) {
@@ -508,9 +527,9 @@ fn enum_reader(name: Str, type: Str) Str {
         + ");\n        };\n    } else {\n        __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n    };\n    out;\n}";
 }
 
-// ── Writers ──
+//! = Writers
 
-// Statements writing `value` (of `type`) to writer `w`.
+/// Statements writing `value` (of `type`) to writer `w`.
 fn json_write(written: Str, value: Str, w: Str) Str {
     let type = without_spaces(written);
     let kind = shape_kind(type);
@@ -553,8 +572,8 @@ fn json_write(written: Str, value: Str, w: Str) Str {
     name + "(" + w + ", " + value + ");";
 }
 
-// Fields as "name":value pairs; `opens` writes the `{` (else the object
-// already has its kind).
+/// Fields as "name":value pairs; `opens` writes the `{` (else the object
+/// already has its kind).
 fn object_writer(holder: I32, value: Str, opens: Bool) Str {
     let parts = "";
     let i = 0;
@@ -572,18 +591,20 @@ fn object_writer(holder: I32, value: Str, opens: Bool) Str {
     parts + "\n    __json_put(w, 125);";
 }
 
-// ── match: structural patterns over JSON ──
-//
-//   @json/\ match text {
-//       { status: "ok", user: { name: |name| Str, age: |age| I32 = 0 } } => greet(name, age),
-//       ~> |error| show(error),
-//   }\/
-//
-// Patterns list only what the program needs; other fields are skipped.
+//! = match: structural patterns over JSON
+//!
+//! ```
+//! @json/\ match text {
+//!     { status: "ok", user: { name: |name| Str, age: |age| I32 = 0 } } => greet(name, age),
+//!     ~> |error| show(error),
+//! }\/
+//! ```
+//!
+//! Patterns list only what the program needs; other fields are skipped.
 
 vec sc_at: I32 = [0];
 
-// Past spaces and `//` comments.
+/// Past spaces and `//` comments.
 fn sc_ws(raw: Str) I32 {
     let i = sc_at[0];
     while (true) {
@@ -609,7 +630,7 @@ fn sc_expect(raw: Str, text: Str) void {
     sc_at[0] += text.len();
 }
 
-// Source up to the first of `stops` at nesting depth 0 (sc_until_start says where it began).
+/// Source up to the first of `stops` at nesting depth 0 (`sc_until_start` says where it began).
 vec sc_until_start: I32 = [0];
 
 fn sc_until(raw: Str, stops: Str) Str {
@@ -638,7 +659,7 @@ fn sc_until(raw: Str, stops: Str) Str {
     trim_end(raw.slice(from, i));
 }
 
-// A word starting at the cursor: an identifier of a lowercase (or _) start, or "".
+/// A word starting at the cursor: an identifier of a lowercase (or `_`) start, or "".
 fn sc_lower_word(raw: Str) Str {
     sc_ws(raw);
     let i = sc_at[0];
@@ -649,7 +670,7 @@ fn sc_lower_word(raw: Str) Str {
     raw.slice(i, j);
 }
 
-// A JSON string literal at the cursor (with its quotes), or "".
+/// A JSON string literal at the cursor (with its quotes), or "".
 fn sc_string(raw: Str) Str {
     sc_ws(raw);
     let i = sc_at[0];
@@ -662,17 +683,26 @@ fn sc_string(raw: Str) Str {
 }
 
 // Patterns: object (its fields' patterns, linked), capture, or literal.
-vec pat_kind: I32;          // 0 object, 1 capture, 2 literal
-vec pat_name: I32;          // capture: its name; a field: its key (words)
+
+/// 0 object, 1 capture, 2 literal
+vec pat_kind: I32;
+/// Capture: its name; a field: its key (words)
+vec pat_name: I32;
 vec pat_name_start: I32;
-vec pat_type: I32;          // capture: its type (a word)
+/// Capture: its type (a word)
+vec pat_type: I32;
 vec pat_type_start: I32;
-vec pat_fallback: I32;      // capture: `= default` text (a word), or -1
+/// Capture: `= default` text (a word), or -1.
+vec pat_fallback: I32;
 vec pat_fallback_start: I32;
-vec pat_text: I32;          // literal: as written (a word)
-vec pat_first: I32;         // object: its first field's pattern, or -1
-vec pat_next: I32;          // a field's next field, or -1
-vec pat_key: I32;           // a field's key (a word)
+/// Literal: as written (a word)
+vec pat_text: I32;
+/// Object: its first field's pattern, or -1.
+vec pat_first: I32;
+/// A field's next field, or -1.
+vec pat_next: I32;
+/// A field's key (a word)
+vec pat_key: I32;
 
 fn new_pattern(kind: I32) I32 {
     let p = pat_kind.len();
@@ -690,6 +720,7 @@ fn new_pattern(kind: I32) I32 {
     p;
 }
 
+/// A `@json match` pattern at the cursor, into the `pat_` rows: its index.
 fn parse_pattern(raw: Str) I32 {
     sc_ws(raw);
     if sc_peek(raw, "{") {
@@ -747,7 +778,7 @@ fn parse_pattern(raw: Str) I32 {
     p;
 }
 
-// An identifier (any case) at the cursor, or "".
+/// An identifier (any case) at the cursor, or "".
 fn sc_word_any(raw: Str) Str {
     sc_ws(raw);
     let i = sc_at[0];
@@ -758,7 +789,7 @@ fn sc_word_any(raw: Str) Str {
     raw.slice(i, j);
 }
 
-// `?Name`, `Name`, `Name[…]` (one level of nested brackets), or "".
+/// `?Name`, `Name`, `Name[…]` (one level of nested brackets), or "".
 fn sc_capture_type(raw: Str) Str {
     let i = sc_at[0];
     let j = i;
@@ -816,7 +847,7 @@ fn sc_keyword(raw: Str) Str {
     "";
 }
 
-// Whether a pattern can be satisfied when its field is absent.
+/// Whether a pattern can be satisfied when its field is absent.
 fn pattern_optional(p: I32) Bool {
     if pat_kind[p] == 1 { return word_text(pat_type[p]).get(0) == 63 or pat_fallback[p] >= 0; };
     if pat_kind[p] == 0 {
@@ -831,11 +862,16 @@ fn pattern_optional(p: I32) Bool {
 }
 
 // The site's fresh names, and an arm's captures.
+
 vec jm_serial: I32 = [0];
-vec cap_name: I32;     // by capture: its name (a word)
-vec cap_local: I32;    // its local (a word)
-vec cap_pat: I32;      // its pattern
-vec jm_declare: I32;   // the current arm's declarations, as words
+/// By capture: its name (a word)
+vec cap_name: I32;
+/// Its local (a word)
+vec cap_local: I32;
+/// Its pattern.
+vec cap_pat: I32;
+/// The current arm's declarations, as words.
+vec jm_declare: I32;
 
 fn fresh_name(prefix: Str, name: Str) Str {
     let text = prefix + name + int_text(jm_serial[0]);
@@ -843,7 +879,7 @@ fn fresh_name(prefix: Str, name: Str) Str {
     text;
 }
 
-// A slice of the body as utu: in parentheses, once it parses.
+/// A slice of the body as utu: in parentheses, once it parses.
 fn json_splice(text: Str, start: I32, what: Str) Str {
     if not splice_parses(jc_site[0], start, text) {
         dsl_fail("Invalid " + what + " in @json match", start, if text.len() > 1 { text.len(); } else { 1; });
@@ -851,6 +887,8 @@ fn json_splice(text: Str, start: I32, what: Str) Str {
     dsl_splice(jc_site[0], start, text);
 }
 
+/// `@json/\ match text { pattern => value, …, ~> fallback }` as utu: a
+/// reader over `text`, then each arm's pattern tried in order.
 fn json_match(raw: Str, prefix: Str) Str {
     jm_serial[0] = 0;
     pat_kind.clear();
@@ -959,8 +997,8 @@ fn json_match(raw: Str, prefix: Str) Str {
     "{ let " + r + " = __json_reader(" + json_splice(text, text_start, "text expression") + "); let " + best + " = \"\"; let " + best_at + " = 0; let " + best_matched + " = -1; " + code + "; }";
 }
 
-// Statements reading pattern p from r, assigning its captures; its
-// declarations go to jm_declare.
+/// Statements reading pattern p from r, assigning its captures; its
+/// declarations go to `jm_declare`.
 fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
     let where = js_string(path);
     if pat_kind[p] == 1 {
@@ -1019,7 +1057,7 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
         + ", 125);\n        while (" + more + ") { __json_span(" + r + "); __json_colon(" + r + "); " + arms + "{ __json_skip(" + r + "); }; " + more + " = __json_next(" + r + ", 125); };\n        " + required;
 }
 
-// A JSON number as a utu F64 literal: `3` is `3.0`.
+/// A JSON number as a utu F64 literal: `3` is `3.0`.
 fn float_text(text: Str) Str {
     if text_index(text, ".", 0) >= 0 or text_index(text, "e", 0) >= 0 or text_index(text, "E", 0) >= 0 { return text; };
     text + ".0";

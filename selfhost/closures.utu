@@ -1,25 +1,29 @@
-// ── Closures ─────────────────────────────────────────────────────────────────
-//
-// `cl(x) { … }` is a JavaScript function, held as an externref: the host's
-// `utu.closure_new(fn, env, boolean_result)` closes a JS function over a
-// wasm function and an environment struct of what the closure captures.
-// Calling one goes through a `utu.closure_call_N` import per signature
-// (every one is the same host function: wasm imports are monomorphic).
-// A `fun` converts to a `cl` with no environment.
-//
-// The closure's body is a function of its own, (env, params…) → result,
-// checked where the closure is, with the enclosing function's state set
-// aside. It reads its captures from the environment at entry.
-//
-// Captures are copies, except that a variable some closure captures and
-// something assigns is a one-field struct (a box) for its whole life, which
-// the closures share: they see each other's writes and the function's, as
-// stage 0 arranges.
+//! = Closures
+//!
+//! `cl(x) { … }` is a JavaScript function, held as an externref: the host's
+//! `utu.closure_new(fn, env, boolean_result)` closes a JS function over a
+//! wasm function and an environment struct of what the closure captures.
+//! Calling one goes through a `utu.closure_call_N` import per signature
+//! (every one is the same host function: wasm imports are monomorphic).
+//! A `fun` converts to a `cl` with no environment.
+//!
+//! The closure's body is a function of its own, (env, params…) → result,
+//! checked where the closure is, with the enclosing function's state set
+//! aside. It reads its captures from the environment at entry.
+//!
+//! Captures are copies, except that a variable some closure captures and
+//! something assigns is a one-field struct (a box) for its whole life, which
+//! the closures share: they see each other's writes and the function's, as
+//! stage 0 arranges.
 
-vec decl_boxed: U8;          // by declaration: 1 when its local holds a box
-vec box_types: I32;          // pairs: value type, its box struct type
-vec closure_calls: I32;      // pairs: wasm function type of the call, its import
-vec closure_new_func: I32;   // [0]: the closure_new import, or -1
+/// By declaration: 1 when its local holds a box.
+vec decl_boxed: U8;
+/// Pairs: value type, its box struct type.
+vec box_types: I32;
+/// Pairs: wasm function type of the call, its import.
+vec closure_calls: I32;
+/// At `[0]`: the closure_new import, or -1.
+vec closure_new_func: I32;
 
 fn reset_closures() void {
     decl_boxed.resize(decl_kind.len());
@@ -30,11 +34,10 @@ fn reset_closures() void {
     closure_new_func[0] = -1;
 }
 
-// ── What closures capture, and which captures are boxes ──
+//! = What closures capture, and which captures are boxes
 
-// Whether declaration `d` is declared inside node `scope`.
-// Whether declaration d is inside `scope` (in the tree: a DSL's splice has
-// tokens of its own, outside its expansion's).
+/// Whether declaration `d` is inside `scope` (in the tree: a DSL's splice has
+/// tokens of its own, outside its expansion's).
 fn declared_in(d: I32, scope: I32) Bool {
     let n = decl_node[d];
     while (n >= 0) {
@@ -44,14 +47,16 @@ fn declared_in(d: I32, scope: I32) Bool {
     false;
 }
 
+/// Whether a declaration is a variable of a function body: a local, a
+/// parameter, or a name a capture, arm, or `catch` binds.
 fn is_local_decl(d: I32) Bool {
     let k = decl_kind[d];
     k == Decl.Local.to_i32() or k == Decl.Param.to_i32() or k == Decl.SelfParam.to_i32() or k == Decl.Capture.to_i32()
         or k == Decl.ClosureParam.to_i32() or k == Decl.ArmBinding.to_i32() or k == Decl.Promoted.to_i32() or k == Decl.Caught.to_i32();
 }
 
-// The variables a closure captures: locals and parameters named inside it
-// and declared outside it, each once, in the order first named.
+/// The variables a closure captures: locals and parameters named inside it
+/// and declared outside it, each once, in the order first named.
 fn captures_of(closure: I32) I32 {
     let m = vl_begin();
     collect_captures(closure, closure);
@@ -75,22 +80,22 @@ fn collect_captures(node: I32, closure: I32) void {
     };
 }
 
-// The start of the list being built (vl_begin's mark), for collect_captures.
+/// The start of the list being built (`vl_begin`'s mark), for `collect_captures`.
 vec capture_mark: I32;
 
 fn vl_pending_mark() I32 { capture_mark[capture_mark.len() - 1]; }
 
-// Before checking a function body: box each variable of it that a closure
-// in it captures and something assigns where the closure could see it (as
-// stage 0's box-captures): in another closure, after the capture, or in a
-// loop around the closure. A variable assigned only before it is captured
-// is copied into the closure, as any other.
+/// Before checking a function body: box each variable of it that a closure
+/// in it captures and something assigns where the closure could see it (as
+/// stage 0's box-captures): in another closure, after the capture, or in a
+/// loop around the closure. A variable assigned only before it is captured
+/// is copied into the closure, as any other.
 fn mark_boxes(body: I32) void {
     find_closures(body, body);
 }
 
-// By node: 1 when a closure is in it (itself included), counted once for
-// the nodes there are; find_closures skips what has none.
+/// By node: 1 when a closure is in it (itself included), counted once for
+/// the nodes there are; `find_closures` skips what has none.
 vec closure_below: U8;
 
 fn has_closure(node: I32) Bool {
@@ -113,6 +118,8 @@ fn mark_closures_below(node: I32) Bool {
     found;
 }
 
+/// Mark in @decl_boxed the variables of function body `body` that closures
+/// under `node` capture and that must be boxes.
 fn find_closures(node: I32, body: I32) void {
     if not has_closure(node) { return; };
     // `let f = cl(…) { … f(…) … };`: the closure captures f before f has a
@@ -143,6 +150,8 @@ fn find_closures(node: I32, body: I32) void {
     };
 }
 
+/// Whether something under `node` assigns `d` where `closure`, which
+/// captures it, could see the write.
 fn assigned_after_capture(d: I32, closure: I32, node: I32) Bool {
     if is_kind(node, Node.Assign_expr) {
         let target = first_child(node);
@@ -156,7 +165,7 @@ fn assigned_after_capture(d: I32, closure: I32, node: I32) Bool {
     false;
 }
 
-// Whether `write`, to variable d, can be seen by `closure`, which captured d.
+/// Whether `write`, to variable d, can be seen by `closure`, which captured d.
 fn write_seen(d: I32, closure: I32, write: I32) Bool {
     let decl = decl_node[d];
     // In a closure outside d's scope's own code (one not around d's declaration).
@@ -176,12 +185,12 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
     false;
 }
 
-// Whether node `outer` spans node `inner`.
+/// Whether node `outer` spans node `inner`.
 fn node_contains(outer: I32, inner: I32) Bool {
     inner >= 0 and node_first[outer] <= node_first[inner] and node_last[inner] <= node_last[outer];
 }
 
-// The box struct of a value type: one mutable field.
+/// The box struct of a value type: one mutable field.
 fn box_type(vt: I32) I32 {
     let i = 0;
     while (i < box_types.len()) {
@@ -196,8 +205,8 @@ fn box_type(vt: I32) I32 {
     h;
 }
 
-// Store the value on the stack (since `m`) as declaration `d`'s: in its
-// local, or in a new box its local holds.
+/// Store the value on the stack (since `m`) as declaration `d`'s: in its
+/// local, or in a new box its local holds.
 fn bind_value(d: I32, t: I32, m: I32) void {
     let vt = repr(t);
     if decl_boxed[d] == 1 {
@@ -213,7 +222,7 @@ fn bind_value(d: I32, t: I32, m: I32) void {
     w_node(Op.LocalSet, vt_none, local, 0, m);
 }
 
-// Push the value of declaration `d` (of type `t`).
+/// Push the value of declaration `d` (of type `t`).
 fn read_value(d: I32, t: I32) void {
     let vt = repr(t);
     if decl_boxed[d] == 1 {
@@ -226,11 +235,14 @@ fn read_value(d: I32, t: I32) void {
     w_leaf(Op.LocalGet, vt, decl_local[d], 0);
 }
 
-// Store the value on the stack (since `m`, pushed after `write_begin`) into `d`.
+/// A write to `d` begins: a box is pushed first, its value to follow (see
+/// @write_end).
 fn write_begin(d: I32, t: I32) void {
     if decl_boxed[d] == 1 { w_leaf(Op.LocalGet, vt_ref(box_type(repr(t)), true), decl_local[d], 0); };
 }
 
+/// A write to `d` ends: the value on the stack since `m` goes into its box
+/// (pushed by @write_begin) or its local.
 fn write_end(d: I32, t: I32, m: I32) void {
     if decl_boxed[d] == 1 {
         w_node(Op.StructSet, vt_none, box_type(repr(t)), 0, m);
@@ -239,8 +251,8 @@ fn write_end(d: I32, t: I32, m: I32) void {
     };
 }
 
-// A boxed parameter: its value moves into a box at the function's start.
-// Returns the statements' node, or -1 when no parameter is boxed.
+/// A boxed parameter: its value moves into a box at the function's start.
+/// Returns the statements' node, or -1 when no parameter is boxed.
 fn box_params(decls: I32, params: I32) I32 {
     let m = w_mark();
     let any = false;
@@ -259,12 +271,17 @@ fn box_params(decls: I32, params: I32) I32 {
     w_pop();
 }
 
-// ── Setting the enclosing function aside ──
+//! = Setting the enclosing function aside
 
 vec saved_locals: I32;
-vec saved_marks: I32;   // per saved function: its locals' start in saved_locals, cur_params, next_label, loop entries' start
-vec saved_loops: I32;   // the loop stacks' entries, four per loop
+/// Five per saved function: its defers' start, its locals' start in
+/// @saved_locals, `cur_params`, `next_label`, and its loops' start in @saved_loops.
+vec saved_marks: I32;
+/// The loop stacks' entries, six per loop.
+vec saved_loops: I32;
 
+/// Set the enclosing function's checking state aside (its locals, labels,
+/// loops, and defers), to check a closure's body as a function of its own.
 fn save_function() void {
     saved_marks.push(function_defers[0]);
     function_defers[0] = defer_node.len();
@@ -291,6 +308,7 @@ fn save_function() void {
     next_label[0] = 0;
 }
 
+/// Bring back what @save_function set aside.
 fn restore_function() void {
     let n = saved_marks.len();
     let loops_at = saved_marks[n - 1];
@@ -323,11 +341,11 @@ fn restore_function() void {
     saved_loops.resize(loops_at);
 }
 
-// ── Closure literals ──
+//! = Closure literals
 
-// `cl(x: T) R { … }`: its parameter types (annotated, else from the
-// closure type expected), its result type (annotated, else expected, else
-// its body's), and the closure built.
+/// `cl(x: T) R { … }`: its parameter types (annotated, else from the
+/// closure type expected), its result type (annotated, else expected, else
+/// its body's), and the closure built.
 fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     let exp = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
     let expected = if exp >= 0 and (ty_is(exp, Ty.Closure) or ty_is(exp, Ty.Fun)) { exp; } else { -1; };
@@ -469,8 +487,8 @@ fn types_list(ts: Array[I32], n: I32) I32 {
     vl_end(m);
 }
 
-// The type a closure literal's annotations give it, when they give all of
-// it (every parameter's type and the result's); else Error.
+/// The type a closure literal's annotations give it, when they give all of
+/// it (every parameter's type and the result's); else Error.
 fn closure_syntax_type(node: I32, inst: I32) I32 {
     let m = vl_begin();
     let result = -1;
@@ -499,7 +517,7 @@ fn closure_syntax_type(node: I32, inst: I32) I32 {
     ty(Ty.Closure, vl_end(m), result);
 }
 
-// utu.closure_new(fn: funcref, env: anyref, boolean_result: i32) → externref.
+/// `utu.closure_new(fn: funcref, env: anyref, boolean_result: i32) → externref`.
 fn closure_new() I32 {
     if closure_new_func[0] >= 0 { return closure_new_func[0]; };
     let m = vl_begin();
@@ -511,7 +529,7 @@ fn closure_new() I32 {
     f;
 }
 
-// The import that calls closures of a signature: (closure, params…) → result.
+/// The import that calls closures of a signature: (closure, params…) → result.
 fn closure_call(t: I32) I32 {
     let m = vl_begin();
     vl_add(vt_externref);
@@ -529,7 +547,7 @@ fn closure_call(t: I32) I32 {
     f;
 }
 
-// A call of a closure value: the closure, the arguments, then its import.
+/// A call of a closure value: the closure, the arguments, then its import.
 fn call_closure(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     check_expr(callee, t, cx);
     if not check_args(ty_a[t], args, 0, at, cx) {
@@ -540,15 +558,15 @@ fn call_closure(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     ty_b[t];
 }
 
-// A `fun` (on the stack since `m`) where a `cl` of the same signature is
-// expected: a closure of it with no environment.
+/// A `fun` (on the stack since `m`) where a `cl` of the same signature is
+/// expected: a closure of it with no environment.
 fn decay_fun(fun_t: I32, m: I32) void {
     w_leaf(Op.RefNull, vt_anyref, vt_anyref, 0);
     w_i32(if ty_b[fun_t] == prelude(Prelude.Bool) { 1; } else { 0; });
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
 }
 
-// The closure imports the module has, for the host section.
+/// The closure imports the module has, for the host section.
 fn write_closure_json() void {
     let any = closure_new_func[0] >= 0 and func_live[closure_new_func[0]] == 1;
     let calls = false;

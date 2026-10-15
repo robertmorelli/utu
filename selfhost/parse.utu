@@ -1,24 +1,27 @@
-// ── The parser ───────────────────────────────────────────────────────────────
-//
-// Recursive descent over the tokens (comments skipped), building a tree of
-// named nodes in mems: each node's kind, its first token and the token after
-// its last, its first child, and its next sibling. Punctuation and keywords
-// are not nodes; a node's span covers them. While parsing, spans are
-// positions in `ptok` (the tokens without comments); once the tree is
-// built, they become the lexer's tokens, and each comment becomes a node.
-//
-// A node is made from the nodes made since it began: those wait on the
-// `pending` stack, and finishing a node links them as its children and puts
-// it in their place. Trying a parse and giving it up (`save`, `restore`)
-// truncates the node mems and the stack.
-//
-// The grammar is stage 0's (src/compiler/syntax/parser.js), function by
-// function, which in turn is tree-sitter-utu's: the nodes are the named nodes
-// of its syntax tree, with the same spans, for every program it accepts
-// (scripts/selfhost-parser-differential.mjs). A program it does not accept
-// fails with a thrown error; stage 0 hands those to tree-sitter, whose error
-// recovery reports them.
+//! = The parser
+//!
+//! Recursive descent over the tokens (comments skipped), building a tree of
+//! named nodes in mems: each node's kind, its first token and the token after
+//! its last, its first child, and its next sibling. Punctuation and keywords
+//! are not nodes; a node's span covers them. While parsing, spans are
+//! positions in @ptok (the tokens without comments); once the tree is
+//! built, they become the lexer's tokens (and, when @comment_nodes asks,
+//! each comment becomes a node).
+//!
+//! A node is made from the nodes made since it began: those wait on the
+//! @pending stack, and finishing a node links them as its children and puts
+//! it in their place. Trying a parse and giving it up (@save, @restore)
+//! truncates the node mems and the stack.
+//!
+//! The grammar is stage 0's (`src/compiler/syntax/parser.js`), function by
+//! function, which in turn is tree-sitter-utu's: the nodes are the named nodes
+//! of its syntax tree, with the same spans, for every program it accepts
+//! (`scripts/selfhost-parser-differential.mjs`). A program it does not accept
+//! fails: a failed rule throws (@fail), and @parse reports the furthest token
+//! any attempt reached, with what the attempts there wanted. (Stage 0 hands
+//! those programs to tree-sitter, whose error recovery reports them.)
 
+/// The kinds of node: tree-sitter-utu's named nodes, capitalized.
 enum(U8) Node:
     | Source_file
     | Comment
@@ -154,9 +157,9 @@ enum(U8) Node:
     | Template_middle
     | Template_tail
 
-// Every keyword of the grammar, as interned word ids: each is its variant's
-// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
-// keyword may stand, the parser compares ids.
+/// Every keyword of the grammar, as interned word ids: each is its variant's
+/// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
+/// keyword may stand, the parser compares ids.
 enum(U8) Kw:
     | Mod
     | Using
@@ -249,32 +252,47 @@ enum(U8) Kw:
     | False
     | Null
 
-// The tokens the parser reads (positions of the lexer's tokens, without
-// comments), and each token's interned word id (-1 when it is not a word).
+/// The tokens the parser reads (positions of the lexer's tokens, without
+/// comments).
 export mem ptok: I32;
+/// By lexer token: its interned word id, or -1 when it is not a word.
 export mem tok_word: I32;
 
+/// The tree, by node id: its kind (a @Node). The `node_*` mems are its rows:
+/// its first token and the token after its last, its first child, and its next
+/// sibling (-1 for none).
 export mem node_kind: U8;
 export mem node_first: I32;
 export mem node_last: I32;
 export mem node_child: I32;
 export mem node_next: I32;
+/// Nodes made but not yet any node's children: the next node finished takes
+/// those above its mark.
 vec pending: I32;
 
+/// Throws, abandoning the rule that failed: an attempt that catches it
+/// restores its @Save.
 let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/;
 
 // Give up: the program is not one this parser accepts. The furthest token
 // any attempt failed at is where the error is reported, with what the
 // attempts that got that far wanted there.
+/// The furthest position any attempt failed at.
 vec parse_furthest: I32 = [0];
-vec parse_expected: I32;        // at the furthest token: Tok kinds, and keywords as kw_wanted + their word
-vec parse_error_at: I32 = [0];  // the token a failed parse reports
-vec parse_error_wanted: I32 = [-1];  // and the word of what it wanted there ("';' or '}'"), or -1
+/// At the furthest token: Tok kinds, and keywords as kw_wanted + their word.
+vec parse_expected: I32;
+/// The token a failed parse reports.
+vec parse_error_at: I32 = [0];
+/// And the word of what it wanted there ("';' or '}'"), or -1.
+vec parse_error_wanted: I32 = [-1];
 
+/// In @parse_expected, a keyword is this plus its word id; a token kind is itself.
 let kw_wanted: I32 = 1000;
 
 fn fail(p: Parser) void { fail_wanting(p, -1); }
 
+/// Fails at the cursor, noting what was wanted there (a token kind, or
+/// @kw_wanted plus a keyword's word; -1 for nothing in particular).
 fn fail_wanting(p: Parser, wanted: I32) void {
     if p.pos > parse_furthest[0] {
         parse_furthest[0] = p.pos;
@@ -288,7 +306,7 @@ fn fail_wanting(p: Parser, wanted: I32) void {
     syntax_error();
 }
 
-// What the furthest attempts wanted, in words: "';'", "';' or '}'", "'(', ',' or ')'".
+/// What the furthest attempts wanted, in words: `"';'"`, `"';' or '}'"`, `"'(', ',' or ')'"`.
 fn wanted_text() Str {
     let n = parse_expected.len();
     if n == 0 { return ""; };
@@ -301,7 +319,7 @@ fn wanted_text() Str {
     text;
 }
 
-// How a kind of token is written (or named, for the kinds with no one spelling).
+/// How a kind of token is written (or named, for the kinds with no one spelling).
 fn tok_spelling(kind: I32) Str {
     match kind {
         0 => "end of file", 1 => "a character", 2 => "a name", 3 => "an integer", 4 => "a number",
@@ -315,15 +333,18 @@ fn tok_spelling(kind: I32) Str {
     };
 }
 
+/// The cursor: a position in @ptok.
 struct Parser:
     | pos: I32
 
+/// Where an attempt began: the cursor and the sizes of the node mems and
+/// @pending, which @restore cuts back to.
 struct Save:
     | pos: I32
     | nodes: I32
     | pending: I32
 
-// ── Tokens ──
+//! = Tokens
 
 fn kind_at(p: Parser, offset: I32) I32 { tok_kind[ptok[p.pos + offset]]; }
 
@@ -341,10 +362,10 @@ fn is_keyword_id(id: I32) Bool { id >= 0 and id < Kw.count(); }
 
 fn at_end(p: Parser) Bool { is(p, Tok.End); }
 
-// Whether the tokens at positions `a` and `b` touch, with nothing between them.
+/// Whether the tokens at positions `a` and `b` touch, with nothing between them.
 fn adjacent(a: I32, b: I32) Bool { tok_end[ptok[a]] == tok_start[ptok[b]]; }
 
-// Identifier-shaped: a lowercase first letter, or `_` and more.
+/// Identifier-shaped: a lowercase first letter, or `_` and more.
 fn shaped_at(p: Parser, offset: I32) Bool {
     let t = ptok[p.pos + offset];
     if tok_kind[t] != Tok.Word.to_i32() { return false; };
@@ -366,11 +387,12 @@ fn expect_kw(p: Parser, kw: Kw) void {
     p.pos += 1;
 }
 
-// ── Nodes ──
+//! = Nodes
 
+/// Where the node about to begin starts on @pending.
 fn mark() I32 { pending.len(); }
 
-// A node of the nodes made since `at` (on the pending stack), spanning tokens first ..< last.
+/// A node of the nodes made since `at` (on the @pending stack), spanning tokens `first ..< last`.
 fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
     let id = node_kind.len();
     let n = pending.len();
@@ -390,24 +412,26 @@ fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
     id;
 }
 
-// A node from `at` up to the cursor.
+/// A node from `at` up to the cursor.
 fn node(p: Parser, kind: Node, at: I32, first: I32) I32 { finish(kind, at, first, p.pos); }
 
-// A node of the token at the cursor.
+/// A node of the token at the cursor.
 fn leaf(p: Parser, kind: Node) I32 {
     let at = mark();
     p.pos += 1;
     finish(kind, at, p.pos - 1, p.pos);
 }
 
-// The mark below `left`, the node on top of the stack, so a node can begin with it.
+/// The mark below `left`, the node on top of the stack, so a node can begin with it.
 fn mark_below(left: I32) I32 {
     if pending[pending.len() - 1] != left { fatal; };
     pending.len() - 1;
 }
 
+/// Before an attempt that may be given up (@restore).
 fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len() }; }
 
+/// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
 fn restore(p: Parser, s: Save) void {
     p.pos = s.pos;
     node_kind.resize(s.nodes);
@@ -418,7 +442,7 @@ fn restore(p: Parser, s: Save) void {
     pending.resize(s.pending);
 }
 
-// ── Words ──
+//! = Words
 
 fn identifier(p: Parser) I32 {
     if not shaped(p) { fail(p); };
@@ -430,13 +454,13 @@ fn type_ident(p: Parser) I32 {
     leaf(p, Node.Type_ident);
 }
 
-// A type name where no keyword can stand.
+/// A type name where no keyword can stand.
 fn unreserved_type_ident(p: Parser) I32 {
     if is_keyword_id(word_id(p)) { fail(p); };
     type_ident(p);
 }
 
-// `identifier` where the word is identifier-shaped, else `type_ident` (both fit here).
+/// `identifier` where the word is identifier-shaped, else `type_ident` (both fit here).
 fn identifier_or_type(p: Parser) I32 {
     if not is_word(p) { fail(p); };
     leaf(p, if shaped(p) { Node.Identifier; } else { Node.Type_ident; });
@@ -459,7 +483,7 @@ fn int_lit(p: Parser) I32 {
     leaf(p, Node.Int_lit);
 }
 
-// ── Source file and items ──
+//! = Source file and items
 
 fn source_file(p: Parser) I32 {
     let at = mark();
@@ -468,6 +492,7 @@ fn source_file(p: Parser) I32 {
     node(p, Node.Source_file, at, first);
 }
 
+/// A top-level declaration, by its first word (`export`'s by its second).
 fn item(p: Parser) void {
     let w = word_id(p);
     if w == Kw.Mod.to_i32() { module_decl(p); return; };
@@ -491,6 +516,7 @@ fn item(p: Parser) void {
     fail(p);
 }
 
+/// A declaration inside a `mod`.
 fn module_item(p: Parser) void {
     let w = word_id(p);
     if w == Kw.Type.to_i32() { type_decl(p); return; };
@@ -946,7 +972,7 @@ fn bench_decl(p: Parser) I32 {
     node(p, Node.Bench_decl, at, first);
 }
 
-// ── Types ──
+//! = Types
 
 fn type_(p: Parser) I32 {
     if is(p, Tok.Question) {
@@ -995,7 +1021,7 @@ fn base_type(p: Parser) I32 {
     node(p, Node.Ref_type, at, first);
 }
 
-// The inside of a ref_type: a type name, `M.T`, `M[A]`, or `M[A].T`.
+/// The inside of a `ref_type`: a type name, `M.T`, `M[A]`, or `M[A].T`.
 fn ref_type(p: Parser) I32 {
     if not is_word(p) { fail(p); };
     let s = save(p);
@@ -1022,7 +1048,7 @@ fn ref_type(p: Parser) I32 {
     type_ident(p);
 }
 
-// ── Blocks ──
+//! = Blocks
 
 fn block(p: Parser) I32 {
     let at = mark();
@@ -1049,12 +1075,13 @@ fn capture(p: Parser) I32 {
     node(p, Node.Capture, at, first);
 }
 
-// ── Expressions ──
+//! = Expressions
 
+/// An expression of any precedence.
 fn expression(p: Parser) I32 { expr(p, -1000, true); }
 
-// An expression whose operators have precedence above `min`, or equal to it
-// when `or_equal` (the rule this operand belongs to is right-associative).
+/// An expression whose operators have precedence above `min`, or equal to it
+/// when `or_equal` (the rule this operand belongs to is right-associative).
 fn expr(p: Parser, min: I32, or_equal: Bool) I32 {
     let left = prefix(p);
     while (true) {
@@ -1069,7 +1096,7 @@ fn binds(precedence: I32, min: I32, or_equal: Bool) Bool {
     precedence > min or (precedence == min and or_equal);
 }
 
-// The precedence of a binary operator token (or keyword), and whether it is right-associative; -1 if none.
+/// The precedence of a binary operator token (or keyword), and whether it is right-associative; -1 if none.
 fn binary_precedence(p: Parser) I32 {
     let k = kind_at(p, 0);
     if k == Tok.Caret.to_i32() { return 12; };
@@ -1093,9 +1120,9 @@ fn is_assignment(k: I32) Bool {
         or k == Tok.Shr3Eq.to_i32() or k == Tok.AmpEq.to_i32() or k == Tok.PipeEq.to_i32() or k == Tok.CaretEq.to_i32();
 }
 
-// The form of an iterator keyword: 0 capture, 1 param-capture, 2 param,
-// 3 element-capture, 4 element, 5 element-key-capture, 6 element-param,
-// 7 none; -1 when the word is not one.
+/// The form of an iterator keyword: 0 capture, 1 param-capture, 2 param,
+/// 3 element-capture, 4 element, 5 element-key-capture, 6 element-param,
+/// 7 none; -1 when the word is not one.
 fn iterator_form(w: I32) I32 {
     if w >= Kw.Map.to_i32() and w <= Kw.Bisect.to_i32() { return 0; };
     if w >= Kw.Fold.to_i32() and w <= Kw.Zip.to_i32() { return 1; };
@@ -1108,7 +1135,7 @@ fn iterator_form(w: I32) I32 {
     -1;
 }
 
-// Extend `left` by one postfix or infix operation, or return -1.
+/// Extend `left` by one postfix or infix operation, or return -1.
 fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     let k = kind_at(p, 0);
     // What most often follows an expression ends it.
@@ -1182,9 +1209,9 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     -1;
 }
 
-// An assignment to `left`, whatever the surrounding precedence: tree-sitter
-// shifts the operator onto an assignable target before reducing it into an
-// enclosing expression, so `a + b = c` is `a + (b = c)`.
+/// An assignment to `left`, whatever the surrounding precedence: tree-sitter
+/// shifts the operator onto an assignable target before reducing it into an
+/// enclosing expression, so `a + b = c` is `a + (b = c)`.
 fn assignment(p: Parser, left: I32, operator_tokens: I32) I32 {
     let target = node_kind[left];
     let assignable = target == Node.Identifier.to_i32() or target == Node.Field_expr.to_i32()
@@ -1339,8 +1366,8 @@ fn prefix(p: Parser) I32 {
     -1;
 }
 
-// Keywords that begin an expression; elsewhere these words are identifiers.
-// (Keywords are the first words interned: any other is past them.)
+/// Keywords that begin an expression; elsewhere these words are identifiers.
+/// (Keywords are the first words interned: any other is past them.)
 fn is_expression_keyword(w: I32) Bool {
     w < Kw.count() and (w == Kw.If.to_i32() or w == Kw.Match.to_i32() or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32()
         or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32()
@@ -1420,10 +1447,7 @@ fn keyword_expression(p: Parser) I32 {
     -1;
 }
 
-// Whether the token at the cursor begins `return`'s or `continue`'s optional
-// value. Words that continue an expression (`and`, `orelse`, `map`, …) and
-// `-o` instead extend the bare `return`.
-// `text ${expr} text`: its text pieces are tokens, the expressions between them.
+/// `text ${expr} text`: its text pieces are tokens, the expressions between them.
 fn template_string(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
@@ -1444,6 +1468,9 @@ fn template_string(p: Parser) I32 {
     node(p, Node.Template_string, at, first);
 }
 
+/// Whether the token at the cursor begins `return`'s or `continue`'s optional
+/// value. Words that continue an expression (`and`, `orelse`, `map`, …) and
+/// `-o` instead extend the bare `return`.
 fn starts_expression(p: Parser) Bool {
     if at_end(p) { return false; };
     if is_word(p) {
@@ -1509,7 +1536,7 @@ fn word_expression(p: Parser) I32 {
     node(p, Node.Type_member_expr, at, first);
 }
 
-// `m.T { field: … }` at the cursor (m a lowercase module), or -1 without consuming.
+/// `m.T { field: … }` at the cursor (`m` a lowercase module), or -1 without consuming.
 fn qualified_struct_init(p: Parser) I32 {
     if not (is_at(p, 1, Tok.Dot) and is_at(p, 2, Tok.Word) and is_at(p, 3, Tok.LBrace)) { return -1; };
     let s = save(p);
@@ -1531,7 +1558,7 @@ fn qualified_struct_init(p: Parser) I32 {
     made;
 }
 
-// Whether the cursor starts `name[index]` or `name[start, end]` with expressions inside.
+/// Whether the cursor starts `name[index]` or `name[start, end]` with expressions inside.
 fn index_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false; };
     let s = save(p);
@@ -1551,7 +1578,7 @@ fn index_ahead(p: Parser) Bool {
     found;
 }
 
-// Whether the cursor starts `name[types].`, a module instantiation.
+/// Whether the cursor starts `name[types].`, a module instantiation.
 fn module_args_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false; };
     let s = save(p);
@@ -1566,7 +1593,7 @@ fn module_args_ahead(p: Parser) Bool {
     found;
 }
 
-// Whether the cursor starts `name[types].identifier(`.
+/// Whether the cursor starts `name[types].identifier(`.
 fn module_call_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false; };
     let s = save(p);
@@ -1919,10 +1946,10 @@ fn while_expr(p: Parser) I32 {
     node(p, Node.While_expr, at, first);
 }
 
-// ── Running the parser ───────────────────────────────────────────────────────
+//! = Running the parser
 
-// Intern every keyword, at the start of `src`, so a word's id is its
-// keyword's when it is one. Files follow.
+/// Intern every keyword, at the start of `src`, so a word's id is its
+/// keyword's when it is one. Files follow.
 fn intern_keywords() void {
     src.resize(abi_kept[0]);
     src.intern_reset();
@@ -1937,8 +1964,8 @@ fn intern_keywords() void {
     };
 }
 
-// Intern the word tokens from `first` up to `last`, and list those the
-// parser reads (all but comments) in `ptok`.
+/// Intern the word tokens from `first` up to `last`, and list those the
+/// parser reads (all but comments) in @ptok.
 fn intern_words(first: I32, last: I32) void {
     tok_word.resize(last);
     ptok.resize(last - first + 4);
@@ -1956,9 +1983,9 @@ fn intern_words(first: I32, last: I32) void {
     ptok.resize(p + 4);
 }
 
-// Parse the tokens from `first` up to `last` (the last of them `End`), adding
-// their nodes. Returns the source file node, or -1 when the tokens do not
-// parse (and adds no nodes).
+/// Parse the tokens from `first` up to `last` (the last of them `End`), adding
+/// their nodes. Returns the source file node, or -1 when the tokens do not
+/// parse (and adds no nodes).
 fn parse(first: I32, last: I32) I32 {
     parse_error_wanted[0] = -1;
     if tok_kind[last - 1] != Tok.End.to_i32() {
@@ -1984,9 +2011,9 @@ fn parse(first: I32, last: I32) I32 {
     };
 }
 
-// Node spans in the lexer's tokens (with comments) rather than the parser's,
-// for the nodes from `before` on. The source file spans every token from
-// `first` up to `end_` (the End token).
+/// Node spans in the lexer's tokens (with comments) rather than the parser's,
+/// for the nodes from `before` on. The source file spans every token from
+/// `first` up to `end_` (the `End` token).
 fn token_spans(before: I32, root: I32, first: I32, end_: I32) void {
     for (before ..< node_kind.len()) |id| {
         let a = node_first[id];
@@ -1998,16 +2025,18 @@ fn token_spans(before: I32, root: I32, first: I32, end_: I32) void {
     node_last[root] = end_;
 }
 
-// Put each comment in the smallest node whose first and last tokens surround
-// it, among its children in order (stage 0's attachComments). Comments come
-// in source order, so one walk down the tree places them all. Only the
-// parser's differential asks for them (comment_nodes): nothing compiling a
-// program reads them, so its tree is without them, and walking it skips none.
+/// 1 when the tree should hold comments (see @attach_comments): only the
+/// parser's differential asks for them.
 vec comment_nodes: I32 = [0];
 
 struct Comments:
     | next: I32
 
+/// Put each comment in the smallest node whose first and last tokens surround
+/// it, among its children in order (stage 0's `attachComments`). Comments come
+/// in source order, so one walk down the tree places them all. Only the
+/// parser's differential asks for them (@comment_nodes): nothing compiling a
+/// program reads them, so its tree is without them, and walking it skips none.
 fn attach_comments(root: I32) void {
     let comments = Comments { next: node_first[root] };
     skip_to_comment(comments);
@@ -2018,7 +2047,7 @@ fn skip_to_comment(comments: Comments) void {
     while (comments.next < tok_kind.len() and tok_kind[comments.next] != Tok.Comment.to_i32()) { comments.next += 1; };
 }
 
-// Place the comments before the end of `parent`'s tokens.
+/// Place the comments before the end of `parent`'s tokens.
 fn attach_within(parent: I32, comments: Comments) void {
     let before = -1;
     let c = node_child[parent];
@@ -2047,9 +2076,9 @@ fn attach_within(parent: I32, comments: Comments) void {
     };
 }
 
-// An expression from tokens [first, last), the last an End token: its node,
-// or -1. (A DSL's expansion takes the utu written in its body this way, at
-// its place in the source.)
+/// An expression from tokens `[first, last)`, the last an `End` token: its node,
+/// or -1. (A DSL's expansion takes the utu written in its body this way, at
+/// its place in the source.)
 fn parse_expression(first: I32, last: I32) I32 {
     if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
     intern_words(first, last);

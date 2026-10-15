@@ -1,17 +1,21 @@
-// ── The host ─────────────────────────────────────────────────────────────────
-//
-// What a program needs from its JavaScript host. An `@es` binding
-// (`let f: fun(I32) I32 = @es/\ (x) => x + 1 \/;`) is an imported function,
-// `__es_N` of the module `es`; a binding of another type is an imported
-// function of no arguments that returns its value, called at each read.
-// The bodies go into the module's `utu` custom section as JSON, in the form
-// src/runtime/host-imports.js reads: `{"es":{"es":{"__es_0":"…"}}}`.
+//! = The host
+//!
+//! What a program needs from its JavaScript host. An `@es` binding
+//! (`let f: fun(I32) I32 = @es/\ (x) => x + 1 \/;`) is an imported function,
+//! `__es_N` of the module `es`; a binding of another type is an imported
+//! function of no arguments that returns its value, called at each read.
+//! The bodies go into the module's `utu` custom section as JSON, in the form
+//! `src/runtime/host-imports.js` reads: `{"es":{"es":{"__es_0":"…"}}}`.
 
+/// By declaration: its `@es` binding's imported function, or -1.
 vec decl_es: I32;     // by declaration: its imported function, or -1
-vec es_func: I32;     // the @es imports (and host declarations' operations), in order
-vec es_start: I32;    // the JS of each: a span of src
+/// The @es imports (and host declarations' operations), in order.
+vec es_func: I32;
+/// The JS of each: a span of src.
+vec es_start: I32;
 vec es_end: I32;
-vec es_made_decl: I32;  // each binding's imports, one a type: (declaration, import) pairs
+/// Each binding's imports, one a type: (declaration, import) pairs.
+vec es_made_decl: I32;
 vec es_made_func: I32;
 
 fn reset_host() void {
@@ -24,21 +28,25 @@ fn reset_host() void {
     es_made_func.clear();
 }
 
-// ── @wat ──
-//
-// A function whose whole body is `@wat/\ … \/` is WebAssembly text. The
-// host assembles it (src/wat/assemble.js) once the program is loaded, from
-// the function's parameters and result as written, and gives back its code
-// (locals, instructions, `end`), which is the function's body in the
-// module; or a mistake, at a place in the text, which ends the build as a
-// DSL's does.
+//! = @wat
+//!
+//! A function whose whole body is `@wat/\ … \/` is WebAssembly text. The
+//! host assembles it (src/wat/assemble.js) once the program is loaded, from
+//! the function's parameters and result as written, and gives back its code
+//! (locals, instructions, `end`), which is the function's body in the
+//! module; or a mistake, at a place in the text, which ends the build as a
+//! DSL's does.
 
-vec wat_site: I32;      // by site: the `@wat` expression that is a function's body
-vec wat_start: I32;     // its code in wat_bytes, or -1
+/// By site: the `@wat` expression that is a function's body.
+vec wat_site: I32;
+/// Its code in wat_bytes, or -1.
+vec wat_start: I32;
 vec wat_len: I32;
-vec wat_message: I32;   // a mistake: its message (a span of src, from the host), or -1
+/// A mistake: its message (a span of src, from the host), or -1.
+vec wat_message: I32;
 vec wat_message_end: I32;
-vec wat_from: I32;      // and where it is in the text (UTF-16 offsets)
+/// And where it is in the text (UTF-16 offsets).
+vec wat_from: I32;
 vec wat_to: I32;
 vec wat_found: I32 = [0];
 export mem wat_bytes: U8;
@@ -57,7 +65,7 @@ fn reset_wat() void {
 
 fn is_wat(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Wat); }
 
-// The program's @wat functions' sites. Returns how many.
+/// Finds the program's `@wat` functions' sites (once). Returns how many.
 fn find_wat() I32 {
     if wat_found[0] == 1 { return wat_site.len(); };
     wat_found[0] = 1;
@@ -77,7 +85,7 @@ fn find_wat() I32 {
     wat_site.len();
 }
 
-// The function (or `export main`) whose whole body site `n` is, or -1.
+/// The function (or `export main`) whose whole body site `n` is, or -1.
 fn wat_function_of(n: I32) I32 {
     let block = parent_of(n);
     if block < 0 or not is_kind(block, Node.Block) or first_child(block) != n or next_sibling(n) >= 0 { return -1; };
@@ -85,7 +93,7 @@ fn wat_function_of(n: I32) I32 {
     if f >= 0 and (is_kind(f, Node.Fn_decl) or is_kind(f, Node.Export_main_decl)) and last_child(f) == block { f; } else { -1; };
 }
 
-// The site of the @wat function whose body is `block`, or -1.
+/// The site of the `@wat` function whose body is `block`, or -1.
 fn wat_of(block: I32) I32 {
     let e = first_child(block);
     if e < 0 or not is_wat(e) { return -1; };
@@ -93,8 +101,8 @@ fn wat_of(block: I32) I32 {
     -1;
 }
 
-// Each @wat function the host did not assemble is a mistake: the host's,
-// at its place in the text, or (with no host to assemble it) the site's.
+/// Each `@wat` function the host did not assemble is a mistake: the host's,
+/// at its place in the text, or (with no host to assemble it) the site's.
 fn report_wat() void {
     find_wat();
     for (0 ..< wat_site.len()) |k| {
@@ -115,10 +123,11 @@ fn report_wat() void {
     };
 }
 
-// Whether a node is `@es/\ … \/`.
+/// Whether a node is `@es/\ … \/`.
 fn is_es(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Es); }
 
-// The imported function of an @es binding of type `t`.
+/// The imported function of an `@es` binding of type `t`, imported once
+/// for each type the binding has (a module's instances may give it several).
 fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     let ft = es_signature(t);
     if decl_es[decl] >= 0 and func_type_of[decl_es[decl]] == ft { return decl_es[decl]; };
@@ -142,14 +151,14 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     f;
 }
 
-// A fun type's signature; for another type, () → its value.
+/// A fun type's signature; for another type, `()` → its value.
 fn es_signature(t: I32) I32 {
     if ty_is(t, Ty.Fun) { return fun_heap(t); };
     func_type(vl_empty(), vl_of_result(repr(t)));
 }
 
-// A read of an @es binding of type `t`: the function as a value, or the
-// value its accessor returns.
+/// A read of an `@es` binding of type `t`: the function as a value, or the
+/// value its accessor returns.
 fn es_read(decl: I32, t: I32) I32 {
     let f = decl_es[decl];
     if ty_is(t, Ty.Fun) { w_leaf(Op.RefFunc, vt_ref(func_type_of[f], false), f, 0); }
@@ -157,13 +166,13 @@ fn es_read(decl: I32, t: I32) I32 {
     t;
 }
 
-// ── The custom section ──
+//! = The custom section
 
 fn json_byte(b: I32) void { host_json.push(b); }
 
 fn json_text(text: Str) void { for (0 ..< text.len()) |i| { host_json.push(text.get(i)); }; }
 
-// A JSON string of src[start ..< end_].
+/// A JSON string of `src[start ..< end_]`.
 fn json_string(start: I32, end_: I32) void {
     json_byte(34);
     for (start ..< end_) |i| {
@@ -187,7 +196,8 @@ fn json_string(start: I32, end_: I32) void {
 
 fn hex_digit(d: I32) I32 { if d < 10 { 48 + d; } else { 87 + d; }; }
 
-// The body of `@name/\ body \/`, without its delimiters and outer spaces.
+/// Where the body of `@name/\ body \/` starts, without its delimiters and
+/// outer spaces; @dsl_text_end is where it ends.
 fn dsl_text_start(dsl: I32) I32 {
     let t = node_first[last_child(dsl)];
     let i = tok_start[t] + 2;
@@ -206,7 +216,8 @@ fn dsl_text_end(dsl: I32) I32 {
 
 fn is_space(c: I32) Bool { c == 32 or c == 10 or c == 9 or c == 13; }
 
-// Write the host section for what the module imports (after the sweep).
+/// Writes the host section for what the module imports (after the sweep):
+/// `host_json`, empty when there is nothing to say.
 fn write_host_json() void {
     host_json.clear();
     json_byte(123);
@@ -219,8 +230,8 @@ fn write_host_json() void {
     if host_json.len() == 2 { host_json.clear(); };
 }
 
-// One part of the host section (es, closures, promises), after a comma
-// when another came before it.
+/// One part of the host section (es, closures, promises, mems), after a comma
+/// when another came before it.
 fn json_part(k: I32) void {
     let before = host_json.len();
     if before > 1 { json_byte(44); };

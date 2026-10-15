@@ -1,34 +1,45 @@
-// ── Generators ───────────────────────────────────────────────────────────────
-//
-// `fn squares(n: I32) yield I32 { for (0 ..< n) |i| { yield i * i; }; }` is
-// not a function: `for (squares(10)) |x| { body }` expands the generator's
-// body in place of the loop, with the consumer's body at each `yield`:
-//
-//   (the arguments into the generator's parameters)
-//   block $whole                      ; break in the body, return in the generator
-//     … the generator's code …
-//     block $resume                   ; continue in the body
-//       x = value; body
-//     end
-//     …
-//   end
-//
-// There is no frame, no closure, and no call per value. The generator's
-// declarations are the expansion's locals, set aside and restored when a
-// consumer body expands the same generator again inside it.
+//! = Generators
+//!
+//! `fn squares(n: I32) yield I32 { for (0 ..< n) |i| { yield i * i; }; }` is
+//! not a function: `for (squares(10)) |x| { body }` expands the generator's
+//! body in place of the loop, with the consumer's body at each `yield`:
+//!
+//! ```
+//! (the arguments into the generator's parameters)
+//! block $whole                      ; break in the body, return in the generator
+//!   … the generator's code …
+//!   block $resume                   ; continue in the body
+//!     x = value; body
+//!   end
+//!   …
+//! end
+//! ```
+//!
+//! There is no frame, no closure, and no call per value. The generator's
+//! declarations are the expansion's locals, set aside and restored when a
+//! consumer body expands the same generator again inside it.
 
 // The expansions being checked, innermost last: what each yield needs.
-vec gen_whole: I32;     // the label a `return;` in the generator and a `break` in the body leave
-vec gen_capture: I32;   // the consumer's capture declaration, or -1
-vec gen_body: I32;      // the consumer's block
-vec gen_type: I32;      // the yielded type
-vec gen_cx_inst: I32;   // the consumer's checking context
+/// The label a `return;` in the generator and a `break` in the body leave.
+vec gen_whole: I32;
+/// The consumer's capture declaration, or -1.
+vec gen_capture: I32;
+/// The consumer's block.
+vec gen_body: I32;
+/// The yielded type.
+vec gen_type: I32;
+/// The consumer's checking context.
+vec gen_cx_inst: I32;
 vec gen_cx_fi: I32;
 vec gen_cx_result: I32;
-vec gen_decl: I32;      // the generator's declaration
-vec gen_defers: I32;    // the defers pending when the generation began
-vec gen_rec: I32;       // for a recursive generation, its index in rec_*; else -1
+/// The generator's declaration.
+vec gen_decl: I32;
+/// The defers pending when the generation began.
+vec gen_defers: I32;
+/// For a recursive generation, its index in `rec_*`; else -1.
+vec gen_rec: I32;
 
+/// Empty the expansion and recursion stacks, before a program is checked.
 fn reset_generators() void {
     gen_whole.clear();
     gen_capture.clear();
@@ -50,7 +61,7 @@ fn reset_generators() void {
     prune_loop.clear();
 }
 
-// Whether a function declaration is a generator (its result is `yield T`).
+/// Whether a function declaration is a generator (its result is `yield T`).
 fn is_generator(decl: I32) Bool {
     if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return false; };
     let c = first_child(decl_node[decl]);
@@ -61,7 +72,7 @@ fn is_generator(decl: I32) Bool {
     false;
 }
 
-// The generator a `for` loop consumes: its one source is a call of one.
+/// The generator a `for` loop consumes: its one source is a call of one.
 fn generator_call(for_node: I32) I32 {
     let sources = first_child(for_node);
     let source = first_child(sources);
@@ -71,8 +82,8 @@ fn generator_call(for_node: I32) I32 {
     if is_generator(node_decl[first_child(call)]) { call; } else { -1; };
 }
 
-// The declarations of a generator (its parameters and locals): those
-// whose node is inside it.
+/// The declarations of a generator (its parameters and locals): those
+/// whose node is inside it.
 fn generator_decls(gen: I32) I32 {
     let node = decl_node[gen];
     let m = vl_begin();
@@ -85,9 +96,10 @@ fn generator_decls(gen: I32) I32 {
     vl_end(m);
 }
 
-// Whether generator `gen`'s body has a `for (gen(…))` of its own.
+/// Whether generator `gen`'s body has a `for (gen(…))` of its own.
 fn delegates_to_itself(gen: I32) Bool { calls_generator(last_child(decl_node[gen]), gen); }
 
+/// Whether a `for` under `node` consumes generator `gen`.
 fn calls_generator(node: I32, gen: I32) Bool {
     if is_kind(node, Node.For_expr) {
         let call = generator_call(node);
@@ -101,7 +113,7 @@ fn calls_generator(node: I32, gen: I32) Bool {
     false;
 }
 
-// `for (g(…)) |v| { yield v; }`: the loop yields each value, and nothing else.
+/// `for (g(…)) |v| { yield v; }`: the loop yields each value, and nothing else.
 fn is_delegation(loop_: I32) Bool {
     let capture = next_sibling(first_child(loop_));
     if not is_kind(capture, Node.Capture) or next_sibling(first_child(capture)) >= 0 { return false; };
@@ -112,7 +124,10 @@ fn is_delegation(loop_: I32) Bool {
     is_kind(v, Node.Identifier) and first_child(v) < 0 and word_of(v) == word_of(first_child(capture));
 }
 
-// `for (gen(args)) |x| { body }`.
+/// `for (gen(args)) |x| { body }`: the generator's body in place of the
+/// loop, the consumer's body at each `yield`. A generator that delegates to
+/// itself goes to @check_recursive_loop; one already expanding here is a
+/// call item of its recursion, or reported.
 fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     let gen = node_decl[first_child(call)];
     // A generator that consumes itself would expand without end.
@@ -218,6 +233,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     ty_void();
 }
 
+/// A function declaration's `Param_list` node, or -1.
 fn param_list_of(decl: I32) I32 {
     let c = first_child(decl_node[decl]);
     while (c >= 0) {
@@ -227,7 +243,7 @@ fn param_list_of(decl: I32) I32 {
     -1;
 }
 
-// The innermost expansion whose generator the node is in, or -1.
+/// The innermost expansion whose generator the node is in, or -1.
 fn expansion_of(node: I32) I32 {
     let k = gen_decl.len() - 1;
     let t = node_first[node];
@@ -241,8 +257,8 @@ fn expansion_of(node: I32) I32 {
     -1;
 }
 
-// `yield v`: v into the consumer's capture, then its body, which `continue`
-// leaves (to resume the generator) and `break` ends the whole generation.
+/// `yield v`: v into the consumer's capture, then its body, which `continue`
+/// leaves (to resume the generator) and `break` ends the whole generation.
 fn check_yield(node: I32, cx: Cx) I32 {
     let k = expansion_of(node);
     if k < 0 {
@@ -281,7 +297,7 @@ fn check_yield(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// `return;` inside a generator's expansion ends the generation.
+/// `return;` inside a generator's expansion ends the generation.
 fn generator_return(node: I32) I32 {
     let k = expansion_of(node);
     if k < 0 { return -1; };
@@ -293,40 +309,47 @@ fn generator_return(node: I32) I32 {
     ty_never();
 }
 
-// ── Recursive generators ──
-//
-// A generator that delegates to itself (`for (walk(c)) |d| { yield d; }`)
-// would expand without end, so it runs on an explicit stack instead, as in
-// stage 0. Its body and the consumer's each appear once:
-//
-//   items   one per yield (a value) or delegation (a call's arguments), in
-//           arrays: kind (0 value, 1 call), val, and one per parameter
-//   frames  one per running call: [cur, end) over its items; the suspended
-//           ones in fcur and fend
-//
-//   loop {
-//     the running frame's next item (or, at its end, the suspended one)
-//     a value → the consumer's body; `prune` skips the calls that follow
-//     a call  → the generator's body once, with its arguments; its yields
-//               and delegations push items, which become a new frame
-//   }
-//
-// A call's body runs to completion before its values are consumed; values
-// still arrive in depth-first order.
+//! = Recursive generators
+//!
+//! A generator that delegates to itself (`for (walk(c)) |d| { yield d; }`)
+//! would expand without end, so it runs on an explicit stack instead, as in
+//! stage 0. Its body and the consumer's each appear once:
+//!
+//! ```
+//! items   one per yield (a value) or delegation (a call's arguments), in
+//!           arrays: kind (0 value, 1 call), val, and one per parameter
+//! frames  one per running call: [cur, end) over its items; the suspended
+//!           ones in fcur and fend
+//!
+//! loop {
+//!   the running frame's next item (or, at its end, the suspended one)
+//!   a value → the consumer's body; `prune` skips the calls that follow
+//!   a call  → the generator's body once, with its arguments; its yields
+//!             and delegations push items, which become a new frame
+//! }
+//! ```
+//!
+//! A call's body runs to completion before its values are consumed; values
+//! still arrive in depth-first order.
 
 // The recursive generations being checked: their item arrays' locals.
 vec rec_kind: I32;
 vec rec_val: I32;
 vec rec_top: I32;
-vec rec_args: I32;    // a list of the parameters' array locals
-vec rec_elem: I32;    // the yielded type
-vec rec_params: I32;  // a list of the parameters' types
-vec prune_flag: I32;  // the innermost recursive consumer's `pruned` local
-vec prune_loop: I32;  // and its loop
+/// A list of the parameters' array locals.
+vec rec_args: I32;
+/// The yielded type.
+vec rec_elem: I32;
+/// A list of the parameters' types.
+vec rec_params: I32;
+/// The innermost recursive consumer's `pruned` local.
+vec prune_flag: I32;
+/// And its loop.
+vec prune_loop: I32;
 
 fn rec_array_heap(vt: I32) I32 { array_type(storage(vt), true); }
 
-// A new array of 16 elements of vt's storage, in a new local.
+/// A new array of 16 elements of vt's storage, in a new local.
 fn rec_new_array(vt: I32) I32 {
     let heap = rec_array_heap(vt);
     let local = new_local(vt_ref(heap, false));
@@ -337,7 +360,7 @@ fn rec_new_array(vt: I32) I32 {
     local;
 }
 
-// array[index] = the value just pushed (at m); index is a local.
+/// `array[index]` = the value just pushed (at `m`); `index` is a local.
 fn rec_set(array: I32, index: I32, m: I32) void {
     let v = w_pop();
     lg(array);
@@ -346,7 +369,7 @@ fn rec_set(array: I32, index: I32, m: I32) void {
     w_node(Op.ArraySet, vt_none, vt_heap(cur_locals[array]), 0, m);
 }
 
-// array[index], read as vt (a reference stored nullable is read non-null).
+/// `array[index]`, read as `vt` (a reference stored nullable is read non-null).
 fn rec_get(array: I32, index: I32, vt: I32) void {
     let heap = vt_heap(cur_locals[array]);
     let m = w_mark();
@@ -356,7 +379,7 @@ fn rec_get(array: I32, index: I32, vt: I32) void {
     if storage(vt) != vt { w_node(Op.RefAsNonNull, vt, 0, 0, m); };
 }
 
-// When `top` reaches an array's length, each of `arrays` (locals) doubles.
+/// When `top` reaches an array's length, each of `arrays` (locals) doubles.
 fn rec_grow(top: I32, arrays: Array[I32], n: I32) void {
     let mi = w_mark();
     let mc = w_mark();
@@ -390,7 +413,7 @@ fn rec_grow(top: I32, arrays: Array[I32], n: I32) void {
     w_node(Op.If, vt_none, new_label(), 0, mi);
 }
 
-// The item arrays of recursive generation r.
+/// The item arrays of recursive generation r.
 fn rec_item_arrays(r: I32) Array[I32] {
     let n = vl_len[rec_args[r]];
     let arrays = Array[I32].new(n + 2, 0);
@@ -400,7 +423,7 @@ fn rec_item_arrays(r: I32) Array[I32] {
     arrays;
 }
 
-// kind[top] = kind_; top += 1 (after the item's own sets).
+/// `kind[top] = kind_; top += 1` (after the item's own sets).
 fn rec_finish_item(r: I32, kind_: I32) void {
     let m = w_mark();
     w_i32(kind_);
@@ -408,7 +431,7 @@ fn rec_finish_item(r: I32, kind_: I32) void {
     incr(rec_top[r]);
 }
 
-// `yield v` in a recursive generation: a value item.
+/// `yield v` in a recursive generation: a value item.
 fn rec_push_value(r: I32, value: I32, cx: Cx) I32 {
     let t = rec_elem[r];
     let m = w_mark();
@@ -425,7 +448,7 @@ fn rec_push_value(r: I32, value: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
+/// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
 fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
     let params = rec_params[r];
     let args = next_sibling(first_child(call));
@@ -455,7 +478,7 @@ fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// `for (walk(root)) |x| { body }`, walk recursive.
+/// `for (walk(root)) |x| { body }`, walk recursive.
 fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, inst: I32, cx: Cx) I32 {
     let params = param_list_of(gen);
     let args = next_sibling(first_child(call));
@@ -717,7 +740,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     ty_void();
 }
 
-// `prune;` in the body of a recursive generator's consumer.
+/// `prune;` in the body of a recursive generator's consumer.
 fn check_prune(node: I32) I32 {
     if prune_flag.len() == 0 {
         report(Diag.PruneOutside, node, -1);

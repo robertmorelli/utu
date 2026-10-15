@@ -1,29 +1,38 @@
-// ── Mems ─────────────────────────────────────────────────────────────────────
-//
-// `mem name: U8;` is a resizable array of scalars, its own linear memory:
-// element i is at byte i << shift, so a read is one load with no base
-// pointer. Its capacity is whole 64 KiB pages, grown by doubling (or to what
-// is needed when that is more). A module has at most max_memories memories,
-// so a program at most that many mems.
-//
-// `vec name: U8;` is the same array as a WasmGC array in a global: as many
-// as a program likes, but the host cannot see one (no export, copy_in, or
-// view). Element i is array[i]; its capacity is the array's length, which
-// starts at its initial contents' count and grows to the larger of what is
-// needed and twice what it was. Wasm checks each access against that.
-//
-// Either way its length is a mutable global, and push, reserve, and resize
-// are small functions of their own, made when first used.
+//! = Mems
+//!
+//! `mem name: U8;` is a resizable array of scalars, its own linear memory:
+//! element i is at byte `i << shift`, so a read is one load with no base
+//! pointer. Its capacity is whole 64 KiB pages, grown by doubling (or to what
+//! is needed when that is more). A module has at most `max_memories` memories,
+//! so a program at most that many mems.
+//!
+//! `vec name: U8;` is the same array as a WasmGC array in a global: as many
+//! as a program likes, but the host cannot see one (no export, `copy_in`, or
+//! view). Element i is array[i]; its capacity is the array's length, which
+//! starts at its initial contents' count and grows to the larger of what is
+//! needed and twice what it was. Wasm checks each access against that.
+//!
+//! Either way its length is a mutable global, and push, reserve, and resize
+//! are small functions of their own, made when first used.
 
-vec mem_memory: I32;   // by declaration: its memory, or -1 until used
-vec mem_len: I32;      // by declaration: its length global
-vec mem_helpers: I32;  // by declaration: its reserve function (push and resize follow), or -1
-vec mem_hosted: I32;   // by declaration: 1 when the host makes its memory (it uses copy_in or view), 0 not, -1 unknown
-vec mem_host_ops: I32; // by declaration: its copy_in import (view follows), or -1
-vec mem_array: I32;    // by declaration: the global holding its array (a mem only the module reaches), or -1
-vec mem_planned: I32;  // by declaration: 1 for a memory, 2 for an array; 0 until planned
-vec mem_array_init: I32;  // mems with initial contents in arrays: (declaration, data segment, count) triples
+/// By declaration: its memory, or -1 until used.
+vec mem_memory: I32;
+/// By declaration: its length global.
+vec mem_len: I32;
+/// By declaration: its reserve function (push and resize follow), or -1.
+vec mem_helpers: I32;
+/// By declaration: 1 when the host makes its memory (it uses `copy_in` or view), 0 not, -1 unknown.
+vec mem_hosted: I32;
+/// By declaration: its `copy_in` import (view follows), or -1.
+vec mem_host_ops: I32;
+/// By declaration: the global holding its array (a mem only the module reaches), or -1.
+vec mem_array: I32;
+/// By declaration: 1 for a memory, 2 for an array; 0 until planned.
+vec mem_planned: I32;
+/// Mems with initial contents in arrays: (declaration, data segment, count) triples.
+vec mem_array_init: I32;
 
+/// Each declaration's mem rows, sized to the program and unset.
 fn reset_mems() void {
     mem_method_word.clear();
     mem_memory.resize(decl_kind.len());
@@ -45,9 +54,9 @@ fn reset_mems() void {
     };
 }
 
-// What a mem stores: one of the storage kinds, by its shift (log2 of the
-// element size), whether narrow reads sign-extend, and the type values
-// read as.
+/// What a mem stores: one of the storage kinds, by its shift (log2 of the
+/// element size), whether narrow reads sign-extend, and the type values
+/// read as.
 enum(U8) Storage:
     | U8
     | I8
@@ -60,11 +69,15 @@ enum(U8) Storage:
     | F32
     | F64
 
+/// The storage of mem `decl`, from its element type.
 fn mem_storage(decl: I32) Storage {
     let elem = next_sibling(first_child(decl_node[decl]));
     storage_of_word(word_of(elem), node_decl[elem]);
 }
 
+/// The storage of an element type written `word`, naming `decl`: the narrow
+/// kinds are the words just after the keywords; an int enum is its
+/// representation; a distinct type, what it wraps.
 fn storage_of_word(word: I32, decl: I32) Storage {
     if word == Kw.count() { return Storage.U8; };
     if word == Kw.count() + 1 { return Storage.I8; };
@@ -84,7 +97,7 @@ fn storage_of_word(word: I32, decl: I32) Storage {
     Storage.I32;
 }
 
-// Whether a mem's element type is one a mem holds.
+/// Whether a mem's element type is one a mem holds.
 fn mem_kind_ok(decl: I32) Bool {
     let elem = next_sibling(first_child(decl_node[decl]));
     let word = word_of(elem);
@@ -126,8 +139,8 @@ fn store_opcode(s: Storage) I32 {
     };
 }
 
-// The type a mem's elements read as: I32 for the narrow kinds, else the
-// element type.
+/// The type a mem's elements read as: I32 for the narrow kinds, else the
+/// element type.
 fn mem_value_type(decl: I32) I32 {
     let elem = next_sibling(first_child(decl_node[decl]));
     if builtin_type(word_of(elem)) { return prelude(Prelude.I32); };
@@ -138,8 +151,8 @@ fn mem_is_const(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Co
 
 fn mem_is_exported(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Export.to_i32(); }
 
-// The memory of a mem (-1 for one in an array), made when first needed,
-// with its initial contents.
+/// The memory of a mem (-1 for one in an array), made when first needed,
+/// with its initial contents.
 fn memory_of(decl: I32) I32 {
     if mem_memory[decl] >= 0 or mem_array[decl] >= 0 { return mem_memory[decl]; };
     if mem_planned[decl] == 0 { plan_mems(); };
@@ -167,9 +180,9 @@ fn memory_of(decl: I32) I32 {
     m;
 }
 
-// ── Mems in arrays ──
+//! = Mems in arrays
 
-// The array a mem of storage `s` is: of bytes, halves, words, or doubles.
+/// The array a mem of storage `s` is: of bytes, halves, words, or doubles.
 fn mem_array_heap(s: Storage) I32 {
     let shift = storage_shift(s);
     let elem = if shift == 0 { vt_i8; } else if shift == 1 { vt_i16; } else { storage_vt(s); };
@@ -182,8 +195,8 @@ fn array_get_op(s: Storage) Op {
     Op.ArrayGet;
 }
 
-// The array of a vec: as long as its initial contents, which are copied in
-// when the module starts.
+/// The array of a vec: as long as its initial contents, which are copied in
+/// when the module starts.
 fn mem_array_of(decl: I32) void {
     let s = mem_storage(decl);
     let h = mem_array_heap(s);
@@ -201,11 +214,11 @@ fn mem_array_of(decl: I32) void {
     };
 }
 
-// `op` (an array get or set) on vec `decl`'s array, of the operands built
-// since `m` (the index, and a value to store). The array is read after them,
-// as in stage 0, where the access is a function called with them: a call in
-// one may push to the vec, and so replace its array. With no call it goes in
-// front of them; else they are kept in locals first.
+/// `op` (an array get or set) on vec `decl`'s array, of the operands built
+/// since `m` (the index, and a value to store). The array is read after them,
+/// as in stage 0, where the access is a function called with them: a call in
+/// one may push to the vec, and so replace its array. With no call it goes in
+/// front of them; else they are kept in locals first.
 fn array_access(decl: I32, m: I32, op: Op, vt: I32) void {
     let h = mem_array_heap(mem_storage(decl));
     let calls = false;
@@ -233,7 +246,7 @@ fn array_access(decl: I32, m: I32, op: Op, vt: I32) void {
     w_node(Op.Seq, vt, 0, 0, m);
 }
 
-// Whether IR node `node` calls a function.
+/// Whether IR node `node` calls a function.
 fn w_calls(node: I32) Bool {
     let op = w_op[node];
     if op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() { return true; };
@@ -241,13 +254,13 @@ fn w_calls(node: I32) Bool {
     false;
 }
 
-// The array of mem `decl`, pushed.
+/// The array of mem `decl`, pushed.
 fn w_mem_array(decl: I32) void {
     w_leaf(Op.GlobalGet, vt_ref(mem_array_heap(mem_storage(decl)), false), mem_array[decl], 0);
 }
 
-// After the sweep: a start function copies the initial contents of the
-// arrays in use into them; an unused one's segment is left empty.
+/// After the sweep: a start function copies the initial contents of the
+/// arrays in use into them; an unused one's segment is left empty.
 fn finish_mems() void {
     let k = 0;
     let m = w_mark();
@@ -276,19 +289,21 @@ fn finish_mems() void {
     mark_late(f);
 }
 
-// ── Initial contents ──
-//
-// `mem prec: U8 = [0, 1, 1, 2];` and `const mem dfa: U8 = @comptime/\ build() \/;`
-// fill the mem from a data segment when the module is instantiated, and set
-// its length. Each value must fit the storage kind.
+//! = Initial contents
+//!
+//! `mem prec: U8 = [0, 1, 1, 2];` and `const mem dfa: U8 = @comptime/\ build() \/;`
+//! fill the mem from a data segment when the module is instantiated, and set
+//! its length. Each value must fit the storage kind.
 
-vec comptime_mem: I32;      // the @comptime mems, in order
-vec comptime_start: I32;    // their values, from the host: bytes in comptime_bytes, or -1 until given
+/// The `@comptime` mems, in order.
+vec comptime_mem: I32;
+/// Their values, from the host: bytes in `comptime_bytes`, or -1 until given.
+vec comptime_start: I32;
 vec comptime_count: I32;
 export mem comptime_bytes: U8;
 
-// The values of the mem's initializer as a data segment of memory `m`;
-// returns their number.
+/// The values of the mem's initializer as a data segment of memory `m`;
+/// returns their number.
 fn mem_initial_data(decl: I32, m: I32) I32 {
     let node = decl_node[decl];
     let elem = next_sibling(first_child(node));
@@ -350,12 +365,13 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
     count;
 }
 
+/// A little-endian 32-bit value from @comptime_bytes.
 fn read_u32(at: I32) I32 {
     comptime_bytes[at] | (comptime_bytes[at + 1] << 8) | (comptime_bytes[at + 2] << 16) | (comptime_bytes[at + 3] << 24);
 }
 
-// Append element `i` of mem `decl`'s initializer `at`: `v`, an integer or
-// a float's 64 bits.
+/// Append element `i` of mem `decl`'s initializer `at`: `v`, an integer or
+/// a float's 64 bits.
 fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
     let s = mem_storage(decl);
     let size = 1 << storage_shift(s);
@@ -381,24 +397,27 @@ fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
     for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
 }
 
+/// Where `decl` is in @comptime_mem, or -1.
 fn comptime_index(decl: I32) I32 {
     for (0 ..< comptime_mem.len()) |k| { if comptime_mem[k] == decl { return k; }; };
     -1;
 }
 
-// `@embed/\ file \/` mems: the host reads each file (relative to the
-// entry file) and gives its bytes, or says it could not.
+/// `@embed/\ file \/` mems: the host reads each file (relative to the
+/// entry file) and gives its bytes, or says it could not.
 vec embed_mem: I32;
-vec embed_start: I32;   // bytes in embed_bytes; -1 until given, -2 when unreadable
+/// Bytes in `embed_bytes`; -1 until given, -2 when unreadable.
+vec embed_start: I32;
 vec embed_count: I32;
 export mem embed_bytes: U8;
 
+/// Where `decl` is in @embed_mem, or -1.
 fn embed_index(decl: I32) I32 {
     for (0 ..< embed_mem.len()) |k| { if embed_mem[k] == decl { return k; }; };
     -1;
 }
 
-// The @comptime mems of the program, found once names are resolved.
+/// The `@comptime` mems of the program, found once names are resolved.
 fn find_comptime_mems() void {
     comptime_mem.clear();
     comptime_start.clear();
@@ -431,13 +450,13 @@ fn find_comptime_mems() void {
     };
 }
 
-// A constant node that is not on the stack (a global's initializer).
+/// A constant node that is not on the stack (a global's initializer).
 fn w_i32_detached(value: I32) I32 {
     w_i32(value);
     w_pop();
 }
 
-// The address of element i (on the stack since `m`): i << shift.
+/// The address of element i (on the stack since `m`): `i << shift`.
 fn mem_address(s: Storage, m: I32) void {
     let shift = storage_shift(s);
     if shift > 0 {
@@ -446,7 +465,7 @@ fn mem_address(s: Storage, m: I32) void {
     };
 }
 
-// `name[i]`.
+/// `name[i]`.
 fn check_mem_index(node: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(node)];
     if is_kind(node, Node.Slice_expr) {
@@ -469,7 +488,7 @@ fn check_mem_index(node: I32, cx: Cx) I32 {
     t;
 }
 
-// `name[i] = v`, `name[i] op= v`.
+/// `name[i] = v`, `name[i] op= v`.
 fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(target)];
     if mem_is_const(decl) {
@@ -515,8 +534,8 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// `name.len()`, `name.push(v)`, … The mem is `decl`; the call's arguments
-// are `args`.
+/// `name.len()`, `name.push(v)`, … The mem is `decl`; the call's arguments
+/// are `args`.
 fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
     let word = word_of(name);
     let s = mem_storage(decl);
@@ -584,6 +603,7 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
     unsupported(at);
 }
 
+/// The methods a mem has; each is spoken as its name with a lowercase first letter.
 enum(U8) MemMethod:
     | Len
     | Cap
@@ -599,8 +619,10 @@ enum(U8) MemMethod:
     | Interned_size
     | Intern_reset
 
-vec mem_method_word: I32;   // by MemMethod: its word
+/// By MemMethod: its word.
+vec mem_method_word: I32;
 
+/// The MemMethod a word names, or -1.
 fn mem_method(word: I32) I32 {
     if mem_method_word.len() == 0 {
         for (0 ..< MemMethod.count()) |k| {
@@ -612,7 +634,7 @@ fn mem_method(word: I32) I32 {
     -1;
 }
 
-// reserve(n), push(v), resize(n) of a mem: three functions, consecutive.
+/// `reserve(n)`, `push(v)`, `resize(n)` of a mem: three functions, consecutive.
 fn mem_helper_functions(decl: I32) I32 {
     if mem_helpers[decl] >= 0 { return mem_helpers[decl]; };
     let s = mem_storage(decl);
@@ -737,8 +759,8 @@ fn mem_helper_functions(decl: I32) I32 {
     reserve;
 }
 
-// reserve(n), push(v), resize(n) of a mem in an array, as of one in a
-// memory: the array is replaced by a longer one, with its elements copied.
+/// `reserve(n)`, `push(v)`, `resize(n)` of a mem in an array, as of one in a
+/// memory: the array is replaced by a longer one, with its elements copied.
 fn array_helper_functions(decl: I32) I32 {
     let s = mem_storage(decl);
     let h = mem_array_heap(s);
@@ -850,7 +872,7 @@ fn array_helper_functions(decl: I32) I32 {
     reserve;
 }
 
-// `src.intern(a, b)` and the rest: the mem's generated interner.
+/// `src.intern(a, b)` and the rest: the mem's generated interner.
 fn call_interner(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
     let s = mem_storage(decl);
     if s != Storage.U8 and s != Storage.I8 {
@@ -862,31 +884,32 @@ fn call_interner(decl: I32, method: I32, args: I32, at: I32, m: I32, cx: Cx) I32
     call_with(fn_instance(f, 0), args, 0, m, at, cx);
 }
 
-// ── Mems the host makes ──
-//
-// copy_in and view reach a mem from JS, so its memory is the host's
-// (src/runtime/host-imports.js memoryImports): utu.mem_NAME, with
-// utu.mem_copy_in_NAME(bytes) → new length and utu.mem_view_NAME(a, b) →
-// a typed array over [a, b).
+//! = Mems the host makes
+//!
+//! copy_in and view reach a mem from JS, so its memory is the host's
+//! (src/runtime/host-imports.js memoryImports): utu.mem_NAME, with
+//! utu.mem_copy_in_NAME(bytes) → new length and utu.mem_view_NAME(a, b) →
+//! a typed array over [a, b).
 
+/// Whether the host makes the memory of mem `decl` (planning the mems first if need be).
 fn mem_is_hosted(decl: I32) Bool {
     if mem_hosted[decl] < 0 { plan_mems(); };
     mem_hosted[decl] == 1;
 }
 
-// The most memories a module may have (the JS API's limit): each mem is one.
+/// The most memories a module may have (the JS API's limit): each mem is one.
 let max_memories: I32 = 100;
 
-// Whether a declaration is `vec name: …` (rather than `mem name: …`).
+/// Whether a declaration is `vec name: …` (rather than `mem name: …`).
 fn mem_is_vec(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Vec.to_i32() or tok_word[node_first[decl_node[decl]] + 1] == Kw.Vec.to_i32(); }
 
-// How a mem or vec is spoken of, for a diagnostic about the one named `w`.
+/// How a mem or vec is spoken of, for a diagnostic about the one named `w`.
 fn mem_word(w: I32) Str {
     for (0 ..< decl_kind.len()) |d| { if decl_is(d, Decl.Mem) and decl_name[d] == w and mem_is_vec(d) { return "vec"; }; };
     "mem";
 }
 
-// A program declares at most max_memories mems; the first past that is reported.
+/// A program declares at most `max_memories` mems; the first past that is reported.
 fn count_memories() void {
     let n = 0;
     for (0 ..< decl_kind.len()) |d| {
@@ -897,9 +920,9 @@ fn count_memories() void {
     };
 }
 
-// Which mems are memories (each mem) and which arrays (each vec); and which
-// memories the host makes, in one pass over the program: those used with
-// copy_in or view.
+/// Which mems are memories (each mem) and which arrays (each vec); and which
+/// memories the host makes, in one pass over the program: those used with
+/// `copy_in` or view.
 fn plan_mems() void {
     mem_method(-1);
     let copy_in = mem_method_word[MemMethod.Copy_in.to_i32()];
@@ -926,6 +949,8 @@ fn plan_mems() void {
     };
 }
 
+/// `name.copy_in(bytes)` and `name.view(a, b)`: calls to the host's
+/// `utu.mem_copy_in_NAME` and `utu.mem_view_NAME` imports, made when first used.
 fn check_mem_host_op(decl: I32, method: I32, args: I32, m: I32, cx: Cx) I32 {
     memory_of(decl);
     if mem_host_ops[decl] < 0 {
@@ -952,7 +977,7 @@ fn check_mem_host_op(decl: I32, method: I32, args: I32, m: I32, cx: Cx) I32 {
     mem_view_type(decl);
 }
 
-// The typed array a view of the mem is: JS.Uint8Array, JS.Float64Array, ….
+/// The typed array a view of the mem is: `JS.Uint8Array`, `JS.Float64Array`, ….
 fn mem_view_type(decl: I32) I32 {
     let w = intern_text(view_array_name(mem_storage(decl)));
     for (0 ..< view_doc.len()) |v| {
@@ -962,6 +987,7 @@ fn mem_view_type(decl: I32) I32 {
     foreign_any(0);
 }
 
+/// The build's `"mems"` list: each mem whose memory the host makes, with its storage.
 fn write_mems_json() void {
     let any = false;
     for (0 ..< decl_kind.len()) |d| {

@@ -1,33 +1,44 @@
-// ── Host declarations: ABI documents ─────────────────────────────────────────
-//
-// `using Browser from std:Browser` (or `npm:…`, `node:…`) imports a JSON
-// declaration ABI (docs/typescript-abi.md), which the host writes into src
-// as text: a document, its `types` array, once, and a view of it per import
-// (its prefix, module specifier, exports, names, mutable globals). std:JS
-// and std:Browser are views of one document, so their types are shared.
-//
-// Nothing is parsed into a tree: a JSON value is the offset of its first
-// byte in src, and a reference into a document is such an offset, read
-// where it is needed. Three indexes keep that fast on a document of
-// megabytes (std:Browser's is 7): each document's type offsets; where each
-// object and array ends (found by bisection, not by scanning it); and, for
-// a large object, its keys (hashed, built when it is first looked into).
+//! = Host declarations: ABI documents
+//!
+//! `using Browser from std:Browser` (or `npm:…`, `node:…`) imports a JSON
+//! declaration ABI (`docs/typescript-abi.md`), which the host writes into src
+//! as text: a document, its `types` array, once, and a view of it per import
+//! (its prefix, module specifier, exports, names, mutable globals). `std:JS`
+//! and `std:Browser` are views of one document, so their types are shared.
+//!
+//! Nothing is parsed into a tree: a JSON value is the offset of its first
+//! byte in src, and a reference into a document is such an offset, read
+//! where it is needed. Three indexes keep that fast on a document of
+//! megabytes (`std:Browser`'s is 7): each document's type offsets; where each
+//! object and array ends (hashed by where it starts, from one scan of each
+//! view and of each type when first used); and, for a large object, its keys
+//! (hashed, built when it is first looked into).
 
-vec abi_doc_types: I32;   // by document: its first entry in abi_type_at
-vec abi_doc_count: I32;   // by document: its number of types
-vec abi_type_at: I32;     // each type's JSON object, by document, in order
-vec abi_type_ready: U8;   // by entry of abi_type_at: 1 once its containers are indexed
+/// By document: its first entry in abi_type_at.
+vec abi_doc_types: I32;
+/// By document: its number of types.
+vec abi_doc_count: I32;
+/// Each type's JSON object, by document, in order.
+vec abi_type_at: I32;
+/// By entry of abi_type_at: 1 once its containers are indexed.
+vec abi_type_ready: U8;
 export mem abi_offsets: I32;   // where the host says a document's types are
 
-vec view_doc: I32;        // by view: its document
-vec view_json: I32;       // by view: its JSON object
-vec view_prefix: I32;     // by view: its prefix, a word (`Browser`)
-vec view_import: I32;     // by view: the import it serves, or -1
+/// By view: its document.
+vec view_doc: I32;
+/// By view: its JSON object.
+vec view_json: I32;
+/// By view: its prefix, a word (`Browser`).
+vec view_prefix: I32;
+/// By view: the import it serves, or -1.
+vec view_import: I32;
 
-// The bytes of src that host declarations sealed with abi_seal fill (from
-// 0), kept from program to program; 0 when none are.
+/// The bytes of src that host declarations sealed with `seal` fill (from
+/// 0), kept from program to program; 0 when none are.
 vec abi_kept: I32 = [0];
 
+/// Forget the documents, views, and indexes: a new program, when no host
+/// declarations are sealed.
 fn reset_abi() void {
     jbr_open.clear();
     jbr_close.clear();
@@ -47,7 +58,7 @@ fn reset_abi() void {
     view_import.clear();
 }
 
-// Room for `n` bytes of JSON at the end of src; returns their offset.
+/// Room for `n` bytes of JSON at the end of src; returns their offset.
 fn abi_reserve(n: I32) I32 {
     let at = src.len();
     src.resize(at + n + 1);
@@ -55,8 +66,8 @@ fn abi_reserve(n: I32) I32 {
     at;
 }
 
-// A document whose types the host has placed (abi_offsets): each type's
-// containers are indexed when it is first used.
+/// A document whose types the host has placed (`abi_offsets`): each type's
+/// containers are indexed when it is first used.
 fn abi_add_doc_at(at: I32, n: I32) I32 {
     let doc = abi_doc_types.len();
     abi_doc_types.push(abi_type_at.len());
@@ -68,7 +79,7 @@ fn abi_add_doc_at(at: I32, n: I32) I32 {
     doc;
 }
 
-// A view of document `doc`, its JSON object at `at`, for import i.
+/// A view of document `doc`, its JSON object at `at`, for import i.
 fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
     jbrackets(at);
     let v = view_doc.len();
@@ -80,17 +91,17 @@ fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
     v;
 }
 
-// Whether view v serves an import of this program (a view kept from
-// earlier programs may serve none).
+/// Whether view v serves an import of this program (a view kept from
+/// earlier programs may serve none).
 fn view_live(v: I32) Bool { view_import[v] >= 0; }
 
-// The view an import declares, or -1.
+/// The view an import declares, or -1.
 fn view_of_import(i: I32) I32 {
     for (0 ..< view_import.len()) |v| { if view_import[v] == i { return v; }; };
     -1;
 }
 
-// The JSON object of type n of document doc.
+/// The JSON object of type n of document doc.
 fn abi_type(doc: I32, n: I32) I32 {
     if n < 0 or n >= abi_doc_count[doc] { return -1; };
     let k = abi_doc_types[doc] + n;
@@ -101,9 +112,9 @@ fn abi_type(doc: I32, n: I32) I32 {
     abi_type_at[k];
 }
 
-// ── JSON ──
-//
-// Values are offsets of their first byte. jend gives the offset after one.
+//! = JSON
+//!
+//! Values are offsets of their first byte. jend gives the offset after one.
 
 fn jws(at: I32) I32 {
     let i = at;
@@ -111,6 +122,7 @@ fn jws(at: I32) I32 {
     i;
 }
 
+/// The offset after the JSON value at `at`.
 fn jend(at: I32) I32 {
     let c = src[at];
     if c == 34 { return jstring_end(at); };
@@ -139,6 +151,7 @@ fn jend(at: I32) I32 {
     i;
 }
 
+/// The offset after the string at `at`.
 fn jstring_end(at: I32) I32 {
     let i = at + 1;
     while (src[i] != 34) {
@@ -147,7 +160,7 @@ fn jstring_end(at: I32) I32 {
     i + 1;
 }
 
-// The first item of an array, or the first key of an object (-1 when empty).
+/// The first item of an array, or the first key of an object (-1 when empty).
 fn jfirst(at: I32) I32 {
     if at < 0 or not (src[at] == 123 or src[at] == 91) { return -1; };
     let i = jws(at + 1);
@@ -155,8 +168,8 @@ fn jfirst(at: I32) I32 {
     i;
 }
 
-// The item (or key) after the one at `at`, -1 after the last. For an
-// object, `at` is a key and the next is the next key.
+/// The item (or key) after the one at `at`, -1 after the last. For an
+/// object, `at` is a key and the next is the next key.
 fn jnext(at: I32) I32 {
     let i = jws(jend(at));
     if src[i] == 58 { i = jws(jend(jws(i + 1))); };
@@ -164,10 +177,10 @@ fn jnext(at: I32) I32 {
     -1;
 }
 
-// An object entry's value, given its key.
+/// An object entry's value, given its key.
 fn jvalue(key: I32) I32 { jws(jws(jstring_end(key)) + 1); }
 
-// Whether the string at `at` is the bytes src[start ..< end_] (without escapes).
+/// Whether the string at `at` is the bytes `src[start ..< end_]` (without escapes).
 fn jstring_is(at: I32, start: I32, end_: I32) Bool {
     let n = end_ - start;
     if src[at + 1 + n] != 34 { return false; };
@@ -175,13 +188,14 @@ fn jstring_is(at: I32, start: I32, end_: I32) Bool {
     true;
 }
 
+/// Whether the string at `at` is `text` (without escapes).
 fn jstring_is_text(at: I32, text: Str) Bool {
     if src[at] != 34 or src[at + 1 + text.len()] != 34 { return false; };
     for (0 ..< text.len()) |k| { if src[at + 1 + k] != text.get(k) { return false; }; };
     true;
 }
 
-// The value of key `key` in the object at `at`, or -1.
+/// The value of key `key` in the object at `at`, or -1.
 fn jget(at: I32, key: Str) I32 {
     if at < 0 or src[at] != 123 { return -1; };
     if jkeyed(at) {
@@ -197,7 +211,7 @@ fn jget(at: I32, key: Str) I32 {
     -1;
 }
 
-// The value of the key that is word w's text, or -1.
+/// The value of the key that is word w's text, or -1.
 fn jget_word(at: I32, w: I32) I32 {
     if at < 0 or src[at] != 123 { return -1; };
     let start = src.interned_start(w);
@@ -211,6 +225,7 @@ fn jget_word(at: I32, w: I32) I32 {
     -1;
 }
 
+/// How many items (or keys) the container at `at` has (0 when `at` is -1).
 fn jlen(at: I32) I32 {
     if at < 0 { return 0; };
     let n = 0;
@@ -222,6 +237,7 @@ fn jlen(at: I32) I32 {
     n;
 }
 
+/// Item `index` of the array at `at`, or -1.
 fn jitem(at: I32, index: I32) I32 {
     if at < 0 { return -1; };
     let i = jfirst(at);
@@ -237,6 +253,7 @@ fn jis_object(at: I32) Bool { at >= 0 and src[at] == 123; }
 
 fn jis_true(at: I32) Bool { at >= 0 and src[at] == 116; }
 
+/// The integer at `at`.
 fn jint(at: I32) I32 {
     let i = at;
     let negative = src[i] == 45;
@@ -249,18 +266,21 @@ fn jint(at: I32) I32 {
     if negative { 0 - v; } else { v; };
 }
 
-// A string's text as a word (escapes kept as written; names have none).
+/// A string's text as a word (escapes kept as written; names have none).
 fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1); }
 
-// ── Where containers end ──
-//
-// For each object and array of a view, and of each type used: its start,
-// and the offset after its end, hashed by its start.
+//! = Where containers end
+//!
+//! For each object and array of a view, and of each type used: its start,
+//! and the offset after its end, hashed by its start.
 vec jbr_open: I32;
 vec jbr_close: I32;
-vec jbr_table: I32;   // open addressing: entry, or -1
+/// Open addressing: entry, or -1.
+vec jbr_table: I32;
 vec jbr_stack: I32;
 
+/// Index where each object and array inside the container at `at` ends, in
+/// one scan.
 fn jbrackets(at: I32) void {
     if not (src[at] == 123 or src[at] == 91) { return; };
     jbr_stack.clear();
@@ -303,7 +323,7 @@ fn jbr_grow() void {
     };
 }
 
-// The end of the container at `at`, or -1 when it is not indexed.
+/// The end of the container at `at`, or -1 when it is not indexed.
 fn jbr_end(at: I32) I32 {
     if jbr_table.len() == 0 { return -1; };
     let mask = jbr_table.len() - 1;
@@ -316,19 +336,24 @@ fn jbr_end(at: I32) I32 {
     -1;
 }
 
-// ── Keys of large objects ──
-//
-// An object of more than jk_large bytes (a view's exports and names) has
-// its keys hashed the first time one is looked up: (object, key) → value.
+//! = Keys of large objects
+//!
+//! An object of more than jk_large bytes (a view's exports and names) has
+//! its keys hashed the first time one is looked up: (object, key) → value.
 let jk_large: I32 = 4096;
 
-vec jk_table: I32;     // open addressing: entry, or -1
-vec jk_obj: I32;       // by entry: the object
-vec jk_key: I32;       // by entry: its key (a JSON string)
-vec jk_val: I32;       // by entry: the value
-vec jk_indexed: I32;   // the objects indexed
+/// Open addressing: entry, or -1.
+vec jk_table: I32;
+/// By entry: the object.
+vec jk_obj: I32;
+/// By entry: its key (a JSON string).
+vec jk_key: I32;
+/// By entry: the value.
+vec jk_val: I32;
+/// The objects indexed.
+vec jk_indexed: I32;
 
-// (An array of strings is indexed the same way, each string its own key and value.)
+/// (An array of strings is indexed the same way, each string its own key and value.)
 fn jkeyed(at: I32) Bool {
     for (0 ..< jk_indexed.len()) |i| { if jk_indexed[i] == at { return true; }; };
     if jbr_end(at) < 0 or jend(at) - at <= jk_large { return false; };
@@ -349,7 +374,7 @@ fn jkeyed(at: I32) Bool {
     true;
 }
 
-// Whether array `at` holds the string src[start ..< end_].
+/// Whether array `at` holds the string `src[start ..< end_]`.
 fn jarray_has(at: I32, start: I32, end_: I32) Bool {
     if at < 0 or src[at] != 91 { return false; };
     if jkeyed(at) { return jk_find(at, start, end_) >= 0; };
@@ -379,7 +404,7 @@ fn jk_grow() void {
     };
 }
 
-// The value of key src[start ..< end_] in indexed object `obj`, or -1.
+/// The value of key `src[start ..< end_]` in indexed object `obj`, or -1.
 fn jk_find(obj: I32, start: I32, end_: I32) I32 {
     let mask = jk_table.len() - 1;
     let h = jk_hash(obj, start, end_) & mask;

@@ -1,14 +1,14 @@
-// ── @stored, @utu, @css ──────────────────────────────────────────────────────
-//
-// `@stored/\ Type "key" [manual] [validate fn] default \/`: typed local
-// storage, as stage 0 writes it (src/compiler/stored.js). Incoming JSON is
-// validated in the host before it is converted, so bad data never
-// half-updates state; a valid value is copied field by field into the
-// state, which keeps references views hold current.
-//
-// `@utu/\ expr \/` is the expression; `@css/\ … \/` is the text, as a Str.
+//! = `@stored`, `@utu`, `@css`
+//!
+//! `@stored/\ Type "key" [manual] [validate fn] default \/`: typed local
+//! storage, as stage 0 writes it (`src/compiler/stored.js`). Incoming JSON is
+//! validated in the host before it is converted, so bad data never
+//! half-updates state; a valid value is copied field by field into the
+//! state, which keeps references views hold current.
+//!
+//! `@utu/\ expr \/` is the expression; `@css/\ … \/` is the text, as a `Str`.
 
-// `@utu/\ e \/`: e.
+/// `@utu/\ e \/`: `e`.
 fn expand_utu(site: I32) void {
     let body = dsl_body(site);
     if not splice_parses(site, 0, body) {
@@ -17,8 +17,8 @@ fn expand_utu(site: I32) void {
     graft_expression(site, dsl_splice(site, 0, body));
 }
 
-// `@css/\ … \/`: the stylesheet's text (no `/` in the literal, so `*/`
-// before a line break cannot spell the DSL's end).
+/// `@css/\ … \/`: the stylesheet's text (no `/` in the literal, so `*/`
+/// before a line break cannot spell the DSL's end).
 fn expand_css(site: I32) void {
     let literal = js_string(dsl_body(site));
     let safe = "";
@@ -29,7 +29,7 @@ fn expand_css(site: I32) void {
     graft_expression(site, "{let value:fun() Str=@es/\\ ()=>" + safe + " \\/;value();}");
 }
 
-// ── @stored ──
+//! = @stored
 
 vec st_serial: I32 = [0];
 vec st_seq: I32 = [0];
@@ -38,6 +38,8 @@ vec st_type_len: I32 = [0];
 
 fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]); }
 
+/// `@stored/\ … \/`: the state, loaded and registered with the host's store.
+/// Each site's names start with its own prefix.
 fn expand_stored(site: I32) void {
     let prefix = "__stored" + int_text(st_serial[0]) + "_";
     st_serial[0] += 1;
@@ -47,7 +49,7 @@ fn expand_stored(site: I32) void {
 
 fn is_stored_scalar(type: Str) Bool { type == "Str" or type == "Bool" or type == "I32" or type == "F64"; }
 
-// Check that a type can be stored (scalars, arrays, acyclic local structs).
+/// Checks that a type can be stored (scalars, arrays, acyclic local structs).
 fn stored_shape(written: Str, visiting: I32, file: I32) void {
     let type = trim_text(written);
     if type.len() == 0 { stored_fail("Unsupported type in stored schema"); };
@@ -68,7 +70,7 @@ fn stored_shape(written: Str, visiting: I32, file: I32) void {
     };
 }
 
-// The file's struct of that name (the last, in order), or -1.
+/// The file's struct of that name (the last, in order), or -1.
 fn stored_struct(type: Str, file: I32) I32 {
     let w = intern_text(type);
     let found = find_declared(file_root[file], w);
@@ -87,7 +89,7 @@ fn stored_fresh(prefix: Str) Str {
     name;
 }
 
-// A JS predicate that `v` matches the type.
+/// A JS predicate that `v` matches the type.
 fn stored_validate(type: Str, v: Str, file: I32) Str {
     let t = trim_text(type);
     if text_at(t, 0, "Array[") { return "Array.isArray(" + v + ")&&" + v + ".length<=100000&&" + v + ".every(v=>" + stored_validate(t.slice(6, t.len() - 1), "v", file) + ")"; };
@@ -110,7 +112,7 @@ fn stored_validate(type: Str, v: Str, file: I32) Str {
     v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")&&" + fields;
 }
 
-// Utu converting validated JS data `v` into a native value.
+/// Utu converting validated JS data `v` into a native value.
 fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
     let t = trim_text(type);
     if text_at(t, 0, "Array[") {
@@ -140,7 +142,7 @@ fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
     t + " { " + fields + " }";
 }
 
-// Utu converting native value `v` into plain JS data.
+/// Utu converting native value `v` into plain JS data.
 fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
     let t = trim_text(type);
     if text_at(t, 0, "Array[") {
@@ -164,6 +166,9 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
     "&{ " + fields + " }";
 }
 
+/// The expansion of a `@stored` site: its body parsed as
+/// `Type "key" [manual] [validate fn] default`, its type checked, and the
+/// utu that holds the state.
 fn stored_code(site: I32, prefix: Str) Str {
     let raw = dsl_body(site);
     let file = file_of_token(node_first[site]);

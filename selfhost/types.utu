@@ -1,15 +1,17 @@
-// ── Types ────────────────────────────────────────────────────────────────────
-//
-// Every type is an interned id, so types compare as ints. A named type is a
-// declaration in a module instance: `I32` is module I32's promoted type
-// (its `type & = …`) in no instance, `Array[I32]` is Array's promoted type
-// in the instance Array[I32], `Node` a struct. Instances are interned too:
-// a module and the list of its type arguments. Instance 0 is none (what
-// is outside every generic module).
-//
-// Lists (of types, of value types) share one interner (`vl_*`, in
-// wasm.utu): a list is an id, and equal lists are equal ids.
+//! = Types
+//!
+//! Every type is an interned id, so types compare as ints. A named type is a
+//! declaration in a module instance: `I32` is module I32's promoted type
+//! (its `type & = …`) in no instance, `Array[I32]` is Array's promoted type
+//! in the instance `Array[I32]`, `Node` a struct. Instances are interned too:
+//! a module and the list of its type arguments. Instance 0 is none (what
+//! is outside every generic module).
+//!
+//! Lists (of types, of value types) share one interner (`vl_*`, in
+//! wasm.utu): a list is an id, and equal lists are equal ids.
 
+/// What kind of type a type id is. Its operands, @ty_a and @ty_b, are as each
+/// variant says.
 enum(U8) Ty:
     | Error     // after a diagnostic: matches everything, so one mistake reports once
     | Void
@@ -22,17 +24,22 @@ enum(U8) Ty:
     | Closure   // a: list of parameter types, b: result type
     | Foreign   // a host value (foreign.utu); a: its canonical spelling, a word
 
+/// By type: its @Ty, then its operands in @ty_a and @ty_b. One id per triple.
 vec ty_kind: U8;
 vec ty_a: I32;
 vec ty_b: I32;
-vec ty_table: I32;   // open addressing over types, -1 empty
+/// Open addressing over types, -1 empty.
+vec ty_table: I32;
 
 vec inst_module: I32;
-vec inst_args: I32;  // a list of types
+/// A list of types.
+vec inst_args: I32;
 vec inst_table: I32;
 
 fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 40503; }
 
+/// The type of this kind and these operands, interned: the same arguments
+/// give the same id.
 fn ty(kind: Ty, a: I32, b: I32) I32 {
     if (ty_kind.len() + 1) * 2 > ty_table.len() { ty_grow(); };
     let mask = ty_table.len() - 1;
@@ -67,6 +74,7 @@ fn ty_is(t: I32, kind: Ty) Bool { ty_kind[t] == kind.to_i32(); }
 
 fn named(decl: I32, inst: I32) I32 { ty(Ty.Named, decl, inst); }
 
+/// `?t`. A type already nullable, or the error type, is its own.
 fn nullable(t: I32) I32 { if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { t; } else { ty(Ty.Nullable, t, 0); }; }
 
 fn ty_error() I32 { ty(Ty.Error, 0, 0); }
@@ -77,15 +85,18 @@ fn ty_never() I32 { ty(Ty.Never, 0, 0); }
 
 fn ty_null() I32 { ty(Ty.Null, 0, 0); }
 
-// The declaration of a named type, or -1.
+/// The declaration of a named type, or -1.
 fn ty_decl(t: I32) I32 { if ty_is(t, Ty.Named) { ty_a[t]; } else { -1; }; }
 
+/// The instance of a named type; 0 for any other type.
 fn ty_inst(t: I32) I32 { if ty_is(t, Ty.Named) { ty_b[t]; } else { 0; }; }
 
-// ── Instances ──
+//! = Instances
 
 fn inst_hash(module: I32, args: I32) I32 { (module * -1640531535) ^ (args * 40503); }
 
+/// The instance of `module` with type arguments `args` (a list of types),
+/// interned.
 fn instance(module: I32, args: I32) I32 {
     if (inst_module.len() + 1) * 2 > inst_table.len() { inst_grow(); };
     let mask = inst_table.len() - 1;
@@ -114,16 +125,17 @@ fn inst_grow() void {
     };
 }
 
+/// Type argument i of an instance.
 fn inst_arg(inst: I32, i: I32) I32 { vl_item(inst_args[inst], i); }
 
-// The module a declaration belongs to (itself for a module), or -1.
+/// The module a declaration belongs to (itself for a module), or -1.
 fn module_of(decl: I32) I32 {
     let d = decl;
     while (d >= 0 and not decl_is(d, Decl.Module)) { d = decl_owner[d]; };
     d;
 }
 
-// How many type parameters a module has.
+/// How many type parameters a module has.
 fn module_arity(module: I32) I32 {
     let list = next_sibling(first_child(decl_node[module]));
     if not is_kind(list, Node.Module_type_param_list) { return 0; };
@@ -136,26 +148,30 @@ fn module_arity(module: I32) I32 {
     n;
 }
 
+/// Whether a module has type parameters.
 fn is_generic(module: I32) Bool {
     module >= 0 and is_kind(next_sibling(first_child(decl_node[module])), Node.Module_type_param_list);
 }
 
-// The instance a declaration of `module` is seen in from code in instance
-// `inst`: that instance when the code is in the same module, none when
-// the module is not generic, else an instance opened by `using M[A];`.
+/// The instance a declaration of `module` is seen in from code in instance
+/// `inst`: that instance when the code is in the same module, none when
+/// the module is not generic, else an instance opened by `using M[A];`.
 fn instance_for(module: I32, inst: I32) I32 {
     if not is_generic(module) { return 0; };
     if inst > 0 and inst_module[inst] == module { return inst; };
     open_instance(module);
 }
 
-// ── Prelude types ──
-//
-// The scalar types and Bool, Str, …, found by name in the program scope
-// when checking starts.
+//! = Prelude types
+//!
+//! The scalar types and Bool, Str, …, found by name in the program scope
+//! when checking starts.
 
-vec prelude_ty: I32;   // by Prelude
+/// By Prelude.
+vec prelude_ty: I32;
 
+/// The types every program has, found by name in the program scope when
+/// checking starts (@find_prelude_types).
 enum(U8) Prelude:
     | I32
     | U32
@@ -172,6 +188,7 @@ enum(U8) Prelude:
     | Externref
     | I31
 
+/// The type of a prelude name: `prelude(Prelude.Str)` is `Str`.
 fn prelude(p: Prelude) I32 { prelude_ty[p.to_i32()]; }
 
 fn find_prelude_types() void {
@@ -183,6 +200,7 @@ fn find_prelude_types() void {
     };
 }
 
+/// Whether arithmetic takes the type: the integers, the floats, `M32`, `M64`.
 fn is_numeric(t: I32) Bool {
     t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
         or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.M32) or t == prelude(Prelude.M64);
@@ -190,9 +208,9 @@ fn is_numeric(t: I32) Bool {
 
 fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64); }
 
-// ── Types from syntax ──
+//! = Types from syntax
 
-// The type a type node names, in instance `inst`.
+/// The type a type node names, in instance `inst`.
 fn type_of(node: I32, inst: I32) I32 {
     if node < 0 { return ty_error(); };
     let kind = node_kind[node];
@@ -235,7 +253,7 @@ fn type_of(node: I32, inst: I32) I32 {
     ty_error();
 }
 
-// The type a name or path names: `T`, `&`, `M[A]`, `M.T`, `M[A].T`.
+/// The type a name or path names: `T`, `&`, `M[A]`, `M.T`, `M[A].T`.
 fn type_path(node: I32, inst: I32) I32 {
     let kind = node_kind[node];
     if kind == Node.Instantiated_module_ref.to_i32() {
@@ -281,7 +299,7 @@ fn type_path(node: I32, inst: I32) I32 {
     decl_type(node_decl[n], inst);
 }
 
-// The types of a module's type arguments, as a list.
+/// The types of a module's type arguments, as a list.
 fn type_args(list: I32, inst: I32) I32 {
     let m = vl_begin();
     let c = first_child(list);
@@ -292,7 +310,7 @@ fn type_args(list: I32, inst: I32) I32 {
     vl_end(m);
 }
 
-// The type a type declaration names, seen from instance `inst`.
+/// The type a type declaration names, seen from instance `inst`.
 fn decl_type(decl: I32, inst: I32) I32 {
     if decl < 0 { return ty_error(); };
     if decl_is(decl, Decl.ModuleParam) {
@@ -308,7 +326,7 @@ fn decl_type(decl: I32, inst: I32) I32 {
     named(decl, if module >= 0 { instance_for(module, inst); } else { 0; });
 }
 
-// What `using M[A] |Alias|` names: M's promoted type in M[A].
+/// What `using M[A] |Alias|` names: `M`'s promoted type in `M[A]`.
 fn alias_type(alias: I32) I32 {
     let module = decl_a[alias];
     if not decl_is(module, Decl.Module) or decl_a[module] < 0 { return ty_error(); };
@@ -323,7 +341,7 @@ fn alias_instance(alias: I32) I32 {
     instance(module, type_args(args, 0));
 }
 
-// The instance `using M[A];` opened, or 0.
+/// The instance `using M[A];` opened, or 0.
 fn open_instance(module: I32) I32 {
     for (0 ..< file_root.len()) |file| {
         if file_root[file] >= 0 {
@@ -344,21 +362,24 @@ fn open_instance(module: I32) I32 {
     0;
 }
 
-// ── Representation ──
-//
-// What a type is in wasm. Every reference is nullable, so locals and
-// fields of any type have a default.
+//! = Representation
+//!
+//! What a type is in wasm. Every reference is nullable, so locals and
+//! fields of any type have a default.
 
 // Each declaration's instances' heap types: a chain of entries per declaration.
 vec struct_inst: I32;
 vec struct_heap: I32;
-vec struct_next: I32;      // the next entry for the same declaration, or -1
-vec struct_first: I32;     // by declaration: its first entry, or -1
+/// The next entry for the same declaration, or -1.
+vec struct_next: I32;
+/// By declaration: its first entry, or -1.
+vec struct_first: I32;
 
-// By type: its representation once known, else -2 (types are interned, so
-// it is asked of the same ids again and again).
+/// By type: its representation once known, else -2 (types are interned, so
+/// it is asked of the same ids again and again).
 vec repr_memo: I32;
 
+/// The wasm value type a type is represented by (a `vt_*` id), memoized.
 fn repr(t: I32) I32 {
     if t < repr_memo.len() and repr_memo[t] != -2 { return repr_memo[t]; };
     let r = repr_of(t);
@@ -371,6 +392,9 @@ fn repr(t: I32) I32 {
     r;
 }
 
+/// What @repr computes: a nullable reference for a struct, enum, or `fun`; an
+/// externref for a closure or host value; a type declaration's `@ir` type;
+/// `i32` for an integer enum and the rest.
 fn repr_of(t: I32) I32 {
     let kind = ty_kind[t];
     if kind == Ty.Void.to_i32() { return vt_none; };
@@ -395,7 +419,7 @@ fn repr_of(t: I32) I32 {
     vt_i32;
 }
 
-// The heap type of a `fun` type: its signature.
+/// The heap type of a `fun` type: its signature.
 fn fun_heap(t: I32) I32 {
     let params = ty_a[t];
     let m = vl_begin();
@@ -404,7 +428,7 @@ fn fun_heap(t: I32) I32 {
     func_type(ps, vl_of_result(repr(ty_b[t])));
 }
 
-// `type & = @ir/\ <ir-wasm-… type-repr="…"/> \/`: what the attribute says.
+/// `type & = @ir/\ <ir-wasm-… type-repr="…"/> \/`: what the attribute says.
 fn type_decl_repr(decl: I32, inst: I32) I32 {
     let x = ir_tree(last_child(last_child(decl_node[decl])));
     let r = x_attr(x, attr_type_repr());
@@ -421,10 +445,10 @@ fn type_decl_repr(decl: I32, inst: I32) I32 {
     vt_i32;
 }
 
-// A field or element's storage: refs as nullable, everything else as is.
+/// A field or element's storage: refs as nullable, everything else as is.
 fn storage(vt: I32) I32 { vt_nullable(vt); }
 
-// The struct type of a struct declaration in an instance.
+/// The struct type of a struct declaration in an instance.
 fn struct_heap_of(decl: I32, inst: I32) I32 {
     if struct_first.len() < decl_kind.len() {
         let old = struct_first.len();

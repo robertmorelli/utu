@@ -1,33 +1,34 @@
-// ── Enums ────────────────────────────────────────────────────────────────────
-//
-// Integer enums (`enum(U8) Tag: | Leaf | Eof = 255`) and distinct types
-// (`type Id = distinct I32;`) are scalars: a value is its integer (or its
-// base's value). Their operations are the language's own: comparisons,
-// `t.to_i32()` and `Tag.from_i32(i)` (or `to_<base>`, `from_<base>`), and for
-// an integer enum `Tag.count()`, `Tag.name(t)`, and `Tag.Leaf`.
-//
-// An enum with data (`enum Shape: | Circle { r: F64 } | Square { s: F64 }`)
-// is a struct type its variants extend: each variant is a struct of its
-// fields, and `alt` tests which one a value is.
+//! = Enums
+//!
+//! Integer enums (`enum(U8) Tag: | Leaf | Eof = 255`) and distinct types
+//! (`type Id = distinct I32;`) are scalars: a value is its integer (or its
+//! base's value). Their operations are the language's own: comparisons,
+//! `t.to_i32()` and `Tag.from_i32(i)` (or `to_<base>`, `from_<base>`), and for
+//! an integer enum `Tag.count()`, `Tag.name(t)`, and `Tag.Leaf`.
+//!
+//! An enum with data (`enum Shape: | Circle { r: F64 } | Square { s: F64 }`)
+//! is a struct type its variants extend: each variant is a struct of its
+//! fields, and `alt` tests which one a value is.
 
-// ── Scalar enums and distinct types ──
+//! = Scalar enums and distinct types
 
+/// Whether a declaration is an integer enum or a distinct type: a scalar.
 fn is_scalar_kind(decl: I32) Bool { decl_is(decl, Decl.IntEnum) or decl_is(decl, Decl.Distinct); }
 
-// The base of a distinct type (I32, F64, …).
+/// The base of a distinct type (I32, F64, …).
 fn distinct_base(decl: I32) I32 { decl_type(node_decl[last_child(decl_node[decl])], 0); }
 
-// The type a scalar kind converts to and from: I32 for an integer enum.
+/// The type a scalar kind converts to and from: I32 for an integer enum.
 fn scalar_base(decl: I32) I32 { if decl_is(decl, Decl.IntEnum) { prelude(Prelude.I32); } else { distinct_base(decl); }; }
 
-// Whether its comparisons are unsigned (U32 and U64 bases, U32 enums).
+/// Whether its comparisons are unsigned (U32 and U64 bases, U32 enums).
 fn scalar_unsigned(decl: I32) Bool {
     let base = if decl_is(decl, Decl.IntEnum) { -1; } else { distinct_base(decl); };
     if base == prelude(Prelude.U32) or base == prelude(Prelude.U64) { return true; };
     decl_is(decl, Decl.IntEnum) and word_of(after_qualifier(decl_node[decl])) == known_word(Known.WordU32);
 }
 
-// A comparison of two values of a scalar kind (on the stack since `m`).
+/// A comparison of two values of a scalar kind (on the stack since `m`).
 fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
     let base = repr(scalar_base(decl));
     let unsigned = scalar_unsigned(decl);
@@ -54,15 +55,15 @@ fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
     true;
 }
 
-// `x.to_i32()` of a scalar kind (x on the stack since `m`): the same value,
-// now of its base type. Returns -1 when `word` is no such method.
+/// `x.to_i32()` of a scalar kind: the base type its value already is (the
+/// method emits nothing), or -1 when `word` is no such method.
 fn scalar_method(decl: I32, word: I32) I32 {
     let base = scalar_base(decl);
     if word != conversion_word(true, base) { return -1; };
     base;
 }
 
-// `to_i32` (or `from_i32`) for a base type.
+/// `to_i32` (or `from_i32`) for a base type.
 fn conversion_word(to: Bool, base: I32) I32 {
     let name = Prelude.name(Prelude.from_i32(prelude_index(base)));
     intern_text(if to { "to_"; } else { "from_"; } + Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()));
@@ -73,8 +74,8 @@ fn prelude_index(t: I32) I32 {
     0;
 }
 
-// `Tag.from_i32(i)`, `Tag.count()`, `Tag.name(t)`: static operations of a
-// scalar kind. -1 when `word` is none of them.
+/// `Tag.from_i32(i)`, `Tag.count()`, `Tag.name(t)`: static operations of a
+/// scalar kind. -1 when `word` is none of them.
 fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
     let t = named(decl, 0);
     let base = scalar_base(decl);
@@ -105,6 +106,7 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
     -1;
 }
 
+/// How many variants an enum declares.
 fn variant_count(decl: I32) I32 {
     let n = 0;
     let c = first_child(decl_node[decl]);
@@ -115,15 +117,16 @@ fn variant_count(decl: I32) I32 {
     n;
 }
 
-// `Tag.Leaf`: its value.
+/// `Tag.Leaf`: its value.
 fn enum_variant_value(variant: I32) I32 {
     w_i32(variant_value[variant]);
     named(decl_owner[variant], 0);
 }
 
-vec name_helper_enum: I32;   // pairs: enum declaration, function
+/// Pairs: enum declaration, function.
+vec name_helper_enum: I32;
 
-// (value) → its variant's name, or "?": one comparison per variant.
+/// (value) → its variant's name, or "?": one comparison per variant.
 fn enum_name_helper(decl: I32) I32 {
     let i = 0;
     while (i < name_helper_enum.len()) {
@@ -168,8 +171,8 @@ fn enum_name_helper(decl: I32) I32 {
 // "?"`. A few bytes a variant, and no comparisons.
 vec name_table_lo: I32 = [0];
 
-// The number of values from the lowest variant's to the highest's, when the
-// names are a table (their lowest in name_table_lo); 0 when not.
+/// The number of values from the lowest variant's to the highest's, when the
+/// names are a table (their lowest in `name_table_lo`); 0 when not.
 fn name_table_span(decl: I32) I32 {
     let n = 0;
     let lo = 0;
@@ -189,7 +192,7 @@ fn name_table_span(decl: I32) I32 {
     if n < 4 or span > n * 2 or span <= 0 { 0; } else { span; };
 }
 
-// Function f's body: the table's look-up, with its one local.
+/// Function f's body: the table's look-up, with its one local.
 fn enum_name_table(decl: I32, f: I32) void {
     let span = name_table_span(decl);
     let lo = name_table_lo[0];
@@ -230,21 +233,23 @@ fn enum_name_table(decl: I32, f: I32) void {
     func_body[f] = w_pop();
 }
 
-// A string constant whose text is word `word`.
+/// A string constant whose text is word `word`.
 fn text_constant(word: I32) void { w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0); }
 
-// ── Enums with data ──
+//! = Enums with data
 
-// Whether `actual` is a variant of the enum type `expected` (it converts to it).
+/// Whether `actual` is a variant of the enum type `expected` (it converts to it).
 fn is_variant_of(actual: I32, expected: I32) Bool {
     let v = ty_decl(actual);
     let e = ty_decl(expected);
     decl_is(v, Decl.Variant) and decl_owner[v] == e and ty_inst(actual) == ty_inst(expected);
 }
 
-// `alt e { V |x| => …, ~> … }`: e once, then each arm tests its variant.
-//   s = e
-//   if ref.test $V s { x = ref.cast $V s; arm } else if … else { default }
+/// `alt e { V |x| => …, ~> … }`: e once, then each arm tests its variant.
+/// ```
+/// s = e
+/// if ref.test $V s { x = ref.cast $V s; arm } else if … else { default }
+/// ```
 fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     let scrutinee = first_child(node);
     let m = w_mark();
@@ -274,7 +279,7 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// The arms from `arm` on, as a chain of ifs; returns the result type.
+/// The arms from `arm` on, as a chain of ifs; returns the result type.
 fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     let a = arm;
     while (a >= 0 and not is_kind(a, Node.Alt_arm)) { a = next_sibling(a); };
@@ -323,13 +328,15 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     t;
 }
 
-// The variant an alt arm names (`Circle`, or `Shape.Circle`).
+/// The variant an alt arm names (`Circle`, or `Shape.Circle`).
 fn alt_variant(pattern: I32, enum_decl: I32) I32 {
     let word = if is_kind(pattern, Node.Qualified_type_ref) { word_of(name_node(last_child(pattern))); } else { word_of(pattern); };
     let v = member(enum_decl, word, Space.Member);
     if decl_is(v, Decl.Variant) { v; } else { -1; };
 }
 
+/// An `alt` without a default arm names every variant: the first missing one
+/// is reported.
 fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
     let c = first_child(decl_node[enum_decl]);
     while (c >= 0) {

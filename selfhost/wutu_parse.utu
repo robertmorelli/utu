@@ -1,49 +1,75 @@
-// ── Wutu: the template parser ────────────────────────────────────────────────
-//
-// Stage 0's wutu-parse.js, statement by statement, into flat tables: the
-// template's nodes (text, expression, if, for, element) and each element's
-// items (classes, attributes, events, two-way bindings, CSS, style values).
-// Ranges are offsets in the template's text (the body, inside `/\ … \/`).
+//! = Wutu: the template parser
+//!
+//! Stage 0's `wutu-parse.js`, statement by statement, into flat tables: the
+//! template's nodes (text, expression, if, for, element) and each element's
+//! items (classes, attributes, events, two-way bindings, CSS, style values).
+//! Ranges are offsets in the template's text (the body, inside `/\ … \/`).
 
-vec tn_kind: I32;       // 0 text, 1 expression, 2 if, 3 for, 4 element
+/// 0 text, 1 expression, 2 if, 3 for, 4 element.
+vec tn_kind: I32;
 vec tn_start: I32;
 vec tn_parent: I32;
-vec tn_first: I32;      // first child, or -1
-vec tn_next: I32;       // next sibling, or -1
-vec tn_else: I32;       // if: first node of its otherwise branch, or -1
-vec tn_text: I32;       // text: the quoted literal; expression: its source; if: its condition; for: its iterable; element: its tag (words)
-vec tn_from: I32;       // its range, or -1
+/// First child, or -1.
+vec tn_first: I32;
+/// Next sibling, or -1.
+vec tn_next: I32;
+/// If: first node of its otherwise branch, or -1.
+vec tn_else: I32;
+/// Text: the quoted literal; expression: its source; if: its condition; for: its iterable; element: its tag (words)
+vec tn_text: I32;
+/// Its range, or -1.
+vec tn_from: I32;
 vec tn_to: I32;
-vec tn_captures: I32;   // for: its captures (a word)
-vec tn_key: I32;        // for: its key's source (a word), or -1
+/// For: its captures (a word)
+vec tn_captures: I32;
+/// For: its key's source (a word), or -1.
+vec tn_key: I32;
 vec tn_key_from: I32;
 vec tn_key_to: I32;
-vec tn_global: I32;     // for: whether its key is global
-vec tn_binding: I32;    // element: its `as` alias (a word), or -1
-vec tn_index: I32;      // element: its number, in order
-vec tn_items: I32;      // element: its first item, or -1
+/// For: whether its key is global.
+vec tn_global: I32;
+/// Element: its `as` alias (a word), or -1.
+vec tn_binding: I32;
+/// Element: its number, in order.
+vec tn_index: I32;
+/// Element: its first item, or -1.
+vec tn_items: I32;
 vec tn_items_last: I32;
 
-vec ti_kind: I32;       // 0 class, 1 attribute, 2 event, 3 two-way binding, 4 CSS, 5 style value
+/// 0 class, 1 attribute, 2 event, 3 two-way binding, 4 CSS, 5 style value.
+vec ti_kind: I32;
 vec ti_next: I32;
-vec ti_a: I32;          // a name or property (a word)
-vec ti_b: I32;          // a value, handler, or CSS source (a word)
-vec ti_c: I32;          // CSS: its scoped form (a word)
-vec ti_flags: I32;      // attribute: 1 property, 2 dynamic; event: 1 shorthand
-vec ti_from: I32;       // its range, or -1
+/// A name or property (a word)
+vec ti_a: I32;
+/// A value, handler, or CSS source (a word)
+vec ti_b: I32;
+/// CSS: its scoped form (a word)
+vec ti_c: I32;
+/// Attribute: 1 property, 2 dynamic; event: 1 shorthand.
+vec ti_flags: I32;
+/// Its range, or -1.
+vec ti_from: I32;
 vec ti_to: I32;
-vec ti_at: I32;         // where its statement starts
+/// Where its statement starts.
+vec ti_at: I32;
 
 // The template's header.
+
+/// 1 when the template is reactive (`@reactive;`, or an `@island`).
 vec tw_reactive: I32 = [0];
-vec tw_scope: I32 = [-1];     // `@island "name"`: the quoted name (a word), or -1
-vec tw_style_value: I32;      // `@style = e;`: the sources (words), and their ranges
+/// `@island "name"`: the quoted name (a word), or -1.
+vec tw_scope: I32 = [-1];
+/// `@style = e;`: the sources (words), and their ranges.
+vec tw_style_value: I32;
 vec tw_style_from: I32;
 vec tw_style_to: I32;
-vec tw_global: I32;           // `@document { … }` blocks (words)
+/// `@document { … }` blocks (words)
+vec tw_global: I32;
 
+/// The cursor: an offset in the template's text.
 vec wp_at: I32 = [0];
 
+/// A syntax error in the template, at `offset` in its text.
 fn wutu_fail(message: Str, offset: I32) void { dsl_fail(message, offset, 1); }
 
 fn reset_template() void {
@@ -121,7 +147,7 @@ fn add_item(node: I32, kind: I32, a: I32, b: I32, flags: I32, from: I32, to: I32
     i;
 }
 
-// Append child c to a list whose first is at `first_of` (a node's children, or its else).
+/// Append child c to a list whose first is at `first_of` (a node's children, or its else).
 fn append_child(parent: I32, c: I32, otherwise: Bool) void {
     let first = if otherwise { tn_else[parent]; } else { tn_first[parent]; };
     if first < 0 {
@@ -133,9 +159,9 @@ fn append_child(parent: I32, c: I32, otherwise: Bool) void {
     tn_next[last] = c;
 }
 
-// ── Vocabulary ──
+//! = Vocabulary
 
-// Whether `w` is one of the space-separated words of `list`.
+/// Whether `w` is one of the space-separated words of `list`.
 fn in_words(list: Str, w: Str) Bool {
     if w.len() == 0 { return false; };
     let i = text_index(list, w, 0);
@@ -169,6 +195,7 @@ fn is_global_attribute(name: Str) Bool {
     in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize nonce is popover", name);
 }
 
+/// The attributes an element of `tag` may have beyond the global ones (space-separated).
 fn tag_attributes(tag: Str) Str {
     if tag == "script" { return "src type async defer nonce crossorigin integrity referrerpolicy nomodule"; };
     if tag == "style" { return "media nonce type"; };
@@ -213,6 +240,8 @@ fn is_custom_element(tag: Str) Bool { text_index(tag, "-", 0) >= 0; }
 
 fn is_known_tag(tag: Str) Bool { is_html_tag(tag) or is_svg_tag(tag) or is_custom_element(tag); }
 
+/// Global, `aria-` and `data-` attributes, the tag's own, SVG's on an SVG
+/// tag, and anything on a custom element.
 fn is_allowed_attribute(tag: Str, name: Str) Bool {
     is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
         or (is_svg_tag(tag) and is_svg_attribute(name)) or is_custom_element(tag);
@@ -220,7 +249,7 @@ fn is_allowed_attribute(tag: Str, name: Str) Bool {
 
 fn is_name_code(c: I32) Bool { is_word_code(c) or c == 45; }
 
-// `--x` or `-?[a-z][\w-]*`: a CSS property.
+/// `--x` or `-?[a-z][\w-]*`: a CSS property.
 fn is_css_property(head: Str) Bool {
     if text_at(head, 0, "--") {
         if head.len() < 3 { return false; };
@@ -233,7 +262,7 @@ fn is_css_property(head: Str) Bool {
     true;
 }
 
-// ── The parser ──
+//! = The parser
 
 fn wp_done(text: Str) Bool { wp_at[0] >= text.len(); }
 
@@ -241,13 +270,13 @@ fn wp_char(text: Str) I32 { if wp_at[0] < text.len() { text.get(wp_at[0]); } els
 
 fn wp_at_text(text: Str, part: Str) Bool { text_at(text, wp_at[0], part); }
 
-// A word then whitespace at the cursor (`if `, `for `, `as `), not consumed.
+/// A word then whitespace at the cursor (`if `, `for `, `as `), not consumed.
 fn wp_keyword(text: Str, word: Str) Bool {
     let i = wp_at[0];
     text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()));
 }
 
-// Whitespace, `# line` comments (after whitespace), and CSS comments.
+/// Whitespace, `# line` comments (after whitespace), and CSS comments.
 fn wp_trivia(text: Str) void {
     while (wp_at[0] < text.len()) {
         let p = wp_at[0];
@@ -278,7 +307,7 @@ fn wp_semicolon(text: Str) void {
     wp_at[0] += 1;
 }
 
-// A quoted string (CSS strings may have backslash escapes; Utu strings may not).
+/// A quoted string (CSS strings may have backslash escapes; Utu strings may not).
 fn wp_quoted(text: Str, escapes: Bool) Str {
     let start = wp_at[0];
     let quote = text.get(start);
@@ -296,8 +325,8 @@ fn wp_quoted(text: Str, escapes: Bool) Str {
     "";
 }
 
-// Skip a Utu token whose contents are not delimiters: a nested DSL, a
-// string, or a line comment. Whether it skipped one.
+/// Skip a Utu token whose contents are not delimiters: a nested DSL, a
+/// string, or a line comment. Whether it skipped one.
 fn wp_opaque(text: Str) Bool {
     let p = wp_at[0];
     let c = text.get(p);
@@ -317,7 +346,7 @@ fn wp_opaque(text: Str) Bool {
     false;
 }
 
-// `@name/\ … \/` starting at `start`: the offset after it, else `start`.
+/// `@name/\ … \/` starting at `start`: the offset after it, else `start`.
 fn skip_dsl(text: Str, start: I32) I32 {
     let i = start + 1;
     if i >= text.len() or not is_word_code(text.get(i)) { return start; };
@@ -341,11 +370,11 @@ fn skip_dsl(text: Str, start: I32) I32 {
     start;
 }
 
-// An expression read: its source, and its range, here.
+/// An expression read: its source, and its range, here.
 vec wx_from: I32 = [0];
 vec wx_to: I32 = [0];
 
-// `= expression;`: up to the statement's semicolon.
+/// `= expression;`: up to the statement's semicolon.
 fn wp_bare_expression(text: Str) Str {
     wp_trivia(text);
     let start = wp_at[0];
@@ -370,7 +399,7 @@ fn wp_bare_expression(text: Str) Str {
     "";
 }
 
-// `$[expression]`.
+/// `$[expression]`.
 fn wp_interpolation(text: Str) Str {
     let open = wp_at[0];
     wp_at[0] += 2;
@@ -406,7 +435,7 @@ fn wp_expression(text: Str) Str {
     "";
 }
 
-// A brace-delimited Utu block, with its braces.
+/// A brace-delimited Utu block, with its braces.
 fn wp_utu_block(text: Str) Str {
     let start = wp_at[0];
     let depth = 0;
@@ -425,9 +454,9 @@ fn wp_utu_block(text: Str) Str {
     text.slice(start, wp_at[0]);
 }
 
-// ── CSS ──
+//! = CSS
 
-// Up to a delimiter outside strings, functions, and attribute selectors.
+/// Up to a delimiter outside strings, functions, and attribute selectors.
 fn wp_css_until(text: Str, delimiters: Str) Str {
     let start = wp_at[0];
     let parens = 0;
@@ -444,7 +473,7 @@ fn wp_css_until(text: Str, delimiters: Str) Str {
     trim_text(text.slice(start, wp_at[0]));
 }
 
-// The body of a `{ … }` CSS block (cursor on the brace), without its braces.
+/// The body of a `{ … }` CSS block (cursor on the brace), without its braces.
 fn wp_css_block(text: Str) Str {
     let open = wp_at[0];
     wp_at[0] += 1;
@@ -495,9 +524,9 @@ fn without_css_comments(text: Str) Str {
     out;
 }
 
-// ── Template structure ──
+//! = Template structure
 
-// The template; returns its root element.
+/// The template; returns its root element.
 fn parse_template(text: Str) I32 {
     reset_template();
     wp_at[0] = 0;
@@ -543,7 +572,7 @@ fn parse_template(text: Str) I32 {
     root;
 }
 
-// Text, an expression, if, for, or an element.
+/// Text, an expression, if, for, or an element.
 fn parse_tnode(text: Str) I32 {
     wp_trivia(text);
     let start = wp_at[0];
@@ -570,7 +599,7 @@ fn parse_tnode(text: Str) I32 {
     parse_telement(text);
 }
 
-// `{ nodes }`, into node n's children (or its otherwise).
+/// `{ nodes }`, into node n's children (or its otherwise).
 fn parse_branch(text: Str, n: I32, otherwise: Bool) void {
     wp_trivia(text);
     let open = wp_at[0];
@@ -589,6 +618,7 @@ fn parse_branch(text: Str, n: I32, otherwise: Bool) void {
     };
 }
 
+/// `if e { … } else { … }`, the cursor on `if`.
 fn parse_tif(text: Str) I32 {
     let start = wp_at[0];
     wp_at[0] += 2;
@@ -619,6 +649,7 @@ fn parse_tif(text: Str) I32 {
     n;
 }
 
+/// `for e |x| { … }`, the cursor on `for`.
 fn parse_tfor(text: Str) I32 {
     let start = wp_at[0];
     wp_at[0] += 3;
@@ -650,7 +681,7 @@ fn parse_tfor(text: Str) I32 {
     n;
 }
 
-// `|a|` or `|a, b|` at the cursor: "a" or "a, b" as written (consumed), or "".
+/// `|a|` or `|a, b|` at the cursor: "a" or "a, b" as written (consumed), or "".
 fn wp_captures(text: Str) Str {
     let p = wp_at[0];
     if wp_char(text) != 124 { return ""; };
@@ -675,6 +706,7 @@ fn wp_captures(text: Str) Str {
     text.slice(from, to);
 }
 
+/// An element: its tag, classes, and `as` alias, then a `{ … }` body or `;`.
 fn parse_telement(text: Str) I32 {
     let start = wp_at[0];
     let p = start;
@@ -730,6 +762,7 @@ fn add_child(n: I32, c: I32) void {
     append_child(n, c, false);
 }
 
+/// One statement of an element's body: an item, a CSS rule, or a child node.
 fn parse_element_statement(text: Str, n: I32) void {
     let p = wp_at[0];
     let c = text.get(p);
@@ -789,7 +822,7 @@ fn parse_element_statement(text: Str, n: I32) void {
     parse_declaration_or_child(text, n);
 }
 
-// `@name =` at p.
+/// `@name =` at p.
 fn event_head(text: Str, p: I32) Bool {
     let q = p + 1;
     let a = q;
@@ -799,6 +832,8 @@ fn event_head(text: Str, p: I32) Bool {
     q < text.len() and text.get(q) == 61;
 }
 
+/// `<name="value";` or `<name=$[e];` (an attribute; `<.name` a property), or
+/// `@event = handler;`.
 fn parse_attribute_or_event(text: Str, n: I32) void {
     let is_event = text.get(wp_at[0]) == 64;
     wp_at[0] += 1;
@@ -847,7 +882,7 @@ fn parse_attribute_or_event(text: Str, n: I32) void {
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);
 }
 
-// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
+/// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
 fn parse_css_rule(text: Str, n: I32) void {
     let selector = wp_css_until(text, "{;");
     if wp_char(text) == 59 {
@@ -861,6 +896,8 @@ fn parse_css_rule(text: Str, n: I32) void {
     ti_c[i] = intern_text(scoped_selector(selector) + "{" + block + "}");
 }
 
+/// A scoped CSS rule's selector, relative to the element (`&`): `@` alone is
+/// the element and all inside it, `@ sel` is `sel`, a pseudo-class is on `&`.
 fn scoped_selector(selector: Str) Str {
     if selector == "@" { return "&, & *"; };
     if text_at(selector, 0, "@ ") {
@@ -871,6 +908,7 @@ fn scoped_selector(selector: Str) Str {
     selector;
 }
 
+/// `property: value;` in an element's body, or else a child element.
 fn parse_declaration_or_child(text: Str, n: I32) void {
     let start = wp_at[0];
     let head = wp_css_until(text, ":{};");

@@ -1,21 +1,30 @@
-// ── @ir bodies ───────────────────────────────────────────────────────────────
-//
-// The standard library writes its intrinsics as XML in `@ir/\ … \/`:
-// scalar operators (`<ir-i32-add><ir-ident name="a"/><ir-ident name="b"/>
-// </ir-i32-add>`), array access, string builtins, and the representation
-// of each scalar type (`<ir-wasm-scalar type-repr="wasm-i32"/>`). Each body
-// is parsed once into a small tree (`x_*`); its tag and attribute names are
-// interned words, so they compare with the names below as ints.
+//! = `@ir` bodies
+//!
+//! The standard library writes its intrinsics as XML in `@ir/\ … \/`:
+//! scalar operators
+//! (`<ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add>`),
+//! array access, string builtins, and the representation of each scalar
+//! type (`<ir-wasm-scalar type-repr="wasm-i32"/>`). Each body is parsed
+//! once into a small tree (`x_*`); its tag and attribute names are interned
+//! words, so they compare with the @Known names as ints.
 
+/// The parsed elements, a row each: its tag's word id. The other `x_*`
+/// vecs are the rows' other columns, and `attr_*` their attributes.
 vec x_tag: I32;        // the tag's word id
-vec x_attr_first: I32; // its first attribute, in attr_*
+/// Its first attribute, in `attr_*`
+vec x_attr_first: I32;
 vec x_attr_count: I32;
-vec x_child: I32;      // first child element, or -1
-vec x_next: I32;       // next sibling element, or -1
-vec attr_name: I32;    // word id
-vec attr_start: I32;   // the value's bytes in src
+/// First child element, or -1.
+vec x_child: I32;
+/// Next sibling element, or -1.
+vec x_next: I32;
+/// Word id.
+vec attr_name: I32;
+/// The value's bytes in src.
+vec attr_start: I32;
 vec attr_end: I32;
-vec x_cache: I32;      // by DSL node: its parsed root, -2 before parsing, -1 when it does not parse
+/// By DSL node: its parsed root, -2 before parsing, -1 when it does not parse.
+vec x_cache: I32;
 
 fn reset_ir_trees() void {
     x_tag.clear();
@@ -29,7 +38,7 @@ fn reset_ir_trees() void {
     x_cache.clear();
 }
 
-// The tree of an `@ir` DSL expression (or of its body token's node).
+/// The tree of an `@ir` DSL expression (or of its body token's node).
 fn ir_tree(dsl: I32) I32 {
     if dsl < 0 { return -1; };
     if x_cache.len() < node_kind.len() {
@@ -47,6 +56,7 @@ fn ir_tree(dsl: I32) I32 {
     root;
 }
 
+/// Where an `@ir` body is being read, and where it ends.
 struct XmlAt:
     | pos: I32
     | end: I32
@@ -57,7 +67,7 @@ fn x_space(at: XmlAt) void {
 
 fn x_name_char(c: I32) Bool { (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 45 or c == 95; }
 
-// An element at `at`, or -1.
+/// The element at `at` and its children, read into the `x_*` rows: its row, or -1.
 fn x_element(at: XmlAt) I32 {
     x_space(at);
     if at.pos >= at.end or src[at.pos] != 60 { return -1; };
@@ -116,7 +126,7 @@ fn x_element(at: XmlAt) I32 {
     id;
 }
 
-// The attribute named `name` (a word id) of an element, or -1.
+/// The attribute named `name` (a word id) of an element, or -1.
 fn x_attr(x: I32, name: I32) I32 {
     if x < 0 { return -1; };
     for (0 ..< x_attr_count[x]) |i| {
@@ -132,7 +142,7 @@ fn attr_is(a: I32, text: Str) Bool {
     true;
 }
 
-// The attribute's value as a word id (to compare with names).
+/// The attribute's value as a word id (to compare with names).
 fn attr_word(a: I32) I32 { src.intern(attr_start[a], attr_end[a]); }
 
 fn x_children(x: I32) I32 {
@@ -145,14 +155,18 @@ fn x_children(x: I32) I32 {
     n;
 }
 
-// ── Names the compiler knows ──
-//
-// Interned when checking starts, after everything in the files, so each
-// has a word id; `word_opcode` maps a tag's word to its wasm opcode.
+//! = Names the compiler knows
+//!
+//! Interned when checking starts, after everything in the files, so each
+//! has a word id; `word_opcode` maps a tag's word to its wasm opcode.
 
-vec known: I32;        // by Known: its word id
-vec word_opcode: I32;  // by word id: the opcode of an `ir-…` tag, or -1
+/// By Known: its word id.
+vec known: I32;
+/// By word id: the opcode of an `ir-…` tag, or -1.
+vec word_opcode: I32;
 
+/// The words the compiler compares names with: `@ir` tag and attribute
+/// names, operator method names, DSL names, and a few type and method names.
 enum(U8) Known:
     | IrIdent
     | IrLit
@@ -222,8 +236,8 @@ fn known_word(k: Known) I32 { known[k.to_i32()]; }
 
 fn attr_type_repr() I32 { known_word(Known.TypeRepr); }
 
-// The tag names, and the opcodes of those that are one wasm instruction
-// (0xFC00 + n and 0xFD00 + n for prefixed ones).
+/// The tag names, and the opcodes of those that are one wasm instruction
+/// (0xFC00 + n and 0xFD00 + n for prefixed ones).
 fn opcode_table() Str {
     "i32-eqz 69 i32-eq 70 i32-ne 71 i32-lt-s 72 i32-gt-s 74 i32-le-s 76 i32-ge-s 78 "
     + "u32-eq 70 u32-ne 71 u32-lt-u 73 u32-gt-u 75 u32-le-u 77 u32-ge-u 79 "
@@ -253,9 +267,11 @@ fn opcode_table() Str {
     + "v128-any-true 64851";
 }
 
-// Sealed with the prelude (see `seal` in lib.utu): its words are kept, and so the same ids.
+/// Sealed with the prelude (see `seal` in lib.utu): its words are kept, and so the same ids.
 vec known_kept: I32 = [0];
 
+/// Interns the @Known words and the tags of @opcode_table, with their
+/// opcodes in @word_opcode. After `seal`, the words kept stand.
 fn intern_known() void {
     if known_kept[0] == 1 { return; };
     word_opcode.clear();
@@ -297,5 +313,5 @@ fn intern_known() void {
     };
 }
 
-// The opcode of a tag, or -1 when it is not one plain instruction.
+/// The opcode of a tag, or -1 when it is not one plain instruction.
 fn tag_opcode(word: I32) I32 { if word < word_opcode.len() { word_opcode[word]; } else { -1; }; }

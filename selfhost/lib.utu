@@ -1,9 +1,35 @@
-// ── The host interface ───────────────────────────────────────────────────────
-//
-// The host starts a program, adds its files (writing each one's bytes into
-// `src` at `file_offset`), parses them, binds the imports each names to the
-// files it adds for them, and resolves the program's names. It reads
-// tokens, nodes, and what names refer to from the exported mems.
+//! = The host interface
+//!
+//! The host starts a program, adds its files (writing each one's bytes into
+//! `src` at `file_offset`), parses them, binds the imports each names to the
+//! files it adds for them, and resolves the program's names. It reads
+//! tokens, nodes, and what names refer to from the exported mems.
+//!
+//! == Reading the compiler
+//!
+//! The files are one program, joined in the order `selfhost/files.txt` lists
+//! them; the data is flat (vecs and mems), a row per token, node,
+//! declaration, type, or function. A build goes:
+//!
+//! + `source.utu` holds the program's files; `lex.utu` makes each one's
+//!   tokens and `parse.utu` its tree of nodes.
+//! + `resolve.utu` gives every declaration an id and every name its
+//!   declaration; `diag.utu` words what is reported. Host declarations
+//!   (`using … from std:…`, `npm:…`) are read from their ABI documents by
+//!   `abi.utu` and `foreign.utu`.
+//! + `validate.utu` checks what needs no expression's type.
+//! + `check.utu` checks each function, once per instance it is reached in
+//!   (the program's own, all of them), building its body as IR as it goes (`types.utu` for types,
+//!   `wasm.utu` for the IR and the module).
+//! + The language's constructs are lowered as they are checked: `control.utu`,
+//!   `closures.utu`, `generators.utu`, `iterators.utu`, `misc.utu`,
+//!   `protocols.utu`, `data.utu`, `strings.utu`, `mems.utu`, `enums.utu`,
+//!   `ir.utu` (the standard library's `@ir` bodies), and `host.utu` (what
+//!   the module imports). `gen.utu` writes parts of the language as utu source.
+//! + DSLs expand into utu source: `dsl.utu`, `json.utu`, `json_runtime.utu`,
+//!   `stored.utu`, `wutu_parse.utu`, `wutu.utu`.
+//! + `optimize.utu` cleans up each function's IR, and `wasm.utu` encodes the
+//!   module.
 
 export lib {
     fn reset() void {
@@ -11,12 +37,12 @@ export lib {
         reset_program();
     }
 
-    // Start a program, keeping what is sealed.
+    /// Start a program, keeping what is sealed.
     fn reset_keep() void { reset_program(); }
 
-    // What the host has given since reset() (host declarations, and the
-    // standard library's prelude, its files added and parsed) stays for the
-    // programs that follow (reset_keep), with what is learned of it.
+    /// What the host has given since `reset()` (host declarations, and the
+    /// standard library's prelude, its files added and parsed) stays for the
+    /// programs that follow (`reset_keep`), with what is learned of it.
     fn seal() void {
         intern_known();
         known_kept[0] = 1;
@@ -30,22 +56,22 @@ export lib {
         kept_reactive[0] = -1;
     }
 
-    // A view of a document, its JSON at `at`, serving no import yet; and
-    // binding a view to import i.
+    /// A view of a document, its JSON at `at`, serving no import yet.
     fn abi_resident_view(doc: I32, at: I32) I32 { abi_add_view(-1, doc, at); }
 
+    /// Binds a view to import `i`.
     fn abi_bind(i: I32, view: I32) void {
         import_target[i] = -2;
         view_import[view] = i;
     }
 
-    // Room for a file of `n` bytes; `role` is a FileRole. Returns the file.
+    /// Room for a file of `n` bytes; `role` is a `FileRole`. Returns the file.
     fn file_add(n: I32, role: I32) I32 { add_file(n, FileRole.from_i32(role)); }
 
-    // Where the host writes the file's bytes in `src`.
+    /// Where the host writes the file's bytes in `src`.
     fn file_offset(file: I32) I32 { file_start[file]; }
 
-    // Lex and parse a file. Returns its source file node, or -1.
+    /// Lex and parse a file. Returns its source file node, or -1.
     fn file_parse(file: I32) I32 { parse_file(file); }
 
     fn file_first_token(file: I32) I32 { file_tok[file]; }
@@ -56,36 +82,36 @@ export lib {
 
     fn import_from(i: I32) I32 { import_file[i]; }
 
-    // The byte span of the import's path (a string with its quotes, or a
-    // platform path like `std:Array`).
+    /// The byte span of the import's path (a string with its quotes, or a
+    /// platform path like `std:Array`).
     fn import_path_start(i: I32) I32 { tok_start[node_first[import_path[i]]]; }
 
     fn import_path_end(i: I32) I32 { tok_end[node_last[import_path[i]] - 1]; }
 
     fn import_bind(i: I32, file: I32) void { import_target[i] = file; }
 
-    // The name a `using` gives the module it imports (`Fs` of `using Fs from "node:fs"`).
+    /// The name a `using` gives the module it imports (`Fs` of `using Fs from "node:fs"`).
     fn import_name_start(i: I32) I32 { tok_start[node_first[name_node(first_child(import_node[i]))]]; }
 
     fn import_name_end(i: I32) I32 { tok_end[node_last[name_node(first_child(import_node[i]))] - 1]; }
 
-    // The import is of host declarations (std:JS, npm:…), not a utu file.
+    /// The import is of host declarations (std:JS, npm:…), not a utu file.
     fn import_foreign(i: I32) void { import_target[i] = -2; }
 
-    // Host declarations: a document's `types` array, `n` bytes the host
-    // writes at the offset abi_room returns, with where each type is (byte
-    // offsets from `at`, `n` of them, in abi_offsets after
-    // abi_offsets_room(n)), so the document is read only where it is used;
-    // then each import's view of one (its prefix, module specifier, exports,
-    // names, mutable globals).
+    /// Host declarations: a document's `types` array, `n` bytes the host
+    /// writes at the offset `abi_room` returns, with where each type is (byte
+    /// offsets from `at`, `n` of them, in `abi_offsets` after
+    /// `abi_offsets_room(n)`), so the document is read only where it is used;
+    /// then each import's view of one (its prefix, module specifier, exports,
+    /// names, mutable globals).
     fn abi_room(n: I32) I32 { abi_reserve(n); }
 
     fn abi_offsets_room(n: I32) void { abi_offsets.resize(n); }
 
     fn abi_doc_at(at: I32, n: I32) I32 { abi_add_doc_at(at, n); }
 
-    // The host cannot read the import's file, whose path is `n` bytes the
-    // host writes at the offset returned. This ends the build.
+    /// The host cannot read the import's file, whose path is `n` bytes the
+    /// host writes at the offset returned. This ends the build.
     fn import_missing(i: I32, n: I32) I32 {
         missing_import[0] = i;
         missing_start[0] = src.len();
@@ -94,27 +120,27 @@ export lib {
         missing_start[0];
     }
 
-    // Resolve every name. Returns the number of diagnostics.
+    /// Resolve every name. Returns the number of diagnostics.
     fn resolve() I32 { resolve_names(); }
 
     fn node_count() I32 { node_kind.len(); }
 
-    // Check and encode the resolved program for a Target (0: its exports,
-    // 1: its tests). Returns the module's size in `out`, or -1 when there
-    // are diagnostics.
+    /// Check and encode the resolved program for a `Target` (0: its exports,
+    /// 1: its tests). Returns the module's size in `out`, or -1 when there
+    /// are diagnostics.
     fn compile_program(target: I32) I32 { compile(Target.from_i32(target)); }
 
-    // The JSON of what the last module built needs from its host (empty for nothing).
+    /// The JSON of what the last module built needs from its host (empty for nothing).
     fn host_json_size() I32 { host_json.len(); }
 
-    // Function names in the modules built (1), or none (0, the default).
+    /// Function names in the modules built (1), or none (0, the default).
     fn set_debug_names(on: I32) void { debug_names[0] = on; }
 
-    // How builds are optimized: 0 none, 1 size (the default), 2 speed.
+    /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level; }
 
-    // A test build's tests: how many, and where test k's name (a string
-    // literal, quotes and all) is in src.
+    /// A test build's tests: how many, and where test k's name (a string
+    /// literal, quotes and all) is in src.
     fn test_count() I32 { test_node.len(); }
 
     fn test_name_start(k: I32) I32 { tok_start[node_first[first_child(test_node[k])]]; }
@@ -125,8 +151,8 @@ export lib {
 
     fn diagnostic_count() I32 { diag_kind.len(); }
 
-    // @comptime: how many mems the host evaluates (with a Comptime build,
-    // calling `__comptime_run_NAME` and reading memory `__comptime_NAME`).
+    /// `@comptime`: how many mems the host evaluates (with a Comptime build,
+    /// calling `__comptime_run_NAME` and reading memory `__comptime_NAME`).
     fn comptime_mems() I32 { comptime_mem.len(); }
 
     fn comptime_name(k: I32) Str {
@@ -136,14 +162,14 @@ export lib {
         text;
     }
 
-    // @embed: the files the host reads, by the byte span of their path in src.
+    /// `@embed`: the files the host reads, by the byte span of their path in src.
     fn embed_files() I32 { embed_mem.len(); }
 
     fn embed_path_start(k: I32) I32 { dsl_text_start(last_child(decl_node[embed_mem[k]])); }
 
     fn embed_path_end(k: I32) I32 { dsl_text_end(last_child(decl_node[embed_mem[k]])); }
 
-    // Room for a file's `n` bytes, written by the host at the offset returned in embed_bytes.
+    /// Room for a file's `n` bytes, written by the host at the offset returned in `embed_bytes`.
     fn embed_set(k: I32, n: I32) I32 {
         let at = embed_bytes.len();
         embed_bytes.resize(at + n);
@@ -152,16 +178,16 @@ export lib {
         at;
     }
 
-    // The file could not be read.
+    /// The file could not be read.
     fn embed_fail(k: I32) void { embed_start[k] = -2; }
 
-    // The size of each value the host reads: 8 for 64-bit kinds, else 4.
+    /// The size of each value the host reads: 8 for 64-bit kinds, else 4.
     fn comptime_value_size(k: I32) I32 {
         let s = mem_storage(comptime_mem[k]);
         if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
     }
 
-    // Room for `count` values of mem k; the host writes them at the offset returned, in comptime_bytes.
+    /// Room for `count` values of mem k; the host writes them at the offset returned, in `comptime_bytes`.
     fn comptime_set(k: I32, count: I32) I32 {
         let at = comptime_bytes.len();
         comptime_bytes.resize(at + count * comptime_value_size(k));
@@ -175,7 +201,7 @@ export lib {
 
     fn diagnostic_message(i: I32) Str { diag_message(i); }
 
-    // Where a diagnostic points: a file, and byte offsets into the source.
+    /// Where a diagnostic points: a file, and byte offsets into the source.
     fn diagnostic_file(i: I32) I32 { diag_file(i); }
 
     fn diagnostic_start(i: I32) I32 { diag_start(i); }
@@ -184,12 +210,12 @@ export lib {
 
     fn diagnostic_node(i: I32) I32 { diag_node[i]; }
 
-    // @wat functions (host.utu): how many the loaded program has; site k's
-    // function (its node: name, parameters, result) and text (between `/\`
-    // and `\/`, in src). The host gives back k's code (`n` bytes it writes
-    // at the offset returned, in wat_bytes), or a mistake: `n` bytes of
-    // message it writes at the offset returned, in src, and where it is in
-    // the text (UTF-16 offsets; -1 for the function's signature).
+    /// `@wat` functions (`host.utu`): how many the loaded program has; site k's
+    /// function (its node: name, parameters, result) and text (between `/\`
+    /// and `\/`, in src). The host gives back k's code (`n` bytes it writes
+    /// at the offset returned, in `wat_bytes`), or a mistake: `n` bytes of
+    /// message it writes at the offset returned, in src, and where it is in
+    /// the text (UTF-16 offsets; -1 for the function's signature).
     fn wat_count() I32 { find_wat(); }
 
     fn wat_function(k: I32) I32 { wat_function_of(wat_site[k]); }
@@ -220,26 +246,26 @@ export lib {
 
     fn decl_count() I32 { decl_kind.len(); }
 
-    // Word ids below this are keywords (tok_word names a word token's word).
+    /// Word ids below this are keywords (`tok_word` names a word token's word).
     fn keyword_count() I32 { Kw.count(); }
 
-    // An expression's type as the last build checked it ("" when it was not).
+    /// An expression's type as the last build checked it ("" when it was not).
     fn node_type(n: I32) Str {
         if n >= node_ty.len() { return ""; };
         if node_ty[n] < 0 { return ""; };
         type_text(node_ty[n]);
     }
 
-    // A local's or parameter's type, as the last build checked it ("" when
-    // it was not checked: not a local, or in a function no export reaches).
+    /// A local's or parameter's type, as the last build checked it ("" when
+    /// it was not checked: not a local, or in a function no export reaches).
     fn decl_checked_type(decl: I32) Str {
         if decl >= decl_local.len() { return ""; };
         if decl_local[decl] < 0 { return ""; };
         type_text(decl_ty[decl]);
     }
 
-    // The declaration of that type (a struct, an enum, a scalar's type;
-    // through `?`), or -1: what `x.` can name.
+    /// The declaration of that type (a struct, an enum, a scalar's type;
+    /// through `?`), or -1: what `x.` can name.
     fn decl_checked_type_decl(decl: I32) I32 {
         if decl >= decl_local.len() { return -1; };
         if decl_local[decl] < 0 { return -1; };
@@ -248,8 +274,8 @@ export lib {
         ty_decl(t);
     }
 
-    // The lexer and parser alone, on one source (for their differentials):
-    // the host writes `n` bytes at the returned offset.
+    /// The lexer and parser alone, on one source (for their differentials):
+    /// the host writes `n` bytes at the returned offset.
     fn source(n: I32) I32 {
         unseal();
         reset_program();
@@ -265,7 +291,7 @@ export lib {
         root;
     }
 
-    // A node kind's name in tree-sitter's spelling.
+    /// A node kind's name in tree-sitter's spelling.
     fn node_kind_name(kind: I32) Str {
         let name = Node.name(Node.from_i32(kind));
         Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len());

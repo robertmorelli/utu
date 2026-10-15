@@ -1,16 +1,16 @@
-// ── Diagnostics ──────────────────────────────────────────────────────────────
-//
-// A diagnostic's kind name, message, and span, made when the host asks, in
-// stage 0's words, from what was reported (see `report` in resolve.utu).
+//! = Diagnostics
+//!
+//! A diagnostic's kind name, message, and span, made when the host asks, in
+//! stage 0's words, from what was reported (see `report` in resolve.utu).
 
-// The text of a word.
+/// The text of a word.
 fn word_text(w: I32) Str {
     if w < 0 { return ""; };
     let start = src.interned_start(w);
     bytes_text(start, start + src.interned_size(w));
 }
 
-// The text of src[start ..< end_] (UTF-8).
+/// The text of `src[start ..< end_]` (UTF-8).
 fn bytes_text(start: I32, end_: I32) Str {
     if end_ <= start { return ""; };
     // Code units into an array (no more of them than bytes), made a string once.
@@ -42,11 +42,13 @@ fn bytes_text(start: I32, end_: I32) Str {
     Str.from_codes(codes, k);
 }
 
+/// A declaration's name, or empty for none.
 fn decl_text(d: I32) Str {
     if d < 0 { return ""; };
     word_text(decl_name[d]);
 }
 
+/// A node's source, as written.
 fn node_text(node: I32) Str {
     if node < 0 { return ""; };
     bytes_text(tok_start[node_first[node]], tok_end[node_last[node] - 1]);
@@ -59,7 +61,7 @@ fn pick(c: Bool, yes: Str, no: Str) Str {
     no;
 }
 
-// A type as stage 0 writes it: `I32`, `?Point`, `Array[I32]`, `fun(I32) Bool`, `.{I32, F64}`.
+/// A type as stage 0 writes it: `I32`, `?Point`, `Array[I32]`, `fun(I32) Bool`, `.{I32, F64}`.
 fn type_text(t: I32) Str {
     if t < 0 { return "unknown"; };
     let kind = ty_kind[t];
@@ -94,7 +96,7 @@ fn type_list_text(list: I32) Str {
     text;
 }
 
-// The symbol of an operator word (add is `+`).
+/// The symbol of an operator word (add is `+`).
 fn operator_symbol(w: I32) Str {
     if w == known_word(Known.Add) { return "+"; };
     if w == known_word(Known.Sub) { return "-"; };
@@ -121,7 +123,7 @@ fn operator_symbol(w: I32) Str {
     word_text(w);
 }
 
-// Where InvalidBreak's argument a says which rule was broken.
+/// Where InvalidBreak's argument a says which rule was broken.
 enum(U8) BreakRule:
     | BreakOutside
     | ContinueOutside
@@ -132,7 +134,7 @@ enum(U8) BreakRule:
     | ReturnInDefer
     | DeferNotStatement
 
-// The JS typed array a mem's view is.
+/// The JS typed array a mem's view is.
 fn view_array_name(s: Storage) Str {
     if s == Storage.U8 { return "Uint8Array"; };
     if s == Storage.I8 { return "Int8Array"; };
@@ -146,9 +148,9 @@ fn view_array_name(s: Storage) Str {
     "Float64Array";
 }
 
-// The @comptime expression a diagnostic is in (its index in
-// comptime_text_*), or -1. Its expression was copied into a function of
-// the generated file, whose line 4 it starts on.
+/// The `@comptime` expression a diagnostic is in (its index in
+/// `comptime_text_*`), or -1. Its expression was copied into a function of
+/// the generated file, whose line 4 it starts on.
 fn comptime_site(i: I32) I32 {
     let node = diag_node[i];
     if node < 0 { return -1; };
@@ -159,12 +161,14 @@ fn comptime_site(i: I32) I32 {
     -1;
 }
 
-// The kind's name, as stage 0 spells it.
+/// The kind's name, as stage 0 spells it.
 fn diag_kind_name(i: I32) Str {
     if comptime_site(i) >= 0 { return "type-mismatch"; };
     diag_kind_of(i);
 }
 
+/// A diagnostic's message for the host: one in a `@comptime` expression
+/// says so, and on which line of it.
 fn diag_message(i: I32) Str {
     let k = comptime_site(i);
     if k < 0 { return diag_text(i); };
@@ -173,6 +177,7 @@ fn diag_message(i: I32) Str {
     "@comptime: " + diag_text(i) + " (line " + int_text(line) + ")";
 }
 
+/// The kind name a diagnostic is reported under; several share one, as in stage 0.
 fn diag_kind_of(i: I32) Str {
     let k = Diag.from_i32(diag_kind[i]);
     if k == Diag.UnknownVariable { return "unknown-variable"; };
@@ -211,6 +216,7 @@ fn diag_kind_of(i: I32) Str {
     "type-mismatch";
 }
 
+/// A diagnostic's message, in stage 0's words.
 fn diag_text(i: I32) Str {
     let k = Diag.from_i32(diag_kind[i]);
     let word = diag_word[i];
@@ -404,8 +410,8 @@ fn diag_text(i: I32) Str {
     Diag.name(k);
 }
 
-// A token as an error names it: a name, number, or symbol as written (a
-// long one cut short), and what the others are.
+/// A token as an error names it: a name, number, or symbol as written (a
+/// long one cut short), and what the others are.
 fn found_text(t: I32) Str {
     let kind = tok_kind[t];
     if kind == Tok.End.to_i32() { return "the end of the file"; };
@@ -422,7 +428,7 @@ fn found_text(t: I32) Str {
     "'" + text + "'";
 }
 
-// The span a diagnostic points at: its node's, as byte offsets.
+/// The span a diagnostic points at: its node's, as byte offsets.
 fn diag_start(i: I32) I32 {
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_a[i]; };
@@ -433,6 +439,7 @@ fn diag_start(i: I32) I32 {
     tok_start[node_first[node]];
 }
 
+/// Where a diagnostic's span ends (see @diag_start).
 fn diag_end(i: I32) I32 {
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_b[i]; };
@@ -443,7 +450,7 @@ fn diag_end(i: I32) I32 {
     tok_end[node_last[node] - 1];
 }
 
-// The generated file of located code a diagnostic is in, or -1.
+/// The generated file of located code a diagnostic is in, or -1.
 fn located_file(i: I32) I32 {
     let node = diag_node[i];
     if node < 0 or comptime_site(i) >= 0 { return -1; };
@@ -451,7 +458,8 @@ fn located_file(i: I32) I32 {
     if file < dsl_file_from.len() and dsl_file_from[file] >= 0 { file; } else { -1; };
 }
 
-// The node a diagnostic points at: its own, or its @comptime expression.
+/// The node a diagnostic points at: its own, or the `@comptime` expression
+/// it is in, or the DSL site whose generated code it is in.
 fn diag_at(i: I32) I32 {
     let k = comptime_site(i);
     if k >= 0 { return comptime_text_node[k]; };
@@ -464,6 +472,7 @@ fn diag_at(i: I32) I32 {
     node;
 }
 
+/// The file a diagnostic is in, or -1.
 fn diag_file(i: I32) I32 {
     let node = diag_at(i);
     if node < 0 {

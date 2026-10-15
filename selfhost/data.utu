@@ -1,11 +1,11 @@
-// ── Data ─────────────────────────────────────────────────────────────────────
-//
-// Structs, arrays, and strings: building them, reading and writing their
-// parts, and the std intrinsics that are their operations.
+//! = Data
+//!
+//! Structs, arrays, and strings: building them, reading and writing their
+//! parts, and the std intrinsics that are their operations.
 
-// ── Structs ──
+//! = Structs
 
-// The node whose Field children are a declaration's fields.
+/// The node whose Field children are a declaration's fields.
 fn fields_holder(decl: I32) I32 {
     let node = decl_node[decl];
     if is_kind(node, Node.Variant) {
@@ -15,10 +15,11 @@ fn fields_holder(decl: I32) I32 {
     node;
 }
 
+/// A field declaration's type, in instance `inst`.
 fn field_type(field: I32, inst: I32) I32 { type_of(next_sibling(first_child(decl_node[field])), inst); }
 
-// `T { a: x, b: y }`: the fields in declaration order (each initializer
-// checked in that order), then struct.new.
+/// `T { a: x, b: y }`: the fields in declaration order (each initializer
+/// checked in that order), then `struct.new`.
 fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     let t = type_path(first_child(node), cx.inst);
     let decl = ty_decl(t);
@@ -27,7 +28,7 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     return build_struct(t, decl, inits, node, cx);
 }
 
-// `&{ a: x }`: the struct type expected.
+/// `&{ a: x }`: the struct type expected.
 fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
     let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
     if is_foreign(t) { return check_foreign_record(node, t, cx); };
@@ -39,6 +40,9 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
     build_struct(t, decl, next_sibling(first_child(node)), node, cx);
 }
 
+/// `struct.new` of `t` from the initializers from `first_init` on, each
+/// checked as its field's type in the fields' order. An unknown, repeated, or
+/// missing field is reported (a missing one's value is `unreachable`).
 fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     // Each initializer names a field once, and each field has one.
     let f = first_init;
@@ -82,6 +86,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     t;
 }
 
+/// The initializer from `first_init` on that names field `word`, or -1.
 fn init_for(first_init: I32, word: I32) I32 {
     let f = first_init;
     while (f >= 0) {
@@ -91,8 +96,8 @@ fn init_for(first_init: I32, word: I32) I32 {
     -1;
 }
 
-// A struct field of the value on the stack (of type `t`), named by node `name`.
-// Returns the field's declaration, or -1 after reporting.
+/// A struct field of the value on the stack (of type `t`), named by node `name`.
+/// Returns the field's declaration, or -1 after reporting.
 fn field_of(t: I32, name: I32) I32 {
     if ty_is(t, Ty.Error) { return -1; };
     let decl = ty_decl(t);
@@ -110,7 +115,7 @@ fn field_of(t: I32, name: I32) I32 {
     field;
 }
 
-// `x.f`: a field.
+/// `x.f`: a field.
 fn check_field_get(node: I32, expect: I32, cx: Cx) I32 {
     let name = last_child(node);
     let m = w_mark();
@@ -129,7 +134,7 @@ fn check_field_get(node: I32, expect: I32, cx: Cx) I32 {
     ft;
 }
 
-// `x.f = v`, `x.f += v`.
+/// `x.f = v`, `x.f += v`.
 fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let name = last_child(target);
     let m = w_mark();
@@ -169,10 +174,10 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// ── Arrays ──
+//! = Arrays
 
-// `[a, b, c]`: an Array of the element type expected, else of the
-// elements' (the first's, nullable when another is null).
+/// `[a, b, c]`: an Array of the element type expected, else of the
+/// elements' (the first's, nullable when another is null).
 fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     let elem = -1;
     if expect >= 0 {
@@ -218,11 +223,11 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// The most elements array.new_fixed may make (wasm's limit).
+/// The most elements `array.new_fixed` may make (wasm's limit).
 let max_new_fixed: I32 = 10000;
 
-// A longer literal: an array of its length, each run of elements made by
-// array.new_fixed and copied into it, in order.
+/// A longer literal: an array of its length, each run of elements made by
+/// `array.new_fixed` and copied into it, in order.
 fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
     let vt = repr(t);
     let heap = vt_heap(vt);
@@ -259,7 +264,7 @@ fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
     t;
 }
 
-// Array[elem], the type.
+/// `Array[elem]`, the type.
 fn array_of(elem: I32) I32 {
     let module = lookup(known_word(Known.WordArray));
     if not decl_is(module, Decl.Module) { return ty_error(); };
@@ -270,8 +275,8 @@ fn array_of(elem: I32) I32 {
 
 fn is_empty_array(node: I32) Bool { is_kind(node, Node.Array_expr) and first_child(node) < 0; }
 
-// `let xs = [];`: the type a later use in its block gives it (an array
-// assigned to it, or the parameter it is passed as), or -1.
+/// `let xs = [];`: the type a later use in its block gives it (an array
+/// assigned to it, or the parameter it is passed as), or -1.
 fn later_array_type(decl: I32, let_node: I32, cx: Cx) I32 {
     let s = next_sibling(let_node);
     while (s >= 0) {
@@ -312,12 +317,13 @@ fn array_use_type(node: I32, decl: I32, cx: Cx) I32 {
     -1;
 }
 
+/// Whether `t` is an `Array[T]`.
 fn is_array_type(t: I32) Bool {
     let decl = ty_decl(t);
     decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == known_word(Known.WordArray);
 }
 
-// `a[i]`, `a[s, e]`, `a[i] = v`: the receiver's get_index, get_slice, set_index.
+/// `a[i]`, `a[s, e]`, `a[i] = v`: the receiver's `get_index`, `get_slice`, `set_index`.
 fn check_index(node: I32, expect: I32, cx: Cx) I32 {
     let base = first_child(node);
     if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Mem) { return check_mem_index(node, cx); };
@@ -345,6 +351,8 @@ fn check_index(node: I32, expect: I32, cx: Cx) I32 {
     finish_call(fi, m, cx);
 }
 
+/// `a[i] = v` and `a[i] op= v`: a mem's store, a host value's index, or the
+/// receiver's `set_index` (`a` and `i` evaluated once).
 fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let base = first_child(target);
     if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Mem) { return check_mem_store(target, value, op, at, cx); };
@@ -394,15 +402,15 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// ── Intrinsics of data ──
+//! = Intrinsics of data
 
-// The array type of an intrinsic's module (Array's `&` in the instance).
+/// The array type of an intrinsic's module (Array's `&` in the instance).
 fn intrinsic_array_heap(fi: I32) I32 {
     let module = module_of(fi_decl[fi]);
     vt_heap(repr(named(decl_a[module], fi_inst[fi])));
 }
 
-// Push an @ir element's children; false when one is not known.
+/// Push an `@ir` element's children; false when one is not known.
 fn translate_kids(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
     let c = x_child[x];
     while (c >= 0) {
@@ -412,7 +420,7 @@ fn translate_kids(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
     true;
 }
 
-// The string and array tags. 1: done; 0: not one of them; -1: failed.
+/// The string and array tags. 1: done; 0: not one of them; -1: failed.
 fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) I32 {
     let tag = x_tag[x];
     let other = translate_other(x, tag, decls, args, locals, direct, fi);
@@ -461,8 +469,8 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
     1;
 }
 
-// Whether a type has a value to start from (a scalar, a nullable or host
-// reference): array.new_default fills arrays of those.
+/// Whether a type has a value to start from (a scalar, a nullable or host
+/// reference): `array.new_default` fills arrays of those.
 fn defaultable(t: I32) Bool {
     if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Closure) or ty_is(t, Ty.Error) { return true; };
     let decl = ty_decl(t);
@@ -470,7 +478,7 @@ fn defaultable(t: I32) Bool {
     not is_array_type(t);
 }
 
-// I31, reference equality, promise subscriptions, v128 constants.
+/// I31, reference equality, promise subscriptions, v128 constants.
 fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) I32 {
     let k = -1;
     for (Known.IrI31New.to_i32() ... Known.IrV128Const.to_i32()) |i| { if known[i] == tag { k = i; }; };
@@ -512,7 +520,7 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
     1;
 }
 
-// (ref i31), the value ref.i31 makes: a nullable i31 local holds it.
+/// `(ref i31)`, the value `ref.i31` makes: a nullable i31 local holds it.
 fn vt_ref_i31() I32 { vt_i31ref; }
 
 fn is_data_tag(tag: I32) Bool {
@@ -520,8 +528,8 @@ fn is_data_tag(tag: I32) Bool {
     false;
 }
 
-// Whether an @ir tree reorders its operands, so its arguments must be
-// stored first (array.new takes its fill before its length).
+/// Whether an `@ir` tree reorders its operands, so its arguments must be
+/// stored first (`array.new` takes its fill before its length).
 fn reorders(x: I32) Bool {
     if x_tag[x] == known_word(Known.IrArrayNew) and x_children(x) == 2 { return true; };
     let c = x_child[x];
@@ -532,16 +540,17 @@ fn reorders(x: I32) Bool {
     false;
 }
 
-// ── Helper functions ──
-//
-// Operations too long to repeat at each use become functions of their own,
-// one per type. They are built here, with their own locals, outside the
-// function being checked.
+//! = Helper functions
+//!
+//! Operations too long to repeat at each use become functions of their own,
+//! one per type. They are built here, with their own locals, outside the
+//! function being checked.
 
-vec slice_helper: I32;   // pairs: array heap type, function
+/// The slice helpers made so far, in pairs: an array heap type, its function.
+vec slice_helper: I32;
 vec codes_helper: I32;
 
-// A helper function's locals after its parameters: value types in local_types.
+/// A helper function's locals after its parameters: value types in `local_types`.
 fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {
     let f = new_func(FuncKind.Defined, func_type(params, results));
     func_debug_name[f] = name_add(name);
@@ -551,7 +560,7 @@ fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {
     f;
 }
 
-// (src, start, end) → a new array of src[start ..< end).
+/// `(src, start, end)` → a new array of `src[start ..< end)`.
 fn array_slice_helper(heap: I32) I32 {
     let i = 0;
     while (i < slice_helper.len()) {
@@ -594,8 +603,8 @@ fn array_slice_helper(heap: I32) I32 {
     f;
 }
 
-// (codes: Array[I32], count) → the string of the first `count` code units:
-// narrowed into an i16 array, then one fromCharCodeArray.
+/// `(codes: Array[I32], count)` → the string of the first `count` code units:
+/// narrowed into an i16 array, then one fromCharCodeArray.
 fn from_codes_helper(heap: I32) I32 {
     if codes_helper.len() > 0 { return codes_helper[0]; };
     let units = code_units_type();
@@ -652,6 +661,7 @@ fn from_codes_helper(heap: I32) I32 {
     f;
 }
 
+/// Forget the helper functions, before a program is checked.
 fn reset_data() void {
     slice_helper.clear();
     codes_helper.clear();

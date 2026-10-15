@@ -1,10 +1,11 @@
-// ── Strings ──────────────────────────────────────────────────────────────────
-//
-// `Str` is a JavaScript string, an externref. Its operations call the JS
-// string builtins (`wasm:js-string`), and a literal is an immutable global
-// imported from the `'` module, named by its text: an engine given
-// `importedStringConstants: "'"` provides it, as it provides the builtins.
+//! = Strings
+//!
+//! `Str` is a JavaScript string, an externref. Its operations call the JS
+//! string builtins (`wasm:js-string`), and a literal is an immutable global
+//! imported from the `'` module, named by its text: an engine given
+//! `importedStringConstants: "'"` provides it, as it provides the builtins.
 
+/// The `wasm:js-string` builtins the compiler calls, each imported on first use.
 enum(U8) Builtin:
     | Concat
     | Equals
@@ -14,8 +15,10 @@ enum(U8) Builtin:
     | FromCodePoint
     | FromCharCodeArray
 
-vec builtin_func: I32;   // by Builtin: its imported function, or -1
-vec word_string: I32;    // by word id (a literal's decoded text): its global, or -1
+/// By Builtin: its imported function, or -1.
+vec builtin_func: I32;
+/// By word id (a literal's decoded text): its global, or -1.
+vec word_string: I32;
 
 fn reset_strings() void {
     builtin_func.resize(Builtin.count());
@@ -23,9 +26,10 @@ fn reset_strings() void {
     word_string.clear();
 }
 
-// (array (mut i16)): the code units fromCharCodeArray takes, its own group.
+/// `(array (mut i16))`: the code units `fromCharCodeArray` takes, its own group.
 fn code_units_type() I32 { array_type_single(vt_i16, true); }
 
+/// The imported function of builtin `b`, imported the first time it is asked for.
 fn builtin(b: Builtin) I32 {
     let i = b.to_i32();
     if builtin_func[i] >= 0 { return builtin_func[i]; };
@@ -50,19 +54,21 @@ fn builtin(b: Builtin) I32 {
     f;
 }
 
-// Call a builtin with the arguments on the stack since `m`.
+/// Calls a builtin with the arguments on the stack since `m`.
 fn call_builtin(b: Builtin, m: I32) void {
     let f = builtin(b);
     let results = ht_b[func_type_of[f]];
     w_node(Op.Call, vl_item(results, 0), f, 0, m);
 }
 
-// ── Literals ──
+//! = Literals
 
-vec lit_bytes: U8;   // a literal's text, decoded, as UTF-8
+/// A literal's text, decoded, as UTF-8.
+vec lit_bytes: U8;
 
-// Push a string literal (or a multiline one) as a constant. False when its
-// text is not well-formed UTF-16 (a lone surrogate), which cannot be an import name.
+/// Pushes a string literal (or a multiline one) as a constant. False when its
+/// text is not well-formed UTF-16 (a lone surrogate), which cannot be an import
+/// name, or has a bad escape (see @bad_escape).
 fn string_literal(node: I32) Bool {
     lit_bytes.clear();
     let ok = true;
@@ -86,8 +92,8 @@ fn string_literal(node: I32) Bool {
     true;
 }
 
-// A template string's text, src[start ..< end_], with its escapes, as a
-// constant. False as for string_literal.
+/// A template string's text, `src[start ..< end_]`, with its escapes, as a
+/// constant. False as for @string_literal.
 fn template_text(start: I32, end_: I32) Bool {
     lit_bytes.clear();
     if not decode_string(start, end_) { return false; };
@@ -95,7 +101,8 @@ fn template_text(start: I32, end_: I32) Bool {
     true;
 }
 
-// The text in lit_bytes, as a constant.
+/// The text in `lit_bytes`, as a constant. Its text is interned, so each
+/// distinct literal is one imported global.
 fn push_lit_bytes() void {
     let start = src.len();
     for (0 ..< lit_bytes.len()) |i| { src.push(lit_bytes[i]); };
@@ -105,7 +112,7 @@ fn push_lit_bytes() void {
     w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0);
 }
 
-// The global of a string constant whose text is word `word`.
+/// The global of a string constant whose text is word `word`.
 fn string_global(word: I32) I32 {
     if word_string.len() <= word {
         let old = word_string.len();
@@ -119,12 +126,12 @@ fn string_global(word: I32) I32 {
     g;
 }
 
-// Where decode_string last found a `\u` without four hexadecimal digits (a
-// byte in src), or -1.
+/// Where @decode_string last found a `\u` without four hexadecimal digits (a
+/// byte in `src`), or -1.
 vec bad_escape: I32 = [-1];
 
-// JSON's escapes, and `\c` as c for any other c, from src[start ..< end_]
-// into lit_bytes as UTF-8. False at a bad escape, or a lone surrogate.
+/// JSON's escapes, and `\c` as `c` for any other `c`, from `src[start ..< end_]`
+/// into `lit_bytes` as UTF-8. False at a bad escape, or a lone surrogate.
 fn decode_string(start: I32, end_: I32) Bool {
     bad_escape[0] = -1;
     let i = start;
@@ -173,7 +180,7 @@ fn decode_string(start: I32, end_: I32) Bool {
     true;
 }
 
-// The four hexadecimal digits at src[at], or -1.
+/// The four hexadecimal digits at `src[at]`, or -1.
 fn hex4(at: I32) I32 {
     let v = 0;
     for (at ..< at + 4) |i| {

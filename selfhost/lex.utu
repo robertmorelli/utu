@@ -1,30 +1,31 @@
-// ── The lexer ────────────────────────────────────────────────────────────────
-//
-// Source bytes in, tokens out.
-//
-// A state machine, built during compilation (`build`) into a const mem:
-// lexing is one table load per byte in a `loop match`. Each token's kind and
-// byte span go into three mems.
-//
-// The lexer does not know the grammar: every word is a `Word` (the parser
-// decides which are keywords, which are identifiers, and which are type
-// names), and the parser joins `std` `:` `Str` into a platform path.
-// Comments are tokens, so the parser can attach them to the tree.
-//
-// A few tokens depend on the token before them. `-o` (pipe), `?.` (optional
-// field), and compound assignments (`&=`, `<<=`, …) only follow a finished
-// expression: `x -o in` pipes to `in`, while `type &= …` declares the self
-// type. So the machine has start states after an expression and not, and
-// the state a token ends in says which start state comes next. Words that
-// begin an expression (`and`, `let`, …) are paths through the word states
-// that end in a state of their own, except after `.` or `?.`, where a word
-// is always a name (`Box.new -o f`, `row.cl >>>= 1`): that has a start
-// state of its own too.
-//
-// The JavaScript compiler's parser is the reference: for every program it
-// accepts, these tokens are exactly the leaves of its syntax tree
-// (scripts/selfhost-lexer-differential.mjs).
+//! = The lexer
+//!
+//! Source bytes in, tokens out.
+//!
+//! A state machine, built during compilation (@build) into const vecs (@dfa):
+//! lexing is one table load per byte in a `loop match`. Each token's kind and
+//! byte span go into three mems.
+//!
+//! The lexer does not know the grammar: every word is a `Word` (the parser
+//! decides which are keywords, which are identifiers, and which are type
+//! names), and the parser joins `std` `:` `Str` into a platform path.
+//! Comments are tokens, so the parser can attach them to the tree.
+//!
+//! A few tokens depend on the token before them. `-o` (pipe), `?.` (optional
+//! field), and compound assignments (`&=`, `<<=`, …) only follow a finished
+//! expression: `x -o in` pipes to `in`, while `type &= …` declares the self
+//! type. So the machine has start states after an expression and not, and
+//! the state a token ends in says which start state comes next. Words that
+//! begin an expression (`and`, `let`, …) are paths through the word states
+//! that end in a state of their own, except after `.` or `?.`, where a word
+//! is always a name (`Box.new -o f`, `row.cl >>>= 1`): that has a start
+//! state of its own too.
+//!
+//! The JavaScript compiler's parser is the reference: for every program it
+//! accepts, these tokens are exactly the leaves of its syntax tree
+//! (`scripts/selfhost-lexer-differential.mjs`).
 
+/// A token's kind. Every word is a `Word`: which are keywords is the parser's to say.
 enum(U8) Tok:
     | End
     | Error
@@ -89,38 +90,57 @@ enum(U8) Tok:
     | TildeArrow
 
 // What the table says to do next, below the real states:
-let error_code: I32 = 0;   // no token can continue or start here
-let accept_code: I32 = 1;  // the token ends before this byte
-let back1_code: I32 = 2;   // the token ended one byte back
-let back2_code: I32 = 3;   // the token ended two bytes back
-let skip_code: I32 = 4;    // whitespace through this byte: drop it
-let dsl_code: I32 = 5;     // `/\`: a DSL body, which nests
-let done_code: I32 = 6;    // the end of the source
-let template_code: I32 = 7; // a backtick: a template string's text, scanned
-let start_before: I32 = 8; // the start states: not after an expression,
-let start_after: I32 = 9;  // after one,
-let start_member: I32 = 10; // after `.` or `?.`,
-let start_type: I32 = 11;  // and after `type`
+/// No token can continue or start here.
+let error_code: I32 = 0;
+/// The token ends before this byte.
+let accept_code: I32 = 1;
+/// The token ended one byte back.
+let back1_code: I32 = 2;
+/// The token ended two bytes back.
+let back2_code: I32 = 3;
+/// Whitespace through this byte: drop it.
+let skip_code: I32 = 4;
+/// `/\`: a DSL body, which nests
+let dsl_code: I32 = 5;
+/// The end of the source.
+let done_code: I32 = 6;
+/// A backtick: a template string's text, scanned.
+let template_code: I32 = 7;
+/// The start states: not after an expression,.
+let start_before: I32 = 8;
+/// After one,.
+let start_after: I32 = 9;
+/// After `.` or `?.`,.
+let start_member: I32 = 10;
+/// And after `type`
+let start_type: I32 = 11;
 
-// The source ends with this byte, which UTF-8 never uses.
+/// The source ends with this byte, which UTF-8 never uses.
 let end_byte: I32 = 255;
 
-// next = dfa[state * 256 + byte]. A token ending in a state has kind
-// kind_of[state]; one backed off from it has kind back_kind[state]. The
-// start state that follows is after_of (0: before, 1: after, 2: the same,
-// 3: member, 4: type).
+/// `next = dfa[state * 256 + byte]`. A token ending in a state has kind
+/// `kind_of[state]`; one backed off from it has kind `back_kind[state]`. The
+/// start state that follows is `after_of` (0: before, 1: after, 2: the same,
+/// 3: member, 4: type).
 const vec dfa: U8 = @comptime/\ build().tabs \/;
 const vec kind_of: U8 = @comptime/\ build().kinds \/;
 const vec back_kind: U8 = @comptime/\ build().backs \/;
 const vec after_of: U8 = @comptime/\ build().afters \/;
 
+/// The program's bytes: each file's, followed by @end_byte, and the text of
+/// interned words (a word is a span of it).
 export mem src: U8;
+/// By token: its @Tok. With @tok_start and @tok_end (its byte span in @src),
+/// the tokens of every file, in order.
 export mem tok_kind: U8;
 export mem tok_start: I32;
 export mem tok_end: I32;
 
-// ── The state machine, built at compile time ─────────────────────────────────
+//! = The state machine, built at compile time
 
+/// The lexer's state machine while @build makes it: a row of 256 next states
+/// per state, each state's token kinds and next start state, the next free
+/// state, and the word state.
 struct Machine:
     | tabs: Array[I32]
     | kinds: Array[I32]
@@ -150,7 +170,7 @@ fn is_word_char(c: I32) Bool {
     (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c == 95 or (c >= 48 and c <= 57);
 }
 
-// A state whose token is complete: any byte without an edge ends it.
+/// A state whose token is complete: any byte without an edge ends it.
 fn ends(m: Machine, kind: Tok, after: I32) I32 {
     let state = m.next;
     m.next += 1;
@@ -160,14 +180,14 @@ fn ends(m: Machine, kind: Tok, after: I32) I32 {
     state;
 }
 
-// A state in the middle of a token: any byte without an edge is an error.
+/// A state in the middle of a token: any byte without an edge is an error.
 fn inside(m: Machine) I32 {
     let state = m.next;
     m.next += 1;
     state;
 }
 
-// A state that backs off when no edge continues: the token was `kind`, ending `by` bytes back.
+/// A state that backs off when no edge continues: the token was `kind`, ending `by` bytes back.
 fn backs_off(m: Machine, kind: Tok, after: I32, by: I32) I32 {
     let state = inside(m);
     m.backs[state] = kind.to_i32();
@@ -219,14 +239,14 @@ fn whitespace(m: Machine) void {
     set(m, ef_bb, 191, skip_code);
 }
 
-// A token running to the end of its line: `// …` and `\\ …`.
+/// A token running to the end of its line: `// …` and `\\ …`.
 fn to_line_end(m: Machine, state: I32) void {
     for (0 ..< 256) |c| { set(m, state, c, state); };
     set(m, state, 10, accept_code);
     set(m, state, end_byte, accept_code);
 }
 
-// `"…"` with backslash escapes; a newline or the end of the source inside is an error.
+/// `"…"` with backslash escapes; a newline or the end of the source inside is an error.
 fn strings(m: Machine) void {
     let body = inside(m);
     let escape = inside(m);
@@ -242,8 +262,8 @@ fn strings(m: Machine) void {
     set(m, escape, 10, error_code);
 }
 
-// Numbers, as the grammar's regular expressions take them: a float
-// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
+/// Numbers, as the grammar's regular expressions take them: a float
+/// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
 fn numbers(m: Machine) void {
     let int = ends(m, Tok.Int, 1);
     let zero = ends(m, Tok.Int, 1);
@@ -285,7 +305,7 @@ fn numbers(m: Machine) void {
     };
 }
 
-// A word state: word characters continue the word, anything else ends it.
+/// A word state: word characters continue the word, anything else ends it.
 fn word_state(m: Machine, after: I32) I32 {
     let state = ends(m, Tok.Word, after);
     for (0 ..< 256) |c| { if is_word_char(c) { set(m, state, c, m.word); }; };
@@ -319,7 +339,7 @@ fn words(m: Machine) void {
     keyword_path(m, start_after, "type", 4);
 }
 
-// The path of `word` through the word states from `root`, ending in a state whose token is followed by start state `after`.
+/// The path of `word` through the word states from `root`, ending in a state whose token is followed by start state `after`.
 fn keyword_path(m: Machine, root: I32, word: Str, after: I32) void {
     let current = root;
     for (0 ..< word.len()) |k| {
@@ -334,8 +354,8 @@ fn keyword_path(m: Machine, root: I32, word: Str, after: I32) void {
     m.afters[current] = after;
 }
 
-// `X` and, after an expression, `X=` (but not before `>`: `|x|=> …` closes
-// a capture before an arm). Returns the state after `X` following an expression.
+/// `X` and, after an expression, `X=` (but not before `>`: `|x|=> …` closes
+/// a capture before an arm). Returns the state after `X` following an expression.
 fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
     set(m, start_before, c, ends(m, plain, 0));
     let first = ends(m, plain, 0);
@@ -441,6 +461,7 @@ fn punctuation(m: Machine) void {
     m.backs[optional] = Tok.Question.to_i32();
 }
 
+/// The state machine, made at compile time (the @dfa tables are its rows).
 fn build() Machine {
     let m = Machine {
         tabs: Array[I32].new(256 * 256, error_code),
@@ -473,9 +494,9 @@ fn build() Machine {
     m;
 }
 
-// ── Lexing ───────────────────────────────────────────────────────────────────
+//! = Lexing
 
-// Token t, written in the room lex reserved; the one after it.
+/// Token t, written in the room lex reserved; the one after it.
 fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
     tok_kind[t] = kind;
     tok_start[t] = start;
@@ -483,7 +504,7 @@ fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
     t + 1;
 }
 
-// The tokens up to t are the mems' contents; their number.
+/// The tokens up to t are the mems' contents; their number.
 fn tokens_end(t: I32) I32 {
     tok_kind.resize(t);
     tok_start.resize(t);
@@ -491,7 +512,7 @@ fn tokens_end(t: I32) I32 {
     t;
 }
 
-// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
+/// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
 fn dsl_end(i: I32, n: I32) I32 {
     let j = i + 2;
     let depth = 1;
@@ -510,9 +531,9 @@ fn dsl_end(i: I32, n: I32) I32 {
     -1;
 }
 
-// Where the text of a template string that starts at `i` ends: at its
-// closing backtick, or at the `$` of a `${`; -1 when the source ends first,
-// or a backslash is the last byte of a line.
+/// Where the text of a template string that starts at `i` ends: at its
+/// closing backtick, or at the `$` of a `${`; -1 when the source ends first,
+/// or a backslash is the last byte of a line.
 fn template_text_end(i: I32, n: I32) I32 {
     let j = i;
     while (j < n) {
@@ -527,14 +548,14 @@ fn template_text_end(i: I32, n: I32) I32 {
     -1;
 }
 
-// Template strings open as they are lexed: by each, how many `{` are open
-// in its current `${ … }` (a `}` with none open continues its text).
+/// Template strings open as they are lexed: by each, how many `{` are open
+/// in its current `${ … }` (a `}` with none open continues its text).
 vec template_braces: I32;
 
-// Lex the bytes of `src` from `first` to the end byte at `n`, appending
-// their tokens. The last token is `End`, or `Error` (at the start of the
-// token that cannot be lexed: a byte no token starts with, or a string or
-// DSL body that does not close). Returns the number of tokens.
+/// Lex the bytes of `src` from `first` to the end byte at `n`, appending
+/// their tokens. The last token is `End`, or `Error` (at the start of the
+/// token that cannot be lexed: a byte no token starts with, or a string or
+/// DSL body that does not close). Returns the number of tokens.
 fn lex(first: I32, n: I32) I32 {
     // Room for the most tokens there can be: one a byte, and the last.
     let t = tok_kind.len();

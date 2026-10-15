@@ -1,12 +1,12 @@
-// ── Validation ───────────────────────────────────────────────────────────────
-//
-// Rules about declarations that need no expression's type: duplicate
-// names, where tuples and nullable types may appear, what a struct field
-// and a global's initializer may be, struct types that contain themselves.
-// They run over the program's own files (the standard library's are known
-// to keep them) before any function is checked.
+//! = Validation
+//!
+//! Rules about declarations that need no expression's type: duplicate
+//! names, where tuples and nullable types may appear, what a struct field
+//! and a global's initializer may be, struct types that contain themselves.
+//! They run over the program's own files (the standard library's are known
+//! to keep them) before any function is checked.
 
-// `type N = distinct B;`: B is one of the numeric scalars.
+/// `type N = distinct B;`: B is one of the numeric scalars.
 fn validate_distinct(node: I32) void {
     let base = last_child(node);
     let t = decl_type(node_decl[base], 0);
@@ -16,13 +16,16 @@ fn validate_distinct(node: I32) void {
     };
 }
 
-// ── Integer enums ──
-//
-// A variant's value counts up from 0, or from the previous `= n`; each fits
-// the representation, and no two are equal.
+//! = Integer enums
+//!
+//! A variant's value counts up from 0, or from the previous `= n`; each fits
+//! the representation, and no two are equal.
 
-vec variant_value: I32;  // by declaration (a variant of an integer enum): its value
+/// By declaration (a variant of an integer enum): its value.
+vec variant_value: I32;
 
+/// Number every integer enum's variants into @variant_value, reporting a
+/// value that is repeated or does not fit.
 fn int_enum_values() void {
     variant_value.resize(decl_kind.len());
     for (0 ..< decl_kind.len()) |d| {
@@ -74,6 +77,9 @@ fn enum_values(decl: I32) void {
     };
 }
 
+/// The rules of this file, over the program: integer enums' values,
+/// protocols, each own file's tree (a file that did not parse is reported
+/// here), recursive structs, and modules of one name.
 fn validate_program() void {
     int_enum_values();
     validate_protocols();
@@ -88,13 +94,14 @@ fn validate_program() void {
     validate_module_members();
 }
 
-// ── Modules of one name ──
-//
-// Stage 0 hoists each module's members into one namespace, as `M__f`,
-// `M.m`, `M:op` (and `M` for its promoted type), so two modules of one
-// name (an own module named like one of the standard library's, say) may
-// not declare a member twice. The later declaration is reported.
+//! = Modules of one name
+//!
+//! Stage 0 hoists each module's members into one namespace, as `M__f`,
+//! `M.m`, `M:op` (and `M` for its promoted type), so two modules of one
+//! name (an own module named like one of the standard library's, say) may
+//! not declare a member twice. The later declaration is reported.
 
+/// Report a member that another module of the same name also declares.
 fn validate_module_members() void {
     for (0 ..< decl_kind.len()) |b| {
         // A generic module is instantiated (`M__I32`), not hoisted as itself.
@@ -113,8 +120,8 @@ fn validate_module_members() void {
     };
 }
 
-// Whether module a comes before module b in stage 0's program: the
-// standard library's first, then by place.
+/// Whether module a comes before module b in stage 0's program: the
+/// standard library's first, then by place.
 fn module_before(a: I32, b: I32) Bool {
     let fa = file_of_token(node_first[decl_node[a]]);
     let fb = file_of_token(node_first[decl_node[b]]);
@@ -133,8 +140,8 @@ fn module_declares(module: I32, name: Str) Bool {
     false;
 }
 
-// The name stage 0 gives item (of module m's declaration) once hoisted, or
-// "" for what it does not name (usings, comments, …).
+/// The name stage 0 gives item (of module m's declaration) once hoisted, or
+/// "" for what it does not name (usings, comments, …).
 fn hoisted_name(m: I32, item: I32) Str {
     let module = word_text(decl_name[m]);
     if is_kind(item, Node.Op_decl) {
@@ -154,8 +161,8 @@ fn hoisted_name(m: I32, item: I32) Str {
     "";
 }
 
-// A receiver, hoisted: `&` is the module's type, a type of the module is
-// `M__T`, and any other keeps its name.
+/// A receiver, hoisted: `&` is the module's type, a type of the module is
+/// `M__T`, and any other keeps its name.
 fn hoisted_receiver(m: I32, receiver: I32) Str {
     let text = node_text(receiver);
     if text == "&" { return word_text(decl_name[m]); };
@@ -164,8 +171,8 @@ fn hoisted_receiver(m: I32, receiver: I32) Str {
     text;
 }
 
-// Validate each node of the tree, in order: those of the kinds validate_node
-// checks (most nodes are not).
+/// Validate each node of the tree, in order: those of the kinds `validate_node`
+/// checks (most nodes are not).
 fn validate_tree(node: I32) void {
     if validated_kinds.len() == 0 {
         validated_kinds.resize(Node.count());
@@ -176,8 +183,10 @@ fn validate_tree(node: I32) void {
     validate_within(node);
 }
 
-vec validated_kinds: U8;  // by Node: 1 for those validate_node checks
+/// By Node: 1 for those validate_node checks.
+vec validated_kinds: U8;
 
+/// The nodes @validated_kinds names, under `node`.
 fn validate_within(node: I32) void {
     if validated_kinds[node_kind[node]] == 1 { validate_node(node); };
     let c = node_child[node];
@@ -204,9 +213,9 @@ fn validate_node(node: I32) void {
     else if kind == Node.Await_expr.to_i32() { validate_await(node); };
 }
 
-// Children that declare a name (parameters, fields, variants), each name
-// once. `what` is the diagnostic's argument: which names (1 parameters, 2
-// variants), or the type whose fields they are.
+/// Children that declare a name (parameters, fields, variants), each name
+/// once. `what` is the diagnostic's argument: which names (1 parameters, 2
+/// variants), or the type whose fields they are.
 fn duplicate_names(node: I32, kind: Diag, what: I32) void {
     let c = first_child(node);
     while (c >= 0) {
@@ -227,7 +236,7 @@ fn duplicate_names(node: I32, kind: Diag, what: I32) void {
     };
 }
 
-// The lets of a block, each name once.
+/// The lets of a block, each name once.
 fn duplicate_lets(block: I32) void {
     let c = first_child(block);
     while (c >= 0) {
@@ -247,7 +256,7 @@ fn duplicate_lets(block: I32) void {
     };
 }
 
-// `?I32`: a scalar has no null.
+/// `?I32`: a scalar has no null.
 fn validate_nullable(node: I32) void {
     let inner = first_child(node);
     if not is_kind(inner, Node.Ref_type) { return; };
@@ -262,7 +271,7 @@ fn is_scalar_decl(decl: I32) Bool {
     x >= 0 and x_tag[x] == known_word(Known.IrWasmScalar);
 }
 
-// A tuple type is only a function's result.
+/// A tuple type is only a function's result.
 fn validate_tuple_type(node: I32) void {
     let parent = parent_of(node);
     if is_kind(parent, Node.Return_type) {
@@ -276,25 +285,27 @@ fn validate_tuple_type(node: I32) void {
     report2(Diag.TupleMisplaced, node, -1, if is_kind(parent, Node.Tuple_type) { 1; } else { 0; }, -1);
 }
 
-// A struct field holds no `fun` (use `cl`).
+/// A struct field holds no `fun` (use `cl`).
 fn validate_field_type(node: I32) void {
     let t = next_sibling(first_child(node));
     if is_kind(t, Node.Func_type) { report2(Diag.FunInField, t, -1, type_of(t, 0), 0); };
 }
 
-// A global's initializer is a literal (maybe negated).
+/// A global's initializer is a literal (maybe negated).
 fn validate_global(node: I32) void {
     if invalid_global_initializer(node) { report(Diag.InvalidGlobalInitializer, last_child(node), word_of(first_child(node))); };
 }
 
+/// Whether a global's initializer is other than a literal, a negated
+/// literal, or a DSL.
 fn invalid_global_initializer(node: I32) Bool {
     let init = last_child(node);
     if is_kind(init, Node.Literal) or is_kind(init, Node.Dsl_expr) { return false; };
     not (is_kind(init, Node.Unary_expr) and tok_kind[node_first[init]] == Tok.Minus.to_i32() and is_kind(last_child(init), Node.Literal));
 }
 
-// A struct that reaches itself through fields of struct types (not
-// nullable, not arrays) can never be built.
+/// A struct that reaches itself through fields of struct types (not
+/// nullable, not arrays) can never be built.
 fn validate_recursive_structs() void {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]]))
@@ -304,6 +315,8 @@ fn validate_recursive_structs() void {
     };
 }
 
+/// Whether `target` is a struct field's type in `from`, or in one it holds
+/// (through at most 64 struct types).
 fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
     if depth > 64 { return false; };
     let c = first_child(decl_node[from]);
@@ -320,8 +333,8 @@ fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
     false;
 }
 
-// `yield` belongs in a generator, and not in a closure inside one (the
-// generator expands into its consumer).
+/// `yield` belongs in a generator, and not in a closure inside one (the
+/// generator expands into its consumer).
 fn validate_yield(node: I32) void {
     let p = parent_of(node);
     while (p >= 0) {
@@ -338,8 +351,8 @@ fn validate_yield(node: I32) void {
     report(Diag.YieldOutside, node, -1);
 }
 
-// A defer is a statement of a block, and its code does not leave it
-// (return, or a break or continue not of a loop inside it).
+/// A defer is a statement of a block, and its code does not leave it
+/// (return, or a break or continue not of a loop inside it).
 fn validate_defer(node: I32) void {
     if not is_kind(parent_of(node), Node.Block) {
         report2(Diag.InvalidDefer, node, -1, BreakRule.DeferNotStatement.to_i32(), -1);
@@ -354,6 +367,8 @@ fn validate_defer(node: I32) void {
     };
 }
 
+/// A `return`, or a `break` or `continue` not inside a loop of its own, in a
+/// defer's code: the first, or -1. Closures are not looked into.
 fn deferred_exit(node: I32, in_loop: Bool) I32 {
     if node < 0 or is_kind(node, Node.Closure_expr) { return -1; };
     if is_kind(node, Node.Return_expr) { return node; };
@@ -368,7 +383,7 @@ fn deferred_exit(node: I32, in_loop: Bool) I32 {
     -1;
 }
 
-// `await for (…)` reads a generator call, or one stream (with one value bound).
+/// `await for (…)` reads a generator call, or one stream (with one value bound).
 fn validate_await(node: I32) void {
     let e = first_child(node);
     if not is_kind(e, Node.For_expr) or generator_call(e) >= 0 { return; };
@@ -380,15 +395,16 @@ fn validate_await(node: I32) void {
     };
 }
 
-// ── Parents ──
-//
-// The tree records children, not parents; validation and checking ask for
-// a node's parent now and then, so they are computed as nodes are added:
-// a new node's children are new, and where a graft hangs a node somewhere
-// else, it says so (set_parent).
+//! = Parents
+//!
+//! The tree records children, not parents; validation and checking ask for
+//! a node's parent now and then, so they are computed as nodes are added:
+//! a new node's children are new, and where a graft hangs a node somewhere
+//! else, it says so (set_parent).
 
 vec node_parent: I32;
 
+/// A node's parent, or -1: computed for the nodes added since it was last asked.
 fn parent_of(node: I32) I32 {
     let n = node_kind.len();
     let old = node_parent.len();
@@ -407,7 +423,7 @@ fn parent_of(node: I32) I32 {
     node_parent[node];
 }
 
-// Node `child` is now under `parent`.
+/// Node `child` is now under `parent`.
 fn set_parent(child: I32, parent: I32) void {
     parent_of(child);
     node_parent[child] = parent;

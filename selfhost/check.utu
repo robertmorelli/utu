@@ -1,44 +1,62 @@
-// ── Checking ─────────────────────────────────────────────────────────────────
-//
-// Monomorphization on demand: each function is checked once per instance
-// it is reached in, and translated as it is checked into IR. A function
-// instance (`fi_*`) is a function declaration and the instance of its
-// module; checking a call enqueues the callee's, so only what the entry
-// points reach is compiled.
-//
-// `expr` checks an expression against the type expected of it (-1 for
-// none), pushes its IR node, and returns its type. Expected types flow
-// down: an integer literal becomes the integer or float type expected of
-// it, `null` the nullable type.
+//! = Checking
+//!
+//! Monomorphization on demand: each function is checked once per instance
+//! it is reached in, and translated as it is checked into IR. A function
+//! instance (`fi_*`) is a function declaration and the instance of its
+//! module; checking a call enqueues the callee's. Every function of the
+//! program's own files is checked, for its diagnostics; another (the
+//! standard library's, a generic's instance) where it is reached. The
+//! module keeps what the exports reach (see @sweep).
+//!
+//! @check_expr checks an expression against the type expected of it (-1 for
+//! none), pushes its IR node, and returns its type. Expected types flow
+//! down: an integer literal becomes the integer or float type expected of
+//! it, `null` the nullable type.
 
+/// By function instance: its function declaration. The other `fi_*` vecs
+/// are its other columns; @fn_instance makes one.
 vec fi_decl: I32;
 vec fi_inst: I32;
-vec fi_func: I32;     // its wasm function, or -1 for an intrinsic
-vec fi_params: I32;   // a list of parameter types (self first)
+/// Its wasm function, or -1 for an intrinsic.
+vec fi_func: I32;
+/// A list of parameter types (self first).
+vec fi_params: I32;
 vec fi_result: I32;
-vec fi_ir: I32;       // an intrinsic's @ir tree, else -1
-vec fi_table: I32;    // open addressing over (decl, inst), -1 empty
-vec fi_queue: I32;    // instances to check, in order
+/// An intrinsic's @ir tree, else -1.
+vec fi_ir: I32;
+/// Open addressing over (decl, inst), -1 empty.
+vec fi_table: I32;
+/// Instances to check, in order.
+vec fi_queue: I32;
 
 // The function being checked.
-vec decl_local: I32;  // by declaration: its local
-vec decl_ty: I32;     // by declaration: its type (locals and parameters)
-vec cur_locals: I32;  // value types of its locals, parameters first
-vec cur_params: I32;  // [0]: how many of them are parameters
-vec next_label: I32;  // [0]
-vec loop_break: I32;  // per enclosing loop, innermost last
+/// By declaration: its local.
+vec decl_local: I32;
+/// By declaration: its type (locals and parameters).
+vec decl_ty: I32;
+/// Value types of its locals, parameters first.
+vec cur_locals: I32;
+/// At `[0]`: how many of them are parameters.
+vec cur_params: I32;
+/// One value, at `[0]`.
+vec next_label: I32;
+/// Per enclosing loop, innermost last.
+vec loop_break: I32;
 vec loop_continue: I32;
 
-// Where checking is.
+/// Where checking is.
 struct Cx:
     | inst: I32      // the instance the code is in
     | fi: I32        // the function instance
     | result: I32    // its result type
 
-// ── Function instances ──
+//! = Function instances
 
 fn fi_hash(decl: I32, inst: I32) I32 { (decl * -1640531535) ^ (inst * 40503); }
 
+/// The function instance of `decl` in module instance `inst`: made when
+/// new, with its wasm function, and queued to be checked (an intrinsic, or
+/// a `@wat` function, is not).
 fn fn_instance(decl: I32, inst: I32) I32 {
     if (fi_decl.len() + 1) * 2 > fi_table.len() { fi_grow(); };
     let mask = fi_table.len() - 1;
@@ -87,10 +105,10 @@ fn fi_grow() void {
     };
 }
 
-// A function's block (its last child).
+/// A function's block (its last child).
 fn fn_body(decl: I32) I32 { last_child(decl_node[decl]); }
 
-// The @ir tree of a body that is one `@ir/\ … \/` expression, or -1.
+/// The `@ir` tree of a body that is one `@ir/\ … \/` expression, or -1.
 fn intrinsic_body(block: I32) I32 {
     let e = first_child(block);
     if e < 0 or next_sibling(e) >= 0 or not is_kind(e, Node.Dsl_expr) { return -1; };
@@ -108,9 +126,12 @@ fn fn_debug_name(decl: I32) I32 {
 }
 
 // A function's parameter types (self first) and result type, in an instance.
-vec sig_params: I32;  // [0]
-vec sig_result: I32;  // [0]
+/// One value, at `[0]`.
+vec sig_params: I32;
+/// One value, at `[0]`.
+vec sig_result: I32;
 
+/// Sets @sig_params and @sig_result for `decl` in instance `inst`.
 fn signature(decl: I32, inst: I32) void {
     let node = decl_node[decl];
     let m = vl_begin();
@@ -145,7 +166,7 @@ fn signature(decl: I32, inst: I32) void {
     sig_result[0] = result;
 }
 
-// The type a method or operator belongs to, in an instance (Error for a free function).
+/// The type a method or operator belongs to, in an instance (Error for a free function).
 fn receiver_type(decl: I32, inst: I32) I32 {
     let owner = decl_a[decl];
     if owner < 0 { return ty_error(); };
@@ -162,8 +183,8 @@ fn receiver_type(decl: I32, inst: I32) I32 {
     decl_type(owner, inst);
 }
 
-// The parameter declarations of a function, in order: self, then the rest
-// (an operator's captures).
+/// The parameter declarations of a function, in order: self, then the rest
+/// (an operator's captures).
 fn param_decls(decl: I32) I32 {
     let m = vl_begin();
     let c = first_child(decl_node[decl]);
@@ -189,8 +210,9 @@ fn param_decls(decl: I32) I32 {
     vl_end(m);
 }
 
-// ── Checking functions ──
+//! = Checking functions
 
+/// A new local of the function being checked, of value type `vt`.
 fn new_local(vt: I32) I32 {
     // A value that never arrives (an expression that does not complete, or
     // none) still gets a local of some type; nothing reads it.
@@ -203,7 +225,7 @@ fn new_label() I32 {
     next_label[0];
 }
 
-// Check a function instance's body into its wasm function.
+/// Check a function instance's body into its wasm function.
 fn check_function(fi: I32) void {
     let decl = fi_decl[fi];
     cur_locals.clear();
@@ -232,8 +254,8 @@ fn check_function(fi: I32) void {
     finish_function(fi_func[fi], fn_body(decl), cx, box_params(decls, params));
 }
 
-// A body checked against the result type, as function `f`'s (after
-// `prologue`, when it is a node: moving boxed parameters into their boxes).
+/// A body checked against the result type, as function `f`'s (after
+/// `prologue`, when it is a node: moving boxed parameters into their boxes).
 fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     let m = w_mark();
     if prologue >= 0 { w_push(prologue); };
@@ -246,8 +268,8 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     for (cur_params[0] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
 }
 
-// Statements of a block; its value is its last one's. Its defers run at
-// its end, after its value.
+/// Statements of a block; its value is its last one's. Its defers run at
+/// its end, after its value.
 fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let defers = defer_node.len();
@@ -282,10 +304,10 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// A value checked as Void: dropped, if it is one.
+/// A value checked as Void: dropped, if it is one.
 fn discard(t: I32) void { drop_value(t); }
 
-// Drop the value on top of the stack, if it has one.
+/// Drop the value on top of the stack, if it has one.
 fn drop_value(t: I32) void {
     let vt = repr(t);
     if vt == vt_none or vt == vt_unreachable or ty_is(t, Ty.Error) { return; };
@@ -293,10 +315,10 @@ fn drop_value(t: I32) void {
     w_node(Op.Drop, vt_none, 0, 0, m);
 }
 
-// ── Types against types ──
+//! = Types against types
 
-// Make the value on top of the stack (of type `actual`) a value of
-// `expected`, or report that it is not one.
+/// Make the value on top of the stack (of type `actual`) a value of
+/// `expected`, or report that it is not one.
 fn coerce(actual: I32, expected: I32, at: I32) I32 {
     if expected < 0 or actual == expected { return actual; };
     if ty_is(actual, Ty.Error) or ty_is(expected, Ty.Error) or ty_is(actual, Ty.Never) { return expected; };
@@ -326,9 +348,11 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
 
 fn heap_of(vt: I32) I32 { vt_nullable(vt); }
 
-// ── Diagnostics ──
+//! = Diagnostics
 
 
+/// Report that the value at `at` is an `actual`, not the `expected`; or,
+/// when it follows from an earlier mistake, count it there.
 fn mismatch(at: I32, expected: I32, actual: I32) void {
     let site = value_site(at);
     // A local whose type came of a mistake: that mistake's consequence.
@@ -339,21 +363,22 @@ fn mismatch(at: I32, expected: I32, actual: I32) void {
     report2(Diag.TypeMismatch, site, -1, expected, actual);
 }
 
-// ── Consequences ──
-//
-// As in stage 0, a mismatch that follows from another (a local typed by a
-// mistaken initializer, a tuple or closure whose part is mistaken) is not
-// reported again: the first one counts it, `(+1 caused by this)`. For a
-// TypeMismatch, diag_c is that count (-1 for none).
+//! = Consequences
+//!
+//! As in stage 0, a mismatch that follows from another (a local typed by a
+//! mistaken initializer, a tuple or closure whose part is mistaken) is not
+//! reported again: the first one counts it, `(+1 caused by this)`. For a
+//! TypeMismatch, diag_c is that count (-1 for none).
 
-vec decl_cause: I32;  // by declaration (a let): the mismatch in its initializer, or -1
+/// By declaration (a let): the mismatch in its initializer, or -1.
+vec decl_cause: I32;
 
 fn fold_into(i: I32) void {
     if i < 0 or i >= diag_kind.len() { return; };
     diag_c[i] = if diag_c[i] < 0 { 1; } else { diag_c[i] + 1; };
 }
 
-// The first mismatch reported since diagnostic `from` at `node`'s value, or -1.
+/// The first mismatch reported since diagnostic `from` at `node`'s value, or -1.
 fn mismatch_since(from: I32, node: I32) I32 {
     let site = value_site(node);
     for (from ..< diag_kind.len()) |i| {
@@ -362,13 +387,13 @@ fn mismatch_since(from: I32, node: I32) I32 {
     -1;
 }
 
-// The first mismatch reported since diagnostic `from`, or -1.
+/// The first mismatch reported since diagnostic `from`, or -1.
 fn any_mismatch_since(from: I32) I32 {
     for (from ..< diag_kind.len()) |i| { if diag_kind[i] == Diag.TypeMismatch.to_i32() { return i; }; };
     -1;
 }
 
-// Where a value comes from, to point at: a block's is its last expression's.
+/// Where a value comes from, to point at: a block's is its last expression's.
 fn value_site(node: I32) I32 {
     if is_kind(node, Node.Block) and last_child(node) >= 0 { return value_site(last_child(node)); };
     // A DSL's splice: the utu written in its body; so too a parenthesis
@@ -378,8 +403,8 @@ fn value_site(node: I32) I32 {
     node;
 }
 
-// Whether an operand's type is unknown to stage 0: a name, or a call of
-// one, that does not resolve. An operator over it is reported too.
+/// Whether an operand's type is unknown to stage 0: a name, or a call of
+/// one, that does not resolve. An operator over it is reported too.
 fn unresolved(node: I32) Bool {
     if is_kind(node, Node.Paren_expr) or is_kind(node, Node.Splice) { return unresolved(first_child(node)); };
     if is_kind(node, Node.Identifier) { return node_decl[node] < 0; };
@@ -387,15 +412,15 @@ fn unresolved(node: I32) Bool {
     false;
 }
 
-// Something the compiler cannot do yet: reported, and checking goes on.
+/// Something the compiler cannot do yet: reported, and checking goes on.
 fn unsupported(at: I32) I32 {
     report(Diag.Unsupported, at, -1);
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
     ty_error();
 }
 
-// A string literal decode_string refused: a bad escape, or a lone
-// surrogate (which no constant's name can hold).
+/// A string literal @decode_string refused: a bad escape, or a lone
+/// surrogate (which no constant's name can hold).
 fn bad_literal(at: I32) I32 {
     if bad_escape[0] < 0 { return unsupported(at); };
     report(Diag.InvalidEscape, at, -1);
@@ -408,18 +433,21 @@ fn error_value() I32 {
     ty_error();
 }
 
-// ── Expressions ──
+//! = Expressions
 
-// Each expression's type as it was last checked, or -1: for queries
-// (`utu grep`, the editor), which the compiler does not read.
+/// Each expression's type as it was last checked, or -1: for queries
+/// (`utu grep`, the editor), which the compiler does not read.
 vec node_ty: I32;
 
+/// Check an expression against the type expected of it (-1 for none):
+/// push its IR node, record its type in @node_ty, and return the type.
 fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     let t = check_node(node, expect, cx);
     if node < node_ty.len() { node_ty[node] = t; };
     t;
 }
 
+/// @check_expr's work, by the node's kind.
 fn check_node(node: I32, expect: I32, cx: Cx) I32 {
     match Node.from_i32(node_kind[node]) {
         Node.Identifier => check_ident(node, cx),
@@ -506,7 +534,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
     t;
 }
 
-// ── Literals ──
+//! = Literals
 
 fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
     let c = first_child(node);
@@ -535,8 +563,8 @@ fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
     unsupported(node);
 }
 
-// `text ${e} text`: its pieces joined with Str's `+`, left to right, each
-// `e` as `e.to_str()`, and empty text left out (as stage 0 desugars it).
+/// `text ${e} text`: its pieces joined with Str's `+`, left to right, each
+/// `e` as `e.to_str()`, and empty text left out (as stage 0 desugars it).
 fn check_template(node: I32, cx: Cx) I32 {
     let str_t = prelude(Prelude.Str);
     let add = fn_instance(member(ty_decl(str_t), known_word(Known.Add), Space.Operator), ty_inst(str_t));
@@ -568,7 +596,7 @@ fn check_template(node: I32, cx: Cx) I32 {
     str_t;
 }
 
-// `${e}`: `e.to_str()`.
+/// `${e}`: `e.to_str()`.
 fn template_value(e: I32, cx: Cx) void {
     let m = w_mark();
     let rt = check_expr(e, -1, cx);
@@ -597,7 +625,7 @@ fn template_value(e: I32, cx: Cx) void {
     if not ty_is(t, Ty.Error) { coerce(t, prelude(Prelude.Str), e); };
 }
 
-// An integer literal's value, as 64 bits.
+/// An integer literal's value, as 64 bits.
 fn int_value(node: I32) I64 {
     let t = node_first[node];
     let i = tok_start[t];
@@ -621,8 +649,8 @@ fn int_value(node: I32) I64 {
     v;
 }
 
-// The type an integer literal takes: the one expected, when integers
-// adopt it, else I32.
+/// The type an integer literal takes: the one expected, when integers
+/// adopt it, else I32.
 fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
     let v = int_value(node);
     if negate { v = 0 - v; };
@@ -632,8 +660,8 @@ fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
     t;
 }
 
-// Whether an integer literal's value fits its type. A literal past the
-// 64-bit range wraps when it is read, so U64's top half reads negative.
+/// Whether an integer literal's value fits its type. A literal past the
+/// 64-bit range wraps when it is read, so U64's top half reads negative.
 fn fits(v: I64, t: I32, negate: Bool) Bool {
     if t == prelude(Prelude.I32) { return v >= -2147483648 and v <= 2147483647; };
     if t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { return v >= 0 and v <= 4294967295; };
@@ -641,8 +669,8 @@ fn fits(v: I64, t: I32, negate: Bool) Bool {
     true;
 }
 
-// Push a constant of numeric type `t`: the integer `v`, or (when `is_float`)
-// the float whose bits are `v`.
+/// Push a constant of numeric type `t`: the integer `v`, or (when `is_float`)
+/// the float whose bits are `v`.
 fn push_number(t: I32, v: I64, is_float: Bool) void {
     let vt = repr(t);
     if vt == vt_i32 {
@@ -674,7 +702,7 @@ fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
     ft;
 }
 
-// ── Locals and globals ──
+//! = Locals and globals
 
 fn check_let(node: I32, cx: Cx) I32 {
     let name = first_child(node);
@@ -732,7 +760,8 @@ fn check_let(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-vec decl_global: I32;  // by declaration: its wasm global, or -1
+/// By declaration: its wasm global, or -1.
+vec decl_global: I32;
 
 fn global_type(decl: I32) I32 {
     let t = type_of(next_sibling(first_child(decl_node[decl])), 0);
@@ -740,7 +769,7 @@ fn global_type(decl: I32) I32 {
     t;
 }
 
-// A function named as a value: a `fun`.
+/// A function named as a value: a `fun`.
 fn fn_value(decl: I32, cx: Cx) I32 {
     let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
     let f = function_of(fi);
@@ -757,7 +786,7 @@ fn global_get(decl: I32) I32 {
     t;
 }
 
-// A top-level `let`: a wasm global holding its constant value.
+/// A top-level `let`: a wasm global holding its constant value.
 fn global_of(decl: I32) I32 {
     if decl_global[decl] != -1 { return decl_global[decl]; };
     let node = decl_node[decl];
@@ -785,7 +814,7 @@ fn global_of(decl: I32) I32 {
     g;
 }
 
-// A constant expression (a literal, maybe negated), or -1.
+/// A constant expression (a literal, maybe negated), or -1.
 fn constant(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(node, Node.Literal) {
         let c = first_child(node);
@@ -802,7 +831,7 @@ fn constant(node: I32, expect: I32, cx: Cx) I32 {
     -1;
 }
 
-// `x = e`, `x += e`, …
+/// `x = e`, `x += e`, …
 fn check_assign(node: I32, cx: Cx) I32 {
     let target = first_child(node);
     let value = last_child(node);
@@ -841,7 +870,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// The operator a compound assignment applies (`+=` adds).
+/// The operator a compound assignment applies (`+=` adds).
 fn compound_word(op: I32, t: I32) I32 {
     if op == Tok.PlusEq.to_i32() { return known_word(Known.Add); };
     if op == Tok.MinusEq.to_i32() { return known_word(Known.Sub); };
@@ -858,10 +887,10 @@ fn compound_word(op: I32, t: I32) I32 {
     tok_word[t];
 }
 
-// ── Operators ──
+//! = Operators
 
-// The operator method a binary operator token names (`+` is add), or the
-// keyword's id for `and`, `or`, `xor`.
+/// The operator method a binary operator token names (`+` is add), or the
+/// keyword's id for `and`, `or`, `xor`.
 fn operator_word(t: I32) I32 {
     let k = tok_kind[t];
     if k == Tok.Plus.to_i32() { return known_word(Known.Add); };
@@ -889,7 +918,7 @@ fn is_comparison(word: I32) Bool {
         or word == known_word(Known.Le) or word == known_word(Known.Gt) or word == known_word(Known.Ge);
 }
 
-// The token after a node's last (its operator, in a binary expression).
+/// The token after a node's last (its operator, in a binary expression).
 fn token_after(node: I32) I32 {
     let t = node_last[node];
     while (tok_kind[t] == Tok.Comment.to_i32()) { t += 1; };
@@ -929,8 +958,8 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
     apply_operator(word, t, right, node, cx, m);
 }
 
-// With the left operand on the stack (since `m`): check the right against
-// its type and apply the operator `word` of that type.
+/// With the left operand on the stack (since `m`): check the right against
+/// its type and apply the operator `word` of that type.
 fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     if ty_is(t, Ty.Error) {
         if is_kind(at, Node.Binary_expr) and unresolved(first_child(at)) { report2(Diag.UnknownOperator, at, -1, -1, -1); };
@@ -982,7 +1011,7 @@ fn is_number_literal(node: I32) Bool {
     is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit));
 }
 
-// The type an expression has, without keeping its IR.
+/// The type an expression has, without keeping its IR.
 fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let diags = diag_kind.len();
@@ -992,7 +1021,7 @@ fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// `a and b` is `if a { b } else { false }`; `a or b`, `if a { true } else { b }`.
+/// `a and b` is `if a { b } else { false }`; `a or b`, `if a { true } else { b }`.
 fn check_logical(node: I32, word: I32, cx: Cx) I32 {
     let bool_t = prelude(Prelude.Bool);
     let m = w_mark();
@@ -1043,8 +1072,10 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
     finish_call(fn_instance(decl, ty_inst(t)), m, cx);
 }
 
-// ── Calls ──
+//! = Calls
 
+/// `f(args)`: of a function, a method (`x.f(…)`, `T.f(…)`), a host
+/// declaration, a `fun` or `cl` value, or a struct or variant constructor.
 fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     let callee = first_child(node);
     let args = next_sibling(callee);
@@ -1195,7 +1226,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     call_value(callee, args, m, node, cx);
 }
 
-// A call of any other expression: a `fun` or `cl` value.
+/// A call of any other expression: a `fun` or `cl` value.
 fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let t = type_only(callee, -1, cx);
     if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, at, cx); };
@@ -1205,8 +1236,8 @@ fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     finish_error(args, m, cx);
 }
 
-// Arguments checked and pushed, after any already pushed since `m`; then
-// the call (or the intrinsic, expanded).
+/// Arguments checked and pushed, after any already pushed since `m`; then
+/// the call (or the intrinsic, expanded).
 fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 {
     call_site.resize(1);
     call_site[0] = at;
@@ -1231,7 +1262,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
     finish_call(fi, m, cx);
 }
 
-// A call of an @es function: its import, directly.
+/// A call of an `@es` function: its import, directly.
 fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let t = decl_ty[decl];
     if not ty_is(t, Ty.Fun) {
@@ -1246,7 +1277,7 @@ fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     ty_b[t];
 }
 
-// A call of a `fun` value: the arguments, then the value, then call_ref.
+/// A call of a `fun` value: the arguments, then the value, then `call_ref`.
 fn call_ref(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     if not check_args(ty_a[t], args, 0, at, cx) {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
@@ -1257,8 +1288,8 @@ fn call_ref(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     ty_b[t];
 }
 
-// Check the arguments against parameter types (from `first`); false after
-// reporting a wrong count.
+/// Check the arguments against parameter types (from `first`); false after
+/// reporting a wrong count.
 fn check_args(params: I32, args: I32, first: I32, at: I32, cx: Cx) Bool {
     let i = first;
     let a = if args >= 0 { first_child(args); } else { -1; };
@@ -1289,9 +1320,9 @@ fn finish_error(args: I32, m: I32, cx: Cx) I32 {
     ty_error();
 }
 
-// The wasm function of a function instance. An intrinsic has none until
-// it is needed as one (exported, or a value): then its body is its
-// expansion, of its parameters.
+/// The wasm function of a function instance. An intrinsic has none until
+/// it is needed as one (exported, or a value): then its body is its
+/// expansion, of its parameters.
 fn function_of(fi: I32) I32 {
     if fi_func[fi] >= 0 { return fi_func[fi]; };
     let params = fi_params[fi];
@@ -1317,16 +1348,16 @@ fn function_of(fi: I32) I32 {
     f;
 }
 
-// Whether the program imports host declarations (std:JS, npm:…).
+/// Whether the program imports host declarations (std:JS, npm:…).
 fn has_foreign() Bool {
     for (0 ..< import_target.len()) |i| { if import_target[i] == -2 { return true; }; };
     false;
 }
 
-// The call being checked, for intrinsics' diagnostics.
+/// The call being checked, for intrinsics' diagnostics.
 vec call_site: I32;
 
-// The arguments are on the stack since `m`: call the function, or expand it.
+/// The arguments are on the stack since `m`: call the function, or expand it.
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     let result = fi_result[fi];
     if fi_ir[fi] >= 0 { return expand(fi, m); };
@@ -1334,12 +1365,15 @@ fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     result;
 }
 
-// ── Intrinsics ──
-//
-// The arguments are on the stack since `m`. Each `<ir-ident name="p"/>`
-// is the argument for p: moved in place when every parameter is used once
-// and in order, else read from a local each argument is stored in first.
+//! = Intrinsics
+//!
+//! The arguments are on the stack since `m`. Each `<ir-ident name="p"/>`
+//! is the argument for p: moved in place when every parameter is used once
+//! and in order, else read from a local each argument is stored in first.
 
+/// An intrinsic's `@ir` body in place of its call, the arguments on the
+/// stack since `m`. They are used where they are when its body reads each
+/// once, in order; else they are stored in locals first.
 fn expand(fi: I32, m: I32) I32 {
     let x = fi_ir[fi];
     let decls = param_decls(fi_decl[fi]);
@@ -1375,7 +1409,7 @@ fn expand(fi: I32, m: I32) I32 {
     fi_result[fi];
 }
 
-// The parameter indices of the `ir-ident`s of a tree, in order.
+/// The parameter indices of the `ir-ident`s of a tree, in order.
 fn ident_uses(x: I32, decls: I32) I32 {
     let m = vl_begin();
     collect_uses(x, decls);
@@ -1402,7 +1436,7 @@ fn param_index(x: I32, decls: I32) I32 {
     -1;
 }
 
-// Push the IR of an @ir element; false when it is not one the compiler knows.
+/// Push the IR of an `@ir` element; false when it is not one the compiler knows.
 fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
     let tag = x_tag[x];
     if tag == known_word(Known.IrIdent) {
@@ -1436,7 +1470,7 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     true;
 }
 
-// The value type a plain instruction leaves.
+/// The value type a plain instruction leaves.
 fn opcode_result(op: I32) I32 {
     if op <= 120 { return vt_i32; };
     if op <= 138 { return vt_i64; };
@@ -1456,8 +1490,8 @@ fn opcode_result(op: I32) I32 {
     vt_v128;
 }
 
-// `m.T` (a field access naming a type of module or alias `m`): that
-// type, in the module's instance; else -1.
+/// `m.T` (a field access naming a type of module or alias `m`): that
+/// type, in the module's instance; else -1.
 fn static_type_path(node: I32, cx: Cx) I32 {
     if not is_kind(node, Node.Field_expr) { return -1; };
     let base = first_child(node);
@@ -1479,13 +1513,13 @@ fn static_type_path(node: I32, cx: Cx) I32 {
     named(t, inst);
 }
 
-// `m.x`: `m` names a module.
+/// `m.x`: `m` names a module.
 fn is_module_path(node: I32) Bool {
     let base = first_child(node);
     is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module);
 }
 
-// `x.f` (not called): a module's global, or a field.
+/// `x.f` (not called): a module's global, or a field.
 fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     if is_module_path(node) {
         let name = last_child(node);
@@ -1495,7 +1529,7 @@ fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     check_field_get(node, expect, cx);
 }
 
-// `M[A].f(…)`: a function of the instance M[A] (a static method of its type).
+/// `M[A].f(…)`: a function of the instance `M[A]` (a static method of its type).
 fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     let name_at = first_child(node);
     let args_types = next_sibling(name_at);
@@ -1516,7 +1550,7 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
-// `T.x` (not called): a module's global, or an integer enum's variant.
+/// `T.x` (not called): a module's global, or an integer enum's variant.
 fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let owner = node_decl[first_child(node)];
     if decl_is(owner, Decl.Foreign) and decl_a[owner] >= 0 { return check_foreign_root(node, decl_a[owner], word_of(last_child(node)), expect); };
@@ -1526,7 +1560,7 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     unsupported(node);
 }
 
-// ── Control ──
+//! = Control
 
 fn check_labeled(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(first_child(node), Node.Identifier) { return unsupported(node); };
@@ -1559,8 +1593,10 @@ fn check_if(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
-// `while (c) { … }`:
-//   block $break  loop $top  (br_if $break (not c))  body  (br $top)  end  end
+/// `while (c) { … }`:
+/// ```
+/// block $break  loop $top  (br_if $break (not c))  body  (br $top)  end  end
+/// ```
 fn check_while(node: I32, cx: Cx) I32 {
     let cond = first_child(node);
     let block = last_child(node);
@@ -1631,7 +1667,7 @@ fn check_return(node: I32, cx: Cx) I32 {
     ty_never();
 }
 
-// `assert c` traps unless c.
+/// `assert c` traps unless c.
 fn check_assert(node: I32, cx: Cx) I32 {
     let bool_t = prelude(Prelude.Bool);
     let m = w_mark();
@@ -1644,8 +1680,10 @@ fn check_assert(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-// ── Entry points ──
+//! = Entry points
 
+/// What a build is of: the program's exports, its tests, or a `@comptime`
+/// build's expressions.
 enum(U8) Target:
     | Normal
     | Tests
@@ -1690,9 +1728,11 @@ fn reset_check() void {
 // Check the program from its entry points, and encode it. Returns the
 // module's size in `out`, or -1 when there are diagnostics.
 
-// A test build's tests, in the order of their exports (`__test_0`, …).
+/// A test build's tests, in the order of their exports (`__test_0`, …).
 vec test_node: I32;
 
+/// Check the resolved program and encode it for `target`: the module's
+/// size in `out`, or -1 when there are diagnostics.
 fn compile(target: Target) I32 {
     restore_diagnostics();
     if missing_import[0] >= 0 { return -1; };
@@ -1799,7 +1839,7 @@ fn has_prefix(word: I32, prefix: Str) Bool {
     true;
 }
 
-// Enqueue a function declaration (or those of an `export lib`).
+/// Enqueue a function declaration (or those of an `export lib`).
 fn check_item(item: I32) void {
     if is_kind(item, Node.Export_lib_decl) {
         let f = first_child(item);
@@ -1822,9 +1862,9 @@ fn check_item(item: I32) void {
     if is_kind(item, Node.Global_decl) and not is_es(last_child(item)) { global_of(node_decl[first_child(item)]); };
 }
 
-// Resolution reports on the whole entry file; drop what is in surfaces the
-// target leaves out (tests in a normal build, exports in a test build), as
-// those are not part of the program built.
+/// Resolution reports on the whole entry file; drop what is in surfaces the
+/// target leaves out (tests in a normal build, exports in a test build), as
+/// those are not part of the program built.
 fn keep_target_diagnostics(target: Target) void {
     let kept = 0;
     for (0 ..< diag_kind.len()) |i| {
@@ -1862,7 +1902,7 @@ fn in_target(node: I32, target: Target) Bool {
     true;
 }
 
-// `export main(…)` and tests: functions of their own, exported.
+/// `export main(…)` and tests: functions of their own, exported.
 fn entry_function(item: I32, name: I32, test_index: I32) void {
     let m = vl_begin();
     let result = ty_void();
@@ -1925,7 +1965,7 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result }, -1);
 }
 
-// `fn T.f` of an own file whose receiver T names no type, or -1.
+/// `fn T.f` of an own file whose receiver T names no type, or -1.
 fn method_of_unknown(receiver: I32, name: I32) I32 {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Fn) and decl_a[d] < 0 and is_kind(decl_node[d], Node.Fn_decl) {
