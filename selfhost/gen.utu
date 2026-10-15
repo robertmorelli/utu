@@ -43,6 +43,19 @@ vec comptime_text_start: I32;
 vec comptime_text_end: I32;
 vec comptime_text_node: I32;
 
+/// The text written at the end of src since `start`, made a generated file
+/// (its bytes, then the end byte, where @add_file places a file): the file.
+fn generated_file(start: I32) I32 {
+    let n = src.len() - start;
+    let copy = Array[I32].new(n, 0);
+    for (0 ..< n) |i| { copy[i] = src[start + i]; };
+    src.resize(start);
+    let file = add_file(n, FileRole.Generated);
+    let at = file_start[file];
+    for (0 ..< n) |i| { src[at + i] = copy[i]; };
+    file;
+}
+
 /// Writes the generated sources for the entry file's mems, and parses them as
 /// one more file. Called before names are resolved.
 fn generate_sources() void {
@@ -59,15 +72,9 @@ fn generate_sources() void {
             };
         };
     };
-    let n = src.len() - start;
-    if n == 0 { return; };
-    // The text becomes a file: its bytes, then the end byte.
-    let copy = Array[I32].new(n, 0);
-    for (0 ..< n) |i| { copy[i] = src[start + i]; };
-    src.resize(start);
-    let file = add_file(n, FileRole.Generated);
+    if src.len() == start { return; };
+    let file = generated_file(start);
     let at = file_start[file];
-    for (0 ..< n) |i| { src[at + i] = copy[i]; };
     for (0 ..< comptime_text_start.len()) |k| {
         comptime_text_start[k] += at - start;
         comptime_text_end[k] += at - start;

@@ -25,48 +25,15 @@ fn expand_dsls() void {
 /// One round, in stage 0's order: `@utu` and `@css`, then `@stored`, then each
 /// container's `@json` sites. Whether any was expanded.
 fn expand_dsl_round() Bool {
-    let utu = intern_text("utu");
-    let css = intern_text("css");
-    let stored = intern_text("stored");
-    let expanded = false;
     let before = node_kind.len();
-    let k = own_sites();
-    while (k < dsl_sites.len() and dsl_sites[k] < before) {
-        let n = dsl_sites[k];
-        if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) {
-            let w = word_of(first_child(n));
-            if w == utu or w == css {
-                expanded = true;
-                try {
-                    if w == utu { expand_utu(n); } else { expand_css(n); };
-                } catch {
-                    report_dsl_error(n);
-                    dsl_failed.push(n);
-                };
-            };
-        };
-        k += 1;
-    };
-    k = own_sites();
-    while (k < dsl_sites.len() and dsl_sites[k] < before) {
-        let n = dsl_sites[k];
-        if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == stored {
-            expanded = true;
-            try {
-                expand_stored(n);
-            } catch {
-                report_dsl_error(n);
-                dsl_failed.push(n);
-            };
-        };
-        k += 1;
-    };
+    let expanded = expand_each(intern_text("utu"), intern_text("css"), before);
+    if expand_each(intern_text("stored"), -1, before) { expanded = true; };
     let json = intern_text("json");
     let containers = Array[I32].new(64, -1);
     let ncontainers = 0;
     let found = false;
     let count = node_kind.len();
-    k = own_sites();
+    let k = own_sites();
     while (k < dsl_sites.len() and dsl_sites[k] < count) {
         let n = dsl_sites[k];
         if node_kind[n] == Node.Dsl_expr.to_i32() and word_of(first_child(n)) == json and dsl_in_program(n) {
@@ -84,29 +51,45 @@ fn expand_dsl_round() Bool {
     for (0 ..< ncontainers) |i| { json_expand_container(containers[i], json, count); };
     // Then the Wutu templates, until none is left (one may hold another).
     let wutu = intern_text("wutu");
-    let more = true;
     let guard = 0;
-    while (more and guard < 64) {
-        more = false;
+    while (guard < 64 and expand_each(wutu, -1, node_kind.len())) {
+        expanded = true;
         guard += 1;
-        let now = node_kind.len();
-        k = own_sites();
-        while (k < dsl_sites.len() and dsl_sites[k] < now) {
-            let n = dsl_sites[k];
-            if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and word_of(first_child(n)) == wutu {
-                more = true;
-                expanded = true;
-                try {
-                    expand_wutu(n, dsl_reconcile[0] == 1);
-                } catch {
-                    report_dsl_error(n);
-                    dsl_failed.push(n);
-                };
-            };
-            k += 1;
-        };
     };
     found or expanded;
+}
+
+/// Expands the program's sites of DSL `a` or `b` (words; -1 for none) among
+/// the nodes before `end_`. Whether there were any.
+fn expand_each(a: I32, b: I32, end_: I32) Bool {
+    let any = false;
+    let k = own_sites();
+    while (k < dsl_sites.len() and dsl_sites[k] < end_) {
+        let n = dsl_sites[k];
+        if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) {
+            let w = word_of(first_child(n));
+            if w == a or w == b {
+                any = true;
+                expand_site(n, word_text(w));
+            };
+        };
+        k += 1;
+    };
+    any;
+}
+
+/// Expands one site of DSL `name` (`utu`, `css`, `stored`, `wutu`); a
+/// mistake is reported, and the site left as it is.
+fn expand_site(n: I32, name: Str) void {
+    try {
+        if name == "utu" { expand_utu(n); }
+        else if name == "css" { expand_css(n); }
+        else if name == "stored" { expand_stored(n); }
+        else { expand_wutu(n, dsl_reconcile[0] == 1); };
+    } catch {
+        report_dsl_error(n);
+        dsl_failed.push(n);
+    };
 }
 
 /// The DSL sites (`@name/\ … \/`), in node order: each parse notes those it
@@ -124,9 +107,7 @@ fn own_sites() I32 { kept[5]; }
 /// Whether a node is in an own file (not the standard library), and its
 /// expansion has not failed (an expanded site is a parenthesis).
 fn dsl_in_program(node: I32) Bool {
-    if not is_own_file(file_of_token(node_first[node])) { return false; };
-    for (0 ..< dsl_failed.len()) |i| { if dsl_failed[i] == node { return false; }; };
-    true;
+    is_own_file(file_of_token(node_first[node])) and not dsl_has_failed(node);
 }
 
 /// Sites whose expansion failed (reported): left as they are, and checked as mistakes.
@@ -184,38 +165,33 @@ fn report_dsl_error(site: I32) void {
 
 /// The last answer of @dsl_byte or @dsl_units. Each walks a site's body
 /// from it when it is before the place asked for (expansions ask in order),
-/// so a body is read once, not once per ask.
-vec dsl_cursor: I32 = [-1, 0, 0];   // site, byte, UTF-16 offset
+/// so a body is read once, not once per ask: the site, the byte, and the
+/// UTF-16 offset.
+vec dsl_cursor: I32 = [-1, 0, 0];
 
 /// The byte in src of UTF-16 offset `offset` in a site's body.
 fn dsl_byte(site: I32, offset: I32) I32 {
-    let b = dsl_inner_start(site);
-    let u = 0;
-    if dsl_cursor[0] == site and dsl_cursor[2] <= offset {
-        b = dsl_cursor[1];
-        u = dsl_cursor[2];
-    };
-    let end_ = dsl_inner_end(site);
-    while (b < end_ and u < offset) {
-        let n = utf8_size(src[b]);
-        u += if n == 4 { 2; } else { 1; };
-        b += n;
-    };
-    dsl_cursor[0] = site;
-    dsl_cursor[1] = b;
-    dsl_cursor[2] = u;
-    b;
+    dsl_walk(site, dsl_inner_end(site), offset);
+    dsl_cursor[1];
 }
 
 /// The UTF-16 offset in a site's body of byte `at`.
 fn dsl_units(site: I32, at: I32) I32 {
+    dsl_walk(site, at, 2147483647);
+    dsl_cursor[2];
+}
+
+/// Moves @dsl_cursor through a site's body (from where it is, unless that
+/// is past the place) to byte `to` or UTF-16 offset `units`, whichever
+/// comes first.
+fn dsl_walk(site: I32, to: I32, units: I32) void {
     let b = dsl_inner_start(site);
     let u = 0;
-    if dsl_cursor[0] == site and dsl_cursor[1] <= at {
+    if dsl_cursor[0] == site and dsl_cursor[1] <= to and dsl_cursor[2] <= units {
         b = dsl_cursor[1];
         u = dsl_cursor[2];
     };
-    while (b < at) {
+    while (b < to and u < units) {
         let n = utf8_size(src[b]);
         u += if n == 4 { 2; } else { 1; };
         b += n;
@@ -223,7 +199,6 @@ fn dsl_units(site: I32, at: I32) I32 {
     dsl_cursor[0] = site;
     dsl_cursor[1] = b;
     dsl_cursor[2] = u;
-    u;
 }
 
 /// The length of the UTF-8 sequence a lead byte starts.
@@ -252,19 +227,25 @@ fn dsl_site_of(node: I32) I32 {
 /// Parse `code` (an expression) and make it the site's value.
 fn graft_expression(site: I32, code: Str) void {
     dsl_current_site[0] = site;
-    let root = parse_generated_file("fn __expansion() void { " + code + "; }");
-    if root < 0 { return; };
-    let fn_ = first_child(root);
-    let block = last_child(fn_);
-    let expr = first_child(block);
-    // The expression leaves the generated file, which is left empty.
-    node_child[root] = -1;
-    node_child[block] = -1;
+    let expr = parse_expansion(code);
+    if expr < 0 { return; };
     node_kind[site] = Node.Paren_expr.to_i32();
     node_child[site] = expr;
-    node_next[expr] = -1;
     set_parent(expr, site);
     fill_splices(expr);
+}
+
+/// Expression `code`, parsed as a generated file, out of the file (which is
+/// left empty): its node, or -1.
+fn parse_expansion(code: Str) I32 {
+    let root = parse_generated_file("fn __expansion() void { " + code + "; }");
+    if root < 0 { return -1; };
+    let block = last_child(first_child(root));
+    let e = first_child(block);
+    node_child[root] = -1;
+    node_child[block] = -1;
+    node_next[e] = -1;
+    e;
 }
 
 /// Parse declarations and make them the container's first items.
@@ -298,13 +279,7 @@ fn graft_declarations(container: I32, code: Str) void {
 fn parse_generated_file(code: Str) I32 {
     let start = src.len();
     gen_text_utf8(code);
-    let n = src.len() - start;
-    let copy = Array[I32].new(n + 1, 0);
-    for (0 ..< n) |i| { copy[i] = src[start + i]; };
-    src.resize(start);
-    let file = add_file(n, FileRole.Generated);
-    let at = file_start[file];
-    for (0 ..< n) |i| { src[at + i] = copy[i]; };
+    let file = generated_file(start);
     let k = dsl_file_site.len();
     dsl_file_site.resize(file + 1);
     dsl_file_from.resize(file + 1);
@@ -442,15 +417,9 @@ fn apply_renames(node: I32, k: I32) void {
 fn parse_located(k: I32) I32 {
     dsl_current_from[0] = splice_from[k];
     dsl_current_to[0] = splice_to[k];
-    let root = parse_generated_file("fn __expansion() void { " + word_text(splice_code[k]) + "; }");
+    let e = parse_expansion(word_text(splice_code[k]));
     dsl_current_from[0] = -1;
-    if root < 0 { return -1; };
-    let block = last_child(first_child(root));
-    let e = first_child(block);
-    node_child[root] = -1;
-    node_child[block] = -1;
-    node_next[e] = -1;
-    fill_splices(e);
+    if e >= 0 { fill_splices(e); };
     e;
 }
 
@@ -483,6 +452,13 @@ fn text_at(text: Str, at: I32, part: Str) Bool {
 fn text_index(text: Str, part: Str, from: I32) I32 { if from > text.len() { -1; } else { str_index(text, part, from); }; }
 
 let str_index: fun(Str, Str, I32) I32 = @es/\ (t, p, f) => t.indexOf(p, f) \/;
+
+/// Where the first non-space of `text` from `i` on is (its length when none is).
+fn skip_spaces(text: Str, i: I32) I32 {
+    let j = i;
+    while (j < text.len() and is_space_code(text.get(j))) { j += 1; };
+    j;
+}
 
 fn trim_end(text: Str) Str {
     let n = text.len();

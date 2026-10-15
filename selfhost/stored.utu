@@ -38,6 +38,9 @@ vec st_type_len: I32 = [0];
 
 fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]); }
 
+/// A body not of the form `Type "key" default`.
+fn stored_syntax(raw: Str) void { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); }
+
 /// `@stored/\ … \/`: the state, loaded and registered with the host's store.
 /// Each site's names start with its own prefix.
 fn expand_stored(site: I32) void {
@@ -63,11 +66,28 @@ fn stored_shape(written: Str, visiting: I32, file: I32) void {
     let node = stored_struct(type, file);
     if node < 0 { stored_fail("Unsupported stored type " + type + "; use local structs, Array, Str, Bool, I32, or F64"); };
     let next = list_with(visiting, w);
+    for (stored_fields(node)) |f| { stored_shape(field_type_text(f), next, file); };
+}
+
+/// A struct declaration's fields, in order.
+fn stored_fields(node: I32) Array[I32] {
+    let n = 0;
     let f = first_child(node);
     while (f >= 0) {
-        if is_kind(f, Node.Field) { stored_shape(field_type_text(f), next, file); };
+        if is_kind(f, Node.Field) { n += 1; };
         f = next_sibling(f);
     };
+    let fields = Array[I32].new(n, -1);
+    let i = 0;
+    f = first_child(node);
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            fields[i] = f;
+            i += 1;
+        };
+        f = next_sibling(f);
+    };
+    fields;
 }
 
 /// The file's struct of that name (the last, in order), or -1.
@@ -77,11 +97,7 @@ fn stored_struct(type: Str, file: I32) I32 {
     if found >= 0 and is_kind(found, Node.Struct_decl) { found; } else { -1; };
 }
 
-fn trim_text(text: Str) Str {
-    let i = 0;
-    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
-    trim_end(text.slice(i, text.len()));
-}
+fn trim_text(text: Str) Str { trim_end(text.slice(skip_spaces(text, 0), text.len())); }
 
 fn stored_fresh(prefix: Str) Str {
     let name = prefix + int_text(st_seq[0]);
@@ -99,15 +115,9 @@ fn stored_validate(type: Str, v: Str, file: I32) Str {
     if t == "F64" { return "typeof " + v + "==='number'&&Number.isFinite(" + v + ")"; };
     let node = stored_struct(t, file);
     let fields = "";
-    let first = true;
-    let f = first_child(node);
-    while (f >= 0) {
-        if is_kind(f, Node.Field) {
-            if not first { fields = fields + "&&"; };
-            fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")";
-            first = false;
-        };
-        f = next_sibling(f);
+    for (stored_fields(node)) |f| {
+        if fields.len() > 0 { fields = fields + "&&"; };
+        fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")";
     };
     v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")&&" + fields;
 }
@@ -129,15 +139,9 @@ fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
     if is_stored_scalar(t) { return v; };
     let node = stored_struct(t, file);
     let fields = "";
-    let first = true;
-    let f = first_child(node);
-    while (f >= 0) {
-        if is_kind(f, Node.Field) {
-            if not first { fields = fields + ", "; };
-            fields = fields + field_name(f) + ": " + stored_decode(field_type_text(f), v + "." + field_name(f), file, prefix);
-            first = false;
-        };
-        f = next_sibling(f);
+    for (stored_fields(node)) |f| {
+        if fields.len() > 0 { fields = fields + ", "; };
+        fields = fields + field_name(f) + ": " + stored_decode(field_type_text(f), v + "." + field_name(f), file, prefix);
     };
     t + " { " + fields + " }";
 }
@@ -153,15 +157,9 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
     if is_stored_scalar(t) { return v; };
     let node = stored_struct(t, file);
     let fields = "";
-    let first = true;
-    let f = first_child(node);
-    while (f >= 0) {
-        if is_kind(f, Node.Field) {
-            if not first { fields = fields + ", "; };
-            fields = fields + field_name(f) + ": " + stored_encode(field_type_text(f), v + "." + field_name(f), file, prefix);
-            first = false;
-        };
-        f = next_sibling(f);
+    for (stored_fields(node)) |f| {
+        if fields.len() > 0 { fields = fields + ", "; };
+        fields = fields + field_name(f) + ": " + stored_encode(field_type_text(f), v + "." + field_name(f), file, prefix);
     };
     "&{ " + fields + " }";
 }
@@ -173,24 +171,23 @@ fn stored_code(site: I32, prefix: Str) Str {
     let raw = dsl_body(site);
     let file = file_of_token(node_first[site]);
     // Type "key" [manual] [validate fn] default
-    let i = 0;
-    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+    let i = skip_spaces(raw, 0);
     let type_start = i;
-    if i >= raw.len() or not is_upper_code(raw.get(i)) { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    if i >= raw.len() or not is_upper_code(raw.get(i)) { stored_syntax(raw); };
     while (i < raw.len() and is_word_code(raw.get(i))) { i += 1; };
     let type = raw.slice(type_start, i);
     let gap = i;
-    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
-    if i == gap or i >= raw.len() or raw.get(i) != 34 { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    i = skip_spaces(raw, i);
+    if i == gap or i >= raw.len() or raw.get(i) != 34 { stored_syntax(raw); };
     let key_start = i;
     i += 1;
     while (i < raw.len() and raw.get(i) != 34 and raw.get(i) != 10) { i += 1; };
-    if i >= raw.len() or raw.get(i) != 34 or i == key_start + 1 { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    if i >= raw.len() or raw.get(i) != 34 or i == key_start + 1 { stored_syntax(raw); };
     i += 1;
     let key = raw.slice(key_start, i);
     let gap2 = i;
-    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
-    if i == gap2 or i >= raw.len() { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); };
+    i = skip_spaces(raw, i);
+    if i == gap2 or i >= raw.len() { stored_syntax(raw); };
     // Modifiers.
     let manual = false;
     let validator = "";
@@ -201,11 +198,10 @@ fn stored_code(site: I32, prefix: Str) Str {
         if text_at(raw, i, "manual") and i + 6 < raw.len() and is_space_code(raw.get(i + 6)) {
             manual = true;
             i += 6;
-            while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+            i = skip_spaces(raw, i);
             more = true;
         } else if text_at(raw, i, "validate") and i + 8 < raw.len() and is_space_code(raw.get(i + 8)) {
-            let j = i + 8;
-            while (j < raw.len() and is_space_code(raw.get(j))) { j += 1; };
+            let j = skip_spaces(raw, i + 8);
             if j < raw.len() and (is_lower_code(raw.get(j)) or raw.get(j) == 95) {
                 let k = j;
                 while (k < raw.len() and is_word_code(raw.get(k))) { k += 1; };
@@ -213,7 +209,7 @@ fn stored_code(site: I32, prefix: Str) Str {
                     validator = raw.slice(j, k);
                     validator_at = j;
                     i = k;
-                    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+                    i = skip_spaces(raw, i);
                     more = true;
                 };
             };
@@ -234,13 +230,8 @@ fn stored_code(site: I32, prefix: Str) Str {
     let load = prefix + "load";
     let register = prefix + "register";
     let apply_raw = prefix + "decode";
-    let node = stored_struct(type, file);
     let copies = "";
-    let f = first_child(node);
-    while (f >= 0) {
-        if is_kind(f, Node.Field) { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; "; };
-        f = next_sibling(f);
-    };
+    for (stored_fields(stored_struct(type, file))) |f| { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; "; };
     let check = if validator.len() > 0 { "if not " + validator + "(candidate) {candidate=" + fallback + ";};"; } else { ""; };
     "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1||!("
         + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="

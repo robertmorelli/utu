@@ -351,7 +351,7 @@ fn skip_dsl(text: Str, start: I32) I32 {
     let i = start + 1;
     if i >= text.len() or not is_word_code(text.get(i)) { return start; };
     while (i < text.len() and is_word_code(text.get(i))) { i += 1; };
-    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    i = skip_spaces(text, i);
     if not text_at(text, i, "/\\") { return start; };
     let depth = 1;
     let j = i + 2;
@@ -634,7 +634,7 @@ fn parse_tif(text: Str) I32 {
     if text_at(text, p, "else") {
         let i = p + 4;
         let gap = i;
-        while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+        i = skip_spaces(text, i);
         if i > gap and text_at(text, i, "if") and i + 2 < text.len() and is_space_code(text.get(i + 2)) {
             wp_at[0] = p + 4;
             wp_trivia(text);
@@ -685,22 +685,20 @@ fn parse_tfor(text: Str) I32 {
 fn wp_captures(text: Str) Str {
     let p = wp_at[0];
     if wp_char(text) != 124 { return ""; };
-    let i = p + 1;
-    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    let i = skip_spaces(text, p + 1);
     let from = i;
     if i >= text.len() or not (is_lower_code(text.get(i)) or text.get(i) == 95) { return ""; };
     while (i < text.len() and is_word_code(text.get(i))) { i += 1; };
-    let j = i;
-    while (j < text.len() and is_space_code(text.get(j))) { j += 1; };
+    let j = skip_spaces(text, i);
     if j < text.len() and text.get(j) == 44 {
         j += 1;
-        while (j < text.len() and is_space_code(text.get(j))) { j += 1; };
+        j = skip_spaces(text, j);
         if j >= text.len() or not (is_lower_code(text.get(j)) or text.get(j) == 95) { return ""; };
         while (j < text.len() and is_word_code(text.get(j))) { j += 1; };
         i = j;
     };
     let to = i;
-    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
+    i = skip_spaces(text, i);
     if i >= text.len() or text.get(i) != 124 { return ""; };
     wp_at[0] = i + 1;
     text.slice(from, to);
@@ -779,8 +777,7 @@ fn parse_element_statement(text: Str, n: I32) void {
         let q = p + 5;
         let property = if text_at(text, q, "value") { "value"; } else if text_at(text, q, "checked") { "checked"; } else if text_at(text, q, "number") { "number"; } else { ""; };
         if property.len() > 0 {
-            let r = q + property.len();
-            while (r < text.len() and is_space_code(text.get(r))) { r += 1; };
+            let r = skip_spaces(text, q + property.len());
             if r < text.len() and text.get(r) == 61 {
                 wp_at[0] = r + 1;
                 let source = wp_bare_expression(text);
@@ -794,12 +791,10 @@ fn parse_element_statement(text: Str, n: I32) void {
     };
     // on name { … }
     if text_at(text, p, "on") and p + 2 < text.len() and is_space_code(text.get(p + 2)) {
-        let q = p + 2;
-        while (q < text.len() and is_space_code(text.get(q))) { q += 1; };
+        let q = skip_spaces(text, p + 2);
         let a = q;
         while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
-        let r = q;
-        while (r < text.len() and is_space_code(text.get(r))) { r += 1; };
+        let r = skip_spaces(text, q);
         if q > a and r < text.len() and text.get(r) == 123 {
             let name = text.slice(a, q);
             wp_at[0] = r;
@@ -828,7 +823,7 @@ fn event_head(text: Str, p: I32) Bool {
     let a = q;
     while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
     if q == a { return false; };
-    while (q < text.len() and is_space_code(text.get(q))) { q += 1; };
+    q = skip_spaces(text, q);
     q < text.len() and text.get(q) == 61;
 }
 
