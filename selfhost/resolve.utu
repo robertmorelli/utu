@@ -399,6 +399,20 @@ fn declare_named(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
     decl;
 }
 
+/// A declaration (as @declare_named makes it), a member of `owner`.
+fn declare_member(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
+    let decl = declare_named(kind, name_at, node, owner);
+    add_member(owner, decl_name[decl], Space.Member, decl);
+    decl;
+}
+
+/// A declaration (as @declare_named makes it), in scope from here.
+fn declare_in_scope(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
+    let decl = declare_named(kind, name_at, node, owner);
+    bind(decl_name[decl], decl);
+    decl;
+}
+
 /// The first child that is not a nominal qualifier.
 fn after_qualifier(node: I32) I32 {
     let c = first_child(node);
@@ -431,8 +445,7 @@ fn declare_type_item(item: I32, owner: I32) I32 {
         let c = first_child(item);
         while (c >= 0) {
             if is_kind(c, Node.Variant) {
-                let variant = declare_named(Decl.Variant, first_child(c), c, decl);
-                add_member(decl, decl_name[variant], Space.Member, variant);
+                let variant = declare_member(Decl.Variant, first_child(c), c, decl);
                 let fields = next_sibling(first_child(c));
                 if is_kind(fields, Node.Field_list) { declare_fields(fields, variant); };
             };
@@ -447,8 +460,7 @@ fn declare_type_item(item: I32, owner: I32) I32 {
             if is_kind(c, Node.Proto_member) {
                 let m = first_child(c);
                 let name_at = first_child(m);
-                let pm = declare_named(Decl.ProtoMember, name_at, m, decl);
-                add_member(decl, decl_name[pm], Space.Member, pm);
+                declare_member(Decl.ProtoMember, name_at, m, decl);
             };
             c = next_sibling(c);
         };
@@ -464,8 +476,7 @@ fn declare_fields(holder: I32, owner: I32) void {
     let index = 0;
     while (c >= 0) {
         if is_kind(c, Node.Field) {
-            let field = declare_named(Decl.Field, first_child(c), c, owner);
-            add_member(owner, decl_name[field], Space.Member, field);
+            let field = declare_member(Decl.Field, first_child(c), c, owner);
             decl_a[field] = index;
             index += 1;
         };
@@ -529,8 +540,7 @@ fn declare_module(item: I32) I32 {
             let f = declare_fn(c, decl);
             add_member(decl, decl_name[f], Space.Member, f);
         } else if kind == Node.Global_decl.to_i32() {
-            let g = declare_named(Decl.Global, first_child(c), c, decl);
-            add_member(decl, decl_name[g], Space.Member, g);
+            declare_member(Decl.Global, first_child(c), c, decl);
         };
         c = next_sibling(c);
     };
@@ -580,8 +590,7 @@ fn declare_alias(item: I32) void {
     let opens = false;
     while (c >= 0) {
         if is_kind(c, Node.Captured_module_name) {
-            let alias = declare_named(Decl.Alias, c, item, -1);
-            bind(decl_name[alias], alias);
+            declare_in_scope(Decl.Alias, c, item, -1);
             return;
         };
         if is_kind(c, Node.Module_type_arg_list) { opens = true; };
@@ -956,7 +965,7 @@ fn promoted(decl: I32) I32 {
 
 /// Names the language provides without a declaration: the narrow element
 /// kinds of mems and integer enums, interned after the keywords.
-fn builtin_type(word: I32) Bool { word >= Kw.count() and word < Kw.count() + 4; }
+fn builtin_type(word: I32) Bool { word >= narrow_word(Narrow.U8) and word <= narrow_word(Narrow.I16); }
 
 /// Element kinds of mems and bases of distinct types: builtin names or types.
 fn walk_elem_type(node: I32, w: Walk) void {
@@ -1074,8 +1083,7 @@ fn walk_params(list: I32, owner: I32, w: Walk) void {
     while (p >= 0) {
         let name_at = first_child(p);
         walk_type(next_sibling(name_at), w);
-        let decl = declare_named(Decl.Param, name_at, p, owner);
-        bind(decl_name[decl], decl);
+        declare_in_scope(Decl.Param, name_at, p, owner);
         p = next_sibling(p);
     };
 }
@@ -1088,8 +1096,7 @@ fn walk_fn(item: I32, w: Walk) void {
     while (c >= 0) {
         let kind = node_kind[c];
         if kind == Node.Self_param.to_i32() {
-            let s = declare_named(Decl.SelfParam, first_child(c), c, decl);
-            bind(decl_name[s], s);
+            declare_in_scope(Decl.SelfParam, first_child(c), c, decl);
         } else if kind == Node.Param_list.to_i32() {
             walk_params(c, decl, w);
         } else if kind == Node.Return_type.to_i32() {
@@ -1112,8 +1119,7 @@ fn walk_op(item: I32, w: Walk) void {
         if is_kind(c, Node.Capture) {
             let n = first_child(c);
             while (n >= 0) {
-                let p = declare_named(Decl.Param, n, n, decl);
-                bind(decl_name[p], p);
+                declare_in_scope(Decl.Param, n, n, decl);
                 n = next_sibling(n);
             };
         } else if is_kind(c, Node.Return_type) {
@@ -1138,8 +1144,7 @@ fn walk_children(node: I32, w: Walk) void {
 fn bind_capture(capture: I32, kind: Decl) void {
     let n = first_child(capture);
     while (n >= 0) {
-        let d = declare_named(kind, n, capture, -1);
-        bind(decl_name[d], d);
+        declare_in_scope(kind, n, capture, -1);
         n = next_sibling(n);
     };
 }
@@ -1216,8 +1221,7 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
             walk_expr(c, w);
             let binding = next_sibling(c);
             let mark = scope_mark();
-            let d = declare_named(Decl.Promoted, binding, node, -1);
-            bind(decl_name[d], d);
+            declare_in_scope(Decl.Promoted, binding, node, -1);
             let arm = next_sibling(binding);
             walk_expr(arm, w);
             scope_pop(mark);
@@ -1229,8 +1233,7 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
             let c = next_sibling(body);
             let mark = scope_mark();
             if is_kind(c, Node.Identifier) {
-                let d = declare_named(Decl.Caught, c, node, -1);
-                bind(decl_name[d], d);
+                declare_in_scope(Decl.Caught, c, node, -1);
                 c = next_sibling(c);
             };
             walk_expr(c, w);
@@ -1290,8 +1293,7 @@ fn walk_bind(node: I32, w: Walk) void {
         walk_expr(init, w);
         let n = first_child(c);
         while (n >= 0) {
-            let d = declare_named(Decl.Local, n, node, -1);
-            bind(decl_name[d], d);
+            declare_in_scope(Decl.Local, n, node, -1);
             n = next_sibling(n);
         };
         return;
@@ -1318,8 +1320,7 @@ fn walk_closure(node: I32, w: Walk) void {
                 let name_at = first_child(p);
                 let t = next_sibling(name_at);
                 if t >= 0 { walk_type(t, w); };
-                let d = declare_named(Decl.ClosureParam, name_at, p, -1);
-                bind(decl_name[d], d);
+                declare_in_scope(Decl.ClosureParam, name_at, p, -1);
                 p = next_sibling(p);
             };
         } else if is_kind(c, Node.Return_type) {
@@ -1379,8 +1380,7 @@ fn walk_alt_arm(arm: I32, w: Walk) void {
     let c = next_sibling(pattern);
     let mark = scope_mark();
     if is_kind(c, Node.Identifier) {
-        let d = declare_named(Decl.ArmBinding, c, arm, -1);
-        bind(decl_name[d], d);
+        declare_in_scope(Decl.ArmBinding, c, arm, -1);
         c = next_sibling(c);
     };
     walk_expr(c, w);

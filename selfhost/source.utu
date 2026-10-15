@@ -18,6 +18,17 @@ enum(U8) FileRole:
     | Prelude
     | Generated
 
+/// The narrow integer types. Their names are the first words after the
+/// keywords (@reset_program interns them so), so their word ids are known.
+enum(U8) Narrow:
+    | U8
+    | I8
+    | U16
+    | I16
+
+/// The word id of a narrow integer type's name.
+fn narrow_word(n: Narrow) I32 { Kw.count() + n.to_i32(); }
+
 /// The program's own files: checked whole, reached or not.
 fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Import.to_i32(); }
 
@@ -25,9 +36,10 @@ fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or f
 fn declares_items(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Generated.to_i32(); }
 
 /// A file's first byte in `src`. The `file_*` vecs are rows by file id.
-vec file_start: I32;    // first byte in `src`
+vec file_start: I32;
 /// The end byte after its last.
 vec file_end: I32;
+/// Its @FileRole.
 vec file_role: U8;
 /// First token.
 vec file_tok: I32;
@@ -98,7 +110,7 @@ fn reset_program() void {
     reset_wat();
     if kept[0] > 0 { intern_kept(); } else {
         intern_keywords();
-        for (["U8", "I8", "U16", "I16"]) |name| { intern_text(name); };
+        for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow.from_i32(k))); };
     };
     let tokens = kept[1];
     tok_kind.resize(tokens);

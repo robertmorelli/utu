@@ -85,6 +85,8 @@ export lib {
     // An implementation of a protocol for a type that is not there (this trapped).
     ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { 0.0; }\nfn sum(l: Array[P]) F32 { l[0].perimeter(); }\nexport lib { fn run() I32 { 0; } }\n',
       "Unknown type 'Nope'"],
+    // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
+    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Syntax error: expected ';', got 'x'"],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

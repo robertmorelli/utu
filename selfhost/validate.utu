@@ -38,10 +38,10 @@ fn enum_values(decl: I32) void {
     let repr_word = word_of(after_qualifier(node));
     let lo = 0;
     let hi = 2147483647;
-    if repr_word == Kw.count() { hi = 255; };                       // U8
-    if repr_word == Kw.count() + 1 { lo = -128; hi = 127; };        // I8
-    if repr_word == Kw.count() + 2 { hi = 65535; };                 // U16
-    if repr_word == Kw.count() + 3 { lo = -32768; hi = 32767; };    // I16
+    if repr_word == narrow_word(Narrow.U8) { hi = 255; };
+    if repr_word == narrow_word(Narrow.I8) { lo = -128; hi = 127; };
+    if repr_word == narrow_word(Narrow.U16) { hi = 65535; };
+    if repr_word == narrow_word(Narrow.I16) { lo = -32768; hi = 32767; };
     if repr_word == known_word(Known.WordI32) { lo = -2147483648; };
     let own = is_own_file(file_of_token(node_first[node]));
     let next = 0;

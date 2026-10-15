@@ -321,15 +321,68 @@ fn wanted_text() Str {
 
 /// How a kind of token is written (or named, for the kinds with no one spelling).
 fn tok_spelling(kind: I32) Str {
-    match kind {
-        0 => "end of file", 1 => "a character", 2 => "a name", 3 => "an integer", 4 => "a number",
-        5 => "a string", 6 => "\\\\", 7 => "/\\", 8 => "//",
-        9 => "(", 10 => ")", 11 => "{", 12 => "}", 13 => "[", 14 => "]", 15 => ",", 16 => ";", 17 => ":",
-        18 => "@", 19 => ".", 20 => "...", 21 => "..<", 22 => "|", 23 => "|=", 24 => "&", 25 => "&=",
-        26 => "^", 27 => "^=", 28 => "*", 29 => "*=", 30 => "/", 31 => "/=", 32 => "%", 33 => "%=",
-        34 => "+", 35 => "+=", 36 => "-", 37 => "-=", 38 => "-o", 39 => "<", 40 => "<=", 41 => "<<",
-        42 => "<<=", 43 => ">", 44 => ">=", 45 => ">>", 46 => ">>=", 47 => ">>>", 48 => ">>>=", 49 => "=",
-        50 => "==", 51 => "=>", 52 => "!=", 53 => "?", 54 => "?.", 55 => "~", ~> "~>",
+    match Tok.from_i32(kind) {
+        Tok.End => "end of file",
+        Tok.Error => "a character",
+        Tok.Word => "a name",
+        Tok.Int => "an integer",
+        Tok.Float => "a number",
+        Tok.String => "a string",
+        Tok.MultilineLine => "\\\\",
+        Tok.DslBody => "/\\",
+        Tok.Comment => "//",
+        Tok.TemplateFull => "a template string",
+        Tok.TemplateHead => "a template string",
+        Tok.TemplateMiddle => "a template string",
+        Tok.TemplateTail => "a template string",
+        Tok.LParen => "(",
+        Tok.RParen => ")",
+        Tok.LBrace => "{",
+        Tok.RBrace => "}",
+        Tok.LBracket => "[",
+        Tok.RBracket => "]",
+        Tok.Comma => ",",
+        Tok.Semi => ";",
+        Tok.Colon => ":",
+        Tok.At => "@",
+        Tok.Dot => ".",
+        Tok.DotDotDot => "...",
+        Tok.DotDotLt => "..<",
+        Tok.Pipe => "|",
+        Tok.PipeEq => "|=",
+        Tok.Amp => "&",
+        Tok.AmpEq => "&=",
+        Tok.Caret => "^",
+        Tok.CaretEq => "^=",
+        Tok.Star => "*",
+        Tok.StarEq => "*=",
+        Tok.Slash => "/",
+        Tok.SlashEq => "/=",
+        Tok.Percent => "%",
+        Tok.PercentEq => "%=",
+        Tok.Plus => "+",
+        Tok.PlusEq => "+=",
+        Tok.Minus => "-",
+        Tok.MinusEq => "-=",
+        Tok.MinusO => "-o",
+        Tok.Lt => "<",
+        Tok.LtEq => "<=",
+        Tok.Shl => "<<",
+        Tok.ShlEq => "<<=",
+        Tok.Gt => ">",
+        Tok.GtEq => ">=",
+        Tok.Shr => ">>",
+        Tok.ShrEq => ">>=",
+        Tok.Shr3 => ">>>",
+        Tok.Shr3Eq => ">>>=",
+        Tok.Eq => "=",
+        Tok.EqEq => "==",
+        Tok.FatArrow => "=>",
+        Tok.BangEq => "!=",
+        Tok.Question => "?",
+        Tok.QuestionDot => "?.",
+        Tok.Tilde => "~",
+        Tok.TildeArrow => "~>",
     };
 }
 
@@ -1096,22 +1149,32 @@ fn binds(precedence: I32, min: I32, or_equal: Bool) Bool {
     precedence > min or (precedence == min and or_equal);
 }
 
-/// The precedence of a binary operator token (or keyword), and whether it is right-associative; -1 if none.
+/// The precedence of the binary operator at the cursor (a token or a
+/// keyword), or -1 if none. `^` (12) is the one right-associative.
 fn binary_precedence(p: Parser) I32 {
-    let k = kind_at(p, 0);
-    if k == Tok.Caret.to_i32() { return 12; };
-    if k == Tok.Star.to_i32() or k == Tok.Slash.to_i32() or k == Tok.Percent.to_i32() { return 11; };
-    if k == Tok.Plus.to_i32() or k == Tok.Minus.to_i32() { return 10; };
-    if k == Tok.Shl.to_i32() or k == Tok.Shr.to_i32() or k == Tok.Shr3.to_i32() { return 9; };
-    if k == Tok.Amp.to_i32() { return 8; };
-    if k == Tok.Pipe.to_i32() { return 6; };
-    if k == Tok.EqEq.to_i32() or k == Tok.BangEq.to_i32() or k == Tok.Lt.to_i32() or k == Tok.Gt.to_i32()
-        or k == Tok.LtEq.to_i32() or k == Tok.GtEq.to_i32() { return 5; };
-    let w = word_id(p);
-    if w == Kw.And.to_i32() { return 4; };
-    if w == Kw.Xor.to_i32() { return 3; };
-    if w == Kw.Or.to_i32() { return 2; };
-    -1;
+    match Tok.from_i32(kind_at(p, 0)) {
+        Tok.Caret => 12,
+        Tok.Star => 11,
+        Tok.Slash => 11,
+        Tok.Percent => 11,
+        Tok.Plus => 10,
+        Tok.Minus => 10,
+        Tok.Shl => 9,
+        Tok.Shr => 9,
+        Tok.Shr3 => 9,
+        Tok.Amp => 8,
+        Tok.Pipe => 6,
+        Tok.EqEq => 5,
+        Tok.BangEq => 5,
+        Tok.Lt => 5,
+        Tok.Gt => 5,
+        Tok.LtEq => 5,
+        Tok.GtEq => 5,
+        ~> {
+            let w = word_id(p);
+            if w == Kw.And.to_i32() { 4; } else if w == Kw.Xor.to_i32() { 3; } else if w == Kw.Or.to_i32() { 2; } else { -1; };
+        },
+    };
 }
 
 fn is_assignment(k: I32) Bool {
