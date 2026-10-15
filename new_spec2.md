@@ -918,8 +918,9 @@ refers to the declaration named so.
 
 `tools/utudoc/utudoc.mjs <paths…> -o docs.pdf` typesets a codebase from
 them, with each declaration's signature colored as the compiler reads it
-and its names linked to their declarations. The editor shows them on
-hover, as Markdown.
+and its names linked to their declarations; its contents list what is
+documented. The editor shows them on hover, as Markdown. The self-hosted
+compiler is documented so: `bun run build --docs` writes `dist/compiler.pdf`.
 
 ---
 

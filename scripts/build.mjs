@@ -7,6 +7,8 @@ import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
 //                             grammar.cjs (requires the tree-sitter CLI)
 //   bun run build --wasm    — the above, plus rebuild tree-sitter-utu.wasm
 //                             (requires emscripten)
+//   bun run build --docs    — also document the compiler: dist/compiler.pdf
+//                             (requires typst; dist/compiler.typ without it)
 //
 // Grammar source of truth — `grammar.cjs` + `grammar/rules/*.cjs`, and nothing
 // else.  `tree-sitter generate` reads them through `grammar.js` and emits
@@ -24,6 +26,7 @@ import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
 // src/grammar.json — it is output, not input.
 
 import fs from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -38,6 +41,7 @@ const BUNDLE_FILE = path.join(DIST_DIR, 'utu.js');
 const args = new Set(process.argv.slice(2));
 const buildGrammar = args.has('--grammar') || args.has('--wasm');
 const buildWasm    = args.has('--wasm');
+const buildDocs    = args.has('--docs');
 
 async function main() {
   if (buildGrammar) await generateParser();
@@ -48,6 +52,7 @@ async function main() {
   execSync(`node ${path.join('scripts', 'build-catalog.mjs')}`, { cwd: ROOT, stdio: 'inherit' });
   await bundlePackage();
   await bundleVscodeExtension();
+  if (buildDocs) documentCompiler();
 }
 
 // ── Parser (parser.c + wasm) ──────────────────────────────────────────────────
@@ -84,6 +89,16 @@ async function generateParser() {
 function buildCompiler() {
   console.log('Building the self-hosted compiler…');
   execSync(`node ${path.join('scripts', 'selfhost-bootstrap.mjs')} --out=${path.join(DIST_DIR, 'utu.wasm')}`, { cwd: ROOT, stdio: 'inherit' });
+}
+
+// dist/compiler.pdf: the compiler's doc comments, by tools/utudoc. lib.utu
+// (the host interface, and where to start reading) first, then the files in
+// the order the compiler is joined: about the order a program goes through it.
+function documentCompiler() {
+  console.log('Documenting the self-hosted compiler…');
+  const order = readFileSync(path.join(ROOT, 'selfhost', 'files.txt'), 'utf8').split('\n').map(line => line.trim()).filter(Boolean);
+  const files = ['lib.utu', ...order.filter(name => name !== 'lib.utu')].map(name => path.join('selfhost', name));
+  execSync(`node ${path.join('tools', 'utudoc', 'utudoc.mjs')} ${files.join(' ')} -o ${path.join(DIST_DIR, 'compiler.pdf')} --title "The utu compiler"`, { cwd: ROOT, stdio: 'inherit' });
 }
 
 // ── Platform sources ──────────────────────────────────────────────────────────

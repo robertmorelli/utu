@@ -9,8 +9,8 @@
 // signature, colored as the compiler reads it (keywords, types, functions,
 // strings) and with the names it uses linked to their declarations, then
 // its doc comment, which is Typst already (src/selfhost/docs.js). A file's
-// `//!` comment opens its section. `typst compile` makes the PDF; without
-// typst, the .typ is written for later.
+// `//!` comment opens its section; a later `//!` block is set where it is.
+// `typst compile` makes the PDF; without typst, the .typ is written for later.
 //
 // This is a tool that uses the compiler: it reads what a build leaves (the
 // declarations, the tokens, what names resolve to) and adds nothing to it.
@@ -27,6 +27,9 @@ import { docComments } from '../../src/selfhost/docs.js';
 
 // The level a doc comment's `= Heading` takes: below any declaration's.
 const DOC_HEADING = 5;
+// Past this many documented declarations, the contents list only the files
+// (the PDF's bookmarks still list every one).
+const CONTENTS_MAX = 200;
 
 // What a section documents, and what goes under its parent.
 const TOP = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct', 'Fn', 'Main', 'Global', 'Mem']);
@@ -55,7 +58,9 @@ async function main() {
       await walk(path.join(target, entry.name));
     }
   };
+  // The files named keep their order (a reading order); a directory's are sorted.
   for (const target of args) {
+    const from = entries.length;
     try {
       await walk(target);
     } catch (error) {
@@ -63,8 +68,8 @@ async function main() {
       console.error(`utudoc: there is no ${target}`);
       process.exit(2);
     }
+    entries.push(...entries.splice(from).sort().filter(entry => !entries.includes(entry)));
   }
-  entries.sort();
 
   const utu = await loadNodeCompiler();
   const sections = new Map();  // file key → its section's Typst
@@ -101,7 +106,7 @@ async function main() {
         doc: docs.declaration(item.decl),
         signature: signature(file.text, item),
         pieces: null,
-      })), fileDoc: docs.file(file.key), paint, index });
+      })), fileDoc: docs.file(file.key), sections: docs.sections(file.key), paint, index });
       // The signature's colors and links, while this build is the one the compiler holds.
       for (const item of plans.at(-1).items) {
         const { start, end } = item.signature;
@@ -141,21 +146,24 @@ async function main() {
   const ownNames = new Map(plans.map(({ file, items }) => [file.key, new Map(items
     .filter(item => shown.has(label(file.key, item.definition.start)))
     .map(item => [item.name, label(file.key, item.definition.start)]))]));
-  // Outside code (raw text keeps its `@`): `@Name` is a link, any other `@`
-  // (an address's) is the character. A heading in a doc comment is under
-  // its declaration's, out of the outline (see the show rule below).
-  const references = (key, doc) => doc.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((piece, i) => (i % 2 ? piece : piece
-    .replace(/(^|[^\w@\\])@([A-Za-z_]\w*)/g, (_, before, name) => {
+  // Outside code (raw text, which may span lines, keeps its `@`): `@Name` is
+  // a link, any other `@` (an address's) is the character. A heading in a
+  // doc comment is under its declaration's, out of the outline (see the
+  // show rule below).
+  const references = (key, doc) => doc.split(/(```[\s\S]*?```|`[^`]*`)/).map((piece, i) => (i % 2 ? piece : piece
+    .replace(/(^|[^\w@\\])@([A-Za-z_]\w*)(;?)/g, (_, before, name, semicolon) => {
       const target = ownNames.get(key).get(name) ?? named.get(name)?.[0];
-      return `${before}${target ? `#link(<${target}>)[#raw(${typstString(name)})]` : `#raw(${typstString(name)})`}`;
+      // (A `;` right after `#…` would end its expression, and be lost.)
+      return `${before}${target ? `#link(<${target}>)[#raw(${typstString(name)})]` : `#raw(${typstString(name)})`}${semicolon && '\\;'}`;
     })
     .replace(/([\w.])@/g, '$1\\@')
     .replace(/^(=+) /gm, (_, level) => `${'='.repeat(DOC_HEADING + level.length - 1)} `))).join('');
 
-  for (const { file, items, fileDoc } of plans) {
+  let outlined = 0;
+  for (const { file, items, fileDoc, sections: later } of plans) {
     const lines = [`= ${typstText(path.relative(base, file.key) || path.basename(file.key))} <${label(file.key, -1)}>`, ''];
     // Each doc comment is marked with where it is, for typst's errors (which name a line of the .typ).
-    const from = (start) => `// ${displayPath(file.key)}:${file.text.slice(0, start).split('\n').length}`;
+    const from = (start, doc) => `// ${displayPath(file.key)}:${file.text.slice(0, start).split('\n').length - doc.split('\n').length}`;
     if (fileDoc) lines.push(`// ${displayPath(file.key)}:1`, references(file.key, fileDoc), '');
     const children = new Map();
     for (const item of items) {
@@ -164,16 +172,37 @@ async function main() {
         children.get(item.parent).push(item);
       }
     }
+    // The outline lists what is documented (or holds something documented);
+    // the rest has its section, out of the outline and unnumbered.
+    const documented = new Set();
+    for (const item of [...items].reverse()) {
+      if (item.doc || documented.has(item.decl)) documented.add(item.decl), documented.add(item.parent);
+    }
     const write = (item, depth) => {
       if (!shown.has(label(file.key, item.definition.start))) return;
-      const heading = '='.repeat(Math.min(depth, 4));
-      lines.push(`${heading} #raw(${typstString(item.name)}) #h(0.5em) #text(size: 0.7em, fill: luma(120), smallcaps[${kindName(item.kind)}]) <${label(file.key, item.definition.start)}>`);
+      const level = Math.min(depth, 4);
+      const title = `#raw(${typstString(item.name)}) #h(0.5em) #text(size: 0.7em, fill: luma(120), smallcaps[${kindName(item.kind)}])`;
+      const at = `<${label(file.key, item.definition.start)}>`;
+      if (documented.has(item.decl)) outlined++;
+      lines.push(documented.has(item.decl) ? `${'='.repeat(level)} ${title} ${at}` : `#heading(level: ${level}, outlined: false, numbering: none)[${title}] ${at}`);
       lines.push(`#block(fill: luma(246), inset: (x: 8pt, y: 6pt), radius: 3pt, width: 100%, breakable: true)[${signatureMarkup(file, item, labels, shown)}]`);
-      if (item.doc) lines.push('', from(item.span.start), references(file.key, item.doc));
+      if (item.doc) lines.push('', from(item.span.start, item.doc), references(file.key, item.doc));
       lines.push('');
       for (const child of children.get(item.decl) ?? []) write(child, depth + 1);
     };
-    for (const item of items.filter(item => item.parent < 0)) write(item, 2);
+    // A later `//!` block, between the declarations it is between.
+    const pending = [...later];
+    const section = before => {
+      while (pending.length && pending[0].start < before) {
+        const { start, text } = pending.shift();
+        lines.push(`// ${displayPath(file.key)}:${file.text.slice(0, start).split('\n').length}`, references(file.key, text), '');
+      }
+    };
+    for (const item of items.filter(item => item.parent < 0)) {
+      section(item.span.start);
+      write(item, 2);
+    }
+    section(Infinity);
     sections.set(file.key, lines.join('\n'));
   }
 
@@ -191,7 +220,7 @@ async function main() {
     '',
     `#align(center)[#text(size: 22pt, weight: "bold")[${typstText(title)}] \\ #text(fill: luma(120))[${entries.length} file${entries.length === 1 ? '' : 's'}, documented by utudoc]]`,
     '#v(1em)',
-    '#outline(depth: 2, title: none)',
+    `#outline(depth: ${outlined > CONTENTS_MAX ? 1 : 2}, title: none)`,
     '',
     ...[...sections.values()].filter(Boolean),
   ].join('\n');
@@ -207,8 +236,21 @@ async function main() {
     return;
   }
   if (typst.status !== 0) {
-    // (Its errors name the copy: they are the .typ's lines, each doc comment marked with where it is.)
-    process.stderr.write(typst.stderr.replaceAll('docs.typ', displayPath(typFile)));
+    // Its errors name a line of the .typ: each doc comment is marked with
+    // where it is, and is its lines as written, so the source line is found.
+    const typLines = document.split('\n');
+    const sourceOf = line => {
+      for (let i = line - 2; i >= 0; i--) {
+        const mark = /^\/\/ (.+):(\d+)$/.exec(typLines[i]);
+        if (mark) return `${mark[1]}:${Number(mark[2]) + line - i - 2}`;
+        if (/^(=|#heading|#block)/.test(typLines[i])) return null;
+      }
+      return null;
+    };
+    process.stderr.write(typst.stderr.replace(/docs\.typ:(\d+):(\d+)/g, (_, line, column) => {
+      const source = sourceOf(Number(line));
+      return `${displayPath(typFile)}:${line}:${column}${source ? ` (the doc comment at ${source})` : ''}`;
+    }));
     console.error(`typst could not typeset ${displayPath(typFile)}: a doc comment's Typst is wrong where it says`);
     process.exit(1);
   }

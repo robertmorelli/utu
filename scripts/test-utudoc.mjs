@@ -26,15 +26,19 @@ fn distance(a: Point, b: Point) F64 {
     (dx * dx + dy * dy).sqrt();
 }
 
+//! = Exported
+//! What the host sees.
+
 export lib {
-    /// From the origin; see @Point and @nowhere.
+    /// From the origin; see @Point; and @nowhere.
     fn norm(x: F64, y: F64) F64 { distance(Point { x: x, y: y }, Point { x: 0.0, y: 0.0 }); }
 }
 `);
   await fs.writeFile(path.join(dir, 'shapes.utu'), `mod shapes {
     /// A shape. Mail a@b.com; \`inline @Point\` stays code.
     /// = Notes
-    /// More.
+    /// More, \`wrapped
+    /// @Point\` still code.
     struct &:
         /// The width.
         | w : F64
@@ -55,13 +59,16 @@ export lib {
   assert.match(typ, /#text\(fill: rgb\("#8b2fa3"\)\)\[#raw\("fn"\)\]/);
   // `@Name` resolves; a name nothing declares is code.
   assert.match(typ, new RegExp(`See #link\\(<${label('distance')}>\\)\\[#raw\\("distance"\\)\\]`));
-  assert.match(typ, /and #raw\("nowhere"\)/);
+  assert.match(typ, /\]\\; and #raw\("nowhere"\)/);
   // A module's own type, \`struct &\`, and its fields are documented; code
   // stays code, an address's \`@\` is the character, and a heading in a doc
   // comment is below its declaration's.
   assert.ok(label('&'), 'struct &');
   assert.match(typ, /A shape\. Mail a\\@b\.com; `inline @Point` stays code\./);
   assert.match(typ, /^===== Notes$/m);
+  // A later \`//!\` block is set where it is: after distance, before norm.
+  assert.match(typ, /#raw\("distance"\)[\s\S]*===== Exported\nWhat the host sees\.[\s\S]*#raw\("norm"\)/);
+  assert.match(typ, /`wrapped\n@Point` still code/);
   assert.match(typ, /The width\./);
   // A doc comment reads no file: typst's root holds only the document.
   const other = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-doc-read-'));
@@ -72,10 +79,14 @@ export lib {
     assert.equal(reads.status, 1);
     assert.match(reads.stderr, /file not found/);
   }
+  // The compiler's own doc comments typeset (what `bun run build --docs` makes).
+  const compiler = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'utudoc', 'utudoc.mjs'), path.join(ROOT, 'selfhost'), '-o', path.join(dir, 'compiler.pdf')], { encoding: 'utf8' });
+  assert.equal(compiler.status, 0, compiler.stderr);
+  assert.match(await fs.readFile(path.join(dir, 'compiler.typ'), 'utf8'), /^= lex\.utu/m);
   if (run.status === 0 && !/not installed/.test(run.stdout)) {
     const pdf = await fs.readFile(path.join(dir, 'docs.pdf'));
     assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
-    console.log('utudoc: doc comments, colored and linked signatures, @references, and the PDF');
+    console.log('utudoc: doc comments, colored and linked signatures, @references, the PDF, and the compiler\'s');
   } else {
     assert.match(run.stdout, /typst is not installed/);
     console.log('utudoc: doc comments, colored and linked signatures, @references (typst is not installed: no PDF)');

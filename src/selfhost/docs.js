@@ -6,7 +6,8 @@
 //   fn add(p: Point, n: I32) I32 { … }
 //
 // A declaration's doc comment is the `///` lines just before it (nothing
-// between them and it but space); a file's is its leading `//!` lines.
+// between them and it but space); a file's is its leading `//!` lines, and
+// a later `//!` block goes on with it there (a section of the file).
 // The text after the marker is Typst markup (`*strong*`, `_emphasis_`,
 // `` `code` ``, `- lists`, `$math$`, `#link(…)[…]`), which tools/utudoc
 // typesets as it is and the editor shows as Markdown (typstToMarkdown).
@@ -67,6 +68,28 @@ export function docComments(utu, files) {
         else if (found.length) break;
       }
       return lines(found, '//!');
+    },
+    /**
+     * A file's other `//!` blocks, each going on with its doc where it is:
+     * { start (in the file's text), text }, in order.
+     */
+    sections(key) {
+      const file = files.findIndex(f => f.key === key);
+      if (file < 0) return [];
+      const { offset, bytes } = files[file];
+      const blocks = [];
+      for (let t = utu.file_first_token(file), end = utu.file_end_token(file), last = -1; t < end; t++) {
+        if (tokKind[t] !== COMMENT || !text(t).startsWith('//!')) continue;
+        if (last >= 0 && last === t - 1 && adjacent(tokEnd[last], tokStart[t])) blocks.at(-1).push(t);
+        else blocks.push([t]);
+        last = t;
+      }
+      // (The leading block is the file's own.)
+      if (blocks.length && blocks[0][0] === utu.file_first_token(file)) blocks.shift();
+      return blocks.map(tokens => ({
+        start: decoder.decode(bytes.subarray(0, tokStart[tokens[0]] - offset)).length,
+        text: lines(tokens, '//!'),
+      }));
     },
   };
 }

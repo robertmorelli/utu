@@ -37,9 +37,39 @@ export async function loadNodeCompiler({ wasm, spec } = {}) {
   return loadCompiler(wasm, spec);
 }
 
-/** The hash a compiler's sources are known by. */
+/**
+ * The hash a compiler's sources are known by: their code, without comments
+ * or the spacing between tokens (documenting the compiler does not change it).
+ */
 export function sourcesHash(text) {
-  return createHash('sha256').update(text).digest('hex');
+  return createHash('sha256').update(codeOf(text)).digest('hex');
+}
+
+// The text, its comments out and each run of space one space. Strings,
+// template strings, and DSL bodies are kept as written: when unsure, text is
+// kept, so a change is never missed for a comment.
+function codeOf(text) {
+  let out = '';
+  for (let i = 0; i < text.length;) {
+    const c = text[i];
+    if (c === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+    } else if (/\s/.test(c)) {
+      while (/\s/.test(text[i] ?? '')) i++;
+      if (out && !out.endsWith(' ')) out += ' ';
+    } else if (c === '"' || c === '`' || (c === '/' && text[i + 1] === '\\')) {
+      const close = c === '/' ? '\\/' : c;
+      let j = i + 1;
+      while (j < text.length && !text.startsWith(close, j)) j += c !== '/' && text[j] === '\\' ? 2 : 1;
+      j += close.length;
+      out += text.slice(i, j);
+      i = j;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out.trimEnd();
 }
 
 const SELFHOST = path.join(ROOT, 'selfhost');
