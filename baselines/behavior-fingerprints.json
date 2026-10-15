@@ -550,15 +550,15 @@
   "formatted": "12ae32cb1ec02d01"
  },
  "examples/foundry/utu/app.utu analysis": {
-  "diagnostics": "d8d88808e923c2c8",
-  "formatted": "bafbdce6d2b35942",
-  "entries": "a02d321d2e2c008d",
-  "queries": "0c35da93ece2c4a8",
-  "graphs": "ed2568c6a5b99815"
+  "diagnostics": "b0d3a3caa79f346a",
+  "formatted": "020c453fa3134b8a",
+  "entries": "c7ff8ef09839a8a4",
+  "queries": "454a3a3a69391b86",
+  "graphs": "108b76875653958c"
  },
  "examples/foundry/utu/app.utu normal": {
-  "diagnostics": "d8d88808e923c2c8",
-  "formatted": "bafbdce6d2b35942"
+  "diagnostics": "b0d3a3caa79f346a",
+  "formatted": "020c453fa3134b8a"
  },
  "examples/foundry/utu/headless.utu analysis": {
   "diagnostics": "2596ddf21cadebd4",
@@ -607,24 +607,24 @@
  "examples/foundry/utu/style.utu analysis": {
   "diagnostics": "e5c6e2d736b9a521",
   "formatted": "95c79ad04b7d9224",
-  "entries": "47d9b758093bac5d",
-  "queries": "a1caaf10501b30be",
-  "graphs": "794fb86527ac66c6"
+  "entries": "a6ce3ff515d8ab6f",
+  "queries": "1ee1a0ccd503d239",
+  "graphs": "4395c31fd8c11532"
  },
  "examples/foundry/utu/style.utu normal": {
   "diagnostics": "e5c6e2d736b9a521",
   "formatted": "95c79ad04b7d9224"
  },
  "examples/foundry/utu/ui.utu analysis": {
-  "diagnostics": "8dd934ef7129775f",
-  "formatted": "8599ba847343f640",
-  "entries": "a7439988992c90be",
-  "queries": "26453afab8328292",
-  "graphs": "6ea7949e32e2a371"
+  "diagnostics": "0caba1d52af8d437",
+  "formatted": "00f4fde40a5e35e7",
+  "entries": "6007d15a10b20a5a",
+  "queries": "c513604f19ae695d",
+  "graphs": "827321b0e844e763"
  },
  "examples/foundry/utu/ui.utu normal": {
-  "diagnostics": "8dd934ef7129775f",
-  "formatted": "8599ba847343f640"
+  "diagnostics": "0caba1d52af8d437",
+  "formatted": "00f4fde40a5e35e7"
  },
  "examples/hello.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",

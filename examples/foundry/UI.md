@@ -133,3 +133,20 @@ URL parameters, read at startup:
   (everything, including style, layout, and paint); `work` is the frame
   callback's own time (simulation, canvas, and UI update). `hash` is the
   simulation's state hash, so a run can be checked against the reference.
+
+## Results (2026-10-15)
+
+Headless Chromium, arm64 macOS, a 600-block factory save (9,975 entities),
+35 pinned panels, the Production and Power windows open, 300 frames; both
+builds reach the same state hash. Sizes are what `tools/build-wutu.mjs` and
+`tools/build-react.mjs` report (the page's embedded game data not counted).
+
+| | utu + wutu | TypeScript + React |
+| --- | ---: | ---: |
+| payload, gzip | 57.2 KB (44.7 wasm + 12.5 JS glue) | 87.6 KB (68.9 of it React + ReactDOM) |
+| payload, brotli | 44.3 KB | 76.1 KB |
+| work per frame (avg / p95) | 5.1 / 6.5 ms | 2.2 / 3.0 ms |
+
+utu ships no framework runtime, so it is smaller in total; the game's own code
+is about three times React's app code (18.7 KB gzip), and its live updates
+take about twice as long per frame.

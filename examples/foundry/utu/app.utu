@@ -208,6 +208,12 @@ fn pin_panels(state: ui.Ui, n: I32) void {
     };
 }
 
+// Run `f` after the microtasks already queued (wutu's render among them).
+fn after_render(f: cl() void) void {
+    let queue: fun(cl() void) void = @es/\ (f) => queueMicrotask(f) \/;
+    queue(f);
+}
+
 fn percentile(values: Array[F64], fraction: F64) F64 {
     let sorted = values sort(F64) |a, b| { a < b; };
     if sorted.len() == 0 { 0.0; } else { sorted[sim.imin(sorted.len() - 1, (sorted.len().to_f64() * fraction).to_i32())]; };
@@ -238,7 +244,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
     pin_panels(state, param_int("panels", 0));
     promote param("windows") {
         |names| => {
-            state.window = names.split(",")[0];
+            for (names.split(",")) |name| { ui.toggle_window(state, name); };
         },
         ~> {},
     };
@@ -310,7 +316,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
             } else {
                 if key == "Escape" {
                     state.tool = ui.tool_none;
-                    state.window = "";
+                    state.windows = [];
                 } else {
                     if key == "w" or key == "ArrowUp" { pan(state, 0.0, -2.0); };
                     if key == "s" or key == "ArrowDown" { pan(state, 0.0, 2.0); };
@@ -345,17 +351,21 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
         wutu.invalidate("inspector");
         wutu.invalidate("footer");
         wutu.invalidate("palette");
-        if state.window.len() > 0 {
+        if state.windows.len() > 0 {
             wutu.invalidate("windows");
         };
         if bench.frames > 0 and bench.done < bench.frames {
             if bench.last_time >= 0.0 {
                 bench.intervals = bench.intervals chain([time - bench.last_time]) collect(F64);
-                bench.work = bench.work chain([Browser.performance.now() - started]) collect(F64);
-                bench.done += 1;
-                if bench.done == bench.frames {
-                    report(state, bench);
-                };
+                // The panels render in the microtask the first invalidate
+                // queued: the frame's work is measured after it.
+                after_render(cl() void {
+                    bench.work = bench.work chain([Browser.performance.now() - started]) collect(F64);
+                    bench.done += 1;
+                    if bench.done == bench.frames {
+                        report(state, bench);
+                    };
+                });
             };
             bench.last_time = time;
         };

@@ -116,9 +116,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .minimap canvas { image-rendering: pixelated; max-width: 190px; max-height: 120px; }
 .tileinfo { border-left: 1px solid var(--line); padding: 6px 10px; }
 
+.windows {
+  position: fixed; inset: 60px 360px 150px 210px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  gap: 8px; z-index: 5;
+}
 .window {
-  position: fixed; inset: 60px 360px 150px 210px; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; box-shadow: 0 12px 40px #000a; display: grid; grid-template-rows: auto 1fr; z-index: 5;
+  background: var(--panel); border: 1px solid var(--line); min-height: 0; min-width: 0;
+  border-radius: 8px; box-shadow: 0 12px 40px #000a; display: grid; grid-template-rows: auto 1fr;
 }
 .window-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .window-head h2 { margin: 0; font-size: 15px; }

@@ -24,7 +24,7 @@ mod ui {
         | pinned: Array[I32]
         | hover_x: I32
         | hover_y: I32
-        | window: Str
+        | windows: Array[Str]
         | prod: Array[I32]
         | prod10: Array[I32]
         | last: Array[I32]
@@ -86,7 +86,7 @@ mod ui {
         let none: Array[I32] = [];
         Ui {
             w: w, game_text: game_text, starter_text: starter_text, speed: 1, tool: tool_none, dir: 1, tab: 0,
-            cam_x: 0.0, cam_y: 0.0, zoom: 24.0, selected: -1, pinned: none, hover_x: -1, hover_y: -1, window: "",
+            cam_x: 0.0, cam_y: 0.0, zoom: 24.0, selected: -1, pinned: none, hover_x: -1, hover_y: -1, windows: [],
             prod: Array[I32].new_default(60 * item_count), prod10: Array[I32].new_default(60 * item_count),
             last: Array[I32].new_default(item_count), last10: Array[I32].new_default(item_count), samples: w.tick / 60,
             supply: Array[I32].new_default(60), demand: Array[I32].new_default(60), alerts: empty_alerts,
@@ -332,10 +332,10 @@ mod ui {
             div.hud-group {
                 for $[["research", "production", "power", "saves"]] |name| key $[name] {
                     button {
-                        <class = if ui.window == name { "active"; } else { ""; };
-                        = name;
+                        <class = if is_open(ui, name) { "active"; } else { ""; };
+                        = window_title(name);
                         on click {
-                            ui.window = if ui.window == name { ""; } else { name; };
+                            toggle_window(ui, name);
                             wutu.invalidate("windows");
                         };
                     }
@@ -1489,23 +1489,44 @@ mod ui {
 
     // ── windows ──────────────────────────────────────────────────────────────
 
+    fn is_open(ui: Ui, name: Str) Bool {
+        ui.windows any |w| { w == name; };
+    }
+
+    fn toggle_window(ui: Ui, name: Str) void {
+        if is_open(ui, name) {
+            ui.windows = ui.windows filter |w| { w != name; } collect(Str);
+        } else {
+            ui.windows = ui.windows chain([name]) collect(Str);
+        };
+    }
+
+    fn window_title(name: Str) Str {
+        name.slice(0, 1).to_upper() + name.slice(1, name.len());
+    }
+
+    // The open windows, side by side.
     fn windows(ui: Ui) Browser.HTMLElement {
         @wutu/\
         @island "windows";
         div {
-            if $[ui.window.len() > 0] {
-                section.window {
-                    div.window-head {
-                        h2 { = ui.window; }
-                        button {
-                            "Close";
-                            on click {
-                                ui.window = "";
-                            };
+            if $[ui.windows.len() > 0] {
+                div.windows {
+                    for $[ui.windows] |name| key $[name] {
+                        section.window {
+                            div.window-head {
+                                h2 { = window_title(name); }
+                                button {
+                                    "Close";
+                                    on click {
+                                        toggle_window(ui, name);
+                                    };
+                                }
+                            }
+                            div.window-body {
+                                = window_body(ui, name);
+                            }
                         }
-                    }
-                    div.window-body {
-                        = window_body(ui);
                     }
                 }
             }
@@ -1513,10 +1534,10 @@ mod ui {
         \/;
     }
 
-    fn window_body(ui: Ui) Browser.HTMLElement {
-        if ui.window == "research" { research_window(ui); } else {
-            if ui.window == "production" { production_window(ui); } else {
-                if ui.window == "power" { power_window(ui); } else { saves_window(ui); };
+    fn window_body(ui: Ui, name: Str) Browser.HTMLElement {
+        if name == "research" { research_window(ui); } else {
+            if name == "production" { production_window(ui); } else {
+                if name == "power" { power_window(ui); } else { saves_window(ui); };
             };
         };
     }
