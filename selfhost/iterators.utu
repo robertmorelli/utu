@@ -206,19 +206,15 @@ fn stage_type(node: I32, which: I32) I32 {
     -1;
 }
 
-fn stage_capture(node: I32) I32 {
-    let c = first_child(node);
-    while (c >= 0) {
-        if is_kind(c, Node.Capture) { return c; };
-        c = next_sibling(c);
-    };
-    -1;
-}
+fn stage_capture(node: I32) I32 { stage_part(node, Node.Capture); }
 
-fn stage_block(node: I32) I32 {
+fn stage_block(node: I32) I32 { stage_part(node, Node.Block); }
+
+/// A stage's first child of a kind, or -1.
+fn stage_part(node: I32, kind: Node) I32 {
     let c = first_child(node);
     while (c >= 0) {
-        if is_kind(c, Node.Block) { return c; };
+        if is_kind(c, kind) { return c; };
         c = next_sibling(c);
     };
     -1;
@@ -379,25 +375,13 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let i32_t = prelude(Prelude.I32);
     // The source: lo = a; hi = b (+ 1); if hi < lo { hi = lo }, or the array and its length.
     if p.range {
-        let a = first_child(input);
-        let b = last_child(input);
-        let ma = w_mark();
-        coerce(check_expr(a, i32_t, cx), i32_t, a);
-        ls(p.lo, ma);
-        let mb = w_mark();
-        coerce(check_expr(b, i32_t, cx), i32_t, b);
-        if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
-            w_i32(1);
-            plain(i32_add, vt_i32, mb);
-        };
-        ls(p.hi, mb);
+        ls(p.hi, range_bounds(input, p.lo, cx));
         let mi = w_mark();
         lg(p.hi);
         lg(p.lo);
         plain(i32_lt_s, vt_i32, mi);
         let mt = w_mark();
-        lg(p.lo);
-        ls(p.hi, mt);
+        copy_local(p.hi, p.lo);
         end_if(mi, mt);
     } else {
         let ms = w_mark();
@@ -466,6 +450,24 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     if p.finish >= 0 { w_push(p.finish); } else if p.result >= 0 { lg(p.result); };
     w_node(Op.Seq, repr(rt), 0, 0, m);
     rt;
+}
+
+/// A range's bounds, as I32s: `lo = a`, then `b` (plus one, for `a ... b`)
+/// on the stack since the mark returned.
+fn range_bounds(range: I32, lo: I32, cx: Cx) I32 {
+    let i32_t = prelude(Prelude.I32);
+    let a = first_child(range);
+    let b = last_child(range);
+    let ma = w_mark();
+    coerce(check_expr(a, i32_t, cx), i32_t, a);
+    ls(lo, ma);
+    let mb = w_mark();
+    coerce(check_expr(b, i32_t, cx), i32_t, b);
+    if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
+        w_i32(1);
+        plain(i32_add, vt_i32, mb);
+    };
+    mb;
 }
 
 /// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
@@ -571,36 +573,40 @@ fn cancel_if(p: Pipe, k: I32, cond_mark: I32) void {
 fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I32) Bool {
     let capture = stage_capture(stage_node(p, k));
     if capture < 0 { return nvalues == 0; };
-    let names = 0;
-    let c = first_child(capture);
-    while (c >= 0) {
-        names += 1;
-        c = next_sibling(c);
-    };
+    let names = child_count(capture);
     if names < nvalues or names > nvalues + 1 {
         report2(Diag.IteratorCaptures, stage_node(p, p.count - 1), stage_op(p, k), nvalues, -1);
         return false;
     };
     let j = 0;
-    c = first_child(capture);
+    let c = first_child(capture);
     while (c >= 0) {
-        let d = node_decl[c];
-        let m = w_mark();
         if j < nvalues {
+            let m = w_mark();
             lg(values[j]);
-            decl_ty[d] = types[j];
-            bind_value(d, types[j], m);
+            bind_typed(node_decl[c], types[j], m);
         } else {
-            // The index: this stage's ordinal, as U64.
-            lg(ordinal_of(p, k));
-            plain(i64_extend_i32_u, vt_i64, m);
-            decl_ty[d] = prelude(Prelude.U64);
-            bind_value(d, prelude(Prelude.U64), m);
+            // The index: this stage's ordinal.
+            bind_index(node_decl[c], ordinal_of(p, k));
         };
         j += 1;
         c = next_sibling(c);
     };
     true;
+}
+
+/// Bind declaration `d`, of type `t`, to the value on the stack since `m`.
+fn bind_typed(d: I32, t: I32, m: I32) void {
+    decl_ty[d] = t;
+    bind_value(d, t, m);
+}
+
+/// Bind declaration `d` to a position (an I32 local), as a U64.
+fn bind_index(d: I32, at: I32) void {
+    let m = w_mark();
+    lg(at);
+    plain(i64_extend_i32_u, vt_i64, m);
+    bind_typed(d, prelude(Prelude.U64), m);
 }
 
 /// A stage's ordinal and counter (made when first needed).
@@ -626,15 +632,7 @@ fn counter_of(p: Pipe, k: I32) I32 {
 fn stage_counts(p: Pipe, k: I32, nvalues: I32) Bool {
     let op = stage_op(p, k);
     if op == Kw.Take.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Zip.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() { return true; };
-    let capture = stage_capture(stage_node(p, k));
-    if capture < 0 { return false; };
-    let names = 0;
-    let c = first_child(capture);
-    while (c >= 0) {
-        names += 1;
-        c = next_sibling(c);
-    };
-    names > nvalues;
+    child_count(stage_capture(stage_node(p, k))) > nvalues;
 }
 
 /// A stage's body checked with its captures bound; its value on the stack.
@@ -737,7 +735,6 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
     let bool_t = prelude(Prelude.Bool);
-    let i32_t = prelude(Prelude.I32);
     if op == Kw.Map.to_i32() {
         let mm = w_mark();
         let t = stage_body(p, k, one(value), one(vt), 1, -1, cx);
@@ -1276,15 +1273,22 @@ struct Buffer:
     | bounded: Bool   // its first allocation is hi - lo values
 
 /// Whether a written type names one with a zero (`I32` … `Bool`, or `?T`).
-fn written_defaultable(type_node: I32) Bool {
-    if is_kind(type_node, Node.Nullable_type) { return true; };
-    let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
-    if not is_kind(name, Node.Type_ident) { return false; };
-    let w = word_of(name);
-    for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64, Prelude.Bool]) |pr| {
+fn written_defaultable(type_node: I32) Bool { is_kind(type_node, Node.Nullable_type) or written_scalar(type_node, true); }
+
+/// Whether a written type names a number (`I32` … `F64`), or `Bool` when `bool_too`.
+fn written_scalar(type_node: I32, bool_too: Bool) Bool {
+    let w = written_word(type_node);
+    if w < 0 { return false; };
+    for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64]) |pr| {
         if w == intern_text(Prelude.name(pr)) { return true; };
     };
-    false;
+    bool_too and w == intern_text(Prelude.name(Prelude.Bool));
+}
+
+/// The word of the name a written type is (`&` aside), or -1.
+fn written_word(type_node: I32) I32 {
+    let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
+    if is_kind(name, Node.Type_ident) { word_of(name); } else { -1; };
 }
 
 fn buffer(p: Pipe, slot: I32, et: I32, type_node: I32) Buffer { buffer_at(p, slot, 0, et, if p.bounded { type_node; } else { -1; }, p.bounded); }
@@ -1518,12 +1522,10 @@ fn compare(p: Pipe, k: I32, x: I32, y: I32, t: I32, cx: Cx) void {
     let b = next_sibling(a);
     let ma = w_mark();
     lg(x);
-    decl_ty[node_decl[a]] = t;
-    bind_value(node_decl[a], t, ma);
+    bind_typed(node_decl[a], t, ma);
     let mb = w_mark();
     lg(y);
-    decl_ty[node_decl[b]] = t;
-    bind_value(node_decl[b], t, mb);
+    bind_typed(node_decl[b], t, mb);
     let bool_t = prelude(Prelude.Bool);
     let block = stage_block(stage_node(p, k));
     coerce(check_block(block, bool_t, cx), bool_t, block);
@@ -1539,13 +1541,7 @@ fn check_sort(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let type_node = stage_type(node, 0);
     let et = type_of(type_node, cx.inst);
     let capture = stage_capture(node);
-    let names = 0;
-    let c = if capture >= 0 { first_child(capture); } else { -1; };
-    while (c >= 0) {
-        names += 1;
-        c = next_sibling(c);
-    };
-    if names != 2 {
+    if child_count(capture) != 2 {
         report(Diag.IteratorCaptures, node, -1);
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return;
@@ -2117,8 +2113,8 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         end_if(mi, mt);
         return;
     };
-    if op == Kw.Reduce.to_i32() and is_scalar_written(type_node) {
-        // A scalar accumulator in a local; the result made once, after.
+    if op == Kw.Reduce.to_i32() and written_scalar(type_node, false) {
+        // A number: the accumulator in a local (it has a zero); the result made once, after.
         let acc = stage_local(slot, 1, repr(et));
         let has = stage_local(slot, 2, vt_i32);
         if not p.replay {
@@ -2191,17 +2187,6 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         end_if(mb, mt2);
     };
     end_if(mi, me);
-}
-
-/// A written type with a zero for reduce's accumulator: one of the numbers.
-fn is_scalar_written(type_node: I32) Bool {
-    let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node); } else { type_node; };
-    if not is_kind(name, Node.Type_ident) { return false; };
-    let w = word_of(name);
-    for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64]) |pr| {
-        if w == intern_text(Prelude.name(pr)) { return true; };
-    };
-    false;
 }
 
 //! = group_by and distinct_by
@@ -2433,9 +2418,8 @@ fn grow_size(size: I32) void {
 
 /// 1: I32 or U32 keys, 2: I64 or U64, 0: others (by the written key type).
 fn key_hash_kind(key_node: I32) I32 {
-    let name = if is_kind(key_node, Node.Ref_type) { first_child(key_node); } else { key_node; };
-    if not is_kind(name, Node.Type_ident) { return 0; };
-    let w = word_of(name);
+    let w = written_word(key_node);
+    if w < 0 { return 0; };
     if w == intern_text("I32") or w == intern_text("U32") { return 1; };
     if w == intern_text("I64") or w == intern_text("U64") { return 2; };
     0;
@@ -2682,17 +2666,8 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     let count = new_local(vt_i32);
     let et = i32_t;
     if range {
-        let a = first_child(input);
-        let b = last_child(input);
-        let ma = w_mark();
-        coerce(check_expr(a, i32_t, cx), i32_t, a);
-        ls(start, ma);
-        let mb = w_mark();
-        coerce(check_expr(b, i32_t, cx), i32_t, b);
-        if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
-            w_i32(1);
-            plain(i32_add, vt_i32, mb);
-        };
+        // count = b - a, at least 0
+        let mb = range_bounds(input, start, cx);
         lg(start);
         plain(i32_sub, vt_i32, mb);
         ls(count, mb);
@@ -2776,16 +2751,9 @@ fn bisect_test(node: I32, range: Bool, source: I32, start: I32, at: I32, et: I32
     } else {
         array_get(source, at);
     };
-    decl_ty[node_decl[v]] = et;
-    bind_value(node_decl[v], et, mv);
+    bind_typed(node_decl[v], et, mv);
     let idx = next_sibling(v);
-    if idx >= 0 {
-        let mi = w_mark();
-        lg(at);
-        plain(i64_extend_i32_u, vt_i64, mi);
-        decl_ty[node_decl[idx]] = prelude(Prelude.U64);
-        bind_value(node_decl[idx], prelude(Prelude.U64), mi);
-    };
+    if idx >= 0 { bind_index(node_decl[idx], at); };
     let bool_t = prelude(Prelude.Bool);
     let block = stage_block(node);
     coerce(check_block(block, bool_t, cx), bool_t, block);
