@@ -533,8 +533,7 @@ fn narrow(p: Pipe, k: I32, cx: Cx) void {
         let mt = w_mark();
         lg(p.lo);
         ls(p.hi, mt);
-        seq_void(mt);
-        let me = w_mark();
+        let me = else_begin(mt);
         lg(limit);
         span(p);
         plain(i32_lt_s, vt_i32, me);
@@ -716,7 +715,7 @@ fn each_in_array(p: Pipe, k: I32, array: I32, et: I32, cx: Cx) void {
     let lp = loop_open();
     let m = w_mark();
     lg(j);
-    other_len(array);
+    len_of(array);
     exit_at_end(p, lp, m);
     let item = new_local(repr(et));
     let mg = w_mark();
@@ -1011,19 +1010,19 @@ fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         if first {
             // if other.len() < hi - lo { hi = lo + other.len() }
             let mi = w_mark();
-            other_len(other);
+            len_of(other);
             span(p);
             plain(i32_lt_s, vt_i32, mi);
             let mt = w_mark();
             lg(p.lo);
-            other_len(other);
+            len_of(other);
             plain(i32_add, vt_i32, mt);
             ls(p.hi, mt);
             end_if(mi, mt);
         } else {
             // if other.len() == 0 { cancel }
             let mi = w_mark();
-            other_len(other);
+            len_of(other);
             plain(i32_eqz, vt_i32, mi);
             cancel_if(p, k, mi);
         };
@@ -1049,7 +1048,7 @@ fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         // if counter >= other.len() { cancel }
         let mi = w_mark();
         lg(st_counter[slot]);
-        other_len(other);
+        len_of(other);
         plain(i32_ge_s, vt_i32, mi);
         cancel_if(p, k, mi);
     };
@@ -1059,7 +1058,7 @@ fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         let pair_code = w_pop();
         let mi = w_mark();
         lg(ord);
-        other_len(other);
+        len_of(other);
         plain(i32_ge_s, vt_i32, mi);
         let mt = w_mark();
         cancel(p, k);
@@ -1070,7 +1069,8 @@ fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     seq_void(m);
 }
 
-fn other_len(local: I32) void {
+/// Push the length of an array local.
+fn len_of(local: I32) void {
     let m = w_mark();
     lg(local);
     w_node(Op.ArrayLen, vt_i32, 0, 0, m);
@@ -1446,12 +1446,13 @@ fn loop_close(lp: WLoop) void {
     w_node(Op.Block, vt_none, lp.brk, 0, lp.mb);
 }
 
-/// Push `a < b` (signed i32) of two locals.
-fn lt(a: I32, b: I32) void {
+/// Leave the loop unless `a < b` (signed i32 locals).
+fn loop_while_lt(lp: WLoop, a: I32, b: I32) void {
     let m = w_mark();
     lg(a);
     lg(b);
     plain(i32_lt_s, vt_i32, m);
+    loop_while(lp, m);
 }
 
 /// The value of `cond ? a : b` for i32 values on the stack since `m`: `a`, `b`, `cond`.
@@ -1555,8 +1556,7 @@ fn check_sort(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let vtr = cur_locals[result];
     let heap = vt_heap(vtr);
     let mf = w_mark();
-    lg(result);
-    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
+    len_of(result);
     lg(b.length);
     plain(i32_eq, vt_i32, mf);
     let mt = w_mark();
@@ -1614,11 +1614,7 @@ fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     set_i32(lo, 0);
     // while (lo < n) { insertion sort of [lo, hi) }
     let runs = loop_open();
-    let mw = w_mark();
-    lg(lo);
-    lg(n);
-    plain(i32_lt_s, vt_i32, mw);
-    loop_while(runs, mw);
+    loop_while_lt(runs, lo, n);
     // hi = if lo + 24 < n { lo + 24 } else { n }
     let mh = w_mark();
     lg(lo);
@@ -1635,11 +1631,7 @@ fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     ls(hi, mh);
     arith_k(i, lo, i32_add, 1);
     let ins = loop_open();
-    let mi = w_mark();
-    lg(i);
-    lg(hi);
-    plain(i32_lt_s, vt_i32, mi);
-    loop_while(ins, mi);
+    loop_while_lt(ins, i, hi);
     let mx = w_mark();
     array_get(a, i);
     ls(x, mx);
@@ -1695,12 +1687,10 @@ fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     let left = new_local(ev);
     let right = new_local(ev);
     let passes = loop_open();
-    lt(width, n);
-    loop_while(passes, w_mark() - 1);
+    loop_while_lt(passes, width, n);
     set_i32(lo, 0);
     let merges = loop_open();
-    lt(lo, n);
-    loop_while(merges, w_mark() - 1);
+    loop_while_lt(merges, lo, n);
     // The two runs: [lo, mid) and [mid, hi).
     capped_add(mid, lo, width, n);
     capped_add(hi, mid, width, n);
@@ -1738,17 +1728,14 @@ fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     lg(lo);
     plain(i32_sub, vt_i32, dl);
     array_copy(to, mcopy);
-    seq_void(mcopy);
-    let mmerge = w_mark();
+    let mmerge = else_begin(mcopy);
     lg(lo);
     ls(i, mmerge);
     copy_local(j, mid);
     copy_local(kk, lo);
     let both = loop_open();
-    lt(i, mid);
-    loop_while(both, w_mark() - 1);
-    lt(j, hi);
-    loop_while(both, w_mark() - 1);
+    loop_while_lt(both, i, mid);
+    loop_while_lt(both, j, hi);
     let gl = w_mark();
     array_get(from, i);
     ls(left, gl);
@@ -1762,8 +1749,7 @@ fn merge_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, cx: Cx) void {
     lg(right);
     array_set_end(to, st1);
     incr(j);
-    seq_void(pt);
-    let pe = w_mark();
+    let pe = else_begin(pt);
     let st2 = array_set_begin(to, kk);
     lg(left);
     array_set_end(to, st2);
@@ -1863,8 +1849,7 @@ fn radix_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, descending: Bool
         set_i32(i, 0);
         arith_k(half, n, i32_div_s, 2);
         let rev = loop_open();
-        lt(i, half);
-        loop_while(rev, w_mark() - 1);
+        loop_while_lt(rev, i, half);
         let g = w_mark();
         array_get(a, i);
         ls(v, g);
@@ -1885,8 +1870,7 @@ fn radix_sort(p: Pipe, k: I32, b: Buffer, et: I32, result: I32, descending: Bool
         loop_close(rev);
     };
     copy_local(result, a);
-    seq_void(mt);
-    let me = w_mark();
+    let me = else_begin(mt);
     merge_sort(p, k, b, et, result, cx);
     end_if(mif, me);
 }
@@ -1904,8 +1888,7 @@ fn radix_pass(n: I32, from: I32, to: I32, counts: I32, counts_heap: I32, high: B
     // counts[digit(from[i]) + 1] += 1
     set_i32(i, 0);
     let l1 = loop_open();
-    lt(i, n);
-    loop_while(l1, w_mark() - 1);
+    loop_while_lt(l1, i, n);
     let gv = w_mark();
     array_get(from, i);
     ls(v, gv);
@@ -1939,8 +1922,7 @@ fn radix_pass(n: I32, from: I32, to: I32, counts: I32, counts_heap: I32, high: B
     // to[counts[digit]] = value; counts[digit] += 1
     set_i32(i, 0);
     let l3 = loop_open();
-    lt(i, n);
-    loop_while(l3, w_mark() - 1);
+    loop_while_lt(l3, i, n);
     let gv2 = w_mark();
     array_get(from, i);
     ls(v, gv2);
@@ -1993,8 +1975,7 @@ fn check_partition(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     stage_body(p, k, one(value), one(vt), 1, prelude(Prelude.Bool), cx);
     let mt = w_mark();
     buffer_add(p, yes, et, value, vt, node);
-    seq_void(mt);
-    let me = w_mark();
+    let me = else_begin(mt);
     buffer_add(p, no, et, value, vt, node);
     end_if(mi, me);
     // [yes, no]
@@ -2093,8 +2074,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let mb = w_mark();
         stage_body(p, k, two(acc, value), two(et, vt), 2, et, cx);
         ls(acc, mb);
-        seq_void(mt);
-        let me = w_mark();
+        let me = else_begin(mt);
         lg(value);
         coerce(vt, et, node);
         ls(acc, me);
@@ -2113,8 +2093,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     coerce(vt, et, node);
     std_new("Found", list1(et), mt, cx);
     ls(result, mt);
-    seq_void(mt);
-    let me = w_mark();
+    let me = else_begin(mt);
     lg(result);
     ls(found, me);
     let mg = w_mark();
@@ -2203,8 +2182,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let mt = w_mark();
         lg(keys.length);
         ls(j, mt);
-        seq_void(mt);
-        let me = w_mark();
+        let me = else_begin(mt);
         let pm1 = new_local(vt_i32);
         arith_k(pm1, probe, i32_sub, 1);
         let mi2 = w_mark();
@@ -2214,8 +2192,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let mt2 = w_mark();
         lg(pm1);
         ls(j, mt2);
-        seq_void(mt2);
-        let me2 = w_mark();
+        let me2 = else_begin(mt2);
         lg(at);
         w_i32(1);
         plain(i32_add, vt_i32, me2);
@@ -2229,8 +2206,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         // j = 0; while (j < keys.length) { if keys[j] == key { break }; j += 1 }
         set_i32(j, 0);
         let lp = loop_open();
-        lt(j, keys.length);
-        loop_while(lp, w_mark() - 1);
+        loop_while_lt(lp, j, keys.length);
         let mi = w_mark();
         array_get(keys.array, j);
         lg(key);
@@ -2286,8 +2262,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     ls(values, mv);
     let mif = w_mark();
     lg(size);
-    lg(values);
-    w_node(Op.ArrayLen, vt_i32, 0, 0, w_mark() - 1);
+    len_of(values);
     plain(i32_eq, vt_i32, mif);
     let mtt = w_mark();
     let grown = new_local(vt_ref(vheap, true));
@@ -2332,8 +2307,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let gg = new_local(repr(group_t));
         set_i32(jj, 0);
         let lp = loop_open();
-        lt(jj, out.length);
-        loop_while(lp, w_mark() - 1);
+        loop_while_lt(lp, jj, out.length);
         let mgg = w_mark();
         array_get(out.array, jj);
         ls(gg, mgg);
@@ -2362,8 +2336,9 @@ fn grow_size(size: I32) void {
     lg(size);
     w_i32(2);
     plain(i32_mul, vt_i32, mb);
+    let mz = w_mark();
     lg(size);
-    plain(i32_eqz, vt_i32, w_mark() - 1);
+    plain(i32_eqz, vt_i32, mz);
     select_i32(m);
 }
 
@@ -2432,8 +2407,7 @@ fn insert_key(keys: Buffer, slots: I32, mask: I32, at: I32, kind: I32) void {
     let kv = new_local(ht_a[vt_heap(cur_locals[keys.array])]);
     set_i32(g, 0);
     let lp = loop_open();
-    lt(g, keys.length);
-    loop_while(lp, w_mark() - 1);
+    loop_while_lt(lp, g, keys.length);
     let mk = w_mark();
     array_get(keys.array, g);
     ls(kv, mk);
@@ -2558,8 +2532,7 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let start = new_local(vt_i32);
     set_i32(j, 1);
     let lp = loop_open();
-    lt(j, total);
-    loop_while(lp, w_mark() - 1);
+    loop_while_lt(lp, j, total);
     if windows { copy_local(start, j); } else { arith(start, j, i32_mul, width); };
     let mset = array_set_begin(groups, j);
     slice_at(data, base, start, width, count, vheap);
