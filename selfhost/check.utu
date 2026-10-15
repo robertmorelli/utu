@@ -80,10 +80,7 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     if ir >= 0 {
         fi_ir[id] = ir;
     } else {
-        let m = vl_begin();
-        let params = fi_params[id];
-        for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
-        let f = new_func(FuncKind.Defined, func_type(vl_end(m), vl_of_result(repr(fi_result[id]))));
+        let f = defined_func(fi_params[id], fi_result[id]);
         fi_func[id] = f;
         func_debug_name[f] = fn_debug_name(decl);
         // A @wat function's body is its code, which the host assembled.
@@ -107,6 +104,21 @@ fn fi_grow() void {
 
 /// A function's block (its last child).
 fn fn_body(decl: I32) I32 { last_child(decl_node[decl]); }
+
+/// The first child of `node` of a kind, or -1.
+fn child_of_kind(node: I32, kind: Node) I32 {
+    let c = first_child(node);
+    while (c >= 0 and not is_kind(c, kind)) { c = next_sibling(c); };
+    c;
+}
+
+/// A new defined wasm function of parameter types `params` (a list) and
+/// result type `result`.
+fn defined_func(params: I32, result: I32) I32 {
+    let m = vl_begin();
+    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
+    new_func(FuncKind.Defined, func_type(vl_end(m), vl_of_result(repr(result))));
+}
 
 /// The `@ir` tree of a body that is one `@ir/\ … \/` expression, or -1.
 fn intrinsic_body(block: I32) I32 {
@@ -225,20 +237,20 @@ fn new_label() I32 {
     next_label[0];
 }
 
-/// Check a function instance's body into its wasm function.
-fn check_function(fi: I32) void {
-    let decl = fi_decl[fi];
+/// A function's checking starts: no locals, labels, loops, or defers yet.
+fn begin_function() void {
     cur_locals.clear();
     next_label.resize(1);
     next_label[0] = 0;
-    loop_break.clear();
-    loop_continue.clear();
-    loop_state.clear();
-    loop_state_type.clear();
-    loop_defers.clear();
-    loop_break_defers.clear();
+    clear_loops();
     defer_node.clear();
     function_defers[0] = 0;
+}
+
+/// Check a function instance's body into its wasm function.
+fn check_function(fi: I32) void {
+    let decl = fi_decl[fi];
+    begin_function();
     let params = fi_params[fi];
     let decls = param_decls(decl);
     for (0 ..< vl_len[decls]) |i| {
@@ -263,9 +275,14 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     if ty_is(cx.result, Ty.Void) { drop_value(t); } else { coerce(t, cx.result, body_node); };
     w_node(Op.Seq, repr(cx.result), 0, 0, m);
     func_body[f] = w_pop();
+    record_locals(f, cur_params[0]);
+}
+
+/// Function `f`'s locals: those of @cur_locals from `first` (past its parameters).
+fn record_locals(f: I32, first: I32) void {
     func_locals[f] = local_types.len();
-    func_local_count[f] = cur_locals.len() - cur_params[0];
-    for (cur_params[0] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
+    func_local_count[f] = cur_locals.len() - first;
+    for (first ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
 }
 
 /// Statements of a block; its value is its last one's. Its defers run at
@@ -289,19 +306,26 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     };
     if defer_node.len() > defers {
         let vt = repr(t);
-        if vt != vt_none and vt != vt_unreachable {
-            let local = new_local(vt);
-            w_node(Op.LocalSet, vt_none, local, 0, w_mark() - 1);
-            run_defers(defers, cx);
-            w_leaf(Op.LocalGet, vt, local, 0);
-        } else if vt != vt_unreachable {
-            run_defers(defers, cx);
-        };
+        if vt != vt_unreachable { defers_after_value(vt, w_mark() - 1, defers, cx); };
         defer_node.resize(defers);
     };
     defer_marks.resize(defer_marks.len() - 1);
     w_node(Op.Seq, repr(t), 0, 0, m);
     t;
+}
+
+/// Run the defers pending since `from` after a value (of value type `vt`,
+/// on the stack since `m`), which waits in a local meanwhile; with no value
+/// (`vt` none or unreachable), just run them.
+fn defers_after_value(vt: I32, m: I32, from: I32, cx: Cx) void {
+    if vt == vt_none or vt == vt_unreachable {
+        run_defers(from, cx);
+        return;
+    };
+    let local = new_local(vt);
+    w_node(Op.LocalSet, vt_none, local, 0, m);
+    run_defers(from, cx);
+    w_leaf(Op.LocalGet, vt, local, 0);
 }
 
 /// A value checked as Void: dropped, if it is one.
@@ -415,8 +439,7 @@ fn unresolved(node: I32) Bool {
 /// Something the compiler cannot do yet: reported, and checking goes on.
 fn unsupported(at: I32) I32 {
     report(Diag.Unsupported, at, -1);
-    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-    ty_error();
+    error_value();
 }
 
 /// A string literal @decode_string refused: a bad escape, or a lone
@@ -424,12 +447,19 @@ fn unsupported(at: I32) I32 {
 fn bad_literal(at: I32) I32 {
     if bad_escape[0] < 0 { return unsupported(at); };
     report(Diag.InvalidEscape, at, -1);
+    error_value();
+}
+
+/// A mistaken expression's value: `unreachable`, of type Error.
+fn error_value() I32 {
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
     ty_error();
 }
 
-fn error_value() I32 {
-    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+/// A mistaken expression whose code is on the stack since `m`: that code,
+/// then `unreachable`, of type Error.
+fn error_since(m: I32) I32 {
+    w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
     ty_error();
 }
 
@@ -528,7 +558,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
         report(Diag.MemNotValue, node, decl_name[decl]);
         return error_value();
     };
-    if k == Decl.Fn.to_i32() or is_type_decl(decl) { return unsupported(node); };
+    if is_type_decl(decl) { return unsupported(node); };
     let t = decl_ty[decl];
     read_value(decl, t);
     t;
@@ -755,7 +785,6 @@ fn check_let(node: I32, cx: Cx) I32 {
         w_node(Op.Seq, repr(t), 0, 0, m);
         return ty_void();
     };
-    decl_ty[decl] = t;
     bind_value(decl, t, m);
     ty_void();
 }
@@ -790,8 +819,7 @@ fn global_get(decl: I32) I32 {
 fn global_of(decl: I32) I32 {
     if decl_global[decl] != -1 { return decl_global[decl]; };
     let node = decl_node[decl];
-    let t = type_of(next_sibling(first_child(node)), 0);
-    decl_ty[decl] = t;
+    let t = global_type(decl);
     let init = last_child(node);
     let m = w_mark();
     let cx = Cx { inst: 0, fi: -1, result: t };
@@ -964,8 +992,7 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     if ty_is(t, Ty.Error) {
         if is_kind(at, Node.Binary_expr) and unresolved(first_child(at)) { report2(Diag.UnknownOperator, at, -1, -1, -1); };
         check_expr(right, -1, cx);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     // A dynamic host value meets the other operand's primitive; two are
     // numeric (and `==` between them is JS identity), as in stage 0.
@@ -989,15 +1016,13 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
         coerce(check_expr(right, t, cx), t, right);
         if scalar_compare(decl, word, m) { return prelude(Prelude.Bool); };
         report2(Diag.UnknownOperator, at, word, t, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     let op = member(decl, word, Space.Operator);
     if op < 0 {
         check_expr(right, t, cx);
         report2(Diag.UnknownOperator, at, word, t, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     let fi = fn_instance(op, ty_inst(t));
     coerce(check_expr(right, vl_item(fi_params[fi], 1), cx), vl_item(fi_params[fi], 1), right);
@@ -1066,8 +1091,7 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
     let decl = member(ty_decl(t), word, Space.Operator);
     if decl < 0 {
         report2(Diag.UnknownOperator, node, word, t, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     finish_call(fn_instance(decl, ty_inst(t)), m, cx);
 }
@@ -1082,148 +1106,162 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     // A DSL's splice is its expression.
     while (is_kind(callee, Node.Splice)) { callee = first_child(callee); };
     let m = w_mark();
-    if is_kind(callee, Node.Identifier) {
-        let decl = node_decl[callee];
-        if decl < 0 { return error_value(); };
-        if is_generator(decl) {
-            report(Diag.GeneratorCall, node, decl_name[decl]);
-            return finish_error(args, m, cx);
-        };
-        if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
-            es_import(decl, last_child(decl_node[decl]), global_type(decl));
-        };
-        if decl_es[decl] >= 0 { return call_es(decl, args, m, node, cx); };
-        if not decl_is(decl, Decl.Fn) {
-            let t = if decl_is(decl, Decl.Global) { global_type(decl); } else { decl_ty[decl]; };
-            if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
-            if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, node, cx); };
-            if ty_is(t, Ty.Error) { return finish_error(args, m, cx); };
-            report2(Diag.NotCallable, node, word_of(callee), t, -1);
-            return finish_error(args, m, cx);
-        };
-        let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
-        return call_with(fi, args, 0, m, node, cx);
-    };
-    if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) {
-        let base = first_child(callee);
-        let name = last_child(callee);
-        let module = node_decl[base];
-        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Mem) { return check_mem_method(module, name, args, node, cx); };
-        // `ints.make(…)` with `using M[A] |ints|`: M's function in M[A].
-        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Module) {
-            let target = static_member(decl_a[module], word_of(name));
-            if not decl_is(target, Decl.Fn) {
-                report(Diag.UnknownMethod, name, word_of(name));
-                return finish_error(args, m, cx);
-            };
-            return call_with(fn_instance(target, alias_instance(module)), args, 0, m, node, cx);
-        };
-        if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
-            let decl = node_decl[name];
-            if not decl_is(decl, Decl.Fn) { return unsupported(node); };
-            return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
-        };
-        // `m.T.f(…)`: a static function of a module's (or alias's) type.
-        let st = static_type_path(base, cx);
-        if st >= 0 {
-            let target = static_member(ty_decl(st), word_of(name));
-            if not decl_is(target, Decl.Fn) {
-                report2(Diag.UnknownMethod, node, word_of(name), st, -1);
-                return finish_error(args, m, cx);
-            };
-            return call_with(fn_instance(target, ty_inst(st)), args, 0, m, node, cx);
-        };
-        // `[…].forEach(…)`: a method native arrays lack makes the literal a JS array.
-        if is_kind(base, Node.Array_expr) and first_child(base) >= 0 and has_foreign() {
-            let js = js_array_receiver(base, word_of(name), cx);
-            if js >= 0 {
-                check_foreign_array(base, js, cx);
-                return check_foreign_method(node, js, word_of(name), args, m, expect, cx);
-            };
-        };
-        // A method: the receiver is its first argument.
-        let rt = check_base(callee, cx);
-        if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
-        // `json.length.to_i32()`: a utu method JS values lack reads a dynamic
-        // receiver as the primitive that has it.
-        if is_dynamic(rt) {
-            let prim = native_owner(word_of(name));
-            if prim >= 0 {
-                foreign_unbox(rt, prim, true);
-                rt = prim;
-            };
-        };
-        if is_foreign(rt) { return check_foreign_method(node, rt, word_of(name), args, m, expect, cx); };
-        if decl_is(ty_decl(rt), Decl.Proto) { return proto_call(rt, name, args, m, node, cx); };
-        if is_scalar_kind(ty_decl(rt)) {
-            let base = scalar_method(ty_decl(rt), word_of(name));
-            if base >= 0 and args < 0 { return base; };
-        };
-        let decl = member(ty_decl(rt), word_of(name), Space.Method);
-        if ty_is(rt, Ty.Nullable) {
-            report2(Diag.NullableAccess, callee, word_of(name), rt, -1);
-            return finish_error(args, m, cx);
-        };
-        if decl < 0 {
-            // `p.f(x)` with a field f holding a closure: the field, called.
-            let field = member(ty_decl(rt), word_of(name), Space.Member);
-            if decl_is(field, Decl.Field) and (decl_is(ty_decl(rt), Decl.Struct) or decl_is(ty_decl(rt), Decl.Variant)) {
-                let ft = field_type(field, ty_inst(rt));
-                if ty_is(ft, Ty.Closure) or ty_is(ft, Ty.Fun) {
-                    // (The receiver is read again, as the callee's base.)
-                    while (w_stack.len() > m) { w_pop(); };
-                    return call_value(callee, args, m, node, cx);
-                };
-            };
-            // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
-            let host = primitive_host_type(rt, word_of(name));
-            if host >= 0 { return check_foreign_primitive_method(node, rt, host, word_of(name), args, m, expect, cx); };
-            report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
-            return finish_error(args, m, cx);
-        };
-        // What the name means, for an editor (as a field's is recorded).
-        node_decl[name] = decl;
-        let fi = fn_instance(decl, ty_inst(rt));
-        // A function of the type without `self` has no receiver to take.
-        if vl_len[fi_params[fi]] == 0 {
-            report2(Diag.WrongArity, node, -1, 0, 1 + if args >= 0 { child_count(args); } else { 0; });
-            return finish_error(args, m, cx);
-        };
-        coerce(rt, vl_item(fi_params[fi], 0), base);
-        return call_with(fi, args, 1, m, node, cx);
-    };
-    if is_kind(callee, Node.Type_member_expr) {
-        let owner_decl = node_decl[first_child(callee)];
-        if decl_is(owner_decl, Decl.Foreign) and decl_a[owner_decl] >= 0 {
-            return check_foreign_root_call(node, decl_a[owner_decl], word_of(last_child(callee)), args, false, m, expect, cx);
-        };
-        if is_scalar_kind(owner_decl) {
-            let r = scalar_static(owner_decl, word_of(last_child(callee)), args, node, cx);
-            if r >= 0 { return r; };
-        };
-        let decl = node_decl[last_child(callee)];
-        // `T.f(…)` with no type T (reported): stage 0 still calls `fn T.f` by its name.
-        if owner_decl < 0 and decl < 0 {
-            let named = method_of_unknown(word_of(first_child(callee)), word_of(last_child(callee)));
-            if named >= 0 { return call_with(fn_instance(named, 0), args, 0, m, node, cx); };
-        };
-        if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module)) and not has_foreign() {
-            report3(Diag.UnknownMethod, node, word_of(last_child(callee)), -1, -1, decl_name[owner_decl]);
-            return finish_error(args, m, cx);
-        };
-        // `M.f(…)` with `let f: fun(…) R = @es/\ … \/` in module M.
-        if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
-            es_import(decl, last_child(decl_node[decl]), global_type(decl));
-            return call_es(decl, args, m, node, cx);
-        };
-        if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
-        let owner_t = type_path(first_child(callee), cx.inst);
-        let inst = if is_kind(first_child(callee), Node.Type_ident) and decl_is(node_decl[first_child(callee)], Decl.Module) {
-            instance_for(node_decl[first_child(callee)], cx.inst);
-        } else { ty_inst(owner_t); };
-        return call_with(fn_instance(decl, inst), args, 0, m, node, cx);
-    };
+    if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx); };
+    if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx); };
+    if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx); };
     call_value(callee, args, m, node, cx);
+}
+
+/// `f(…)`: a function, a host function, or a `fun` or `cl` value, by name.
+fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
+    let decl = node_decl[callee];
+    if decl < 0 { return error_value(); };
+    if is_generator(decl) {
+        report(Diag.GeneratorCall, node, decl_name[decl]);
+        return finish_error(args, m, cx);
+    };
+    if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
+        es_import(decl, last_child(decl_node[decl]), global_type(decl));
+    };
+    if decl_es[decl] >= 0 { return call_es(decl, args, m, node, cx); };
+    if not decl_is(decl, Decl.Fn) {
+        let t = if decl_is(decl, Decl.Global) { global_type(decl); } else { decl_ty[decl]; };
+        if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
+        if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, node, cx); };
+        if ty_is(t, Ty.Error) { return finish_error(args, m, cx); };
+        report2(Diag.NotCallable, node, word_of(callee), t, -1);
+        return finish_error(args, m, cx);
+    };
+    call_with(fn_instance(decl, instance_for(module_of(decl), cx.inst)), args, 0, m, node, cx);
+}
+
+/// `x.f(…)`: a function of a module, alias, or module's type (`m.T.f`), a
+/// mem's method, a JS array literal's, or a method of x's type.
+fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let base = first_child(callee);
+    let name = last_child(callee);
+    let module = node_decl[base];
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Mem) { return check_mem_method(module, name, args, node, cx); };
+    // `ints.make(…)` with `using M[A] |ints|`: M's function in M[A].
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Module) {
+        let target = static_member(decl_a[module], word_of(name));
+        if not decl_is(target, Decl.Fn) {
+            report(Diag.UnknownMethod, name, word_of(name));
+            return finish_error(args, m, cx);
+        };
+        return call_with(fn_instance(target, alias_instance(module)), args, 0, m, node, cx);
+    };
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
+        let decl = node_decl[name];
+        if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+        return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
+    };
+    // `m.T.f(…)`: a static function of a module's (or alias's) type.
+    let st = static_type_path(base, cx);
+    if st >= 0 {
+        let target = static_member(ty_decl(st), word_of(name));
+        if not decl_is(target, Decl.Fn) {
+            report2(Diag.UnknownMethod, node, word_of(name), st, -1);
+            return finish_error(args, m, cx);
+        };
+        return call_with(fn_instance(target, ty_inst(st)), args, 0, m, node, cx);
+    };
+    // `[…].forEach(…)`: a method native arrays lack makes the literal a JS array.
+    if is_kind(base, Node.Array_expr) and first_child(base) >= 0 and has_foreign() {
+        let js = js_array_receiver(base, word_of(name), cx);
+        if js >= 0 {
+            check_foreign_array(base, js, cx);
+            return check_foreign_method(node, js, word_of(name), args, m, expect, cx);
+        };
+    };
+    call_method(node, callee, args, m, expect, cx);
+}
+
+/// `x.f(…)`, a method: the receiver is its first argument.
+fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let name = last_child(callee);
+    let rt = check_base(callee, cx);
+    if ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
+    // `json.length.to_i32()`: a utu method JS values lack reads a dynamic
+    // receiver as the primitive that has it.
+    if is_dynamic(rt) {
+        let prim = native_owner(word_of(name));
+        if prim >= 0 {
+            foreign_unbox(rt, prim, true);
+            rt = prim;
+        };
+    };
+    if is_foreign(rt) { return check_foreign_method(node, rt, word_of(name), args, m, expect, cx); };
+    if decl_is(ty_decl(rt), Decl.Proto) { return proto_call(rt, name, args, m, node, cx); };
+    if is_scalar_kind(ty_decl(rt)) {
+        let scalar = scalar_method(ty_decl(rt), word_of(name));
+        if scalar >= 0 and args < 0 { return scalar; };
+    };
+    let decl = member(ty_decl(rt), word_of(name), Space.Method);
+    if ty_is(rt, Ty.Nullable) {
+        report2(Diag.NullableAccess, callee, word_of(name), rt, -1);
+        return finish_error(args, m, cx);
+    };
+    if decl < 0 {
+        // `p.f(x)` with a field f holding a closure: the field, called.
+        let field = member(ty_decl(rt), word_of(name), Space.Member);
+        if decl_is(field, Decl.Field) and (decl_is(ty_decl(rt), Decl.Struct) or decl_is(ty_decl(rt), Decl.Variant)) {
+            let ft = field_type(field, ty_inst(rt));
+            if ty_is(ft, Ty.Closure) or ty_is(ft, Ty.Fun) {
+                // (The receiver is read again, as the callee's base.)
+                while (w_stack.len() > m) { w_pop(); };
+                return call_value(callee, args, m, node, cx);
+            };
+        };
+        // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
+        let host = primitive_host_type(rt, word_of(name));
+        if host >= 0 { return check_foreign_primitive_method(node, rt, host, word_of(name), args, m, expect, cx); };
+        report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
+        return finish_error(args, m, cx);
+    };
+    // What the name means, for an editor (as a field's is recorded).
+    node_decl[name] = decl;
+    let fi = fn_instance(decl, ty_inst(rt));
+    // A function of the type without `self` has no receiver to take.
+    if vl_len[fi_params[fi]] == 0 {
+        report2(Diag.WrongArity, node, -1, 0, 1 + if args >= 0 { child_count(args); } else { 0; });
+        return finish_error(args, m, cx);
+    };
+    coerce(rt, vl_item(fi_params[fi], 0), first_child(callee));
+    call_with(fi, args, 1, m, node, cx);
+}
+
+/// `T.f(…)`: a static function of a type, a host root's, or a scalar's.
+fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let owner_decl = node_decl[first_child(callee)];
+    if decl_is(owner_decl, Decl.Foreign) and decl_a[owner_decl] >= 0 {
+        return check_foreign_root_call(node, decl_a[owner_decl], word_of(last_child(callee)), args, false, m, expect, cx);
+    };
+    if is_scalar_kind(owner_decl) {
+        let r = scalar_static(owner_decl, word_of(last_child(callee)), args, node, cx);
+        if r >= 0 { return r; };
+    };
+    let decl = node_decl[last_child(callee)];
+    // `T.f(…)` with no type T (reported): stage 0 still calls `fn T.f` by its name.
+    if owner_decl < 0 and decl < 0 {
+        let named = method_of_unknown(word_of(first_child(callee)), word_of(last_child(callee)));
+        if named >= 0 { return call_with(fn_instance(named, 0), args, 0, m, node, cx); };
+    };
+    if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module)) and not has_foreign() {
+        report3(Diag.UnknownMethod, node, word_of(last_child(callee)), -1, -1, decl_name[owner_decl]);
+        return finish_error(args, m, cx);
+    };
+    // `M.f(…)` with `let f: fun(…) R = @es/\ … \/` in module M.
+    if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
+        es_import(decl, last_child(decl_node[decl]), global_type(decl));
+        return call_es(decl, args, m, node, cx);
+    };
+    if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
+    let owner_t = type_path(first_child(callee), cx.inst);
+    let inst = if is_kind(first_child(callee), Node.Type_ident) and decl_is(node_decl[first_child(callee)], Decl.Module) {
+        instance_for(node_decl[first_child(callee)], cx.inst);
+    } else { ty_inst(owner_t); };
+    call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
 /// A call of any other expression: a `fun` or `cl` value.
@@ -1256,8 +1294,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
     };
     if i != vl_len[params] {
         report2(Diag.WrongArity, at, -1, vl_len[params] - first_param, i - first_param);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     finish_call(fi, m, cx);
 }
@@ -1270,8 +1307,7 @@ fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         return finish_error(args, m, cx);
     };
     if not check_args(ty_a[t], args, 0, at, cx) {
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     w_node(Op.Call, repr(ty_b[t]), decl_es[decl], 0, m);
     ty_b[t];
@@ -1280,8 +1316,7 @@ fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
 /// A call of a `fun` value: the arguments, then the value, then `call_ref`.
 fn call_ref(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     if not check_args(ty_a[t], args, 0, at, cx) {
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     check_expr(callee, t, cx);
     w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m);
@@ -1316,8 +1351,7 @@ fn finish_error(args: I32, m: I32, cx: Cx) I32 {
         drop_value(check_expr(a, -1, cx));
         a = next_sibling(a);
     };
-    w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-    ty_error();
+    error_since(m);
 }
 
 /// The wasm function of a function instance. An intrinsic has none until
@@ -1326,9 +1360,7 @@ fn finish_error(args: I32, m: I32, cx: Cx) I32 {
 fn function_of(fi: I32) I32 {
     if fi_func[fi] >= 0 { return fi_func[fi]; };
     let params = fi_params[fi];
-    let mv = vl_begin();
-    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
-    let f = new_func(FuncKind.Defined, func_type(vl_end(mv), vl_of_result(repr(fi_result[fi]))));
+    let f = defined_func(params, fi_result[fi]);
     fi_func[fi] = f;
     func_debug_name[f] = fn_debug_name(fi_decl[fi]);
     // (A function being checked names it as a value: its locals are kept aside.)
@@ -1340,9 +1372,7 @@ fn function_of(fi: I32) I32 {
     for (0 ..< vl_len[params]) |i| { w_leaf(Op.LocalGet, repr(vl_item(params, i)), i, 0); };
     expand(fi, m);
     func_body[f] = w_pop();
-    func_locals[f] = local_types.len();
-    func_local_count[f] = cur_locals.len() - vl_len[params];
-    for (vl_len[params] ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]); };
+    record_locals(f, vl_len[params]);
     cur_locals.clear();
     for (0 ..< saved.len()) |i| { cur_locals.push(saved[i]); };
     f;
@@ -1401,9 +1431,7 @@ fn expand(fi: I32, m: I32) I32 {
     let ok = translate(x, decls, args, locals, direct, fi);
     if not ok {
         w_stack.resize(m);
-        report(Diag.Unsupported, decl_node[fi_decl[fi]], -1);
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return ty_error();
+        return unsupported(decl_node[fi_decl[fi]]);
     };
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
     fi_result[fi];
@@ -1584,12 +1612,28 @@ fn check_if(node: I32, expect: I32, cx: Cx) I32 {
     };
     // The result: what is expected, else the then branch's type, else
     // (when it does not complete) the else branch's.
-    let t1 = check_block(then_, expect, cx);
-    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
-    if t >= 0 { coerce(t1, t, then_); };
+    let t = first_branch(check_block(then_, expect, cx), expect, then_);
     let t2 = if is_kind(else_, Node.If_expr) { check_if(else_, t, cx); } else { check_block(else_, t, cx); };
-    if t < 0 { t = t2; } else { coerce(t2, t, else_); };
+    t = other_branch(t, t2, else_);
     w_node(Op.If, repr(t), label, 0, m);
+    t;
+}
+
+/// The type of a two-way choice (an `if`'s value, `promote`, `try`), from
+/// its first branch's (of type `t1`, checked against `expect`): what is
+/// expected, else t1; or -1 when the branch does not complete, so the
+/// other decides.
+fn first_branch(t1: I32, expect: I32, at: I32) I32 {
+    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
+    if t >= 0 { coerce(t1, t, at); };
+    t;
+}
+
+/// The choice's type, its other branch (at `at`, of type `t2`) checked
+/// against what @first_branch decided.
+fn other_branch(t: I32, t2: I32, at: I32) I32 {
+    if t < 0 { return t2; };
+    coerce(t2, t, at);
     t;
 }
 
@@ -1649,19 +1693,9 @@ fn check_return(node: I32, cx: Cx) I32 {
     } else if not ty_is(cx.result, Ty.Void) {
         mismatch(node, cx.result, ty_void());
     };
+    // The value first, then every pending defer of the function.
     if defer_node.len() > function_defers[0] {
-        // The value first, then every pending defer of the function.
-        let vt = repr(cx.result);
-        if value >= 0 and vt != vt_none and vt != vt_unreachable {
-            let local = new_local(vt);
-            w_node(Op.LocalSet, vt_none, local, 0, m);
-            run_defers(function_defers[0], cx);
-            w_leaf(Op.LocalGet, vt, local, 0);
-        } else {
-            run_defers(function_defers[0], cx);
-        };
-        w_node(Op.Return, vt_unreachable, 0, 0, m);
-        return ty_never();
+        defers_after_value(if value >= 0 { repr(cx.result); } else { vt_none; }, m, function_defers[0], cx);
     };
     w_node(Op.Return, vt_unreachable, 0, 0, m);
     ty_never();
@@ -1767,8 +1801,7 @@ fn compile(target: Target) I32 {
                 if target == Target.Normal and is_kind(item, Node.Export_lib_decl) {
                     let f = first_child(item);
                     while (f >= 0) {
-                        let fi = fn_instance(node_decl[last_child(first_child(f))], 0);
-                        func_field_name[function_of(fi)] = fn_debug_name(fi_decl[fi]);
+                        export_fn(node_decl[last_child(first_child(f))]);
                         f = next_sibling(f);
                     };
                 };
@@ -1792,8 +1825,7 @@ fn compile(target: Target) I32 {
             let item = first_child(file_root[file]);
             while (item >= 0) {
                 if is_kind(item, Node.Fn_decl) and has_prefix(word_of(last_child(first_child(item))), "__comptime_run_") {
-                    let fi = fn_instance(node_decl[last_child(first_child(item))], 0);
-                    func_field_name[function_of(fi)] = fn_debug_name(fi_decl[fi]);
+                    export_fn(node_decl[last_child(first_child(item))]);
                 };
                 if is_kind(item, Node.Mem_decl) and mem_is_exported(node_decl[first_child(item)]) { memory_of(node_decl[first_child(item)]); };
                 item = next_sibling(item);
@@ -1830,6 +1862,12 @@ fn compile(target: Target) I32 {
     };
     if diag_kind.len() > 0 { return -1; };
     encode_module();
+}
+
+/// Export a function of the program under its name.
+fn export_fn(decl: I32) void {
+    let fi = fn_instance(decl, 0);
+    func_field_name[function_of(fi)] = fn_debug_name(decl);
 }
 
 fn has_prefix(word: I32, prefix: Str) Bool {
@@ -1904,25 +1942,18 @@ fn in_target(node: I32, target: Target) Bool {
 
 /// `export main(…)` and tests: functions of their own, exported.
 fn entry_function(item: I32, name: I32, test_index: I32) void {
+    let list = child_of_kind(item, Node.Param_list);
     let m = vl_begin();
     let result = ty_void();
-    let c = first_child(item);
-    while (c >= 0) {
-        if is_kind(c, Node.Param_list) {
-            let p = first_child(c);
-            while (p >= 0) {
-                vl_add(type_of(next_sibling(first_child(p)), 0));
-                p = next_sibling(p);
-            };
-        } else if is_kind(c, Node.Return_type) {
-            result = type_of(c, 0);
-        };
-        c = next_sibling(c);
+    let p = if list >= 0 { first_child(list); } else { -1; };
+    while (p >= 0) {
+        vl_add(type_of(next_sibling(first_child(p)), 0));
+        p = next_sibling(p);
     };
+    let ret = child_of_kind(item, Node.Return_type);
+    if ret >= 0 { result = type_of(ret, 0); };
     let params = vl_end(m);
-    let mv = vl_begin();
-    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
-    let f = new_func(FuncKind.Defined, func_type(vl_end(mv), vl_of_result(repr(result))));
+    let f = defined_func(params, result);
     let export_name = if name >= 0 { name_from_src(src.interned_start(name), src.interned_start(name) + src.interned_size(name)); }
         else { name_add("__test_" + test_index.to_str()); };
     func_field_name[f] = export_name;
@@ -1933,31 +1964,13 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
         func_code[f] = wat;
         return;
     };
-    cur_locals.clear();
-    next_label.resize(1);
-    next_label[0] = 0;
-    loop_break.clear();
-    loop_continue.clear();
-    loop_state.clear();
-    loop_state_type.clear();
-    loop_defers.clear();
-    loop_break_defers.clear();
-    defer_node.clear();
-    function_defers[0] = 0;
-    c = first_child(item);
-    let i = 0;
-    while (c >= 0) {
-        if is_kind(c, Node.Param_list) {
-            let p = first_child(c);
-            while (p >= 0) {
-                let d = node_decl[first_child(p)];
-                decl_local[d] = new_local(repr(vl_item(params, i)));
-                decl_ty[d] = vl_item(params, i);
-                i += 1;
-                p = next_sibling(p);
-            };
-        };
-        c = next_sibling(c);
+    begin_function();
+    p = if list >= 0 { first_child(list); } else { -1; };
+    for (0 ..< vl_len[params]) |i| {
+        let d = node_decl[first_child(p)];
+        decl_local[d] = new_local(repr(vl_item(params, i)));
+        decl_ty[d] = vl_item(params, i);
+        p = next_sibling(p);
     };
     cur_params.resize(1);
     cur_params[0] = cur_locals.len();

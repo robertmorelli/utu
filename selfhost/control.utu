@@ -32,20 +32,21 @@ fn pattern_value(lit: I32, t: I32) I64 {
         for (tok_start[node_first[c]] ..< tok_end[node_first[c]]) |i| { text = text + Str.from_code_point(src[i]); };
         let f = parse_number(text);
         if negate { f = 0.0 - f; };
-        if t == prelude(Prelude.F32) { return f.to_f32().bits().to_i64(); };
-        return f.bits();
+        return float_bits(f, t);
     };
     let v = int_value(c);
     if negate { v = 0 - v; };
-    if is_float(t) {
-        let f = v.to_f64();
-        if t == prelude(Prelude.F32) { return f.to_f32().bits().to_i64(); };
-        return f.bits();
-    };
+    if is_float(t) { return float_bits(v.to_f64(), t); };
     if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v; };
     if not is_numeric(t) and not decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };
     if not fits(v, t, negate) { pattern_fault[0] = 0; };
     v;
+}
+
+/// The bits of `f` as float type `t` (F32 or F64).
+fn float_bits(f: F64, t: I32) I64 {
+    if t == prelude(Prelude.F32) { return f.to_f32().bits().to_i64(); };
+    f.bits();
 }
 
 /// Push the comparison of local `s` (of type `t`) with a pattern's value.
@@ -82,8 +83,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let d = ty_decl(st);
     if not (is_numeric(st) or st == prelude(Prelude.Bool) or decl_is(d, Decl.IntEnum)) {
         report2(Diag.MatchType, scrutinee, -1, st, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     let vt = repr(st);
     let s = new_local(vt);
@@ -342,8 +342,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     if ty_is(et, Ty.Error) { return finish_error(-1, m, cx); };
     if not ty_is(et, Ty.Nullable) {
         report2(Diag.NotNullable, e, -1, et, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     let inner = ty_a[et];
     let s = new_local(repr(et));
@@ -365,13 +364,10 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
         w_node(Op.Seq, vt_none, 0, 0, m);
         return ty_void();
     };
-    let t1 = check_expr(arm, expect, cx);
-    t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
-    if t >= 0 { coerce(t1, t, arm); };
+    t = first_branch(check_expr(arm, expect, cx), expect, arm);
     w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mt);
     let me = w_mark();
-    let t2 = check_expr(default_, t, cx);
-    if t < 0 { t = t2; } else { coerce(t2, t, default_); };
+    t = other_branch(t, check_expr(default_, t, cx), default_);
     w_node(Op.Seq, repr(t), 0, 0, me);
     w_node(Op.If, repr(t), new_label(), 0, mi);
     w_node(Op.Seq, repr(t), 0, 0, m);
@@ -387,8 +383,7 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     if ty_is(at, Ty.Error) { return finish_error(-1, m, cx); };
     if not ty_is(at, Ty.Nullable) {
         report2(Diag.NotNullable, a, -1, at, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     let t = ty_a[at];
     let s = new_local(repr(at));
@@ -443,9 +438,7 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     let handler = last_child(node);
     let m = w_mark();
     let mb = w_mark();
-    let t1 = check_block(body_, expect, cx);
-    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
-    if t >= 0 { coerce(t1, t, body_); };
+    let t = first_branch(check_block(body_, expect, cx), expect, body_);
     w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mb);
     let mh = w_mark();
     // The thrown value is on the stack.
@@ -458,8 +451,7 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     } else {
         w_leaf(Op.Drop, vt_none, 0, 0);
     };
-    let t2 = check_block(handler, t, cx);
-    if t < 0 { t = t2; } else { coerce(t2, t, handler); };
+    t = other_branch(t, check_block(handler, t, cx), handler);
     w_node(Op.Seq, repr(t), 0, 0, mh);
     w_node(Op.Try, repr(t), new_label(), 0, m);
     t;
@@ -469,17 +461,12 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
 
 /// `.{a, b}`: several values at once.
 fn check_tuple(node: I32, expect: I32, cx: Cx) I32 {
-    let n = 0;
-    let c = first_child(node);
-    while (c >= 0) {
-        n += 1;
-        c = next_sibling(c);
-    };
+    let n = child_count(node);
     let types = Array[I32].new(n, 0);
     let m = w_mark();
     let i = 0;
     let folded = false;
-    c = first_child(node);
+    let c = first_child(node);
     while (c >= 0) {
         let e = if expect >= 0 and ty_is(expect, Ty.Tuple) and i < vl_len[ty_a[expect]] { vl_item(ty_a[expect], i); } else { -1; };
         let before = diag_kind.len();
@@ -508,20 +495,14 @@ fn check_let_tuple(node: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_expr(init, -1, cx);
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
-    let n = 0;
-    let c = first_child(pattern);
-    while (c >= 0) {
-        n += 1;
-        c = next_sibling(c);
-    };
+    let n = child_count(pattern);
     if not ty_is(t, Ty.Tuple) or vl_len[ty_a[t]] != n {
         report2(Diag.TupleLet, node, -1, t, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     let names = Array[I32].new(n, 0);
     let i = 0;
-    c = first_child(pattern);
+    let c = first_child(pattern);
     while (c >= 0) {
         names[i] = c;
         i += 1;
@@ -561,6 +542,16 @@ fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) void {
     loop_state_type.push(state_type);
 }
 
+/// No loop is entered: a function's start.
+fn clear_loops() void {
+    loop_break.clear();
+    loop_continue.clear();
+    loop_state.clear();
+    loop_state_type.clear();
+    loop_defers.clear();
+    loop_break_defers.clear();
+}
+
 fn leave_loop() void {
     loop_defers.resize(loop_defers.len() - 1);
     loop_break_defers.resize(loop_break_defers.len() - 1);
@@ -589,19 +580,8 @@ fn check_for(node: I32, cx: Cx) I32 {
     let capture = next_sibling(sources);
     let block = last_child(node);
     if not is_kind(capture, Node.Capture) { capture = -1; };
-    let n = 0;
-    let s = first_child(sources);
-    while (s >= 0) {
-        n += 1;
-        s = next_sibling(s);
-    };
-    let names = 0;
-    let c = if capture >= 0 { first_child(capture); } else { -1; };
-    while (c >= 0) {
-        names += 1;
-        c = next_sibling(c);
-    };
-    if capture >= 0 and names != n {
+    let n = child_count(sources);
+    if capture >= 0 and child_count(capture) != n {
         report(Diag.InvalidForSource, capture, -1);
         return error_value();
     };
@@ -614,7 +594,7 @@ fn check_for(node: I32, cx: Cx) I32 {
     let arrays = Array[I32].new(n, 0);
     let types = Array[I32].new(n, 0);
     let i = 0;
-    s = first_child(sources);
+    let s = first_child(sources);
     while (s >= 0) {
         let lo = first_child(s);
         let hi = next_sibling(lo);
@@ -683,14 +663,12 @@ fn check_for(node: I32, cx: Cx) I32 {
         let mc = w_mark();
         w_leaf(Op.LocalGet, vt, counters[k], 0);
         w_leaf(Op.LocalGet, vt, ends[k], 0);
-        let cmp = if vt == vt_i64 { if inclusive { if unsigned { 86; } else { 85; }; } else { if unsigned { 90; } else { 89; }; }; }
-            else { if inclusive { if unsigned { 75; } else { 74; }; } else { if unsigned { 79; } else { 78; }; }; };
-        w_node(Op.Plain, vt_i32, cmp, 0, mc);
+        w_node(Op.Plain, vt_i32, past_end_op(vt, unsigned, inclusive), 0, mc);
         w_node(Op.BrIf, vt_none, brk, 0, mc);
     };
     // The captures.
     let k = 0;
-    c = if capture >= 0 { first_child(capture); } else { -1; };
+    let c = if capture >= 0 { first_child(capture); } else { -1; };
     while (c >= 0) {
         let d = node_decl[c];
         decl_ty[d] = types[k];
@@ -698,7 +676,7 @@ fn check_for(node: I32, cx: Cx) I32 {
             let local = new_local(repr(types[k]));
             decl_local[d] = local;
             let mg = w_mark();
-            w_leaf(Op.LocalGet, w_type_of_local(arrays[k]), arrays[k], 0);
+            w_leaf(Op.LocalGet, cur_locals[arrays[k]], arrays[k], 0);
             w_leaf(Op.LocalGet, vt_i32, counters[k], 0);
             let heap = vt_heap(cur_locals[arrays[k]]);
             w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
@@ -714,14 +692,7 @@ fn check_for(node: I32, cx: Cx) I32 {
     discard(check_block(block, ty_void(), cx));
     leave_loop();
     w_node(Op.Block, vt_none, next, 0, mn);
-    for (0 ..< n) |j| {
-        let vt = if kinds[j] == 2 { vt_i32; } else { repr(types[j]); };
-        let mstep = w_mark();
-        w_leaf(Op.LocalGet, vt, counters[j], 0);
-        if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0); } else { w_i32(1); };
-        w_node(Op.Plain, vt, if vt == vt_i64 { 124; } else { 106; }, 0, mstep);
-        w_node(Op.LocalSet, vt_none, counters[j], 0, mstep);
-    };
+    for (0 ..< n) |j| { step_counter(counters[j], if kinds[j] == 2 { vt_i32; } else { repr(types[j]); }); };
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, mb);
@@ -729,7 +700,22 @@ fn check_for(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-fn w_type_of_local(local: I32) I32 { cur_locals[local]; }
+/// The comparison that ends a count: the counter (of value type `vt`) is past
+/// its end (`>=` the end; with `inclusive`, `>`).
+fn past_end_op(vt: I32, unsigned: Bool, inclusive: Bool) I32 {
+    // i64.gt_u, gt_s, ge_u, ge_s; i32's.
+    if vt == vt_i64 { return if inclusive { if unsigned { 86; } else { 85; }; } else { if unsigned { 90; } else { 89; }; }; };
+    if inclusive { if unsigned { 75; } else { 74; }; } else { if unsigned { 79; } else { 78; }; };
+}
+
+/// `counter += 1` (of value type `vt`).
+fn step_counter(counter: I32, vt: I32) void {
+    let m = w_mark();
+    w_leaf(Op.LocalGet, vt, counter, 0);
+    if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0); } else { w_i32(1); };
+    w_node(Op.Plain, vt, if vt == vt_i64 { 124; } else { 106; }, 0, m);
+    w_node(Op.LocalSet, vt_none, counter, 0, m);
+}
 
 //! = Unrolling (speed builds, as stage 0's -O3)
 //!
@@ -796,7 +782,7 @@ fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, br
     let mc = w_mark();
     w_leaf(Op.LocalGet, vt, counter, 0);
     w_leaf(Op.LocalGet, vt, end_, 0);
-    w_node(Op.Plain, vt_i32, if wide { if unsigned { 90; } else { 89; }; } else { if unsigned { 79; } else { 78; }; }, 0, mc);
+    w_node(Op.Plain, vt_i32, past_end_op(vt, unsigned, false), 0, mc);
     w_node(Op.BrIf, vt_none, brk, 0, mc);
     // if (end - i) >=u 4 { four copies; br $top }
     let mi = w_mark();
@@ -805,7 +791,7 @@ fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, br
     w_leaf(Op.LocalGet, vt, counter, 0);
     w_node(Op.Plain, vt, if wide { 125; } else { 107; }, 0, mr);
     if wide { w_leaf(Op.I64Const, vt_i64, unroll_copies, 0); } else { w_i32(unroll_copies); };
-    w_node(Op.Plain, vt_i32, if wide { 90; } else { 79; }, 0, mr);
+    w_node(Op.Plain, vt_i32, past_end_op(vt, true, false), 0, mr);
     let mt = w_mark();
     for (0 ..< unroll_copies) |_k| { unrolled_step(block, counter, vt, brk, cx); };
     w_leaf(Op.Br, vt_unreachable, top, 0);
@@ -825,9 +811,5 @@ fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) void {
     discard(check_block(block, ty_void(), cx));
     leave_loop();
     w_node(Op.Block, vt_none, next, 0, mn);
-    let ms = w_mark();
-    w_leaf(Op.LocalGet, vt, counter, 0);
-    if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0); } else { w_i32(1); };
-    w_node(Op.Plain, vt, if vt == vt_i64 { 124; } else { 106; }, 0, ms);
-    w_node(Op.LocalSet, vt_none, counter, 0, ms);
+    step_counter(counter, vt);
 }

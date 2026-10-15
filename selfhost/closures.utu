@@ -59,31 +59,27 @@ fn is_local_decl(d: I32) Bool {
 /// and declared outside it, each once, in the order first named.
 fn captures_of(closure: I32) I32 {
     let m = vl_begin();
-    collect_captures(closure, closure);
+    collect_captures(closure, closure, m);
     vl_end(m);
 }
 
-fn collect_captures(node: I32, closure: I32) void {
+/// Add the captures under `node` to the list being built since `m`.
+fn collect_captures(node: I32, closure: I32, m: I32) void {
     if is_kind(node, Node.Identifier) {
         let d = node_decl[node];
         if d >= 0 and is_local_decl(d) and not declared_in(d, closure) and decl_es[d] < 0 {
             let seen = false;
-            for (vl_pending_mark() ..< vl_pending.len()) |i| { if vl_pending[i] == d { seen = true; }; };
+            for (m ..< vl_pending.len()) |i| { if vl_pending[i] == d { seen = true; }; };
             if not seen { vl_add(d); };
         };
         return;
     };
     let c = first_child(node);
     while (c >= 0) {
-        collect_captures(c, closure);
+        collect_captures(c, closure, m);
         c = next_sibling(c);
     };
 }
-
-/// The start of the list being built (`vl_begin`'s mark), for `collect_captures`.
-vec capture_mark: I32;
-
-fn vl_pending_mark() I32 { capture_mark[capture_mark.len() - 1]; }
 
 /// Before checking a function body: box each variable of it that a closure
 /// in it captures and something assigns where the closure could see it (as
@@ -126,15 +122,11 @@ fn find_closures(node: I32, body: I32) void {
     // value, so f is a box, filled once the closure exists.
     if is_kind(node, Node.Bind_expr) and is_kind(last_child(node), Node.Closure_expr) and is_kind(first_child(node), Node.Identifier) {
         let d = node_decl[first_child(node)];
-        capture_mark.push(vl_pending.len());
         let list = captures_of(last_child(node));
-        capture_mark.resize(capture_mark.len() - 1);
         for (0 ..< vl_len[list]) |i| { if vl_item(list, i) == d { decl_boxed[d] = 1; }; };
     };
     if is_kind(node, Node.Closure_expr) {
-        capture_mark.push(vl_pending.len());
         let list = captures_of(node);
-        capture_mark.resize(capture_mark.len() - 1);
         for (0 ..< vl_len[list]) |i| {
             let d = vl_item(list, i);
             // Only variables bound by a let or as a parameter can live in a box.
@@ -299,12 +291,7 @@ fn save_function() void {
         saved_loops.push(loop_break_defers[i]);
     };
     cur_locals.clear();
-    loop_defers.clear();
-    loop_break_defers.clear();
-    loop_break.clear();
-    loop_continue.clear();
-    loop_state.clear();
-    loop_state_type.clear();
+    clear_loops();
     next_label[0] = 0;
 }
 
@@ -322,12 +309,7 @@ fn restore_function() void {
     saved_locals.resize(locals_at);
     cur_params[0] = params;
     next_label[0] = label;
-    loop_break.clear();
-    loop_continue.clear();
-    loop_state.clear();
-    loop_state_type.clear();
-    loop_defers.clear();
-    loop_break_defers.clear();
+    clear_loops();
     let i = loops_at;
     while (i < saved_loops.len()) {
         loop_break.push(saved_loops[i]);
@@ -352,16 +334,11 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     // Parameters.
     let list = first_child(node);
     if not is_kind(list, Node.Closure_param_list) { list = -1; };
-    let i = 0;
-    let p = if list >= 0 { first_child(list); } else { -1; };
-    let n = 0;
-    while (p >= 0) {
-        n += 1;
-        p = next_sibling(p);
-    };
+    let n = child_count(list);
     let ptypes = Array[I32].new(n, 0);
     let pd = Array[I32].new(n, 0);
-    p = if list >= 0 { first_child(list); } else { -1; };
+    let i = 0;
+    let p = if list >= 0 { first_child(list); } else { -1; };
     while (p >= 0) {
         let t_node = next_sibling(first_child(p));
         let t = if t_node >= 0 { type_of(t_node, cx.inst); }
@@ -378,18 +355,11 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         i += 1;
         p = next_sibling(p);
     };
-    let ret_node = -1;
-    let c = first_child(node);
-    while (c >= 0) {
-        if is_kind(c, Node.Return_type) { ret_node = c; };
-        c = next_sibling(c);
-    };
+    let ret_node = child_of_kind(node, Node.Return_type);
     let result = if ret_node >= 0 { type_of(ret_node, cx.inst); } else if expected >= 0 { ty_b[expected]; } else { -1; };
     let body_node = last_child(node);
     // What it captures, and their types now.
-    capture_mark.push(vl_pending.len());
     let caps = captures_of(node);
-    capture_mark.resize(capture_mark.len() - 1);
     let ncap = vl_len[caps];
     let cap_types = Array[I32].new(ncap, 0);
     let cap_locals = Array[I32].new(ncap, 0);
@@ -455,9 +425,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     let f = new_func(FuncKind.Defined, func_type(wasm_params, vl_of_result(repr(result))));
     func_debug_name[f] = name_add("closure");
     func_body[f] = w_pop();
-    func_locals[f] = local_types.len();
-    func_local_count[f] = cur_locals.len() - cur_params[0];
-    for (cur_params[0] ..< cur_locals.len()) |k| { local_types.push(cur_locals[k]); };
+    record_locals(f, cur_params[0]);
     restore_function();
     // The enclosing function's view of the captures again.
     for (0 ..< ncap) |k| {
@@ -476,11 +444,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     w_node(Op.StructNew, vt_ref(env, false), env, 0, me);
     w_i32(if result == prelude(Prelude.Bool) { 1; } else { 0; });
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
-    let mt = vl_begin();
-    for (0 ..< n) |k| { vl_add(ptypes[k]); };
-    ty(Ty.Closure, vl_end(mt), result);
+    ty(Ty.Closure, types_list(ptypes, n), result);
 }
 
+/// The first `n` of `ts`, as a list.
 fn types_list(ts: Array[I32], n: I32) I32 {
     let m = vl_begin();
     for (0 ..< n) |k| { vl_add(ts[k]); };
@@ -551,8 +518,7 @@ fn closure_call(t: I32) I32 {
 fn call_closure(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     check_expr(callee, t, cx);
     if not check_args(ty_a[t], args, 0, at, cx) {
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
+        return error_since(m);
     };
     w_node(Op.Call, repr(ty_b[t]), closure_call(t), 0, m);
     ty_b[t];

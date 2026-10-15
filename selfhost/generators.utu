@@ -39,6 +39,35 @@ vec gen_defers: I32;
 /// For a recursive generation, its index in `rec_*`; else -1.
 vec gen_rec: I32;
 
+/// An expansion begins: what its yields need, on the stacks above.
+fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32, rec: I32) void {
+    gen_whole.push(whole);
+    gen_capture.push(cap);
+    gen_body.push(body);
+    gen_type.push(elem);
+    gen_cx_inst.push(cx.inst);
+    gen_cx_fi.push(cx.fi);
+    gen_cx_result.push(cx.result);
+    gen_decl.push(gen);
+    gen_defers.push(defer_node.len());
+    gen_rec.push(rec);
+}
+
+/// The innermost expansion ends.
+fn end_expansion() void {
+    let k = gen_whole.len() - 1;
+    gen_whole.resize(k);
+    gen_capture.resize(k);
+    gen_body.resize(k);
+    gen_type.resize(k);
+    gen_cx_inst.resize(k);
+    gen_cx_fi.resize(k);
+    gen_cx_result.resize(k);
+    gen_decl.resize(k);
+    gen_defers.resize(k);
+    gen_rec.resize(k);
+}
+
 /// Empty the expansion and recursion stacks, before a program is checked.
 fn reset_generators() void {
     gen_whole.clear();
@@ -64,12 +93,8 @@ fn reset_generators() void {
 /// Whether a function declaration is a generator (its result is `yield T`).
 fn is_generator(decl: I32) Bool {
     if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return false; };
-    let c = first_child(decl_node[decl]);
-    while (c >= 0) {
-        if is_kind(c, Node.Return_type) { return is_kind(first_child(c), Node.Yield_type); };
-        c = next_sibling(c);
-    };
-    false;
+    let ret = child_of_kind(decl_node[decl], Node.Return_type);
+    ret >= 0 and is_kind(first_child(ret), Node.Yield_type);
 }
 
 /// The generator a `for` loop consumes: its one source is a call of one.
@@ -94,6 +119,25 @@ fn generator_decls(gen: I32) I32 {
         };
     };
     vl_end(m);
+}
+
+/// Set aside the locals and types of declarations `decls` (a list), in case
+/// an outer expansion of their generator is running: [local, type] each.
+fn set_aside(decls: I32) Array[I32] {
+    let saved = Array[I32].new(vl_len[decls] * 2, 0);
+    for (0 ..< vl_len[decls]) |i| {
+        saved[i * 2] = decl_local[vl_item(decls, i)];
+        saved[i * 2 + 1] = decl_ty[vl_item(decls, i)];
+    };
+    saved;
+}
+
+/// Bring back what @set_aside kept.
+fn bring_back(decls: I32, saved: Array[I32]) void {
+    for (0 ..< vl_len[decls]) |i| {
+        decl_local[vl_item(decls, i)] = saved[i * 2];
+        decl_ty[vl_item(decls, i)] = saved[i * 2 + 1];
+    };
 }
 
 /// Whether generator `gen`'s body has a `for (gen(…))` of its own.
@@ -159,22 +203,10 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     };
     let inst = instance_for(module_of(gen), cx.inst);
     // Its element type: `yield T`.
-    let ret = -1;
-    let c = first_child(decl_node[gen]);
-    while (c >= 0) {
-        if is_kind(c, Node.Return_type) { ret = first_child(c); };
-        c = next_sibling(c);
-    };
-    let elem = type_of(first_child(ret), inst);
+    let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), inst);
     if delegates_to_itself(gen) { return check_recursive_loop(node, call, gen, cap, elem, inst, cx); };
-    // Set aside its declarations' locals, in case an outer expansion of it is running.
     let decls = generator_decls(gen);
-    let saved_local = Array[I32].new(vl_len[decls], 0);
-    let saved_ty = Array[I32].new(vl_len[decls], 0);
-    for (0 ..< vl_len[decls]) |i| {
-        saved_local[i] = decl_local[vl_item(decls, i)];
-        saved_ty[i] = decl_ty[vl_item(decls, i)];
-    };
+    let saved = set_aside(decls);
     let m = w_mark();
     // Arguments into the parameters.
     let params = param_list_of(gen);
@@ -198,50 +230,21 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     };
     // The generation.
     let whole = new_label();
-    gen_whole.push(whole);
-    gen_capture.push(cap);
-    gen_body.push(body);
-    gen_type.push(elem);
-    gen_cx_inst.push(cx.inst);
-    gen_cx_fi.push(cx.fi);
-    gen_cx_result.push(cx.result);
-    gen_decl.push(gen);
-    gen_defers.push(defer_node.len());
-    gen_rec.push(-1);
+    begin_expansion(whole, cap, body, elem, cx, gen, -1);
     let mb = w_mark();
     mark_boxes(fn_body(gen));
     // The generator's own loops are its; the consumer's loops are not in reach.
     let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
     discard(check_block(fn_body(gen), ty_void(), gcx));
     w_node(Op.Block, vt_none, whole, 0, mb);
-    let k = gen_whole.len() - 1;
-    gen_whole.resize(k);
-    gen_capture.resize(k);
-    gen_body.resize(k);
-    gen_type.resize(k);
-    gen_cx_inst.resize(k);
-    gen_cx_fi.resize(k);
-    gen_cx_result.resize(k);
-    gen_decl.resize(k);
-    gen_defers.resize(k);
-    gen_rec.resize(k);
-    for (0 ..< vl_len[decls]) |i| {
-        decl_local[vl_item(decls, i)] = saved_local[i];
-        decl_ty[vl_item(decls, i)] = saved_ty[i];
-    };
+    end_expansion();
+    bring_back(decls, saved);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
 }
 
 /// A function declaration's `Param_list` node, or -1.
-fn param_list_of(decl: I32) I32 {
-    let c = first_child(decl_node[decl]);
-    while (c >= 0) {
-        if is_kind(c, Node.Param_list) { return c; };
-        c = next_sibling(c);
-    };
-    -1;
-}
+fn param_list_of(decl: I32) I32 { child_of_kind(decl_node[decl], Node.Param_list); }
 
 /// The innermost expansion whose generator the node is in, or -1.
 fn expansion_of(node: I32) I32 {
@@ -448,6 +451,23 @@ fn rec_push_value(r: I32, value: I32, cx: Cx) I32 {
     ty_void();
 }
 
+/// The arguments of a call checked against `ptypes` (a list), each into a
+/// new local; the locals.
+fn args_into_locals(args: I32, ptypes: I32, cx: Cx) Array[I32] {
+    let n = vl_len[ptypes];
+    let locals = Array[I32].new(n + 1, 0);
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    for (0 ..< n) |i| {
+        let pt = vl_item(ptypes, i);
+        locals[i] = new_local(repr(pt));
+        let ma = w_mark();
+        coerce(check_expr(a, pt, cx), pt, a);
+        ls(locals[i], ma);
+        a = next_sibling(a);
+    };
+    locals;
+}
+
 /// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
 fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
     let params = rec_params[r];
@@ -457,16 +477,7 @@ fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
         return error_value();
     };
     let m = w_mark();
-    let values = Array[I32].new(vl_len[params] + 1, 0);
-    let a = if args >= 0 { first_child(args); } else { -1; };
-    for (0 ..< vl_len[params]) |i| {
-        let pt = vl_item(params, i);
-        values[i] = new_local(repr(pt));
-        let ma = w_mark();
-        coerce(check_expr(a, pt, cx), pt, a);
-        ls(values[i], ma);
-        a = next_sibling(a);
-    };
+    let values = args_into_locals(args, params, cx);
     rec_grow(rec_top[r], rec_item_arrays(r), vl_len[params] + 2);
     for (0 ..< vl_len[params]) |i| {
         let ms = w_mark();
@@ -476,6 +487,94 @@ fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
     rec_finish_item(r, 1);
     seq_void(m);
     ty_void();
+}
+
+/// The locals of a recursive generation's loop.
+struct RecLoop:
+    | kind: I32     // the item arrays: each item's kind (0 value, 1 call) …
+    | val: I32      // … and value
+    | top: I32      // how many items there are
+    | cur: I32      // the running frame's next item …
+    | end_: I32     // … and its end
+    | fsp: I32      // how many frames are suspended …
+    | fcur: I32     // … and their cur and end
+    | fend: I32
+
+/// The running frame is done: the last suspended one runs again, or, with
+/// none, the generation (block `whole`) ends.
+fn rec_resume_frame(l: RecLoop, whole: I32) void {
+    let m = w_mark();
+    let mz = w_mark();
+    let mzc = w_mark();
+    lg(l.fsp);
+    plain(69, vt_i32, mzc);
+    let mzt = w_mark();
+    w_leaf(Op.Br, vt_unreachable, whole, 0);
+    seq_void(mzt);
+    w_node(Op.If, vt_none, new_label(), 0, mz);
+    let md = w_mark();
+    lg(l.fsp);
+    w_i32(1);
+    plain(107, vt_i32, md);
+    ls(l.fsp, md);
+    rec_get(l.fcur, l.fsp, vt_i32);
+    ls(l.cur, w_mark() - 1);
+    rec_get(l.fend, l.fsp, vt_i32);
+    ls(l.end_, w_mark() - 1);
+    let mtop = w_mark();
+    lg(l.end_);
+    ls(l.top, mtop);
+    seq_void(m);
+}
+
+/// After `prune`: skip the call items that follow in the running frame
+/// (`while cur < end and kind[cur] == 1: cur += 1`).
+fn rec_skip_calls(l: RecLoop) void {
+    let m = w_mark();
+    let skip_loop = new_label();
+    let skip_out = new_label();
+    let mso = w_mark();
+    let msl = w_mark();
+    let mex = w_mark();
+    lg(l.cur);
+    lg(l.end_);
+    plain(72, vt_i32, mex);
+    plain(69, vt_i32, mex);
+    w_node(Op.BrIf, vt_none, skip_out, 0, mex);
+    let mek = w_mark();
+    rec_get(l.kind, l.cur, vt_i32);
+    w_i32(1);
+    plain(71, vt_i32, mek);
+    w_node(Op.BrIf, vt_none, skip_out, 0, mek);
+    incr(l.cur);
+    w_leaf(Op.Br, vt_unreachable, skip_loop, 0);
+    w_node(Op.Loop, vt_none, skip_loop, 0, msl);
+    w_node(Op.Block, vt_none, skip_out, 0, mso);
+    seq_void(m);
+}
+
+/// A call pushed the items from `start`: they are the running frame, and
+/// the one it ran in is suspended.
+fn rec_enter_frame(l: RecLoop, start: I32) void {
+    let m = w_mark();
+    let frames = Array[I32].new(2, 0);
+    frames[0] = l.fcur;
+    frames[1] = l.fend;
+    rec_grow(l.fsp, frames, 2);
+    let ms1 = w_mark();
+    lg(l.cur);
+    rec_set(l.fcur, l.fsp, ms1);
+    let ms2 = w_mark();
+    lg(l.end_);
+    rec_set(l.fend, l.fsp, ms2);
+    incr(l.fsp);
+    let ms3 = w_mark();
+    lg(start);
+    ls(l.cur, ms3);
+    let ms4 = w_mark();
+    lg(l.top);
+    ls(l.end_, ms4);
+    seq_void(m);
 }
 
 /// `for (walk(root)) |x| { body }`, walk recursive.
@@ -488,12 +587,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     };
     let np = child_count(params);
     let decls = generator_decls(gen);
-    let saved_local = Array[I32].new(vl_len[decls], 0);
-    let saved_ty = Array[I32].new(vl_len[decls], 0);
-    for (0 ..< vl_len[decls]) |i| {
-        saved_local[i] = decl_local[vl_item(decls, i)];
-        saved_ty[i] = decl_ty[vl_item(decls, i)];
-    };
+    let saved = set_aside(decls);
     let m = w_mark();
     // The parameters' types, and the roots: the call's arguments.
     let mt = vl_begin();
@@ -503,16 +597,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
         p = next_sibling(p);
     };
     let ptypes = vl_end(mt);
-    let roots = Array[I32].new(np + 1, 0);
-    let a = if args >= 0 { first_child(args); } else { -1; };
-    for (0 ..< np) |i| {
-        let pt = vl_item(ptypes, i);
-        roots[i] = new_local(repr(pt));
-        let ma = w_mark();
-        coerce(check_expr(a, pt, cx), pt, a);
-        ls(roots[i], ma);
-        a = next_sibling(a);
-    };
+    let roots = args_into_locals(args, ptypes, cx);
     // The items, starting with the root call; the frames.
     let kind = rec_new_array(vt_i32);
     let val = rec_new_array(repr(elem));
@@ -523,8 +608,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     let cur = new_local(vt_i32);
     let end_ = new_local(vt_i32);
     let fsp = new_local(vt_i32);
-    let fcur = rec_new_array(vt_i32);
-    let fend = rec_new_array(vt_i32);
+    let l = RecLoop { kind: kind, val: val, top: top, cur: cur, end_: end_, fsp: fsp, fcur: rec_new_array(vt_i32), fend: rec_new_array(vt_i32) };
     let mk = w_mark();
     w_i32(1);
     rec_set(kind, top, mk);
@@ -550,28 +634,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     lg(cur);
     lg(end_);
     plain(70, vt_i32, mc);
-    let mthen = w_mark();
-    let mz = w_mark();
-    let mzc = w_mark();
-    lg(fsp);
-    plain(69, vt_i32, mzc);
-    let mzt = w_mark();
-    w_leaf(Op.Br, vt_unreachable, whole, 0);
-    seq_void(mzt);
-    w_node(Op.If, vt_none, new_label(), 0, mz);
-    let md = w_mark();
-    lg(fsp);
-    w_i32(1);
-    plain(107, vt_i32, md);
-    ls(fsp, md);
-    rec_get(fcur, fsp, vt_i32);
-    ls(cur, w_mark() - 1);
-    rec_get(fend, fsp, vt_i32);
-    ls(end_, w_mark() - 1);
-    let mtop = w_mark();
-    lg(end_);
-    ls(top, mtop);
-    seq_void(mthen);
+    rec_resume_frame(l, whole);
     // Else: the next item.
     let melse = w_mark();
     let i = new_local(vt_i32);
@@ -610,31 +673,9 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     prune_loop.resize(prune_loop.len() - 1);
     leave_loop();
     w_node(Op.Block, vt_none, resume, 0, mr);
-    // Pruned: skip the calls that follow.
     let mpr = w_mark();
     lg(pruned);
-    let mskip = w_mark();
-    let skip_loop = new_label();
-    let skip_out = new_label();
-    let mso = w_mark();
-    let msl = w_mark();
-    // while cur < end and kind[cur] == 1: cur += 1
-    let mex = w_mark();
-    lg(cur);
-    lg(end_);
-    plain(72, vt_i32, mex);
-    plain(69, vt_i32, mex);
-    w_node(Op.BrIf, vt_none, skip_out, 0, mex);
-    let mek = w_mark();
-    rec_get(kind, cur, vt_i32);
-    w_i32(1);
-    plain(71, vt_i32, mek);
-    w_node(Op.BrIf, vt_none, skip_out, 0, mek);
-    incr(cur);
-    w_leaf(Op.Br, vt_unreachable, skip_loop, 0);
-    w_node(Op.Loop, vt_none, skip_loop, 0, msl);
-    w_node(Op.Block, vt_none, skip_out, 0, mso);
-    seq_void(mskip);
+    rec_skip_calls(l);
     w_node(Op.If, vt_none, new_label(), 0, mpr);
     seq_void(mvt);
     w_node(Op.If, vt_none, new_label(), 0, mv);
@@ -668,31 +709,12 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     rec_args.push(arg_arrays);
     rec_elem.push(elem);
     rec_params.push(ptypes);
-    gen_whole.push(frame);
-    gen_capture.push(-1);
-    gen_body.push(-1);
-    gen_type.push(elem);
-    gen_cx_inst.push(cx.inst);
-    gen_cx_fi.push(cx.fi);
-    gen_cx_result.push(cx.result);
-    gen_decl.push(gen);
-    gen_defers.push(defer_node.len());
-    gen_rec.push(r);
+    begin_expansion(frame, -1, -1, elem, cx, gen, r);
     let mb = w_mark();
     let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
     discard(check_block(fn_body(gen), ty_void(), gcx));
     w_node(Op.Block, vt_none, frame, 0, mb);
-    let g = gen_whole.len() - 1;
-    gen_whole.resize(g);
-    gen_capture.resize(g);
-    gen_body.resize(g);
-    gen_type.resize(g);
-    gen_cx_inst.resize(g);
-    gen_cx_fi.resize(g);
-    gen_cx_result.resize(g);
-    gen_decl.resize(g);
-    gen_defers.resize(g);
-    gen_rec.resize(g);
+    end_expansion();
     rec_kind.resize(r);
     rec_val.resize(r);
     rec_top.resize(r);
@@ -705,25 +727,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     lg(top);
     lg(start);
     plain(74, vt_i32, mfc);
-    let mft = w_mark();
-    let frames = Array[I32].new(2, 0);
-    frames[0] = fcur;
-    frames[1] = fend;
-    rec_grow(fsp, frames, 2);
-    let ms1 = w_mark();
-    lg(cur);
-    rec_set(fcur, fsp, ms1);
-    let ms2 = w_mark();
-    lg(end_);
-    rec_set(fend, fsp, ms2);
-    incr(fsp);
-    let ms3 = w_mark();
-    lg(start);
-    ls(cur, ms3);
-    let ms4 = w_mark();
-    lg(top);
-    ls(end_, ms4);
-    seq_void(mft);
+    rec_enter_frame(l, start);
     w_node(Op.If, vt_none, new_label(), 0, mf);
     seq_void(mct);
     w_node(Op.If, vt_none, new_label(), 0, mcall);
@@ -732,10 +736,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     w_leaf(Op.Br, vt_unreachable, again, 0);
     w_node(Op.Loop, vt_none, again, 0, ml);
     w_node(Op.Block, vt_none, whole, 0, mw);
-    for (0 ..< vl_len[decls]) |j| {
-        decl_local[vl_item(decls, j)] = saved_local[j];
-        decl_ty[vl_item(decls, j)] = saved_ty[j];
-    };
+    bring_back(decls, saved);
     seq_void(m);
     ty_void();
 }
