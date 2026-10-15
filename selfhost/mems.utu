@@ -461,7 +461,7 @@ fn mem_address(s: Storage, m: I32) void {
     let shift = storage_shift(s);
     if shift > 0 {
         w_i32(shift);
-        w_node(Op.Plain, vt_i32, 116, 0, m);
+        w_i32_op(i32_shl, m);
     };
 }
 
@@ -538,8 +538,7 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
 /// are `args`.
 fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
     let word = word_of(name);
-    let s = mem_storage(decl);
-    let mem_id = memory_of(decl);
+    memory_of(decl);  // (any use of a mem makes its memory or array)
     let len_g = mem_len[decl];
     let i32_t = prelude(Prelude.I32);
     let m = w_mark();
@@ -560,14 +559,7 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
         return i32_t;
     };
     if method == MemMethod.Cap.to_i32() {
-        if mem_array[decl] >= 0 {
-            w_mem_array(decl);
-            w_node(Op.ArrayLen, vt_i32, 0, 0, m);
-            return i32_t;
-        };
-        w_leaf(Op.MemorySize, vt_i32, mem_id, 0);
-        w_i32(16 - storage_shift(s));
-        w_node(Op.Plain, vt_i32, 116, 0, m);
+        w_mem_capacity(decl);
         return i32_t;
     };
     if method == MemMethod.Clear.to_i32() {
@@ -634,67 +626,66 @@ fn mem_method(word: I32) I32 {
     -1;
 }
 
-/// `reserve(n)`, `push(v)`, `resize(n)` of a mem: three functions, consecutive.
+/// `reserve(n)`, `push(v)`, `resize(n)` of a mem: three functions,
+/// consecutive. Only `reserve` differs between a mem in a memory and one in
+/// an array.
 fn mem_helper_functions(decl: I32) I32 {
     if mem_helpers[decl] >= 0 { return mem_helpers[decl]; };
-    let s = mem_storage(decl);
+    // (This makes the mem's memory, or its array: which, it says.)
+    memory_of(decl);
+    let reserve = if mem_array[decl] >= 0 { array_reserve_helper(decl); } else { memory_reserve_helper(decl); };
+    mem_push_helper(decl, reserve);
+    mem_resize_helper(decl, reserve);
+    mem_helpers[decl] = reserve;
+    reserve;
+}
+
+/// `reserve(n)` of a mem in a memory: `need = (n + per_page - 1) >> (16 - shift)`;
+/// when `need > memory.size`, grow by `max(size, need - size)` pages, or else
+/// by `need - size`, or else trap.
+fn memory_reserve_helper(decl: I32) I32 {
     let mem_id = memory_of(decl);
-    if mem_array[decl] >= 0 { return array_helper_functions(decl); };
-    let len_g = mem_len[decl];
-    let shift = storage_shift(s);
-    let vt = storage_vt(s);
-    let i32s = vl_one(vt_i32);
-    let none = vl_empty();
-    let ml = vl_begin();
-    vl_add(vt_i32);
-    vl_add(vt_i32);
-    // reserve(n): need = (n + per_page - 1) >> (16 - shift); size = memory.size;
-    // if need > size { if not grow(max(size, need - size)) { if not grow(need - size) { trap } } }
-    let reserve = helper(i32s, none, vl_end(ml), "mem.reserve");
+    let shift = storage_shift(mem_storage(decl));
+    let locals = vl_begin();
+    vl_add(vt_i32);  // need
+    vl_add(vt_i32);  // size
+    let reserve = helper(vl_one(vt_i32), vl_empty(), vl_end(locals), "mem.reserve");
     let m = w_mark();
     let mn = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_get(vt_i32, 0);
     w_i32((1 << (16 - shift)) - 1);
-    w_node(Op.Plain, vt_i32, 106, 0, mn);
+    w_i32_op(i32_add, mn);
     w_i32(16 - shift);
-    w_node(Op.Plain, vt_i32, 118, 0, mn);
+    w_i32_op(i32_shr_u, mn);
     w_node(Op.LocalSet, vt_none, 1, 0, mn);
     let ms = w_mark();
     w_leaf(Op.MemorySize, vt_i32, mem_id, 0);
     w_node(Op.LocalSet, vt_none, 2, 0, ms);
     let mif = w_mark();
     let mc = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    w_node(Op.Plain, vt_i32, 75, 0, mc);
+    w_get(vt_i32, 1);
+    w_get(vt_i32, 2);
+    w_i32_op(i32_gt_u, mc);
     let then_ = w_mark();
     let mg = w_mark();
     // grow(select(size, need - size, size > need - size)) == -1 ?
     let mgrow = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    let md = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    w_node(Op.Plain, vt_i32, 107, 0, md);
+    w_get(vt_i32, 2);
+    pages_short();
     let mcmp = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    let md2 = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    w_node(Op.Plain, vt_i32, 107, 0, md2);
-    w_node(Op.Plain, vt_i32, 75, 0, mcmp);
+    w_get(vt_i32, 2);
+    pages_short();
+    w_i32_op(i32_gt_u, mcmp);
     w_node(Op.Select, vt_i32, 0, 0, mgrow);
     w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow);
     w_i32(-1);
-    w_node(Op.Plain, vt_i32, 70, 0, mgrow);
+    w_i32_op(i32_eq, mgrow);
     let inner = w_mark();
     let mgrow2 = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.LocalGet, vt_i32, 2, 0);
-    w_node(Op.Plain, vt_i32, 107, 0, mgrow2);
+    pages_short();
     w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow2);
     w_i32(-1);
-    w_node(Op.Plain, vt_i32, 70, 0, mgrow2);
+    w_i32_op(i32_eq, mgrow2);
     let trap = w_mark();
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
     w_node(Op.Seq, vt_none, 0, 0, trap);
@@ -705,76 +696,26 @@ fn mem_helper_functions(decl: I32) I32 {
     w_node(Op.If, vt_none, 3, 0, mif);
     w_node(Op.Seq, vt_none, 0, 0, m);
     func_body[reserve] = w_pop();
-
-    // push(v): at = len; if at >= cap { reserve(at + 1) }; store at; len = at + 1
-    let mpl = vl_begin();
-    vl_add(vt_i32);
-    let pparams = vl_one(vt);
-    let push = helper(pparams, none, vl_end(mpl), "mem.push");
-    let p = w_mark();
-    let pa = w_mark();
-    w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
-    w_node(Op.LocalSet, vt_none, 1, 0, pa);
-    let pif = w_mark();
-    let pc = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.MemorySize, vt_i32, mem_id, 0);
-    w_i32(16 - shift);
-    let pcap = w_mark() - 2;
-    w_node(Op.Plain, vt_i32, 116, 0, pcap);
-    w_node(Op.Plain, vt_i32, 79, 0, pc);
-    let pthen = w_mark();
-    let pr = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_i32(1);
-    w_node(Op.Plain, vt_i32, 106, 0, pr);
-    w_node(Op.Call, vt_none, reserve, 0, pr);
-    w_node(Op.Seq, vt_none, 0, 0, pthen);
-    w_node(Op.If, vt_none, 1, 0, pif);
-    let pst = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    mem_address(s, pst);
-    w_leaf(Op.LocalGet, vt, 0, 0);
-    w_node(Op.Store, vt_none, mem_id, store_opcode(s), pst);
-    let pl = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_i32(1);
-    w_node(Op.Plain, vt_i32, 106, 0, pl);
-    w_node(Op.GlobalSet, vt_none, len_g, 0, pl);
-    w_node(Op.Seq, vt_none, 0, 0, p);
-    func_body[push] = w_pop();
-
-    // resize(n): reserve(n); len = n
-    let resize = helper(i32s, none, none, "mem.resize");
-    let r = w_mark();
-    let rr = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
-    w_node(Op.Call, vt_none, reserve, 0, rr);
-    let rl = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
-    w_node(Op.GlobalSet, vt_none, len_g, 0, rl);
-    w_node(Op.Seq, vt_none, 0, 0, r);
-    func_body[resize] = w_pop();
-    mem_helpers[decl] = reserve;
     reserve;
 }
 
-/// `reserve(n)`, `push(v)`, `resize(n)` of a mem in an array, as of one in a
-/// memory: the array is replaced by a longer one, with its elements copied.
-fn array_helper_functions(decl: I32) I32 {
-    let s = mem_storage(decl);
-    let h = mem_array_heap(s);
-    let arr = mem_array[decl];
-    let len_g = mem_len[decl];
-    let vt = storage_vt(s);
-    let i32s = vl_one(vt_i32);
-    let none = vl_empty();
-    // reserve(n): cap = the array's length; if n > cap { new = an array of
-    //   max(n, cap * 2) elements; copy the elements to it; it is the vec's array }
-    let ml = vl_begin();
-    vl_add(vt_i32);
-    vl_add(vt_ref(h, true));
-    let reserve = helper(i32s, none, vl_end(ml), "mem.reserve");
+/// `need - size`, in @memory_reserve_helper.
+fn pages_short() void {
+    let m = w_mark();
+    w_get(vt_i32, 1);
+    w_get(vt_i32, 2);
+    w_i32_op(i32_sub, m);
+}
+
+/// `reserve(n)` of a mem in an array: when `n` is more than the array's
+/// length, the array is replaced by one of `max(n, length * 2)` elements,
+/// the elements copied to it.
+fn array_reserve_helper(decl: I32) I32 {
+    let h = mem_array_heap(mem_storage(decl));
+    let locals = vl_begin();
+    vl_add(vt_i32);  // the length
+    vl_add(vt_ref(h, true));  // the new array
+    let reserve = helper(vl_one(vt_i32), vl_empty(), vl_end(locals), "mem.reserve");
     let m = w_mark();
     let ms = w_mark();
     w_mem_array(decl);
@@ -782,94 +723,121 @@ fn array_helper_functions(decl: I32) I32 {
     w_node(Op.LocalSet, vt_none, 1, 0, ms);
     let mif = w_mark();
     let mc = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_node(Op.Plain, vt_i32, 75, 0, mc);
+    w_get(vt_i32, 0);
+    w_get(vt_i32, 1);
+    w_i32_op(i32_gt_u, mc);
     let then_ = w_mark();
-    // new = array.new_default(select(n, cap << 1, n > cap << 1))
+    // new = array.new_default(select(n, length << 1, n > length << 1))
     let mnew = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
-    let md = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_i32(1);
-    w_node(Op.Plain, vt_i32, 116, 0, md);
+    w_get(vt_i32, 0);
+    twice_length();
     let mcmp = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
-    let md2 = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_i32(1);
-    w_node(Op.Plain, vt_i32, 116, 0, md2);
-    w_node(Op.Plain, vt_i32, 75, 0, mcmp);
+    w_get(vt_i32, 0);
+    twice_length();
+    w_i32_op(i32_gt_u, mcmp);
     w_node(Op.Select, vt_i32, 0, 0, mnew);
     w_node(Op.ArrayNewDefault, vt_ref(h, false), h, 0, mnew);
     w_node(Op.LocalSet, vt_none, 2, 0, mnew);
-    // array.copy(new, 0, old, 0, cap)
+    // array.copy(new, 0, old, 0, length)
     let mcopy = w_mark();
-    w_leaf(Op.LocalGet, vt_ref(h, true), 2, 0);
+    w_get(vt_ref(h, true), 2);
     w_i32(0);
     w_mem_array(decl);
     w_i32(0);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_get(vt_i32, 1);
     w_node(Op.ArrayCopy, vt_none, h, h, mcopy);
     let mset = w_mark();
     let mnn = w_mark();
-    w_leaf(Op.LocalGet, vt_ref(h, true), 2, 0);
+    w_get(vt_ref(h, true), 2);
     w_node(Op.RefAsNonNull, vt_ref(h, false), 0, 0, mnn);
-    w_node(Op.GlobalSet, vt_none, arr, 0, mset);
+    w_node(Op.GlobalSet, vt_none, mem_array[decl], 0, mset);
     w_node(Op.Seq, vt_none, 0, 0, then_);
     w_node(Op.If, vt_none, 1, 0, mif);
     w_node(Op.Seq, vt_none, 0, 0, m);
     func_body[reserve] = w_pop();
+    reserve;
+}
 
-    // push(v): at = len; if at >= cap { reserve(at + 1) }; array[at] = v; len = at + 1
-    let mpl = vl_begin();
-    vl_add(vt_i32);
-    let push = helper(vl_one(vt), none, vl_end(mpl), "mem.push");
+/// `length << 1`, in @array_reserve_helper.
+fn twice_length() void {
+    let m = w_mark();
+    w_get(vt_i32, 1);
+    w_i32(1);
+    w_i32_op(i32_shl, m);
+}
+
+/// `push(v)`: `at = len; if at >= cap { reserve(at + 1) }; element at = v; len = at + 1`.
+fn mem_push_helper(decl: I32, reserve: I32) void {
+    let s = mem_storage(decl);
+    let vt = storage_vt(s);
+    let len_g = mem_len[decl];
+    let locals = vl_begin();
+    vl_add(vt_i32);  // at
+    let push = helper(vl_one(vt), vl_empty(), vl_end(locals), "mem.push");
     let p = w_mark();
     let pa = w_mark();
     w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
     w_node(Op.LocalSet, vt_none, 1, 0, pa);
     let pif = w_mark();
     let pc = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    let pcap = w_mark();
-    w_mem_array(decl);
-    w_node(Op.ArrayLen, vt_i32, 0, 0, pcap);
-    w_node(Op.Plain, vt_i32, 79, 0, pc);
+    w_get(vt_i32, 1);
+    w_mem_capacity(decl);
+    w_i32_op(i32_ge_u, pc);
     let pthen = w_mark();
     let pr = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_get(vt_i32, 1);
     w_i32(1);
-    w_node(Op.Plain, vt_i32, 106, 0, pr);
+    w_i32_op(i32_add, pr);
     w_node(Op.Call, vt_none, reserve, 0, pr);
     w_node(Op.Seq, vt_none, 0, 0, pthen);
     w_node(Op.If, vt_none, 1, 0, pif);
     let pst = w_mark();
-    w_mem_array(decl);
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
-    w_leaf(Op.LocalGet, vt, 0, 0);
-    w_node(Op.ArraySet, vt_none, h, 0, pst);
+    if mem_array[decl] >= 0 {
+        w_mem_array(decl);
+        w_get(vt_i32, 1);
+        w_get(vt, 0);
+        w_node(Op.ArraySet, vt_none, mem_array_heap(s), 0, pst);
+    } else {
+        w_get(vt_i32, 1);
+        mem_address(s, pst);
+        w_get(vt, 0);
+        w_node(Op.Store, vt_none, memory_of(decl), store_opcode(s), pst);
+    };
     let pl = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 1, 0);
+    w_get(vt_i32, 1);
     w_i32(1);
-    w_node(Op.Plain, vt_i32, 106, 0, pl);
+    w_i32_op(i32_add, pl);
     w_node(Op.GlobalSet, vt_none, len_g, 0, pl);
     w_node(Op.Seq, vt_none, 0, 0, p);
     func_body[push] = w_pop();
+}
 
-    // resize(n): reserve(n); len = n
-    let resize = helper(i32s, none, none, "mem.resize");
+/// `resize(n)`: `reserve(n); len = n`.
+fn mem_resize_helper(decl: I32, reserve: I32) void {
+    let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize");
     let r = w_mark();
     let rr = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
+    w_get(vt_i32, 0);
     w_node(Op.Call, vt_none, reserve, 0, rr);
     let rl = w_mark();
-    w_leaf(Op.LocalGet, vt_i32, 0, 0);
-    w_node(Op.GlobalSet, vt_none, len_g, 0, rl);
+    w_get(vt_i32, 0);
+    w_node(Op.GlobalSet, vt_none, mem_len[decl], 0, rl);
     w_node(Op.Seq, vt_none, 0, 0, r);
     func_body[resize] = w_pop();
-    mem_helpers[decl] = reserve;
-    reserve;
+}
+
+/// The capacity of mem `decl`, in elements, pushed: its array's length, or
+/// its memory's size in elements.
+fn w_mem_capacity(decl: I32) void {
+    let m = w_mark();
+    if mem_array[decl] >= 0 {
+        w_mem_array(decl);
+        w_node(Op.ArrayLen, vt_i32, 0, 0, m);
+        return;
+    };
+    w_leaf(Op.MemorySize, vt_i32, memory_of(decl), 0);
+    w_i32(16 - storage_shift(mem_storage(decl)));
+    w_i32_op(i32_shl, m);
 }
 
 /// `src.intern(a, b)` and the rest: the mem's generated interner.

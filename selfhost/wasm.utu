@@ -503,6 +503,17 @@ enum(U16) Op:
     | Rethrow     // a: label of the try
     | V128Const   // a: four words in w_aux
 
+// The `Plain` instructions written by name, by their opcodes.
+let i32_eqz: I32 = 69;
+let i32_eq: I32 = 70;
+let i32_lt_u: I32 = 73;
+let i32_gt_u: I32 = 75;
+let i32_ge_u: I32 = 79;
+let i32_add: I32 = 106;
+let i32_sub: I32 = 107;
+let i32_shl: I32 = 116;
+let i32_shr_u: I32 = 118;
+
 /// By IR node: its instruction. The other `w_*` vecs are its other columns.
 vec w_op: U16;
 /// Its value type (vt_none for none).
@@ -577,6 +588,11 @@ fn w_insert(at: I32, id: I32) void {
 fn w_kid(node: I32, i: I32) I32 { w_kids[w_first[node] + i]; }
 
 fn w_i32(value: I32) I32 { w_leaf(Op.I32Const, vt_i32, value, 0); }
+
+fn w_get(vt: I32, local: I32) I32 { w_leaf(Op.LocalGet, vt, local, 0); }
+
+/// An `i32` instruction of no immediates (as `i32_add`) over the nodes since `mark`.
+fn w_i32_op(opcode: I32, mark: I32) I32 { w_node(Op.Plain, vt_i32, opcode, 0, mark); }
 
 //! = Encoding
 
@@ -1612,25 +1628,33 @@ fn exits_only_loop(block: I32) Bool {
 fn emit_while(block: I32, f: I32) void {
     let lp = w_kid(block, 0);
     let leave = w_kid(w_kid(lp, 0), 0);
-    op1(3);
-    block_type(vt_none);
-    labels.push(w_a[lp]);
+    open_block(3, vt_none, w_a[lp]);
     // Round again while the condition to leave does not hold.
-    if w_op[leave] == Op.Plain.to_i32() and w_a[leave] == 69 and w_count[leave] == 1 {
+    if w_op[leave] == Op.Plain.to_i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
         emit(w_kid(leave, 0), f);
     } else if w_op[leave] == Op.Plain.to_i32() and inverse_comparison(w_a[leave]) >= 0 {
         emit_kids(leave);
         op1(inverse_comparison(w_a[leave]));
     } else {
         emit(leave, f);
-        op1(69);
+        op1(i32_eqz);
     };
-    op1(4);
-    block_type(vt_none);
-    labels.push(-1);
+    open_block(4, vt_none, -1);
     for (1 ..< w_count[lp]) |i| { emit(w_kid(lp, i), f); };
-    labels.resize(labels.len() - 2);
-    op1(11);
+    close_block();
+    close_block();
+}
+
+/// Open a structured instruction (`block` 2, `loop` 3, `if` 4, `try` 6) of
+/// result `vt`, branched to as `label`; @close_block ends it.
+fn open_block(code: I32, vt: I32, label: I32) void {
+    op1(code);
+    block_type(vt);
+    labels.push(label);
+}
+
+fn close_block() void {
+    labels.resize(labels.len() - 1);
     op1(11);
 }
 
@@ -1667,31 +1691,25 @@ fn emit(node: I32, f: I32) void {
             emit_kids(node);
             return;
         };
-        op1(if op == Op.Block.to_i32() { 2; } else { 3; });
-        block_type(w_type[node]);
-        labels.push(a);
+        open_block(if op == Op.Block.to_i32() { 2; } else { 3; }, w_type[node], a);
         emit_kids(node);
-        labels.resize(labels.len() - 1);
-        op1(11);
+        close_block();
         return;
     };
     if op == Op.If.to_i32() {
         emit(w_kid(node, 0), f);
-        op1(4);
-        block_type(w_type[node]);
-        labels.push(a);
+        open_block(4, w_type[node], a);
         emit(w_kid(node, 1), f);
         if w_count[node] > 2 {
-            op1(5);
+            op1(5);  // else
             emit(w_kid(node, 2), f);
         };
-        labels.resize(labels.len() - 1);
-        op1(11);
+        close_block();
         return;
     };
     // `i32.eqz` of an integer comparison is the opposite comparison (a byte
     // fewer; not for floats, where NaN makes neither hold).
-    if op == Op.Plain.to_i32() and a == 69 and w_count[node] == 1 {
+    if op == Op.Plain.to_i32() and a == i32_eqz and w_count[node] == 1 {
         let c = w_kid(node, 0);
         if w_op[c] == Op.Plain.to_i32() and inverse_comparison(w_a[c]) >= 0 {
             emit_kids(c);
@@ -1700,15 +1718,12 @@ fn emit(node: I32, f: I32) void {
         };
     };
     if op == Op.Try.to_i32() {
-        op1(6);
-        block_type(w_type[node]);
-        labels.push(a);
+        open_block(6, w_type[node], a);
         emit(w_kid(node, 0), f);
-        op1(7);
+        op1(7);  // catch the JS tag (tag 0)
         leb_u(true, 0);
         emit(w_kid(node, 1), f);
-        labels.resize(labels.len() - 1);
-        op1(11);
+        close_block();
         return;
     };
     emit_kids(node);
