@@ -370,8 +370,13 @@ fn wutu_helper(kind: Str) Str {
         params = "U64";
         js = "(i)=>globalThis.__utuWutu.pushCall(String(i))";
     } else if kind == "call" {
-        params = "Str";
-        js = "(k)=>globalThis.__utuWutu.pushCall(k)";
+        // A slot's or a loop's key: the template's hash and the site's
+        // position (one string per template, not one per site).
+        params = "Str, I32";
+        js = "(h,p)=>globalThis.__utuWutu.pushCall(\"call:\"+h+\":\"+p)";
+    } else if kind == "loop" {
+        params = "Str, I32";
+        js = "(h,p)=>globalThis.__utuWutu.pushCall(\"loop:\"+h+\":\"+p)";
     } else if kind == "globalKey" {
         params = "Str";
         js = "(k)=>globalThis.__utuWutu.pushGlobal(k)";
@@ -395,13 +400,15 @@ fn wutu_helper(kind: Str) Str {
 }
 
 /// The reconciler's `enter()`, typed to give the element's own interface.
+/// An element is known by its template's hash and its index there
+/// (`v<hash>:<index>`), put together in the glue.
 fn wutu_enter(tag: Str, svg: Bool) Str {
     let kind = "enter_" + tag;
     let w = intern_text(kind);
     for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
     let type = if svg { "Browser.SVGElement"; } else { "Browser.HTML" + element_interface(tag) + "Element"; };
     let name = wutu_prefix() + kind;
-    wu_decls.push(intern_text("let " + name + ": fun(Str, Bool, Str, Str) " + type + " = @es/\\ (t,s,i,k)=>globalThis.__utuWutu.enter(t,!!s,i,k) \\/;"));
+    wu_decls.push(intern_text("let " + name + ": fun(Str, Str, I32) " + type + " = @es/\\ (t,h,i)=>globalThis.__utuWutu.enter(t," + (if svg { "true"; } else { "false"; }) + ",\"v\"+h+\":\"+i,\"\") \\/;"));
     wu_declared_kind.push(w);
     wu_declared_name.push(intern_text(name));
     name;
@@ -468,8 +475,7 @@ fn wutu_element(n: I32, outer_svg: Bool) Str {
     let code = "";
     let properties = "";
     if reconcile {
-        let identity = js_string("v" + word_text(wu_view_hash[0]) + ":" + int_text(tn_index[n]));
-        code = code + "let " + id + " = " + wutu_enter(tag, svg) + "(" + js_string(tag) + ", " + (if svg { "true"; } else { "false"; }) + ", " + identity + ", \"\");\n";
+        code = code + "let " + id + " = " + wutu_enter(tag, svg) + "(" + js_string(tag) + ", " + js_string(word_text(wu_view_hash[0])) + ", " + int_text(tn_index[n]) + ");\n";
     } else {
         let create = if svg { "createElementNS(\"http://www.w3.org/2000/svg\", "; } else { "createElement("; };
         code = code + "let " + id + " = Browser.document." + create + js_string(tag) + ");\n";
@@ -615,11 +621,12 @@ fn wutu_child(parent_id: Str, svg: Bool, child: I32) Str {
         let value = node_uid(child);
         return code + (if reconcile { wutu_helper("node") + "(" + value + ");"; } else { parent_id + ".append(" + value + ");"; }) + "\n";
     };
-    // Text and interpolated values; reconciled slots get a stable call key.
+    // Text and interpolated values. A reconciled value gets a stable call key,
+    // for the elements a component it calls makes; written text makes none.
     let value = "(" + wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child) + ")";
     if not reconcile { return parent_id + ".append(" + value + ");\n"; };
-    let at = if tn_from[child] >= 0 { tn_from[child]; } else { 0; };
-    wutu_helper("call") + "(" + js_string("call:" + word_text(wu_view_hash[0]) + ":" + int_text(at)) + ");\n" + wutu_helper("append") + "(" + value + ");\n" + wutu_helper("unkey") + "();\n";
+    if tn_from[child] < 0 { return wutu_helper("append") + "(" + value + ");\n"; };
+    wutu_helper("call") + "(" + js_string(word_text(wu_view_hash[0])) + ", " + int_text(tn_from[child]) + ");\n" + wutu_helper("append") + "(" + value + ");\n" + wutu_helper("unkey") + "();\n";
 }
 
 /// A `for` in a template: its fragment for each item. Reconciled, an item
@@ -630,8 +637,10 @@ fn wutu_loop(parent_id: Str, svg: Bool, n: I32) Str {
     let comma = text_index(written, ",", 0);
     let index = "";
     let captures = written;
+    // An unkeyed iteration is known by its index: one the loop does not name is added.
+    let unkeyed = wu_reconcile[0] == 1 and tn_key[n] < 0;
     if comma >= 0 { index = trim_text(written.slice(comma + 1, written.len())); }
-    else {
+    else if unkeyed {
         index = wutu_prefix() + "index" + int_text(wu_node_count[0]);
         wu_node_count[0] += 1;
         captures = written + ", " + index;
@@ -645,8 +654,7 @@ fn wutu_loop(parent_id: Str, svg: Bool, n: I32) Str {
         enter_key = push + "(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ");";
     } else if reconcile {
         // Unkeyed iterations are known by the loop's site and position.
-        let site = js_string("loop:" + word_text(wu_view_hash[0]) + ":" + int_text(tn_from[n]));
-        enter_key = wutu_helper("call") + "(" + site + ");" + wutu_helper("index") + "(" + index + ");";
+        enter_key = wutu_helper("loop") + "(" + js_string(word_text(wu_view_hash[0])) + ", " + int_text(tn_from[n]) + ");" + wutu_helper("index") + "(" + index + ");";
     };
     let fragment = wutu_fragment(parent_id, svg, tn_first[n]);
     if reconcile {

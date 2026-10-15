@@ -49,7 +49,10 @@ const RUNTIME_HELPERS = {
   event: ['Browser.Element, Str, cl(Browser.Event) void', 'void', '(n,e,h)=>globalThis.__utuWutu.listen(n,e,h)'],
   leave: ['', 'void', '()=>{globalThis.__utuWutu.leave()}'],
   index: ['U64', 'void', '(i)=>globalThis.__utuWutu.pushCall(String(i))'],
-  call: ['Str', 'void', '(k)=>globalThis.__utuWutu.pushCall(k)'],
+  // A slot's or a loop's key: the template's hash and the site's position
+  // (one string per template, not one per site).
+  call: ['Str, I32', 'void', '(h,p)=>globalThis.__utuWutu.pushCall("call:"+h+":"+p)'],
+  loop: ['Str, I32', 'void', '(h,p)=>globalThis.__utuWutu.pushCall("loop:"+h+":"+p)'],
   globalKey: ['Str', 'void', '(k)=>globalThis.__utuWutu.pushGlobal(k)'],
   key: ['Str', 'void', '(k)=>globalThis.__utuWutu.pushKey(k)'],
   unkey: ['', 'void', '()=>globalThis.__utuWutu.popKey()'],
@@ -252,13 +255,17 @@ class SiteExpander {
     return name;
   }
 
-  /** The reconciler's enter() typed to return the element's concrete interface. */
+  /**
+   * The reconciler's enter() typed to return the element's concrete
+   * interface. An element is known by its template's hash and its index
+   * there (`v<hash>:<index>`), put together in the glue.
+   */
   enter(tag, svg) {
     const kind = 'enter_' + tag;
     if (this.declared.has(kind)) return this.declared.get(kind);
     const type = svg ? 'Browser.SVGElement' : `Browser.HTML${ELEMENT_INTERFACES[tag] ?? ''}Element`;
     const name = this.prefix + kind;
-    this.declarations.push(`let ${name}: fun(Str, Bool, Str, Str) ${type} = @es/\\ (t,s,i,k)=>globalThis.__utuWutu.enter(t,!!s,i,k) \\/;`);
+    this.declarations.push(`let ${name}: fun(Str, Str, I32) ${type} = @es/\\ (t,h,i)=>globalThis.__utuWutu.enter(t,${svg},"v"+h+":"+i,"") \\/;`);
     this.declared.set(kind, name);
     return name;
   }
@@ -272,8 +279,7 @@ class SiteExpander {
     const id = node.uid;
     const properties = [];
     if (this.reconcile) {
-      const identity = JSON.stringify(`v${this.viewHash}:${node.index}`);
-      code.push(`let ${id} = ${this.enter(node.tag, svg)}(${JSON.stringify(node.tag)}, ${svg}, ${identity}, "");`);
+      code.push(`let ${id} = ${this.enter(node.tag, svg)}(${JSON.stringify(node.tag)}, ${JSON.stringify(this.viewHash)}, ${node.index});`);
     } else {
       const create = svg ? `createElementNS("${SVG_NAMESPACE}", ` : 'createElement(';
       code.push(`let ${id} = Browser.document.${create}${JSON.stringify(node.tag)});`);
@@ -386,13 +392,19 @@ class SiteExpander {
         return;
       }
       default: {
-        // Text and interpolated values. Reconciled slots get a stable call key.
+        // Text and interpolated values. A reconciled value gets a stable call
+        // key, for the elements a component it calls makes; written text
+        // (no range) makes none.
         const value = `(${this.island(child.expr, child.range, child)})`;
         if (!this.reconcile) {
           body.push(`${parent.id}.append(${value});`);
           return;
         }
-        body.push(`${this.helper('call')}(${JSON.stringify(`call:${this.viewHash}:${child.range?.start ?? 0}`)});`);
+        if (!child.range) {
+          body.push(`${this.helper('append')}(${value});`);
+          return;
+        }
+        body.push(`${this.helper('call')}(${JSON.stringify(this.viewHash)}, ${child.range.start});`);
         body.push(`${this.helper('append')}(${value});`);
         body.push(`${this.helper('unkey')}();`);
       }
@@ -401,8 +413,10 @@ class SiteExpander {
 
   emitLoop(parent, loop) {
     const parts = loop.captures.split(',').map(part => part.trim());
+    // An unkeyed iteration is known by its index: one the loop does not name is added.
+    const unkeyed = this.reconcile && !loop.key;
     const index = parts[1] ?? `${this.prefix}index${this.nodeCount++}`;
-    const captures = parts.length > 1 ? loop.captures : `${loop.captures}, ${index}`;
+    const captures = parts.length > 1 || !unkeyed ? loop.captures : `${loop.captures}, ${index}`;
     const iterable = this.island(loop.iterable, loop.iterableRange, loop);
     let enterKey = '', leaveKey = '';
     if (this.reconcile && loop.key) {
@@ -410,8 +424,7 @@ class SiteExpander {
       enterKey = `${push}(${this.island(loop.key, loop.keyRange, loop)});`;
     } else if (this.reconcile) {
       // Unkeyed iterations are identified by the loop's site and position.
-      const site = JSON.stringify(`loop:${this.viewHash}:${loop.iterableRange.start}`);
-      enterKey = `${this.helper('call')}(${site});${this.helper('index')}(${index});`;
+      enterKey = `${this.helper('loop')}(${JSON.stringify(this.viewHash)}, ${loop.iterableRange.start});${this.helper('index')}(${index});`;
     }
     const fragment = this.emitFragment(parent, loop.children);
     if (this.reconcile) {
