@@ -176,7 +176,8 @@ fn validate_tree(node: I32) void {
     validate_node(node);
     let c = node_child[node];
     while (c >= 0) {
-        validate_tree(c);
+        // (Most nodes are leaves: no call into the tree for them.)
+        if node_child[c] >= 0 { validate_tree(c); } else { validate_node(c); };
         c = node_next[c];
     };
 }
