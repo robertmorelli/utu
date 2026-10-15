@@ -506,13 +506,25 @@ enum(U16) Op:
 // The `Plain` instructions written by name, by their opcodes.
 let i32_eqz: I32 = 69;
 let i32_eq: I32 = 70;
+let i32_lt_s: I32 = 72;
 let i32_lt_u: I32 = 73;
+let i32_gt_s: I32 = 74;
 let i32_gt_u: I32 = 75;
+let i32_le_s: I32 = 76;
+let i32_ge_s: I32 = 78;
 let i32_ge_u: I32 = 79;
 let i32_add: I32 = 106;
 let i32_sub: I32 = 107;
+let i32_mul: I32 = 108;
+let i32_div_s: I32 = 109;
+let i32_and: I32 = 113;
+let i32_xor: I32 = 115;
 let i32_shl: I32 = 116;
 let i32_shr_u: I32 = 118;
+let i64_xor: I32 = 133;
+let i64_shr_u: I32 = 136;
+let i32_wrap_i64: I32 = 167;
+let i64_extend_i32_u: I32 = 173;
 
 /// By IR node: its instruction. The other `w_*` vecs are its other columns.
 vec w_op: U16;
