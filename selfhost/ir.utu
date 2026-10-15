@@ -10,7 +10,7 @@
 
 /// The parsed elements, a row each: its tag's word id. The other `x_*`
 /// vecs are the rows' other columns, and `attr_*` their attributes.
-vec x_tag: I32;        // the tag's word id
+vec x_tag: I32;
 /// Its first attribute, in `attr_*`
 vec x_attr_first: I32;
 vec x_attr_count: I32;
@@ -62,7 +62,7 @@ struct XmlAt:
     | end: I32
 
 fn x_space(at: XmlAt) void {
-    while (at.pos < at.end and (src[at.pos] == 32 or src[at.pos] == 10 or src[at.pos] == 9 or src[at.pos] == 13)) { at.pos += 1; };
+    while (at.pos < at.end and is_space(src[at.pos])) { at.pos += 1; };
 }
 
 fn x_name_char(c: I32) Bool { (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 45 or c == 95; }

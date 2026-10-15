@@ -220,15 +220,7 @@ fn type_of(node: I32, inst: I32) I32 {
     if kind == Node.Paren_type.to_i32() { return type_of(first_child(node), inst); };
     if kind == Node.Void_type.to_i32() { return ty_void(); };
     if kind == Node.Return_type.to_i32() { return type_of(first_child(node), inst); };
-    if kind == Node.Tuple_type.to_i32() {
-        let m = vl_begin();
-        let c = first_child(node);
-        while (c >= 0) {
-            vl_add(type_of(c, inst));
-            c = next_sibling(c);
-        };
-        return ty(Ty.Tuple, vl_end(m), 0);
-    };
+    if kind == Node.Tuple_type.to_i32() { return ty(Ty.Tuple, type_args(node, inst), 0); };
     if kind == Node.Func_type.to_i32() or kind == Node.Closure_type.to_i32() {
         let m = vl_begin();
         let c = first_child(node);
@@ -299,7 +291,8 @@ fn type_path(node: I32, inst: I32) I32 {
     decl_type(node_decl[n], inst);
 }
 
-/// The types of a module's type arguments, as a list.
+/// The types a node's children name, as a list: a module's type arguments,
+/// a tuple's types.
 fn type_args(list: I32, inst: I32) I32 {
     let m = vl_begin();
     let c = first_child(list);

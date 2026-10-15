@@ -91,8 +91,7 @@ fn name_ref(name: Str) Str {
 /// The utu expression a `@json` site stands for; its codecs go to @jc_pending.
 fn json_expand_site(site: I32, prefix: Str) Str {
     let raw = dsl_body(site);
-    let i = 0;
-    while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+    let i = skip_spaces(raw, 0);
     if text_at(raw, i, "match") and (i + 5 >= raw.len() or not is_word_code(raw.get(i + 5))) { return json_match(raw, prefix); };
     // `decode|encode|error`, a type (with nested brackets), then the expression.
     let op = if text_at(raw, i, "decode") { "decode"; } else if text_at(raw, i, "encode") { "encode"; } else if text_at(raw, i, "error") { "error"; } else { ""; };
@@ -100,8 +99,7 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     if op.len() == 0 or after >= raw.len() or not is_space_code(raw.get(after)) {
         dsl_fail("@json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`", first_non_space(raw), 1);
     };
-    let type_start = after;
-    while (type_start < raw.len() and is_space_code(raw.get(type_start))) { type_start += 1; };
+    let type_start = skip_spaces(raw, after);
     let j = type_start;
     let depth = 0;
     while (j < raw.len() and (depth > 0 or not is_space_code(raw.get(j)))) {
@@ -113,8 +111,7 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     if not is_written_type(type) {
         dsl_fail("Expected a type after " + op, type_start, if type.len() > 1 { type.len(); } else { 1; });
     };
-    let expr_start = j;
-    while (expr_start < raw.len() and is_space_code(raw.get(expr_start))) { expr_start += 1; };
+    let expr_start = skip_spaces(raw, j);
     if expr_start >= trim_end(raw).len() {
         let what = if op == "encode" { "value"; } else { "text"; };
         dsl_fail("@json " + op + " needs a " + what + " expression after the type", type_start, type.len());
@@ -123,7 +120,7 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     jc_type_at[0] = type_start;
     jc_type_len[0] = type.len();
     let kind = shape_kind(type);
-    if kind == 0 or kind == 1 {
+    if kind == Shape.Scalar or kind == Shape.Nullable {
         dsl_fail("@json " + op + " works on a struct, enum, or Array; wrap " + type + " in a struct field", type_start, type.len());
     };
     if not splice_parses(site, expr_start, expr) {
@@ -144,11 +141,7 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     "{ let " + r + " = __json_reader(" + input + "); let " + value + " = " + read + "; __json_end(" + r + "); __json_describe(" + r + "); }";
 }
 
-fn first_non_space(text: Str) I32 {
-    let i = 0;
-    while (i < text.len() and is_space_code(text.get(i))) { i += 1; };
-    i;
-}
+fn first_non_space(text: Str) I32 { skip_spaces(text, 0); }
 
 /// `?Name`, `Name`, `Name[…]`: what may follow decode, encode, or error.
 fn is_written_type(type: Str) Bool {
@@ -171,24 +164,31 @@ fn is_json_scalar(type: Str) Bool {
     type == "I32" or type == "U32" or type == "I64" or type == "F32" or type == "F64" or type == "Bool" or type == "Str";
 }
 
-/// 0 a scalar, 1 nullable, 2 an array, 3 a struct, 4 an enum; a type JSON
-/// cannot have is reported.
-fn shape_kind(written: Str) I32 {
+/// What JSON a type is.
+enum(U8) Shape:
+    | Scalar
+    | Nullable
+    | Array
+    | Struct
+    | Enum
+
+/// The @Shape of a written type; a type JSON cannot have is reported.
+fn shape_kind(written: Str) Shape {
     let type = without_spaces(written);
-    if is_json_scalar(type) { return 0; };
+    if is_json_scalar(type) { return Shape.Scalar; };
     if type.len() > 0 and type.get(0) == 63 {
         let inner = shape_kind(type.slice(1, type.len()));
-        if inner == 0 and type.slice(1, type.len()) != "Str" { json_fail(type + " is not supported: only reference types (Str, structs, enums, arrays) can be null"); };
-        if inner == 1 { json_fail(type + " is not supported"); };
-        return 1;
+        if inner == Shape.Scalar and type.slice(1, type.len()) != "Str" { json_fail(type + " is not supported: only reference types (Str, structs, enums, arrays) can be null"); };
+        if inner == Shape.Nullable { json_fail(type + " is not supported"); };
+        return Shape.Nullable;
     };
     if text_at(type, 0, "Array[") and type.get(type.len() - 1) == 93 {
         shape_kind(type.slice(6, type.len() - 1));
-        return 2;
+        return Shape.Array;
     };
     let node = declared_type(type);
     if node < 0 { json_fail("@json cannot use " + type + ": use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64"); };
-    if is_kind(node, Node.Struct_decl) { return 3; };
+    if is_kind(node, Node.Struct_decl) { return Shape.Struct; };
     // Enum variants name their kind with a field `kind`: none may have one.
     let v = first_child(node);
     while (v >= 0) {
@@ -204,7 +204,7 @@ fn shape_kind(written: Str) I32 {
         };
         v = next_sibling(v);
     };
-    4;
+    Shape.Enum;
 }
 
 /// The struct or enum declaration a type names in the container (any of
@@ -314,9 +314,9 @@ fn json_emit(source: Str) void { jc_pending.push(intern_text(source)); }
 fn json_zero(written: Str, visiting: I32) Str {
     let type = without_spaces(written);
     let kind = shape_kind(type);
-    if kind == 0 { return scalar_zero(type); };
-    if kind == 1 { return "null"; };
-    if kind == 2 { return "[]"; };
+    if kind == Shape.Scalar { return scalar_zero(type); };
+    if kind == Shape.Nullable { return "null"; };
+    if kind == Shape.Array { return "[]"; };
     let w = intern_text(type);
     if visiting >= 0 and list_has(visiting, w) { json_fail(type + " contains itself; make the recursive field ?" + type + " or an Array"); };
     let name = "__json_zero_" + mangle(type);
@@ -324,7 +324,7 @@ fn json_zero(written: Str, visiting: I32) Str {
     let node = declared_type(type);
     if json_define(name) {
         let body = "";
-        if kind == 3 { body = type + " { " + construct_fields(node, next) + " }"; }
+        if kind == Shape.Struct { body = type + " { " + construct_fields(node, next) + " }"; }
         else {
             let usable = -1;
             let v = first_child(node);
@@ -369,12 +369,12 @@ fn fields_constructible(holder: I32, visiting: I32) Bool {
 /// (`visiting`, a list of words).
 fn constructible(type: Str, visiting: I32) Bool {
     let kind = shape_kind(type);
-    if kind <= 2 { return true; };
+    if kind == Shape.Scalar or kind == Shape.Nullable or kind == Shape.Array { return true; };
     let w = intern_text(type);
     if visiting >= 0 and list_has(visiting, w) { return false; };
     let next = list_with(visiting, w);
     let node = declared_type(type);
-    if kind == 3 { return fields_constructible(node, next); };
+    if kind == Shape.Struct { return fields_constructible(node, next); };
     let v = first_child(node);
     while (v >= 0) {
         if is_kind(v, Node.Variant) and fields_constructible(fields_holder_of(v), next) { return true; };
@@ -401,14 +401,14 @@ fn list_with(list: I32, w: I32) I32 {
 fn json_read(written: Str, r: Str) Str {
     let type = without_spaces(written);
     let kind = shape_kind(type);
-    if kind == 0 { return "__json_" + scalar_read(type) + "(" + r + ")"; };
+    if kind == Shape.Scalar { return "__json_" + scalar_read(type) + "(" + r + ")"; };
     let name = "__json_read_" + mangle(type);
     if json_define(name) {
-        if kind == 1 {
+        if kind == Shape.Nullable {
             json_emit("fn " + name + "(r: JsonReader__) " + type + " {\n    let out: " + type + " = null;\n    if not __json_null(r) {\n        out = " + json_read(inner_type(type), "r") + ";\n    };\n    out;\n}");
-        } else if kind == 2 {
+        } else if kind == Shape.Array {
             json_emit(array_reader(name, type));
-        } else if kind == 3 {
+        } else if kind == Shape.Struct {
             let node = declared_type(type);
             json_emit("fn " + name + "(r: JsonReader__) " + type + " {\n" + fields_reader(node, type + " { " + fields_result(node) + " }", true) + "\n}");
         } else {
@@ -533,15 +533,15 @@ fn enum_reader(name: Str, type: Str) Str {
 fn json_write(written: Str, value: Str, w: Str) Str {
     let type = without_spaces(written);
     let kind = shape_kind(type);
-    if kind == 0 { return scalar_write(type, value, w); };
+    if kind == Shape.Scalar { return scalar_write(type, value, w); };
     let name = "__json_write_" + mangle(type);
     if json_define(name) {
         let body = "";
-        if kind == 1 {
+        if kind == Shape.Nullable {
             body = "promote v {\n        |x| => {\n            " + json_write(inner_type(type), "x", "w") + "\n        },\n        ~> {\n            __json_raw(w, \"null\");\n        },\n    };";
-        } else if kind == 2 {
+        } else if kind == Shape.Array {
             body = "__json_put(w, 91);\n    for (0..<v.len()) |i| {\n        if i > 0 {\n            __json_put(w, 44);\n        };\n        " + json_write(inner_type(type), "v[i]", "w") + "\n    };\n    __json_put(w, 93);";
-        } else if kind == 3 {
+        } else if kind == Shape.Struct {
             body = object_writer(declared_type(type), "v", true);
         } else {
             let node = declared_type(type);
@@ -608,7 +608,7 @@ vec sc_at: I32 = [0];
 fn sc_ws(raw: Str) I32 {
     let i = sc_at[0];
     while (true) {
-        while (i < raw.len() and is_space_code(raw.get(i))) { i += 1; };
+        i = skip_spaces(raw, i);
         if text_at(raw, i, "//") {
             while (i < raw.len() and raw.get(i) != 10) { i += 1; };
         } else {
@@ -659,11 +659,14 @@ fn sc_until(raw: Str, stops: Str) Str {
     trim_end(raw.slice(from, i));
 }
 
-/// A word starting at the cursor: an identifier of a lowercase (or `_`) start, or "".
-fn sc_lower_word(raw: Str) Str {
+/// An identifier at the cursor (of a lowercase or `_` start, unless
+/// `upper` allows uppercase too), or "".
+fn sc_word(raw: Str, upper: Bool) Str {
     sc_ws(raw);
     let i = sc_at[0];
-    if i >= raw.len() or not (is_lower_code(raw.get(i)) or raw.get(i) == 95) { return ""; };
+    if i >= raw.len() { return ""; };
+    let c = raw.get(i);
+    if not (is_lower_code(c) or c == 95 or upper and is_upper_code(c)) { return ""; };
     let j = i;
     while (j < raw.len() and is_word_code(raw.get(j))) { j += 1; };
     sc_at[0] = j;
@@ -684,8 +687,14 @@ fn sc_string(raw: Str) Str {
 
 // Patterns: object (its fields' patterns, linked), capture, or literal.
 
-/// 0 object, 1 capture, 2 literal
-vec pat_kind: I32;
+/// What a pattern is.
+enum(U8) Pat:
+    | Object
+    | Capture
+    | Literal
+
+/// Its @Pat.
+vec pat_kind: U8;
 /// Capture: its name; a field: its key (words)
 vec pat_name: I32;
 vec pat_name_start: I32;
@@ -704,9 +713,11 @@ vec pat_next: I32;
 /// A field's key (a word)
 vec pat_key: I32;
 
-fn new_pattern(kind: I32) I32 {
+fn pat_is(p: I32, kind: Pat) Bool { pat_kind[p] == kind.to_i32(); }
+
+fn new_pattern(kind: Pat) I32 {
     let p = pat_kind.len();
-    pat_kind.push(kind);
+    pat_kind.push(kind.to_i32());
     pat_name.push(-1);
     pat_name_start.push(0);
     pat_type.push(-1);
@@ -725,12 +736,12 @@ fn parse_pattern(raw: Str) I32 {
     sc_ws(raw);
     if sc_peek(raw, "{") {
         sc_expect(raw, "{");
-        let p = new_pattern(0);
+        let p = new_pattern(Pat.Object);
         let last = -1;
         while (not sc_peek(raw, "}")) {
             let key_start = sc_ws(raw);
             let quoted = sc_string(raw);
-            let key = if quoted.len() > 0 { quoted.slice(1, quoted.len() - 1); } else { sc_word_any(raw); };
+            let key = if quoted.len() > 0 { quoted.slice(1, quoted.len() - 1); } else { sc_word(raw, true); };
             if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at[0], 1); };
             let written = if quoted.len() > 0 { quoted.len(); } else { key.len(); };
             let f = pat_first[p];
@@ -751,13 +762,13 @@ fn parse_pattern(raw: Str) I32 {
     if sc_peek(raw, "|") {
         sc_expect(raw, "|");
         let name_start = sc_ws(raw);
-        let name = sc_lower_word(raw);
+        let name = sc_word(raw, false);
         if name.len() == 0 { dsl_fail("Expected a capture name: |name| Type", sc_at[0], 1); };
         sc_expect(raw, "|");
         let type_start = sc_ws(raw);
         let type = sc_capture_type(raw);
         if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at[0], 1); };
-        let p = new_pattern(1);
+        let p = new_pattern(Pat.Capture);
         pat_name[p] = intern_text(name);
         pat_name_start[p] = name_start;
         pat_type[p] = intern_text(type);
@@ -773,20 +784,9 @@ fn parse_pattern(raw: Str) I32 {
     if token.len() == 0 { token = sc_number(raw); };
     if token.len() == 0 { token = sc_keyword(raw); };
     if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at[0], 1); };
-    let p = new_pattern(2);
+    let p = new_pattern(Pat.Literal);
     pat_text[p] = intern_text(token);
     p;
-}
-
-/// An identifier (any case) at the cursor, or "".
-fn sc_word_any(raw: Str) Str {
-    sc_ws(raw);
-    let i = sc_at[0];
-    if i >= raw.len() or not (is_lower_code(raw.get(i)) or is_upper_code(raw.get(i)) or raw.get(i) == 95) { return ""; };
-    let j = i;
-    while (j < raw.len() and is_word_code(raw.get(j))) { j += 1; };
-    sc_at[0] = j;
-    raw.slice(i, j);
 }
 
 /// `?Name`, `Name`, `Name[…]` (one level of nested brackets), or "".
@@ -849,8 +849,8 @@ fn sc_keyword(raw: Str) Str {
 
 /// Whether a pattern can be satisfied when its field is absent.
 fn pattern_optional(p: I32) Bool {
-    if pat_kind[p] == 1 { return word_text(pat_type[p]).get(0) == 63 or pat_fallback[p] >= 0; };
-    if pat_kind[p] == 0 {
+    if pat_is(p, Pat.Capture) { return word_text(pat_type[p]).get(0) == 63 or pat_fallback[p] >= 0; };
+    if pat_is(p, Pat.Object) {
         let f = pat_first[p];
         while (f >= 0) {
             if not pattern_optional(f) { return false; };
@@ -921,7 +921,7 @@ fn json_match(raw: Str, prefix: Str) Str {
             sc_expect(raw, "~>");
             if sc_peek(raw, "|") {
                 sc_expect(raw, "|");
-                let binding = sc_lower_word(raw);
+                let binding = sc_word(raw, false);
                 if binding.len() == 0 { dsl_fail("Expected a name for the error: ~> |error| …", sc_at[0], 1); };
                 fallback_binding = intern_text(binding);
                 sc_expect(raw, "|");
@@ -961,31 +961,23 @@ fn json_match(raw: Str, prefix: Str) Str {
         let read = read_pattern(arm_pattern[index], "", r, prefix);
         let declare = "";
         for (0 ..< jm_declare.len()) |k| { declare = declare + word_text(jm_declare[k]) + " "; };
-        // Defaults fill captures whose field was absent: presence per capture.
-        let present = Array[I32].new(cap_name.len() + 1, -1);
+        // Each capture is marked present where it is read; a default fills
+        // one whose field was absent; then each is bound by its name.
         let marked = read;
         let has_decls = "";
-        for (0 ..< cap_name.len()) |k| {
-            let has = fresh_name(prefix, "has");
-            present[k] = intern_text(has);
-            has_decls = has_decls + "let " + has + " = false; ";
-        };
-        let defaults = Array[I32].new(cap_name.len() + 1, -1);
-        for (0 ..< cap_name.len()) |k| {
-            let p = cap_pat[k];
-            if pat_fallback[p] >= 0 {
-                defaults[k] = intern_text(word_text(cap_local[k]) + " = " + json_splice(word_text(pat_fallback[p]), pat_fallback_start[p], "default for " + word_text(pat_name[p])) + ";");
-            };
-        };
-        for (0 ..< cap_name.len()) |k| {
-            let local = word_text(cap_local[k]);
-            marked = replace_first(marked, local + " = ", word_text(present[k]) + " = true; " + local + " = ");
-        };
         let fill = "";
         let bind = "";
         for (0 ..< cap_name.len()) |k| {
-            if defaults[k] >= 0 { fill = fill + "if not " + word_text(present[k]) + " { " + word_text(defaults[k]) + " }; "; };
-            bind = bind + "let " + word_text(cap_name[k]) + ": " + word_text(pat_type[cap_pat[k]]) + " = " + word_text(cap_local[k]) + "; ";
+            let p = cap_pat[k];
+            let local = word_text(cap_local[k]);
+            let has = fresh_name(prefix, "has");
+            has_decls = has_decls + "let " + has + " = false; ";
+            marked = replace_first(marked, local + " = ", has + " = true; " + local + " = ");
+            if pat_fallback[p] >= 0 {
+                let value = json_splice(word_text(pat_fallback[p]), pat_fallback_start[p], "default for " + word_text(pat_name[p]));
+                fill = fill + "if not " + has + " { " + local + " = " + value + "; }; ";
+            };
+            bind = bind + "let " + word_text(cap_name[k]) + ": " + word_text(pat_type[p]) + " = " + local + "; ";
         };
         let body = json_splice(word_text(arm_body[index]), arm_body_start[index], "arm body");
         code = "{ " + (if index > 0 { "__json_restart(" + r + ");"; } else { ""; }) + "\n      " + declare + " " + has_decls + "\n      " + marked
@@ -1001,7 +993,7 @@ fn json_match(raw: Str, prefix: Str) Str {
 /// declarations go to `jm_declare`.
 fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
     let where = js_string(path);
-    if pat_kind[p] == 1 {
+    if pat_is(p, Pat.Capture) {
         let name = word_text(pat_name[p]);
         for (0 ..< cap_name.len()) |k| {
             if cap_name[k] == pat_name[p] { dsl_fail(name + " is captured twice in this pattern", pat_name_start[p], name.len()); };
@@ -1020,7 +1012,7 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
         jm_declare.push(intern_text("let " + local + ": " + type + " = " + zero + ";"));
         return "let " + ok + " = " + r + ".failed == 0; " + local + " = " + read + "; __json_at(" + r + ", " + ok + ", " + where + ");";
     };
-    if pat_kind[p] == 2 {
+    if pat_is(p, Pat.Literal) {
         let ok = fresh_name(prefix, "ok");
         let text = word_text(pat_text[p]);
         let expected = js_string("expected " + text);

@@ -8,7 +8,7 @@
 //! `src/runtime/host-imports.js` reads: `{"es":{"es":{"__es_0":"…"}}}`.
 
 /// By declaration: its `@es` binding's imported function, or -1.
-vec decl_es: I32;     // by declaration: its imported function, or -1
+vec decl_es: I32;
 /// The @es imports (and host declarations' operations), in order.
 vec es_func: I32;
 /// The JS of each: a span of src.
