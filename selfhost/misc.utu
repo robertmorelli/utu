@@ -20,27 +20,19 @@
 fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
     let value = first_child(node);
     let target = last_child(node);
-    // The arguments: their nodes, -2 for the piped value.
+    // The arguments: their nodes, -2 for the piped value (alone, when none are written).
     let args_node = last_child(target);
     let has_args = is_kind(args_node, Node.Pipe_args);
-    let n = 0;
     let list = if has_args { first_child(args_node); } else { -1; };
+    let count = if has_args { child_count(list); } else { 1; };
+    let args = Array[I32].new(count, -2);
     let a = if list >= 0 { first_child(list); } else { -1; };
+    let i = 0;
     while (a >= 0) {
-        n += 1;
+        args[i] = if is_kind(a, Node.Pipe_arg) { first_child(a); } else { -2; };
+        i += 1;
         a = next_sibling(a);
     };
-    let args = Array[I32].new(if has_args { n; } else { 1; }, -2);
-    if has_args {
-        let i = 0;
-        a = first_child(list);
-        while (a >= 0) {
-            args[i] = if is_kind(a, Node.Pipe_arg) { first_child(a); } else { -2; };
-            i += 1;
-            a = next_sibling(a);
-        };
-    };
-    let count = if has_args { n; } else { 1; };
     // The path: its first part, then names.
     let first = first_child(target);
     let names = Array[I32].new(8, -1);

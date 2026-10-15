@@ -169,11 +169,9 @@ fn enum_name_helper(decl: I32) I32 {
 // With four variants or more, values from lo to hi at most half gaps: the
 // names in a constant array (a global), and `(value - lo) <u len ? names[…] :
 // "?"`. A few bytes a variant, and no comparisons.
-vec name_table_lo: I32 = [0];
 
-/// The number of values from the lowest variant's to the highest's, when the
-/// names are a table (their lowest in `name_table_lo`); 0 when not.
-fn name_table_span(decl: I32) I32 {
+/// How many variants enum `decl` has, and its lowest and highest values.
+fn variant_range(decl: I32) .{I32, I32, I32} {
     let n = 0;
     let lo = 0;
     let hi = 0;
@@ -187,15 +185,21 @@ fn name_table_span(decl: I32) I32 {
         };
         c = next_sibling(c);
     };
+    .{n, lo, hi};
+}
+
+/// The number of values from the lowest variant's to the highest's, when the
+/// names are a table; 0 when not.
+fn name_table_span(decl: I32) I32 {
+    let .{n, lo, hi} = variant_range(decl);
     let span = hi - lo + 1;
-    name_table_lo[0] = lo;
     if n < 4 or span > n * 2 or span <= 0 { 0; } else { span; };
 }
 
 /// Function f's body: the table's look-up, with its one local.
 fn enum_name_table(decl: I32, f: I32) void {
-    let span = name_table_span(decl);
-    let lo = name_table_lo[0];
+    let .{n, lo, hi} = variant_range(decl);
+    let span = hi - lo + 1;
     let h = array_type(vt_extern, false);
     let unknown = intern_text("?");
     let mt = w_mark();
