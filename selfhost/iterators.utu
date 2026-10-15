@@ -461,7 +461,6 @@ fn range_bounds(range: I32, lo: I32, cx: Cx) I32 {
 /// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
 fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     let top = new_label();
-    set_i32(index, 0);
     copy_local(index, p.lo);
     let mb = w_mark();
     let lp = WLoop { brk: brk, top: top, mb: mb, ml: mb };

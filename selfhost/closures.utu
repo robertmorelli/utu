@@ -30,6 +30,7 @@ fn reset_closures() void {
     for (0 ..< decl_kind.len()) |d| { decl_boxed[d] = 0; };
     box_types.clear();
     closure_calls.clear();
+    env_types.clear();
     closure_new_func.resize(1);
     closure_new_func[0] = -1;
 }
@@ -328,6 +329,27 @@ fn restore_function() void {
 /// `cl(x: T) R { … }`: its parameter types (annotated, else from the
 /// closure type expected), its result type (annotated, else expected, else
 /// its body's), and the closure built.
+/// Closure environments made so far: closures capturing values of the same
+/// types share one (and so one function type for their bodies).
+vec env_types: I32;
+
+fn same_fields(t: I32, vts: Array[I32]) Bool {
+    for (0 ..< vts.len()) |k| { if field_storage(t, k) != vts[k] { return false; }; };
+    true;
+}
+
+/// The environment struct of fields `vts`.
+fn env_type(vts: Array[I32]) I32 {
+    for (0 ..< env_types.len()) |i| {
+        let t = env_types[i];
+        if ht_b[t] == vts.len() and same_fields(t, vts) { return t; };
+    };
+    let env = struct_type(-1, false);
+    for (vts) |vt| { struct_field(env, vt, false); };
+    env_types.push(env);
+    env;
+}
+
 fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     let exp = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
     let expected = if exp >= 0 and (ty_is(exp, Ty.Closure) or ty_is(exp, Ty.Fun)) { exp; } else { -1; };
@@ -368,15 +390,13 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         cap_locals[k] = decl_local[vl_item(caps, k)];
     };
     // The environment: the captured values (boxes for boxed variables).
-    let env = struct_type(-1, false);
     let env_vts = Array[I32].new(ncap, 0);
     for (0 ..< ncap) |k| {
         let d = vl_item(caps, k);
         let vt = repr(cap_types[k]);
         env_vts[k] = if decl_boxed[d] == 1 { vt_ref(box_type(vt), true); } else { storage(vt); };
     };
-    ht_a[env] = ht_fields.len();
-    for (0 ..< ncap) |k| { struct_field(env, env_vts[k], false); };
+    let env = env_type(env_vts);
     // The body, as a function of its own: (env, params…). It is called only
     // through the closure the host makes (closure_new), so its environment
     // is typed exactly: the call from JS checks it, as in stage 0.

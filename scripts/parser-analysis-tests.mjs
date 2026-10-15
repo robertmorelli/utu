@@ -367,8 +367,14 @@ export function registerParserAnalysisTests({ test, assert, assertEq, assertNoEr
       assert(byFields.includes('a,n'), `expected an env capturing n and a, got ${JSON.stringify(byFields)}`);
       assert(byFields.includes(''), 'expected a capture-free closure to produce an empty env');
       // `m` is free in the inner closure and must also be captured by the outer
-      // one, which has to thread it inward.
-      assertEq(byFields.filter(f => f === 'm').length, 2, 'expected m captured at both nesting levels');
+      // one, which has to thread it inward. (Closures capturing alike share
+      // one environment struct, so count the closures, by their env parameter.)
+      const envOf = fn => {
+        const param = fn.querySelector(':scope > ir-param-list > ir-param');
+        return envs.find(env => param && new RegExp(`"${env.name}"`).test(param.outerHTML));
+      };
+      const lifted = [...root.querySelectorAll('ir-fn[data-closure-lifted]')];
+      assertEq(lifted.filter(fn => envOf(fn)?.fields.join(',') === 'm').length, 2, 'expected m captured at both nesting levels');
     });
   });
 

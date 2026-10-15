@@ -108,14 +108,26 @@ function decayInto(node, expectedType, { facts }) {
   return true;
 }
 
+// By program: each environment shape (captured names, types, and modes) and
+// its struct, so closures capturing alike share one (and their bodies one
+// function type).
+const environments = new WeakMap();
+
 function liftClosure(closure, root, index, typeIndex, graph, scopeGraph, lowering) {
   const doc = closure.ownerDocument;
-  const envType = `__ClosureEnv${index}`;
   const fnName = `__closure${index}`;
   const captures = readCaptures(closure, typeIndex, graph, scopeGraph);
 
-  const env = buildEnvStruct(doc, closure, envType, captures, lowering);
-  root.insertBefore(env, root.firstChild);
+  if (!environments.has(root)) environments.set(root, new Map());
+  const shapes = environments.get(root);
+  const shape = JSON.stringify(captures.map(capture => [capture.name, capture.type, capture.mode]));
+  let env = shapes.get(shape);
+  if (!env?.isConnected) {
+    env = buildEnvStruct(doc, closure, `__ClosureEnv${index}`, captures, lowering);
+    root.insertBefore(env, root.firstChild);
+    shapes.set(shape, env);
+  }
+  const envType = env.getAttribute('name');
   root.appendChild(buildLiftedFn(doc, closure, fnName, envType, captures, scopeGraph, env, lowering));
   replaceTypedNode(closure, buildMakeClosure(doc, closure, fnName, envType, captures, lowering), lowering.facts);
 }

@@ -143,10 +143,12 @@ builds reach the same state hash. Sizes are what `tools/build-wutu.mjs` and
 
 | | utu + wutu | TypeScript + React |
 | --- | ---: | ---: |
-| payload, gzip | 57.2 KB (44.7 wasm + 12.5 JS glue) | 87.6 KB (68.9 of it React + ReactDOM) |
-| payload, brotli | 44.3 KB | 76.1 KB |
-| work per frame (avg / p95) | 5.1 / 6.5 ms | 2.2 / 3.0 ms |
+| payload, gzip | 45.0 KB (38.4 wasm + 6.6 JS glue) | 87.6 KB (68.9 of it React + ReactDOM) |
+| payload, brotli | 37.6 KB | 76.1 KB |
+| work per frame (avg / p95) | 5.1 / 6.5 ms | 2.2 / 3.1 ms |
 
-utu ships no framework runtime, so it is smaller in total; the game's own code
-is about three times React's app code (18.7 KB gzip), and its live updates
-take about twice as long per frame.
+utu ships no framework runtime, so it is smaller in total. Per component it
+costs more: in a generated app of N like components, each adds about 114 B
+gzip in utu and 39 B in React (0.85 KB and 0.66 KB uncompressed), so utu stays
+smaller up to roughly 500 components. Live updates take about twice as long
+per frame: wutu re-renders each island and reconciles against the DOM itself.
