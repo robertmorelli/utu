@@ -100,28 +100,31 @@ let back1_code: I32 = 2;
 let back2_code: I32 = 3;
 /// Whitespace through this byte: drop it.
 let skip_code: I32 = 4;
-/// `/\`: a DSL body, which nests
+/// `/\`: a DSL body, which nests.
 let dsl_code: I32 = 5;
 /// The end of the source.
 let done_code: I32 = 6;
 /// A backtick: a template string's text, scanned.
 let template_code: I32 = 7;
-/// The start states: not after an expression,.
+// The start states, the first real ones:
+/// Not after an expression.
 let start_before: I32 = 8;
-/// After one,.
+/// After an expression.
 let start_after: I32 = 9;
-/// After `.` or `?.`,.
+/// After `.` or `?.`, where a word is always a name.
 let start_member: I32 = 10;
-/// And after `type`
+/// After `type`.
 let start_type: I32 = 11;
+/// For a token's next start state: the one it started in (as after a comment).
+let same_start: I32 = 0;
 
 /// The source ends with this byte, which UTF-8 never uses.
 let end_byte: I32 = 255;
 
 /// `next = dfa[state * 256 + byte]`. A token ending in a state has kind
 /// `kind_of[state]`; one backed off from it has kind `back_kind[state]`. The
-/// start state that follows is `after_of` (0: before, 1: after, 2: the same,
-/// 3: member, 4: type).
+/// start state that follows is `after_of[state]` (or, for @same_start, the
+/// one it started in).
 const vec dfa: U8 = @comptime/\ build().tabs \/;
 const vec kind_of: U8 = @comptime/\ build().kinds \/;
 const vec back_kind: U8 = @comptime/\ build().backs \/;
@@ -250,7 +253,7 @@ fn to_line_end(m: Machine, state: I32) void {
 fn strings(m: Machine) void {
     let body = inside(m);
     let escape = inside(m);
-    let close = ends(m, Tok.String, 1);
+    let close = ends(m, Tok.String, start_after);
     both(m, 34, body);
     for (0 ..< 255) |c| {
         set(m, body, c, body);
@@ -265,17 +268,17 @@ fn strings(m: Machine) void {
 /// Numbers, as the grammar's regular expressions take them: a float
 /// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
 fn numbers(m: Machine) void {
-    let int = ends(m, Tok.Int, 1);
-    let zero = ends(m, Tok.Int, 1);
-    let dot = backs_off(m, Tok.Int, 1, 1);
-    let float = ends(m, Tok.Float, 1);
-    let exp = backs_off(m, Tok.Float, 1, 1);
-    let exp_sign = backs_off(m, Tok.Float, 1, 2);
-    let exp_digits = ends(m, Tok.Float, 1);
-    let hex_start = backs_off(m, Tok.Int, 1, 1);
-    let hex = ends(m, Tok.Int, 1);
-    let bin_start = backs_off(m, Tok.Int, 1, 1);
-    let bin = ends(m, Tok.Int, 1);
+    let int = ends(m, Tok.Int, start_after);
+    let zero = ends(m, Tok.Int, start_after);
+    let dot = backs_off(m, Tok.Int, start_after, 1);
+    let float = ends(m, Tok.Float, start_after);
+    let exp = backs_off(m, Tok.Float, start_after, 1);
+    let exp_sign = backs_off(m, Tok.Float, start_after, 2);
+    let exp_digits = ends(m, Tok.Float, start_after);
+    let hex_start = backs_off(m, Tok.Int, start_after, 1);
+    let hex = ends(m, Tok.Int, start_after);
+    let bin_start = backs_off(m, Tok.Int, start_after, 1);
+    let bin = ends(m, Tok.Int, start_after);
     set_range(m, start_before, 49, 57, int);
     set_range(m, start_after, 49, 57, int);
     both(m, 48, zero);
@@ -313,7 +316,7 @@ fn word_state(m: Machine, after: I32) I32 {
 }
 
 fn words(m: Machine) void {
-    m.word = word_state(m, 1);
+    m.word = word_state(m, start_after);
     for (0 ..< 256) |c| { if is_word_char(c) { set(m, m.word, c, m.word); }; };
     for (0 ..< 256) |c| {
         if is_word_char(c) and (c < 48 or c > 57) { both(m, c, m.word); };
@@ -328,15 +331,15 @@ fn words(m: Machine) void {
     // a pipe (`return -o f`).
     for (["if", "match", "loop", "alt", "promote", "try", "for", "while", "defer", "yield", "let", "cl", "new",
             "await", "assert", "not"]) |word| {
-        keyword_path(m, start_before, word, 0);
-        keyword_path(m, start_after, word, 0);
+        keyword_path(m, start_before, word, start_before);
+        keyword_path(m, start_after, word, start_before);
     };
     // The keyword operators, and `else`, follow an expression; where one
     // begins, they are names (`assert or >>>= 1`).
-    for (["and", "or", "xor", "orelse", "else"]) |word| { keyword_path(m, start_after, word, 0); };
+    for (["and", "or", "xor", "orelse", "else"]) |word| { keyword_path(m, start_after, word, start_before); };
     // `type &= …` declares the self type: after `type`, `&=` is `&` and `=`.
-    keyword_path(m, start_before, "type", 4);
-    keyword_path(m, start_after, "type", 4);
+    keyword_path(m, start_before, "type", start_type);
+    keyword_path(m, start_after, "type", start_type);
 }
 
 /// The path of `word` through the word states from `root`, ending in a state whose token is followed by start state `after`.
@@ -346,7 +349,7 @@ fn keyword_path(m: Machine, root: I32, word: Str, after: I32) void {
         let c = word.get(k);
         let next = get(m, current, c);
         if next == m.word {
-            next = word_state(m, 1);
+            next = word_state(m, start_after);
             set(m, current, c, next);
         };
         current = next;
@@ -357,10 +360,10 @@ fn keyword_path(m: Machine, root: I32, word: Str, after: I32) void {
 /// `X` and, after an expression, `X=` (but not before `>`: `|x|=> …` closes
 /// a capture before an arm). Returns the state after `X` following an expression.
 fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
-    set(m, start_before, c, ends(m, plain, 0));
-    let first = ends(m, plain, 0);
+    set(m, start_before, c, ends(m, plain, start_before));
+    let first = ends(m, plain, start_before);
     set(m, start_after, c, first);
-    let eq = ends(m, assign, 0);
+    let eq = ends(m, assign, start_before);
     set(m, first, 61, eq);
     set(m, eq, 62, back1_code);
     m.backs[eq] = plain.to_i32();
@@ -368,24 +371,24 @@ fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
 }
 
 fn punctuation(m: Machine) void {
-    single(m, 40, Tok.LParen, 0);
-    single(m, 41, Tok.RParen, 1);
-    single(m, 123, Tok.LBrace, 0);
-    single(m, 125, Tok.RBrace, 1);
-    single(m, 91, Tok.LBracket, 0);
-    single(m, 93, Tok.RBracket, 1);
-    single(m, 44, Tok.Comma, 0);
-    single(m, 59, Tok.Semi, 0);
-    single(m, 58, Tok.Colon, 0);
-    single(m, 64, Tok.At, 0);
+    single(m, 40, Tok.LParen, start_before);
+    single(m, 41, Tok.RParen, start_after);
+    single(m, 123, Tok.LBrace, start_before);
+    single(m, 125, Tok.RBrace, start_after);
+    single(m, 91, Tok.LBracket, start_before);
+    single(m, 93, Tok.RBracket, start_after);
+    single(m, 44, Tok.Comma, start_before);
+    single(m, 59, Tok.Semi, start_before);
+    single(m, 58, Tok.Colon, start_before);
+    single(m, 64, Tok.At, start_before);
 
     // `.`, `...`, `..<`; `..` alone is two dots.
-    let dot = ends(m, Tok.Dot, 3);
-    let dots = backs_off(m, Tok.Dot, 3, 1);
+    let dot = ends(m, Tok.Dot, start_member);
+    let dots = backs_off(m, Tok.Dot, start_member, 1);
     both(m, 46, dot);
     set(m, dot, 46, dots);
-    set(m, dots, 46, ends(m, Tok.DotDotDot, 0));
-    set(m, dots, 60, ends(m, Tok.DotDotLt, 0));
+    set(m, dots, 46, ends(m, Tok.DotDotDot, start_before));
+    set(m, dots, 60, ends(m, Tok.DotDotLt, start_before));
 
     compound(m, 124, Tok.Pipe, Tok.PipeEq);
     compound(m, 38, Tok.Amp, Tok.AmpEq);
@@ -396,7 +399,7 @@ fn punctuation(m: Machine) void {
 
     // `/`: also `//` comments and `/\` DSL bodies.
     let slash_after = compound(m, 47, Tok.Slash, Tok.SlashEq);
-    let comment = ends(m, Tok.Comment, 2);
+    let comment = ends(m, Tok.Comment, same_start);
     to_line_end(m, comment);
     for ([get(m, start_before, 47), slash_after]) |state| {
         set(m, state, 47, comment);
@@ -404,57 +407,57 @@ fn punctuation(m: Machine) void {
     };
     // `\\` multiline string lines.
     let backslash = inside(m);
-    let line = ends(m, Tok.MultilineLine, 1);
+    let line = ends(m, Tok.MultilineLine, start_after);
     to_line_end(m, line);
     both(m, 92, backslash);
     set(m, backslash, 92, line);
 
     // `-`, and after an expression `-o` and `-=`.
     let minus = compound(m, 45, Tok.Minus, Tok.MinusEq);
-    set(m, minus, 111, ends(m, Tok.MinusO, 0));
+    set(m, minus, 111, ends(m, Tok.MinusO, start_before));
 
     // `<`, `<=`, `<<`, and after an expression `<<=`.
     for ([start_before, start_after]) |start| {
-        let lt = ends(m, Tok.Lt, 0);
-        let shl = ends(m, Tok.Shl, 0);
+        let lt = ends(m, Tok.Lt, start_before);
+        let shl = ends(m, Tok.Shl, start_before);
         set(m, start, 60, lt);
-        set(m, lt, 61, ends(m, Tok.LtEq, 0));
+        set(m, lt, 61, ends(m, Tok.LtEq, start_before));
         set(m, lt, 60, shl);
-        if start == start_after { set(m, shl, 61, ends(m, Tok.ShlEq, 0)); };
+        if start == start_after { set(m, shl, 61, ends(m, Tok.ShlEq, start_before)); };
     };
     // `>`, `>=`, `>>`, `>>>`, and after an expression `>>=` and `>>>=`.
     for ([start_before, start_after]) |start| {
-        let gt = ends(m, Tok.Gt, 0);
-        let shr = ends(m, Tok.Shr, 0);
-        let shr3 = ends(m, Tok.Shr3, 0);
+        let gt = ends(m, Tok.Gt, start_before);
+        let shr = ends(m, Tok.Shr, start_before);
+        let shr3 = ends(m, Tok.Shr3, start_before);
         set(m, start, 62, gt);
-        set(m, gt, 61, ends(m, Tok.GtEq, 0));
+        set(m, gt, 61, ends(m, Tok.GtEq, start_before));
         set(m, gt, 62, shr);
         set(m, shr, 62, shr3);
         if start == start_after {
-            set(m, shr, 61, ends(m, Tok.ShrEq, 0));
-            set(m, shr3, 61, ends(m, Tok.Shr3Eq, 0));
+            set(m, shr, 61, ends(m, Tok.ShrEq, start_before));
+            set(m, shr3, 61, ends(m, Tok.Shr3Eq, start_before));
         };
     };
 
     // `=`, `==`, `=>`.
-    let eq = ends(m, Tok.Eq, 0);
+    let eq = ends(m, Tok.Eq, start_before);
     both(m, 61, eq);
-    set(m, eq, 61, ends(m, Tok.EqEq, 0));
-    set(m, eq, 62, ends(m, Tok.FatArrow, 0));
+    set(m, eq, 61, ends(m, Tok.EqEq, start_before));
+    set(m, eq, 62, ends(m, Tok.FatArrow, start_before));
     // `!=` (`!` alone is no token).
     let bang = inside(m);
     both(m, 33, bang);
-    set(m, bang, 61, ends(m, Tok.BangEq, 0));
+    set(m, bang, 61, ends(m, Tok.BangEq, start_before));
     // `~`, `~>`.
-    let tilde = ends(m, Tok.Tilde, 0);
+    let tilde = ends(m, Tok.Tilde, start_before);
     both(m, 126, tilde);
-    set(m, tilde, 62, ends(m, Tok.TildeArrow, 0));
+    set(m, tilde, 62, ends(m, Tok.TildeArrow, start_before));
     // `?`, and after an expression `?.` (but `?.{I32}` after a parameter
     // list is a nullable tuple type).
-    set(m, start_before, 63, ends(m, Tok.Question, 0));
-    let question = ends(m, Tok.Question, 0);
-    let optional = ends(m, Tok.QuestionDot, 3);
+    set(m, start_before, 63, ends(m, Tok.Question, start_before));
+    let question = ends(m, Tok.Question, start_before);
+    let optional = ends(m, Tok.QuestionDot, start_member);
     set(m, start_after, 63, question);
     set(m, question, 46, optional);
     set(m, optional, 123, back1_code);
@@ -467,7 +470,7 @@ fn build() Machine {
         tabs: Array[I32].new(256 * 256, error_code),
         kinds: Array[I32].new(256, Tok.Error.to_i32()),
         backs: Array[I32].new(256, Tok.Error.to_i32()),
-        afters: Array[I32].new(256, 0),
+        afters: Array[I32].new(256, same_start),
         next: start_type + 1,
         word: 0,
     };
@@ -571,10 +574,10 @@ fn lex(first: I32, n: I32) I32 {
     let state = start;
     let next = dfa[start * 256 + src[first]];
     loop match next {
-        0 => {
+        0 => {  // error_code
             return tokens_end(put_token(t, Tok.Error.to_i32(), i, i));
         },
-        1 => {
+        1 => {  // accept_code
             let kind = kind_of[state];
             if open > 0 and kind == Tok.RBrace.to_i32() and template_braces[open - 1] == 0 {
                 // The `}` that ends a `${`: the template's text goes on.
@@ -600,41 +603,38 @@ fn lex(first: I32, n: I32) I32 {
             if open > 0 and kind == Tok.RBrace.to_i32() { template_braces[open - 1] -= 1; };
             t = put_token(t, kind, i, j);
             let after = after_of[state];
-            if after == 0 { start = start_before; } else if after == 1 { start = start_after; }
-            else if after == 3 { start = start_member; } else if after == 4 { start = start_type; };
+            if after != same_start { start = after; };
             i = j;
             state = start;
             next = dfa[start * 256 + src[j]];
             continue next;
         },
-        2 => {
+        2 => {  // back1_code
             j -= 1;
             t = put_token(t, back_kind[state], i, j);
-            let after = after_of[state];
-            start = if after == 1 { start_after; } else if after == 3 { start_member; } else { start_before; };
+            start = after_of[state];
             i = j;
             state = start;
             next = dfa[start * 256 + src[j]];
             continue next;
         },
-        3 => {
+        3 => {  // back2_code
             j -= 2;
             t = put_token(t, back_kind[state], i, j);
-            let after = after_of[state];
-            start = if after == 1 { start_after; } else if after == 3 { start_member; } else { start_before; };
+            start = after_of[state];
             i = j;
             state = start;
             next = dfa[start * 256 + src[j]];
             continue next;
         },
-        4 => {
+        4 => {  // skip_code
             j += 1;
             i = j;
             state = start;
             next = dfa[start * 256 + src[j]];
             continue next;
         },
-        5 => {
+        5 => {  // dsl_code
             j = dsl_end(i, n);
             if j < 0 {
                 return tokens_end(put_token(t, Tok.Error.to_i32(), i, i));
@@ -646,10 +646,10 @@ fn lex(first: I32, n: I32) I32 {
             next = dfa[start * 256 + src[j]];
             continue next;
         },
-        6 => {
+        6 => {  // done_code
             return tokens_end(put_token(t, Tok.End.to_i32(), n, n));
         },
-        7 => {
+        7 => {  // template_code
             j = template_text_end(i + 1, n);
             if j < 0 { return tokens_end(put_token(t, Tok.Error.to_i32(), i, i)); };
             if src[j] == 96 {
