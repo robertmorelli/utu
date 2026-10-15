@@ -158,7 +158,7 @@ fn check_defer(node: I32) I32 {
     // One that leaves (reported in validation) would run itself without end.
     if deferred_exit(first_child(node), false) >= 0 { return error_value(); };
     defer_node.push(first_child(node));
-    w_leaf(Op.Nop, vt_none, 0, 0);
+    w_node(Op.Seq, vt_none, 0, 0, w_mark());
     ty_void();
 }
 

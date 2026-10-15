@@ -747,7 +747,8 @@ fn check_let(node: I32, cx: Cx) I32 {
     if is_es(init) and annotated {
         decl_ty[decl] = t;
         es_import(decl, init, t);
-        w_leaf(Op.Nop, vt_none, 0, 0);
+        // (A binding of the import: nothing to run.)
+        w_node(Op.Seq, vt_none, 0, 0, w_mark());
         return ty_void();
     };
     let m = w_mark();

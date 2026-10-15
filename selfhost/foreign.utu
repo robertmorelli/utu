@@ -1845,7 +1845,7 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
             w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
             return ty_never();
         };
-        w_leaf(Op.Nop, vt_none, 0, 0);
+        w_node(Op.Seq, vt_none, 0, 0, w_mark());
         return ty_void();
     };
     let pattern = first_child(a);

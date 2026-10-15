@@ -96,6 +96,13 @@ function bodyPoint(site, { start, end }) {
   return point;
 }
 
+// By document: each `@es` body and signature's import name.
+const esImportNames = new WeakMap();
+function esImportsOf(doc) {
+  if (!esImportNames.has(doc)) esImportNames.set(doc, new Map());
+  return esImportNames.get(doc);
+}
+
 function stripDslDelims(body) {
   return body.startsWith('/\\') && body.endsWith('\\/') ? body.slice(2, -2) : body;
 }
@@ -111,10 +118,15 @@ function expandEsDsl({ doc, node, body, freshName }) {
   const sig = signatureFromType(typeNode);
   if (!sig) return null;
 
-  const importName = freshName('__es');
+  // A body uses only its parameters and globals, so a body and signature
+  // seen before is that import: generated code (wutu's) repeats a few.
+  const bodyText = stripDslDelims(body);
+  const imports = esImportsOf(doc);
+  const content = JSON.stringify([bodyText, sig.params, sig.result]);
+  if (!imports.has(content)) imports.set(content, freshName('__es'));
+  const importName = imports.get(content);
   const publicName = sig.isFunction && binding.localName === T.GLOBAL ? bindingName : importName;
   const extern = buildExternFn(doc, node, publicName, sig, importName);
-  const bodyText = stripDslDelims(body);
   const result = {
     wasmImports: [{
       key: importName,

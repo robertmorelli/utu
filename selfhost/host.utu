@@ -139,6 +139,18 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
             return es_made_func[k];
         };
     };
+    // A body uses only its parameters and globals, so one seen before with
+    // this signature is that import: generated code (wutu's) repeats a few.
+    let at = dsl_text_start(dsl);
+    let end = dsl_text_end(dsl);
+    for (0 ..< es_func.len()) |k| {
+        if func_type_of[es_func[k]] == ft and bytes_equal(es_start[k], es_end[k], at, end) {
+            decl_es[decl] = es_func[k];
+            es_made_decl.push(decl);
+            es_made_func.push(es_func[k]);
+            return es_func[k];
+        };
+    };
     let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), ft);
     let w = decl_name[decl];
     func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w));
@@ -146,8 +158,8 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     es_made_decl.push(decl);
     es_made_func.push(f);
     es_func.push(f);
-    es_start.push(dsl_text_start(dsl));
-    es_end.push(dsl_text_end(dsl));
+    es_start.push(at);
+    es_end.push(end);
     f;
 }
 
