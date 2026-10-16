@@ -42,22 +42,25 @@ brace-nested bodies. Looks as close to CSS as possible.
 
 ```
 div.card {
-  # A comment: `#` first on its line, then a space. Not `//`, so
-  # `url(http://…)` doesn't break the lexer. At a line's end, /* … */.
+  // A comment: utu's own, first on a line or after a blank, so
+  // url(http://…) is not one. `#` is always text: color: #fff; works.
 
-  color: red;                    /* CSS declaration */
-  href = "/get-started";         /* HTML attribute: name = value */
-  title = $[tooltipText];        /* attribute with interpolation */
-  .value = $[draft];             /* DOM property: .name = value */
+  color: red;                    // CSS declaration
+  href = "/get-started";         // HTML attribute: name = value
+  title = tooltipText;           // attribute from an expression
+  .value = draft;                // DOM property: .name = value
+  width: = size + "px";          // CSS value computed at render
 
-  :hover { color: blue; }        /* element-local pseudo-class */
-  @media (width < 40rem) { … }   /* nested at point of use */
+  :hover { color: blue; }        // element-local pseudo-class
+  @media (width < 40rem) { … }   // nested at point of use
 
-  @ & > * { margin: 0; }         /* scoped rule block, full selector power */
-  @ { … }                        /* shorthand: this subtree and down */
+  @ & > * { margin: 0; }         // scoped rule block, full selector power
+  @ { … }                        // shorthand: this subtree and down
 
-  h2 { "Welcome"; }              /* child element, text node */
-  p { $[ctaText]; }              /* child with interpolation */
+  h2 { "Welcome"; }              // child element, text node
+  p { = ctaText; }               // child from an expression (text, number, or node)
+  if open { p { "open"; } }      // a condition is just an expression
+  on click |e| { log(e); }       // an event, typed by the DOM (MouseEvent)
 }
 ```
 
@@ -81,12 +84,11 @@ So disambiguation is syntactic:
 | HTML attribute | `prop = "value";` | `=` where CSS has `:`; a bare `prop;` is a boolean attribute |
 | DOM property | `.prop = value;` | a leading `.` (an element head always starts with its tag) |
 | child element | `tag { … }` | nesting |
-| text / interpolation | `"literal"` / `$[expr]` | |
-| event handler | **[open]** | must take a typed `cl`, not a string |
+| text / expression | `"literal"` / `= expr` | an expression may be a Str, a number, a Bool, or a node |
+| event handler | `on click \|e\| { … }` / `on click = handler;` | a typed `cl`, never a string |
 
-Events are the one namespace still unaccounted for. They should not be pushed
-through the string-valued attribute channel — utu has real typed closures and
-they should survive.
+Events got their own keyword rather than the string-valued attribute channel:
+utu has real typed closures, and they survive.
 
 **Types do the work inference cannot.** utu has a real type system and a binding
 graph with blame derivation. Attributes get checked against an element schema,

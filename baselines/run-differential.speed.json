@@ -134,15 +134,10 @@
   }
  },
  "baselines/corpus/085669870f99609554259256d1ba9a706f5d96de.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/085669870f99609554259256d1ba9a706f5d96de.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/08667123610fb4b702c1e47b0a27294e670c8619.utu normal": {
   "diagnostics": true
@@ -268,7 +263,7 @@
   "calls": {}
  },
  "baselines/corpus/181f74979ad874696c95634697e658f29dc85fb3.utu normal": {
-  "compile": "Error: unknown attribute hreff on p"
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/181f74979ad874696c95634697e658f29dc85fb3.utu test": {
   "calls": {}
@@ -647,12 +642,7 @@
   "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
  },
  "baselines/corpus/2f303e7fa3e96d8847380416aa1af6c06263f443.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/2f303e7fa3e96d8847380416aa1af6c06263f443.utu test": {
   "calls": {}
@@ -743,15 +733,10 @@
   "calls": {}
  },
  "baselines/corpus/3310c158cfa2087a62318981437f2d979cbbfd8b.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "TypeError: self.getItem is not a function",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/3310c158cfa2087a62318981437f2d979cbbfd8b.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/333f12471002e694fdd978840b802b0c97c19c56.utu normal": {
   "calls": {}
@@ -888,7 +873,7 @@
   "compile": "Error: yield can only appear in a generator: declare the function with `yield T` as its return type"
  },
  "baselines/corpus/3f66f8154618f139351897edabc797391174b480.utu normal": {
-  "compile": "Error: bind requires an @reactive view in this source file"
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/3f66f8154618f139351897edabc797391174b480.utu test": {
   "calls": {}
@@ -990,15 +975,10 @@
   "calls": {}
  },
  "baselines/corpus/48289f11f8fe6858bcbfea5cbeefb6c41bdf1f49.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/48289f11f8fe6858bcbfea5cbeefb6c41bdf1f49.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/48486bdd707202c0765b6dfc2a61e2298fab3b65.utu normal": {
   "calls": {}
@@ -1071,10 +1051,10 @@
   "calls": {}
  },
  "baselines/corpus/4dc01d74ad0e9889e6fc5390909b3f193f6a882c.utu normal": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/4dc01d74ad0e9889e6fc5390909b3f193f6a882c.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/4e2e51882c7b84989f4f467b92bdc0528da0b8ff.utu normal": {
   "calls": {}
@@ -1190,15 +1170,10 @@
   "calls": {}
  },
  "baselines/corpus/5486af2ca7d386a53acffe658a9d9b8756d656fd.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/5486af2ca7d386a53acffe658a9d9b8756d656fd.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/54e1810b301541e910b7d6da9d25655cd3becc6f.utu normal": {
   "calls": {
@@ -1384,12 +1359,7 @@
   "calls": {}
  },
  "baselines/corpus/5bb359210ceee87ce13cfd2ebb713b5f49d8b014.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/5bb359210ceee87ce13cfd2ebb713b5f49d8b014.utu test": {
   "calls": {}
@@ -1567,7 +1537,7 @@
   "calls": {}
  },
  "baselines/corpus/65eeb04411f0c492d614be707974be0eff5ca932.utu normal": {
-  "compile": "Error: Ambiguous element alias 'x'; reference it inside its own subtree"
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/65eeb04411f0c492d614be707974be0eff5ca932.utu test": {
   "calls": {}
@@ -1771,12 +1741,7 @@
   "calls": {}
  },
  "baselines/corpus/6be2d90168da9e127b21d6f9b2aeeb45ad6f858e.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/6be2d90168da9e127b21d6f9b2aeeb45ad6f858e.utu test": {
   "calls": {}
@@ -2112,15 +2077,10 @@
   "calls": {}
  },
  "baselines/corpus/84da01551e61987c07c555a3d96a7f8ebe59ce69.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/84da01551e61987c07c555a3d96a7f8ebe59ce69.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/878af1db77f70078b86430489e463ee100bfa27b.utu normal": {
   "diagnostics": true
@@ -2175,12 +2135,7 @@
   "calls": {}
  },
  "baselines/corpus/8cd3336530b3b3d840f424b0035ab039b63b76b9.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: document is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/8cd3336530b3b3d840f424b0035ab039b63b76b9.utu test": {
   "calls": {}
@@ -2353,12 +2308,7 @@
   "calls": {}
  },
  "baselines/corpus/95dfc2ca5fddcca92983d711c298d74dff4fd501.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/95dfc2ca5fddcca92983d711c298d74dff4fd501.utu test": {
   "calls": {}
@@ -2685,15 +2635,10 @@
   "calls": {}
  },
  "baselines/corpus/a91851b910d1d1cb590ba403bd7e345d9c7ed334.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/a91851b910d1d1cb590ba403bd7e345d9c7ed334.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/a93076aa7ec74f50008e3caa2146e57a8c7f5afc.utu normal": {
   "calls": {}
@@ -3044,15 +2989,10 @@
   "calls": {}
  },
  "baselines/corpus/be72014f1ad4a7789637c14ac361c5d4b4eeefc4.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/be72014f1ad4a7789637c14ac361c5d4b4eeefc4.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/bf24ee8aebc9da647ec84af834e871b0a866e076.utu normal": {
   "diagnostics": true
@@ -3073,7 +3013,7 @@
   "diagnostics": true
  },
  "baselines/corpus/c1da2c2d2028916e893f2cf5e6404a21e8e1b2b6.utu normal": {
-  "diagnostics": true
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/c1da2c2d2028916e893f2cf5e6404a21e8e1b2b6.utu test": {
   "calls": {}
@@ -3263,10 +3203,10 @@
   "calls": {}
  },
  "baselines/corpus/cf77bb2ee8176dd6ffbcb37f4339d561f064d8be.utu normal": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/cf77bb2ee8176dd6ffbcb37f4339d561f064d8be.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/d0e40ff72d65155b15149adcfa3c403156cbb7c9.utu normal": {
   "compile": "Error: yield cannot appear inside a closure; the generator expands into its consumer"
@@ -3298,15 +3238,10 @@
   "calls": {}
  },
  "baselines/corpus/d3e969869a60730b1ceb4493d2f0c8d42c69a4fe.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/d3e969869a60730b1ceb4493d2f0c8d42c69a4fe.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/d435f6fe29d06e1a921ed2e80d64f5dfd10e88e9.utu normal": {
   "calls": {
@@ -3557,15 +3492,10 @@
   "compile": "Error: Cannot import \"./does-not-exist.utu\": file not found (<root>/baselines/corpus/does-not-exist.utu)"
  },
  "baselines/corpus/e361552ecc6e14fcb267702469f9292c9dc97cc1.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: document is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/e361552ecc6e14fcb267702469f9292c9dc97cc1.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/e3df34f358e3b9ee3993572c691c391658f1ce9c.utu normal": {
   "diagnostics": true
@@ -3928,10 +3858,10 @@
   "calls": {}
  },
  "baselines/corpus/f6a937a1b7f949170f1970f263b51fd57820546f.utu normal": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/f6a937a1b7f949170f1970f263b51fd57820546f.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/f735cf1cf1352eca768f39e15c06fd95afc90840.utu normal": {
   "calls": {}
@@ -3975,7 +3905,7 @@
   "calls": {}
  },
  "baselines/corpus/fbbbd4557efa65eecfb6eea0ce06717800b96ef6.utu normal": {
-  "compile": "Error: Invalid Utu interpolation at offset 84: 1 +"
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/fbbbd4557efa65eecfb6eea0ce06717800b96ef6.utu test": {
   "calls": {}
@@ -4032,10 +3962,10 @@
   "calls": {}
  },
  "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu normal": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "benchmarks/deltablue/deltablue.utu normal": {
   "calls": {}
@@ -4582,15 +4512,10 @@
   "calls": {}
  },
  "examples/foundry/utu/app.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "TypeError: Cannot read properties of undefined (reading 'getElementById')",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/foundry/utu/app.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/foundry/utu/headless.utu normal": {
   "calls": {}
@@ -4599,15 +4524,10 @@
   "calls": {}
  },
  "examples/foundry/utu/proto/app.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "TypeError: Cannot read properties of undefined (reading 'getElementById')",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/foundry/utu/proto/app.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/hello_world.utu normal": {
   "calls": {
@@ -5087,223 +5007,123 @@
   "calls": {}
  },
  "examples/wutu-five/folio/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/folio/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/juniper/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/juniper/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/scope/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/scope/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/signal/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/signal/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/wayfarer/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-five/wayfarer/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-garden/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "TypeError: self.getItem is not a function",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-garden/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-more/dispatch/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-more/dispatch/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-more/split/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-more/split/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-more/supper/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-more/supper/main.utu test": {
   "calls": {}
  },
  "examples/wutu-reactive/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-reactive/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/atlas/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/atlas/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/ledger/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/ledger/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/meter/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/meter/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/pantry/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/pantry/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/studio/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/studio/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/grove/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/grove/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/pitch/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/pitch/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/readroom/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/readroom/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/tempo/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/tempo/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/venue/main.utu normal": {
-  "calls": {
-   "main": {
-    "throws": "ReferenceError: addEventListener is not defined",
-    "printed": []
-   }
-  }
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-two/venue/main.utu test": {
-  "calls": {}
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  }
 }

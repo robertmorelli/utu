@@ -61,14 +61,14 @@ fn settlement(state: Trip) Browser.HTMLElement {
             color:#c4d0ff;
             "Equal shares. A short path back to zero.";
         }
-        if $[sum == 0] {
+        if sum == 0 {
             p {
                 "No expenses yet. Add the first one to get started.";
             }
         }
-        for $[balances] |debtor| {
-            for $[balances] |creditor| {
-                if $[debtor.cents < 0 and creditor.cents > 0] {
+        for balances |debtor| {
+            for balances |creditor| {
+                if debtor.cents < 0 and creditor.cents > 0 {
                     = transfer(debtor, creditor);
                 }
             }
@@ -317,7 +317,7 @@ export main() void {
                 h2 {
                     "The shared notebook";
                 }
-                for $[state.expenses] |expense| key $[expense.id] {
+                for state.expenses |expense| key expense.id {
                     article.expense.panel.bar {
                         div {
                             h3 {
@@ -332,19 +332,19 @@ export main() void {
                                 = money(expense.cents);
                             }
                             button {
-                                aria-label = $["Remove " + expense.title];
+                                aria-label = "Remove " + expense.title;
                                 "×";
                                 on click {
                                     state.expenses = state.expenses filter |item| {
                                         item.id != expense.id;
                                     }
                                     collect(Expense);
-                                };
+                                }
                             }
                         }
                     }
                 }
-                if $[state.expenses.len() == 0] {
+                if state.expenses.len() == 0 {
                     p.panel {
                         "Your notebook is empty. Start with coffee, fuel, or a place to stay.";
                     }
@@ -395,7 +395,7 @@ export main() void {
                 }
                 button.primary {
                     type = "submit";
-                    disabled = $[state.expenses.len() >= 100];
+                    disabled = state.expenses.len() >= 100;
                     "Add expense +";
                 }
                 p.muted {
@@ -414,7 +414,7 @@ export main() void {
                         state.amount = 0.0;
                         title.focus();
                     };
-                };
+                }
             }
         }
         footer.bar {

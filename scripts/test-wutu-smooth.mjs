@@ -4,7 +4,7 @@ import path from 'node:path';
 import http from 'node:http';
 import {chromium,webkit} from 'playwright';
 import {formatWutuSource,wutuCompletions,wutuIslands} from '../src/compiler/wutu-tooling.js';
-import {parseWutu} from '../src/compiler/wutu.js';
+import {parseWutu} from '../src/compiler/wutu-parse.js';
 const root=path.resolve('dist/wutu-reactive');
 const source=await fs.readFile('examples/wutu-reactive/main.utu','utf8');
 assert.equal(formatWutuSource(formatWutuSource(source)),formatWutuSource(source));

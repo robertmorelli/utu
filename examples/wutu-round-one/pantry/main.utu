@@ -17,7 +17,7 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                 h2 {
                     "On the shelf";
                 }
-                for $[state.items] |item| key $[item.id] {
+                for state.items |item| key item.id {
                     article.panel.bar {
                         div {
                             h3 {
@@ -29,21 +29,21 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                         }
                         div.bar {
                             button {
-                                aria-label = $["Use "+item.name];
-                                disabled = $[item.count==0];
+                                aria-label = "Use "+item.name;
+                                disabled = item.count==0;
                                 "−";
                                 on click {
                                     item.count-=1;
                                     wutu.save("pantry-v2");
-                                };
+                                }
                             }
                             button {
-                                aria-label = $["Add "+item.name];
+                                aria-label = "Add "+item.name;
                                 "+";
                                 on click {
                                     item.count+=1;
                                     wutu.save("pantry-v2");
-                                };
+                                }
                             }
                         }
                     }
@@ -53,7 +53,7 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                 h2 {
                     "Pick up next time";
                 }
-                for $[state.items filter |item| {item.count<item.target;}] |item| key $[item.id] {
+                for (state.items filter |item| {item.count<item.target;}) |item| key item.id {
                     div.panel.bar {
                         p {
                             = item.name;
@@ -72,7 +72,7 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                             };
                         };
                         wutu.save("pantry-v2");
-                    };
+                    }
                 }
                 p.muted {
                     "Target counts are for this household, not a recommended diet.";
@@ -112,7 +112,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "pantry";
         nav {

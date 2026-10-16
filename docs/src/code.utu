@@ -208,9 +208,9 @@ mod code {
         @wutu/\
         pre.code {
             code {
-                for $[parts.kinds] |kind, index| {
+                for parts.kinds |kind, index| {
                     span {
-                        class = $[kind];
+                        class = kind;
                         = parts.texts[index.to_i32()];
                     }
                 }
@@ -228,9 +228,9 @@ mod code {
         });
         @wutu/\
         code {
-            for $[parts.kinds] |kind, index| {
+            for parts.kinds |kind, index| {
                 span {
-                    class = $[kind];
+                    class = kind;
                     = parts.texts[index.to_i32()];
                 }
             }

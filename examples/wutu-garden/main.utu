@@ -16,13 +16,13 @@ fn card(plant: Plant) Browser.HTMLElement {
         border: 1px solid var(--line);
         border-radius: 1.25rem;
         background: var(--card);
-        h2 { font-size: 1.4rem; margin: 0; $[plant.name]; }
-        p { margin: 0; color: var(--muted); "Water every "; $[plant.days.to_f64().toString()]; " days"; }
+        h2 { font-size: 1.4rem; margin: 0; = plant.name; }
+        p { margin: 0; color: var(--muted); "Water every "; = plant.days.to_f64().toString(); " days"; }
         button as toggle {
             type="button";
-            aria-pressed=$[if plant.watered { "true";
+            aria-pressed=if plant.watered { "true";
             } else { "false";
-            }];
+            };
             background: var(--green);
             color: var(--paper);
             border: 0;
@@ -31,15 +31,15 @@ fn card(plant: Plant) Browser.HTMLElement {
             cursor: pointer;
             :hover { background: var(--dark); }
             :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-            $[if plant.watered { "Watered today ✓";
+            = if plant.watered { "Watered today ✓";
             } else { "Mark as watered";
-            }];
-            @click=$[cl(event) void {
+            };
+            on click = cl(event) void {
                 plant.watered = not plant.watered;
                 Browser.localStorage.setItem("wutu-plant-" + plant.name, if plant.watered { today(); } else { ""; });
                 toggle.textContent = if plant.watered { "Watered today ✓"; } else { "Mark as watered"; };
                 toggle.setAttribute("aria-pressed", if plant.watered { "true"; } else { "false"; });
-            }];
+            };
         }
     }
     \/;
@@ -55,11 +55,11 @@ fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLEle
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
         gap: 1rem;
-        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); role="status"; $[visible.to_f64().toString()]; " plants in your greenhouse"; }
-        for $[ordered filter |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); }] |plant| {
-            $[card(plant)];
+        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); role="status"; = visible.to_f64().toString(); " plants in your greenhouse"; }
+        for (ordered filter |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); }) |plant| {
+            = card(plant);
         }
-        if $[visible == 0] {
+        if visible == 0 {
             p.empty { grid-column: 1 / -1; padding-block: 2rem; color: var(--muted); "No plants found. Try a different name."; }
         }
     }
@@ -117,11 +117,11 @@ export main() void {
                 border-radius: 0.75rem;
                 background: var(--card);
                 color: var(--ink);
-                @input=$[cl(event) void {
+                on input = cl(event) void {
                     let next = listing(plants, search.value, sort.value == "frequency");
                     grid.replaceWith(next);
                     grid = next;
-                }];
+                };
             }
             label { for="sort"; font-weight: 650; "Arrange by"; }
             select#sort as sort {
@@ -132,13 +132,13 @@ export main() void {
                 color: var(--ink);
                 option { value="original"; "My collection"; }
                 option { value="frequency"; "Watering frequency"; }
-                @change=$[cl(event) void {
+                on change = cl(event) void {
                     let next = listing(plants, search.value, sort.value == "frequency");
                     grid.replaceWith(next);
                     grid = next;
-                }];
+                };
             }
-            $[grid];
+            = grid;
         }
         footer { color: var(--muted); font-size: 0.85rem; "Grown with Utu. Native Wasm, a little CSS, and room to breathe."; }
     }

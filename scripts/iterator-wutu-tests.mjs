@@ -1,8 +1,7 @@
-import { glueModuleSource, liveGlueFields } from '../src/runtime/host-imports.js';
 import { parseHTML } from 'linkedom/worker';
-import { emitText, emitBinary } from '../src/index.js';
-import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
-import { parseWutu } from '../src/compiler/wutu.js';
+import { emitText } from '../src/index.js';
+import { compileAndInstantiate, compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
+import { parseWutu } from '../src/compiler/wutu-parse.js';
 
 export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,assertNoErrors,makeCompiler}) {
   test('iterators: fused stages, independent indexes, short circuit, and nested pipelines',async({ROOT})=>{
@@ -76,27 +75,26 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     const {document,Event} = parseHTML('<html><head></head><body></body></html>');
     globalThis.document = document;
     try {
-      const {instance,doc}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'wutu_dom.utu',source:`
+      const {instance,spec}=await compileAndInstantiateSelfhost({ROOT,name:'wutu_dom.utu',source:`
         using Browser from std:Browser;
         fn unused() Browser.HTMLElement { @wutu/\\ div { color: magenta; "DEAD-COMPONENT"; } \\/; }
         export main() Browser.HTMLElement {
           @wutu/\\
           div.card {
             color: red;
-            class=$["extra"];
-            data-label=$["<b>safe</b>"];
-            input { .value=$["hello"]; disabled=$["x" == "y"]; }
+            class="extra";
+            data-label="<b>safe</b>";
+            input { .value="hello"; disabled="x" == "y"; }
             svg { viewBox="0 0 10 10"; circle { cx="5"; cy="5"; r="4"; } }
-            for $[[1,2]] |n| {
-              button as button { type="button"; $[n.to_f64().toString()]; @click=$[cl(e) void { button.textContent = (n*10).to_f64().toString(); }]; }
+            for [1,2] |n| {
+              button as button { type="button"; = n.to_f64().toString(); on click = cl(e) void { button.textContent = (n*10).to_f64().toString(); }; }
             }
-            if $[true] { p { "present"; } } else { p { "absent"; } }
+            if true { p { "present"; } } else { p { "absent"; } }
           }
           \\/;
         }
       `});
-      const glue=glueModuleSource(JSON.parse(doc.body.firstChild.dataset.dslImportsJs ?? '{}'),await liveGlueFields(emitBinary(doc)));
-      assert(!glue.includes('magenta'),'unreachable component styles are absent from shipped glue');
+      assert(!JSON.stringify(spec).includes('magenta'),'unreachable component styles are absent from shipped glue');
       const root=instance.exports.main();
       assert(root.classList.contains('extra'));assert(root.classList.contains('card'));
       assertEq(root.getAttribute('data-label'),'<b>safe</b>');assertEq(root.querySelectorAll('b').length,0);
@@ -124,7 +122,6 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     for (const [source,kind] of [
       ['export main() void { [1,2] map |x| {x;}; }','invalid-iterator-usage'],
       ['export main() I32 { [1] map |x,y,z| {x;} sum; }','invalid-iterator-usage'],
-      ['using Browser from std:Browser; export main() void { @wutu/\\ canvas { padding="10"; } \\/; }','invalid-dsl-usage'],
     ]) {
       await withTempUtu(ROOT,'invalid_new_syntax.utu',source,async file=>{
         let caught;try { await compiler.compileFile(file); } catch(error) { caught=error; }
@@ -135,21 +132,19 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
       const doc=await compiler.compileFile(file);
       assert(doc.querySelector('[data-error="parse-error"]'),'malformed DSL reports syntax error instead of crashing expansion');
     });
-    const source='using Browser from std:Browser; export main() void { @wutu/\\ div { $[unknown_value]; } \\/; }';
-    await withTempUtu(ROOT,'wutu_ranges.utu',source,async file=>{
-      const doc=await compiler.compileFile(file);
-      const problem=doc.querySelector('[data-error="unknown-variable"]');
-      assert(problem,'expected an unknown variable diagnostic');
-      assertEq(source.slice(Number(problem.dataset.start),Number(problem.dataset.end)),'unknown_value');
-    });
+    // Wutu templates are the self-hosted compiler's: an expression in one keeps its exact range.
+    const source='using Browser from std:Browser; export main() void { @wutu/\\ div { = unknown_value; } \\/; }';
+    const problem=(await selfhostDiagnostics({ROOT,name:'wutu_ranges.utu',source})).find(d=>d.kind==='unknown-variable');
+    assert(problem,'expected an unknown variable diagnostic');
+    assertEq(problem.text,'unknown_value');
   });
   test('wutu: parser separates attributes, events, CSS scopes, strings, and expressions',()=>{
-    const parsed=parseWutu(`@document { :root { --ink: red; } } main.card { color: var(--ink); :hover {color:blue;} @media (width < 40rem) {display:grid;} @ & > * {margin:0;} h2 { "Hello"; $[items[0]]; } button { type="button"; @click=$[cl(e) void { call("["); }]; "Go"; } }`);
+    const parsed=parseWutu(`@document { :root { --ink: red; } } main.card { color: var(--ink); :hover {color:blue;} @media (width < 40rem) {display:grid;} @ & > * {margin:0;} h2 { "Hello"; = items[0]; } button { type="button"; on click=cl(e) void { call("["); }; "Go"; } }`);
     assertEq(parsed.root.tag,'main');assertEq(parsed.root.children.length,2);assertEq(parsed.root.children[0].children[1].expr,'items[0]');
     assertThrows(()=>parseWutu('canvas { padding="10"; }'),'unknown attribute');
     assertThrows(()=>parseWutu('input { "bad"; }'),'cannot have children');
-    assertThrows(()=>parseWutu('div { onclick="bad"; }'),'use @event');
+    assertThrows(()=>parseWutu('div { onclick="bad"; }'),'events are written');
     assertThrows(()=>parseWutu('.card {}'),'expected an HTML tag');
-    assertThrows(()=>parseWutu('p { $[x }'),'unterminated interpolation');
+    assertThrows(()=>parseWutu('p { $[x]; }'),'no longer writes');
   });
 }

@@ -1,4 +1,4 @@
-function Q(e,t={}){for(let r of e?.ops??[])r==="promise_then"&&(t.promise_then=(n,a)=>{n.then(a)}),r==="promise_catch"&&(t.promise_catch=(n,a)=>{n.catch(a)});return t}function X(e,t={}){for(let r of e?.awaits??[]){if(typeof WebAssembly.Suspending!="function")throw new Error("utu: `await` needs JS Promise Integration (WebAssembly.Suspending), which this host does not provide \u2014 use `.then` instead, or run on a JSPI-capable host (Chrome 126+, Node 23+, Bun)");t[`await_${r}`]=new WebAssembly.Suspending(async n=>await n)}return t}function ee(e,t={}){if(!e)return t;e.new&&(t.closure_new=(n,a,s)=>{let i=a==null&&!(s&2)?(...o)=>n(...o):(...o)=>n(a,...o);return s&1?(...o)=>!!i(...o):i});let r=(n,...a)=>n(...a);for(let n of e.calls??[])t[n]=r;return t}var Fe={U8:"Uint8Array",I8:"Int8Array",U16:"Uint16Array",I16:"Int16Array",I32:"Int32Array",U32:"Uint32Array",I64:"BigInt64Array",U64:"BigUint64Array",F32:"Float32Array",F64:"Float64Array"};function ne(e,t={}){for(let{name:n,kind:a,host:s,data:i}of e??[]){if(!s)continue;let o=Math.max(1,Math.ceil((i?i.length*3/4:0)/65536)),c=new WebAssembly.Memory({initial:o,maximum:65535}),u=globalThis[Fe[a]],v=u.BYTES_PER_ELEMENT,m=y=>{let p=Math.ceil(y/65536)-c.buffer.byteLength/65536;p>0&&c.grow(p)};t[`mem_${n}`]=c,t[`mem_copy_in_${n}`]=y=>{if(typeof y=="string")return m(y.length*3),Math.floor(new TextEncoder().encodeInto(y,new Uint8Array(c.buffer)).written/v);let p=y instanceof ArrayBuffer?new Uint8Array(y):new Uint8Array(y.buffer,y.byteOffset,y.byteLength);return m(p.byteLength),new Uint8Array(c.buffer).set(p),Math.floor(p.byteLength/v)},t[`mem_view_${n}`]=(y,p)=>new u(c.buffer,y*v,p-y)}return t}function te(e={}){return e.js_tag=WebAssembly.JSTag,e}function re(e,t){let r=t?.asyncExports??[];if(r.length===0)return e.exports;let n={...e.exports};for(let a of r)typeof n[a]=="function"&&(n[a]=WebAssembly.promising(n[a]));return n}var H=/^\s*import\s[^;]*;/;function Ee(e){let t=[],r=e;for(let n=r.match(H);n;n=r.match(H))t.push(n[0].trim()),r=r.slice(n[0].length);return{imports:t,expr:r.trim()}}function D(e,t=null){let r=new Set,n=[];for(let s of Object.values(e??{}))for(let[i,o]of Object.entries(s??{})){if(t&&!t.has(i))continue;let{imports:c,expr:u}=Ee(o);for(let v of c)r.add(v);n.push(`export const ${i} = (
+function X(e,t={}){for(let r of e?.ops??[])r==="promise_then"&&(t.promise_then=(n,a)=>{n.then(a)}),r==="promise_catch"&&(t.promise_catch=(n,a)=>{n.catch(a)});return t}function ee(e,t={}){for(let r of e?.awaits??[]){if(typeof WebAssembly.Suspending!="function")throw new Error("utu: `await` needs JS Promise Integration (WebAssembly.Suspending), which this host does not provide \u2014 use `.then` instead, or run on a JSPI-capable host (Chrome 126+, Node 23+, Bun)");t[`await_${r}`]=new WebAssembly.Suspending(async n=>await n)}return t}function ne(e,t={}){if(!e)return t;e.new&&(t.closure_new=(n,a,s)=>{let i=a==null&&!(s&2)?(...o)=>n(...o):(...o)=>n(a,...o);return s&1?(...o)=>!!i(...o):i});let r=(n,...a)=>n(...a);for(let n of e.calls??[])t[n]=r;return t}var Oe={U8:"Uint8Array",I8:"Int8Array",U16:"Uint16Array",I16:"Int16Array",I32:"Int32Array",U32:"Uint32Array",I64:"BigInt64Array",U64:"BigUint64Array",F32:"Float32Array",F64:"Float64Array"};function te(e,t={}){for(let{name:n,kind:a,host:s,data:i}of e??[]){if(!s)continue;let o=Math.max(1,Math.ceil((i?i.length*3/4:0)/65536)),f=new WebAssembly.Memory({initial:o,maximum:65535}),u=globalThis[Oe[a]],h=u.BYTES_PER_ELEMENT,m=b=>{let p=Math.ceil(b/65536)-f.buffer.byteLength/65536;p>0&&f.grow(p)};t[`mem_${n}`]=f,t[`mem_copy_in_${n}`]=b=>{if(typeof b=="string")return m(b.length*3),Math.floor(new TextEncoder().encodeInto(b,new Uint8Array(f.buffer)).written/h);let p=b instanceof ArrayBuffer?new Uint8Array(b):new Uint8Array(b.buffer,b.byteOffset,b.byteLength);return m(p.byteLength),new Uint8Array(f.buffer).set(p),Math.floor(p.byteLength/h)},t[`mem_view_${n}`]=(b,p)=>new u(f.buffer,b*h,p-b)}return t}function re(e={}){return e.js_tag=WebAssembly.JSTag,e}function ie(e,t){let r=t?.asyncExports??[];if(r.length===0)return e.exports;let n={...e.exports};for(let a of r)typeof n[a]=="function"&&(n[a]=WebAssembly.promising(n[a]));return n}var Q=/^\s*import\s[^;]*;/;function We(e){let t=[],r=e;for(let n=r.match(Q);n;n=r.match(Q))t.push(n[0].trim()),r=r.slice(n[0].length);return{imports:t,expr:r.trim()}}function L(e,t=null){let r=new Set,n=[];for(let s of Object.values(e??{}))for(let[i,o]of Object.entries(s??{})){if(t&&!t.has(i))continue;let{imports:f,expr:u}=We(o);for(let h of f)r.add(h);n.push(`export const ${i} = (
 ${u}
 );`)}return n.length===0?"":`${r.size?`${[...r].join(`
 `)}
@@ -6,16 +6,18 @@ ${u}
 `:""}${n.join(`
 
 `)}
-`}function ie(e,t){let r={};for(let[n,a]of Object.entries(e??{})){r[n]={};for(let s of Object.keys(a??{})){if(!(s in t))continue;let i=t[s];r[n][s]=typeof i=="function"?i:()=>i}}return r}function ae(e){let t={};for(let[r,n]of Object.entries(e??{})){t[r]={};for(let[a,s]of Object.entries(n??{})){let i=new Function(`return (${s});`)();t[r][a]=typeof i=="function"?i:()=>i}}return t}var q={entry:0,import:1,prelude:2},J={normal:0,test:1,comptime:2},V={none:0,size:1,speed:2},We=Object.freeze({builtins:["js-string"],importedStringConstants:"'"}),de=new TextDecoder,C=new TextEncoder,R=(e,t,r)=>de.decode(new Uint8Array(e.buffer,t,r-t));async function Ne(e,t={}){return(await Y(e,t)).exports}async function Be(e,t,r){let{target:n="normal",optimize:a="size",debugNames:s=!1}=r;e.set_optimize(V[a]??V.size),e.set_debug_names(s?1:0);let i=await G(e,t,r),o=await he(e,J[n]??J.normal,r),c=ye(e,i);return o<0?{wasm:null,spec:null,diagnostics:c,files:i}:{...K(e,o),diagnostics:c,files:i,tests:n==="test"?Re(e):[]}}function Re(e){let t=[];for(let r=0;r<e.test_count();r++)t.push({export:`__test_${r}`,name:JSON.parse(R(e.src,e.test_name_start(r),e.test_name_end(r)))});return t}async function G(e,t,r,n=new Map){let{resolvePath:a=be,stdlib:s}=r,i=async m=>(n.has(m)||n.set(m,await r.readFile(m)),n.get(m)),o=qe(e,s),c=[...o.files],u=new Map(o.byKey),v=[];U(e,c,u,t,await i(t),q.entry);for(let m=0;m<e.import_count();m++){let y=c[e.import_from(m)],p=R(e.src,e.import_path_start(m),e.import_path_end(m)),k=ce.test(p);if(/^"?(npm|node):/.test(p)||k&&typeof s.get(p)=="function"){e.import_foreign(m),v.push({i:m,raw:p,from:y.key,name:R(e.src,e.import_name_start(m),e.import_name_end(m))});continue}let _=k?p:a(y.key,JSON.parse(p)),I=u.get(_);if(I===void 0){let E=y.role===q.prelude?q.prelude:q.import;if(k){let T=s.get(_);if(typeof T!="string")continue;I=U(e,c,u,_,T,E)}else{let T;try{T=await i(_)}catch{let M=C.encode(_);new Uint8Array(e.src.buffer).set(M,e.import_missing(m,M.length));break}I=U(e,c,u,_,T,E)}}e.import_bind(m,I)}return await ze(e,v,r)?(c.diagnostics=e.resolve(),await Pe(e,t,r),await Oe(e),c):G(e,t,r,n)}async function Oe(e){let t=e.wat_count();if(t===0)return;let{assembleWat:r}=await import("./assemble-RU7P7L2O.js"),n=i=>e.node_kind_name(new Uint8Array(e.node_kind.buffer)[i]),a=i=>{let o=new Int32Array(e.node_child.buffer),c=new Int32Array(e.node_next.buffer),u=[];for(let v=o[i];v>=0;v=c[v])u.push(v);return u},s=i=>{let o=new Int32Array(e.node_first.buffer)[i],c=new Int32Array(e.node_last.buffer)[i];return R(e.src,new Int32Array(e.tok_start.buffer)[o],new Int32Array(e.tok_end.buffer)[c-1])};for(let i=0;i<t;i++){let o=a(e.wat_function(i)),c=o.filter(p=>n(p)==="param_list").flatMap(a).map(p=>{let[k,_]=[a(p)[0],a(p).at(-1)];return{name:s(k),type:s(_)}}),u=o.find(p=>n(p)==="return_type"),v=n(a(u)[0])==="void_type"?"void":s(u),m=o.some(p=>n(p)==="self_param")||n(a(u)[0])==="yield_type",y=r({params:c,result:v,method:m,text:R(e.src,e.wat_text_start(i),e.wat_text_end(i))});if(y.code){let p=e.wat_set(i,y.code.length);new Uint8Array(e.wat_bytes.buffer).set(y.code,p)}else{let{message:p,start:k,end:_}=y.error,I=C.encode(p),E=e.wat_fail(i,k??-1,_??-1,I.length);new Uint8Array(e.src.buffer).set(I,E)}}}var ce=/^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;function U(e,t,r,n,a,s){let i=C.encode(a),o=e.file_add(i.length,s);return new Uint8Array(e.src.buffer).set(i,e.file_offset(o)),t.push({key:n,role:s,text:a,offset:e.file_offset(o),bytes:i}),r.set(n,o),e.file_parse(o),o}var se=new WeakMap;function ue(e){let t=se.get(e);if(!t){let r=e.map(i=>C.encode(JSON.stringify(i))),n=new Int32Array(r.length),a=new Uint8Array(r.reduce((i,o)=>i+o.length+1,1)),s=0;a[s++]=91,r.forEach((i,o)=>{o>0&&(a[s++]=44),n[o]=s,a.set(i,s),s+=i.length}),a[s++]=93,t={bytes:a.subarray(0,s),offsets:n},se.set(e,t)}return t}var oe=new WeakMap;function me(e){let t=oe.get(e);return t||oe.set(e,t={docs:new Map,views:new Map,wanted:new Set,prelude:null,rebuild:!1}),t}function qe(e,t){let r=me(e);if(!r.rebuild&&r.prelude?.files.every(n=>t.get(n.key)===n.text))return e.reset_keep(),r.prelude;e.reset(),r.docs.clear(),r.views.clear();for(let n of r.wanted){let a=$e(e,n,Ce(e,n,r.docs));r.views.set(n,e.abi_resident_view(a.doc,a.at))}return r.prelude=je(e,t),e.seal(),r.rebuild=!1,r.prelude}function je(e,t){let r=[],n=new Map,a=t.get("std:Prelude");if(typeof a!="string")return{files:r,byKey:n};U(e,r,n,"std:Prelude",a,q.prelude);for(let s=0;s<e.import_count();s++){let i=R(e.src,e.import_path_start(s),e.import_path_end(s)),o=t.get(i);!ce.test(i)||typeof o!="string"||e.import_bind(s,n.get(i)??U(e,r,n,i,o,q.prelude))}return{files:r,byKey:n}}function pe(e,t){let r=e.abi_room(t.length);return new Uint8Array(e.src.buffer).set(t,r),r}var le=new WeakMap;function Ue(e){let t=le.get(e);if(!t){let{prefix:r,moduleSpecifier:n,exports:a,names:s,mutableGlobals:i}=e;t={document:ue(e.types),view:C.encode(JSON.stringify({prefix:r,moduleSpecifier:n,exports:a,names:s,mutableGlobals:i}))},le.set(e,t)}return t}function Ce(e,t,r){if(!r.has(t.document)){let{bytes:n,offsets:a}=t.document,s=pe(e,n);e.abi_offsets_room(a.length),new Int32Array(e.abi_offsets.buffer,0,a.length).set(a),r.set(t.document,e.abi_doc_at(s,a.length))}return r.get(t.document)}function $e(e,t,r){return{doc:r,at:pe(e,t.view)}}async function ze(e,t,{stdlib:r,resolvePackage:n}){let a=me(e),s=[],i=!1;for(let{i:o,raw:c,from:u,name:v}of t){let m;try{let y=/^"?(npm|node):/.test(c)?await n(JSON.parse(c),{prefix:v,from:u}):await r.get(c)();m=y.document?y:Ue(y.abi??y)}catch{continue}a.views.has(m)||(a.wanted.add(m),a.rebuild=!0,i=!0),s.push([o,m])}if(i)return!1;for(let[o,c]of s)e.abi_bind(o,a.views.get(c));return!0}async function Pe(e,t,{resolvePath:r=be,readBinaryFile:n}){for(let a=0;a<e.embed_files();a++){let s=R(e.src,e.embed_path_start(a),e.embed_path_end(a)),i;try{i=await n(r(t,s))}catch{e.embed_fail(a);continue}let o=e.embed_set(a,i.length);new Uint8Array(e.embed_bytes.buffer).set(i,o)}}async function he(e,t,r={}){let n=e.comptime_mems();if(n>0){let a=e.compile_program(J.comptime);if(a<0)return-1;let{wasm:s,spec:i}=K(e,a),{exports:o}=await Y(s,i,r);for(let c=0;c<n;c++){let u=e.comptime_name(c),v=o[`__comptime_run_${u}`](),m=new Uint8Array(o[`__comptime_${u}`].buffer,0,v*e.comptime_value_size(c)).slice(),y=e.comptime_set(c,v);new Uint8Array(e.comptime_bytes.buffer).set(m,y)}}return e.compile_program(t)}function K(e,t){let r=new Uint8Array(e.out.buffer,0,t).slice(),n=e.host_json_size(),a=n?JSON.parse(R(e.host_json,0,n)):{};return{wasm:r,spec:a}}function ye(e,t){let r=[];for(let n=0;n<e.diagnostic_count();n++){let a=e.diagnostic_file(n),s=a>=0?t[a]:null,i={kind:e.diagnostic_kind(n),message:e.diagnostic_message(n),severity:"error",file:s?.key??null};if(s){let o=fe(s,e.diagnostic_start(n)),c=fe(s,e.diagnostic_end(n)),u=s.text.slice(0,o),v=u.split(`
-`).length;Object.assign(i,{start:o,end:c,line:v,column:o-u.lastIndexOf(`
-`)})}r.push(i)}return r}function fe(e,t){return de.decode(e.bytes.subarray(0,Math.max(0,t-e.offset))).length}async function Y(e,t={},{loadGlue:r=null}={}){let n=await WebAssembly.compile(e,We),a=t.es??{},s=D(a),i=s?r?ie(a,await r(s)):ae(a):{};t.closures&&(i.utu=ee(t.closures,i.utu??{})),t.mems&&(i.utu=ne(t.mems,i.utu??{})),t.promises&&(i.utu=Q(t.promises,i.utu??{}),i.utu=X(t.promises,i.utu)),WebAssembly.Module.imports(n).some(c=>c.module==="utu"&&c.name==="js_tag")&&(i.utu=te(i.utu??{}));let o=await WebAssembly.instantiate(n,i);return{module:n,instance:o,exports:re(o,t.promises)}}function be(e,t){if(/^[a-z]+:\/\//i.test(e))return new URL(t,e).href;let r=e.split("/").slice(0,-1);for(let n of t.split("/"))n===".."?r.pop():n!=="."&&r.push(n);return r.join("/")}var De=/[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/,Je=new Set(["export","mod","struct","tag","enum","proto","fn","type","distinct","let","const","mem","vec","using"]);function ge(e,t){let r=(l,f)=>new f(l.buffer),n=r(e.node_first,Int32Array),a=r(e.node_last,Int32Array),s=r(e.tok_start,Int32Array),i=r(e.tok_end,Int32Array),o=r(e.tok_kind,Uint8Array),c=r(e.node_decl,Int32Array),u=r(e.decl_node,Int32Array),v=r(e.decl_owner,Int32Array),m=e.node_count(),y=new Map,p=l=>{for(let f=t.length-1;f>=0;f--)if(t[f].offset<=l)return l<t[f].offset+t[f].bytes.length?t[f]:null;return null},k=(l,f)=>{let d=y.get(l);if(!d){d=new Int32Array(l.bytes.length+1);let h=0;for(let x=0;x<l.bytes.length;){let A=l.bytes[x],F=A<128?1:A<224?2:A<240?3:4;for(let B=0;B<F;B++)d[x+B]=h;x+=F,h+=F===4?2:1}d[l.bytes.length]=h,y.set(l,d)}return d[f-l.offset]},_=l=>{let f=s[n[l]],d=p(f);return d?{file:d.key,start:k(d,f),end:k(d,i[a[l]-1])}:null},I=null,E=()=>{if(I)return I;I=new Int32Array(e.decl_count()).fill(-1);for(let l=0;l<m;l++){let f=c[l];if(f<0||f>=I.length||!T(l)||u[f]<0)continue;let d=s[n[l]];if(d<s[n[u[f]]]||d>=i[a[u[f]]-1])continue;let h=I[f];(h<0||d<s[n[h]])&&(I[f]=l)}return I},T=l=>c[l]>=0&&n[l]<a[l]&&a[l]-n[l]===1,M=null,N=()=>{if(M)return M;M=new Map;let l=new Uint8Array(e.src.buffer);for(let f=0,d=e.wat_count?.()??0;f<d;f++){let h=e.wat_function(f),x=-1;for(let g=0,O=e.decl_count();g<O&&x<0;g++)u[g]===h&&(x=g);let A=new Map;for(let g=0,O=e.decl_count();g<O;g++){if(v[g]!==x||e.decl_kind_name(g)!=="Param")continue;let W=_(E()[g]>=0?E()[g]:u[g]);W&&A.set(t.find(j=>j.key===W.file)?.text.slice(W.start,W.end),g)}let F=e.wat_text_start(f),B=e.wat_text_end(f),P=p(F);if(!(!P||!A.size))for(let g=F;g<B;g++){let O=l[g];if(O===59&&l[g+1]===59){for(;g<B&&l[g]!==10;)g++;continue}if(O===40&&l[g+1]===59){let L=0;for(;g<B;g++)if(l[g]===40&&l[g+1]===59)L++,g++;else if(l[g]===59&&l[g+1]===41&&(L--,g++,!L))break;continue}if(O!==36)continue;let W=g+1;for(;W<B&&De.test(String.fromCharCode(l[W]));)W++;let j=A.get(new TextDecoder().decode(l.subarray(g+1,W)));j!==void 0&&(M.has(j)||M.set(j,[]),M.get(j).push({file:P.key,start:k(P,g+1),end:k(P,W)})),g=W-1}}return M},b=new TextDecoder,S=l=>{for(let f=n[l];f<a[l];f++){if(o[f]===8)continue;let d=p(s[f]);if(!d)return null;let h=b.decode(d.bytes.subarray(s[f]-d.offset,i[f]-d.offset));if(!Je.has(h))return h!=="&"&&!/^[A-Za-z_]\w*$/.test(h)?null:{file:d.key,start:k(d,s[f]),end:k(d,i[f])}}return null};return{at:_,declarationAt(l,f){for(let d=0;d<m;d++){if(!T(d))continue;let h=_(d);if(h&&h.file===l&&h.start<=f&&f<=h.end)return c[d]}for(let[d,h]of N())if(h.some(x=>x.file===l&&x.start-1<=f&&f<=x.end))return d;return-1},definition(l){let f=u[l];if(f<0)return null;let d=E()[l];return d>=0?_(d):S(f)??_(f)},references(l,{includeDeclaration:f=!0}={}){let d=this.definition(l),h=[];for(let x=0;x<m;x++){if(c[x]!==l||!T(x))continue;let A=_(x);if(!A)continue;let F=d&&A.file===d.file&&A.start===d.start;F&&!f||(F?h.unshift(A):h.push(A))}return[...h,...N().get(l)??[]]},span(l){return u[l]>=0?_(u[l]):null},kind(l){return e.decl_kind_name(l)},owner(l){return v[l]},type(l){return e.decl_checked_type(l)},typeDeclaration(l){return e.decl_checked_type_decl(l)},declarations(l=null){let f=[];for(let d=0,h=e.decl_count();d<h;d++){if(u[d]<0)continue;let x=_(u[d]);x&&(l==null||x.file===l)&&f.push({decl:d,kind:e.decl_kind_name(d),owner:v[d],span:x})}return f},names(l){let f=[];for(let d=0;d<m;d++){if(!T(d))continue;let h=_(d);h&&h.file===l&&f.push({decl:c[d],at:h})}for(let[d,h]of N())for(let x of h)x.file===l&&f.push({decl:d,at:x});return f.sort((d,h)=>d.at.start-h.at.start),f.filter((d,h)=>h===0||d.at.start!==f[h-1].at.start)},tokenAt(l,f){let d=t.findIndex(h=>h.key===l);if(d<0)return null;for(let h=e.file_first_token(d),x=e.file_end_token(d);h<x;h++){let A=k(t[d],s[h]);if(A>=f)return null;let F=k(t[d],i[h]);if(f<F||f===F&&o[h]===8)return{kind:o[h],start:A,end:F}}return null},text(l){let f=t.find(d=>d.key===l.file);return f?f.text.slice(l.start,l.end):""}}}function Le(e,t){let r=new Map,n,a=o=>(r.has(o)||r.set(o,(async()=>{let[c,u]=await Promise.all([t(`${o}.types.json`),t(`${o}.offsets`)]);return{bytes:c,offsets:Ve(u)}})()),r.get(o)),s=new Map(e),i=new Map;for(let o of["std:Browser","std:JS","std:Web","std:Worker"])typeof e.get(o)=="function"&&s.set(o,()=>(i.has(o)||i.set(o,(async()=>{n??=JSON.parse(new TextDecoder().decode(await t("catalog.json")));let{document:c,view:u}=n[o],[v,m]=await Promise.all([a(c),t(`${u}.view.json`)]);return{document:v,view:m}})()),i.get(o)));return s}function Ve(e){let t=new DataView(e.buffer,e.byteOffset,e.byteLength),r=new Int32Array(e.byteLength/4);for(let n=0;n<r.length;n++)r[n]=t.getInt32(n*4,!0);return r}var Ge={keyword:"35",string:"32",number:"33",comment:"2",type:"36",function:"34",constant:"33",field:"0",parameter:"3",variable:"0",dsl:"32"};function we(e,t,r){let n="",a=0;for(let s of r){let i=Math.max(0,s.start-t),o=Math.min(e.length,s.end-t);if(o<=a)continue;n+=e.slice(a,Math.max(a,i));let c=Ge[s.class];n+=c==="0"?e.slice(Math.max(a,i),o):`\x1B[${c}m${e.slice(Math.max(a,i),o)}\x1B[0m`,a=o}return n+e.slice(a)}var Ke=6;function ve(e){let t=0;for(let r of e){let n=r.codePointAt(0);if(r==="	")t+=4;else{if(n>=768&&n<=879||n>=8203&&n<=8207||n>=65024&&n<=65039)continue;n>=4352&&n<=4447||n>=11904&&n<=42191||n>=44032&&n<=55203||n>=63744&&n<=64255||n>=65072&&n<=65103||n>=65280&&n<=65376||n>=65504&&n<=65510||n>=127744&&n<=128591||n>=129280&&n<=129535||n>=131072&&n<=262141?t+=2:t+=1}}return t}function Ye(e,t,{color:r=!1,relative:n=s=>s,highlight:a=null}={}){let s=(i,o)=>r?`\x1B[${i}m${o}\x1B[0m`:o;return e.map(i=>{let o=i.severity??"error",c=s(o==="warning"?"1;33":"1;31",`${o}:`),u=i.file!=null?t.get(i.file):null;if(u==null||i.start==null)return`${i.file!=null?`${n(i.file)}: `:""}${c} ${s("1",i.message)}`;let v=`${s("1",`${n(i.file)}:${i.line}:${i.column}:`)} ${c} ${s("1",i.message)}`,m=[0];for(let b=u.indexOf(`
-`);b>=0;b=u.indexOf(`
-`,b+1))m.push(b+1);let y=b=>{let S=0,l=m.length-1;for(;S<l;){let f=S+l+1>>1;m[f]<=b?S=f:l=f-1}return S},p=i.line-1,k=Math.max(p,y(Math.max(i.start,i.end-1))),_=b=>u.slice(m[b],(m[b+1]??u.length+1)-1).replace(/\r$/,""),I=[];p>0&&_(p-1).trim()&&I.push({line:p-1,context:!0});for(let b=p;b<=k;b++){if(k-p+1>Ke&&b===p+2){I.push({gap:!0}),b=k-2;continue}I.push({line:b})}let E=String(k+1).length,T=b=>b.replace(/\t/g,"    "),M=b=>s("2",`${b.padStart(E+1)} |`),N=[v];for(let b of I){if(b.gap){N.push(s("2",`${" ".repeat(E)}...`));continue}let S=_(b.line),l=T(r&&a?we(S,m[b.line],a(i.file,m[b.line],m[b.line]+S.length)):S);if(N.push(`${M(String(b.line+1))} ${b.context&&r?`\x1B[2m${T(S)}\x1B[0m`:l}`),b.context)continue;let f=b.line===p?i.start-m[b.line]:S.length-S.trimStart().length,d=b.line===k?Math.min(S.length,Math.max(f+1,i.end-m[b.line])):S.length;if(d<=f&&b.line!==p)continue;let h=ve(S.slice(0,f)),x=Math.max(1,ve(S.slice(0,d))-h);N.push(`${M("")} ${" ".repeat(h)}${s("1;31","^".repeat(x))}`)}return N.join(`
+`}function ae(e,t){let r={};for(let[n,a]of Object.entries(e??{})){r[n]={};for(let s of Object.keys(a??{})){if(!(s in t))continue;let i=t[s];r[n][s]=typeof i=="function"?i:()=>i}}return r}function se(e){let t={};for(let[r,n]of Object.entries(e??{})){t[r]={};for(let[a,s]of Object.entries(n??{})){let i=new Function(`return (${s});`)();t[r][a]=typeof i=="function"?i:()=>i}}return t}var J={PARSE_ERROR:"parse-error",COMPRESSED_SOURCE:"compressed-source",UNKNOWN_ISLAND:"unknown-island",IMPORT_CYCLE:"import-cycle",UNKNOWN_IMPORT:"unknown-import",ENTRY_SURFACE_CONFLICT:"entry-surface-conflict",MODULE_VARIANCE:"module-variance",INVALID_MODULE_ARITY:"invalid-module-arity",DUPLICATE_DECLARATION:"duplicate-declaration",NON_DEFAULTABLE_TYPE:"non-defaultable-type",INVALID_NULLABLE_TYPE:"invalid-nullable-type",INTEGER_LITERAL_OUT_OF_RANGE:"integer-literal-out-of-range",INVALID_ESCAPE:"invalid-escape",UNKNOWN_TYPE:"unknown-type",UNKNOWN_VARIABLE:"unknown-variable",UNKNOWN_FIELD:"unknown-field",UNKNOWN_METHOD:"unknown-method",UNKNOWN_OPERATOR:"unknown-operator",NOT_CALLABLE:"not-callable",INVALID_AWAIT:"invalid-await",WRONG_ARITY:"wrong-arity",TYPE_MISMATCH:"type-mismatch",INVALID_ASSIGNMENT_TARGET:"invalid-assignment-target",INVALID_BREAK:"invalid-break",INVALID_GLOBAL_INITIALIZER:"invalid-global-initializer",INVALID_FOR_SOURCE:"invalid-for-source",ASSIGNMENT_TO_IMMUTABLE:"assignment-to-immutable",NULLABLE_ACCESS:"nullable-access",MISSING_FIELD:"missing-field",DUPLICATE_FIELD:"duplicate-field",RECURSIVE_TYPE:"recursive-type",NON_EXHAUSTIVE_MATCH:"non-exhaustive-match",IMPLICIT_STRUCT_INIT:"implicit-struct-init",REWRITE_INVARIANT:"rewrite-invariant",INVALID_DSL_USAGE:"invalid-dsl-usage",INVALID_ITERATOR_USAGE:"invalid-iterator-usage"};var Be=/(?<=\b(?:if\b[^{};]*|else\s*))\{[^{};]*;?\s*\}/g;function le(e,t){let r=[],n=0,a=!1;for(let[s,i]of e.split(`
+`).entries()){let o="",f=!1;if(!i.trimStart().startsWith("\\\\"))for(let h=0;h<i.length;h++){let m=i.slice(h,h+2);if(a)m==="*/"&&(a=!1,h++);else if(f)i[h]==='"'&&(f=!1);else{if(m==="//")break;m==="/*"?(a=!0,h++):i[h]==='"'?f=!0:o+=i[h]}}let u=(o.replace(Be," ").match(/[{};]/g)??[]).length;if(i.length>160&&o.trim().length>100&&u>=5){let h=i.search(/\S/)+1;r.push({kind:J.COMPRESSED_SOURCE,severity:"warning",message:"This line packs multiple statements or blocks together. Put statements and block contents on separate, indented lines; keep source readable and minify build output instead.",primary:{file:t,row:s+1,col:h,endRow:s+1,endCol:i.length+1,start:n+h-1,end:n+i.length},related:[],notes:[],fixes:[]})}n+=i.length+1}return r}function Ce(e){return e.replace(/"[^"\n]*"|\/\/[^\n]*|\\\\[^\n]*/g,t=>t[0]==='"'?`"${" ".repeat(t.length-2)}"`:" ".repeat(t.length))}function oe(e,t){let r=e.slice(0,t).split(`
+`);return{row:r.length,col:r.at(-1).length+1}}function fe(e){let t=new Set,r=[];for(let[n,a]of e){let s=Ce(a);for(let i of s.matchAll(/@island\s+"/g)){let o=i.index+i[0].length;t.add(a.slice(o,a.indexOf('"',o)))}if(!/^(std|node|npm):/.test(n))for(let i of s.matchAll(/\bwutu\s*\.\s*invalidate\s*\(\s*"/g)){let o=i.index+i[0].length-1,f=a.indexOf('"',o+1)+1;r.push({file:n,source:a,start:o,end:f,name:a.slice(o+1,f-1)})}}return r.filter(n=>!t.has(n.name)).map(({file:n,source:a,start:s,end:i,name:o})=>{let f=oe(a,s),u=oe(a,i),h=[...t].sort();return{kind:J.UNKNOWN_ISLAND,severity:"warning",message:`No @island named "${o}" exists, so this invalidate refreshes nothing.${h.length?` Known islands: ${h.map(m=>`"${m}"`).join(", ")}.`:""}`,primary:{file:n,row:f.row,col:f.col,endRow:u.row,endCol:u.col,start:s,end:i},related:[],notes:[],fixes:[]}})}var C={entry:0,import:1,prelude:2},z={normal:0,test:1,comptime:2},V={none:0,size:1,speed:2},Ue=Object.freeze({builtins:["js-string"],importedStringConstants:"'"}),pe=new TextDecoder,q=new TextEncoder,W=(e,t,r)=>pe.decode(new Uint8Array(e.buffer,t,r-t));async function De(e,t={}){return(await H(e,t)).exports}async function qe(e,t,r){let{target:n="normal",optimize:a="size",debugNames:s=!1}=r;e.set_optimize(V[a]??V.size),e.set_debug_names(s?1:0);let i=await K(e,t,r),o=await we(e,z[n]??z.normal,r),f=ve(e,i).concat(Ye(i));return o<0?{wasm:null,spec:null,diagnostics:f,files:i}:{...Y(e,o),diagnostics:f,files:i,tests:n==="test"?je(e):[]}}function je(e){let t=[];for(let r=0;r<e.test_count();r++)t.push({export:`__test_${r}`,name:JSON.parse(W(e.src,e.test_name_start(r),e.test_name_end(r)))});return t}async function K(e,t,r,n=new Map){let{resolvePath:a=xe,stdlib:s}=r,i=async m=>(n.has(m)||n.set(m,await r.readFile(m)),n.get(m)),o=$e(e,s),f=[...o.files],u=new Map(o.byKey),h=[];D(e,f,u,t,await i(t),C.entry);for(let m=0;m<e.import_count();m++){let b=f[e.import_from(m)],p=W(e.src,e.import_path_start(m),e.import_path_end(m)),k=he.test(p);if(/^"?(npm|node):/.test(p)||k&&typeof s.get(p)=="function"){e.import_foreign(m),h.push({i:m,raw:p,from:b.key,name:W(e.src,e.import_name_start(m),e.import_name_end(m))});continue}let _=k?p:a(b.key,JSON.parse(p)),I=u.get(_);if(I===void 0){let E=b.role===C.prelude?C.prelude:C.import;if(k){let T=s.get(_);if(typeof T!="string")continue;I=D(e,f,u,_,T,E)}else{let T;try{T=await i(_)}catch{let M=q.encode(_);new Uint8Array(e.src.buffer).set(M,e.import_missing(m,M.length));break}I=D(e,f,u,_,T,E)}}e.import_bind(m,I)}return await Ve(e,h,r)?(f.diagnostics=e.resolve(),await Ke(e,t,r),await Pe(e),f):K(e,t,r,n)}async function Pe(e){let t=e.wat_count();if(t===0)return;let{assembleWat:r}=await import("./assemble-RU7P7L2O.js"),n=i=>e.node_kind_name(new Uint8Array(e.node_kind.buffer)[i]),a=i=>{let o=new Int32Array(e.node_child.buffer),f=new Int32Array(e.node_next.buffer),u=[];for(let h=o[i];h>=0;h=f[h])u.push(h);return u},s=i=>{let o=new Int32Array(e.node_first.buffer)[i],f=new Int32Array(e.node_last.buffer)[i];return W(e.src,new Int32Array(e.tok_start.buffer)[o],new Int32Array(e.tok_end.buffer)[f-1])};for(let i=0;i<t;i++){let o=a(e.wat_function(i)),f=o.filter(p=>n(p)==="param_list").flatMap(a).map(p=>{let[k,_]=[a(p)[0],a(p).at(-1)];return{name:s(k),type:s(_)}}),u=o.find(p=>n(p)==="return_type"),h=n(a(u)[0])==="void_type"?"void":s(u),m=o.some(p=>n(p)==="self_param")||n(a(u)[0])==="yield_type",b=r({params:f,result:h,method:m,text:W(e.src,e.wat_text_start(i),e.wat_text_end(i))});if(b.code){let p=e.wat_set(i,b.code.length);new Uint8Array(e.wat_bytes.buffer).set(b.code,p)}else{let{message:p,start:k,end:_}=b.error,I=q.encode(p),E=e.wat_fail(i,k??-1,_??-1,I.length);new Uint8Array(e.src.buffer).set(I,E)}}}var he=/^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;function D(e,t,r,n,a,s){let i=q.encode(a),o=e.file_add(i.length,s);return new Uint8Array(e.src.buffer).set(i,e.file_offset(o)),t.push({key:n,role:s,text:a,offset:e.file_offset(o),bytes:i}),r.set(n,o),e.file_parse(o),o}var de=new WeakMap;function ye(e){let t=de.get(e);if(!t){let r=e.map(i=>q.encode(JSON.stringify(i))),n=new Int32Array(r.length),a=new Uint8Array(r.reduce((i,o)=>i+o.length+1,1)),s=0;a[s++]=91,r.forEach((i,o)=>{o>0&&(a[s++]=44),n[o]=s,a.set(i,s),s+=i.length}),a[s++]=93,t={bytes:a.subarray(0,s),offsets:n},de.set(e,t)}return t}var ce=new WeakMap;function be(e){let t=ce.get(e);return t||ce.set(e,t={docs:new Map,views:new Map,wanted:new Set,prelude:null,rebuild:!1}),t}function $e(e,t){let r=be(e);if(!r.rebuild&&r.prelude?.files.every(n=>t.get(n.key)===n.text))return e.reset_keep(),r.prelude;e.reset(),r.docs.clear(),r.views.clear();for(let n of r.wanted){let a=Je(e,n,Ge(e,n,r.docs));r.views.set(n,e.abi_resident_view(a.doc,a.at))}return r.prelude=Le(e,t),e.seal(),r.rebuild=!1,r.prelude}function Le(e,t){let r=[],n=new Map,a=t.get("std:Prelude");if(typeof a!="string")return{files:r,byKey:n};D(e,r,n,"std:Prelude",a,C.prelude);for(let s=0;s<e.import_count();s++){let i=W(e.src,e.import_path_start(s),e.import_path_end(s)),o=t.get(i);!he.test(i)||typeof o!="string"||e.import_bind(s,n.get(i)??D(e,r,n,i,o,C.prelude))}return{files:r,byKey:n}}function ge(e,t){let r=e.abi_room(t.length);return new Uint8Array(e.src.buffer).set(t,r),r}var ue=new WeakMap;function ze(e){let t=ue.get(e);if(!t){let{prefix:r,moduleSpecifier:n,exports:a,names:s,mutableGlobals:i}=e;t={document:ye(e.types),view:q.encode(JSON.stringify({prefix:r,moduleSpecifier:n,exports:a,names:s,mutableGlobals:i}))},ue.set(e,t)}return t}function Ge(e,t,r){if(!r.has(t.document)){let{bytes:n,offsets:a}=t.document,s=ge(e,n);e.abi_offsets_room(a.length),new Int32Array(e.abi_offsets.buffer,0,a.length).set(a),r.set(t.document,e.abi_doc_at(s,a.length))}return r.get(t.document)}function Je(e,t,r){return{doc:r,at:ge(e,t.view)}}async function Ve(e,t,{stdlib:r,resolvePackage:n}){let a=be(e),s=[],i=!1;for(let{i:o,raw:f,from:u,name:h}of t){let m;try{let b=/^"?(npm|node):/.test(f)?await n(JSON.parse(f),{prefix:h,from:u}):await r.get(f)();m=b.document?b:ze(b.abi??b)}catch{continue}a.views.has(m)||(a.wanted.add(m),a.rebuild=!0,i=!0),s.push([o,m])}if(i)return!1;for(let[o,f]of s)e.abi_bind(o,a.views.get(f));return!0}async function Ke(e,t,{resolvePath:r=xe,readBinaryFile:n}){for(let a=0;a<e.embed_files();a++){let s=W(e.src,e.embed_path_start(a),e.embed_path_end(a)),i;try{i=await n(r(t,s))}catch{e.embed_fail(a);continue}let o=e.embed_set(a,i.length);new Uint8Array(e.embed_bytes.buffer).set(i,o)}}async function we(e,t,r={}){let n=e.comptime_mems();if(n>0){let a=e.compile_program(z.comptime);if(a<0)return-1;let{wasm:s,spec:i}=Y(e,a),{exports:o}=await H(s,i,r);for(let f=0;f<n;f++){let u=e.comptime_name(f),h=o[`__comptime_run_${u}`](),m=new Uint8Array(o[`__comptime_${u}`].buffer,0,h*e.comptime_value_size(f)).slice(),b=e.comptime_set(f,h);new Uint8Array(e.comptime_bytes.buffer).set(m,b)}}return e.compile_program(t)}function Y(e,t){let r=new Uint8Array(e.out.buffer,0,t).slice(),n=e.host_json_size(),a=n?JSON.parse(W(e.host_json,0,n)):{};return{wasm:r,spec:a}}function ve(e,t){let r=[];for(let n=0;n<e.diagnostic_count();n++){let a=e.diagnostic_file(n),s=a>=0?t[a]:null,i={kind:e.diagnostic_kind(n),message:e.diagnostic_message(n),severity:"error",file:s?.key??null};if(s){let o=me(s,e.diagnostic_start(n)),f=me(s,e.diagnostic_end(n)),u=s.text.slice(0,o),h=u.split(`
+`).length;Object.assign(i,{start:o,end:f,line:h,column:o-u.lastIndexOf(`
+`)})}r.push(i)}return r}function Ye(e){return[...e.filter(n=>!/^(std|node|npm):/.test(n.key)).flatMap(n=>le(n.text,n.key)),...fe(e.map(n=>[n.key,n.text]))].map(({kind:n,message:a,primary:s})=>({kind:n,message:a,severity:"warning",file:s.file,start:s.start,end:s.end,line:s.row,column:s.col}))}function me(e,t){return pe.decode(e.bytes.subarray(0,Math.max(0,t-e.offset))).length}async function H(e,t={},{loadGlue:r=null}={}){let n=await WebAssembly.compile(e,Ue),a=t.es??{},s=L(a),i=s?r?ae(a,await r(s)):se(a):{};t.closures&&(i.utu=ne(t.closures,i.utu??{})),t.mems&&(i.utu=te(t.mems,i.utu??{})),t.promises&&(i.utu=X(t.promises,i.utu??{}),i.utu=ee(t.promises,i.utu)),WebAssembly.Module.imports(n).some(f=>f.module==="utu"&&f.name==="js_tag")&&(i.utu=re(i.utu??{}));let o=await WebAssembly.instantiate(n,i);return{module:n,instance:o,exports:ie(o,t.promises)}}function xe(e,t){if(/^[a-z]+:\/\//i.test(e))return new URL(t,e).href;let r=e.split("/").slice(0,-1);for(let n of t.split("/"))n===".."?r.pop():n!=="."&&r.push(n);return r.join("/")}var He=/[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/,Ze=new Set(["export","mod","struct","tag","enum","proto","fn","type","distinct","let","const","mem","vec","using"]);function _e(e,t){let r=(l,d)=>new d(l.buffer),n=r(e.node_first,Int32Array),a=r(e.node_last,Int32Array),s=r(e.tok_start,Int32Array),i=r(e.tok_end,Int32Array),o=r(e.tok_kind,Uint8Array),f=r(e.node_decl,Int32Array),u=r(e.decl_node,Int32Array),h=r(e.decl_owner,Int32Array),m=e.node_count(),b=new Map,p=l=>{for(let d=t.length-1;d>=0;d--)if(t[d].offset<=l)return l<t[d].offset+t[d].bytes.length?t[d]:null;return null},k=(l,d)=>{let c=b.get(l);if(!c){c=new Int32Array(l.bytes.length+1);let y=0;for(let x=0;x<l.bytes.length;){let A=l.bytes[x],N=A<128?1:A<224?2:A<240?3:4;for(let O=0;O<N;O++)c[x+O]=y;x+=N,y+=N===4?2:1}c[l.bytes.length]=y,b.set(l,c)}return c[d-l.offset]},_=l=>{let d=s[n[l]],c=p(d);return c?{file:c.key,start:k(c,d),end:k(c,i[a[l]-1])}:null},I=null,E=()=>{if(I)return I;I=new Int32Array(e.decl_count()).fill(-1);for(let l=0;l<m;l++){let d=f[l];if(d<0||d>=I.length||!T(l)||u[d]<0)continue;let c=s[n[l]];if(c<s[n[u[d]]]||c>=i[a[u[d]]-1])continue;let y=I[d];(y<0||c<s[n[y]])&&(I[d]=l)}return I},T=l=>f[l]>=0&&n[l]<a[l]&&a[l]-n[l]===1,M=null,R=()=>{if(M)return M;M=new Map;let l=new Uint8Array(e.src.buffer);for(let d=0,c=e.wat_count?.()??0;d<c;d++){let y=e.wat_function(d),x=-1;for(let w=0,B=e.decl_count();w<B&&x<0;w++)u[w]===y&&(x=w);let A=new Map;for(let w=0,B=e.decl_count();w<B;w++){if(h[w]!==x||e.decl_kind_name(w)!=="Param")continue;let F=_(E()[w]>=0?E()[w]:u[w]);F&&A.set(t.find(U=>U.key===F.file)?.text.slice(F.start,F.end),w)}let N=e.wat_text_start(d),O=e.wat_text_end(d),$=p(N);if(!(!$||!A.size))for(let w=N;w<O;w++){let B=l[w];if(B===59&&l[w+1]===59){for(;w<O&&l[w]!==10;)w++;continue}if(B===40&&l[w+1]===59){let G=0;for(;w<O;w++)if(l[w]===40&&l[w+1]===59)G++,w++;else if(l[w]===59&&l[w+1]===41&&(G--,w++,!G))break;continue}if(B!==36)continue;let F=w+1;for(;F<O&&He.test(String.fromCharCode(l[F]));)F++;let U=A.get(new TextDecoder().decode(l.subarray(w+1,F)));U!==void 0&&(M.has(U)||M.set(U,[]),M.get(U).push({file:$.key,start:k($,w+1),end:k($,F)})),w=F-1}}return M},g=new TextDecoder,S=l=>{for(let d=n[l];d<a[l];d++){if(o[d]===8)continue;let c=p(s[d]);if(!c)return null;let y=g.decode(c.bytes.subarray(s[d]-c.offset,i[d]-c.offset));if(!Ze.has(y))return y!=="&"&&!/^[A-Za-z_]\w*$/.test(y)?null:{file:c.key,start:k(c,s[d]),end:k(c,i[d])}}return null};return{at:_,declarationAt(l,d){for(let c=0;c<m;c++){if(!T(c))continue;let y=_(c);if(y&&y.file===l&&y.start<=d&&d<=y.end)return f[c]}for(let[c,y]of R())if(y.some(x=>x.file===l&&x.start-1<=d&&d<=x.end))return c;return-1},definition(l){let d=u[l];if(d<0)return null;let c=E()[l];return c>=0?_(c):S(d)??_(d)},references(l,{includeDeclaration:d=!0}={}){let c=this.definition(l),y=[];for(let x=0;x<m;x++){if(f[x]!==l||!T(x))continue;let A=_(x);if(!A)continue;let N=c&&A.file===c.file&&A.start===c.start;N&&!d||(N?y.unshift(A):y.push(A))}return[...y,...R().get(l)??[]]},span(l){return u[l]>=0?_(u[l]):null},kind(l){return e.decl_kind_name(l)},owner(l){return h[l]},type(l){return e.decl_checked_type(l)},typeDeclaration(l){return e.decl_checked_type_decl(l)},declarations(l=null){let d=[];for(let c=0,y=e.decl_count();c<y;c++){if(u[c]<0)continue;let x=_(u[c]);x&&(l==null||x.file===l)&&d.push({decl:c,kind:e.decl_kind_name(c),owner:h[c],span:x})}return d},names(l){let d=[];for(let c=0;c<m;c++){if(!T(c))continue;let y=_(c);y&&y.file===l&&d.push({decl:f[c],at:y})}for(let[c,y]of R())for(let x of y)x.file===l&&d.push({decl:c,at:x});return d.sort((c,y)=>c.at.start-y.at.start),d.filter((c,y)=>y===0||c.at.start!==d[y-1].at.start)},tokenAt(l,d){let c=t.findIndex(y=>y.key===l);if(c<0)return null;for(let y=e.file_first_token(c),x=e.file_end_token(c);y<x;y++){let A=k(t[c],s[y]);if(A>=d)return null;let N=k(t[c],i[y]);if(d<N||d===N&&o[y]===8)return{kind:o[y],start:A,end:N}}return null},text(l){let d=t.find(c=>c.key===l.file);return d?d.text.slice(l.start,l.end):""}}}function Qe(e,t){let r=new Map,n,a=o=>(r.has(o)||r.set(o,(async()=>{let[f,u]=await Promise.all([t(`${o}.types.json`),t(`${o}.offsets`)]);return{bytes:f,offsets:Xe(u)}})()),r.get(o)),s=new Map(e),i=new Map;for(let o of["std:Browser","std:JS","std:Web","std:Worker"])typeof e.get(o)=="function"&&s.set(o,()=>(i.has(o)||i.set(o,(async()=>{n??=JSON.parse(new TextDecoder().decode(await t("catalog.json")));let{document:f,view:u}=n[o],[h,m]=await Promise.all([a(f),t(`${u}.view.json`)]);return{document:h,view:m}})()),i.get(o)));return s}function Xe(e){let t=new DataView(e.buffer,e.byteOffset,e.byteLength),r=new Int32Array(e.byteLength/4);for(let n=0;n<r.length;n++)r[n]=t.getInt32(n*4,!0);return r}var en={keyword:"35",string:"32",number:"33",comment:"2",type:"36",function:"34",constant:"33",field:"0",parameter:"3",variable:"0",dsl:"32"};function ke(e,t,r){let n="",a=0;for(let s of r){let i=Math.max(0,s.start-t),o=Math.min(e.length,s.end-t);if(o<=a)continue;n+=e.slice(a,Math.max(a,i));let f=en[s.class];n+=f==="0"?e.slice(Math.max(a,i),o):`\x1B[${f}m${e.slice(Math.max(a,i),o)}\x1B[0m`,a=o}return n+e.slice(a)}var nn=6;function Ie(e){let t=0;for(let r of e){let n=r.codePointAt(0);if(r==="	")t+=4;else{if(n>=768&&n<=879||n>=8203&&n<=8207||n>=65024&&n<=65039)continue;n>=4352&&n<=4447||n>=11904&&n<=42191||n>=44032&&n<=55203||n>=63744&&n<=64255||n>=65072&&n<=65103||n>=65280&&n<=65376||n>=65504&&n<=65510||n>=127744&&n<=128591||n>=129280&&n<=129535||n>=131072&&n<=262141?t+=2:t+=1}}return t}function tn(e,t,{color:r=!1,relative:n=s=>s,highlight:a=null}={}){let s=(i,o)=>r?`\x1B[${i}m${o}\x1B[0m`:o;return e.map(i=>{let o=i.severity??"error",f=s(o==="warning"?"1;33":"1;31",`${o}:`),u=i.file!=null?t.get(i.file):null;if(u==null||i.start==null)return`${i.file!=null?`${n(i.file)}: `:""}${f} ${s("1",i.message)}`;let h=`${s("1",`${n(i.file)}:${i.line}:${i.column}:`)} ${f} ${s("1",i.message)}`,m=[0];for(let g=u.indexOf(`
+`);g>=0;g=u.indexOf(`
+`,g+1))m.push(g+1);let b=g=>{let S=0,l=m.length-1;for(;S<l;){let d=S+l+1>>1;m[d]<=g?S=d:l=d-1}return S},p=i.line-1,k=Math.max(p,b(Math.max(i.start,i.end-1))),_=g=>u.slice(m[g],(m[g+1]??u.length+1)-1).replace(/\r$/,""),I=[];p>0&&_(p-1).trim()&&I.push({line:p-1,context:!0});for(let g=p;g<=k;g++){if(k-p+1>nn&&g===p+2){I.push({gap:!0}),g=k-2;continue}I.push({line:g})}let E=String(k+1).length,T=g=>g.replace(/\t/g,"    "),M=g=>s("2",`${g.padStart(E+1)} |`),R=[h];for(let g of I){if(g.gap){R.push(s("2",`${" ".repeat(E)}...`));continue}let S=_(g.line),l=T(r&&a?ke(S,m[g.line],a(i.file,m[g.line],m[g.line]+S.length)):S);if(R.push(`${M(String(g.line+1))} ${g.context&&r?`\x1B[2m${T(S)}\x1B[0m`:l}`),g.context)continue;let d=g.line===p?i.start-m[g.line]:S.length-S.trimStart().length,c=g.line===k?Math.min(S.length,Math.max(d+1,i.end-m[g.line])):S.length;if(c<=d&&g.line!==p)continue;let y=Ie(S.slice(0,d)),x=Math.max(1,Ie(S.slice(0,c))-y);R.push(`${M("")} ${" ".repeat(y)}${s("1;31","^".repeat(x))}`)}return R.join(`
 `)}).join(`
 
-`)}function Ze(e){return D(e.es??{})}function He(e,t,{runtime:r,glue:n,wasm:a,streaming:s=!1}){let i=new Set(WebAssembly.Module.imports(new WebAssembly.Module(t,xe)).map(p=>`${p.module}.${p.name}`)),o=[],c=[],u=[],v=e.es??{},m=Object.fromEntries(Object.entries(v).map(([p,k])=>[p,Object.fromEntries(Object.keys(k).map(_=>[_,""]))]));n&&Object.values(m).some(p=>Object.keys(p).length)?(o.push("importObjectFromGlue"),c.push(`import * as glue from ${JSON.stringify(n)};`),u.push(`const imports = importObjectFromGlue(${JSON.stringify(m)}, glue);`)):u.push("const imports = {};"),e.closures&&(o.push("closureImports"),u.push(`imports.utu = closureImports(${JSON.stringify(e.closures)}, imports.utu);`)),e.mems&&(o.push("memoryImports"),u.push(`imports.utu = memoryImports(${JSON.stringify(e.mems)}, imports.utu);`)),e.promises&&(o.push("promiseImports","awaitImports","promisifyExports"),u.push(`imports.utu = awaitImports(${JSON.stringify(e.promises)}, promiseImports(${JSON.stringify(e.promises)}, imports.utu));`)),i.has("utu.js_tag")&&(o.push("exceptionImports"),u.push("imports.utu = exceptionImports(imports.utu);")),o.length&&c.unshift(`import { ${o.join(", ")} } from ${JSON.stringify(r)};`);let y=s?"compileStreaming":"compile";return u.push(`const module = await WebAssembly.${y}(${a}, ${JSON.stringify(xe)});`),u.push("export const instance = await WebAssembly.instantiate(module, imports);"),u.push(e.promises?`export const exports = promisifyExports(instance, ${JSON.stringify(e.promises)});`:"export const exports = instance.exports;"),[...c,...u].join(`
+`)}function rn(e){return L(e.es??{})}function an(e,t,{runtime:r,glue:n,wasm:a,streaming:s=!1}){let i=new Set(WebAssembly.Module.imports(new WebAssembly.Module(t,Se)).map(p=>`${p.module}.${p.name}`)),o=[],f=[],u=[],h=e.es??{},m=Object.fromEntries(Object.entries(h).map(([p,k])=>[p,Object.fromEntries(Object.keys(k).map(_=>[_,""]))]));n&&Object.values(m).some(p=>Object.keys(p).length)?(o.push("importObjectFromGlue"),f.push(`import * as glue from ${JSON.stringify(n)};`),u.push(`const imports = importObjectFromGlue(${JSON.stringify(m)}, glue);`)):u.push("const imports = {};"),e.closures&&(o.push("closureImports"),u.push(`imports.utu = closureImports(${JSON.stringify(e.closures)}, imports.utu);`)),e.mems&&(o.push("memoryImports"),u.push(`imports.utu = memoryImports(${JSON.stringify(e.mems)}, imports.utu);`)),e.promises&&(o.push("promiseImports","awaitImports","promisifyExports"),u.push(`imports.utu = awaitImports(${JSON.stringify(e.promises)}, promiseImports(${JSON.stringify(e.promises)}, imports.utu));`)),i.has("utu.js_tag")&&(o.push("exceptionImports"),u.push("imports.utu = exceptionImports(imports.utu);")),o.length&&f.unshift(`import { ${o.join(", ")} } from ${JSON.stringify(r)};`);let b=s?"compileStreaming":"compile";return u.push(`const module = await WebAssembly.${b}(${a}, ${JSON.stringify(Se)});`),u.push("export const instance = await WebAssembly.instantiate(module, imports);"),u.push(e.promises?`export const exports = promisifyExports(instance, ${JSON.stringify(e.promises)});`:"export const exports = instance.exports;"),[...f,...u].join(`
 `)+`
-`}var xe={builtins:["js-string"],importedStringConstants:"'"};var _e=()=>import("./browser-catalog.generated-2OMWPVRO.js");async function ke(e,t,r){let n=e[`${t}_JSON`];if(n===void 0){let s=Uint8Array.from(atob(e[`${t}_GZIP`]),o=>o.charCodeAt(0)),i=new Blob([s]).stream().pipeThrough(new DecompressionStream("gzip"));n=await new Response(i).text()}let a=JSON.parse(n);if(a.version!==1)throw new Error(`Unsupported ${r} declaration ABI version`);return a}function $(e){let t;return()=>t??=e().catch(r=>{throw t=void 0,r})}var Z=$(async()=>ke(await _e(),"BROWSER_ABI","browser")),Qe=$(async()=>ke(await _e(),"WORKER_ABI","worker"));function Ie(e,t,r){let n=a=>Object.fromEntries(Object.entries(a).filter(([s])=>r(s)));return{source:`mod ${e} {}`,abi:{...t,prefix:e,exports:n(t.exports),names:n(t.names),mutableGlobals:t.mutableGlobals.filter(r)}}}async function Se(){return{source:"mod Browser {}",abi:await Z()}}var Ae=$(async()=>{let e=await Z(),t=new Set(e.ecmascript??[]);return Ie("JS",e,r=>t.has(r))}),Xe=["AbortController","AbortSignal","Blob","ByteLengthQueuingStrategy","CompressionStream","CountQueuingStrategy","Crypto","CryptoKey","CustomEvent","DOMException","DecompressionStream","Event","EventTarget","File","FormData","Headers","MessageChannel","MessageEvent","MessagePort","ReadableByteStreamController","ReadableStream","ReadableStreamBYOBReader","ReadableStreamBYOBRequest","ReadableStreamDefaultController","ReadableStreamDefaultReader","Request","RequestInit","Response","ResponseInit","SubtleCrypto","TextDecoder","TextDecoderStream","TextEncoder","TextEncoderStream","TransformStream","TransformStreamDefaultController","URL","URLSearchParams","WebAssembly","WritableStream","WritableStreamDefaultController","WritableStreamDefaultWriter","atob","btoa","clearInterval","clearTimeout","console","crypto","fetch","navigator","performance","queueMicrotask","reportError","setInterval","setTimeout","structuredClone"],Te=$(async()=>{let e=new Set(Xe);return Ie("Web",await Z(),t=>e.has(t))}),Me=$(async()=>({source:"mod Worker {}",abi:await Qe()}));var w="ir-wasm-",z=new Map([["std:Array",`// std/Array.utu \u2014 Array[T1]
+`}var Se={builtins:["js-string"],importedStringConstants:"'"};var Ae=()=>import("./browser-catalog.generated-2OMWPVRO.js");async function Te(e,t,r){let n=e[`${t}_JSON`];if(n===void 0){let s=Uint8Array.from(atob(e[`${t}_GZIP`]),o=>o.charCodeAt(0)),i=new Blob([s]).stream().pipeThrough(new DecompressionStream("gzip"));n=await new Response(i).text()}let a=JSON.parse(n);if(a.version!==1)throw new Error(`Unsupported ${r} declaration ABI version`);return a}function j(e){let t;return()=>t??=e().catch(r=>{throw t=void 0,r})}var Z=j(async()=>Te(await Ae(),"BROWSER_ABI","browser")),sn=j(async()=>Te(await Ae(),"WORKER_ABI","worker"));function Me(e,t,r){let n=a=>Object.fromEntries(Object.entries(a).filter(([s])=>r(s)));return{source:`mod ${e} {}`,abi:{...t,prefix:e,exports:n(t.exports),names:n(t.names),mutableGlobals:t.mutableGlobals.filter(r)}}}async function Ne(){return{source:"mod Browser {}",abi:await Z()}}var Ee=j(async()=>{let e=await Z(),t=new Set(e.ecmascript??[]);return Me("JS",e,r=>t.has(r))}),on=["AbortController","AbortSignal","Blob","ByteLengthQueuingStrategy","CompressionStream","CountQueuingStrategy","Crypto","CryptoKey","CustomEvent","DOMException","DecompressionStream","Event","EventTarget","File","FormData","Headers","MessageChannel","MessageEvent","MessagePort","ReadableByteStreamController","ReadableStream","ReadableStreamBYOBReader","ReadableStreamBYOBRequest","ReadableStreamDefaultController","ReadableStreamDefaultReader","Request","RequestInit","Response","ResponseInit","SubtleCrypto","TextDecoder","TextDecoderStream","TextEncoder","TextEncoderStream","TransformStream","TransformStreamDefaultController","URL","URLSearchParams","WebAssembly","WritableStream","WritableStreamDefaultController","WritableStreamDefaultWriter","atob","btoa","clearInterval","clearTimeout","console","crypto","fetch","navigator","performance","queueMicrotask","reportError","setInterval","setTimeout","structuredClone"],Fe=j(async()=>{let e=new Set(on);return Me("Web",await Z(),t=>e.has(t))}),Re=j(async()=>({source:"mod Worker {}",abi:await sn()}));var v="ir-wasm-",P=new Map([["std:Array",`// std/Array.utu \u2014 Array[T1]
 //
 // & maps to a WasmGC mutable array type with element type T1.
 //
@@ -88,7 +90,7 @@ mod Array[T1] {
         </ir-array-copy> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Bool",`// std/Bool.utu \u2014 Bool scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:Bool",`// std/Bool.utu \u2014 Bool scalar type module
 // & is a WasmGC I32 used as boolean (0 = false, 1 = true).
 // Logical operators live here like every other operator; the compiler lowers
 // \`and\`, \`or\`, \`xor\`, and \`not\` through this module instead of hardcoding them.
@@ -109,7 +111,7 @@ mod Bool {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Buffer",`// Geometrically growing native buffer, including non-defaultable element types.
+`.replaceAll("@@IR_WASM@@",v)],["std:Buffer",`// Geometrically growing native buffer, including non-defaultable element types.
 mod Buffer[T] {
     struct &:
         | values: Array[T]
@@ -139,7 +141,7 @@ mod Buffer[T] {
         self.values.slice(0, self.length);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Console",`//! The host's console: \`using console from std:Console;\`, then
+`.replaceAll("@@IR_WASM@@",v)],["std:Console",`//! The host's console: \`using console from std:Console;\`, then
 //! \`console.log("hello")\`. Text in, nothing out; each function ships only
 //! when used.
 
@@ -162,7 +164,7 @@ mod console {
         f(text);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Externref",`// std/Externref.utu \u2014 Externref opaque external reference type module
+`.replaceAll("@@IR_WASM@@",v)],["std:Externref",`// std/Externref.utu \u2014 Externref opaque external reference type module
 // & maps to the WebAssembly Externref type: an opaque, garbage-collected
 // reference to a host (JavaScript) object.
 // Externrefs ARE nullable: ?Externref is valid.
@@ -173,7 +175,7 @@ mod console {
 mod Externref {
     type & = @ir/\\ <@@IR_WASM@@ref type-repr="wasm-externref"/> \\/
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:F32",`// std/F32.utu \u2014 F32 scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:F32",`// std/F32.utu \u2014 F32 scalar type module
 // & is a WasmGC F32 value (stack-only, never heap-allocated, never nullable).
 
 mod F32 {
@@ -217,7 +219,7 @@ mod F32 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:F64",`// std/F64.utu \u2014 F64 scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:F64",`// std/F64.utu \u2014 F64 scalar type module
 // & is a WasmGC F64 value (stack-only, never heap-allocated, never nullable).
 
 mod F64 {
@@ -365,7 +367,7 @@ mod F64 {
     /// Not a number.
     fn nan() & { 0.0 / 0.0; }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Found",`// Optional iterator result: null means empty; a present wrapper holds any T,
+`.replaceAll("@@IR_WASM@@",v)],["std:Found",`// Optional iterator result: null means empty; a present wrapper holds any T,
 // including non-nullable scalar types. Use \`promote\` or \`orelse\` to unwrap.
 mod Found[T] {
     struct &:
@@ -374,7 +376,7 @@ mod Found[T] {
         &{ value: value };
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Group",`mod Group[K, T] {
+`.replaceAll("@@IR_WASM@@",v)],["std:Group",`mod Group[K, T] {
     struct &:
         | key: K
         | values: Array[T]
@@ -382,7 +384,7 @@ mod Found[T] {
         &{ key: key, values: [] };
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:I31",`// std/I31.utu \u2014 I31 WasmGC reference type module
+`.replaceAll("@@IR_WASM@@",v)],["std:I31",`// std/I31.utu \u2014 I31 WasmGC reference type module
 // & maps to WasmGC i31ref: a 31-bit signed integer packed into a GC reference.
 // I31 IS nullable: ?I31 is valid (it is a heap reference).
 //
@@ -413,7 +415,7 @@ mod I31 {
     fn &:eq |a, b| Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }
     fn &:ne |a, b| Bool { @ir/\\ <ir-ref-ne><ir-ident name="a"/><ir-ident name="b"/></ir-ref-ne> \\/; }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:I32",`// std/I32.utu \u2014 I32 scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:I32",`// std/I32.utu \u2014 I32 scalar type module
 // & is a WasmGC I32 value (stack-only, never heap-allocated, never nullable).
 
 mod I32 {
@@ -458,7 +460,7 @@ mod I32 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:I64",`// std/I64.utu \u2014 I64 scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:I64",`// std/I64.utu \u2014 I64 scalar type module
 mod I64 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i64"/> \\/
 
@@ -498,7 +500,7 @@ mod I64 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:IntMap",`// std/IntMap.utu \u2014 I32 keys to I32 values, open addressing.
+`.replaceAll("@@IR_WASM@@",v)],["std:IntMap",`// std/IntMap.utu \u2014 I32 keys to I32 values, open addressing.
 //
 //   let m = IntMap.new();
 //   m.set(7, 70);
@@ -574,7 +576,7 @@ mod IntMap {
         };
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Interner",`// std/Interner.utu \u2014 byte strings to dense I32 ids: 0, 1, 2, \u2026 in first-seen order.
+`.replaceAll("@@IR_WASM@@",v)],["std:Interner",`// std/Interner.utu \u2014 byte strings to dense I32 ids: 0, 1, 2, \u2026 in first-seen order.
 //
 //   let names = Interner.new();
 //   names.begin();
@@ -687,7 +689,7 @@ mod Interner {
         Str.from_codes(self.bytes.slice(self.starts[id], self.starts[id + 1]), self.size(id));
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:List",`mod List[T] {
+`.replaceAll("@@IR_WASM@@",v)],["std:List",`mod List[T] {
     // Persistent edits; the input remains unchanged.
     fn append(self: Array[T], value: T) Array[T] {
         let result = Array[T].new(self.len() + 1, value);
@@ -704,7 +706,7 @@ mod Interner {
         };
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:LiteralDefaults",`// std/LiteralDefaults.utu \u2014 default static type for each literal syntax kind
+`.replaceAll("@@IR_WASM@@",v)],["std:LiteralDefaults",`// std/LiteralDefaults.utu \u2014 default static type for each literal syntax kind
 //
 // The compiler reads <ir-literal-defaults> during type inference to decide
 // what \`data-type-name\` to stamp on every literal.  Each <ir-default kind="X"
@@ -738,7 +740,7 @@ mod LiteralDefaults {
       </ir-literal-defaults>
     \\/
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:M128",`// std/M128.utu \u2014 M128 bitmask type module
+`.replaceAll("@@IR_WASM@@",v)],["std:M128",`// std/M128.utu \u2014 M128 bitmask type module
 // & is a 128-bit SIMD mask value (same wasm representation as V128).
 // Used for lane-selection in SIMD operations.
 // Supports bitwise ops; interpreted as four 32-bit lanes of all-zeros/all-ones.
@@ -775,7 +777,7 @@ mod M128 {
         @ir/\\ <ir-v128-any-true><ir-ident name="a"/></ir-v128-any-true> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:M32",`// std/M32.utu \u2014 M32 bitmask type module
+`.replaceAll("@@IR_WASM@@",v)],["std:M32",`// std/M32.utu \u2014 M32 bitmask type module
 // & is a 32-bit bitmask value (same wasm representation as I32).
 // Intended for use as a lane-selection mask, not a general integer.
 // Supports bitwise and comparison ops; arithmetic (add/sub/mul) is excluded.
@@ -794,7 +796,7 @@ mod M32 {
     fn &:eq   |a, b| Bool { @ir/\\ <ir-i32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i32-eq> \\/; }
     fn &:ne   |a, b| Bool { @ir/\\ <ir-i32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i32-ne> \\/; }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:M64",`// std/M64.utu \u2014 M64 bitmask type module
+`.replaceAll("@@IR_WASM@@",v)],["std:M64",`// std/M64.utu \u2014 M64 bitmask type module
 // & is a 64-bit bitmask value (same wasm representation as I64).
 // Intended for use as a lane-selection mask, not a general integer.
 // Supports bitwise and comparison ops; arithmetic (add/sub/mul) is excluded.
@@ -813,7 +815,7 @@ mod M64 {
     fn &:eq   |a, b| Bool { @ir/\\ <ir-i64-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i64-eq> \\/; }
     fn &:ne   |a, b| Bool { @ir/\\ <ir-i64-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i64-ne> \\/; }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:NumberField",`// Keep the user's draft, including empty/invalid text, separate from a number.
+`.replaceAll("@@IR_WASM@@",v)],["std:NumberField",`// Keep the user's draft, including empty/invalid text, separate from a number.
 mod NumberField {
     struct &:
         | text: Str
@@ -830,7 +832,7 @@ mod NumberField {
         if self.valid(min,max) { ""; } else { "Enter a number within the allowed range."; };
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:PersistentSegmentTree",`// Immutable versions of an ordered monoid index. Point updates share untouched
+`.replaceAll("@@IR_WASM@@",v)],["std:PersistentSegmentTree",`// Immutable versions of an ordered monoid index. Point updates share untouched
 // branches, allocating O(log n) new nodes. combine must be pure and associative.
 mod PersistentSegmentTree[T] {
     struct Node:
@@ -898,7 +900,7 @@ mod PersistentSegmentTree[T] {
         range(self.root, 0, self.length, start, end_, self.identity, combine);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Prelude",`// std/prelude.utu \u2014 automatically injected into every compilation
+`.replaceAll("@@IR_WASM@@",v)],["std:Prelude",`// std/prelude.utu \u2014 automatically injected into every compilation
 //
 // Every name listed here is visible in user code without an explicit \`using\`.
 // The compiler prepends these modules before processing any file.
@@ -944,7 +946,7 @@ using LiteralDefaults from std:LiteralDefaults;
 using Found from std:Found;
 using Group from std:Group;
 using wutu from std:Wutu;
-`.replaceAll("@@IR_WASM@@",w)],["std:Promise",`// std/Promise.utu \u2014 Promise[T]
+`.replaceAll("@@IR_WASM@@",v)],["std:Promise",`// std/Promise.utu \u2014 Promise[T]
 //
 // & maps to WebAssembly externref, so a \`Promise[T]\` IS a real JavaScript
 // promise. Nothing is wrapped, boxed, or marshalled: a promise obtained from
@@ -979,7 +981,7 @@ mod Promise[T1] {
         @ir/\\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Random",`//! Seeded random numbers: \`using Random from std:Random;\`.
+`.replaceAll("@@IR_WASM@@",v)],["std:Random",`//! Seeded random numbers: \`using Random from std:Random;\`.
 //!
 //! xoshiro128\\*\\* (Blackman and Vigna), in utu: the same seed gives the
 //! same numbers on every host, and nothing crosses to JavaScript (unless
@@ -1061,7 +1063,7 @@ mod Random {
 
     fn rotl(x: I32, k: I32) I32 { (x << k) | (x >>> (32 - k)); }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:SegmentTree",`// An ordered monoid index. combine must be associative and identity neutral.
+`.replaceAll("@@IR_WASM@@",v)],["std:SegmentTree",`// An ordered monoid index. combine must be associative and identity neutral.
 // Build O(n), point replacement / half-open range query O(log n), space O(n).
 mod SegmentTree[T] {
     struct &:
@@ -1137,7 +1139,7 @@ mod SegmentTree[T] {
         i - self.size;
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Spatial",`using Buffer from std:Buffer;
+`.replaceAll("@@IR_WASM@@",v)],["std:Spatial",`using Buffer from std:Buffer;
 
 // Static priority search tree: minimum y at each node, balanced x partitions.
 // Coordinates are copied at construction. Query results are caller-supplied IDs.
@@ -1327,7 +1329,7 @@ mod Spatial {
         };
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Str",`// std/Str.utu \u2014 Str string reference type module
+`.replaceAll("@@IR_WASM@@",v)],["std:Str",`// std/Str.utu \u2014 Str string reference type module
 // & maps to Binaryen's stringref-backed host string model.
 // This is a deliberate Binaryen feature, not a core Wasm GC heap type like
 // arrays or structs. Utu treats it as a first-class type because Binaryen is
@@ -1540,7 +1542,7 @@ mod Str {
         f(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:StrMap",`//! Str keys to values of any type: \`using StrMap from std:StrMap;\`.
+`.replaceAll("@@IR_WASM@@",v)],["std:StrMap",`//! Str keys to values of any type: \`using StrMap from std:StrMap;\`.
 //!
 //! \`\`\`
 //! let ages = StrMap[I32].new();
@@ -1681,7 +1683,7 @@ mod StrMap[V] {
         f(key);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Stream",`//! \`Stream[T]\`: a JavaScript async iterable, held as an externref. An async
+`.replaceAll("@@IR_WASM@@",v)],["std:Stream",`//! \`Stream[T]\`: a JavaScript async iterable, held as an externref. An async
 //! generator, a \`ReadableStream\`, a Node stream: anything with
 //! \`[Symbol.asyncIterator]\`. As with \`Promise[T]\`, nothing is wrapped: a
 //! stream utu returns is one JS reads with \`for await\`, and one from the host
@@ -1790,7 +1792,7 @@ mod Stream[T1] {
         await f(iterator);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Time",`//! Clocks: \`using time from std:Time;\`, then \`time.now()\`. Each function ships only when used.
+`.replaceAll("@@IR_WASM@@",v)],["std:Time",`//! Clocks: \`using time from std:Time;\`, then \`time.now()\`. Each function ships only when used.
 
 mod time {
     /// Milliseconds since an arbitrary start, with sub-millisecond precision
@@ -1806,7 +1808,7 @@ mod time {
         f();
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:U32",`// std/U32.utu \u2014 U32 scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:U32",`// std/U32.utu \u2014 U32 scalar type module
 mod U32 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i32"/> \\/
 
@@ -1846,7 +1848,7 @@ mod U32 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:U64",`// std/U64.utu \u2014 U64 scalar type module
+`.replaceAll("@@IR_WASM@@",v)],["std:U64",`// std/U64.utu \u2014 U64 scalar type module
 mod U64 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i64"/> \\/
 
@@ -1886,7 +1888,7 @@ mod U64 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:V128",`// std/V128.utu \u2014 V128 SIMD vector type module
+`.replaceAll("@@IR_WASM@@",v)],["std:V128",`// std/V128.utu \u2014 V128 SIMD vector type module
 // & is the WebAssembly 128-bit SIMD vector type.
 // Interpreted as different lane types depending on the operation:
 //   i8x16, i16x8, i32x4, i64x2, f32x4, f64x2
@@ -1927,7 +1929,7 @@ mod V128 {
         @ir/\\ <ir-v128-any-true><ir-ident name="a"/></ir-v128-any-true> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",w)],["std:Wutu",`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
+`.replaceAll("@@IR_WASM@@",v)],["std:Wutu",`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
 mod wutu {
     fn init() void {
         let install: fun() void = @es/\\ () => { globalThis.__utuWutu ??= (function createWutuRuntime() {
@@ -2703,6 +2705,12 @@ mod wutu {
         let give: fun(Str, Externref) void = @es/\\ (path,page)=>globalThis.__utuWutu.deliver(path,page) \\/;
         give(path, page);
     }
+    /// A template's text hole (\`= x;\`): a number or a Bool shows as its
+    /// \`to_str()\`, a Str or a node as itself. The compiler picks which, by
+    /// x's type; this body is never what runs.
+    fn show(value: Externref) Externref {
+        value;
+    }
     fn route() Str {
         let call: fun() Str = @es/\\ ()=>location.hash.slice(1)||"/" \\/;
         call();
@@ -2736,4 +2744,4 @@ mod wutu {
         update();
     }
 }
-`.replaceAll("@@IR_WASM@@",w)]]);z.set("std:Browser",Se);z.set("std:JS",Ae);z.set("std:Web",Te);z.set("std:Worker",Me);export{V as OPTIMIZE,z as PLATFORM_SOURCES,q as ROLE,J as TARGET,K as builtModule,Le as catalogStdlib,Be as compile,he as compileProgram,Ye as formatDiagnostics,Ze as glueSource,Y as instantiate,Ne as loadCompiler,G as loadProgram,He as loaderSource,ge as programIndex,ye as readDiagnostics};
+`.replaceAll("@@IR_WASM@@",v)]]);P.set("std:Browser",Ne);P.set("std:JS",Ee);P.set("std:Web",Fe);P.set("std:Worker",Re);export{V as OPTIMIZE,P as PLATFORM_SOURCES,C as ROLE,z as TARGET,Y as builtModule,Qe as catalogStdlib,qe as compile,we as compileProgram,tn as formatDiagnostics,rn as glueSource,H as instantiate,De as loadCompiler,K as loadProgram,an as loaderSource,_e as programIndex,ve as readDiagnostics};

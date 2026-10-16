@@ -12,7 +12,18 @@ export function registerExamplesConformanceTests({ test, assertNoErrors, makeCom
   for (const file of utuFiles(path.join(ROOT, 'examples'))) {
     const name = path.relative(ROOT, file);
     test(`examples: ${name} analyses and emits valid Wasm`, async ({ ROOT }) => {
-      const analyzed = await (await makeCompiler({ ROOT, target: 'analysis' })).analyzeFile(file);
+      // Wutu programs are built by the self-hosted compiler alone (stage 0 refuses them).
+      const refusesWutu = (error) => String(error?.message ?? '').startsWith('Wutu templates are compiled by the self-hosted compiler');
+      let analyzed;
+      try {
+        analyzed = await (await makeCompiler({ ROOT, target: 'analysis' })).analyzeFile(file);
+      } catch (error) {
+        if (!refusesWutu(error)) throw error;
+      }
+      if (!analyzed || analyzed.artifacts?.diagnostics?.some(refusesWutu)) {
+        await buildWithSelfhost(file, name);
+        return;
+      }
       try {
         assertNoErrors(analyzed.doc);
       } catch (error) {
@@ -28,6 +39,15 @@ export function registerExamplesConformanceTests({ test, assertNoErrors, makeCom
       }
     });
   }
+}
+
+/** A Wutu program: the self-hosted compiler builds it without errors, and the engine accepts its module. */
+async function buildWithSelfhost(file, name) {
+  const { compileFile, loadNodeCompiler } = await import('../src/selfhost/node.js');
+  const result = await compileFile(await loadNodeCompiler(), file, { optimize: 'none' });
+  const errors = result.diagnostics.filter(d => d.severity !== 'warning');
+  if (!result.wasm || errors.length) throw new Error(`${name} (self-hosted): ${errors.map(d => d.message).join('; ')}`);
+  new WebAssembly.Module(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
 }
 
 function utuFiles(directory) {

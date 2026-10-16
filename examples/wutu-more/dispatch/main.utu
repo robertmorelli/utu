@@ -29,7 +29,7 @@ fn count(state: Board, stage: Str) Str {
 fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
     @wutu/\
     section.lane {
-        aria-label = $[label];
+        aria-label = label;
         background:var(--well);
         padding:1rem;
         border-radius:0.8rem;
@@ -45,7 +45,7 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                 = count(state, stage);
             }
         }
-        for $[state.cards filter |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()); }] |card| key $[card.id] {
+        for (state.cards filter |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()); }) |card| key card.id {
             article.card.stack {
                 background:var(--card);
                 padding:1.2rem;
@@ -62,8 +62,8 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                 }
                 div.bar {
                     button {
-                        id = $["move-" + card.id];
-                        aria-label = $["Move " + card.title];
+                        id = "move-" + card.id;
+                        aria-label = "Move " + card.title;
                         = if next == "doing" {
                             "Start →";
                         }
@@ -78,10 +78,10 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                         on click {
                             card.stage = next;
                             focus_after_render("move-" + card.id);
-                        };
+                        }
                     }
                     button {
-                        aria-label = $["Delete " + card.title];
+                        aria-label = "Delete " + card.title;
                         "×";
                         on click {
                             state.cards = state.cards filter |item| {
@@ -89,12 +89,12 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                             }
                             collect(Card);
                             focus_after_render("new-card");
-                        };
+                        }
                     }
                 }
             }
         }
-        if $[(state.cards count_where |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()); }) == 0] {
+        if (state.cards count_where |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()); }) == 0 {
             p.muted {
                 padding:1rem;
                 "Nothing here. A little breathing room.";
@@ -355,7 +355,7 @@ export main() void {
                     state.query = "";
                     title.focus();
                 };
-            };
+            }
         }
         div {
             display:grid;

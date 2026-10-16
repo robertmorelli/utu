@@ -631,6 +631,35 @@ fn template_value(e: I32, cx: Cx) void {
     let m = w_mark();
     let rt = check_expr(e, -1, cx);
     if ty_is(rt, Ty.Error) { return; };
+    to_str_of(rt, e, m, cx);
+}
+
+/// `wutu.show(x)`, what a Wutu text hole (`= x;`) becomes: a number or a
+/// Bool is its `to_str()`, a Str or a node is itself (as stage 0 lowers it).
+fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    if a < 0 or next_sibling(a) >= 0 {
+        report2(Diag.WrongArity, node, -1, 1, if args >= 0 { child_count(args); } else { 0; });
+        return error_value();
+    };
+    let m = w_mark();
+    let rt = check_expr(a, -1, cx);
+    if ty_is(rt, Ty.Error) { return rt; };
+    if not in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(rt)) { return rt; };
+    to_str_of(rt, a, m, cx);
+    prelude(Prelude.Str);
+}
+
+/// Whether `callee` is `wutu.show` (std:Wutu's).
+fn is_wutu_show(callee: I32) Bool {
+    if not is_kind(callee, Node.Field_expr) { return false; };
+    let base = first_child(callee);
+    is_kind(base, Node.Identifier) and word_text(word_of(base)) == "wutu" and decl_is(node_decl[base], Decl.Module)
+        and word_text(word_of(last_child(callee))) == "show";
+}
+
+/// The value of type rt (checked, its code from mark m) as `.to_str()`.
+fn to_str_of(rt: I32, e: I32, m: I32, cx: Cx) void {
     let word = known_word(Known.ToStr);
     if ty_is(rt, Ty.Nullable) {
         report2(Diag.NullableAccess, e, word, rt, -1);
@@ -745,6 +774,7 @@ fn check_let(node: I32, cx: Cx) I32 {
     // `let f = cl(e) void {…}; el.addEventListener("x", f);`: its first use as a host argument types it.
     if not annotated and is_kind(init, Node.Closure_expr) and has_foreign() { t = first_host_use(decl, node, cx); };
     if is_es(init) and annotated {
+        t = es_binding_type(t);
         decl_ty[decl] = t;
         es_import(decl, init, t);
         // (A binding of the import: nothing to run.)
@@ -795,8 +825,25 @@ vec decl_global: I32;
 
 fn global_type(decl: I32) I32 {
     let t = type_of(next_sibling(first_child(decl_node[decl])), 0);
+    if is_es(last_child(decl_node[decl])) { t = es_binding_type(t); };
     decl_ty[decl] = t;
     t;
+}
+
+/// An `@es` binding's type, each `fun(…)` parameter read as `cl(…)`:
+/// JavaScript calls either alike, and a closure is what utu code passes.
+fn es_binding_type(t: I32) I32 {
+    if not ty_is(t, Ty.Fun) { return t; };
+    let params = ty_a[t];
+    let funs = false;
+    for (0 ..< vl_len[params]) |i| { if ty_is(vl_item(params, i), Ty.Fun) { funs = true; }; };
+    if not funs { return t; };
+    let mark = vl_begin();
+    for (0 ..< vl_len[params]) |i| {
+        let p = vl_item(params, i);
+        vl_add(if ty_is(p, Ty.Fun) { ty(Ty.Closure, ty_a[p], ty_b[p]); } else { p; });
+    };
+    ty(Ty.Fun, vl_end(mark), ty_b[t]);
 }
 
 /// A function named as a value: a `fun`.
@@ -1107,6 +1154,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     // A DSL's splice is its expression.
     while (is_kind(callee, Node.Splice)) { callee = first_child(callee); };
     let m = w_mark();
+    if is_wutu_show(callee) { return check_wutu_show(node, args, cx); };
     if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx); };
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx); };
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx); };

@@ -774,6 +774,12 @@ mod wutu {
         let give: fun(Str, Externref) void = @es/\ (path,page)=>globalThis.__utuWutu.deliver(path,page) \/;
         give(path, page);
     }
+    /// A template's text hole (`= x;`): a number or a Bool shows as its
+    /// `to_str()`, a Str or a node as itself. The compiler picks which, by
+    /// x's type; this body is never what runs.
+    fn show(value: Externref) Externref {
+        value;
+    }
     fn route() Str {
         let call: fun() Str = @es/\ ()=>location.hash.slice(1)||"/" \/;
         call();

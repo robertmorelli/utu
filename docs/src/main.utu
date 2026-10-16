@@ -542,11 +542,11 @@ export main() void {
                     margin-inline: -1rem;
                     padding-inline: 1rem;
                 }
-                for $[links()] |link| key $[link.href] {
+                for links() |link| key link.href {
                     a {
-                        href = $["#" + link.href];
-                        class = $[if link.href == wutu.route() { "here"; } else { "elsewhere"; }];
-                        aria-current = $[if link.href == wutu.route() { "page"; } else { "false"; }];
+                        href = "#" + link.href;
+                        class = if link.href == wutu.route() { "here"; } else { "elsewhere"; };
+                        aria-current = if link.href == wutu.route() { "page"; } else { "false"; };
                         display:block;
                         padding:0.5rem 0.75rem;
                         text-decoration:none;
@@ -584,13 +584,13 @@ export main() void {
                     display: none;
                 }
                 a {
-                    href = $[ui.repo()];
+                    href = ui.repo();
                     "GitHub";
                 }
                 br {
                 }
                 a {
-                    href = $[ui.repo() + "/tree/main/docs"];
+                    href = ui.repo() + "/tree/main/docs";
                     "Markdown deep dives";
                 }
             }
@@ -611,7 +611,7 @@ export main() void {
                 p {
                     "This site is written in utu and compiled to WasmGC. ";
                     a {
-                        href = $[ui.repo() + "/tree/main/docs/src"];
+                        href = ui.repo() + "/tree/main/docs/src";
                         "Read its source";
                     }
                     ".";
@@ -619,7 +619,7 @@ export main() void {
                 p {
                     "MIT licensed. ";
                     a {
-                        href = $[ui.repo()];
+                        href = ui.repo();
                         "robertmorelli/utu";
                     }
                 }

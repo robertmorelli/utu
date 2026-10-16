@@ -29,7 +29,7 @@ mod ui {
             g {
                 transform = "translate(50 50) scale(0.06 -0.06) translate(-524.5 -206.5)";
                 path {
-                    d = $[ud_path()];
+                    d = ud_path();
                     fill = "#000000";
                 }
             }
@@ -42,7 +42,7 @@ mod ui {
         p.further {
             "Deep dive: ";
             a {
-                href = $[repo() + "/blob/main/" + path];
+                href = repo() + "/blob/main/" + path;
                 = label;
             }
         }

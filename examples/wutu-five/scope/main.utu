@@ -160,7 +160,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                 }
             }
         }
-        for $[state.lines] |line| key $[line.id] {
+        for state.lines |line| key line.id {
             article.line {
                 display:grid;
                 grid-template-columns:1fr auto;
@@ -190,7 +190,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     display:flex;
                     gap:0.6rem;
                     button {
-                        aria-label = $["Edit " + line.title];
+                        aria-label = "Edit " + line.title;
                         "Edit";
                         on click {
                             state.edit = line.id;
@@ -198,10 +198,10 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                             input("hours").value = line.hours.toString();
                             input("rate").value = (line.rate.to_f64() / 100.0).toString();
                             input("work").focus();
-                        };
+                        }
                     }
                     button {
-                        aria-label = $["Delete " + line.title];
+                        aria-label = "Delete " + line.title;
                         "Delete";
                         on click {
                             state.lines = state.lines filter |l| {
@@ -213,18 +213,18 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                             };
                             refresh(state);
                             restore_focus("work");
-                        };
+                        }
                     }
                 }
             }
         }
-        if $[state.lines.len() == 0] {
+        if state.lines.len() == 0 {
             p.empty {
                 "A blank canvas. Add your first work item to start the estimate.";
             }
         }
         a {
-            href = $[csv(state)];
+            href = csv(state);
             download = "project-estimate.csv";
             justify-self:start;
             color:var(--accent);
@@ -468,12 +468,12 @@ export main() void {
             "Project name";
             input as project {
                 id = "project";
-                .value = $[state.project];
+                .value = state.project;
                 maxlength = "160";
                 on input {
                     state.project = project.value;
                     refresh(state);
-                };
+                }
             }
         }
         div {
@@ -552,9 +552,9 @@ export main() void {
                             state.edit = "";
                             form.reset();
                             work.focus();
-                        };
+                        }
                     }
-                    on submit {
+                    on submit |event| {
                         event.preventDefault();
                         if work.value.trim().len()>0 {
                             if state.edit == "" {
@@ -580,7 +580,7 @@ export main() void {
                             form.reset();
                             work.focus();
                         };
-                    };
+                    }
                 }
                 p.muted {
                     font-size:0.8rem;

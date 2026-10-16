@@ -7,12 +7,12 @@ mod web {
         \\
         \\fn greeting(name: Str) Browser.HTMLElement {
         \\    @wutu/\
-        \\    section.greeting#hello {  /* tag.class#id makes an element */
-        \\        h2 {  /* a child element */
-        \\            "Hello, ";  /* a text node */
-        \\            = name;  /* text from an expression */
+        \\    section.greeting#hello {  // tag.class#id makes an element
+        \\        h2 {  // a child element
+        \\            "Hello, ";  // a text node
+        \\            = name;  // text from an expression
         \\        }
-        \\        p.note.quiet {  /* several classes */
+        \\        p.note.quiet {  // several classes
         \\            "Welcome back.";
         \\        }
         \\    }
@@ -31,18 +31,18 @@ mod web {
         \\    @wutu/\
         \\    figure {
         \\        canvas {
-        \\            width = "600";  /* attribute: the bitmap's resolution */
-        \\            width: 300px;  /* CSS: its size on the page */
+        \\            width = "600";  // attribute: the bitmap's resolution
+        \\            width: 300px;  // CSS: its size on the page
         \\            aria-label = "Sales";
         \\        }
         \\        input {
-        \\            hidden = $[done];  /* a boolean attribute, present when true */
-        \\            .value = $[draft];  /* a typed DOM property */
+        \\            hidden = done;  // a boolean attribute, present when true
+        \\            .value = draft;  // a typed DOM property
         \\        }
         \\        a {
         \\            href = "/about";
         \\            data-kind = "nav";
-        \\            color: rgb(30 60 120);  /* CSS declarations sit on their element */
+        \\            color: rgb(30 60 120);  // CSS declarations sit on their element
         \\            "About";
         \\        }
         \\    }
@@ -60,13 +60,13 @@ mod web {
         \\fn stats(user: Str, count: I32, ratio: F64) Browser.HTMLElement {
         \\    @wutu/\
         \\    p {
-        \\        title = $["Stats for " + user];  /* an attribute built from text */
+        \\        title = "Stats for " + user;  // an attribute built from text
         \\        "User ";
         \\        b { = user; }
         \\        " has ";
-        \\        = count.to_str();
+        \\        = count;                     // a number shows as its to_str
         \\        " items (";
-        \\        $[(ratio * 100.0).to_str()];  /* $[...] works as well as = */
+        \\        = ratio * 100.0;
         \\        "%). Escapes: \"quoted\" →";
         \\    }
         \\    \/;
@@ -88,13 +88,13 @@ mod web {
         \\    @wutu/\
         \\    article {
         \\        h2 { = plant.name; }
-        \\        button as toggle {  /* name the node: toggle */
+        \\        button as toggle {  // name the node: toggle
         \\            type = "button";
         \\            "Water me";
-        \\            @click=$[cl(event) void {       // a typed closure as the listener
+        \\            on click = cl(event) void {       // a typed closure as the listener
         \\                plant.watered = not plant.watered;
         \\                toggle.textContent = if plant.watered { "Watered"; } else { "Water me"; };
-        \\            }];
+        \\            };
         \\        }
         \\    }
         \\    \/;
@@ -119,14 +119,14 @@ mod web {
         \\    main {
         \\        button {
         \\            "Add one";
-        \\            on click {                      // `event` is in scope, typed
+        \\            on click |event| {                      // `event` is in scope, typed
         \\                state.n += 1;
         \\                state.last = event.type;
-        \\            };
+        \\            }
         \\        }
         \\        input {
         \\            placeholder = "Type";
-        \\            on keydown { state.last = event.key; };
+        \\            on keydown |event| { state.last = event.key; }
         \\        }
         \\        p { = `${state.n} clicks, last event: ${state.last}`; }
         \\    }
@@ -152,8 +152,8 @@ mod web {
         \\fn card(title: Str, body: Browser.HTMLElement) Browser.HTMLElement {
         \\    @wutu/\
         \\    article.card {
-        \\        h3 { = title; = badge("new"); }  /* a component is a function call */
-        \\        = body;  /* a slot is just a node parameter */
+        \\        h3 { = title; = badge("new"); }  // a component is a function call
+        \\        = body;  // a slot is just a node parameter
         \\    }
         \\    \/;
         \\}
@@ -172,9 +172,9 @@ mod web {
         \\fn status(stock: I32) Browser.HTMLElement {
         \\    @wutu/\
         \\    p {
-        \\        if $[stock == 0] {
+        \\        if stock == 0 {
         \\            b { "Sold out"; }
-        \\        } else if $[stock < 5] {
+        \\        } else if stock < 5 {
         \\            "Only ";
         \\            = stock.to_str();
         \\            " left";
@@ -196,9 +196,9 @@ mod web {
         \\fn ranking(names: Array[Str]) Browser.HTMLElement {
         \\    @wutu/\
         \\    ol {
-        \\        for $[names] |name, i| {  /* the index is a U64 */
+        \\        for names |name, i| {  // the index is a U64
         \\            li {
-        \\                data-rank = $[(i.to_i32() + 1).to_str()];
+        \\                data-rank = (i.to_i32() + 1).to_str();
         \\                = name;
         \\            }
         \\        }
@@ -209,7 +209,7 @@ mod web {
         \\fn long_words(words: Array[Str]) Browser.HTMLElement {
         \\    @wutu/\
         \\    ul {
-        \\        for $[words filter |w| { w.len() > 4; }] |w| {  /* a pipeline, no temporary array */
+        \\        for (words filter |w| { w.len() > 4; }) |w| {  // a pipeline, no temporary array
         \\            li { = w; }
         \\        }
         \\    }
@@ -241,14 +241,14 @@ mod web {
         \\    let app = @wutu/\
         \\    @reactive;
         \\    ul {
-        \\        for $[state.todos] |todo| key $[todo.id] {  /* identity follows the key */
+        \\        for state.todos |todo| key todo.id {  // identity follows the key
         \\            li {
         \\                = todo.title;
         \\                button {
         \\                    "Done";
         \\                    on click {
         \\                        state.todos = state.todos filter |t| { t.id != todo.id; } collect(Todo);
-        \\                    };
+        \\                    }
         \\                }
         \\            }
         \\        }
@@ -279,7 +279,7 @@ mod web {
         \\        input { type = "number"; bind:number = order.amount; }
         \\        p {
         \\            = `${order.amount} for ${order.name}`;
-        \\            if $[order.gift] { " (wrapped)"; }
+        \\            if order.gift { " (wrapped)"; }
         \\        }
         \\    }
         \\    \/;
@@ -326,7 +326,7 @@ mod web {
         \\        textarea { bind:value = draft.text; }
         \\        button {
         \\            "Save";
-        \\            on click { wutu.save("draft-v1"); };
+        \\            on click { wutu.save("draft-v1"); }
         \\        }
         \\    }
         \\    \/;
@@ -339,7 +339,7 @@ mod web {
         \\
         \\export main() void {
         \\    let app = @wutu/\
-        \\    @document {  /* document-level CSS, before the root */
+        \\    @document {  // document-level CSS, before the root
         \\        :root { --accent: oklch(65% 0.15 60); }
         \\        body { margin: 0; font: 1rem system-ui; }
         \\        @keyframes pop { from { scale: 0.9; } to { scale: 1; } }
@@ -365,11 +365,11 @@ mod web {
         \\    nav {
         \\        display: flex;
         \\        gap: 1rem;
-        \\        # a media query, at the element it changes
+        \\        // a media query, at the element it changes
         \\        @media (width < 40rem) {
         \\            flex-direction: column;
         \\        }
-        \\        # a scoped selector rule, for relations like siblings
+        \\        // a scoped selector rule, for relations like siblings
         \\        @ & > a + a {
         \\            border-left: 1px solid gray;
         \\        }
@@ -395,13 +395,13 @@ mod web {
         \\fn meter(progress: I32, hue: I32) Browser.HTMLElement {
         \\    @wutu/\
         \\    div.bar {
-        \\        height: 0.5rem;  /* static: compiled to a shared class */
+        \\        height: 0.5rem;  // static: compiled to a shared class
         \\        background: lightgray;
         \\        i {
         \\            display: block;
         \\            height: 100%;
-        \\            width: $[progress.to_str() + "%"];  /* computed at render */
-        \\            background: $["hsl(" + hue.to_str() + " 70% 50%)"];
+        \\            width: = progress.to_str() + "%";  // computed at render
+        \\            background: = "hsl(" + hue.to_str() + " 70% 50%)";
         \\        }
         \\    }
         \\    \/;
@@ -425,7 +425,7 @@ mod web {
         \\
         \\export main() void {
         \\    let app = @wutu/\
-        \\    @style $[sheet()];  /* install any stylesheet, once */
+        \\    @style sheet();  // install any stylesheet, once
         \\    div {
         \\        class = "card";
         \\        "Styled by a plain CSS class";
@@ -445,11 +445,11 @@ mod web {
         \\        output as result { "Nothing yet"; }
         \\        button {
         \\            "Search";
-        \\            @click=$[cl(event) void {
+        \\            on click = cl(event) void {
         \\                event.preventDefault();
         \\                result.textContent = "Looking for " + query.value;   // query is an HTMLInputElement
         \\                query.focus();
-        \\            }];
+        \\            };
         \\        }
         \\    }
         \\    \/;
@@ -471,7 +471,7 @@ mod web {
         \\            a { href = "#/"; "Home"; }
         \\            a { href = "#/about"; "About"; }
         \\        }
-        \\        if $[wutu.route() == "/about"] {  /* the hash path; changes re-render */
+        \\        if wutu.route() == "/about" {  // the hash path; changes re-render
         \\            h1 { "About"; }
         \\        } else {
         \\            h1 { "Home"; }
@@ -491,7 +491,7 @@ mod web {
         \\fn clock(c: Clock) Browser.HTMLElement {
         \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1; });
         \\    @wutu/\
-        \\    @island "clock";  /* updates on its own */
+        \\    @island "clock";  // updates on its own
         \\    p { = `${c.ticks} seconds`; }
         \\    \/;
         \\}
@@ -507,7 +507,7 @@ mod web {
         \\            on click {
         \\                c.ticks = 0;
         \\                wutu.invalidate("clock");           // refresh the island from outside
-        \\            };
+        \\            }
         \\        }
         \\    }
         \\    \/;
@@ -525,7 +525,7 @@ mod web {
         \\    }
         \\    main {
         \\        p.note {
-        \\            color: seagreen;        /* written here, so it wins */
+        \\            color: seagreen;        // written here, so it wins
         \\            "green, with the document's padding";
         \\        }
         \\    }
@@ -545,14 +545,14 @@ mod web {
         \\            data-kind = "chart";
         \\            on mount {
         \\                chart.append(Browser.document.createTextNode("drawn by JavaScript"));
-        \\            };
+        \\            }
         \\        }
         \\        div as list {
         \\            height: 6rem;
         \\            overflow: auto;
         \\            on scroll {
         \\                chart.title = list.className;   // quiet: only elements change
-        \\            };
+        \\            }
         \\        }
         \\    }
         \\    \/);
@@ -570,8 +570,8 @@ mod web {
         \\            a { href = "#/"; "Home"; }
         \\            a { href = "#/guide"; "Guide"; }
         \\        }
-        \\        if $[wutu.route() == "/guide"] {
-        \\            = wutu.lazy("./guide.utu");    /* its own chunk */
+        \\        if wutu.route() == "/guide" {
+        \\            = wutu.lazy("./guide.utu");    // its own chunk
         \\        } else {
         \\            p { "Welcome."; }
         \\        }
@@ -608,13 +608,9 @@ mod web {
                 }
                 " alone never silently makes a div. Leaf statements end with a semicolon; blocks do not. ";
                 code {
-                    "# ";
+                    "//";
                 }
-                " first on a line starts a comment; at the end of a line, use ";
-                code {
-                    "/* … */";
-                }
-                ". Any other # is text, so hex colors just work.";
+                " starts a comment, as in utu; # is always text, so hex colors just work.";
             }
             = code.block(hello_sample());
             h2 {
@@ -637,7 +633,18 @@ mod web {
             }
             = code.block(namespaces_sample());
             h2 {
-                "Text and interpolation";
+                "Text, numbers, and expressions";
+            }
+            p {
+                "An expression stands on its own: ";
+                code {
+                    "= state.count;";
+                }
+                " shows a number, ";
+                code {
+                    "if done { … }";
+                }
+                " takes a condition as written. Wrap one with braces or captures of its own in parentheses.";
             }
             = code.block(text_sample());
             h2 {
@@ -645,17 +652,21 @@ mod web {
             }
             p {
                 code {
-                    "@click=$[cl(event) void { ... }];";
+                    "on click |e| { ... }";
                 }
-                " attaches a closure; ";
+                " runs a block with the event as ";
                 code {
-                    "on click { ... };";
+                    "e";
                 }
-                " is the short form with an implicit typed ";
+                ", typed as the DOM types it (a MouseEvent); leave out ";
                 code {
-                    "event";
+                    "|e|";
                 }
-                ". String handlers are rejected.";
+                " when it is not needed. ";
+                code {
+                    "on click = handler;";
+                }
+                " takes a closure value. String handlers are rejected.";
             }
             = code.block(events_closure_sample());
             = code.block(events_on_sample());
@@ -688,7 +699,19 @@ mod web {
                 code {
                     "bind:number";
                 }
-                " connect controls to fields both ways.";
+                " connect controls to fields both ways, and ";
+                code {
+                    "bind:group";
+                }
+                ", ";
+                code {
+                    "bind:values";
+                }
+                ", and ";
+                code {
+                    "bind:files";
+                }
+                " cover radio groups, multiple selects, and file inputs.";
             }
             = code.block(bind_sample());
             h2 {
@@ -708,7 +731,7 @@ mod web {
             p {
                 "Static declarations become shared classes; ";
                 code {
-                    "$[...]";
+                    "prop: = expr;";
                 }
                 " values are set at render. ";
                 code {

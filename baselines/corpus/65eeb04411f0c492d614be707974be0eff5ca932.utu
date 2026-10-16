@@ -1,2 +1,2 @@
 using Browser from std:Browser;
-export main() Browser.HTMLElement { @wutu/\ div { p as x { "a"; } p as x { "b"; } button { @click=$[cl(e) void { x.focus(); }]; } } \/; }
+export main() Browser.HTMLElement { @wutu/\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) void { x.focus(); }; } } \/; }

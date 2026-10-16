@@ -28,14 +28,14 @@ fn workspace(state: GroveState) Browser.HTMLElement {
                 bind:value = state.date;
             }
         }
-        if $[state.date.len()!=10] {
+        if state.date.len()!=10 {
             p {
                 role = "status";
                 "Choose a date to continue.";
             }
         }
         div.grid {
-            for $[state.plants] |plant| key $[plant.id] {
+            for state.plants |plant| key plant.id {
                 article.panel.stack {
                     p.eyebrow {
                         = if days(plant.watered,state.date)>=plant.interval {
@@ -55,13 +55,13 @@ fn workspace(state: GroveState) Browser.HTMLElement {
                         = "Check roughly every "+wutu.number(plant.interval)+" days. Let the soil guide you.";
                     }
                     button.primary {
-                        disabled = $[state.date.len()!=10];
-                        aria-label = $["Watered "+plant.name];
+                        disabled = state.date.len()!=10;
+                        aria-label = "Watered "+plant.name;
                         "Watered today ✓";
                         on click {
                             plant.watered=state.date;
                             wutu.save("grove-v2");
-                        };
+                        }
                     }
                 }
             }
@@ -98,7 +98,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "grove";
         nav {

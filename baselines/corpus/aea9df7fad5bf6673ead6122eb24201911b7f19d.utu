@@ -46,8 +46,8 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 "seconds remaining";
             }
             progress {
-                max = $[wutu.number(state.duration)];
-                value = $[wutu.number(state.duration-state.remaining)];
+                max = wutu.number(state.duration);
+                value = wutu.number(state.duration-state.remaining);
             }
             div.bar {
                 justify-content:center;
@@ -63,14 +63,14 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                             state.remaining=state.duration;
                         };
                         state.running=not state.running;
-                    };
+                    }
                 }
                 button {
                     "Reset";
                     on click {
                         state.running=false;
                         state.remaining=state.duration;
-                    };
+                    }
                 }
             }
         }
@@ -79,24 +79,24 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 = "Interval length: "+wutu.number(state.duration)+" seconds";
             }
             button {
-                disabled = $[state.duration<=15];
+                disabled = state.duration<=15;
                 "− 15 seconds";
                 on click {
                     state.duration-=15;
                     state.remaining=state.duration;
                     state.running=false;
                     wutu.save("tempo-v2");
-                };
+                }
             }
             button {
-                disabled = $[state.duration>=3600];
+                disabled = state.duration>=3600;
                 "+ 15 seconds";
                 on click {
                     state.duration+=15;
                     state.remaining=state.duration;
                     state.running=false;
                     wutu.save("tempo-v2");
-                };
+                }
             }
         }
         a {
@@ -117,7 +117,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "tempo";
         nav {
@@ -144,7 +144,7 @@ export main() void {
                 "A small interval timer for focused practice, movement, or a quiet pause. Choose a duration and take one interval at a time.";
             }
         }
-        if $[wutu.route()=="/about"] {
+        if wutu.route()=="/about" {
             section.panel.stack {
                 h2 {
                     "A quieter kind of timer";

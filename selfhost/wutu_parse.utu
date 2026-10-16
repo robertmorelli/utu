@@ -45,7 +45,8 @@ vec ti_a: I32;
 vec ti_b: I32;
 /// CSS: its scoped form (a word)
 vec ti_c: I32;
-/// Attribute: 1 property, 2 dynamic; event: 1 shorthand.
+/// Attribute: 1 property, 2 dynamic; event: 1 shorthand, 4 quiet. (An
+/// event's ti_c is its `|e|` parameter's word, or -1.)
 vec ti_flags: I32;
 /// Its range, or -1.
 vec ti_from: I32;
@@ -276,29 +277,21 @@ fn wp_keyword(text: Str, word: Str) Bool {
     text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()));
 }
 
-/// What a `# ` after code on its line says.
-fn trailing_hash_text() Str { "a # comment goes on a line of its own; at the end of a line, use /* … */"; }
+/// Whether offset p starts the text or follows a blank (a `//` there is a
+/// comment, not `url(http://…)`).
+fn wp_after_blank(text: Str, p: I32) Bool { p == 0 or is_space_code(text.get(p - 1)); }
 
-/// Whether only blanks precede offset p on its line.
-fn wp_line_start(text: Str, p: I32) Bool {
-    let i = p - 1;
-    while (i >= 0 and text.get(i) != 10) {
-        if text.get(i) != 32 and text.get(i) != 9 { return false; };
-        i -= 1;
-    };
-    true;
-}
-
-/// Whitespace, `# ` comment lines (a `#` first on its line, then a blank), and CSS comments.
+/// Whitespace, `//` comments (first on a line or after a blank), and CSS comments.
 fn wp_trivia(text: Str) void {
     while (wp_at[0] < text.len()) {
         let p = wp_at[0];
         let c = text.get(p);
         if is_space_code(c) {
             wp_at[0] += 1;
-        } else if c == 35 and (p + 1 >= text.len() or is_space_code(text.get(p + 1))) {
-            if not wp_line_start(text, p) { wutu_fail(trailing_hash_text(), p); };
+        } else if text_at(text, p, "//") and wp_after_blank(text, p) {
             wp_skip_line(text);
+        } else if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) {
+            wutu_fail("Wutu comments are written // …", p);
         } else if text_at(text, p, "/*") {
             let end = text_index(text, "*/", p + 2);
             if end < 0 { wutu_fail("unterminated comment", p); };
@@ -421,39 +414,74 @@ fn wp_bare_expression(text: Str) Str {
 }
 
 /// `$[expression]`.
-fn wp_interpolation(text: Str) Str {
-    let open = wp_at[0];
-    wp_at[0] += 2;
+/// An expression up to the first top-level character in `ends` (not
+/// consumed): `if cond {`, `for items |item|`, `key item.id {`. Braces or
+/// pipes of its own go in parentheses.
+fn wp_expression_until(text: Str, ends: Str, what: Str) Str {
+    wp_trivia(text);
+    if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
     let start = wp_at[0];
-    let depth = 1;
+    let depth = 0;
     while (not wp_done(text)) {
         if not wp_opaque(text) {
             let c = text.get(wp_at[0]);
-            if c == 91 { depth += 1; }
-            else if c == 93 {
+            if depth == 0 and text_index(ends, Str.from_code_point(c), 0) >= 0 {
+                let source = trim_end(text.slice(start, wp_at[0]));
+                if source.len() == 0 { wutu_fail("expected " + what, wp_at[0]); };
+                wx_from[0] = start;
+                wx_to[0] = start + source.len();
+                return source;
+            };
+            if c == 40 or c == 91 or c == 123 { depth += 1; }
+            else if c == 41 or c == 93 or c == 125 {
+                if depth == 0 { wutu_fail("expected " + what, wp_at[0]); };
                 depth -= 1;
-                if depth == 0 {
-                    wx_from[0] = start;
-                    wx_to[0] = wp_at[0];
-                    wp_at[0] += 1;
-                    return text.slice(start, wx_to[0]);
-                };
             };
             wp_at[0] += 1;
         };
     };
-    wutu_fail("unterminated interpolation", open);
+    wutu_fail("unterminated " + what, start);
     "";
 }
 
-fn wp_expression(text: Str) Str {
-    if wp_char(text) == 61 {
-        wp_at[0] += 1;
-        return wp_bare_expression(text);
+/// A `for` iterable (its range in wx_from/wx_to) without parentheses that
+/// only hide its pipeline's captures: `(xs filter |x| { … })` is
+/// `xs filter |x| { … }`, and the loop's body continues that pipeline.
+/// Parentheses around a finished pipeline (one ending in a terminal, like
+/// sort) or a range (`(0..<n)`) stay.
+fn unparenthesized(source: Str) Str {
+    let n = source.len();
+    if n < 2 or source.get(0) != 40 or source.get(n - 1) != 41 { return source; };
+    let depth = 0;
+    let last = "";
+    let i = 0;
+    while (i < n) {
+        let c = source.get(i);
+        let before = if i > 0 { source.get(i - 1); } else { 32; };
+        if c == 34 {
+            i += 1;
+            while (i < n and source.get(i) != 34) { i += if source.get(i) == 92 { 2; } else { 1; }; };
+        } else if c == 40 or c == 91 or c == 123 {
+            depth += 1;
+        } else if c == 41 or c == 93 or c == 125 {
+            depth -= 1;
+            if depth == 0 and i < n - 1 { return source; };
+        } else if depth == 1 and ((c >= 97 and c <= 122) or c == 95) and not is_word_code(before) and before != 46 {
+            let w = i;
+            while (i + 1 < n and is_word_code(source.get(i + 1))) { i += 1; };
+            let word = source.slice(w, i + 1);
+            if in_words("fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", word) or in_words("map filter skip take skip_while take_while scan zip chain flat_map repeat", word) { last = word; };
+        };
+        i += 1;
     };
-    if wp_at_text(text, "$[") { return wp_interpolation(text); };
-    wutu_fail("expected = expression; or $[expression]", wp_at[0]);
-    "";
+    if last.len() == 0 or in_words("fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", last) { return source; };
+    wx_from[0] += 1;
+    wx_to[0] -= 1;
+    trim_text(source.slice(1, n - 1));
+}
+
+fn wp_fail_interpolation(text: Str) void {
+    wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr; for text, name = expr; for an attribute, if cond {, prop: = expr;)", wp_at[0]);
 }
 
 /// A brace-delimited Utu block, with its braces.
@@ -495,31 +523,40 @@ fn wp_css_until(text: Str, delimiters: Str) Str {
 }
 
 /// The body of a `{ … }` CSS block (cursor on the brace), without its braces.
+/// A `{ … }` CSS block's body (the cursor on its brace), without its `//`
+/// comments (CSS has none; `url(http://…)` is not one: a comment starts first
+/// on a line or after a blank, outside parentheses).
 fn wp_css_block(text: Str) Str {
     let open = wp_at[0];
     wp_at[0] += 1;
     let start = wp_at[0];
+    let body = "";
     let depth = 1;
+    let parens = 0;
     while (not wp_done(text)) {
+        let p = wp_at[0];
         if wp_at_text(text, "/*") {
-            let end = text_index(text, "*/", wp_at[0] + 2);
-            if end < 0 { wutu_fail("unterminated CSS comment", wp_at[0]); };
+            let end = text_index(text, "*/", p + 2);
+            if end < 0 { wutu_fail("unterminated CSS comment", p); };
             wp_at[0] = end + 2;
+        } else if text_at(text, p, "//") and parens == 0 and wp_after_blank(text, p) {
+            body = body + text.slice(start, p);
+            wp_skip_line(text);
+            start = wp_at[0];
         } else {
-            let c = text.get(wp_at[0]);
+            let c = text.get(p);
             if c == 34 or c == 39 { wp_quoted(text); }
             else {
-                if c == 35 and wp_at[0] + 1 < text.len() and (text.get(wp_at[0] + 1) == 32 or text.get(wp_at[0] + 1) == 9) and not wp_line_start(text, wp_at[0]) {
-                    wutu_fail(trailing_hash_text(), wp_at[0]);
-                };
+                if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) { wutu_fail("Wutu comments are written // …", p); };
+                if c == 40 { parens += 1; } else if c == 41 { parens -= 1; };
                 if c == 123 { depth += 1; };
                 if c == 125 {
-                    let before = trim_end(without_css_comments(text.slice(start - 1, wp_at[0])));
-                    let last = if before.len() > 0 { before.get(before.len() - 1); } else { -1; };
-                    if not (last == 59 or last == 123 or last == 125) { wutu_fail("CSS declarations require a semicolon", wp_at[0]); };
+                    let before = trim_end(without_css_comments(body + text.slice(start, p)));
+                    let last = if before.len() > 0 { before.get(before.len() - 1); } else { 59; };
+                    if not (last == 59 or last == 123 or last == 125) { wutu_fail("CSS declarations require a semicolon", p); };
                     depth -= 1;
                     if depth == 0 {
-                        let block = text.slice(start, wp_at[0]);
+                        let block = body + text.slice(start, p);
                         wp_at[0] += 1;
                         return block;
                     };
@@ -573,7 +610,8 @@ fn parse_template(text: Str) I32 {
     while (wp_at_text(text, "@style")) {
         wp_at[0] += 6;
         wp_trivia(text);
-        let source = wp_expression(text);
+        if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+        let source = wp_bare_expression(text);
         let from = wx_from[0];
         let to = wx_to[0];
         wp_semicolon(text);
@@ -607,8 +645,10 @@ fn parse_tnode(text: Str) I32 {
         tn_text[n] = intern_text(expr);
         return n;
     };
-    if wp_char(text) == 61 or wp_at_text(text, "$[") {
-        let source = wp_expression(text);
+    if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+    if wp_char(text) == 61 {
+        wp_at[0] += 1;
+        let source = wp_bare_expression(text);
         let from = wx_from[0];
         let to = wx_to[0];
         wp_semicolon(text);
@@ -646,8 +686,7 @@ fn parse_branch(text: Str, n: I32, otherwise: Bool) void {
 fn parse_tif(text: Str) I32 {
     let start = wp_at[0];
     wp_at[0] += 2;
-    wp_trivia(text);
-    let condition = wp_expression(text);
+    let condition = wp_expression_until(text, "{", "a condition before {");
     let n = new_tnode(2, start);
     tn_text[n] = intern_text(condition);
     tn_from[n] = wx_from[0];
@@ -677,8 +716,9 @@ fn parse_tif(text: Str) I32 {
 fn parse_tfor(text: Str) I32 {
     let start = wp_at[0];
     wp_at[0] += 3;
-    wp_trivia(text);
-    let iterable = wp_expression(text);
+    // (The loop's body joins the iterable's pipeline: parentheses that only
+    // hide its own `|…|` go.)
+    let iterable = unparenthesized(wp_expression_until(text, "|", "what to iterate, then |item|"));
     let n = new_tnode(3, start);
     tn_text[n] = intern_text(iterable);
     tn_from[n] = wx_from[0];
@@ -697,7 +737,7 @@ fn parse_tfor(text: Str) I32 {
             wp_trivia(text);
             tn_global[n] = 1;
         };
-        tn_key[n] = intern_text(wp_expression(text));
+        tn_key[n] = intern_text(wp_expression_until(text, "{", "a key before {"));
         tn_key_from[n] = wx_from[0];
         tn_key_to[n] = wx_to[0];
     };
@@ -805,14 +845,18 @@ fn parse_element_statement(text: Str, n: I32) void {
         wp_at[0] += 1;
         return;
     };
-    if c == 34 or c == 61 or wp_at_text(text, "$[") or wp_keyword(text, "if") or wp_keyword(text, "for") {
+    if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+    if c == 34 or c == 61 or wp_keyword(text, "if") or wp_keyword(text, "for") {
         add_child(n, parse_tnode(text));
         return;
     };
-    // bind:value|checked|number =
+    // bind:value|checked|number|group|values|files =
     if text_at(text, p, "bind:") {
         let q = p + 5;
-        let property = if text_at(text, q, "value") { "value"; } else if text_at(text, q, "checked") { "checked"; } else if text_at(text, q, "number") { "number"; } else { ""; };
+        let property = "";
+        for (["value", "checked", "number", "group", "values", "files"]) |candidate| {
+            if property.len() == 0 and text_at(text, q, candidate) and not (q + candidate.len() < text.len() and is_name_code(text.get(q + candidate.len()))) { property = candidate; };
+        };
         if property.len() > 0 {
             let r = skip_spaces(text, q + property.len());
             if r < text.len() and text.get(r) == 61 {
@@ -826,23 +870,42 @@ fn parse_element_statement(text: Str, n: I32) void {
             };
         };
     };
-    // on name { … }
+    // on name [quiet] [|e|] { … }, or on name [quiet] = handler;
     if text_at(text, p, "on") and p + 2 < text.len() and is_space_code(text.get(p + 2)) {
         let q = skip_spaces(text, p + 2);
         let a = q;
         while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
         let r = skip_spaces(text, q);
-        // `on name quiet { … }`: no render follows it (flag 4).
-        let quiet = text_at(text, r, "quiet") and r + 5 < text.len() and (is_space_code(text.get(r + 5)) or text.get(r + 5) == 123);
+        let quiet = text_at(text, r, "quiet") and r + 5 < text.len() and not is_name_code(text.get(r + 5));
         if quiet { r = skip_spaces(text, r + 5); };
-        if q > a and r < text.len() and text.get(r) == 123 {
+        let param = -1;
+        if r < text.len() and text.get(r) == 124 {
+            let b = skip_spaces(text, r + 1);
+            let e = b;
+            while (e < text.len() and is_word_code(text.get(e))) { e += 1; };
+            let close = skip_spaces(text, e);
+            if e > b and close < text.len() and text.get(close) == 124 {
+                param = intern_text(text.slice(b, e));
+                r = skip_spaces(text, close + 1);
+            };
+        };
+        if q > a and r < text.len() and (text.get(r) == 123 or text.get(r) == 61) {
             let name = text.slice(a, q);
+            let flags = if quiet { 4; } else { 0; };
+            if text.get(r) == 61 {
+                if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) void { … };", r); };
+                wp_at[0] = r + 1;
+                let source = wp_bare_expression(text);
+                let from = wx_from[0];
+                let to = wx_to[0];
+                wp_semicolon(text);
+                add_item(n, 2, intern_text(name), intern_text(source), flags, from, to, p);
+                return;
+            };
             wp_at[0] = r;
             let source = wp_utu_block(text);
-            let from = wx_from[0];
-            let to = wx_to[0];
-            wp_semicolon(text);
-            add_item(n, 2, intern_text(name), intern_text(source), 1 + (if quiet { 4; } else { 0; }), from, to, p);
+            let i = add_item(n, 2, intern_text(name), intern_text(source), 1 + flags, wx_from[0], wx_to[0], p);
+            ti_c[i] = param;
             return;
         };
     };
@@ -858,17 +921,18 @@ fn parse_element_statement(text: Str, n: I32) void {
         };
     };
     if c == 64 and event_head(text, p) {
-        wp_at[0] += 1;
-        parse_attribute_or_event(text, n, 2);
-        return;
+        let q = p + 1;
+        while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+        let name = text.slice(p + 1, q);
+        wutu_fail("events are written on " + name + " = handler; (or on " + name + " { … })", p);
     };
     if c == 46 and assignment_head(text, p + 1, false) {
         wp_at[0] += 1;
-        parse_attribute_or_event(text, n, 1);
+        parse_attribute(text, n, true);
         return;
     };
     if c >= 97 and c <= 122 and assignment_head(text, p, true) {
-        parse_attribute_or_event(text, n, 0);
+        parse_attribute(text, n, false);
         return;
     };
     if c == 58 or c == 64 or c == 38 {
@@ -911,15 +975,37 @@ fn old_attribute_text(text: Str, p: I32) Str {
     "attributes are written without '<': " + spelled + " = value; (or " + spelled + "; for a boolean attribute)";
 }
 
-/// `name = value;` or `name;` (kind 0, an attribute), `.name = value;` (1, a
-/// property), or `@event = handler;` (2); the cursor is on the name.
-fn parse_attribute_or_event(text: Str, n: I32, kind: I32) void {
-    let is_event = kind == 2;
-    let is_property = kind == 1;
+/// `"text" name…`: a string, then (no operator) another statement: a forgotten `;`.
+fn literal_then_name(text: Str, q: I32) void {
+    if q >= text.len() or text.get(q) != 34 { return; };
+    let i = q + 1;
+    while (i < text.len() and text.get(i) != 34 and text.get(i) != 10) { i += if text.get(i) == 92 { 2; } else { 1; }; };
+    if i >= text.len() or text.get(i) != 34 { return; };
+    let w = skip_spaces(text, i + 1);
+    let e = w;
+    while (e < text.len() and is_name_code(text.get(e))) { e += 1; };
+    if e > w and not (text.get(w) >= 48 and text.get(w) <= 57) and not in_words("and or not orelse", text.slice(w, e)) {
+        wutu_fail("expected ; after Wutu statement", i + 1);
+    };
+}
+
+/// Whether a string literal at q is the whole value: `"…"` then `;`.
+fn literal_value(text: Str, q: I32) Bool {
+    if q >= text.len() or text.get(q) != 34 { return false; };
+    let i = q + 1;
+    while (i < text.len() and text.get(i) != 34 and text.get(i) != 10) { i += if text.get(i) == 92 { 2; } else { 1; }; };
+    if i >= text.len() or text.get(i) != 34 { return false; };
+    let after = skip_spaces(text, i + 1);
+    after < text.len() and text.get(after) == 59;
+}
+
+/// `name = value;` or `name;` (an attribute), `.name = value;` (a property);
+/// the cursor is on the name. A value that is one string literal is written
+/// into the element; anything else is an expression.
+fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     let name_start = wp_at[0];
     let q = name_start;
     while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
-    if q == name_start { wutu_fail("expected attribute/event name", name_start); };
     let name = text.slice(name_start, q);
     wp_at[0] = q;
     wp_trivia(text);
@@ -930,31 +1016,22 @@ fn parse_attribute_or_event(text: Str, n: I32, kind: I32) void {
     if wp_char(text) == 61 {
         wp_at[0] += 1;
         wp_trivia(text);
-        if wp_char(text) == 34 {
-            // A quoted value is the whole attribute.
+        if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+        if literal_value(text, wp_at[0]) {
             value = wp_quoted(text);
-            let value_end = wp_at[0];
-            wp_trivia(text);
-            let after = wp_char(text);
-            if after == 43 or after == 46 { wutu_fail("expected ; after quoted attribute value; build computed values with $[...]", value_end); };
-            wp_at[0] = value_end;
         } else {
-            value = if wp_at_text(text, "$[") { wp_interpolation(text); } else { wp_bare_expression(text); };
+            literal_then_name(text, wp_at[0]);
+            value = wp_bare_expression(text);
             dynamic = true;
             from = wx_from[0];
             to = wx_to[0];
         };
-    } else if is_event or is_property {
-        wutu_fail("events and properties require a value", wp_at[0]);
+    } else if is_property {
+        wutu_fail("a property takes a value: .name = value;", wp_at[0]);
     };
     wp_semicolon(text);
     let tag = word_text(tn_text[n]);
-    if is_event {
-        if not dynamic { wutu_fail("event handlers take a closure: @" + name + "=$[cl(event) void { ... }];", name_start); };
-        add_item(n, 2, intern_text(name), intern_text(value), 0, from, to, name_start);
-        return;
-    };
-    if text_at(name, 0, "on") { wutu_fail("use @event=$[closure] for events", name_start); };
+    if text_at(name, 0, "on") { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start); };
     if not is_property and not is_allowed_attribute(tag, name) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);
 }
@@ -996,14 +1073,14 @@ fn parse_declaration_or_child(text: Str, n: I32) void {
     };
     wp_at[0] += 1;
     wp_trivia(text);
-    if wp_at_text(text, "$[") {
-        // `width: $[expression];`: applied with style.setProperty at render.
-        let source = wp_interpolation(text);
+    if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+    if wp_char(text) == 61 {
+        // `width: = expression;`: applied with style.setProperty at render.
+        wp_at[0] += 1;
+        let source = wp_bare_expression(text);
         let from = wx_from[0];
         let to = wx_to[0];
-        wp_trivia(text);
-        if wp_char(text) != 59 { wutu_fail("CSS declarations require a semicolon", wp_at[0]); };
-        wp_at[0] += 1;
+        wp_semicolon(text);
         if not is_css_property(head) { wutu_fail("invalid CSS property", start); };
         add_item(n, 5, intern_text(trim_text(head)), intern_text(source), 0, from, to, start);
         return;

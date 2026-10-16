@@ -125,7 +125,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
             = number(visible.len());
             " stops in this view. Costs are your own estimates.";
         }
-        for $[visible] |stop| key $[stop.id] {
+        for visible |stop| key stop.id {
             article.stop {
                 display:grid;
                 grid-template-columns:auto 1fr auto;
@@ -167,8 +167,8 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                         grid-column: 2;
                     }
                     button {
-                        id = $["stop-" + stop.id];
-                        aria-pressed = $[if stop.done { "true"; } else { "false"; }];
+                        id = "stop-" + stop.id;
+                        aria-pressed = if stop.done { "true"; } else { "false"; };
                         = if stop.done {
                             "Visited ✓";
                         }
@@ -179,10 +179,10 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                             stop.done = not stop.done;
                             refresh(state);
                             restore_focus("stop-" + stop.id);
-                        };
+                        }
                     }
                     button {
-                        aria-label = $["Remove " + stop.title];
+                        aria-label = "Remove " + stop.title;
                         "×";
                         on click {
                             state.stops = state.stops filter |s| {
@@ -191,12 +191,12 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                             collect(Stop);
                             refresh(state);
                             restore_focus("place");
-                        };
+                        }
                     }
                 }
             }
         }
-        if $[visible.len() == 0] {
+        if visible.len() == 0 {
             p.empty {
                 "A little room for serendipity. Add your first stop for this day.";
             }
@@ -507,7 +507,7 @@ export main() void {
                             }
                             on change {
                                 state.day = day_filter.value;
-                            };
+                            }
                         }
                     }
                 }
@@ -572,7 +572,7 @@ export main() void {
                         type = "submit";
                         "Add to the journey ↗";
                     }
-                    on submit {
+                    on submit |event| {
                         event.preventDefault();
                         if place.value.trim().len()>0 {
                             let d = if day.value == "1" {
@@ -598,7 +598,7 @@ export main() void {
                             form.reset();
                             place.focus();
                         };
-                    };
+                    }
                 }
             }
         }

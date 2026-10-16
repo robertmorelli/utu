@@ -15,14 +15,14 @@ mod view {
             span { = "tick " + ui.w.tick.to_str(); }
             span { = "power " + ui.w.satisfaction.to_str(); }
             button {
-                class = $[if ui.speed == 0 { "active"; } else { ""; }];
+                class = if ui.speed == 0 { "active"; } else { ""; };
                 "Pause";
-                on click { ui.speed = 0; };
+                on click { ui.speed = 0; }
             }
             button {
-                class = $[if ui.speed == 1 { "active"; } else { ""; }];
+                class = if ui.speed == 1 { "active"; } else { ""; };
                 "1×";
-                on click { ui.speed = 1; };
+                on click { ui.speed = 1; }
             }
         }
         \/;
@@ -32,13 +32,13 @@ mod view {
         @wutu/\
         @island "inspector";
         aside.inspector {
-            if $[ui.selected > 0] {
+            if ui.selected > 0 {
                 section.panel {
                     div.panel-head { h3 { = "Entity " + ui.selected.to_str(); } }
                     div.panel-body {
                         div.row {
                             span { "Progress"; }
-                            div.bar { i { width: $[(sim.get_progress(ui.w, ui.selected)).to_str() + "%"]; } }
+                            div.bar { i { width: = (sim.get_progress(ui.w, ui.selected)).to_str() + "%"; } }
                         }
                     }
                 }

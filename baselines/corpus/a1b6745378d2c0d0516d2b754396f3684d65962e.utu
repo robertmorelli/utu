@@ -32,7 +32,7 @@ fn notes(book:Book) Browser.HTMLElement {
                 bind:value = book.note;
                 on input {
                     wutu.save("readroom-v2");
-                };
+                }
             }
         }
         p.muted {
@@ -46,7 +46,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
     @island "readroom-workspace";
     section.workspace {
         div.grid {
-            for $[state.books] |book| key $[book.id] {
+            for state.books |book| key book.id {
                 article.panel.stack {
                     p.eyebrow {
                         = if book.finished {
@@ -68,7 +68,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
                         on click {
                             state.selected=book.id;
                             wutu.save("readroom-v2");
-                        };
+                        }
                     }
                     button {
                         = if book.finished {
@@ -80,7 +80,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
                         on click {
                             book.finished=not book.finished;
                             wutu.save("readroom-v2");
-                        };
+                        }
                     }
                 }
             }
@@ -117,7 +117,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "readroom";
         nav {
@@ -144,8 +144,8 @@ export main() void {
                 "A reading journal with room for a thought, a sentence, or a question. Finish books at your own pace.";
             }
         }
-        if $[wutu.route()=="/notes"] {
-            for $[state.books filter |book| {book.id==state.selected;}] |book| {
+        if wutu.route()=="/notes" {
+            for (state.books filter |book| {book.id==state.selected;}) |book| {
                 = notes(book);
             }
         }

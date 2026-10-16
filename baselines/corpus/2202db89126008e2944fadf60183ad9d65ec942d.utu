@@ -33,10 +33,10 @@ fn workspace(state: PitchState) Browser.HTMLElement {
                 bind:value = state.client;
                 on change {
                     wutu.save("pitch-v2");
-                };
+                }
             }
         }
-        for $[state.services] |service| key $[service.id] {
+        for state.services |service| key service.id {
             article.panel.bar {
                 div {
                     h2 {
@@ -48,25 +48,25 @@ fn workspace(state: PitchState) Browser.HTMLElement {
                 }
                 div.bar {
                     button {
-                        aria-label = $["Fewer "+service.name];
-                        disabled = $[service.hours==0];
+                        aria-label = "Fewer "+service.name;
+                        disabled = service.hours==0;
                         "−";
                         on click {
                             service.hours-=1;
                             wutu.save("pitch-v2");
-                        };
+                        }
                     }
                     strong {
                         = wutu.number(service.hours)+" hours";
                     }
                     button {
-                        aria-label = $["More "+service.name];
-                        disabled = $[service.hours==100];
+                        aria-label = "More "+service.name;
+                        disabled = service.hours==100;
                         "+";
                         on click {
                             service.hours+=1;
                             wutu.save("pitch-v2");
-                        };
+                        }
                     }
                     strong {
                         = wutu.money(service.hours*service.rate);
@@ -81,7 +81,7 @@ fn workspace(state: PitchState) Browser.HTMLElement {
                 bind:checked = state.discount;
                 on change {
                     wutu.save("pitch-v2");
-                };
+                }
             }
         }
         article.well.bar {
@@ -101,7 +101,7 @@ fn workspace(state: PitchState) Browser.HTMLElement {
             "Print estimate";
             on click {
                 Browser.window.print();
-            };
+            }
         }
         p.muted {
             "USD. Estimate only; excludes taxes, expenses, and payment processing.";
@@ -136,7 +136,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "pitch";
         nav {

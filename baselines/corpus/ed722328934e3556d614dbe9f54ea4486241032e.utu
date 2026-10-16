@@ -55,7 +55,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
                 wutu.save("ledger-v2");
                 wutu.invalidate("ledger-workspace");
             };
-        };
+        }
     }
     \/;
 }
@@ -85,7 +85,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
                 }
             }
         }
-        for $[state.purchases] |purchase,index| {
+        for state.purchases |purchase,index| {
             article.panel.bar {
                 h3 {
                     = purchase.title;
@@ -95,12 +95,12 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
                         = wutu.money(purchase.cents);
                     }
                     button {
-                        aria-label = $["Remove "+purchase.title];
+                        aria-label = "Remove "+purchase.title;
                         "Remove";
                         on click {
                             state.purchases=purchases.remove_at(state.purchases, index.to_i64().to_i32());
                             wutu.save("ledger-v2");
-                        };
+                        }
                     }
                 }
             }
@@ -124,7 +124,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "ledger";
         nav {

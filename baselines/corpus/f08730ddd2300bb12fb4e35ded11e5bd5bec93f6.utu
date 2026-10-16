@@ -11,7 +11,7 @@ fn workspace(state: MeterState) Browser.HTMLElement {
     @wutu/\
     @island "meter-workspace";
     section.workspace {
-        for $[state.habits] |habit| key $[habit.id] {
+        for state.habits |habit| key habit.id {
             article.panel.stack {
                 div.bar {
                     h2 {
@@ -24,16 +24,16 @@ fn workspace(state: MeterState) Browser.HTMLElement {
                     }
                 }
                 div.days {
-                    for $[["M","T","W","T","F","S","S"]] |day,index| {
+                    for ["M","T","W","T","F","S","S"] |day,index| {
                         button {
-                            aria-label = $[habit.name+" day "+wutu.number(index.to_i64().to_i32()+1)];
-                            aria-pressed = $[if habit.days[index.to_i64().to_i32()] {"true";} else {"false";}];
+                            aria-label = habit.name+" day "+wutu.number(index.to_i64().to_i32()+1);
+                            aria-pressed = if habit.days[index.to_i64().to_i32()] {"true";} else {"false";};
                             = day;
                             on click {
                                 let i=index.to_i64().to_i32();
                                 habit.days[i]=not habit.days[i];
                                 wutu.save("meter-v2");
-                            };
+                            }
                         }
                     }
                 }
@@ -46,7 +46,7 @@ fn workspace(state: MeterState) Browser.HTMLElement {
                     habit.days=[false,false,false,false,false,false,false];
                 };
                 wutu.save("meter-v2");
-            };
+            }
         }
     }
     \/;
@@ -73,7 +73,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "meter";
         nav {

@@ -10,7 +10,7 @@ mod home {
         \\    section.greeting {
         \\        display: grid;
         \\        gap: 1rem;
-        \\        h2 { "Hello, "; $[name]; }
+        \\        h2 { "Hello, "; = name; }
         \\        a {
         \\            href = "#/start";
         \\            :hover { opacity: 0.8; }
@@ -67,7 +67,7 @@ mod home {
                             "Try it in your browser";
                         }
                         a {
-                            href = $[ui.repo()];
+                            href = ui.repo();
                             "Source on GitHub";
                         }
                     }

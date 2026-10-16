@@ -1,2 +1,2 @@
 using Browser from std:Browser;
-export main() Browser.HTMLElement { @wutu/\ div { $[1 +]; } \/; }
+export main() Browser.HTMLElement { @wutu/\ div { = 1 +; } \/; }

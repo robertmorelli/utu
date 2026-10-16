@@ -400,7 +400,7 @@ mod stdlib {
         \\            on click {
         \\                cart.cents += 100;
         \\                wutu.after_render(cl() void { wutu.focus("note"); });
-        \\            };
+        \\            }
         \\        }
         \\    }
         \\    \/;
@@ -625,7 +625,7 @@ mod stdlib {
         @wutu/\
         table {
             tbody {
-                for $[rows] |row| {
+                for rows |row| {
                     tr {
                         th {
                             white-space:normal;
@@ -669,7 +669,7 @@ mod stdlib {
     fn group(id: Str, title: Str) Browser.HTMLElement {
         @wutu/\
         h2 {
-            id = $[id];
+            id = id;
             scroll-margin-block-start:1.5rem;
             = title;
         }
@@ -685,7 +685,7 @@ mod stdlib {
                 flex-wrap:wrap;
                 gap:0.5rem;
                 margin-block-start:1.75rem;
-                for $[toc()] |entry| {
+                for toc() |entry| {
                     button {
                         type = "button";
                         font:inherit;
@@ -701,7 +701,7 @@ mod stdlib {
                         = entry.split("::")[0];
                         on click {
                             jump(entry.split("::")[1]);
-                        };
+                        }
                     }
                 }
             }

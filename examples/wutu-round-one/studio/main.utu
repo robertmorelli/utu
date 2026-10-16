@@ -39,7 +39,7 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
                 wutu.save("studio-v2");
                 wutu.invalidate("studio-workspace");
             };
-        };
+        }
     }
     \/;
 }
@@ -49,18 +49,18 @@ fn workspace(state: StudioState) Browser.HTMLElement {
     section.workspace {
         = studio_form(state);
         div.grid {
-            for $[["Up next","In progress","Finished"]] |name,index| {
+            for ["Up next","In progress","Finished"] |name,index| {
                 section.well.stack {
                     h2 {
                         = name;
                     }
-                    for $[state.tasks filter |task| {task.stage==index.to_i64().to_i32();}] |task| key global $[task.id] {
+                    for (state.tasks filter |task| {task.stage==index.to_i64().to_i32();}) |task| key global task.id {
                         article.panel.stack {
                             h3 {
                                 = task.title;
                             }
                             button {
-                                aria-label = $["Move "+task.title];
+                                aria-label = "Move "+task.title;
                                 = if task.stage==2 {
                                     "Reopen ↺";
                                 }
@@ -75,7 +75,7 @@ fn workspace(state: StudioState) Browser.HTMLElement {
                                         task.stage+1;
                                     };
                                     wutu.save("studio-v2");
-                                };
+                                }
                             }
                         }
                     }
@@ -107,7 +107,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "studio";
         nav {

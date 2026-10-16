@@ -82,8 +82,8 @@ state: Library) Browser.HTMLElement {
                 gap:0.5rem;
                 flex-wrap:wrap;
                 button {
-                    id = $["book-" + book.id];
-                    aria-pressed = $[if book.finished { "true"; } else { "false"; }];
+                    id = "book-" + book.id;
+                    aria-pressed = if book.finished { "true"; } else { "false"; };
                     = if book.finished {
                         "Read again";
                     }
@@ -92,10 +92,10 @@ state: Library) Browser.HTMLElement {
                     };
                     on click {
                         book.finished = not book.finished;
-                    };
+                    }
                 }
                 button {
-                    aria-label = $["Remove " + book.title];
+                    aria-label = "Remove " + book.title;
                     "Remove";
                     on click {
                         state.books = state.books filter |b| {
@@ -103,7 +103,7 @@ state: Library) Browser.HTMLElement {
                         }
                         collect(Book);
                         restore_focus("search");
-                    };
+                    }
                 }
             }
         }
@@ -140,10 +140,10 @@ fn results(state: Library) Browser.HTMLElement {
                 " finished";
             }
         }
-        for $[state.books filter |book| { matches(book, state); }] |book| key $[book.id] {
+        for (state.books filter |book| { matches(book, state); }) |book| key book.id {
             = book_card(book, state);
         }
-        if $[count == 0] {
+        if count == 0 {
             p.empty {
                 "No books here yet. Add a title or try another search.";
             }
@@ -431,7 +431,7 @@ export main() void {
                         type = "submit";
                         "Add book ↗";
                     }
-                    on submit {
+                    on submit |event| {
                         event.preventDefault();
                         if title.value.trim().len()>0 and author.value.trim().len()>0 {
                             let book = Book {
@@ -444,7 +444,7 @@ export main() void {
                             form.reset();
                             title.focus();
                         };
-                    };
+                    }
                 }
                 p.muted {
                     line-height:1.6;

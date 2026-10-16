@@ -480,6 +480,15 @@ fn wutu_helper(kind: Str) Str {
         params = "cl() Browser.HTMLElement, Str";
         result = "Browser.HTMLElement";
         js = "(f,k)=>globalThis.__utuWutu.mount(f,k)";
+    } else if kind == "select_set" {
+        // `bind:values`: a multiple select's chosen values, joined by U+001F, both ways.
+        params = "Browser.Element, Str";
+        // (Applied again after the render: on the first, its options come after it.)
+        js = "(n,v)=>{const w=new Set(v===''?[]:v.split('\\u001f'));const a=()=>{for(const o of n.options)o.selected=w.has(o.value)};a();queueMicrotask(a)}";
+    } else if kind == "select_get" {
+        params = "Browser.Element";
+        result = "Str";
+        js = "(n)=>Array.from(n.selectedOptions,o=>o.value).join('\\u001f')";
     } else if kind == "mounted" {
         // `on mount { … }` in a static template: once, after the element is made.
         params = "Browser.Element, cl(Browser.Event) void";
@@ -654,16 +663,10 @@ fn wutu_element(n: I32, outer_svg: Bool) Str {
         if ti_kind[i] == 2 {
             let handler = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
             let name = word_text(ti_a[i]);
-            let prevent = if name == "submit" { "event.preventDefault();"; } else { ""; };
-            let type = event_type(name);
             let shorthand = (ti_flags[i] & 1) != 0;
-            // `on mousemove { … }` gets `event: MouseEvent`, as HTMLElementEventMap
-            // types it: a handler that names `event` (one that does not checks nothing).
-            let listener = if not shorthand { handler; }
-                else if type.len() > 0 and names_event(word_text(ti_b[i])) { "cl(__wutu_event) void { alt __wutu_event { Browser." + type + " |event| => { " + prevent + " " + handler + "; }, ~> {}, }; }"; }
-                else { "cl(event) void { " + prevent + " " + handler + "; }"; };
+            let listener = if shorthand { event_listener(name, handler, ti_c[i]); } else { handler; };
             // A quiet listener (`~name`) renders nothing after it runs.
-            let quiet = shorthand and ((ti_flags[i] & 4) != 0 or quiet_handler(word_text(ti_b[i])));
+            let quiet = (ti_flags[i] & 4) != 0 or (shorthand and quiet_handler(word_text(ti_b[i]), ti_c[i]));
             let emitted = (if quiet { "~"; } else { ""; }) + name;
             wx_events.push(intern_text((if reconcile { wutu_helper("event") + "(" + id + ", " + js_string(emitted) + ", (" + listener + "));"; }
                 else if name == "mount" { wutu_helper("mounted") + "(" + id + ", (" + listener + "));"; }
@@ -675,23 +678,25 @@ fn wutu_element(n: I32, outer_svg: Bool) Str {
 }
 
 /// Whether a handler's source names `event` (as a word, not a member).
-fn names_event(source: Str) Bool {
-    let at = text_index(source, "event", 0);
-    while (at >= 0) {
-        let before = if at > 0 { source.get(at - 1); } else { 32; };
-        let after = if at + 5 < source.len() { source.get(at + 5); } else { 32; };
-        if not word_byte(before) and before != 46 and not word_byte(after) { return true; };
-        at = text_index(source, "event", at + 1);
-    };
-    false;
+
+/// The closure an `on name [|e|] { … }` block becomes. `e` (word `param`, or
+/// -1 for none) is the event, typed as HTMLElementEventMap types it (`on
+/// click |e|` gets a MouseEvent). `on submit` also prevents navigation.
+fn event_listener(name: Str, handler: Str, param: I32) Str {
+    let prevent = if name == "submit" { "__wutu_event.preventDefault();"; } else { ""; };
+    let type = event_type(name);
+    if param < 0 { return "cl(__wutu_event) void { " + prevent + " " + handler + "; }"; };
+    let e = word_text(param);
+    if type.len() > 0 { return "cl(__wutu_event) void { " + prevent + " alt __wutu_event { Browser." + type + " |" + e + "| => { " + handler + "; }, ~> {}, }; }"; };
+    "cl(__wutu_event) void { " + prevent + " let " + e + " = __wutu_event; " + handler + "; }";
 }
 
 /// Whether an `on` handler can only change its own elements: every statement
 /// assigns to a property of an `as` element (`overlay.scrollTop = …`) from
-/// those elements, `event`, and literals, and nothing is called. Such a
+/// those elements, its `|e|` event, and literals, and nothing is called. Such a
 /// handler is quiet: nothing a render reads changed, so none follows it.
 /// Anything else (a call, a closure, a local, a struct field) renders.
-fn quiet_handler(body: Str) Bool {
+fn quiet_handler(body: Str, param: I32) Bool {
     // The code without its strings, outer braces, and blanks at either end.
     let code = "";
     let i = 0;
@@ -727,7 +732,7 @@ fn quiet_handler(body: Str) Bool {
         if end < 0 { end = code.len(); };
         let statement = code.slice(start, end);
         if trim_end(statement).len() > 0 {
-            if not quiet_statement(statement) { return false; };
+            if not quiet_statement(statement, param) { return false; };
             statements += 1;
         };
         start = end + 1;
@@ -735,8 +740,9 @@ fn quiet_handler(body: Str) Bool {
     statements > 0;
 }
 
-/// `alias.property (op)= value` where the value reads only elements, `event`, and literals.
-fn quiet_statement(statement: Str) Bool {
+/// `alias.property (op)= value` where the value reads only elements, the
+/// event parameter (word `param`), and literals.
+fn quiet_statement(statement: Str, param: I32) Bool {
     let i = skip_spaces(statement, 0);
     let a = i;
     while (i < statement.len() and word_byte(statement.get(i))) { i += 1; };
@@ -762,7 +768,7 @@ fn quiet_statement(statement: Str) Bool {
             let w = i;
             while (i < statement.len() and word_byte(statement.get(i))) { i += 1; };
             let word = statement.slice(w, i);
-            if not is_alias_name(word) and not in_words("event true false null not and or", word) { return false; };
+            if not is_alias_name(word) and not (param >= 0 and word == word_text(param)) and not in_words("true false null not and or", word) { return false; };
         } else {
             i += 1;
         };
@@ -970,15 +976,9 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
         if ti_kind[i] == 2 {
             let handler = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
             let name = word_text(ti_a[i]);
-            let prevent = if name == "submit" { "event.preventDefault();"; } else { ""; };
-            let type = event_type(name);
             let shorthand = (ti_flags[i] & 1) != 0;
-            // `on mousemove { … }` gets `event: MouseEvent`, as HTMLElementEventMap
-            // types it: a handler that names `event` (one that does not checks nothing).
-            let listener = if not shorthand { handler; }
-                else if type.len() > 0 and names_event(word_text(ti_b[i])) { "cl(__wutu_event) void { alt __wutu_event { Browser." + type + " |event| => { " + prevent + " " + handler + "; }, ~> {}, }; }"; }
-                else { "cl(event) void { " + prevent + " " + handler + "; }"; };
-            let quiet = shorthand and ((ti_flags[i] & 4) != 0 or quiet_handler(word_text(ti_b[i])));
+            let listener = if shorthand { event_listener(name, handler, ti_c[i]); } else { handler; };
+            let quiet = (ti_flags[i] & 4) != 0 or (shorthand and quiet_handler(word_text(ti_b[i]), ti_c[i]));
             wx_events.push(intern_text(wutu_helper("on") + "((" + listener + "));\n"));
             wx_event_ops.push(intern_text("[\"v\"," + index + "," + wutu_json((if quiet { "~"; } else { ""; }) + name) + "]"));
         };
@@ -990,18 +990,54 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
 /// A binding's code: the property written on render, read back on input.
 fn wd_binding(n: I32, i: I32) Str {
     let id = node_uid(n);
-    let numeric = word_text(ti_a[i]) == "number";
-    let property = if numeric { "valueAsNumber"; } else { word_text(ti_a[i]); };
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
-    let sync = located_splice(wu_site[0], "if " + (if numeric { id + ".validity.valid and "; } else { ""; }) + id + "." + property + " != (" + target + ") { " + id + "." + property + " = (" + target + "); }", ti_at[i], ti_to[i]);
-    let event = if word_text(ti_a[i]) == "checked" { "change"; } else { "input"; };
-    // NaN != NaN: an unparsable number leaves the state as it is.
-    let update = located_splice(wu_site[0], if numeric { "if " + id + "." + property + " == " + id + "." + property + " { " + target + " = " + id + "." + property + "; }"; }
-        else { target + " = " + id + "." + property; }, ti_at[i], ti_to[i]);
-    wx_events.push(intern_text(wutu_helper("on") + "(cl(event) void { " + update + "; });\n"));
-    wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + event + "\"]"));
-    sync + ";\n";
+    let kind = word_text(ti_a[i]);
+    let update = located_splice(wu_site[0], binding_update(kind, id, target), ti_at[i], ti_to[i]);
+    wx_events.push(intern_text(wutu_helper("on") + "(cl(__wutu_event) void { " + update + "; });\n"));
+    wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + binding_event(kind) + "\"]"));
+    binding_sync_code(kind, id, target, i);
 }
+
+/// A binding's sync (state into the element, on render), located at the
+/// bind statement; empty for `files`, which is read-only.
+fn binding_sync_code(kind: Str, id: Str, target: Str, i: I32) Str {
+    let sync = binding_sync(kind, id, target);
+    if sync.len() == 0 { ""; } else { located_splice(wu_site[0], sync, ti_at[i], ti_to[i]) + ";\n"; };
+}
+
+/// `bind:values` crosses as one string: the chosen values joined by U+001F.
+fn values_separator() Str { "\"\\u001f\""; }
+
+/// A binding's sync code:
+///   value / checked   a string / a Bool property
+///   number            valueAsNumber (an unparsable entry leaves the state)
+///   group             a radio group: the checked radio's value
+///   values            a multiple select's chosen values, an Array[Str]
+///   files             a file input's ?Browser.FileList (read-only: none)
+fn binding_sync(kind: Str, id: Str, target: Str) Str {
+    if kind == "number" { return "if " + id + ".validity.valid and " + id + ".valueAsNumber != (" + target + ") { " + id + ".valueAsNumber = (" + target + "); }"; };
+    if kind == "group" { return "if " + id + ".checked != (" + id + ".value == (" + target + ")) { " + id + ".checked = " + id + ".value == (" + target + "); }"; };
+    if kind == "values" { return wutu_helper("select_set") + "(" + id + ", " + values_separator() + ".join(" + target + "))"; };
+    if kind == "files" { return ""; };
+    "if " + id + "." + kind + " != (" + target + ") { " + id + "." + kind + " = (" + target + "); }";
+}
+
+/// What reads a binding back into the state, when its event fires.
+fn binding_update(kind: Str, id: Str, target: Str) Str {
+    // NaN != NaN: an unparsable number leaves the state as it is.
+    if kind == "number" { return "if " + id + ".valueAsNumber == " + id + ".valueAsNumber { " + target + " = " + id + ".valueAsNumber; }"; };
+    if kind == "group" { return "if " + id + ".checked { " + target + " = " + id + ".value; }"; };
+    // (One expression: the update is spliced in as one.)
+    if kind == "values" {
+        let chosen = wutu_helper("select_get") + "(" + id + ")";
+        return target + " = if " + chosen + ".len() == 0 { Array[Str].new(0, \"\"); } else { " + chosen + ".split(" + values_separator() + "); }";
+    };
+    if kind == "files" { return target + " = " + id + ".files"; };
+    target + " = " + id + "." + kind;
+}
+
+/// The event a binding listens to.
+fn binding_event(kind: Str) Str { if kind == "value" or kind == "number" { "input"; } else { "change"; }; }
 
 /// The children from `first`, as ops into `o`, then their listeners.
 fn wd_fragment(first: I32, svg: Bool, o: WOps) Str {
@@ -1042,7 +1078,7 @@ fn wd_child(child: I32, svg: Bool, o: WOps) Str {
         wd_op(o, "[\"t\"," + wutu_json(source.slice(1, source.len() - 1)) + "]");
         return "";
     };
-    let value = "(" + wutu_island(source, tn_from[child], tn_to[child], child) + ")";
+    let value = shown(wutu_island(source, tn_from[child], tn_to[child], child), tn_from[child]);
     if tn_from[child] < 0 {
         wd_op(o, "[\"w\"]");
         return wutu_helper("put") + "(" + value + ");\n";
@@ -1065,7 +1101,7 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
         captures = written + ", " + index;
     };
     let iterable = wutu_island(word_text(tn_text[n]), tn_from[n], tn_to[n], n);
-    let next = if keyed { wutu_helper("item") + "(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ");"; }
+    let next = if keyed { wutu_helper("item") + "((" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ").to_str());"; }
         else { wutu_helper("item_index") + "(" + index + ");"; };
     let body = WOps { text: "" };
     let fragment = wd_fragment(tn_first[n], svg, body);
@@ -1078,16 +1114,11 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
 fn wutu_binding(n: I32, i: I32) Str {
     if wu_reconcile[0] == 0 { wutu_fail("bind requires an @reactive view in this source file", ti_at[i]); };
     let id = node_uid(n);
-    let numeric = word_text(ti_a[i]) == "number";
-    let property = if numeric { "valueAsNumber"; } else { word_text(ti_a[i]); };
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
-    let sync = located_splice(wu_site[0], "if " + (if numeric { id + ".validity.valid and "; } else { ""; }) + id + "." + property + " != (" + target + ") { " + id + "." + property + " = (" + target + "); }", ti_at[i], ti_to[i]);
-    let event = if word_text(ti_a[i]) == "checked" { "change"; } else { "input"; };
-    // NaN != NaN: an unparsable number leaves the state as it is.
-    let update = located_splice(wu_site[0], if numeric { "if " + id + "." + property + " == " + id + "." + property + " { " + target + " = " + id + "." + property + "; }"; }
-        else { target + " = " + id + "." + property; }, ti_at[i], ti_to[i]);
-    wx_events.push(intern_text(wutu_helper("event") + "(" + id + ", \"" + event + "\", cl(event) void { " + update + "; });\n"));
-    sync + ";\n";
+    let kind = word_text(ti_a[i]);
+    let update = located_splice(wu_site[0], binding_update(kind, id, target), ti_at[i], ti_to[i]);
+    wx_events.push(intern_text(wutu_helper("event") + "(" + id + ", \"" + binding_event(kind) + "\", cl(__wutu_event) void { " + update + "; });\n"));
+    binding_sync_code(kind, id, target, i);
 }
 
 //! = Children
@@ -1124,11 +1155,15 @@ fn wutu_child(parent_id: Str, svg: Bool, child: I32) Str {
     };
     // Text and interpolated values. A reconciled value gets a stable call key,
     // for the elements a component it calls makes; written text makes none.
-    let value = "(" + wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child) + ")";
+    let value = shown(wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child), tn_from[child]);
     if not reconcile { return parent_id + ".append(" + value + ");\n"; };
     if tn_from[child] < 0 { return wutu_helper("append") + "(" + value + ");\n"; };
     wutu_helper("call") + "(" + js_string(word_text(wu_view_hash[0])) + ", " + int_text(tn_from[child]) + ");\n" + wutu_helper("put") + "(" + value + ");\n";
 }
+
+/// A text hole's value: `= x;` is `wutu.show(x)` (a number or Bool shows as
+/// its to_str, a Str or a node as itself); written text (from < 0) is itself.
+fn shown(value: Str, from: I32) Str { if from < 0 { "(" + value + ")"; } else { "wutu.show(" + value + ")"; }; }
 
 /// A `for` in a template: its fragment for each item. Reconciled, an item
 /// is known by its `key`, else by the loop's site and its index (the second
@@ -1152,7 +1187,7 @@ fn wutu_loop(parent_id: Str, svg: Bool, n: I32) Str {
     let reconcile = wu_reconcile[0] == 1;
     if reconcile and tn_key[n] >= 0 {
         let push = wutu_helper(if tn_global[n] == 1 { "globalKey"; } else { "key"; });
-        enter_key = push + "(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ");";
+        enter_key = push + "((" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ").to_str());";
     } else if reconcile {
         // Unkeyed iterations are known by the loop's site and position.
         enter_key = wutu_helper("loop") + "(" + js_string(word_text(wu_view_hash[0])) + ", " + int_text(tn_from[n]) + ");" + wutu_helper("index") + "(" + index + ");";

@@ -261,11 +261,11 @@ export main() void {
                     div.bar {
                         button {
                             aria-label = "Fewer servings";
-                            disabled = $[state.servings <= 1.0];
+                            disabled = state.servings <= 1.0;
                             "−";
                             on click {
                                 state.servings -= 1.0;
-                            };
+                            }
                         }
                         strong {
                             id = "servings";
@@ -273,15 +273,15 @@ export main() void {
                         }
                         button {
                             aria-label = "More servings";
-                            disabled = $[state.servings >= 12.0];
+                            disabled = state.servings >= 12.0;
                             "+";
                             on click {
                                 state.servings += 1.0;
-                            };
+                            }
                         }
                     }
                 }
-                for $[state.ingredients] |item| key $[item.id] {
+                for state.ingredients |item| key item.id {
                     label.ingredient {
                         grid-template-columns:auto 1fr auto;
                         align-items:center;
@@ -307,7 +307,7 @@ export main() void {
                         state.ingredients each |item| {
                             item.packed = false;
                         };
-                    };
+                    }
                 }
             }
             section.stack {
@@ -322,7 +322,7 @@ export main() void {
                 }
                 progress {
                     max = "4";
-                    value = $[(state.step + 1).to_f64().toString()];
+                    value = (state.step + 1).to_f64().toString();
                     width:100%;
                     accent-color:var(--accent);
                 }
@@ -337,18 +337,18 @@ export main() void {
                 }
                 div.bar {
                     button {
-                        disabled = $[state.step == 0];
+                        disabled = state.step == 0;
                         "Previous step";
                         on click {
                             state.step -= 1;
-                        };
+                        }
                     }
                     button.primary {
-                        disabled = $[state.step == 3];
+                        disabled = state.step == 3;
                         "Next step →";
                         on click {
                             state.step += 1;
-                        };
+                        }
                     }
                 }
                 aside.panel.stack {

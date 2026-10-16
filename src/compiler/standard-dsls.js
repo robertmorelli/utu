@@ -114,6 +114,7 @@ function expandEsDsl({ doc, node, body, freshName }) {
   const bindingName = binding.getAttribute('name');
   const typeNode = firstTypeChild(binding);
   if (!bindingName || !typeNode) return null;
+  closureParameters(typeNode);
 
   const sig = signatureFromType(typeNode);
   if (!sig) return null;
@@ -158,6 +159,23 @@ function expandEsDsl({ doc, node, body, freshName }) {
     globals: [{ key: importName, node: extern }],
     node: sig.isFunction ? call.firstElementChild : call,
   };
+}
+
+/**
+ * An `@es` binding's `fun(…)` parameters are read as `cl(…)`: JavaScript
+ * calls either alike, and a closure is what utu code passes (the binding's
+ * own declared type changes too, so a local's callers see it).
+ */
+function closureParameters(typeNode) {
+  if (typeNode.localName !== T.TYPE_FN) return;
+  const params = [...typeNode.children].slice(0, -1);
+  for (const param of params) {
+    if (param.localName !== T.TYPE_FN) continue;
+    const closure = typeNode.ownerDocument.createElement(T.TYPE_CL);
+    for (const { name, value } of [...param.attributes]) closure.setAttribute(name, value);
+    closure.append(...param.childNodes);
+    param.replaceWith(closure);
+  }
 }
 
 // Types are spelled by the shared reader — a local copy here previously did not

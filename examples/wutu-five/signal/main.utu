@@ -132,9 +132,9 @@ fn sessions(state: Conference) Browser.HTMLElement {
                 = number(visible.len());
                 " sessions shown";
             }
-            if $[count>0] {
+            if count>0 {
                 a {
-                    href = $[calendar(state)];
+                    href = calendar(state);
                     download = "signal-agenda.ics";
                     padding:0.8rem 1rem;
                     border:1px solid var(--accent);
@@ -144,7 +144,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
                 }
             }
         }
-        if $[conflicts>0] {
+        if conflicts>0 {
             p.conflict {
                 role = "alert";
                 padding:1rem;
@@ -153,7 +153,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
                 "Some saved sessions overlap. Choose one session per time slot before exporting.";
             }
         }
-        for $[visible] |session| key $[session.id] {
+        for visible |session| key session.id {
             article.session {
                 display:grid;
                 grid-template-columns:6rem 1fr auto;
@@ -199,9 +199,9 @@ fn sessions(state: Conference) Browser.HTMLElement {
                     }
                 }
                 button {
-                    id = $["session-" + session.id];
-                    aria-label = $[if session.saved { "Remove " + session.title; } else { "Save " + session.title; }];
-                    aria-pressed = $[if session.saved { "true"; } else { "false"; }];
+                    id = "session-" + session.id;
+                    aria-label = if session.saved { "Remove " + session.title; } else { "Save " + session.title; };
+                    aria-pressed = if session.saved { "true"; } else { "false"; };
                     = if session.saved {
                         "Saved ✓";
                     }
@@ -218,11 +218,11 @@ fn sessions(state: Conference) Browser.HTMLElement {
                         });
                         refresh(state);
                         restore_focus("session-" + session.id);
-                    };
+                    }
                 }
             }
         }
-        if $[visible.len() == 0] {
+        if visible.len() == 0 {
             p.empty {
                 "No sessions in this view. Explore the full programme and save a few favorites.";
             }
@@ -528,7 +528,7 @@ export main() void {
                     on change {
                         state.day = day.value;
                         refresh(state);
-                    };
+                    }
                 }
             }
             label {
@@ -550,7 +550,7 @@ export main() void {
                     on change {
                         state.track = track.value;
                         refresh(state);
-                    };
+                    }
                 }
             }
             label {
@@ -563,7 +563,7 @@ export main() void {
                     on change {
                         state.agenda = agenda.checked;
                         refresh(state);
-                    };
+                    }
                 }
                 "My agenda only";
             }

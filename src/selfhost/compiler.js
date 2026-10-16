@@ -19,6 +19,7 @@ import {
   awaitImports, closureImports, exceptionImports, glueModuleSource, importObjectFromEval, importObjectFromGlue,
   memoryImports, promiseImports, promisifyExports,
 } from '../runtime/host-imports.js';
+import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
 
 /** How a file joins the program. */
 export const ROLE = { entry: 0, import: 1, prelude: 2 };
@@ -54,7 +55,7 @@ export async function compile(utu, entry, host) {
   utu.set_debug_names(debugNames ? 1 : 0);
   const files = await loadProgram(utu, entry, host);
   const size = await compileProgram(utu, TARGET[target] ?? TARGET.normal, host);
-  const diagnostics = readDiagnostics(utu, files);
+  const diagnostics = readDiagnostics(utu, files).concat(sourceWarnings(files));
   if (size < 0) return { wasm: null, spec: null, diagnostics, files };
   return { ...builtModule(utu, size), diagnostics, files, tests: target === 'test' ? readTests(utu) : [] };
 }
@@ -404,6 +405,22 @@ export function readDiagnostics(utu, files) {
     out.push(diagnostic);
   }
   return out;
+}
+
+/**
+ * The author-facing checks of the source text (as stage 0 makes them): an
+ * over-dense line in the program's own files, and a `wutu.invalidate`
+ * naming no `@island`. Warnings: they never stop a build.
+ */
+function sourceWarnings(files) {
+  const own = files.filter(file => !/^(std|node|npm):/.test(file.key));
+  const found = [
+    ...own.flatMap(file => compressedSourceWarnings(file.text, file.key)),
+    ...unknownIslandWarnings(files.map(file => [file.key, file.text])),
+  ];
+  return found.map(({ kind, message, primary }) => ({
+    kind, message, severity: 'warning', file: primary.file, start: primary.start, end: primary.end, line: primary.row, column: primary.col,
+  }));
 }
 
 /** A byte offset in `src` as a UTF-16 offset in the file's text. */

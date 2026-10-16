@@ -50,23 +50,17 @@ function formatWithOpaquePayloads(source) {
   return formatWutuBody(masked).replace(/__wutu_payload_(\d+)/g, (_, index) => payloads[index]);
 }
 
-/** Whether brackets outside string literals pair up. */
-function isBalanced(code) {
-  const stack = [];
-  const pairs = { ')': '(', ']': '[', '}': '{' };
-  for (let i = 0; i < code.length; i++) {
-    const c = code[i];
-    if (c === '"') {
-      const end = stringEnd(code, i);
-      if (end < 0) return false;
-      i = end;
-    } else if ('([{'.includes(c)) {
-      stack.push(c);
-    } else if (c in pairs && stack.pop() !== pairs[c]) {
-      return false;
-    }
+/** `expr` parenthesized when a top-level character of `chars` would end it early (`if`, `for`, `key`). */
+function grouped(expr, chars) {
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const c = expr[i];
+    if (c === '"') { i = stringEnd(expr, i); if (i < 0) break; continue; }
+    if (depth === 0 && chars.includes(c)) return `(${expr})`;
+    if ('([{'.includes(c)) depth++;
+    else if (')]}'.includes(c)) depth--;
   }
-  return stack.length === 0;
+  return expr;
 }
 
 /** Collapse whitespace outside string literals. */
@@ -96,7 +90,7 @@ class BodyFormatter {
   format(tree) {
     if (tree.scope) this.add(0, `@island ${tree.scope};`);
     else if (tree.reactive) this.add(0, '@reactive;');
-    for (const use of tree.styleUses) this.add(0, `@style $[${use.value}];`);
+    for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)};`);
     for (const css of tree.global) this.block(`@document {${css}}`, 0);
     this.node(tree.root, 0);
     return '\n' + this.lines.join('\n') + '\n';
@@ -157,9 +151,7 @@ class BodyFormatter {
   node(node, depth) {
     switch (node.kind) {
       case 'text': return this.block(`${node.expr};`, depth, true);
-      // `= expr;` ends at the first top-level semicolon, so only balanced
-      // expressions may leave their `$[...]` delimiters behind.
-      case 'expression': return this.block(isBalanced(node.expr) ? `= ${node.expr};` : `$[${node.expr}];`, depth, true);
+      case 'expression': return this.block(`= ${node.expr};`, depth, true);
       case 'if': return this.conditional(node, depth, 'if');
       case 'for': return this.loop(node, depth);
       default: return this.element(node, depth);
@@ -167,7 +159,7 @@ class BodyFormatter {
   }
 
   conditional(node, depth, keyword) {
-    this.add(depth, `${keyword} $[${compactExpression(node.condition)}] {`);
+    this.add(depth, `${keyword} ${grouped(compactExpression(node.condition), '{')} {`);
     this.children(node.children, depth + 1);
     const [first] = node.otherwise;
     if (node.otherwise.length === 1 && first.elseIf) return this.conditional(first, depth, '} else if');
@@ -179,8 +171,8 @@ class BodyFormatter {
   }
 
   loop(node, depth) {
-    const key = node.key ? ` key ${node.globalKey ? 'global ' : ''}$[${compactExpression(node.key)}]` : '';
-    this.add(depth, `for $[${compactExpression(node.iterable)}] |${node.captures}|${key} {`);
+    const key = node.key ? ` key ${node.globalKey ? 'global ' : ''}${grouped(compactExpression(node.key), '{')}` : '';
+    this.add(depth, `for ${grouped(compactExpression(node.iterable), '{|')} |${node.captures}|${key} {`);
     this.children(node.children, depth + 1);
     this.add(depth, '}');
   }
@@ -189,18 +181,19 @@ class BodyFormatter {
     const classes = node.classes.map(name => '.' + name).join('');
     this.add(depth, `${node.tag}${classes}${node.binding ? ' as ' + node.binding : ''} {`);
     if (node.unmanaged) this.add(depth + 1, '@unmanaged;');
-    for (const { name, value, property, dynamic, wrapped } of node.attrs) {
+    for (const { name, value, property, dynamic } of node.attrs) {
       if (node.unmanaged && name === 'data-wutu-unmanaged') continue;
       if (!property && !dynamic && value === '""') this.add(depth + 1, `${name};`);
-      // A bare value ends at the statement's semicolon, so only a balanced one may gain `$[...]`.
-      else this.add(depth + 1, `${property ? '.' : ''}${name} = ${!dynamic ? value : wrapped || isBalanced(value) ? `$[${compactExpression(value)}]` : value.trim()};`);
+      else this.add(depth + 1, `${property ? '.' : ''}${name} = ${dynamic ? compactExpression(value) : value};`);
     }
     for (const rule of node.css) this.block(rule.source, depth + 1);
+    for (const style of node.styles ?? []) this.add(depth + 1, `${style.property}: = ${compactExpression(style.value)};`);
     for (const binding of node.twoWay) this.add(depth + 1, `bind:${binding.property} = ${compactExpression(binding.value)};`);
     this.children(node.children, depth + 1);
     for (const event of node.events) {
-      if (event.shorthand) this.block(`on ${event.name}${event.quiet ? ' quiet' : ''} ${event.handler};`, depth + 1, true);
-      else this.block(`@${event.name} = $[${event.handler}];`, depth + 1, true);
+      const head = `on ${event.name}${event.quiet ? ' quiet' : ''}`;
+      if (event.shorthand) this.block(`${head}${event.param ? ` |${event.param}|` : ''} ${event.handler}`, depth + 1, true);
+      else this.block(`${head} = ${event.handler};`, depth + 1, true);
     }
     this.add(depth, '}');
   }
@@ -238,9 +231,12 @@ const KEYWORD_COMPLETIONS = [
   { label: 'bind:value', insertText: 'bind:value = state.value;', detail: 'Two-way string binding' },
   { label: 'bind:checked', insertText: 'bind:checked = state.checked;', detail: 'Two-way boolean binding' },
   { label: 'bind:number', insertText: 'bind:number = state.number;', detail: 'Two-way numeric binding' },
-  { label: 'on', insertText: 'on click {\n    \n};', detail: 'Event handler' },
+  { label: 'bind:group', insertText: 'bind:group = state.choice;', detail: 'Radio group: the checked radio\'s value' },
+  { label: 'bind:values', insertText: 'bind:values = state.selected;', detail: 'Multiple select: Array[Str] of chosen values' },
+  { label: 'bind:files', insertText: 'bind:files = state.files;', detail: 'File input: its FileList (read-only)' },
+  { label: 'on', insertText: 'on click {\n    \n}', detail: 'Event handler' },
   { label: '@island', insertText: '@island "view-name";', detail: 'Independent update boundary' },
-  { label: '@style', insertText: '@style $[theme.sheet()];', detail: 'Shared CSS stylesheet' },
+  { label: '@style', insertText: '@style theme.sheet();', detail: 'Shared CSS stylesheet' },
   { label: '@reactive', insertText: '@reactive;', detail: 'Reactive root view' },
 ];
 
@@ -249,7 +245,7 @@ export function wutuCompletions(source, offset) {
   if (!island) return [];
   const prefix = source.slice(island.start, offset);
   if (/\bon\s+\w*$/.test(prefix)) {
-    return EVENT_COMPLETIONS.map(label => ({ label, insertText: label + ' {\n    \n};', detail: 'Wutu event handler' }));
+    return EVENT_COMPLETIONS.map(label => ({ label, insertText: label + ' {\n    \n}', detail: 'Wutu event handler' }));
   }
   const tags = [...wutuVocabulary.tags].map(label => ({ label, insertText: label + ' {\n    \n}', detail: 'Wutu element' }));
   const names = new Set([...wutuVocabulary.globals, ...Object.values(wutuVocabulary.attrs).flatMap(set => [...set])]);

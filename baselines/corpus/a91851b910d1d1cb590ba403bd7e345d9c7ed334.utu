@@ -87,9 +87,9 @@ state: Menu) Browser.HTMLElement {
                 = money(dish.price);
             }
             button {
-                id = $["add-" + dish.id];
-                disabled = $[dish.quantity >= 20];
-                aria-label = $["Add " + dish.title];
+                id = "add-" + dish.id;
+                disabled = dish.quantity >= 20;
+                aria-label = "Add " + dish.title;
                 "Add +";
                 on click {
                     if dish.quantity<20 {
@@ -97,7 +97,7 @@ state: Menu) Browser.HTMLElement {
                         update(state);
                         restore_focus("add-" + dish.id);
                     };
-                };
+                }
             }
         }
     }
@@ -111,7 +111,7 @@ fn menu(state: Menu) Browser.HTMLElement {
         display:grid;
         grid-template-columns:repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
         gap:1rem;
-        for $[state.dishes filter |dish| { state.category == "All" or dish.category == state.category; }] |dish| key $[dish.id] {
+        for (state.dishes filter |dish| { state.category == "All" or dish.category == state.category; }) |dish| key dish.id {
             = dish_card(dish, state);
         }
     }
@@ -152,7 +152,7 @@ fn basket(state: Menu) Browser.HTMLElement {
                 " items · a draft, not a placed order";
             };
         }
-        for $[state.dishes filter |dish| { dish.quantity>0; }] |dish| key $[dish.id] {
+        for (state.dishes filter |dish| { dish.quantity>0; }) |dish| key dish.id {
             div {
                 display:grid;
                 grid-template-columns:1fr auto;
@@ -171,8 +171,8 @@ fn basket(state: Menu) Browser.HTMLElement {
                     gap:0.6rem;
                     align-items:center;
                     button {
-                        id = $["minus-" + dish.id];
-                        aria-label = $["Remove one " + dish.title];
+                        id = "minus-" + dish.id;
+                        aria-label = "Remove one " + dish.title;
                         "−";
                         on click {
                             dish.quantity -= 1;
@@ -183,15 +183,15 @@ fn basket(state: Menu) Browser.HTMLElement {
                             else {
                                 "add-" + dish.id;
                             });
-                        };
+                        }
                     }
                     span {
                         = number(dish.quantity);
                     }
                     button {
-                        id = $["plus-" + dish.id];
-                        disabled = $[dish.quantity >= 20];
-                        aria-label = $["Add another " + dish.title];
+                        id = "plus-" + dish.id;
+                        disabled = dish.quantity >= 20;
+                        aria-label = "Add another " + dish.title;
                         "+";
                         on click {
                             if dish.quantity<20 {
@@ -199,12 +199,12 @@ fn basket(state: Menu) Browser.HTMLElement {
                                 update(state);
                                 restore_focus("plus-" + dish.id);
                             };
-                        };
+                        }
                     }
                 }
             }
         }
-        if $[count == 0] {
+        if count == 0 {
             p.empty {
                 "Something delicious starts with one choice. Add an item from the menu.";
             }
@@ -227,14 +227,14 @@ fn basket(state: Menu) Browser.HTMLElement {
             "Tax and service are not included. Save your choices here and show them to your server. No payment is collected.";
         }
         button {
-            disabled = $[count == 0];
+            disabled = count == 0;
             "Clear order notes";
             on click {
                 state.dishes each |dish| {
                     dish.quantity = 0;
                 };
                 update(state);
-            };
+            }
         }
     }
     \/;
@@ -544,7 +544,7 @@ export main() void {
                             }
                             on change {
                                 state.category = category.value;
-                            };
+                            }
                         }
                     }
                 }

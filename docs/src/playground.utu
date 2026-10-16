@@ -69,12 +69,12 @@ mod playground {
         \\                    state.todos = state.todos chain([todo]) collect(Todo);
         \\                    state.draft = "";
         \\                };
-        \\            };
+        \\            }
         \\        }
         \\        ul {
         \\            padding: 0;
         \\            list-style: none;
-        \\            for $[state.todos] |todo| key $[todo.id] {
+        \\            for state.todos |todo| key todo.id {
         \\                li {
         \\                    padding: 0.4rem 0;
         \\                    label {
@@ -199,12 +199,12 @@ mod playground {
                         bind:value = state.saved.source;
                         on input {
                             compile(state, 600);
-                        };
+                        }
                         on scroll {
                             overlay.scrollTop = field.scrollTop;
                             overlay.scrollLeft = field.scrollLeft;
-                        };
-                        on keydown {
+                        }
+                        on keydown |event| {
                             if event.key == "Tab" {
                                 event.preventDefault();
                                 field.setRangeText("    ", field.selectionStart, field.selectionEnd, "end");
@@ -215,7 +215,7 @@ mod playground {
                                 event.preventDefault();
                                 compile(state, 0);
                             };
-                        };
+                        }
                     }
                 }
                 div.stage {
@@ -229,7 +229,7 @@ mod playground {
                     }
                     p.status {
                         role = "status";
-                        class = $[if state.failed { "failed"; } else { "fine"; }];
+                        class = if state.failed { "failed"; } else { "fine"; };
                         margin:0;
                         padding:0.5rem 0.75rem;
                         font-size:0.85rem;
@@ -253,7 +253,7 @@ mod playground {
                     }
                 }
             }
-            if $[state.detail != ""] {
+            if state.detail != "" {
                 pre.code.shell.diagnostics {
                     margin-block-start:0;
                     inline-size:min(100%, 76rem);
@@ -287,7 +287,7 @@ mod playground {
                     on click {
                         state.saved.source = sample();
                         compile(state, 0);
-                    };
+                    }
                 }
             }
         }

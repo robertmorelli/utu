@@ -1,6 +1,5 @@
 import { expandStored } from './stored.js';
 import { expandJson } from './json.js';
-import { expandWutu } from './wutu.js';
 import { lowerIterators } from './lower-iterators.js';
 import { lowerForArrays } from './lower-for-arrays.js';
 import { lowerGenerators } from './lower-generators.js';
@@ -225,12 +224,8 @@ export function createCompiler(env) {
       foreign.set('std:JS', (await stdlib.get('std:JS')()).abi);
     }
     const foreignABI = foreign.size ? new ForeignABI(foreign) : null;
-    // Any reactive template switches every template to the reconciler, so
-    // components can join reactive views.
-    const reactiveProject = [...graph.values()].some(sourceDoc => [...sourceDoc.querySelectorAll('ir-dsl')]
-      .some(site => /@(?:reactive|island)/.test(site.getAttribute('body') ?? '')));
     for (const sourceDoc of graph.values()) {
-      expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, reactiveProject, expandTemplates: !dsls.wutu });
+      expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, refuseTemplates: !dsls.wutu });
     }
     if (foreignABI) prepareForeignImports(graph, imports, foreignABI);
     clock('buildModuleGraph + DSLs', graph.get(filePath));
@@ -499,7 +494,7 @@ const MAX_DSL_ROUNDS = 100;
  * Expand the built-in source DSLs. They can produce one another (Wutu inside
  * Utu inside Wutu), so expansion repeats until a round introduces nothing new.
  */
-function expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, reactiveProject, expandTemplates }) {
+function expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, refuseTemplates }) {
   const pending = () => [...sourceDoc.querySelectorAll('ir-dsl')].filter(site => SOURCE_DSLS.has(site.getAttribute('name')));
   for (let round = 0; round < MAX_DSL_ROUNDS; round++) {
     const before = pending();
@@ -507,10 +502,21 @@ function expandSourceDsls(sourceDoc, { parser, createDocument, standardDsls, rea
     expandDsls(sourceDoc, { dsls: { utu: standardDsls.utu, css: standardDsls.css } });
     expandStored(sourceDoc, parser, createDocument);
     expandJson(sourceDoc, parser, createDocument);
-    if (expandTemplates) expandWutu(sourceDoc, parser, createDocument, reactiveProject);
+    if (refuseTemplates) refuseWutu(sourceDoc);
     if (pending().every(site => before.includes(site))) return;
   }
   throw new Error('Recursive DSL expansion limit exceeded');
+}
+
+/**
+ * Wutu templates are built by the self-hosted compiler (`utu`, `wutu build`),
+ * not by stage 0: a `@wutu` here is reported, not expanded.
+ */
+function refuseWutu(sourceDoc) {
+  // (A file that does not parse reports that first.)
+  if (sourceDoc.body.firstChild?.attr?.('data-parse-errors')) return;
+  const site = sourceDoc.querySelector('ir-dsl[name="wutu"]');
+  if (site) throw compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, 'Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0', site);
 }
 
 // ── Parser initialisation helper ─────────────────────────────────────────────

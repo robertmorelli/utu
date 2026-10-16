@@ -104,6 +104,8 @@ async function main() {
   const baseline = JSON.parse(zlib.gunzipSync(fs.readFileSync(BASELINE)));
   const count = { same: 0, differ: 0, intended: 0, unsupported: 0 };
   const onlyParseErrors = list => list.length > 0 && list.every(d => d[0] === 'parse-error');
+  // Wutu templates are the self-hosted compiler's alone: stage 0 refuses them.
+  const refusesWutu = list => list.some(d => String(d[1]).startsWith('Wutu templates are compiled by the self-hosted compiler'));
   const lines = [];
   for (const key of Object.keys(results).sort()) {
     const got = results[key];
@@ -111,6 +113,7 @@ async function main() {
     if (INTENDED[key]) { count.intended++; continue; }
     const want = baseline[key] ?? [];
     if (JSON.stringify(want) === JSON.stringify(got)) { count.same++; continue; }
+    if (refusesWutu(want)) { count.intended++; continue; }
     if (onlyParseErrors(want) && onlyParseErrors(got)) { count.intended++; continue; }
     count.differ++;
     if (lines.length < show) lines.push(`DIFFERS ${key}\n  stage 0: ${JSON.stringify(want).slice(0, 300)}\n  now:     ${JSON.stringify(got).slice(0, 300)}`);

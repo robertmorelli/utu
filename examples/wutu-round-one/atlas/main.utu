@@ -38,7 +38,7 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
             }
         }
         div.grid {
-            for $[state.places filter |place| {state.region == "All" or state.region == place.region;}] |place| key $[place.id] {
+            for (state.places filter |place| {state.region == "All" or state.region == place.region;}) |place| key place.id {
                 article.panel.stack {
                     p.eyebrow {
                         = place.region;
@@ -50,7 +50,7 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
                         = place.note;
                     }
                     button {
-                        aria-pressed = $[if place.saved {"true";} else {"false";}];
+                        aria-pressed = if place.saved {"true";} else {"false";};
                         = if place.saved {
                             "Saved ✓";
                         }
@@ -60,7 +60,7 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
                         on click {
                             place.saved = not place.saved;
                             wutu.save("atlas-v2");
-                        };
+                        }
                     }
                     = @utu/\ @wutu/\ small { "Room for a slower day."; } \/ \/;
                 }
@@ -114,7 +114,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "atlas";
         nav {

@@ -503,13 +503,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "Array[T]";
                                 }
                                 on click {
                                     jump("it-array");
-                                };
+                                }
                             }
                         }
                         td {
@@ -524,13 +524,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "(a ..< b)";
                                 }
                                 on click {
                                     jump("it-range");
-                                };
+                                }
                             }
                         }
                         td {
@@ -545,13 +545,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "(a ... b)";
                                 }
                                 on click {
                                     jump("it-range_inclusive");
-                                };
+                                }
                             }
                         }
                         td {
@@ -566,13 +566,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "(pipeline)";
                                 }
                                 on click {
                                     jump("it-nested");
-                                };
+                                }
                             }
                         }
                         td {
@@ -587,13 +587,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "text.split(…), buffer.finish()";
                                 }
                                 on click {
                                     jump("it-strings");
-                                };
+                                }
                             }
                         }
                         td {
@@ -608,13 +608,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "map";
                                 }
                                 on click {
                                     jump("it-map");
-                                };
+                                }
                             }
                         }
                         td {
@@ -629,13 +629,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "filter";
                                 }
                                 on click {
                                     jump("it-filter");
-                                };
+                                }
                             }
                         }
                         td {
@@ -650,13 +650,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "flat_map";
                                 }
                                 on click {
                                     jump("it-flat_map");
-                                };
+                                }
                             }
                         }
                         td {
@@ -671,13 +671,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "take(n)";
                                 }
                                 on click {
                                     jump("it-take");
-                                };
+                                }
                             }
                         }
                         td {
@@ -692,13 +692,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "skip(n)";
                                 }
                                 on click {
                                     jump("it-skip");
-                                };
+                                }
                             }
                         }
                         td {
@@ -713,13 +713,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "take_while";
                                 }
                                 on click {
                                     jump("it-take_while");
-                                };
+                                }
                             }
                         }
                         td {
@@ -734,13 +734,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "skip_while";
                                 }
                                 on click {
                                     jump("it-skip_while");
-                                };
+                                }
                             }
                         }
                         td {
@@ -755,13 +755,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "zip(other)";
                                 }
                                 on click {
                                     jump("it-zip");
-                                };
+                                }
                             }
                         }
                         td {
@@ -776,13 +776,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "chain(other)";
                                 }
                                 on click {
                                     jump("it-chain");
-                                };
+                                }
                             }
                         }
                         td {
@@ -797,13 +797,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "repeat(n)";
                                 }
                                 on click {
                                     jump("it-repeat");
-                                };
+                                }
                             }
                         }
                         td {
@@ -818,13 +818,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "scan(init)";
                                 }
                                 on click {
                                     jump("it-scan");
-                                };
+                                }
                             }
                         }
                         td {
@@ -839,13 +839,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "fold(init)";
                                 }
                                 on click {
                                     jump("it-fold");
-                                };
+                                }
                             }
                         }
                         td {
@@ -860,13 +860,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "each";
                                 }
                                 on click {
                                     jump("it-each");
-                                };
+                                }
                             }
                         }
                         td {
@@ -881,13 +881,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "sum";
                                 }
                                 on click {
                                     jump("it-sum");
-                                };
+                                }
                             }
                         }
                         td {
@@ -902,13 +902,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "product";
                                 }
                                 on click {
                                     jump("it-product");
-                                };
+                                }
                             }
                         }
                         td {
@@ -923,13 +923,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "fast_sum";
                                 }
                                 on click {
                                     jump("it-fast_sum");
-                                };
+                                }
                             }
                         }
                         td {
@@ -944,13 +944,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "count";
                                 }
                                 on click {
                                     jump("it-count");
-                                };
+                                }
                             }
                         }
                         td {
@@ -965,13 +965,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "count_where";
                                 }
                                 on click {
                                     jump("it-count_where");
-                                };
+                                }
                             }
                         }
                         td {
@@ -986,13 +986,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "any";
                                 }
                                 on click {
                                     jump("it-any");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1007,13 +1007,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "all";
                                 }
                                 on click {
                                     jump("it-all");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1028,13 +1028,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "first_index";
                                 }
                                 on click {
                                     jump("it-first_index");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1049,13 +1049,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "last_index";
                                 }
                                 on click {
                                     jump("it-last_index");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1070,13 +1070,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "collect(T)";
                                 }
                                 on click {
                                     jump("it-collect");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1091,13 +1091,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "sort(T)";
                                 }
                                 on click {
                                     jump("it-sort");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1112,13 +1112,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "distinct_by(T, K)";
                                 }
                                 on click {
                                     jump("it-distinct_by");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1133,13 +1133,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "group_by(T, K)";
                                 }
                                 on click {
                                     jump("it-group_by");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1154,13 +1154,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "partition(T)";
                                 }
                                 on click {
                                     jump("it-partition");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1175,13 +1175,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "batched(T, n)";
                                 }
                                 on click {
                                     jump("it-batched");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1196,13 +1196,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "windows(T, n)";
                                 }
                                 on click {
                                     jump("it-windows");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1217,13 +1217,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "min_by(T)";
                                 }
                                 on click {
                                     jump("it-min_by");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1238,13 +1238,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "max_by(T)";
                                 }
                                 on click {
                                     jump("it-max_by");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1259,13 +1259,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "first_where(T)";
                                 }
                                 on click {
                                     jump("it-first_where");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1280,13 +1280,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "reduce(T)";
                                 }
                                 on click {
                                     jump("it-reduce");
-                                };
+                                }
                             }
                         }
                         td {
@@ -1301,13 +1301,13 @@ mod iterators {
                     tr {
                         td {
                             a {
-                                href = $["#" + wutu.route()];
+                                href = "#" + wutu.route();
                                 code {
                                     "bisect";
                                 }
                                 on click {
                                     jump("it-bisect");
-                                };
+                                }
                             }
                         }
                         td {

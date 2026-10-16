@@ -5,14 +5,14 @@
           @wutu/\
           div.card {
             color: red;
-            class=$["extra"];
-            data-label=$["<b>safe</b>"];
-            input { .value=$["hello"]; disabled=$["x" == "y"]; }
+            class="extra";
+            data-label="<b>safe</b>";
+            input { .value="hello"; disabled="x" == "y"; }
             svg { viewBox="0 0 10 10"; circle { cx="5"; cy="5"; r="4"; } }
-            for $[[1,2]] |n| {
-              button as button { type="button"; $[n.to_f64().toString()]; @click=$[cl(e) void { button.textContent = (n*10).to_f64().toString(); }]; }
+            for [1,2] |n| {
+              button as button { type="button"; = n.to_f64().toString(); on click = cl(e) void { button.textContent = (n*10).to_f64().toString(); }; }
             }
-            if $[true] { p { "present"; } } else { p { "absent"; } }
+            if true { p { "present"; } } else { p { "absent"; } }
           }
           \/;
         }

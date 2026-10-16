@@ -25,15 +25,15 @@ fn workspace(state: VenueState) Browser.HTMLElement {
                 display:grid;
                 grid-template-columns:repeat(6,minmax(0,1fr));
                 gap:0.6rem;
-                for $[state.seats] |seat| key $[seat.name] {
+                for state.seats |seat| key seat.name {
                     button {
-                        aria-label = $["Seat "+seat.name];
-                        aria-pressed = $[if seat.selected {"true";} else {"false";}];
+                        aria-label = "Seat "+seat.name;
+                        aria-pressed = if seat.selected {"true";} else {"false";};
                         = seat.name;
                         on click {
                             seat.selected=not seat.selected;
                             wutu.save("venue-v2");
-                        };
+                        }
                     }
                 }
             }
@@ -67,7 +67,7 @@ fn workspace(state: VenueState) Browser.HTMLElement {
                     seat.selected=false;
                 };
                 wutu.save("venue-v2");
-            };
+            }
         }
         p.muted {
             "A private planning tool. Seats are not reserved and no tickets are purchased.";
@@ -139,7 +139,7 @@ export main() void {
     \/;
     let app = @wutu/\
     @reactive;
-    @style $[theme.sheet()];
+    @style theme.sheet();
     main {
         data-theme = "venue";
         nav {

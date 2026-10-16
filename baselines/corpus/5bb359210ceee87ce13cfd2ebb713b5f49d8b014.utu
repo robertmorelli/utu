@@ -13,14 +13,14 @@ using Browser from std:Browser;
             input { bind:value = state.text; }
             p { = state.text; }
             ul {
-              for $[state.items] |item| key $[item.id] {
+              for state.items |item| key item.id {
                 li { = item.id; }
               }
             }
             button {
               on click {
                 state.items = [state.items[1], state.items[0]];
-              };
+              }
             }
           }
           \/;

@@ -13,7 +13,7 @@ fn greeting(name: Str) Browser.HTMLElement {
         display: grid;
         gap: 1rem;
         padding: 1.5rem;
-        h2 { margin: 0; "Hello, "; $[name]; }
+        h2 { margin: 0; "Hello, "; = name; }
         a {
             href="/about";
             color: oklch(45% 0.12 150);
@@ -53,13 +53,27 @@ and returns that element, with its concrete browser type where available.
 | `tag as name { ... }` | Name the node within its template subtree |
 | `property: value;` | CSS declaration attached to this element |
 | `name = "value";` | HTML attribute (`=` where CSS has `:`) |
-| `name = $[expression];` | Utu-valued attribute; ordinary attributes expect Str |
-| `disabled;` / `disabled = $[condition];` | Boolean attribute presence |
-| `.value = $[expression];` | Typed DOM **property** assignment |
+| `name = expression;` | Utu-valued attribute; ordinary attributes expect Str |
+| `disabled;` / `disabled = condition;` | Boolean attribute presence |
+| `.value = expression;` | Typed DOM **property** assignment |
 | `"text";` | A text node |
-| `$[expression];` | A Utu string or DOM node, including a component result |
-| `@click=$[cl(event) void { ... }];` | A typed event listener |
-| `# comment` | A comment line: `#` first on its line, then a space. At the end of a line, `/* ... */`. Any other `#` is text, so `color: #1f2535;` is a color |
+| `= expression;` | Text or a node: a Str, a number or Bool (its `to_str()`), or a DOM node such as a component's result |
+| `property: = expression;` | A CSS value computed at render |
+| `if cond { … } else if cond { … } else { … }` | Conditional children |
+| `for items \|item, i\| key item.id { … }` | Repeated children (keys may be any scalar or Str) |
+| `on click { … }` | An event handler, with no event variable |
+| `on click \|e\| { … }` | The same, with the event as `e`, typed as the DOM types it (`MouseEvent`) |
+| `on click = handler;` | A handler value: a `cl(Browser.Event) void` |
+| `bind:value = state.text;` | Two-way bindings: `value`, `checked`, `number`, `group`, `values`, `files` |
+| `// comment` | A comment, first on a line or after a blank; `/* … */` also works. `#` is always text, so `color: #1f2535;` is a color |
+
+An expression stands on its own: `if`, `for`, and `key` read up to the block's
+`{` (`for` up to its `|item|`). An expression with braces or captures of its own
+goes in parentheses: `if (xs any |x| { x.done; }) { … }`,
+`for (xs filter |x| { x.ok; }) |x| { … }`; the loop continues that pipeline.
+(Before this release Wutu wrapped expressions in `$[…]`, wrote events
+`@click = $[…]`, ended `on` blocks with `;`, and named the event `event`
+implicitly; each old form is now an error that names the new one.)
 
 Common attributes are checked per tag. `canvas { padding="10" }` is an error.
 `aria-*`, `data-*`, and custom-element attributes are accepted. Property
@@ -67,9 +81,9 @@ assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
 are rejected: use a closure. Interpolated strings become text, never HTML.
 Written strings take Utu's escapes: `"say \"hi\"";`, `"\u2192";`, `"\\";`.
-Use `.to_f64().toString()` to display a native integer through browser Number.
+A number or Bool in a text hole shows as its `to_str()`: `= state.count;`.
 
-Classes from `class = $[classes];` are combined with authored shorthand and
+Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
 children switch back to HTML. SVG attributes such as `viewBox`, `d`, and
 `stroke-width` keep their original spelling.
@@ -77,17 +91,17 @@ children switch back to HTML. SVG attributes such as `viewBox`, `d`, and
 ## Components, slots, lists, and conditions
 
 Components are ordinary typed Utu functions. Pass data or DOM nodes as normal
-parameters and insert returned nodes with `$[component(args)]`. There is no
+parameters and insert returned nodes with `= component(args)`. There is no
 separate component registry or wrapper element. A node supplied as a slot is
 moved into the parent by the DOM's normal append semantics.
 
 ```utu
 @wutu/\
 section {
-    for $[plants filter |plant| { not plant.watered; }] |plant, index| {
-        $[plant_card(plant)];
+    for (plants filter |plant| { not plant.watered; }) |plant, index| {
+        = plant_card(plant);
     }
-    if $[empty] {
+    if empty {
         p { "Everything is watered."; }
     } else {
         p { "A little care goes a long way."; }
@@ -96,7 +110,7 @@ section {
 \/;
 ```
 
-Conditions chain with `else if $[...] { ... }`; the first matching branch renders.
+Conditions chain with `else if ... { ... }`; the first matching branch renders.
 
 `for` adds an `each` terminal to the iterator pipeline; no temporary array is
 required. Its optional index is U64. Conditional branches and loops can contain
@@ -116,12 +130,12 @@ references, shared struct state, and persistence.
 
 ```utu
 button as toggle {
-    type="button"
-    $[if plant.watered { "Watered ✓"; } else { "Water me"; }]
-    @click=$[cl(event) void {
+    type = "button";
+    = if plant.watered { "Watered ✓"; } else { "Water me"; };
+    on click {
         plant.watered = not plant.watered;
         toggle.textContent = if plant.watered { "Watered ✓"; } else { "Water me"; };
-    }]
+    }
 }
 ```
 
@@ -144,14 +158,14 @@ button {
 }
 ```
 
-A declaration whose value is `$[...]` is computed when the template renders
+A declaration whose value is `= ...` is computed when the template renders
 and applied with `style.setProperty`, which a strict `style-src` policy allows:
 
 ```css
 div.bar {
     i {
-        width: $[progress.to_str() + "%"];
-        --hue: $[hue.to_str()];
+        width: = progress.to_str() + "%";
+        --hue: = hue.to_str();
     }
 }
 ```
@@ -235,7 +249,7 @@ The warning appears in analysis diagnostics used by `utu check` and the editor. 
 `@unmanaged;` in an element hands its insides to JavaScript: the template makes
 the element and sets the attributes it names, and renders never touch its
 children or any other attribute (an editor widget, a chart, an iframe's
-`srcdoc`). It has no children in its template. `on mount { … };` runs once per
+`srcdoc`). It has no children in its template. `on mount { … }` runs once per
 element, after the render that made it; name the element with `as` to reach it:
 
 ```wutu
@@ -243,16 +257,16 @@ div as chart {
     @unmanaged;
     on mount {
         chart.append(Browser.document.createTextNode("drawn by JavaScript"));
-    };
+    }
 }
 ```
 
 A handler normally schedules a render after it runs. A **quiet** handler does
-not: write `on scroll quiet { … };`. Wutu also infers it: a handler whose every
+not: write `on scroll quiet { … }`. Wutu also infers it: a handler whose every
 statement assigns a property of an `as` element from those elements, `event`,
 and literals, calling nothing, is quiet without the word (nothing a render
-reads changed). `on scroll { overlay.scrollTop = field.scrollTop; };` is quiet;
-`on scroll { state.top = field.scrollTop; };` is not.
+reads changed). `on scroll { overlay.scrollTop = field.scrollTop; }` is quiet;
+`on scroll { state.top = field.scrollTop; }` is not.
 
 ## Lazy pages
 
@@ -271,7 +285,7 @@ or storage, not through captured structs.
 @wutu/\
 @reactive;
 main {
-    if $[wutu.route() == "/tour"] {
+    if wutu.route() == "/tour" {
         = wutu.lazy("./tour.utu");
     } else {
         = home.page();
@@ -299,12 +313,12 @@ main {
         "Search";
         input { bind:value = state.query; }
     }
-    for $[state.items] |item| key $[item.id] {
+    for state.items |item| key item.id {
         article {
             h2 { = item.title; }
             button {
                 "Finish";
-                on click { item.done = true; };
+                on click { item.done = true; }
             }
         }
     }
@@ -312,14 +326,14 @@ main {
 \/;
 ```
 
-`= expression;` inserts text or a component node. Attributes can use direct
-expressions (`title = item.title;`) as well as `$[...]`. Attribute expressions
-beginning with a quoted literal use `$[...]` when concatenating more text.
-`on click { ... };` supplies an implicit typed `event`; `on submit` also prevents
-navigation. Native form constraints still govern normal browser submission.
-The existing explicit closure syntax remains supported.
+`= expression;` inserts text, a number, or a component node. An attribute's
+value is a string literal or any expression (`title = "Remove " + item.title;`).
+`on click |e| { ... }` names the event and types it (`MouseEvent` here); without
+`|e|` there is no event variable. `on submit` also prevents navigation. Native
+form constraints still govern normal browser submission. `on click = handler;`
+takes a closure value.
 
-Keys are stable **strings**, unique per repeated template under a parent. Use a
+Keys are any scalar or Str (`key item.id`), unique per repeated template under a parent. Use a
 record ID rather than its changing position. Keyed reordering preserves DOM
 identity, focused controls, and selection. Duplicate keys throw a useful runtime
 error. Removing an item removes its DOM; reintroducing it creates new nodes.
@@ -337,11 +351,13 @@ and closure parameters take precedence over aliases.
 - `bind:checked = state.enabled;` binds a checkbox boolean.
 - `bind:number = state.amount;` binds an F64 through `valueAsNumber`. Invalid
   numeric edits do not overwrite the state with NaN.
+- `bind:group = state.size;` on radio inputs binds the checked radio's `value` (a Str).
+- `bind:values = state.tags;` on a `select multiple` binds the chosen values (an `Array[Str]`).
+- `bind:files = state.files;` on a file input reads its `?Browser.FileList` (read-only).
 
 A binding and a custom handler for the same event compose in that order.
 Unchanged property values are not rewritten, preserving the input caret.
-Radio groups, multiple selects, files, and richer validation use explicit events
-and browser properties.
+Richer validation uses explicit events and browser properties.
 
 ```utu
 struct Preferences:
@@ -428,7 +444,7 @@ mod theme {
 }
 ```
 
-Install it with `@style $[theme.sheet()];` before the Wutu root. Identical sheets
+Install it with `@style theme.sheet();` before the Wutu root. Identical sheets
 are installed once, including during hydration, and several `@style` lines
 install in source order. Static (non-reactive) projects support `@style` too. The compiler preserves the raw
 CSS payload: it has no property, selector, value, or at-rule allowlist. Browser
@@ -454,7 +470,7 @@ since a misspelling would otherwise refresh nothing. Replacement factory
 arguments are not automatically treated as new props; mutate the shared model or
 unmount and remount the island.
 
-A loop may use `key global $[item.id]` to preserve node identity across containers
+A loop may use `key global item.id` to preserve node identity across containers
 within the same island. Ordinary `key` remains local to its parent. Duplicate keys
 produce runtime diagnostics. Unkeyed loops receive positional identities.
 

@@ -54,7 +54,7 @@ export main() void {
                 bind:value = state.query;
                 on input {
                     state.changes += 1;
-                };
+                }
             }
         }
         p {
@@ -77,7 +77,7 @@ export main() void {
             = wutu.storage_error();
         }
         ul {
-            for $[state.tasks filter |task| { task.title.includes(state.query); }] |task| key $[task.id] {
+            for (state.tasks filter |task| { task.title.includes(state.query); }) |task| key task.id {
                 li {
                     = ui.badge("Task");
                     = ui.badge(task.title);
@@ -89,14 +89,14 @@ export main() void {
                         = task.title;
                     }
                     button {
-                        aria-label = $["Remove " + task.title];
+                        aria-label = "Remove " + task.title;
                         "Remove";
                         on click {
                             state.tasks = state.tasks filter |item| {
                                 item.id != task.id;
                             }
                             collect(Task);
-                        };
+                        }
                     }
                 }
             }
@@ -124,7 +124,7 @@ export main() void {
                     state.draft = "";
                     field.focus();
                 };
-            };
+            }
         }
         section {
             input as field {
@@ -134,7 +134,7 @@ export main() void {
                 "Focus independent field";
                 on click {
                     field.focus();
-                };
+                }
             }
         }
         button {
@@ -145,7 +145,7 @@ export main() void {
                     state.tasks[state.tasks.len() - 1 - index.to_i64().to_i32()];
                 }
                 collect(Task);
-            };
+            }
         }
     }
     \/;
