@@ -198,7 +198,7 @@ mod playground {
                         }
                         bind:value = state.saved.source;
                         on input {
-                            compile(state, 600);
+                            compile(state, 0);
                         }
                         on scroll {
                             overlay.scrollTop = field.scrollTop;
@@ -209,7 +209,7 @@ mod playground {
                                 event.preventDefault();
                                 field.setRangeText("    ", field.selectionStart, field.selectionEnd, "end");
                                 state.saved.source = field.value;
-                                compile(state, 600);
+                                compile(state, 0);
                             }
                             else if event.key == "Enter" and (event.metaKey or event.ctrlKey) {
                                 event.preventDefault();
@@ -262,7 +262,7 @@ mod playground {
                 }
             }
             p {
-                "Press ⌘/Ctrl+Enter to build now, or just keep typing. Your source is kept in this browser. One file, with ";
+                "It rebuilds as you type (a build takes a few milliseconds). Your source is kept in this browser. One file, with ";
                 code {
                     "std:Browser";
                 }
