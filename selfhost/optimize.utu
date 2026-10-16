@@ -14,6 +14,8 @@
 //!   stored there, by a tee (two bytes fewer).
 //! / unused: a local never read is not stored (its value is kept, and
 //!   dropped, when it has effects), and is no longer declared.
+//! / coalescing: locals of one type whose live ranges do not overlap share
+//!   one, and the locals are declared grouped by type (one run each).
 //!
 //! So a consumed generator compiles to what the equivalent loop compiles to.
 //! Every local codegen makes is set before it is read, which is what makes
@@ -54,6 +56,7 @@ fn optimize_function(f: I32) void {
     while (propagate_copies(params) or sink_temporaries(params)) { opt_collect(f, total); };
     if tee_stores() { opt_collect(f, total); };
     remove_unused_locals(f, params, total);
+    coalesce_locals(f, params);
 }
 
 /// Walk the body, noting each node's parent, and each local's reads and writes.
@@ -328,5 +331,148 @@ fn remove_unused_locals(f: I32, params: I32, total: I32) void {
         if (op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params {
             w_a[n] = renumber[w_a[n]];
         };
+    };
+}
+
+//! = Coalescing
+
+/// By local: its first and last mention, in the order the code runs
+/// (positions of the walk), and whether the first stores it.
+vec co_first: I32;
+vec co_last: I32;
+vec co_store_first: I32;
+/// By local: the outermost loop around its first and its last mention, or -1.
+vec co_loop_first: I32;
+vec co_loop_last: I32;
+/// By loop (in the order they start): the positions it spans.
+vec co_loop_start: I32;
+vec co_loop_end: I32;
+/// The loops around the walk, outermost first.
+vec co_loops: I32;
+/// The nodes that read or write a local.
+vec co_mentions: I32;
+vec co_pos: I32 = [0];
+
+/// Share locals whose ranges do not overlap: a local is live from its first
+/// mention to its last, and a mention inside a loop makes it live through
+/// the whole outermost loop around it (its value may come round). A local is
+/// only moved into another's when its first mention stores it: one read
+/// first would rely on starting at zero.
+fn coalesce_locals(f: I32, params: I32) void {
+    let n = func_local_count[f];
+    if n < 2 { return; };
+    let total = params + n;
+    co_first.resize(total);
+    co_last.resize(total);
+    co_store_first.resize(total);
+    co_loop_first.resize(total);
+    co_loop_last.resize(total);
+    for (0 ..< total) |l| {
+        co_first[l] = -1;
+        co_loop_first[l] = -1;
+        co_loop_last[l] = -1;
+    };
+    co_loop_start.clear();
+    co_loop_end.clear();
+    co_loops.clear();
+    co_mentions.clear();
+    co_pos[0] = 0;
+    co_walk(func_body[f]);
+    // Each local's range, and the slot it takes: the first of its type free
+    // by then (locals in the order their ranges start).
+    let start = Array[I32].new(total, 0);
+    let end = Array[I32].new(total, 0);
+    for (params ..< total) |l| {
+        start[l] = co_first[l];
+        end[l] = co_last[l];
+        if co_loop_first[l] >= 0 and co_loop_start[co_loop_first[l]] < start[l] { start[l] = co_loop_start[co_loop_first[l]]; };
+        if co_loop_last[l] >= 0 and co_loop_end[co_loop_last[l]] > end[l] { end[l] = co_loop_end[co_loop_last[l]]; };
+    };
+    let order = Array[I32].new(n, 0);
+    for (0 ..< n) |i| { order[i] = params + i; };
+    // (Insertion sort by start: functions have tens of locals.)
+    for (1 ..< n) |i| {
+        let l = order[i];
+        let j = i;
+        while (j > 0 and start[order[j - 1]] > start[l]) {
+            order[j] = order[j - 1];
+            j -= 1;
+        };
+        order[j] = l;
+    };
+    let first = func_locals[f];
+    let slot_of = Array[I32].new(total, -1);
+    let slot_type: Array[I32] = [];
+    let slot_end: Array[I32] = [];
+    for (order) |l| {
+        let vt = local_types[first + l - params];
+        let slot = -1;
+        if co_first[l] >= 0 and co_store_first[l] == 1 {
+            for (0 ..< slot_type.len()) |s| {
+                if slot < 0 and slot_type[s] == vt and slot_end[s] < start[l] { slot = s; };
+            };
+        };
+        if slot < 0 {
+            slot = slot_type.len();
+            slot_type = slot_type chain([vt]) collect(I32);
+            slot_end = slot_end chain([end[l]]) collect(I32);
+        } else {
+            slot_end[slot] = end[l];
+        };
+        slot_of[l] = slot;
+    };
+    // The slots, declared grouped by type (in the order types first appear).
+    let count = slot_type.len();
+    let index = Array[I32].new(count, -1);
+    let next = 0;
+    for (0 ..< count) |s| {
+        if index[s] < 0 {
+            for (s ..< count) |t| {
+                if index[t] < 0 and slot_type[t] == slot_type[s] {
+                    index[t] = next;
+                    next += 1;
+                };
+            };
+        };
+    };
+    let grouped = count < n;
+    for (0 ..< count) |s| { if index[s] != s { grouped = true; }; };
+    if not grouped { return; };
+    for (0 ..< count) |s| { local_types[first + index[s]] = slot_type[s]; };
+    func_local_count[f] = count;
+    for (0 ..< co_mentions.len()) |k| {
+        let node = co_mentions[k];
+        if w_a[node] >= params { w_a[node] = params + index[slot_of[w_a[node]]]; };
+    };
+}
+
+/// Number the nodes in the order they run (operands first), noting each
+/// local's mentions and each loop's span.
+fn co_walk(node: I32) void {
+    let op = w_op[node];
+    let span = -1;
+    if op == Op.Loop.to_i32() {
+        span = co_loop_start.len();
+        co_loop_start.push(co_pos[0]);
+        co_loop_end.push(-1);
+        co_loops.push(span);
+    };
+    for (0 ..< w_count[node]) |i| { co_walk(w_kid(node, i)); };
+    let at = co_pos[0];
+    co_pos[0] = at + 1;
+    if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        let l = w_a[node];
+        co_mentions.push(node);
+        if co_first[l] < 0 {
+            co_first[l] = at;
+            co_store_first[l] = if op == Op.LocalGet.to_i32() { 0; } else { 1; };
+            if co_loops.len() > 0 { co_loop_first[l] = co_loops[0]; };
+        };
+        co_last[l] = at;
+        if co_loops.len() > 0 { co_loop_last[l] = co_loops[0]; };
+    };
+    if span >= 0 {
+        co_loop_end[span] = at;
+        co_loops.resize(co_loops.len() - 1);
     };
 }
