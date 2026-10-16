@@ -115,7 +115,7 @@ mod start {
                 }
                 " file, or run a command from the UTU group in the command palette. Other editors speak to the same compiler through the language server; see ";
                 a {
-                    <href = "#/tooling";
+                    href = "#/tooling";
                     "Tooling";
                 }
                 ".";

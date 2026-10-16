@@ -75,8 +75,11 @@ try {
   await buildPlayground(temp);
   await stampVersions(temp);
   for (const name of outputs) await fs.copyFile(path.join(temp, name), path.join(target, name));
-  await fs.rm(path.join(target, 'playground'), { recursive: true, force: true });
-  await fs.cp(path.join(temp, 'playground'), path.join(target, 'playground'), { recursive: true });
+  // The playground, and each lazy page's chunk (wutu.lazy), replace last build's.
+  for (const directory of ['playground', 'chunks']) {
+    await fs.rm(path.join(target, directory), { recursive: true, force: true });
+    await fs.cp(path.join(temp, directory), path.join(target, directory), { recursive: true });
+  }
   await fs.writeFile(path.join(target, '.nojekyll'), '');
   const sizes = await Promise.all(outputs.map(async (name) => `${name} ${(await fs.stat(path.join(target, name))).size} bytes`));
   console.log(`docs/: ${sizes.join(', ')}`);

@@ -7,12 +7,12 @@ mod web {
         \\
         \\fn greeting(name: Str) Browser.HTMLElement {
         \\    @wutu/\
-        \\    section.greeting#hello {      # tag.class#id makes an element
-        \\        h2 {                      # a child element
-        \\            "Hello, ";            # a text node
-        \\            = name;               # text from an expression
+        \\    section.greeting#hello {  /* tag.class#id makes an element */
+        \\        h2 {  /* a child element */
+        \\            "Hello, ";  /* a text node */
+        \\            = name;  /* text from an expression */
         \\        }
-        \\        p.note.quiet {            # several classes
+        \\        p.note.quiet {  /* several classes */
         \\            "Welcome back.";
         \\        }
         \\    }
@@ -31,18 +31,18 @@ mod web {
         \\    @wutu/\
         \\    figure {
         \\        canvas {
-        \\            <width = "600";          # attribute: the bitmap's resolution
-        \\            width: 300px;            # CSS: its size on the page
-        \\            <aria-label = "Sales";
+        \\            width = "600";  /* attribute: the bitmap's resolution */
+        \\            width: 300px;  /* CSS: its size on the page */
+        \\            aria-label = "Sales";
         \\        }
         \\        input {
-        \\            <hidden = $[done];       # a boolean attribute, present when true
-        \\            <.value = $[draft];      # a typed DOM property
+        \\            hidden = $[done];  /* a boolean attribute, present when true */
+        \\            .value = $[draft];  /* a typed DOM property */
         \\        }
         \\        a {
-        \\            <href = "/about";
-        \\            <data-kind = "nav";
-        \\            color: rgb(30 60 120);   # CSS declarations sit on their element
+        \\            href = "/about";
+        \\            data-kind = "nav";
+        \\            color: rgb(30 60 120);  /* CSS declarations sit on their element */
         \\            "About";
         \\        }
         \\    }
@@ -60,13 +60,13 @@ mod web {
         \\fn stats(user: Str, count: I32, ratio: F64) Browser.HTMLElement {
         \\    @wutu/\
         \\    p {
-        \\        <title = $["Stats for " + user];   # an attribute built from text
+        \\        title = $["Stats for " + user];  /* an attribute built from text */
         \\        "User ";
         \\        b { = user; }
         \\        " has ";
         \\        = count.to_str();
         \\        " items (";
-        \\        $[(ratio * 100.0).to_str()];         # $[...] works as well as =
+        \\        $[(ratio * 100.0).to_str()];  /* $[...] works as well as = */
         \\        "%). Escapes: \"quoted\" →";
         \\    }
         \\    \/;
@@ -88,8 +88,8 @@ mod web {
         \\    @wutu/\
         \\    article {
         \\        h2 { = plant.name; }
-        \\        button as toggle {                  # name the node: toggle
-        \\            <type = "button";
+        \\        button as toggle {  /* name the node: toggle */
+        \\            type = "button";
         \\            "Water me";
         \\            @click=$[cl(event) void {       // a typed closure as the listener
         \\                plant.watered = not plant.watered;
@@ -125,7 +125,7 @@ mod web {
         \\            };
         \\        }
         \\        input {
-        \\            <placeholder = "Type";
+        \\            placeholder = "Type";
         \\            on keydown { state.last = event.key; };
         \\        }
         \\        p { = `${state.n} clicks, last event: ${state.last}`; }
@@ -152,8 +152,8 @@ mod web {
         \\fn card(title: Str, body: Browser.HTMLElement) Browser.HTMLElement {
         \\    @wutu/\
         \\    article.card {
-        \\        h3 { = title; = badge("new"); }   # a component is a function call
-        \\        = body;                          # a slot is just a node parameter
+        \\        h3 { = title; = badge("new"); }  /* a component is a function call */
+        \\        = body;  /* a slot is just a node parameter */
         \\    }
         \\    \/;
         \\}
@@ -196,9 +196,9 @@ mod web {
         \\fn ranking(names: Array[Str]) Browser.HTMLElement {
         \\    @wutu/\
         \\    ol {
-        \\        for $[names] |name, i| {                      # the index is a U64
+        \\        for $[names] |name, i| {  /* the index is a U64 */
         \\            li {
-        \\                <data-rank = $[(i.to_i32() + 1).to_str()];
+        \\                data-rank = $[(i.to_i32() + 1).to_str()];
         \\                = name;
         \\            }
         \\        }
@@ -209,7 +209,7 @@ mod web {
         \\fn long_words(words: Array[Str]) Browser.HTMLElement {
         \\    @wutu/\
         \\    ul {
-        \\        for $[words filter |w| { w.len() > 4; }] |w| {   # a pipeline, no temporary array
+        \\        for $[words filter |w| { w.len() > 4; }] |w| {  /* a pipeline, no temporary array */
         \\            li { = w; }
         \\        }
         \\    }
@@ -241,7 +241,7 @@ mod web {
         \\    let app = @wutu/\
         \\    @reactive;
         \\    ul {
-        \\        for $[state.todos] |todo| key $[todo.id] {   # identity follows the key
+        \\        for $[state.todos] |todo| key $[todo.id] {  /* identity follows the key */
         \\            li {
         \\                = todo.title;
         \\                button {
@@ -271,12 +271,12 @@ mod web {
         \\    let app = @wutu/\
         \\    @reactive;
         \\    form {
-        \\        input { <placeholder = "Name"; bind:value = order.name; }
+        \\        input { placeholder = "Name"; bind:value = order.name; }
         \\        label {
-        \\            input { <type = "checkbox"; bind:checked = order.gift; }
+        \\            input { type = "checkbox"; bind:checked = order.gift; }
         \\            "Gift wrap";
         \\        }
-        \\        input { <type = "number"; bind:number = order.amount; }
+        \\        input { type = "number"; bind:number = order.amount; }
         \\        p {
         \\            = `${order.amount} for ${order.name}`;
         \\            if $[order.gift] { " (wrapped)"; }
@@ -339,7 +339,7 @@ mod web {
         \\
         \\export main() void {
         \\    let app = @wutu/\
-        \\    @document {                          # document-level CSS, before the root
+        \\    @document {  /* document-level CSS, before the root */
         \\        :root { --accent: oklch(65% 0.15 60); }
         \\        body { margin: 0; font: 1rem system-ui; }
         \\        @keyframes pop { from { scale: 0.9; } to { scale: 1; } }
@@ -374,12 +374,12 @@ mod web {
         \\            border-left: 1px solid gray;
         \\        }
         \\        a {
-        \\            <href = "#/";
+        \\            href = "#/";
         \\            :hover { text-decoration: underline; }
         \\            ::after { content: " >"; }
         \\            "Home";
         \\        }
-        \\        a { <href = "#/docs"; "Docs"; }
+        \\        a { href = "#/docs"; "Docs"; }
         \\    }
         \\    \/;
         \\}
@@ -395,12 +395,12 @@ mod web {
         \\fn meter(progress: I32, hue: I32) Browser.HTMLElement {
         \\    @wutu/\
         \\    div.bar {
-        \\        height: 0.5rem;                     # static: compiled to a shared class
+        \\        height: 0.5rem;  /* static: compiled to a shared class */
         \\        background: lightgray;
         \\        i {
         \\            display: block;
         \\            height: 100%;
-        \\            width: $[progress.to_str() + "%"];               # computed at render
+        \\            width: $[progress.to_str() + "%"];  /* computed at render */
         \\            background: $["hsl(" + hue.to_str() + " 70% 50%)"];
         \\        }
         \\    }
@@ -425,9 +425,9 @@ mod web {
         \\
         \\export main() void {
         \\    let app = @wutu/\
-        \\    @style $[sheet()];                      # install any stylesheet, once
+        \\    @style $[sheet()];  /* install any stylesheet, once */
         \\    div {
-        \\        <class = "card";
+        \\        class = "card";
         \\        "Styled by a plain CSS class";
         \\    }
         \\    \/;
@@ -441,7 +441,7 @@ mod web {
         \\fn search() Browser.HTMLElement {
         \\    @wutu/\
         \\    form {
-        \\        input as query { <type = "search"; }
+        \\        input as query { type = "search"; }
         \\        output as result { "Nothing yet"; }
         \\        button {
         \\            "Search";
@@ -468,10 +468,10 @@ mod web {
         \\    @reactive;
         \\    main {
         \\        nav {
-        \\            a { <href = "#/"; "Home"; }
-        \\            a { <href = "#/about"; "About"; }
+        \\            a { href = "#/"; "Home"; }
+        \\            a { href = "#/about"; "About"; }
         \\        }
-        \\        if $[wutu.route() == "/about"] {     # the hash path; changes re-render
+        \\        if $[wutu.route() == "/about"] {  /* the hash path; changes re-render */
         \\            h1 { "About"; }
         \\        } else {
         \\            h1 { "Home"; }
@@ -491,7 +491,7 @@ mod web {
         \\fn clock(c: Clock) Browser.HTMLElement {
         \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1; });
         \\    @wutu/\
-        \\    @island "clock";                        # updates on its own
+        \\    @island "clock";  /* updates on its own */
         \\    p { = `${c.ticks} seconds`; }
         \\    \/;
         \\}
@@ -515,6 +515,71 @@ mod web {
         \\}
         ;
     }
+    fn layers_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(@wutu/\
+        \\    @document {
+        \\        main p.note { color: crimson; padding: 1rem; }
+        \\    }
+        \\    main {
+        \\        p.note {
+        \\            color: seagreen;        /* written here, so it wins */
+        \\            "green, with the document's padding";
+        \\        }
+        \\    }
+        \\    \/);
+        \\}
+        ;
+    }
+    fn unmanaged_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(@wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        div as chart {
+        \\            @unmanaged;
+        \\            data-kind = "chart";
+        \\            on mount {
+        \\                chart.append(Browser.document.createTextNode("drawn by JavaScript"));
+        \\            };
+        \\        }
+        \\        div as list {
+        \\            height: 6rem;
+        \\            overflow: auto;
+        \\            on scroll {
+        \\                chart.title = list.className;   // quiet: only elements change
+        \\            };
+        \\        }
+        \\    }
+        \\    \/);
+        \\}
+        ;
+    }
+    fn lazy_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(@wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        nav {
+        \\            a { href = "#/"; "Home"; }
+        \\            a { href = "#/guide"; "Guide"; }
+        \\        }
+        \\        if $[wutu.route() == "/guide"] {
+        \\            = wutu.lazy("./guide.utu");    /* its own chunk */
+        \\        } else {
+        \\            p { "Welcome."; }
+        \\        }
+        \\    }
+        \\    \/);
+        \\}
+        ;
+    }
     fn build_shell() Str {
         \\node cli/wutu.mjs dev main.utu --port 4176
         \\node cli/wutu.mjs format main.utu --check
@@ -528,7 +593,7 @@ mod web {
             p {
                 "Every sample below is a whole program. Paste one into the ";
                 a {
-                    <href = "#/playground";
+                    href = "#/playground";
                     "Playground";
                 }
                 " to see it run.";
@@ -543,9 +608,13 @@ mod web {
                 }
                 " alone never silently makes a div. Leaf statements end with a semicolon; blocks do not. ";
                 code {
-                    "#";
+                    "# ";
                 }
-                " after whitespace starts a comment.";
+                " first on a line starts a comment; at the end of a line, use ";
+                code {
+                    "/* … */";
+                }
+                ". Any other # is text, so hex colors just work.";
             }
             = code.block(hello_sample());
             h2 {
@@ -554,11 +623,11 @@ mod web {
             p {
                 "Three namespaces, told apart by syntax: ";
                 code {
-                    "<name = ...;";
+                    "name = ...;";
                 }
                 " is an attribute, ";
                 code {
-                    "<.name = ...;";
+                    ".name = ...;";
                 }
                 " a DOM property, and ";
                 code {
@@ -692,6 +761,45 @@ mod web {
             }
             = code.block(route_sample());
             = code.block(island_sample());
+            h2 {
+                "The nearer rule wins";
+            }
+            p {
+                "Document CSS and shared sheets sit in a cascade layer below element styles, so what is written on an element beats a document rule of any specificity.";
+            }
+            = code.block(layers_sample());
+            h2 {
+                "Elements JavaScript owns, and quiet handlers";
+            }
+            p {
+                code {
+                    "@unmanaged;";
+                }
+                " gives an element's insides to JavaScript, and ";
+                code {
+                    "on mount";
+                }
+                " runs once when it appears. A handler that only changes ";
+                code {
+                    "as";
+                }
+                " elements is quiet: no render follows it (or write ";
+                code {
+                    "on scroll quiet";
+                }
+                ").";
+            }
+            = code.block(unmanaged_sample());
+            h2 {
+                "Lazy pages";
+            }
+            p {
+                code {
+                    "wutu.lazy";
+                }
+                " shows a page built as its own chunk, fetched the first time it is shown. This site loads each page that way.";
+            }
+            = code.block(lazy_sample());
             h2 {
                 "Build, preview, and prerender";
             }

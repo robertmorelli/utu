@@ -370,7 +370,7 @@ mod data {
                 }
                 " compile to plain loops. They have ";
                 a {
-                    <href = "#/iterators";
+                    href = "#/iterators";
                     "their own page";
                 }
                 ".";
@@ -437,7 +437,7 @@ mod data {
                 }
                 ", ...) are on the ";
                 a {
-                    <href = "#/std";
+                    href = "#/std";
                     "standard library";
                 }
                 " page.";

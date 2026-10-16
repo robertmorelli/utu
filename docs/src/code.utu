@@ -210,7 +210,7 @@ mod code {
             code {
                 for $[parts.kinds] |kind, index| {
                     span {
-                        <class = $[kind];
+                        class = $[kind];
                         = parts.texts[index.to_i32()];
                     }
                 }
@@ -230,7 +230,7 @@ mod code {
         code {
             for $[parts.kinds] |kind, index| {
                 span {
-                    <class = $[kind];
+                    class = $[kind];
                     = parts.texts[index.to_i32()];
                 }
             }

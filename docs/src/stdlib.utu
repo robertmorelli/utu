@@ -394,7 +394,7 @@ mod stdlib {
         \\    section {
         \\        p { = wutu.money(cart.cents) + " at " + wutu.decimal(cart.cents.to_f64() / 3.0, 2); }
         \\        p { = "open for " + wutu.number(cart.seconds) + " s, on " + wutu.route(); }
-        \\        input { <id = "note"; }
+        \\        input { id = "note"; }
         \\        button {
         \\            "Add one";
         \\            on click {
@@ -669,7 +669,7 @@ mod stdlib {
     fn group(id: Str, title: Str) Browser.HTMLElement {
         @wutu/\
         h2 {
-            <id = $[id];
+            id = $[id];
             scroll-margin-block-start:1.5rem;
             = title;
         }
@@ -680,14 +680,14 @@ mod stdlib {
         article.page {
             = ui.header("The standard library", "Every module, by example. Each sample is a whole program; the last comment is what it prints.");
             nav {
-                <aria-label = "Sections";
+                aria-label = "Sections";
                 display:flex;
                 flex-wrap:wrap;
                 gap:0.5rem;
                 margin-block-start:1.75rem;
                 for $[toc()] |entry| {
                     button {
-                        <type = "button";
+                        type = "button";
                         font:inherit;
                         font-size:0.95rem;
                         padding:0.35rem 0.85rem;

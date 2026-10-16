@@ -12,7 +12,7 @@ mod home {
         \\        gap: 1rem;
         \\        h2 { "Hello, "; $[name]; }
         \\        a {
-        \\            <href = "#/start";
+        \\            href = "#/start";
         \\            :hover { opacity: 0.8; }
         \\            "Start here";
         \\        }
@@ -59,15 +59,15 @@ mod home {
                     }
                     p.actions {
                         a.button {
-                            <href = "#/start";
+                            href = "#/start";
                             "Get started";
                         }
                         a {
-                            <href = "#/playground";
+                            href = "#/playground";
                             "Try it in your browser";
                         }
                         a {
-                            <href = $[ui.repo()];
+                            href = $[ui.repo()];
                             "Source on GitHub";
                         }
                     }
@@ -92,7 +92,7 @@ mod home {
                     }
                     = code.block(npm_sample());
                     a {
-                        <href = "#/javascript";
+                        href = "#/javascript";
                         "JavaScript, the browser, and npm";
                     }
                 }
@@ -105,7 +105,7 @@ mod home {
                     }
                     = code.block(pipeline_sample());
                     a {
-                        <href = "#/data";
+                        href = "#/data";
                         "Typed JSON, iterators, and indexes";
                     }
                 }
@@ -161,7 +161,7 @@ mod home {
                 ul {
                     li {
                         a {
-                            <href = "#/start";
+                            href = "#/start";
                             "Getting started";
                         }
                         span {
@@ -170,7 +170,7 @@ mod home {
                     }
                     li {
                         a {
-                            <href = "#/tour";
+                            href = "#/tour";
                             "Language tour";
                         }
                         span {
@@ -179,7 +179,7 @@ mod home {
                     }
                     li {
                         a {
-                            <href = "#/javascript";
+                            href = "#/javascript";
                             "JavaScript and npm";
                         }
                         span {
@@ -188,7 +188,7 @@ mod home {
                     }
                     li {
                         a {
-                            <href = "#/data";
+                            href = "#/data";
                             "Data";
                         }
                         span {
@@ -197,7 +197,7 @@ mod home {
                     }
                     li {
                         a {
-                            <href = "#/wutu";
+                            href = "#/wutu";
                             "Wutu";
                         }
                         span {
@@ -206,7 +206,7 @@ mod home {
                     }
                     li {
                         a {
-                            <href = "#/tooling";
+                            href = "#/tooling";
                             "Tooling";
                         }
                         span {
@@ -215,7 +215,7 @@ mod home {
                     }
                     li {
                         a {
-                            <href = "#/compiler";
+                            href = "#/compiler";
                             "The compiler";
                         }
                         span {

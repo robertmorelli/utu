@@ -1365,7 +1365,7 @@ mod tour {
                 }
                 " are syntax that compiles to one loop. ";
                 a {
-                    <href = "#/iterators";
+                    href = "#/iterators";
                     "The iterators page";
                 }
                 " covers every stage. ";
@@ -1456,7 +1456,7 @@ mod tour {
                 }
                 ". For whole libraries, see ";
                 a {
-                    <href = "#/javascript";
+                    href = "#/javascript";
                     "JavaScript and npm";
                 }
                 ".";
@@ -1468,7 +1468,7 @@ mod tour {
             p {
                 "An ";
                 code {
-                    = "@name" + ui.open_mark() + " ... " + ui.close_mark();
+                    "@name/\\ ... \\/";
                 }
                 " envelope hands its text to a language the compiler knows: ";
                 code {
@@ -1476,7 +1476,7 @@ mod tour {
                 }
                 " (";
                 a {
-                    <href = "#/data";
+                    href = "#/data";
                     "typed JSON";
                 }
                 "), ";
@@ -1493,7 +1493,7 @@ mod tour {
                 }
                 " (";
                 a {
-                    <href = "#/wutu";
+                    href = "#/wutu";
                     "markup";
                 }
                 ").";

@@ -3,16 +3,7 @@
 using Browser from std:Browser;
 using ui from "./ui.utu";
 using home from "./home.utu";
-using start from "./start.utu";
-using tour from "./tour.utu";
-using javascript from "./javascript.utu";
-using data from "./data.utu";
-using web from "./web.utu";
-using tooling from "./tooling.utu";
-using compiler from "./compiler.utu";
 using playground from "./playground.utu";
-using stdlib from "./stdlib.utu";
-using iterators from "./iterators.utu";
 struct Link:
 | href: Str
 | label: Str
@@ -79,27 +70,30 @@ fn title(route: Str) Str {
         ~> "utu",
     };
 }
-fn page(route: Str, play: playground.State) Browser.HTMLElement {
+// The overview and the playground are part of the site; every other page is
+// its own chunk (wutu.lazy), loaded the first time it is shown, so the site
+// starts with only the page it shows.
+fn page(route: Str, play: playground.State) Externref {
     if route == "/playground" {
         playground.page(play);
-    } else if route == "/iterators" {
-        iterators.page();
-    } else if route == "/std" {
-        stdlib.page();
     } else if route == "/start" {
-        start.page();
+        wutu.lazy("./start.utu");
     } else if route == "/tour" {
-        tour.page();
+        wutu.lazy("./tour.utu");
+    } else if route == "/iterators" {
+        wutu.lazy("./iterators.utu");
+    } else if route == "/std" {
+        wutu.lazy("./stdlib.utu");
     } else if route == "/javascript" {
-        javascript.page();
+        wutu.lazy("./javascript.utu");
     } else if route == "/data" {
-        data.page();
+        wutu.lazy("./data.utu");
     } else if route == "/wutu" {
-        web.page();
+        wutu.lazy("./web.utu");
     } else if route == "/tooling" {
-        tooling.page();
+        wutu.lazy("./tooling.utu");
     } else if route == "/compiler" {
-        compiler.page();
+        wutu.lazy("./compiler.utu");
     } else {
         home.page();
     };
@@ -233,6 +227,9 @@ export main() void {
             max-inline-size: 44rem;
             padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 6rem;
         }
+        .page-head + p {
+            margin-block-start: 2rem;
+        }
         .page.playground {
             max-inline-size: 84rem;
         }
@@ -315,10 +312,6 @@ export main() void {
         }
         pre.code .f {
             color: var(--code-f);
-        }
-        div.editor > pre.code {
-            margin: 0;
-            overflow: hidden;
         }
         table {
             border-collapse: collapse;
@@ -511,7 +504,7 @@ export main() void {
                 border-block-end: 1px solid var(--line);
             }
             a.brand {
-                <href = "#/";
+                href = "#/";
                 display:flex;
                 align-items:center;
                 gap:0.7rem;
@@ -539,7 +532,7 @@ export main() void {
                 }
             }
             nav {
-                <aria-label = "Pages";
+                aria-label = "Pages";
                 display:grid;
                 @media (width < 64rem) {
                     display: flex;
@@ -551,9 +544,9 @@ export main() void {
                 }
                 for $[links()] |link| key $[link.href] {
                     a {
-                        <href = $["#" + link.href];
-                        <class = $[if link.href == wutu.route() { "here"; } else { "elsewhere"; }];
-                        <aria-current = $[if link.href == wutu.route() { "page"; } else { "false"; }];
+                        href = $["#" + link.href];
+                        class = $[if link.href == wutu.route() { "here"; } else { "elsewhere"; }];
+                        aria-current = $[if link.href == wutu.route() { "page"; } else { "false"; }];
                         display:block;
                         padding:0.5rem 0.75rem;
                         text-decoration:none;
@@ -591,13 +584,13 @@ export main() void {
                     display: none;
                 }
                 a {
-                    <href = $[ui.repo()];
+                    href = $[ui.repo()];
                     "GitHub";
                 }
                 br {
                 }
                 a {
-                    <href = $[ui.repo() + "/tree/main/docs"];
+                    href = $[ui.repo() + "/tree/main/docs"];
                     "Markdown deep dives";
                 }
             }
@@ -618,7 +611,7 @@ export main() void {
                 p {
                     "This site is written in utu and compiled to WasmGC. ";
                     a {
-                        <href = $[ui.repo() + "/tree/main/docs/src"];
+                        href = $[ui.repo() + "/tree/main/docs/src"];
                         "Read its source";
                     }
                     ".";
@@ -626,7 +619,7 @@ export main() void {
                 p {
                     "MIT licensed. ";
                     a {
-                        <href = $[ui.repo()];
+                        href = $[ui.repo()];
                         "robertmorelli/utu";
                     }
                 }

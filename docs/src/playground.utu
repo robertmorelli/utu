@@ -49,7 +49,7 @@ mod playground {
         \\            display: flex;
         \\            gap: 0.5rem;
         \\            input {
-        \\                <placeholder = "Add something";
+        \\                placeholder = "Add something";
         \\                flex: 1;
         \\                padding: 0.5rem;
         \\                bind:value = state.draft;
@@ -79,7 +79,7 @@ mod playground {
         \\                    padding: 0.4rem 0;
         \\                    label {
         \\                        input {
-        \\                            <type = "checkbox";
+        \\                            type = "checkbox";
         \\                            bind:checked = todo.done;
         \\                        }
         \\                        " ";
@@ -155,7 +155,7 @@ mod playground {
                         block-size: 26rem;
                     }
                     pre.code as overlay {
-                        <aria-hidden = "true";
+                        aria-hidden = "true";
                         position:absolute;
                         inset:0;
                         margin:0;
@@ -165,10 +165,10 @@ mod playground {
                         = code.spans(state.saved.source);
                     }
                     textarea as field {
-                        <spellcheck = "false";
-                        <autocapitalize = "off";
-                        <autocomplete = "off";
-                        <aria-label = "Wutu source";
+                        spellcheck = "false";
+                        autocapitalize = "off";
+                        autocomplete = "off";
+                        aria-label = "Wutu source";
                         position:absolute;
                         inset:0;
                         inline-size:100%;
@@ -228,8 +228,8 @@ mod playground {
                         block-size: 30rem;
                     }
                     p.status {
-                        <role = "status";
-                        <class = $[if state.failed { "failed"; } else { "fine"; }];
+                        role = "status";
+                        class = $[if state.failed { "failed"; } else { "fine"; }];
                         margin:0;
                         padding:0.5rem 0.75rem;
                         font-size:0.85rem;
@@ -243,9 +243,9 @@ mod playground {
                         = state.status;
                     }
                     iframe {
-                        <id = "play-preview";
-                        <title = "The site your Wutu builds";
-                        <sandbox = "allow-scripts allow-forms";
+                        id = "play-preview";
+                        title = "The site your Wutu builds";
+                        sandbox = "allow-scripts allow-forms";
                         inline-size:100%;
                         block-size:100%;
                         border:0;
@@ -268,14 +268,14 @@ mod playground {
                 }
                 " and the standard library; npm packages need the ";
                 a {
-                    <href = "#/tooling";
+                    href = "#/tooling";
                     "wutu CLI";
                 }
                 ".";
             }
             p {
                 button.reset {
-                    <type = "button";
+                    type = "button";
                     padding:0.4rem 0.8rem;
                     font:inherit;
                     font-size:0.9rem;
