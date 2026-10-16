@@ -229,6 +229,14 @@ fn break_rule_text(a: I32) Str {
     "defer must be a statement in a block";
 }
 
+/// Whether token t is a `\\` line whose text ends in `;` (meant to end the statement).
+fn semicolon_in_multiline(t: I32) Bool {
+    if t < 0 or tok_kind[t] != Tok.MultilineLine.to_i32() { return false; };
+    let e = tok_end[t] - 1;
+    while (e > tok_start[t] and (src[e] == 32 or src[e] == 9 or src[e] == 10 or src[e] == 13)) { e -= 1; };
+    src[e] == 59;
+}
+
 /// A diagnostic's message, in stage 0's words.
 fn diag_text(i: I32) Str {
     let k = Diag.from_i32(diag_kind[i]);
@@ -266,6 +274,10 @@ fn diag_text(i: I32) Str {
         },
         Diag.UnknownMethod => {
             if a >= 0 and ty_is(a, Ty.Nullable) { return "Unknown method '" + type_text(ty_a[a]) + "." + w + "'"; };
+            if a >= 0 and b == 1 {
+                let t = type_text(a);
+                return "Unknown method '" + t + "." + w + "': " + w + " is a function of " + t + ", not a method; call it as " + t + "." + w + "(value)";
+            };
             if a >= 0 { return "Unknown method '" + type_text(a) + "." + w + "'"; };
             if diag_c[i] >= 0 { return "Unknown method '" + word_text(diag_c[i]) + "." + w + "'"; };
             "Unknown method '" + w + "'";
@@ -401,6 +413,9 @@ fn diag_text(i: I32) Str {
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 34 { return "Syntax error: a string not closed on its line"; };
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 96 { return "Syntax error: a template string not closed"; };
             let found = found_text(a);
+            if b >= 0 and semicolon_in_multiline(a - 1) and word_text(b) == "';'" {
+                return "Syntax error: expected ';', got " + found + " (a \\\\ line runs to the end of the line, so its ';' is text: end the string with ';' on a line of its own)";
+            };
             if b >= 0 { return "Syntax error: expected " + word_text(b) + ", got " + found; };
             if tok_kind[a] == Tok.End.to_i32() { return "Syntax error: unexpected end of the file"; };
             "Syntax error: unexpected " + found;

@@ -172,12 +172,12 @@ class WutuParser {
     this.p++;
   }
 
-  /** A quoted string. CSS strings may contain backslash escapes; Utu strings may not. */
-  readQuoted({ escapes = false } = {}) {
+  /** A quoted string, CSS or Utu: a backslash escapes the character after it. */
+  readQuoted() {
     const start = this.p, quote = this.text[this.p++];
     while (this.p < this.text.length) {
       const c = this.text[this.p];
-      if (escapes && c === '\\') { this.p += 2; continue; }
+      if (c === '\\') { this.p += 2; continue; }
       this.p++;
       if (c === quote) return this.text.slice(start, this.p);
     }
@@ -281,7 +281,7 @@ class WutuParser {
     let parens = 0, brackets = 0;
     while (!this.done) {
       const c = this.text[this.p];
-      if (c === '"' || c === "'") { this.readQuoted({ escapes: true }); continue; }
+      if (c === '"' || c === "'") { this.readQuoted(); continue; }
       if (!parens && !brackets && delimiters.includes(c)) break;
       if (c === '(') parens++;
       else if (c === ')') parens--;
@@ -305,7 +305,7 @@ class WutuParser {
         continue;
       }
       const c = this.text[this.p];
-      if (c === '"' || c === "'") { this.readQuoted({ escapes: true }); continue; }
+      if (c === '"' || c === "'") { this.readQuoted(); continue; }
       if (c === '{') depth++;
       if (c === '}') {
         const before = this.text.slice(start - 1, this.p).replace(/\/\*[\s\S]*?\*\//g, '').trimEnd();

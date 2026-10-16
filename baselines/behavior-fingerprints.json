@@ -1825,6 +1825,17 @@
   "diagnostics": "87255d7a1ace7e17",
   "formatted": "df8736809cffd427"
  },
+ "negative/043 module function called as a method analysis": {
+  "diagnostics": "c1a0d265df7a5efa",
+  "formatted": "caf66232363e5727",
+  "entries": "81e3d1022b462bf0",
+  "queries": "68e52980a1a2e6f9",
+  "graphs": "c82f184f9160b076"
+ },
+ "negative/043 module function called as a method normal": {
+  "diagnostics": "c1a0d265df7a5efa",
+  "formatted": "caf66232363e5727"
+ },
  "std/Array.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",

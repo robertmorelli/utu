@@ -52,4 +52,5 @@ export const negativeDiagnosticCases = [
   ['direct recursive struct', `struct Node:\n  | next : Node\nexport lib { fn bad() I32 { 0; } }`, 'recursive-type', "Recursive type 'Node'"],
   ['indirect recursive struct', `struct A:\n  | b : B\nstruct B:\n  | a : A\nexport lib { fn bad() I32 { 0; } }`, 'recursive-type', "Recursive type 'A'"],
   ['nullable recursive struct is allowed except missing init field', `struct Node:\n  | next : ?Node\nexport lib { fn bad() Node { Node { }; } }`, 'missing-field', "Missing field 'next' for Node"],
+  ['module function called as a method', `export lib { fn bad(x: F64) F64 { x.sqrt(); } }`, 'unknown-method', "Unknown method 'F64.sqrt': sqrt is a function of F64, not a method; call it as F64.sqrt(value)"],
 ];

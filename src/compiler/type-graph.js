@@ -951,6 +951,11 @@ function collectOperationFailures(graph) {
   }
 }
 
+/** What calling module function `owner.member` as a method says. */
+function staticAsMethod(owner, member) {
+  return `Unknown method '${owner}.${member}': ${member} is a function of ${owner}, not a method; call it as ${owner}.${member}(value)`;
+}
+
 function checkArity(graph, call) {
   if (rareFactOf(graph, call, 'foreign')) return;
   const fn = resolvedFunction(graph, call);
@@ -960,6 +965,18 @@ function checkArity(graph, call) {
     : protocol ? paramsOf(protocol.declaration)
     : callableParts(actual(graph, callee))?.params;
   if (!signature) return;
+  // `x.sqrt()` where the type's module has `fn sqrt(x: &)` and no method:
+  // say how to call the function.
+  const recv = callee?.localName === 'ir-field-access' ? callee.firstElementChild : null;
+  if (fn && recv && !selfParamOf(fn) && fnNameOf(fn)?.getAttribute('kind') !== 'method'
+    && !(recv.localName === 'ir-ident' && !bindingOf(graph, recv))) {
+    const owner = unwrapNullable(actual(graph, recv) ?? '');
+    const member = callee.getAttribute('field');
+    if (owner && owner !== 'undefined') {
+      fail(graph, call, DIAGNOSTIC_KINDS.UNKNOWN_METHOD, staticAsMethod(owner, member), { method: member, receiverName: owner });
+      return;
+    }
+  }
   const expected = signature.length;
   const actualCount = argCount(call);
   // `T.method(value, args)` passes the receiver explicitly; that extra

@@ -66,6 +66,7 @@ Common attributes are checked per tag. `canvas { <padding="10" }` is an error.
 assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
 are rejected: use a closure. Interpolated strings become text, never HTML.
+Written strings take Utu's escapes: `"say \"hi\"";`, `"\u2192";`, `"\\";`.
 Use `.to_f64().toString()` to display a native integer through browser Number.
 
 Classes from `<class=$[classes]>` are combined with authored shorthand and

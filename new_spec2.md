@@ -561,7 +561,18 @@ orelse
 \\multiline                   // multiline string (each line prefixed \\)
 `x is ${x}`                   // template string: see below
 true  false  null
+```
 
+A `\\` line is text to the end of its line, so the statement's `;` goes on
+a line of its own after the last one (a `;` on a `\\` line is text):
+
+```
+let usage = \\usage: utu check <file.utu>
+            \\       utu run <file.utu>
+;
+```
+
+```
 // struct init
 T1 { field1: 10, field2: x }
 

@@ -46,9 +46,9 @@ export function dslLiterals(source) {
       continue;
     }
     if (source[i] === '"') {
-      // Utu strings have no escapes and end at the line.
+      // A Utu string ends at its closing quote or the line; `\"` is in it.
       i++;
-      while (i < source.length && source[i] !== '"' && source[i] !== '\n') i++;
+      while (i < source.length && source[i] !== '"' && source[i] !== '\n') i += source[i] === '\\' ? 2 : 1;
       i++;
       continue;
     }

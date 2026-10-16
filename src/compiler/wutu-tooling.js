@@ -8,9 +8,18 @@ import { parseWutu, wutuVocabulary } from './wutu-parse.js';
 
 const INDENT = '    ';
 
+/** Offset of the quote closing the string opened at `start`, past `\\` escapes; -1 if none. */
+function stringEnd(source, start) {
+  for (let i = start + 1; i < source.length; i++) {
+    if (source[i] === '\\') i++;
+    else if (source[i] === source[start]) return i;
+  }
+  return -1;
+}
+
 export function formatWutuBody(source) {
   // Comments carry meaning for authors. Preserve commented bodies rather than discard them.
-  if (/^\s*#|\/\/|\/\*|^\s*\\\\/m.test(source.replace(/"[^"\n]*"/g, '""'))) return source;
+  if (/^\s*#|\/\/|\/\*|^\s*\\\\/m.test(source.replace(/"(?:[^"\\\n]|\\.)*"/g, '""'))) return source;
   if (/@\w+\s*\/\\/.test(source)) return formatWithOpaquePayloads(source);
   return new BodyFormatter().format(parseWutu(source));
 }
@@ -21,7 +30,7 @@ function formatWithOpaquePayloads(source) {
   let masked = '';
   for (let i = 0; i < source.length;) {
     if (source[i] === '"') {
-      const end = source.indexOf('"', i + 1);
+      const end = stringEnd(source, i);
       if (end < 0) return source;
       masked += source.slice(i, end + 1);
       i = end + 1;
@@ -46,7 +55,7 @@ function isBalanced(code) {
   for (let i = 0; i < code.length; i++) {
     const c = code[i];
     if (c === '"') {
-      const end = code.indexOf('"', i + 1);
+      const end = stringEnd(code, i);
       if (end < 0) return false;
       i = end;
     } else if ('([{'.includes(c)) {
@@ -60,9 +69,10 @@ function isBalanced(code) {
 
 /** Collapse whitespace outside string literals. */
 function compactExpression(value) {
-  let result = '', quoted = false;
+  let result = '', quoted = false, escaped = false;
   for (const c of value.trim()) {
-    if (c === '"') quoted = !quoted;
+    if (quoted && (escaped || c === '\\')) escaped = !escaped;
+    else if (c === '"') quoted = !quoted;
     if (!quoted && /\s/.test(c)) {
       if (!result.endsWith(' ')) result += ' ';
     } else {
@@ -157,14 +167,13 @@ class BodyFormatter {
   conditional(node, depth, keyword) {
     this.add(depth, `${keyword} $[${compactExpression(node.condition)}] {`);
     this.children(node.children, depth + 1);
-    this.add(depth, '}');
     const [first] = node.otherwise;
-    if (node.otherwise.length === 1 && first.elseIf) return this.conditional(first, depth, 'else if');
+    if (node.otherwise.length === 1 && first.elseIf) return this.conditional(first, depth, '} else if');
     if (node.otherwise.length) {
-      this.add(depth, 'else {');
+      this.add(depth, '} else {');
       this.children(node.otherwise, depth + 1);
-      this.add(depth, '}');
     }
+    this.add(depth, '}');
   }
 
   loop(node, depth) {
@@ -257,6 +266,11 @@ export function formatUtuSource(source) {
     if (line.trim()) result += INDENT.repeat(Math.max(0, depth)) + line.trim() + '\n';
     line = '';
   };
+  // A blank line the author left between statements stays (one at most),
+  // except just inside a block's braces.
+  const blankLine = () => {
+    if (result && !result.endsWith('\n\n') && !result.endsWith('{\n')) result += '\n';
+  };
   for (let i = 0; i < source.length;) {
     if (isLineComment(source, i)) {
       const end = lineEnd(source, i);
@@ -266,7 +280,7 @@ export function formatUtuSource(source) {
       continue;
     }
     if (source[i] === '"') {
-      const end = source.indexOf('"', i + 1);
+      const end = stringEnd(source, i);
       if (end < 0) return source;
       line += source.slice(i, end + 1);
       i = end + 1;
@@ -289,18 +303,23 @@ export function formatUtuSource(source) {
       depth++;
     } else if (c === '}') {
       flush();
+      result = result.replace(/\n\n$/, '\n');
       depth--;
       braces.pop();
       line = '}';
-      if (!/^\s*[;,)]/.test(source.slice(i))) flush();
+      if (!/^\s*([;,)]|else\b)/.test(source.slice(i))) flush();
     } else if (c === ';' && parens === 0) {
       line = line.trimEnd() + ';';
       flush();
     } else if (c === ',' && braces.at(-1) === parens) {
       line = line.trimEnd() + ',';
       flush();
+    } else if (c === '\n' && line.trim() === '}' && /^\s*else\b/.test(source.slice(i))) {
+      line += ' ';
     } else if (c === '\n') {
+      const blank = !line.trim() && /^[ \t\r]*\n/.test(source.slice(i));
       flush();
+      if (blank) blankLine();
     } else if (/\s/.test(c)) {
       if (line && !line.endsWith(' ')) line += ' ';
     } else {
