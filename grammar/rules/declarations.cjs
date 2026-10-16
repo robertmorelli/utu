@@ -136,6 +136,8 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
         $.module_name,
         optional($.module_type_arg_list),
         optional($.captured_module_name),
+        // `using tour lazy from "./tour.utu"`: the module builds as its own chunk.
+        optional(field('lazy', 'lazy')),
         optional(seq('from', $._from_path)),
       ),
     captured_module_name: ($) => seq('|', $.module_name, '|'),

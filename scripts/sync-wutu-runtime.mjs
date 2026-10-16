@@ -36,25 +36,16 @@ mod wutu {
         let call: fun(cl() void) void = @es/\\ (callback)=>globalThis.__utuWutu?.cleanup(callback) \\/;
         call(callback);
     }
-    /// A page compiled on its own and loaded the first time it is shown:
-    /// \`wutu build\` makes a chunk of each file named here (its module's
-    /// \`page()\`). This is its placeholder element, which the chunk fills.
-    fn lazy(path: Str) Externref {
-        init();
-        let load: fun(Str) Externref = @es/\\ (path)=>globalThis.__utuWutu.lazy(path) \\/;
-        load(path);
-    }
-    /// A chunk's page, into the placeholder \`lazy(path)\` made.
-    fn deliver(path: Str, page: Externref) void {
-        init();
-        let give: fun(Str, Externref) void = @es/\\ (path,page)=>globalThis.__utuWutu.deliver(path,page) \\/;
-        give(path, page);
-    }
     /// A template's text hole (\`= x;\`): a number or a Bool shows as its
     /// \`to_str()\`, a Str or a node as itself. The compiler picks which, by
     /// x's type; this body is never what runs.
     fn show(value: Externref) Externref {
         value;
+    }
+    /// A text hole's reuse key (\`= f(a, b);\`): the compiler makes it, from
+    /// the call and its arguments; this body is never what runs.
+    fn memo_key(call: Externref, key: Str) Str {
+        key;
     }
     fn route() Str {
         let call: fun() Str = @es/\\ ()=>location.hash.slice(1)||"/" \\/;

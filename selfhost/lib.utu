@@ -68,6 +68,9 @@ export lib {
     /// Room for a file of `n` bytes; `role` is a `FileRole`. Returns the file.
     fn file_add(n: I32, role: I32) I32 { add_file(n, FileRole.from_i32(role)); }
 
+    /// The file is the standard library's (`std:…`).
+    fn file_mark_std(file: I32) void { file_std[file] = 1; }
+
     /// Where the host writes the file's bytes in `src`.
     fn file_offset(file: I32) I32 { file_start[file]; }
 

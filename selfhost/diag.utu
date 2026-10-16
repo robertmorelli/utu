@@ -190,6 +190,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.AssignmentToImmutable { return "assignment-to-immutable"; };
     if k == Diag.InvalidBreak or k == Diag.InvalidDefer { return "invalid-break"; };
     if k == Diag.Unsupported { return "unsupported"; };
+    if k == Diag.LazyValue { return "invalid-lazy-call"; };
     if k == Diag.ParseError { return "parse-error"; };
     if k == Diag.DuplicateField { return "duplicate-field"; };
     if k == Diag.InvalidNullableType or k == Diag.BareNull { return "invalid-nullable-type"; };
@@ -421,6 +422,10 @@ fn diag_text(i: I32) Str {
             "Syntax error: unexpected " + found;
         },
         Diag.Unsupported => "not supported yet",
+        Diag.LazyValue => {
+            if b == 1 { return "A lazy module's function returns its element to the page: " + w + " returns " + type_text(a) + ", not a host element"; };
+            "A lazy module's function takes numbers, Bool, Str, and host values (they cross into its chunk): " + w + " takes " + type_text(a);
+        },
         ~> Diag.name(k),
     };
 }

@@ -11,13 +11,9 @@
 //! Utu written inside a DSL body (an interpolation, a match arm) is copied
 //! into the expansion as text, where it means what it meant at the site.
 
-vec dsl_reconcile: I32 = [0];
-
 /// Expand every DSL site of the program's own files; then the sites the
 /// expansions made, until none is left.
 fn expand_dsls() void {
-    // Any reactive template makes every one reconciled.
-    dsl_reconcile[0] = if wutu_reactive_program() { 1; } else { 0; };
     let rounds = 0;
     while (rounds < 16 and expand_dsl_round()) { rounds += 1; };
 }
@@ -85,7 +81,7 @@ fn expand_site(n: I32, name: Str) void {
         if name == "utu" { expand_utu(n); }
         else if name == "css" { expand_css(n); }
         else if name == "stored" { expand_stored(n); }
-        else { expand_wutu(n, dsl_reconcile[0] == 1); };
+        else { expand_wutu(n); };
     } catch {
         report_dsl_error(n);
         dsl_failed.push(n);

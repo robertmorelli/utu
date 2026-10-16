@@ -190,6 +190,7 @@ enum(U8) Diag:
     | EntrySurface
     | InvalidEscape
     | AwaitInClosure
+    | LazyValue
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -601,6 +602,25 @@ fn declare_alias(item: I32) void {
     if opens and decl_is(module, Decl.Module) { bind_module_members(module); };
 }
 
+/// Lazy modules (`using … lazy from`), and each one's path as written (with its quotes).
+vec lazy_module: I32;
+vec lazy_path: I32;
+
+/// Whether a `using` says `lazy`.
+fn using_is_lazy(node: I32) Bool {
+    for (node_first[node] ..< node_last[node]) |t| {
+        let n = tok_end[t] - tok_start[t];
+        if n == 4 and src[tok_start[t]] == 108 and src[tok_start[t] + 1] == 97 and src[tok_start[t] + 2] == 122 and src[tok_start[t] + 3] == 121 { return true; };
+    };
+    false;
+}
+
+/// The lazy module m's index in lazy_module, or -1.
+fn lazy_index(m: I32) I32 {
+    for (0 ..< lazy_module.len()) |k| { if lazy_module[k] == m { return k; }; };
+    -1;
+}
+
 /// The program scope, from the prelude up: modules, then aliases, then the
 /// entry file's own declarations, each hiding what came before.
 fn declare_program() void {
@@ -614,6 +634,21 @@ fn declare_program() void {
                         bind(decl_name[m], m);
                     };
                     item = next_sibling(item);
+                };
+            };
+        };
+    };
+    // `using tour lazy from "./tour.utu"`: the modules that file declares are
+    // lazy; their functions the program calls are stubs (see lazy_stub).
+    lazy_module.clear();
+    lazy_path.clear();
+    for (0 ..< import_file.len()) |i| {
+        if import_target[i] >= 0 and using_is_lazy(import_node[i]) {
+            let written = intern_text(bytes_text(tok_start[node_first[import_path[i]]], tok_end[node_last[import_path[i]] - 1]));
+            for (0 ..< decl_kind.len()) |m| {
+                if decl_is(m, Decl.Module) and decl_node[m] >= 0 and file_of_token(node_first[decl_node[m]]) == import_target[i] and lazy_index(m) < 0 {
+                    lazy_module.push(m);
+                    lazy_path.push(written);
                 };
             };
         };

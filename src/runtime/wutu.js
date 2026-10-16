@@ -22,7 +22,10 @@ export function createWutuRuntime() {
   const afterRender = [];
   const installedStyles = new Set();
   const mounted = new WeakSet();    // elements whose `on mount` has run
-  const lazies = new Map();         // lazy page path -> its placeholder
+  const lazies = new Map();         // lazy call (path, name, arguments) -> its placeholder
+  let memoNode = null;              // the element memoHit() found
+  /** Where a reused hole is: its call key and the keys around it. */
+  const memoPlace = () => keys.map(k => k.value).join('|');
   let loading = 0;                  // chunks loading
   const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
   const prototypes = new Map();     // description -> [element, its attribute names]
@@ -599,8 +602,9 @@ export function createWutuRuntime() {
     for (const child of node.children ?? []) dispose(child);
   }
 
-  addEventListener('hashchange', refresh);
-  addEventListener('popstate', refresh);
+  // (Where there is a window: a DOM without one, in tests, has no routes.)
+  globalThis.addEventListener?.('hashchange', refresh);
+  globalThis.addEventListener?.('popstate', refresh);
 
   const api = {
     enter, shell, still, append, attr, listen, leave, mount, refresh, invalidate, style,
@@ -621,19 +625,19 @@ export function createWutuRuntime() {
       view.cleanups.push(() => clearInterval(timer));
     },
     /**
-     * A lazily built page's placeholder (a prerendered one, kept, if there is
-     * one): its chunk loads once, and deliver() fills it. While chunks load,
-     * <html> has data-wutu-loading (a prerenderer waits for it to go).
+     * A lazy module's function (`using m lazy from "…"`), called with `args`:
+     * its placeholder, which the element the function makes fills once the
+     * module's chunk has loaded (a prerendered placeholder keeps its markup
+     * until then). One placeholder per path, name, and arguments. While chunks
+     * load, <html> has data-wutu-loading (a prerenderer waits for it to go).
      */
-    lazy(path) {
-      let node = lazies.get(path);
+    lazyCall(path, name, args) {
+      const key = path + '|' + name + '|' + args.map(arg => arg !== null && typeof arg === 'object' ? '#' : String(arg)).join('\u001f');
+      let node = lazies.get(key);
       if (node) return node;
-      node = document.querySelector('[data-wutu-lazy="' + path + '"]');
-      if (!node) {
-        node = document.createElement('div');
-        node.setAttribute('data-wutu-lazy', path);
-      }
-      lazies.set(path, node);
+      node = [...document.querySelectorAll('[data-wutu-lazy]')].find(n => n.getAttribute('data-wutu-lazy') === key) ?? document.createElement('div');
+      node.setAttribute('data-wutu-lazy', key);
+      lazies.set(key, node);
       const url = globalThis.__wutuChunks?.[path];
       if (!url) {
         console.error('Wutu: no chunk was built for ' + path);
@@ -641,12 +645,26 @@ export function createWutuRuntime() {
       }
       loading++;
       document.documentElement.setAttribute('data-wutu-loading', '');
-      import(url).catch(error => console.error(error)).finally(() => {
+      import(url).then(chunk => node.replaceChildren(chunk.exports[name](...args))).catch(error => console.error(error)).finally(() => {
         if (--loading === 0) document.documentElement.removeAttribute('data-wutu-loading');
       });
       return node;
     },
-    deliver(path, page) { lazies.get(path)?.replaceChildren(page); },
+    /**
+     * A hole that calls a function (`= f(a, b);`) with a key the compiler
+     * made from its arguments: if the call at this place in this view made
+     * its element last time with the same key, it is put back without the
+     * call. ("" is never reused.)
+     */
+    memoHit(key) {
+      if (!key || !active) return false;
+      const entry = active.memo?.get(memoPlace());
+      if (entry?.key !== key || !entry.node?.isConnected) return false;
+      memoNode = entry.node;
+      return true;
+    },
+    memoLast() { return memoNode; },
+    memoKeep(key, node) { if (key && active) (active.memo ??= new Map()).set(memoPlace(), { key, node }); },
     after(callback) { afterRender.push(callback); schedule(); },
     focus(id) { afterRender.push(() => document.getElementById(id)?.focus()); schedule(); },
     cleanup(callback) { if (active) active.cleanupCallbacks[active.cleanupIndex++] = callback; },

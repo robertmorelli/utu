@@ -272,7 +272,6 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     const cases = [
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; }`, 'invalid-dsl-usage', 'h'],
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) void { x.focus(); }; } } \\/; }`, 'invalid-dsl-usage', 'x'],
-      [`${BROWSER}struct S:\n    | t: Str\nexport main() Browser.HTMLElement { let s = S { t: "" }; @wutu/\\ div { input { bind:value = s.t; } } \\/; }`, 'invalid-dsl-usage', 'b'],
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { = 1 +; } \\/; }`, 'invalid-dsl-usage', '1'],
     ];
     for (const [source, kind, text] of cases) {

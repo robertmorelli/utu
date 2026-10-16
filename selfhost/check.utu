@@ -651,11 +651,137 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
 }
 
 /// Whether `callee` is `wutu.show` (std:Wutu's).
-fn is_wutu_show(callee: I32) Bool {
+fn is_wutu_show(callee: I32) Bool { is_wutu_fn(callee, "show"); }
+
+/// Whether `callee` is std:Wutu's function `name` (`wutu.name`).
+fn is_wutu_fn(callee: I32, name: Str) Bool {
     if not is_kind(callee, Node.Field_expr) { return false; };
     let base = first_child(callee);
     is_kind(base, Node.Identifier) and word_text(word_of(base)) == "wutu" and decl_is(node_decl[base], Decl.Module)
-        and word_text(word_of(last_child(callee))) == "show";
+        and word_text(word_of(last_child(callee))) == name;
+}
+
+//! = Reusing a component's DOM
+//!
+//! A Wutu text hole that calls a function, `= f(a, b);`, asks
+//! `wutu.memo_key(f(a, b), `…`)` for a key first: the template string (f's
+//! name and its arguments as text) when the call can be reused while its
+//! arguments are unchanged, else "" (never reused). On a re-render with the
+//! same key the reconciler puts back the element f made last time without
+//! calling f. A call can be reused when every argument is a scalar or a Str
+//! (compared by value, so nothing it reads can change unseen) and f is
+//! memo-safe: it, and every function it calls, reads no global or mem,
+//! calls no host function or `@es` binding of its own (std's and the
+//! template's helpers are trusted), and uses none of std:Wutu's effects
+//! (route, refresh, timers, cleanups, storage).
+
+/// `wutu.memo_key(f(…), `…`)`: the key's template when f(…) may be reused, else "".
+fn check_memo_key(node: I32, args: I32, cx: Cx) I32 {
+    let call = if args >= 0 { first_child(args); } else { -1; };
+    let key = if call >= 0 { next_sibling(call); } else { -1; };
+    if key < 0 {
+        report2(Diag.WrongArity, node, -1, 2, if args >= 0 { child_count(args); } else { 0; });
+        return error_value();
+    };
+    if memoizable_call(call, cx) { return check_expr(key, prelude(Prelude.Str), cx); };
+    lit_bytes.clear();
+    push_lit_bytes();
+    prelude(Prelude.Str);
+}
+
+/// Whether `call` is `f(args)` with f memo-safe and each argument a scalar or
+/// Str, itself memo-safe (it is evaluated for the key as well as the call).
+fn memoizable_call(call: I32, cx: Cx) Bool {
+    while (is_kind(call, Node.Splice)) { call = first_child(call); };
+    if not is_kind(call, Node.Call_expr) { return false; };
+    let callee = first_child(call);
+    while (is_kind(callee, Node.Splice)) { callee = first_child(callee); };
+    let f = -1;
+    if is_kind(callee, Node.Identifier) { f = node_decl[callee]; }
+    else if is_kind(callee, Node.Field_expr) and is_kind(first_child(callee), Node.Identifier) and decl_is(node_decl[first_child(callee)], Decl.Module) {
+        f = static_member(node_decl[first_child(callee)], word_of(last_child(callee)));
+    };
+    if not decl_is(f, Decl.Fn) or not memo_safe_fn(f) { return false; };
+    let args = next_sibling(callee);
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    while (a >= 0) {
+        if not memo_safe_node(a) { return false; };
+        // Its type, by checking it once and dropping the code.
+        let m = w_mark();
+        let t = check_expr(a, -1, cx);
+        while (w_stack.len() > m) { w_pop(); };
+        if ty_is(t, Ty.Error) or not in_words("I32 U32 I64 U64 F32 F64 Bool Str", type_text(t)) { return false; };
+        a = next_sibling(a);
+    };
+    true;
+}
+
+/// By declaration: 0 not yet known, 1 being decided, 2 memo-safe, 3 not.
+vec memo_state: I32;
+
+/// Whether function `decl` is memo-safe (see above). A function in a file
+/// that is not the program's own (std's) is, but std:Wutu's effects.
+fn memo_safe_fn(decl: I32) Bool {
+    if not decl_is(decl, Decl.Fn) { return false; };
+    while (memo_state.len() <= decl) { memo_state.push(0); };
+    let state = memo_state[decl];
+    if state == 2 or state == 1 { return true; };
+    if state == 3 { return false; };
+    memo_state[decl] = 1;
+    let node = decl_node[decl];
+    let ok = if file_std[file_of_token(node_first[node])] == 1 { std_memo_safe(decl); } else { memo_safe_node(node); };
+    memo_state[decl] = if ok { 2; } else { 3; };
+    ok;
+}
+
+/// A std function: all are memo-safe but std:Wutu's effects.
+fn std_memo_safe(decl: I32) Bool {
+    let module = module_of(decl);
+    if module < 0 or word_text(decl_name[module]) != "wutu" { return true; };
+    in_words("init show memo_key number money decimal", word_text(decl_name[decl]));
+}
+
+/// Whether the code at `n` keeps a function memo-safe.
+fn memo_safe_node(n: I32) Bool {
+    if n < 0 { return true; };
+    if is_kind(n, Node.Bind_expr) and is_es(last_child(n)) {
+        // A template's own helper bindings are trusted; another `@es` is the host.
+        return text_at(word_text(word_of(first_child(n))), 0, "__wutu_");
+    };
+    if is_kind(n, Node.Dsl_expr) and is_es(n) { return false; };
+    if is_kind(n, Node.Identifier) {
+        let d = node_decl[n];
+        // A global, a mem, or a host module (`Browser`, an npm package).
+        if decl_is(d, Decl.Global) or decl_is(d, Decl.Mem) or decl_is(d, Decl.Foreign) { return false; };
+        if decl_is(d, Decl.Fn) { return memo_safe_fn(d); };
+        return true;
+    };
+    if is_kind(n, Node.Field_expr) or is_kind(n, Node.Type_member_expr) {
+        let base = first_child(n);
+        // (`Browser.document` is a type member: its base a type name.)
+        let named = is_kind(base, Node.Identifier) or is_kind(n, Node.Type_member_expr);
+        if named {
+            let d = node_decl[base];
+            if d < 0 and first_child(base) >= 0 { d = node_decl[first_child(base)]; };
+            if decl_is(d, Decl.Foreign) { return false; };
+            // An unresolved base is a host name (`Browser.document`).
+            if d < 0 { return false; };
+            if decl_is(d, Decl.Module) or decl_is(d, Decl.Struct) or decl_is(d, Decl.Enum) {
+                let f = static_member(d, word_of(last_child(n)));
+                // (No utu member by that name: a module's is a host's, `Browser.document`.)
+                if f < 0 { return not decl_is(d, Decl.Module); };
+                if decl_is(f, Decl.Fn) { return memo_safe_fn(f); };
+                return not (decl_is(f, Decl.Global) or decl_is(f, Decl.Mem));
+            };
+        };
+        return memo_safe_node(base);
+    };
+    let c = first_child(n);
+    while (c >= 0) {
+        if not memo_safe_node(c) { return false; };
+        c = next_sibling(c);
+    };
+    true;
 }
 
 /// The value of type rt (checked, its code from mark m) as `.to_str()`.
@@ -1155,6 +1281,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     while (is_kind(callee, Node.Splice)) { callee = first_child(callee); };
     let m = w_mark();
     if is_wutu_show(callee) { return check_wutu_show(node, args, cx); };
+    if is_wutu_fn(callee, "memo_key") { return check_memo_key(node, args, cx); };
     if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx); };
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx); };
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx); };
@@ -1428,6 +1555,51 @@ fn function_of(fi: I32) I32 {
     f;
 }
 
+//! = Lazy modules
+//!
+//! `using tour lazy from "./tour.utu"` type-checks the module as usual, but
+//! the program does not contain it: each of its functions the program calls
+//! is a stub that asks std:Wutu's runtime (`lazyCall`) for the element the
+//! function makes. The runtime loads the module's chunk the first time and
+//! fills a placeholder; `wutu build` makes the chunk from what the host
+//! section's `lazy` list says the program calls. Arguments cross into the
+//! chunk as they are: numbers, Bool, Str, and host values; the result is a
+//! host element.
+
+/// The stubs made: each one's function, its signature (utu text), and its lazy module's index.
+vec lazy_call_fn: I32;
+vec lazy_call_sig: I32;
+vec lazy_call_path: I32;
+
+/// Lazy module function `fi`'s body (f, its arguments on the stack since m):
+/// a call of the runtime, through an import of its own.
+fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
+    let decl = fi_decl[fi];
+    let params = fi_params[fi];
+    let sig = "(";
+    for (0 ..< vl_len[params]) |i| {
+        let t = vl_item(params, i);
+        if not crosses_chunk(t) { report2(Diag.LazyValue, decl_node[decl], decl_name[decl], t, -1); };
+        if i > 0 { sig = sig + ", "; };
+        sig = sig + "a" + i.to_str() + ": " + type_text(t);
+    };
+    let r = fi_result[fi];
+    if not is_foreign(r) { report2(Diag.LazyValue, decl_node[decl], decl_name[decl], r, 1); };
+    sig = sig + ") " + type_text(r);
+    let body = "(...a)=>globalThis.__utuWutu.lazyCall(" + word_text(lazy_path[lazy]) + ",\"" + word_text(decl_name[decl]) + "\",a)";
+    let imp = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), func_type_of[f]);
+    es_func.push(imp);
+    es_start.push(-1);
+    es_end.push(intern_text(body));
+    w_node(Op.Call, repr(r), imp, 0, m);
+    lazy_call_fn.push(decl);
+    lazy_call_sig.push(intern_text(sig));
+    lazy_call_path.push(lazy);
+}
+
+/// Whether a value of type t can cross into a chunk: a number, a Bool, a Str, or a host value.
+fn crosses_chunk(t: I32) Bool { in_words("I32 U32 I64 U64 F32 F64 Bool Str", type_text(t)) or is_foreign(t); }
+
 /// Whether the program imports host declarations (std:JS, npm:…).
 fn has_foreign() Bool {
     for (0 ..< import_target.len()) |i| { if import_target[i] == -2 { return true; }; };
@@ -1441,8 +1613,39 @@ vec call_site: I32;
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     let result = fi_result[fi];
     if fi_ir[fi] >= 0 { return expand(fi, m); };
-    w_node(Op.Call, repr(result), fi_func[fi], 0, m);
+    // From outside a lazy module, its function is its stub (see lazy_stub).
+    let lazy = lazy_index(module_of(fi_decl[fi]));
+    let caller = if cx.fi >= 0 { module_of(fi_decl[cx.fi]); } else { -1; };
+    let target = if lazy >= 0 and caller != module_of(fi_decl[fi]) { lazy_stub_func(fi, lazy); } else { fi_func[fi]; };
+    w_node(Op.Call, repr(result), target, 0, m);
     result;
+}
+
+/// By function instance: its lazy stub, or -1.
+vec lazy_stub_of: I32;
+
+/// Lazy module function `fi`'s stub (made once): a function of the same
+/// signature whose body asks the runtime for the element (see lazy_stub).
+fn lazy_stub_func(fi: I32, lazy: I32) I32 {
+    while (lazy_stub_of.len() <= fi) { lazy_stub_of.push(-1); };
+    if lazy_stub_of[fi] >= 0 { return lazy_stub_of[fi]; };
+    let params = fi_params[fi];
+    let f = defined_func(params, fi_result[fi]);
+    lazy_stub_of[fi] = f;
+    func_debug_name[f] = fn_debug_name(fi_decl[fi]);
+    // (Made while another function is checked: its locals are kept aside.)
+    let saved = Array[I32].new(cur_locals.len(), 0);
+    for (0 ..< cur_locals.len()) |i| { saved[i] = cur_locals[i]; };
+    cur_locals.clear();
+    for (0 ..< vl_len[params]) |i| { new_local(repr(vl_item(params, i))); };
+    let m = w_mark();
+    for (0 ..< vl_len[params]) |i| { w_leaf(Op.LocalGet, repr(vl_item(params, i)), i, 0); };
+    lazy_stub(fi, f, lazy, m);
+    func_body[f] = w_pop();
+    record_locals(f, vl_len[params]);
+    cur_locals.clear();
+    for (0 ..< saved.len()) |i| { cur_locals.push(saved[i]); };
+    f;
 }
 
 //! = Intrinsics
@@ -1774,6 +1977,11 @@ enum(U8) Target:
     | Comptime
 
 fn reset_check() void {
+    memo_state.clear();
+    lazy_call_fn.clear();
+    lazy_call_sig.clear();
+    lazy_call_path.clear();
+    lazy_stub_of.clear();
     fi_decl.clear();
     fi_inst.clear();
     fi_func.clear();

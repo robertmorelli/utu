@@ -1435,6 +1435,22 @@
           "type": "CHOICE",
           "members": [
             {
+              "type": "FIELD",
+              "name": "lazy",
+              "content": {
+                "type": "STRING",
+                "value": "lazy"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
               "type": "SEQ",
               "members": [
                 {

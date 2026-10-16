@@ -10167,7 +10167,18 @@
   {
     "type": "using_decl",
     "named": true,
-    "fields": {},
+    "fields": {
+      "lazy": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "lazy",
+            "named": false
+          }
+        ]
+      }
+    },
     "children": {
       "multiple": true,
       "required": true,
@@ -11017,6 +11028,10 @@
   },
   {
     "type": "last_index",
+    "named": false
+  },
+  {
+    "type": "lazy",
     "named": false
   },
   {

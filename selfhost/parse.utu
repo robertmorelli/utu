@@ -941,6 +941,15 @@ fn type_decl(p: Parser) I32 {
     node(p, Node.Type_decl, at, first);
 }
 
+/// Whether the token at position i spells `text`.
+fn token_is(i: I32, text: Str) Bool {
+    let t = ptok[i];
+    let n = tok_end[t] - tok_start[t];
+    if n != text.len() { return false; };
+    for (0 ..< n) |k| { if src[tok_start[t] + k] != text.get(k) { return false; }; };
+    true;
+}
+
 fn using_decl(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
@@ -955,6 +964,8 @@ fn using_decl(p: Parser) I32 {
         expect(p, Tok.Pipe);
         node(p, Node.Captured_module_name, captured, start);
     };
+    // `lazy`: the module builds as its own chunk (a word here, not a keyword).
+    if is(p, Tok.Word) and token_is(p.pos, "lazy") { advance(p); };
     if is_kw(p, Kw.From) {
         advance(p);
         if is(p, Tok.String) {

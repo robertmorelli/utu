@@ -690,6 +690,7 @@ class Parser {
     const children = [this.token('using'), this.moduleName()];
     if (this.isPunct('[')) children.push(this.moduleTypeArgList());
     if (this.isPunct('|')) children.push(this.node('captured_module_name', [this.token('|'), this.moduleName(), this.expectPunct('|')]));
+    if (this.isWord('lazy')) children.push(this.token('lazy'));
     if (this.isWord('from')) {
       children.push(this.token('from'));
       if (this.source[this.pos] === '"') {

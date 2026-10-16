@@ -179,7 +179,7 @@
         },
         {
           "name": "meta.declaration.file-import.utu",
-          "match": "\\b(using)\\s+([a-z_][a-zA-Z0-9_]*|[A-Z][a-zA-Z0-9_]*)(?:\\s+(\\|[a-z_][a-zA-Z0-9_]*\\||\\|[A-Z][a-zA-Z0-9_]*\\|))?\\s+(from)\\s+(\"(?:\\\\.|[^\"\\\\])*\"|[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*)",
+          "match": "\\b(using)\\s+([a-z_][a-zA-Z0-9_]*|[A-Z][a-zA-Z0-9_]*)(?:\\s+(\\|[a-z_][a-zA-Z0-9_]*\\||\\|[A-Z][a-zA-Z0-9_]*\\|))?(?:\\s+(lazy))?\\s+(from)\\s+(\"(?:\\\\.|[^\"\\\\])*\"|[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*)",
           "captures": {
             "1": {
               "name": "keyword.control.utu"
@@ -194,6 +194,9 @@
               "name": "keyword.control.utu"
             },
             "5": {
+              "name": "keyword.control.utu"
+            },
+            "6": {
               "name": "string.quoted.double.utu"
             }
           }

@@ -559,24 +559,32 @@ mod web {
         \\}
         ;
     }
-    fn lazy_sample() Str {
+    fn lazy_multi() Str {
+        \\// main.utu
         \\using Browser from std:Browser;
+        \\using guide lazy from "./guide.utu";    // its own chunk
         \\
         \\export main() void {
         \\    Browser.document.body.append(@wutu/\
         \\    @reactive;
         \\    main {
-        \\        nav {
-        \\            a { href = "#/"; "Home"; }
-        \\            a { href = "#/guide"; "Guide"; }
-        \\        }
         \\        if wutu.route() == "/guide" {
-        \\            = wutu.lazy("./guide.utu");    // its own chunk
+        \\            = guide.page("you");     // typed: a Browser.HTMLElement
         \\        } else {
         \\            p { "Welcome."; }
         \\        }
         \\    }
         \\    \/);
+        \\}
+        \\
+        \\// guide.utu
+        \\using Browser from std:Browser;
+        \\mod guide {
+        \\    fn page(reader: Str) Browser.HTMLElement {
+        \\        @wutu/\
+        \\        article { h1 { = "A guide for " + reader; } }
+        \\        \/;
+        \\    }
         \\}
         ;
     }
@@ -818,11 +826,11 @@ mod web {
             }
             p {
                 code {
-                    "wutu.lazy";
+                    "using guide lazy from \"./guide.utu\";";
                 }
-                " shows a page built as its own chunk, fetched the first time it is shown. This site loads each page that way.";
+                " type-checks the module as usual but leaves it out of the page: it builds as its own chunk, fetched the first time a function of it is called. Calls keep their types; arguments are numbers, Bool, Str, or host values. This site loads each page that way.";
             }
-            = code.block(lazy_sample());
+            = code.block(lazy_multi());
             h2 {
                 "Build, preview, and prerender";
             }

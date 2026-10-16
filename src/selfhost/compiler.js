@@ -176,6 +176,7 @@ const PLATFORM_PATH = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;
 function addFile(utu, files, byKey, key, text, role) {
   const bytes = encoder.encode(text);
   const file = utu.file_add(bytes.length, role);
+  if (key.startsWith('std:')) utu.file_mark_std?.(file);
   new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
   files.push({ key, role, text, offset: utu.file_offset(file), bytes });
   byKey.set(key, file);

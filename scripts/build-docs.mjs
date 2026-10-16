@@ -75,7 +75,7 @@ try {
   await buildPlayground(temp);
   await stampVersions(temp);
   for (const name of outputs) await fs.copyFile(path.join(temp, name), path.join(target, name));
-  // The playground, and each lazy page's chunk (wutu.lazy), replace last build's.
+  // The playground, and each lazy module's chunk, replace last build's.
   for (const directory of ['playground', 'chunks']) {
     await fs.rm(path.join(target, directory), { recursive: true, force: true });
     await fs.cp(path.join(temp, directory), path.join(target, directory), { recursive: true });

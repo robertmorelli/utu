@@ -4,6 +4,16 @@ using Browser from std:Browser;
 using ui from "./ui.utu";
 using home from "./home.utu";
 using playground from "./playground.utu";
+// Every other page is its own chunk, loaded the first time it is shown.
+using start lazy from "./start.utu";
+using tour lazy from "./tour.utu";
+using iterators lazy from "./iterators.utu";
+using stdlib lazy from "./stdlib.utu";
+using javascript lazy from "./javascript.utu";
+using data lazy from "./data.utu";
+using web lazy from "./web.utu";
+using tooling lazy from "./tooling.utu";
+using compiler lazy from "./compiler.utu";
 struct Link:
 | href: Str
 | label: Str
@@ -71,29 +81,28 @@ fn title(route: Str) Str {
     };
 }
 // The overview and the playground are part of the site; every other page is
-// its own chunk (wutu.lazy), loaded the first time it is shown, so the site
-// starts with only the page it shows.
-fn page(route: Str, play: playground.State) Externref {
+// a lazy module (above), so the site starts with only the page it shows.
+fn page(route: Str, play: playground.State) Browser.HTMLElement {
     if route == "/playground" {
         playground.page(play);
     } else if route == "/start" {
-        wutu.lazy("./start.utu");
+        start.page();
     } else if route == "/tour" {
-        wutu.lazy("./tour.utu");
+        tour.page();
     } else if route == "/iterators" {
-        wutu.lazy("./iterators.utu");
+        iterators.page();
     } else if route == "/std" {
-        wutu.lazy("./stdlib.utu");
+        stdlib.page();
     } else if route == "/javascript" {
-        wutu.lazy("./javascript.utu");
+        javascript.page();
     } else if route == "/data" {
-        wutu.lazy("./data.utu");
+        data.page();
     } else if route == "/wutu" {
-        wutu.lazy("./web.utu");
+        web.page();
     } else if route == "/tooling" {
-        wutu.lazy("./tooling.utu");
+        tooling.page();
     } else if route == "/compiler" {
-        wutu.lazy("./compiler.utu");
+        compiler.page();
     } else {
         home.page();
     };

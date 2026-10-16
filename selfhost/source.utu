@@ -35,6 +35,8 @@ fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or f
 /// Files whose top-level declarations are the program's (not only modules).
 fn declares_items(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Generated.to_i32(); }
 
+/// By file: 1 for the standard library's (the host says which).
+vec file_std: I32;
 /// A file's first byte in `src`. The `file_*` vecs are rows by file id.
 vec file_start: I32;
 /// The end byte after its last.
@@ -132,6 +134,7 @@ fn reset_program() void {
     file_root.resize(files);
     file_error.resize(files);
     file_wanted.resize(files);
+    file_std.resize(files);
     let imports = kept[4];
     import_file.resize(imports);
     import_node.resize(imports);
@@ -188,6 +191,7 @@ fn add_file(n: I32, role: FileRole) I32 {
     file_root.push(-1);
     file_error.push(-1);
     file_wanted.push(-1);
+    file_std.push(0);
     file;
 }
 

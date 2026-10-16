@@ -270,28 +270,31 @@ reads changed). `on scroll { overlay.scrollTop = field.scrollTop; }` is quiet;
 
 ## Lazy pages
 
-`= wutu.lazy("./tour.utu");` shows a page that is compiled on its own and loaded
-the first time it is shown. `wutu build` finds every `wutu.lazy` path in the
-entry and the files it imports, and builds each as a chunk
-(`chunks/tour-<hash>/app.js` and `app.wasm`, named by their bytes): the file
-declares a module whose `fn page() Browser.HTMLElement` is the page. The chunk
-renders it and delivers it into the placeholder `wutu.lazy` returned; a
-prerendered placeholder keeps its markup until then. The host never ships the
-page's code or text, so a site of many pages starts with only the one it shows.
-A chunk is its own program: share state with the host through the DOM, the URL,
-or storage, not through captured structs.
+`using guide lazy from "./guide.utu";` imports a module that is compiled on its
+own and loaded the first time a function of it is called. The program
+type-checks it as usual (a missing file, a misspelled function, or a wrong
+argument is a compile error), but does not contain it: a call such as
+`guide.page("you")` returns a placeholder element, typed as the function
+declares (`Browser.HTMLElement`), that the module's chunk fills when it
+arrives. `wutu build` builds one chunk per lazy module, with exactly the
+functions the program calls, as `chunks/guide-<hash>/app.js` and `app.wasm`
+(named by their bytes, so they cache safely). A prerendered placeholder keeps
+its markup until the chunk arrives, and the prerenderer waits for chunks.
+
+Arguments cross into the chunk as they are, so a lazy module's functions take
+numbers, Bool, Str, and host values, and return a host element; anything else
+is a compile error naming the type. A chunk is its own program: share state
+with the page through those arguments, the DOM, the URL, or storage.
 
 ```utu
-@wutu/\
-@reactive;
-main {
-    if wutu.route() == "/tour" {
-        = wutu.lazy("./tour.utu");
-    } else {
-        = home.page();
-    }
+using guide lazy from "./guide.utu";
+
+// …
+if wutu.route() == "/guide" {
+    = guide.page("you");
+} else {
+    = home.page();
 }
-\/;
 ```
 
 ## Reactive views, identity, and concise expressions
@@ -300,10 +303,23 @@ Put `@reactive;` at the start of a root template. Event handlers may mutate
 captured structs directly: Wutu batches a refresh into the next microtask.
 Components called while rendering join that root. There is no proxy state or
 virtual DOM; the compiler emits calls to a small shared DOM reconciler.
-Static templates in projects without reactive views retain their direct DOM path.
+Every template goes through the reconciler, so a component behaves the same
+wherever it is rendered: under an `@reactive` root it re-renders with the root
+(and `bind:` keeps both sides in step); rendered anywhere else it renders once.
 External callbacks (timers, network subscriptions) call `wutu.refresh()` after
 changing state. A refresh visits connected roots; this is explicit whole-view
 rendering, not dependency tracking or list virtualization.
+
+**Unchanged components are reused.** A hole that calls a function,
+`= tag(item.title);`, is skipped on a re-render when its arguments are the same
+as last time: the element the call made then is put back without calling it.
+The compiler allows this only when it cannot be wrong: every argument is a
+scalar or a Str (compared by value), and the function, and everything it
+calls, reads no global or mem, calls no host function or `@es` of its own, and
+uses none of `wutu`'s effects (`route`, `refresh`, timers, cleanups, storage).
+Pass a struct, or read the route inside, and the call runs every time, as
+before. A component that takes plain values (a code block from its source, a
+header from its title) costs nothing once rendered.
 
 ```utu
 @wutu/\
