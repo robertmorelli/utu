@@ -63,6 +63,10 @@ mod home {
                             "Get started";
                         }
                         a {
+                            <href = "#/playground";
+                            "Try it in your browser";
+                        }
+                        a {
                             <href = $[ui.repo()];
                             "Source on GitHub";
                         }

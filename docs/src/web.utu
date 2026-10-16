@@ -2,77 +2,255 @@ using Browser from std:Browser;
 using code from "./code.utu";
 using ui from "./ui.utu";
 mod web {
-    fn forms_sample() Str {
-        \\article.card#intro {            # tag.class#id creates an element
-        \\    display: grid;               # a CSS declaration, compiled to a class
-        \\    gap: 1rem;
-        \\    <aria-label = "Welcome";     # an HTML attribute
-        \\    <hidden = $[done];           # a boolean attribute, present when true
-        \\    <.value = $[draft];          # a typed DOM property
-        \\    :hover { opacity: 0.9; }     # pseudo-classes and media queries nest in place
-        \\    @media (width < 40rem) { gap: 0.5rem; }
-        \\    @ & > svg { pointer-events: none; }
-        \\    h2 { "A title"; }            # a child element with a text node
-        \\    p { = state.message; }       # text from an expression
-        \\    button {
-        \\        "Save";
-        \\        on click { state.saved = true; };
+    fn hello_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn greeting(name: Str) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    section.greeting#hello {      # tag.class#id makes an element
+        \\        h2 {                      # a child element
+        \\            "Hello, ";            # a text node
+        \\            = name;               # text from an expression
+        \\        }
+        \\        p.note.quiet {            # several classes
+        \\            "Welcome back.";
+        \\        }
         \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(greeting("friend"));
+        \\}
+        ;
+    }
+    fn namespaces_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn chart(done: Bool, draft: Str) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    figure {
+        \\        canvas {
+        \\            <width = "600";          # attribute: the bitmap's resolution
+        \\            width: 300px;            # CSS: its size on the page
+        \\            <aria-label = "Sales";
+        \\        }
+        \\        input {
+        \\            <hidden = $[done];       # a boolean attribute, present when true
+        \\            <.value = $[draft];      # a typed DOM property
+        \\        }
+        \\        a {
+        \\            <href = "/about";
+        \\            <data-kind = "nav";
+        \\            color: rgb(30 60 120);   # CSS declarations sit on their element
+        \\            "About";
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(chart(false, "draft"));
+        \\}
+        ;
+    }
+    fn text_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn stats(user: Str, count: I32, ratio: F64) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    p {
+        \\        <title = $["Stats for " + user];   # an attribute built from text
+        \\        "User ";
+        \\        b { = user; }
+        \\        " has ";
+        \\        = count.to_str();
+        \\        " items (";
+        \\        $[(ratio * 100.0).to_str()];         # $[...] works as well as =
+        \\        "%). Escapes: \"quoted\" →";
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(stats("<b>ada</b>", 3, 0.5));   // text, never HTML
+        \\}
+        ;
+    }
+    fn events_closure_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Plant:
+        \\    | name: Str
+        \\    | watered: Bool
+        \\
+        \\fn plant_card(plant: Plant) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    article {
+        \\        h2 { = plant.name; }
+        \\        button as toggle {                  # name the node: toggle
+        \\            <type = "button";
+        \\            "Water me";
+        \\            @click=$[cl(event) void {       // a typed closure as the listener
+        \\                plant.watered = not plant.watered;
+        \\                toggle.textContent = if plant.watered { "Watered"; } else { "Water me"; };
+        \\            }];
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(plant_card(Plant { name: "Fern", watered: false }));
+        \\}
+        ;
+    }
+    fn events_on_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Counter:
+        \\    | n: I32
+        \\    | last: Str
+        \\
+        \\export main() void {
+        \\    let state = Counter { n: 0, last: "" };
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        button {
+        \\            "Add one";
+        \\            on click {                      // `event` is in scope, typed
+        \\                state.n += 1;
+        \\                state.last = event.type;
+        \\            };
+        \\        }
+        \\        input {
+        \\            <placeholder = "Type";
+        \\            on keydown { state.last = event.key; };
+        \\        }
+        \\        p { = `${state.n} clicks, last event: ${state.last}`; }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
         \\}
         ;
     }
     fn components_sample() Str {
-        \\fn plant_card(plant: Plant) Browser.HTMLElement {
+        \\using Browser from std:Browser;
+        \\
+        \\fn badge(label: Str) Browser.HTMLElement {
         \\    @wutu/\
-        \\    article.plant {
-        \\        h2 { = plant.name; }
-        \\        button as toggle {
-        \\            <type = "button";
-        \\            = if plant.watered { "Watered"; } else { "Water me"; };
-        \\            on click { plant.watered = not plant.watered; };
-        \\        }
+        \\    span.badge {
+        \\        padding: 0.1rem 0.5rem;
+        \\        border-radius: 1rem;
+        \\        background: gold;
+        \\        = label;
         \\    }
         \\    \/;
         \\}
         \\
-        \\fn listing(plants: Array[Plant], empty: Bool) Browser.HTMLElement {
+        \\fn card(title: Str, body: Browser.HTMLElement) Browser.HTMLElement {
         \\    @wutu/\
-        \\    section {
-        \\        for $[plants filter |plant| { not plant.watered; }] |plant| {
-        \\            = plant_card(plant);
-        \\        }
-        \\        if $[empty] {
-        \\            p { "Everything is watered."; }
-        \\        } else {
-        \\            p { "A little care goes a long way."; }
-        \\        }
+        \\    article.card {
+        \\        h3 { = title; = badge("new"); }   # a component is a function call
+        \\        = body;                          # a slot is just a node parameter
         \\    }
         \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    let content = @wutu/\
+        \\    p { "Any element can go in the slot."; }
+        \\    \/;
+        \\    Browser.document.body.append(card("Slots", content));
         \\}
         ;
     }
-    fn reactive_sample() Str {
-        \\struct Preferences:
-        \\    | name: Str
-        \\    | enabled: Bool
+    fn conditions_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn status(stock: I32) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    p {
+        \\        if $[stock == 0] {
+        \\            b { "Sold out"; }
+        \\        } else if $[stock < 5] {
+        \\            "Only ";
+        \\            = stock.to_str();
+        \\            " left";
+        \\        } else {
+        \\            "In stock";
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
         \\
         \\export main() void {
-        \\    let preferences = @stored/\
-        \\        Preferences "preferences-v1" Preferences { name: "", enabled: true }
+        \\    Browser.document.body.append(status(3));
+        \\}
+        ;
+    }
+    fn for_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn ranking(names: Array[Str]) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    ol {
+        \\        for $[names] |name, i| {                      # the index is a U64
+        \\            li {
+        \\                <data-rank = $[(i.to_i32() + 1).to_str()];
+        \\                = name;
+        \\            }
+        \\        }
+        \\    }
         \\    \/;
+        \\}
+        \\
+        \\fn long_words(words: Array[Str]) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    ul {
+        \\        for $[words filter |w| { w.len() > 4; }] |w| {   # a pipeline, no temporary array
+        \\            li { = w; }
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(ranking(["ada", "grace"]));
+        \\    Browser.document.body.append(long_words(["tiny", "enormous", "huge", "gigantic"]));
+        \\}
+        ;
+    }
+    fn keyed_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Todo:
+        \\    | id: Str
+        \\    | title: Str
+        \\    | done: Bool
+        \\
+        \\struct State:
+        \\    | todos: Array[Todo]
+        \\
+        \\export main() void {
+        \\    let state = State { todos: [
+        \\        Todo { id: "a", title: "Water the fern", done: false },
+        \\        Todo { id: "b", title: "Repot the cactus", done: false }
+        \\    ] };
         \\    let app = @wutu/\
         \\    @reactive;
-        \\    main {
-        \\        label {
-        \\            "Your name";
-        \\            input { bind:value = preferences.name; }
-        \\        }
-        \\        label {
-        \\            input { <type = "checkbox"; bind:checked = preferences.enabled; }
-        \\            "Send reminders";
-        \\        }
-        \\        if $[preferences.enabled] {
-        \\            p { "Hello, "; = preferences.name; }
+        \\    ul {
+        \\        for $[state.todos] |todo| key $[todo.id] {   # identity follows the key
+        \\            li {
+        \\                = todo.title;
+        \\                button {
+        \\                    "Done";
+        \\                    on click {
+        \\                        state.todos = state.todos filter |t| { t.id != todo.id; } collect(Todo);
+        \\                    };
+        \\                }
+        \\            }
         \\        }
         \\    }
         \\    \/;
@@ -80,51 +258,264 @@ mod web {
         \\}
         ;
     }
-    fn keyed_sample() Str {
-        \\for $[state.items] |item| key $[item.id] {
-        \\    article {
-        \\        h2 { = item.title; }
+    fn bind_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Order:
+        \\    | name: Str
+        \\    | gift: Bool
+        \\    | amount: F64
+        \\
+        \\export main() void {
+        \\    let order = Order { name: "", gift: false, amount: 1.0 };
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    form {
+        \\        input { <placeholder = "Name"; bind:value = order.name; }
+        \\        label {
+        \\            input { <type = "checkbox"; bind:checked = order.gift; }
+        \\            "Gift wrap";
+        \\        }
+        \\        input { <type = "number"; bind:number = order.amount; }
+        \\        p {
+        \\            = `${order.amount} for ${order.name}`;
+        \\            if $[order.gift] { " (wrapped)"; }
+        \\        }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn stored_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Prefs:
+        \\    | name: Str
+        \\    | visits: I32
+        \\
+        \\export main() void {
+        \\    let prefs = @stored/\
+        \\        Prefs "prefs-v1" Prefs { name: "", visits: 0 }
+        \\    \/;                                          // loaded, validated, saved after events
+        \\    prefs.visits += 1;
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        input { bind:value = prefs.name; }
+        \\        p { = `Visit ${prefs.visits}, ${prefs.name}`; }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn stored_manual_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Draft:
+        \\    | text: Str
+        \\
+        \\export main() void {
+        \\    let draft = @stored/\
+        \\        Draft "draft-v1" manual Draft { text: "" }
+        \\    \/;                                          // saves only when asked
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        textarea { bind:value = draft.text; }
         \\        button {
-        \\            "Finish";
-        \\            on click { item.done = true; };
+        \\            "Save";
+        \\            on click { wutu.save("draft-v1"); };
         \\        }
         \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
         \\}
         ;
     }
-    fn dynamic_sample() Str {
-        \\div.bar {
-        \\    i {
-        \\        width: $[progress.to_str() + "%"];   # computed when the template renders
-        \\        --hue: $[hue.to_str()];
+    fn document_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let app = @wutu/\
+        \\    @document {                          # document-level CSS, before the root
+        \\        :root { --accent: oklch(65% 0.15 60); }
+        \\        body { margin: 0; font: 1rem system-ui; }
+        \\        @keyframes pop { from { scale: 0.9; } to { scale: 1; } }
         \\    }
+        \\    main {
+        \\        padding: 2rem;
+        \\        h1 {
+        \\            color: var(--accent);
+        \\            animation: pop 0.3s;
+        \\            "Tokens and resets";
+        \\        }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
         \\}
         ;
     }
-    fn css_sample() Str {
-        \\mod theme {
-        \\    fn sheet() Str {
-        \\        @css/\
-        \\        @layer theme {
-        \\            .card { color: oklch(40% .12 150); }
+    fn local_css_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn toolbar() Browser.HTMLElement {
+        \\    @wutu/\
+        \\    nav {
+        \\        display: flex;
+        \\        gap: 1rem;
+        \\        # a media query, at the element it changes
+        \\        @media (width < 40rem) {
+        \\            flex-direction: column;
         \\        }
-        \\        \/;
+        \\        # a scoped selector rule, for relations like siblings
+        \\        @ & > a + a {
+        \\            border-left: 1px solid gray;
+        \\        }
+        \\        a {
+        \\            <href = "#/";
+        \\            :hover { text-decoration: underline; }
+        \\            ::after { content: " >"; }
+        \\            "Home";
+        \\        }
+        \\        a { <href = "#/docs"; "Docs"; }
         \\    }
+        \\    \/;
         \\}
         \\
-        \\// before the root element:
-        \\@style $[theme.sheet()];
+        \\export main() void {
+        \\    Browser.document.body.append(toolbar());
+        \\}
+        ;
+    }
+    fn dynamic_css_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn meter(progress: I32, hue: I32) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    div.bar {
+        \\        height: 0.5rem;                     # static: compiled to a shared class
+        \\        background: lightgray;
+        \\        i {
+        \\            display: block;
+        \\            height: 100%;
+        \\            width: $[progress.to_str() + "%"];               # computed at render
+        \\            background: $["hsl(" + hue.to_str() + " 70% 50%)"];
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(meter(40, 140));
+        \\}
+        ;
+    }
+    fn css_sheet_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn sheet() Str {
+        \\    @css/\
+        \\    @layer theme {
+        \\        .card { border: 1px solid oklch(40% 0.12 150); border-radius: 8px; }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    let app = @wutu/\
+        \\    @style $[sheet()];                      # install any stylesheet, once
+        \\    div {
+        \\        <class = "card";
+        \\        "Styled by a plain CSS class";
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn alias_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn search() Browser.HTMLElement {
+        \\    @wutu/\
+        \\    form {
+        \\        input as query { <type = "search"; }
+        \\        output as result { "Nothing yet"; }
+        \\        button {
+        \\            "Search";
+        \\            @click=$[cl(event) void {
+        \\                event.preventDefault();
+        \\                result.textContent = "Looking for " + query.value;   // query is an HTMLInputElement
+        \\                query.focus();
+        \\            }];
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(search());
+        \\}
         ;
     }
     fn route_sample() Str {
-        \\if $[wutu.route() == "/notes"] {
-        \\    = notes(state);
-        \\} else {
-        \\    = shelf(state);
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        nav {
+        \\            a { <href = "#/"; "Home"; }
+        \\            a { <href = "#/about"; "About"; }
+        \\        }
+        \\        if $[wutu.route() == "/about"] {     # the hash path; changes re-render
+        \\            h1 { "About"; }
+        \\        } else {
+        \\            h1 { "Home"; }
+        \\        }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
         \\}
         ;
     }
-    fn build_sample() Str {
+    fn island_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Clock:
+        \\    | ticks: I32
+        \\
+        \\fn clock(c: Clock) Browser.HTMLElement {
+        \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1; });
+        \\    @wutu/\
+        \\    @island "clock";                        # updates on its own
+        \\    p { = `${c.ticks} seconds`; }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    let c = Clock { ticks: 0 };
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        = clock(c);
+        \\        button {
+        \\            "Reset";
+        \\            on click {
+        \\                c.ticks = 0;
+        \\                wutu.invalidate("clock");           // refresh the island from outside
+        \\            };
+        \\        }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn build_shell() Str {
         \\node cli/wutu.mjs dev main.utu --port 4176
         \\node cli/wutu.mjs format main.utu --check
         \\node cli/wutu.mjs build main.utu --out dist/site --title "My site"
@@ -133,99 +524,90 @@ mod web {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Wutu", "Markup and CSS in one typed expression. Wutu constructs real DOM nodes through the browser bindings, so a component is an ordinary function that returns an element.");
+            = ui.header("Wutu", "Markup and CSS in one typed expression. A component is an ordinary function that returns a real DOM element.");
+            p {
+                "Every sample below is a whole program. Paste one into the ";
+                a {
+                    <href = "#/playground";
+                    "Playground";
+                }
+                " to see it run.";
+            }
             h2 {
-                "The meld deletes the join";
+                "Elements, classes, and text";
             }
             p {
-                "Every mainstream styling approach makes you write markup and then write a selector to find that markup again. The selector is a join key, and joins are where drift lives. In Wutu, selectors are elements: CSS-shaped nesting where a declaration sits on the element it styles, a pseudo-class or media query nests three lines from what it affects, and moving something from code to CSS is a local edit.";
-            }
-            p {
-                "Four namespaces are told apart syntactically, because attributes and CSS overlap with different meanings: ";
-                code {
-                    "canvas { <width = \"300\"; }";
-                }
-                " sets bitmap resolution and ";
-                code {
-                    "canvas { width: 300px; }";
-                }
-                " sets display size.";
-            }
-            = code.block(forms_sample());
-            p {
-                "Every leaf statement ends with a semicolon; element and selector blocks do not. Every element head starts with a tag, so ";
+                "Every element head starts with a tag, so ";
                 code {
                     ".card";
                 }
-                " alone never silently creates a div. Common attributes are checked per tag: ";
+                " alone never silently makes a div. Leaf statements end with a semicolon; blocks do not. ";
                 code {
-                    "canvas { <padding = \"10\"; }";
+                    "#";
                 }
-                " is a compile error pointing at the token. Interpolated strings become text, never HTML. String event handlers are rejected; handlers are typed closures.";
+                " after whitespace starts a comment.";
             }
+            = code.block(hello_sample());
             h2 {
-                "Components, lists, and conditions";
+                "Attributes, properties, and CSS";
             }
             p {
-                "Components are typed functions. Pass data or nodes as parameters and insert the result with ";
+                "Three namespaces, told apart by syntax: ";
                 code {
-                    "= component(args);";
+                    "<name = ...;";
                 }
-                ". ";
+                " is an attribute, ";
                 code {
-                    "for";
+                    "<.name = ...;";
                 }
-                " adds an ";
+                " a DOM property, and ";
                 code {
-                    "each";
+                    "name: value;";
                 }
-                " terminal to an iterator pipeline, so no temporary array is built. ";
+                " CSS. Attributes are checked per tag.";
+            }
+            = code.block(namespaces_sample());
+            h2 {
+                "Text and interpolation";
+            }
+            = code.block(text_sample());
+            h2 {
+                "Events";
+            }
+            p {
                 code {
-                    "tag as name";
+                    "@click=$[cl(event) void { ... }];";
                 }
-                " names a node within its template subtree so a handler can reach it.";
+                " attaches a closure; ";
+                code {
+                    "on click { ... };";
+                }
+                " is the short form with an implicit typed ";
+                code {
+                    "event";
+                }
+                ". String handlers are rejected.";
+            }
+            = code.block(events_closure_sample());
+            = code.block(events_on_sample());
+            h2 {
+                "Components and slots";
             }
             = code.block(components_sample());
             h2 {
-                "CSS, three ways";
+                "Conditions and lists";
             }
-            p {
-                "Element-local declarations compile to deterministic shared classes: identical declaration sets become one class, and unreachable components take their styles with them. A declaration whose value is an expression is applied with ";
-                code {
-                    "style.setProperty";
-                }
-                " when the template renders. ";
-                code {
-                    "@ selector { ... }";
-                }
-                " is a scoped rule for relational cases such as siblings and slotted children, and ";
-                code {
-                    "@document { ... }";
-                }
-                " before the root holds tokens, resets, fonts, and keyframes.";
-            }
-            = code.block(dynamic_sample());
-            p {
-                "For CSS the DSL does not model, write a stylesheet in a ";
-                code {
-                    "@css";
-                }
-                " envelope and install it with ";
-                code {
-                    "@style";
-                }
-                ". The compiler preserves the payload without a property or selector allowlist. Identical sheets install once.";
-            }
-            = code.block(css_sample());
+            = code.block(conditions_sample());
+            = code.block(for_sample());
+            = code.block(keyed_sample());
             h2 {
-                "Reactive views, bindings, and typed storage";
+                "Reactive views and bindings";
             }
             p {
-                "Put ";
                 code {
                     "@reactive;";
                 }
-                " at the start of a root template. Event handlers mutate ordinary structs, and Wutu batches a refresh into the next microtask. There is no proxy state and no virtual DOM: the compiler emits calls to a small shared DOM reconciler, and a refresh re-renders connected roots. ";
+                " at the start of a root template re-renders it after each event handler changes ordinary structs. No proxies, no virtual DOM. ";
                 code {
                     "bind:value";
                 }
@@ -237,62 +619,84 @@ mod web {
                 code {
                     "bind:number";
                 }
-                " connect form controls to fields in both directions, preserving the caret.";
+                " connect controls to fields both ways.";
             }
-            = code.block(reactive_sample());
+            = code.block(bind_sample());
+            h2 {
+                "Stored state";
+            }
             p {
                 code {
                     "@stored";
                 }
-                " generates the JSON conversion for a struct, validates the full stored shape before accepting it, and returns the defaults when storage is unavailable. Saves are debounced after events, or explicit with ";
-                code {
-                    "manual";
-                }
-                " and ";
-                code {
-                    "wutu.save(key)";
-                }
-                ". Cross-tab changes pass through the generated decoder.";
+                " keeps a struct in localStorage, validating it on load and falling back to the defaults.";
             }
-            p {
-                "Keyed loops preserve DOM identity, focus, and selection across reorders. Keys are stable strings, unique per repeated template under a parent.";
-            }
-            = code.block(keyed_sample());
+            = code.block(stored_sample());
+            = code.block(stored_manual_sample());
             h2 {
-                "Islands, effects, and routes";
+                "CSS";
+            }
+            p {
+                "Static declarations become shared classes; ";
+                code {
+                    "$[...]";
+                }
+                " values are set at render. ";
+                code {
+                    "@ selector";
+                }
+                " is a scoped rule, ";
+                code {
+                    "@document";
+                }
+                " holds page-wide CSS, and ";
+                code {
+                    "@css";
+                }
+                " with ";
+                code {
+                    "@style";
+                }
+                " installs anything else.";
+            }
+            = code.block(local_css_sample());
+            = code.block(dynamic_css_sample());
+            = code.block(document_sample());
+            = code.block(css_sheet_sample());
+            h2 {
+                "Named nodes";
             }
             p {
                 code {
-                    "@island \"name\";";
+                    "tag as name";
                 }
-                " makes an independently updating view whose state survives parent renders; ";
-                code {
-                    "wutu.invalidate(name)";
-                }
-                " refreshes it from outside. ";
-                code {
-                    "wutu.after_render";
-                }
-                ", ";
-                code {
-                    "wutu.on_cleanup";
-                }
-                ", and ";
-                code {
-                    "wutu.interval";
-                }
-                " cover effects, and ";
+                " names a node within its template, typed as that element.";
+            }
+            = code.block(alias_sample());
+            h2 {
+                "Routes and islands";
+            }
+            p {
                 code {
                     "wutu.route()";
                 }
-                " reads the hash path; hash and history changes refresh views. This site's pages are selected that way.";
+                " reads the hash path. ";
+                code {
+                    "@island";
+                }
+                " makes a view that updates on its own; ";
+                code {
+                    "wutu.invalidate";
+                }
+                " refreshes it from outside.";
             }
             = code.block(route_sample());
+            = code.block(island_sample());
             h2 {
                 "Build, preview, and prerender";
             }
             p {
-                "The preview rebuilds on save and reloads the browser, keeping control values, focus, and scroll. Failed builds keep the last working output and show the error in place. A production build prerenders the page with build-time Chromium: the HTML contains real content and styles, the runtime hydrates the marked DOM on startup, and form controls stay disabled until handlers exist. Deployment needs only ";
+                "The preview rebuilds on save and reloads, keeping form values and scroll. A production build prerenders the page, and deploys as ";
                 code {
                     "index.html";
                 }
@@ -306,12 +710,8 @@ mod web {
                 }
                 ".";
             }
-            = code.shell(build_sample());
-            p {
-                "The formatter lays out surrounding utu and parsed Wutu islands together. The VS Code extension registers the same formatter and completions for tags, attributes, bindings, and events, and UTU: Show CSS Stencil projects a template's CSS into a plain CSS document.";
-            }
+            = code.shell(build_shell());
             = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression");
-            = ui.further("WUTU.md", "the Wutu design notes");
             = ui.further("examples/wutu-five/README.md", "five working Wutu websites");
         }
         \/;

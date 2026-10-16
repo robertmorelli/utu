@@ -2,171 +2,357 @@ using Browser from std:Browser;
 using code from "./code.utu";
 using ui from "./ui.utu";
 mod data {
-    fn json_sample() Str {
+    fn decode_sample() Str {
         \\struct Item:
         \\    | name: Str
         \\    | count: I32
-        \\    | tags: Array[Str]
+        \\    | note: ?Str            // may be null or missing
+        \\
+        \\export main() Str {
+        \\    let text = \\{"name": "pen", "count": 3, "extra": [1, 2]}
+        \\    ;
+        \\    promote @json/\ decode Item text \/ {
+        \\        |item| => `${item.count} ${item.name}, ${item.note orelse "no note"}`,
+        \\        ~> "not an Item",
+        \\    };
+        \\    // 3 pen, no note: unknown fields are skipped
+        \\}
+        ;
+    }
+    fn encode_sample() Str {
+        \\struct Item:
+        \\    | name: Str
+        \\    | count: I32
         \\    | note: ?Str
         \\
         \\struct Save:
         \\    | version: I32
         \\    | items: Array[Item]
         \\
-        \\fn load(text: Str) Save {
-        \\    promote @json/\ decode Save text \/ {
-        \\        |save| => save,
-        \\        ~> Save { version: 1, items: [] },
-        \\    };
+        \\export main() Str {
+        \\    let save = Save { version: 2, items: [
+        \\        Item { name: "pen", count: 3, note: null },
+        \\        Item { name: "cup", count: 1, note: "chipped" }
+        \\    ] };
+        \\    @json/\ encode Save save \/;
+        \\    // {"version":2,"items":[{"name":"pen","count":3,"note":null},
+        \\    //                       {"name":"cup","count":1,"note":"chipped"}]}
+        \\}
+        ;
+    }
+    fn roundtrip_sample() Str {
+        \\struct Point:
+        \\    | x: I32
+        \\    | y: I32
+        \\
+        \\export main() Str {
+        \\    let points = @json/\ decode Array[Point] "[{\"x\": 1, \"y\": 2}, {\"y\": 5, \"x\": 4}]" \/
+        \\        orelse fatal;
+        \\    for (points) |p| { p.x *= 10; };
+        \\    @json/\ encode Array[Point] points \/;   // [{"x":10,"y":2},{"x":40,"y":5}]
+        \\}
+        ;
+    }
+    fn error_sample() Str {
+        \\using console from std:Console;
+        \\
+        \\struct Item:
+        \\    | name: Str
+        \\    | count: I32
+        \\
+        \\export main() void {
+        \\    let missing = \\{"name": "pen",
+        \\                  \\ "colour": "red"}
+        \\    ;
+        \\    console.log(@json/\ error Item missing \/);         // missing field "count" at line 2, column 18
+        \\    console.log(@json/\ error Item "{\"name\": 5}" \/);   // expected a string at line 1, column 10
+        \\    let ok = @json/\ error Item "{\"name\": \"a\", \"count\": 1}" \/;
+        \\    console.log(`matches: ${ok == ""}`);                 // matches: true
+        \\}
+        ;
+    }
+    fn enums_sample() Str {
+        \\enum Color:
+        \\    | Red {}
+        \\    | Green {}
+        \\
+        \\enum Shape:
+        \\    | Circle { r: F64 }
+        \\    | Square { side: F64 }
+        \\
+        \\struct Sticker:
+        \\    | color: Color          // a field-less enum is a string: "Red"
+        \\    | shape: Shape          // others carry a "kind" field first
+        \\
+        \\export main() Str {
+        \\    let text = \\{"color": "Green", "shape": {"kind": "Circle", "r": 2}}
+        \\    ;
+        \\    let s = @json/\ decode Sticker text \/ orelse fatal;
+        \\    s.shape = Square { side: 3.0 };
+        \\    @json/\ encode Sticker s \/;   // {"color":"Green","shape":{"kind":"Square","side":3}}
+        \\}
+        ;
+    }
+    fn recursive_sample() Str {
+        \\struct Folder:
+        \\    | name: Str
+        \\    | size: I64             // integers past 2^53 stay exact
+        \\    | children: Array[Folder]
+        \\
+        \\fn total(f: Folder) I64 {
+        \\    let sum = f.size;
+        \\    for (f.children) |c| { sum += total(c); };
+        \\    sum;
         \\}
         \\
-        \\fn store(save: Save) Str {
-        \\    @json/\ encode Save save \/;
+        \\export main() I64 {
+        \\    let text = \\{"name": "/", "size": 9007199254740993, "children": [
+        \\               \\  {"name": "src", "size": 10, "children": []}]}
+        \\    ;
+        \\    total(@json/\ decode Folder text \/ orelse fatal);   // 9007199254741003
         \\}
         ;
     }
     fn match_sample() Str {
-        \\@json/\ match response {
-        \\    { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 } } => {
-        \\        greet(name, age);
-        \\    },
-        \\    { status: "error", message: |message| Str } => show(message),
-        \\    ~> |error| show("unexpected response: " + error),
-        \\}\/;
+        \\fn handle(response: Str) Str {
+        \\    @json/\ match response {
+        \\        { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 } } => `${name} is ${age}`,
+        \\        { status: "error", message: |message| Str } => "error: " + message,
+        \\        ~> |error| "unexpected: " + error,
+        \\    }\/;
+        \\}
+        \\
+        \\export main() Str {
+        \\    handle("{\"status\": \"ok\", \"user\": {\"name\": \"Ada\", \"age\": 36}}");
+        \\    // Ada is 36
+        \\    // {"status": "ok", "user": {"name": "Bo"}}            Bo is 18 (a default)
+        \\    // {"status": "error", "message": "quota"}             error: quota
+        \\    // {"status": "ok", "user": {"name": "Cy", "age": "old"}}
+        \\    //     unexpected: user.age: expected an integer at line 1, column 48
+        \\}
         ;
     }
-    fn operators_sample() Str {
-        \\let totals = [1, 2, 3] scan(0) |acc, value| { acc + value; } collect(I32);   // [1, 3, 6]
+    fn match_subtree_sample() Str {
+        \\struct Line:
+        \\    | name: Str
+        \\    | count: I32
         \\
-        \\let groups = [1, 2, 3, 4] group_by(I32, I32) |value| { value % 2; };
-        \\// Array[Group[I32, I32]]: key 1 -> [1, 3], then key 0 -> [2, 4]
+        \\fn units(order: Str) I32 {
+        \\    @json/\ match order {
+        \\        { lines: |lines| Array[Line], "coupon-code": |code| ?Str } => {
+        \\            let sum = 0;
+        \\            for (lines) |line| { sum += line.count; };
+        \\            if code != null { sum += 1; };    // a free one with a coupon
+        \\            sum;
+        \\        },
+        \\        ~> 0,
+        \\    }\/;
+        \\}
         \\
-        \\let first = [4, 2, 3] first_where(I32) |value| { value < 4; };
-        \\let value = (first orelse fatal).value;
-        \\
-        \\let lower = [1, 2, 2, 4] bisect |value| { value < 2; };   // 1
+        \\export main() I32 {
+        \\    let order = \\{"id": 7, "lines": [{"name": "a", "count": 2}, {"name": "b", "count": 3}],
+        \\                \\ "coupon-code": "SPRING", "audit": {"by": "x", "at": 1}}
+        \\    ;
+        \\    units(order);   // 6: "id" and "audit" are skipped without being decoded
+        \\}
         ;
     }
     fn segment_sample() Str {
         \\using SegmentTree from std:SegmentTree;
         \\
-        \\fn add(a: I32, b: I32) I32 {
-        \\    a + b;
-        \\}
+        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\fn reaches_ten(total: I32) Bool { total >= 10; }
         \\
-        \\fn example() I32 {
+        \\export main() I32 {
         \\    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add);
-        \\    sums.set(1, 10, add);
-        \\    sums.query(1, 3, add);   // 15
+        \\    let before = sums.query(1, 3, add);              // 3 + 5 = 8, the range [1, 3)
+        \\    sums.set(1, 10, add);                            // O(log n)
+        \\    let after = sums.query(1, 3, add);               // 10 + 5 = 15
+        \\    let first = sums.first_prefix(reaches_ten, add); // 1: 2 + 10 reaches ten
+        \\    before * 100 + after + first;                    // 816
+        \\}
+        ;
+    }
+    fn segment_max_sample() Str {
+        \\using SegmentTree from std:SegmentTree;
+        \\
+        \\fn max(a: F64, b: F64) F64 { F64.max(a, b); }
+        \\
+        \\export main() F64 {
+        \\    let temps = SegmentTree[F64].new([12.5, 18.0, 9.5, 21.0, 15.0], F64.inf() * -1.0, max);
+        \\    temps.query(0, 3, max) + temps.query(2, 5, max);   // 18 + 21 = 39
+        \\}
+        ;
+    }
+    fn persistent_sample() Str {
+        \\using PersistentSegmentTree from std:PersistentSegmentTree;
+        \\
+        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\
+        \\export main() I32 {
+        \\    let v1 = PersistentSegmentTree[I32].new([2, 3, 5], 0, add);
+        \\    let v2 = v1.set(1, 10, add);          // a new version; v1 is unchanged
+        \\    v1.query(0, 3, add) * 100 + v2.query(0, 3, add);   // 10 and 17: 1017
         \\}
         ;
     }
     fn spatial_sample() Str {
         \\using Spatial from std:Spatial;
         \\
-        \\let points = [
-        \\    Spatial.point(0.0, 0.0, 10),
-        \\    Spatial.point(1.0, 2.0, 20),
-        \\    Spatial.point(3.0, 1.0, 30)
-        \\];
-        \\let index = Spatial.new(points);
-        \\let ids = index.below(0.0, 3.0, 2.0);     // x interval, y ceiling
-        \\let nearby = index.radius(0.0, 0.0, 2.5);
-        \\let closest = index.nearest(2.9, 1.0);    // ?Found[I32]
+        \\export main() I32 {
+        \\    let index = Spatial.new([
+        \\        Spatial.point(0.0, 0.0, 10),      // x, y, id
+        \\        Spatial.point(1.0, 2.0, 20),
+        \\        Spatial.point(3.0, 1.0, 30),
+        \\        Spatial.point(1.0, 5.0, 40)
+        \\    ]);
+        \\    let low = index.below(0.0, 3.0, 2.0) sum;         // x in [0, 3], y <= 2: 60
+        \\    let box = index.within(0.0, 1.0, 0.0, 2.0) sum;   // a rectangle: 30
+        \\    let near = index.radius(0.0, 0.0, 1.0) sum;       // a circle: 10
+        \\    let closest = (index.nearest(3.1, 1.1) orelse fatal).value;   // 30
+        \\    low + box + near + closest;                       // 130
+        \\}
         ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Typed JSON, iterators, and indexes", "Data handling that stays in Wasm: a generated JSON parser per type, iterator pipelines that compile to loops, and native range and spatial indexes.");
+            = ui.header("Typed JSON and indexes", "Data handling that stays in Wasm: a JSON parser and printer generated per type, and native range and spatial indexes.");
             h2 {
-                "Typed JSON";
+                "Decode and encode";
             }
             p {
                 code {
                     "@json";
                 }
-                " reads and writes JSON as native utu values. The compiler generates a parser and printer for each type. They run in Wasm and read the string's code units directly: no ";
+                " reads JSON straight into utu structs, enums, and arrays, in Wasm, with no ";
                 code {
                     "JSON.parse";
                 }
-                ", no intermediate JavaScript objects, no boundary call per field. Bad input is reported with its position: ";
+                " and no boundary call per field. ";
                 code {
-                    "missing field \"count\" at line 3, column 9";
+                    "decode T text";
                 }
-                ".";
+                " is a ";
+                code {
+                    "?T";
+                }
+                "; ";
+                code {
+                    "encode T value";
+                }
+                " writes compact JSON in field order.";
             }
-            = code.block(json_sample());
+            = code.block(decode_sample());
+            = code.block(encode_sample());
+            = code.block(roundtrip_sample());
+            h2 {
+                "Errors with positions";
+            }
+            p {
+                code {
+                    "error T text";
+                }
+                " is empty when the text matches, and otherwise says what is wrong and where.";
+            }
+            = code.block(error_sample());
+            h2 {
+                "Enums, recursion, and big integers";
+            }
+            = code.block(enums_sample());
+            = code.block(recursive_sample());
             table {
                 tbody {
                     tr {
                         th {
                             code {
-                                "decode T text";
+                                "I32 U32 I64";
                             }
                         }
                         td {
+                            "integers, range-checked";
+                        }
+                    }
+                    tr {
+                        th {
+                            code {
+                                "F32 F64 Bool Str";
+                            }
+                        }
+                        td {
+                            "numbers, booleans, strings with every escape";
+                        }
+                    }
+                    tr {
+                        th {
                             code {
                                 "?T";
                             }
-                            ": the value, or null if the text does not match";
+                        }
+                        td {
+                            "null or a missing field";
                         }
                     }
                     tr {
                         th {
                             code {
-                                "error T text";
+                                "Array[T]";
                             }
                         }
                         td {
-                            code {
-                                "Str";
-                            }
-                            ": empty if it matches, else the problem";
+                            "arrays";
                         }
                     }
                     tr {
                         th {
-                            code {
-                                "encode T value";
-                            }
+                            "structs";
                         }
                         td {
-                            code {
-                                "Str";
-                            }
-                            ": compact JSON, fields in declaration order";
+                            "objects; unknown fields skipped, any field order";
                         }
                     }
                     tr {
                         th {
-                            code {
-                                "match text { ... }";
-                            }
+                            "enums";
                         }
                         td {
-                            "the value of the first matching structural pattern";
+                            code {
+                                "\"Red\"";
+                            }
+                            " without fields, ";
+                            code {
+                                "{\"kind\": \"Circle\", ...}";
+                            }
+                            " with them";
                         }
                     }
                 }
+            }
+            h2 {
+                "Structural match";
             }
             p {
                 "When only part of a document matters, ";
                 code {
                     "match";
                 }
-                " describes just that part. Captures are typed, defaults fill missing fields, literals must match exactly, and fields a pattern does not mention are skipped without being decoded.";
+                " describes that part: typed captures, defaults, literals that must match, and a required ";
+                code {
+                    "~>";
+                }
+                " arm that can bind the error.";
             }
             = code.block(match_sample());
+            = code.block(match_subtree_sample());
             p {
-                "On a 4 MB save file of 40,000 entities, decoding to native structs takes 23 ms on V8. The generated code adds about 4 KB to a module for the shared reader and writer, plus a few hundred bytes per type.";
+                "A 4 MB save file of 40,000 entities decodes to native structs in 23 ms on V8. The generated code adds about 4 KB per module plus a few hundred bytes per type.";
             }
             = ui.further("docs/json.md", "Typed JSON");
             h2 {
-                "Iterator pipelines";
+                "Iterators";
             }
             p {
-                "Stages (";
+                "Pipelines such as ";
                 code {
                     "map";
                 }
@@ -176,122 +362,47 @@ mod data {
                 }
                 ", ";
                 code {
-                    "flat_map";
+                    "group_by";
                 }
-                ", ";
-                code {
-                    "skip";
-                }
-                ", ";
-                code {
-                    "take";
-                }
-                ", ";
-                code {
-                    "zip";
-                }
-                ", ";
-                code {
-                    "chain";
-                }
-                ", ";
-                code {
-                    "scan";
-                }
-                ") are consumed by a terminal (";
-                code {
-                    "fold";
-                }
-                ", ";
-                code {
-                    "each";
-                }
-                ", ";
-                code {
-                    "sum";
-                }
-                ", ";
-                code {
-                    "count";
-                }
-                ", ";
-                code {
-                    "any";
-                }
-                ", ";
-                code {
-                    "all";
-                }
-                ", ";
-                code {
-                    "collect";
-                }
-                ", ";
+                ", and ";
                 code {
                     "sort";
                 }
-                ", ";
-                code {
-                    "group_by";
+                " compile to plain loops. They have ";
+                a {
+                    <href = "#/iterators";
+                    "their own page";
                 }
-                ", ";
-                code {
-                    "partition";
-                }
-                ", ";
-                code {
-                    "min_by";
-                }
-                ", ";
-                code {
-                    "first_where";
-                }
-                ", ";
-                code {
-                    "reduce";
-                }
-                "...). Bodies are inlined in place, so ";
-                code {
-                    "return";
-                }
-                " returns from the enclosing function. Collection types are spelled out, so empty results and changed element types stay unambiguous.";
+                ".";
             }
-            = code.block(operators_sample());
-            p {
-                "Map, filter, and fold pipelines emit one Wasm loop. Collect allocates its result once when every stage keeps or shrinks the length. Sort is a stable merge sort; a bare integer sort is a radix sort. Integer group keys use an open-addressing hash table. Pure reductions ship no JavaScript iterator runtime.";
-            }
-            = ui.further("docs/iterators.md", "Syntax-level iterators");
             h2 {
-                "Range and spatial indexes";
+                "Range indexes";
             }
-            p {
-                "When many queries would otherwise rescan the same data, build an index once. These modules compile to WasmGC data structures, with no JavaScript query runtime; importing an unused module adds no website bytes.";
-            }
-            = code.block(segment_sample());
             p {
                 code {
                     "SegmentTree[T]";
                 }
-                " supports any associative combiner with a neutral identity; build is O(n), updates and queries are O(log n), and ";
-                code {
-                    "first_prefix";
-                }
-                " finds the first element whose prefix satisfies a monotone predicate. ";
+                " answers range queries with any associative combiner in O(log n). ";
                 code {
                     "PersistentSegmentTree[T]";
                 }
-                " returns a new index from each ";
+                " returns a new version from each ";
                 code {
                     "set";
                 }
-                " and shares untouched branches.";
+                ".";
             }
-            = code.block(spatial_sample());
+            = code.block(segment_sample());
+            = code.block(segment_max_sample());
+            = code.block(persistent_sample());
+            h2 {
+                "Spatial indexes";
+            }
             p {
                 code {
                     "std:Spatial";
                 }
-                " is a static priority search tree with subtree bounding boxes: three-sided reporting with ";
+                " is a static priority search tree: three-sided ";
                 code {
                     "below";
                 }
@@ -307,48 +418,30 @@ mod data {
                 code {
                     "nearest";
                 }
-                ". Results own their storage and have unspecified order.";
+                ". Results come in no particular order.";
             }
+            = code.block(spatial_sample());
             = ui.further("docs/queries.md", "Native range and spatial indexes");
-            h2 {
-                "Everyday modules";
-            }
             p {
-                "The prelude's ";
+                "More modules (";
                 code {
-                    "Str";
+                    "StrMap";
                 }
-                " and ";
+                ", ";
                 code {
-                    "F64";
+                    "Random";
                 }
-                " carry the usual text and math methods. ";
+                ", ";
                 code {
-                    "std:StrMap";
+                    "Stream";
                 }
-                " maps strings to values, ";
-                code {
-                    "std:Random";
+                ", ...) are on the ";
+                a {
+                    <href = "#/std";
+                    "standard library";
                 }
-                " is a seeded xoshiro128** generator with the same numbers on every host, ";
-                code {
-                    "std:Stream";
-                }
-                " wraps JavaScript async iterables for ";
-                code {
-                    "await for";
-                }
-                ", and ";
-                code {
-                    "std:Console";
-                }
-                " and ";
-                code {
-                    "std:Time";
-                }
-                " cover logging and clocks. Each function ships only when a program uses it.";
+                " page.";
             }
-            = ui.further("std/README.md", "the standard library notes");
         }
         \/;
     }

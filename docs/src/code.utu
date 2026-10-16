@@ -35,7 +35,8 @@ mod code {
         "all", "take", "skip", "zip", "chain", "scan", "group_by", "first_where", "reduce",
         "bisect", "flat_map", "take_while", "skip_while", "partition", "distinct_by",
         "min_by", "max_by", "batched", "windows", "manual", "validate", "decode", "encode",
-        "error", "in"
+        "error", "in", "product", "fast_sum", "first_index", "last_index", "repeat", "yield",
+        "prune", "defer"
         ];
         words any |w| {
             w == word;
@@ -86,7 +87,9 @@ mod code {
     fn number_end(source: Str, from: I32) I32 {
         let i = from;
         let n = source.len();
-        while (i < n and (is_digit(source[i]) or source[i] == 46 or source[i] == 95 or source[i] == 120)) {
+        // Digits, letters (0xff, 0b1010, 2.5e3), and a point before a digit
+        // (so 0..<5 stays a range).
+        while (i < n and (is_ident(source[i]) or (source[i] == 46 and i + 1 < n and is_digit(source[i + 1])))) {
             i += 1;
         };
         i;
@@ -210,6 +213,25 @@ mod code {
                         <class = $[kind];
                         = parts.texts[index.to_i32()];
                     }
+                }
+            }
+        }
+        \/;
+    }
+    // The spans alone, for an editor that lays them under its textarea. A
+    // trailing newline gets a space after it so the last line has a height.
+    fn spans(source: Str) Browser.HTMLElement {
+        let parts = tokens(if source.len() > 0 and source[source.len() - 1] == 10 {
+            source + " ";
+        } else {
+            source;
+        });
+        @wutu/\
+        code {
+            for $[parts.kinds] |kind, index| {
+                span {
+                    <class = $[kind];
+                    = parts.texts[index.to_i32()];
                 }
             }
         }

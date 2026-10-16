@@ -1,0 +1,2135 @@
+// Every iterator source, stage, and terminal, each with an example whose
+// result comment was checked by running it against the current compiler.
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod iterators {
+    fn jump(id: Str) void {
+        let go: fun(Str) void = @es/\ (id) => document.getElementById(id)?.scrollIntoView({ block: "start" }) \/;
+        go(id);
+    }
+    fn array_sample() Str {
+        \\export main() Array[I32] {
+        \\    let xs = [3, 1, 4, 1, 5];
+        \\    xs map |x| { x * 10; } collect(I32);   // [30, 10, 40, 10, 50]
+        \\}
+        ;
+    }
+    fn range_sample() Str {
+        \\export main() Array[I32] {
+        \\    (2 ..< 6) collect(I32);   // [2, 3, 4, 5]
+        \\}
+        ;
+    }
+    fn range_inclusive_sample() Str {
+        \\export main() I32 {
+        \\    (1 ... 5) product;   // 120
+        \\}
+        ;
+    }
+    fn nested_sample() Str {
+        \\export main() I32 {
+        \\    ([1, 2, 3, 4, 5] batched(I32, 2)) map |batch| { batch.len(); } count;   // 3
+        \\}
+        ;
+    }
+    fn strings_sample() Str {
+        \\using Buffer from std:Buffer;
+        \\
+        \\export main() Array[I32] {
+        \\    let text = "to be or not";
+        \\    let lengths = text.split(" ") map |word| { word.len(); } collect(I32);
+        \\    let spaces = (0 ..< text.len()) count_where |i| { text[i] == 32; };
+        \\    let buffer = Buffer[I32].new();
+        \\    buffer.push(spaces);
+        \\    buffer.finish() chain(lengths) collect(I32);   // [3, 2, 2, 2, 3]
+        \\}
+        ;
+    }
+    fn map_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 3] map |n| { n * n; } collect(I32);   // [1, 4, 9]
+        \\}
+        ;
+    }
+    fn filter_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 3, 4, 5, 6] filter |n| { n % 2 == 0; } collect(I32);   // [2, 4, 6]
+        \\}
+        ;
+    }
+    fn flat_map_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 3] flat_map |n| { [n, -n]; } collect(I32);   // [1, -1, 2, -2, 3, -3]
+        \\}
+        ;
+    }
+    fn take_sample() Str {
+        \\export main() Array[I32] {
+        \\    (0 ..< 1000000) take(3) collect(I32);   // [0, 1, 2]
+        \\}
+        ;
+    }
+    fn skip_sample() Str {
+        \\export main() Array[I32] {
+        \\    [10, 20, 30, 40] skip(2) collect(I32);   // [30, 40]
+        \\}
+        ;
+    }
+    fn take_while_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 7, 3, 1] take_while |n| { n < 5; } collect(I32);   // [1, 2]
+        \\}
+        ;
+    }
+    fn skip_while_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 7, 3, 1] skip_while |n| { n < 5; } collect(I32);   // [7, 3, 1]
+        \\}
+        ;
+    }
+    fn zip_sample() Str {
+        \\export main() Array[I32] {
+        \\    let prices = [5, 3, 8];
+        \\    let counts = [2, 10, 1, 99];
+        \\    prices zip(counts) |price, count| { price * count; } collect(I32);   // [10, 30, 8]
+        \\}
+        ;
+    }
+    fn chain_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2] map |n| { n * 100; } chain([7, 8]) collect(I32);   // [100, 200, 7, 8]
+        \\}
+        ;
+    }
+    fn repeat_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 3] repeat(2) collect(I32);   // [1, 1, 2, 2, 3, 3]
+        \\}
+        ;
+    }
+    fn scan_sample() Str {
+        \\export main() Array[I32] {
+        \\    [1, 2, 3, 4] scan(0) |total, n| { total + n; } collect(I32);   // [1, 3, 6, 10]
+        \\}
+        ;
+    }
+    fn index_sample() Str {
+        \\export main() Array[I32] {
+        \\    [5, 6, 7, 8]
+        \\        filter |n, i| { i % 2 == 0; }       // positions 0 and 2: 5, 7
+        \\        map |n, i| { n * 10 + i.to_i32(); } // positions in the filtered stream: 0, 1
+        \\        collect(I32);   // [50, 71]
+        \\}
+        ;
+    }
+    fn fold_sample() Str {
+        \\export main() I32 {
+        \\    [3, 1, 4] fold(100) |acc, n| { acc - n; };   // 92
+        \\}
+        ;
+    }
+    fn each_sample() Str {
+        \\export main() Str {
+        \\    let out = "";
+        \\    ["a", "b", "c"] each |letter, i| { out = out + `${i}${letter} `; };
+        \\    out;   // "0a 1b 2c "
+        \\}
+        ;
+    }
+    fn sum_sample() Str {
+        \\export main() F64 {
+        \\    [1.5, 2.25, 0.25] sum;   // 4
+        \\}
+        ;
+    }
+    fn product_sample() Str {
+        \\export main() I32 {
+        \\    [2, 3, 7] product;   // 42
+        \\}
+        ;
+    }
+    fn fast_sum_sample() Str {
+        \\export main() I64 {
+        \\    let xs: Array[I64] = [10, 20, 30, 40, 50];
+        \\    xs fast_sum;   // 150
+        \\}
+        ;
+    }
+    fn count_sample() Str {
+        \\export main() I32 {
+        \\    (0 ..< 100) filter |n| { n % 7 == 0; } count;   // 15
+        \\}
+        ;
+    }
+    fn count_where_sample() Str {
+        \\export main() I32 {
+        \\    ["ok", "fail", "ok", "ok"] count_where |s| { s == "ok"; };   // 3
+        \\}
+        ;
+    }
+    fn any_sample() Str {
+        \\export main() Bool {
+        \\    [3, 8, 12] any |n| { n > 10; };   // true
+        \\}
+        ;
+    }
+    fn all_sample() Str {
+        \\export main() Bool {
+        \\    [3, 8, 12] all |n| { n > 5; };   // false
+        \\}
+        ;
+    }
+    fn first_index_sample() Str {
+        \\export main() I32 {
+        \\    [4, 9, 2, 9] first_index |n| { n == 9; };   // 1
+        \\}
+        ;
+    }
+    fn last_index_sample() Str {
+        \\export main() I32 {
+        \\    [4, 9, 2, 9] last_index |n| { n == 9; };   // 3
+        \\}
+        ;
+    }
+    fn collect_sample() Str {
+        \\export main() Array[Str] {
+        \\    [1, 2, 3] map |n| { `#${n}`; } collect(Str);   // ["#1", "#2", "#3"]
+        \\}
+        ;
+    }
+    fn sort_sample() Str {
+        \\struct Player:
+        \\    | name: Str
+        \\    | score: I32
+        \\
+        \\export main() Array[Str] {
+        \\    let players = [
+        \\        Player { name: "ada", score: 7 },
+        \\        Player { name: "bo", score: 9 },
+        \\        Player { name: "cy", score: 7 }
+        \\    ];
+        \\    let ranked = players sort(Player) |a, b| { a.score > b.score; };
+        \\    ranked map |p| { p.name; } collect(Str);   // ["bo", "ada", "cy"]
+        \\}
+        ;
+    }
+    fn distinct_by_sample() Str {
+        \\export main() Array[Str] {
+        \\    ["apple", "avocado", "banana", "blueberry", "cherry"]
+        \\        distinct_by(Str, I32) |fruit| { fruit[0]; };   // ["apple", "banana", "cherry"]
+        \\}
+        ;
+    }
+    fn group_by_sample() Str {
+        \\export main() Array[Group[I32, Str]] {
+        \\    ["hi", "yo", "hey", "hello", "sup"] group_by(Str, I32) |word| { word.len(); };
+        \\    // [2: ["hi", "yo"], 3: ["hey", "sup"], 5: ["hello"]]
+        \\}
+        ;
+    }
+    fn partition_sample() Str {
+        \\export main() Array[Array[I32]] {
+        \\    [1, 2, 3, 4, 5] partition(I32) |n| { n > 2; };   // [[3, 4, 5], [1, 2]]
+        \\}
+        ;
+    }
+    fn batched_sample() Str {
+        \\export main() Array[Array[I32]] {
+        \\    [1, 2, 3, 4, 5] batched(I32, 2);   // [[1, 2], [3, 4], [5]]
+        \\}
+        ;
+    }
+    fn windows_sample() Str {
+        \\export main() Array[Array[I32]] {
+        \\    [1, 2, 3, 4] windows(I32, 3);   // [[1, 2, 3], [2, 3, 4]]
+        \\}
+        ;
+    }
+    fn min_by_sample() Str {
+        \\export main() Str {
+        \\    let shortest = ["pear", "fig", "plum", "kiwi"] min_by(Str) |a, b| { a.len() < b.len(); };
+        \\    (shortest orelse fatal).value;   // "fig"
+        \\}
+        ;
+    }
+    fn max_by_sample() Str {
+        \\export main() Str {
+        \\    let longest = ["pear", "fig", "plum", "kiwi"] max_by(Str) |a, b| { a.len() < b.len(); };
+        \\    (longest orelse fatal).value;   // "pear"
+        \\}
+        ;
+    }
+    fn first_where_sample() Str {
+        \\export main() I32 {
+        \\    let found = [4, 9, 2, 12] first_where(I32) |n| { n > 5; };
+        \\    promote found {
+        \\        |hit| => hit.value,
+        \\        ~> -1,
+        \\    };   // 9
+        \\}
+        ;
+    }
+    fn reduce_sample() Str {
+        \\export main() I32 {
+        \\    let biggest = [4, 9, 2, 12, 7] reduce(I32) |best, n| { if n > best { n; } else { best; }; };
+        \\    (biggest orelse fatal).value;   // 12
+        \\}
+        ;
+    }
+    fn bisect_sample() Str {
+        \\export main() I32 {
+        \\    let sorted = [1, 3, 3, 5, 8, 13];
+        \\    let lower = sorted bisect |n| { n < 3; };    // 1
+        \\    let upper = sorted bisect |n| { n <= 3; };   // 3
+        \\    lower * 10 + upper;   // 13
+        \\}
+        ;
+    }
+    fn for_range_sample() Str {
+        \\export main() I32 {
+        \\    let total = 0;
+        \\    for (0 ..< 4) |i| { total += i; };       // 0 + 1 + 2 + 3
+        \\    for (10 ... 12) |i| { total += i; };     // 10 + 11 + 12
+        \\    total;   // 39
+        \\}
+        ;
+    }
+    fn for_array_sample() Str {
+        \\export main() Str {
+        \\    let out = "";
+        \\    for (["red", "green", "blue"]) |color| { out = out + color + "/"; };
+        \\    out;   // "red/green/blue/"
+        \\}
+        ;
+    }
+    fn for_zip_sample() Str {
+        \\export main() Str {
+        \\    let names = ["ada", "bo", "cy"];
+        \\    let out = "";
+        \\    for (names, 0 ..< names.len()) |name, i| { out = out + `${i}=${name} `; };
+        \\    out;   // "0=ada 1=bo 2=cy "
+        \\}
+        ;
+    }
+    fn for_break_sample() Str {
+        \\export main() I32 {
+        \\    let total = 0;
+        \\    for (0 ..< 100) |n| {
+        \\        if n % 2 == 0 { continue; };
+        \\        if n > 9 { break; };
+        \\        total += n;
+        \\    };
+        \\    total;   // 1 + 3 + 5 + 7 + 9 = 25
+        \\}
+        ;
+    }
+    fn generator_sample() Str {
+        \\fn squares(n: I32) yield I32 {
+        \\    for (1 ... n) |i| { yield i * i; };
+        \\}
+        \\
+        \\export main() I32 {
+        \\    let total = 0;
+        \\    for (squares(4)) |s| { total += s; };
+        \\    total;   // 1 + 4 + 9 + 16 = 30
+        \\}
+        ;
+    }
+    fn recursive_sample() Str {
+        \\struct Node:
+        \\    | name: Str
+        \\    | kids: Array[Node]
+        \\
+        \\fn leaf(name: Str) Node { Node { name: name, kids: [] }; }
+        \\
+        \\fn walk(n: Node) yield Node {
+        \\    for (n.kids) |kid| { yield kid; for (walk(kid)) |d| { yield d; }; };
+        \\}
+        \\
+        \\export main() Str {
+        \\    let root = Node { name: "/", kids: [
+        \\        Node { name: "src", kids: [leaf("a.utu"), leaf("b.utu")] },
+        \\        Node { name: "tmp", kids: [leaf("junk")] }
+        \\    ] };
+        \\    let out = "";
+        \\    for (walk(root)) |n| {
+        \\        out = out + n.name + " ";
+        \\        if n.name == "tmp" { prune; };
+        \\    };
+        \\    out;   // "src a.utu b.utu tmp "
+        \\}
+        ;
+    }
+    fn fusion_sample() Str {
+        \\export main() I32 {
+        \\    (1 ..< 1000)
+        \\        map |n| { n * n; }
+        \\        filter |sq| { sq % 3 == 1; }
+        \\        take(5)
+        \\        sum;   // 1 + 4 + 16 + 25 + 49 = 95
+        \\}
+        ;
+    }
+    fn fusion_collect_sample() Str {
+        \\export main() I32 {
+        \\    let doubled = [1, 2, 3, 4];
+        \\    ((doubled map |n| { n * 2; } collect(I32)) filter |n| { n > 4; } sum);   // 6 + 8 = 14
+        \\}
+        ;
+    }
+    fn stream_sample() Str {
+        \\export main() I32 {
+        \\    let s = Stream[I32].of([1, 2, 3, 4, 5, 6])
+        \\        .filter(cl(v) { v % 2 == 0; })
+        \\        .map(cl(v) { v * 10; });
+        \\    let total = 0;
+        \\    await for (s) |v| { total += v; };
+        \\    total;   // 20 + 40 + 60 = 120
+        \\}
+        ;
+    }
+    fn stream_more_sample() Str {
+        \\export main() Str {
+        \\    let s = Stream[I32].generate(10, cl(i) { i * i; })
+        \\        .skip(1)
+        \\        .take(4)
+        \\        .chain(Stream[I32].of([-1, 999]));
+        \\    let out = "";
+        \\    await for (s) |v| {
+        \\        if v < 0 { break; };
+        \\        out = out + `${v} `;
+        \\    };
+        \\    out;   // "1 4 9 16 "
+        \\}
+        ;
+    }
+    fn recipe_words_sample() Str {
+        \\export main() Str {
+        \\    let text = "the cat and the hat and the bat";
+        \\    let groups = text.split(" ") group_by(Str, Str) |w| { w; };
+        \\    let ranked = groups sort(Group[Str, Str]) |a, b| { a.values.len() > b.values.len(); };
+        \\    ranked take(2) map |g| { `${g.key}:${g.values.len()}`; } fold("") |acc, s| { acc + s + " "; };
+        \\    // "the:3 and:2 "
+        \\}
+        ;
+    }
+    fn recipe_stats_sample() Str {
+        \\export main() Str {
+        \\    let temps = [12.5, 17.0, 9.5, 21.0];
+        \\    let mean = temps sum / temps.len().to_f64();
+        \\    let hottest = temps reduce(F64) |a, b| { if b > a { b; } else { a; }; };
+        \\    `mean ${mean}, max ${(hottest orelse fatal).value}`;   // "mean 15, max 21"
+        \\}
+        ;
+    }
+    fn recipe_diffs_sample() Str {
+        \\export main() Array[I32] {
+        \\    let xs = [3, 7, 8, 15];
+        \\    let a = (xs windows(I32, 2)) map |w| { w[1] - w[0]; } collect(I32);
+        \\    let b = xs skip(1) zip(xs) |next, prev| { next - prev; } collect(I32);
+        \\    a chain(b) collect(I32);   // [4, 1, 7, 4, 1, 7]
+        \\}
+        ;
+    }
+    fn recipe_primes_sample() Str {
+        \\export main() Array[I32] {
+        \\    (2 ..< 50) filter |n| {
+        \\        (2 ..< n) take_while |d| { d * d <= n; } all |d| { n % d != 0; };
+        \\    } collect(I32);   // [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
+        \\}
+        ;
+    }
+    fn recipe_top_sample() Str {
+        \\struct Entry:
+        \\    | name: Str
+        \\    | score: I32
+        \\    | active: Bool
+        \\
+        \\export main() Array[Str] {
+        \\    let entries = [
+        \\        Entry { name: "ada", score: 88, active: true },
+        \\        Entry { name: "bo", score: 95, active: false },
+        \\        Entry { name: "cy", score: 72, active: true },
+        \\        Entry { name: "di", score: 91, active: true }
+        \\    ];
+        \\    let best = entries filter |e| { e.active; } sort(Entry) |a, b| { a.score > b.score; };
+        \\    best take(2) map |e| { e.name; } collect(Str);   // ["di", "ada"]
+        \\}
+        ;
+    }
+    fn recipe_matrix_sample() Str {
+        \\export main() Array[I32] {
+        \\    let cells = (0 ..< 3) flat_map |r| { (0 ..< 4) map |c| { r * 10 + c; } collect(I32); } collect(I32);
+        \\    let rows = cells batched(I32, 4);
+        \\    rows map |row| { row sum; } collect(I32);   // [6, 46, 86]
+        \\}
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Iterators", "Every source, stage, and terminal the compiler accepts, each with an example. A pipeline is syntax, not an object: it compiles to one loop.");
+            p {
+                "A pipeline is a source, any number of stages, and one terminal. Extra arguments go in parentheses (";
+                code {
+                    "take(3)";
+                }
+                ", ";
+                code {
+                    "fold(0)";
+                }
+                ", ";
+                code {
+                    "collect(I32)";
+                }
+                "), bodies take capture bars, and every result comment below was produced by running the sample.";
+            }
+            table {
+                thead {
+                    tr {
+                        th {
+                            "Operation";
+                        }
+                        th {
+                            "Kind";
+                        }
+                        th {
+                            "Yields";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "Array[T]";
+                                }
+                                on click {
+                                    jump("it-array");
+                                };
+                            }
+                        }
+                        td {
+                            "source";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "(a ..< b)";
+                                }
+                                on click {
+                                    jump("it-range");
+                                };
+                            }
+                        }
+                        td {
+                            "source";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "(a ... b)";
+                                }
+                                on click {
+                                    jump("it-range_inclusive");
+                                };
+                            }
+                        }
+                        td {
+                            "source";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "(pipeline)";
+                                }
+                                on click {
+                                    jump("it-nested");
+                                };
+                            }
+                        }
+                        td {
+                            "source";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "text.split(…), buffer.finish()";
+                                }
+                                on click {
+                                    jump("it-strings");
+                                };
+                            }
+                        }
+                        td {
+                            "source";
+                        }
+                        td {
+                            code {
+                                "Str, T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "map";
+                                }
+                                on click {
+                                    jump("it-map");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "U, the body's type";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "filter";
+                                }
+                                on click {
+                                    jump("it-filter");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "flat_map";
+                                }
+                                on click {
+                                    jump("it-flat_map");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "U, the arrays' element";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "take(n)";
+                                }
+                                on click {
+                                    jump("it-take");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "skip(n)";
+                                }
+                                on click {
+                                    jump("it-skip");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "take_while";
+                                }
+                                on click {
+                                    jump("it-take_while");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "skip_while";
+                                }
+                                on click {
+                                    jump("it-skip_while");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "zip(other)";
+                                }
+                                on click {
+                                    jump("it-zip");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "U, the body's type";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "chain(other)";
+                                }
+                                on click {
+                                    jump("it-chain");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "repeat(n)";
+                                }
+                                on click {
+                                    jump("it-repeat");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "scan(init)";
+                                }
+                                on click {
+                                    jump("it-scan");
+                                };
+                            }
+                        }
+                        td {
+                            "stage";
+                        }
+                        td {
+                            code {
+                                "A, the accumulator";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "fold(init)";
+                                }
+                                on click {
+                                    jump("it-fold");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "A";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "each";
+                                }
+                                on click {
+                                    jump("it-each");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "void";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "sum";
+                                }
+                                on click {
+                                    jump("it-sum");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "product";
+                                }
+                                on click {
+                                    jump("it-product");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "fast_sum";
+                                }
+                                on click {
+                                    jump("it-fast_sum");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "T";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "count";
+                                }
+                                on click {
+                                    jump("it-count");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "count_where";
+                                }
+                                on click {
+                                    jump("it-count_where");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "any";
+                                }
+                                on click {
+                                    jump("it-any");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Bool";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "all";
+                                }
+                                on click {
+                                    jump("it-all");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Bool";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "first_index";
+                                }
+                                on click {
+                                    jump("it-first_index");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "last_index";
+                                }
+                                on click {
+                                    jump("it-last_index");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "collect(T)";
+                                }
+                                on click {
+                                    jump("it-collect");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "sort(T)";
+                                }
+                                on click {
+                                    jump("it-sort");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "distinct_by(T, K)";
+                                }
+                                on click {
+                                    jump("it-distinct_by");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "group_by(T, K)";
+                                }
+                                on click {
+                                    jump("it-group_by");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[Group[K, T]]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "partition(T)";
+                                }
+                                on click {
+                                    jump("it-partition");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[Array[T]]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "batched(T, n)";
+                                }
+                                on click {
+                                    jump("it-batched");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[Array[T]]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "windows(T, n)";
+                                }
+                                on click {
+                                    jump("it-windows");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "Array[Array[T]]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "min_by(T)";
+                                }
+                                on click {
+                                    jump("it-min_by");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "?Found[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "max_by(T)";
+                                }
+                                on click {
+                                    jump("it-max_by");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "?Found[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "first_where(T)";
+                                }
+                                on click {
+                                    jump("it-first_where");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "?Found[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "reduce(T)";
+                                }
+                                on click {
+                                    jump("it-reduce");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "?Found[T]";
+                            }
+                        }
+                    }
+                    tr {
+                        td {
+                            a {
+                                <href = $["#" + wutu.route()];
+                                code {
+                                    "bisect";
+                                }
+                                on click {
+                                    jump("it-bisect");
+                                };
+                            }
+                        }
+                        td {
+                            "terminal";
+                        }
+                        td {
+                            code {
+                                "I32";
+                            }
+                        }
+                    }
+                }
+            }
+            p {
+                code {
+                    "T";
+                }
+                " is the element type entering a stage. Terminals that build arrays or groups name their element and key types, so empty inputs and changed types stay unambiguous.";
+            }
+            section {
+                h2 {
+                    "Sources";
+                }
+                p {
+                    "Where values come from. Ranges and arrays are read in place; nothing is copied.";
+                }
+                h3 {
+                    <id = "it-array";
+                    "Arrays";
+                }
+                p {
+                    "Any ";
+                    code {
+                        "Array[T]";
+                    }
+                    " value, evaluated once, before the loop starts.";
+                }
+                = code.block(array_sample());
+                h3 {
+                    <id = "it-range";
+                    code {
+                        "(a ..< b)";
+                    }
+                }
+                p {
+                    "The integers from ";
+                    code {
+                        "a";
+                    }
+                    " up to but not including ";
+                    code {
+                        "b";
+                    }
+                    ". No array is built; written in parentheses.";
+                }
+                = code.block(range_sample());
+                h3 {
+                    <id = "it-range_inclusive";
+                    code {
+                        "(a ... b)";
+                    }
+                }
+                p {
+                    "The integers from ";
+                    code {
+                        "a";
+                    }
+                    " through ";
+                    code {
+                        "b";
+                    }
+                    ", inclusive.";
+                }
+                = code.block(range_inclusive_sample());
+                h3 {
+                    <id = "it-nested";
+                    code {
+                        "(pipeline)";
+                    }
+                }
+                p {
+                    "A parenthesized pipeline that ends in an array is a source for the next one.";
+                }
+                = code.block(nested_sample());
+                h3 {
+                    <id = "it-strings";
+                    "Strings and buffers";
+                }
+                p {
+                    "A ";
+                    code {
+                        "Str";
+                    }
+                    " is not a source: split it, or count over its code units. A ";
+                    code {
+                        "Buffer";
+                    }
+                    " becomes one with ";
+                    code {
+                        "finish()";
+                    }
+                    ".";
+                }
+                = code.block(strings_sample());
+            }
+            section {
+                h2 {
+                    "Stages";
+                }
+                p {
+                    "Stages change the values on their way to the terminal. Each runs inside the same loop.";
+                }
+                h3 {
+                    <id = "it-map";
+                    code {
+                        "map";
+                    }
+                }
+                p {
+                    "Transform each value.";
+                }
+                = code.block(map_sample());
+                h3 {
+                    <id = "it-filter";
+                    code {
+                        "filter";
+                    }
+                }
+                p {
+                    "Keep the values the predicate is true of.";
+                }
+                = code.block(filter_sample());
+                h3 {
+                    <id = "it-flat_map";
+                    code {
+                        "flat_map";
+                    }
+                }
+                p {
+                    "Return an array per value; its values flow on in order.";
+                }
+                = code.block(flat_map_sample());
+                h3 {
+                    <id = "it-take";
+                    code {
+                        "take(n)";
+                    }
+                }
+                p {
+                    "The first ";
+                    code {
+                        "n";
+                    }
+                    " values; later stages and the source stop there.";
+                }
+                = code.block(take_sample());
+                h3 {
+                    <id = "it-skip";
+                    code {
+                        "skip(n)";
+                    }
+                }
+                p {
+                    "All but the first ";
+                    code {
+                        "n";
+                    }
+                    " values.";
+                }
+                = code.block(skip_sample());
+                h3 {
+                    <id = "it-take_while";
+                    code {
+                        "take_while";
+                    }
+                }
+                p {
+                    "Values up to the first one the predicate is false of.";
+                }
+                = code.block(take_while_sample());
+                h3 {
+                    <id = "it-skip_while";
+                    code {
+                        "skip_while";
+                    }
+                }
+                p {
+                    "Drop the leading values the predicate is true of, then keep everything.";
+                }
+                = code.block(skip_while_sample());
+                h3 {
+                    <id = "it-zip";
+                    code {
+                        "zip(other)";
+                    }
+                }
+                p {
+                    "Pair each value with the other array's, stopping at the shorter one.";
+                }
+                = code.block(zip_sample());
+                h3 {
+                    <id = "it-chain";
+                    code {
+                        "chain(other)";
+                    }
+                }
+                p {
+                    "After the stages before it finish, go on with another array.";
+                }
+                = code.block(chain_sample());
+                h3 {
+                    <id = "it-repeat";
+                    code {
+                        "repeat(n)";
+                    }
+                }
+                p {
+                    "Emit each value ";
+                    code {
+                        "n";
+                    }
+                    " times in a row.";
+                }
+                = code.block(repeat_sample());
+                h3 {
+                    <id = "it-scan";
+                    code {
+                        "scan(init)";
+                    }
+                }
+                p {
+                    "Like ";
+                    code {
+                        "fold";
+                    }
+                    ", but passes on every running accumulator (not the seed).";
+                }
+                = code.block(scan_sample());
+                h3 {
+                    <id = "it-index";
+                    "Index captures";
+                }
+                p {
+                    "Any body may name one more capture: the zero-based ";
+                    code {
+                        "U64";
+                    }
+                    " position of the value entering that stage.";
+                }
+                = code.block(index_sample());
+            }
+            section {
+                h2 {
+                    "Terminals";
+                }
+                p {
+                    "A pipeline must end in a terminal, which consumes it immediately. Terminals that may find nothing return ";
+                    code {
+                        "?Found[T]";
+                    }
+                    ": unwrap ";
+                    code {
+                        ".value";
+                    }
+                    " with ";
+                    code {
+                        "promote";
+                    }
+                    " or ";
+                    code {
+                        "orelse";
+                    }
+                    ".";
+                }
+                h3 {
+                    <id = "it-fold";
+                    code {
+                        "fold(init)";
+                    }
+                }
+                p {
+                    "Combine every value into an accumulator; the seed on empty input.";
+                }
+                = code.block(fold_sample());
+                h3 {
+                    <id = "it-each";
+                    code {
+                        "each";
+                    }
+                }
+                p {
+                    "Run the body for every value, in order.";
+                }
+                = code.block(each_sample());
+                h3 {
+                    <id = "it-sum";
+                    code {
+                        "sum";
+                    }
+                }
+                p {
+                    "Add the values; zero when empty.";
+                }
+                = code.block(sum_sample());
+                h3 {
+                    <id = "it-product";
+                    code {
+                        "product";
+                    }
+                }
+                p {
+                    "Multiply the values; one when empty.";
+                }
+                = code.block(product_sample());
+                h3 {
+                    <id = "it-fast_sum";
+                    code {
+                        "fast_sum";
+                    }
+                }
+                p {
+                    code {
+                        "sum";
+                    }
+                    " with four running totals so additions overlap; exact for integers, floats may round differently.";
+                }
+                = code.block(fast_sum_sample());
+                h3 {
+                    <id = "it-count";
+                    code {
+                        "count";
+                    }
+                }
+                p {
+                    "How many values arrive.";
+                }
+                = code.block(count_sample());
+                h3 {
+                    <id = "it-count_where";
+                    code {
+                        "count_where";
+                    }
+                }
+                p {
+                    "How many values the predicate is true of.";
+                }
+                = code.block(count_where_sample());
+                h3 {
+                    <id = "it-any";
+                    code {
+                        "any";
+                    }
+                }
+                p {
+                    "True when some value matches; stops at the first. False when empty.";
+                }
+                = code.block(any_sample());
+                h3 {
+                    <id = "it-all";
+                    code {
+                        "all";
+                    }
+                }
+                p {
+                    "True when every value matches; stops at the first miss. True when empty.";
+                }
+                = code.block(all_sample());
+                h3 {
+                    <id = "it-first_index";
+                    code {
+                        "first_index";
+                    }
+                }
+                p {
+                    "The stage position of the first match, or -1.";
+                }
+                = code.block(first_index_sample());
+                h3 {
+                    <id = "it-last_index";
+                    code {
+                        "last_index";
+                    }
+                }
+                p {
+                    "The stage position of the last match, or -1.";
+                }
+                = code.block(last_index_sample());
+                h3 {
+                    <id = "it-collect";
+                    code {
+                        "collect(T)";
+                    }
+                }
+                p {
+                    "A new array of the values. The element type is written out.";
+                }
+                = code.block(collect_sample());
+                h3 {
+                    <id = "it-sort";
+                    code {
+                        "sort(T)";
+                    }
+                }
+                p {
+                    "A new array, stably sorted by a less-than comparator. The source is untouched.";
+                }
+                = code.block(sort_sample());
+                h3 {
+                    <id = "it-distinct_by";
+                    code {
+                        "distinct_by(T, K)";
+                    }
+                }
+                p {
+                    "The first value for each key, in input order.";
+                }
+                = code.block(distinct_by_sample());
+                h3 {
+                    <id = "it-group_by";
+                    code {
+                        "group_by(T, K)";
+                    }
+                }
+                p {
+                    "Values grouped by key; groups and members keep encounter order. Each group has ";
+                    code {
+                        ".key";
+                    }
+                    " and ";
+                    code {
+                        ".values";
+                    }
+                    ".";
+                }
+                = code.block(group_by_sample());
+                h3 {
+                    <id = "it-partition";
+                    code {
+                        "partition(T)";
+                    }
+                }
+                p {
+                    "Two arrays: matches at ";
+                    code {
+                        "[0]";
+                    }
+                    ", the rest at ";
+                    code {
+                        "[1]";
+                    }
+                    ", both in order.";
+                }
+                = code.block(partition_sample());
+                h3 {
+                    <id = "it-batched";
+                    code {
+                        "batched(T, n)";
+                    }
+                }
+                p {
+                    "Non-overlapping batches of ";
+                    code {
+                        "n";
+                    }
+                    "; the last may be short.";
+                }
+                = code.block(batched_sample());
+                h3 {
+                    <id = "it-windows";
+                    code {
+                        "windows(T, n)";
+                    }
+                }
+                p {
+                    "Every run of ";
+                    code {
+                        "n";
+                    }
+                    " consecutive values, overlapping; empty when there are fewer.";
+                }
+                = code.block(windows_sample());
+                h3 {
+                    <id = "it-min_by";
+                    code {
+                        "min_by(T)";
+                    }
+                }
+                p {
+                    "The smallest value by a less-than comparator, or null when empty. The first of equals wins.";
+                }
+                = code.block(min_by_sample());
+                h3 {
+                    <id = "it-max_by";
+                    code {
+                        "max_by(T)";
+                    }
+                }
+                p {
+                    "The largest value, with the same less-than comparator. The first of equals wins.";
+                }
+                = code.block(max_by_sample());
+                h3 {
+                    <id = "it-first_where";
+                    code {
+                        "first_where(T)";
+                    }
+                }
+                p {
+                    "The first match, or null; stops there.";
+                }
+                = code.block(first_where_sample());
+                h3 {
+                    <id = "it-reduce";
+                    code {
+                        "reduce(T)";
+                    }
+                }
+                p {
+                    "Like ";
+                    code {
+                        "fold";
+                    }
+                    " seeded with the first value; null when empty.";
+                }
+                = code.block(reduce_sample());
+                h3 {
+                    <id = "it-bisect";
+                    code {
+                        "bisect";
+                    }
+                }
+                p {
+                    "Binary search of a sorted array (or range): the first position where a true-then-false predicate turns false.";
+                }
+                = code.block(bisect_sample());
+            }
+            section {
+                h2 {
+                    "for loops";
+                }
+                p {
+                    "A ";
+                    code {
+                        "for";
+                    }
+                    " loop takes one capture per source. Range captures are ";
+                    code {
+                        "I32";
+                    }
+                    "; there is no implicit index on an array source, so zip one in.";
+                }
+                h3 {
+                    <id = "it-for_range";
+                    "For ranges";
+                }
+                p {
+                    "A counted loop. ";
+                    code {
+                        "..<";
+                    }
+                    " excludes the end, ";
+                    code {
+                        "...";
+                    }
+                    " includes it.";
+                }
+                = code.block(for_range_sample());
+                h3 {
+                    <id = "it-for_array";
+                    "For arrays";
+                }
+                p {
+                    "Each element of an array, evaluated once.";
+                }
+                = code.block(for_array_sample());
+                h3 {
+                    <id = "it-for_zip";
+                    "For zipped sources";
+                }
+                p {
+                    "Several sources step together and stop at the shortest. Pair an array with a range for its index.";
+                }
+                = code.block(for_zip_sample());
+                h3 {
+                    <id = "it-for_break";
+                    "Break and continue";
+                }
+                p {
+                    code {
+                        "continue";
+                    }
+                    " goes to the next value; ";
+                    code {
+                        "break";
+                    }
+                    " leaves the loop.";
+                }
+                = code.block(for_break_sample());
+                h3 {
+                    <id = "it-generator";
+                    "Generators";
+                }
+                p {
+                    "A function that returns ";
+                    code {
+                        "yield T";
+                    }
+                    " is consumed by ";
+                    code {
+                        "for";
+                    }
+                    "; its body is expanded inline at the loop.";
+                }
+                = code.block(generator_sample());
+                h3 {
+                    <id = "it-recursive";
+                    "Recursive generators";
+                }
+                p {
+                    "A generator may delegate to itself; it runs as one loop over an explicit stack. ";
+                    code {
+                        "prune;";
+                    }
+                    " skips the current value's children.";
+                }
+                = code.block(recursive_sample());
+            }
+            section {
+                h2 {
+                    "One loop, no intermediate arrays";
+                }
+                p {
+                    "Stages are inlined, not called: no iterator objects, no closures, no intermediate arrays. The pipeline below is one Wasm loop over the range with three locals, and ";
+                    code {
+                        "take(5)";
+                    }
+                    " ends that loop after the fifth match. Only ";
+                    code {
+                        "flat_map";
+                    }
+                    " and ";
+                    code {
+                        "repeat";
+                    }
+                    " add an inner loop, and ";
+                    code {
+                        "chain";
+                    }
+                    " a second loop after the first; terminals that build arrays allocate their result once when every stage keeps or shrinks the length.";
+                }
+                h3 {
+                    <id = "it-fusion";
+                    "One loop";
+                }
+                p {
+                    "Every stage is inlined into one Wasm loop with scalar locals.";
+                }
+                = code.block(fusion_sample());
+                h3 {
+                    <id = "it-fusion_collect";
+                    "Fused collect";
+                }
+                p {
+                    "A side-effect-free ";
+                    code {
+                        "(… collect(T))";
+                    }
+                    " used as a source is merged into the outer pipeline: the inner array is never built.";
+                }
+                = code.block(fusion_collect_sample());
+            }
+            section {
+                h2 {
+                    "Streams and await for";
+                }
+                p {
+                    "Pipelines are synchronous. Asynchronous sequences are ";
+                    code {
+                        "Stream[T]";
+                    }
+                    " values, read with ";
+                    code {
+                        "await for";
+                    }
+                    "; their ";
+                    code {
+                        "filter";
+                    }
+                    ", ";
+                    code {
+                        "map";
+                    }
+                    ", ";
+                    code {
+                        "take";
+                    }
+                    ", ";
+                    code {
+                        "skip";
+                    }
+                    " and ";
+                    code {
+                        "chain";
+                    }
+                    " are methods taking closures, not pipeline stages.";
+                }
+                h3 {
+                    <id = "it-stream";
+                    "Await for";
+                }
+                p {
+                    code {
+                        "Stream[T]";
+                    }
+                    " is a JavaScript async iterable. ";
+                    code {
+                        "await for";
+                    }
+                    " reads it, suspending at each value (JSPI).";
+                }
+                = code.block(stream_sample());
+                h3 {
+                    <id = "it-stream_more";
+                    "Stream methods";
+                }
+                p {
+                    code {
+                        "generate";
+                    }
+                    ", ";
+                    code {
+                        "take";
+                    }
+                    ", ";
+                    code {
+                        "skip";
+                    }
+                    " and ";
+                    code {
+                        "chain";
+                    }
+                    " make new streams that read the old one lazily. ";
+                    code {
+                        "break";
+                    }
+                    " closes the stream.";
+                }
+                = code.block(stream_more_sample());
+            }
+            section {
+                h2 {
+                    "Recipes";
+                }
+                p {
+                    "Multi-step pipelines.";
+                }
+                h3 {
+                    <id = "it-recipe_words";
+                    "Word frequencies";
+                }
+                p {
+                    "Split, normalize, group, and rank.";
+                }
+                = code.block(recipe_words_sample());
+                h3 {
+                    <id = "it-recipe_stats";
+                    "Mean and maximum";
+                }
+                p {
+                    "Several terminals over the same array, with a nullable result for the empty case.";
+                }
+                = code.block(recipe_stats_sample());
+                h3 {
+                    <id = "it-recipe_diffs";
+                    "Differences and runs";
+                }
+                p {
+                    code {
+                        "windows";
+                    }
+                    " for pairwise differences; ";
+                    code {
+                        "zip";
+                    }
+                    " against a shifted copy does the same without allocating windows.";
+                }
+                = code.block(recipe_diffs_sample());
+                h3 {
+                    <id = "it-recipe_primes";
+                    "Primes below 50";
+                }
+                p {
+                    "A range, a nested pipeline in the predicate, and a collect.";
+                }
+                = code.block(recipe_primes_sample());
+                h3 {
+                    <id = "it-recipe_top";
+                    "Top scorers";
+                }
+                p {
+                    "Filter, sort, take, and project.";
+                }
+                = code.block(recipe_top_sample());
+                h3 {
+                    <id = "it-recipe_matrix";
+                    "Rows and columns";
+                }
+                p {
+                    "Build a grid with ";
+                    code {
+                        "flat_map";
+                    }
+                    ", then cut it back into rows with ";
+                    code {
+                        "batched";
+                    }
+                    ".";
+                }
+                = code.block(recipe_matrix_sample());
+            }
+            = ui.further("docs/iterators.md", "Syntax-level iterators");
+        }
+        \/;
+    }
+}

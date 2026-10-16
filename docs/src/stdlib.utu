@@ -1,0 +1,798 @@
+// The standard library reference: one short example per module, then its surface.
+// Every sample here is a whole program that compiles; the comments show what it prints.
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod stdlib {
+    // ── Samples ──────────────────────────────────────────────────────────────
+    fn ints_sample() Str {
+        \\export main() Str {
+        \\    let n = 1000000;
+        \\    let wide = n.to_i64() * n.to_i64();   // I64: no overflow
+        \\    let flags = 0b1011;
+        \\    let mask = (flags & 6) | (1 << 4);
+        \\    let unsigned = (0 - 1).to_u32();      // the same bits, read unsigned
+        \\    `${wide} ${mask} ${~flags} ${-8 >> 1} ${-8 >>> 28} ${unsigned} ${I32.popcnt(255)} ${I32.clz(1)}`;
+        \\}
+        \\// 1000000000000 18 -12 -4 15 4294967295 8 31
+        ;
+    }
+    fn wide_sample() Str {
+        \\export main() Str {
+        \\    let one: U64 = 1;                     // an integer literal adopts the declared type
+        \\    let top = one << 63;
+        \\    let signed = top.to_i64();            // the same bits, read signed
+        \\    let seconds: I64 = 86400;
+        \\    let ms = seconds * 1000;
+        \\    `${top} ${signed} ${ms} ${ms.to_f64() / 3.6e6} ${top.to_u32()}`;
+        \\}
+        \\// 9223372036854775808 -9223372036854775808 86400000 24 0
+        ;
+    }
+    fn floats_sample() Str {
+        \\export main() Str {
+        \\    let angle = F64.pi() / 6.0;
+        \\    let two: F64 = 2;
+        \\    let hyp = two.hypot(3.0);
+        \\    let r = F64.sqrt(2.0);                // operations on the bits are module functions,
+        \\    let parts = `${angle.sin()} ${two.pow(10.0)} ${F64.floor(hyp * 100.0) / 100.0}`;   // Math is methods
+        \\    `${parts} ${F64.max(r, 1.5)} ${F64.nan().is_nan()} ${F64.inf().is_finite()} ${2.9.to_i32()}`;
+        \\}
+        \\// 0.49999999999999994 1024 3.6 1.5 true false 2
+        ;
+    }
+    fn f32_sample() Str {
+        \\export main() Str {
+        \\    let x: F32 = 0.1;
+        \\    let y = x * 3.0;
+        \\    let bits = x.bits();                  // the IEEE 754 bits, as an I32
+        \\    let back = F32.from_bits(bits);
+        \\    `${y} ${bits} ${back == x} ${y.to_f64()} ${F32.sqrt(x)}`;
+        \\}
+        \\// 0.3 1036831949 true 0.30000001192092896 0.31622776
+        ;
+    }
+    fn bool_sample() Str {
+        \\export main() Str {
+        \\    let ready = true;
+        \\    let late = 3 > 4;
+        \\    `${ready and not late} ${ready xor late} ${ready == late}`;
+        \\}
+        \\// true true false
+        ;
+    }
+    fn masks_sample() Str {
+        \\export main() Str {
+        \\    let read: M32 = 1;
+        \\    let write: M32 = 2;
+        \\    let both = read | write;              // bitwise only: no + or * on a mask
+        \\    let lanes = M128.ones() & ~M128.zero();
+        \\    `${(both & write) == write} ${M128.any_true(lanes)} ${V128.any_true(V128.zero())}`;
+        \\}
+        \\// true true false
+        ;
+    }
+    fn i31_sample() Str {
+        \\export main() I32 {
+        \\    let packed = I31.from_i32(-5);        // an integer in a GC reference slot
+        \\    I31.get_s(packed) + I31.get_u(I31.from_i32(7));
+        \\}
+        \\// 2
+        ;
+    }
+    fn str_search_sample() Str {
+        \\export main() Str {
+        \\    let s = "the cat sat on the mat";
+        \\    let first = s.index_of("at", 0);
+        \\    let next = s.index_of("at", first + 1);
+        \\    let last = s.last_index_of("the");
+        \\    let checks = `${s.contains("sat")} ${s.starts_with("the")} ${s.ends_with("hat")}`;
+        \\    `${s.len()} ${first} ${next} ${last} ${checks} ${s.slice(4, 7)} ${s[0]}`;
+        \\}
+        \\// 22 5 9 15 true true false cat 116
+        ;
+    }
+    fn str_shape_sample() Str {
+        \\export main() Str {
+        \\    let raw = "  Hello, World  ";
+        \\    let t = raw.trim();
+        \\    let shouted = t.to_upper();
+        \\    let swapped = t.replace("o", "0");    // every occurrence
+        \\    let row = "7".pad_start(3, "0") + "|" + "ab".pad_end(4, ".") + "|" + "-".repeat(3);
+        \\    `[${raw.trim_start()}] ${shouted} ${swapped} ${row}`;
+        \\}
+        \\// [Hello, World  ] HELLO, WORLD Hell0, W0rld 007|ab..|---
+        ;
+    }
+    fn str_split_sample() Str {
+        \\export main() Str {
+        \\    let fields = "ada,36,,london".split(",");   // ["ada", "36", "", "london"]
+        \\    let age = fields[1].parse_i32(0);
+        \\    let bad = "twelve".parse_i32(-1);           // the fallback
+        \\    let price = " 2.50 ".parse_f64();
+        \\    let letters = " / ".join("abc".split(""));
+        \\    `${fields.len()} ${age} ${bad} ${price} ${"x".parse_f64().is_nan()} ${letters}`;
+        \\}
+        \\// 4 36 -1 2.5 true a / b / c
+        ;
+    }
+    fn str_build_sample() Str {
+        \\export main() Str {
+        \\    let codes = Array[I32].new(26, 0);
+        \\    for (0 ..< 26) |i| { codes[i] = 97 + i; };
+        \\    let alphabet = Str.from_codes(codes, 26);   // build once, no concatenation
+        \\    let star = Str.from_code_point(9733);
+        \\    let n = 42;
+        \\    `${alphabet.slice(0, 5)} ${star} ${n.to_str() + "!"} ${3.5} ${true}`;
+        \\}
+        \\// abcde ★ 42! 3.5 true
+        ;
+    }
+    fn array_sample() Str {
+        \\export main() Str {
+        \\    let xs = [3, 1, 4, 1, 5];                // Array[I32]
+        \\    xs[1] = 9;
+        \\    let zeros = Array[I32].new(4, 0);        // [0, 0, 0, 0]
+        \\    let names = Array[?Str].new_default(2);  // [null, null]
+        \\    zeros.copy_from(1, xs, 0, 3);            // [0, 3, 9, 4]
+        \\    let middle = xs[1, 4];                   // a copy: [9, 4, 1]
+        \\    `${xs.len()} ${zeros[3]} ${middle.len()} ${middle[0]} ${names.len()} ${xs.slice(3, 5)[1]}`;
+        \\}
+        \\// 5 4 3 9 2 5
+        ;
+    }
+    fn buffer_sample() Str {
+        \\using Buffer from std:Buffer;
+        \\
+        \\fn even_squares(n: I32) Array[I32] {
+        \\    let out = Buffer[I32].new();
+        \\    for (0 ..< n) |i| {
+        \\        if i % 2 == 0 { out.push(i * i); };
+        \\    };
+        \\    out.finish();                            // exactly the pushed length
+        \\}
+        \\
+        \\export main() Str {
+        \\    let xs = even_squares(10);
+        \\    `${xs.len()} ${xs[4]}`;
+        \\}
+        \\// 5 64
+        ;
+    }
+    fn list_sample() Str {
+        \\using List from std:List;
+        \\
+        \\export main() Str {
+        \\    let before = ["a", "b", "c"];
+        \\    let more = List[Str].append(before, "d");
+        \\    let fewer = List[Str].remove_at(more, 1);
+        \\    `${before.len()} ${", ".join(more)} | ${", ".join(fewer)}`;
+        \\}
+        \\// 3 a, b, c, d | a, c, d
+        ;
+    }
+    fn strmap_sample() Str {
+        \\using StrMap from std:StrMap;
+        \\
+        \\export main() Str {
+        \\    let counts = StrMap[I32].new();
+        \\    for ("the cat and the hat and the bat".split(" ")) |word| {
+        \\        counts.set(word, counts.get(word, 0) + 1);
+        \\    };
+        \\    let removed = counts.remove("bat");
+        \\    `${counts.len()} ${counts.get("the", 0)} ${counts.get("dog", -1)} ${counts.has("hat")} ${removed} ${counts.keys().len()}`;
+        \\}
+        \\// 4 3 -1 true true 4
+        ;
+    }
+    fn intmap_sample() Str {
+        \\using IntMap from std:IntMap;
+        \\
+        \\export main() Str {
+        \\    let squares = IntMap.new();
+        \\    for (0 ..< 100) |i| { squares.set(i * 7, i * i); };
+        \\    `${squares.len()} ${squares.get(21, -1)} ${squares.get(22, -1)} ${squares.has(693)}`;
+        \\}
+        \\// 100 9 -1 true
+        ;
+    }
+    fn interner_sample() Str {
+        \\using Interner from std:Interner;
+        \\
+        \\fn intern(names: Interner, word: Str) I32 {
+        \\    names.begin();
+        \\    for (0 ..< word.len()) |i| { names.byte(word[i]); };
+        \\    names.finish();
+        \\}
+        \\
+        \\export main() Str {
+        \\    let names = Interner.new();
+        \\    let a = intern(names, "alpha");
+        \\    let b = intern(names, "beta");
+        \\    let again = intern(names, "alpha");     // the same bytes, the same id
+        \\    `${a} ${b} ${again} ${names.len()} ${names.size(b)} ${names.byte_at(b, 0)} ${names.ascii(b)}`;
+        \\}
+        \\// 0 1 0 2 4 98 beta
+        ;
+    }
+    fn found_sample() Str {
+        \\export main() Str {
+        \\    let words = ["fig", "apple", "kiwi", "banana"];
+        \\    let long = words first_where(Str) |w| { w.len() > 4; };      // ?Found[Str]
+        \\    let none = words first_where(Str) |w| { w.len() > 9; };
+        \\    let groups = words group_by(Str, I32) |w| { w.len() % 2; };  // Array[Group[I32, Str]]
+        \\    let first = promote long { |f| => f.value, ~> "none", };
+        \\    let g = groups[0];
+        \\    `${first} ${(none orelse Found[Str].new("fallback")).value} ${g.key} ${", ".join(g.values)}`;
+        \\}
+        \\// apple fallback 1 fig, apple
+        ;
+    }
+    fn segment_sample() Str {
+        \\using SegmentTree from std:SegmentTree;
+        \\
+        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\fn at_least_ten(sum: I32) Bool { sum >= 10; }
+        \\
+        \\export main() Str {
+        \\    let sums = SegmentTree[I32].new([2, 3, 5, 7, 1], 0, add);
+        \\    let before = sums.query(1, 4, add);                // 3 + 5 + 7
+        \\    sums.set(2, 20, add);                              // [2, 3, 20, 7, 1]
+        \\    let after = sums.query(1, 4, add);
+        \\    let first = sums.first_prefix(at_least_ten, add);  // 2 + 3 + 20 >= 10 at index 2
+        \\    `${before} ${after} ${first}`;
+        \\}
+        \\// 15 30 2
+        ;
+    }
+    fn segment_max_sample() Str {
+        \\using SegmentTree from std:SegmentTree;
+        \\
+        \\fn larger(a: F64, b: F64) F64 { F64.max(a, b); }
+        \\
+        \\export main() F64 {
+        \\    let temps = [12.5, 18.0, 9.5, 21.0, 16.5];
+        \\    let highs = SegmentTree[F64].new(temps, -F64.inf(), larger);
+        \\    highs.query(0, 3, larger);
+        \\}
+        \\// 18
+        ;
+    }
+    fn persistent_sample() Str {
+        \\using PersistentSegmentTree from std:PersistentSegmentTree;
+        \\
+        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\
+        \\export main() Str {
+        \\    let v1 = PersistentSegmentTree[I32].new([1, 2, 3, 4], 0, add);
+        \\    let v2 = v1.set(0, 100, add);              // a new version; v1 is unchanged
+        \\    `${v1.query(0, 4, add)} ${v2.query(0, 4, add)} ${v2.query(1, 3, add)}`;
+        \\}
+        \\// 10 109 5
+        ;
+    }
+    fn spatial_sample() Str {
+        \\using Spatial from std:Spatial;
+        \\
+        \\export main() Str {
+        \\    let index = Spatial.new([
+        \\        Spatial.point(0.0, 0.0, 10),
+        \\        Spatial.point(1.0, 2.0, 20),
+        \\        Spatial.point(3.0, 1.0, 30),
+        \\        Spatial.point(5.0, 5.0, 40)
+        \\    ]);
+        \\    let box = index.within(0.0, 3.0, 0.0, 2.0);   // x in [0, 3], y in [0, 2]
+        \\    let low = index.below(0.0, 5.0, 1.0);         // x in [0, 5], y <= 1
+        \\    let near = index.radius(0.0, 0.0, 2.5);
+        \\    let closest = promote index.nearest(4.0, 4.0) { |f| => f.value, ~> -1, };
+        \\    `${box.len()} ${low.len()} ${near.len()} ${closest}`;
+        \\}
+        \\// 3 2 2 40
+        ;
+    }
+    fn promise_sample() Str {
+        \\let later: fun(I32, I32) Promise[I32] =
+        \\    @es/\ (value, ms) => new Promise(done => setTimeout(() => done(value), ms)) \/;
+        \\
+        \\fn total() I32 {
+        \\    let a = await later(20, 5);          // suspends here (JSPI), then resumes
+        \\    let b = await later(22, 5);
+        \\    a + b;
+        \\}
+        \\
+        \\export main() I32 {
+        \\    later(7, 1).then(cl(v) { assert v == 7; });
+        \\    later(0, 1).catch(cl(reason) { fatal; });
+        \\    total();
+        \\}
+        \\// 42
+        ;
+    }
+    fn stream_sample() Str {
+        \\fn sum(s: Stream[I32]) I32 {
+        \\    let total = 0;
+        \\    await for (s) |v| { total += v; };
+        \\    total;
+        \\}
+        \\
+        \\export main() Str {
+        \\    let evens = Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { v % 2 == 0; }).map(cl(v) { v * 10; });
+        \\    let squares = Stream[I32].generate(10, cl(i) { i * i; }).skip(1).take(3);   // 1, 4, 9
+        \\    let both = Stream[I32].of([100]).chain(Stream[I32].of([1, 2]));
+        \\    `${sum(evens)} ${sum(squares)} ${sum(both)}`;
+        \\}
+        \\// 120 14 103
+        ;
+    }
+    fn stream_js_sample() Str {
+        \\let words: fun() Externref = @es/\ () => (async function* () {
+        \\    yield "alpha"; yield "beta"; yield "gamma";
+        \\})() \/;
+        \\
+        \\export main() Str {
+        \\    let out = "";
+        \\    await for (Stream[Str].from_js(words())) |w| {
+        \\        if w == "gamma" { break; };       // break closes the host iterator
+        \\        out = out + w + " ";
+        \\    };
+        \\    out;
+        \\}
+        \\// alpha beta
+        ;
+    }
+    fn console_sample() Str {
+        \\using console from std:Console;
+        \\using time from std:Time;
+        \\
+        \\export main() void {
+        \\    let start = time.now();
+        \\    let total = 0;
+        \\    for (0 ..< 1000000) |i| { total += i % 7; };
+        \\    console.log(`total ${total}`);                    // total 2999997
+        \\    console.warn(`took ${time.now() - start} ms`);    // took 1.2 ms (on standard error)
+        \\    if time.epoch_ms() < 0.0 { console.error("the clock is wrong"); };
+        \\}
+        ;
+    }
+    fn random_sample() Str {
+        \\using Random from std:Random;
+        \\
+        \\export main() Str {
+        \\    let r = Random.new(42);              // the same seed, the same numbers, on every host
+        \\    let die = r.int(1, 7);               // 1 to 6, unbiased
+        \\    let unit = r.float();                // in [0, 1)
+        \\    let heads = 0;
+        \\    for (0 ..< 1000) |i| { if r.chance(0.5) { heads += 1; }; };
+        \\    let fresh = Random.from_host();      // seeded from crypto.getRandomValues
+        \\    `${die} ${unit < 1.0} ${heads > 400 and heads < 600} ${r.bits() != 0 or fresh.bits() != 0}`;
+        \\}
+        \\// 4 true true true
+        ;
+    }
+    fn number_field_sample() Str {
+        \\using NumberField from std:NumberField;
+        \\
+        \\export main() Str {
+        \\    let good = NumberField.new("42.5");
+        \\    let empty = NumberField.new("");
+        \\    `${good.valid(0.0, 100.0)} ${good.value()} ${empty.valid(0.0, 100.0)} [${good.error(0.0, 10.0)}]`;
+        \\}
+        \\// true 42.5 false [Enter a number within the allowed range.]
+        ;
+    }
+    fn wutu_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Cart:
+        \\    | cents: I32
+        \\    | seconds: I32
+        \\
+        \\export main() void {
+        \\    let cart = Cart { cents: 1999, seconds: 0 };
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    section {
+        \\        p { = wutu.money(cart.cents) + " at " + wutu.decimal(cart.cents.to_f64() / 3.0, 2); }
+        \\        p { = "open for " + wutu.number(cart.seconds) + " s, on " + wutu.route(); }
+        \\        input { <id = "note"; }
+        \\        button {
+        \\            "Add one";
+        \\            on click {
+        \\                cart.cents += 100;
+        \\                wutu.after_render(cl() void { wutu.focus("note"); });
+        \\            };
+        \\        }
+        \\    }
+        \\    \/;
+        \\    wutu.interval("clock", 1000.0, cl() void { cart.seconds += 1; wutu.refresh(); });
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn browser_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let title = Browser.document.createElement("h1");   // an HTMLHeadingElement
+        \\    title.textContent = "Hello";
+        \\    title.addEventListener("click", cl(event) void {
+        \\        Browser.console.log(Browser.location.hash);
+        \\    });
+        \\    Browser.document.body.append(title);
+        \\}
+        ;
+    }
+    fn js_sample() Str {
+        \\using JS from std:JS;
+        \\
+        \\export main() Str {
+        \\    let biggest = JS.Math.max(3.0, 7.0);
+        \\    let when = JS.Date.UTC(2026, 0, 1);
+        \\    let parsed = try { JS.JSON.parse("[1, 2"); 1; } catch { 0; };   // a host throw, caught
+        \\    `${biggest} ${when} ${parsed} ${JS.Number.isInteger(4.0)}`;
+        \\}
+        \\// 7 1767225600000 0 true
+        ;
+    }
+    fn web_sample() Str {
+        \\using Web from std:Web;
+        \\
+        \\export main() Str {
+        \\    let url = new Web.URL("https://example.com/a/b?q=utu");
+        \\    let bytes = new Web.TextEncoder().encode("héllo");
+        \\    `${url.pathname} ${url.searchParams.get("q") orelse ""} ${bytes.length}`;
+        \\}
+        \\// /a/b utu 6
+        ;
+    }
+    // ── Surfaces: each row is "signature::what it does" ─────────────────────
+    fn int_rows() Array[Str] {
+        [
+        "+ - * / %::arithmetic; / and % truncate (signed for I32 and I64, unsigned for U32 and U64)",
+        "& | ^ ~ << >> >>>::bitwise; >> keeps the sign of a signed type, >>> shifts in zeros",
+        "== != < <= > >=::comparison, signed or unsigned by type",
+        "I32.clz(x) I32.ctz(x) I32.popcnt(x)::leading zeros, trailing zeros, set bits (I32 only)",
+        "x.to_i32() .to_u32() .to_i64() .to_u64()::reinterpret, wrap, or extend; one instruction",
+        "x.to_f32() .to_f64()::to a float",
+        "x.to_str()::decimal text, as JavaScript's String() spells it"
+        ];
+    }
+    fn float_rows() Array[Str] {
+        [
+        "+ - * / and comparisons::IEEE 754; there is no % on floats",
+        "F64.abs sqrt ceil floor trunc nearest (x)::one Wasm instruction each; nearest rounds half to even",
+        "F64.min(a, b) F64.max(a, b)::NaN if either is NaN",
+        "x.sin() cos tan asin acos atan::trigonometry, in radians (F64 only)",
+        "x.exp() ln log2 log10 cbrt::exponentials and logarithms (F64 only)",
+        "x.pow(e) y.atan2(x) x.hypot(y)::two-argument math (F64 only)",
+        "x.is_nan() x.is_finite()::classification (F64 only)",
+        "F64.pi() e() inf() nan()::constants",
+        "x.bits()  F64.from_bits(b)::the IEEE 754 bits (an I64; an I32 for F32), and back",
+        "x.to_i32() ... .to_f32()::float to integer saturates and NaN becomes 0, like Rust's as",
+        "x.to_str()::shortest text that reads back as the same value"
+        ];
+    }
+    fn str_rows() Array[Str] {
+        [
+        "s.len()::length in UTF-16 code units",
+        "s[i]  s.get(i)::the code unit at i, an I32",
+        "s[a, b]  s.slice(a, b)::the text from a up to b",
+        "a + b  a == b  a != b::concatenate; compare contents",
+        "s.index_of(part, from)  s.last_index_of(part)::where part occurs, or -1",
+        "s.contains(p) starts_with(p) ends_with(p)::tests, as Bool",
+        "s.trim() trim_start() trim_end()::without surrounding white space",
+        "s.to_upper() to_lower()::case mapping",
+        "s.repeat(n)  s.replace(part, with)::repeat; replace every occurrence, literally",
+        "s.pad_start(width, fill)  s.pad_end(width, fill)::pad to a width",
+        "s.split(sep) Array[Str]::pieces; an empty sep splits into code units",
+        "sep.join(parts)::the parts with sep between each two",
+        "s.parse_i32(fallback)  s.parse_f64()::numbers from text; parse_f64 is NaN when it is not one",
+        "Str.from_code_point(c)  Str.from_codes(codes, n)::text from code points or code units",
+        "x.to_str()::every scalar has one; template strings call it for ${x}"
+        ];
+    }
+    fn array_rows() Array[Str] {
+        [
+        "[a, b, c]::a literal; the element type comes from the elements or the context",
+        "Array[T].new(n, fill)::n copies of fill",
+        "Array[T].new_default(n)::n zeros or nulls (T must have a default)",
+        "a.len()::the number of elements",
+        "a[i]  a.get(i)  a[i] = v  a.set(i, v)::read and write; out of range traps",
+        "a[s, e]  a.slice(s, e)::a copy of elements s up to e",
+        "a.copy_from(at, source, start, count)::bulk copy, overlap safe"
+        ];
+    }
+    fn strmap_rows() Array[Str] {
+        [
+        "StrMap[V].new()::an empty map",
+        "m.set(key, value)::insert or replace",
+        "m.get(key, missing) V::the value, or missing",
+        "m.has(key) Bool::whether the key is there",
+        "m.remove(key) Bool::remove; whether it was there",
+        "m.len()  m.keys() Array[Str]::size; keys in no particular order"
+        ];
+    }
+    fn intmap_rows() Array[Str] {
+        [
+        "IntMap.new()::an empty map from I32 to I32",
+        "m.set(key, value)  m.get(key, missing)::insert or replace; read with a default",
+        "m.has(key)  m.len()::membership; size"
+        ];
+    }
+    fn interner_rows() Array[Str] {
+        [
+        "Interner.new()::an empty table",
+        "t.begin()  t.byte(b)  t.finish() I32::feed one key a byte at a time; its id, 0, 1, 2, ... in first-seen order",
+        "t.len()::distinct keys so far",
+        "t.size(id)  t.byte_at(id, k)  t.ascii(id)::read a key back: its length, a byte, as text"
+        ];
+    }
+    fn segment_rows() Array[Str] {
+        [
+        "SegmentTree[T].new(values, identity, combine)::build in O(n); combine is associative, identity neutral",
+        "t.set(index, value, combine)::replace one value, O(log n)",
+        "t.query(start, end, combine) T::combine values start up to end, O(log n)",
+        "t.first_prefix(matches, combine) I32::first index whose prefix matches a false-then-true predicate; len if none",
+        "PersistentSegmentTree[T]: new, query::the same, immutable",
+        "p.set(index, value, combine) PersistentSegmentTree[T]::a new version sharing untouched branches"
+        ];
+    }
+    fn spatial_rows() Array[Str] {
+        [
+        "Spatial.point(x, y, id)::a point carrying your id",
+        "Spatial.new(points)::build the index once; coordinates are copied",
+        "s.within(min_x, max_x, min_y, max_y) Array[I32]::ids in a rectangle, edges included",
+        "s.below(min_x, max_x, ceiling) Array[I32]::ids in an x interval with y <= ceiling",
+        "s.radius(x, y, r) Array[I32]::ids within distance r",
+        "s.nearest(x, y) ?Found[I32]::the closest id; null when empty"
+        ];
+    }
+    fn async_rows() Array[Str] {
+        [
+        "await p::the value of a Promise[T], suspending until it settles (JSPI)",
+        "p.then(cl(v) { ... })::subscribe to fulfilment; works on any JS host",
+        "p.catch(cl(reason) { ... })::subscribe to rejection; reason is an Externref",
+        "await for (s) |v| { ... }::read a Stream[T]; break or return closes it",
+        "Stream[T].of(array)  generate(n, make)  from_js(iterable)::make a stream",
+        "s.take(n) skip(n) filter(keep) map(f) chain(other)::new lazy streams over this one"
+        ];
+    }
+    fn random_rows() Array[Str] {
+        [
+        "Random.new(seed)  Random.from_host()::a seeded generator, or one seeded by the host",
+        "r.bits() I32::the next 32 random bits",
+        "r.int(low, high) I32::uniform in [low, high)",
+        "r.float() F64::uniform in [0, 1)",
+        "r.chance(p) Bool::true with probability p"
+        ];
+    }
+    fn host_rows() Array[Str] {
+        [
+        "console.log(text) warn(text) error(text)::the host console; using console from std:Console",
+        "time.now() F64::milliseconds for measuring (performance.now); using time from std:Time",
+        "time.epoch_ms() F64::milliseconds since 1970 (Date.now)",
+        "NumberField.new(text)::a form field's draft text, kept apart from its number",
+        "f.valid(min, max)  f.value()  f.error(min, max)::check it, read it, or the message to show"
+        ];
+    }
+    fn wutu_rows() Array[Str] {
+        [
+        "wutu.route() Str::the hash route, / when empty",
+        "wutu.refresh()  wutu.invalidate(island)::render again: everything, or one island",
+        "wutu.after_render(callback)  wutu.on_cleanup(callback)::run after this render; run when a node goes",
+        "wutu.focus(id)::focus an element by id once it exists",
+        "wutu.interval(key, ms, callback)::a repeating timer, one per key",
+        "wutu.save(key)  wutu.flush()  wutu.reload_store(key)::@stored state: save soon, save now, read again",
+        "wutu.storage_error() Str::the last storage problem, or empty",
+        "wutu.number(n)  wutu.money(cents)  wutu.decimal(x, digits)::formatting for display"
+        ];
+    }
+    fn binding_rows() Array[Str] {
+        [
+        "std:Browser::the DOM and every standard JavaScript API (lib.dom and lib.es)",
+        "std:JS::the ECMAScript subset: Math, JSON, Date, Map, Set, RegExp, Intl, ...",
+        "std:Web::what every modern runtime shares: fetch, URL, streams, crypto, timers, ...",
+        "std:Worker::a web worker's global scope"
+        ];
+    }
+    fn overview_rows() Array[Str] {
+        [
+        "I32 U32 I64 U64::integers (prelude)",
+        "F32 F64::floats and math (prelude)",
+        "Bool M32 M64 M128 V128 I31 Externref::booleans, masks, SIMD, references (prelude)",
+        "Str::host strings and text methods (prelude)",
+        "Array[T] Found[T] Group[K, T]::arrays and iterator results (prelude)",
+        "Buffer List StrMap IntMap Interner::growing arrays, persistent edits, hash maps, interning (using)",
+        "SegmentTree PersistentSegmentTree Spatial::range and 2D indexes (using)",
+        "Promise[T] Stream[T]::JavaScript promises and async iterables (prelude)",
+        "Random Console Time NumberField::host services (using)",
+        "wutu::the Wutu runtime helpers (prelude)",
+        "Browser JS Web Worker::typed host declarations (using)"
+        ];
+    }
+    fn toc() Array[Str] {
+        ["Scalars::std-scalars", "Text::std-text", "Collections::std-collections", "Indexes::std-indexes", "Async::std-async", "Host::std-host"];
+    }
+    // ── Pieces ───────────────────────────────────────────────────────────────
+    fn jump(id: Str) void {
+        promote Browser.document.getElementById(id) {
+            |target| => target.scrollIntoView(),
+            ~> {
+            },
+        };
+    }
+    fn api(rows: Array[Str]) Browser.HTMLElement {
+        @wutu/\
+        table {
+            tbody {
+                for $[rows] |row| {
+                    tr {
+                        th {
+                            white-space:normal;
+                            inline-size:46%;
+                            code {
+                                = row.split("::")[0];
+                            }
+                        }
+                        td {
+                            = row.split("::")[1];
+                        }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+    // A module's heading: its name, what it is, and how to bring it in.
+    fn module(name: Str, line: Str, import: Str) Browser.HTMLElement {
+        @wutu/\
+        div {
+            margin-block:2.75rem 0;
+            h3 {
+                font-size:1.15rem;
+                font-weight:600;
+                margin-block-end:0.4rem;
+                code {
+                    = name;
+                }
+            }
+            p {
+                = line;
+                " ";
+                code {
+                    = import;
+                }
+            }
+        }
+        \/;
+    }
+    fn group(id: Str, title: Str) Browser.HTMLElement {
+        @wutu/\
+        h2 {
+            <id = $[id];
+            scroll-margin-block-start:1.5rem;
+            = title;
+        }
+        \/;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("The standard library", "Every module, by example. Each sample is a whole program; the last comment is what it prints.");
+            nav {
+                <aria-label = "Sections";
+                display:flex;
+                flex-wrap:wrap;
+                gap:0.5rem;
+                margin-block-start:1.75rem;
+                for $[toc()] |entry| {
+                    button {
+                        <type = "button";
+                        font:inherit;
+                        font-size:0.95rem;
+                        padding:0.35rem 0.85rem;
+                        color:var(--ink);
+                        background:var(--tint);
+                        border:1px solid var(--line);
+                        cursor:pointer;
+                        :hover {
+                            border-color: var(--orange);
+                        }
+                        = entry.split("::")[0];
+                        on click {
+                            jump(entry.split("::")[1]);
+                        };
+                    }
+                }
+            }
+            p {
+                margin-block-start:1.5rem;
+                "Prelude modules are always in scope. The rest come in with ";
+                code {
+                    "using Name from std:Name;";
+                }
+                ". Each function ships only when a program calls it.";
+            }
+            = api(overview_rows());
+            = group("std-scalars", "Scalars");
+            = module("I32 U32 I64 U64", "Integers. Operators are the type's own functions; conversions are explicit, one instruction each.", "prelude");
+            = code.block(ints_sample());
+            = code.block(wide_sample());
+            = api(int_rows());
+            = module("F64 F32", "Floats. F64 carries the host's Math; F32 has the instruction-level set.", "prelude");
+            = code.block(floats_sample());
+            = code.block(f32_sample());
+            = api(float_rows());
+            = module("Bool", "true and false, with and, or, xor, not. An integer is not a Bool.", "prelude");
+            = code.block(bool_sample());
+            = module("M32 M64 M128 V128", "Bit masks and 128-bit SIMD vectors: bitwise operators, zero(), ones(), andnot, bitselect, any_true.", "prelude");
+            = code.block(masks_sample());
+            = module("I31 Externref", "A 31-bit integer in a GC reference (from_i32, get_s, get_u), and an opaque host value.", "prelude");
+            = code.block(i31_sample());
+            = group("std-text", "Text");
+            = module("Str", "Host strings, measured and indexed in UTF-16 code units. Most methods are one call to JavaScript's own.", "prelude");
+            = code.block(str_search_sample());
+            = code.block(str_shape_sample());
+            = code.block(str_split_sample());
+            = code.block(str_build_sample());
+            = api(str_rows());
+            = group("std-collections", "Collections");
+            = module("Array[T]", "A fixed-length mutable WasmGC array. Iterator stages (map, filter, sort, ...) work on it directly.", "prelude");
+            = code.block(array_sample());
+            = api(array_rows());
+            = module("Buffer[T]", "A growing array: push, then finish into an Array of the exact length.", "using Buffer from std:Buffer;");
+            = code.block(buffer_sample());
+            = module("List[T]", "Persistent edits on arrays: append and remove_at return a new array.", "using List from std:List;");
+            = code.block(list_sample());
+            = module("StrMap[V]", "Str keys to any values. Open addressing, no tombstones.", "using StrMap from std:StrMap;");
+            = code.block(strmap_sample());
+            = api(strmap_rows());
+            = module("IntMap", "I32 keys to I32 values, without a host call.", "using IntMap from std:IntMap;");
+            = code.block(intmap_sample());
+            = api(intmap_rows());
+            = module("Interner", "Byte strings to dense ids. Keys arrive a byte at a time, from a string, an array, or a mem.", "using Interner from std:Interner;");
+            = code.block(interner_sample());
+            = api(interner_rows());
+            = module("Found[T] Group[K, T]", "What iterator terminals return: first_where gives ?Found[T], group_by gives Array[Group[K, T]].", "prelude");
+            = code.block(found_sample());
+            = group("std-indexes", "Indexes");
+            = module("SegmentTree[T]", "Range queries over any associative combine: sums, maxima, minima.", "using SegmentTree from std:SegmentTree;");
+            = code.block(segment_sample());
+            = code.block(segment_max_sample());
+            = module("PersistentSegmentTree[T]", "The same queries; set returns a new version and keeps the old.", "using PersistentSegmentTree from std:PersistentSegmentTree;");
+            = code.block(persistent_sample());
+            = api(segment_rows());
+            = module("Spatial", "A static 2D index of points with ids: rectangles, three-sided ranges, circles, nearest.", "using Spatial from std:Spatial;");
+            = code.block(spatial_sample());
+            = api(spatial_rows());
+            = ui.further("docs/queries.md", "Native range and spatial indexes");
+            = group("std-async", "Async");
+            = module("Promise[T]", "A real JavaScript promise. Await it, or subscribe with then and catch.", "prelude");
+            = code.block(promise_sample());
+            = module("Stream[T]", "A real JavaScript async iterable, read once with await for.", "prelude");
+            = code.block(stream_sample());
+            = code.block(stream_js_sample());
+            = api(async_rows());
+            = group("std-host", "Host");
+            = module("console time", "Logging and clocks.", "using console from std:Console; using time from std:Time;");
+            = code.block(console_sample());
+            = module("Random", "xoshiro128** in utu: the same seed gives the same numbers on every host.", "using Random from std:Random;");
+            = code.block(random_sample());
+            = api(random_rows());
+            = module("NumberField", "A number input's text, valid or not, with its range check.", "using NumberField from std:NumberField;");
+            = code.block(number_field_sample());
+            = api(host_rows());
+            = module("wutu", "The Wutu runtime's helpers, for templates and the code around them.", "prelude");
+            = code.block(wutu_sample());
+            = api(wutu_rows());
+            = module("Browser JS Web Worker", "Typed declarations for the host, linked from TypeScript's libraries. Only what a program uses emits boundary code.", "using Browser from std:Browser;");
+            = code.block(browser_sample());
+            = code.block(js_sample());
+            = code.block(web_sample());
+            = api(binding_rows());
+            = ui.further("docs/typescript-abi.md", "The TypeScript declaration ABI");
+            = ui.further("std/README.md", "the standard library notes");
+        }
+        \/;
+    }
+}

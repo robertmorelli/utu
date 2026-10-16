@@ -10,6 +10,9 @@ using data from "./data.utu";
 using web from "./web.utu";
 using tooling from "./tooling.utu";
 using compiler from "./compiler.utu";
+using playground from "./playground.utu";
+using stdlib from "./stdlib.utu";
+using iterators from "./iterators.utu";
 struct Link:
 | href: Str
 | label: Str
@@ -30,16 +33,28 @@ fn links() Array[Link] {
         label: "Language tour"
     },
     Link {
+        href: "/iterators",
+        label: "Iterators"
+    },
+    Link {
+        href: "/std",
+        label: "Standard library"
+    },
+    Link {
         href: "/javascript",
         label: "JavaScript and npm"
     },
     Link {
         href: "/data",
-        label: "JSON, iterators, indexes"
+        label: "JSON and indexes"
     },
     Link {
         href: "/wutu",
         label: "Wutu"
+    },
+    Link {
+        href: "/playground",
+        label: "Playground"
     },
     Link {
         href: "/tooling",
@@ -64,8 +79,14 @@ fn title(route: Str) Str {
         ~> "utu",
     };
 }
-fn page(route: Str) Browser.HTMLElement {
-    if route == "/start" {
+fn page(route: Str, play: playground.State) Browser.HTMLElement {
+    if route == "/playground" {
+        playground.page(play);
+    } else if route == "/iterators" {
+        iterators.page();
+    } else if route == "/std" {
+        stdlib.page();
+    } else if route == "/start" {
         start.page();
     } else if route == "/tour" {
         tour.page();
@@ -114,6 +135,7 @@ export main() void {
     let site = Site {
         route: ""
     };
+    let play = playground.start();
     // The favicon is the same mark as the sidebar's, as an SVG data URI.
     let icon = Browser.document.createElement("link");
     icon.rel = "icon";
@@ -133,17 +155,17 @@ export main() void {
             --blue: #2d53c4;
             --orange: #e4772c;
             --sun: #f2a33a;
-            --code-bg: #1b2236;
-            --code-ink: #dfe3ee;
-            --code-k: #f2a36b;
-            --code-a: #f6b86a;
-            --code-d: #ffffff;
-            --code-T: #93b6ff;
-            --code-s: #b9cdf5;
-            --code-y: #c9cfdc;
-            --code-n: #ecd3a0;
-            --code-c: #7f889f;
-            --code-f: #dfe3ee;
+            --code-bg: #171c30;
+            --code-ink: #e4e7f2;
+            --code-k: #c8bdff;
+            --code-s: #a7dfb1;
+            --code-c: #7d86a1;
+            --code-T: #ffd48a;
+            --code-n: #ffb3b3;
+            --code-a: #ff9ed6;
+            --code-d: #8fd6ff;
+            --code-y: #a6d4ff;
+            --code-f: #e4e7f2;
             color-scheme: light dark;
         }
         @media (prefers-color-scheme: dark) {
@@ -155,8 +177,7 @@ export main() void {
                 --tint: #1d2437;
                 --blue: #93b0ff;
                 --orange: #f0924e;
-                --code-bg: #0c1120;
-                --code-c: #737d96;
+                --code-bg: #090c17;
             }
         }
         * {
@@ -211,6 +232,12 @@ export main() void {
         .page {
             max-inline-size: 44rem;
             padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 6rem;
+        }
+        .page.playground {
+            max-inline-size: 84rem;
+        }
+        .page.playground > p {
+            max-inline-size: 44rem;
         }
         .page-head {
             display: grid;
@@ -281,12 +308,17 @@ export main() void {
         }
         pre.code .d {
             color: var(--code-d);
+            font-weight: 500;
         }
         pre.code .y {
             color: var(--code-y);
         }
         pre.code .f {
             color: var(--code-f);
+        }
+        div.editor > pre.code {
+            margin: 0;
+            overflow: hidden;
         }
         table {
             border-collapse: collapse;
@@ -573,7 +605,7 @@ export main() void {
         div.content {
             min-inline-size:0;
             = arrive(site, wutu.route());
-            = page(wutu.route());
+            = page(wutu.route(), play);
             footer {
                 padding:1.5rem clamp(1rem, 4vw, 3rem) 3rem;
                 border-block-start:1px solid var(--line);

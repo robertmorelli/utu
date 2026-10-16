@@ -1,0 +1,296 @@
+// The playground: edit Wutu, see the site it builds. The editor is a textarea
+// over the same highlighter the code samples use; the self-hosted compiler
+// (utu, compiled to WasmGC) builds the source in the browser, and the result
+// runs in a sandboxed iframe.
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod playground {
+    struct Saved:
+    | source: Str
+    struct State:
+    | saved: Saved
+    | status: Str
+    | detail: Str
+    | failed: Bool
+    | started: Bool
+    fn sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\struct Todo:
+        \\    | id: Str
+        \\    | text: Str
+        \\    | done: Bool
+        \\
+        \\struct State:
+        \\    | draft: Str
+        \\    | todos: Array[Todo]
+        \\    | made: I32
+        \\
+        \\fn Todo.left(todos: Array[Todo]) I32 {
+        \\    todos count_where |t| { not t.done; };
+        \\}
+        \\
+        \\export main() void {
+        \\    let state = State { draft: "", todos: [], made: 0 };
+        \\    Browser.document.body.append(@wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        font-family: system-ui, sans-serif;
+        \\        max-width: 30rem;
+        \\        margin: 3rem auto;
+        \\        padding: 0 1rem;
+        \\        color: rgb(31 37 53);
+        \\        h1 {
+        \\            color: rgb(228 119 44);
+        \\            "Things to do";
+        \\        }
+        \\        form {
+        \\            display: flex;
+        \\            gap: 0.5rem;
+        \\            input {
+        \\                <placeholder = "Add something";
+        \\                flex: 1;
+        \\                padding: 0.5rem;
+        \\                bind:value = state.draft;
+        \\            }
+        \\            button {
+        \\                padding: 0.5rem 1rem;
+        \\                "Add";
+        \\            }
+        \\            on submit {
+        \\                if state.draft != "" {
+        \\                    state.made += 1;
+        \\                    let todo = Todo {
+        \\                        id: state.made.to_str(),
+        \\                        text: state.draft,
+        \\                        done: false
+        \\                    };
+        \\                    state.todos = state.todos chain([todo]) collect(Todo);
+        \\                    state.draft = "";
+        \\                };
+        \\            };
+        \\        }
+        \\        ul {
+        \\            padding: 0;
+        \\            list-style: none;
+        \\            for $[state.todos] |todo| key $[todo.id] {
+        \\                li {
+        \\                    padding: 0.4rem 0;
+        \\                    label {
+        \\                        input {
+        \\                            <type = "checkbox";
+        \\                            bind:checked = todo.done;
+        \\                        }
+        \\                        " ";
+        \\                        = todo.text;
+        \\                    }
+        \\                }
+        \\            }
+        \\        }
+        \\        p {
+        \\            color: rgb(101 108 126);
+        \\            = `${Todo.left(state.todos)} left`;
+        \\        }
+        \\    }
+        \\    \/);
+        \\}
+        ;
+    }
+    /// The source the editor opens with: the last one edited, kept in this
+    /// browser's storage.
+    fn saved() Saved {
+        @stored/\
+        Saved "utu-playground-v1" Saved { source: sample() }
+        \/;
+    }
+    fn start() State {
+        State {
+            saved: saved(),
+            status: "Loading the compiler…",
+            detail: "",
+            failed: false,
+            started: false
+        };
+    }
+    // Hands the source to the compiler (docs/playground/playground.js, loaded
+    // on first use) and hears back how it went.
+    fn compile(state: State, delay: I32) void {
+        let schedule: fun(Str, I32, cl(Str, Str, Bool) void) void = @es/\
+        (source, delay, done) => import(new URL("./playground/playground.js", document.baseURI).href)
+            .then((m) => m.schedule(source, delay, done))
+            .catch((error) => done("Could not load the compiler", String(error), true))
+        \/;
+        schedule(state.saved.source, delay, cl(status: Str, detail: Str, failed: Bool) void {
+            state.status = status;
+            state.detail = detail;
+            state.failed = failed;
+            wutu.refresh();
+        });
+    }
+    fn page(state: State) Browser.HTMLElement {
+        if not state.started {
+            state.started = true;
+            wutu.after_render(cl() void {
+                compile(state, 0);
+            });
+        };
+        @wutu/\
+        article.page.playground {
+            = ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.");
+            div.bench {
+                display:grid;
+                grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+                gap:1rem;
+                margin-block:1.5rem;
+                inline-size:min(100%, 76rem);
+                @media (width < 72rem) {
+                    grid-template-columns: minmax(0, 1fr);
+                }
+                div.editor {
+                    position:relative;
+                    block-size:36rem;
+                    background:var(--code-bg);
+                    @media (width < 72rem) {
+                        block-size: 26rem;
+                    }
+                    pre.code as overlay {
+                        <aria-hidden = "true";
+                        position:absolute;
+                        inset:0;
+                        margin:0;
+                        overflow:hidden;
+                        white-space:pre;
+                        pointer-events:none;
+                        = code.spans(state.saved.source);
+                    }
+                    textarea as field {
+                        <spellcheck = "false";
+                        <autocapitalize = "off";
+                        <autocomplete = "off";
+                        <aria-label = "Wutu source";
+                        position:absolute;
+                        inset:0;
+                        inline-size:100%;
+                        block-size:100%;
+                        margin:0;
+                        padding:1.1rem 1.25rem;
+                        border:0;
+                        outline:none;
+                        resize:none;
+                        overflow:auto;
+                        white-space:pre;
+                        background:transparent;
+                        color:transparent;
+                        caret-color:var(--code-ink);
+                        font:400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+                        tab-size:4;
+                        @media (width < 40rem) {
+                            font-size: 0.78rem;
+                            padding: 0.9rem 1rem;
+                        }
+                        ::selection {
+                            background: rgba(143, 214, 255, 0.3);
+                            color: transparent;
+                        }
+                        :focus-visible {
+                            box-shadow: inset 0 0 0 2px var(--orange);
+                        }
+                        bind:value = state.saved.source;
+                        on input {
+                            compile(state, 600);
+                        };
+                        on scroll {
+                            overlay.scrollTop = field.scrollTop;
+                            overlay.scrollLeft = field.scrollLeft;
+                        };
+                        on keydown {
+                            if event.key == "Tab" {
+                                event.preventDefault();
+                                field.setRangeText("    ", field.selectionStart, field.selectionEnd, "end");
+                                state.saved.source = field.value;
+                                compile(state, 600);
+                            }
+                            else if event.key == "Enter" and (event.metaKey or event.ctrlKey) {
+                                event.preventDefault();
+                                compile(state, 0);
+                            };
+                        };
+                    }
+                }
+                div.stage {
+                    display:grid;
+                    grid-template-rows:auto minmax(0, 1fr);
+                    block-size:36rem;
+                    border:1px solid var(--line);
+                    background:white;
+                    @media (width < 72rem) {
+                        block-size: 30rem;
+                    }
+                    p.status {
+                        <role = "status";
+                        <class = $[if state.failed { "failed"; } else { "fine"; }];
+                        margin:0;
+                        padding:0.5rem 0.75rem;
+                        font-size:0.85rem;
+                        color:var(--muted);
+                        background:var(--bg);
+                        border-block-end:1px solid var(--line);
+                        @ &.failed {
+                            color: var(--orange);
+                            font-weight: 600;
+                        }
+                        = state.status;
+                    }
+                    iframe {
+                        <id = "play-preview";
+                        <title = "The site your Wutu builds";
+                        <sandbox = "allow-scripts allow-forms";
+                        inline-size:100%;
+                        block-size:100%;
+                        border:0;
+                        background:white;
+                    }
+                }
+            }
+            if $[state.detail != ""] {
+                pre.code.shell.diagnostics {
+                    margin-block-start:0;
+                    inline-size:min(100%, 76rem);
+                    white-space:pre-wrap;
+                    = state.detail;
+                }
+            }
+            p {
+                "Press ⌘/Ctrl+Enter to build now, or just keep typing. Your source is kept in this browser. One file, with ";
+                code {
+                    "std:Browser";
+                }
+                " and the standard library; npm packages need the ";
+                a {
+                    <href = "#/tooling";
+                    "wutu CLI";
+                }
+                ".";
+            }
+            p {
+                button.reset {
+                    <type = "button";
+                    padding:0.4rem 0.8rem;
+                    font:inherit;
+                    font-size:0.9rem;
+                    color:var(--ink);
+                    background:var(--tint);
+                    border:1px solid var(--line);
+                    cursor:pointer;
+                    "Start over with the example";
+                    on click {
+                        state.saved.source = sample();
+                        compile(state, 0);
+                    };
+                }
+            }
+        }
+        \/;
+    }
+}

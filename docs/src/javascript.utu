@@ -2,90 +2,190 @@ using Browser from std:Browser;
 using code from "./code.utu";
 using ui from "./ui.utu";
 mod javascript {
-    fn browser_sample() Str {
+    fn dom_sample() Str {
         \\using Browser from std:Browser;
         \\
         \\export main() void {
         \\    let document = Browser.document;
         \\    let input = document.createElement("input");   // an HTMLInputElement
         \\    input.placeholder = "Write something";
+        \\    let echo = document.createElement("p");
         \\    input.addEventListener("input", cl(event) void {
-        \\        Browser.console.log(input.value);
+        \\        echo.textContent = input.value.toUpperCase();
         \\    });
-        \\    document.body.appendChild(input);
+        \\    document.body.append(input, echo);
+        \\}
+        ;
+    }
+    fn builtins_sample() Str {
+        \\using JS from std:JS;
+        \\using console from std:Console;
+        \\
+        \\export main() void {
+        \\    let epoch = new JS.Date(0.0);
+        \\    console.log(epoch.toISOString());                     // 1970-01-01T00:00:00.000Z
+        \\    console.log(`${JS.Math.max(1.0, 5.0)} ${JS.Math.floor(2.7)}`);   // 5 2
+        \\    console.log(`${(3.14159).toFixed(2)} ${"abc".toUpperCase()}`);   // 3.14 ABC
+        \\    let words = JS.Array.of("b", "c", "a");
+        \\    words.sort();
+        \\    console.log(words.join("-"));                         // a-b-c
+        \\}
+        ;
+    }
+    fn json_host_sample() Str {
+        \\using JS from std:JS;
+        \\using console from std:Console;
+        \\
+        \\export main() void {
+        \\    let text = JS.JSON.stringify(&{ name: "utu", tags: ["wasm", "gc"] });
+        \\    console.log(text);                    // {"name":"utu","tags":["wasm","gc"]}
+        \\    let parsed = JS.JSON.parse(text);     // any: read in the context that needs it
+        \\    let name: Str = parsed.name;
+        \\    console.log(name.to_upper());         // UTU
+        \\}
+        ;
+    }
+    fn records_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let doc = Browser.document;
+        \\    // &{ ... } and [ ... ] become real JS objects and arrays in a declared slot
+        \\    let blob = new Browser.Blob(["hello, ", "file"], &{ type: "text/plain" });
+        \\    let link = doc.createElement("a");
+        \\    link.href = Browser.URL.createObjectURL(blob);
+        \\    link.download = "hello.txt";
+        \\    link.textContent = "Download";
+        \\    link.addEventListener("click", cl(e) void {
+        \\        link.textContent = "Downloaded";
+        \\    }, &{ once: true });
+        \\    doc.body.append(link);
+        \\    Browser.window.scrollTo(&{ top: 0.0, left: 0.0, behavior: "smooth" });
+        \\}
+        ;
+    }
+    fn callbacks_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let doc = Browser.document;
+        \\    // parameter types come from the declaration the closure reaches
+        \\    doc.querySelectorAll("p.old").forEach(cl(el) void { el.remove(); });
+        \\    let tags = Browser.Array.of("wasm", "gc", "dom");
+        \\    let loud = tags.map(cl(s) Str { s.toUpperCase(); });
+        \\    Browser.setTimeout(cl() void {
+        \\        doc.title = loud.join(" ");
+        \\    }, 100);
+        \\}
+        ;
+    }
+    fn narrowing_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let doc = Browser.document;
+        \\    // alt over a host value tests each arm with instanceof
+        \\    doc.addEventListener("input", cl(e) void {
+        \\        let text = alt e.target {
+        \\            Browser.HTMLInputElement |t| => t.value,
+        \\            Browser.HTMLTextAreaElement |t| => t.value,
+        \\            ~> "",
+        \\        };
+        \\        Browser.console.log(text);
+        \\    });
+        \\    // null and undefined both mean absence
+        \\    let search: ?Browser.HTMLInputElement = doc.querySelector("#search");
+        \\    promote search { |s| => s.focus(), ~> {}, };
+        \\    let name = Browser.localStorage.getItem("name") orelse "stranger";
+        \\    doc.title = "Hello, " + name;
+        \\}
+        ;
+    }
+    fn try_sample() Str {
+        \\using JS from std:JS;
+        \\
+        \\fn parse_or(text: Str, fallback: Str) Str {
+        \\    try {
+        \\        JS.JSON.stringify(JS.JSON.parse(text));
+        \\    } catch |e| {                // e is the thrown JavaScript value
+        \\        fallback + " (" + JS.String(e) + ")";
+        \\    };
+        \\}
+        \\
+        \\export main() Str {
+        \\    parse_or("[1, 2]", "") + " / " + parse_or("{oops", "bad");
+        \\    // [1,2] / bad (SyntaxError: ...)
+        \\}
+        ;
+    }
+    fn fetch_sample() Str {
+        \\using Web from std:Web;
+        \\
+        \\fn load(url: Str) Str {
+        \\    let response = await Web.fetch(url);   // a host Promise[Response]
+        \\    if not response.ok { return "failed"; };
+        \\    await response.text();
+        \\}
+        \\
+        \\export main() Str {
+        \\    load("data:text/plain,hello from fetch");   // hello from fetch
+        \\}
+        ;
+    }
+    fn timers_sample() Str {
+        \\using Web from std:Web;
+        \\using console from std:Console;
+        \\
+        \\export main() void {
+        \\    Web.setTimeout(cl() void { console.log("later"); }, 10);
+        \\    console.log(`${Web.crypto.randomUUID().len()}`);   // 36
+        \\    let url = new Web.URL("https://example.com/a?page=2");
+        \\    console.log(url.hostname + " " + (url.searchParams.get("page") orelse "1"));
+        \\    // example.com 2, then: later
         \\}
         ;
     }
     fn packages_sample() Str {
         \\using Nano from "npm:nanoid";
-        \\using Floating from "npm:@floating-ui/dom";
         \\using Path from "node:path";
+        \\using Fs from "node:fs";
+        \\using console from std:Console;
         \\
         \\export main() void {
         \\    let id = Nano.nanoid(8);
         \\    let file = Path.join("out", id, "report.txt");
+        \\    console.log(`${Path.extname(file)} ${id.len()}`);   // .txt 8
+        \\    console.log(`${Fs.existsSync("package.json")}`);    // true, run from a package
         \\}
         ;
     }
-    fn shapes_sample() Str {
-        \\// records and arrays take their shape from the declaration slot
-        \\new Browser.Blob(["a", "b"], &{ type: "text/plain" });
-        \\el.addEventListener("x", f, &{ once: true });
-        \\
-        \\// closures take parameter types from the slot they reach
-        \\list.forEach(cl(el) void { el.remove(); });
-        \\xs.map(cl(s) Str { s.toUpperCase(); });
-        \\
-        \\// narrowing a host value tests each arm with instanceof
-        \\alt e.target {
-        \\    Browser.HTMLInputElement |t| => t.value,
-        \\    ~> "",
-        \\};
-        \\
-        \\// null and undefined both mean absence
-        \\promote Browser.localStorage.getItem("key") {
-        \\    |stored| => use(stored),
-        \\    ~> {},
-        \\};
-        ;
-    }
-    fn try_sample() Str {
-        \\let parsed = try {
-        \\    JS.JSON.parse(text);
-        \\} catch |e| {
-        \\    Browser.console.warn(e.message);
-        \\    null;
-        \\};
-        ;
-    }
-    fn link_sample() Str {
+    fn link_shell() Str {
         \\node tools/dts/cli.mjs --input path/to/api.d.ts --module ./api.js --prefix Api --out bindings
+        \\wasm-pack build --target nodejs --out-dir pkg
+        \\node tools/dts/cli.mjs --input pkg/geom.d.ts --module ./pkg/geom.js --prefix Geom --out bindings
         ;
     }
-    fn link_use_sample() Str {
+    fn link_use_multi() Str {
         \\using Api from "./bindings/Api.abi.json";
+        \\using Geom from "./bindings/Geom.abi.json";
         ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface. The compiler resolves the declaration graph with TypeScript's own checker, keeps utu's semantics, and emits only the boundary operations a program uses.");
+            = ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface: import a declaration graph and call it in utu syntax. Only the operations a program uses become boundary code.");
             h2 {
-                "One import for the platform";
+                "The platform";
             }
             p {
                 code {
                     "std:Browser";
                 }
-                " is the browser and standard JavaScript declaration graph, linked from TypeScript's ";
+                " is the DOM and standard JavaScript, linked from TypeScript's own ";
                 code {
                     "lib.dom";
                 }
-                " and ";
-                code {
-                    "lib.es*";
-                }
-                " and embedded compressed in the compiler. Literal overloads keep their precise results, so ";
+                ". Literal overloads keep their precise results: ";
                 code {
                     "createElement(\"input\")";
                 }
@@ -93,13 +193,9 @@ mod javascript {
                 code {
                     "HTMLInputElement";
                 }
-                " with a ";
-                code {
-                    "value";
-                }
                 ".";
             }
-            = code.block(browser_sample());
+            = code.block(dom_sample());
             table.modules {
                 thead {
                     tr {
@@ -135,7 +231,7 @@ mod javascript {
                             }
                         }
                         td {
-                            "The common web APIs: fetch, Request and Response, URL, TextEncoder, streams, AbortController, Blob, crypto, console, timers, WebAssembly";
+                            "fetch, URL, TextEncoder, streams, AbortController, Blob, crypto, timers";
                         }
                         td {
                             "Node, Bun, Deno, browsers, workers";
@@ -161,7 +257,7 @@ mod javascript {
                             }
                         }
                         td {
-                            "A worker's global scope: self, postMessage, importScripts, service-worker types";
+                            "A worker's global scope: self, postMessage, importScripts";
                         }
                         td {
                             "web workers";
@@ -169,19 +265,77 @@ mod javascript {
                     }
                 }
             }
-            p {
-                "Every module shares standard-library identities: a ";
-                code {
-                    "Web.Response";
-                }
-                " is a ";
-                code {
-                    "Browser.Response";
-                }
-                ". A declared type from one package is accepted by another package that references the same DOM or ECMAScript type.";
-            }
             h2 {
-                "Packages";
+                "Standard JavaScript";
+            }
+            p {
+                "Numbers cross as ";
+                code {
+                    "F64";
+                }
+                ", strings as ";
+                code {
+                    "Str";
+                }
+                ". A dynamic value (";
+                code {
+                    "any";
+                }
+                ") is checked with ";
+                code {
+                    "typeof";
+                }
+                " when it reaches a typed slot.";
+            }
+            = code.block(builtins_sample());
+            = code.block(json_host_sample());
+            h2 {
+                "Records, arrays, and callbacks";
+            }
+            p {
+                code {
+                    "&{ ... }";
+                }
+                " and array literals take their shape from the declaration they are passed to. Closures are real JavaScript functions, typed from the slot they reach.";
+            }
+            = code.block(records_sample());
+            = code.block(callbacks_sample());
+            h2 {
+                "Narrowing and absence";
+            }
+            = code.block(narrowing_sample());
+            h2 {
+                "Exceptions";
+            }
+            p {
+                code {
+                    "try";
+                }
+                " catches JavaScript exceptions and is an expression. Wasm traps are never caught.";
+            }
+            = code.block(try_sample());
+            h2 {
+                "Promises and the web APIs";
+            }
+            p {
+                "A host promise is a ";
+                code {
+                    "Promise[T]";
+                }
+                ", so ";
+                code {
+                    "await";
+                }
+                " works on it directly. ";
+                code {
+                    "std:Web";
+                }
+                " runs on servers as well as pages.";
+            }
+            = code.block(fetch_sample());
+            = code.block(timers_sample());
+            h2 {
+                "npm and Node packages";
             }
             p {
                 code {
@@ -191,52 +345,9 @@ mod javascript {
                 code {
                     "\"node:mod\"";
                 }
-                " import a package's declarations directly, found through TypeScript's module resolution: ";
-                code {
-                    "types";
-                }
-                " and ";
-                code {
-                    "exports";
-                }
-                " conditions, ";
-                code {
-                    "@types/*";
-                }
-                ", and Node's ambient modules. The glue imports the same specifier as a named import, so bundlers can tree-shake the package.";
+                " import a package's declarations through TypeScript's module resolution. The glue keeps named imports, so bundlers tree-shake the package.";
             }
             = code.block(packages_sample());
-            h2 {
-                "Declaration shapes in utu syntax";
-            }
-            p {
-                "Records (";
-                code {
-                    "&{ ... }";
-                }
-                ") and array literals become real JavaScript objects and arrays when they reach a declaration slot. Numbers cross as ";
-                code {
-                    "F64";
-                }
-                ", strings as ";
-                code {
-                    "Str";
-                }
-                ", booleans as booleans, and closures as the same function object every time.";
-            }
-            = code.block(shapes_sample());
-            p {
-                "Host exceptions are caught with ";
-                code {
-                    "try";
-                }
-                ", an expression whose branches meet like ";
-                code {
-                    "if";
-                }
-                ". Wasm traps are not exceptions and are never caught.";
-            }
-            = code.block(try_sample());
             h2 {
                 "Your own declarations, and Rust";
             }
@@ -245,26 +356,23 @@ mod javascript {
                 code {
                     ".d.ts";
                 }
-                " file once and import the result. A Rust crate built with wasm-pack arrives the same way, through the declarations wasm-bindgen writes; its memory is still managed by wasm-bindgen, so call ";
+                " once and import the result. A wasm-pack crate arrives the same way; call ";
                 code {
                     "free()";
                 }
-                " when an object is done.";
+                " on its objects when done.";
             }
-            = code.shell(link_sample());
-            = code.block(link_use_sample());
+            = code.shell(link_shell());
+            = code.block(link_use_multi());
             h2 {
                 "What it costs";
             }
             p {
-                "Only used operations become Wasm imports and live JavaScript. Host references share one Wasm representation, so operations that differ only in declaration type share one import. At the default ";
+                "At the default ";
                 code {
                     "-Oz";
                 }
-                " the browser task board is 2,572 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard, which exercises much more of the platform, is 4,867 bytes. A regression test requires that 1,000 unused declarations add exactly zero bytes.";
-            }
-            p {
-                "The boundary still costs time. The compiler does not move utu loops into JavaScript; a crossing per element is materially slower than one call for the whole operation.";
+                ", the browser task board is 2,572 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard 4,867. A thousand unused declarations add zero bytes. Each boundary crossing still costs time, so call once per operation, not once per element.";
             }
             = ui.further("docs/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI");
         }
