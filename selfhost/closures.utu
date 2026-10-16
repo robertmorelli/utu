@@ -396,11 +396,13 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         let vt = repr(cap_types[k]);
         env_vts[k] = if decl_boxed[d] == 1 { vt_ref(box_type(vt), true); } else { storage(vt); };
     };
-    let env = env_type(env_vts);
+    // One captured GC reference is the environment itself: no struct.
+    let single = ncap == 1 and gc_ref(env_vts[0]);
+    let env = if single { -1; } else { env_type(env_vts); };
     // The body, as a function of its own: (env, params…). It is called only
     // through the closure the host makes (closure_new), so its environment
     // is typed exactly: the call from JS checks it, as in stage 0.
-    let env_vt = vt_ref(env, false);
+    let env_vt = if single { env_vts[0]; } else { vt_ref(env, false); };
     let mp2 = vl_begin();
     vl_add(env_vt);
     for (0 ..< n) |k| { vl_add(repr(ptypes[k])); };
@@ -414,8 +416,9 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     cur_params[0] = cur_locals.len();
     mark_boxes(body_node);
     let mbody = w_mark();
-    // Prologue: each capture, from the environment.
-    for (0 ..< ncap) |k| {
+    // Prologue: each capture, from the environment (one alone is it).
+    if single { decl_local[vl_item(caps, 0)] = 0; };
+    for (0 ..< if single { 0; } else { ncap; }) |k| {
         let d = vl_item(caps, k);
         let local = new_local(env_vts[k]);
         let mg = w_mark();
@@ -461,10 +464,18 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         if decl_boxed[d] == 1 { w_leaf(Op.LocalGet, env_vts[k], decl_local[d], 0); }
         else { read_value(d, cap_types[k]); };
     };
-    w_node(Op.StructNew, vt_ref(env, false), env, 0, me);
-    w_i32(if result == prelude(Prelude.Bool) { 1; } else { 0; });
+    if not single { w_node(Op.StructNew, vt_ref(env, false), env, 0, me); };
+    w_i32((if result == prelude(Prelude.Bool) { 1; } else { 0; }) + (if single { 2; } else { 0; }));
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
     ty(Ty.Closure, types_list(ptypes, n), result);
+}
+
+/// Whether a value type is a reference to a struct or an array (an `anyref`,
+/// which closure_new's environment is).
+fn gc_ref(vt: I32) Bool {
+    if vt < vt_defined or vt >= vt_tuple { return false; };
+    let kind = ht_kind[(vt - vt_defined) / 2];
+    kind == Heap.Struct.to_i32() or kind == Heap.Array.to_i32();
 }
 
 /// The first `n` of `ts`, as a list.

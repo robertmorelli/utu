@@ -64,7 +64,8 @@ export function awaitImports(promiseSpec, utu = {}) {
  * environment. The funcref arrives already callable, so there is no table
  * lookup — the result is an ordinary JS function, which is what makes a utu
  * closure usable as a JS callback anywhere. A null environment marks a decayed
- * `fun`, which has no environment parameter to prepend.
+ * `fun`, which has no environment parameter to prepend, unless flag 2 says
+ * the environment is a capture (which may be null).
  *
  * Every `closure_call_*` field is the *same* function — invoking a JS callable.
  * They differ only in wasm signature, since wasm imports are monomorphic, so one
@@ -74,9 +75,11 @@ export function awaitImports(promiseSpec, utu = {}) {
 export function closureImports(closureSpec, utu = {}) {
   if (!closureSpec) return utu;
   if (closureSpec.new) {
-    utu.closure_new = (fn, env, booleanResult) => {
-      const invoke = env == null ? (...args) => fn(...args) : (...args) => fn(env, ...args);
-      return booleanResult ? (...args) => !!invoke(...args) : invoke;
+    // flags: 1, the result is a Bool; 2, the environment is there even when
+    // null (a closure whose one capture is its environment).
+    utu.closure_new = (fn, env, flags) => {
+      const invoke = env == null && !(flags & 2) ? (...args) => fn(...args) : (...args) => fn(env, ...args);
+      return flags & 1 ? (...args) => !!invoke(...args) : invoke;
     };
   }
   const apply = (closure, ...args) => closure(...args);
