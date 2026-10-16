@@ -15,7 +15,7 @@ fn greeting(name: Str) Browser.HTMLElement {
         padding: 1.5rem;
         h2 { margin: 0; "Hello, "; $[name]; }
         a {
-            <href="/about";
+            href="/about";
             color: oklch(45% 0.12 150);
             :hover { text-decoration-thickness: 0.15em; }
             "About this garden";
@@ -38,7 +38,7 @@ selector, and `if`/`for` blocks are brace-delimited and do not take a terminator
 Missing semicolons are compile errors, not warnings or implicit separators.
 
 ```wutu
-<aria-hidden = "true";
+aria-hidden = "true";
 aspect-ratio: 0.68;
 ```
 
@@ -52,16 +52,16 @@ and returns that element, with its concrete browser type where available.
 | `tag.class#id { ... }` | An HTML element; custom-element names are accepted |
 | `tag as name { ... }` | Name the node within its template subtree |
 | `property: value;` | CSS declaration attached to this element |
-| `<name="value";` | HTML attribute |
-| `<name=$[expression];` | Utu-valued attribute; ordinary attributes expect Str |
-| `<disabled;` / `<disabled=$[condition];` | Boolean attribute presence |
-| `<.value=$[expression];` | Typed DOM **property** assignment |
+| `name = "value";` | HTML attribute (`=` where CSS has `:`) |
+| `name = $[expression];` | Utu-valued attribute; ordinary attributes expect Str |
+| `disabled;` / `disabled = $[condition];` | Boolean attribute presence |
+| `.value = $[expression];` | Typed DOM **property** assignment |
 | `"text";` | A text node |
 | `$[expression];` | A Utu string or DOM node, including a component result |
 | `@click=$[cl(event) void { ... }];` | A typed event listener |
-| `# comment` | A Wutu comment (after whitespace); `/* ... */` also works |
+| `# comment` | A comment line: `#` first on its line, then a space. At the end of a line, `/* ... */`. Any other `#` is text, so `color: #1f2535;` is a color |
 
-Common attributes are checked per tag. `canvas { <padding="10" }` is an error.
+Common attributes are checked per tag. `canvas { padding="10" }` is an error.
 `aria-*`, `data-*`, and custom-element attributes are accepted. Property
 assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
@@ -69,7 +69,7 @@ are rejected: use a closure. Interpolated strings become text, never HTML.
 Written strings take Utu's escapes: `"say \"hi\"";`, `"\u2192";`, `"\\";`.
 Use `.to_f64().toString()` to display a native integer through browser Number.
 
-Classes from `<class=$[classes]>` are combined with authored shorthand and
+Classes from `class = $[classes];` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
 children switch back to HTML. SVG attributes such as `viewBox`, `d`, and
 `stroke-width` keep their original spelling.
@@ -116,7 +116,7 @@ references, shared struct state, and persistence.
 
 ```utu
 button as toggle {
-    <type="button"
+    type="button"
     $[if plant.watered { "Watered ✓"; } else { "Water me"; }]
     @click=$[cl(event) void {
         plant.watered = not plant.watered;
@@ -164,6 +164,38 @@ the root contains document-level CSS: tokens, resets, `@font-face`, `@keyframes`
 layer ordering, and so on. Within raw CSS blocks use CSS comments, or standalone
 `# ` comment lines. URLs retain `//` and fragments unchanged.
 
+**The nearer rule wins.** `@document` CSS, and sheets installed with `@style`,
+sit in the `wutu.document` cascade layer; element-local styles are unlayered.
+So a declaration written on an element beats a document rule however specific
+the document selector is (`main p.note { color: red; }` loses to `color: green;`
+written inside that `p.note`). An `@import` in `@document` is hoisted and
+imports into the same layer. To let a document rule win on purpose, use
+`!important` or a layer of your own.
+
+**`@document` belongs to its component.** Any template may start with one, not
+only the root view: a component's document CSS is installed once, the first time
+the component renders, and is shaken out with the component when nothing calls
+it. Keep page-specific rules next to the page that uses them:
+
+```utu
+fn editor() Browser.HTMLElement {
+    @wutu/\
+    @document {
+        .editor > pre { margin: 0; }
+    }
+    div.editor {
+        pre {
+            "…";
+        }
+    }
+    \/;
+}
+```
+
+Strings in a payload are text, so a `/\` or `\/` inside one does not open or
+close a DSL: `"Envelope: /\\ … \\/";` (a written backslash is `\\`, as in
+any utu string). This holds for every DSL; a string ends at its line.
+
 Identical declaration sets receive identical deterministic classes. Each
 reachable component's stylesheet is installed once, even when many instances
 are created. Unused components and their style installers are removed by the
@@ -198,6 +230,56 @@ Keep statements and block contents on separate, indented lines. Compiler diagnos
 
 The warning appears in analysis diagnostics used by `utu check` and the editor. Build output can still be minified independently of source formatting.
 
+## Elements JavaScript owns, mount, and quiet handlers
+
+`@unmanaged;` in an element hands its insides to JavaScript: the template makes
+the element and sets the attributes it names, and renders never touch its
+children or any other attribute (an editor widget, a chart, an iframe's
+`srcdoc`). It has no children in its template. `on mount { … };` runs once per
+element, after the render that made it; name the element with `as` to reach it:
+
+```wutu
+div as chart {
+    @unmanaged;
+    on mount {
+        chart.append(Browser.document.createTextNode("drawn by JavaScript"));
+    };
+}
+```
+
+A handler normally schedules a render after it runs. A **quiet** handler does
+not: write `on scroll quiet { … };`. Wutu also infers it: a handler whose every
+statement assigns a property of an `as` element from those elements, `event`,
+and literals, calling nothing, is quiet without the word (nothing a render
+reads changed). `on scroll { overlay.scrollTop = field.scrollTop; };` is quiet;
+`on scroll { state.top = field.scrollTop; };` is not.
+
+## Lazy pages
+
+`= wutu.lazy("./tour.utu");` shows a page that is compiled on its own and loaded
+the first time it is shown. `wutu build` finds every `wutu.lazy` path in the
+entry and the files it imports, and builds each as a chunk
+(`chunks/tour-<hash>/app.js` and `app.wasm`, named by their bytes): the file
+declares a module whose `fn page() Browser.HTMLElement` is the page. The chunk
+renders it and delivers it into the placeholder `wutu.lazy` returned; a
+prerendered placeholder keeps its markup until then. The host never ships the
+page's code or text, so a site of many pages starts with only the one it shows.
+A chunk is its own program: share state with the host through the DOM, the URL,
+or storage, not through captured structs.
+
+```utu
+@wutu/\
+@reactive;
+main {
+    if $[wutu.route() == "/tour"] {
+        = wutu.lazy("./tour.utu");
+    } else {
+        = home.page();
+    }
+}
+\/;
+```
+
 ## Reactive views, identity, and concise expressions
 
 Put `@reactive;` at the start of a root template. Event handlers may mutate
@@ -231,7 +313,7 @@ main {
 ```
 
 `= expression;` inserts text or a component node. Attributes can use direct
-expressions (`<title = item.title;`) as well as `$[...]`. Attribute expressions
+expressions (`title = item.title;`) as well as `$[...]`. Attribute expressions
 beginning with a quoted literal use `$[...]` when concatenating more text.
 `on click { ... };` supplies an implicit typed `event`; `on submit` also prevents
 navigation. Native form constraints still govern normal browser submission.

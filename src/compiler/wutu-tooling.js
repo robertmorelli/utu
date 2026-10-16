@@ -19,8 +19,10 @@ function stringEnd(source, start) {
 
 export function formatWutuBody(source) {
   // Comments carry meaning for authors. Preserve commented bodies rather than discard them.
-  if (/^\s*#|\/\/|\/\*|^\s*\\\\/m.test(source.replace(/"(?:[^"\\\n]|\\.)*"/g, '""'))) return source;
-  if (/@\w+\s*\/\\/.test(source)) return formatWithOpaquePayloads(source);
+  const code = source.replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
+  if (/^\s*#|\/\/|\/\*|^\s*\\\\/m.test(code)) return source;
+  // (An opener in a string is text: strings are masked as they are.)
+  if (/@\w+\s*\/\\/.test(code)) return formatWithOpaquePayloads(source);
   return new BodyFormatter().format(parseWutu(source));
 }
 
@@ -186,14 +188,18 @@ class BodyFormatter {
   element(node, depth) {
     const classes = node.classes.map(name => '.' + name).join('');
     this.add(depth, `${node.tag}${classes}${node.binding ? ' as ' + node.binding : ''} {`);
-    for (const { name, value, property, dynamic } of node.attrs) {
-      this.add(depth + 1, `<${property ? '.' : ''}${name} = ${dynamic ? `$[${compactExpression(value)}]` : value};`);
+    if (node.unmanaged) this.add(depth + 1, '@unmanaged;');
+    for (const { name, value, property, dynamic, wrapped } of node.attrs) {
+      if (node.unmanaged && name === 'data-wutu-unmanaged') continue;
+      if (!property && !dynamic && value === '""') this.add(depth + 1, `${name};`);
+      // A bare value ends at the statement's semicolon, so only a balanced one may gain `$[...]`.
+      else this.add(depth + 1, `${property ? '.' : ''}${name} = ${!dynamic ? value : wrapped || isBalanced(value) ? `$[${compactExpression(value)}]` : value.trim()};`);
     }
     for (const rule of node.css) this.block(rule.source, depth + 1);
     for (const binding of node.twoWay) this.add(depth + 1, `bind:${binding.property} = ${compactExpression(binding.value)};`);
     this.children(node.children, depth + 1);
     for (const event of node.events) {
-      if (event.shorthand) this.block(`on ${event.name} ${event.handler};`, depth + 1, true);
+      if (event.shorthand) this.block(`on ${event.name}${event.quiet ? ' quiet' : ''} ${event.handler};`, depth + 1, true);
       else this.block(`@${event.name} = $[${event.handler}];`, depth + 1, true);
     }
     this.add(depth, '}');
@@ -242,15 +248,14 @@ export function wutuCompletions(source, offset) {
   const island = wutuIslands(source).find(range => offset >= range.start && offset <= range.end);
   if (!island) return [];
   const prefix = source.slice(island.start, offset);
-  if (/<[-.\w]*$/.test(prefix)) {
-    const names = new Set([...wutuVocabulary.globals, ...Object.values(wutuVocabulary.attrs).flatMap(set => [...set])]);
-    return [...names].map(label => ({ label, insertText: label + ' = "";', detail: 'Wutu attribute' }));
-  }
   if (/\bon\s+\w*$/.test(prefix)) {
     return EVENT_COMPLETIONS.map(label => ({ label, insertText: label + ' {\n    \n};', detail: 'Wutu event handler' }));
   }
   const tags = [...wutuVocabulary.tags].map(label => ({ label, insertText: label + ' {\n    \n}', detail: 'Wutu element' }));
-  return tags.concat(KEYWORD_COMPLETIONS);
+  const names = new Set([...wutuVocabulary.globals, ...Object.values(wutuVocabulary.attrs).flatMap(set => [...set])]);
+  const attributes = [...names].filter(label => !wutuVocabulary.tags.has(label))
+    .map(label => ({ label, insertText: label + ' = "";', detail: 'Wutu attribute' }));
+  return tags.concat(attributes, KEYWORD_COMPLETIONS);
 }
 
 /**

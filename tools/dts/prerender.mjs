@@ -22,6 +22,8 @@ export async function prerender(outDir) {
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.waitForFunction(()=>document.documentElement.hasAttribute('data-utu-ready')||document.documentElement.hasAttribute('data-utu-error'));
+    // Lazy pages (wutu.lazy) arrive in chunks after main.
+    await page.waitForFunction(()=>!document.documentElement.hasAttribute('data-wutu-loading'));
     const failure=await page.locator('html').getAttribute('data-utu-error');if(failure)throw Error(failure);
     if(errors.length)throw Error(errors.join('\n'));
     const html=await page.evaluate(()=>{

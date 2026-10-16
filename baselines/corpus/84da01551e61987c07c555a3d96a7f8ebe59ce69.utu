@@ -46,7 +46,7 @@ state: Library) Browser.HTMLElement {
         padding-block:1.5rem;
         border-block-end:1px solid var(--line);
         div {
-            <aria-hidden = "true";
+            aria-hidden = "true";
             aspect-ratio:0.68;
             background:linear-gradient(135deg, var(--accent), var(--ink));
             border-radius:0.15rem 0.45rem 0.45rem 0.15rem;
@@ -82,8 +82,8 @@ state: Library) Browser.HTMLElement {
                 gap:0.5rem;
                 flex-wrap:wrap;
                 button {
-                    <id = $["book-" + book.id];
-                    <aria-pressed = $[if book.finished { "true"; } else { "false"; }];
+                    id = $["book-" + book.id];
+                    aria-pressed = $[if book.finished { "true"; } else { "false"; }];
                     = if book.finished {
                         "Read again";
                     }
@@ -95,7 +95,7 @@ state: Library) Browser.HTMLElement {
                     };
                 }
                 button {
-                    <aria-label = $["Remove " + book.title];
+                    aria-label = $["Remove " + book.title];
                     "Remove";
                     on click {
                         state.books = state.books filter |b| {
@@ -120,7 +120,7 @@ fn results(state: Library) Browser.HTMLElement {
     };
     @wutu/\
     section {
-        <id = "results";
+        id = "results";
         display:grid;
         gap:1rem;
         header {
@@ -133,7 +133,7 @@ fn results(state: Library) Browser.HTMLElement {
                 "The bookshelf";
             }
             p.muted {
-                <role = "status";
+                role = "status";
                 = number(count);
                 " shown · ";
                 = number(finished);
@@ -311,16 +311,16 @@ export main() void {
         gap:3rem;
         header.site-nav {
             a {
-                <href = "./";
+                href = "./";
                 "FOLIO / A READING LIFE";
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "All five sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "View Utu source ↗";
                 }
             }
@@ -365,27 +365,27 @@ export main() void {
                     label {
                         "Search the shelf";
                         input as search {
-                            <id = "search";
-                            <type = "search";
-                            <placeholder = "Title or author";
+                            id = "search";
+                            type = "search";
+                            placeholder = "Title or author";
                             bind:value = state.query;
                         }
                     }
                     label {
                         "Show";
                         select as filter {
-                            <aria-label = "Show";
+                            aria-label = "Show";
                             bind:value = state.filter;
                             option {
-                                <value = "all";
+                                value = "all";
                                 "All books";
                             }
                             option {
-                                <value = "reading";
+                                value = "reading";
                                 "To read";
                             }
                             option {
-                                <value = "finished";
+                                value = "finished";
                                 "Finished";
                             }
                         }
@@ -413,22 +413,22 @@ export main() void {
                     label {
                         "Book title";
                         input as title {
-                            <id = "title";
-                            <required = "";
-                            <maxlength = "160";
-                            <placeholder = "What are you reading?";
+                            id = "title";
+                            required = "";
+                            maxlength = "160";
+                            placeholder = "What are you reading?";
                         }
                     }
                     label {
                         "Author";
                         input as author {
-                            <required = "";
-                            <maxlength = "100";
-                            <placeholder = "Who wrote it?";
+                            required = "";
+                            maxlength = "100";
+                            placeholder = "Who wrote it?";
                         }
                     }
                     button.primary {
-                        <type = "submit";
+                        type = "submit";
                         "Add book ↗";
                     }
                     on submit {
@@ -458,8 +458,8 @@ export main() void {
                 "A reading life, one book at a time.";
             }
             p {
-                <id = "notice";
-                <role = "status";
+                id = "notice";
+                role = "status";
                 "Saved on this device. No account needed.";
             }
         }

@@ -15,12 +15,12 @@ mod view {
             span { = "tick " + ui.w.tick.to_str(); }
             span { = "power " + ui.w.satisfaction.to_str(); }
             button {
-                <class = $[if ui.speed == 0 { "active"; } else { ""; }];
+                class = $[if ui.speed == 0 { "active"; } else { ""; }];
                 "Pause";
                 on click { ui.speed = 0; };
             }
             button {
-                <class = $[if ui.speed == 1 { "active"; } else { ""; }];
+                class = $[if ui.speed == 1 { "active"; } else { ""; }];
                 "1×";
                 on click { ui.speed = 1; };
             }

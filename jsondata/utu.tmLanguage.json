@@ -409,8 +409,12 @@
               "name": "entity.other.attribute-name.event.wutu"
             },
             {
-              "match": "<\\.?[\\w-]+",
-              "name": "entity.other.attribute-name.wutu"
+              "match": "(?:^|(?<=[{;]))\\s*(\\.?[a-z][\\w-]*)(?=\\s*(?:=(?!=)|;))",
+              "captures": {
+                "1": {
+                  "name": "entity.other.attribute-name.wutu"
+                }
+              }
             },
             {
               "match": "\\b(?:as|if|else|for|key|on)\\b",

@@ -29,8 +29,8 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                         }
                         div.bar {
                             button {
-                                <aria-label = $["Use "+item.name];
-                                <disabled = $[item.count==0];
+                                aria-label = $["Use "+item.name];
+                                disabled = $[item.count==0];
                                 "−";
                                 on click {
                                     item.count-=1;
@@ -38,7 +38,7 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                                 };
                             }
                             button {
-                                <aria-label = $["Add "+item.name];
+                                aria-label = $["Add "+item.name];
                                 "+";
                                 on click {
                                     item.count+=1;
@@ -114,17 +114,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "pantry";
+        data-theme = "pantry";
         nav {
             strong {
                 "PANTRY / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -145,7 +145,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

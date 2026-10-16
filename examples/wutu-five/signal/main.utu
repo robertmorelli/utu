@@ -116,7 +116,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
     } collect(Session);
     @wutu/\
     section {
-        <id = "sessions";
+        id = "sessions";
         display:grid;
         gap:1rem;
         div {
@@ -126,7 +126,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
             justify-content:space-between;
             flex-wrap:wrap;
             p {
-                <role = "status";
+                role = "status";
                 = number(count);
                 " in your agenda · ";
                 = number(visible.len());
@@ -134,8 +134,8 @@ fn sessions(state: Conference) Browser.HTMLElement {
             }
             if $[count>0] {
                 a {
-                    <href = $[calendar(state)];
-                    <download = "signal-agenda.ics";
+                    href = $[calendar(state)];
+                    download = "signal-agenda.ics";
                     padding:0.8rem 1rem;
                     border:1px solid var(--accent);
                     border-radius:0.5rem;
@@ -146,7 +146,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
         }
         if $[conflicts>0] {
             p.conflict {
-                <role = "alert";
+                role = "alert";
                 padding:1rem;
                 border:1px solid var(--accent);
                 color:var(--accent);
@@ -199,9 +199,9 @@ fn sessions(state: Conference) Browser.HTMLElement {
                     }
                 }
                 button {
-                    <id = $["session-" + session.id];
-                    <aria-label = $[if session.saved { "Remove " + session.title; } else { "Save " + session.title; }];
-                    <aria-pressed = $[if session.saved { "true"; } else { "false"; }];
+                    id = $["session-" + session.id];
+                    aria-label = $[if session.saved { "Remove " + session.title; } else { "Save " + session.title; }];
+                    aria-pressed = $[if session.saved { "true"; } else { "false"; }];
                     = if session.saved {
                         "Saved ✓";
                     }
@@ -456,16 +456,16 @@ export main() void {
         gap:2.5rem;
         header.site-nav {
             a {
-                <href = "./";
+                href = "./";
                 "SIGNAL / 26";
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "All five sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "View Utu source ↗";
                 }
             }
@@ -512,17 +512,17 @@ export main() void {
             label {
                 "Day";
                 select as day {
-                    <aria-label = "Day";
+                    aria-label = "Day";
                     option {
-                        <value = "all";
+                        value = "all";
                         "Both days";
                     }
                     option {
-                        <value = "1";
+                        value = "1";
                         "Thursday 22 Oct";
                     }
                     option {
-                        <value = "2";
+                        value = "2";
                         "Friday 23 Oct";
                     }
                     on change {
@@ -534,7 +534,7 @@ export main() void {
             label {
                 "Track";
                 select as track {
-                    <aria-label = "Track";
+                    aria-label = "Track";
                     option {
                         "All tracks";
                     }
@@ -559,7 +559,7 @@ export main() void {
                 gap:0.75rem;
                 padding:0.8rem;
                 input as agenda {
-                    <type = "checkbox";
+                    type = "checkbox";
                     on change {
                         state.agenda = agenda.checked;
                         refresh(state);
@@ -574,8 +574,8 @@ export main() void {
                 "Fictional programme, real agenda tools. Calendar downloads use UTC.";
             }
             p {
-                <id = "notice";
-                <role = "status";
+                id = "notice";
+                role = "status";
                 "Saved on this device. No account needed.";
             }
         }

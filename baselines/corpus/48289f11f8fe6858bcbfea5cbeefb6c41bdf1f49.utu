@@ -72,7 +72,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
     };
     @wutu/\
     section {
-        <id = "itinerary";
+        id = "itinerary";
         display:grid;
         gap:1.25rem;
         div {
@@ -114,14 +114,14 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                     "PLAN COST";
                 }
                 strong {
-                    <id = "trip-total";
+                    id = "trip-total";
                     font-size:clamp(1.2rem, 3vw, 2rem);
                     = "$" + (total / 100.0).toFixed(2);
                 }
             }
         }
         p.muted {
-            <role = "status";
+            role = "status";
             = number(visible.len());
             " stops in this view. Costs are your own estimates.";
         }
@@ -167,8 +167,8 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                         grid-column: 2;
                     }
                     button {
-                        <id = $["stop-" + stop.id];
-                        <aria-pressed = $[if stop.done { "true"; } else { "false"; }];
+                        id = $["stop-" + stop.id];
+                        aria-pressed = $[if stop.done { "true"; } else { "false"; }];
                         = if stop.done {
                             "Visited ✓";
                         }
@@ -182,7 +182,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                         };
                     }
                     button {
-                        <aria-label = $["Remove " + stop.title];
+                        aria-label = $["Remove " + stop.title];
                         "×";
                         on click {
                             state.stops = state.stops filter |s| {
@@ -399,16 +399,16 @@ export main() void {
         gap:2.5rem;
         header.site-nav {
             a {
-                <href = "./";
+                href = "./";
                 "↗ WAYFARER / GO SOMEWHERE";
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "All five sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "View Utu source ↗";
                 }
             }
@@ -449,7 +449,7 @@ export main() void {
                 }
             }
             div {
-                <aria-hidden = "true";
+                aria-hidden = "true";
                 aspect-ratio:1.2;
                 border:1px solid var(--line);
                 border-radius:1.5rem;
@@ -488,21 +488,21 @@ export main() void {
                     label {
                         "Day";
                         select as day_filter {
-                            <aria-label = "Day";
+                            aria-label = "Day";
                             option {
-                                <value = "all";
+                                value = "all";
                                 "Every day";
                             }
                             option {
-                                <value = "1";
+                                value = "1";
                                 "Day 1";
                             }
                             option {
-                                <value = "2";
+                                value = "2";
                                 "Day 2";
                             }
                             option {
-                                <value = "3";
+                                value = "3";
                                 "Day 3";
                             }
                             on change {
@@ -533,26 +533,26 @@ export main() void {
                     label {
                         "Place or activity";
                         input as place {
-                            <id = "place";
-                            <required = "";
-                            <maxlength = "160";
-                            <placeholder = "A place worth a detour";
+                            id = "place";
+                            required = "";
+                            maxlength = "160";
+                            placeholder = "A place worth a detour";
                         }
                     }
                     label {
                         "Which day?";
                         select as day {
-                            <aria-label = "Which day?";
+                            aria-label = "Which day?";
                             option {
-                                <value = "1";
+                                value = "1";
                                 "Day 1";
                             }
                             option {
-                                <value = "2";
+                                value = "2";
                                 "Day 2";
                             }
                             option {
-                                <value = "3";
+                                value = "3";
                                 "Day 3";
                             }
                         }
@@ -560,16 +560,16 @@ export main() void {
                     label {
                         "Estimated cost ($)";
                         input as cost {
-                            <type = "number";
-                            <min = "0";
-                            <max = "100000";
-                            <step = "1";
-                            <required = "";
-                            <value = "0";
+                            type = "number";
+                            min = "0";
+                            max = "100000";
+                            step = "1";
+                            required = "";
+                            value = "0";
                         }
                     }
                     button.primary {
-                        <type = "submit";
+                        type = "submit";
                         "Add to the journey ↗";
                     }
                     on submit {
@@ -607,8 +607,8 @@ export main() void {
                 "A personal itinerary notebook. Sample stops are illustrative, not bookings.";
             }
             p {
-                <id = "notice";
-                <role = "status";
+                id = "notice";
+                role = "status";
                 "Saved on this device. No account needed.";
             }
         }

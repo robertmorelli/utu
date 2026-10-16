@@ -50,7 +50,7 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
                         = place.note;
                     }
                     button {
-                        <aria-pressed = $[if place.saved {"true";} else {"false";}];
+                        aria-pressed = $[if place.saved {"true";} else {"false";}];
                         = if place.saved {
                             "Saved ✓";
                         }
@@ -67,7 +67,7 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
             }
         }
         p {
-            <role = "status";
+            role = "status";
             = wutu.number(state.places count_where |p| {
                 p.saved;
             }) + " places saved";
@@ -116,17 +116,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "atlas";
+        data-theme = "atlas";
         nav {
             strong {
                 "ATLAS / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -147,7 +147,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

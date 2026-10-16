@@ -83,12 +83,12 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
           @wutu/\\
           div.card {
             color: red;
-            <class=$["extra"];
-            <data-label=$["<b>safe</b>"];
-            input { <.value=$["hello"]; <disabled=$["x" == "y"]; }
-            svg { <viewBox="0 0 10 10"; circle { <cx="5"; <cy="5"; <r="4"; } }
+            class=$["extra"];
+            data-label=$["<b>safe</b>"];
+            input { .value=$["hello"]; disabled=$["x" == "y"]; }
+            svg { viewBox="0 0 10 10"; circle { cx="5"; cy="5"; r="4"; } }
             for $[[1,2]] |n| {
-              button as button { <type="button"; $[n.to_f64().toString()]; @click=$[cl(e) void { button.textContent = (n*10).to_f64().toString(); }]; }
+              button as button { type="button"; $[n.to_f64().toString()]; @click=$[cl(e) void { button.textContent = (n*10).to_f64().toString(); }]; }
             }
             if $[true] { p { "present"; } } else { p { "absent"; } }
           }
@@ -124,7 +124,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     for (const [source,kind] of [
       ['export main() void { [1,2] map |x| {x;}; }','invalid-iterator-usage'],
       ['export main() I32 { [1] map |x,y,z| {x;} sum; }','invalid-iterator-usage'],
-      ['using Browser from std:Browser; export main() void { @wutu/\\ canvas { <padding="10"; } \\/; }','invalid-dsl-usage'],
+      ['using Browser from std:Browser; export main() void { @wutu/\\ canvas { padding="10"; } \\/; }','invalid-dsl-usage'],
     ]) {
       await withTempUtu(ROOT,'invalid_new_syntax.utu',source,async file=>{
         let caught;try { await compiler.compileFile(file); } catch(error) { caught=error; }
@@ -144,11 +144,11 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     });
   });
   test('wutu: parser separates attributes, events, CSS scopes, strings, and expressions',()=>{
-    const parsed=parseWutu(`@document { :root { --ink: red; } } main.card { color: var(--ink); :hover {color:blue;} @media (width < 40rem) {display:grid;} @ & > * {margin:0;} h2 { "Hello"; $[items[0]]; } button { <type="button"; @click=$[cl(e) void { call("["); }]; "Go"; } }`);
+    const parsed=parseWutu(`@document { :root { --ink: red; } } main.card { color: var(--ink); :hover {color:blue;} @media (width < 40rem) {display:grid;} @ & > * {margin:0;} h2 { "Hello"; $[items[0]]; } button { type="button"; @click=$[cl(e) void { call("["); }]; "Go"; } }`);
     assertEq(parsed.root.tag,'main');assertEq(parsed.root.children.length,2);assertEq(parsed.root.children[0].children[1].expr,'items[0]');
-    assertThrows(()=>parseWutu('canvas { <padding="10"; }'),'unknown attribute');
+    assertThrows(()=>parseWutu('canvas { padding="10"; }'),'unknown attribute');
     assertThrows(()=>parseWutu('input { "bad"; }'),'cannot have children');
-    assertThrows(()=>parseWutu('div { <onclick="bad"; }'),'use @event');
+    assertThrows(()=>parseWutu('div { onclick="bad"; }'),'use @event');
     assertThrows(()=>parseWutu('.card {}'),'expected an HTML tag');
     assertThrows(()=>parseWutu('p { $[x }'),'unterminated interpolation');
   });

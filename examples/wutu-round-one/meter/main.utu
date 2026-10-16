@@ -26,8 +26,8 @@ fn workspace(state: MeterState) Browser.HTMLElement {
                 div.days {
                     for $[["M","T","W","T","F","S","S"]] |day,index| {
                         button {
-                            <aria-label = $[habit.name+" day "+wutu.number(index.to_i64().to_i32()+1)];
-                            <aria-pressed = $[if habit.days[index.to_i64().to_i32()] {"true";} else {"false";}];
+                            aria-label = $[habit.name+" day "+wutu.number(index.to_i64().to_i32()+1)];
+                            aria-pressed = $[if habit.days[index.to_i64().to_i32()] {"true";} else {"false";}];
                             = day;
                             on click {
                                 let i=index.to_i64().to_i32();
@@ -75,17 +75,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "meter";
+        data-theme = "meter";
         nav {
             strong {
                 "METER / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -106,7 +106,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

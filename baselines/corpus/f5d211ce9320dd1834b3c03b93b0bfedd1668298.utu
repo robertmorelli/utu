@@ -20,12 +20,12 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
         label {
             "Next piece of work";
             input {
-                <required = "";
+                required = "";
                 bind:value = draft.title;
             }
         }
         button.primary {
-            <type = "submit";
+            type = "submit";
             "Add work";
         }
         on submit {
@@ -60,7 +60,7 @@ fn workspace(state: StudioState) Browser.HTMLElement {
                                 = task.title;
                             }
                             button {
-                                <aria-label = $["Move "+task.title];
+                                aria-label = $["Move "+task.title];
                                 = if task.stage==2 {
                                     "Reopen ↺";
                                 }
@@ -109,17 +109,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "studio";
+        data-theme = "studio";
         nav {
             strong {
                 "STUDIO / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -140,7 +140,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

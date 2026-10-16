@@ -122,10 +122,10 @@ for(const name of ['invalid_batch','invalid_window']){
 console.log('Iterator empty inputs, growth, stage boundaries, short circuit, shadowing, and logarithmic bisect passed');
 
 const { parseWutu }=await import('../src/compiler/wutu.js');
-for(const source of ['div { <aria-hidden = "true" aspect-ratio: 0.68; }','input { <disabled }','input { <.value=$[x] }','button { @click=$[handler] }','p { "text" }','p { $[text] }','div { :hover {color:red} }', 'div { color:red } p { color:blue; }']) {
+for(const source of ['div { aria-hidden = "true" aspect-ratio: 0.68; }','input { disabled }','input { .value=$[x] }','button { @click=$[handler] }','p { "text" }','p { $[text] }','div { :hover {color:red} }', 'div { color:red } p { color:blue; }']) {
  let threw=false;try{parseWutu(source);}catch(e){threw=/semicolon|expected ;/.test(e.message);}assertEq(threw,true,source);
 }
-parseWutu('div { <aria-hidden = "true"; aspect-ratio: 0.68; "text"; $[label]; }');
+parseWutu('div { aria-hidden = "true"; aspect-ratio: 0.68; "text"; $[label]; }');
 parseWutu('@document { p { color:red; /* a } is just a comment */ } } div {}');
 console.log('All Wutu leaf statements require semicolons');
 

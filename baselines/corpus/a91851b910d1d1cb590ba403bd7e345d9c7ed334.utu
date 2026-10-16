@@ -87,9 +87,9 @@ state: Menu) Browser.HTMLElement {
                 = money(dish.price);
             }
             button {
-                <id = $["add-" + dish.id];
-                <disabled = $[dish.quantity >= 20];
-                <aria-label = $["Add " + dish.title];
+                id = $["add-" + dish.id];
+                disabled = $[dish.quantity >= 20];
+                aria-label = $["Add " + dish.title];
                 "Add +";
                 on click {
                     if dish.quantity<20 {
@@ -107,7 +107,7 @@ state: Menu) Browser.HTMLElement {
 fn menu(state: Menu) Browser.HTMLElement {
     @wutu/\
     div {
-        <id = "menu";
+        id = "menu";
         display:grid;
         grid-template-columns:repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
         gap:1rem;
@@ -127,7 +127,7 @@ fn basket(state: Menu) Browser.HTMLElement {
     } sum;
     @wutu/\
     aside {
-        <id = "basket";
+        id = "basket";
         display:grid;
         gap:1.25rem;
         padding:1.75rem;
@@ -143,7 +143,7 @@ fn basket(state: Menu) Browser.HTMLElement {
             "Your order notes";
         }
         p.muted {
-            <role = "status";
+            role = "status";
             = number(count);
             = if count == 1 {
                 " item · a draft, not a placed order";
@@ -171,8 +171,8 @@ fn basket(state: Menu) Browser.HTMLElement {
                     gap:0.6rem;
                     align-items:center;
                     button {
-                        <id = $["minus-" + dish.id];
-                        <aria-label = $["Remove one " + dish.title];
+                        id = $["minus-" + dish.id];
+                        aria-label = $["Remove one " + dish.title];
                         "−";
                         on click {
                             dish.quantity -= 1;
@@ -189,9 +189,9 @@ fn basket(state: Menu) Browser.HTMLElement {
                         = number(dish.quantity);
                     }
                     button {
-                        <id = $["plus-" + dish.id];
-                        <disabled = $[dish.quantity >= 20];
-                        <aria-label = $["Add another " + dish.title];
+                        id = $["plus-" + dish.id];
+                        disabled = $[dish.quantity >= 20];
+                        aria-label = $["Add another " + dish.title];
                         "+";
                         on click {
                             if dish.quantity<20 {
@@ -217,7 +217,7 @@ fn basket(state: Menu) Browser.HTMLElement {
                 "Subtotal";
             }
             strong {
-                <id = "subtotal";
+                id = "subtotal";
                 = money(total);
             }
         }
@@ -227,7 +227,7 @@ fn basket(state: Menu) Browser.HTMLElement {
             "Tax and service are not included. Save your choices here and show them to your server. No payment is collected.";
         }
         button {
-            <disabled = $[count == 0];
+            disabled = $[count == 0];
             "Clear order notes";
             on click {
                 state.dishes each |dish| {
@@ -450,16 +450,16 @@ export main() void {
         gap:2.5rem;
         header.site-nav {
             a {
-                <href = "./";
+                href = "./";
                 "JUNIPER / KITCHEN & COFFEE";
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "All five sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "View Utu source ↗";
                 }
             }
@@ -496,7 +496,7 @@ export main() void {
                 }
             }
             div {
-                <aria-hidden = "true";
+                aria-hidden = "true";
                 aspect-ratio:1.2;
                 border-radius:50% 50% 1rem 1rem;
                 background:radial-gradient(circle at 50% 50%, var(--bg) 0 20%, var(--accent) 21% 24%, var(--panel) 25% 38%, var(--line) 39% 40%, transparent 41%), repeating-linear-gradient(45deg, var(--line) 0 1px, var(--bg) 1px 1.5rem);
@@ -529,7 +529,7 @@ export main() void {
                     label {
                         "Browse";
                         select as category {
-                            <aria-label = "Browse";
+                            aria-label = "Browse";
                             option {
                                 "All";
                             }
@@ -557,8 +557,8 @@ export main() void {
                 "Juniper is a fictional café. This is a working, local order notebook.";
             }
             p {
-                <id = "notice";
-                <role = "status";
+                id = "notice";
+                role = "status";
                 "Saved on this device. No account needed.";
             }
         }

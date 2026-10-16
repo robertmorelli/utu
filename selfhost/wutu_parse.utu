@@ -276,14 +276,28 @@ fn wp_keyword(text: Str, word: Str) Bool {
     text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()));
 }
 
-/// Whitespace, `# line` comments (after whitespace), and CSS comments.
+/// What a `# ` after code on its line says.
+fn trailing_hash_text() Str { "a # comment goes on a line of its own; at the end of a line, use /* … */"; }
+
+/// Whether only blanks precede offset p on its line.
+fn wp_line_start(text: Str, p: I32) Bool {
+    let i = p - 1;
+    while (i >= 0 and text.get(i) != 10) {
+        if text.get(i) != 32 and text.get(i) != 9 { return false; };
+        i -= 1;
+    };
+    true;
+}
+
+/// Whitespace, `# ` comment lines (a `#` first on its line, then a blank), and CSS comments.
 fn wp_trivia(text: Str) void {
     while (wp_at[0] < text.len()) {
         let p = wp_at[0];
         let c = text.get(p);
         if is_space_code(c) {
             wp_at[0] += 1;
-        } else if c == 35 and (p == 0 or is_space_code(text.get(p - 1))) {
+        } else if c == 35 and (p + 1 >= text.len() or is_space_code(text.get(p + 1))) {
+            if not wp_line_start(text, p) { wutu_fail(trailing_hash_text(), p); };
             wp_skip_line(text);
         } else if text_at(text, p, "/*") {
             let end = text_index(text, "*/", p + 2);
@@ -356,7 +370,14 @@ fn skip_dsl(text: Str, start: I32) I32 {
     let depth = 1;
     let j = i + 2;
     while (j < text.len() - 1) {
-        if text.get(j) == 47 and text.get(j + 1) == 92 {
+        if text.get(j) == 34 {
+            // A string is text (to its closing quote or its line).
+            j += 1;
+            while (j < text.len() and text.get(j) != 34 and text.get(j) != 10) {
+                j += if text.get(j) == 92 and j + 1 < text.len() and text.get(j + 1) != 10 { 2; } else { 1; };
+            };
+            if j >= text.len() or text.get(j) == 10 { j -= 1; };
+        } else if text.get(j) == 47 and text.get(j + 1) == 92 {
             depth += 1;
             j += 1;
         } else if text.get(j) == 92 and text.get(j + 1) == 47 {
@@ -488,6 +509,9 @@ fn wp_css_block(text: Str) Str {
             let c = text.get(wp_at[0]);
             if c == 34 or c == 39 { wp_quoted(text); }
             else {
+                if c == 35 and wp_at[0] + 1 < text.len() and (text.get(wp_at[0] + 1) == 32 or text.get(wp_at[0] + 1) == 9) and not wp_line_start(text, wp_at[0]) {
+                    wutu_fail(trailing_hash_text(), wp_at[0]);
+                };
                 if c == 123 { depth += 1; };
                 if c == 125 {
                     let before = trim_end(without_css_comments(text.slice(start - 1, wp_at[0])));
@@ -752,7 +776,20 @@ fn parse_telement(text: Str) I32 {
         parse_element_statement(text, n);
     };
     if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start); };
+    if tn_first[n] >= 0 and has_attribute_item(n, "data-wutu-unmanaged") {
+        wutu_fail("an @unmanaged " + tag + " has no children in its template: what is inside it is JavaScript's", start);
+    };
     n;
+}
+
+/// Whether element n has an attribute item named `name`.
+fn has_attribute_item(n: I32, name: Str) Bool {
+    let i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 1 and word_text(ti_a[i]) == name { return true; };
+        i = ti_next[i];
+    };
+    false;
 }
 
 fn add_child(n: I32, c: I32) void {
@@ -795,6 +832,9 @@ fn parse_element_statement(text: Str, n: I32) void {
         let a = q;
         while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
         let r = skip_spaces(text, q);
+        // `on name quiet { … }`: no render follows it (flag 4).
+        let quiet = text_at(text, r, "quiet") and r + 5 < text.len() and (is_space_code(text.get(r + 5)) or text.get(r + 5) == 123);
+        if quiet { r = skip_spaces(text, r + 5); };
         if q > a and r < text.len() and text.get(r) == 123 {
             let name = text.slice(a, q);
             wp_at[0] = r;
@@ -802,12 +842,33 @@ fn parse_element_statement(text: Str, n: I32) void {
             let from = wx_from[0];
             let to = wx_to[0];
             wp_semicolon(text);
-            add_item(n, 2, intern_text(name), intern_text(source), 1, from, to, p);
+            add_item(n, 2, intern_text(name), intern_text(source), 1 + (if quiet { 4; } else { 0; }), from, to, p);
             return;
         };
     };
-    if c == 60 or (c == 64 and event_head(text, p)) {
-        parse_attribute_or_event(text, n);
+    if c == 60 { wutu_fail(old_attribute_text(text, p), p); };
+    // `@unmanaged;`: the template makes the element; what JavaScript does to
+    // its children and its other attributes, renders leave alone.
+    if text_at(text, p, "@unmanaged") {
+        let r = skip_spaces(text, p + 10);
+        if r < text.len() and text.get(r) == 59 {
+            wp_at[0] = r + 1;
+            add_item(n, 1, intern_text("data-wutu-unmanaged"), intern_text("\"\""), 0, -1, -1, wp_at[0]);
+            return;
+        };
+    };
+    if c == 64 and event_head(text, p) {
+        wp_at[0] += 1;
+        parse_attribute_or_event(text, n, 2);
+        return;
+    };
+    if c == 46 and assignment_head(text, p + 1, false) {
+        wp_at[0] += 1;
+        parse_attribute_or_event(text, n, 1);
+        return;
+    };
+    if c >= 97 and c <= 122 and assignment_head(text, p, true) {
+        parse_attribute_or_event(text, n, 0);
         return;
     };
     if c == 58 or c == 64 or c == 38 {
@@ -827,13 +888,34 @@ fn event_head(text: Str, p: I32) Bool {
     q < text.len() and text.get(q) == 61;
 }
 
-/// `<name="value";` or `<name=$[e];` (an attribute; `<.name` a property), or
-/// `@event = handler;`.
-fn parse_attribute_or_event(text: Str, n: I32) void {
-    let is_event = text.get(wp_at[0]) == 64;
-    wp_at[0] += 1;
-    let is_property = not is_event and wp_char(text) == 46;
-    if is_property { wp_at[0] += 1; };
+/// A name at q, then `=` (not `==`), or `;` when `bare` (a boolean attribute).
+fn assignment_head(text: Str, q: I32, bare: Bool) Bool {
+    let a = q;
+    let i = q;
+    while (i < text.len() and is_name_code(text.get(i))) { i += 1; };
+    if i == a { return false; };
+    i = skip_spaces(text, i);
+    if i >= text.len() { return false; };
+    let c = text.get(i);
+    // (`name }` is an attribute without its semicolon, and says so.)
+    (c == 61 and not (i + 1 < text.len() and text.get(i + 1) == 61)) or (bare and (c == 59 or c == 125));
+}
+
+/// `<name = value;`, the spelling before attributes lost their `<`: the new one.
+fn old_attribute_text(text: Str, p: I32) Str {
+    let q = p + 1;
+    if q < text.len() and text.get(q) == 46 { q += 1; };
+    let a = q;
+    while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+    let spelled = if q > a { text.slice(p + 1, q); } else { "name"; };
+    "attributes are written without '<': " + spelled + " = value; (or " + spelled + "; for a boolean attribute)";
+}
+
+/// `name = value;` or `name;` (kind 0, an attribute), `.name = value;` (1, a
+/// property), or `@event = handler;` (2); the cursor is on the name.
+fn parse_attribute_or_event(text: Str, n: I32, kind: I32) void {
+    let is_event = kind == 2;
+    let is_property = kind == 1;
     let name_start = wp_at[0];
     let q = name_start;
     while (q < text.len() and is_name_code(text.get(q))) { q += 1; };

@@ -2,11 +2,25 @@
 // envelopes. Mirrors the external scanner; used by DSL expanders, formatters,
 // and editor projections that must find payloads without parsing Utu.
 
-/** Offset of the `\/` closing an envelope whose payload starts at `start`. */
+/** The offset just past the string whose `"` is at `i` (its line's end if it has no closing quote). */
+export function dslStringEnd(source, i) {
+  let j = i + 1;
+  while (j < source.length && source[j] !== '"' && source[j] !== '\n') j += source[j] === '\\' && source[j + 1] !== '\n' ? 2 : 1;
+  return source[j] === '"' ? j + 1 : j;
+}
+
+/**
+ * Offset of the `\/` closing an envelope whose payload starts at `start`.
+ * Nested pairs balance, and a double-quoted string is text: a `/\` or `\/`
+ * in one is not a delimiter. A string ends at its closing quote or its line,
+ * so a stray quote cannot hide the rest of the file.
+ */
 export function dslEnd(source, start) {
   let depth = 1;
   for (let i = start; i < source.length - 1; i++) {
-    if (source[i] === '/' && source[i + 1] === '\\') {
+    if (source[i] === '"') {
+      i = dslStringEnd(source, i) - 1;
+    } else if (source[i] === '/' && source[i + 1] === '\\') {
       depth++;
       i++;
     } else if (source[i] === '\\' && source[i + 1] === '/') {

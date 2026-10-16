@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 import {chromium} from 'playwright';
 const dir=await fs.mkdtemp(path.resolve('.wutu-preview-test-'));
 const entry=path.join(dir,'main.utu');
-const source=text=>`using Browser from std:Browser; export main() void {let app=@wutu/\\ @reactive; main {h1 {"${text}";} input {<aria-label="Draft";} } \\/;Browser.document.body.append(app);}`;
+const source=text=>`using Browser from std:Browser; export main() void {let app=@wutu/\\ @reactive; main {h1 {"${text}";} input {aria-label="Draft";} } \\/;Browser.document.body.append(app);}`;
 await fs.writeFile(entry,source('First build'));
 const child=spawn(process.execPath,['cli/wutu.mjs','dev',entry,'--out',path.join(dir,'output'),'--port','0'],{stdio:['ignore','pipe','pipe']});
 let log='';child.stdout.on('data',b=>log+=b);child.stderr.on('data',b=>log+=b);

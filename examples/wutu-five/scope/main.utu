@@ -103,7 +103,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
     } sum;
     @wutu/\
     section {
-        <id = "estimate";
+        id = "estimate";
         display:grid;
         gap:1.5rem;
         div {
@@ -122,7 +122,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     "ESTIMATED TOTAL";
                 }
                 strong {
-                    <id = "estimate-total";
+                    id = "estimate-total";
                     display:block;
                     padding-block-start:0.6rem;
                     font-size:clamp(1.3rem, 3vw, 2.5rem);
@@ -190,7 +190,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     display:flex;
                     gap:0.6rem;
                     button {
-                        <aria-label = $["Edit " + line.title];
+                        aria-label = $["Edit " + line.title];
                         "Edit";
                         on click {
                             state.edit = line.id;
@@ -201,7 +201,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                         };
                     }
                     button {
-                        <aria-label = $["Delete " + line.title];
+                        aria-label = $["Delete " + line.title];
                         "Delete";
                         on click {
                             state.lines = state.lines filter |l| {
@@ -224,8 +224,8 @@ fn estimate(state: Estimate) Browser.HTMLElement {
             }
         }
         a {
-            <href = $[csv(state)];
-            <download = "project-estimate.csv";
+            href = $[csv(state)];
+            download = "project-estimate.csv";
             justify-self:start;
             color:var(--accent);
             font-weight:700;
@@ -425,16 +425,16 @@ export main() void {
         gap:2.5rem;
         header.site-nav {
             a {
-                <href = "./";
+                href = "./";
                 "SCOPE / INDEPENDENT WORK, CLEARLY PRICED";
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "All five sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "View Utu source ↗";
                 }
             }
@@ -467,9 +467,9 @@ export main() void {
             max-inline-size:40rem;
             "Project name";
             input as project {
-                <id = "project";
-                <.value = $[state.project];
-                <maxlength = "160";
+                id = "project";
+                .value = $[state.project];
+                maxlength = "160";
                 on input {
                     state.project = project.value;
                     refresh(state);
@@ -505,39 +505,39 @@ export main() void {
                     label {
                         "Work description";
                         input as work {
-                            <id = "work";
-                            <required = "";
-                            <maxlength = "160";
-                            <placeholder = "e.g. Homepage design";
+                            id = "work";
+                            required = "";
+                            maxlength = "160";
+                            placeholder = "e.g. Homepage design";
                         }
                     }
                     label {
                         "Hours";
                         input as hours {
-                            <id = "hours";
-                            <type = "number";
-                            <required = "";
-                            <min = "0.25";
-                            <max = "1000";
-                            <step = "0.25";
-                            <value = "4";
+                            id = "hours";
+                            type = "number";
+                            required = "";
+                            min = "0.25";
+                            max = "1000";
+                            step = "0.25";
+                            value = "4";
                         }
                     }
                     label {
                         "Hourly rate ($)";
                         input as rate {
-                            <id = "rate";
-                            <type = "number";
-                            <required = "";
-                            <min = "1";
-                            <max = "10000";
-                            <step = "1";
-                            <value = "90";
+                            id = "rate";
+                            type = "number";
+                            required = "";
+                            min = "1";
+                            max = "10000";
+                            step = "1";
+                            value = "90";
                         }
                     }
                     button.primary {
-                        <id = "submit";
-                        <type = "submit";
+                        id = "submit";
+                        type = "submit";
                         = if state.edit == "" {
                             "Add work item";
                         }
@@ -546,7 +546,7 @@ export main() void {
                         };
                     }
                     button {
-                        <type = "button";
+                        type = "button";
                         "Cancel editing";
                         on click {
                             state.edit = "";
@@ -594,8 +594,8 @@ export main() void {
                 "Less spreadsheet wrestling. More time for the work.";
             }
             p {
-                <id = "notice";
-                <role = "status";
+                id = "notice";
+                role = "status";
                 "Saved on this device. No account needed.";
             }
         }

@@ -50,7 +50,7 @@ export main() void {
         label {
             "Search";
             input {
-                <type = "search";
+                type = "search";
                 bind:value = state.query;
                 on input {
                     state.changes += 1;
@@ -58,22 +58,22 @@ export main() void {
             }
         }
         p {
-            <id = "changes";
+            id = "changes";
             = state.changes.to_f64().toString();
         }
         label {
             "Budget";
             input {
-                <type = "number";
+                type = "number";
                 bind:number = state.budget;
             }
         }
         p {
-            <id = "budget";
+            id = "budget";
             = state.budget.toString();
         }
         p {
-            <id = "storage";
+            id = "storage";
             = wutu.storage_error();
         }
         ul {
@@ -83,13 +83,13 @@ export main() void {
                     = ui.badge(task.title);
                     label {
                         input {
-                            <type = "checkbox";
+                            type = "checkbox";
                             bind:checked = task.done;
                         }
                         = task.title;
                     }
                     button {
-                        <aria-label = $["Remove " + task.title];
+                        aria-label = $["Remove " + task.title];
                         "Remove";
                         on click {
                             state.tasks = state.tasks filter |item| {
@@ -105,12 +105,12 @@ export main() void {
             display:flex;
             gap:1rem;
             input as field {
-                <aria-label = "New task";
-                <required = "";
+                aria-label = "New task";
+                required = "";
                 bind:value = state.draft;
             }
             button {
-                <type = "submit";
+                type = "submit";
                 "Add task";
             }
             on submit {
@@ -128,7 +128,7 @@ export main() void {
         }
         section {
             input as field {
-                <aria-label = "Independent field";
+                aria-label = "Independent field";
             }
             button {
                 "Focus independent field";

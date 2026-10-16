@@ -243,11 +243,11 @@ export main() void {
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "More Wutu sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "Read the source ↗";
                 }
             }
@@ -281,7 +281,7 @@ export main() void {
                     "TOTAL SPENT";
                 }
                 strong {
-                    <id = "total";
+                    id = "total";
                     font-size:2.5rem;
                     = money(total(state));
                 }
@@ -332,7 +332,7 @@ export main() void {
                                 = money(expense.cents);
                             }
                             button {
-                                <aria-label = $["Remove " + expense.title];
+                                aria-label = $["Remove " + expense.title];
                                 "×";
                                 on click {
                                     state.expenses = state.expenses filter |item| {
@@ -358,20 +358,20 @@ export main() void {
                 label {
                     "What was it for?";
                     input as title {
-                        <required = "";
-                        <maxlength = "100";
-                        <placeholder = "Dinner on the last night";
+                        required = "";
+                        maxlength = "100";
+                        placeholder = "Dinner on the last night";
                         bind:value = state.draft;
                     }
                 }
                 label {
                     "Amount ($)";
                     input {
-                        <type = "number";
-                        <required = "";
-                        <min = "0.01";
-                        <max = "100000";
-                        <step = "0.01";
+                        type = "number";
+                        required = "";
+                        min = "0.01";
+                        max = "100000";
+                        step = "0.01";
                         bind:number = state.amount;
                     }
                 }
@@ -380,22 +380,22 @@ export main() void {
                     select {
                         bind:value = state.payer;
                         option {
-                            <value = "Ada";
+                            value = "Ada";
                             "Ada";
                         }
                         option {
-                            <value = "Ben";
+                            value = "Ben";
                             "Ben";
                         }
                         option {
-                            <value = "Cleo";
+                            value = "Cleo";
                             "Cleo";
                         }
                     }
                 }
                 button.primary {
-                    <type = "submit";
-                    <disabled = $[state.expenses.len() >= 100];
+                    type = "submit";
+                    disabled = $[state.expenses.len() >= 100];
                     "Add expense +";
                 }
                 p.muted {
@@ -422,7 +422,7 @@ export main() void {
                 "Built in Utu + Wutu. Data stays in this browser.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

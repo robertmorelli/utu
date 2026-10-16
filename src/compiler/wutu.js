@@ -59,11 +59,72 @@ const RUNTIME_HELPERS = {
   key: ['Str', 'void', '(k)=>globalThis.__utuWutu.pushKey(k)'],
   unkey: ['', 'void', '()=>globalThis.__utuWutu.popKey()'],
   mount: ['cl() Browser.HTMLElement, Str', 'Browser.HTMLElement', '(f,k)=>globalThis.__utuWutu.mount(f,k)'],
+  // `on mount { … }` in a static template: once, after the element is made.
+  mounted: ['Browser.Element, cl(Browser.Event) void', 'void', '(n,h)=>queueMicrotask(()=>h(new Event("mount")))'],
   style: ['Str', 'void', '(s)=>globalThis.__utuWutu.style(s)'],
 };
 
+// (A shared sheet joins the `wutu.document` layer, as the runtime's style() does.)
 const STATIC_STYLE_HELPER = ['Str', 'void',
-  "(s)=>{if([...document.querySelectorAll('style')].some(n=>n.textContent===s))return;const n=document.createElement('style');n.textContent=s;document.head.append(n);}"];
+  "(s)=>{const E=a=>{let q='',d=0;for(let j=a;j<s.length;j++){const c=s[j];if(q){if(c==='\\\\')j++;else if(c===q)q=''}else if(c==='\\x22'||c==='\\x27')q=c;else if(c==='(')d++;else if(c===')')d--;else if(c===';'&&d<=0)return j}return -1};let m='',r='',i=0;for(let a=s.indexOf('@import');a>=0;a=s.indexOf('@import',i)){const e=E(a);if(e<0)break;const u=s.slice(a,e);r+=s.slice(i,a);m+=u.includes('layer(')?u+';':u+' layer(wutu.document);';i=e+1}r+=s.slice(i);s=m+(r.trim()?'@layer wutu.document{'+r+'}':'');if([...document.querySelectorAll('style')].some(n=>n.textContent===s))return;const n=document.createElement('style');n.textContent=s;document.head.append(n);}"];
+
+/** CSS without its comment lines (a `#` first on its line, then a blank). */
+const withoutHashLines = (css) => css.replace(/^[ \t]*#[ \t][^\r\n]*/gm, '');
+
+/**
+ * Whether an `on` handler can only change its own elements: every statement
+ * assigns to a property of an `as` element (`overlay.scrollTop = …`) from
+ * those elements, `event`, and literals, and nothing is called. Such a
+ * handler is quiet: nothing a render reads changed, so none follows it.
+ * Anything else (a call, a closure, a local, a struct field) renders, as before.
+ */
+export function quietHandler(body, aliases) {
+  const code = body.trim().replace(/^\{|\}$/g, '').replace(/"(?:[^"\\\n]|\\.)*"/g, '""').replace(/\/\/[^\n]*/g, '');
+  if (/[(){}[\]]|\/\*/.test(code)) return false;
+  const statements = code.split(';').map(statement => statement.trim()).filter(Boolean);
+  if (!statements.length) return false;
+  const reads = new Set([...aliases, 'event', 'true', 'false', 'null', 'not', 'and', 'or']);
+  return statements.every(statement => {
+    const m = /^([a-z_]\w*)((?:\.\w+)+)\s*[-+*\/]?=(?!=)\s*(.+)$/s.exec(statement);
+    if (!m || !aliases.has(m[1])) return false;
+    // Every name the value reads is an element, `event`, or a literal word (a `.member` is not a name).
+    return [...m[3].matchAll(/(^|[^.\w])([A-Za-z_]\w*)/g)].every(read => reads.has(read[2]));
+  });
+}
+
+/**
+ * `@document` CSS in the `wutu.document` cascade layer, so a style written on
+ * an element (unlayered) wins over a document rule whatever their
+ * specificity. `@import`s cannot sit in a layer block: they go first, each
+ * importing into the layer.
+ */
+/** The `;` ending the CSS statement at `at`, outside strings and parentheses; -1 if none. */
+function cssStatementEnd(css, at) {
+  let quote = '', depth = 0;
+  for (let j = at; j < css.length; j++) {
+    const c = css[j];
+    if (quote) { if (c === '\\') j++; else if (c === quote) quote = ''; }
+    else if (c === '"' || c === "'") quote = c;
+    else if (c === '(') depth++;
+    else if (c === ')') depth--;
+    else if (c === ';' && depth <= 0) return j;
+  }
+  return -1;
+}
+
+export function layeredDocumentCss(css) {
+  let imports = '', rest = '', i = 0;
+  for (let at = css.indexOf('@import'); at >= 0; at = css.indexOf('@import', i)) {
+    const end = cssStatementEnd(css, at);
+    if (end < 0) break;
+    const rule = css.slice(at, end);
+    rest += css.slice(i, at);
+    imports += rule.includes('layer(') ? rule + ';' : rule + ' layer(wutu.document);';
+    i = end + 1;
+  }
+  rest += css.slice(i);
+  return imports + (rest.trim() ? `@layer wutu.document{${rest}}` : '');
+}
 
 /**
  * A JS string literal that is safe inside an `@es/\ ... \/` envelope: a
@@ -148,7 +209,7 @@ class SiteExpander {
   expand() {
     const template = parseWutu(this.body.startsWith('/\\') ? this.body.slice(2, -2) : this.body);
     this.prepare(template.root, null);
-    for (const css of template.global) this.styles.set(hash(css), css);
+    const documentCss = [...new Set(template.global)].join('');
 
     const code = [], events = [];
     const root = this.emitElement(template.root, code, events, false);
@@ -157,7 +218,7 @@ class SiteExpander {
       `${this.helper('style')}(${this.island(style.value, style.range, template.root)});`);
     // Each site owns its CSS import so ordinary reachability shaking removes
     // styles for unused components. The tiny host helper installs it once.
-    const css = [...this.styles.values()].join('').replace(/^[ \t]*#[ \t][^\r\n]*/gm, '');
+    const css = layeredDocumentCss(withoutHashLines(documentCss)) + withoutHashLines([...this.styles.values()].join(''));
     if (css) {
       const key = esString('wutu-' + hash(css));
       prelude.unshift(`let ${this.prefix}install_css: fun() void = @es/\\ () => { if (!document.getElementById(${key})) { const s=document.createElement('style'); s.id=${key}; s.textContent=${esString(css)}; document.head.append(s); } } \\/; ${this.prefix}install_css();`);
@@ -172,6 +233,11 @@ class SiteExpander {
     }
     const source = `{ ${this.reconcile ? 'wutu.init();' : ''} ${value}; }`;
     this.site.replaceWith(expressionFromSource(this.parser, source, this.site, this.splices, { createDocument: this.createDocument }));
+  }
+
+  /** The template's `as` names. */
+  aliasNames() {
+    return new Set(this.aliases.map(node => node.binding));
   }
 
   /** Link parents, number elements, and collect `as` aliases (pre-order). */
@@ -391,10 +457,14 @@ class SiteExpander {
       const listener = !event.shorthand ? handler : type && named
         ? `cl(__wutu_event) void { alt __wutu_event { Browser.${type} |event| => { ${prevent} ${handler}; }, ~> {}, }; }`
         : `cl(event) void { ${prevent} ${handler}; }`;
-      const name = JSON.stringify(event.name);
+      // A quiet listener (`~name`) renders nothing after it runs.
+      const quiet = event.shorthand && (event.quiet || quietHandler(event.handler, this.aliasNames()));
+      const name = JSON.stringify((quiet ? '~' : '') + event.name);
       events.push(this.reconcile
         ? `${this.helper('event')}(${id}, ${name}, (${listener}));`
-        : `${id}.addEventListener(${name}, (${listener}));`);
+        : event.name === 'mount'
+          ? `${this.helper('mounted')}(${id}, (${listener}));`
+          : `${id}.addEventListener(${JSON.stringify(event.name)}, (${listener}));`);
     }
     return id;
   }

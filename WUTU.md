@@ -42,20 +42,22 @@ brace-nested bodies. Looks as close to CSS as possible.
 
 ```
 div.card {
-  # comment — `#`, not `//`, so `url(http://…)` doesn't break the lexer
+  # A comment: `#` first on its line, then a space. Not `//`, so
+  # `url(http://…)` doesn't break the lexer. At a line's end, /* … */.
 
-  color: red;                    # CSS declaration
-  <href="/get-started"           # HTML attribute — sigil-marked
-  <title=$[tooltipText]          # attribute with interpolation
+  color: red;                    /* CSS declaration */
+  href = "/get-started";         /* HTML attribute: name = value */
+  title = $[tooltipText];        /* attribute with interpolation */
+  .value = $[draft];             /* DOM property: .name = value */
 
-  :hover { color: blue; }        # element-local pseudo-class
-  @media (width < 40rem) { … }   # nested at point of use
+  :hover { color: blue; }        /* element-local pseudo-class */
+  @media (width < 40rem) { … }   /* nested at point of use */
 
-  @ & > * { margin: 0; }         # scoped rule block — full selector power
-  @ { … }                        # shorthand: this subtree and down
+  @ & > * { margin: 0; }         /* scoped rule block, full selector power */
+  @ { … }                        /* shorthand: this subtree and down */
 
-  h2 { "Welcome" }               # child element, text node
-  p { $[ctaText] }               # child with interpolation
+  h2 { "Welcome"; }              /* child element, text node */
+  p { $[ctaText]; }              /* child with interpolation */
 }
 ```
 
@@ -76,7 +78,8 @@ So disambiguation is syntactic:
 | kind | form | notes |
 |---|---|---|
 | CSS declaration | `prop: value;` | bare — the common case, so unmarked |
-| HTML attribute | `<prop="value"` | sigil-marked; sigil TBD if `<` fights tooling |
+| HTML attribute | `prop = "value";` | `=` where CSS has `:`; a bare `prop;` is a boolean attribute |
+| DOM property | `.prop = value;` | a leading `.` (an element head always starts with its tag) |
 | child element | `tag { … }` | nesting |
 | text / interpolation | `"literal"` / `$[expr]` | |
 | event handler | **[open]** | must take a typed `cl`, not a string |

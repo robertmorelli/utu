@@ -20,19 +20,19 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
         label {
             "Purchase";
             input {
-                <required = "";
+                required = "";
                 bind:value = draft.title;
             }
         }
         label {
             "Amount ($)";
             input {
-                <inputmode = "decimal";
+                inputmode = "decimal";
                 bind:value = amount.text;
             }
         }
         p {
-            <role = "status";
+            role = "status";
             = if amount.text.len()>0 {
                 amount.error(0.01,10000.0);
             }
@@ -41,7 +41,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
             };
         }
         button.primary {
-            <type = "submit";
+            type = "submit";
             "Record purchase";
         }
         on submit {
@@ -95,7 +95,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
                         = wutu.money(purchase.cents);
                     }
                     button {
-                        <aria-label = $["Remove "+purchase.title];
+                        aria-label = $["Remove "+purchase.title];
                         "Remove";
                         on click {
                             state.purchases=purchases.remove_at(state.purchases, index.to_i64().to_i32());
@@ -126,17 +126,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "ledger";
+        data-theme = "ledger";
         nav {
             strong {
                 "LEDGER / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -157,7 +157,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

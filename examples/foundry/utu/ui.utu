@@ -175,7 +175,7 @@ mod ui {
     fn bar(value: I32, max: I32, kind: Str) Browser.HTMLElement {
         @wutu/\
         div.bar {
-            <class = kind;
+            class = kind;
             i {
                 width: $[percent(value, max)];
             }
@@ -208,7 +208,7 @@ mod ui {
     fn slot(ui: Ui, item: I32, count: I32) Browser.HTMLElement {
         @wutu/\
         div.slot {
-            <title = item_name(ui, item);
+            title = item_name(ui, item);
             if $[item >= 0] {
                 span.dot {
                     background: $[ui.item_colors[item]];
@@ -261,7 +261,7 @@ mod ui {
     fn fluid_gauge(ui: Ui, item: I32, amount: I32, max: I32) Browser.HTMLElement {
         @wutu/\
         div {
-            <title = item_name(ui, item) + ": " + amount.to_str();
+            title = item_name(ui, item) + ": " + amount.to_str();
             div.gauge {
                 i {
                     height: $[percent(amount, max)];
@@ -293,10 +293,10 @@ mod ui {
                 b { = clock(ui.w.tick); }
             }
             div.hud-group {
-                <title = $["Supply " + ui.w.supply.to_str() + " / demand " + ui.w.demand.to_str()];
+                title = $["Supply " + ui.w.supply.to_str() + " / demand " + ui.w.demand.to_str()];
                 span.muted { "Power"; }
                 div.meter {
-                    <class = if ui.w.satisfaction < 500 { "low"; } else { ""; };
+                    class = if ui.w.satisfaction < 500 { "low"; } else { ""; };
                     i {
                         width: $[percent(ui.w.satisfaction, 1000)];
                     }
@@ -313,7 +313,7 @@ mod ui {
             }
             for $[[5, 6, 7, 9, 11, 13, 17, 18]] |item| key $[item.to_str()] {
                 div.counter {
-                    <title = item_name(ui, item) + " per minute";
+                    title = item_name(ui, item) + " per minute";
                     b { = per_minute(ui, item).to_str(); }
                     small { = item_name(ui, item); }
                 }
@@ -321,7 +321,7 @@ mod ui {
             div.hud-group {
                 for $[[0, 1, 2, 4]] |s| key $[s.to_str()] {
                     button {
-                        <class = if ui.speed == s { "active"; } else { ""; };
+                        class = if ui.speed == s { "active"; } else { ""; };
                         = if s == 0 { "❚❚"; } else { s.to_str() + "×"; };
                         on click {
                             ui.speed = s;
@@ -332,7 +332,7 @@ mod ui {
             div.hud-group {
                 for $[["research", "production", "power", "saves"]] |name| key $[name] {
                     button {
-                        <class = if is_open(ui, name) { "active"; } else { ""; };
+                        class = if is_open(ui, name) { "active"; } else { ""; };
                         = window_title(name);
                         on click {
                             toggle_window(ui, name);
@@ -364,7 +364,7 @@ mod ui {
             div.tabs {
                 for $[categories()] |name, index| key $[name] {
                     button {
-                        <class = if ui.tab == index.to_i32() { "active"; } else { ""; };
+                        class = if ui.tab == index.to_i32() { "active"; } else { ""; };
                         = name;
                         on click {
                             ui.tab = index.to_i32();
@@ -375,9 +375,9 @@ mod ui {
             div.machines {
                 for $[(0..<ui.w.game.machines.len()) filter |m| { ui.w.game.machines[m].category == categories()[ui.tab]; }] |m| key $[m.to_str()] {
                     button.machine-btn {
-                        <class = if ui.tool == m { "active"; } else { ""; };
-                        <disabled = ui.w.machine_unlocked[m] == 0;
-                        <title = ui.w.game.machines[m].label + " · speed " + ui.w.game.machines[m].speed.to_str() + " · power " + ui.w.game.machines[m].power.to_str();
+                        class = if ui.tool == m { "active"; } else { ""; };
+                        disabled = ui.w.machine_unlocked[m] == 0;
+                        title = ui.w.game.machines[m].label + " · speed " + ui.w.game.machines[m].speed.to_str() + " · power " + ui.w.game.machines[m].power.to_str();
                         span.glyph {
                             background: $[ui.colors[m]];
                             = ui.glyphs[m];
@@ -391,22 +391,22 @@ mod ui {
             }
             div.tools {
                 button {
-                    <title = "Rotate (R)";
+                    title = "Rotate (R)";
                     = "Facing " + ["N", "E", "S", "W"][ui.dir];
                     on click {
                         ui.dir = (ui.dir + 1) % 4;
                     };
                 }
                 button {
-                    <class = if ui.tool == tool_remove { "active"; } else { ""; };
-                    <title = "Remove (X)";
+                    class = if ui.tool == tool_remove { "active"; } else { ""; };
+                    title = "Remove (X)";
                     "Remove";
                     on click {
                         ui.tool = if ui.tool == tool_remove { tool_none; } else { tool_remove; };
                     };
                 }
                 button {
-                    <title = "Clear tool (Esc)";
+                    title = "Clear tool (Esc)";
                     "Select";
                     on click {
                         ui.tool = tool_none;
@@ -462,7 +462,7 @@ mod ui {
     fn machine_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         @wutu/\
         section.panel {
-            <class = if e.id == ui.selected { "selected"; } else { ""; };
+            class = if e.id == ui.selected { "selected"; } else { ""; };
             div.panel-head {
                 span.glyph {
                     background: $[ui.colors[e.machine]];
@@ -471,22 +471,22 @@ mod ui {
                 h3 { = ui.w.game.machines[e.machine].label; }
                 small.muted { = "#" + e.id.to_str() + " (" + e.x.to_str() + ", " + e.y.to_str() + ") " + ["N", "E", "S", "W"][e.dir]; }
                 button {
-                    <title = "Rotate";
+                    title = "Rotate";
                     "↻";
                     on click {
                         sim.rotate(e);
                     };
                 }
                 button {
-                    <title = if is_pinned(ui, e.id) { "Unpin"; } else { "Pin"; };
-                    <class = if is_pinned(ui, e.id) { "active"; } else { ""; };
+                    title = if is_pinned(ui, e.id) { "Unpin"; } else { "Pin"; };
+                    class = if is_pinned(ui, e.id) { "active"; } else { ""; };
                     "📌";
                     on click {
                         toggle_pin(ui, e.id);
                     };
                 }
                 button {
-                    <title = "Remove";
+                    title = "Remove";
                     "✕";
                     on click {
                         sim.remove(ui.w, e.x, e.y);
@@ -642,7 +642,7 @@ mod ui {
         div {
             div.row {
                 span.flame {
-                    <class = if e.burn > 0 or (e.busy and not ui.w.burner[e.machine]) { "on"; } else { ""; };
+                    class = if e.burn > 0 or (e.busy and not ui.w.burner[e.machine]) { "on"; } else { ""; };
                 }
                 span { = recipe_name(ui, e.recipe); }
             }
@@ -734,21 +734,21 @@ mod ui {
         let fraction = if time <= 0 { 0.0; } else { e.progress.to_f64() / (time * 1000).to_f64(); };
         @wutu/\
         svg {
-            <viewBox = "0 0 40 40";
+            viewBox = "0 0 40 40";
             width: 40px;
             height: 40px;
             circle {
-                <cx = "20";
-                <cy = "20";
-                <r = "16";
+                cx = "20";
+                cy = "20";
+                r = "16";
                 fill: none;
                 stroke: #2f3843;
                 stroke-width: 5;
             }
             circle {
-                <cx = "20";
-                <cy = "20";
-                <r = "16";
+                cx = "20";
+                cy = "20";
+                r = "16";
                 fill: none;
                 stroke: #f0a73a;
                 stroke-width: 5;
@@ -774,7 +774,7 @@ mod ui {
             div.recipe-grid {
                 for $[allowed_recipes(ui, e)] |r| key $[r.to_str()] {
                     button {
-                        <class = if e.recipe == r { "active"; } else { ""; };
+                        class = if e.recipe == r { "active"; } else { ""; };
                         = ui.w.game.recipes[r].name;
                         on click {
                             sim.set_recipe(ui.w, e, r);
@@ -798,15 +798,15 @@ mod ui {
         @wutu/\
         div {
             select as pick {
-                <aria-label = "Recipe";
+                aria-label = "Recipe";
                 option {
-                    <value = "-1";
+                    value = "-1";
                     "Choose a recipe";
                 }
                 for $[allowed_recipes(ui, e)] |r| key $[r.to_str()] {
                     option {
-                        <value = r.to_str();
-                        <selected = e.recipe == r;
+                        value = r.to_str();
+                        selected = e.recipe == r;
                         = ui.w.game.recipes[r].name;
                     }
                 }
@@ -826,9 +826,9 @@ mod ui {
         @wutu/\
         div {
             input as query {
-                <type = "search";
-                <placeholder = "Search recipes";
-                <value = ui.search;
+                type = "search";
+                placeholder = "Search recipes";
+                value = ui.search;
                 on input {
                     ui.search = query.value;
                 };
@@ -836,7 +836,7 @@ mod ui {
             div.recipe-grid {
                 for $[allowed_recipes(ui, e) filter |r| { ui.search.len() == 0 or ui.w.game.recipes[r].name.includes(ui.search); }] |r| key $[r.to_str()] {
                     button {
-                        <class = if e.recipe == r { "active"; } else { ""; };
+                        class = if e.recipe == r { "active"; } else { ""; };
                         = ui.w.game.recipes[r].name;
                         on click {
                             sim.set_recipe(ui.w, e, r);
@@ -871,15 +871,15 @@ mod ui {
         @wutu/\
         div {
             select as pick {
-                <aria-label = "Recipe";
+                aria-label = "Recipe";
                 option {
-                    <value = "-1";
+                    value = "-1";
                     "Choose a recipe";
                 }
                 for $[allowed_recipes(ui, e)] |r| key $[r.to_str()] {
                     option {
-                        <value = r.to_str();
-                        <selected = e.recipe == r;
+                        value = r.to_str();
+                        selected = e.recipe == r;
                         = ui.w.game.recipes[r].name;
                     }
                 }
@@ -932,7 +932,7 @@ mod ui {
         div.items {
             for $[(0..<(e.belt_n / 2))] |k| key $[k.to_str()] {
                 span {
-                    <title = item_name(ui, e.belt[k * 2]);
+                    title = item_name(ui, e.belt[k * 2]);
                     span.dot {
                         background: $[ui.item_colors[e.belt[k * 2]]];
                     }
@@ -979,7 +979,7 @@ mod ui {
             div.row {
                 for $[(0..<3)] |p| key $[p.to_str()] {
                     button {
-                        <class = if e.priority == p { "active"; } else { ""; };
+                        class = if e.priority == p { "active"; } else { ""; };
                         = ["Alternate", "Front", "Side"][p];
                         on click {
                             e.priority = p;
@@ -988,15 +988,15 @@ mod ui {
                 }
             }
             select as pick {
-                <aria-label = "Filter";
+                aria-label = "Filter";
                 option {
-                    <value = "-1";
+                    value = "-1";
                     "No filter";
                 }
                 for $[(0..<22)] |i| key $[i.to_str()] {
                     option {
-                        <value = i.to_str();
-                        <selected = e.pick == i;
+                        value = i.to_str();
+                        selected = e.pick == i;
                         = item_name(ui, i);
                     }
                 }
@@ -1030,14 +1030,14 @@ mod ui {
         div {
             div.row {
                 button {
-                    <class = if e.role == 0 { "active"; } else { ""; };
+                    class = if e.role == 0 { "active"; } else { ""; };
                     "Entrance";
                     on click {
                         e.role = 0;
                     };
                 }
                 button {
-                    <class = if e.role == 1 { "active"; } else { ""; };
+                    class = if e.role == 1 { "active"; } else { ""; };
                     "Exit";
                     on click {
                         e.role = 1;
@@ -1114,7 +1114,7 @@ mod ui {
             div.reach {
                 for $[(0..<5)] |k| key $[k.to_str()] {
                     div {
-                        <class = if k == 0 { "src"; } else { if k == 2 { "me"; } else { if k == 4 { "dst"; } else { ""; }; }; };
+                        class = if k == 0 { "src"; } else { if k == 2 { "me"; } else { if k == 4 { "dst"; } else { ""; }; }; };
                     }
                 }
             }
@@ -1143,8 +1143,8 @@ mod ui {
             div.items {
                 for $[(0..<22)] |i| key $[i.to_str()] {
                     button {
-                        <class = if e.pick == i { "active"; } else { ""; };
-                        <title = item_name(ui, i);
+                        class = if e.pick == i { "active"; } else { ""; };
+                        title = item_name(ui, i);
                         span.dot {
                             background: $[ui.item_colors[i]];
                         }
@@ -1167,10 +1167,10 @@ mod ui {
             label.row {
                 span.muted { = "Stack size " + e.stack.to_str(); }
                 input as size {
-                    <type = "range";
-                    <min = "1";
-                    <max = "4";
-                    <value = e.stack.to_str();
+                    type = "range";
+                    min = "1";
+                    max = "4";
+                    value = e.stack.to_str();
                     on input {
                         e.stack = sim.imax(1, sim.imin(4, Browser.parseInt(size.value, 10).to_i32()));
                     };
@@ -1272,19 +1272,19 @@ mod ui {
         @wutu/\
         div {
             svg {
-                <viewBox = "0 0 100 50";
+                viewBox = "0 0 100 50";
                 width: 100%;
                 height: 60px;
                 path {
-                    <d = "M 5 48 A 45 45 0 0 1 95 48";
+                    d = "M 5 48 A 45 45 0 0 1 95 48";
                     fill: none;
                     stroke: #2f3843;
                     stroke-width: 2;
                 }
                 circle {
-                    <cx = (50.0 - 45.0 * Browser.Math.cos(angle)).toFixed(1);
-                    <cy = (48.0 - 45.0 * Browser.Math.sin(angle)).toFixed(1);
-                    <r = "5";
+                    cx = (50.0 - 45.0 * Browser.Math.cos(angle)).toFixed(1);
+                    cy = (48.0 - 45.0 * Browser.Math.sin(angle)).toFixed(1);
+                    r = "5";
                     fill: $[if ui.w.light > 0 { "#ffd54a"; } else { "#55606e"; }];
                 }
             }
@@ -1358,11 +1358,11 @@ mod ui {
         div {
             div.row {
                 select as item {
-                    <aria-label = "Item";
+                    aria-label = "Item";
                     for $[(0..<22)] |i| key $[i.to_str()] {
                         option {
-                            <value = i.to_str();
-                            <selected = e.cond_item == i;
+                            value = i.to_str();
+                            selected = e.cond_item == i;
                             = item_name(ui, i);
                         }
                     }
@@ -1371,11 +1371,11 @@ mod ui {
                     };
                 }
                 select as op {
-                    <aria-label = "Operator";
+                    aria-label = "Operator";
                     for $[(0..<3)] |o| key $[o.to_str()] {
                         option {
-                            <value = o.to_str();
-                            <selected = e.cond_op == o;
+                            value = o.to_str();
+                            selected = e.cond_op == o;
                             = [">", "<", "="][o];
                         }
                     }
@@ -1384,9 +1384,9 @@ mod ui {
                     };
                 }
                 input as amount {
-                    <type = "number";
-                    <aria-label = "Value";
-                    <value = e.cond_value.to_str();
+                    type = "number";
+                    aria-label = "Value";
+                    value = e.cond_value.to_str();
                     width: 70px;
                     on change {
                         e.cond_value = Browser.parseInt(amount.value, 10).to_i32();
@@ -1403,7 +1403,7 @@ mod ui {
         @wutu/\
         div {
             div.lamp {
-                <class = if e.signal { "on"; } else { ""; };
+                class = if e.signal { "on"; } else { ""; };
             }
             = row("Controlled by", if (0..<4) any |side| { connected_combinator(ui, e, side); } { "combinator"; } else { "nothing"; });
         }
@@ -1428,7 +1428,7 @@ mod ui {
                 = slot(ui, 16, e.inv[16]);
             }
             button {
-                <disabled = e.held < 20;
+                disabled = e.held < 20;
                 "Launch";
                 on click {
                     sim.launch(e);
@@ -1448,7 +1448,7 @@ mod ui {
             div.alerts {
                 for $[ui.alerts] |a, index| key $[a.text + index.to_str()] {
                     div.alert {
-                        <class = a.kind;
+                        class = a.kind;
                         = a.text;
                     }
                 }
@@ -1458,8 +1458,8 @@ mod ui {
             }
             div.minimap {
                 canvas#minimap {
-                    <width = ui.w.width.to_str();
-                    <height = ui.w.height.to_str();
+                    width = ui.w.width.to_str();
+                    height = ui.w.height.to_str();
                 }
             }
             div.tileinfo {
@@ -1561,8 +1561,8 @@ mod ui {
         div.techs {
             for $[(0..<ui.w.game.techs.len())] |t| key $[t.to_str()] {
                 button.tech {
-                    <class = tech_state(ui, t);
-                    <disabled = tech_state(ui, t) != "available";
+                    class = tech_state(ui, t);
+                    disabled = tech_state(ui, t) != "available";
                     b { = ui.w.game.techs[t].label; }
                     small.muted { = ui.w.game.techs[t].units.to_str() + " × " + (ui.w.game.techs[t].packs sum).to_str() + " packs"; }
                     small { = unlocks(ui, t); }
@@ -1594,14 +1594,14 @@ mod ui {
         div {
             div.row {
                 button {
-                    <class = if ui.range10 { ""; } else { "active"; };
+                    class = if ui.range10 { ""; } else { "active"; };
                     "1 min";
                     on click {
                         ui.range10 = false;
                     };
                 }
                 button {
-                    <class = if ui.range10 { "active"; } else { ""; };
+                    class = if ui.range10 { "active"; } else { ""; };
                     "10 min";
                     on click {
                         ui.range10 = true;
@@ -1620,10 +1620,10 @@ mod ui {
                         td.num { = per_minute(ui, i).to_str() + " / min"; }
                         td {
                             svg.spark {
-                                <viewBox = "0 0 60 22";
-                                <preserveAspectRatio = "none";
+                                viewBox = "0 0 60 22";
+                                preserveAspectRatio = "none";
                                 path {
-                                    <d = spark_path(ui, i);
+                                    d = spark_path(ui, i);
                                 }
                             }
                         }
@@ -1661,13 +1661,13 @@ mod ui {
             = row("Satisfaction", (ui.w.satisfaction / 10).to_str() + "%");
             = row("Supply / demand", ui.w.supply.to_str() + " / " + ui.w.demand.to_str() + " kW");
             svg.graph {
-                <viewBox = "0 0 600 120";
-                <preserveAspectRatio = "none";
+                viewBox = "0 0 600 120";
+                preserveAspectRatio = "none";
                 path.supply {
-                    <d = graph_path(ui.supply, ui.samples, high);
+                    d = graph_path(ui.supply, ui.samples, high);
                 }
                 path.demand {
-                    <d = graph_path(ui.demand, ui.samples, high);
+                    d = graph_path(ui.demand, ui.samples, high);
                 }
             }
             table {
@@ -1748,8 +1748,8 @@ mod ui {
                 }
             }
             textarea as box {
-                <aria-label = "Save JSON";
-                <.value = ui.text;
+                aria-label = "Save JSON";
+                .value = ui.text;
                 on input {
                     ui.text = box.value;
                 };

@@ -515,14 +515,21 @@ fn tokens_end(t: I32) I32 {
     t;
 }
 
-/// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs balanced, or -1.
+/// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs
+/// balanced, or -1. A double-quoted string is text: it ends at its closing
+/// quote or its line.
 fn dsl_end(i: I32, n: I32) I32 {
     let j = i + 2;
     let depth = 1;
     while (j < n) {
         let c = src[j];
         j += 1;
-        if c == 47 and src[j] == 92 {
+        if c == 34 {
+            while (j < n and src[j] != 34 and src[j] != 10) {
+                j += if src[j] == 92 and j + 1 < n and src[j + 1] != 10 { 2; } else { 1; };
+            };
+            if j < n and src[j] == 34 { j += 1; };
+        } else if c == 47 and src[j] == 92 {
             depth += 1;
             j += 1;
         } else if c == 92 and src[j] == 47 {

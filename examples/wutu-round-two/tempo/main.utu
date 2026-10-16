@@ -37,7 +37,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 };
             }
             strong {
-                <id = "clock";
+                id = "clock";
                 font-size:clamp(5rem,15vw,10rem);
                 line-height:1.1;
                 = wutu.number(state.remaining);
@@ -46,8 +46,8 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 "seconds remaining";
             }
             progress {
-                <max = $[wutu.number(state.duration)];
-                <value = $[wutu.number(state.duration-state.remaining)];
+                max = $[wutu.number(state.duration)];
+                value = $[wutu.number(state.duration-state.remaining)];
             }
             div.bar {
                 justify-content:center;
@@ -79,7 +79,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 = "Interval length: "+wutu.number(state.duration)+" seconds";
             }
             button {
-                <disabled = $[state.duration<=15];
+                disabled = $[state.duration<=15];
                 "− 15 seconds";
                 on click {
                     state.duration-=15;
@@ -89,7 +89,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 };
             }
             button {
-                <disabled = $[state.duration>=3600];
+                disabled = $[state.duration>=3600];
                 "+ 15 seconds";
                 on click {
                     state.duration+=15;
@@ -100,7 +100,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
             }
         }
         a {
-            <href = "#/about";
+            href = "#/about";
             "About this timer";
         }
     }
@@ -119,17 +119,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "tempo";
+        data-theme = "tempo";
         nav {
             strong {
                 "TEMPO / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -153,7 +153,7 @@ export main() void {
                     "The timer pauses when you leave its view. It runs locally and does not need an account.";
                 }
                 a {
-                    <href = "#/";
+                    href = "#/";
                     "Back to timer";
                 }
             }
@@ -166,7 +166,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

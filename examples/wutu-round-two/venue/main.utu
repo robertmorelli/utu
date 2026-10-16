@@ -27,8 +27,8 @@ fn workspace(state: VenueState) Browser.HTMLElement {
                 gap:0.6rem;
                 for $[state.seats] |seat| key $[seat.name] {
                     button {
-                        <aria-label = $["Seat "+seat.name];
-                        <aria-pressed = $[if seat.selected {"true";} else {"false";}];
+                        aria-label = $["Seat "+seat.name];
+                        aria-pressed = $[if seat.selected {"true";} else {"false";}];
                         = seat.name;
                         on click {
                             seat.selected=not seat.selected;
@@ -141,17 +141,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "venue";
+        data-theme = "venue";
         nav {
             strong {
                 "VENUE / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -172,7 +172,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

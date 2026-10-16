@@ -148,7 +148,8 @@ class WutuParser {
       const c = text[this.p];
       if (/\s/.test(c)) {
         this.p++;
-      } else if (c === '#' && (this.p === 0 || /\s/.test(text[this.p - 1]))) {
+      } else if (c === '#' && /[ \t\r\n]/.test(text[this.p + 1] ?? '\n')) {
+        if (!this.lineStart(this.p)) this.fail(TRAILING_HASH);
         this.skipLine();
       } else if (this.at('/*')) {
         const end = text.indexOf('*/', this.p + 2);
@@ -158,6 +159,12 @@ class WutuParser {
         return;
       }
     }
+  }
+
+  /** Whether only blanks precede offset `p` on its line. */
+  lineStart(p) {
+    for (let i = p - 1; i >= 0 && this.text[i] !== '\n'; i--) if (this.text[i] !== ' ' && this.text[i] !== '\t') return false;
+    return true;
   }
 
   skipLine() {
@@ -306,6 +313,7 @@ class WutuParser {
       }
       const c = this.text[this.p];
       if (c === '"' || c === "'") { this.readQuoted(); continue; }
+      if (c === '#' && /[ \t]/.test(this.text[this.p + 1] ?? '') && !this.lineStart(this.p)) this.fail(TRAILING_HASH);
       if (c === '{') depth++;
       if (c === '}') {
         const before = this.text.slice(start - 1, this.p).replace(/\/\*[\s\S]*?\*\//g, '').trimEnd();
@@ -483,6 +491,7 @@ class WutuParser {
       this.parseElementStatement(node);
     }
     if (VOID_TAGS.has(tag) && node.children.length) this.fail(`${tag} cannot have children`, start);
+    if (node.unmanaged && node.children.length) this.fail(`an @unmanaged ${tag} has no children in its template: what is inside it is JavaScript's`, start);
     return node;
   }
 
@@ -500,13 +509,27 @@ class WutuParser {
       const { source, range } = this.readBareExpression();
       this.expectSemicolon();
       node.twoWay.push({ property: match[1], value: source, range, start });
-    } else if ((match = this.peek(/on\s+([\w-]+)\s*(?=\{)/y))) {
+    } else if ((match = this.peek(/on\s+([\w-]+)(\s+quiet)?\s*(?=\{)/y))) {
       this.p += match[0].length;
       const { source, range } = this.readUtuBlock();
       this.expectSemicolon();
-      node.events.push({ name: match[1], handler: source, range, shorthand: true });
-    } else if (c === '<' || this.peek(/@[\w-]+\s*=/y)) {
-      this.parseAttributeOrEvent(node);
+      node.events.push({ name: match[1], handler: source, range, shorthand: true, quiet: !!match[2] });
+    } else if (this.peek(/@unmanaged\s*;/y)) {
+      // The template makes the element; what JavaScript does to its children
+      // and its other attributes, renders leave alone.
+      this.p = this.text.indexOf(';', this.p) + 1;
+      node.unmanaged = true;
+      node.attrs.push({ name: 'data-wutu-unmanaged', value: '""', property: false, dynamic: false, wrapped: false, range: null, start: this.p });
+    } else if (c === '<') {
+      this.failOldAttribute();
+    } else if (this.peek(/@[\w-]+\s*=/y)) {
+      this.p++;
+      this.parseAttributeOrEvent(node, 'event');
+    } else if (this.peek(/\.[\w-]+\s*=(?!=)/y)) {
+      this.p++;
+      this.parseAttributeOrEvent(node, 'property');
+    } else if (this.peek(/[a-z][\w-]*\s*(?:=(?!=)|;|\})/y)) {
+      this.parseAttributeOrEvent(node, 'attribute');
     } else if (c === ':' || c === '@' || c === '&') {
       this.parseCssRule(node);
     } else {
@@ -514,10 +537,16 @@ class WutuParser {
     }
   }
 
-  parseAttributeOrEvent(node) {
-    const isEvent = this.text[this.p++] === '@';
-    const isProperty = !isEvent && this.text[this.p] === '.';
-    if (isProperty) this.p++;
+  /** `<name = value;`, the spelling before attributes lost their `<`: say the new one. */
+  failOldAttribute() {
+    const old = this.peek(/<(\.?)([\w-]+)/y);
+    const spelled = old ? `${old[1]}${old[2]}` : 'name';
+    this.fail(`attributes are written without '<': ${spelled} = value; (or ${spelled}; for a boolean attribute)`);
+  }
+
+  /** `name = value;` / `name;` (an attribute), `.name = value;` (a property), `@event = handler;`; the cursor is on the name. */
+  parseAttributeOrEvent(node, kind) {
+    const isEvent = kind === 'event', isProperty = kind === 'property';
     const nameStart = this.p;
     const nameMatch = this.peek(/[\w-]+/y);
     if (!nameMatch) this.fail('expected attribute/event name');
@@ -525,7 +554,7 @@ class WutuParser {
     this.p += name.length;
     this.skipTrivia();
 
-    let value = '""', dynamic = false, range = null;
+    let value = '""', dynamic = false, range = null, wrapped = false;
     if (this.text[this.p] === '=') {
       this.p++;
       this.skipTrivia();
@@ -540,7 +569,8 @@ class WutuParser {
         }
         this.p = valueEnd;
       } else {
-        const expression = this.at('$[') ? this.readInterpolation() : this.readBareExpression();
+        wrapped = this.at('$[');
+        const expression = wrapped ? this.readInterpolation() : this.readBareExpression();
         dynamic = true;
         value = expression.source;
         range = expression.range;
@@ -557,7 +587,7 @@ class WutuParser {
     }
     if (name.startsWith('on')) this.fail('use @event=$[closure] for events', nameStart);
     if (!isProperty && !isAllowedAttribute(node.tag, name)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
-    node.attrs.push({ name, value, property: isProperty, dynamic, range, start: nameStart });
+    node.attrs.push({ name, value, property: isProperty, dynamic, wrapped, range, start: nameStart });
   }
 
   /** Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules. */
@@ -601,6 +631,8 @@ class WutuParser {
     node.css.push({ source: declaration, css: declaration });
   }
 }
+
+const TRAILING_HASH = 'a # comment goes on a line of its own; at the end of a line, use /* … */';
 
 function scopedSelector(selector) {
   if (selector === '@') return '&, & *';

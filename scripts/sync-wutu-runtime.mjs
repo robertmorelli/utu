@@ -36,6 +36,20 @@ mod wutu {
         let call: fun(cl() void) void = @es/\\ (callback)=>globalThis.__utuWutu?.cleanup(callback) \\/;
         call(callback);
     }
+    /// A page compiled on its own and loaded the first time it is shown:
+    /// \`wutu build\` makes a chunk of each file named here (its module's
+    /// \`page()\`). This is its placeholder element, which the chunk fills.
+    fn lazy(path: Str) Externref {
+        init();
+        let load: fun(Str) Externref = @es/\\ (path)=>globalThis.__utuWutu.lazy(path) \\/;
+        load(path);
+    }
+    /// A chunk's page, into the placeholder \`lazy(path)\` made.
+    fn deliver(path: Str, page: Externref) void {
+        init();
+        let give: fun(Str, Externref) void = @es/\\ (path,page)=>globalThis.__utuWutu.deliver(path,page) \\/;
+        give(path, page);
+    }
     fn route() Str {
         let call: fun() Str = @es/\\ ()=>location.hash.slice(1)||"/" \\/;
         call();

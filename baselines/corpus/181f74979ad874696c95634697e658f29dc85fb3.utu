@@ -1,2 +1,2 @@
 using Browser from std:Browser;
-export main() Browser.HTMLElement { @wutu/\ div { p { <hreff = "/"; } } \/; }
+export main() Browser.HTMLElement { @wutu/\ div { p { hreff = "/"; } } \/; }

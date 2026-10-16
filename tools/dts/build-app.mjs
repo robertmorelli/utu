@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+import os from 'node:os';
 import { build } from 'esbuild';
 import { initParser, createCompiler, emitBinary, formatDiagnostics } from '../../src/index.js';
 import { glueModuleSource, liveGlueFields } from '../../src/runtime/host-imports.js';
@@ -15,6 +17,9 @@ const size = bytes => ({ raw: bytes.length, gzip: gzipSync(bytes, { level: 9 }).
 // What the page does once the module is instantiated: drop the static
 // fallback, run main, and say it is ready; or, when it cannot start, say so.
 const START = 'document.querySelectorAll("[data-utu-static]").forEach(n=>n.remove());\nawait exports.main?.();\ndocument.documentElement.setAttribute("data-utu-ready","");';
+// A lazy page's chunk: main renders the page and delivers it; the host page owns readiness.
+const CHUNK_START = 'await exports.main?.();';
+const CHUNK_FAILED = 'console.error(error);';
 const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error);';
 
 /**
@@ -23,7 +28,7 @@ const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(er
  * custom `stdlib`, uses the JavaScript compiler).
  */
 export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size', compiler = 'self' }) {
-  if (compiler === 'self' && !stdlib) return buildWithSelfhost({ entry, outDir, optimize });
+  if (compiler === 'self' && !stdlib) return buildWithSelfhost({ entry, outDir, optimize, chunks: await buildChunks({ entry, outDir, optimize }) });
   const parser = suppliedParser ?? await initParser({ wasmDir: `${ROOT}/` });
   const started = performance.now();
   try {
@@ -87,8 +92,50 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
   }
 }
 
+/**
+ * Every `wutu.lazy("./page.utu")` in the entry and the files it imports
+ * names a page built on its own: a chunk whose main renders the module's
+ * `page()` and delivers it. Each goes to chunks/<name>-<hash>/ (its own
+ * app.js and app.wasm, named by their bytes, so they cache safely); the result
+ * maps each path as written to its chunk's app.js, relative to the page.
+ */
+async function buildChunks({ entry, outDir, optimize }) {
+  const lazy = new Map(), seen = new Set();
+  const visit = async (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    let text;
+    try { text = await fs.readFile(file, 'utf8'); } catch { return; }
+    for (const [, written] of text.matchAll(/wutu\.lazy\(\s*"([^"]+)"\s*\)/g)) lazy.set(written, path.resolve(path.dirname(file), written));
+    for (const [, imported] of text.matchAll(/^\s*using\s+\w+(?:\[[^\]]*\])?\s+from\s+"(\.{1,2}\/[^"]+)"/gm)) await visit(path.resolve(path.dirname(file), imported));
+  };
+  await visit(path.resolve(entry));
+  const chunks = {};
+  if (!lazy.size) return chunks;
+  await fs.rm(path.join(outDir, 'chunks'), { recursive: true, force: true });
+  for (const [written, file] of lazy) {
+    const module = /^\s*mod\s+([a-z_]\w*)/m.exec(await fs.readFile(file, 'utf8'))?.[1];
+    if (!module) throw new Error(`${written}: a lazy page's file declares a module with fn page() (mod name { fn page() ... })`);
+    const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'wutu-chunk-'));
+    const wrapper = path.join(temp, 'chunk.utu');
+    await fs.writeFile(wrapper, `using ${module} from ${JSON.stringify(file)};\n\nexport main() void {\n    wutu.deliver(${JSON.stringify(written)}, ${module}.page());\n}\n`);
+    try {
+      await buildWithSelfhost({ entry: wrapper, outDir: temp, optimize, chunk: true });
+      const digest = createHash('sha256').update(await fs.readFile(path.join(temp, 'app.wasm'))).update(await fs.readFile(path.join(temp, 'app.js'))).digest('hex').slice(0, 10);
+      const name = `${path.basename(file, '.utu')}-${digest}`;
+      const target = path.join(outDir, 'chunks', name);
+      await fs.mkdir(target, { recursive: true });
+      for (const asset of ['app.js', 'app.wasm']) await fs.copyFile(path.join(temp, asset), path.join(target, asset));
+      chunks[written] = `./chunks/${name}/app.js`;
+    } finally {
+      await fs.rm(temp, { recursive: true, force: true });
+    }
+  }
+  return chunks;
+}
+
 /** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
-async function buildWithSelfhost({ entry, outDir, optimize }) {
+async function buildWithSelfhost({ entry, outDir, optimize, chunk = false, chunks = {} }) {
   const started = performance.now();
   const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
   const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
@@ -112,7 +159,11 @@ async function buildWithSelfhost({ entry, outDir, optimize }) {
   const lines = loader.trimEnd().split('\n');
   const imports = lines.filter(line => line.startsWith('import '));
   const body = lines.filter(line => !line.startsWith('import ')).map(line => line.replace(/^export const /, 'const '));
-  const source = [...imports, 'try {', ...body, START, '} catch (error) {', FAILED, '}'].join('\n');
+  // Where each lazy page's chunk is, for wutu.lazy (relative to this script).
+  const chunkMap = Object.keys(chunks).length
+    ? `globalThis.__wutuChunks={...globalThis.__wutuChunks,${Object.entries(chunks).map(([written, url]) => `${JSON.stringify(written)}:new URL(${JSON.stringify(url)},import.meta.url).href`).join(',')}};`
+    : '';
+  const source = [...imports, chunkMap, 'try {', ...body, chunk ? CHUNK_START : START, '} catch (error) {', chunk ? CHUNK_FAILED : FAILED, '}'].join('\n');
   await build({ stdin: { contents: source, resolveDir: ROOT, sourcefile: 'generated-loader.mjs', loader: 'js' },
     outfile: path.join(outDir, 'app.js'), bundle: true, minify: true, format: 'esm', platform: 'browser', target: 'es2022', legalComments: 'none' });
   // The intermediate module is not a deployed asset.

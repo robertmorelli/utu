@@ -6,7 +6,7 @@ export main() Browser.HTMLElement {
     @wutu/\
     @reactive;
     div {
-        <title = $[42];
+        title = $[42];
         p { = 7; }
         button { @click = $[42]; }
         input { bind:value = s.n; }

@@ -29,7 +29,7 @@ fn count(state: Board, stage: Str) Str {
 fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
     @wutu/\
     section.lane {
-        <aria-label = $[label];
+        aria-label = $[label];
         background:var(--well);
         padding:1rem;
         border-radius:0.8rem;
@@ -62,8 +62,8 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                 }
                 div.bar {
                     button {
-                        <id = $["move-" + card.id];
-                        <aria-label = $["Move " + card.title];
+                        id = $["move-" + card.id];
+                        aria-label = $["Move " + card.title];
                         = if next == "doing" {
                             "Start →";
                         }
@@ -81,7 +81,7 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                         };
                     }
                     button {
-                        <aria-label = $["Delete " + card.title];
+                        aria-label = $["Delete " + card.title];
                         "×";
                         on click {
                             state.cards = state.cards filter |item| {
@@ -265,11 +265,11 @@ export main() void {
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "More Wutu sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "Read the source ↗";
                 }
             }
@@ -291,8 +291,8 @@ export main() void {
                 label {
                     "Find a card";
                     input {
-                        <type = "search";
-                        <placeholder = "Search this board";
+                        type = "search";
+                        placeholder = "Search this board";
                         bind:value = state.query;
                     }
                 }
@@ -309,10 +309,10 @@ export main() void {
             label {
                 "What needs doing?";
                 input as title {
-                    <id = "new-card";
-                    <required = "";
-                    <maxlength = "100";
-                    <placeholder = "A small, specific next step";
+                    id = "new-card";
+                    required = "";
+                    maxlength = "100";
+                    placeholder = "A small, specific next step";
                     bind:value = state.draft;
                 }
             }
@@ -321,25 +321,25 @@ export main() void {
                 select {
                     bind:value = state.category;
                     option {
-                        <value = "Design";
+                        value = "Design";
                         "Design";
                     }
                     option {
-                        <value = "Development";
+                        value = "Development";
                         "Development";
                     }
                     option {
-                        <value = "Writing";
+                        value = "Writing";
                         "Writing";
                     }
                     option {
-                        <value = "Research";
+                        value = "Research";
                         "Research";
                     }
                 }
             }
             button.primary {
-                <type = "submit";
+                type = "submit";
                 "Add to the board +";
             }
             on submit {
@@ -373,7 +373,7 @@ export main() void {
                 "Built in Utu + Wutu. Data stays in this browser.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

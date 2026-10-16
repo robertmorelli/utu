@@ -77,14 +77,14 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
 
   test('wutu parser: errors explain the fix and point at the offending token', () => {
     const cases = [
-      ['div { p { <hreff = "/"; } }', 'unknown attribute hreff', 'hreff'],
+      ['div { p { hreff = "/"; } }', 'unknown attribute hreff', 'hreff'],
       ['div { p { "x" } }', 'expected ;', ' } }'],
-      ['div { <title = "Hi " + name; }', 'build computed values with $[...]', ' + name'],
+      ['div { title = "Hi " + name; }', 'build computed values with $[...]', ' + name'],
       ['button { @click = "go"; }', 'take a closure', 'click'],
       ['div { foo { } }', "unknown element 'foo'", 'foo'],
       ['@island view; div { }', 'quoted island name', 'view'],
       ['div {\n p { "x";\n', "unterminated element 'p'", 'p {'],
-      ['div { p { <onclick = $[f]; } }', 'use @event', 'onclick'],
+      ['div { p { onclick = $[f]; } }', 'use @event', 'onclick'],
       ['p { $[x }', 'unterminated interpolation', '$[x }'],
     ];
     for (const [text, message, at] of cases) {
@@ -208,8 +208,10 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       instance.exports.main();
       instance.exports.main();
       const sheets = [...document.querySelectorAll('style')].map(node => node.textContent);
-      assertEq(sheets.filter(text => text === 'p{color:red}').length, 1, 'each sheet installs once');
-      assert(sheets.indexOf('p{color:red}') < sheets.indexOf('p{color:blue}'), `sheets out of order: ${sheets.join(' | ')}`);
+      // A shared sheet joins the wutu.document layer, below element styles.
+      const red = '@layer wutu.document{p{color:red}}', blue = '@layer wutu.document{p{color:blue}}';
+      assertEq(sheets.filter(text => text === red).length, 1, 'each sheet installs once');
+      assert(sheets.indexOf(red) < sheets.indexOf(blue), `sheets out of order: ${sheets.join(' | ')}`);
       assert(sheets.some(text => text.includes('url(https://example.com/a.png)')), 'URLs keep their slashes');
     });
   });
@@ -263,7 +265,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
   test('wutu diagnostics: template errors point at the attribute, alias, binding, or interpolation', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p { <hreff = "/"; } } \\/; }`, 'invalid-dsl-usage', 'h'],
+      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; }`, 'invalid-dsl-usage', 'h'],
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { @click=$[cl(e) void { x.focus(); }]; } } \\/; }`, 'invalid-dsl-usage', 'x'],
       [`${BROWSER}struct S:\n    | t: Str\nexport main() Browser.HTMLElement { let s = S { t: "" }; @wutu/\\ div { input { bind:value = s.t; } } \\/; }`, 'invalid-dsl-usage', 'b'],
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { $[1 +]; } \\/; }`, 'invalid-dsl-usage', '1'],
@@ -285,7 +287,7 @@ export main() Browser.HTMLElement {
     @wutu/\\
     @reactive;
     div {
-        <title = $[42];
+        title = $[42];
         p { = 7; }
         button { @click = $[42]; }
         input { bind:value = s.n; }
@@ -341,9 +343,9 @@ export main() Browser.HTMLElement {
         @media (width < 40rem) { gap: 0; }
         h1 { "Title"; = subtitle; }
         if $[ready] { p { "ready"; } } else if $[failed] { p { "failed"; } } else { p { "wait"; } }
-        for $[items] |item, i| key $[item.id] { li { <data-id = $[item.id]; = item.name; } }
-        input { <type = "text"; bind:value = state.text; <.disabled = $[locked]; }
-        button { <aria-label = "Go"; on click { go(app); }; @focus = $[cl(e) void { log("[x]"); }]; }
+        for $[items] |item, i| key $[item.id] { li { data-id = $[item.id]; = item.name; } }
+        input { type = "text"; bind:value = state.text; .disabled = $[locked]; }
+        button { aria-label = "Go"; on click { go(app); }; @focus = $[cl(e) void { log("[x]"); }]; }
       }`;
     let seed = 1;
     const random = n => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
@@ -370,8 +372,8 @@ export main() Browser.HTMLElement {
   });
 
   test('wutu parser: legacy surface still parses', () => {
-    assertThrows(() => parseWutu('div { <aria-hidden = "true" aspect-ratio: 0.68; }'), 'expected ;');
-    const tree = parseWutu('section.a#b { <data-x = $[x]; <hidden; svg { <viewBox = "0 0 1 1"; } my-widget { <anything = "ok"; } }');
+    assertThrows(() => parseWutu('div { aria-hidden = "true" aspect-ratio: 0.68; }'), 'expected ;');
+    const tree = parseWutu('section.a#b { data-x = $[x]; hidden; svg { viewBox = "0 0 1 1"; } my-widget { anything = "ok"; } }');
     assertEq(tree.root.attrs.find(a => a.name === 'id').value, '"b"');
     assertEq(tree.root.children.length, 2);
   });

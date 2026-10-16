@@ -21,11 +21,41 @@ export function createWutuRuntime() {
   const dirty = new Set();
   const afterRender = [];
   const installedStyles = new Set();
+  const mounted = new WeakSet();    // elements whose `on mount` has run
+  const lazies = new Map();         // lazy page path -> its placeholder
+  let loading = 0;                  // chunks loading
   const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
   const prototypes = new Map();     // description -> [element, its attribute names]
   let frames = [], active = null, keys = [], scheduled = false, generation = 0;
 
-  function style(css) {
+  /** A shared sheet joins the `wutu.document` layer, below element styles; its `@import`s go first. */
+  function layered(css) {
+    // (No regex here: this source ships inside an @es envelope, where a slash
+    // next to a backslash would end it.)
+    let imports = '', rest = '', i = 0;
+    for (let at = css.indexOf('@import', i); at >= 0; at = css.indexOf('@import', i)) {
+      // (The `;` outside strings and parentheses: a font URL may have some.)
+      let end = -1, quote = '', depth = 0;
+      for (let j = at; j < css.length && end < 0; j++) {
+        const c = css[j];
+        if (quote) { if (c === '\\') j++; else if (c === quote) quote = ''; }
+        else if (c === '"' || c === "'") quote = c;
+        else if (c === '(') depth++;
+        else if (c === ')') depth--;
+        else if (c === ';' && depth <= 0) end = j;
+      }
+      if (end < 0) break;
+      const rule = css.slice(at, end);
+      rest += css.slice(i, at);
+      imports += rule.includes('layer(') ? rule + ';' : rule + ' layer(wutu.document);';
+      i = end + 1;
+    }
+    rest += css.slice(i);
+    return imports + (rest.trim() ? '@layer wutu.document{' + rest + '}' : '');
+  }
+
+  function style(sheet) {
+    const css = layered(sheet);
     if (installedStyles.has(css)) return;
     installedStyles.add(css);
     // Prerendered pages already contain their sheets.
@@ -271,9 +301,25 @@ export function createWutuRuntime() {
   /**
    * One DOM listener per element and event; each render replaces the handlers
    * it calls, so closures always see the latest captures. Handling an event
-   * saves stores and schedules the owning view.
+   * saves stores and schedules the owning view, unless every handler that ran
+   * was quiet (`~event`: it changed only DOM the template does not read).
+   * `mount` is no DOM event: its handler runs once per element, after the
+   * render that made it.
    */
   function listen(node, event, handler) {
+    if (event === 'mount') {
+      if (mounted.has(node)) return;
+      mounted.add(node);
+      const view = active;
+      queueMicrotask(() => {
+        handler(new Event('mount'));
+        autoSave();
+        if (view) schedule(view);
+      });
+      return;
+    }
+    const quiet = event[0] === '~';
+    if (quiet) event = event.slice(1);
     let map = listeners.get(node);
     if (!map) listeners.set(node, map = new Map());
     let record = map.get(event);
@@ -281,14 +327,18 @@ export function createWutuRuntime() {
       record = { handlers: [], generation: -1, view: active };
       map.set(event, record);
       node.addEventListener(event, e => {
+        let loud = false;
         try {
-          for (const current of [...record.handlers]) {
+          for (const [current, isQuiet] of [...record.handlers]) {
+            if (!isQuiet) loud = true;
             const result = current(e);
             if (result?.then) result.then(refresh, error => { refresh(); setTimeout(() => { throw error; }); });
           }
         } finally {
-          autoSave();
-          if (record.view) schedule(record.view);
+          if (loud) {
+            autoSave();
+            if (record.view) schedule(record.view);
+          }
         }
       });
     }
@@ -296,12 +346,17 @@ export function createWutuRuntime() {
       record.handlers = [];
       record.generation = generation;
     }
-    record.handlers.push(handler);
+    record.handlers.push([handler, quiet]);
     record.view = active;
   }
 
   function leave() {
     const frame = frames.pop(), node = frame.node, attrs = frame.attrs ?? NO_ATTRS;
+    // `@unmanaged`: its children, and attributes the template does not set, are JavaScript's.
+    if (node.hasAttribute('data-wutu-unmanaged')) {
+      metadata.set(node, { ...metadata.get(node), attrs });
+      return node;
+    }
     // The attributes a render set last time and not this time go.
     const meta = frame.meta;
     for (const name of meta ? meta.attrs : frame.before) if (!attrs.has(name)) node.removeAttribute(name);
@@ -324,7 +379,8 @@ export function createWutuRuntime() {
   //                          an attribute, a class merged after the static
   //                          ones, a boolean attribute, a style value: put()
   //   ["x", p] ["w"]         a value (with a call key, from slot()), a text: put()
-  //   ["v", i, event]        a listener on element i: put()
+  //   ["v", i, event]        a listener on element i (`~event` quiet, `mount`
+  //                          once): put()
   //   ["n", i]               element i, to the module: node()
   //   ["i", then, else]      an if: arm()
   //   ["f", mode, p, body]   a loop (mode 0 by index, 1 keyed, 2 globally
@@ -564,6 +620,33 @@ export function createWutuRuntime() {
       view.effects.set(key, timer);
       view.cleanups.push(() => clearInterval(timer));
     },
+    /**
+     * A lazily built page's placeholder (a prerendered one, kept, if there is
+     * one): its chunk loads once, and deliver() fills it. While chunks load,
+     * <html> has data-wutu-loading (a prerenderer waits for it to go).
+     */
+    lazy(path) {
+      let node = lazies.get(path);
+      if (node) return node;
+      node = document.querySelector('[data-wutu-lazy="' + path + '"]');
+      if (!node) {
+        node = document.createElement('div');
+        node.setAttribute('data-wutu-lazy', path);
+      }
+      lazies.set(path, node);
+      const url = globalThis.__wutuChunks?.[path];
+      if (!url) {
+        console.error('Wutu: no chunk was built for ' + path);
+        return node;
+      }
+      loading++;
+      document.documentElement.setAttribute('data-wutu-loading', '');
+      import(url).catch(error => console.error(error)).finally(() => {
+        if (--loading === 0) document.documentElement.removeAttribute('data-wutu-loading');
+      });
+      return node;
+    },
+    deliver(path, page) { lazies.get(path)?.replaceChildren(page); },
     after(callback) { afterRender.push(callback); schedule(); },
     focus(id) { afterRender.push(() => document.getElementById(id)?.focus()); schedule(); },
     cleanup(callback) { if (active) active.cleanupCallbacks[active.cleanupIndex++] = callback; },

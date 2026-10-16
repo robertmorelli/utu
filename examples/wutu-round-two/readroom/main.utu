@@ -15,7 +15,7 @@ fn notes(book:Book) Browser.HTMLElement {
     @island "readroom-notes";
     section.panel.stack {
         a {
-            <href = "#/";
+            href = "#/";
             "← Back to the shelf";
         }
         h2 {
@@ -27,8 +27,8 @@ fn notes(book:Book) Browser.HTMLElement {
         label {
             "Your notes";
             textarea {
-                <rows = "10";
-                <placeholder = "A thought worth keeping…";
+                rows = "10";
+                placeholder = "A thought worth keeping…";
                 bind:value = book.note;
                 on input {
                     wutu.save("readroom-v2");
@@ -63,7 +63,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
                         = book.author;
                     }
                     a {
-                        <href = "#/notes";
+                        href = "#/notes";
                         "Open your notes ↗";
                         on click {
                             state.selected=book.id;
@@ -119,17 +119,17 @@ export main() void {
     @reactive;
     @style $[theme.sheet()];
     main {
-        <data-theme = "readroom";
+        data-theme = "readroom";
         nav {
             strong {
                 "READROOM / AN EVERYDAY TOOL";
             }
             a {
-                <href = "../";
+                href = "../";
                 "All five sites";
             }
             a {
-                <href = "source.html";
+                href = "source.html";
                 "Read source ↗";
             }
         }
@@ -157,7 +157,7 @@ export main() void {
                 "Stored on this device. Built with Utu + Wutu.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

@@ -178,11 +178,11 @@ export main() void {
             }
             nav {
                 a {
-                    <href = "../";
+                    href = "../";
                     "More Wutu sites";
                 }
                 a {
-                    <href = "source.html";
+                    href = "source.html";
                     "Read the source ↗";
                 }
             }
@@ -218,7 +218,7 @@ export main() void {
                 }
             }
             div {
-                <aria-hidden = "true";
+                aria-hidden = "true";
                 aspect-ratio:1.15;
                 border-radius:50% 50% 4% 4%;
                 background:#d2d8b5;
@@ -260,20 +260,20 @@ export main() void {
                     }
                     div.bar {
                         button {
-                            <aria-label = "Fewer servings";
-                            <disabled = $[state.servings <= 1.0];
+                            aria-label = "Fewer servings";
+                            disabled = $[state.servings <= 1.0];
                             "−";
                             on click {
                                 state.servings -= 1.0;
                             };
                         }
                         strong {
-                            <id = "servings";
+                            id = "servings";
                             = state.servings.toString() + " servings";
                         }
                         button {
-                            <aria-label = "More servings";
-                            <disabled = $[state.servings >= 12.0];
+                            aria-label = "More servings";
+                            disabled = $[state.servings >= 12.0];
                             "+";
                             on click {
                                 state.servings += 1.0;
@@ -290,7 +290,7 @@ export main() void {
                         font-weight:400;
                         font-size:1rem;
                         input {
-                            <type = "checkbox";
+                            type = "checkbox";
                             bind:checked = item.packed;
                         }
                         span {
@@ -321,8 +321,8 @@ export main() void {
                     }
                 }
                 progress {
-                    <max = "4";
-                    <value = $[(state.step + 1).to_f64().toString()];
+                    max = "4";
+                    value = $[(state.step + 1).to_f64().toString()];
                     width:100%;
                     accent-color:var(--accent);
                 }
@@ -337,14 +337,14 @@ export main() void {
                 }
                 div.bar {
                     button {
-                        <disabled = $[state.step == 0];
+                        disabled = $[state.step == 0];
                         "Previous step";
                         on click {
                             state.step -= 1;
                         };
                     }
                     button.primary {
-                        <disabled = $[state.step == 3];
+                        disabled = $[state.step == 3];
                         "Next step →";
                         on click {
                             state.step += 1;
@@ -366,7 +366,7 @@ export main() void {
                 "Built in Utu + Wutu. Data stays in this browser.";
             }
             p {
-                <role = "status";
+                role = "status";
                 = wutu.storage_error();
             }
         }

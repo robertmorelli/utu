@@ -124,7 +124,13 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
     let template = dsl_body(site);
     let root = parse_template(template);
     wutu_prepare(root);
-    for (0 ..< tw_global.len()) |k| { wutu_style(wutu_hash(word_text(tw_global[k])), word_text(tw_global[k])); };
+    // `@document` CSS, each block once, goes in its own layer (below).
+    let document = "";
+    for (0 ..< tw_global.len()) |k| {
+        let seen = false;
+        for (0 ..< k) |j| { if tw_global[j] == tw_global[k] { seen = true; }; };
+        if not seen { document = document + word_text(tw_global[k]); };
+    };
     wx_events.clear();
     wx_event_ops.clear();
     // Reconciled, the template is a program (its structure, as data) and the
@@ -148,7 +154,7 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
     };
     let css = "";
     for (0 ..< wu_style_css.len()) |k| { css = css + word_text(wu_style_css[k]); };
-    css = without_hash_lines(css);
+    css = layered_document_css(without_hash_lines(document)) + without_hash_lines(css);
     if css.len() > 0 {
         let key = es_string("wutu-" + wutu_hash(css));
         prelude = "let " + prefix + "install_css: fun() void = @es/\\ () => { if (!document.getElementById(" + key + ")) { const s=document.createElement('style'); s.id=" + key
@@ -168,6 +174,51 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
         value = last + " " + mount + "(cl() Browser.HTMLElement " + render + ", " + (if tw_scope[0] >= 0 { word_text(tw_scope[0]); } else { "\"\""; }) + ")";
     };
     graft_expression(site, "{ " + (if reconcile { "wutu.init();"; } else { ""; }) + " " + value + "; }");
+}
+
+/// The `;` ending the CSS statement at `at`, outside strings and parentheses, or -1.
+fn css_statement_end(css: Str, at: I32) I32 {
+    let quote = 0;
+    let depth = 0;
+    let j = at;
+    while (j < css.len()) {
+        let c = css.get(j);
+        if quote != 0 {
+            if c == 92 { j += 1; } else if c == quote { quote = 0; };
+        } else if c == 34 or c == 39 {
+            quote = c;
+        } else if c == 40 {
+            depth += 1;
+        } else if c == 41 {
+            depth -= 1;
+        } else if c == 59 and depth <= 0 {
+            return j;
+        };
+        j += 1;
+    };
+    -1;
+}
+
+/// `@document` CSS in the `wutu.document` cascade layer, so a style written on
+/// an element (unlayered) wins over a document rule whatever their
+/// specificity. `@import`s cannot sit in a layer block: they go first, each
+/// importing into the layer.
+fn layered_document_css(css: Str) Str {
+    let imports = "";
+    let rest = "";
+    let i = 0;
+    let at = text_index(css, "@import", 0);
+    while (at >= 0) {
+        let end = css_statement_end(css, at);
+        if end < 0 { break; };
+        let rule = css.slice(at, end);
+        rest = rest + css.slice(i, at);
+        imports = imports + (if text_index(rule, "layer(", 0) >= 0 { rule + ";"; } else { rule + " layer(wutu.document);"; });
+        i = end + 1;
+        at = text_index(css, "@import", i);
+    };
+    rest = rest + css.slice(i, css.len());
+    imports + (if trim_end(rest).len() > 0 { "@layer wutu.document{" + rest + "}"; } else { ""; });
 }
 
 /// The CSS without its comment lines (those that begin with `# `).
@@ -360,7 +411,7 @@ fn wutu_helper(kind: Str) Str {
     let js = "";
     if kind == "style" and wu_reconcile[0] == 0 {
         params = "Str";
-        js = "(s)=>{if([...document.querySelectorAll('style')].some(n=>n.textContent===s))return;const n=document.createElement('style');n.textContent=s;document.head.append(n);}";
+        js = "(s)=>{const E=a=>{let q='',d=0;for(let j=a;j<s.length;j++){const c=s[j];if(q){if(c==='\\\\')j++;else if(c===q)q=''}else if(c==='\\x22'||c==='\\x27')q=c;else if(c==='(')d++;else if(c===')')d--;else if(c===';'&&d<=0)return j}return -1};let m='',r='',i=0;for(let a=s.indexOf('@import');a>=0;a=s.indexOf('@import',i)){const e=E(a);if(e<0)break;const u=s.slice(a,e);r+=s.slice(i,a);m+=u.includes('layer(')?u+';':u+' layer(wutu.document);';i=e+1}r+=s.slice(i);s=m+(r.trim()?'@layer wutu.document{'+r+'}':'');if([...document.querySelectorAll('style')].some(n=>n.textContent===s))return;const n=document.createElement('style');n.textContent=s;document.head.append(n);}";
     } else if kind == "attr" {
         params = "Browser.Element, Str, Str";
         js = "(n,k,v)=>globalThis.__utuWutu.attr(n,k,v)";
@@ -429,6 +480,10 @@ fn wutu_helper(kind: Str) Str {
         params = "cl() Browser.HTMLElement, Str";
         result = "Browser.HTMLElement";
         js = "(f,k)=>globalThis.__utuWutu.mount(f,k)";
+    } else if kind == "mounted" {
+        // `on mount { … }` in a static template: once, after the element is made.
+        params = "Browser.Element, cl(Browser.Event) void";
+        js = "(n,h)=>queueMicrotask(()=>h(new Event(\"mount\")))";
     } else {
         params = "Str";
         js = "(s)=>globalThis.__utuWutu.style(s)";
@@ -607,7 +662,12 @@ fn wutu_element(n: I32, outer_svg: Bool) Str {
             let listener = if not shorthand { handler; }
                 else if type.len() > 0 and names_event(word_text(ti_b[i])) { "cl(__wutu_event) void { alt __wutu_event { Browser." + type + " |event| => { " + prevent + " " + handler + "; }, ~> {}, }; }"; }
                 else { "cl(event) void { " + prevent + " " + handler + "; }"; };
-            wx_events.push(intern_text((if reconcile { wutu_helper("event") + "(" + id + ", " + js_string(name) + ", (" + listener + "));"; } else { id + ".addEventListener(" + js_string(name) + ", (" + listener + "));"; }) + "\n"));
+            // A quiet listener (`~name`) renders nothing after it runs.
+            let quiet = shorthand and ((ti_flags[i] & 4) != 0 or quiet_handler(word_text(ti_b[i])));
+            let emitted = (if quiet { "~"; } else { ""; }) + name;
+            wx_events.push(intern_text((if reconcile { wutu_helper("event") + "(" + id + ", " + js_string(emitted) + ", (" + listener + "));"; }
+                else if name == "mount" { wutu_helper("mounted") + "(" + id + ", (" + listener + "));"; }
+                else { id + ".addEventListener(" + js_string(name) + ", (" + listener + "));"; }) + "\n"));
         };
         i = ti_next[i];
     };
@@ -623,6 +683,96 @@ fn names_event(source: Str) Bool {
         if not word_byte(before) and before != 46 and not word_byte(after) { return true; };
         at = text_index(source, "event", at + 1);
     };
+    false;
+}
+
+/// Whether an `on` handler can only change its own elements: every statement
+/// assigns to a property of an `as` element (`overlay.scrollTop = …`) from
+/// those elements, `event`, and literals, and nothing is called. Such a
+/// handler is quiet: nothing a render reads changed, so none follows it.
+/// Anything else (a call, a closure, a local, a struct field) renders.
+fn quiet_handler(body: Str) Bool {
+    // The code without its strings, outer braces, and blanks at either end.
+    let code = "";
+    let i = 0;
+    while (i < body.len()) {
+        let c = body.get(i);
+        if c == 34 {
+            i += 1;
+            while (i < body.len() and body.get(i) != 34 and body.get(i) != 10) { i += if body.get(i) == 92 { 2; } else { 1; }; };
+            code = code + "\"\"";
+        } else if c == 47 and i + 1 < body.len() and body.get(i + 1) == 47 {
+            // A line comment says nothing.
+            while (i + 1 < body.len() and body.get(i + 1) != 10) { i += 1; };
+        } else {
+            code = code + Str.from_code_point(c);
+        };
+        i += 1;
+    };
+    let a = 0;
+    let b = code.len();
+    while (a < b and is_space_code(code.get(a))) { a += 1; };
+    while (b > a and is_space_code(code.get(b - 1))) { b -= 1; };
+    if a < b and code.get(a) == 123 and code.get(b - 1) == 125 { a += 1; b -= 1; };
+    code = code.slice(a, b);
+    for (0 ..< code.len()) |k| {
+        let c = code.get(k);
+        if c == 40 or c == 41 or c == 123 or c == 125 or c == 91 or c == 93 { return false; };
+        if c == 47 and k + 1 < code.len() and code.get(k + 1) == 42 { return false; };
+    };
+    let statements = 0;
+    let start = 0;
+    while (start <= code.len()) {
+        let end = text_index(code, ";", start);
+        if end < 0 { end = code.len(); };
+        let statement = code.slice(start, end);
+        if trim_end(statement).len() > 0 {
+            if not quiet_statement(statement) { return false; };
+            statements += 1;
+        };
+        start = end + 1;
+    };
+    statements > 0;
+}
+
+/// `alias.property (op)= value` where the value reads only elements, `event`, and literals.
+fn quiet_statement(statement: Str) Bool {
+    let i = skip_spaces(statement, 0);
+    let a = i;
+    while (i < statement.len() and word_byte(statement.get(i))) { i += 1; };
+    if i == a or not is_alias_name(statement.slice(a, i)) { return false; };
+    let members = 0;
+    while (i < statement.len() and statement.get(i) == 46) {
+        i += 1;
+        let m = i;
+        while (i < statement.len() and word_byte(statement.get(i))) { i += 1; };
+        if i == m { return false; };
+        members += 1;
+    };
+    if members == 0 { return false; };
+    i = skip_spaces(statement, i);
+    if i < statement.len() and (statement.get(i) == 43 or statement.get(i) == 45 or statement.get(i) == 42 or statement.get(i) == 47) { i += 1; };
+    if i >= statement.len() or statement.get(i) != 61 { return false; };
+    if i + 1 < statement.len() and statement.get(i + 1) == 61 { return false; };
+    i += 1;
+    while (i < statement.len()) {
+        let c = statement.get(i);
+        let before = if i > 0 { statement.get(i - 1); } else { 32; };
+        if (word_byte(c) and not (c >= 48 and c <= 57)) and not word_byte(before) and before != 46 {
+            let w = i;
+            while (i < statement.len() and word_byte(statement.get(i))) { i += 1; };
+            let word = statement.slice(w, i);
+            if not is_alias_name(word) and not in_words("event true false null not and or", word) { return false; };
+        } else {
+            i += 1;
+        };
+    };
+    true;
+}
+
+/// Whether `name` is an `as` name in the template.
+fn is_alias_name(name: Str) Bool {
+    for (0 ..< wu_aliases.len()) |k| { if word_text(tn_binding[wu_aliases[k]]) == name { return true; }; };
     false;
 }
 
@@ -828,8 +978,9 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
             let listener = if not shorthand { handler; }
                 else if type.len() > 0 and names_event(word_text(ti_b[i])) { "cl(__wutu_event) void { alt __wutu_event { Browser." + type + " |event| => { " + prevent + " " + handler + "; }, ~> {}, }; }"; }
                 else { "cl(event) void { " + prevent + " " + handler + "; }"; };
+            let quiet = shorthand and ((ti_flags[i] & 4) != 0 or quiet_handler(word_text(ti_b[i])));
             wx_events.push(intern_text(wutu_helper("on") + "((" + listener + "));\n"));
-            wx_event_ops.push(intern_text("[\"v\"," + index + "," + wutu_json(name) + "]"));
+            wx_event_ops.push(intern_text("[\"v\"," + index + "," + wutu_json((if quiet { "~"; } else { ""; }) + name) + "]"));
         };
         i = ti_next[i];
     };

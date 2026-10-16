@@ -19,8 +19,8 @@ fn card(plant: Plant) Browser.HTMLElement {
         h2 { font-size: 1.4rem; margin: 0; $[plant.name]; }
         p { margin: 0; color: var(--muted); "Water every "; $[plant.days.to_f64().toString()]; " days"; }
         button as toggle {
-            <type="button";
-            <aria-pressed=$[if plant.watered { "true";
+            type="button";
+            aria-pressed=$[if plant.watered { "true";
             } else { "false";
             }];
             background: var(--green);
@@ -51,11 +51,11 @@ fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLEle
     let visible = ordered count_where |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); };
     @wutu/\
     section#plants {
-        <aria-label="Your plants";
+        aria-label="Your plants";
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
         gap: 1rem;
-        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); <role="status"; $[visible.to_f64().toString()]; " plants in your greenhouse"; }
+        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); role="status"; $[visible.to_f64().toString()]; " plants in your greenhouse"; }
         for $[ordered filter |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); }] |plant| {
             $[card(plant)];
         }
@@ -94,7 +94,7 @@ export main() void {
             align-items: center;
             border-block-end: 1px solid var(--line);
             padding-block-end: 1.5rem;
-            a { <href="#"; color: var(--ink); text-decoration: none; font-weight: 750; "◒  STILL / GROWING"; }
+            a { href="#"; color: var(--ink); text-decoration: none; font-weight: 750; "◒  STILL / GROWING"; }
             span { color: var(--muted); "A little care, every day."; }
         }
         section {
@@ -107,11 +107,11 @@ export main() void {
         section {
             display: grid;
             gap: 1.25rem;
-            <aria-label="Your plants";
-            label { <for="search"; font-weight: 650; "Find your plants"; }
+            aria-label="Your plants";
+            label { for="search"; font-weight: 650; "Find your plants"; }
             input#search as search {
-                <type="search";
-                <placeholder="Search your greenhouse…";
+                type="search";
+                placeholder="Search your greenhouse…";
                 padding: 1rem;
                 border: 1px solid var(--line);
                 border-radius: 0.75rem;
@@ -123,15 +123,15 @@ export main() void {
                     grid = next;
                 }];
             }
-            label { <for="sort"; font-weight: 650; "Arrange by"; }
+            label { for="sort"; font-weight: 650; "Arrange by"; }
             select#sort as sort {
                 padding: 0.75rem;
                 border: 1px solid var(--line);
                 border-radius: 0.75rem;
                 background: var(--card);
                 color: var(--ink);
-                option { <value="original"; "My collection"; }
-                option { <value="frequency"; "Watering frequency"; }
+                option { value="original"; "My collection"; }
+                option { value="frequency"; "Watering frequency"; }
                 @change=$[cl(event) void {
                     let next = listing(plants, search.value, sort.value == "frequency");
                     grid.replaceWith(next);

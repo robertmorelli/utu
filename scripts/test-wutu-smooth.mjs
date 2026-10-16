@@ -15,7 +15,7 @@ const commented='let node=@wutu/\\ main { // Keep this\n "Hi"; } \\/;';
 assert.equal(formatWutuSource(commented),commented);
 const raw='let node=@wutu/\\ main { "path\\"; span {"Safe";} } \\/;';
 assert.equal(formatWutuSource(formatWutuSource(raw)),formatWutuSource(raw));
-assert.throws(()=>parseWutu('main { <aria-hidden = "true" aspect-ratio: 0.68; }'),/semicolon|expected.*;/i);
+assert.throws(()=>parseWutu('main { aria-hidden = "true" aspect-ratio: 0.68; }'),/semicolon|expected.*;/i);
 const server=http.createServer(async(req,res)=>{try{const p=new URL(req.url,'http://local').pathname;const f=path.resolve(root,'.'+(p==='/'?'/index.html':p));if(!f.startsWith(root+'/'))throw Error();res.setHeader('Content-Type',f.endsWith('.wasm')?'application/wasm':f.endsWith('.js')?'text/javascript':'text/html');res.end(await fs.readFile(f));}catch{res.writeHead(404).end();}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const origin=`http://127.0.0.1:${server.address().port}`;

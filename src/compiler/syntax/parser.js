@@ -24,6 +24,8 @@
 
 // ── Syntax nodes ─────────────────────────────────────────────────────────────
 
+import { dslEnd } from '../dsl-envelope.js';
+
 let nextId = 1;
 
 export class SyntaxNode {
@@ -1291,21 +1293,13 @@ class Parser {
   dslExpr() {
     const at = this.expectPunct('@');
     const name = this.identifier();
-    // The body is an external token: `/\ … \/`, nested pairs balanced.
+    // The body is an external token: `/\ … \/`, nested pairs balanced (see dsl-envelope.js).
     const source = this.source;
     if (!source.startsWith('/\\', this.pos)) this.fail();
     const start = this.pos;
-    let i = this.pos + 2;
-    let depth = 1;
-    while (i < source.length) {
-      const c = source[i++];
-      if (c === '/' && source[i] === '\\') { depth++; i++; }
-      else if (c === '\\' && source[i] === '/') {
-        i++;
-        if (--depth === 0) break;
-      }
-    }
-    if (depth !== 0) this.fail();
+    let close;
+    try { close = dslEnd(source, start + 2); } catch { this.fail(); }
+    const i = close + 2;
     this.pos = i;
     const body = this.leaf('dsl_body', start, i, true);
     this.skip();
