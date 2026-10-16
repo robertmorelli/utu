@@ -126,10 +126,21 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
     wutu_prepare(root);
     for (0 ..< tw_global.len()) |k| { wutu_style(wutu_hash(word_text(tw_global[k])), word_text(tw_global[k])); };
     wx_events.clear();
-    let code = wutu_element(root, false);
+    wx_event_ops.clear();
+    // Reconciled, the template is a program (its structure, as data) and the
+    // code that supplies its values; else, code that makes its elements.
+    let ops = WOps { text: "" };
+    let code = if reconcile { wd_element(root, false, ops); } else { wutu_element(root, false); };
     let root_id = node_uid(root);
     let events = "";
     for (0 ..< wx_events.len()) |k| { events = events + word_text(wx_events[k]); };
+    for (0 ..< wx_event_ops.len()) |k| { wd_op(ops, word_text(wx_event_ops[k])); };
+    if reconcile {
+        let tag = word_text(tn_text[root]);
+        code = wutu_helper("begin") + "(" + js_string("[" + ops.text + "]") + ", " + js_string(word_text(wu_view_hash[0])) + ");\n" + code;
+        events = events + wutu_typed_fn("done", tag, tag == "svg") + "()";
+        root_id = "";
+    };
     // Shared sheets install in source order, so later ones win the cascade.
     let prelude = "";
     for (0 ..< tw_style_value.len()) |k| {
@@ -149,6 +160,7 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
         declarations = declarations + word_text(wu_decls[k]);
     };
     let render = "{ " + declarations + " " + prelude + code + " " + events + " " + root_id + "; }";
+    if reconcile { render = "{ " + declarations + " " + prelude + code + " " + events + "; }"; };
     let value = render;
     if tw_reactive[0] == 1 {
         let mount = wutu_helper("mount");
@@ -361,6 +373,31 @@ fn wutu_helper(kind: Str) Str {
     } else if kind == "put" {
         params = "Externref";
         js = "(v)=>globalThis.__utuWutu.put(v)";
+    } else if kind == "put_text" {
+        params = "Str";
+        js = "(v)=>globalThis.__utuWutu.put(v)";
+    } else if kind == "flag" {
+        params = "Bool";
+        js = "(v)=>globalThis.__utuWutu.put(v)";
+    } else if kind == "on" {
+        params = "cl(Browser.Event) void";
+        js = "(v)=>globalThis.__utuWutu.put(v)";
+    } else if kind == "begin" {
+        params = "Str, Str";
+        js = "(p,h)=>globalThis.__utuWutu.begin(p,h)";
+    } else if kind == "slot" {
+        js = "()=>globalThis.__utuWutu.slot()";
+    } else if kind == "arm" {
+        params = "I32";
+        js = "(n)=>globalThis.__utuWutu.arm(n)";
+    } else if kind == "item" {
+        params = "Str";
+        js = "(k)=>globalThis.__utuWutu.item(k)";
+    } else if kind == "item_index" {
+        params = "U64";
+        js = "(i)=>globalThis.__utuWutu.item(i)";
+    } else if kind == "end" {
+        js = "()=>globalThis.__utuWutu.end()";
     } else if kind == "node" {
         params = "Browser.Node";
         js = "(v)=>globalThis.__utuWutu.append(v)";
@@ -417,6 +454,20 @@ fn wutu_element_fn(entry: Str, tag: Str, svg: Bool) Str {
     name;
 }
 
+/// The reconciler's `node()` or `done()` (`entry`), typed to give the
+/// element's own interface.
+fn wutu_typed_fn(entry: Str, tag: Str, svg: Bool) Str {
+    let kind = entry + "_" + (if svg { "svg_"; } else { ""; }) + tag;
+    let w = intern_text(kind);
+    for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
+    let type = if svg { "Browser.SVGElement"; } else { "Browser.HTML" + element_interface(tag) + "Element"; };
+    let name = wutu_prefix() + kind;
+    wu_decls.push(intern_text("let " + name + ": fun() " + type + " = @es/\\ ()=>globalThis.__utuWutu." + entry + "() \\/;"));
+    wu_declared_kind.push(w);
+    wu_declared_name.push(intern_text(name));
+    name;
+}
+
 /// What goes between `HTML` and `Element` in the interface of a tag the
 /// `Browser` declarations type more closely; empty for the rest.
 fn element_interface(tag: Str) Str {
@@ -467,6 +518,8 @@ fn event_type(name: Str) Str {
 
 /// Listeners pending (words), in order.
 vec wx_events: I32;
+/// Reconciled, their ops (words), in the same order.
+vec wx_event_ops: I32;
 
 /// The statements that create template element n and its children (SVG ones
 /// under `svg` or inside one); its listeners go to @wx_events.
@@ -677,6 +730,197 @@ fn wutu_description(n: I32) Str {
         c = tn_next[c];
     };
     out + "]";
+}
+
+//! = Templates as data
+//!
+//! Reconciled, a template is a program: its structure as JSON ops (see
+//! `src/runtime/wutu.js`), which the runtime runs as the module supplies the
+//! template's values, in order. Shells, still subtrees, written text, and
+//! static attributes are only data; the code holds the holes: `put()` for an
+//! attribute, a value, or a listener, `slot()` before a value that may
+//! render, `arm()` for an if, `item()` and `end()` for a loop, and `node()`
+//! where code needs an element (an alias, a property, a binding).
+
+/// A program being written: its ops, comma-separated.
+struct WOps:
+    | text: Str
+
+fn wd_op(o: WOps, item: Str) void { o.text = o.text + (if o.text.len() > 0 { ","; } else { ""; }) + item; }
+
+/// Whether code needs element n itself: an alias, a property, or a binding.
+fn wd_needs_node(n: I32) Bool {
+    if tn_binding[n] >= 0 { return true; };
+    let i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 3 or (ti_kind[i] == 1 and (ti_flags[i] & 1) != 0) { return true; };
+        i = ti_next[i];
+    };
+    false;
+}
+
+/// Element n's ops, into `o`, and the code that supplies its values (its
+/// listeners go to @wx_events and @wx_event_ops).
+fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
+    let tag = word_text(tn_text[n]);
+    let svg = outer_svg or tag == "svg";
+    let flag = if svg { ",1"; } else { ""; };
+    let index = int_text(tn_index[n]);
+    if wutu_still(n) {
+        wd_op(o, "[\"s\"," + index + "," + wutu_description(n) + flag + "]");
+        return "";
+    };
+    let classes = wutu_classes(n);
+    wd_op(o, "[\"o\"," + index + ",[" + wutu_json(tag) + "," + wutu_static_attributes(n, classes) + "]" + flag + "]");
+    let id = node_uid(n);
+    let code = "";
+    if wd_needs_node(n) {
+        wd_op(o, "[\"n\"," + index + "]");
+        code = "let " + id + " = " + wutu_typed_fn("node", tag, svg) + "();\n";
+    };
+    let properties = "";
+    let i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 1 and not wutu_baked(i) {
+            let name = word_text(ti_a[i]);
+            let value = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+            if (ti_flags[i] & 1) != 0 {
+                // An unchanged value is not assigned: selection and caret survive updates.
+                properties = properties + "if " + id + "." + name + " != (" + value + ") { " + id + "." + name + " = (" + value + "); };\n";
+            } else if is_boolean_attribute(name) and (ti_flags[i] & 2) != 0 {
+                wd_op(o, "[\"b\"," + wutu_json(name) + "]");
+                code = code + wutu_helper("flag") + "((" + value + "));\n";
+            } else {
+                wd_op(o, if name == "class" and classes.len() > 0 { "[\"m\"," + wutu_json(classes + " ") + "]"; } else { "[\"a\"," + wutu_json(name) + "]"; });
+                // (An attribute's value is text.)
+                code = code + wutu_helper("put_text") + "((" + value + "));\n";
+            };
+        };
+        i = ti_next[i];
+    };
+    i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 5 {
+            wd_op(o, "[\"y\"," + wutu_json(word_text(ti_a[i])) + "]");
+            code = code + wutu_helper("put_text") + "((" + wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n) + "));\n";
+        };
+        i = ti_next[i];
+    };
+    let child_svg = svg and tag != "foreignObject";
+    let c = tn_first[n];
+    while (c >= 0) {
+        code = code + wd_child(c, child_svg, o);
+        c = tn_next[c];
+    };
+    wd_op(o, "[\"c\"]");
+    code = code + properties;
+    i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 3 { code = code + wd_binding(n, i); };
+        if ti_kind[i] == 2 {
+            let handler = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+            let name = word_text(ti_a[i]);
+            let prevent = if name == "submit" { "event.preventDefault();"; } else { ""; };
+            let type = event_type(name);
+            let shorthand = (ti_flags[i] & 1) != 0;
+            // `on mousemove { … }` gets `event: MouseEvent`, as HTMLElementEventMap
+            // types it: a handler that names `event` (one that does not checks nothing).
+            let listener = if not shorthand { handler; }
+                else if type.len() > 0 and names_event(word_text(ti_b[i])) { "cl(__wutu_event) void { alt __wutu_event { Browser." + type + " |event| => { " + prevent + " " + handler + "; }, ~> {}, }; }"; }
+                else { "cl(event) void { " + prevent + " " + handler + "; }"; };
+            wx_events.push(intern_text(wutu_helper("on") + "((" + listener + "));\n"));
+            wx_event_ops.push(intern_text("[\"v\"," + index + "," + wutu_json(name) + "]"));
+        };
+        i = ti_next[i];
+    };
+    code;
+}
+
+/// A binding's code: the property written on render, read back on input.
+fn wd_binding(n: I32, i: I32) Str {
+    let id = node_uid(n);
+    let numeric = word_text(ti_a[i]) == "number";
+    let property = if numeric { "valueAsNumber"; } else { word_text(ti_a[i]); };
+    let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
+    let sync = located_splice(wu_site[0], "if " + (if numeric { id + ".validity.valid and "; } else { ""; }) + id + "." + property + " != (" + target + ") { " + id + "." + property + " = (" + target + "); }", ti_at[i], ti_to[i]);
+    let event = if word_text(ti_a[i]) == "checked" { "change"; } else { "input"; };
+    // NaN != NaN: an unparsable number leaves the state as it is.
+    let update = located_splice(wu_site[0], if numeric { "if " + id + "." + property + " == " + id + "." + property + " { " + target + " = " + id + "." + property + "; }"; }
+        else { target + " = " + id + "." + property; }, ti_at[i], ti_to[i]);
+    wx_events.push(intern_text(wutu_helper("on") + "(cl(event) void { " + update + "; });\n"));
+    wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + event + "\"]"));
+    sync + ";\n";
+}
+
+/// The children from `first`, as ops into `o`, then their listeners.
+fn wd_fragment(first: I32, svg: Bool, o: WOps) Str {
+    let mark = wx_events.len();
+    let code = "";
+    let c = first;
+    while (c >= 0) {
+        code = code + wd_child(c, svg, o);
+        c = tn_next[c];
+    };
+    for (mark ..< wx_events.len()) |k| {
+        code = code + word_text(wx_events[k]);
+        wd_op(o, word_text(wx_event_ops[k]));
+    };
+    wx_events.resize(mark);
+    wx_event_ops.resize(mark);
+    code;
+}
+
+/// A child's ops, into `o`, and its code.
+fn wd_child(child: I32, svg: Bool, o: WOps) Str {
+    let kind = tn_kind[child];
+    if kind == 4 { return wd_element(child, svg, o); };
+    if kind == 2 {
+        let then = WOps { text: "" };
+        let otherwise = WOps { text: "" };
+        let condition = wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child);
+        let a = wd_fragment(tn_first[child], svg, then);
+        let b = wd_fragment(tn_else[child], svg, otherwise);
+        wd_op(o, "[\"i\",[" + then.text + "],[" + otherwise.text + "]]");
+        return "if (" + condition + ") { " + wutu_helper("arm") + "(1); " + a + " } else { " + wutu_helper("arm") + "(0); " + b + " };\n";
+    };
+    if kind == 3 { return wd_loop(child, svg, o); };
+    // Written text is data; another value is a hole (with a call key, for
+    // the elements a component it calls makes).
+    let source = word_text(tn_text[child]);
+    if tn_from[child] < 0 and plain_literal(source) {
+        wd_op(o, "[\"t\"," + wutu_json(source.slice(1, source.len() - 1)) + "]");
+        return "";
+    };
+    let value = "(" + wutu_island(source, tn_from[child], tn_to[child], child) + ")";
+    if tn_from[child] < 0 {
+        wd_op(o, "[\"w\"]");
+        return wutu_helper("put") + "(" + value + ");\n";
+    };
+    wd_op(o, "[\"x\"," + int_text(tn_from[child]) + "]");
+    wutu_helper("slot") + "();\n" + wutu_helper("put") + "(" + value + ");\n";
+}
+
+/// A `for`: its body as a program of its own, run per `item()`.
+fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
+    let written = word_text(tn_captures[n]);
+    let comma = text_index(written, ",", 0);
+    let keyed = tn_key[n] >= 0;
+    let index = "";
+    let captures = written;
+    if comma >= 0 { index = trim_text(written.slice(comma + 1, written.len())); }
+    else if not keyed {
+        index = wutu_prefix() + "index" + int_text(wu_node_count[0]);
+        wu_node_count[0] += 1;
+        captures = written + ", " + index;
+    };
+    let iterable = wutu_island(word_text(tn_text[n]), tn_from[n], tn_to[n], n);
+    let next = if keyed { wutu_helper("item") + "(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ");"; }
+        else { wutu_helper("item_index") + "(" + index + ");"; };
+    let body = WOps { text: "" };
+    let fragment = wd_fragment(tn_first[n], svg, body);
+    let mode = if not keyed { 0; } else if tn_global[n] == 1 { 2; } else { 1; };
+    wd_op(o, "[\"f\"," + int_text(mode) + "," + int_text(tn_from[n]) + ",[" + body.text + "]]");
+    iterable + " each |" + captures + "| { " + next + " " + fragment + " };\n" + wutu_helper("end") + "();\n";
 }
 
 /// `bind:value|checked|number`: write the property on render, read it back on input.

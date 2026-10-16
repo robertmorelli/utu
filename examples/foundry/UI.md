@@ -138,17 +138,20 @@ URL parameters, read at startup:
 
 Headless Chromium, arm64 macOS, a 600-block factory save (9,975 entities),
 35 pinned panels, the Production and Power windows open, 300 frames; both
-builds reach the same state hash. Sizes are what `tools/build-wutu.mjs` and
-`tools/build-react.mjs` report (the page's embedded game data not counted).
+builds reach the same state hash. Sizes are what `tools/build-wutu.mjs` (the
+self-hosted compiler) and `tools/build-react.mjs` report (the page's embedded
+game data not counted).
 
 | | utu + wutu | TypeScript + React |
 | --- | ---: | ---: |
-| payload, gzip | 45.0 KB (38.4 wasm + 6.6 JS glue) | 87.6 KB (68.9 of it React + ReactDOM) |
-| payload, brotli | 37.6 KB | 76.1 KB |
-| work per frame (avg / p95) | 5.1 / 6.5 ms | 2.2 / 3.1 ms |
+| payload, gzip | 36.8 KB (29.2 wasm + 7.7 JS) | 87.6 KB (68.9 of it React + ReactDOM) |
+| payload, brotli | 31.5 KB | 76.1 KB |
+| work per frame (avg / p95) | 2.7 / 3.4 ms | 2.3 / 3.1 ms |
 
-utu ships no framework runtime, so it is smaller in total. Per component it
-costs more: in a generated app of N like components, each adds about 114 B
-gzip in utu and 39 B in React (0.85 KB and 0.66 KB uncompressed), so utu stays
-smaller up to roughly 500 components. Live updates take about twice as long
-per frame: wutu re-renders each island and reconciles against the DOM itself.
+utu ships no framework runtime, so it is smaller in total, and a template is
+mostly data (a program the runtime runs), so its components are small too:
+in a generated app of N like components, each adds about 72 B gzip in utu
+and 39 B in React (0.69 KB and 0.66 KB uncompressed), so utu stays smaller up
+to about 2,000 components. Event handlers cost the most per use (each is a
+function of its own); text, attributes, styles, and conditionals cost less
+than React's.

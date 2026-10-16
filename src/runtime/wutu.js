@@ -206,20 +206,28 @@ export function createWutuRuntime() {
   /** The element a description makes (cloned from then on), and its attribute names. */
   function prototype(description, svg) {
     let entry = prototypes.get(description);
-    if (!entry) {
-      const tree = JSON.parse(description);
-      const build = ([tag, attributes, ...children], svg) => {
-        svg = svg || tag === 'svg';
-        const element = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
-        for (const name in attributes) element.setAttribute(name, attributes[name]);
-        const childSvg = svg && tag !== 'foreignObject';
-        for (const child of children) element.append(typeof child === 'string' ? child : build(child, childSvg));
-        return element;
-      };
-      entry = [build(tree, svg), Object.keys(tree[1])];
-      prototypes.set(description, entry);
-    }
+    if (!entry) prototypes.set(description, entry = prototypeOf(JSON.parse(description), svg));
     return entry;
+  }
+
+  // A description already parsed (a template program's): by the array itself.
+  const trees = new WeakMap();
+  function prototypeOfTree(tree, svg) {
+    let entry = trees.get(tree);
+    if (!entry) trees.set(tree, entry = prototypeOf(tree, svg));
+    return entry;
+  }
+
+  function prototypeOf(tree, svg) {
+    const build = ([tag, attributes, ...children], svg) => {
+      svg = svg || tag === 'svg';
+      const element = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
+      for (const name in attributes) element.setAttribute(name, attributes[name]);
+      const childSvg = svg && tag !== 'foreignObject';
+      for (const child of children) element.append(typeof child === 'string' ? child : build(child, childSvg));
+      return element;
+    };
+    return [build(tree, svg), Object.keys(tree[1])];
   }
 
   /** Enter an element made from its shell: its tag and static attributes. */
@@ -301,6 +309,136 @@ export function createWutuRuntime() {
     else metadata.set(node, { attrs });
     place(node, frame.wanted);
     return node;
+  }
+
+  // ── Template programs ──────────────────────────────────────────────────────
+  //
+  // A template compiled to data: its structure as a program of ops (JSON),
+  // run here as the module supplies its values, in order. Static ops run
+  // as soon as they are reached; a hole waits for its call:
+  //
+  //   ["s", i, tree, svg?]   a still subtree, element i
+  //   ["o", i, tree, svg?]   open element i from its shell; ["c"] closes it
+  //   ["t", text]            written text
+  //   ["a", name] ["m", classes] ["b", name] ["y", property]
+  //                          an attribute, a class merged after the static
+  //                          ones, a boolean attribute, a style value: put()
+  //   ["x", p] ["w"]         a value (with a call key, from slot()), a text: put()
+  //   ["v", i, event]        a listener on element i: put()
+  //   ["n", i]               element i, to the module: node()
+  //   ["i", then, else]      an if: arm()
+  //   ["f", mode, p, body]   a loop (mode 0 by index, 1 keyed, 2 globally
+  //                          keyed): item() per iteration, end() after
+  const programs = new Map();      // program text -> its ops
+  const BODY_END = ['end'];
+  let run = null;                  // the template running: { h, nodes, stack, loop }
+
+  function begin(text, h) {
+    let ops = programs.get(text);
+    if (!ops) programs.set(text, ops = JSON.parse(text));
+    run = { h, nodes: [], stack: [{ ops, pc: 0, kind: 'top' }], outer: run, pending: null };
+  }
+
+  /** Run static ops up to the next hole, and return it (BODY_END at a loop body's end, null at the end). */
+  function advance() {
+    for (;;) {
+      const top = run.stack.at(-1);
+      if (top.pc >= top.ops.length) {
+        if (top.kind === 'arm') { run.stack.pop(); continue; }
+        return top.kind === 'body' ? BODY_END : null;
+      }
+      const op = top.ops[top.pc++];
+      switch (op[0]) {
+        case 's': {
+          const [element] = prototypeOfTree(op[2], !!op[3]);
+          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(true));
+          break;
+        }
+        case 'o': {
+          const [element, names] = prototypeOfTree(op[2], !!op[3]);
+          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false)), names);
+          break;
+        }
+        case 'c': leave(); break;
+        case 't': append(op[1]); break;
+        default: return op;
+      }
+    }
+  }
+
+  /** A value for the next hole. */
+  function put(value) {
+    if (run?.pending) {
+      run.pending = null;
+      append(value);
+      keys.pop();
+      return;
+    }
+    if (!run) { append(value); keys.pop(); return; }  // (from code made before programs)
+    const op = advance(), node = frames.at(-1)?.node;
+    switch (op[0]) {
+      case 'a': attr(node, op[1], value); break;
+      case 'm': attr(node, 'class', op[1] + value); break;
+      case 'b': attr(node, op[1], !!value); break;
+      case 'y': node.style.setProperty(op[1], value); break;
+      case 'w': append(value); break;
+      case 'v': listen(run.nodes[op[1]], op[2], value); break;
+      default: throw new Error('Wutu: a value where the template has ' + JSON.stringify(op?.[0]));
+    }
+  }
+
+  /** Before a value that may render (a component): its call key. */
+  function slot() {
+    const op = advance();
+    keys.push({ value: `call:${run.h}:${op[1]}`, explicit: false });
+    run.pending = op;
+  }
+
+  /** An if takes its then (1) or else (0) arm. */
+  function arm(which) {
+    const op = advance();
+    run.stack.push({ ops: which ? op[1] : op[2], pc: 0, kind: 'arm' });
+  }
+
+  /** Ends the current iteration, if any; returns the loop. */
+  function iteration() {
+    const op = advance();
+    if (op !== BODY_END) return [op, null];
+    const body = run.stack.at(-1);
+    keys.pop();
+    if (body.loop[1] === 0) keys.pop();
+    return [body.loop, body];
+  }
+
+  /** The next iteration of a loop, known by `key` (its index, unkeyed). */
+  function item(key) {
+    const [loop, body] = iteration();
+    if (body) body.pc = 0;
+    else run.stack.push({ ops: loop[3], pc: 0, kind: 'body', loop });
+    const value = String(key), mode = loop[1];
+    if (mode === 0) {
+      keys.push({ value: `loop:${run.h}:${loop[2]}`, explicit: false });
+      keys.push({ value, explicit: false });
+    } else {
+      keys.push({ value, explicit: true, global: mode === 2, depth: frames.length });
+    }
+  }
+
+  /** After a loop's last iteration. */
+  function end() {
+    const [, body] = iteration();
+    if (body) run.stack.pop();
+  }
+
+  /** The element a node op names. */
+  function node() { return run.nodes[advance()[1]]; }
+
+  /** The template's end: its root element. */
+  function done() {
+    while (advance() !== null) { /* (only static ops remain) */ }
+    const root = run.nodes[0];
+    run = run.outer;
+    return root;
   }
 
   function render(view) {
@@ -401,8 +539,7 @@ export function createWutuRuntime() {
 
   const api = {
     enter, shell, still, append, attr, listen, leave, mount, refresh, invalidate, style,
-    /** Append a slot's value and pop its call key. */
-    put(value) { append(value); keys.pop(); },
+    put, begin, slot, arm, item, end, node, done,
     storageError: '',
     notify() {
       for (const ref of views) {
