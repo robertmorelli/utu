@@ -9,6 +9,8 @@ mod wutu {
   const dirty = new Set();
   const afterRender = [];
   const installedStyles = new Set();
+  const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
+  const prototypes = new Map();     // description -> [element, its attribute names]
   let frames = [], active = null, keys = [], scheduled = false, generation = 0;
 
   function style(css) {
@@ -32,15 +34,24 @@ mod wutu {
     schedule(view);
   }
 
-  /** Identity of an element: its site, then keys pushed since the last global key. */
-  function identityOf(site, key) {
-    const lastGlobal = Math.max(0, keys.findLastIndex(k => k.global));
-    const path = keys.slice(lastGlobal).map(k => `:${k.explicit ? 'k' : 'c'}${k.value.length}:${k.value}`).join('');
-    return site + (key ? ':' + key : '') + path;
+  const NO_ATTRS = new Set();
+
+  /** An element's identity, from its attribute the first time (a prerendered one). */
+  function identityOfNode(node) {
+    let identity = identities.get(node);
+    if (identity === undefined) identities.set(node, identity = node.getAttribute('data-wutu'));
+    return identity;
   }
 
   /** Make `parent`'s children exactly `wanted`, moving nodes and keeping focus. */
   function place(parent, wanted) {
+    // Usually they already are.
+    const children = parent.childNodes;
+    if (children.length === wanted.length) {
+      let same = true;
+      for (let i = 0; same && i < wanted.length; i++) same = children[i] === wanted[i];
+      if (same) return;
+    }
     const focused = document.activeElement;
     const selection = focused && 'selectionStart' in focused
       ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection]
@@ -64,71 +75,151 @@ mod wutu {
     }
   }
 
-  function claimIdentity(parent, identity) {
-    const globallyKeyed = keys.some(k => k.global);
-    if (globallyKeyed && active) {
+  function claimIdentity(parent, identity, global, explicit) {
+    if (global && active) {
       if (active.globalClaims.has(identity)) throw new Error('Duplicate global Wutu key: ' + identity);
       active.globalClaims.add(identity);
     }
-    if (keys.some(k => k.explicit)) {
-      if (parent?.keyed.has(identity)) throw new Error('Duplicate Wutu key: ' + keys.findLast(k => k.explicit).value);
-      parent?.keyed.add(identity);
+    if (explicit && parent) {
+      parent.keyed ??= new Set();
+      if (parent.keyed.has(identity)) throw new Error('Duplicate Wutu key: ' + keys.findLast(k => k.explicit).value);
+      parent.keyed.add(identity);
     }
   }
 
   /** The previous render's element for this identity, if one can be reused. */
-  function reusable(parent, identity, tag) {
-    const queue = parent?.byKey.get(identity);
+  function reusable(parent, identity, tag, global) {
+    // Usually it is where it was last time.
+    const at = parent?.old[parent.wanted.length];
+    if (at?.nodeType === 1 && at.localName === tag && identityOfNode(at) === identity && !parent.used.has(at)) return at;
+    const queue = parent && byKey(parent).get(identity);
     while (queue && queue.index < queue.nodes.length) {
       const candidate = queue.nodes[queue.index++];
       if (!parent.used.has(candidate) && candidate.localName === tag) return candidate;
     }
-    if (keys.some(k => k.global)) return active?.globalNodes.get(identity);
-    return undefined;
+    return global ? globalNode(identity) : undefined;
   }
 
-  function enter(tag, svg, site, key) {
-    const parent = frames.at(-1), identity = identityOf(site, key);
-    claimIdentity(parent, identity);
-    let node = reusable(parent, identity, tag);
+  /** A frame's previous child elements by identity (indexed when first asked). */
+  function byKey(frame) {
+    if (frame.byKey) return frame.byKey;
+    frame.byKey = new Map();
+    for (const child of frame.old) {
+      if (child.nodeType !== 1) continue;
+      const identity = identityOfNode(child);
+      let queue = frame.byKey.get(identity);
+      if (!queue) frame.byKey.set(identity, queue = { nodes: [], index: 0 });
+      queue.nodes.push(child);
+    }
+    return frame.byKey;
+  }
+
+  /** The view's element of a global identity, from before this render (indexed when first asked). */
+  function globalNode(identity) {
+    if (!active) return undefined;
+    if (!active.globalNodes) {
+      active.globalNodes = new Map();
+      for (const node of active.root?.querySelectorAll('[data-wutu]') ?? []) active.globalNodes.set(identityOfNode(node), node);
+    }
+    return active.globalNodes.get(identity);
+  }
+
+  /**
+   * The element for `site` here: last render's, a prerendered one, or what
+   * `make()` makes. It joins its parent's children where it is entered.
+   */
+  function claim(site, key, tag, make) {
+    const parent = frames.at(-1);
+    // Identity: the site, then the keys pushed since the last global key.
+    let identity = site + (key ? ':' + key : ''), global = false, explicit = false;
+    if (keys.length) {
+      // Keys are checked for duplicates where they are pushed: below that,
+      // an identity is unique when its key is.
+      let from = 0;
+      for (let i = 0; i < keys.length; i++) {
+        if (keys[i].global) { from = i; global = keys[i].depth === frames.length; }
+        if (keys[i].explicit) explicit = keys[i].depth === frames.length;
+      }
+      for (let i = from; i < keys.length; i++) {
+        const k = keys[i];
+        identity += `:${k.explicit ? 'k' : 'c'}${k.value.length}:${k.value}`;
+      }
+    }
+    claimIdentity(parent, identity, global, explicit);
+    let node = reusable(parent, identity, tag, global);
     if (node) active?.retained.add(node);
     // A root reuses its own previous element, or adopts prerendered markup.
     if (!parent) node = active?.root ?? document.querySelector(`[data-wutu-root="${site}"][data-wutu-prerender]`);
-    node?.removeAttribute('data-wutu-prerender');
-    if (node?.hasAttribute('data-wutu-pending')) {
-      node.disabled = false;
-      node.removeAttribute('data-wutu-pending');
+    // (Only an element this runtime has not seen can be prerendered.)
+    if (node && !identities.has(node)) {
+      node.removeAttribute('data-wutu-prerender');
+      if (node.hasAttribute('data-wutu-pending')) {
+        node.disabled = false;
+        node.removeAttribute('data-wutu-pending');
+      }
     }
-    if (!node || node.localName !== tag) {
-      node = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
-    }
+    if (!node || node.localName !== tag) node = make();
     if (parent) { parent.used.add(node); parent.wanted.push(node); }
-    node.setAttribute('data-wutu', identity);
+    if (identities.get(node) !== identity) {
+      node.setAttribute('data-wutu', identity);
+      identities.set(node, identity);
+    }
     if (!parent) {
-      node.setAttribute('data-wutu-root', site);
+      if (node.getAttribute('data-wutu-root') !== site) node.setAttribute('data-wutu-root', site);
       if (active) active.root = node;
     }
-    const oldAttrs = metadata.get(node)?.attrs
-      ?? new Set([...node.attributes].map(a => a.name).filter(name => !name.startsWith('data-wutu')));
-    const frame = {
-      node,
-      old: [...node.childNodes],
-      used: new Set(),
-      wanted: [],
-      attrs: new Set(),
-      oldAttrs,
-      byKey: new Map(),
-      keyed: new Set(),
-    };
-    for (const child of frame.old) {
-      if (child.nodeType !== 1) continue;
-      const childIdentity = child.getAttribute('data-wutu');
-      let queue = frame.byKey.get(childIdentity);
-      if (!queue) frame.byKey.set(childIdentity, queue = { nodes: [], index: 0 });
-      queue.nodes.push(child);
-    }
-    frames.push(frame);
     return node;
+  }
+
+  /**
+   * Begin an element's children; `kept` names the attributes it has from its
+   * shell, which no render sets. (`old` is the live child list: they move only
+   * when this frame leaves.)
+   */
+  function open(node, kept) {
+    // An element first seen (made, or prerendered) has had no render set its
+    // attributes: those it has now, but its shell's, are what a render may drop.
+    const meta = metadata.get(node);
+    const before = meta ? null : new Set([...node.attributes].map(a => a.name)
+      .filter(name => !name.startsWith('data-wutu') && !kept.includes(name)));
+    frames.push({ node, meta, before, old: node.childNodes, used: new Set(), wanted: [], attrs: null, byKey: null, keyed: null });
+    return node;
+  }
+
+  function enter(tag, svg, site, key) {
+    return open(claim(site, key, tag, () =>
+      svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag)), []);
+  }
+
+  /** The element a description makes (cloned from then on), and its attribute names. */
+  function prototype(description, svg) {
+    let entry = prototypes.get(description);
+    if (!entry) {
+      const tree = JSON.parse(description);
+      const build = ([tag, attributes, ...children], svg) => {
+        svg = svg || tag === 'svg';
+        const element = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
+        for (const name in attributes) element.setAttribute(name, attributes[name]);
+        const childSvg = svg && tag !== 'foreignObject';
+        for (const child of children) element.append(typeof child === 'string' ? child : build(child, childSvg));
+        return element;
+      };
+      entry = [build(tree, svg), Object.keys(tree[1])];
+      prototypes.set(description, entry);
+    }
+    return entry;
+  }
+
+  /** Enter an element made from its shell: its tag and static attributes. */
+  function shell(description, svg, site) {
+    const [element, names] = prototype(description, svg);
+    return open(claim(site, '', element.localName, () => element.cloneNode(false)), names);
+  }
+
+  /** A subtree with nothing dynamic in it: made from its description, then kept as it is. */
+  function still(description, svg, site) {
+    const [element] = prototype(description, svg);
+    return claim(site, '', element.localName, () => element.cloneNode(true));
   }
 
   /** Append a node (a component or slot) or text, reusing the text node in this position. */
@@ -148,7 +239,7 @@ mod wutu {
 
   /** Set an attribute for this render; null/false remove it, true sets it empty. */
   function attr(node, name, value) {
-    frames.at(-1).attrs.add(name);
+    (frames.at(-1).attrs ??= new Set()).add(name);
     if (value === null || value === false) {
       node.removeAttribute(name);
       return;
@@ -190,11 +281,14 @@ mod wutu {
   }
 
   function leave() {
-    const frame = frames.pop();
-    for (const name of frame.oldAttrs) if (!frame.attrs.has(name)) frame.node.removeAttribute(name);
-    metadata.set(frame.node, { ...metadata.get(frame.node), attrs: frame.attrs });
-    place(frame.node, frame.wanted);
-    return frame.node;
+    const frame = frames.pop(), node = frame.node, attrs = frame.attrs ?? NO_ATTRS;
+    // The attributes a render set last time and not this time go.
+    const meta = frame.meta;
+    for (const name of meta ? meta.attrs : frame.before) if (!attrs.has(name)) node.removeAttribute(name);
+    if (meta) meta.attrs = attrs;
+    else metadata.set(node, { attrs });
+    place(node, frame.wanted);
+    return node;
   }
 
   function render(view) {
@@ -203,9 +297,8 @@ mod wutu {
     view.cleanupCallbacks ??= [];
     view.removals = new Set();
     view.retained = new Set();
-    view.globalNodes = new Map();
+    view.globalNodes = null;
     view.globalClaims = new Set();
-    for (const node of view.root?.querySelectorAll('[data-wutu]') ?? []) view.globalNodes.set(node.getAttribute('data-wutu'), node);
     frames = [];
     active = view;
     keys = [];
@@ -222,7 +315,7 @@ mod wutu {
       if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
     } finally {
       [frames, active, keys] = previous;
-      view.globalNodes.clear();
+      view.globalNodes = null;
       view.removals.clear();
       view.retained.clear();
     }
@@ -295,7 +388,9 @@ mod wutu {
   addEventListener('popstate', refresh);
 
   const api = {
-    enter, append, attr, listen, leave, mount, refresh, invalidate, style,
+    enter, shell, still, append, attr, listen, leave, mount, refresh, invalidate, style,
+    /** Append a slot's value and pop its call key. */
+    put(value) { append(value); keys.pop(); },
     storageError: '',
     notify() {
       for (const ref of views) {
@@ -314,8 +409,8 @@ mod wutu {
     after(callback) { afterRender.push(callback); schedule(); },
     focus(id) { afterRender.push(() => document.getElementById(id)?.focus()); schedule(); },
     cleanup(callback) { if (active) active.cleanupCallbacks[active.cleanupIndex++] = callback; },
-    pushGlobal: key => keys.push({ value: String(key), explicit: true, global: true }),
-    pushKey: key => keys.push({ value: String(key), explicit: true }),
+    pushGlobal: key => keys.push({ value: String(key), explicit: true, global: true, depth: frames.length }),
+    pushKey: key => keys.push({ value: String(key), explicit: true, depth: frames.length }),
     pushCall: key => keys.push({ value: key, explicit: false }),
     popKey: () => keys.pop(),
   };

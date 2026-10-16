@@ -9,6 +9,7 @@ import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 import { hasLexicalShadow } from './hoist-modules.js';
 import { expressionFromSource } from './source-expansion.js';
 import { BOOLEAN_ATTRIBUTES, WutuSyntaxError, parseWutu, wutuVocabulary } from './wutu-parse.js';
+import { decodeEscapes } from './string-escapes.js';
 
 // Event interfaces from lib.dom's HTMLElementEventMap, for `on name { … }`.
 const EVENT_TYPES = Object.fromEntries([
@@ -45,6 +46,7 @@ const RUNTIME_HELPERS = {
   attr: ['Browser.Element, Str, Str', 'void', '(n,k,v)=>globalThis.__utuWutu.attr(n,k,v)'],
   boolean: ['Browser.Element, Str, Bool', 'void', '(n,k,v)=>globalThis.__utuWutu.attr(n,k,!!v)'],
   append: ['Externref', 'void', '(v)=>globalThis.__utuWutu.append(v)'],
+  put: ['Externref', 'void', '(v)=>globalThis.__utuWutu.put(v)'],
   node: ['Browser.Node', 'void', '(v)=>globalThis.__utuWutu.append(v)'],
   event: ['Browser.Element, Str, cl(Browser.Event) void', 'void', '(n,e,h)=>globalThis.__utuWutu.listen(n,e,h)'],
   leave: ['', 'void', '()=>{globalThis.__utuWutu.leave()}'],
@@ -244,6 +246,54 @@ class SiteExpander {
     return key;
   }
 
+  /** The text a written string (`"…"`) means, or null for any other source. */
+  literal(source) {
+    return /^"[^"]*"$/.test(source) ? decodeEscapes(source.slice(1, -1)) : null;
+  }
+
+  /** An element's classes, its scoped CSS's among them (registered here). */
+  classesOf(node) {
+    const classes = [...node.classes];
+    if (node.css.length) {
+      const css = node.css.map(rule => rule.css).join(''), key = 'w' + hash(css);
+      this.styles.set(key, `.${key}{${css}}`);
+      classes.push(key);
+    }
+    return classes;
+  }
+
+  /** The attributes known when compiling: the classes (unless a written class merges them) and written values. */
+  staticAttributes(node, classes) {
+    const attributes = {};
+    const dynamicClass = node.attrs.some(attr => attr.name === 'class');
+    if (classes.length && !dynamicClass) attributes.class = classes.join(' ');
+    for (const attr of node.attrs) {
+      if (attr.dynamic || attr.property || attr.name === 'class') continue;
+      const value = this.literal(attr.value);
+      if (value != null) attributes[attr.name] = value;
+    }
+    return attributes;
+  }
+
+  /**
+   * Whether nothing in an element's subtree changes between renders: no
+   * expressions, events, bindings, styles, or aliases; only written text.
+   * (Raw-text elements are left to the general path.)
+   */
+  isStill(node) {
+    if (node.binding || node.events.length || node.twoWay.length || node.styles?.length) return false;
+    if (['script', 'style', 'textarea', 'template'].includes(node.tag)) return false;
+    if (node.attrs.some(attr => attr.dynamic || attr.property || this.literal(attr.value) == null)) return false;
+    return node.children.every(child => child.kind === 'element' ? this.isStill(child)
+      : child.kind === 'text' && this.literal(child.expr) != null);
+  }
+
+  /** A still subtree's description: `[tag, {attributes}, ...children]`. */
+  description(node) {
+    return [node.tag, this.staticAttributes(node, this.classesOf(node)),
+      ...node.children.map(child => child.kind === 'element' ? this.description(child) : this.literal(child.expr))];
+  }
+
   /** Declare (once per site) a typed binding to a reconciler entry point. */
   helper(kind) {
     if (this.declared.has(kind)) return this.declared.get(kind);
@@ -256,16 +306,16 @@ class SiteExpander {
   }
 
   /**
-   * The reconciler's enter() typed to return the element's concrete
-   * interface. An element is known by its template's hash and its index
-   * there (`v<hash>:<index>`), put together in the glue.
+   * The reconciler's shell() or still(), typed to return the element's
+   * concrete interface. An element is known by its template's hash and its
+   * index there (`v<hash>:<index>`), put together in the glue.
    */
-  enter(tag, svg) {
-    const kind = 'enter_' + tag;
+  element(entry, tag, svg) {
+    const kind = `${entry}_${svg ? 'svg_' : ''}${tag}`;
     if (this.declared.has(kind)) return this.declared.get(kind);
     const type = svg ? 'Browser.SVGElement' : `Browser.HTML${ELEMENT_INTERFACES[tag] ?? ''}Element`;
     const name = this.prefix + kind;
-    this.declarations.push(`let ${name}: fun(Str, Str, I32) ${type} = @es/\\ (t,h,i)=>globalThis.__utuWutu.enter(t,${svg},"v"+h+":"+i,"") \\/;`);
+    this.declarations.push(`let ${name}: fun(Str, Str, I32) ${type} = @es/\\ (d,h,i)=>globalThis.__utuWutu.${entry}(d,${svg},"v"+h+":"+i) \\/;`);
     this.declared.set(kind, name);
     return name;
   }
@@ -278,25 +328,25 @@ class SiteExpander {
     svg = svg || node.tag === 'svg';
     const id = node.uid;
     const properties = [];
+    const site = `${JSON.stringify(this.viewHash)}, ${node.index}`;
+    // A still subtree is one call; it joins its parent where it is made.
+    if (this.reconcile && this.isStill(node)) {
+      code.push(`let ${id} = ${this.element('still', node.tag, svg)}(${JSON.stringify(JSON.stringify(this.description(node)))}, ${site});`);
+      return id;
+    }
+    const classes = this.classesOf(node);
+    // Reconciled, the static attributes come with the element, in its shell.
+    const shell = this.reconcile ? this.staticAttributes(node, classes) : {};
     if (this.reconcile) {
-      code.push(`let ${id} = ${this.enter(node.tag, svg)}(${JSON.stringify(node.tag)}, ${JSON.stringify(this.viewHash)}, ${node.index});`);
+      code.push(`let ${id} = ${this.element('shell', node.tag, svg)}(${JSON.stringify(JSON.stringify([node.tag, shell]))}, ${site});`);
     } else {
       const create = svg ? `createElementNS("${SVG_NAMESPACE}", ` : 'createElement(';
       code.push(`let ${id} = Browser.document.${create}${JSON.stringify(node.tag)});`);
-    }
-
-    const classes = [...node.classes];
-    if (node.css.length) {
-      const css = node.css.map(rule => rule.css).join(''), key = 'w' + hash(css);
-      this.styles.set(key, `.${key}{${css}}`);
-      classes.push(key);
-    }
-    const classList = JSON.stringify(classes.join(' '));
-    if (classes.length) {
-      code.push(this.reconcile ? `${this.helper('attr')}(${id}, "class", ${classList});` : `${id}.setAttribute("class", ${classList});`);
+      if (classes.length) code.push(`${id}.setAttribute("class", ${JSON.stringify(classes.join(' '))});`);
     }
 
     for (const attr of node.attrs) {
+      if (attr.name in shell && attr.name !== 'class') continue;
       const value = this.island(attr.value, attr.range, node);
       const name = JSON.stringify(attr.name);
       if (attr.property) {
@@ -335,8 +385,10 @@ class SiteExpander {
       const handler = this.island(event.handler, event.range, node);
       const prevent = event.name === 'submit' ? 'event.preventDefault();' : '';
       const type = EVENT_TYPES[event.name];
-      // `on mousemove { … }` gets `event: MouseEvent`, as HTMLElementEventMap types it.
-      const listener = !event.shorthand ? handler : type
+      // `on mousemove { … }` gets `event: MouseEvent`, as HTMLElementEventMap
+      // types it: a handler that names `event` (one that does not checks nothing).
+      const named = /(^|[^\w.])event\b/.test(event.handler);
+      const listener = !event.shorthand ? handler : type && named
         ? `cl(__wutu_event) void { alt __wutu_event { Browser.${type} |event| => { ${prevent} ${handler}; }, ~> {}, }; }`
         : `cl(event) void { ${prevent} ${handler}; }`;
       const name = JSON.stringify(event.name);
@@ -387,8 +439,9 @@ class SiteExpander {
         body.push(this.emitLoop(parent, child));
         return;
       case 'element': {
+        // Reconciled, an element joins its parent when it is entered.
         const value = this.emitElement(child, body, handlers, parent.childSvg);
-        body.push(this.reconcile ? `${this.helper('node')}(${value});` : `${parent.id}.append(${value});`);
+        if (!this.reconcile) body.push(`${parent.id}.append(${value});`);
         return;
       }
       default: {
@@ -405,8 +458,7 @@ class SiteExpander {
           return;
         }
         body.push(`${this.helper('call')}(${JSON.stringify(this.viewHash)}, ${child.range.start});`);
-        body.push(`${this.helper('append')}(${value});`);
-        body.push(`${this.helper('unkey')}();`);
+        body.push(`${this.helper('put')}(${value});`);
       }
     }
   }
