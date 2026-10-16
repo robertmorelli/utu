@@ -10,8 +10,20 @@ import { nodePackageResolver } from './packages.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** Package any UTU main as browser Wasm + minimal generated JS, with no app glue. */
-export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size' }) {
+const size = bytes => ({ raw: bytes.length, gzip: gzipSync(bytes, { level: 9 }).length, brotli: brotliCompressSync(bytes).length });
+
+// What the page does once the module is instantiated: drop the static
+// fallback, run main, and say it is ready; or, when it cannot start, say so.
+const START = 'document.querySelectorAll("[data-utu-static]").forEach(n=>n.remove());\nawait exports.main?.();\ndocument.documentElement.setAttribute("data-utu-ready","");';
+const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error);';
+
+/**
+ * Package any UTU main as browser Wasm + minimal generated JS, with no app
+ * glue. The self-hosted compiler builds it (`compiler: 'stage0'`, or a
+ * custom `stdlib`, uses the JavaScript compiler).
+ */
+export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size', compiler = 'self' }) {
+  if (compiler === 'self' && !stdlib) return buildWithSelfhost({ entry, outDir, optimize });
   const parser = suppliedParser ?? await initParser({ wasmDir: `${ROOT}/` });
   const started = performance.now();
   try {
@@ -58,7 +70,6 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
     // The intermediate module is not a deployed asset.
     await fs.unlink(gluePath);
     const javascript = await fs.readFile(path.join(outDir, 'app.js'));
-    const size = bytes => ({ raw: bytes.length, gzip: gzipSync(bytes, { level: 9 }).length, brotli: brotliCompressSync(bytes).length });
     const report = { wasm: size(wasm), javascript: size(javascript), imports: live.size,
       declaredBindings: Object.values(spec).reduce((n, m) => n + Object.keys(m).length, 0), compileMs: Math.round(performance.now() - started) };
     report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key]]));
@@ -74,6 +85,45 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
   } finally {
     if (!suppliedParser) parser.delete();
   }
+}
+
+/** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
+async function buildWithSelfhost({ entry, outDir, optimize }) {
+  const started = performance.now();
+  const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
+  const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
+  const { formatDiagnostics: format } = await import('../../src/selfhost/format.js');
+  const utu = await loadNodeCompiler();
+  const result = await compileFile(utu, path.resolve(entry), { optimize });
+  // Warnings alone never fail a build.
+  const errors = result.diagnostics.filter(d => d.severity !== 'warning');
+  if (!result.wasm || errors.length) throw new Error(format(errors, new Map(result.files.map(f => [f.key, f.text]))));
+  const { wasm, spec } = result;
+  await fs.mkdir(outDir, { recursive: true });
+  await fs.writeFile(path.join(outDir, 'app.wasm'), wasm);
+  const glue = glueSource(spec);
+  const gluePath = path.resolve(outDir, 'glue.mjs');
+  if (glue) await fs.writeFile(gluePath, glue);
+  const loader = loaderSource(spec, wasm, {
+    runtime: path.join(ROOT, 'src/runtime/host-imports.js'), glue: glue ? gluePath : null, streaming: true,
+    wasm: "fetch(new URL('./app.wasm', import.meta.url))",
+  });
+  // The loader's statements, with what the page does after, inside one try.
+  const lines = loader.trimEnd().split('\n');
+  const imports = lines.filter(line => line.startsWith('import '));
+  const body = lines.filter(line => !line.startsWith('import ')).map(line => line.replace(/^export const /, 'const '));
+  const source = [...imports, 'try {', ...body, START, '} catch (error) {', FAILED, '}'].join('\n');
+  await build({ stdin: { contents: source, resolveDir: ROOT, sourcefile: 'generated-loader.mjs', loader: 'js' },
+    outfile: path.join(outDir, 'app.js'), bundle: true, minify: true, format: 'esm', platform: 'browser', target: 'es2022', legalComments: 'none' });
+  // The intermediate module is not a deployed asset.
+  if (glue) await fs.unlink(gluePath);
+  const javascript = await fs.readFile(path.join(outDir, 'app.js'));
+  const imported = WebAssembly.Module.imports(new WebAssembly.Module(wasm, { builtins: ['js-string'], importedStringConstants: "'" }));
+  const report = { wasm: size(wasm), javascript: size(javascript), imports: imported.filter(entry => entry.module !== "'").length,
+    declaredBindings: Object.values(spec.es ?? {}).reduce((n, m) => n + Object.keys(m).length, 0), compileMs: Math.round(performance.now() - started) };
+  report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key]]));
+  await fs.writeFile(path.join(outDir, 'sizes.json'), JSON.stringify(report, null, 2) + '\n');
+  return report;
 }
 
 /** Fallback when no structured diagnostic exists: name each error and where it is. */
