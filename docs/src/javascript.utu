@@ -87,9 +87,7 @@ mod javascript {
                 }
                 " and embedded compressed in the compiler. Literal overloads keep their precise results, so ";
                 code {
-                    "createElement(";
-                    = ui.q("input");
-                    ")";
+                    "createElement(\"input\")";
                 }
                 " is an ";
                 code {
@@ -187,11 +185,11 @@ mod javascript {
             }
             p {
                 code {
-                    = ui.q("npm:pkg");
+                    "\"npm:pkg\"";
                 }
                 " and ";
                 code {
-                    = ui.q("node:mod");
+                    "\"node:mod\"";
                 }
                 " import a package's declarations directly, found through TypeScript's module resolution: ";
                 code {

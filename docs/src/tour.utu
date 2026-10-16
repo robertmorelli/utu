@@ -4,7 +4,9 @@ using ui from "./ui.utu";
 mod tour {
     fn functions_sample() Str {
         \\fn classify(n: I32) Str {
-        \\    if n < 0 { "negative"; } else if n == 0 { "zero"; } else { "positive"; };
+        \\    if n < 0 { "negative"; }
+        \\    else if n == 0 { "zero"; }
+        \\    else { "positive"; };
         \\}
         \\
         \\fn add(a: I32, b: I32) I32 {

@@ -143,9 +143,7 @@ mod web {
             p {
                 "Four namespaces are told apart syntactically, because attributes and CSS overlap with different meanings: ";
                 code {
-                    "canvas { <width = ";
-                    = ui.q("300");
-                    "; }";
+                    "canvas { <width = \"300\"; }";
                 }
                 " sets bitmap resolution and ";
                 code {
@@ -161,9 +159,7 @@ mod web {
                 }
                 " alone never silently creates a div. Common attributes are checked per tag: ";
                 code {
-                    "canvas { <padding = ";
-                    = ui.q("10");
-                    "; }";
+                    "canvas { <padding = \"10\"; }";
                 }
                 " is a compile error pointing at the token. Interpolated strings become text, never HTML. String event handlers are rejected; handlers are typed closures.";
             }
@@ -267,9 +263,7 @@ mod web {
             }
             p {
                 code {
-                    "@island ";
-                    = ui.q("name");
-                    ";";
+                    "@island \"name\";";
                 }
                 " makes an independently updating view whose state survives parent renders; ";
                 code {

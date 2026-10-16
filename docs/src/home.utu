@@ -50,6 +50,7 @@ mod home {
         article.home {
             section.hero {
                 div.pitch {
+                    = ui.logo();
                     h1 {
                         "A language that compiles to WasmGC.";
                     }
@@ -67,16 +68,8 @@ mod home {
                         }
                     }
                 }
-                div.envelope {
-                    span.bracket.open {
-                        <aria-hidden = "true";
-                        = ui.open_mark();
-                    }
+                div.sample {
                     = code.block(greeting_sample());
-                    span.bracket.close {
-                        <aria-hidden = "true";
-                        = ui.close_mark();
-                    }
                     p.caption {
                         "Wutu, utu's built-in DOM and CSS language. Markup, styles, and events in one typed expression. This page is written in it.";
                     }

@@ -92,9 +92,7 @@ mod data {
                 }
                 ", no intermediate JavaScript objects, no boundary call per field. Bad input is reported with its position: ";
                 code {
-                    "missing field ";
-                    = ui.q("count");
-                    " at line 3, column 9";
+                    "missing field \"count\" at line 3, column 9";
                 }
                 ".";
             }

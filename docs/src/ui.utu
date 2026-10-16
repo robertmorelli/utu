@@ -15,9 +15,34 @@ mod ui {
     fn close_mark() Str {
         "\\" + "/";
     }
-    // Wutu strings have no quote escape, so quoted text is made here.
-    fn q(text: Str) Str {
-        "\"" + text + "\"";
+    // The outline of U+12313 CUNEIFORM SIGN UD, the sun sign that names Utu,
+    // taken from Noto Sans Cuneiform so the mark needs no font to render.
+    fn ud_path() Str {
+        "M692 -323 667 -316Q678 -275 686.0 -237.5Q694 -200 701 -166Q526 -103 369.5 -62.5Q213 -22 100 -9Q160 91 180 189Q235 139 315.5 84.0Q396 29 495.5 -27.0Q595 -83 706 -137Q727 -27 734.0 60.5Q741 148 743 234Q782 215 823 201Q780 318 739.5 402.5Q699 487 657 555Q491 475 377.0 400.0Q263 325 180 249Q160 347 100 447Q175 456 256.5 471.5Q338 487 433.0 513.0Q528 539 641 579Q625 604 608.0 628.0Q591 652 574 675Q625 681 675.0 696.0Q725 711 780 736Q782 659 787.5 580.5Q793 502 808.5 408.5Q824 315 854 192Q878 185 901.5 180.0Q925 175 949 173Q903 112 860.5 43.5Q818 -25 777.0 -113.0Q736 -201 692 -323Z";
+    }
+    // The mark: the UD sign on an orange disc, a sun and a tablet at once.
+    fn logo() Browser.SVGElement {
+        @wutu/\
+        svg.sun {
+            <xmlns = "http://www.w3.org/2000/svg";
+            <viewBox = "0 0 100 100";
+            <role = "img";
+            <aria-label = "Utu, the cuneiform sun sign";
+            circle {
+                <cx = "50";
+                <cy = "50";
+                <r = "50";
+                <fill = "#f7a21b";
+            }
+            g {
+                <transform = "translate(50 50) scale(0.06 -0.06) translate(-524.5 -206.5)";
+                path {
+                    <d = $[ud_path()];
+                    <fill = "#000000";
+                }
+            }
+        }
+        \/;
     }
     // A pointer to the markdown deep dive that this page summarizes.
     fn further(path: Str, label: Str) Browser.HTMLElement {
