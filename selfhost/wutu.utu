@@ -137,7 +137,7 @@ fn expand_wutu(site: I32, reconcile: Bool) void {
     for (0 ..< wx_event_ops.len()) |k| { wd_op(ops, word_text(wx_event_ops[k])); };
     if reconcile {
         let tag = word_text(tn_text[root]);
-        code = wutu_helper("begin") + "(" + js_string("[" + ops.text + "]") + ", " + js_string(word_text(wu_view_hash[0])) + ");\n" + code;
+        code = wutu_helper("begin") + "(" + js_string("[" + ops.text + "]") + ");\n" + code;
         events = events + wutu_typed_fn("done", tag, tag == "svg") + "()";
         root_id = "";
     };
@@ -383,8 +383,8 @@ fn wutu_helper(kind: Str) Str {
         params = "cl(Browser.Event) void";
         js = "(v)=>globalThis.__utuWutu.put(v)";
     } else if kind == "begin" {
-        params = "Str, Str";
-        js = "(p,h)=>globalThis.__utuWutu.begin(p,h)";
+        params = "Str";
+        js = "(p)=>globalThis.__utuWutu.begin(p)";
     } else if kind == "slot" {
         js = "()=>globalThis.__utuWutu.slot()";
     } else if kind == "arm" {

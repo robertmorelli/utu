@@ -329,14 +329,23 @@ export function createWutuRuntime() {
   //   ["i", then, else]      an if: arm()
   //   ["f", mode, p, body]   a loop (mode 0 by index, 1 keyed, 2 globally
   //                          keyed): item() per iteration, end() after
-  const programs = new Map();      // program text -> its ops
+  const programs = new Map();      // program text -> [its ops, its hash]
   const BODY_END = ['end'];
   let run = null;                  // the template running: { h, nodes, stack, loop }
 
-  function begin(text, h) {
-    let ops = programs.get(text);
-    if (!ops) programs.set(text, ops = JSON.parse(text));
-    run = { h, nodes: [], stack: [{ ops, pc: 0, kind: 'top' }], outer: run, pending: null };
+  /**
+   * A template begins. It is known by its program's hash (FNV-1a, base 36):
+   * the same on every render and in prerendered markup. (Two templates alike
+   * to the byte would share it, and could only share elements alike too.)
+   */
+  function begin(text) {
+    let program = programs.get(text);
+    if (!program) {
+      let n = 2166136261;
+      for (let i = 0; i < text.length; i++) n = Math.imul(n ^ text.charCodeAt(i), 16777619);
+      programs.set(text, program = [JSON.parse(text), (n >>> 0).toString(36)]);
+    }
+    run = { h: program[1], nodes: [], stack: [{ ops: program[0], pc: 0, kind: 'top' }], outer: run, pending: null };
   }
 
   /** Run static ops up to the next hole, and return it (BODY_END at a loop body's end, null at the end). */
