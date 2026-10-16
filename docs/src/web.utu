@@ -1,0 +1,325 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod web {
+    fn forms_sample() Str {
+        \\article.card#intro {            # tag.class#id creates an element
+        \\    display: grid;               # a CSS declaration, compiled to a class
+        \\    gap: 1rem;
+        \\    <aria-label = "Welcome";     # an HTML attribute
+        \\    <hidden = $[done];           # a boolean attribute, present when true
+        \\    <.value = $[draft];          # a typed DOM property
+        \\    :hover { opacity: 0.9; }     # pseudo-classes and media queries nest in place
+        \\    @media (width < 40rem) { gap: 0.5rem; }
+        \\    @ & > svg { pointer-events: none; }
+        \\    h2 { "A title"; }            # a child element with a text node
+        \\    p { = state.message; }       # text from an expression
+        \\    button {
+        \\        "Save";
+        \\        on click { state.saved = true; };
+        \\    }
+        \\}
+        ;
+    }
+    fn components_sample() Str {
+        \\fn plant_card(plant: Plant) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    article.plant {
+        \\        h2 { = plant.name; }
+        \\        button as toggle {
+        \\            <type = "button";
+        \\            = if plant.watered { "Watered"; } else { "Water me"; };
+        \\            on click { plant.watered = not plant.watered; };
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\fn listing(plants: Array[Plant], empty: Bool) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    section {
+        \\        for $[plants filter |plant| { not plant.watered; }] |plant| {
+        \\            = plant_card(plant);
+        \\        }
+        \\        if $[empty] {
+        \\            p { "Everything is watered."; }
+        \\        } else {
+        \\            p { "A little care goes a long way."; }
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        ;
+    }
+    fn reactive_sample() Str {
+        \\struct Preferences:
+        \\    | name: Str
+        \\    | enabled: Bool
+        \\
+        \\export main() void {
+        \\    let preferences = @stored/\
+        \\        Preferences "preferences-v1" Preferences { name: "", enabled: true }
+        \\    \/;
+        \\    let app = @wutu/\
+        \\    @reactive;
+        \\    main {
+        \\        label {
+        \\            "Your name";
+        \\            input { bind:value = preferences.name; }
+        \\        }
+        \\        label {
+        \\            input { <type = "checkbox"; bind:checked = preferences.enabled; }
+        \\            "Send reminders";
+        \\        }
+        \\        if $[preferences.enabled] {
+        \\            p { "Hello, "; = preferences.name; }
+        \\        }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn keyed_sample() Str {
+        \\for $[state.items] |item| key $[item.id] {
+        \\    article {
+        \\        h2 { = item.title; }
+        \\        button {
+        \\            "Finish";
+        \\            on click { item.done = true; };
+        \\        }
+        \\    }
+        \\}
+        ;
+    }
+    fn dynamic_sample() Str {
+        \\div.bar {
+        \\    i {
+        \\        width: $[progress.to_str() + "%"];   # computed when the template renders
+        \\        --hue: $[hue.to_str()];
+        \\    }
+        \\}
+        ;
+    }
+    fn css_sample() Str {
+        \\mod theme {
+        \\    fn sheet() Str {
+        \\        @css/\
+        \\        @layer theme {
+        \\            .card { color: oklch(40% .12 150); }
+        \\        }
+        \\        \/;
+        \\    }
+        \\}
+        \\
+        \\// before the root element:
+        \\@style $[theme.sheet()];
+        ;
+    }
+    fn route_sample() Str {
+        \\if $[wutu.route() == "/notes"] {
+        \\    = notes(state);
+        \\} else {
+        \\    = shelf(state);
+        \\}
+        ;
+    }
+    fn build_sample() Str {
+        \\node cli/wutu.mjs dev main.utu --port 4176
+        \\node cli/wutu.mjs format main.utu --check
+        \\node cli/wutu.mjs build main.utu --out dist/site --title "My site"
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Wutu", "Markup and CSS in one typed expression. Wutu constructs real DOM nodes through the browser bindings, so a component is an ordinary function that returns an element.");
+            h2 {
+                "The meld deletes the join";
+            }
+            p {
+                "Every mainstream styling approach makes you write markup and then write a selector to find that markup again. The selector is a join key, and joins are where drift lives. In Wutu, selectors are elements: CSS-shaped nesting where a declaration sits on the element it styles, a pseudo-class or media query nests three lines from what it affects, and moving something from code to CSS is a local edit.";
+            }
+            p {
+                "Four namespaces are told apart syntactically, because attributes and CSS overlap with different meanings: ";
+                code {
+                    "canvas { <width = ";
+                    = ui.q("300");
+                    "; }";
+                }
+                " sets bitmap resolution and ";
+                code {
+                    "canvas { width: 300px; }";
+                }
+                " sets display size.";
+            }
+            = code.block(forms_sample());
+            p {
+                "Every leaf statement ends with a semicolon; element and selector blocks do not. Every element head starts with a tag, so ";
+                code {
+                    ".card";
+                }
+                " alone never silently creates a div. Common attributes are checked per tag: ";
+                code {
+                    "canvas { <padding = ";
+                    = ui.q("10");
+                    "; }";
+                }
+                " is a compile error pointing at the token. Interpolated strings become text, never HTML. String event handlers are rejected; handlers are typed closures.";
+            }
+            h2 {
+                "Components, lists, and conditions";
+            }
+            p {
+                "Components are typed functions. Pass data or nodes as parameters and insert the result with ";
+                code {
+                    "= component(args);";
+                }
+                ". ";
+                code {
+                    "for";
+                }
+                " adds an ";
+                code {
+                    "each";
+                }
+                " terminal to an iterator pipeline, so no temporary array is built. ";
+                code {
+                    "tag as name";
+                }
+                " names a node within its template subtree so a handler can reach it.";
+            }
+            = code.block(components_sample());
+            h2 {
+                "CSS, three ways";
+            }
+            p {
+                "Element-local declarations compile to deterministic shared classes: identical declaration sets become one class, and unreachable components take their styles with them. A declaration whose value is an expression is applied with ";
+                code {
+                    "style.setProperty";
+                }
+                " when the template renders. ";
+                code {
+                    "@ selector { ... }";
+                }
+                " is a scoped rule for relational cases such as siblings and slotted children, and ";
+                code {
+                    "@document { ... }";
+                }
+                " before the root holds tokens, resets, fonts, and keyframes.";
+            }
+            = code.block(dynamic_sample());
+            p {
+                "For CSS the DSL does not model, write a stylesheet in a ";
+                code {
+                    "@css";
+                }
+                " envelope and install it with ";
+                code {
+                    "@style";
+                }
+                ". The compiler preserves the payload without a property or selector allowlist. Identical sheets install once.";
+            }
+            = code.block(css_sample());
+            h2 {
+                "Reactive views, bindings, and typed storage";
+            }
+            p {
+                "Put ";
+                code {
+                    "@reactive;";
+                }
+                " at the start of a root template. Event handlers mutate ordinary structs, and Wutu batches a refresh into the next microtask. There is no proxy state and no virtual DOM: the compiler emits calls to a small shared DOM reconciler, and a refresh re-renders connected roots. ";
+                code {
+                    "bind:value";
+                }
+                ", ";
+                code {
+                    "bind:checked";
+                }
+                ", and ";
+                code {
+                    "bind:number";
+                }
+                " connect form controls to fields in both directions, preserving the caret.";
+            }
+            = code.block(reactive_sample());
+            p {
+                code {
+                    "@stored";
+                }
+                " generates the JSON conversion for a struct, validates the full stored shape before accepting it, and returns the defaults when storage is unavailable. Saves are debounced after events, or explicit with ";
+                code {
+                    "manual";
+                }
+                " and ";
+                code {
+                    "wutu.save(key)";
+                }
+                ". Cross-tab changes pass through the generated decoder.";
+            }
+            p {
+                "Keyed loops preserve DOM identity, focus, and selection across reorders. Keys are stable strings, unique per repeated template under a parent.";
+            }
+            = code.block(keyed_sample());
+            h2 {
+                "Islands, effects, and routes";
+            }
+            p {
+                code {
+                    "@island ";
+                    = ui.q("name");
+                    ";";
+                }
+                " makes an independently updating view whose state survives parent renders; ";
+                code {
+                    "wutu.invalidate(name)";
+                }
+                " refreshes it from outside. ";
+                code {
+                    "wutu.after_render";
+                }
+                ", ";
+                code {
+                    "wutu.on_cleanup";
+                }
+                ", and ";
+                code {
+                    "wutu.interval";
+                }
+                " cover effects, and ";
+                code {
+                    "wutu.route()";
+                }
+                " reads the hash path; hash and history changes refresh views. This site's pages are selected that way.";
+            }
+            = code.block(route_sample());
+            h2 {
+                "Build, preview, and prerender";
+            }
+            p {
+                "The preview rebuilds on save and reloads the browser, keeping control values, focus, and scroll. Failed builds keep the last working output and show the error in place. A production build prerenders the page with build-time Chromium: the HTML contains real content and styles, the runtime hydrates the marked DOM on startup, and form controls stay disabled until handlers exist. Deployment needs only ";
+                code {
+                    "index.html";
+                }
+                ", ";
+                code {
+                    "app.js";
+                }
+                ", and ";
+                code {
+                    "app.wasm";
+                }
+                ".";
+            }
+            = code.shell(build_sample());
+            p {
+                "The formatter lays out surrounding utu and parsed Wutu islands together. The VS Code extension registers the same formatter and completions for tags, attributes, bindings, and events, and UTU: Show CSS Stencil projects a template's CSS into a plain CSS document.";
+            }
+            = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression");
+            = ui.further("WUTU.md", "the Wutu design notes");
+            = ui.further("examples/wutu-five/README.md", "five working Wutu websites");
+        }
+        \/;
+    }
+}

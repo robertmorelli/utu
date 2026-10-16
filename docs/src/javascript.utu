@@ -1,0 +1,275 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod javascript {
+    fn browser_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let document = Browser.document;
+        \\    let input = document.createElement("input");   // an HTMLInputElement
+        \\    input.placeholder = "Write something";
+        \\    input.addEventListener("input", cl(event) void {
+        \\        Browser.console.log(input.value);
+        \\    });
+        \\    document.body.appendChild(input);
+        \\}
+        ;
+    }
+    fn packages_sample() Str {
+        \\using Nano from "npm:nanoid";
+        \\using Floating from "npm:@floating-ui/dom";
+        \\using Path from "node:path";
+        \\
+        \\export main() void {
+        \\    let id = Nano.nanoid(8);
+        \\    let file = Path.join("out", id, "report.txt");
+        \\}
+        ;
+    }
+    fn shapes_sample() Str {
+        \\// records and arrays take their shape from the declaration slot
+        \\new Browser.Blob(["a", "b"], &{ type: "text/plain" });
+        \\el.addEventListener("x", f, &{ once: true });
+        \\
+        \\// closures take parameter types from the slot they reach
+        \\list.forEach(cl(el) void { el.remove(); });
+        \\xs.map(cl(s) Str { s.toUpperCase(); });
+        \\
+        \\// narrowing a host value tests each arm with instanceof
+        \\alt e.target {
+        \\    Browser.HTMLInputElement |t| => t.value,
+        \\    ~> "",
+        \\};
+        \\
+        \\// null and undefined both mean absence
+        \\promote Browser.localStorage.getItem("key") {
+        \\    |stored| => use(stored),
+        \\    ~> {},
+        \\};
+        ;
+    }
+    fn try_sample() Str {
+        \\let parsed = try {
+        \\    JS.JSON.parse(text);
+        \\} catch |e| {
+        \\    Browser.console.warn(e.message);
+        \\    null;
+        \\};
+        ;
+    }
+    fn link_sample() Str {
+        \\node tools/dts/cli.mjs --input path/to/api.d.ts --module ./api.js --prefix Api --out bindings
+        ;
+    }
+    fn link_use_sample() Str {
+        \\using Api from "./bindings/Api.abi.json";
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface. The compiler resolves the declaration graph with TypeScript's own checker, keeps utu's semantics, and emits only the boundary operations a program uses.");
+            h2 {
+                "One import for the platform";
+            }
+            p {
+                code {
+                    "std:Browser";
+                }
+                " is the browser and standard JavaScript declaration graph, linked from TypeScript's ";
+                code {
+                    "lib.dom";
+                }
+                " and ";
+                code {
+                    "lib.es*";
+                }
+                " and embedded compressed in the compiler. Literal overloads keep their precise results, so ";
+                code {
+                    "createElement(";
+                    = ui.q("input");
+                    ")";
+                }
+                " is an ";
+                code {
+                    "HTMLInputElement";
+                }
+                " with a ";
+                code {
+                    "value";
+                }
+                ".";
+            }
+            = code.block(browser_sample());
+            table.modules {
+                thead {
+                    tr {
+                        th {
+                            "Module";
+                        }
+                        th {
+                            "Contents";
+                        }
+                        th {
+                            "Runs on";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        td {
+                            code {
+                                "std:JS";
+                            }
+                        }
+                        td {
+                            "ECMAScript: Array, Map, Set, JSON, Math, Promise, Date, RegExp, Intl";
+                        }
+                        td {
+                            "any JavaScript host";
+                        }
+                    }
+                    tr {
+                        td {
+                            code {
+                                "std:Web";
+                            }
+                        }
+                        td {
+                            "The common web APIs: fetch, Request and Response, URL, TextEncoder, streams, AbortController, Blob, crypto, console, timers, WebAssembly";
+                        }
+                        td {
+                            "Node, Bun, Deno, browsers, workers";
+                        }
+                    }
+                    tr {
+                        td {
+                            code {
+                                "std:Browser";
+                            }
+                        }
+                        td {
+                            "All of the above plus the DOM";
+                        }
+                        td {
+                            "browser pages";
+                        }
+                    }
+                    tr {
+                        td {
+                            code {
+                                "std:Worker";
+                            }
+                        }
+                        td {
+                            "A worker's global scope: self, postMessage, importScripts, service-worker types";
+                        }
+                        td {
+                            "web workers";
+                        }
+                    }
+                }
+            }
+            p {
+                "Every module shares standard-library identities: a ";
+                code {
+                    "Web.Response";
+                }
+                " is a ";
+                code {
+                    "Browser.Response";
+                }
+                ". A declared type from one package is accepted by another package that references the same DOM or ECMAScript type.";
+            }
+            h2 {
+                "Packages";
+            }
+            p {
+                code {
+                    = ui.q("npm:pkg");
+                }
+                " and ";
+                code {
+                    = ui.q("node:mod");
+                }
+                " import a package's declarations directly, found through TypeScript's module resolution: ";
+                code {
+                    "types";
+                }
+                " and ";
+                code {
+                    "exports";
+                }
+                " conditions, ";
+                code {
+                    "@types/*";
+                }
+                ", and Node's ambient modules. The glue imports the same specifier as a named import, so bundlers can tree-shake the package.";
+            }
+            = code.block(packages_sample());
+            h2 {
+                "Declaration shapes in utu syntax";
+            }
+            p {
+                "Records (";
+                code {
+                    "&{ ... }";
+                }
+                ") and array literals become real JavaScript objects and arrays when they reach a declaration slot. Numbers cross as ";
+                code {
+                    "F64";
+                }
+                ", strings as ";
+                code {
+                    "Str";
+                }
+                ", booleans as booleans, and closures as the same function object every time.";
+            }
+            = code.block(shapes_sample());
+            p {
+                "Host exceptions are caught with ";
+                code {
+                    "try";
+                }
+                ", an expression whose branches meet like ";
+                code {
+                    "if";
+                }
+                ". Wasm traps are not exceptions and are never caught.";
+            }
+            = code.block(try_sample());
+            h2 {
+                "Your own declarations, and Rust";
+            }
+            p {
+                "Link a ";
+                code {
+                    ".d.ts";
+                }
+                " file once and import the result. A Rust crate built with wasm-pack arrives the same way, through the declarations wasm-bindgen writes; its memory is still managed by wasm-bindgen, so call ";
+                code {
+                    "free()";
+                }
+                " when an object is done.";
+            }
+            = code.shell(link_sample());
+            = code.block(link_use_sample());
+            h2 {
+                "What it costs";
+            }
+            p {
+                "Only used operations become Wasm imports and live JavaScript. Host references share one Wasm representation, so operations that differ only in declaration type share one import. At the default ";
+                code {
+                    "-Oz";
+                }
+                " the browser task board is 2,572 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard, which exercises much more of the platform, is 4,867 bytes. A regression test requires that 1,000 unused declarations add exactly zero bytes.";
+            }
+            p {
+                "The boundary still costs time. The compiler does not move utu loops into JavaScript; a crossing per element is materially slower than one call for the whole operation.";
+            }
+            = ui.further("docs/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI");
+        }
+        \/;
+    }
+}

@@ -1,0 +1,184 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod compiler {
+    fn pipeline_sample() Str {
+        \\source files
+        \\    │ lex + parse (utu's own parser; tree-sitter only for sources with errors)
+        \\    ▼
+        \\modules, imports, name resolution
+        \\    ▼
+        \\types and checking ── monomorphization on demand, one pass into a wasm-shaped IR
+        \\    │   lowerings: operators, loops, match, alt, promote, closures, strings, DSLs
+        \\    ▼
+        \\wasm backend ── types, module, local cleanup, encoding, source maps
+        \\    ▼
+        \\app.wasm + the JavaScript glue it actually imports
+        ;
+    }
+    fn stages_sample() Str {
+        \\bun run build        # stage 0 (JavaScript) builds stage 1,
+        \\                     # stage 1 builds stage 2, stage 2 builds stage 3;
+        \\                     # stages 2 and 3 must be identical
+        \\bun run test         # the whole suite, including the bootstrap
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("The compiler", "utu compiles utu. The shipped compiler is a 372 KB Wasm module, bootstrapped from a JavaScript compiler that now serves only its IR and graph views.");
+            h2 {
+                "Pipeline";
+            }
+            = code.shell(pipeline_sample());
+            p {
+                "The self-hosted compiler lives in ";
+                code {
+                    "selfhost/";
+                }
+                ". Its lexer's tokens are the leaves of the reference syntax tree and its parser's nodes are the named nodes, checked on every source and on millions of mutants. Name resolution agrees with the reference compiler's go-to-definition on every name. Checking and translation happen in one pass into a Wasm-shaped IR, with intrinsics expanded from the standard library's ";
+                code {
+                    "@ir";
+                }
+                " bodies. The DSL expanders for ";
+                code {
+                    "@json";
+                }
+                ", ";
+                code {
+                    "@stored";
+                }
+                ", CSS, and Wutu are ported too.";
+            }
+            h2 {
+                "Self-hosting";
+            }
+            p {
+                "The invariant is behavior, not bytes: every program does what the reference compiler's build of it did, and every program that does not build is diagnosed with the same kinds, messages, and spans. Of the programs both compilers build at ";
+                code {
+                    "-Oz";
+                }
+                ", 262 of 284 are smaller from the self-hosted compiler and 16.8% smaller in all. Compiling DeltaBlue warm takes 0.9 ms against 56 ms before.";
+            }
+            = code.shell(stages_sample());
+            p {
+                "The TypeScript declaration linker, the CLI, the editor extension, and file and process I/O stay in JavaScript as hosts of the compiler. The compiler itself touches no file system.";
+            }
+            = ui.further("docs/self-hosting.md", "Fast compiler, then self-hosted compiler");
+            h2 {
+                "The Wasm backend";
+            }
+            p {
+                "The backend is utu's own; it replaced Binaryen, and emitting became 10 to 40 times faster. Every type is one object, so types compare by identity; structs, arrays, and signatures are canonicalized rec group by rec group as Wasm's iso-recursive type system does. Only what the exports reach is encoded. ";
+                code {
+                    "Str";
+                }
+                " is a JavaScript string held as ";
+                code {
+                    "externref";
+                }
+                "; string operations call the engine's ";
+                code {
+                    "wasm:js-string";
+                }
+                " builtins and string constants are imported globals, so there is no shipped UTF-8 transcoder. At ";
+                code {
+                    "-Oz";
+                }
+                " and ";
+                code {
+                    "-O3";
+                }
+                " a local cleanup removes the copies and temporaries lowerings leave, which is what makes a consumed iterator compile to the loop you would have written by hand.";
+            }
+            = ui.further("docs/wasm-backend.md", "The wasm backend");
+            h2 {
+                "Closures and the callable ABI";
+            }
+            p {
+                "A ";
+                code {
+                    "cl";
+                }
+                " literal becomes an environment struct, a lifted function, and a JavaScript function object created through one import. Captures are matched by declaration identity and copied at construction; a captured variable that is reassigned after capture is first boxed into a one-field cell shared by every closure. A ";
+                code {
+                    "fun";
+                }
+                " is a Wasm function reference called with ";
+                code {
+                    "call_ref";
+                }
+                ". No escape analysis changes a closure's representation; the boundary is explicit by design.";
+            }
+            = ui.further("docs/closure-lowering.md", "Closure lowering and callable ABI");
+            h2 {
+                "Names and representations";
+            }
+            p {
+                "Every concrete type records two facts: its type name, which the checker compares, and its representation, which code generation uses. ";
+                code {
+                    "I32";
+                }
+                ", ";
+                code {
+                    "U32";
+                }
+                ", and ";
+                code {
+                    "Bool";
+                }
+                " are three names over one Wasm ";
+                code {
+                    "i32";
+                }
+                "; ";
+                code {
+                    "Document";
+                }
+                ", ";
+                code {
+                    "Element";
+                }
+                ", and ";
+                code {
+                    "Response";
+                }
+                " are distinct names over one ";
+                code {
+                    "externref";
+                }
+                ". The checker never peeks at representations and codegen never branches on names.";
+            }
+            = ui.further("TYPES.md", "utu types: name versus representation");
+            h2 {
+                "Principles";
+            }
+            ol.principles {
+                li {
+                    "One bundle, same bytes everywhere. Node, Bun, browser, worker, and IDE run identical bytes.";
+                }
+                li {
+                    "The standard library is in the bundle, baked in at build time. Whether the stdlib is installed is not a question anyone can ask.";
+                }
+                li {
+                    "Zero runtime dependencies. The Wasm backend is utu's own and the parser is embedded.";
+                }
+                li {
+                    "The compiler is the only source of analysis truth. Editors and tools import it and ask questions.";
+                }
+                li {
+                    "No lite or full variants. One entry point, one set of exports.";
+                }
+                li {
+                    "Tools and editors consume utu as a dependency; they are not utu.";
+                }
+                li {
+                    "One person should be able to ship it.";
+                }
+            }
+            = ui.further("PRINCIPLES.md", "utu design principles");
+            = ui.further("docs/compiler-architecture.md", "Compiler architecture");
+        }
+        \/;
+    }
+}

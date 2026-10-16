@@ -1,0 +1,357 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod data {
+    fn json_sample() Str {
+        \\struct Item:
+        \\    | name: Str
+        \\    | count: I32
+        \\    | tags: Array[Str]
+        \\    | note: ?Str
+        \\
+        \\struct Save:
+        \\    | version: I32
+        \\    | items: Array[Item]
+        \\
+        \\fn load(text: Str) Save {
+        \\    promote @json/\ decode Save text \/ {
+        \\        |save| => save,
+        \\        ~> Save { version: 1, items: [] },
+        \\    };
+        \\}
+        \\
+        \\fn store(save: Save) Str {
+        \\    @json/\ encode Save save \/;
+        \\}
+        ;
+    }
+    fn match_sample() Str {
+        \\@json/\ match response {
+        \\    { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 } } => {
+        \\        greet(name, age);
+        \\    },
+        \\    { status: "error", message: |message| Str } => show(message),
+        \\    ~> |error| show("unexpected response: " + error),
+        \\}\/;
+        ;
+    }
+    fn operators_sample() Str {
+        \\let totals = [1, 2, 3] scan(0) |acc, value| { acc + value; } collect(I32);   // [1, 3, 6]
+        \\
+        \\let groups = [1, 2, 3, 4] group_by(I32, I32) |value| { value % 2; };
+        \\// Array[Group[I32, I32]]: key 1 -> [1, 3], then key 0 -> [2, 4]
+        \\
+        \\let first = [4, 2, 3] first_where(I32) |value| { value < 4; };
+        \\let value = (first orelse fatal).value;
+        \\
+        \\let lower = [1, 2, 2, 4] bisect |value| { value < 2; };   // 1
+        ;
+    }
+    fn segment_sample() Str {
+        \\using SegmentTree from std:SegmentTree;
+        \\
+        \\fn add(a: I32, b: I32) I32 {
+        \\    a + b;
+        \\}
+        \\
+        \\fn example() I32 {
+        \\    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add);
+        \\    sums.set(1, 10, add);
+        \\    sums.query(1, 3, add);   // 15
+        \\}
+        ;
+    }
+    fn spatial_sample() Str {
+        \\using Spatial from std:Spatial;
+        \\
+        \\let points = [
+        \\    Spatial.point(0.0, 0.0, 10),
+        \\    Spatial.point(1.0, 2.0, 20),
+        \\    Spatial.point(3.0, 1.0, 30)
+        \\];
+        \\let index = Spatial.new(points);
+        \\let ids = index.below(0.0, 3.0, 2.0);     // x interval, y ceiling
+        \\let nearby = index.radius(0.0, 0.0, 2.5);
+        \\let closest = index.nearest(2.9, 1.0);    // ?Found[I32]
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Typed JSON, iterators, and indexes", "Data handling that stays in Wasm: a generated JSON parser per type, iterator pipelines that compile to loops, and native range and spatial indexes.");
+            h2 {
+                "Typed JSON";
+            }
+            p {
+                code {
+                    "@json";
+                }
+                " reads and writes JSON as native utu values. The compiler generates a parser and printer for each type. They run in Wasm and read the string's code units directly: no ";
+                code {
+                    "JSON.parse";
+                }
+                ", no intermediate JavaScript objects, no boundary call per field. Bad input is reported with its position: ";
+                code {
+                    "missing field ";
+                    = ui.q("count");
+                    " at line 3, column 9";
+                }
+                ".";
+            }
+            = code.block(json_sample());
+            table {
+                tbody {
+                    tr {
+                        th {
+                            code {
+                                "decode T text";
+                            }
+                        }
+                        td {
+                            code {
+                                "?T";
+                            }
+                            ": the value, or null if the text does not match";
+                        }
+                    }
+                    tr {
+                        th {
+                            code {
+                                "error T text";
+                            }
+                        }
+                        td {
+                            code {
+                                "Str";
+                            }
+                            ": empty if it matches, else the problem";
+                        }
+                    }
+                    tr {
+                        th {
+                            code {
+                                "encode T value";
+                            }
+                        }
+                        td {
+                            code {
+                                "Str";
+                            }
+                            ": compact JSON, fields in declaration order";
+                        }
+                    }
+                    tr {
+                        th {
+                            code {
+                                "match text { ... }";
+                            }
+                        }
+                        td {
+                            "the value of the first matching structural pattern";
+                        }
+                    }
+                }
+            }
+            p {
+                "When only part of a document matters, ";
+                code {
+                    "match";
+                }
+                " describes just that part. Captures are typed, defaults fill missing fields, literals must match exactly, and fields a pattern does not mention are skipped without being decoded.";
+            }
+            = code.block(match_sample());
+            p {
+                "On a 4 MB save file of 40,000 entities, decoding to native structs takes 23 ms on V8. The generated code adds about 4 KB to a module for the shared reader and writer, plus a few hundred bytes per type.";
+            }
+            = ui.further("docs/json.md", "Typed JSON");
+            h2 {
+                "Iterator pipelines";
+            }
+            p {
+                "Stages (";
+                code {
+                    "map";
+                }
+                ", ";
+                code {
+                    "filter";
+                }
+                ", ";
+                code {
+                    "flat_map";
+                }
+                ", ";
+                code {
+                    "skip";
+                }
+                ", ";
+                code {
+                    "take";
+                }
+                ", ";
+                code {
+                    "zip";
+                }
+                ", ";
+                code {
+                    "chain";
+                }
+                ", ";
+                code {
+                    "scan";
+                }
+                ") are consumed by a terminal (";
+                code {
+                    "fold";
+                }
+                ", ";
+                code {
+                    "each";
+                }
+                ", ";
+                code {
+                    "sum";
+                }
+                ", ";
+                code {
+                    "count";
+                }
+                ", ";
+                code {
+                    "any";
+                }
+                ", ";
+                code {
+                    "all";
+                }
+                ", ";
+                code {
+                    "collect";
+                }
+                ", ";
+                code {
+                    "sort";
+                }
+                ", ";
+                code {
+                    "group_by";
+                }
+                ", ";
+                code {
+                    "partition";
+                }
+                ", ";
+                code {
+                    "min_by";
+                }
+                ", ";
+                code {
+                    "first_where";
+                }
+                ", ";
+                code {
+                    "reduce";
+                }
+                "...). Bodies are inlined in place, so ";
+                code {
+                    "return";
+                }
+                " returns from the enclosing function. Collection types are spelled out, so empty results and changed element types stay unambiguous.";
+            }
+            = code.block(operators_sample());
+            p {
+                "Map, filter, and fold pipelines emit one Wasm loop. Collect allocates its result once when every stage keeps or shrinks the length. Sort is a stable merge sort; a bare integer sort is a radix sort. Integer group keys use an open-addressing hash table. Pure reductions ship no JavaScript iterator runtime.";
+            }
+            = ui.further("docs/iterators.md", "Syntax-level iterators");
+            h2 {
+                "Range and spatial indexes";
+            }
+            p {
+                "When many queries would otherwise rescan the same data, build an index once. These modules compile to WasmGC data structures, with no JavaScript query runtime; importing an unused module adds no website bytes.";
+            }
+            = code.block(segment_sample());
+            p {
+                code {
+                    "SegmentTree[T]";
+                }
+                " supports any associative combiner with a neutral identity; build is O(n), updates and queries are O(log n), and ";
+                code {
+                    "first_prefix";
+                }
+                " finds the first element whose prefix satisfies a monotone predicate. ";
+                code {
+                    "PersistentSegmentTree[T]";
+                }
+                " returns a new index from each ";
+                code {
+                    "set";
+                }
+                " and shares untouched branches.";
+            }
+            = code.block(spatial_sample());
+            p {
+                code {
+                    "std:Spatial";
+                }
+                " is a static priority search tree with subtree bounding boxes: three-sided reporting with ";
+                code {
+                    "below";
+                }
+                ", rectangles with ";
+                code {
+                    "within";
+                }
+                ", ";
+                code {
+                    "radius";
+                }
+                ", and ";
+                code {
+                    "nearest";
+                }
+                ". Results own their storage and have unspecified order.";
+            }
+            = ui.further("docs/queries.md", "Native range and spatial indexes");
+            h2 {
+                "Everyday modules";
+            }
+            p {
+                "The prelude's ";
+                code {
+                    "Str";
+                }
+                " and ";
+                code {
+                    "F64";
+                }
+                " carry the usual text and math methods. ";
+                code {
+                    "std:StrMap";
+                }
+                " maps strings to values, ";
+                code {
+                    "std:Random";
+                }
+                " is a seeded xoshiro128** generator with the same numbers on every host, ";
+                code {
+                    "std:Stream";
+                }
+                " wraps JavaScript async iterables for ";
+                code {
+                    "await for";
+                }
+                ", and ";
+                code {
+                    "std:Console";
+                }
+                " and ";
+                code {
+                    "std:Time";
+                }
+                " cover logging and clocks. Each function ships only when a program uses it.";
+            }
+            = ui.further("std/README.md", "the standard library notes");
+        }
+        \/;
+    }
+}

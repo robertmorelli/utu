@@ -1,0 +1,166 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod tooling {
+    fn cli_sample() Str {
+        \\usage: utu <command> <file.utu> [options]
+        \\
+        \\  check <file>                 report what is wrong with the program
+        \\  run <file> [-O…]             build it, then call its main
+        \\  test <file> [-O…]            build its tests, then run each
+        \\  build <file> [-o dir] [-O…]  NAME.wasm, and NAME.mjs that loads it
+        \\  build-exe <file> [-o out]    a standalone executable (needs bun)
+        \\  lsp                          a language server on stdin and stdout
+        \\  grep <pattern> <paths…>      code by its syntax and types
+        \\  grep --refs <name> <paths…>  a name's declaration and every use
+        \\
+        \\  -Oz  the smallest module (the default)
+        \\  -O3  the fastest module
+        \\  -O0  the module as code generation leaves it
+        ;
+    }
+    fn grep_sample() Str {
+        \\bun ./cli/utu.mjs grep '$v.push($x)' src/ --where 'x: I32'
+        \\bun ./cli/utu.mjs grep --refs word_counts examples/
+        ;
+    }
+    fn wutu_sample() Str {
+        \\wutu format <files...> [--check]
+        \\wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
+        \\wutu dev <entry.utu> [--out dist/wutu] [--port 4176]
+        ;
+    }
+    fn neovim_sample() Str {
+        \\vim.lsp.config('utu', { cmd = { 'node', '/path/to/utu/cli/utu.mjs', 'lsp' }, filetypes = { 'utu' } })
+        \\vim.lsp.enable('utu')
+        \\vim.filetype.add({ extension = { utu = 'utu' } })
+        ;
+    }
+    fn helix_sample() Str {
+        \\[language-server.utu]
+        \\command = "node"
+        \\args = ["/path/to/utu/cli/utu.mjs", "lsp"]
+        \\
+        \\[[language]]
+        \\name = "utu"
+        \\scope = "source.utu"
+        \\file-types = ["utu"]
+        \\language-servers = ["utu"]
+        ;
+    }
+    fn diagnostic_sample() Str {
+        \\hello.utu:10:5: error: Unknown method 'F64.sqrt'
+        \\  9 | fn Point.length |self| () F64 {
+        \\ 10 |     (self.x * self.x + self.y * self.y).sqrt();
+        \\    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Tooling", "One compiler answers every tool. Diagnostics, hover, definitions, formatting, and semantic tokens all come from the same bundle the command line runs; there is no second analyzer.");
+            h2 {
+                "The command line";
+            }
+            p {
+                code {
+                    "cli/utu.mjs";
+                }
+                " runs the self-hosted compiler from ";
+                code {
+                    "dist/utu.wasm";
+                }
+                ". It checks, runs, tests, and builds programs, and serves the language server.";
+            }
+            = code.shell(cli_sample());
+            p {
+                code {
+                    "utu grep";
+                }
+                " searches code by syntax and types rather than text: a pattern with ";
+                code {
+                    "$name";
+                }
+                " holes matches expressions, and ";
+                code {
+                    "--where";
+                }
+                " constrains a hole's type. ";
+                code {
+                    "--refs";
+                }
+                " finds a declaration and every use that resolves to it.";
+            }
+            = code.shell(grep_sample());
+            p {
+                "The Wutu command line formats, previews, and builds browser apps.";
+            }
+            = code.shell(wutu_sample());
+            h2 {
+                "Diagnostics";
+            }
+            p {
+                "Errors name the file, line, and column, show the source line, and underline the span. Diagnostics are collected rather than thrown, so one check reports every problem. ";
+                code {
+                    "utu check";
+                }
+                " makes both builds, the exports' and the tests'. A ";
+                code {
+                    "compressed-source";
+                }
+                " warning flags lines dense enough to hurt reading.";
+            }
+            = code.shell(diagnostic_sample());
+            h2 {
+                "VS Code";
+            }
+            p {
+                "The extension runs on the desktop and on the web with identical bytes. Beyond highlighting and diagnostics as you type, it shows inferred types, coercions, closure captures, and effects as inlay hints. Commands in the UTU palette group:";
+            }
+            ul.commands {
+                li {
+                    "Compile Current File, Run Main, Show Generated WAT";
+                }
+                li {
+                    "Show Syntax Tree, Show Compiler IR, Open Semantic X-Ray, Explore Compiler Graphs";
+                }
+                li {
+                    "Show CSS Stencil, Create Wutu Website, Preview Wutu Website";
+                }
+            }
+            p {
+                "Settings choose when validation runs (";
+                code {
+                    "onType";
+                }
+                ", ";
+                code {
+                    "onSave";
+                }
+                ", ";
+                code {
+                    "off";
+                }
+                ") and whether inlay hints appear.";
+            }
+            h2 {
+                "The language server";
+            }
+            p {
+                code {
+                    "utu lsp";
+                }
+                " speaks LSP on stdin and stdout for any editor. Every answer is read from a fresh build of the program whose entry is the file asked about; a build takes a few milliseconds, so nothing is incremental. It answers diagnostics, hover, go to definition, references and highlights, rename across files, outline, semantic tokens, and completion.";
+            }
+            = code.shell(neovim_sample());
+            = code.shell(helix_sample());
+            p {
+                "Zed, Sublime, Emacs, and Kakoune take the same command.";
+            }
+            = ui.further("docs/language-server.md", "The language server");
+            = ui.further("docs/diagnostics.md", "Diagnostics");
+            = ui.further("docs/grep.md", "utu grep");
+        }
+        \/;
+    }
+}

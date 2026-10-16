@@ -1,0 +1,233 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod home {
+    fn greeting_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\fn greeting(name: Str) Browser.HTMLElement {
+        \\    @wutu/\
+        \\    section.greeting {
+        \\        display: grid;
+        \\        gap: 1rem;
+        \\        h2 { "Hello, "; $[name]; }
+        \\        a {
+        \\            <href = "#/start";
+        \\            :hover { opacity: 0.8; }
+        \\            "Start here";
+        \\        }
+        \\    }
+        \\    \/;
+        \\}
+        \\
+        \\export main() void {
+        \\    Browser.document.body.append(greeting("friend"));
+        \\}
+        ;
+    }
+    fn npm_sample() Str {
+        \\using Browser from std:Browser;
+        \\using Nano from "npm:nanoid";
+        \\
+        \\export main() void {
+        \\    let item = Browser.document.createElement("li");
+        \\    item.textContent = Nano.nanoid(8);
+        \\    Browser.document.body.append(item);
+        \\}
+        ;
+    }
+    fn pipeline_sample() Str {
+        \\export main() I32 {
+        \\    [1, 2, 3, 4, 5]
+        \\        map |n| { n * 2; }
+        \\        filter |n| { n > 4; }
+        \\        fold (0) |total, n| { total + n; };
+        \\}
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.home {
+            section.hero {
+                div.pitch {
+                    h1 {
+                        "A language that compiles to WasmGC.";
+                    }
+                    p.lede {
+                        "The compiler, standard library, parser, and analysis engine ship as one bundle. It is the same bytes in Node, Bun, a browser, an IDE, or CI. There is no separate stdlib install, no host-specific build, and no lite version.";
+                    }
+                    p.actions {
+                        a.button {
+                            <href = "#/start";
+                            "Get started";
+                        }
+                        a {
+                            <href = $[ui.repo()];
+                            "Source on GitHub";
+                        }
+                    }
+                }
+                div.envelope {
+                    span.bracket.open {
+                        <aria-hidden = "true";
+                        = ui.open_mark();
+                    }
+                    = code.block(greeting_sample());
+                    span.bracket.close {
+                        <aria-hidden = "true";
+                        = ui.close_mark();
+                    }
+                    p.caption {
+                        "Wutu, utu's built-in DOM and CSS language. Markup, styles, and events in one typed expression. This page is written in it.";
+                    }
+                }
+            }
+            section.points {
+                div.point {
+                    h2 {
+                        "TypeScript declarations are the foreign-function interface.";
+                    }
+                    p {
+                        code {
+                            "std:Browser";
+                        }
+                        " gives typed access to the whole DOM and JavaScript standard library, and any npm package with types imports directly. Only the boundary operations a program uses are emitted.";
+                    }
+                    = code.block(npm_sample());
+                    a {
+                        <href = "#/javascript";
+                        "JavaScript, the browser, and npm";
+                    }
+                }
+                div.point {
+                    h2 {
+                        "Iterators are syntax, and they fuse.";
+                    }
+                    p {
+                        "A pipeline over a native array compiles to one Wasm loop with scalar locals. No iterator objects, no closures, no operator library, no intermediate collections.";
+                    }
+                    = code.block(pipeline_sample());
+                    a {
+                        <href = "#/data";
+                        "Typed JSON, iterators, and indexes";
+                    }
+                }
+            }
+            section.measured {
+                h2 {
+                    "Measured, not estimated";
+                }
+                p {
+                    "Every number below is recorded in the repository and checked by its test suite.";
+                }
+                table {
+                    tbody {
+                        tr {
+                            th {
+                                "1,836 bytes";
+                            }
+                            td {
+                                "DeltaBlue, a real constraint solver, compressed with brotli.";
+                            }
+                        }
+                        tr {
+                            th {
+                                "2,572 bytes";
+                            }
+                            td {
+                                "The browser task board example, JavaScript glue and Wasm together, gzipped at the default size optimization.";
+                            }
+                        }
+                        tr {
+                            th {
+                                "38 ms";
+                            }
+                            td {
+                                "The self-hosted compiler compiling itself. Stage 2 and stage 3 of the bootstrap are byte-identical.";
+                            }
+                        }
+                        tr {
+                            th {
+                                "96 KB";
+                            }
+                            td {
+                                "The whole compiler as brotli-compressed Wasm. It is what the CLI, the editor, and the web playground run.";
+                            }
+                        }
+                    }
+                }
+            }
+            section.map {
+                h2 {
+                    "Read the docs";
+                }
+                ul {
+                    li {
+                        a {
+                            <href = "#/start";
+                            "Getting started";
+                        }
+                        span {
+                            "Clone, build, run a program, and install the editor extension.";
+                        }
+                    }
+                    li {
+                        a {
+                            <href = "#/tour";
+                            "Language tour";
+                        }
+                        span {
+                            "Functions, structs, enums, nullables, closures, protocols, modules, tests.";
+                        }
+                    }
+                    li {
+                        a {
+                            <href = "#/javascript";
+                            "JavaScript and npm";
+                        }
+                        span {
+                            "Typed declarations as the ABI, records, callbacks, promises, exceptions.";
+                        }
+                    }
+                    li {
+                        a {
+                            <href = "#/data";
+                            "Data";
+                        }
+                        span {
+                            "Typed JSON, iterator pipelines, segment trees, spatial queries.";
+                        }
+                    }
+                    li {
+                        a {
+                            <href = "#/wutu";
+                            "Wutu";
+                        }
+                        span {
+                            "Templates, CSS, reactive views, bindings, typed storage, prerendering.";
+                        }
+                    }
+                    li {
+                        a {
+                            <href = "#/tooling";
+                            "Tooling";
+                        }
+                        span {
+                            "The CLI, VS Code, the language server, and diagnostics.";
+                        }
+                    }
+                    li {
+                        a {
+                            <href = "#/compiler";
+                            "The compiler";
+                        }
+                        span {
+                            "Pipeline, self-hosting, the Wasm backend, and the design principles.";
+                        }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+}

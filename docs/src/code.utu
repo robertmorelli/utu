@@ -1,0 +1,244 @@
+// A small utu syntax highlighter, written in utu. It scans code units and
+// returns tokens; `block` renders them as spans inside a <pre>.
+using Browser from std:Browser;
+using Buffer from std:Buffer;
+mod code {
+    struct Token:
+    | kind: Str
+    | text: Str
+    fn is_digit(c: I32) Bool {
+        c >= 48 and c <= 57;
+    }
+    fn is_upper(c: I32) Bool {
+        c >= 65 and c <= 90;
+    }
+    fn is_ident_start(c: I32) Bool {
+        (c >= 97 and c <= 122) or is_upper(c) or c == 95;
+    }
+    fn is_ident(c: I32) Bool {
+        is_ident_start(c) or is_digit(c);
+    }
+    fn is_space(c: I32) Bool {
+        c == 32 or c == 9 or c == 10 or c == 13;
+    }
+    fn keyword(word: Str) Bool {
+        let words = [
+        "fn", "let", "struct", "enum", "proto", "mod", "using", "from", "export", "main", "lib",
+        "if", "else", "for", "while", "loop", "match", "alt", "promote", "orelse", "return",
+        "break", "continue", "cl", "fun", "await", "try", "catch", "not", "and", "or", "xor",
+        "true", "false", "null", "new", "test", "bench", "measure", "assert", "fatal", "tag",
+        "rec", "type", "distinct", "mem", "void", "get", "set", "bind", "on", "key", "each",
+        "map", "filter", "fold", "collect", "sort", "sum", "count", "count_where", "any",
+        "all", "take", "skip", "zip", "chain", "scan", "group_by", "first_where", "reduce",
+        "bisect", "flat_map", "take_while", "skip_while", "partition", "distinct_by",
+        "min_by", "max_by", "batched", "windows", "manual", "validate", "decode", "encode",
+        "error", "in"
+        ];
+        words any |w| {
+            w == word;
+        };
+    }
+    fn line_end(source: Str, from: I32) I32 {
+        let i = from;
+        let n = source.len();
+        while (i < n and source[i] != 10) {
+            i += 1;
+        };
+        i;
+    }
+    fn string_end(source: Str, from: I32, quote: I32) I32 {
+        let i = from + 1;
+        let n = source.len();
+        while (i < n) {
+            let c = source[i];
+            if c == 92 {
+                i += 2;
+            }
+            else if c == quote {
+                return i + 1;
+            }
+            else {
+                i += 1;
+            };
+        };
+        n;
+    }
+    fn block_comment_end(source: Str, from: I32) I32 {
+        let i = from + 2;
+        let n = source.len();
+        while (i + 1 < n) {
+            if source[i] == 42 and source[i + 1] == 47 {
+                return i + 2;
+            };
+            i += 1;
+        };
+        n;
+    }
+    fn ident_end(source: Str, from: I32) I32 {
+        let i = from;
+        let n = source.len();
+        while (i < n and is_ident(source[i])) {
+            i += 1;
+        };
+        i;
+    }
+    fn number_end(source: Str, from: I32) I32 {
+        let i = from;
+        let n = source.len();
+        while (i < n and (is_digit(source[i]) or source[i] == 46 or source[i] == 95 or source[i] == 120)) {
+            i += 1;
+        };
+        i;
+    }
+    // A run of punctuation and spaces that starts no other token.
+    fn plain_end(source: Str, from: I32) I32 {
+        let i = from + 1;
+        let n = source.len();
+        while (i < n) {
+            let c = source[i];
+            if is_ident_start(c) or is_digit(c) or c == 34 or c == 96 or c == 64 or c == 47 or c == 92 or c == 35 or c == 36 {
+                return i;
+            };
+            i += 1;
+        };
+        n;
+    }
+    fn at(source: Str, i: I32) I32 {
+        if i < source.len() {
+            source[i];
+        }
+        else {
+            0;
+        };
+    }
+    fn tokens(source: Str) Array[Token] {
+        let out = Buffer[Token].new();
+        let n = source.len();
+        let i = 0;
+        let plain = "";
+        while (i < n) {
+            let c = source[i];
+            let next = at(source, i + 1);
+            let start = i;
+            let kind = "t";
+            if c == 47 and next == 47 {
+                i = line_end(source, i);
+                kind = "c";
+            }
+            else if c == 47 and next == 42 {
+                i = block_comment_end(source, i);
+                kind = "c";
+            }
+            else if c == 35 and (next == 32 or next == 10) and (i == 0 or is_space(source[i - 1])) {
+                i = line_end(source, i);
+                kind = "c";
+            }
+            else if c == 34 or c == 96 {
+                i = string_end(source, i, c);
+                kind = "s";
+            }
+            else if c == 47 and next == 92 {
+                i += 2;
+                kind = "d";
+            }
+            else if c == 92 and next == 47 {
+                i += 2;
+                kind = "d";
+            }
+            else if c == 36 and next == 91 {
+                i += 2;
+                kind = "d";
+            }
+            else if c == 64 and is_ident_start(next) {
+                i = ident_end(source, i + 1);
+                kind = "a";
+            }
+            else if is_digit(c) {
+                i = number_end(source, i);
+                kind = "n";
+            }
+            else if is_ident_start(c) {
+                i = ident_end(source, i);
+                let word = source.slice(start, i);
+                let after = at(source, i);
+                if is_upper(c) {
+                    kind = "T";
+                }
+                else if after == 58 and at(source, i + 1) != 58 and at(source, i + 1) != 61 {
+                    kind = "y";
+                }
+                else if keyword(word) {
+                    kind = "k";
+                }
+                else if after == 40 {
+                    kind = "f";
+                }
+                else if after == 45 and is_ident_start(at(source, i + 1)) {
+                    // css property such as `grid-template-columns`
+                    let j = i;
+                    while (at(source, j) == 45 or is_ident(at(source, j))) {
+                        j += 1;
+                    };
+                    if at(source, j) == 58 {
+                        i = j;
+                        kind = "y";
+                    };
+                };
+            }
+            else {
+                i = plain_end(source, i);
+            };
+            if i <= start {
+                i = start + 1;
+            };
+            let text = source.slice(start, i);
+            if kind == "t" {
+                plain = plain + text;
+            }
+            else {
+                if plain.len() > 0 {
+                    out.push(Token {
+                        kind: "t",
+                        text: plain
+                    });
+                    plain = "";
+                };
+                out.push(Token {
+                    kind: kind,
+                    text: text
+                });
+            };
+        };
+        if plain.len() > 0 {
+            out.push(Token {
+                kind: "t",
+                text: plain
+            });
+        };
+        out.finish();
+    }
+    fn block(source: Str) Browser.HTMLElement {
+        let parts = tokens(source);
+        @wutu/\
+        pre.code {
+            code {
+                for $[parts] |part| {
+                    span {
+                        <class = $[part.kind];
+                        = part.text;
+                    }
+                }
+            }
+        }
+        \/;
+    }
+    fn shell(source: Str) Browser.HTMLElement {
+        @wutu/\
+        pre.code.shell {
+            code {
+                = source;
+            }
+        }
+        \/;
+    }
+}

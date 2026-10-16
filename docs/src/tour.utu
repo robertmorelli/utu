@@ -1,0 +1,506 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod tour {
+    fn functions_sample() Str {
+        \\fn classify(n: I32) Str {
+        \\    if n < 0 { "negative"; } else if n == 0 { "zero"; } else { "positive"; };
+        \\}
+        \\
+        \\fn add(a: I32, b: I32) I32 {
+        \\    a + b;
+        \\}
+        \\
+        \\export main() Str {
+        \\    let total = add(20, 22);   // the type is inferred
+        \\    let ratio: F64 = 1;        // an integer literal adopts the float type
+        \\    classify(total);
+        \\}
+        ;
+    }
+    fn structs_sample() Str {
+        \\struct Point:
+        \\    | x: F64
+        \\    | y: F64
+        \\
+        \\fn Point.origin() Point {
+        \\    Point { x: 0.0, y: 0.0 };
+        \\}
+        \\
+        \\fn Point.length |self| () F64 {
+        \\    F64.sqrt(self.x * self.x + self.y * self.y);
+        \\}
+        \\
+        \\fn Point:add |a, b| Point {
+        \\    Point { x: a.x + b.x, y: a.y + b.y };
+        \\}
+        \\
+        \\fn label(p: Point) Str {
+        \\    `(${p.x}, ${p.y})`;
+        \\}
+        \\
+        \\export main() F64 {
+        \\    let p = Point { x: 3.0, y: 4.0 } + Point.origin();
+        \\    p.length();
+        \\}
+        ;
+    }
+    fn enums_sample() Str {
+        \\tag enum Shape:
+        \\    | Circle { r: F64 }
+        \\    | Square { side: F64 }
+        \\
+        \\fn area(shape: Shape) F64 {
+        \\    alt shape {
+        \\        Circle |c| => 3.14159 * c.r * c.r,
+        \\        Square |s| => s.side * s.side,
+        \\    };
+        \\}
+        \\
+        \\enum(U8) Level:
+        \\    | Low
+        \\    | High
+        \\
+        \\fn describe(level: Level) Str {
+        \\    match level { Level.Low => "low", Level.High => "high", };
+        \\}
+        ;
+    }
+    fn nullable_sample() Str {
+        \\fn first_word(text: ?Str) Str {
+        \\    promote text {
+        \\        |t| => t.split(" ")[0],
+        \\        ~> "nothing",
+        \\    };
+        \\}
+        \\
+        \\fn fallback(text: ?Str) Str {
+        \\    text orelse "nothing";
+        \\}
+        ;
+    }
+    fn closures_sample() Str {
+        \\struct Counter:
+        \\    | n: I32
+        \\
+        \\fn double(x: I32) I32 { x * 2; }
+        \\
+        \\fn capture_modes() I32 {
+        \\    let base: I32 = 100;
+        \\    let c: Counter = Counter { n: 1 };
+        \\    let read: cl() I32 = cl() { base + c.n; };
+        \\    base = 999;   // not observed: scalars are snapshot
+        \\    c.n = 5;      // observed: the Counter is shared
+        \\    read();       // 105
+        \\}
+        \\
+        \\fn takes_closure(f: cl(I32) I32) I32 { f(21); }
+        \\
+        \\export main() I32 {
+        \\    let op: fun(I32) I32 = double;   // a wasm function reference
+        \\    op(1) + capture_modes() + takes_closure(double);
+        \\}
+        ;
+    }
+    fn arrays_sample() Str {
+        \\struct Row:
+        \\    | score: I32
+        \\
+        \\fn rows() Array[Row] {
+        \\    [3, 1, 2] map |n| { Row { score: n }; }
+        \\        sort(Row) |a, b| { a.score < b.score; };
+        \\}
+        \\
+        \\export main() I32 {
+        \\    let xs: Array[F64] = [1, 2.5];
+        \\    let total = [1, 2, 3, 4, 5]
+        \\        map |n| { n * 2; }
+        \\        filter |n| { n > 4; }
+        \\        fold (0) |sum, n| { sum + n; };
+        \\    for (0..<rows().len()) |i| {
+        \\        total += rows()[i].score;
+        \\    };
+        \\    total;
+        \\}
+        ;
+    }
+    fn protocols_sample() Str {
+        \\proto Shape:
+        \\    | get x : F32
+        \\    | perimeter() F32
+        \\
+        \\tag struct Line[Shape]:
+        \\    | x : F32
+        \\    | x2 : F32
+        \\
+        \\fn Shape[Line].perimeter |self| () F32 {
+        \\    self.x2 - self.x;
+        \\}
+        \\
+        \\fn perimeter_sum(shapes: Array[Shape]) F32 {
+        \\    let s: F32 = 0.0;
+        \\    for (0..<shapes.len()) |i| {
+        \\        s = s + shapes[i].perimeter();
+        \\    };
+        \\    s;
+        \\}
+        ;
+    }
+    fn modules_sample() Str {
+        \\// _ops.utu
+        \\mod mathops {
+        \\    fn double(value: I32) I32 { value * 2; }
+        \\}
+        \\
+        \\// _boxes.utu
+        \\using mathops |ops| from "./_ops.utu";
+        \\
+        \\mod boxes {
+        \\    struct &:
+        \\        | value : I32
+        \\
+        \\    fn &.new(value: I32) & { &{ value: value }; }
+        \\    fn &.score |self| () I32 { ops.double(self.value); }
+        \\}
+        \\
+        \\// main.utu
+        \\using boxes |Box| from "./_boxes.utu";
+        \\
+        \\fn main() I32 {
+        \\    Box.score(Box.new(20));
+        \\}
+        ;
+    }
+    fn generic_sample() Str {
+        \\using StrMap from std:StrMap;
+        \\
+        \\fn word_counts(text: Str) StrMap[I32] {
+        \\    let counts = StrMap[I32].new();
+        \\    for (text.to_lower().split(" ")) |word| {
+        \\        if word.len() > 0 { counts.set(word, counts.get(word, 0) + 1); };
+        \\    };
+        \\    counts;
+        \\}
+        ;
+    }
+    fn tests_sample() Str {
+        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\
+        \\test "addition commutes" {
+        \\    assert add(2, 3) == add(3, 2);
+        \\}
+        \\
+        \\bench "adding" {
+        \\    measure {
+        \\        add(2, 3);
+        \\    }
+        \\}
+        ;
+    }
+    fn await_sample() Str {
+        \\let delay: fun(I32, I32) Promise[I32] =
+        \\    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+        \\
+        \\fn total(a: I32, b: I32) I32 {
+        \\    let first: I32 = await delay(a, 5);
+        \\    let second: I32 = await delay(b, 5);
+        \\    first + second;
+        \\}
+        \\
+        \\fn subscribe(n: I32) void {
+        \\    delay(n, 5).then(cl(v) { record(v); });
+        \\}
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Language tour", "Enough utu to read the rest of these pages. Every sample here type-checks against the current compiler.");
+            h2 {
+                "Functions and blocks";
+            }
+            p {
+                "Blocks are expressions: the last expression is the value, and ";
+                code {
+                    "if";
+                }
+                " is an expression too. Every statement ends with a semicolon, including the one that produces the value. Return types are written after the parameter list; a function without one returns ";
+                code {
+                    "void";
+                }
+                ".";
+            }
+            = code.block(functions_sample());
+            h2 {
+                "Scalars and names";
+            }
+            p {
+                "The numeric types are ";
+                code {
+                    "I32";
+                }
+                ", ";
+                code {
+                    "U32";
+                }
+                ", ";
+                code {
+                    "I64";
+                }
+                ", ";
+                code {
+                    "U64";
+                }
+                ", ";
+                code {
+                    "F32";
+                }
+                ", and ";
+                code {
+                    "F64";
+                }
+                ", with ";
+                code {
+                    "Bool";
+                }
+                " and ";
+                code {
+                    "Str";
+                }
+                " beside them. Type checking is nominal: ";
+                code {
+                    "U32";
+                }
+                " and ";
+                code {
+                    "I32";
+                }
+                " share a Wasm representation and are still different types. Conversions are explicit and cost one instruction each: ";
+                code {
+                    "i.to_f64()";
+                }
+                ", ";
+                code {
+                    "f.to_i32()";
+                }
+                ". A ";
+                code {
+                    "Str";
+                }
+                " is a JavaScript string; string operations call the engine's string builtins.";
+            }
+            h2 {
+                "Structs, methods, and operators";
+            }
+            p {
+                "Fields are declared one per line behind a bar. Associated functions take the type's name; methods name their receiver in capture bars before the parameter list; an operator is a method whose name is the operator's (";
+                code {
+                    "add";
+                }
+                ", ";
+                code {
+                    "eq";
+                }
+                ", ";
+                code {
+                    "lt";
+                }
+                "...). Template strings call ";
+                code {
+                    "to_str";
+                }
+                " on each piece.";
+            }
+            = code.block(structs_sample());
+            h2 {
+                "Enums, alt, and match";
+            }
+            p {
+                "An enum's variants may carry fields; ";
+                code {
+                    "alt";
+                }
+                " tests them, binding the variant's value in each arm. ";
+                code {
+                    "tag";
+                }
+                " makes that dispatch a jump table. Field-less enums with an integer representation are compared and dispatched with ";
+                code {
+                    "match";
+                }
+                ", which is exhaustive, and can be stored in memories.";
+            }
+            = code.block(enums_sample());
+            h2 {
+                "Nullable values";
+            }
+            p {
+                code {
+                    "?T";
+                }
+                " is a value that may be absent. ";
+                code {
+                    "promote";
+                }
+                " binds the present value in one arm and handles absence in the ";
+                code {
+                    "~>";
+                }
+                " arm; ";
+                code {
+                    "orelse";
+                }
+                " supplies a default, and ";
+                code {
+                    "orelse fatal";
+                }
+                " traps. Widening a ";
+                code {
+                    "T";
+                }
+                " to a ";
+                code {
+                    "?T";
+                }
+                " is one of only two implicit conversions in the language.";
+            }
+            = code.block(nullable_sample());
+            h2 {
+                "Function pointers and closures";
+            }
+            p {
+                "There are two callable types, and the difference is representational. A ";
+                code {
+                    "fun";
+                }
+                " is a Wasm function reference: no environment, no host involvement, a call never leaves Wasm. A ";
+                code {
+                    "cl";
+                }
+                " is a real JavaScript function held as an ";
+                code {
+                    "externref";
+                }
+                ", so it can be handed to any JavaScript callback without marshalling. A ";
+                code {
+                    "fun";
+                }
+                " converts to a ";
+                code {
+                    "cl";
+                }
+                " implicitly; the reverse never happens. Closures capture scalars by value and references by sharing.";
+            }
+            = code.block(closures_sample());
+            h2 {
+                "Arrays and iterators";
+            }
+            p {
+                "An array literal takes its type from context and otherwise from its elements. Iterator stages are syntax over native arrays: ";
+                code {
+                    "map";
+                }
+                ", ";
+                code {
+                    "filter";
+                }
+                ", ";
+                code {
+                    "fold";
+                }
+                ", ";
+                code {
+                    "sort";
+                }
+                ", ";
+                code {
+                    "collect";
+                }
+                ", and more compile to one loop with scalar locals. Counted loops use ranges.";
+            }
+            = code.block(arrays_sample());
+            h2 {
+                "Protocols";
+            }
+            p {
+                "A protocol lists getters, setters, and methods. A type implements it in its declaration, and each method is written as ";
+                code {
+                    "fn Proto[Type].method";
+                }
+                ". An ";
+                code {
+                    "Array[Proto]";
+                }
+                " holds any implementor and dispatches at the call.";
+            }
+            = code.block(protocols_sample());
+            h2 {
+                "Modules and files";
+            }
+            p {
+                "A ";
+                code {
+                    "mod";
+                }
+                " groups types and functions under a name; inside it, ";
+                code {
+                    "&";
+                }
+                " names the module's own type. Files import each other's modules with ";
+                code {
+                    "using";
+                }
+                ", optionally renaming. Modules are also the unit of type parameterization: ";
+                code {
+                    "StrMap[I32]";
+                }
+                " is the ";
+                code {
+                    "StrMap";
+                }
+                " module instantiated at ";
+                code {
+                    "I32";
+                }
+                ".";
+            }
+            = code.block(modules_sample());
+            = code.block(generic_sample());
+            h2 {
+                "Tests and benchmarks";
+            }
+            p {
+                "Tests live next to the code and run with ";
+                code {
+                    "utu test";
+                }
+                ". A failed ";
+                code {
+                    "assert";
+                }
+                " is a Wasm trap, so there is nothing to catch and nothing to forget.";
+            }
+            = code.block(tests_sample());
+            h2 {
+                "Promises and await";
+            }
+            p {
+                code {
+                    "Promise[T]";
+                }
+                " is a real JavaScript promise. Any function may ";
+                code {
+                    "await";
+                }
+                "; there is no async keyword and functions are not colored. The Wasm stack suspends through JavaScript Promise Integration, which needs Chrome 126+, Node 23+, or Bun. ";
+                code {
+                    ".then";
+                }
+                " works on any host and is the portable floor.";
+            }
+            = code.block(await_sample());
+            = ui.further("new_spec2.md", "the language specification");
+        }
+        \/;
+    }
+}

@@ -1,0 +1,154 @@
+using Browser from std:Browser;
+using code from "./code.utu";
+using ui from "./ui.utu";
+mod start {
+    fn clone_sample() Str {
+        \\git clone https://github.com/robertmorelli/utu
+        \\cd utu
+        \\bun install
+        \\bun run build
+        ;
+    }
+    fn hello_sample() Str {
+        \\using console from std:Console;
+        \\
+        \\fn greeting(name: Str) Str {
+        \\    `hello, ${name}`;
+        \\}
+        \\
+        \\export main() void {
+        \\    console.log(greeting("world"));
+        \\}
+        ;
+    }
+    fn run_sample() Str {
+        \\bun ./cli/utu.mjs check hello.utu    # report what is wrong with the program
+        \\bun ./cli/utu.mjs run hello.utu      # build it, then call its main
+        \\bun ./cli/utu.mjs test hello.utu     # build its tests, then run each
+        \\bun ./cli/utu.mjs build hello.utu    # hello.wasm, and hello.mjs that loads it
+        ;
+    }
+    fn vscode_sample() Str {
+        \\bun run package:vscode
+        \\code --install-extension dist/utu-vscode.vsix
+        ;
+    }
+    fn site_sample() Str {
+        \\using Browser from std:Browser;
+        \\
+        \\export main() void {
+        \\    let app = @wutu/\
+        \\    main {
+        \\        padding: 2rem;
+        \\        font-family: system-ui;
+        \\        h1 { "Hello from utu"; }
+        \\        p { "This page is Wasm, HTML, and CSS from one source file."; }
+        \\    }
+        \\    \/;
+        \\    Browser.document.body.append(app);
+        \\}
+        ;
+    }
+    fn wutu_sample() Str {
+        \\node cli/wutu.mjs dev main.utu                 # live-reload preview
+        \\node cli/wutu.mjs format main.utu              # format source
+        \\node cli/wutu.mjs build main.utu --out dist/site
+        ;
+    }
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Getting started", "utu lives in one repository. Clone it, build the bundle once, and the same compiler serves the command line, the editor, and the browser.");
+            h2 {
+                "Build the compiler";
+            }
+            p {
+                "You need Bun and Node. The build makes ";
+                code {
+                    "dist/utu.wasm";
+                }
+                ", the self-hosted compiler, by bootstrapping it from the JavaScript compiler: stage 0 builds stage 1, stage 1 builds stage 2, and stage 2 must reproduce itself exactly.";
+            }
+            = code.shell(clone_sample());
+            h2 {
+                "Run a program";
+            }
+            p {
+                "A program's entry point is ";
+                code {
+                    "export main";
+                }
+                ". A block's last expression is its value, and every statement ends with a semicolon.";
+            }
+            = code.block(hello_sample());
+            = code.shell(run_sample());
+            p {
+                "Pass ";
+                code {
+                    "-O3";
+                }
+                " for the fastest module, or ";
+                code {
+                    "-Oz";
+                }
+                " (the default) for the smallest one. ";
+                code {
+                    "build-exe";
+                }
+                " writes a standalone executable with Bun.";
+            }
+            h2 {
+                "Install the editor extension";
+            }
+            p {
+                "The VS Code extension runs on the desktop and on the web. It provides syntax highlighting, compiler-backed diagnostics as you type, hover information, inlay hints, Wasm and WAT compilation, syntax and compiler-IR views, and runs ";
+                code {
+                    "export main";
+                }
+                " from the editor.";
+            }
+            = code.shell(vscode_sample());
+            p {
+                "Open any ";
+                code {
+                    ".utu";
+                }
+                " file, or run a command from the UTU group in the command palette. Other editors speak to the same compiler through the language server; see ";
+                a {
+                    <href = "#/tooling";
+                    "Tooling";
+                }
+                ".";
+            }
+            h2 {
+                "Build a website";
+            }
+            p {
+                "Wutu is the built-in DOM and CSS language. Write a ";
+                code {
+                    "main.utu";
+                }
+                " with a Wutu root, preview it with live reload, and build it into a folder with ";
+                code {
+                    "index.html";
+                }
+                ", ";
+                code {
+                    "app.js";
+                }
+                ", and ";
+                code {
+                    "app.wasm";
+                }
+                ". The HTML is prerendered in build-time Chromium, so the page reads before any script loads.";
+            }
+            = code.block(site_sample());
+            = code.shell(wutu_sample());
+            p {
+                "In VS Code, run UTU: Create Wutu Website for a starter file and UTU: Preview Wutu Website for the live preview.";
+            }
+            = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression");
+        }
+        \/;
+    }
+}

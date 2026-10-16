@@ -1,0 +1,412 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>utu</title><style id="wutu-141049t">
+        @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap");
+        :root {
+            --bg: #eef0f4;
+            --surface: #ffffff;
+            --ink: #141a2b;
+            --muted: #5b6579;
+            --line: #d5d9e3;
+            --accent: #4a3dd6;
+            --accent-soft: #e6e3fb;
+            --code-bg: #171c30;
+            --code-ink: #e4e7f2;
+            --code-k: #c8bdff;
+            --code-s: #a7dfb1;
+            --code-c: #7d86a1;
+            --code-T: #ffd48a;
+            --code-n: #ffb3b3;
+            --code-a: #ff9ed6;
+            --code-d: #8fd6ff;
+            --code-y: #a6d4ff;
+            --code-f: #e4e7f2;
+            color-scheme: light dark;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0e1220;
+                --surface: #151a2c;
+                --ink: #e6e8f1;
+                --muted: #99a1b8;
+                --line: #272e49;
+                --accent: #aaa0ff;
+                --accent-soft: #23264a;
+                --code-bg: #090c17;
+            }
+        }
+        * {
+            box-sizing: border-box;
+        }
+        html {
+            -webkit-text-size-adjust: 100%;
+            scroll-behavior: smooth;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 400 1.0625rem/1.6 "Bricolage Grotesque", system-ui, sans-serif;
+            font-optical-sizing: auto;
+        }
+        a {
+            color: var(--accent);
+            text-underline-offset: 0.2em;
+            text-decoration-thickness: 1px;
+        }
+        a:hover {
+            text-decoration-thickness: 2px;
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
+            border-radius: 2px;
+        }
+        h1, h2, h3, p, ul, ol, table {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        h1 {
+            font-weight: 500;
+            font-size: clamp(2.2rem, 1.4rem + 3vw, 3.6rem);
+            line-height: 1.05;
+            letter-spacing: -0.035em;
+        }
+        h2 {
+            font-weight: 600;
+            font-size: 1.55rem;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            margin-block: 3rem 0.9rem;
+        }
+        h2:first-of-type {
+            margin-block-start: 2.25rem;
+        }
+        p + p {
+            margin-block-start: 0.9rem;
+        }
+        .page {
+            max-inline-size: 46rem;
+            padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem) 5rem;
+        }
+        .page-head {
+            display: grid;
+            gap: 1rem;
+            padding-block-end: 1.5rem;
+            border-block-end: 1px solid var(--line);
+        }
+        .lede {
+            font-size: 1.2rem;
+            line-height: 1.5;
+            color: var(--muted);
+            max-inline-size: 38rem;
+        }
+        .further {
+            margin-block-start: 1.5rem;
+            padding-inline-start: 1rem;
+            border-inline-start: 3px solid var(--accent-soft);
+            color: var(--muted);
+        }
+        .further + .further {
+            margin-block-start: 0.6rem;
+        }
+        code {
+            font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.86em;
+        }
+        p code, li code, td code, th code {
+            background: var(--accent-soft);
+            padding: 0.08em 0.35em;
+            border-radius: 0.3em;
+        }
+        pre.code {
+            margin: 1.25rem 0;
+            padding: 1.1rem 1.25rem;
+            background: var(--code-bg);
+            color: var(--code-ink);
+            border-radius: 0.65rem;
+            overflow-x: auto;
+            font: 400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+            tab-size: 4;
+        }
+        pre.code code {
+            font-size: inherit;
+        }
+        @media (width < 40rem) {
+            pre.code {
+                font-size: 0.78rem;
+                padding: 0.9rem 1rem;
+            }
+        }
+        pre.code .k {
+            color: var(--code-k);
+        }
+        pre.code .s {
+            color: var(--code-s);
+        }
+        pre.code .c {
+            color: var(--code-c);
+            font-style: italic;
+        }
+        pre.code .T {
+            color: var(--code-T);
+        }
+        pre.code .n {
+            color: var(--code-n);
+        }
+        pre.code .a {
+            color: var(--code-a);
+            font-weight: 500;
+        }
+        pre.code .d {
+            color: var(--code-d);
+            font-weight: 500;
+        }
+        pre.code .y {
+            color: var(--code-y);
+        }
+        pre.code .f {
+            color: var(--code-f);
+        }
+        pre.shell {
+            color: var(--code-ink);
+        }
+        table {
+            border-collapse: collapse;
+            inline-size: 100%;
+            margin-block: 1.25rem;
+            font-size: 0.95rem;
+        }
+        th, td {
+            text-align: start;
+            vertical-align: top;
+            padding: 0.6rem 0.75rem 0.6rem 0;
+            border-block-end: 1px solid var(--line);
+        }
+        th {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        thead th {
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+        ul, ol {
+            padding-inline-start: 1.25rem;
+        }
+        li + li {
+            margin-block-start: 0.4rem;
+        }
+        .principles li {
+            padding-inline-start: 0.35rem;
+        }
+        .principles li::marker {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .home {
+            padding: clamp(1.5rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem) 4rem;
+            max-inline-size: 72rem;
+            display: grid;
+            gap: clamp(3rem, 7vw, 5.5rem);
+        }
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: clamp(2rem, 5vw, 4rem);
+            align-items: start;
+        }
+        @media (width < 60rem) {
+            .hero {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        .pitch {
+            display: grid;
+            gap: 1.5rem;
+            align-content: start;
+            padding-block-start: 1rem;
+        }
+        .pitch h1 {
+            font-size: clamp(2.6rem, 1.5rem + 4.2vw, 4.8rem);
+            font-weight: 450;
+            max-inline-size: 11em;
+        }
+        .pitch .lede {
+            font-size: 1.15rem;
+            max-inline-size: 34rem;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 1.75rem;
+            align-items: center;
+        }
+        .button {
+            display: inline-block;
+            padding: 0.8rem 1.4rem;
+            border-radius: 0.6rem;
+            background: var(--accent);
+            color: var(--bg);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .button:hover {
+            filter: brightness(1.08);
+        }
+        .envelope {
+            position: relative;
+            display: grid;
+            gap: 0.75rem;
+            padding-inline: clamp(0rem, 2vw, 1.5rem);
+        }
+        .envelope pre.code {
+            margin: 0;
+            font-size: 0.8rem;
+        }
+        .bracket {
+            font: 400 clamp(3rem, 6vw, 5rem)/0.8 "IBM Plex Mono", ui-monospace, monospace;
+            color: var(--accent);
+            user-select: none;
+            line-height: 0.75;
+        }
+        .bracket.open {
+            justify-self: start;
+            margin-inline-start: -0.1em;
+        }
+        .bracket.close {
+            justify-self: end;
+            margin-inline-end: -0.1em;
+        }
+        .caption {
+            color: var(--muted);
+            font-size: 0.95rem;
+            max-inline-size: 30rem;
+        }
+        .points {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+            gap: clamp(2rem, 4vw, 3.5rem);
+        }
+        .point {
+            display: grid;
+            gap: 0.9rem;
+            align-content: start;
+        }
+        .point h2 {
+            margin: 0;
+            font-size: 1.45rem;
+            max-inline-size: 22ch;
+        }
+        .point pre.code {
+            margin: 0.25rem 0;
+        }
+        .measured {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .measured h2, .map h2 {
+            margin: 0;
+        }
+        .measured table {
+            margin-block: 0.75rem 0;
+            max-inline-size: 52rem;
+        }
+        .measured th {
+            font-size: 1.5rem;
+            font-weight: 500;
+            letter-spacing: -0.02em;
+            padding-inline-end: 1.5rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .measured td {
+            color: var(--muted);
+        }
+        .map ul {
+            list-style: none;
+            padding: 0;
+            margin-block-start: 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+            gap: 1rem 2.5rem;
+        }
+        .map li {
+            display: grid;
+            gap: 0.15rem;
+            padding-block: 0.75rem;
+            border-block-start: 1px solid var(--line);
+            margin: 0;
+        }
+        .map li a {
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+        .map li span {
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+    .w1qs58sx{display:grid;grid-template-columns:17rem minmax(0, 1fr);min-block-size:100dvh;@media (width < 64rem){
+            grid-template-columns: minmax(0, 1fr);
+        }}.wqbk89c{position:sticky;top:0;block-size:100dvh;overflow-y:auto;display:flex;flex-direction:column;gap:1.5rem;padding:1.75rem 1.5rem;border-inline-end:1px solid var(--line);@media (width < 64rem){
+                position: static;
+                block-size: auto;
+                gap: 0.9rem;
+                padding: 1rem 1rem 0.75rem;
+                border-inline-end: 0;
+                border-block-end: 1px solid var(--line);
+                background: var(--bg);
+            }}.wdb7r3s{display:flex;align-items:baseline;gap:0.6rem;color:var(--ink);text-decoration:none;font-weight:700;font-size:1.5rem;letter-spacing:-0.03em;}.w1ab12w6{font:500 1.05rem "IBM Plex Mono", ui-monospace, monospace;color:var(--accent);letter-spacing:0;}.w119mzep{font-weight:400;font-size:0.9rem;color:var(--muted);letter-spacing:0;}.wscv5xn{display:grid;gap:0.1rem;@media (width < 64rem){
+                    display: flex;
+                    gap: 0.35rem;
+                    overflow-x: auto;
+                    scrollbar-width: none;
+                    margin-inline: -1rem;
+                    padding-inline: 1rem;
+                }}.wkqu3zs{display:block;padding:0.45rem 0.7rem;border-radius:0.5rem;color:var(--ink);text-decoration:none;font-size:0.98rem;white-space:nowrap;&:hover{
+                            background: var(--accent-soft);
+                        }&.here{
+                            background: var(--accent);
+                            color: var(--surface);
+                            font-weight: 600;
+                        }@media (prefers-color-scheme: dark){
+                            @ &.here {
+                                color: var(--bg);
+                            }
+                        }}.w14c5k7f{margin-block-start:auto;font-size:0.85rem;color:var(--muted);line-height:1.5;@media (width < 64rem){
+                    display: none;
+                }}.wu7hoyu{min-inline-size:0;}.wgt71xe{padding:2rem clamp(1rem, 4vw, 3rem) 3rem;border-block-start:1px solid var(--line);color:var(--muted);font-size:0.9rem;display:flex;flex-wrap:wrap;gap:0.5rem 2rem;justify-content:space-between;}</style></head><body><noscript>Interactive controls require JavaScript and WebAssembly.</noscript><script type="module" src="./app.js"></script><div class="shell w1qs58sx" data-wutu="vnokpnc:0" data-wutu-root="vnokpnc:0" data-wutu-prerender=""><aside class="side wqbk89c" data-wutu="vnokpnc:1"><a class="brand wdb7r3s" href="#/" data-wutu="vnokpnc:2"><span class="mark w1ab12w6" aria-hidden="true" data-wutu="vnokpnc:3">/\</span>utu<span class="sub w119mzep" data-wutu="vnokpnc:4">docs</span></a><nav class="wscv5xn" aria-label="Pages" data-wutu="vnokpnc:5"><a data-wutu="vnokpnc:6:k1:/" href="#/" class="wkqu3zs here" aria-current="page">Overview</a><a data-wutu="vnokpnc:6:k6:/start" href="#/start" class="wkqu3zs elsewhere" aria-current="false">Getting started</a><a data-wutu="vnokpnc:6:k5:/tour" href="#/tour" class="wkqu3zs elsewhere" aria-current="false">Language tour</a><a data-wutu="vnokpnc:6:k11:/javascript" href="#/javascript" class="wkqu3zs elsewhere" aria-current="false">JavaScript and npm</a><a data-wutu="vnokpnc:6:k5:/data" href="#/data" class="wkqu3zs elsewhere" aria-current="false">JSON, iterators, indexes</a><a data-wutu="vnokpnc:6:k5:/wutu" href="#/wutu" class="wkqu3zs elsewhere" aria-current="false">Wutu</a><a data-wutu="vnokpnc:6:k8:/tooling" href="#/tooling" class="wkqu3zs elsewhere" aria-current="false">Tooling</a><a data-wutu="vnokpnc:6:k9:/compiler" href="#/compiler" class="wkqu3zs elsewhere" aria-current="false">The compiler</a></nav><p class="aside-foot w14c5k7f" data-wutu="vnokpnc:7"><a data-wutu="vnokpnc:8" href="https://github.com/robertmorelli/utu">GitHub</a><br data-wutu="vnokpnc:9"><a data-wutu="vnokpnc:10" href="https://github.com/robertmorelli/utu/tree/main/docs">Markdown deep dives</a></p></aside><div class="content wu7hoyu" data-wutu="vnokpnc:11"><article class="home" data-wutu="v1ctso30:0:c17:call:nokpnc:14017"><section class="hero" data-wutu="v1ctso30:1:c17:call:nokpnc:14017"><div class="pitch" data-wutu="v1ctso30:2:c17:call:nokpnc:14017"><h1 data-wutu="v1ctso30:3:c17:call:nokpnc:14017">A language that compiles to WasmGC.</h1><p class="lede" data-wutu="v1ctso30:4:c17:call:nokpnc:14017">The compiler, standard library, parser, and analysis engine ship as one bundle. It is the same bytes in Node, Bun, a browser, an IDE, or CI. There is no separate stdlib install, no host-specific build, and no lite version.</p><p class="actions" data-wutu="v1ctso30:5:c17:call:nokpnc:14017"><a class="button" href="#/start" data-wutu="v1ctso30:6:c17:call:nokpnc:14017">Get started</a><a data-wutu="v1ctso30:7:c17:call:nokpnc:14017" href="https://github.com/robertmorelli/utu">Source on GitHub</a></p></div><div class="envelope" data-wutu="v1ctso30:8:c17:call:nokpnc:14017"><span class="bracket open" aria-hidden="true" data-wutu="v1ctso30:9:c17:call:nokpnc:14017">/\</span><pre class="code" data-wutu="v1l4qo6s:0:c17:call:nokpnc:14017:c17:call:1ctso30:1069"><code data-wutu="v1l4qo6s:1:c17:call:nokpnc:14017:c17:call:1ctso30:1069"><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:0" class="k">using</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:1" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:2" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:3" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:4" class="k">from</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:5" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:6" class="y">std</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:7" class="t">:</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:8" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c1:9" class="t">;
+
+</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:10" class="k">fn</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:11" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:12" class="f">greeting</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:13" class="t">(</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:14" class="y">name</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:15" class="t">: </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:16" class="T">Str</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:17" class="t">) </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:18" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:19" class="t">.</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:20" class="T">HTMLElement</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:21" class="t"> {
+    </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:22" class="a">@wutu</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:23" class="d">/\</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:24" class="t">
+    section.greeting {
+        </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:25" class="y">display</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:26" class="t">: grid;
+        </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:27" class="y">gap</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:28" class="t">: </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:29" class="n">1</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:30" class="t">rem;
+        h2 { </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:31" class="s">"Hello, "</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:32" class="t">; </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:33" class="d">$[</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:34" class="t">name]; }
+        a {
+            &lt;href = </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:35" class="s">"#/start"</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:36" class="t">;
+            :hover { </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:37" class="y">opacity</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:38" class="t">: </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:39" class="n">0.8</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:40" class="t">; }
+            </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:41" class="s">"Start here"</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:42" class="t">;
+        }
+    }
+    </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:43" class="d">\/</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:44" class="t">;
+}
+
+</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:45" class="k">export</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:46" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:47" class="k">main</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:48" class="t">() </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:49" class="k">void</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:50" class="t"> {
+    </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:51" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:52" class="t">.document.body.</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:53" class="f">append</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:54" class="t">(</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:55" class="f">greeting</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:56" class="t">(</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:57" class="s">"friend"</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:1069:c15:loop:1l4qo6s:61:c2:58" class="t">));
+}</span></code></pre><span class="bracket close" aria-hidden="true" data-wutu="v1ctso30:10:c17:call:nokpnc:14017">\/</span><p class="caption" data-wutu="v1ctso30:11:c17:call:nokpnc:14017">Wutu, utu's built-in DOM and CSS language. Markup, styles, and events in one typed expression. This page is written in it.</p></div></section><section class="points" data-wutu="v1ctso30:12:c17:call:nokpnc:14017"><div class="point" data-wutu="v1ctso30:13:c17:call:nokpnc:14017"><h2 data-wutu="v1ctso30:14:c17:call:nokpnc:14017">TypeScript declarations are the foreign-function interface.</h2><p data-wutu="v1ctso30:15:c17:call:nokpnc:14017"><code>std:Browser</code> gives typed access to the whole DOM and JavaScript standard library, and any npm package with types imports directly. Only the boundary operations a program uses are emitted.</p><pre class="code" data-wutu="v1l4qo6s:0:c17:call:nokpnc:14017:c17:call:1ctso30:2051"><code data-wutu="v1l4qo6s:1:c17:call:nokpnc:14017:c17:call:1ctso30:2051"><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:0" class="k">using</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:1" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:2" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:3" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:4" class="k">from</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:5" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:6" class="y">std</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:7" class="t">:</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:8" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c1:9" class="t">;
+</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:10" class="k">using</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:11" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:12" class="T">Nano</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:13" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:14" class="k">from</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:15" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:16" class="s">"npm:nanoid"</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:17" class="t">;
+
+</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:18" class="k">export</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:19" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:20" class="k">main</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:21" class="t">() </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:22" class="k">void</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:23" class="t"> {
+    </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:24" class="k">let</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:25" class="t"> item = </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:26" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:27" class="t">.document.</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:28" class="f">createElement</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:29" class="t">(</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:30" class="s">"li"</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:31" class="t">);
+    item.textContent = </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:32" class="T">Nano</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:33" class="t">.</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:34" class="f">nanoid</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:35" class="t">(</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:36" class="n">8</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:37" class="t">);
+    </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:38" class="T">Browser</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:39" class="t">.document.body.</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:40" class="f">append</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2051:c15:loop:1l4qo6s:61:c2:41" class="t">(item);
+}</span></code></pre><a href="#/javascript" data-wutu="v1ctso30:17:c17:call:nokpnc:14017">JavaScript, the browser, and npm</a></div><div class="point" data-wutu="v1ctso30:18:c17:call:nokpnc:14017"><h2 data-wutu="v1ctso30:19:c17:call:nokpnc:14017">Iterators are syntax, and they fuse.</h2><p data-wutu="v1ctso30:20:c17:call:nokpnc:14017">A pipeline over a native array compiles to one Wasm loop with scalar locals. No iterator objects, no closures, no operator library, no intermediate collections.</p><pre class="code" data-wutu="v1l4qo6s:0:c17:call:nokpnc:14017:c17:call:1ctso30:2644"><code data-wutu="v1l4qo6s:1:c17:call:nokpnc:14017:c17:call:1ctso30:2644"><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:0" class="k">export</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:1" class="t"> </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:2" class="k">main</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:3" class="t">() </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:4" class="T">I32</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:5" class="t"> {
+    [</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:6" class="n">1</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:7" class="t">, </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:8" class="n">2</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c1:9" class="t">, </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:10" class="n">3</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:11" class="t">, </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:12" class="n">4</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:13" class="t">, </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:14" class="n">5</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:15" class="t">]
+        </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:16" class="k">map</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:17" class="t"> |n| { n * </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:18" class="n">2</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:19" class="t">; }
+        </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:20" class="k">filter</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:21" class="t"> |n| { n &gt; </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:22" class="n">4</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:23" class="t">; }
+        </span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:24" class="k">fold</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:25" class="t"> (</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:26" class="n">0</span><span data-wutu="v1l4qo6s:2:c17:call:nokpnc:14017:c17:call:1ctso30:2644:c15:loop:1l4qo6s:61:c2:27" class="t">) |total, n| { total + n; };
+}</span></code></pre><a href="#/data" data-wutu="v1ctso30:21:c17:call:nokpnc:14017">Typed JSON, iterators, and indexes</a></div></section><section class="measured" data-wutu="v1ctso30:22:c17:call:nokpnc:14017"><h2>Measured, not estimated</h2><p>Every number below is recorded in the repository and checked by its test suite.</p><table><tbody><tr><th>1,836 bytes</th><td>DeltaBlue, a real constraint solver, compressed with brotli.</td></tr><tr><th>2,572 bytes</th><td>The browser task board example, JavaScript glue and Wasm together, gzipped at the default size optimization.</td></tr><tr><th>38 ms</th><td>The self-hosted compiler compiling itself. Stage 2 and stage 3 of the bootstrap are byte-identical.</td></tr><tr><th>96 KB</th><td>The whole compiler as brotli-compressed Wasm. It is what the CLI, the editor, and the web playground run.</td></tr></tbody></table></section><section class="map" data-wutu="v1ctso30:39:c17:call:nokpnc:14017"><h2>Read the docs</h2><ul><li><a href="#/start">Getting started</a><span>Clone, build, run a program, and install the editor extension.</span></li><li><a href="#/tour">Language tour</a><span>Functions, structs, enums, nullables, closures, protocols, modules, tests.</span></li><li><a href="#/javascript">JavaScript and npm</a><span>Typed declarations as the ABI, records, callbacks, promises, exceptions.</span></li><li><a href="#/data">Data</a><span>Typed JSON, iterator pipelines, segment trees, spatial queries.</span></li><li><a href="#/wutu">Wutu</a><span>Templates, CSS, reactive views, bindings, typed storage, prerendering.</span></li><li><a href="#/tooling">Tooling</a><span>The CLI, VS Code, the language server, and diagnostics.</span></li><li><a href="#/compiler">The compiler</a><span>Pipeline, self-hosting, the Wasm backend, and the design principles.</span></li></ul></section></article><footer class="wgt71xe" data-wutu="vnokpnc:12"><p data-wutu="vnokpnc:13">This site is written in utu and compiled to WasmGC. <a data-wutu="vnokpnc:14" href="https://github.com/robertmorelli/utu/tree/main/docs/src">Read its source</a>.</p><p data-wutu="vnokpnc:15">MIT licensed. <a data-wutu="vnokpnc:16" href="https://github.com/robertmorelli/utu">robertmorelli/utu</a></p></footer></div></div></body></html>

@@ -1,0 +1,46 @@
+// Small shared pieces: deep-dive links into the repository and page headers.
+using Browser from std:Browser;
+mod ui {
+    fn repo() Str {
+        "https://github.com/robertmorelli/utu";
+    }
+    fn doc(path: Str) Str {
+        repo() + "/blob/main/" + path;
+    }
+    // The envelope delimiters, built outside any template: the raw pair is
+    // reserved inside a Wutu payload, even in its strings.
+    fn open_mark() Str {
+        "/" + "\\";
+    }
+    fn close_mark() Str {
+        "\\" + "/";
+    }
+    // Wutu strings have no quote escape, so quoted text is made here.
+    fn q(text: Str) Str {
+        "\"" + text + "\"";
+    }
+    // A pointer to the markdown deep dive that this page summarizes.
+    fn further(path: Str, label: Str) Browser.HTMLElement {
+        @wutu/\
+        p.further {
+            "Deep dive: ";
+            a {
+                <href = $[repo() + "/blob/main/" + path];
+                = label;
+            }
+        }
+        \/;
+    }
+    fn header(title: Str, lede: Str) Browser.HTMLElement {
+        @wutu/\
+        header.page-head {
+            h1 {
+                = title;
+            }
+            p.lede {
+                = lede;
+            }
+        }
+        \/;
+    }
+}
