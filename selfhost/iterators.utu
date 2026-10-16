@@ -50,6 +50,7 @@ struct Pipe:
     | range: Bool
     | source: I32        // the source array's local (not for a range)
     | lo: I32
+    | lo_zero: Bool      // lo is 0 when the loop starts (an array not narrowed)
     | hi: I32
     | stop: I32          // the stop flag's local, or -1
     | stop_at: I32
@@ -356,7 +357,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let m = w_mark();
     let p = Pipe {
         first_stage: first_stage, count: n, first: 0, range: is_kind(input, Node.Range_expr), source: -1,
-        lo: new_local(vt_i32), hi: new_local(vt_i32), stop: -1, stop_at: -1, result: -1, result_type: ty_void(),
+        lo: new_local(vt_i32), lo_zero: false, hi: new_local(vt_i32), stop: -1, stop_at: -1, result: -1, result_type: ty_void(),
         finish: -1, setup_start: iter_setup.len(), cleanup_start: iter_cleanup.len(), replay: false,
         skip_loop: false, bounded: false, elem: prelude(Prelude.I32),
     };
@@ -383,6 +384,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         p.source = new_local(repr(at));
         ls(p.source, ms);
         set_i32(p.lo, 0);
+        p.lo_zero = true;
         let mh = w_mark();
         lg(p.source);
         w_node(Op.ArrayLen, vt_i32, 0, 0, mh);
@@ -461,7 +463,8 @@ fn range_bounds(range: I32, lo: I32, cx: Cx) I32 {
 /// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
 fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     let top = new_label();
-    copy_local(index, p.lo);
+    // (From the constant, lo is read only by the stages that need it.)
+    if p.lo_zero { set_i32(index, 0); } else { copy_local(index, p.lo); };
     let mb = w_mark();
     let lp = WLoop { brk: brk, top: top, mb: mb, ml: mb };
     // while (i < hi and not stop)
@@ -478,6 +481,7 @@ fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
 
 /// `skip(n)` / `take(n)` before any other stage: narrow `[lo, hi)`.
 fn narrow(p: Pipe, k: I32, cx: Cx) void {
+    p.lo_zero = false;
     let limit = stage_local(p.first_stage + k, 0, vt_i32);
     let m = w_mark();
     param_i32(stage_node(p, k), limit, cx);
@@ -562,10 +566,15 @@ fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues
     let j = 0;
     let c = first_child(capture);
     while (c >= 0) {
-        if j < nvalues {
+        let d = node_decl[c];
+        if j < nvalues and decl_boxed[d] == 0 and cur_locals[values[j]] == repr(types[j]) and not assigns(stage_block(stage_node(p, k)), d) {
+            // Bound to the value's own local: the stage only reads it.
+            decl_ty[d] = types[j];
+            decl_local[d] = values[j];
+        } else if j < nvalues {
             let m = w_mark();
             lg(values[j]);
-            bind_typed(node_decl[c], types[j], m);
+            bind_typed(d, types[j], m);
         } else {
             // The index: this stage's ordinal.
             bind_index(node_decl[c], ordinal_of(p, k));
@@ -574,6 +583,17 @@ fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues
         c = next_sibling(c);
     };
     true;
+}
+
+/// Whether something under `node` assigns variable `d`.
+fn assigns(node: I32, d: I32) Bool {
+    if is_kind(node, Node.Assign_expr) and is_kind(first_child(node), Node.Identifier) and node_decl[first_child(node)] == d { return true; };
+    let c = first_child(node);
+    while (c >= 0) {
+        if assigns(c, d) { return true; };
+        c = next_sibling(c);
+    };
+    false;
 }
 
 /// Bind declaration `d`, of type `t`, to the value on the stack since `m`.
