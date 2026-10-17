@@ -1,0 +1,15 @@
+// A module sample.utu imports: go to definition (gd) on `ui.badge` lands here.
+using Browser from std:Browser;
+
+mod ui {
+    fn badge(text: Str) Browser.HTMLElement {
+        @wutu/\
+        span.badge {
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.3rem;
+            background: #eef;
+            = text;
+        }
+        \/;
+    }
+}

@@ -1,0 +1,136 @@
+// A tour of what the Helix support does. Open it with `hx editors/helix/sample.utu`.
+using Browser from std:Browser;
+using ui from "./sample_ui.utu";
+
+/// A to-do item. (Hover a name with `space k`; `gd` goes to its definition.)
+struct Todo:
+    | id: I32
+    | text: Str
+    | done: Bool
+
+struct State:
+    | draft: Str
+    | todos: Array[Todo]
+    | made: I32
+    | filter: Filter
+
+tag enum Filter:
+    | All
+    | Open
+    | Done
+
+/// Settings read from JSON (the payload is highlighted as JSON).
+struct Settings:
+    | title: Str
+    | limit: I32
+
+fn settings() Settings {
+    @json/\ decode Settings `{"title": "Things to do", "limit": 20}` \/ orelse Settings { title: "Todo", limit: 10 };
+}
+
+/// A shared stylesheet (the payload is highlighted as CSS).
+fn sheet() Str {
+    @css/\
+    .badge { font-size: 0.8rem; }
+    li.done { text-decoration: line-through; }
+    \/;
+}
+
+/// Host JavaScript (the payload is highlighted as JavaScript).
+fn now() F64 {
+    let read: fun() F64 = @es/\ () => performance.now() \/;
+    read();
+}
+
+fn left(todos: Array[Todo]) I32 {
+    todos count_where |t| { not t.done; };
+}
+
+fn shown(todos: Array[Todo], filter: Filter) Array[Todo] {
+    todos filter |t| {
+        alt filter {
+            All => true,
+            Open => not t.done,
+            Done => t.done,
+        };
+    } collect(Todo);
+}
+
+export main() void {
+    let config = settings();
+    let state = State { draft: "", todos: [], made: 0, filter: All {} };
+    let started = now();
+    let help = \\Type a task and press Enter.
+               \\Tick it when it is done.
+    ;
+    Browser.document.body.append(@wutu/\
+    @reactive;
+    @style sheet();
+    main {
+        font-family: system-ui, sans-serif;
+        max-width: 30rem;
+        margin: 3rem auto;
+        h1 {
+            color: #e4772c;          // a hex color is text
+            = config.title;
+        }
+        p {
+            = help;
+        }
+        form {
+            display: flex;
+            gap: 0.5rem;
+            input {
+                placeholder = "Add something";
+                flex: 1;
+                bind:value = state.draft;
+            }
+            button {
+                "Add";
+            }
+            on submit {
+                if state.draft != "" and state.todos.len() < config.limit {
+                    state.made += 1;
+                    let todo = Todo { id: state.made, text: state.draft, done: false };
+                    state.todos = state.todos chain([todo]) collect(Todo);
+                    state.draft = "";
+                };
+            }
+        }
+        ul {
+            for shown(state.todos, state.filter) |todo| key todo.id {
+                li {
+                    class = if todo.done { "done"; } else { ""; };
+                    label {
+                        input {
+                            type = "checkbox";
+                            bind:checked = todo.done;
+                        }
+                        " ";
+                        = todo.text;
+                    }
+                    = ui.badge(`#${todo.id}`);
+                }
+            }
+        }
+        p {
+            = left(state.todos);
+            " left, ";
+            = `${now() - started}`;
+            " ms since start";
+            on click |e| {
+                Browser.console.log(e.type);
+            }
+        }
+    }
+    \/);
+}
+
+test "a new list has nothing left" {
+    assert left([]) == 0;
+}
+
+test "done items are filtered out of Open" {
+    let todos = [Todo { id: 1, text: "a", done: true }, Todo { id: 2, text: "b", done: false }];
+    assert shown(todos, Open {}).len() == 1;
+}
