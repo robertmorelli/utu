@@ -47,6 +47,8 @@
 ; Embedded languages: `@wutu/\ … \/`, `@es/\ … \/`, …
 (dsl_expr (identifier) @function.macro)
 (dsl_expr "@" @function.macro)
+; (A DSL's text gets its own language: see injections.scm. One with no
+; grammar here, @ir or @wat, reads as a string.)
 (dsl_body) @string.special
 
 ; Keywords

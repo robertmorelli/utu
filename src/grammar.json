@@ -5073,6 +5073,36 @@
         }
       ]
     },
+    "dsl_body": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_dsl_open"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_dsl_text"
+              },
+              "named": false,
+              "value": "dsl_text"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_dsl_close"
+        }
+      ]
+    },
     "literal": {
       "type": "CHOICE",
       "members": [
@@ -5443,7 +5473,15 @@
   "externals": [
     {
       "type": "SYMBOL",
-      "name": "dsl_body"
+      "name": "_dsl_open"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_dsl_text"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_dsl_close"
     }
   ],
   "inline": [],

@@ -1,0 +1,6 @@
+{
+  "grammars": [
+    { "name": "wutu", "camelcase": "Wutu", "scope": "source.wutu", "path": ".", "file-types": [], "injection-regex": "^wutu$" }
+  ],
+  "metadata": { "version": "0.1.0", "license": "MIT", "description": "Wutu templates, for editors" }
+}

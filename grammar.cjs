@@ -11,7 +11,8 @@ const options = buildGrammarOptions();
 module.exports = grammar({
   name: 'utu',
   word: options.word,
-  externals: $ => [$.dsl_body],
+  // A DSL's envelope: `/\`, its text, and the balancing `\/` (src/scanner.c).
+  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close],
   extras: options.extras,
   conflicts: options.conflicts,
   rules: {

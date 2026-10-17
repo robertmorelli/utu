@@ -99,7 +99,8 @@ function utf16Offsets(bytes, at) {
 function leaves(root) {
   const out = [];
   const visit = node => {
-    if (node.children.length === 0) out.push(node);
+    // (A DSL's envelope is one token to the lexer; the tree splits out its text for editors.)
+    if (node.children.length === 0 || node.type === 'dsl_body') out.push(node);
     else node.children.forEach(visit);
   };
   visit(root);

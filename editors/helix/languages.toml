@@ -23,3 +23,16 @@ language-servers = ["utu"]
 [[grammar]]
 name = "utu"
 source = { path = "@REPO@" }
+
+# Wutu templates, injected into `@wutu/\ … \/` (and into Wutu's own utu).
+[[language]]
+name = "wutu"
+scope = "source.wutu"
+injection-regex = "^wutu$"
+file-types = []
+comment-token = "//"
+indent = { tab-width = 4, unit = "    " }
+
+[[grammar]]
+name = "wutu"
+source = { path = "@REPO@/editors/tree-sitter-wutu" }

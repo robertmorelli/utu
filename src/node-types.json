@@ -3100,6 +3100,11 @@
     }
   },
   {
+    "type": "dsl_body",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "dsl_expr",
     "named": true,
     "fields": {},
@@ -10931,8 +10936,8 @@
     "named": false
   },
   {
-    "type": "dsl_body",
-    "named": true
+    "type": "dsl_text",
+    "named": false
   },
   {
     "type": "each",

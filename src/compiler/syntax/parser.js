@@ -1302,7 +1302,9 @@ class Parser {
     try { close = dslEnd(source, start + 2); } catch { this.fail(); }
     const i = close + 2;
     this.pos = i;
-    const body = this.leaf('dsl_body', start, i, true);
+    // As tree-sitter's: the delimiters hidden, the text (if any) an anonymous `dsl_text`.
+    const text = close > start + 2 ? [this.leaf('dsl_text', start + 2, close, false)] : [];
+    const body = new SyntaxNode(this.tree, 'dsl_body', true, start, i, text);
     this.skip();
     return this.node('dsl_expr', [at, name, body]);
   }
