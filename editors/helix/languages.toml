@@ -1,0 +1,25 @@
+# utu for Helix. editors/helix/install.mjs writes this into your
+# languages.toml with @REPO@ replaced by this repository's path.
+
+[language-server.utu]
+command = "node"
+args = ["@REPO@/cli/utu.mjs", "lsp"]
+
+[[language]]
+name = "utu"
+scope = "source.utu"
+file-types = ["utu"]
+comment-token = "//"
+indent = { tab-width = 4, unit = "    " }
+language-servers = ["utu"]
+
+[language.auto-pairs]
+'(' = ')'
+'{' = '}'
+'[' = ']'
+'"' = '"'
+'`' = '`'
+
+[[grammar]]
+name = "utu"
+source = { path = "@REPO@" }
