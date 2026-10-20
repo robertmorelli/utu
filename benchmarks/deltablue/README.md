@@ -20,9 +20,10 @@ Use `bun run bench:deltablue` to run only this benchmark.
 `BENCH_ITERATIONS`, `BENCH_SAMPLES`, and `BENCH_WARMUPS` control the run.
 Kernel timings exclude compilation and instantiation.
 
-`dart/`, `kotlin/`, `moonbit/`, `assemblyscript/`, `go/`, and `swift/` hold
-the same program in Dart, Kotlin, and MoonBit (WasmGC), and AssemblyScript,
-Go, and Swift (linear memory, each carrying its own collector or runtime).
+`dart/`, `kotlin/`, `moonbit/`, `assemblyscript/`, `go/`, `swift/`, and
+`haskell/` hold the same program in Dart, Kotlin, and MoonBit (WasmGC), and
+AssemblyScript, Go, Swift, and Haskell (linear memory, each carrying its own
+collector or runtime).
 Each has a README with its build, and those that need one a d8 prelude that
 instantiates it and defines `chain(n)` and `projection(n)`.
 

@@ -23,15 +23,17 @@
 //   Go         go/, GOOS=wasip1 (linear memory, its own runtime)
 //   Swift      swift/, the Swift SDK for WebAssembly (linear memory; swiftly's
 //              toolchain in ~/.swiftly/bin)
+//   Haskell    haskell/, GHC's WebAssembly backend at -O2, a WASI reactor
+//              (linear memory, GHC's runtime; ghc-wasm-meta in ~/.ghc-wasm)
 // Every build but utu's is from clean, the median of 3 (Gradle's daemon stays
-// warm between Kotlin's). Dart, Kotlin, MoonBit, Go, and Swift run through the
+// warm between Kotlin's). Dart, Kotlin, MoonBit, Go, Swift, and Haskell run through the
 // d8 prelude beside their source.
 //
 // A size is what ships to run it: the Wasm, and the JavaScript it needs,
 // minified alike (gzip is per file, summed): utu the loader `utu build`
 // writes; Rust, MoonBit, and AssemblyScript a loader of the same kind (with
-// AssemblyScript's `env.abort`); Dart and Kotlin what their compilers emit; Go
-// and Swift the WASI shim in their prelude; JavaScript its source.
+// AssemblyScript's `env.abort`); Dart and Kotlin what their compilers emit; Go,
+// Swift, and Haskell the WASI shim in their prelude; JavaScript its source.
 import fs from 'node:fs/promises';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -134,6 +136,7 @@ for (const name of names) {
   if (has('assemblyscript')) ports.push({ port: 'AssemblyScript', kind: 'wasm', ...buildAssemblyScript(dir, name), js: await plainLoader(name, '{ env: { abort() { throw new Error("abort"); } } }') });
   if (has('go')) ports.push({ port: 'Go', kind: 'prelude', ...buildGo(dir, name) });
   if (has('swift')) ports.push({ port: 'Swift', kind: 'prelude', ...buildSwift(dir, name) });
+  if (has('haskell')) ports.push({ port: 'Haskell', kind: 'prelude', ...buildHaskell(dir, name) });
 
   // Each JavaScript file minified on its own (Kotlin's are three modules).
   for (const p of ports) p.js = await Promise.all([].concat(await p.js ?? []).map(minify));
@@ -324,6 +327,20 @@ function buildSwift(dir, name) {
   const found = spawnSync('find', [scratch, '-name', '*.wasm', '-path', '*Release*'], { encoding: 'utf8' }).stdout.trim().split('\n').filter(f => !f.includes('.build/'))[0];
   if (!found) throw new Error(`${name}/swift: no module built`);
   return { bytes: readFileSync(found), js: readFileSync(path.join(dir, 'swift', 'd8-prelude.js')), compile, outDir: path.dirname(found), preludeDir: path.join(dir, 'swift') };
+}
+
+// GHC's WebAssembly backend: a reactor exporting hs_init and the bench functions.
+function buildHaskell(dir, name) {
+  const out = path.join(TMP, `${name}-haskell`);
+  const source = readdirSync(path.join(dir, 'haskell')).find(file => file.endsWith('.hs'));
+  const exports = PROGRAMS[name].workloads.map(w => (w.wasm ?? 'bench(N)').replace(/\(.*/, ''));
+  const command = [
+    'source ~/.ghc-wasm/env &&', 'mkdir -p', JSON.stringify(out), '&&', 'wasm32-wasi-ghc -O2', JSON.stringify(path.join(dir, 'haskell', source)),
+    '-outputdir', JSON.stringify(path.join(out, 'obj')), '-o', JSON.stringify(path.join(out, `${name}.wasm`)),
+    '-no-hs-main -optl-mexec-model=reactor', `-optl-Wl,--export=hs_init,${exports.map(e => `--export=${e}`).join(',')}`, '-optl-Wl,--strip-all',
+  ].join(' ');
+  const compile = timedBuilds(`${name}/haskell`, rm(out), () => spawnSync('bash', ['-c', command], { encoding: 'utf8' }));
+  return { bytes: readFileSync(path.join(out, `${name}.wasm`)), js: readFileSync(path.join(dir, 'haskell', 'd8-prelude.js')), compile, outDir: out, preludeDir: path.join(dir, 'haskell') };
 }
 
 function formatMs(value) { return `${value.toFixed(2)} ms`; }
