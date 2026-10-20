@@ -94,26 +94,10 @@ mod compiler {
             }
             = ui.further("docs/wasm-backend.md", "The wasm backend");
             h2 {
-                "DeltaBlue: Rust, utu, and JavaScript";
+                "DeltaBlue across languages";
             }
             p {
-                "V8's constraint solver, written the same way in Rc Rust (a graph of Rc<RefCell<_>>, no unsafe code), unsafe Rust (an arena and unchecked indexing), JavaScript (classes and arrays), and utu, built at ";
-                code {
-                    "-O3";
-                }
-                " and at ";
-                code {
-                    "-Oz";
-                }
-                ", each with and without ";
-                code {
-                    "--safe";
-                }
-                " (which puts back the bounds checks Wasm does not make itself). Each runs in d8 (15.6.75.16), the median of 20 samples after 5 warmups. utu compiles warm with the self-hosted compiler; Rust builds with ";
-                code {
-                    "cargo build --release";
-                }
-                " from a clean target directory. JavaScript's size is its minified source.";
+                "V8's constraint solver, written the same way in each language: utu at -O3 and -Oz, each with and without --safe (which puts back the bounds checks Wasm does not make itself); Rc Rust (a graph of Rc<RefCell<_>>, no unsafe code) and unsafe Rust (an arena and unchecked indexing); JavaScript; and Dart, compiled to WasmGC by dart2wasm. Go and Swift have no WasmGC backend, so theirs are linear-memory Wasm carrying their own runtimes (Go's collector, Swift's standard library), which is most of their size. Each runs in d8 (15.6.75.16): chain and projection are the median of 20 samples of 20 solves of 1,048 variables, after 5 warmups. utu compiles warm with the self-hosted compiler; the others build from clean. A size is what must ship to run it.";
             }
             table.wide {
                 thead {
@@ -122,157 +106,221 @@ mod compiler {
                             "";
                         }
                         th {
-                            "Rc Rust";
+                            "chain, ms";
                         }
                         th {
-                            "unsafe Rust";
+                            "projection, ms";
                         }
                         th {
-                            "utu -O3";
+                            "compile, ms";
                         }
                         th {
-                            "utu -O3 --safe";
+                            "size, KB";
                         }
                         th {
-                            "utu -Oz";
-                        }
-                        th {
-                            "utu -Oz --safe";
-                        }
-                        th {
-                            "JavaScript";
+                            "gzip, KB";
                         }
                     }
                 }
                 tbody {
                     tr {
                         th {
-                            "chain, 20 × 1,048 variables";
+                            "Rc Rust";
                         }
                         td {
-                            "17.4 ms";
+                            "16.7";
                         }
                         td {
-                            "5.19 ms";
+                            "16.9";
                         }
                         td {
-                            "6.34 ms";
+                            "382";
                         }
                         td {
-                            "6.26 ms";
+                            "38.0";
                         }
                         td {
-                            "10.3 ms";
-                        }
-                        td {
-                            "10.8 ms";
-                        }
-                        td {
-                            "6.57 ms";
+                            "15.0";
                         }
                     }
                     tr {
                         th {
-                            "projection, 20 × 1,048 variables";
+                            "unsafe Rust";
                         }
                         td {
-                            "17.5 ms";
+                            "5.01";
                         }
                         td {
-                            "4.36 ms";
+                            "4.26";
                         }
                         td {
-                            "5.04 ms";
+                            "320";
                         }
                         td {
-                            "5.25 ms";
+                            "32.0";
                         }
                         td {
-                            "8.54 ms";
-                        }
-                        td {
-                            "8.70 ms";
-                        }
-                        td {
-                            "6.02 ms";
+                            "13.1";
                         }
                     }
                     tr {
                         th {
-                            "compile time";
+                            "utu -O3";
                         }
                         td {
-                            "384.4 ms";
+                            "6.18";
                         }
                         td {
-                            "286.5 ms";
+                            "5.07";
                         }
                         td {
-                            "8.90 ms";
+                            "8.52";
                         }
                         td {
-                            "8.86 ms";
+                            "27.9";
                         }
                         td {
-                            "1.86 ms";
+                            "8.7";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -O3 --safe";
                         }
                         td {
-                            "1.76 ms";
+                            "6.10";
+                        }
+                        td {
+                            "5.05";
+                        }
+                        td {
+                            "8.82";
+                        }
+                        td {
+                            "30.9";
+                        }
+                        td {
+                            "8.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz";
+                        }
+                        td {
+                            "9.89";
+                        }
+                        td {
+                            "8.17";
+                        }
+                        td {
+                            "1.91";
+                        }
+                        td {
+                            "4.9";
+                        }
+                        td {
+                            "2.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz --safe";
+                        }
+                        td {
+                            "10.3";
+                        }
+                        td {
+                            "8.38";
+                        }
+                        td {
+                            "1.73";
+                        }
+                        td {
+                            "5.0";
+                        }
+                        td {
+                            "2.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript";
+                        }
+                        td {
+                            "6.28";
+                        }
+                        td {
+                            "6.00";
                         }
                         td {
                             "—";
                         }
-                    }
-                    tr {
-                        th {
-                            "size";
+                        td {
+                            "5.8";
                         }
                         td {
-                            "38.0 KB";
-                        }
-                        td {
-                            "32.0 KB";
-                        }
-                        td {
-                            "27.9 KB";
-                        }
-                        td {
-                            "30.9 KB";
-                        }
-                        td {
-                            "4.9 KB";
-                        }
-                        td {
-                            "5.0 KB";
-                        }
-                        td {
-                            "5.8 KB";
+                            "1.8";
                         }
                     }
                     tr {
                         th {
-                            "gzipped";
+                            "Dart";
                         }
                         td {
-                            "15.0 KB";
+                            "9.53";
                         }
                         td {
-                            "13.1 KB";
+                            "7.03";
                         }
                         td {
-                            "8.7 KB";
+                            "816";
                         }
                         td {
-                            "8.9 KB";
+                            "48.4";
                         }
                         td {
-                            "2.1 KB";
+                            "18.6";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Go";
                         }
                         td {
-                            "2.1 KB";
+                            "51.4";
                         }
                         td {
-                            "1.8 KB";
+                            "45.1";
+                        }
+                        td {
+                            "1,332";
+                        }
+                        td {
+                            "1,894";
+                        }
+                        td {
+                            "561.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Swift";
+                        }
+                        td {
+                            "8.03";
+                        }
+                        td {
+                            "18.3";
+                        }
+                        td {
+                            "2,049";
+                        }
+                        td {
+                            "5,449";
+                        }
+                        td {
+                            "1,671";
                         }
                     }
                 }

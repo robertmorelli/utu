@@ -233,8 +233,11 @@ export main() void {
             margin-block-start: 1rem;
         }
         .page {
-            max-inline-size: 44rem;
+            max-inline-size: 64rem;
             padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 6rem;
+        }
+        .page > :is(p, ul, ol, h2, h3, .further) {
+            max-inline-size: 44rem;
         }
         .page-head + p {
             margin-block-start: 2rem;
@@ -279,7 +282,8 @@ export main() void {
             padding: 1.2rem 1.4rem;
             background: var(--code-bg);
             color: var(--code-ink);
-            overflow-x: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
             font: 400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
             tab-size: 4;
         }
@@ -344,14 +348,31 @@ export main() void {
             font-size: 0.85rem;
         }
         table.wide {
-            display: block;
-            overflow-x: auto;
+            overflow-wrap: normal;
         }
         table.wide td, table.wide thead th {
             text-align: end;
-            white-space: nowrap;
             font-variant-numeric: tabular-nums;
             padding-inline: 0.75rem 0;
+        }
+        table.wide th {
+            white-space: normal;
+        }
+        table.wide thead th {
+            font-size: 0.9em;
+        }
+        @media (width < 40rem) {
+            table.wide {
+                font-size: 0.74rem;
+            }
+            table.wide th, table.wide td {
+                padding-inline: 0.3rem 0;
+            }
+        }
+        @media (width < 22rem) {
+            table.wide {
+                font-size: 0.66rem;
+            }
         }
         ul, ol {
             padding-inline-start: 1.25rem;

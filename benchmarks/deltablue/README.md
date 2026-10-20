@@ -20,9 +20,16 @@ Use `bun run bench:deltablue` to run only this benchmark.
 `BENCH_ITERATIONS`, `BENCH_SAMPLES`, and `BENCH_WARMUPS` control the run.
 Kernel timings exclude compilation and instantiation.
 
-`bun run bench:deltablue-table` times both Rust ports, JavaScript, and the utu port at
--O3 and -Oz, each with and without `--safe`, in d8, with compile times and
-sizes; the compiler page of the docs site shows its table.
+`dart/`, `go/`, and `swift/` hold the same program in Dart (WasmGC, by
+dart2wasm), Go (`GOOS=wasip1`), and Swift (the Swift SDK for WebAssembly);
+Go and Swift have no WasmGC backend, so theirs are linear-memory modules
+carrying their own runtimes. Each has a d8 prelude that instantiates it and
+defines `chain(n)` and `projection(n)`, and a README with its build.
+
+`bun run bench:deltablue-table` times all of them with both Rust ports,
+JavaScript, and the utu port at -O3 and -Oz, each with and without `--safe`,
+in d8, with build times and sizes; the compiler page of the docs site shows
+its table.
 
 ## Current snapshot
 
