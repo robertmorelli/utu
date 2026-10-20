@@ -14,6 +14,7 @@ using data lazy from "./data.utu";
 using web lazy from "./web.utu";
 using tooling lazy from "./tooling.utu";
 using compiler lazy from "./compiler.utu";
+using benchmarks lazy from "./benchmarks.utu";
 struct Link:
 | href: Str
 | label: Str
@@ -64,6 +65,10 @@ fn links() Array[Link] {
     Link {
         href: "/compiler",
         label: "The compiler"
+    },
+    Link {
+        href: "/benchmarks",
+        label: "Benchmarks"
     }
     ];
 }
@@ -103,6 +108,8 @@ fn page(route: Str, play: playground.State) Browser.HTMLElement {
         tooling.page();
     } else if route == "/compiler" {
         compiler.page();
+    } else if route == "/benchmarks" {
+        benchmarks.page();
     } else {
         home.page();
     };

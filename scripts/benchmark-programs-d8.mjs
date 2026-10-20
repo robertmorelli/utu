@@ -3,7 +3,11 @@
 // This process builds every port and checks they agree; each port runs in a
 // d8 of its own, which warms it up and times it. Set D8_BIN to choose the d8.
 //
-//   node scripts/benchmark-programs-d8.mjs [name ...]
+//   node scripts/benchmark-programs-d8.mjs [name ...] [--json=file]
+//
+// utu builds at -O3 and -Oz, warm (the median of 20 builds after 5); Rust
+// builds with `cargo build --release` from a clean target directory (the
+// median of 3). A size is what ships: the module, or JavaScript minified.
 import fs from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -54,7 +58,11 @@ print('RESULT ' + JSON.stringify(JSON.parse(calls).map(call => measure(new Funct
 
 const version = spawnSync(D8, ['-e', 'print(version())'], { encoding: 'utf8' });
 if (version.error || version.status !== 0) throw new Error('d8 unavailable: put d8 on PATH or set D8_BIN');
-const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(PROGRAMS);
+const args = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
+const json = process.argv.find(arg => arg.startsWith('--json='))?.slice(7);
+const names = args.length ? args : Object.keys(PROGRAMS);
+const median = values => { const s = [...values].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const recorded = { d8: version.stdout.trim(), programs: {} };
 for (const name of names) if (!PROGRAMS[name]) throw new Error(`no program ${name}: ${Object.keys(PROGRAMS).join(', ')}`);
 await fs.mkdir(TMP, { recursive: true });
 const driver = path.join(TMP, 'd8-driver.js');
@@ -66,9 +74,10 @@ for (const name of names) {
   const program = PROGRAMS[name];
   const dir = path.join(ROOT, 'benchmarks', name);
   const ports = [
-    { port: 'utu', file: `${name}.wasm`, bytes: await compileUtu(path.join(dir, `${name}.utu`)), call: w => w.utu ?? 'bench(N)' },
-    { port: 'safe Rust', file: `${name}-rust.wasm`, bytes: compileRust(dir, 'rust', `rust_${name}`), call: w => w.rust ?? 'bench(N)' },
-    { port: 'unsafe Rust', file: `${name}-rust-unsafe.wasm`, bytes: compileRust(dir, 'rust-unsafe', program.unsafeCrate ?? `rust_${name}_unsafe`), call: w => w.rust ?? 'bench(N)' },
+    { port: 'utu -O3', file: `${name}.wasm`, ...await compileUtu(path.join(dir, `${name}.utu`), 'speed'), call: w => w.utu ?? 'bench(N)' },
+    { port: 'utu -Oz', file: `${name}-oz.wasm`, ...await compileUtu(path.join(dir, `${name}.utu`), 'size'), call: w => w.utu ?? 'bench(N)' },
+    { port: name === 'deltablue' ? 'Rc Rust' : 'safe Rust', file: `${name}-rust.wasm`, ...compileRust(dir, 'rust', `rust_${name}`), call: w => w.rust ?? 'bench(N)' },
+    { port: 'unsafe Rust', file: `${name}-rust-unsafe.wasm`, ...compileRust(dir, 'rust-unsafe', program.unsafeCrate ?? `rust_${name}_unsafe`), call: w => w.rust ?? 'bench(N)' },
     { port: 'JavaScript', file: `${name}.js`, ...await loadJavaScript(path.join(dir, `${name}.js`)), call: w => w.js ?? 'bench(N)' },
   ];
   console.log(`\n${name}: ${ports.map(p => `${p.port} ${formatBytes(p.bytes.length)} (${formatBytes(gzipSync(p.bytes).length)} gzip)`).join(', ')}`);
@@ -81,22 +90,34 @@ for (const name of names) {
     p.results = JSON.parse(line.slice(7));
   }
   program.workloads.forEach((w, i) => {
-    const expected = ports[1].results[i].result;
+    const expected = ports[2].results[i].result;
     const wrong = ports.filter(p => p.results[i].result !== expected);
     if (wrong.length) throw new Error(`${name} ${w.name}: results differ, ${ports.map(p => `${p.port}=${p.results[i].result}`).join(', ')}`);
-    const [utuTime, rust, rustUnsafe, js] = ports.map(p => p.results[i].median);
+    const [utuTime, , rust, rustUnsafe, js] = ports.map(p => p.results[i].median);
     console.log(`  ${w.name} (×${w.n}, result ${expected}): ${ports.map(p => `${p.port} ${formatMs(p.results[i].median)} (${formatMs(p.results[i].best)})`).join(', ')}`);
-    console.log(`    utu: ${(utuTime / rust).toFixed(2)}× safe Rust, ${(utuTime / rustUnsafe).toFixed(2)}× unsafe Rust, ${(utuTime / js).toFixed(2)}× JS time`);
+    console.log(`    utu -O3: ${(utuTime / rust).toFixed(2)}× safe Rust, ${(utuTime / rustUnsafe).toFixed(2)}× unsafe Rust, ${(utuTime / js).toFixed(2)}× JS time`);
   });
+  recorded.programs[name] = {
+    workloads: program.workloads.map(w => ({ name: w.name, n: w.n, result: ports[2].results[program.workloads.indexOf(w)].result })),
+    ports: ports.map(p => ({ name: p.port, times: p.results.map(r => r.median), compile: p.compile ?? null, bytes: p.bytes.length, gzip: gzipSync(p.bytes).length })),
+  };
 }
+if (json) await fs.writeFile(json, JSON.stringify(recorded, null, 1));
 console.log(`\nartifacts: ${path.relative(ROOT, TMP)}/`);
 
 // utu as `utu build -O3` makes it: the self-hosted compiler, optimizing for speed.
-async function compileUtu(file) {
-  const { wasm, spec, diagnostics } = await compileFile(utu, file, { optimize: 'speed' });
+async function compileUtu(file, optimize) {
+  let built;
+  const times = [];
+  for (let i = 0; i < 25; i++) {
+    const start = performance.now();
+    built = await compileFile(utu, file, { optimize });
+    if (i >= 5) times.push(performance.now() - start);
+  }
+  const { wasm, spec, diagnostics } = built;
   if (!wasm) throw new Error(`${file}: ${diagnostics.map(d => d.message).join('; ')}`);
   if (Object.keys(spec ?? {}).length) throw new Error(`${file}: a benchmark module must import nothing from its host`);
-  return wasm;
+  return { bytes: wasm, compile: median(times) };
 }
 
 // The module as a d8 script (its exports as globals); payload is its minified size.
@@ -110,12 +131,18 @@ function compileRust(dir, directory, artifact) {
   const targetDir = path.join(TMP, `${path.basename(dir)}-${directory}-target`);
   const rustc = spawnSync('rustup', ['which', '--toolchain', 'stable', 'rustc'], { encoding: 'utf8' });
   if (rustc.status !== 0) throw new Error('rustup stable is required for the Rust ports');
-  const result = spawnSync('cargo', [
-    'build', '--release', '--lib', '--target', 'wasm32-unknown-unknown',
-    '--manifest-path', path.join(dir, directory, 'Cargo.toml'), '--target-dir', targetDir,
-  ], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, RUSTC: rustc.stdout.trim() } });
-  if (result.status !== 0) throw new Error(`${dir}/${directory}: Rust build failed:\n${result.stderr || result.stdout}`);
-  return new Uint8Array(readFileSync(path.join(targetDir, 'wasm32-unknown-unknown', 'release', `${artifact}.wasm`)));
+  const times = [];
+  for (let i = 0; i < 3; i++) {
+    spawnSync('rm', ['-rf', targetDir]);
+    const start = performance.now();
+    const result = spawnSync('cargo', [
+      'build', '--release', '--lib', '--target', 'wasm32-unknown-unknown',
+      '--manifest-path', path.join(dir, directory, 'Cargo.toml'), '--target-dir', targetDir,
+    ], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, RUSTC: rustc.stdout.trim() } });
+    times.push(performance.now() - start);
+    if (result.status !== 0) throw new Error(`${dir}/${directory}: Rust build failed:\n${result.stderr || result.stdout}`);
+  }
+  return { bytes: new Uint8Array(readFileSync(path.join(targetDir, 'wasm32-unknown-unknown', 'release', `${artifact}.wasm`))), compile: median(times) };
 }
 
 function formatMs(value) { return `${value.toFixed(2)} ms`; }

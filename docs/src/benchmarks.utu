@@ -1,0 +1,725 @@
+using Browser from std:Browser;
+using ui from "./ui.utu";
+mod benchmarks {
+    fn page() Browser.HTMLElement {
+        @wutu/\
+        article.page {
+            = ui.header("Benchmarks", "The same programs in utu, Rust, JavaScript, and other languages that compile to Wasm, timed in V8.");
+            p {
+                "Each program is written once per language, the same way: the same data structures, loops, and order of operations, with only the language's idiom differing. Every port's result is checked against the others before it is timed. Each runs in d8 (15.6.75.16, V8's shell) in a process of its own; a time is the median of 20 samples after 5 warmups. utu compiles warm with the self-hosted compiler; the others build from clean. A size is what must ship to run it: the Wasm module, or JavaScript minified.";
+            }
+            p {
+                "Run them again with ";
+                code {
+                    "bun run bench:deltablue-table";
+                }
+                " and ";
+                code {
+                    "bun run bench:programs-d8";
+                }
+                ".";
+            }
+            h2 {
+                "DeltaBlue";
+            }
+            p {
+                "V8's incremental constraint solver: a graph of small objects, planned and re-planned. Chain and projection each solve 1,048 variables 20 times. utu is built at ";
+                code {
+                    "-O3";
+                }
+                " and ";
+                code {
+                    "-Oz";
+                }
+                ", each with and without ";
+                code {
+                    "--safe";
+                }
+                " (which puts back the bounds checks Wasm does not make itself). Rc Rust is a graph of Rc<RefCell<_>> with no unsafe code; unsafe Rust uses an arena and unchecked indexing. Dart compiles to WasmGC; Go and Swift have no WasmGC backend, so theirs are linear-memory modules carrying their own runtimes, which is most of their size.";
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            "";
+                        }
+                        th {
+                            "chain, ms";
+                        }
+                        th {
+                            "projection, ms";
+                        }
+                        th {
+                            "build, ms";
+                        }
+                        th {
+                            "size, KB";
+                        }
+                        th {
+                            "gzip, KB";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "Rc Rust";
+                        }
+                        td {
+                            "16.7";
+                        }
+                        td {
+                            "16.9";
+                        }
+                        td {
+                            "382";
+                        }
+                        td {
+                            "38.0";
+                        }
+                        td {
+                            "15.0";
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust";
+                        }
+                        td {
+                            "5.01";
+                        }
+                        td {
+                            "4.26";
+                        }
+                        td {
+                            "320";
+                        }
+                        td {
+                            "32.0";
+                        }
+                        td {
+                            "13.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -O3";
+                        }
+                        td {
+                            "6.18";
+                        }
+                        td {
+                            "5.07";
+                        }
+                        td {
+                            "8.52";
+                        }
+                        td {
+                            "27.9";
+                        }
+                        td {
+                            "8.7";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -O3 --safe";
+                        }
+                        td {
+                            "6.10";
+                        }
+                        td {
+                            "5.05";
+                        }
+                        td {
+                            "8.82";
+                        }
+                        td {
+                            "30.9";
+                        }
+                        td {
+                            "8.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz";
+                        }
+                        td {
+                            "9.89";
+                        }
+                        td {
+                            "8.17";
+                        }
+                        td {
+                            "1.91";
+                        }
+                        td {
+                            "4.9";
+                        }
+                        td {
+                            "2.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz --safe";
+                        }
+                        td {
+                            "10.3";
+                        }
+                        td {
+                            "8.38";
+                        }
+                        td {
+                            "1.73";
+                        }
+                        td {
+                            "5.0";
+                        }
+                        td {
+                            "2.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript";
+                        }
+                        td {
+                            "6.28";
+                        }
+                        td {
+                            "6.00";
+                        }
+                        td {
+                            "—";
+                        }
+                        td {
+                            "5.8";
+                        }
+                        td {
+                            "1.8";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Dart";
+                        }
+                        td {
+                            "9.53";
+                        }
+                        td {
+                            "7.03";
+                        }
+                        td {
+                            "816";
+                        }
+                        td {
+                            "48.4";
+                        }
+                        td {
+                            "18.6";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Go";
+                        }
+                        td {
+                            "51.4";
+                        }
+                        td {
+                            "45.1";
+                        }
+                        td {
+                            "1,332";
+                        }
+                        td {
+                            "1,894";
+                        }
+                        td {
+                            "561.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Swift";
+                        }
+                        td {
+                            "8.03";
+                        }
+                        td {
+                            "18.3";
+                        }
+                        td {
+                            "2,049";
+                        }
+                        td {
+                            "5,449";
+                        }
+                        td {
+                            "1,671";
+                        }
+                    }
+                }
+            }
+            h2 {
+                "Richards";
+            }
+            p {
+                "An operating-system task scheduler: tasks of four kinds, linked queues of packets, and dispatch on the kind of task, ten simulations per sample.";
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            "";
+                        }
+                        th {
+                            "richards, ms";
+                        }
+                        th {
+                            "build, ms";
+                        }
+                        th {
+                            "size, KB";
+                        }
+                        th {
+                            "gzip, KB";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "utu -O3";
+                        }
+                        td {
+                            "4.24";
+                        }
+                        td {
+                            "6.93";
+                        }
+                        td {
+                            "14.5";
+                        }
+                        td {
+                            "6.8";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz";
+                        }
+                        td {
+                            "5.50";
+                        }
+                        td {
+                            "1.23";
+                        }
+                        td {
+                            "1.8";
+                        }
+                        td {
+                            "0.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "safe Rust";
+                        }
+                        td {
+                            "7.83";
+                        }
+                        td {
+                            "283";
+                        }
+                        td {
+                            "28.5";
+                        }
+                        td {
+                            "11.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust";
+                        }
+                        td {
+                            "3.54";
+                        }
+                        td {
+                            "239";
+                        }
+                        td {
+                            "23.7";
+                        }
+                        td {
+                            "10.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript";
+                        }
+                        td {
+                            "8.45";
+                        }
+                        td {
+                            "—";
+                        }
+                        td {
+                            "3.6";
+                        }
+                        td {
+                            "1.2";
+                        }
+                    }
+                }
+            }
+            h2 {
+                "n-body";
+            }
+            p {
+                "Five planets under gravity, 20,000 steps, five times per sample: floating-point arithmetic on the fields of a few structs.";
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            "";
+                        }
+                        th {
+                            "n-body, ms";
+                        }
+                        th {
+                            "build, ms";
+                        }
+                        th {
+                            "size, KB";
+                        }
+                        th {
+                            "gzip, KB";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "utu -O3";
+                        }
+                        td {
+                            "4.95";
+                        }
+                        td {
+                            "1.53";
+                        }
+                        td {
+                            "5.9";
+                        }
+                        td {
+                            "2.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz";
+                        }
+                        td {
+                            "5.12";
+                        }
+                        td {
+                            "0.70";
+                        }
+                        td {
+                            "1.5";
+                        }
+                        td {
+                            "0.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "safe Rust";
+                        }
+                        td {
+                            "3.41";
+                        }
+                        td {
+                            "227";
+                        }
+                        td {
+                            "3.2";
+                        }
+                        td {
+                            "1.8";
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust";
+                        }
+                        td {
+                            "5.02";
+                        }
+                        td {
+                            "213";
+                        }
+                        td {
+                            "22.1";
+                        }
+                        td {
+                            "10.3";
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript";
+                        }
+                        td {
+                            "8.05";
+                        }
+                        td {
+                            "—";
+                        }
+                        td {
+                            "1.8";
+                        }
+                        td {
+                            "0.9";
+                        }
+                    }
+                }
+            }
+            h2 {
+                "binary-trees";
+            }
+            p {
+                "Allocating and walking millions of short-lived binary trees: the garbage collector against Rust's Box, and against an arena.";
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            "";
+                        }
+                        th {
+                            "binary-trees, ms";
+                        }
+                        th {
+                            "build, ms";
+                        }
+                        th {
+                            "size, KB";
+                        }
+                        th {
+                            "gzip, KB";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "utu -O3";
+                        }
+                        td {
+                            "10.7";
+                        }
+                        td {
+                            "0.91";
+                        }
+                        td {
+                            "3.8";
+                        }
+                        td {
+                            "1.4";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz";
+                        }
+                        td {
+                            "10.8";
+                        }
+                        td {
+                            "0.41";
+                        }
+                        td {
+                            "0.3";
+                        }
+                        td {
+                            "0.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "safe Rust";
+                        }
+                        td {
+                            "41.5";
+                        }
+                        td {
+                            "194";
+                        }
+                        td {
+                            "20.8";
+                        }
+                        td {
+                            "9.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust";
+                        }
+                        td {
+                            "9.12";
+                        }
+                        td {
+                            "206";
+                        }
+                        td {
+                            "21.0";
+                        }
+                        td {
+                            "9.3";
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript";
+                        }
+                        td {
+                            "20.2";
+                        }
+                        td {
+                            "—";
+                        }
+                        td {
+                            "0.5";
+                        }
+                        td {
+                            "0.3";
+                        }
+                    }
+                }
+            }
+            h2 {
+                "fannkuch-redux";
+            }
+            p {
+                "Every permutation of nine elements, flipped by prefix reversal: small integer arrays, indexed in tight loops.";
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            "";
+                        }
+                        th {
+                            "fannkuch, ms";
+                        }
+                        th {
+                            "build, ms";
+                        }
+                        th {
+                            "size, KB";
+                        }
+                        th {
+                            "gzip, KB";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "utu -O3";
+                        }
+                        td {
+                            "13.1";
+                        }
+                        td {
+                            "0.97";
+                        }
+                        td {
+                            "5.1";
+                        }
+                        td {
+                            "1.7";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu -Oz";
+                        }
+                        td {
+                            "14.4";
+                        }
+                        td {
+                            "0.42";
+                        }
+                        td {
+                            "0.5";
+                        }
+                        td {
+                            "0.3";
+                        }
+                    }
+                    tr {
+                        th {
+                            "safe Rust";
+                        }
+                        td {
+                            "12.5";
+                        }
+                        td {
+                            "222";
+                        }
+                        td {
+                            "22.2";
+                        }
+                        td {
+                            "9.8";
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust";
+                        }
+                        td {
+                            "13.8";
+                        }
+                        td {
+                            "214";
+                        }
+                        td {
+                            "21.6";
+                        }
+                        td {
+                            "9.5";
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript";
+                        }
+                        td {
+                            "17.7";
+                        }
+                        td {
+                            "—";
+                        }
+                        td {
+                            "0.5";
+                        }
+                        td {
+                            "0.3";
+                        }
+                    }
+                }
+            }
+        }
+        \/;
+    }
+}
