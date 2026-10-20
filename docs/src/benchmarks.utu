@@ -4,16 +4,27 @@ mod benchmarks {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Benchmarks", "The same programs in utu, Rust, JavaScript, and other languages that compile to Wasm, timed in V8.");
+            = ui.header("Benchmarks", "The same programs in utu and in eight other languages that run in V8: Rust, JavaScript, Dart, Kotlin, MoonBit, AssemblyScript, Go, and Swift.");
             p {
-                "Each program is written once per language, the same way: the same data structures, loops, and order of operations, with only the language's idiom differing. Every port's result is checked against the others before it is timed. Each runs in d8 (15.6.75.16, V8's shell) in a process of its own; a time is the median of 20 samples after 5 warmups. utu compiles warm with the self-hosted compiler; the others build from clean. A size is what must ship to run it: the Wasm module, or JavaScript minified.";
+                "Each program is written once per language, the same way: the same data structures, loops, and order of operations, with only the language's idiom differing. Every port's result is checked against the others before it is timed. Each runs in d8 (15.6.75.16, V8's shell) in a process of its own; a time is the median of 20 samples after 5 warmups. A build time is from clean, the median of 3, as each toolchain's command line runs it; utu's is a warm compile in a running process (the whole utu build command takes about 90 ms, most of it starting Node), and Kotlin's has Gradle's daemon already running. A size is what must ship to run it: the Wasm module, or JavaScript minified.";
+            }
+            p {
+                "utu is built at ";
+                code {
+                    "-O3";
+                }
+                " and at ";
+                code {
+                    "-Oz";
+                }
+                " (and DeltaBlue also with ";
+                code {
+                    "--safe";
+                }
+                " as well, which puts back the bounds checks Wasm does not make itself). Dart, Kotlin, and MoonBit compile to WasmGC, as utu does. Rust, AssemblyScript, Go, and Swift compile to linear memory: Rust frees memory itself, while AssemblyScript, Go, and Swift carry their own collector or runtime in the module, which is much of their size. Every language keeps its normal checks.";
             }
             p {
                 "Run them again with ";
-                code {
-                    "bun run bench:deltablue-table";
-                }
-                " and ";
                 code {
                     "bun run bench:programs-d8";
                 }
@@ -23,19 +34,7 @@ mod benchmarks {
                 "DeltaBlue";
             }
             p {
-                "V8's incremental constraint solver: a graph of small objects, planned and re-planned. Chain and projection each solve 1,048 variables 20 times. utu is built at ";
-                code {
-                    "-O3";
-                }
-                " and ";
-                code {
-                    "-Oz";
-                }
-                ", each with and without ";
-                code {
-                    "--safe";
-                }
-                " (which puts back the bounds checks Wasm does not make itself). Rc Rust is a graph of Rc<RefCell<_>> with no unsafe code; unsafe Rust uses an arena and unchecked indexing. Dart compiles to WasmGC; Go and Swift have no WasmGC backend, so theirs are linear-memory modules carrying their own runtimes, which is most of their size.";
+                "V8's incremental constraint solver: a graph of small objects, planned and re-planned. Chain and projection each solve 1,048 variables 20 times. Rc Rust is a graph of Rc<RefCell<_>> with no unsafe code; unsafe Rust uses an arena and unchecked indexing.";
             }
             table.wide {
                 thead {
@@ -63,56 +62,16 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "Rc Rust";
-                        }
-                        td {
-                            "16.7";
-                        }
-                        td {
-                            "16.9";
-                        }
-                        td {
-                            "382";
-                        }
-                        td {
-                            "38.0";
-                        }
-                        td {
-                            "15.0";
-                        }
-                    }
-                    tr {
-                        th {
-                            "unsafe Rust";
-                        }
-                        td {
-                            "5.01";
-                        }
-                        td {
-                            "4.26";
-                        }
-                        td {
-                            "320";
-                        }
-                        td {
-                            "32.0";
-                        }
-                        td {
-                            "13.1";
-                        }
-                    }
-                    tr {
-                        th {
                             "utu -O3";
                         }
                         td {
-                            "6.18";
+                            "5.96";
                         }
                         td {
-                            "5.07";
+                            "4.96";
                         }
                         td {
-                            "8.52";
+                            "8.90";
                         }
                         td {
                             "27.9";
@@ -126,13 +85,13 @@ mod benchmarks {
                             "utu -O3 --safe";
                         }
                         td {
-                            "6.10";
+                            "6.20";
                         }
                         td {
-                            "5.05";
+                            "5.16";
                         }
                         td {
-                            "8.82";
+                            "8.97";
                         }
                         td {
                             "30.9";
@@ -146,13 +105,13 @@ mod benchmarks {
                             "utu -Oz";
                         }
                         td {
-                            "9.89";
+                            "10.1";
                         }
                         td {
-                            "8.17";
+                            "8.39";
                         }
                         td {
-                            "1.91";
+                            "1.84";
                         }
                         td {
                             "4.9";
@@ -166,13 +125,13 @@ mod benchmarks {
                             "utu -Oz --safe";
                         }
                         td {
-                            "10.3";
+                            "10.4";
                         }
                         td {
-                            "8.38";
+                            "8.29";
                         }
                         td {
-                            "1.73";
+                            "1.75";
                         }
                         td {
                             "5.0";
@@ -183,13 +142,53 @@ mod benchmarks {
                     }
                     tr {
                         th {
+                            "Rc Rust";
+                        }
+                        td {
+                            "16.5";
+                        }
+                        td {
+                            "17.2";
+                        }
+                        td {
+                            "394";
+                        }
+                        td {
+                            "38.0";
+                        }
+                        td {
+                            "15.0";
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust";
+                        }
+                        td {
+                            "4.88";
+                        }
+                        td {
+                            "4.11";
+                        }
+                        td {
+                            "338";
+                        }
+                        td {
+                            "32.0";
+                        }
+                        td {
+                            "13.1";
+                        }
+                    }
+                    tr {
+                        th {
                             "JavaScript";
                         }
                         td {
-                            "6.28";
+                            "6.32";
                         }
                         td {
-                            "6.00";
+                            "5.42";
                         }
                         td {
                             "—";
@@ -206,13 +205,13 @@ mod benchmarks {
                             "Dart";
                         }
                         td {
-                            "9.53";
+                            "9.38";
                         }
                         td {
-                            "7.03";
+                            "7.02";
                         }
                         td {
-                            "816";
+                            "876";
                         }
                         td {
                             "48.4";
@@ -223,16 +222,76 @@ mod benchmarks {
                     }
                     tr {
                         th {
+                            "Kotlin";
+                        }
+                        td {
+                            "23.4";
+                        }
+                        td {
+                            "13.3";
+                        }
+                        td {
+                            "1,615";
+                        }
+                        td {
+                            "20.3";
+                        }
+                        td {
+                            "8.8";
+                        }
+                    }
+                    tr {
+                        th {
+                            "MoonBit";
+                        }
+                        td {
+                            "16.3";
+                        }
+                        td {
+                            "7.92";
+                        }
+                        td {
+                            "111";
+                        }
+                        td {
+                            "9.9";
+                        }
+                        td {
+                            "4.4";
+                        }
+                    }
+                    tr {
+                        th {
+                            "AssemblyScript";
+                        }
+                        td {
+                            "46.8";
+                        }
+                        td {
+                            "33.9";
+                        }
+                        td {
+                            "1,365";
+                        }
+                        td {
+                            "14.2";
+                        }
+                        td {
+                            "5.1";
+                        }
+                    }
+                    tr {
+                        th {
                             "Go";
                         }
                         td {
-                            "51.4";
+                            "50.2";
                         }
                         td {
-                            "45.1";
+                            "43.4";
                         }
                         td {
-                            "1,332";
+                            "1,340";
                         }
                         td {
                             "1,894";
@@ -246,13 +305,13 @@ mod benchmarks {
                             "Swift";
                         }
                         td {
-                            "8.03";
+                            "7.81";
                         }
                         td {
-                            "18.3";
+                            "18.2";
                         }
                         td {
-                            "2,049";
+                            "2,040";
                         }
                         td {
                             "5,449";
@@ -295,10 +354,10 @@ mod benchmarks {
                             "utu -O3";
                         }
                         td {
-                            "4.24";
+                            "4.21";
                         }
                         td {
-                            "6.93";
+                            "6.24";
                         }
                         td {
                             "14.5";
@@ -312,10 +371,10 @@ mod benchmarks {
                             "utu -Oz";
                         }
                         td {
-                            "5.50";
+                            "5.42";
                         }
                         td {
-                            "1.23";
+                            "0.89";
                         }
                         td {
                             "1.8";
@@ -332,7 +391,7 @@ mod benchmarks {
                             "7.83";
                         }
                         td {
-                            "283";
+                            "273";
                         }
                         td {
                             "28.5";
@@ -349,7 +408,7 @@ mod benchmarks {
                             "3.54";
                         }
                         td {
-                            "239";
+                            "230";
                         }
                         td {
                             "23.7";
@@ -363,7 +422,7 @@ mod benchmarks {
                             "JavaScript";
                         }
                         td {
-                            "8.45";
+                            "8.38";
                         }
                         td {
                             "—";
@@ -373,6 +432,57 @@ mod benchmarks {
                         }
                         td {
                             "1.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Kotlin";
+                        }
+                        td {
+                            "5.36";
+                        }
+                        td {
+                            "1,251";
+                        }
+                        td {
+                            "11.4";
+                        }
+                        td {
+                            "4.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "MoonBit";
+                        }
+                        td {
+                            "5.32";
+                        }
+                        td {
+                            "104";
+                        }
+                        td {
+                            "2.1";
+                        }
+                        td {
+                            "1.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "AssemblyScript";
+                        }
+                        td {
+                            "18.8";
+                        }
+                        td {
+                            "1,204";
+                        }
+                        td {
+                            "10.2";
+                        }
+                        td {
+                            "4.0";
                         }
                     }
                 }
@@ -409,10 +519,10 @@ mod benchmarks {
                             "utu -O3";
                         }
                         td {
-                            "4.95";
+                            "5.01";
                         }
                         td {
-                            "1.53";
+                            "1.33";
                         }
                         td {
                             "5.9";
@@ -426,10 +536,10 @@ mod benchmarks {
                             "utu -Oz";
                         }
                         td {
-                            "5.12";
+                            "5.19";
                         }
                         td {
-                            "0.70";
+                            "0.59";
                         }
                         td {
                             "1.5";
@@ -446,7 +556,7 @@ mod benchmarks {
                             "3.41";
                         }
                         td {
-                            "227";
+                            "211";
                         }
                         td {
                             "3.2";
@@ -460,10 +570,10 @@ mod benchmarks {
                             "unsafe Rust";
                         }
                         td {
-                            "5.02";
+                            "4.96";
                         }
                         td {
-                            "213";
+                            "207";
                         }
                         td {
                             "22.1";
@@ -487,6 +597,57 @@ mod benchmarks {
                         }
                         td {
                             "0.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Kotlin";
+                        }
+                        td {
+                            "5.26";
+                        }
+                        td {
+                            "1,224";
+                        }
+                        td {
+                            "10.9";
+                        }
+                        td {
+                            "4.7";
+                        }
+                    }
+                    tr {
+                        th {
+                            "MoonBit";
+                        }
+                        td {
+                            "5.48";
+                        }
+                        td {
+                            "104";
+                        }
+                        td {
+                            "1.8";
+                        }
+                        td {
+                            "1.1";
+                        }
+                    }
+                    tr {
+                        th {
+                            "AssemblyScript";
+                        }
+                        td {
+                            "21.6";
+                        }
+                        td {
+                            "1,100";
+                        }
+                        td {
+                            "6.8";
+                        }
+                        td {
+                            "3.2";
                         }
                     }
                 }
@@ -523,10 +684,10 @@ mod benchmarks {
                             "utu -O3";
                         }
                         td {
-                            "10.7";
+                            "10.8";
                         }
                         td {
-                            "0.91";
+                            "0.89";
                         }
                         td {
                             "3.8";
@@ -540,10 +701,10 @@ mod benchmarks {
                             "utu -Oz";
                         }
                         td {
-                            "10.8";
+                            "10.7";
                         }
                         td {
-                            "0.41";
+                            "0.38";
                         }
                         td {
                             "0.3";
@@ -557,10 +718,10 @@ mod benchmarks {
                             "safe Rust";
                         }
                         td {
-                            "41.5";
+                            "40.7";
                         }
                         td {
-                            "194";
+                            "190";
                         }
                         td {
                             "20.8";
@@ -574,10 +735,10 @@ mod benchmarks {
                             "unsafe Rust";
                         }
                         td {
-                            "9.12";
+                            "9.14";
                         }
                         td {
-                            "206";
+                            "199";
                         }
                         td {
                             "21.0";
@@ -591,7 +752,7 @@ mod benchmarks {
                             "JavaScript";
                         }
                         td {
-                            "20.2";
+                            "20.3";
                         }
                         td {
                             "—";
@@ -601,6 +762,57 @@ mod benchmarks {
                         }
                         td {
                             "0.3";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Kotlin";
+                        }
+                        td {
+                            "10.3";
+                        }
+                        td {
+                            "1,054";
+                        }
+                        td {
+                            "7.9";
+                        }
+                        td {
+                            "2.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "MoonBit";
+                        }
+                        td {
+                            "11.1";
+                        }
+                        td {
+                            "98.7";
+                        }
+                        td {
+                            "0.5";
+                        }
+                        td {
+                            "0.4";
+                        }
+                    }
+                    tr {
+                        th {
+                            "AssemblyScript";
+                        }
+                        td {
+                            "163";
+                        }
+                        td {
+                            "1,024";
+                        }
+                        td {
+                            "4.0";
+                        }
+                        td {
+                            "2.0";
                         }
                     }
                 }
@@ -640,7 +852,7 @@ mod benchmarks {
                             "13.1";
                         }
                         td {
-                            "0.97";
+                            "0.96";
                         }
                         td {
                             "5.1";
@@ -654,7 +866,7 @@ mod benchmarks {
                             "utu -Oz";
                         }
                         td {
-                            "14.4";
+                            "14.2";
                         }
                         td {
                             "0.42";
@@ -674,7 +886,7 @@ mod benchmarks {
                             "12.5";
                         }
                         td {
-                            "222";
+                            "214";
                         }
                         td {
                             "22.2";
@@ -688,10 +900,10 @@ mod benchmarks {
                             "unsafe Rust";
                         }
                         td {
-                            "13.8";
+                            "13.5";
                         }
                         td {
-                            "214";
+                            "211";
                         }
                         td {
                             "21.6";
@@ -705,7 +917,7 @@ mod benchmarks {
                             "JavaScript";
                         }
                         td {
-                            "17.7";
+                            "17.4";
                         }
                         td {
                             "—";
@@ -715,6 +927,57 @@ mod benchmarks {
                         }
                         td {
                             "0.3";
+                        }
+                    }
+                    tr {
+                        th {
+                            "Kotlin";
+                        }
+                        td {
+                            "14.8";
+                        }
+                        td {
+                            "1,060";
+                        }
+                        td {
+                            "8.3";
+                        }
+                        td {
+                            "3.2";
+                        }
+                    }
+                    tr {
+                        th {
+                            "MoonBit";
+                        }
+                        td {
+                            "14.8";
+                        }
+                        td {
+                            "99.2";
+                        }
+                        td {
+                            "0.7";
+                        }
+                        td {
+                            "0.5";
+                        }
+                    }
+                    tr {
+                        th {
+                            "AssemblyScript";
+                        }
+                        td {
+                            "99.3";
+                        }
+                        td {
+                            "1,039";
+                        }
+                        td {
+                            "4.6";
+                        }
+                        td {
+                            "2.3";
                         }
                     }
                 }
