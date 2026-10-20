@@ -40,6 +40,7 @@ const commands = [
   ['node', './scripts/test-wutu-grammar.mjs'],
   ['node', './scripts/test-wutu-cli.mjs'],
   ['node', './scripts/test-utu-cli.mjs'],
+  ['node', './scripts/test-go-host.mjs'],
   ['node', './scripts/test-lsp.mjs'],
   ['node', './scripts/test-grep.mjs'],
   ['node', './scripts/test-utudoc.mjs'],

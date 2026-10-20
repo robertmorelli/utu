@@ -15,6 +15,17 @@ code --install-extension dist/utu-vscode.vsix
 
 Open any `.utu` file or run a command from the **UTU** command palette group.
 
+## Go
+
+`utu build` writes a Go package: the module, made Go by gosm, and Go for
+everything it imports, the standard library's included. `--package main`
+makes a program that `go run` runs as `utu run` would. `@go/\ … \/` bindings
+are Go, as `@es` ones are JavaScript. See [the Go host](docs/go-host.md).
+
+```utu
+let shout: fun(Str) Str = @go/\ import "strings"; strings.ToUpper \/;
+```
+
 ## JavaScript, the browser, and npm
 
 TypeScript declarations are utu's foreign-function interface. `std:Browser`

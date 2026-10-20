@@ -4,7 +4,8 @@
 //   utu check <file.utu>                 report what is wrong
 //   utu run <file.utu> [-O…]             build, then call main
 //   utu test <file.utu> [-O…]            build the tests, then run each
-//   utu build <file.utu> [-o dir] [-O…]  NAME.wasm and NAME.mjs (its loader)
+//   utu build <file.utu> [-o dir] [-O…]  a Go package: NAME.wasm made Go by gosm, and its host
+//     [--package name] [--host=js]       (package main runs it) … or NAME.mjs, a JavaScript loader
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
 //   utu lsp                              a language server, on stdin and stdout
 //   utu grep <pattern> <paths…>          utu code by syntax, names, and types
@@ -15,6 +16,7 @@
 // IR and graphs, so they use stage 0.
 
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -53,7 +55,9 @@ async function main() {
   const optimize = rest.includes('-O3') ? 'speed' : rest.includes('-O0') ? 'none' : 'size';
   const safe = rest.includes('--safe');
   const out = option(rest, '-o') ?? option(rest, '--out');
-  await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
+  const host = rest.includes('--host=js') ? 'js' : 'go';
+  const pkg = option(rest, '--package');
+  await commands[command](file, { optimize, safe, out, host, pkg, utu: await loadNodeCompiler() });
 }
 
 /** A file as the user would write it: relative to here, unless that is longer. */
@@ -125,11 +129,12 @@ async function test(file, { utu, optimize, safe }) {
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
-async function build(file, { utu, optimize, safe, out }) {
+async function build(file, { utu, optimize, safe, out, host, pkg }) {
   const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
   const name = path.basename(file, '.utu');
   const dir = path.resolve(out ?? '.');
   await fs.mkdir(dir, { recursive: true });
+  if (host === 'go') return buildGo(file, { wasm, spec, name, dir, pkg });
   const glue = glueSource(spec);
   const { build: bundle } = await import('esbuild');
   const loader = loaderSource(spec, wasm, {
@@ -147,6 +152,115 @@ async function build(file, { utu, optimize, safe, out }) {
   const js = await fs.stat(path.join(dir, `${name}.mjs`));
   console.log(`${displayPath(path.join(dir, `${name}.wasm`))}  ${wasm.length} bytes`);
   console.log(`${displayPath(path.join(dir, `${name}.mjs`))}   ${js.size} bytes`);
+}
+
+/**
+ * A Go package of the module: NAME.wasm, made Go by gosm (NAME_gosm.go), and
+ * its host (host.go, and the runtime's utu_*.go), in package `pkg` (from
+ * NAME by default). Package main is a program: it runs `export main`.
+ * Without gosm, the module and its host, for gosm to make Go of later.
+ */
+async function buildGo(file, { wasm, spec, name, dir, pkg }) {
+  const { goHostFiles, parseHostInterface, readSidecars, stdHostSites, wasmImportSignatures } = await import('../src/selfhost/go-host.js');
+  const readDir = async (from, keep) => Object.fromEntries(await Promise.all((await fs.readdir(from)).filter(keep)
+    .map(async f => [f, await fs.readFile(path.join(from, f), 'utf8')])));
+  const std = path.join(ROOT, 'std');
+  pkg ??= goPackageName(name);
+  const wasmFile = path.join(dir, `${name}.wasm`);
+  await fs.writeFile(wasmFile, wasm);
+  console.log(`${displayPath(wasmFile)}  ${wasm.length} bytes`);
+
+  const gosm = findGosm();
+  let host = null, main = null;
+  if (gosm) {
+    // Not NAME_wasm.go: Go builds a file named so only for GOARCH=wasm.
+    const out = path.join(dir, `${name}_gosm.go`);
+    // Imports, host.go's, is the host: calls to it are direct, and inline.
+    gosm.run(['-pkg', pkg, '-host-type', '*Imports', '-o', out, wasmFile]);
+    host = parseHostInterface(gosm.run(['-emit-host', '-pkg', pkg, wasmFile]));
+    if (pkg === 'main') {
+      const found = (await fs.readFile(out, 'utf8')).match(/^func \(m \*Instance\) Main\(\)\s*([^{]*)\{/m);
+      if (!found) {
+        console.error(`${displayPath(file)}: package main runs \`export main\`, and there is none`);
+        process.exit(1);
+      }
+      main = found[1].trim();
+    }
+    console.log(`${displayPath(out)}  (gosm)`);
+  } else {
+    console.error('utu build: no gosm (UTU_GOSM, `gosm` on PATH, or a checkout beside utu): the host is written for the module as it is, for gosm to make Go of');
+  }
+  let files;
+  try {
+    files = goHostFiles(spec, wasmImportSignatures(wasm), {
+      pkg, source: path.basename(file), host, main,
+      stdSites: stdHostSites(await readDir(std, f => f.endsWith('.utu'))),
+      sidecars: readSidecars(await readDir(path.join(std, 'go'), f => f.endsWith('.go') && !f.endsWith('_test.go'))),
+    });
+  } catch (error) {
+    console.error(`${displayPath(file)}: ${error.message}`);
+    process.exit(1);
+  }
+  // Formatted, which checks the `@go` bodies are Go, when there is a gofmt.
+  const formatted = spawnSync('gofmt', [], { input: files['host.go'], encoding: 'utf8' });
+  if (formatted.status === 0) files['host.go'] = formatted.stdout;
+  else if (!formatted.error) {
+    console.error(`${displayPath(file)}: the Go host is not Go (an \`@go\` body?):\n${formatted.stderr.replaceAll('<standard input>', 'host.go')}`);
+    process.exit(1);
+  }
+  for (const [f, text] of Object.entries(files)) await fs.writeFile(path.join(dir, f), text);
+  console.log(`${displayPath(path.join(dir, 'host.go'))}  and ${Object.keys(files).length - 1} runtime files`);
+  // A module of its own, when it is in none, that finds gosm's runtime.
+  if (gosm?.dir && !(await inGoModule(dir))) {
+    await fs.writeFile(path.join(dir, 'go.mod'), `module utu.local/${pkg === 'main' ? goPackageName(name) : pkg}\n\ngo 1.24\n\nrequire gosm v0.0.0\n\nreplace gosm => ${gosm.dir}\n`);
+    console.log(`${displayPath(path.join(dir, 'go.mod'))}`);
+  }
+}
+
+/**
+ * gosm: UTU_GOSM (a checkout, or the command), `gosm` on PATH, or a
+ * checkout beside utu. `run` runs it, and is what it prints; `dir` is the
+ * checkout, when there is one (for a go.mod's replace).
+ */
+function findGosm() {
+  const checkout = dir => {
+    try { return fsSync.statSync(path.join(dir, 'cmd', 'gosm')).isDirectory() ? path.resolve(dir) : null; } catch { return null; }
+  };
+  const command = (cmd, args = [], cwd = undefined, dir = null) => ({
+    dir,
+    run(more) {
+      const r = spawnSync(cmd, [...args, ...more], { cwd, encoding: 'utf8', maxBuffer: 1 << 28 });
+      if (r.error) throw r.error;
+      if (r.status !== 0) {
+        console.error(`gosm ${more.join(' ')}:\n${r.stderr}`);
+        process.exit(1);
+      }
+      return r.stdout;
+    },
+  });
+  const fromCheckout = dir => command('go', ['run', './cmd/gosm'], dir, dir);
+  const env = process.env.UTU_GOSM;
+  if (env) return checkout(env) ? fromCheckout(checkout(env)) : command(env);
+  for (const bin of (process.env.PATH ?? '').split(path.delimiter)) {
+    const candidate = path.join(bin, 'gosm');
+    try { fsSync.accessSync(candidate, fsSync.constants.X_OK); return command(candidate); } catch {}
+  }
+  const beside = checkout(path.join(ROOT, '..', 'gosm'));
+  return beside ? fromCheckout(beside) : null;
+}
+
+/** Whether dir is in a Go module (a go.mod here or above). */
+async function inGoModule(dir) {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    try { await fs.access(path.join(d, 'go.mod')); return true; } catch {}
+    if (path.dirname(d) === d) return false;
+  }
+}
+
+/** A Go package name from a file's: lower case, letters, digits, and underscores. */
+function goPackageName(name) {
+  const clean = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  return /^[a-z_]/.test(clean) ? clean : `utu_${clean}`;
 }
 
 /** The glue module, given to esbuild without being written. */
@@ -350,7 +464,9 @@ function usage(code) {
   check <file>                 report what is wrong with the program
   run <file> [-O…]             build it, then call its main
   test <file> [-O…]            build its tests, then run each
-  build <file> [-o dir] [-O…]  NAME.wasm, and NAME.mjs that loads it
+  build <file> [-o dir] [-O…]  a Go package: NAME.wasm made Go by gosm, and its host
+    [--package name]           the Go package (NAME by default); main is a program
+    [--host=js]                NAME.mjs, a JavaScript loader, in place of the Go host
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
   grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']

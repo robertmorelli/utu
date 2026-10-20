@@ -17,7 +17,7 @@
 
 import {
   awaitImports, closureImports, exceptionImports, glueModuleSource, importObjectFromEval, importObjectFromGlue,
-  memoryImports, promiseImports, promisifyExports,
+  memoryImports, needsNoGoHost, promiseImports, promisifyExports,
 } from '../runtime/host-imports.js';
 import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
 
@@ -438,6 +438,7 @@ function units(file, byte) {
  * engine's JS string builtins.
  */
 export async function instantiate(wasm, spec = {}, { loadGlue = null } = {}) {
+  needsNoGoHost(spec);
   const module = await WebAssembly.compile(wasm, COMPILE_OPTIONS);
   const es = spec.es ?? {};
   const source = glueModuleSource(es);

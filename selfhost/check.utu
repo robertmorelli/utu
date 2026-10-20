@@ -1591,6 +1591,7 @@ fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
     es_func.push(imp);
     es_start.push(-1);
     es_end.push(intern_text(body));
+    es_go.push(0);
     w_node(Op.Call, repr(r), imp, 0, m);
     lazy_call_fn.push(decl);
     lazy_call_sig.push(intern_text(sig));

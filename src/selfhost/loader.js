@@ -6,7 +6,7 @@
 // those: each runtime piece is imported only when the module uses it, so a
 // bundler leaves the rest out.
 
-import { glueModuleSource } from '../runtime/host-imports.js';
+import { glueModuleSource, needsNoGoHost } from '../runtime/host-imports.js';
 
 /** The glue module's source: the bodies of the `@es` imports. Empty when there are none. */
 export function glueSource(spec) {
@@ -23,6 +23,7 @@ export function glueSource(spec) {
  *   streaming  whether `wasm` is a Response (WebAssembly.compileStreaming)
  */
 export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming = false }) {
+  needsNoGoHost(spec);
   const imported = new Set(WebAssembly.Module.imports(new WebAssembly.Module(wasmBytes, COMPILE_OPTIONS)).map(entry => `${entry.module}.${entry.name}`));
   const runtimeNames = [];
   const lines = [];

@@ -83,7 +83,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   }
 
   // A module and the least JavaScript that loads it.
-  r = utu('build', 'good.utu', '-o', 'out');
+  r = utu('build', 'good.utu', '-o', 'out', '--host=js');
   assert.equal(r.status, 0, r.stderr);
   const loaded = await import(pathToFileURL(path.join(dir, 'out', 'good.mjs')).href);
   assert.equal(loaded.exports.main(), 6);

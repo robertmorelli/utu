@@ -10,5 +10,8 @@
   (#eq? @_name "es")
   (#set! injection.language "javascript"))
 ((dsl_expr (dsl_name) @_name (dsl_body "dsl_text" @injection.content))
+  (#eq? @_name "go")
+  (#set! injection.language "go"))
+((dsl_expr (dsl_name) @_name (dsl_body "dsl_text" @injection.content))
   (#eq? @_name "css")
   (#set! injection.language "css"))

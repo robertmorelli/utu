@@ -6,6 +6,10 @@
 //! function of no arguments that returns its value, called at each read.
 //! The bodies go into the module's `utu` custom section as JSON, in the form
 //! `src/runtime/host-imports.js` reads: `{"es":{"es":{"__es_0":"…"}}}`.
+//!
+//! An `@go` binding (`let f: fun(I32) I32 = @go/\ func(x int32) int32 { return x + 1 } \/;`)
+//! is the same, for a Go host: `__go_N` of the module `go`, its body a Go
+//! expression, under `"go":{"go":{…}}`. No JavaScript host gives it.
 
 /// By declaration: its `@es` binding's imported function, or -1.
 vec decl_es: I32;
@@ -15,6 +19,8 @@ vec es_func: I32;
 /// es_end is a word id of its text.
 vec es_start: I32;
 vec es_end: I32;
+/// 1 for an `@go` import (Go, not JS).
+vec es_go: I32;
 /// Each binding's imports, one a type: (declaration, import) pairs.
 vec es_made_decl: I32;
 vec es_made_func: I32;
@@ -25,6 +31,7 @@ fn reset_host() void {
     es_func.clear();
     es_start.clear();
     es_end.clear();
+    es_go.clear();
     es_made_decl.clear();
     es_made_func.clear();
 }
@@ -124,8 +131,11 @@ fn report_wat() void {
     };
 }
 
-/// Whether a node is `@es/\ … \/`.
-fn is_es(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Es); }
+/// Whether a node is a host binding's body: `@es/\ … \/` or `@go/\ … \/`.
+fn is_es(node: I32) Bool { is_kind(node, Node.Dsl_expr) and (word_of(first_child(node)) == known_word(Known.Es) or is_go(node)); }
+
+/// Whether a node is `@go/\ … \/`.
+fn is_go(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_text(word_of(first_child(node))) == "go"; }
 
 /// The imported function of an `@es` binding of type `t`, imported once
 /// for each type the binding has (a module's instances may give it several).
@@ -144,15 +154,17 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     // this signature is that import: generated code (wutu's) repeats a few.
     let at = dsl_text_start(dsl);
     let end = dsl_text_end(dsl);
+    let go = if is_go(dsl) { 1; } else { 0; };
     for (0 ..< es_func.len()) |k| {
-        if func_type_of[es_func[k]] == ft and bytes_equal(es_start[k], es_end[k], at, end) {
+        if func_type_of[es_func[k]] == ft and es_go[k] == go and bytes_equal(es_start[k], es_end[k], at, end) {
             decl_es[decl] = es_func[k];
             es_made_decl.push(decl);
             es_made_func.push(es_func[k]);
             return es_func[k];
         };
     };
-    let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), ft);
+    let module = if go == 1 { "go"; } else { "es"; };
+    let f = add_import_func(name_add(module), name_add("__" + module + "_" + es_func.len().to_str()), ft);
     let w = decl_name[decl];
     func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w));
     decl_es[decl] = f;
@@ -161,6 +173,7 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     es_func.push(f);
     es_start.push(at);
     es_end.push(end);
+    es_go.push(go);
     f;
 }
 
@@ -239,6 +252,7 @@ fn write_host_json() void {
     json_part(2);
     json_part(3);
     json_part(4);
+    json_part(5);
     json_byte(125);
     // Nothing to say: no section.
     if host_json.len() == 2 { host_json.clear(); };
@@ -250,19 +264,20 @@ fn json_part(k: I32) void {
     let before = host_json.len();
     if before > 1 { json_byte(44); };
     let start = host_json.len();
-    if k == 0 { write_es_json(); } else if k == 1 { write_closure_json(); } else if k == 2 { write_promise_json(); } else if k == 3 { write_mems_json(); } else { write_lazy_json(); };
+    if k == 0 { write_es_json(0); } else if k == 5 { write_es_json(1); } else if k == 1 { write_closure_json(); } else if k == 2 { write_promise_json(); } else if k == 3 { write_mems_json(); } else { write_lazy_json(); };
     if host_json.len() == start { host_json.resize(before); };
 }
 
-fn write_es_json() void {
+/// The live imports of one host (0 JS, 1 Go): `"es":{"es":{…}}` or `"go":{"go":{…}}`.
+fn write_es_json(go: I32) void {
     let any = false;
-    for (0 ..< es_func.len()) |i| { if func_live[es_func[i]] == 1 { any = true; }; };
+    for (0 ..< es_func.len()) |i| { if func_live[es_func[i]] == 1 and es_go[i] == go { any = true; }; };
     if not any { return; };
-    json_text("\"es\":{\"es\":{");
+    json_text(if go == 1 { "\"go\":{\"go\":{"; } else { "\"es\":{\"es\":{"; });
     let first = true;
     for (0 ..< es_func.len()) |i| {
         let f = es_func[i];
-        if func_live[f] == 1 {
+        if func_live[f] == 1 and es_go[i] == go {
             if not first { json_byte(44); };
             first = false;
             json_byte(34);

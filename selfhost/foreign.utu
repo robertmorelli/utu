@@ -483,6 +483,7 @@ fn foreign_op(params: I32, result: I32, body: Str) I32 {
     es_func.push(f);
     es_start.push(start);
     es_end.push(src.len());
+    es_go.push(0);
     fop_key.push(key);
     fop_func.push(f);
     f;

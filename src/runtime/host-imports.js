@@ -322,6 +322,12 @@ export function importObjectFromEval(importSpec) {
   return imports;
 }
 
+/** A module with `@go` bindings runs on a Go host (`utu build`), not this one. */
+export function needsNoGoHost(spec) {
+  const go = Object.keys(spec?.go?.go ?? {});
+  if (go.length) throw new Error(`utu: this module has ${go.length} \`@go\` binding${go.length === 1 ? '' : 's'}, which only a Go host gives: build it with \`utu build\` and run it as Go`);
+}
+
 /** Read a JSON spec stamped on the document root, tolerating absence. */
 export function readRuntimeSpec(root, key) {
   try {
