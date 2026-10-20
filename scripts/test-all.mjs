@@ -20,7 +20,7 @@ const commands = [
   ['node', './scripts/selfhost-lexer-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-resolve-differential.mjs'],
-  ['node', './scripts/selfhost-bootstrap.mjs'],
+  ['node', './scripts/selfhost-bootstrap.mjs', '--stage-1'],
   ['node', './scripts/test-vec.mjs'],
   ['node', './scripts/test-templates.mjs'],
   ['node', './scripts/test-streams.mjs'],

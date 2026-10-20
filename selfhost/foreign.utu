@@ -540,6 +540,11 @@ fn foreign_call_op(params: I32, result: I32, body: Str, m: I32) I32 {
 /// default), 2 speed.
 vec optimize_level: I32 = [1];
 
+/// Whether builds keep the checks wasm makes anyway (1, `--safe`): std's
+/// `<ir-safe-checks/>` is this, an exhaustive `alt` tests its last arm, and
+/// a mem that cannot grow traps where it fails.
+vec safe_checks: I32 = [0];
+
 /// A member operation (a read, write, or call of member `key`; of a view's
 /// root when `root`). Size-optimized builds share one import per shape, as
 /// stage 0 does: `el.value` and `el.textContent` both call

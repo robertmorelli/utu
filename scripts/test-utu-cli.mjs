@@ -68,6 +68,20 @@ bad.utu:4:9: error: Unknown variable 'missing'
   assert.match(r.stdout, /^FAIL fails: /m);
   assert.match(r.stdout, /1 passed, 1 failed/);
 
+  // --safe keeps the checks wasm makes anyway: past a Buffer's length is a
+  // trap, where otherwise it reaches the capacity beyond (at -Oz and -O3).
+  await write('past.utu', `using Buffer from std:Buffer;
+export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
+`);
+  for (const level of [[], ['-O3']]) {
+    r = utu('run', 'past.utu', ...level);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.trim(), '7');
+    r = utu('run', 'past.utu', '--safe', ...level);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /unreachable/);
+  }
+
   // A module and the least JavaScript that loads it.
   r = utu('build', 'good.utu', '-o', 'out');
   assert.equal(r.status, 0, r.stderr);

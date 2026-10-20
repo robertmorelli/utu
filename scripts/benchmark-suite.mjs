@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { transform } from 'esbuild';
 import { exportFunctions } from './wasm-exports.mjs';
-import { createCompiler, emitBinary, initParser, instantiateLowered } from '../src/index.js';
+import { createCompiler, emitBinary, initParser } from '../src/index.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SUITE = path.join(ROOT, 'benchmarks', 'suite');
@@ -23,43 +23,23 @@ const compiler = createCompiler({
   resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
 });
 
+// Each case only describes its inputs. All execution, warmups and timing
+// happen in a fresh d8 process per implementation (see DRIVER below).
 const cases = [
   {
     name: 'scalar recurrence', stem: 'scalar', detail: '1,000,000 dependent integer iterations',
-    setup(utu, rust, rustSafe, js) {
-      const n = 1_000_000;
-      return { utu: () => utu.run(n), rust: () => rust.run(n), rustSafe: () => rustSafe.run(n), js: () => js.run(n) };
-    },
+    inputs: () => ({ kind: 'scalar', n: 1_000_000 }),
   },
   stringCase('middle insert: tiny chunks', 8, 8_192),
   stringCase('middle insert: medium chunks', 32, 2_048),
   stringCase('middle insert: large chunks', 1024, 64),
   {
     name: 'source analyzer', stem: 'analyzer', detail: '256 KiB source-like document; 14 lexical/statistical metrics',
-    setup(utu, rust, rustSafe, js) {
-      const text = analyzerInput(256 * 1024);
-      const encoder = new TextEncoder();
-      const utuRun = () => utu.run(text);
-      const rustRun = () => {
-        const bytes = encoder.encode(text); // boundary conversion and copy are intentionally timed
-        new Uint8Array(rust.memory.buffer, rust.input_ptr(), bytes.length).set(bytes);
-        return rust.run(bytes.length);
-      };
-      const rustSafeRun = () => {
-        const bytes = encoder.encode(text);
-        new Uint8Array(rustSafe.memory.buffer, rustSafe.input_ptr(), bytes.length).set(bytes);
-        return rustSafe.run(bytes.length);
-      };
-      const jsRun = () => js.run(text);
-      return { utu: utuRun, rust: rustRun, rustSafe: rustSafeRun, js: jsRun };
-    },
+    inputs: () => ({ kind: 'analyzer', text: analyzerInput(256 * 1024) }),
   },
   {
     name: 'prime sieve', stem: 'sieve', detail: '100,000 flags; allocation/fill/random writes/reduction',
-    setup(utu, rust, rustSafe, js) {
-      const n = 100_000;
-      return { utu: () => utu.run(n), rust: () => rust.run(n), rustSafe: () => rustSafe.run(n), js: () => js.run(n) };
-    },
+    inputs: () => ({ kind: 'scalar', n: 100_000 }),
   },
 ];
 
@@ -67,83 +47,159 @@ function stringCase(name, pieceLength, repeats) {
   return {
     name, stem: 'strings',
     detail: `${pieceLength.toLocaleString()} ASCII chars inserted ${repeats.toLocaleString()} times at midpoint; 64→128 KiB`,
-    setup(utu, rust, rustSafe, js) {
-      const base = asciiPiece(65_536);
-      const piece = asciiPiece(pieceLength);
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-      const utuRun = () => checksumString(utu.run(base, piece, repeats));
-      const rustRun = () => {
-        const baseBytes = encoder.encode(base); // both boundary conversions are intentionally timed
-        const pieceBytes = encoder.encode(piece);
-        new Uint8Array(rust.memory.buffer, rust.base_ptr(), baseBytes.length).set(baseBytes);
-        new Uint8Array(rust.memory.buffer, rust.piece_ptr(), pieceBytes.length).set(pieceBytes);
-        const packed = BigInt.asUintN(64, rust.run(baseBytes.length, pieceBytes.length, repeats));
-        const outputPtr = Number(packed >> 32n);
-        const outputLen = Number(packed & 0xffff_ffffn);
-        const output = decoder.decode(new Uint8Array(rust.memory.buffer, outputPtr, outputLen));
-        return checksumString(output); // decode and flatten are intentionally timed
-      };
-      const rustSafeRun = () => {
-        const baseBytes = encoder.encode(base);
-        const pieceBytes = encoder.encode(piece);
-        new Uint8Array(rustSafe.memory.buffer, rustSafe.base_ptr(), baseBytes.length).set(baseBytes);
-        new Uint8Array(rustSafe.memory.buffer, rustSafe.piece_ptr(), pieceBytes.length).set(pieceBytes);
-        const packed = BigInt.asUintN(64, rustSafe.run(baseBytes.length, pieceBytes.length, repeats));
-        const outputPtr = Number(packed >> 32n);
-        const outputLen = Number(packed & 0xffff_ffffn);
-        return checksumString(decoder.decode(new Uint8Array(rustSafe.memory.buffer, outputPtr, outputLen)));
-      };
-      const jsRun = () => checksumString(js.run(base, piece, repeats));
-      return { utu: utuRun, rust: rustRun, rustSafe: rustSafeRun, js: jsRun };
-    },
+    inputs: () => ({ kind: 'strings', base: asciiPiece(65_536), piece: asciiPiece(pieceLength), repeats }),
   };
 }
 
+const IMPLEMENTATIONS = ['utu', 'rust', 'rustSafe', 'js'];
+
+// The d8 driver: one process runs one implementation of one case. d8 has no
+// TextEncoder/TextDecoder, so the Rust boundary's UTF-8 conversions (which are
+// intentionally timed, as is the copy into linear memory) are plain JS here.
+const DRIVER = String.raw`
+const config = JSON.parse(read(arguments[0]));
+const input = JSON.parse(read(config.inputs));
+
+function checksumString(value) {
+  return value.length ^ value.charCodeAt(value.length >> 1) ^ value.charCodeAt(value.length - 1);
+}
+
+function encodeUtf8(text) {
+  const out = new Uint8Array(text.length * 3);
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    let c = text.charCodeAt(i);
+    if (c < 0x80) { out[n++] = c; continue; }
+    if (c < 0x800) { out[n++] = 0xc0 | (c >> 6); out[n++] = 0x80 | (c & 63); continue; }
+    if (c >= 0xd800 && c < 0xdc00 && i + 1 < text.length) {
+      const low = text.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low < 0xe000) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (low - 0xdc00);
+        i++;
+        out[n++] = 0xf0 | (c >> 18); out[n++] = 0x80 | ((c >> 12) & 63);
+        out[n++] = 0x80 | ((c >> 6) & 63); out[n++] = 0x80 | (c & 63);
+        continue;
+      }
+    }
+    if (c >= 0xd800 && c < 0xe000) c = 0xfffd; // lone surrogate, as TextEncoder does
+    out[n++] = 0xe0 | (c >> 12); out[n++] = 0x80 | ((c >> 6) & 63); out[n++] = 0x80 | (c & 63);
+  }
+  return out.subarray(0, n);
+}
+
+// Assumes well-formed UTF-8 (the Rust kernels only produce it).
+function decodeUtf8(bytes) {
+  const units = new Uint16Array(bytes.length);
+  let n = 0;
+  for (let i = 0; i < bytes.length;) {
+    const b = bytes[i++];
+    if (b < 0x80) { units[n++] = b; continue; }
+    if (b < 0xe0) { units[n++] = ((b & 31) << 6) | (bytes[i++] & 63); continue; }
+    if (b < 0xf0) { units[n++] = ((b & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63); continue; }
+    const c = (((b & 7) << 18) | ((bytes[i++] & 63) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63)) - 0x10000;
+    units[n++] = 0xd800 + (c >> 10); units[n++] = 0xdc00 + (c & 1023);
+  }
+  let text = '';
+  for (let i = 0; i < n; i += 8192) text += String.fromCharCode.apply(null, units.subarray(i, Math.min(n, i + 8192)));
+  return text;
+}
+
+function instantiate(file, options) {
+  const module = new WebAssembly.Module(new Uint8Array(readbuffer(file)), options);
+  if (WebAssembly.Module.imports(module).length) throw new Error(file + ' needs host imports; the d8 runner provides none');
+  return new WebAssembly.Instance(module, {}).exports;
+}
+
+function makeRunner() {
+  if (config.impl === 'js') return import(config.js).then(js =>
+    input.kind === 'strings' ? () => checksumString(js.run(input.base, input.piece, input.repeats))
+    : input.kind === 'analyzer' ? () => js.run(input.text)
+    : () => js.run(input.n));
+  if (config.impl === 'utu') {
+    const utu = instantiate(config.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
+    return input.kind === 'strings' ? () => checksumString(utu.run(input.base, input.piece, input.repeats))
+      : input.kind === 'analyzer' ? () => utu.run(input.text)
+      : () => utu.run(input.n);
+  }
+  const rust = instantiate(config.wasm);
+  if (input.kind === 'strings') return () => {
+    const baseBytes = encodeUtf8(input.base); // both boundary conversions are intentionally timed
+    const pieceBytes = encodeUtf8(input.piece);
+    new Uint8Array(rust.memory.buffer, rust.base_ptr(), baseBytes.length).set(baseBytes);
+    new Uint8Array(rust.memory.buffer, rust.piece_ptr(), pieceBytes.length).set(pieceBytes);
+    const packed = BigInt.asUintN(64, rust.run(baseBytes.length, pieceBytes.length, input.repeats));
+    const outputPtr = Number(packed >> 32n);
+    const outputLen = Number(packed & 0xffffffffn);
+    return checksumString(decodeUtf8(new Uint8Array(rust.memory.buffer, outputPtr, outputLen))); // decode and flatten are timed
+  };
+  if (input.kind === 'analyzer') return () => {
+    const bytes = encodeUtf8(input.text); // boundary conversion and copy are intentionally timed
+    new Uint8Array(rust.memory.buffer, rust.input_ptr(), bytes.length).set(bytes);
+    return rust.run(bytes.length);
+  };
+  return () => rust.run(input.n);
+}
+
+const run = await makeRunner();
+const result = run();
+for (let i = 0; i < config.warmups; i++) {
+  const value = run();
+  if (value !== result) throw new Error('nondeterministic result: ' + value + ' after ' + result);
+}
+const times = [];
+for (let i = 0; i < config.samples; i++) {
+  const start = performance.now();
+  run();
+  times.push(performance.now() - start);
+}
+print('RESULT ' + JSON.stringify({ result: typeof result === 'bigint' ? String(result) : result, times }));
+`;
+const DRIVER_PATH = path.join(TMP, 'driver.mjs');
+await fs.writeFile(DRIVER_PATH, DRIVER);
+const D8 = findD8();
+
 console.log('Rust/utu Wasm benchmark suite (including forbid(unsafe_code) Rust)');
-console.log(`  engine: Bun ${Bun.version} (${process.arch})`);
+console.log(`  engine: d8 (V8 ${D8.version}, ${process.arch}), one process per implementation and case`);
 console.log(`  samples: ${SAMPLES}, warmups: ${WARMUPS}`);
 console.log('  Rust: rustc stable -O3 + LTO + simd128 + bulk-memory');
-console.log('  utu: -Oz (local cleanup); strings through the JS string builtins\n');
+console.log('  utu: -Oz (local cleanup); strings through the JS string builtins');
+console.log('  Rust string boundary: UTF-8 encode/decode in plain JS (d8 has no TextEncoder)\n');
 
 const rows = [];
-for (const spec of cases) {
+for (const [index, spec] of cases.entries()) {
   const utuBytes = await compileUtu(spec.stem);
   const rustBytes = compileRust(spec.stem);
   const rustSafeBytes = compileRust(spec.stem, { safe: true });
-  const { module: jsModule, bytes: jsBytes } = await loadJavaScript(spec.stem);
+  const { source: jsSource, bytes: jsBytes } = await loadJavaScript(spec.stem);
+  const dir = path.join(TMP, `case-${index}-${spec.stem}`);
+  await fs.mkdir(dir, { recursive: true });
+  const artifacts = {
+    utu: { wasm: path.join(dir, `${spec.stem}-utu.wasm`) },
+    rust: { wasm: path.join(dir, `${spec.stem}-rust.wasm`) },
+    rustSafe: { wasm: path.join(dir, `${spec.stem}-rust-safe.wasm`) },
+    js: { js: path.join(dir, `${spec.stem}.mjs`) },
+  };
+  const inputsPath = path.join(dir, 'inputs.json');
   await Promise.all([
-    fs.writeFile(path.join(TMP, `${spec.stem}-utu.wasm`), utuBytes),
-    fs.writeFile(path.join(TMP, `${spec.stem}-rust.wasm`), rustBytes),
-    fs.writeFile(path.join(TMP, `${spec.stem}-rust-safe.wasm`), rustSafeBytes),
+    fs.writeFile(artifacts.utu.wasm, utuBytes),
+    fs.writeFile(artifacts.rust.wasm, rustBytes),
+    fs.writeFile(artifacts.rustSafe.wasm, rustSafeBytes),
+    fs.writeFile(artifacts.js.js, jsSource),
+    fs.writeFile(inputsPath, JSON.stringify(spec.inputs())),
   ]);
-  const [{ instance: utuInstance }, rustResult, rustSafeResult] = await Promise.all([
-    instantiateLowered(utuBytes),
-    WebAssembly.instantiate(rustBytes),
-    WebAssembly.instantiate(rustSafeBytes),
-  ]);
-  const runners = spec.setup(utuInstance.exports, rustResult.instance.exports, rustSafeResult.instance.exports, jsModule);
-  const expected = runners.rust();
-  const actual = runners.utu();
-  const rustSafeResultValue = runners.rustSafe();
-  const jsResult = runners.js();
-  if (actual !== expected || rustSafeResultValue !== expected || jsResult !== expected) {
-    throw new Error(`${spec.name}: output mismatch, utu=${actual}, Rust=${expected}, safe Rust=${rustSafeResultValue}, JS=${jsResult}`);
+  const measured = {};
+  for (const impl of IMPLEMENTATIONS) {
+    const configPath = path.join(dir, `${impl}.json`);
+    await fs.writeFile(configPath, JSON.stringify({ impl, ...artifacts[impl], inputs: inputsPath, samples: SAMPLES, warmups: WARMUPS }));
+    measured[impl] = runInD8(configPath, `${spec.name} (${impl})`);
   }
-  for (let i = 0; i < WARMUPS; i++) { runners.utu(); runners.rust(); runners.rustSafe(); runners.js(); }
-  const utuTimes = [], rustTimes = [], rustSafeTimes = [], jsTimes = [];
-  for (let i = 0; i < SAMPLES; i++) {
-    const order = i % 4;
-    const timed = [
-      () => utuTimes.push(time(runners.utu)),
-      () => rustTimes.push(time(runners.rust)),
-      () => rustSafeTimes.push(time(runners.rustSafe)),
-      () => jsTimes.push(time(runners.js)),
-    ];
-    for (let offset = 0; offset < timed.length; offset++) timed[(order + offset) % timed.length]();
+  const expected = measured.rust.result;
+  if (IMPLEMENTATIONS.some(impl => measured[impl].result !== expected)) {
+    throw new Error(`${spec.name}: output mismatch, utu=${measured.utu.result}, Rust=${expected}, safe Rust=${measured.rustSafe.result}, JS=${measured.js.result}`);
   }
+  const { utu: { times: utuTimes }, rust: { times: rustTimes }, rustSafe: { times: rustSafeTimes }, js: { times: jsTimes } } = measured;
   const row = {
-    ...spec, result: actual,
+    ...spec, result: expected,
     utuMs: median(utuTimes), rustMs: median(rustTimes), rustSafeMs: median(rustSafeTimes), jsMs: median(jsTimes),
     utuBest: Math.min(...utuTimes), rustBest: Math.min(...rustTimes), rustSafeBest: Math.min(...rustSafeTimes), jsBest: Math.min(...jsTimes),
     utuSize: utuBytes.length, rustSize: rustBytes.length, rustSafeSize: rustSafeBytes.length, jsSize: jsBytes.length,
@@ -162,11 +218,28 @@ for (const row of rows) {
 console.log(`\nArtifacts: ${path.relative(ROOT, TMP)}/`);
 
 async function loadJavaScript(stem) {
-  const file = path.join(SUITE, `${stem}.js`);
-  const source = await fs.readFile(file, 'utf8');
+  const source = await fs.readFile(path.join(SUITE, `${stem}.js`), 'utf8');
   const minified = await transform(source, { minify: true, format: 'esm', target: 'es2022' });
-  const module = await import(`${pathToFileURL(file).href}?benchmark=${Date.now()}`);
-  return { module, bytes: new TextEncoder().encode(minified.code) };
+  return { source, bytes: new TextEncoder().encode(minified.code) };
+}
+
+/** Resolve d8 from D8_BIN or PATH; fail clearly when neither runs. */
+function findD8() {
+  const executable = process.env.D8_BIN || 'd8';
+  const probe = spawnSync(executable, ['-e', 'print(version())'], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) {
+    const why = probe.error?.message ?? (probe.stderr || probe.stdout).trim();
+    throw new Error(`d8 is required for bench:kernels: could not run ${JSON.stringify(executable)} (${why}). Install V8's d8 shell or set D8_BIN to its path.`);
+  }
+  return { executable, version: probe.stdout.trim() };
+}
+
+function runInD8(configPath, label) {
+  const run = spawnSync(D8.executable, [DRIVER_PATH, '--', configPath], { cwd: ROOT, encoding: 'utf8', timeout: 600_000, maxBuffer: 64 * 1024 * 1024 });
+  if (run.error || run.status !== 0) throw new Error(`${label}: d8 failed: ${run.error?.message ?? `${run.stdout}\n${run.stderr}`}`);
+  const line = run.stdout.split('\n').find(line => line.startsWith('RESULT '));
+  if (!line) throw new Error(`${label}: d8 printed no result:\n${run.stdout}\n${run.stderr}`);
+  return JSON.parse(line.slice('RESULT '.length));
 }
 
 async function compileUtu(stem) {
@@ -205,19 +278,9 @@ function asciiPiece(length) {
   return seed.repeat(Math.ceil(length / seed.length)).slice(0, length);
 }
 
-function checksumString(value) {
-  return value.length ^ value.charCodeAt(value.length >> 1) ^ value.charCodeAt(value.length - 1);
-}
-
 function analyzerInput(length) {
   const block = `// generated source fixture 104729\nfn transform_item(value_17: I32) I32 {\n  let scaled = value_17 * 31 + 7;\n  if scaled > 4096 { return scaled - 113; }\n  for (0..<12) |index| { scaled = scaled + index; };\n  let message = "utu \\183 parser [fixture]"; /* balanced comment */\n  scaled;\n}\n`;
   return block.repeat(Math.ceil(length / block.length)).slice(0, length);
-}
-
-function time(run) {
-  const start = Bun.nanoseconds();
-  run();
-  return (Bun.nanoseconds() - start) / 1e6;
 }
 
 function median(values) {

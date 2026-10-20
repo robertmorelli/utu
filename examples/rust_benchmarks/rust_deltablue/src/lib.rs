@@ -1,1083 +1,683 @@
-#![allow(dead_code, unused_assignments)]
+//! DeltaBlue, the incremental constraint solver (V8's `deltablue.js` / Dart's
+//! `DeltaBlue.dart`), in idiomatic safe Rust.
+//!
+//! Variables and constraints form a shared object graph of `Rc<RefCell<_>>`
+//! nodes: a variable lists the constraints on it, and a constraint holds the
+//! variables it relates. The four constraint kinds are one enum. Worklists are
+//! `Vec` stacks. The graph is reference-counted in both directions, so each
+//! test's graph is a cycle that is never freed (as in the previous version).
+//!
+//! There is no `unsafe` code. The crate denies `unsafe_code` rather than
+//! forbidding it only because that lint also flags `#[no_mangle]`, so the four
+//! exports at the bottom opt out of it one by one.
+#![deny(unsafe_code)]
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-const REQUIRED: i32 = 0;
-const STRONG_PREFERRED: i32 = 1;
-const PREFERRED: i32 = 2;
-const STRONG_DEFAULT: i32 = 3;
-const NORMAL: i32 = 4;
-const WEAK_DEFAULT: i32 = 5;
-const WEAKEST: i32 = 6;
+// ---------------------------------------------------------------------------
+// Strength
 
-const DIRECTION_NONE: i32 = 0;
-const DIRECTION_FORWARD: i32 = 1;
-const DIRECTION_BACKWARD: i32 = -1;
-
-type ConstraintRef = Rc<RefCell<Constraint>>;
-type VariableRef = Rc<RefCell<Variable>>;
-
-struct ConstraintList {
-    items: Vec<ConstraintRef>,
-    count: i32,
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Strength {
+    Required,
+    #[allow(dead_code)] // in the strength table, but no test uses it
+    StrongPreferred,
+    Preferred,
+    StrongDefault,
+    Normal,
+    WeakDefault,
+    Weakest,
 }
+
+impl Strength {
+    fn stronger(self, other: Strength) -> bool {
+        self < other
+    }
+
+    fn weaker(self, other: Strength) -> bool {
+        self > other
+    }
+
+    fn weakest_of(self, other: Strength) -> Strength {
+        if self.weaker(other) {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// The original's table, inverted on purpose: Required is followed by
+    /// Weakest, so `incremental_remove` only ever re-adds required constraints.
+    fn next_weaker(self) -> Strength {
+        match self {
+            Strength::Required => Strength::Weakest,
+            Strength::StrongPreferred => Strength::WeakDefault,
+            Strength::Preferred => Strength::Normal,
+            Strength::StrongDefault => Strength::StrongDefault,
+            Strength::Normal => Strength::Preferred,
+            Strength::WeakDefault => Strength::Required,
+            Strength::Weakest => unreachable!("Weakest has no weaker strength"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Variable
+
+type Var = Rc<RefCell<Variable>>;
 
 struct Variable {
     value: i32,
-    constraints: ConstraintList,
-    determined_by: Option<ConstraintRef>,
+    constraints: Vec<Constraint>,
+    determined_by: Option<Constraint>,
     mark: i32,
-    walk_strength: i32,
+    walk_strength: Strength,
     stay: bool,
 }
 
-struct VariableList {
-    items: Vec<VariableRef>,
-    count: i32,
+impl Variable {
+    fn new(value: i32) -> Var {
+        Rc::new(RefCell::new(Variable {
+            value,
+            constraints: Vec::new(),
+            determined_by: None,
+            mark: 0,
+            walk_strength: Strength::Weakest,
+            stay: true,
+        }))
+    }
+
+    fn add_constraint(&mut self, c: &Constraint) {
+        self.constraints.push(c.clone());
+    }
+
+    fn remove_constraint(&mut self, c: &Constraint) {
+        self.constraints.retain(|other| other != c);
+        if self.determined_by.as_ref() == Some(c) {
+            self.determined_by = None;
+        }
+    }
+
+    /// Pushes the satisfied constraints that consume this variable, i.e. all
+    /// satisfied ones except the one that determines it.
+    fn push_consumers(&self, into: &mut Vec<Constraint>) {
+        let determining = self.determined_by.as_ref();
+        into.extend(
+            self.constraints
+                .iter()
+                .filter(|c| Some(*c) != determining && c.is_satisfied())
+                .cloned(),
+        );
+    }
 }
 
-struct Planner {
-    current_mark: i32,
-    constraint_capacity: i32,
-    variable_capacity: i32,
+// ---------------------------------------------------------------------------
+// Constraint
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Direction {
+    None,
+    Forward,
+    Backward,
 }
 
+enum UnaryRole {
+    Stay,
+    Edit,
+}
+
+enum BinaryOp {
+    Equality,
+    /// `v2 = v1 * scale + offset`
+    Scale { scale: Var, offset: Var },
+}
+
+enum Kind {
+    Unary {
+        output: Var,
+        satisfied: bool,
+        role: UnaryRole,
+    },
+    Binary {
+        v1: Var,
+        v2: Var,
+        direction: Direction,
+        op: BinaryOp,
+    },
+}
+
+struct ConstraintData {
+    strength: Strength,
+    kind: Kind,
+}
+
+/// A shared handle to a constraint; equality is identity.
 #[derive(Clone)]
-enum Constraint {
-    EmptyConstraint,
-    StayConstraint {
-        output: VariableRef,
-        strength: i32,
-        satisfied: bool,
-    },
-    EditConstraint {
-        output: VariableRef,
-        strength: i32,
-        satisfied: bool,
-    },
-    EqualityConstraint {
-        v1: VariableRef,
-        v2: VariableRef,
-        strength: i32,
-        direction: i32,
-    },
-    ScaleConstraint {
-        src: VariableRef,
-        scale: VariableRef,
-        offset: VariableRef,
-        dest: VariableRef,
-        strength: i32,
-        direction: i32,
-    },
-}
+struct Constraint(Rc<RefCell<ConstraintData>>);
 
-fn stronger(s1: i32, s2: i32) -> bool {
-    s1 < s2
-}
-
-fn weaker(s1: i32, s2: i32) -> bool {
-    s1 > s2
-}
-
-fn weakest_of(s1: i32, s2: i32) -> i32 {
-    if s1 > s2 { s1 } else { s2 }
-}
-
-fn next_weaker(strength: i32) -> i32 {
-    match strength {
-        0 => WEAKEST,
-        1 => WEAK_DEFAULT,
-        2 => NORMAL,
-        3 => STRONG_DEFAULT,
-        4 => PREFERRED,
-        5 => REQUIRED,
-        _ => WEAKEST,
+impl PartialEq for Constraint {
+    fn eq(&self, other: &Constraint) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
-fn new_empty_constraint() -> ConstraintRef {
-    Rc::new(RefCell::new(Constraint::EmptyConstraint))
-}
-
-fn new_constraint_list(capacity: i32) -> ConstraintList {
-    let dummy = new_empty_constraint();
-    ConstraintList {
-        items: vec![dummy; capacity as usize],
-        count: 0,
-    }
-}
-
-fn new_variable(value: i32, constraint_capacity: i32) -> VariableRef {
-    Rc::new(RefCell::new(Variable {
-        value,
-        constraints: new_constraint_list(constraint_capacity),
-        determined_by: None,
-        mark: 0,
-        walk_strength: WEAKEST,
-        stay: true,
-    }))
-}
-
-fn new_variable_placeholder() -> VariableRef {
-    new_variable(0, 1)
-}
-
-fn new_variable_list(capacity: i32) -> VariableList {
-    let dummy = new_variable_placeholder();
-    VariableList {
-        items: vec![dummy; capacity as usize],
-        count: 0,
-    }
-}
-
-fn new_planner(variable_capacity: i32, constraint_capacity: i32) -> Planner {
-    Planner {
-        current_mark: 0,
-        variable_capacity,
-        constraint_capacity,
-    }
-}
-
-fn constraint_list_append(list: &mut ConstraintList, constraint: ConstraintRef) {
-    assert!(
-        list.count < list.items.len() as i32,
-        "constraint list capacity exceeded"
-    );
-    list.items[list.count as usize] = constraint;
-    list.count += 1;
-}
-
-fn constraint_list_pop_front(list: &mut ConstraintList) -> ConstraintRef {
-    let constraint = list.items[0].clone();
-    let mut i = 0;
-    while i + 1 < list.count {
-        list.items[i as usize] = list.items[(i + 1) as usize].clone();
-        i += 1;
-    }
-    list.count -= 1;
-    constraint
-}
-
-fn constraint_list_copy(src: &ConstraintList, capacity: i32) -> ConstraintList {
-    let mut out = new_constraint_list(capacity);
-    let mut i = 0;
-    while i < src.count {
-        constraint_list_append(&mut out, src.items[i as usize].clone());
-        i += 1;
-    }
-    out
-}
-
-fn variable_list_append(list: &mut VariableList, value: VariableRef) {
-    assert!(
-        list.count < list.items.len() as i32,
-        "variable list capacity exceeded"
-    );
-    list.items[list.count as usize] = value;
-    list.count += 1;
-}
-
-fn variable_list_pop_front(list: &mut VariableList) -> VariableRef {
-    let value = list.items[0].clone();
-    let mut i = 0;
-    while i + 1 < list.count {
-        list.items[i as usize] = list.items[(i + 1) as usize].clone();
-        i += 1;
-    }
-    list.count -= 1;
-    value
-}
-
-fn variable_add_constraint(variable: &VariableRef, constraint: &ConstraintRef) {
-    constraint_list_append(&mut variable.borrow_mut().constraints, constraint.clone());
-}
-
-fn variable_remove_constraint(variable: &VariableRef, constraint: &ConstraintRef) {
-    let mut found = -1;
-    let count = variable.borrow().constraints.count;
-    let mut i = 0;
-    while i < count {
-        if found == -1
-            && Rc::ptr_eq(
-                &variable.borrow().constraints.items[i as usize],
-                constraint,
-            )
-        {
-            found = i;
-        }
-        i += 1;
+impl Constraint {
+    /// Creates a constraint and adds it to the graph and the plan.
+    fn new(strength: Strength, kind: Kind, planner: &mut Planner) -> Constraint {
+        let c = Constraint(Rc::new(RefCell::new(ConstraintData { strength, kind })));
+        c.add_to_graph();
+        planner.incremental_add(&c);
+        c
     }
 
-    if found != -1 {
-        let mut slot = found;
-        while slot + 1 < variable.borrow().constraints.count {
-            let next = variable.borrow().constraints.items[(slot + 1) as usize].clone();
-            variable.borrow_mut().constraints.items[slot as usize] = next;
-            slot += 1;
-        }
-        variable.borrow_mut().constraints.count -= 1;
+    fn stay(v: &Var, strength: Strength, planner: &mut Planner) -> Constraint {
+        Self::unary(v, strength, UnaryRole::Stay, planner)
     }
 
-    let determining = variable.borrow().determined_by.clone();
-    if let Some(existing) = determining {
-        if Rc::ptr_eq(&existing, constraint) {
-            variable.borrow_mut().determined_by = None;
-        }
+    fn edit(v: &Var, strength: Strength, planner: &mut Planner) -> Constraint {
+        Self::unary(v, strength, UnaryRole::Edit, planner)
     }
-}
 
-fn constraint_strength(constraint: &ConstraintRef) -> i32 {
-    match &*constraint.borrow() {
-        Constraint::EmptyConstraint => WEAKEST,
-        Constraint::StayConstraint { strength, .. }
-        | Constraint::EditConstraint { strength, .. }
-        | Constraint::EqualityConstraint { strength, .. }
-        | Constraint::ScaleConstraint { strength, .. } => *strength,
+    fn unary(v: &Var, strength: Strength, role: UnaryRole, planner: &mut Planner) -> Constraint {
+        let kind = Kind::Unary { output: v.clone(), satisfied: false, role };
+        Self::new(strength, kind, planner)
     }
-}
 
-fn constraint_is_input(constraint: &ConstraintRef) -> bool {
-    matches!(&*constraint.borrow(), Constraint::EditConstraint { .. })
-}
-
-fn constraint_is_satisfied(constraint: &ConstraintRef) -> bool {
-    match &*constraint.borrow() {
-        Constraint::EmptyConstraint => false,
-        Constraint::StayConstraint { satisfied, .. } | Constraint::EditConstraint { satisfied, .. } => {
-            *satisfied
-        }
-        Constraint::EqualityConstraint { direction, .. } | Constraint::ScaleConstraint { direction, .. } => {
-            *direction != DIRECTION_NONE
-        }
+    fn equality(v1: &Var, v2: &Var, strength: Strength, planner: &mut Planner) -> Constraint {
+        Self::binary(v1, v2, BinaryOp::Equality, strength, planner)
     }
-}
 
-fn constraint_input(constraint: &ConstraintRef) -> VariableRef {
-    match &*constraint.borrow() {
-        Constraint::EqualityConstraint {
-            v1, v2, direction, ..
-        } => {
-            if *direction == DIRECTION_FORWARD {
-                v1.clone()
-            } else {
-                v2.clone()
-            }
-        }
-        Constraint::ScaleConstraint {
-            src,
-            dest,
-            direction,
-            ..
-        } => {
-            if *direction == DIRECTION_FORWARD {
-                src.clone()
-            } else {
-                dest.clone()
-            }
-        }
-        Constraint::EmptyConstraint
-        | Constraint::StayConstraint { .. }
-        | Constraint::EditConstraint { .. } => panic!("constraint has no input"),
+    fn scale(
+        src: &Var,
+        scale: &Var,
+        offset: &Var,
+        dst: &Var,
+        strength: Strength,
+        planner: &mut Planner,
+    ) -> Constraint {
+        let op = BinaryOp::Scale { scale: scale.clone(), offset: offset.clone() };
+        Self::binary(src, dst, op, strength, planner)
     }
-}
 
-fn constraint_output(constraint: &ConstraintRef) -> VariableRef {
-    match &*constraint.borrow() {
-        Constraint::StayConstraint { output, .. } | Constraint::EditConstraint { output, .. } => {
-            output.clone()
-        }
-        Constraint::EqualityConstraint {
-            v1, v2, direction, ..
-        } => {
-            if *direction == DIRECTION_FORWARD {
-                v2.clone()
-            } else {
-                v1.clone()
-            }
-        }
-        Constraint::ScaleConstraint {
-            src,
-            dest,
-            direction,
-            ..
-        } => {
-            if *direction == DIRECTION_FORWARD {
-                dest.clone()
-            } else {
-                src.clone()
-            }
-        }
-        Constraint::EmptyConstraint => panic!("empty constraint has no output"),
+    fn binary(v1: &Var, v2: &Var, op: BinaryOp, strength: Strength, planner: &mut Planner) -> Constraint {
+        let kind = Kind::Binary { v1: v1.clone(), v2: v2.clone(), direction: Direction::None, op };
+        Self::new(strength, kind, planner)
     }
-}
 
-fn constraint_execute(constraint: &ConstraintRef) {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => panic!("empty constraint cannot execute"),
-        Constraint::StayConstraint { .. } | Constraint::EditConstraint { .. } => {}
-        Constraint::EqualityConstraint { .. } => {
-            let input = constraint_input(constraint);
-            let output = constraint_output(constraint);
-            let value = input.borrow().value;
-            output.borrow_mut().value = value;
-        }
-        Constraint::ScaleConstraint {
-            src,
-            scale,
-            offset,
-            dest,
-            direction,
-            ..
-        } => {
-            if direction == DIRECTION_FORWARD {
-                dest.borrow_mut().value =
-                    src.borrow().value * scale.borrow().value + offset.borrow().value;
-            } else {
-                src.borrow_mut().value =
-                    (dest.borrow().value - offset.borrow().value) / scale.borrow().value;
-            }
-        }
+    fn strength(&self) -> Strength {
+        self.0.borrow().strength
     }
-}
 
-fn constraint_mark_unsatisfied(constraint: &ConstraintRef) {
-    match &mut *constraint.borrow_mut() {
-        Constraint::EmptyConstraint => {}
-        Constraint::StayConstraint { satisfied, .. } | Constraint::EditConstraint { satisfied, .. } => {
-            *satisfied = false;
-        }
-        Constraint::EqualityConstraint { direction, .. } | Constraint::ScaleConstraint { direction, .. } => {
-            *direction = DIRECTION_NONE;
-        }
-    }
-}
-
-fn constraint_add_to_graph(constraint: &ConstraintRef) {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => panic!("empty constraint cannot be added"),
-        Constraint::StayConstraint { output, .. } => {
-            variable_add_constraint(&output, constraint);
-            if let Constraint::StayConstraint { satisfied, .. } = &mut *constraint.borrow_mut() {
+    fn add_to_graph(&self) {
+        let mut data = self.0.borrow_mut();
+        match &mut data.kind {
+            Kind::Unary { output, satisfied, .. } => {
+                output.borrow_mut().add_constraint(self);
                 *satisfied = false;
             }
+            Kind::Binary { v1, v2, direction, op } => {
+                v1.borrow_mut().add_constraint(self);
+                v2.borrow_mut().add_constraint(self);
+                *direction = Direction::None;
+                if let BinaryOp::Scale { scale, offset } = op {
+                    scale.borrow_mut().add_constraint(self);
+                    offset.borrow_mut().add_constraint(self);
+                }
+            }
         }
-        Constraint::EditConstraint { output, .. } => {
-            variable_add_constraint(&output, constraint);
-            if let Constraint::EditConstraint { satisfied, .. } = &mut *constraint.borrow_mut() {
+    }
+
+    fn remove_from_graph(&self) {
+        let mut data = self.0.borrow_mut();
+        match &mut data.kind {
+            Kind::Unary { output, satisfied, .. } => {
+                output.borrow_mut().remove_constraint(self);
                 *satisfied = false;
             }
-        }
-        Constraint::EqualityConstraint { v1, v2, .. } => {
-            variable_add_constraint(&v1, constraint);
-            variable_add_constraint(&v2, constraint);
-            if let Constraint::EqualityConstraint { direction, .. } = &mut *constraint.borrow_mut() {
-                *direction = DIRECTION_NONE;
-            }
-        }
-        Constraint::ScaleConstraint {
-            src,
-            scale,
-            offset,
-            dest,
-            ..
-        } => {
-            variable_add_constraint(&src, constraint);
-            variable_add_constraint(&dest, constraint);
-            variable_add_constraint(&scale, constraint);
-            variable_add_constraint(&offset, constraint);
-            if let Constraint::ScaleConstraint { direction, .. } = &mut *constraint.borrow_mut() {
-                *direction = DIRECTION_NONE;
+            Kind::Binary { v1, v2, direction, op } => {
+                v1.borrow_mut().remove_constraint(self);
+                v2.borrow_mut().remove_constraint(self);
+                *direction = Direction::None;
+                if let BinaryOp::Scale { scale, offset } = op {
+                    scale.borrow_mut().remove_constraint(self);
+                    offset.borrow_mut().remove_constraint(self);
+                }
             }
         }
     }
-}
 
-fn constraint_remove_from_graph(constraint: &ConstraintRef) {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => {}
-        Constraint::StayConstraint { output, .. } => {
-            variable_remove_constraint(&output, constraint);
-            if let Constraint::StayConstraint { satisfied, .. } = &mut *constraint.borrow_mut() {
-                *satisfied = false;
+    /// Decides whether (unary) or in which direction (binary) to satisfy this
+    /// constraint, given the variables already marked in this pass.
+    #[allow(unused_assignments)] // the original's first two choices are overwritten
+    fn choose_method(&self, mark: i32) {
+        let mut data = self.0.borrow_mut();
+        let strength = data.strength;
+        match &mut data.kind {
+            Kind::Unary { output, satisfied, .. } => {
+                let output = output.borrow();
+                *satisfied = output.mark != mark && strength.stronger(output.walk_strength);
             }
-        }
-        Constraint::EditConstraint { output, .. } => {
-            variable_remove_constraint(&output, constraint);
-            if let Constraint::EditConstraint { satisfied, .. } = &mut *constraint.borrow_mut() {
-                *satisfied = false;
-            }
-        }
-        Constraint::EqualityConstraint { v1, v2, .. } => {
-            variable_remove_constraint(&v1, constraint);
-            variable_remove_constraint(&v2, constraint);
-            if let Constraint::EqualityConstraint { direction, .. } = &mut *constraint.borrow_mut() {
-                *direction = DIRECTION_NONE;
-            }
-        }
-        Constraint::ScaleConstraint {
-            src,
-            scale,
-            offset,
-            dest,
-            ..
-        } => {
-            variable_remove_constraint(&src, constraint);
-            variable_remove_constraint(&dest, constraint);
-            variable_remove_constraint(&scale, constraint);
-            variable_remove_constraint(&offset, constraint);
-            if let Constraint::ScaleConstraint { direction, .. } = &mut *constraint.borrow_mut() {
-                *direction = DIRECTION_NONE;
-            }
-        }
-    }
-}
-
-fn constraint_mark_inputs(constraint: &ConstraintRef, mark: i32) {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => panic!("empty constraint cannot mark inputs"),
-        Constraint::StayConstraint { .. } | Constraint::EditConstraint { .. } => {}
-        Constraint::EqualityConstraint { .. } => {
-            constraint_input(constraint).borrow_mut().mark = mark;
-        }
-        Constraint::ScaleConstraint { scale, offset, .. } => {
-            constraint_input(constraint).borrow_mut().mark = mark;
-            scale.borrow_mut().mark = mark;
-            offset.borrow_mut().mark = mark;
-        }
-    }
-}
-
-fn constraint_choose_method(constraint: &ConstraintRef, mark: i32) {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => panic!("empty constraint cannot choose a method"),
-        Constraint::StayConstraint {
-            output, strength, ..
-        } => {
-            let satisfied = if output.borrow().mark != mark {
-                stronger(strength, output.borrow().walk_strength)
-            } else {
-                false
-            };
-            if let Constraint::StayConstraint { satisfied: slot, .. } = &mut *constraint.borrow_mut() {
-                *slot = satisfied;
-            }
-        }
-        Constraint::EditConstraint {
-            output, strength, ..
-        } => {
-            let satisfied = if output.borrow().mark != mark {
-                stronger(strength, output.borrow().walk_strength)
-            } else {
-                false
-            };
-            if let Constraint::EditConstraint { satisfied: slot, .. } = &mut *constraint.borrow_mut() {
-                *slot = satisfied;
-            }
-        }
-        Constraint::EqualityConstraint {
-            v1, v2, strength, ..
-        } => {
-            let mut direction = DIRECTION_NONE;
-
-            if v1.borrow().mark == mark {
-                if v2.borrow().mark != mark {
-                    if stronger(strength, v2.borrow().walk_strength) {
-                        direction = DIRECTION_FORWARD;
+            Kind::Binary { v1, v2, direction, .. } => {
+                let (v1, v2) = (v1.borrow(), v2.borrow());
+                // The first two decisions are always overwritten by the third;
+                // the original does this too.
+                let mut chosen = Direction::None;
+                if v1.mark == mark {
+                    chosen = if v2.mark != mark && strength.stronger(v2.walk_strength) {
+                        Direction::Forward
                     } else {
-                        direction = DIRECTION_BACKWARD;
-                    }
-                } else {
-                    direction = DIRECTION_BACKWARD;
+                        Direction::None
+                    };
                 }
-            }
-
-            if v2.borrow().mark == mark {
-                if v1.borrow().mark != mark {
-                    if stronger(strength, v1.borrow().walk_strength) {
-                        direction = DIRECTION_BACKWARD;
+                if v2.mark == mark {
+                    chosen = if v1.mark != mark && strength.stronger(v1.walk_strength) {
+                        Direction::Backward
                     } else {
-                        direction = DIRECTION_NONE;
-                    }
-                } else {
-                    direction = DIRECTION_NONE;
+                        Direction::None
+                    };
                 }
-            }
-
-            if weaker(v1.borrow().walk_strength, v2.borrow().walk_strength) {
-                if stronger(strength, v1.borrow().walk_strength) {
-                    direction = DIRECTION_BACKWARD;
-                } else {
-                    direction = DIRECTION_NONE;
-                }
-            } else if stronger(strength, v2.borrow().walk_strength) {
-                direction = DIRECTION_FORWARD;
-            } else {
-                direction = DIRECTION_BACKWARD;
-            }
-
-            if let Constraint::EqualityConstraint { direction: slot, .. } = &mut *constraint.borrow_mut() {
-                *slot = direction;
-            }
-        }
-        Constraint::ScaleConstraint {
-            src,
-            dest,
-            strength,
-            ..
-        } => {
-            let mut direction = DIRECTION_NONE;
-
-            if src.borrow().mark == mark {
-                if dest.borrow().mark != mark {
-                    if stronger(strength, dest.borrow().walk_strength) {
-                        direction = DIRECTION_FORWARD;
+                chosen = if v1.walk_strength.weaker(v2.walk_strength) {
+                    if strength.stronger(v1.walk_strength) {
+                        Direction::Backward
                     } else {
-                        direction = DIRECTION_BACKWARD;
+                        Direction::None
                     }
+                } else if strength.stronger(v2.walk_strength) {
+                    Direction::Forward
                 } else {
-                    direction = DIRECTION_BACKWARD;
-                }
-            }
-
-            if dest.borrow().mark == mark {
-                if src.borrow().mark != mark {
-                    if stronger(strength, src.borrow().walk_strength) {
-                        direction = DIRECTION_BACKWARD;
-                    } else {
-                        direction = DIRECTION_NONE;
-                    }
-                } else {
-                    direction = DIRECTION_NONE;
-                }
-            }
-
-            if weaker(src.borrow().walk_strength, dest.borrow().walk_strength) {
-                if stronger(strength, src.borrow().walk_strength) {
-                    direction = DIRECTION_BACKWARD;
-                } else {
-                    direction = DIRECTION_NONE;
-                }
-            } else if stronger(strength, dest.borrow().walk_strength) {
-                direction = DIRECTION_FORWARD;
-            } else {
-                direction = DIRECTION_BACKWARD;
-            }
-
-            if let Constraint::ScaleConstraint { direction: slot, .. } = &mut *constraint.borrow_mut() {
-                *slot = direction;
+                    Direction::Backward
+                };
+                *direction = chosen;
             }
         }
     }
-}
 
-fn constraint_inputs_known(constraint: &ConstraintRef, mark: i32) -> bool {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => false,
-        Constraint::StayConstraint { .. } | Constraint::EditConstraint { .. } => true,
-        Constraint::EqualityConstraint { .. } | Constraint::ScaleConstraint { .. } => {
-            let input = constraint_input(constraint);
-            let variable = input.borrow();
-            if variable.mark == mark {
-                true
-            } else if variable.stay {
-                true
-            } else {
-                variable.determined_by.is_none()
+    fn is_satisfied(&self) -> bool {
+        match &self.0.borrow().kind {
+            Kind::Unary { satisfied, .. } => *satisfied,
+            Kind::Binary { direction, .. } => *direction != Direction::None,
+        }
+    }
+
+    fn mark_unsatisfied(&self) {
+        match &mut self.0.borrow_mut().kind {
+            Kind::Unary { satisfied, .. } => *satisfied = false,
+            Kind::Binary { direction, .. } => *direction = Direction::None,
+        }
+    }
+
+    fn is_input(&self) -> bool {
+        matches!(self.0.borrow().kind, Kind::Unary { role: UnaryRole::Edit, .. })
+    }
+
+    fn input(&self) -> Var {
+        match &self.0.borrow().kind {
+            Kind::Unary { output, .. } => output.clone(),
+            Kind::Binary { v1, v2, direction, .. } => {
+                if *direction == Direction::Forward { v1.clone() } else { v2.clone() }
             }
         }
     }
-}
 
-fn constraint_recalculate(constraint: &ConstraintRef) {
-    let current = constraint.borrow().clone();
-    match current {
-        Constraint::EmptyConstraint => panic!("empty constraint cannot recalculate"),
-        Constraint::StayConstraint {
-            output, strength, ..
-        } => {
-            output.borrow_mut().walk_strength = strength;
-            output.borrow_mut().stay = !constraint_is_input(constraint);
-            if output.borrow().stay {
-                constraint_execute(constraint);
-            }
-        }
-        Constraint::EditConstraint {
-            output, strength, ..
-        } => {
-            output.borrow_mut().walk_strength = strength;
-            output.borrow_mut().stay = !constraint_is_input(constraint);
-            if output.borrow().stay {
-                constraint_execute(constraint);
-            }
-        }
-        Constraint::EqualityConstraint { strength, .. } => {
-            let input = constraint_input(constraint);
-            let out = constraint_output(constraint);
-            out.borrow_mut().walk_strength = weakest_of(strength, input.borrow().walk_strength);
-            out.borrow_mut().stay = input.borrow().stay;
-            if out.borrow().stay {
-                constraint_execute(constraint);
-            }
-        }
-        Constraint::ScaleConstraint {
-            scale,
-            offset,
-            strength,
-            ..
-        } => {
-            let input = constraint_input(constraint);
-            let out = constraint_output(constraint);
-            let mut all_stay = false;
-            out.borrow_mut().walk_strength = weakest_of(strength, input.borrow().walk_strength);
-            if input.borrow().stay {
-                if scale.borrow().stay {
-                    all_stay = offset.borrow().stay;
-                }
-            }
-            out.borrow_mut().stay = all_stay;
-            if out.borrow().stay {
-                constraint_execute(constraint);
+    fn output(&self) -> Var {
+        match &self.0.borrow().kind {
+            Kind::Unary { output, .. } => output.clone(),
+            Kind::Binary { v1, v2, direction, .. } => {
+                if *direction == Direction::Forward { v2.clone() } else { v1.clone() }
             }
         }
     }
-}
 
-fn planner_new_mark(planner: &mut Planner) -> i32 {
-    planner.current_mark += 1;
-    planner.current_mark
-}
+    fn mark_inputs(&self, mark: i32) {
+        if let Kind::Binary { op, .. } = &self.0.borrow().kind {
+            self.input().borrow_mut().mark = mark;
+            if let BinaryOp::Scale { scale, offset } = op {
+                scale.borrow_mut().mark = mark;
+                offset.borrow_mut().mark = mark;
+            }
+        }
+    }
 
-fn planner_add_constraints_consuming_to(variable: &VariableRef, coll: &mut ConstraintList) {
-    let determining = variable.borrow().determined_by.clone();
-    let count = variable.borrow().constraints.count;
-    let mut i = 0;
-    while i < count {
-        let constraint = variable.borrow().constraints.items[i as usize].clone();
-        let same = if let Some(current) = &determining {
-            Rc::ptr_eq(&constraint, current)
-        } else {
-            false
+    fn inputs_known(&self, mark: i32) -> bool {
+        match &self.0.borrow().kind {
+            Kind::Unary { .. } => true,
+            Kind::Binary { .. } => {
+                let input = self.input();
+                let input = input.borrow();
+                input.mark == mark || input.stay || input.determined_by.is_none()
+            }
+        }
+    }
+
+    /// Recomputes the output's walk strength and stay flag, and its value if
+    /// it is constant.
+    fn recalculate(&self) {
+        let data = self.0.borrow();
+        let stay = match &data.kind {
+            Kind::Unary { output, role, .. } => {
+                let mut output = output.borrow_mut();
+                output.walk_strength = data.strength;
+                output.stay = !matches!(role, UnaryRole::Edit);
+                output.stay
+            }
+            Kind::Binary { op, .. } => {
+                let (input, output) = (self.input(), self.output());
+                let input = input.borrow();
+                let mut output = output.borrow_mut();
+                output.walk_strength = data.strength.weakest_of(input.walk_strength);
+                output.stay = match op {
+                    BinaryOp::Equality => input.stay,
+                    BinaryOp::Scale { scale, offset } => {
+                        input.stay && scale.borrow().stay && offset.borrow().stay
+                    }
+                };
+                output.stay
+            }
         };
-        if !same && constraint_is_satisfied(&constraint) {
-            constraint_list_append(coll, constraint);
+        if stay {
+            self.execute();
         }
-        i += 1;
-    }
-}
-
-fn planner_add_propagate(planner: &mut Planner, constraint: &ConstraintRef, mark: i32) -> bool {
-    let mut todo = new_constraint_list(planner.constraint_capacity);
-    constraint_list_append(&mut todo, constraint.clone());
-
-    while todo.count > 0 {
-        let current = constraint_list_pop_front(&mut todo);
-        if constraint_output(&current).borrow().mark == mark {
-            planner_incremental_remove(planner, constraint);
-            return false;
-        }
-
-        constraint_recalculate(&current);
-        planner_add_constraints_consuming_to(&constraint_output(&current), &mut todo);
     }
 
-    true
-}
-
-fn planner_remove_propagate_from(planner: &Planner, out: &VariableRef) -> ConstraintList {
-    out.borrow_mut().determined_by = None;
-    out.borrow_mut().walk_strength = WEAKEST;
-    out.borrow_mut().stay = true;
-
-    let mut unsatisfied = new_constraint_list(planner.constraint_capacity);
-    let mut todo = new_variable_list(planner.variable_capacity);
-    variable_list_append(&mut todo, out.clone());
-
-    while todo.count > 0 {
-        let variable = variable_list_pop_front(&mut todo);
-        let determining = variable.borrow().determined_by.clone();
-        let count = variable.borrow().constraints.count;
-
-        let mut i = 0;
-        while i < count {
-            let constraint = variable.borrow().constraints.items[i as usize].clone();
-            if !constraint_is_satisfied(&constraint) {
-                constraint_list_append(&mut unsatisfied, constraint);
+    fn execute(&self) {
+        let data = self.0.borrow();
+        match &data.kind {
+            Kind::Unary { .. } => {}
+            Kind::Binary { op: BinaryOp::Equality, .. } => {
+                let value = self.input().borrow().value;
+                self.output().borrow_mut().value = value;
             }
-            i += 1;
-        }
-
-        i = 0;
-        while i < count {
-            let constraint = variable.borrow().constraints.items[i as usize].clone();
-            let same = if let Some(current) = &determining {
-                Rc::ptr_eq(&constraint, current)
-            } else {
-                false
-            };
-            if !same && constraint_is_satisfied(&constraint) {
-                constraint_recalculate(&constraint);
-                variable_list_append(&mut todo, constraint_output(&constraint));
+            Kind::Binary { v1, v2, direction, op: BinaryOp::Scale { scale, offset } } => {
+                let (scale, offset) = (scale.borrow().value, offset.borrow().value);
+                if *direction == Direction::Forward {
+                    let value = v1.borrow().value * scale + offset;
+                    v2.borrow_mut().value = value;
+                } else {
+                    let value = (v2.borrow().value - offset) / scale;
+                    v1.borrow_mut().value = value;
+                }
             }
-            i += 1;
         }
     }
 
-    unsatisfied
-}
-
-fn planner_incremental_add(planner: &mut Planner, constraint: &ConstraintRef) {
-    let mark = planner_new_mark(planner);
-    let mut overridden = constraint_satisfy(constraint, planner, mark);
-
-    while let Some(current) = overridden {
-        overridden = constraint_satisfy(&current, planner, mark);
-    }
-}
-
-fn planner_incremental_remove(planner: &mut Planner, constraint: &ConstraintRef) {
-    let out = constraint_output(constraint);
-    constraint_mark_unsatisfied(constraint);
-    constraint_remove_from_graph(constraint);
-
-    let unsatisfied = planner_remove_propagate_from(planner, &out);
-    let mut strength = REQUIRED;
-    let mut repeat = true;
-
-    while repeat {
-        let mut i = 0;
-        while i < unsatisfied.count {
-            let current = unsatisfied.items[i as usize].clone();
-            if constraint_strength(&current) == strength {
-                planner_incremental_add(planner, &current);
+    /// Satisfies this constraint if it can, returning the constraint it
+    /// overrode, if any.
+    fn satisfy(&self, mark: i32, planner: &mut Planner) -> Option<Constraint> {
+        self.choose_method(mark);
+        if !self.is_satisfied() {
+            if self.strength() == Strength::Required {
+                panic!("could not satisfy a required constraint");
             }
-            strength = next_weaker(strength);
-            i += 1;
+            return None;
         }
-        repeat = strength != WEAKEST;
-    }
-}
-
-fn planner_make_plan(planner: &mut Planner, sources: &ConstraintList) -> ConstraintList {
-    let mark = planner_new_mark(planner);
-    let mut plan = new_constraint_list(planner.constraint_capacity);
-    let mut todo = constraint_list_copy(sources, planner.constraint_capacity);
-
-    while todo.count > 0 {
-        let constraint = constraint_list_pop_front(&mut todo);
-        let out = constraint_output(&constraint);
-        if out.borrow().mark != mark && constraint_inputs_known(&constraint, mark) {
-            constraint_list_append(&mut plan, constraint.clone());
-            out.borrow_mut().mark = mark;
-            planner_add_constraints_consuming_to(&out, &mut todo);
+        self.mark_inputs(mark);
+        let output = self.output();
+        let overridden = output.borrow().determined_by.clone();
+        if let Some(overridden) = &overridden {
+            overridden.mark_unsatisfied();
         }
-    }
-
-    plan
-}
-
-fn planner_extract_plan_from_constraints(
-    planner: &mut Planner,
-    constraints: &ConstraintList,
-) -> ConstraintList {
-    let mut sources = new_constraint_list(planner.constraint_capacity);
-    let mut i = 0;
-
-    while i < constraints.count {
-        let constraint = constraints.items[i as usize].clone();
-        if constraint_is_input(&constraint) && constraint_is_satisfied(&constraint) {
-            constraint_list_append(&mut sources, constraint);
+        output.borrow_mut().determined_by = Some(self.clone());
+        if !planner.add_propagate(self, mark) {
+            panic!("cycle encountered");
         }
-        i += 1;
-    }
-
-    planner_make_plan(planner, &sources)
-}
-
-fn constraint_add_constraint(constraint: &ConstraintRef, planner: &mut Planner) {
-    constraint_add_to_graph(constraint);
-    planner_incremental_add(planner, constraint);
-}
-
-fn constraint_satisfy(
-    constraint: &ConstraintRef,
-    planner: &mut Planner,
-    mark: i32,
-) -> Option<ConstraintRef> {
-    constraint_choose_method(constraint, mark);
-
-    if !constraint_is_satisfied(constraint) {
-        assert!(
-            constraint_strength(constraint) != REQUIRED,
-            "could not satisfy a required constraint"
-        );
-        None
-    } else {
-        constraint_mark_inputs(constraint, mark);
-        let out = constraint_output(constraint);
-        let overridden = out.borrow().determined_by.clone();
-
-        if let Some(current) = &overridden {
-            constraint_mark_unsatisfied(current);
-        }
-
-        out.borrow_mut().determined_by = Some(constraint.clone());
-
-        assert!(
-            planner_add_propagate(planner, constraint, mark),
-            "cycle encountered"
-        );
-
-        out.borrow_mut().mark = mark;
+        output.borrow_mut().mark = mark;
         overridden
     }
-}
 
-fn constraint_destroy(constraint: &ConstraintRef, planner: &mut Planner) {
-    if constraint_is_satisfied(constraint) {
-        planner_incremental_remove(planner, constraint);
-    } else {
-        constraint_remove_from_graph(constraint);
+    fn destroy(&self, planner: &mut Planner) {
+        if self.is_satisfied() {
+            planner.incremental_remove(self);
+        } else {
+            self.remove_from_graph();
+        }
     }
 }
 
-fn plan_execute(plan: &ConstraintList) {
-    let mut i = 0;
-    while i < plan.count {
-        constraint_execute(&plan.items[i as usize]);
-        i += 1;
+// ---------------------------------------------------------------------------
+// Planner and plans
+
+struct Plan(Vec<Constraint>);
+
+impl Plan {
+    fn execute(&self) {
+        for c in &self.0 {
+            c.execute();
+        }
     }
 }
 
-fn new_stay_constraint(variable: &VariableRef, strength: i32, planner: &mut Planner) -> ConstraintRef {
-    let constraint = Rc::new(RefCell::new(Constraint::StayConstraint {
-        output: variable.clone(),
-        strength,
-        satisfied: false,
-    }));
-    constraint_add_constraint(&constraint, planner);
-    constraint
+#[derive(Default)]
+struct Planner {
+    current_mark: i32,
 }
 
-fn new_edit_constraint(variable: &VariableRef, strength: i32, planner: &mut Planner) -> ConstraintRef {
-    let constraint = Rc::new(RefCell::new(Constraint::EditConstraint {
-        output: variable.clone(),
-        strength,
-        satisfied: false,
-    }));
-    constraint_add_constraint(&constraint, planner);
-    constraint
-}
-
-fn new_equality_constraint(
-    v1: &VariableRef,
-    v2: &VariableRef,
-    strength: i32,
-    planner: &mut Planner,
-) -> ConstraintRef {
-    let constraint = Rc::new(RefCell::new(Constraint::EqualityConstraint {
-        v1: v1.clone(),
-        v2: v2.clone(),
-        strength,
-        direction: DIRECTION_NONE,
-    }));
-    constraint_add_constraint(&constraint, planner);
-    constraint
-}
-
-fn new_scale_constraint(
-    src: &VariableRef,
-    scale: &VariableRef,
-    offset: &VariableRef,
-    dest: &VariableRef,
-    strength: i32,
-    planner: &mut Planner,
-) -> ConstraintRef {
-    let constraint = Rc::new(RefCell::new(Constraint::ScaleConstraint {
-        src: src.clone(),
-        scale: scale.clone(),
-        offset: offset.clone(),
-        dest: dest.clone(),
-        strength,
-        direction: DIRECTION_NONE,
-    }));
-    constraint_add_constraint(&constraint, planner);
-    constraint
-}
-
-fn change(planner: &mut Planner, variable: &VariableRef, new_value: i32) {
-    let edit = new_edit_constraint(variable, PREFERRED, planner);
-    let mut edits = new_constraint_list(1);
-    constraint_list_append(&mut edits, edit.clone());
-
-    let plan = planner_extract_plan_from_constraints(planner, &edits);
-    let mut i = 0;
-    while i < 10 {
-        variable.borrow_mut().value = new_value;
-        plan_execute(&plan);
-        i += 1;
+impl Planner {
+    fn new_mark(&mut self) -> i32 {
+        self.current_mark += 1;
+        self.current_mark
     }
 
-    constraint_destroy(&edit, planner);
+    fn incremental_add(&mut self, c: &Constraint) {
+        let mark = self.new_mark();
+        let mut overridden = c.satisfy(mark, self);
+        while let Some(o) = overridden {
+            overridden = o.satisfy(mark, self);
+        }
+    }
+
+    fn incremental_remove(&mut self, c: &Constraint) {
+        let output = c.output();
+        c.mark_unsatisfied();
+        c.remove_from_graph();
+        let unsatisfied = self.remove_propagate_from(&output);
+        let mut strength = Strength::Required;
+        loop {
+            for u in &unsatisfied {
+                if u.strength() == strength {
+                    self.incremental_add(u);
+                }
+            }
+            strength = strength.next_weaker();
+            if strength == Strength::Weakest {
+                break;
+            }
+        }
+    }
+
+    /// Recomputes everything downstream of `c`; false if that reaches a
+    /// variable already marked in this pass (a cycle).
+    fn add_propagate(&mut self, c: &Constraint, mark: i32) -> bool {
+        let mut todo = vec![c.clone()];
+        while let Some(d) = todo.pop() {
+            let output = d.output();
+            if output.borrow().mark == mark {
+                self.incremental_remove(c);
+                return false;
+            }
+            d.recalculate();
+            output.borrow().push_consumers(&mut todo);
+        }
+        true
+    }
+
+    /// Resets everything downstream of `output`, returning the unsatisfied
+    /// constraints it finds.
+    fn remove_propagate_from(&mut self, output: &Var) -> Vec<Constraint> {
+        {
+            let mut output = output.borrow_mut();
+            output.determined_by = None;
+            output.walk_strength = Strength::Weakest;
+            output.stay = true;
+        }
+        let mut unsatisfied = Vec::new();
+        let mut todo = vec![output.clone()];
+        while let Some(v) = todo.pop() {
+            let count = v.borrow().constraints.len();
+            for i in 0..count {
+                let c = v.borrow().constraints[i].clone();
+                if !c.is_satisfied() {
+                    unsatisfied.push(c);
+                }
+            }
+            // Each constraint is borrowed out of v's list only while it is read:
+            // recalculating a Stay on v itself writes v.
+            let determining = v.borrow().determined_by.clone();
+            for i in 0..count {
+                let c = v.borrow().constraints[i].clone();
+                if Some(&c) != determining.as_ref() && c.is_satisfied() {
+                    c.recalculate();
+                    todo.push(c.output());
+                }
+            }
+        }
+        unsatisfied
+    }
+
+    fn make_plan(&mut self, sources: Vec<Constraint>) -> Plan {
+        let mark = self.new_mark();
+        let mut plan = Vec::new();
+        let mut todo = sources;
+        while let Some(c) = todo.pop() {
+            let output = c.output();
+            if output.borrow().mark != mark && c.inputs_known(mark) {
+                plan.push(c);
+                output.borrow_mut().mark = mark;
+                output.borrow().push_consumers(&mut todo);
+            }
+        }
+        Plan(plan)
+    }
+
+    fn extract_plan_from_constraints(&mut self, constraints: &[Constraint]) -> Plan {
+        let sources = constraints
+            .iter()
+            .filter(|c| c.is_input() && c.is_satisfied())
+            .cloned()
+            .collect();
+        self.make_plan(sources)
+    }
 }
 
+// ---------------------------------------------------------------------------
+// Tests
+
+/// A chain of n equality constraints, edited from the first variable.
 fn chain_test(n: i32) -> i64 {
-    let mut planner = new_planner(n + 4, n + 4);
-    let mut prev: Option<VariableRef> = None;
-    let mut first: Option<VariableRef> = None;
-    let mut last: Option<VariableRef> = None;
-    let mut i = 0;
-
-    while i < n + 1 {
-        let variable = new_variable(0, 2);
-
-        if let Some(current_prev) = &prev {
-            new_equality_constraint(current_prev, &variable, REQUIRED, &mut planner);
+    let mut planner = Planner::default();
+    let mut prev: Option<Var> = None;
+    let mut first: Option<Var> = None;
+    let mut last: Option<Var> = None;
+    for i in 0..=n {
+        let v = Variable::new(0);
+        if let Some(p) = &prev {
+            Constraint::equality(p, &v, Strength::Required, &mut planner);
         }
-
         if i == 0 {
-            first = Some(variable.clone());
+            first = Some(v.clone());
         }
-
         if i == n {
-            last = Some(variable.clone());
+            last = Some(v.clone());
         }
-
-        prev = Some(variable);
-        i += 1;
+        prev = Some(v);
     }
+    let (first, last) = (first.expect("n >= 0"), last.expect("n >= 0"));
 
-    let first_variable = first.expect("missing first variable");
-    let last_variable = last.expect("missing last variable");
-    new_stay_constraint(&last_variable, STRONG_DEFAULT, &mut planner);
+    Constraint::stay(&last, Strength::StrongDefault, &mut planner);
+    let edit = Constraint::edit(&first, Strength::Preferred, &mut planner);
+    let edits = vec![edit];
+    let plan = planner.extract_plan_from_constraints(&edits);
 
-    let edit = new_edit_constraint(&first_variable, PREFERRED, &mut planner);
-    let mut edits = new_constraint_list(1);
-    constraint_list_append(&mut edits, edit);
-    let plan = planner_extract_plan_from_constraints(&mut planner, &edits);
-
-    let mut failures = 0i64;
-    i = 0;
-    while i < 100 {
-        first_variable.borrow_mut().value = i;
-        plan_execute(&plan);
-        if last_variable.borrow().value != i {
+    let mut failures = 0;
+    for i in 0..100 {
+        first.borrow_mut().value = i;
+        plan.execute();
+        if last.borrow().value != i {
             failures += 1;
         }
-        i += 1;
     }
-
     failures
 }
 
+/// n scale constraints sharing one scale and offset, edited from either end.
 fn projection_test(n: i32) -> i64 {
-    let mut planner = new_planner(n * 2 + 8, n * 2 + 8);
-    let scale = new_variable(10, n + 1);
-    let offset = new_variable(1000, n + 1);
-    let dummy = new_variable_placeholder();
-    let mut src = dummy.clone();
-    let mut dst = dummy.clone();
-    let mut dests = vec![dummy; n as usize];
-    let mut i = 0;
-
-    while i < n {
-        src = new_variable(i, 3);
-        dst = new_variable(i, 2);
-        dests[i as usize] = dst.clone();
-        new_stay_constraint(&src, NORMAL, &mut planner);
-        new_scale_constraint(&src, &scale, &offset, &dst, REQUIRED, &mut planner);
-        i += 1;
+    let mut planner = Planner::default();
+    let scale = Variable::new(10);
+    let offset = Variable::new(1000);
+    let mut src = None;
+    let mut dst = None;
+    let mut dests = Vec::new();
+    for i in 0..n {
+        let s = Variable::new(i);
+        let d = Variable::new(i);
+        dests.push(d.clone());
+        Constraint::stay(&s, Strength::Normal, &mut planner);
+        Constraint::scale(&s, &scale, &offset, &d, Strength::Required, &mut planner);
+        src = Some(s);
+        dst = Some(d);
     }
+    let (src, dst) = (src.expect("n > 0"), dst.expect("n > 0"));
 
-    let mut failures = 0i64;
-
+    let mut failures = 0;
     change(&mut planner, &src, 17);
     if dst.borrow().value != 1170 {
         failures += 1;
     }
-
     change(&mut planner, &dst, 1050);
     if src.borrow().value != 5 {
         failures += 1;
     }
-
     change(&mut planner, &scale, 5);
-    i = 0;
-    while i < n - 1 {
-        if dests[i as usize].borrow().value != i * 5 + 1000 {
+    for (i, d) in (0..n - 1).zip(&dests) {
+        if d.borrow().value != i * 5 + 1000 {
             failures += 1;
         }
-        i += 1;
     }
-
     change(&mut planner, &offset, 2000);
-    i = 0;
-    while i < n - 1 {
-        if dests[i as usize].borrow().value != i * 5 + 2000 {
+    for (i, d) in (0..n - 1).zip(&dests) {
+        if d.borrow().value != i * 5 + 2000 {
             failures += 1;
         }
-        i += 1;
     }
-
     failures
 }
 
-fn delta_blue_impl(n: i32) -> i64 {
+fn change(planner: &mut Planner, v: &Var, new_value: i32) {
+    let edit = Constraint::edit(v, Strength::Preferred, planner);
+    let edits = vec![edit.clone()];
+    let plan = planner.extract_plan_from_constraints(&edits);
+    for _ in 0..10 {
+        v.borrow_mut().value = new_value;
+        plan.execute();
+    }
+    edit.destroy(planner);
+}
+
+// ---------------------------------------------------------------------------
+// Exports
+
+#[allow(unsafe_code)]
+#[no_mangle]
+pub extern "C" fn delta_blue(n: i32) -> i64 {
     chain_test(n) + projection_test(n)
 }
 
-fn bench_chain_impl(iterations: i32) -> i64 {
-    if iterations <= 0 {
-        return 0;
-    }
-
-    let mut sink = 0i64;
-    let mut i = 0;
-    while i < iterations {
-        sink += chain_test(1048);
-        i += 1;
-    }
-    sink
-}
-
-fn bench_projection_impl(iterations: i32) -> i64 {
-    if iterations <= 0 {
-        return 0;
-    }
-
-    let mut sink = 0i64;
-    let mut i = 0;
-    while i < iterations {
-        sink += projection_test(1048);
-        i += 1;
-    }
-    sink
-}
-
-#[no_mangle]
-pub extern "C" fn delta_blue(n: i32) -> i64 {
-    delta_blue_impl(n)
-}
-
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "C" fn run_check() -> i64 {
-    delta_blue_impl(200)
+    delta_blue(200)
 }
 
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "C" fn bench_chain(iterations: i32) -> i64 {
-    bench_chain_impl(iterations)
+    (0..iterations).map(|_| chain_test(1048)).sum()
 }
 
+#[allow(unsafe_code)]
 #[no_mangle]
 pub extern "C" fn bench_projection(iterations: i32) -> i64 {
-    bench_projection_impl(iterations)
+    (0..iterations).map(|_| projection_test(1048)).sum()
 }
 
 #[cfg(test)]
@@ -1085,12 +685,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chain_small_is_consistent() {
+    fn small_graphs_have_no_failures() {
         assert_eq!(chain_test(20), 0);
+        assert_eq!(projection_test(20), 0);
     }
 
     #[test]
-    fn projection_small_is_consistent() {
-        assert_eq!(projection_test(20), 0);
+    fn benchmarks_have_no_failures() {
+        assert_eq!(bench_chain(2), 0);
+        assert_eq!(bench_projection(2), 0);
+        assert_eq!(run_check(), 0);
     }
 }

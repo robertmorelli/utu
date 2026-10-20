@@ -104,11 +104,12 @@ constraint graph. With 20 solver iterations per sample, utu measured 94.366 ms
 for chain propagation and 173.008 ms for projection; safe `Rc<RefCell<_>>` Rust
 measured 183.514 ms and 302.062 ms, unsafe arena Rust measured 49.856 ms and
 93.488 ms, and JavaScript measured 77.216 ms and 132.481 ms respectively. All
-four returned zero failures. Each uses fixed-capacity lists and explicit O(n)
-front/removal shifts; replacing those loops with JavaScript's native
-`Array.shift`/`splice` was measured separately and rejected as non-analogous.
-See [../deltablue/README.md](../deltablue/README.md) for its methodology,
-historical comparison, and payload sizes.
+four returned zero failures. These rows measured the ports as they were then,
+each emulating fixed-capacity lists with O(n) front removal, which made the
+solver quadratic. The ports have since been rewritten as the canonical
+algorithm in each language's idiom, and run 3–8× faster; see
+[../deltablue/README.md](../deltablue/README.md) for current figures,
+methodology, and payload sizes.
 
 These are directional benchmarks, not whole-language rankings. Run the full
 set with `bun run bench:suite`; `bench:kernels` and `bench:deltablue` run its

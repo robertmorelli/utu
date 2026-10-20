@@ -1,0 +1,66 @@
+// binary-trees, from the Computer Language Benchmarks Game, in idiomatic utu:
+// a stretch tree, a long-lived tree, and many short-lived trees of increasing
+// depth, each a GC struct whose children are nullable references. Every port
+// in this directory allocates and walks the same trees in the same order.
+
+rec struct Node:
+    | left: ?Node
+    | right: ?Node
+
+// A perfect tree of the given depth, left subtree built first.
+fn bottom_up_tree(depth: I32) Node {
+    if depth > 0 {
+        let left = bottom_up_tree(depth - 1);
+        let right = bottom_up_tree(depth - 1);
+        Node { left: left, right: right };
+    } else {
+        Node { left: null, right: null };
+    };
+}
+
+// The number of nodes in the tree.
+fn Node.check |self| () I32 {
+    promote self.left {
+        |left| => 1 + left.check() + (self.right orelse fatal).check(),
+        ~> 1,
+    };
+}
+
+let min_depth: I32 = 4;
+let max_depth: I32 = 14;
+
+// One run of the benchmark; the sum of every tree's check.
+fn binary_trees() I64 {
+    let checksum: I64 = 0;
+    let stretch_depth = max_depth + 1;
+    checksum += bottom_up_tree(stretch_depth).check().to_i64();
+
+    let long_lived = bottom_up_tree(max_depth);
+
+    let depth = min_depth;
+    while (depth <= max_depth) {
+        let iterations = 1 << (max_depth - depth + min_depth);
+        let check = 0;
+        for (0..<iterations) {
+            check += bottom_up_tree(depth).check();
+        };
+        checksum += check.to_i64();
+        depth += 2;
+    };
+
+    checksum += long_lived.check().to_i64();
+    checksum;
+}
+
+test "binary trees counts its nodes" {
+    assert bottom_up_tree(0).check() == 1;
+    assert bottom_up_tree(3).check() == 15;
+}
+
+export lib {
+    fn bench(iterations: I32) I64 {
+        let sink: I64 = 0;
+        for (0..<iterations) { sink += binary_trees(); };
+        sink;
+    }
+}

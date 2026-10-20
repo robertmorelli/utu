@@ -9,8 +9,9 @@
 //   utu lsp                              a language server, on stdin and stdout
 //   utu grep <pattern> <paths…>          utu code by syntax, names, and types
 //
-// -Oz (the default) builds the smallest module, -O3 the fastest, -O0 the
-// module as code generation leaves it. `display` and `graph` show stage 0's
+// -Oz (the default) builds the smallest module, -O3 the fastest (it inlines,
+// selfhost/inline.utu), -O0 the module as code generation leaves it. --safe
+// keeps the checks wasm makes anyway. `display` and `graph` show stage 0's
 // IR and graphs, so they use stage 0.
 
 import fs from 'node:fs/promises';
@@ -50,8 +51,9 @@ async function main() {
     process.exit(1);
   }
   const optimize = rest.includes('-O3') ? 'speed' : rest.includes('-O0') ? 'none' : 'size';
+  const safe = rest.includes('--safe');
   const out = option(rest, '-o') ?? option(rest, '--out');
-  await commands[command](file, { optimize, out, utu: await loadNodeCompiler() });
+  await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
 }
 
 /** A file as the user would write it: relative to here, unless that is longer. */
@@ -92,8 +94,8 @@ async function check(file, { utu }) {
   console.log('ok');
 }
 
-async function run(file, { utu, optimize }) {
-  const { wasm, spec } = await buildOrExit(utu, file, { optimize });
+async function run(file, { utu, optimize, safe }) {
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
   if (typeof exports.main !== 'function') {
     console.error(`${displayPath(file)}: no \`export main\``);
@@ -103,8 +105,8 @@ async function run(file, { utu, optimize }) {
   if (result !== undefined) console.log(result);
 }
 
-async function test(file, { utu, optimize }) {
-  const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize });
+async function test(file, { utu, optimize, safe }) {
+  const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize, safe });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   let failed = 0;
@@ -123,8 +125,8 @@ async function test(file, { utu, optimize }) {
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
-async function build(file, { utu, optimize, out }) {
-  const { wasm, spec } = await buildOrExit(utu, file, { optimize });
+async function build(file, { utu, optimize, safe, out }) {
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
   const name = path.basename(file, '.utu');
   const dir = path.resolve(out ?? '.');
   await fs.mkdir(dir, { recursive: true });
@@ -159,8 +161,8 @@ function virtualGlue(source) {
 }
 
 /** A standalone executable: bun compiles the loader, the glue, and the module. */
-async function buildExe(file, { utu, optimize, out }) {
-  const { wasm, spec } = await buildOrExit(utu, file, { optimize });
+async function buildExe(file, { utu, optimize, safe, out }) {
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
   const target = path.resolve(out ?? path.basename(file, '.utu'));
   // In the project when it has dependencies, so an `@es` body's imports
   // resolve as its own source's would, and bun bundles them in.
@@ -357,6 +359,7 @@ function usage(code) {
   -Oz  the smallest module (the default)
   -O3  the fastest module
   -O0  the module as code generation leaves it
+  --safe  keep the checks wasm makes anyway (Buffer indexing, a last alt arm, …)
 
   display[:tests|:benches|:modules|:exports|:debug] <file>, graph <file> [-o out.html]
                                stage 0's IR and graphs`);

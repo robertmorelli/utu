@@ -480,6 +480,11 @@ fn defaultable(t: I32) Bool {
 
 /// I31, reference equality, promise subscriptions, v128 constants.
 fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) I32 {
+    // Whether the build is `--safe`: a constant.
+    if tag == known_word(Known.IrSafeChecks) {
+        w_i32(safe_checks[0]);
+        return 1;
+    };
     let k = -1;
     for (Known.IrI31New.to_i32() ... Known.IrV128Const.to_i32()) |i| { if known[i] == tag { k = i; }; };
     if k < 0 { return 0; };

@@ -37,7 +37,10 @@ function placeOf(parts, line) {
   return `${part.name}:${line - part.line + 1}`;
 }
 
-/** The compiled module's bytes; throws with every error, placed in its file. */
+/**
+ * Stage -1: selfhost/ built by the JavaScript compiler. The compiled module's
+ * bytes; throws with every error, placed in its file.
+ */
 export async function buildSelfhost() {
   const { text, parts } = joinSelfhost();
   const relocate = message => message
@@ -86,15 +89,41 @@ export function instantiateBuilt(wasm, spec = {}) {
   return instantiate(wasm, spec, host);
 }
 
+// Stage 0 is a self-hosted compiler checked in as Wasm (stage0/utu.wasm, and
+// its host spec beside it). Stage -1, the JavaScript compiler, is the last
+// resort: it builds stage 1 only when stage 0 cannot (selfhost/ uses something
+// newer than stage 0 understands), or when UTU_STAGE0=js asks for it.
+export const STAGE0 = path.join(ROOT, 'stage0', 'utu.wasm');
+const STAGE0_SPEC = path.join(ROOT, 'stage0', 'utu.host.json');
+
+/**
+ * Stage 1, the compiler as stage 0 builds it from selfhost/ (or stage -1, the
+ * JavaScript compiler, when stage 0 cannot): its exports, and which built it.
+ */
+export async function loadStage1({ log = message => console.error(message) } = {}) {
+  if (process.env.UTU_STAGE0 !== 'js' && fs.existsSync(STAGE0)) {
+    try {
+      const stage0 = (await instantiateBuilt(fs.readFileSync(STAGE0), JSON.parse(fs.readFileSync(STAGE0_SPEC, 'utf8')))).instance.exports;
+      const { wasm, spec } = await buildWith(stage0);
+      return { exports: (await instantiateBuilt(wasm, spec)).instance.exports, builder: 'stage 0' };
+    } catch (error) {
+      log(`stage 0 (stage0/utu.wasm) does not build selfhost/: ${error.message.split('\n')[0]}\n`
+        + 'falling back to stage -1, the JavaScript compiler; once the build passes, run `bun run stage0` to update stage 0');
+    }
+  }
+  const { doc, wasm } = await buildSelfhost();
+  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
+  return { exports: instance.exports, builder: 'stage -1' };
+}
+
 /**
  * The self-hosted compiler's exports. Stage 1 is the compiler as stage 0
  * builds it; stage 2, as stage 1 builds it (the compiler built by itself).
  */
 export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) } = {}) {
-  const { doc, wasm } = await buildSelfhost();
-  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
-  if (stage === 1) return instance.exports;
-  let compiler = instance.exports;
+  const { exports } = await loadStage1();
+  if (stage === 1) return exports;
+  let compiler = exports;
   for (let s = 2; s <= stage; s++) {
     const { wasm, spec } = await buildWith(compiler);
     compiler = (await instantiateBuilt(wasm, spec)).instance.exports;

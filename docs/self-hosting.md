@@ -191,7 +191,7 @@ language stays as it is.
    (`scripts/selfhost-bootstrap.mjs`, part of `bun run test`). Stage 2
    builds the compiler in 38 ms; stage 0 takes 3.9 s.
 7. **Shipped.** `bun run build` makes `dist/utu.wasm` by the bootstrap
-   (always from stage 0; it is never checked in) and `dist/selfhost/utu.js`,
+   (see step 9 for what builds stage 1) and `dist/selfhost/utu.js`,
    its JavaScript API (`src/selfhost/`: the driver for any host, name
    queries, diagnostics formatting, the loader writer). The CLI (`check`,
    `run`, `test`, `build`, `build-exe`), the VS Code extension (diagnostics,
@@ -226,3 +226,22 @@ they are in `selfhost/`.
 `node examples/jpl/run.mjs` caches compiled wasm, so benchmark loops cost
 the compile once. Plan A should add the same cache to every benchmark and
 test that compiles the same program repeatedly.
+
+## Stage 0 in Wasm
+
+Stage 0 is now a self-hosted compiler checked in as Wasm, `stage0/utu.wasm`
+(with its host spec beside it); the JavaScript compiler, called stage 0
+above, is stage -1. Stage 0 builds stage 1 in about 0.1 s where stage -1
+takes 13 to 100 s, so `bun run build` and every self-hosted differential
+start at once. Stage -1 is the last resort: when stage 0 cannot build
+`selfhost/` (it uses something newer than stage 0 understands), the build
+says so and builds stage 1 with stage -1 instead; `UTU_STAGE0=js` asks for
+it. Once that build passes, `bun run stage0` makes the compiler just built
+the new stage 0.
+
+Stage -1 keeps vouching: `bun run test` runs the bootstrap with `--stage-1`,
+which also builds stage 1 with stage -1 and requires the stage 2 it builds
+to be the same bytes. Two unrelated compilers, one in JavaScript and one in
+Wasm, then agree on the compiler shipped, so stage 0 hides nothing it did
+not get from `selfhost/`. Stage -1 remains the reference the differentials
+compare behavior against.

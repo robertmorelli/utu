@@ -1,12 +1,34 @@
 {
+ "benchmarks/binarytrees/binarytrees.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "c499a2a875de2f76",
+  "queries": "005b64b7f44eb2aa",
+  "graphs": "349be4c4e0defd2b"
+ },
+ "benchmarks/binarytrees/binarytrees.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
  "benchmarks/deltablue/deltablue.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "1e316fbfde61da44",
-  "queries": "3f194b0a5f2beb40",
-  "graphs": "2829ad7f4eab5b9e"
+  "entries": "df27d035a3b62139",
+  "queries": "1fe34dbdbd3b291c",
+  "graphs": "ea54bca5a855a4bb"
  },
  "benchmarks/deltablue/deltablue.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/fannkuch/fannkuch.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "f6957abd1bc65dcd",
+  "queries": "a685d2a96a7fc26a",
+  "graphs": "b3a2bd44a5d73b32"
+ },
+ "benchmarks/fannkuch/fannkuch.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
@@ -21,6 +43,17 @@
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
+ "benchmarks/nbody/nbody.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "3a488657b1b834c9",
+  "queries": "f4b1ee54fd975c36",
+  "graphs": "63f57ca3d99cf66d"
+ },
+ "benchmarks/nbody/nbody.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
  "benchmarks/pantry/kernels.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
@@ -29,6 +62,17 @@
   "graphs": "dc90b50816d3688a"
  },
  "benchmarks/pantry/kernels.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "benchmarks/richards/richards.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "44a98592668be942",
+  "queries": "19042fdc2cb31e2c",
+  "graphs": "b6df0f44542f6aca"
+ },
+ "benchmarks/richards/richards.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
@@ -848,9 +892,9 @@
  "examples/queries/indexes.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "ade0f6e674ab3b77",
-  "queries": "9c6bc5ed8d68e82a",
-  "graphs": "e7ff649c12254d39"
+  "entries": "af2415fbf7f5999a",
+  "queries": "781e144484a0053f",
+  "graphs": "9f0f4e6afca371db"
  },
  "examples/queries/indexes.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1786,9 +1830,9 @@
  "std/Buffer.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9348d59b34f114ec",
-  "queries": "ef288d2294dc863d",
-  "graphs": "f3a694421d9c901b"
+  "entries": "34ab4af3cfaa8231",
+  "queries": "acacfcba338d4e32",
+  "graphs": "31e70d29926c17d0"
  },
  "std/Buffer.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2039,9 +2083,9 @@
  "std/Spatial.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "5f649387671998c0",
-  "queries": "0e6032fa291ceda7",
-  "graphs": "b22de4ac098a1473"
+  "entries": "b6afea13ef2b019c",
+  "queries": "5e8211611d0532f5",
+  "graphs": "f8927be55ad98fd4"
  },
  "std/Spatial.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",

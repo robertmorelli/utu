@@ -1,4 +1,7 @@
 // Geometrically growing native buffer, including non-defaultable element types.
+// Its checks are kept only in a --safe build: otherwise an index past the
+// length reaches the capacity beyond (and past that, the array's own bounds
+// trap).
 mod Buffer[T] {
     struct &:
         | values: Array[T]
@@ -10,7 +13,7 @@ mod Buffer[T] {
 
     fn &.push |self| (value: T) void {
         if self.length == self.values.len() {
-            if self.length > 536870911 { fatal; };
+            if checks() and self.length > 536870911 { fatal; };
             let capacity = if self.length == 0 { 8; } else { self.length * 2; };
             let grown = Array[T].new(capacity, value);
             let i = 0;
@@ -23,6 +26,39 @@ mod Buffer[T] {
         self.values[self.length] = value;
         self.length += 1;
     }
+
+    fn &.len |self| () I32 { self.length; }
+
+    fn &.is_empty |self| () Bool { self.length == 0; }
+
+    // b[i] and b[i] = v.
+    fn &.get_index |self| (i: I32) T {
+        if checks() and (i < 0 or i >= self.length) { fatal; };
+        self.values[i];
+    }
+
+    fn &.set_index |self| (i: I32, value: T) void {
+        if checks() and (i < 0 or i >= self.length) { fatal; };
+        self.values[i] = value;
+    }
+
+    // The last value, removed.
+    fn &.pop |self| () T {
+        if checks() and self.length == 0 { fatal; };
+        self.length -= 1;
+        self.values[self.length];
+    }
+
+    fn &.clear |self| () void { self.length = 0; }
+
+    // Keeps the first `length` values.
+    fn &.truncate |self| (length: I32) void {
+        if checks() and (length < 0 or length > self.length) { fatal; };
+        self.length = length;
+    }
+
+    // Whether the build is --safe.
+    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
 
     fn &.finish |self| () Array[T] {
         self.values.slice(0, self.length);

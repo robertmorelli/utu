@@ -50,8 +50,9 @@ export async function loadCompiler(wasm, spec = {}) {
  * a Map from `std:Name` to text or to an async thunk of a host ABI).
  */
 export async function compile(utu, entry, host) {
-  const { target = 'normal', optimize = 'size', debugNames = false } = host;
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false } = host;
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
+  utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
   const files = await loadProgram(utu, entry, host);
   const size = await compileProgram(utu, TARGET[target] ?? TARGET.normal, host);

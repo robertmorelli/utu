@@ -1,11 +1,13 @@
 # DeltaBlue benchmark
 
-This is the pre-rewrite DeltaBlue constraint-solver benchmark, migrated to the
-current utu surface syntax. It compares WasmGC utu with a safe
-`Rc<RefCell<_>>` Rust implementation, an unsafe arena/raw-pointer Rust
-implementation, and JavaScript. All four execute the same 1,048-node chain and
-projection workloads and return a failure count, which the runner requires to
-match.
+DeltaBlue, the incremental constraint solver of V8's `deltablue.js` and Dart's
+`DeltaBlue`, in four ports that each compute the canonical algorithm in their
+own language's idiom: WasmGC utu (`Buffer`s, nullable references, one enum of
+constraint kinds), safe Rust (an `Rc<RefCell<_>>` graph, `Vec`, `Option`),
+unsafe Rust (typed arenas and raw pointers), and JavaScript (classes and
+arrays). Worklists are stacks, as the original's are. All four run the same
+1,048-node chain and projection workloads and return a failure count, which
+the runner requires to match.
 
 It is included in the consolidated repository benchmark run:
 
@@ -18,7 +20,46 @@ Use `bun run bench:deltablue` to run only this benchmark.
 `BENCH_ITERATIONS`, `BENCH_SAMPLES`, and `BENCH_WARMUPS` control the run.
 Kernel timings exclude compilation and instantiation.
 
-## Last pre-rewrite snapshot
+`bun run bench:deltablue-table` times both Rust ports, JavaScript, and the utu port at
+-O3 and -Oz, each with and without `--safe`, in d8, with compile times and
+sizes; the compiler page of the docs site shows its table.
+
+## Current snapshot
+
+`bun run bench:deltablue` builds the four ports and times each in a d8
+process of its own (V8's shell; `D8_BIN` chooses which), with 5 warmups and
+the median of 20 samples, each containing 20 solver iterations. utu is built
+as `utu build -O3` builds it. d8 15.6 on arm64 macOS; all returned zero
+failures.
+
+| workload | utu Wasm | safe Rust Wasm | unsafe Rust Wasm | JavaScript |
+|---|---:|---:|---:|---:|
+| chain | 11.212 ms | 17.596 ms | **5.184 ms** | 6.663 ms |
+| projection | 8.595 ms | 17.993 ms | **4.382 ms** | 6.283 ms |
+
+| implementation | payload | gzip |
+|---|---:|---:|
+| utu Wasm | 5.29 KiB | 2.21 KiB |
+| safe Rust Wasm | 38.04 KiB | 15.17 KiB |
+| unsafe Rust Wasm | 32.05 KiB | 13.11 KiB |
+| minified JavaScript | 5.83 KiB | 1.83 KiB |
+
+The ports do the same work step for step: in-place removal, a stack for
+every worklist, one `output()` per step, `determined_by` read once per scan,
+the same test setup. What differs is only what each language is: GC
+references, `Rc<RefCell<_>>`, arena pointers, or JS objects, and their
+collections.
+
+## Before the idiomatic rewrite
+
+Until 2026-10-20 every port emulated the same fixed-capacity list model: each
+propagation step allocated a list sized to the whole planner and removed from
+its front by shifting every element, which made the solver quadratic (about
+18 GB of allocation per utu run). The figures below measured that model and
+are kept only as history; they are 3–8× slower than the same engines on the
+current ports.
+
+### Last pre-rewrite snapshot
 
 The old harness measured whole commands with 20 solver iterations per command.
 Its last report (2026-03-28) recorded:
@@ -31,7 +72,7 @@ Its last report (2026-03-28) recorded:
 Those values include process startup and therefore are only useful as a broad
 regression reference, not a direct comparison with this in-process runner.
 
-## Current snapshot
+### Fixed-capacity snapshot
 
 Bun 1.3.14 on arm64 macOS; 3 warmups and 10 samples, each containing 20
 solver iterations. All implementations returned zero failures.
@@ -52,7 +93,7 @@ Unlike the historical hyperfine report, these timings exclude process startup,
 compilation, and instantiation. JavaScript payload size is the standalone ES
 module after esbuild minification.
 
-### Bun 1.3.14 follow-up
+#### Bun 1.3.14 follow-up
 
 A controlled comparison ran Bun 1.3.11 and 1.3.14 against byte-identical utu
 Wasm (`cffd55b0…`) and the same Rust/JavaScript sources. With 5 warmups and 20
@@ -69,11 +110,3 @@ A reverse-order repeat confirmed the direction of the change. Ordinary Wasm
 Rust was effectively unchanged, while Bun 1.3.14 regressed both WasmGC utu and
 JavaScript on this workload. The current consolidated table now records a
 fresh, internally consistent Bun 1.3.14 run.
-
-All implementations use the same fixed-capacity list model, explicit O(n)
-front removal and constraint removal, planner strength updates, graph sizes,
-and validation loops. In particular, JavaScript intentionally does not use
-native `Array.shift` or `Array.splice`: those operations made the initial port
-algorithmically non-analogous by replacing the explicit element-shifting loops
-in utu and Rust. Correcting that discrepancy removed the implausible 8–12×
-JavaScript lead.

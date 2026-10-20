@@ -142,6 +142,9 @@ export lib {
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level; }
 
+    /// Whether builds keep the checks wasm makes anyway (1), or not (0, the default).
+    fn set_safe(on: I32) void { safe_checks[0] = on; }
+
     /// A test build's tests: how many, and where test k's name (a string
     /// literal, quotes and all) is in src.
     fn test_count() I32 { test_node.len(); }

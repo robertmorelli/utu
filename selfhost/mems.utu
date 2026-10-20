@@ -680,16 +680,22 @@ fn memory_reserve_helper(decl: I32) I32 {
     w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow);
     w_i32(-1);
     w_i32_op(i32_eq, mgrow);
+    // Else the least it needs; if even that fails, an access past the end
+    // traps, as wasm checks it (a safe build traps here).
     let inner = w_mark();
     let mgrow2 = w_mark();
     pages_short();
     w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow2);
-    w_i32(-1);
-    w_i32_op(i32_eq, mgrow2);
-    let trap = w_mark();
-    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-    w_node(Op.Seq, vt_none, 0, 0, trap);
-    w_node(Op.If, vt_none, 1, 0, inner);
+    if safe_checks[0] == 1 {
+        w_i32(-1);
+        w_i32_op(i32_eq, mgrow2);
+        let trap = w_mark();
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        w_node(Op.Seq, vt_none, 0, 0, trap);
+        w_node(Op.If, vt_none, 1, 0, inner);
+    } else {
+        w_node(Op.Drop, vt_none, 0, 0, inner);
+    };
     w_node(Op.Seq, vt_none, 0, 0, inner);
     w_node(Op.If, vt_none, 2, 0, mg);
     w_node(Op.Seq, vt_none, 0, 0, then_);

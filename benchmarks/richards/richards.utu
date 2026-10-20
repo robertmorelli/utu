@@ -1,0 +1,318 @@
+// Richards, Martin Richards' operating-system scheduler simulation, as the
+// Are We Fast Yet suite has it, in idiomatic utu: task control blocks and
+// packets are linked lists of nullable references, and the four kinds of task
+// are one enum whose variants carry each kind's private data. Every port in
+// this directory runs the same canonical algorithm.
+
+let idler: I32 = 0;
+let worker: I32 = 1;
+let handler_a: I32 = 2;
+let handler_b: I32 = 3;
+let device_a: I32 = 4;
+let device_b: I32 = 5;
+let num_types: I32 = 6;
+
+let device_packet_kind: I32 = 0;
+let work_packet_kind: I32 = 1;
+let data_size: I32 = 4;
+
+rec struct Packet:
+    | link: ?Packet
+    | identity: I32
+    | kind: I32
+    | datum: I32
+    | data: Array[I32]
+
+// What each kind of task keeps between its runs.
+tag rec enum TaskData:
+    | Idle { control: I32, count: I32 }
+    | Device { pending: ?Packet }
+    | Handler { work_in: ?Packet, device_in: ?Packet }
+    | Worker { destination: I32, count: I32 }
+
+rec struct Task:
+    | link: ?Task
+    | identity: I32
+    | priority: I32
+    | input: ?Packet
+    | packet_pending: Bool
+    | task_waiting: Bool
+    | task_holding: Bool
+    | data: TaskData
+
+struct Scheduler:
+    | task_list: ?Task
+    | current_task: ?Task
+    | current_task_identity: I32
+    | task_table: Array[?Task]
+    | hold_count: I32
+    | queue_packet_count: I32
+
+fn Packet.new(link: ?Packet, identity: I32, kind: I32) Packet {
+    &{ link: link, identity: identity, kind: kind, datum: 0, data: Array[I32].new(data_size, 0) };
+}
+
+// Adds packet to the end of the queue, which may be empty; the queue's head.
+fn append(packet: Packet, queue_head: ?Packet) Packet {
+    packet.link = null;
+    promote queue_head {
+        |head| => {
+            let mouse = head;
+            let more = true;
+            while (more) {
+                promote mouse.link {
+                    |next| => { mouse = next; },
+                    ~> { more = false; },
+                };
+            };
+            mouse.link = packet;
+            head;
+        },
+        ~> packet,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Task control blocks
+
+fn Task.is_task_holding_or_waiting |self| () Bool { self.task_holding or (not self.packet_pending and self.task_waiting); }
+
+fn Task.is_waiting_with_packet |self| () Bool { self.packet_pending and self.task_waiting and not self.task_holding; }
+
+fn Task.add_input_and_check_priority |self| (packet: Packet, old_task: Task) Task {
+    promote self.input {
+        |input| => { self.input = append(packet, input); },
+        ~> {
+            self.input = packet;
+            self.packet_pending = true;
+            if self.priority > old_task.priority { return self; };
+        },
+    };
+    old_task;
+}
+
+fn Task.run_task |self| (s: Scheduler) ?Task {
+    let message: ?Packet = null;
+    if self.is_waiting_with_packet() {
+        let m = self.input orelse fatal;
+        message = m;
+        self.input = m.link;
+        promote self.input {
+            |next| => {
+                self.packet_pending = true;
+                self.task_waiting = false;
+                self.task_holding = false;
+            },
+            ~> {
+                self.packet_pending = false;
+                self.task_waiting = false;
+                self.task_holding = false;
+            },
+        };
+    };
+    s.run_function(self.data, message);
+}
+
+// ---------------------------------------------------------------------------
+// The scheduler
+
+fn Scheduler.new() Scheduler {
+    &{
+        task_list: null,
+        current_task: null,
+        current_task_identity: 0,
+        task_table: Array[?Task].new(num_types, null),
+        hold_count: 0,
+        queue_packet_count: 0,
+    };
+}
+
+fn Scheduler.create_task |self| (identity: I32, priority: I32, work: ?Packet, packet_pending: Bool, task_waiting: Bool, task_holding: Bool, data: TaskData) void {
+    let t: Task = &{
+        link: self.task_list,
+        identity: identity,
+        priority: priority,
+        input: work,
+        packet_pending: packet_pending,
+        task_waiting: task_waiting,
+        task_holding: task_holding,
+        data: data,
+    };
+    self.task_table[identity] = t;
+    self.task_list = t;
+}
+
+fn Scheduler.current |self| () Task { self.current_task orelse fatal; }
+
+fn Scheduler.find_task |self| (identity: I32) Task { self.task_table[identity] orelse fatal; }
+
+fn Scheduler.hold_self |self| () ?Task {
+    self.hold_count += 1;
+    let t = self.current();
+    t.task_holding = true;
+    t.link;
+}
+
+fn Scheduler.wait_task |self| () ?Task {
+    let t = self.current();
+    t.task_waiting = true;
+    t;
+}
+
+fn Scheduler.release |self| (identity: I32) ?Task {
+    let t = self.find_task(identity);
+    t.task_holding = false;
+    let current = self.current();
+    if t.priority > current.priority { t; } else { current; };
+}
+
+fn Scheduler.queue_packet |self| (packet: Packet) ?Task {
+    let t = self.find_task(packet.identity);
+    self.queue_packet_count += 1;
+    packet.link = null;
+    packet.identity = self.current_task_identity;
+    t.add_input_and_check_priority(packet, self.current());
+}
+
+// One run of a task of each kind, given the packet it received, if any.
+fn Scheduler.run_function |self| (data: TaskData, work: ?Packet) ?Task {
+    alt data {
+        Idle |d| => {
+            d.count -= 1;
+            if d.count == 0 {
+                self.hold_self();
+            } else if (d.control & 1) == 0 {
+                d.control = d.control / 2;
+                self.release(device_a);
+            } else {
+                d.control = (d.control / 2) ^ 53256;
+                self.release(device_b);
+            };
+        },
+        Device |d| => {
+            promote work {
+                |w| => {
+                    d.pending = w;
+                    self.hold_self();
+                },
+                ~> promote d.pending {
+                    |p| => {
+                        d.pending = null;
+                        self.queue_packet(p);
+                    },
+                    ~> self.wait_task(),
+                },
+            };
+        },
+        Handler |d| => {
+            promote work {
+                |w| => {
+                    if w.kind == work_packet_kind {
+                        d.work_in = append(w, d.work_in);
+                    } else {
+                        d.device_in = append(w, d.device_in);
+                    };
+                },
+                ~> {},
+            };
+            promote d.work_in {
+                |work_packet| => {
+                    let count = work_packet.datum;
+                    if count >= data_size {
+                        d.work_in = work_packet.link;
+                        self.queue_packet(work_packet);
+                    } else {
+                        promote d.device_in {
+                            |device_packet| => {
+                                d.device_in = device_packet.link;
+                                device_packet.datum = work_packet.data[count];
+                                work_packet.datum = count + 1;
+                                self.queue_packet(device_packet);
+                            },
+                            ~> self.wait_task(),
+                        };
+                    };
+                },
+                ~> self.wait_task(),
+            };
+        },
+        Worker |d| => {
+            promote work {
+                |w| => {
+                    d.destination = if d.destination == handler_a { handler_b; } else { handler_a; };
+                    w.identity = d.destination;
+                    w.datum = 0;
+                    for (0..<data_size) |i| {
+                        d.count += 1;
+                        if d.count > 26 { d.count = 1; };
+                        w.data[i] = d.count;
+                    };
+                    self.queue_packet(w);
+                },
+                ~> self.wait_task(),
+            };
+        },
+    };
+}
+
+fn Scheduler.schedule |self| () void {
+    self.current_task = self.task_list;
+    let more = true;
+    while (more) {
+        promote self.current_task {
+            |t| => {
+                if t.is_task_holding_or_waiting() {
+                    self.current_task = t.link;
+                } else {
+                    self.current_task_identity = t.identity;
+                    self.current_task = t.run_task(self);
+                };
+            },
+            ~> { more = false; },
+        };
+    };
+}
+
+// ---------------------------------------------------------------------------
+// The benchmark
+
+// One simulation: queuePacketCount * 100000 + holdCount (23246 and 9297).
+fn richards() I64 {
+    let s = Scheduler.new();
+    s.create_task(idler, 0, null, false, false, false, Idle { control: 1, count: 10000 });
+
+    let work_q = Packet.new(null, worker, work_packet_kind);
+    work_q = Packet.new(work_q, worker, work_packet_kind);
+    s.create_task(worker, 1000, work_q, true, true, false, Worker { destination: handler_a, count: 0 });
+
+    work_q = Packet.new(null, device_a, device_packet_kind);
+    work_q = Packet.new(work_q, device_a, device_packet_kind);
+    work_q = Packet.new(work_q, device_a, device_packet_kind);
+    s.create_task(handler_a, 2000, work_q, true, true, false, Handler { work_in: null, device_in: null });
+
+    work_q = Packet.new(null, device_b, device_packet_kind);
+    work_q = Packet.new(work_q, device_b, device_packet_kind);
+    work_q = Packet.new(work_q, device_b, device_packet_kind);
+    s.create_task(handler_b, 3000, work_q, true, true, false, Handler { work_in: null, device_in: null });
+
+    s.create_task(device_a, 4000, null, false, true, false, Device { pending: null });
+    s.create_task(device_b, 5000, null, false, true, false, Device { pending: null });
+
+    s.schedule();
+    s.queue_packet_count.to_i64() * 100000 + s.hold_count.to_i64();
+}
+
+test "richards counts its packets and holds" {
+    assert richards() == 2324609297;
+}
+
+// Each iteration runs the simulation inner_iterations times.
+let inner_iterations: I32 = 10;
+
+export lib {
+    fn bench(iterations: I32) I64 {
+        let sink: I64 = 0;
+        for (0..<iterations * inner_iterations) { sink += richards(); };
+        sink;
+    }
+}

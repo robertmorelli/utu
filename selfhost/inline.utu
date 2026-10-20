@@ -1,0 +1,564 @@
+//! = Inlining (-O3)
+//!
+//! A call to a small function, or to one called from one place, becomes its
+//! body: the arguments set the callee's parameters, which become locals of
+//! the caller (as its locals do), its labels are numbered past the caller's,
+//! and each `return` leaves a block around the copy. V8 inlines wasm only
+//! within a budget, which utu's many small functions (an enum method each,
+//! std's accessors) use up; this does it before V8 sees the module, so -O3
+//! trades size for speed and -Oz stays small.
+//!
+//! Callees are inlined into first, so a copy is of what the callee became.
+//! A call back into a function being inlined into (recursion) stays a call.
+
+/// By function: 0 not yet, 1 being inlined into, 2 done.
+vec inl_state: U8;
+/// By function: its body's size in nodes, once done.
+vec inl_size: I32;
+/// While copying a callee: its locals' indices in the caller.
+vec inl_local_map: I32;
+/// While copying: how far its labels move, and where a `return` goes.
+vec inl_label_offset: I32 = [0];
+vec inl_return_label: I32 = [0];
+/// The calls found in a body.
+vec inl_calls: I32;
+
+/// Inlined at every call (-O3 may be big). The limits are the fastest found
+/// for the programs in benchmarks/ (in d8) and the compiler building itself:
+/// below 2000 DeltaBlue slows, above it nothing gains and the code grows.
+let inline_always_nodes: I32 = 2000;
+/// Inlined where it is called from one place.
+let inline_once_nodes: I32 = 2000;
+/// Inlining stops growing a function past this many nodes.
+let inline_caller_nodes: I32 = 20000;
+
+/// Inline through every live function (after the sweep; sweep again after).
+fn inline_module() void {
+    inl_state.resize(func_kind.len());
+    inl_size.resize(func_kind.len());
+    for (0 ..< func_kind.len()) |f| {
+        inl_state[f] = 0;
+        inl_size[f] = 0;
+    };
+    for (0 ..< func_kind.len()) |f| { if optimizable(f) and func_code[f] < 0 { inline_into(f); }; };
+    for (0 ..< func_kind.len()) |f| {
+        if optimizable(f) and func_code[f] < 0 and inl_state[f] == 2 {
+            fold_known_tests(f);
+            locals_for_structs(f);
+        };
+    };
+}
+
+fn inline_into(f: I32) void {
+    if inl_state[f] != 0 { return; };
+    inl_state[f] = 1;
+    // The calls first: inlining rewrites the body, and the callees' own
+    // inlining reuses @inl_calls.
+    inl_calls.clear();
+    calls_in(func_body[f]);
+    let calls = Array[I32].new(inl_calls.len(), 0);
+    for (0 ..< inl_calls.len()) |i| { calls[i] = inl_calls[i]; };
+    for (calls) |c| { if inlinable(w_a[c]) { inline_into(w_a[c]); }; };
+    let size = inl_nodes(func_body[f]);
+    let label = max_label(func_body[f]);
+    for (calls) |c| {
+        let g = w_a[c];
+        if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and size + inl_size[g] <= inline_caller_nodes
+            and (inl_size[g] <= inline_always_nodes or (func_uses[g] == 1 and inl_size[g] <= inline_once_nodes)) {
+            label = inline_call(f, c, g, label);
+            size += inl_size[g];
+        };
+    };
+    inl_state[f] = 2;
+    inl_size[f] = inl_nodes(func_body[f]);
+}
+
+/// A function whose body can be copied into a caller.
+fn inlinable(g: I32) Bool {
+    func_kind[g] == FuncKind.Defined.to_i32() and func_body[g] >= 0 and func_code[g] < 0
+        and vl_len[ht_b[func_type_of[g]]] <= 1 and not has_op(func_body[g], Op.ReturnCall.to_i32());
+}
+
+/// Call `c` in `f`, to `g`, becomes a block of g's body. `label` is the
+/// greatest label f uses; returns the greatest after.
+fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
+    let params = ht_a[func_type_of[g]];
+    let np = vl_len[params];
+    let nl = func_local_count[g];
+    inl_local_map.resize(np + nl);
+    // An argument that is a local the callee's parameter stands for: that
+    // local, when nothing assigns either before the body is done (so the
+    // caller's own type tests of it still hold inside).
+    for (0 ..< np) |i| {
+        let arg = w_kid(c, i);
+        let same = w_op[arg] == Op.LocalGet.to_i32() and not inl_assigns(func_body[g], i);
+        if same { for (i + 1 ..< np) |j| { if inl_assigns(w_kid(c, j), w_a[arg]) { same = false; }; }; };
+        inl_local_map[i] = if same { w_a[arg]; } else { add_local(f, vl_item(params, i)); };
+    };
+    for (0 ..< nl) |i| { inl_local_map[np + i] = add_local(f, local_types[func_locals[g] + i]); };
+    inl_label_offset[0] = label;
+    let block = label + max_label(func_body[g]) + 1;
+    inl_return_label[0] = block;
+    // The arguments set the parameters, in order; then the body.
+    let m = w_mark();
+    for (0 ..< np) |i| {
+        let arg = w_kid(c, i);
+        if not (w_op[arg] == Op.LocalGet.to_i32() and inl_local_map[i] == w_a[arg]) {
+            let ms = w_mark();
+            w_push(arg);
+            w_node(Op.LocalSet, vt_none, inl_local_map[i], 0, ms);
+        };
+    };
+    w_push(inl_copy(func_body[g]));
+    // The call node becomes the block (its type, the call's result, stays).
+    let n = w_mark() - m;
+    w_first[c] = w_kids.len();
+    for (m ..< m + n) |i| { w_kids.push(w_stack[i]); };
+    w_count[c] = n;
+    w_stack.resize(m);
+    w_op[c] = Op.Block.to_i32();
+    w_a[c] = block;
+    w_b[c] = 0;
+    block;
+}
+
+/// A new local of `f`, of value type `vt`: its index.
+fn add_local(f: I32, vt: I32) I32 {
+    let start = func_locals[f];
+    let n = func_local_count[f];
+    // f's locals are a run of @local_types; moved to its end to grow.
+    if start + n != local_types.len() {
+        let moved = local_types.len();
+        for (0 ..< n) |i| { local_types.push(local_types[start + i]); };
+        func_locals[f] = moved;
+    };
+    local_types.push(vt);
+    func_local_count[f] = n + 1;
+    vl_len[ht_a[func_type_of[f]]] + n;
+}
+
+/// A copy of node `n` of the callee being inlined, in the caller's locals
+/// and labels.
+fn inl_copy(n: I32) I32 {
+    let m = w_mark();
+    for (0 ..< w_count[n]) |i| { w_push(inl_copy(w_kid(n, i))); };
+    let op = w_op[n];
+    let a = w_a[n];
+    if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        a = inl_local_map[a];
+    } else if is_labelled(op) {
+        if a > 0 { a += inl_label_offset[0]; };
+    } else if op == Op.BrTable.to_i32() {
+        let start = w_aux.len();
+        for (0 ..< w_b[n]) |i| { w_aux.push(w_aux[w_a[n] + i] + inl_label_offset[0]); };
+        a = start;
+    } else if op == Op.Return.to_i32() {
+        op = Op.Br.to_i32();
+        a = inl_return_label[0];
+    };
+    w_node(Op.from_i32(op), w_type[n], a, w_b[n], m);
+    w_pop();
+}
+
+/// An op whose `a` is a label: a block it opens, or one it branches to.
+fn is_labelled(op: I32) Bool {
+    op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.If.to_i32() or op == Op.Try.to_i32()
+        or op == Op.Br.to_i32() or op == Op.BrIf.to_i32() or op == Op.Rethrow.to_i32();
+}
+
+/// The greatest label under node `n` (0 for none).
+fn max_label(n: I32) I32 {
+    let op = w_op[n];
+    let most = 0;
+    if is_labelled(op) and w_a[n] > most { most = w_a[n]; };
+    if op == Op.BrTable.to_i32() {
+        for (0 ..< w_b[n]) |i| { if w_aux[w_a[n] + i] > most { most = w_aux[w_a[n] + i]; }; };
+    };
+    for (0 ..< w_count[n]) |i| {
+        let kid = max_label(w_kid(n, i));
+        if kid > most { most = kid; };
+    };
+    most;
+}
+
+fn inl_nodes(n: I32) I32 {
+    let total = 1;
+    for (0 ..< w_count[n]) |i| { total += inl_nodes(w_kid(n, i)); };
+    total;
+}
+
+/// Whether an op `op` is under node `n`.
+fn has_op(n: I32, op: I32) Bool {
+    if w_op[n] == op { return true; };
+    for (0 ..< w_count[n]) |i| { if has_op(w_kid(n, i), op) { return true; }; };
+    false;
+}
+
+/// The calls under node `n`, onto @inl_calls.
+fn calls_in(n: I32) void {
+    if w_op[n] == Op.Call.to_i32() { inl_calls.push(n); };
+    for (0 ..< w_count[n]) |i| { calls_in(w_kid(n, i)); };
+}
+
+/// Whether anything under node `n` assigns local `local`.
+fn inl_assigns(n: I32, local: I32) Bool {
+    let op = w_op[n];
+    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] == local { return true; };
+    for (0 ..< w_count[n]) |i| { if inl_assigns(w_kid(n, i), local) { return true; }; };
+    false;
+}
+
+//! == Known types
+//!
+//! Inlined methods test again what their caller tested: an `alt` arm for
+//! Equality calls `output()`, whose copy asks Stay? Edit? Equality? of the
+//! same local. Inside `if (ref.test T x)`, with x assigned at most once (as
+//! every local is set before it is read, the one assignment came before the
+//! test), a test of x against U is known: true when T is U or below it,
+//! false when T is final and is not. A local whose one assignment copies
+//! another (`alt` keeps its scrutinee in one) is that other. An `if` on a
+//! known condition is the branch it takes.
+
+/// By local of the function being folded: how often it is assigned (to 2),
+/// and the local its one assignment copies, or -1.
+vec fold_assigned: U8;
+vec fold_copy_of: I32;
+/// The facts in force: a local, and the heap type it is known to have.
+vec fold_local: I32;
+vec fold_heap: I32;
+
+fn fold_known_tests(f: I32) void {
+    let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f];
+    fold_assigned.resize(total);
+    fold_copy_of.resize(total);
+    for (0 ..< total) |i| {
+        fold_assigned[i] = 0;
+        fold_copy_of[i] = -1;
+    };
+    note_assigned(func_body[f]);
+    fold_local.clear();
+    fold_heap.clear();
+    fold(func_body[f]);
+}
+
+fn note_assigned(n: I32) void {
+    let op = w_op[n];
+    if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        let x = w_a[n];
+        if fold_assigned[x] < 2 { fold_assigned[x] += 1; };
+        let value = w_kid(n, 0);
+        fold_copy_of[x] = if w_op[value] == Op.LocalGet.to_i32() { w_a[value]; } else { -1; };
+    };
+    for (0 ..< w_count[n]) |i| { note_assigned(w_kid(n, i)); };
+}
+
+/// The local `x` is, through copies; or -1 when it may change.
+fn fold_canonical(x: I32) I32 {
+    let local = x;
+    let steps = 0;
+    while (steps < 64) {
+        if fold_assigned[local] > 1 { return -1; };
+        if fold_assigned[local] == 0 or fold_copy_of[local] < 0 { return local; };
+        local = fold_copy_of[local];
+        steps += 1;
+    };
+    -1;
+}
+
+fn fold(n: I32) void {
+    let op = w_op[n];
+    if op == Op.RefTest.to_i32() {
+        let known = known_test(n);
+        if known >= 0 {
+            w_op[n] = Op.I32Const.to_i32();
+            w_a[n] = known;
+            w_b[n] = 0;
+            w_count[n] = 0;
+        };
+        return;
+    };
+    if op == Op.If.to_i32() {
+        let cond = w_kid(n, 0);
+        fold(cond);
+        // A test of a local holds in the then-branch.
+        let pushed = false;
+        if w_op[cond] == Op.RefTest.to_i32() and w_count[cond] == 1 {
+            let x = w_kid(cond, 0);
+            let local = if w_op[x] == Op.LocalGet.to_i32() { fold_canonical(w_a[x]); } else { -1; };
+            if local >= 0 and vt_is_ref(w_a[cond]) and w_a[cond] >= vt_defined {
+                fold_local.push(local);
+                fold_heap.push(vt_heap(w_a[cond]));
+                pushed = true;
+            };
+        };
+        fold(w_kid(n, 1));
+        if pushed {
+            fold_local.resize(fold_local.len() - 1);
+            fold_heap.resize(fold_heap.len() - 1);
+        };
+        if w_count[n] > 2 { fold(w_kid(n, 2)); };
+        // A known condition: the branch it takes, as a block (branches to the
+        // `if` still reach its end).
+        let known = known_i32(cond);
+        if known >= 0 {
+            let taken = if known != 0 { 1; } else { 2; };
+            if taken < w_count[n] {
+                w_kids[w_first[n]] = w_kid(n, taken);
+                w_count[n] = 1;
+            } else {
+                w_count[n] = 0;
+            };
+            w_op[n] = Op.Block.to_i32();
+        };
+        return;
+    };
+    for (0 ..< w_count[n]) |i| { fold(w_kid(n, i)); };
+}
+
+/// The value of an i32 node when it is a constant (seen through a block or
+/// sequence holding only it, which folding leaves), as 0 or 1 for false or
+/// true; else -1.
+fn known_i32(n: I32) I32 {
+    let v = n;
+    while ((w_op[v] == Op.Block.to_i32() or w_op[v] == Op.Seq.to_i32()) and w_count[v] == 1) { v = w_kid(v, 0); };
+    if w_op[v] != Op.I32Const.to_i32() { return -1; };
+    if w_a[v] != 0 { 1; } else { 0; };
+}
+
+/// What `ref.test` node `n` gives, when the facts decide it: 1, 0, or -1.
+fn known_test(n: I32) I32 {
+    if w_count[n] != 1 { return -1; };
+    let x = w_kid(n, 0);
+    if w_op[x] != Op.LocalGet.to_i32() or w_a[n] < vt_defined or not vt_is_ref(w_a[n]) { return -1; };
+    let local = fold_canonical(w_a[x]);
+    if local < 0 { return -1; };
+    let u = vt_heap(w_a[n]);
+    let i = fold_local.len() - 1;
+    while (i >= 0) {
+        if fold_local[i] == local {
+            let t = fold_heap[i];
+            if heap_below(t, u) { return 1; };
+            if ht_open[t] == 0 { return 0; };
+            return -1;
+        };
+        i -= 1;
+    };
+    -1;
+}
+
+/// Whether heap type t is u or a subtype of it.
+fn heap_below(t: I32, u: I32) Bool {
+    let h = t;
+    while (h >= 0) {
+        if h == u { return true; };
+        h = ht_super[h];
+    };
+    false;
+}
+
+//! == Structs that stay in a function
+//!
+//! After inlining, a struct often lives and dies in one function: a worklist
+//! Buffer, made, pushed to, and read there. Made into a local set once and
+//! read only as the object of its fields' gets and sets, it need not be
+//! made at all: each field is a local, the allocation sets them, and the
+//! local that held it is set to null and never read (local cleanup removes
+//! the store). Structs with packed fields stay as they are.
+
+/// The function's nodes, each with its parent and its place there.
+vec h_node: I32;
+vec h_parent: I32;
+vec h_place: I32;
+/// By local: its one assignment (a node), -1 for none, -2 for several.
+vec h_set: I32;
+/// By label: whether something branches to it.
+vec h_targeted: U8;
+
+/// The function `locals_for_structs` is working on.
+vec current_fold_function: I32 = [0];
+
+fn locals_for_structs(f: I32) void {
+    current_fold_function[0] = f;
+    let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f];
+    h_walk_function(f);
+    for (0 ..< total) |local| {
+        let set = h_set[local];
+        // A struct replaced rewrites nodes and adds locals: walk again.
+        if set >= 0 and w_op[set] == Op.LocalSet.to_i32() and replace_struct(f, local, set) { h_walk_function(f); };
+    };
+}
+
+fn h_walk_function(f: I32) void {
+    let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f];
+    h_node.clear();
+    h_parent.clear();
+    h_place.clear();
+    h_set.resize(total);
+    for (0 ..< total) |i| { h_set[i] = -1; };
+    h_targeted.resize(max_label(func_body[f]) + 1);
+    for (0 ..< h_targeted.len()) |l| { h_targeted[l] = 0; };
+    h_walk(func_body[f], -1, 0);
+}
+
+fn h_walk(n: I32, parent: I32, place: I32) void {
+    h_node.push(n);
+    h_parent.push(parent);
+    h_place.push(place);
+    let op = w_op[n];
+    if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        h_set[w_a[n]] = if h_set[w_a[n]] == -1 { n; } else { -2; };
+    } else if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() or op == Op.Rethrow.to_i32() {
+        h_target(w_a[n]);
+    } else if op == Op.BrTable.to_i32() {
+        for (0 ..< w_b[n]) |i| { h_target(w_aux[w_a[n] + i]); };
+    };
+    for (0 ..< w_count[n]) |i| { h_walk(w_kid(n, i), n, i); };
+}
+
+fn h_target(label: I32) void { if label >= 0 and label < h_targeted.len() { h_targeted[label] = 1; }; }
+
+/// The struct.new whose value `n` is, through blocks nothing branches to
+/// and sequences (whose other parts run first), or -1.
+fn made_struct(n: I32) I32 {
+    let v = n;
+    while (true) {
+        let op = w_op[v];
+        if op == Op.StructNew.to_i32() { return v; };
+        let passes = op == Op.Seq.to_i32() or (op == Op.Block.to_i32() and not (w_a[v] > 0 and w_a[v] < h_targeted.len() and h_targeted[w_a[v]] == 1));
+        if not passes or w_count[v] == 0 { return -1; };
+        v = w_kid(v, w_count[v] - 1);
+    };
+    -1;
+}
+
+/// By node of the function: its position in @h_node, or -1.
+vec h_index: I32;
+/// The locals holding the struct (its local and copies of it), the nodes
+/// carrying it (reads of them, tees into them), its field uses, and the
+/// copies.
+vec h_family: I32;
+vec h_carriers: I32;
+vec h_uses: I32;
+vec h_copies: I32;
+
+/// Local `local`, set once by `set`: when it holds a struct only its fields
+/// are used of (directly, or through copies of the local), the fields
+/// become locals. Whether they did.
+fn replace_struct(f: I32, local: I32, set: I32) Bool {
+    let made = made_struct(w_kid(set, 0));
+    if made < 0 { return false; };
+    let t = w_a[made];
+    for (0 ..< ht_b[t]) |i| {
+        let storage = field_storage(t, i);
+        if storage == vt_i8 or storage == vt_i16 { return false; };
+    };
+    if h_index.len() < w_op.len() {
+        let old = h_index.len();
+        h_index.resize(w_op.len());
+        for (old ..< w_op.len()) |n| { h_index[n] = -1; };
+    };
+    for (0 ..< h_node.len()) |k| { h_index[h_node[k]] = k; };
+    let ok = struct_stays(local, t);
+    for (0 ..< h_node.len()) |k| { h_index[h_node[k]] = -1; };
+    if not ok { return false; };
+    let fields = Array[I32].new(ht_b[t], 0);
+    for (0 ..< ht_b[t]) |i| { fields[i] = add_local(f, field_storage(t, i)); };
+    // Gets and sets of its fields are of the fields' locals.
+    for (0 ..< h_uses.len()) |p_at| {
+        let p = h_uses[p_at];
+        if w_op[p] == Op.StructGet.to_i32() {
+            w_op[p] = Op.LocalGet.to_i32();
+            w_a[p] = fields[w_b[p]];
+            w_count[p] = 0;
+        } else {
+            w_op[p] = Op.LocalSet.to_i32();
+            w_a[p] = fields[w_b[p]];
+            w_first[p] = w_first[p] + 1;
+            w_count[p] = 1;
+            w_type[p] = vt_none;
+        };
+        w_b[p] = 0;
+    };
+    // Copies of it are nothing (a tee's value went to a use, gone above).
+    for (0 ..< h_copies.len()) |c_at| {
+        let c = h_copies[c_at];
+        if w_op[c] == Op.LocalSet.to_i32() {
+            w_op[c] = Op.Seq.to_i32();
+            w_count[c] = 0;
+            w_type[c] = vt_none;
+        };
+    };
+    // The allocation sets them, in order, and gives null.
+    let nullable = vt_ref(t, true);
+    let m = w_mark();
+    for (0 ..< w_count[made]) |i| {
+        let ms = w_mark();
+        w_push(w_kid(made, i));
+        w_node(Op.LocalSet, vt_none, fields[i], 0, ms);
+    };
+    w_leaf(Op.RefNull, nullable, t, 0);
+    let count = w_mark() - m;
+    w_first[made] = w_kids.len();
+    for (m ..< m + count) |i| { w_kids.push(w_stack[i]); };
+    w_count[made] = count;
+    w_stack.resize(m);
+    w_op[made] = Op.Seq.to_i32();
+    w_type[made] = nullable;
+    // What carried it to the local, and the locals, may now hold null.
+    let v = w_kid(set, 0);
+    while (v != made) {
+        if vt_is_ref(w_type[v]) and w_type[v] >= vt_defined { w_type[v] = vt_ref(vt_heap(w_type[v]), true); };
+        v = w_kid(v, w_count[v] - 1);
+    };
+    let params = vl_len[ht_a[func_type_of[f]]];
+    for (0 ..< h_family.len()) |x_at| {
+        let x = h_family[x_at];
+        let at = func_locals[f] + x - params;
+        if local_types[at] >= vt_defined and vt_is_ref(local_types[at]) { local_types[at] = vt_ref(vt_heap(local_types[at]), true); };
+    };
+    true;
+}
+
+/// Whether the struct of type `t` in `local` is used only for its fields:
+/// fills @h_family, @h_uses, and @h_copies.
+fn struct_stays(local: I32, t: I32) Bool {
+    h_family.clear();
+    h_carriers.clear();
+    h_uses.clear();
+    h_copies.clear();
+    let params = vl_len[ht_a[func_type_of[current_fold_function[0]]]];
+    if local < params { return false; };
+    h_family.push(local);
+    add_carriers(local);
+    let i = 0;
+    while (i < h_carriers.len()) {
+        let k = h_index[h_carriers[i]];
+        i += 1;
+        let p = h_parent[k];
+        if p < 0 { return false; };
+        let op = w_op[p];
+        if (op == Op.StructGet.to_i32() or op == Op.StructSet.to_i32()) and h_place[k] == 0 and heap_below(t, w_a[p]) {
+            h_uses.push(p);
+        } else if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and h_set[w_a[p]] == p and w_a[p] >= params {
+            let copy = w_a[p];
+            for (0 ..< h_family.len()) |x_at| {
+                let x = h_family[x_at];
+                if x == copy { return false; };
+            };
+            h_family.push(copy);
+            h_copies.push(p);
+            add_carriers(copy);
+            if op == Op.LocalTee.to_i32() { h_carriers.push(p); };
+        } else {
+            return false;
+        };
+    };
+    true;
+}
+
+fn add_carriers(local: I32) void {
+    for (0 ..< h_node.len()) |n_at| {
+        let n = h_node[n_at];
+        if w_op[n] == Op.LocalGet.to_i32() and w_a[n] == local { h_carriers.push(n); };
+    };
+}

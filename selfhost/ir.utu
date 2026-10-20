@@ -231,6 +231,7 @@ enum(U8) Known:
     | IrV128Const
     | ToStr
     | Wat
+    | IrSafeChecks
 
 fn known_word(k: Known) I32 { known[k.to_i32()]; }
 
@@ -283,7 +284,7 @@ fn intern_known() void {
         "ir-string-get-wtf16", "ir-string-from-code-point", "ir-string-from-codes",
         "ir-array-get", "ir-array-set", "ir-array-len", "ir-array-new", "ir-array-slice", "ir-array-copy",
         "count", "U32", "ir-i31-new", "ir-i31-get-s", "ir-i31-get-u", "ir-ref-eq", "ir-ref-ne",
-        "ir-promise-then", "ir-promise-catch", "ir-v128-const", "to_str", "wat"];
+        "ir-promise-then", "ir-promise-catch", "ir-v128-const", "to_str", "wat", "ir-safe-checks"];
     for (0 ..< Known.count()) |k| { known[k] = intern_text(names[k]); };
     // Tags: "ir-" and the name, then its opcode.
     let table = opcode_table();

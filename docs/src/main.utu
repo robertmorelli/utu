@@ -343,6 +343,16 @@ export main() void {
             font-weight: 500;
             font-size: 0.85rem;
         }
+        table.wide {
+            display: block;
+            overflow-x: auto;
+        }
+        table.wide td, table.wide thead th {
+            text-align: end;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            padding-inline: 0.75rem 0;
+        }
         ul, ol {
             padding-inline-start: 1.25rem;
         }

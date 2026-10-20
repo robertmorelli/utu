@@ -142,7 +142,7 @@ function passClock(file) {
 }
 
 export function createCompiler(env) {
-  const { parser, readFile, resolvePath, resolvePackage = null, readBinaryFile = null, optimize = 'size', stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
+  const { parser, readFile, resolvePath, resolvePackage = null, readBinaryFile = null, optimize = 'size', safe = false, stdlib = PLATFORM_SOURCES, dsls = {}, createDocument = createIRDocument, debugAssertions = false, target = 'analysis' } = env;
 
   if (!parser)      throw new Error('createCompiler: `parser` is required');
   if (!readFile)    throw new Error('createCompiler: `readFile` is required');
@@ -248,6 +248,8 @@ export function createCompiler(env) {
     }
     // -Oz ('size', the default) or -O3 ('speed'): read by host-call lowering and emitBinary.
     if (doc.body.firstChild) doc.body.firstChild.setAttribute('data-optimize', optimize);
+    // --safe: the checks wasm makes anyway are kept (std's <ir-safe-checks/>).
+    if (doc.body.firstChild && safe) doc.body.firstChild.setAttribute('data-safe', 'true');
     doc.__utuForeign = foreignABI;
     doc.__utuSourceTexts = new Map([...graph].map(([file, sourceDoc]) => [file, sourceDoc.__utuSourceText ?? '']));
     if (target === 'analysis') {

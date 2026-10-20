@@ -3967,10 +3967,32 @@
  "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu test": {
   "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
+ "benchmarks/binarytrees/binarytrees.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/binarytrees/binarytrees.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
  "benchmarks/deltablue/deltablue.utu normal": {
   "calls": {}
  },
  "benchmarks/deltablue/deltablue.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
+ "benchmarks/fannkuch/fannkuch.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/fannkuch/fannkuch.utu test": {
   "calls": {
    "__test_0": {
     "result": null,
@@ -3984,11 +4006,33 @@
  "benchmarks/loops/loops.utu test": {
   "calls": {}
  },
+ "benchmarks/nbody/nbody.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/nbody/nbody.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
  "benchmarks/pantry/kernels.utu normal": {
   "calls": {}
  },
  "benchmarks/pantry/kernels.utu test": {
   "calls": {}
+ },
+ "benchmarks/richards/richards.utu normal": {
+  "calls": {}
+ },
+ "benchmarks/richards/richards.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/suite/analyzer.utu normal": {
   "calls": {}

@@ -79,7 +79,7 @@ async function main() {
   const queue = list.flatMap(p => ['normal', 'test'].map(target => ({ ...p, target })));
   const jobs = Math.min(Number(flag('jobs') ?? os.availableParallelism()), queue.length);
   // Built once here, so the workers load it from the cache.
-  if (!record) await (await import('./selfhost.mjs')).buildSelfhost();
+  if (!record) await (await import('./selfhost.mjs')).loadSelfhost();
   const results = {};
   const started = performance.now();
   await Promise.all(Array.from({ length: jobs }, async () => {

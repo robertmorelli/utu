@@ -75,6 +75,25 @@ export lib {
   assert.equal(valued.exports?.run(), 3164, valued.errors?.join('\n'));
   checked++;
 
+  // At -O3, a struct made into locals and then a second, stored into the
+  // first's field (the second pass read the first's rewritten nodes).
+  const stored = await compileFile(utu, await write(`struct Task:
+    | identity: I32
+struct Holder:
+    | task: Task
+export lib {
+    fn run() I32 {
+        let a: Task = &{ identity: 3 };
+        let h: Holder = &{ task: a };
+        let b: Task = &{ identity: 7 };
+        h.task = b;
+        h.task.identity;
+    }
+}
+`), { optimize: 'speed' });
+  assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+
   // Mistakes the self-hosted compiler reports (stage 0's words, where it has them).
   const mistakes = [
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'entry surface: multiple export lib declarations'],

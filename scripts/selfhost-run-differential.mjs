@@ -35,7 +35,7 @@ else await worker();
 
 async function main() {
   // Build once here first, so a compiler that does not build fails at once.
-  await (await import('./selfhost.mjs')).buildSelfhost();
+  await (await import('./selfhost.mjs')).loadSelfhost();
   const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   const only = flag('only');
   const show = Number(flag('show') ?? 10);

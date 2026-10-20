@@ -17,16 +17,17 @@ mod compiler {
         ;
     }
     fn stages_sample() Str {
-        \\bun run build        # stage 0 (JavaScript) builds stage 1,
+        \\bun run build        # stage 0 (stage0/utu.wasm) builds stage 1,
         \\                     # stage 1 builds stage 2, stage 2 builds stage 3;
         \\                     # stages 2 and 3 must be identical
+        \\bun run stage0       # the compiler just built becomes stage 0
         \\bun run test         # the whole suite, including the bootstrap
         ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("The compiler", "utu compiles utu. The shipped compiler is a 372 KB Wasm module, bootstrapped from a JavaScript compiler that now serves only its IR and graph views.");
+            = ui.header("The compiler", "utu compiles utu. The shipped compiler is a 372 KB Wasm module, bootstrapped from itself: a checked-in copy builds the next. The JavaScript compiler it began from is the last resort, and the reference the self-hosted compiler is checked against.");
             h2 {
                 "Pipeline";
             }
@@ -92,6 +93,197 @@ mod compiler {
                 " a local cleanup removes the copies and temporaries lowerings leave, which is what makes a consumed iterator compile to the loop you would have written by hand.";
             }
             = ui.further("docs/wasm-backend.md", "The wasm backend");
+            h2 {
+                "DeltaBlue: Rust, utu, and JavaScript";
+            }
+            p {
+                "V8's constraint solver, written the same way in Rc Rust (a graph of Rc<RefCell<_>>, no unsafe code), unsafe Rust (an arena and unchecked indexing), JavaScript (classes and arrays), and utu, built at ";
+                code {
+                    "-O3";
+                }
+                " and at ";
+                code {
+                    "-Oz";
+                }
+                ", each with and without ";
+                code {
+                    "--safe";
+                }
+                " (which puts back the bounds checks Wasm does not make itself). Each runs in d8 (15.6.75.16), the median of 20 samples after 5 warmups. utu compiles warm with the self-hosted compiler; Rust builds with ";
+                code {
+                    "cargo build --release";
+                }
+                " from a clean target directory. JavaScript's size is its minified source.";
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            "";
+                        }
+                        th {
+                            "Rc Rust";
+                        }
+                        th {
+                            "unsafe Rust";
+                        }
+                        th {
+                            "utu -O3";
+                        }
+                        th {
+                            "utu -O3 --safe";
+                        }
+                        th {
+                            "utu -Oz";
+                        }
+                        th {
+                            "utu -Oz --safe";
+                        }
+                        th {
+                            "JavaScript";
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "chain, 20 × 1,048 variables";
+                        }
+                        td {
+                            "17.4 ms";
+                        }
+                        td {
+                            "5.19 ms";
+                        }
+                        td {
+                            "6.34 ms";
+                        }
+                        td {
+                            "6.26 ms";
+                        }
+                        td {
+                            "10.3 ms";
+                        }
+                        td {
+                            "10.8 ms";
+                        }
+                        td {
+                            "6.57 ms";
+                        }
+                    }
+                    tr {
+                        th {
+                            "projection, 20 × 1,048 variables";
+                        }
+                        td {
+                            "17.5 ms";
+                        }
+                        td {
+                            "4.36 ms";
+                        }
+                        td {
+                            "5.04 ms";
+                        }
+                        td {
+                            "5.25 ms";
+                        }
+                        td {
+                            "8.54 ms";
+                        }
+                        td {
+                            "8.70 ms";
+                        }
+                        td {
+                            "6.02 ms";
+                        }
+                    }
+                    tr {
+                        th {
+                            "compile time";
+                        }
+                        td {
+                            "384.4 ms";
+                        }
+                        td {
+                            "286.5 ms";
+                        }
+                        td {
+                            "8.90 ms";
+                        }
+                        td {
+                            "8.86 ms";
+                        }
+                        td {
+                            "1.86 ms";
+                        }
+                        td {
+                            "1.76 ms";
+                        }
+                        td {
+                            "—";
+                        }
+                    }
+                    tr {
+                        th {
+                            "size";
+                        }
+                        td {
+                            "38.0 KB";
+                        }
+                        td {
+                            "32.0 KB";
+                        }
+                        td {
+                            "27.9 KB";
+                        }
+                        td {
+                            "30.9 KB";
+                        }
+                        td {
+                            "4.9 KB";
+                        }
+                        td {
+                            "5.0 KB";
+                        }
+                        td {
+                            "5.8 KB";
+                        }
+                    }
+                    tr {
+                        th {
+                            "gzipped";
+                        }
+                        td {
+                            "15.0 KB";
+                        }
+                        td {
+                            "13.1 KB";
+                        }
+                        td {
+                            "8.7 KB";
+                        }
+                        td {
+                            "8.9 KB";
+                        }
+                        td {
+                            "2.1 KB";
+                        }
+                        td {
+                            "2.1 KB";
+                        }
+                        td {
+                            "1.8 KB";
+                        }
+                    }
+                }
+            }
+            p {
+                "Run it again with ";
+                code {
+                    "bun run bench:deltablue-table";
+                }
+                ".";
+            }
             h2 {
                 "Closures and the callable ABI";
             }

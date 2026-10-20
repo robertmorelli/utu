@@ -85,6 +85,8 @@ function populateModule(m, doc, { artifacts, sourceMap }) {
     module: m,
     // -O3 trades bytes for speed in a few lowerings (loop match arm copies).
     optimize: doc.body.firstChild?.attr?.('data-optimize') === 'speed' ? 'speed' : 'size',
+    // --safe: std's <ir-safe-checks/> is true, keeping checks wasm makes anyway.
+    safe: doc.body.firstChild?.attr?.('data-safe') === 'true',
     fnById,
     fnByName,
     structTypes,

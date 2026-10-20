@@ -1,90 +1,100 @@
+// DeltaBlue in utu, safe Rust, unsafe Rust, and JavaScript, timed in d8 (V8's
+// shell). This process builds the four and checks they agree; each runs in a
+// d8 of its own, which warms it up and times it. Set D8_BIN to choose the d8.
 import fs from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { transform } from 'esbuild';
-import { createCompiler, emitBinary, initParser, instantiateLowered } from '../src/index.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BENCH = path.join(ROOT, 'benchmarks', 'deltablue');
 const TMP = path.join(ROOT, '.tmp', 'deltablue-benchmark');
-const SAMPLES = Number(process.env.BENCH_SAMPLES ?? 10);
-const WARMUPS = Number(process.env.BENCH_WARMUPS ?? 3);
+const SAMPLES = Number(process.env.BENCH_SAMPLES ?? 20);
+const WARMUPS = Number(process.env.BENCH_WARMUPS ?? 5);
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS ?? 20);
+const D8 = process.env.D8_BIN ?? 'd8';
 await fs.mkdir(TMP, { recursive: true });
 
-const utuBytes = await compileUtu();
-const rustBytes = compileRust('rust', 'rust_deltablue');
-const rustUnsafeBytes = compileRust('rust-unsafe', 'rust_deltablue_arena');
-const { module: js, bytes: jsBytes } = await loadJavaScript();
-await Promise.all([
-  fs.writeFile(path.join(TMP, 'deltablue-utu.wasm'), utuBytes),
-  fs.writeFile(path.join(TMP, 'deltablue-rust.wasm'), rustBytes),
-  fs.writeFile(path.join(TMP, 'deltablue-rust-unsafe.wasm'), rustUnsafeBytes),
-]);
-const [{ instance: utu }, rust, rustUnsafe] = await Promise.all([
-  instantiateLowered(utuBytes),
-  WebAssembly.instantiate(rustBytes),
-  WebAssembly.instantiate(rustUnsafeBytes),
-]);
+// Runs in d8: one port, both workloads.
+const DRIVER = String.raw`
+const [kind, file, samples, warmups, iterations] = arguments;
+let chain, projection;
+if (kind === 'js') {
+  load(file);
+  chain = () => benchChain(+iterations);
+  projection = () => benchProjection(+iterations);
+} else {
+  const e = new WebAssembly.Instance(new WebAssembly.Module(readbuffer(file)), {}).exports;
+  chain = e.main ? () => e.main(0, +iterations) : () => e.bench_chain(+iterations);
+  projection = e.main ? () => e.main(1, +iterations) : () => e.bench_projection(+iterations);
+}
+function measure(run) {
+  const result = String(run());
+  for (let i = 0; i < +warmups; i++) run();
+  const times = [];
+  for (let i = 0; i < +samples; i++) { const start = performance.now(); run(); times.push(performance.now() - start); }
+  times.sort((a, b) => a - b);
+  const m = times.length >> 1;
+  return { result, median: times.length % 2 ? times[m] : (times[m - 1] + times[m]) / 2, best: times[0] };
+}
+print('RESULT ' + JSON.stringify({ chain: measure(chain), projection: measure(projection) }));
+`;
 
-console.log(`DeltaBlue: ${SAMPLES} samples, ${WARMUPS} warmups, ${ITERATIONS} iteration(s) per sample`);
-console.log(`Payload: utu ${formatBytes(utuBytes.length)} (${formatBytes(gzipSync(utuBytes).length)} gzip), safe Rust ${formatBytes(rustBytes.length)} (${formatBytes(gzipSync(rustBytes).length)} gzip), unsafe Rust ${formatBytes(rustUnsafeBytes.length)} (${formatBytes(gzipSync(rustUnsafeBytes).length)} gzip), JS ${formatBytes(jsBytes.length)} (${formatBytes(gzipSync(jsBytes).length)} gzip)`);
-for (const spec of [
-  { name: 'chain', kind: 0, rustExport: 'bench_chain', jsExport: 'benchChain' },
-  { name: 'projection', kind: 1, rustExport: 'bench_projection', jsExport: 'benchProjection' },
-]) {
-  const utuRun = () => utu.exports.main(spec.kind, ITERATIONS);
-  const rustRun = () => rust.instance.exports[spec.rustExport](ITERATIONS);
-  const rustUnsafeRun = () => rustUnsafe.instance.exports[spec.rustExport](ITERATIONS);
-  const jsRun = () => js[spec.jsExport](ITERATIONS);
-  const expected = rustRun();
-  const actual = utuRun();
-  const unsafeActual = rustUnsafeRun();
-  const jsActual = BigInt(jsRun());
-  if (actual !== expected || unsafeActual !== expected || jsActual !== expected) throw new Error(`${spec.name}: result mismatch, utu=${actual}, safe Rust=${expected}, unsafe Rust=${unsafeActual}, JS=${jsActual}`);
-  for (let i = 0; i < WARMUPS; i++) { utuRun(); rustRun(); rustUnsafeRun(); jsRun(); }
-  const utuTimes = [], rustTimes = [], rustUnsafeTimes = [], jsTimes = [];
-  const timed = [
-    [utuTimes, utuRun], [rustTimes, rustRun], [rustUnsafeTimes, rustUnsafeRun], [jsTimes, jsRun],
-  ];
-  for (let i = 0; i < SAMPLES; i++) {
-    for (let offset = 0; offset < timed.length; offset++) {
-      const [times, run] = timed[(i + offset) % timed.length];
-      times.push(time(run));
-    }
+const version = spawnSync(D8, ['-e', 'print(version())'], { encoding: 'utf8' });
+if (version.error || version.status !== 0) throw new Error('d8 unavailable: put d8 on PATH or set D8_BIN');
+
+const ports = [
+  { name: 'utu', file: 'deltablue-utu.wasm', bytes: await compileUtu() },
+  { name: 'safe Rust', file: 'deltablue-rust.wasm', bytes: compileRust('rust', 'rust_deltablue') },
+  { name: 'unsafe Rust', file: 'deltablue-rust-unsafe.wasm', bytes: compileRust('rust-unsafe', 'rust_deltablue_arena') },
+  { name: 'JavaScript', file: 'deltablue.js', ...await loadJavaScript() },
+];
+for (const port of ports) await fs.writeFile(path.join(TMP, port.file), port.script ?? port.bytes);
+const driver = path.join(TMP, 'd8-driver.js');
+await fs.writeFile(driver, DRIVER);
+
+console.log(`DeltaBlue in d8 ${version.stdout.trim()}: ${SAMPLES} samples, ${WARMUPS} warmups, ${ITERATIONS} iteration(s) per sample`);
+console.log(`Payload: ${ports.map(port => `${port.name} ${formatBytes(port.bytes.length)} (${formatBytes(gzipSync(port.bytes).length)} gzip)`).join(', ')}`);
+
+const results = ports.map(port => {
+  const run = spawnSync(D8, [driver, '--', port.script ? 'js' : 'wasm', path.join(TMP, port.file), SAMPLES, WARMUPS, ITERATIONS], { encoding: 'utf8', timeout: 600000 });
+  const line = run.stdout?.split('\n').find(text => text.startsWith('RESULT '));
+  if (run.status !== 0 || !line) throw new Error(`${port.name} in d8 failed:\n${run.stdout}\n${run.stderr}`);
+  return { ...port, ...JSON.parse(line.slice(7)) };
+});
+
+for (const workload of ['chain', 'projection']) {
+  const [utu, rust, rustUnsafe, js] = results.map(port => port[workload]);
+  const expected = rust.result;
+  if (results.some(port => port[workload].result !== expected)) {
+    throw new Error(`${workload}: result mismatch, ${results.map(port => `${port.name}=${port[workload].result}`).join(', ')}`);
   }
-  const utuMedian = median(utuTimes), rustMedian = median(rustTimes), rustUnsafeMedian = median(rustUnsafeTimes), jsMedian = median(jsTimes);
-  console.log(`${spec.name}: result ${actual}`);
-  console.log(`  utu:         ${formatMs(utuMedian)} median (${formatMs(Math.min(...utuTimes))} best)`);
-  console.log(`  safe Rust:   ${formatMs(rustMedian)} median (${formatMs(Math.min(...rustTimes))} best)`);
-  console.log(`  unsafe Rust: ${formatMs(rustUnsafeMedian)} median (${formatMs(Math.min(...rustUnsafeTimes))} best)`);
-  console.log(`  JavaScript:  ${formatMs(jsMedian)} median (${formatMs(Math.min(...jsTimes))} best)`);
-  console.log(`  utu ratios: ${(utuMedian / rustMedian).toFixed(2)}× safe Rust time, ${(utuMedian / rustUnsafeMedian).toFixed(2)}× unsafe Rust time, ${(utuMedian / jsMedian).toFixed(2)}× JS time`);
+  console.log(`${workload}: result ${expected}`);
+  for (const port of results) {
+    console.log(`  ${`${port.name}:`.padEnd(13)}${formatMs(port[workload].median)} median (${formatMs(port[workload].best)} best)`);
+  }
+  console.log(`  utu ratios: ${(utu.median / rust.median).toFixed(2)}× safe Rust time, ${(utu.median / rustUnsafe.median).toFixed(2)}× unsafe Rust time, ${(utu.median / js.median).toFixed(2)}× JS time`);
 }
 console.log(`artifacts: ${path.relative(ROOT, TMP)}/`);
 
+// utu as `utu build -O3` makes it: the self-hosted compiler, optimizing for speed.
 async function compileUtu() {
-  const file = path.join(BENCH, 'deltablue.utu');
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser, target: 'normal', readFile: name => fs.readFile(name, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  const doc = await compiler.compileFile(file);
-  const errors = [...doc.querySelectorAll('[data-error]')];
-  if (errors.length) throw new Error(`deltablue.utu: ${errors.map(node => node.dataset.errorMessage).join('; ')}`);
-  return emitBinary(doc);
+  const utu = await loadNodeCompiler();
+  const { wasm, spec, diagnostics } = await compileFile(utu, path.join(BENCH, 'deltablue.utu'), { optimize: 'speed' });
+  if (!wasm) throw new Error(`deltablue.utu: ${diagnostics.map(d => d.message).join('; ')}`);
+  if (Object.keys(spec ?? {}).length) throw new Error('deltablue.utu: the benchmark module must import nothing from its host');
+  return wasm;
 }
 
+// The module as a d8 script (its exports as globals); payload is its minified size.
 async function loadJavaScript() {
-  const file = path.join(BENCH, 'deltablue.js');
-  const source = await fs.readFile(file, 'utf8');
+  const source = await fs.readFile(path.join(BENCH, 'deltablue.js'), 'utf8');
   const minified = await transform(source, { minify: true, format: 'esm', target: 'es2022' });
-  const module = await import(`${pathToFileURL(file).href}?benchmark=${Date.now()}`);
-  return { module, bytes: new TextEncoder().encode(minified.code) };
+  return { script: source.replace(/^export /gm, ''), bytes: new TextEncoder().encode(minified.code) };
 }
 
 function compileRust(directory, artifact) {
@@ -100,7 +110,5 @@ function compileRust(directory, artifact) {
   return new Uint8Array(readFileSync(path.join(targetDir, 'wasm32-unknown-unknown', 'release', `${artifact}.wasm`)));
 }
 
-function time(run) { const start = Bun.nanoseconds(); run(); return (Bun.nanoseconds() - start) / 1e6; }
-function median(values) { const sorted = [...values].sort((a, b) => a - b); const i = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[i] : (sorted[i - 1] + sorted[i]) / 2; }
 function formatMs(value) { return `${value.toFixed(3)} ms`; }
 function formatBytes(value) { return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(2)} KiB`; }

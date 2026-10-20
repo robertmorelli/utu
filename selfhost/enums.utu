@@ -303,9 +303,16 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     };
     let vt_ = named(variant, ty_inst(st));
     let vrepr = repr(vt_);
-    let mc = w_mark();
-    w_get(repr(st), s);
-    w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc);
+    // Without a default, the last arm is the only variant left: it is not
+    // tested (binding it casts, which wasm checks), unless the build is safe.
+    let rest = next_sibling(a);
+    while (rest >= 0 and not is_kind(rest, Node.Alt_arm)) { rest = next_sibling(rest); };
+    let last = default_ < 0 and rest < 0 and safe_checks[0] == 0;
+    if not last {
+        let mc = w_mark();
+        w_get(repr(st), s);
+        w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc);
+    };
     // The arm: bind, then its expression.
     let mt = w_mark();
     let c = next_sibling(pattern);
@@ -324,6 +331,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
     if t >= 0 { coerce(t1, t, c); };
     w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mt);
+    if last { return if t >= 0 { t; } else { ty_never(); }; };
     let me = w_mark();
     let t2 = alt_arms(next_sibling(a), s, st, if t >= 0 { t; } else { -1; }, default_, cx);
     if t < 0 { t = t2; } else { coerce(t2, t, a); };

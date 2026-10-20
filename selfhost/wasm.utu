@@ -1548,6 +1548,12 @@ fn encode_names() void {
 /// encoded section by section. Returns their number.
 fn encode_module() I32 {
     sweep();
+    // -O3 inlines (inline.utu); what is no longer called is then swept out,
+    // before the mems' late functions are made (and marked live).
+    if optimize_level[0] == 2 {
+        inline_module();
+        sweep();
+    };
     finish_mems();
     if optimize_level[0] != 0 { optimize_module(); };
     write_host_json();

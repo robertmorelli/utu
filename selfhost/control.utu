@@ -386,6 +386,11 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
         return error_since(m);
     };
     let t = ty_a[at];
+    // `x orelse fatal`: wasm's own null check, with no branch.
+    if is_kind(b, Node.Fatal_expr) {
+        w_node(Op.RefAsNonNull, repr(t), 0, 0, m);
+        return t;
+    };
     let s = new_local(repr(at));
     w_node(Op.LocalSet, vt_none, s, 0, m);
     let mi = w_mark();

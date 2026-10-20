@@ -1,0 +1,35 @@
+# fannkuch-redux benchmark
+
+fannkuch-redux from the Computer Language Benchmarks Game, following its
+single-threaded C program (`fannkuchredux.c`): every permutation of `0..n` is
+generated in place with a count array (rotating a prefix left), copied, and
+flipped by prefix reversal until its first element is 0. The run records the
+largest flip count and an alternating-sign checksum of all flip counts. It
+exercises tight integer loops over small mutable int arrays and bounds checks.
+
+Four ports do the same work step for step: utu (`Array[I32]`), safe Rust
+(`Vec<i32>`, indexed), unsafe Rust (the same `Vec`s with `get_unchecked` and
+`ptr::swap`), and JavaScript (`Int32Array`). Each allocates its three arrays
+once per run, as the C program does.
+
+## Workload
+
+Each port exports `bench(iterations)`, which runs fannkuch-redux with `n = 9`
+`iterations` times and returns the sum of `checksum * 1000 + maxFlips`. For
+`n = 9` the reference output is checksum 8629 and 30 flips, so `bench(1)` is
+`8629030`. (`n = 7` gives `228016`, which the utu and Rust tests check.)
+
+## Snapshot
+
+d8 on arm64 macOS, 5 warmups then the median of 20 samples of `bench(5)`; utu
+built at `-O3`. All four returned 43145150.
+
+| utu Wasm | safe Rust Wasm | unsafe Rust Wasm | JavaScript |
+|---:|---:|---:|---:|
+| 69.8 ms | 65.4 ms | 71.2 ms | 91.7 ms |
+
+| implementation | payload | gzip |
+|---|---:|---:|
+| utu Wasm | 5,240 B | 1,702 B |
+| safe Rust Wasm | 22,760 B | 9,876 B |
+| unsafe Rust Wasm | 22,133 B | 9,641 B |
