@@ -1,0 +1,6 @@
+// What: two tests with one name
+// Expect: Duplicate test "adds": a test's name says which one failed
+fn add(a: I32, b: I32) I32 { a + b; }
+
+test "adds" { assert add(1, 2) == 3; }
+test "adds" { assert add(2, 2) == 4; }

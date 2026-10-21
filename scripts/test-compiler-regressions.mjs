@@ -444,10 +444,78 @@ export lib {
     ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 'A closure cannot capture tuple t'],
     // An integer is no variant of an integer enum.
     ['enum(U8) A:\n    | X\n    | Y\nexport main() I32 { match A.X { 0 => 10, 1 => 20, }; }\n', '0 cannot match A'],
+    // Two opened modules with one name: neither is meant (this said "Unknown variable v").
+    ['mod a { fn v() I32 { 1; } }\nmod b { fn v() I32 { 2; } }\nusing a;\nusing b;\nexport main() I32 { v(); }\n', 'v is ambiguous: a.v or b.v'],
+    // A declaration named like a prelude module (the prelude's own `using Found` once found it).
+    ['struct Found:\n    | x: I32\nexport main() I32 { let s = Found { x: 4 }; s.x; }\n', 'Found is a standard type'],
+    // A generic module's function called with no instance (this built invalid Wasm).
+    ['mod gb[T] { fn id(v: T) T { v; } }\nexport main() F64 { gb.id(1.5); }\n', 'gb takes 1 type arguments, given 0'],
+    // Two types of one name, told apart.
+    ['mod a {\n    struct S:\n        | x: I32\n    fn mk() S { S { x: 1 }; }\n}\nstruct S:\n    | x: I32\nexport main() I32 { let s: S = a.mk(); s.x; }\n', 'Expected S, got a.S'],
+    // A module instantiating a bigger type each time it recurses (this ran for a minute, then crashed).
+    ['mod m[T] {\n    fn f(n: I32) I32 { if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; }; }\n}\nexport main() I32 { m[I32].f(3); }\n', "m's instances nest more than 64 deep"],
+    // Past what a Wasm function takes (the engine refused the module).
+    [`fn f(${Array.from({ length: 1001 }, (_, i) => `a${i}: I32`).join(', ')}) I32 { a0; }\nexport main() I32 { 1; }\n`, 'f has 1001 parameters (max 1000)'],
+    // Nesting past the compiler's stack: a diagnostic, not a JavaScript stack.
+    [`export main() I32 {\n    ${'('.repeat(30000)}1${')'.repeat(30000)};\n}\n`, 'Program nested too deeply (at about line 2)'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
-    assert.ok(errors?.includes(message), `${source}\n  reported: ${errors}`);
+    assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
+    checked++;
+  }
+
+  // Test names: each test has one, its own.
+  const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
+  assert.deepEqual(twice.diagnostics.map(d => d.message), ['Duplicate test "passes"', 'Empty test name']);
+  checked++;
+
+  // Each file's names are its own (only modules cross files), and generic
+  // modules called through aliases: what each builds to, in every mode.
+  const project = async files => {
+    const at = await fs.mkdtemp(path.join(dir, 'project-'));
+    for (const [name, text] of Object.entries(files)) await fs.writeFile(path.join(at, name), text);
+    return path.join(at, 'main.utu');
+  };
+  const tee = Array.from({ length: 3000 }, (_, k) => `    a = a * 3 + ${k % 7};`).join('\n');
+  let teed = 1;
+  for (let k = 0; k < 3000; k++) teed = (Math.imul(teed, 3) + k % 7) | 0;
+  const built = [
+    // An imported module's file's own function, not the entry's of the same name (this gave 2000).
+    [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { helper(); } }\n',
+      'main.utu': 'using hm |H| from "./hf.utu";\nfn helper() I32 { 1000; }\nexport main() I32 { H.f() + helper(); }\n' }, 1002],
+    // An imported file's alias stays in its file (it hid the entry's own `ops`).
+    [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n',
+      'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f(v: I32) I32 { ops.double(v); } }\n',
+      'main.utu': 'using boxes from "./boxes.utu";\nmod ops { fn double(v: I32) I32 { v * 10; } }\nexport main() I32 { ops.double(1) + boxes.f(1); }\n' }, 12],
+    // A capitalized alias of an instance, called and piped to (this built invalid Wasm).
+    [{ 'main.utu': 'mod box[T] { fn id(v: T) T { v; } }\nusing box[F64] |B|;\nexport main() F64 { B.id(1.5) + (2.5 -o B.id); }\n' }, 4],
+    [{ 'main.utu': 'mod num[T] { fn half(v: T) T { v / 2; } }\nusing num[U32] |N|;\nexport main() I64 { let x: U32 = 4000000000; N.half(x).to_i64(); }\n' }, 2000000000n],
+    // A module's promoted type's function, called on the module (this said "sm has no member new").
+    [{ 'main.utu': 'mod sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nexport main() I32 { sm.get(sm.new(3)); }\n' }, 3],
+    // An @es binding of a generic module, typed in each instance.
+    [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nexport main() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).to_f64(); }\n' }, 10.5],
+    // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
+    [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
+  ];
+  for (const [files, expected] of built) {
+    const file = await project(files);
+    for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+      const result = await compileFile(utu, file, { mode });
+      assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}\n${files['main.utu'].slice(0, 200)}`);
+      assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), expected, `${mode}: ${files['main.utu'].slice(0, 200)}`);
+      checked++;
+    }
+  }
+  // What a file does not import, it does not see.
+  const unseen = [
+    [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { 1; } }\n', 'main.utu': 'using hm from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'Unknown variable helper'],
+    [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n', 'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f() I32 { 1; } }\n',
+      'main.utu': 'using boxes from "./boxes.utu";\nexport main() I32 { ops.double(21); }\n' }, 'Unknown variable ops'],
+  ];
+  for (const [files, message] of unseen) {
+    const result = await compileFile(utu, await project(files), {});
+    assert.ok(result.diagnostics.some(d => d.message === message), `${files['main.utu']}\n  reported: ${result.diagnostics.map(d => d.message)}`);
     checked++;
   }
   console.log(`compiler regressions: ${checked} builds as they should be`);

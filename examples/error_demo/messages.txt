@@ -3080,25 +3080,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/55_duplicate_hoisted_std_name.utu
- ERROR  Duplicate Str__len
-        duplicate-declaration · examples/error_demo/names/55_duplicate_hoisted_std_name.utu:4:5
+ ERROR  Str is a standard type
+        standard-name · examples/error_demo/names/55_duplicate_hoisted_std_name.utu:3:5
 
+ 1 │ // What: an own module named like a std module (Str) redeclares one of its functions
  2 │ // Expect: Duplicate top-level declaration 'Str.len' (std's Str already declares it)
  3 │ mod Str {
+   │     ━━━
+   │     ╰─ a prelude name
  4 │     fn len |s| () I32 { 0; }
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ already declared
  5 │ }
-
- ERROR  No method Str.len
-        unknown-method · examples/error_demo/names/55_duplicate_hoisted_std_name.utu:8:5
-
- 6 │
- 7 │ export main() I32 {
- 8 │     "abc".len();
-   │     ━━━━━━━━━━━
-   │     ╰─ no such method
- 9 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/56_duplicate_methods.utu
@@ -3557,6 +3548,96 @@ ok
 18 │     fn total(n: I32) I32 { n * 2; }
 19 │ }
 --- exit 1
+
+=== utu check examples/error_demo/names/91_ambiguous_opened_name.utu
+ ERROR  v is ambiguous: a.v or b.v
+        ambiguous-name · examples/error_demo/names/91_ambiguous_opened_name.utu:9:5
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     v();
+   │     ━
+   │     ╰─ ambiguous
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/92_standard_name_struct.utu
+ ERROR  Found is a standard type
+        standard-name · examples/error_demo/names/92_standard_name_struct.utu:3:8
+
+ 1 │ // What: a struct named like a prelude module (Found, which iterators return)
+ 2 │ // Expect: Found is a standard type: name it something else
+ 3 │ struct Found:
+   │        ━━━━━
+   │        ╰─ a prelude name
+ 4 │     | x: I32
+--- exit 1
+
+=== utu check examples/error_demo/names/93_imported_file_helper_private.utu
+ ERROR  Unknown variable helper
+        unknown-variable · examples/error_demo/names/93_imported_file_helper_private.utu:6:22
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     shapes.area(2) + helper();
+   │                      ━━━━━━
+   │                      ╰─ not defined
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/94_imported_alias_stays_in_its_file.utu
+ ERROR  Unknown variable ops
+        unknown-variable · examples/error_demo/names/94_imported_alias_stays_in_its_file.utu:6:5
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     ops.double(21);
+   │     ━━━
+   │     ╰─ not defined
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/95_generic_call_without_instance.utu
+ ERROR  box takes 1 type arguments, given 0
+        invalid-module-arity · examples/error_demo/names/95_generic_call_without_instance.utu:8:5
+
+ 6 │
+ 7 │ export main() F64 {
+ 8 │     box.id(1.5);
+   │     ━━━
+   │     ╰─ here
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/96_duplicate_test_name.utu
+ ERROR  Duplicate test "adds"
+        test-name · examples/error_demo/names/96_duplicate_test_name.utu:6:6
+
+ 4 │
+ 5 │ test "adds" { assert add(1, 2) == 3; }
+ 6 │ test "adds" { assert add(2, 2) == 4; }
+   │      ━━━━━━
+   │      ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/97_empty_test_name.utu
+ ERROR  Empty test name
+        test-name · examples/error_demo/names/97_empty_test_name.utu:3:6
+
+ 1 │ // What: a test with an empty name
+ 2 │ // Expect: Empty test name
+ 3 │ test "" { assert 1 + 1 == 2; }
+   │      ━━
+   │      ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/import_parts/mathops.utu
+ok
+--- exit 0
+
+=== utu check examples/error_demo/names/import_parts/shapes.utu
+ok
+--- exit 0
 
 === utu check examples/error_demo/names/lazy_parts/widgets.utu
 ok
@@ -5214,10 +5295,10 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 --- exit 1
 
 === utu run examples/error_demo/runtime/54_main_takes_args.utu
- TRAP  Wrong type from JavaScript
-       trap · examples/error_demo/runtime/54_main_takes_args.utu
+ ERROR  main takes (name: Str), but utu run calls it with none
+        main-arguments
 
-  in main
+  note  Give main no parameters to run it, or call it from JavaScript (utu build).
 --- exit 1
 
 === utu run examples/error_demo/runtime/55_main_returns_struct.utu
@@ -5786,7 +5867,7 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 --- exit 1
 
 === utu check examples/error_demo/syntax/45_dsl_block_not_closed.utu
- ERROR  No \/ ends this body
+ ERROR  Unexpected character '/'
         parse-error · examples/error_demo/syntax/45_dsl_block_not_closed.utu:3:25
 
  1 │ // What: an @es DSL block is never closed with `\/`.
@@ -6026,13 +6107,13 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 
 === utu check examples/error_demo/syntax/64_int_negative_unsigned.utu
  ERROR  -1 does not fit U32
-        integer-out-of-range · examples/error_demo/syntax/64_int_negative_unsigned.utu:4:22
+        integer-out-of-range · examples/error_demo/syntax/64_int_negative_unsigned.utu:4:21
 
  2 │ // Expect: Integer literal -1 is out of range for U32.
  3 │ export main() I32 {
  4 │     let none: U32 = -1;
-   │                      ━
-   │                      ╰─ U32
+   │                     ━━
+   │                     ╰─ U32
  5 │     none.to_i32();
  6 │ }
 --- exit 1
@@ -6448,17 +6529,17 @@ ok
  5 │ }
 --- exit 1
 
-=== utu check examples/error_demo/syntax/95_es_regex_nests.utu
- ERROR  This /\ opens a nested body, so the body ends at a later \/
-        dsl-error · examples/error_demo/syntax/95_es_regex_nests.utu:3:48
+=== utu check examples/error_demo/syntax/95_too_many_parameters.utu
+ ERROR  f has 1001 parameters (max 1000)
+        too-many-params · examples/error_demo/syntax/95_too_many_parameters.utu:3:4
 
- 1 │ // What: a JavaScript regex in an @es body holds `/\`, which opens a nested body.
- 2 │ // Expect: the `/\` in the regex is named: the body ends at a later `\/` than meant.
- 3 │ let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
-   │                                                ━━
-   │                                                ╰─ here
- 4 │
- 5 │ export main() I32 {
+ 1 │ // What: a function with more parameters than a Wasm function takes (1000)
+ 2 │ // Expect: f has 1001 parameters (max 1000)
+ 3 │ fn f(
+   │    ━
+   │    ╰─ here
+ 4 │     a0: I32,
+ 5 │     a1: I32,
 --- exit 1
 
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu
@@ -6598,17 +6679,30 @@ ok
  7 │ }
 --- exit 1
 
-=== utu check examples/error_demo/types/100_host_value_as_str.utu
- ERROR  Expected Str, got JS.Map<any, any>
-        type-mismatch · examples/error_demo/types/100_host_value_as_str.utu:6:18
+=== utu check examples/error_demo/types/100_same_name_types.utu
+ ERROR  Expected S, got a.S
+        type-mismatch · examples/error_demo/types/100_same_name_types.utu:13:16
 
- 4 │
- 5 │ export main() I32 {
- 6 │     let s: Str = new JS.Map();
-   │                  ━━━━━━━━━━━━
-   │                  ╰─ JS.Map<any, any>
- 7 │     s.len();
- 8 │ }
+11 │
+12 │ export main() I32 {
+13 │     let s: S = a.mk();
+   │                ━━━━━━
+   │                ╰─ S
+14 │     s.x;
+15 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/101_instances_without_end.utu
+ ERROR  m's instances nest more than 64 deep
+        instance-depth · examples/error_demo/types/101_instances_without_end.utu:5:33
+
+ 3 │ mod m[T] {
+ 4 │     fn f(n: I32) I32 {
+ 5 │         if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
+   │                                 ━━━━━━━━━━━━━━━━━━━━
+   │                                 ╰─ one more level
+ 6 │     }
+ 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/10_reassign_local.utu

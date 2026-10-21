@@ -18,6 +18,9 @@ export main(...) ... {
 }
 ```
 
+`main` may take parameters for a host that calls it with arguments; `utu run`
+calls it with none, so it refuses a `main` that takes any.
+
 Rules:
 - `export lib` is a codegen annotation surface. It contains **only functions** — no structs, enums, globals, or tests.
 - `export lib` does not create any importable Utu interface. It only marks enclosed functions for Wasm export to JS.
@@ -477,6 +480,17 @@ Array      // std:Array — mutable WasmGC Array, invariant in T1
 ```
 
 All auto-imported names can be shadowed by an explicit `using ... |Alias|`.
+A file's own declarations may not take a prelude module's name (`struct Found`
+is an error: `Found is a standard type`).
+
+Names are per file. Only modules cross files: `using M from "f.utu"` brings
+module `M` (under its alias, when it has one) into this file. The imported
+file's other top-level declarations (functions, types, globals) and its
+aliases are its own: its modules see them, and no other file does.
+
+`using M;` and `using M[A];` (no alias, no file) open the module: its members
+are in scope by their own names. A name two opened modules both have is
+ambiguous where it is used; the file's own declarations hide opened ones.
 
 ```
 // cross-file import

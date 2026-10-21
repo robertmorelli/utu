@@ -2201,7 +2201,7 @@ fn check_partition(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
 /// Push `M[args].new(…)` of a std module (Found, Group): the arguments are
 /// on the stack since `m`.
 fn std_new(module_name: Str, args: I32, m: I32, cx: Cx) I32 {
-    let module = lookup(intern_text(module_name));
+    let module = prelude_lookup(intern_text(module_name));
     if not decl_is(module, Decl.Module) { return -1; };
     let inst = instance(module, args);
     let f = member(decl_a[module], intern_text("new"), Space.Method);
@@ -2227,7 +2227,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let slot = p.first_stage + k;
     let type_node = stage_type(node, 0);
     let et = type_of(type_node, cx.inst);
-    let module = lookup(intern_text("Found"));
+    let module = prelude_lookup(intern_text("Found"));
     let found_t = named(decl_a[module], instance(module, list1(et)));
     let rt = nullable(found_t);
     let result = stage_local(slot, 0, repr(rt));
@@ -2346,7 +2346,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let et = type_of(type_node, cx.inst);
     let kt = type_of(key_node, cx.inst);
     let grouping = op == Kw.Group_by.to_i32();
-    let gmodule = lookup(intern_text("Group"));
+    let gmodule = prelude_lookup(intern_text("Group"));
     let group_t = if grouping { named(decl_a[gmodule], instance(gmodule, list2(kt, et))); } else { et; };
     let keys = buffer_at(p, slot, 0, kt, -1, false);
     let out = buffer_at(p, slot, 3, group_t, -1, false);

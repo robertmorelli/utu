@@ -133,7 +133,8 @@ fn validate_program() void {
 fn validate_module_members() void {
     for (0 ..< decl_kind.len()) |b| {
         // A generic module is instantiated (`M__I32`), not hoisted as itself.
-        if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) {
+        // (One named like a prelude module is reported as that.)
+        if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) and prelude_lookup(decl_name[b]) < 0 {
             for (0 ..< decl_kind.len()) |a| {
                 if a != b and decl_is(a, Decl.Module) and not is_generic(a) and decl_name[a] == decl_name[b] and module_before(a, b) {
                     let item = first_child(decl_node[b]);
@@ -308,21 +309,37 @@ fn duplicate_alt_arms(node: I32) void {
     };
 }
 
+/// By word: the stamp of the block whose lets last named it; and the last stamp.
+vec let_seen: I32;
+vec let_stamp: I32 = [0];
+
+/// A new stamp for @word_seen: no word seen with it yet.
+fn word_stamp() I32 {
+    let_stamp[0] += 1;
+    let_stamp[0];
+}
+
+/// Whether `word` was seen with `stamp` before; it is now.
+fn word_seen(word: I32, stamp: I32) Bool {
+    if word < 0 { return false; };
+    if let_seen.len() <= word {
+        let k = let_seen.len();
+        let_seen.resize(src.interned() + 1);
+        for (k ..< let_seen.len()) |w| { let_seen[w] = 0; };
+    };
+    if let_seen[word] == stamp { return true; };
+    let_seen[word] = stamp;
+    false;
+}
+
 /// The lets of a block, each name once.
 fn duplicate_lets(block: I32) void {
+    let stamp = word_stamp();
     let c = first_child(block);
     while (c >= 0) {
         if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
             let word = word_of(first_child(c));
-            let other = first_child(block);
-            while (other != c) {
-                if is_kind(other, Node.Bind_expr) and is_kind(first_child(other), Node.Identifier) and word_of(first_child(other)) == word {
-                    report2(Diag.DuplicateDeclaration, c, word, 3, -1);
-                    other = c;
-                } else {
-                    other = next_sibling(other);
-                };
-            };
+            if word_seen(word, stamp) { report2(Diag.DuplicateDeclaration, c, word, 3, -1); };
         };
         c = next_sibling(c);
     };
