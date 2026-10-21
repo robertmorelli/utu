@@ -155,24 +155,25 @@ try {
     assert.equal(exports?.main(), 37, `${compiler}: ${errors}`);
   }
 
-  // Mistakes: each at its place.
+  // Mistakes: each at its place. A third entry is stage 0's message where it
+  // is worded otherwise than the self-hosted compiler's.
   const mistakes = [
     ['fn f(x: I32) I32 { @wat/\\ (i64.add (local.get $x) (local.get $x)) \\/; }', '1:27 i64.add needs an i64, not an i32'],
     ['fn f(x: I32) I32 {\n    @wat/\\\n        local.get $x\n        i32.lodd\n    \\/;\n}', "4:9 unknown instruction 'i32.lodd'"],
     ['fn f(x: I32) I32 { @wat/\\ (i32.load (local.get $x)) \\/; }', '1:28 i32.load: a @wat function computes on its arguments; it has no memories, globals, calls, or references'],
     ['fn f(x: I32) I32 { @wat/\\ local.get $x local.get $x \\/; }', '1:40 the function returns i32, but its body leaves 1 more value'],
     ['fn f(x: Str) I32 { @wat/\\ i32.const 1 \\/; }', '1:20 a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, V128, M32, M64, or M128, not Str'],
-    ['fn f() I32 { let y = 1; @wat/\\ i32.const 1 \\/; }', "1:25 @wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
-    ['let w: I32 = @wat/\\ i32.const 1 \\/;', "1:14 @wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
+    ['fn f() I32 { let y = 1; @wat/\\ i32.const 1 \\/; }', "1:25 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
+    ['let w: I32 = @wat/\\ i32.const 1 \\/;', "1:14 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
     ['fn f(x: I32) I32 { @wat/\\ v128.const i32x4 1 2 \\/; }', '1:27 v128.const needs 5 immediates'],
   ];
-  for (const [i, [source, want]] of mistakes.entries()) {
+  for (const [i, [source, want, stage0Want]] of mistakes.entries()) {
     const file = path.join(dir, `mistake${i}.utu`);
     await fs.writeFile(file, `${source}\nexport lib { fn g() I32 { 0; } }\n`);
     const got = await selfhost(file);
     assert.deepEqual(got.errors, [want], source);
     const theirs = await stage0(file);
-    assert.equal(theirs.errors?.[0], want.replace(/^\d+:\d+ /, ''), `stage 0: ${source}`);
+    assert.equal(theirs.errors?.[0], stage0Want ?? want.replace(/^\d+:\d+ /, ''), `stage 0: ${source}`);
   }
   // A generator is not one, whether or not it is called (it expands into its consumers).
   for (const call of ['0', 'let s = 0; for (g(3)) |v| { s += v; }; s']) {

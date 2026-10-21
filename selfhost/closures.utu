@@ -370,8 +370,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
             // Host declarations type the closures handed to them.
             if has_foreign() { return unsupported(node); };
             report(Diag.ClosureParamType, p, word_of(first_child(p)));
-            diag_label("no type");
-            diag_note("Give it one, as in cl(" + word_text(word_of(first_child(p))) + ": I32), or pass the closure where its type is known.");
+            diag_label("cl(" + word_text(word_of(first_child(p))) + ": T)");
             t = ty_error();
         };
         ptypes[i] = t;

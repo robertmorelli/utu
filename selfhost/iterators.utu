@@ -378,8 +378,9 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         if not is_array_type(at) {
             if not ty_is(at, Ty.Error) {
                 report2(Diag.IteratorSource, input, -1, at, 0);
-                diag_label("this is " + article(type_text(at)));
-                diag_note(source_hint(at));
+                diag_label(type_text(at));
+                let hint = source_hint(at);
+                if hint.len() > 0 { diag_note(hint); };
             };
             w_stack.resize(m);
             return error_value();
@@ -678,8 +679,8 @@ fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         report(Diag.IteratorTerminalInside, stage_node(p, k), op);
         let here = stage_node(p, k);
         let next = stage_node(p, k + 1);
-        diag_focus(node_last[first_child(here)], node_last[here] - 1, "ends the pipeline");
-        diag_place_tokens(Extra.Related, node_last[first_child(next)], node_last[next] - 1, "so this has nothing to read");
+        diag_focus(node_last[first_child(here)], node_last[here] - 1, "ends here");
+        diag_place_tokens(Extra.Related, node_last[first_child(next)], node_last[next] - 1, "cannot follow");
         seq_void(m);
         return;
     };
@@ -921,7 +922,7 @@ fn other_array(p: Pipe, k: I32, cx: Cx) I32 {
     if not is_array_type(ot) {
         if not ty_is(ot, Ty.Error) {
             report2(Diag.IteratorSource, param, stage_op(p, k), ot, 1);
-            diag_label("this is " + article(type_text(ot)));
+            diag_label(type_text(ot));
         };
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return -1;
@@ -998,7 +999,7 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     if not is_array_type(nt) {
         if not ty_is(nt, Ty.Error) {
             report2(Diag.IteratorSource, block, -1, nt, 2);
-            diag_label("gives " + article(type_text(nt)));
+            diag_label(type_text(nt));
         };
         w_stack.resize(mn);
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
@@ -2046,6 +2047,11 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     p.result = result;
     p.result_type = rt;
     let fheap = vt_heap(repr(found_t));
+    // min_by and max_by compare two values: no index.
+    let capture = stage_capture(node);
+    if (op == Kw.Min_by.to_i32() or op == Kw.Max_by.to_i32()) and capture >= 0 and child_count(capture) != 2 {
+        report2(Diag.IteratorCaptures, node, stage_op(p, k), 2, 1);
+    };
     if op == Kw.First_where.to_i32() {
         // if test { result = Found.new(value); stop }
         let mi = w_mark();
@@ -2623,8 +2629,9 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
         if not is_array_type(at) {
             if not ty_is(at, Ty.Error) {
                 report2(Diag.IteratorSource, input, -1, at, 0);
-                diag_label("this is " + article(type_text(at)));
-                diag_note(source_hint(at));
+                diag_label(type_text(at));
+                let hint = source_hint(at);
+                if hint.len() > 0 { diag_note(hint); };
             };
             w_stack.resize(m);
             return error_value();

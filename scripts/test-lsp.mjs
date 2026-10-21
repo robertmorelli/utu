@@ -157,7 +157,7 @@ try {
 
   // Diagnostics as the text changes, and cleared when it is fixed.
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN.replace('total * 2', 'total * nope') }] });
-  assert.deepEqual(diagnostics().map(d => [d.code, d.message, d.range.start.line]), [['unknown-variable', "Unknown variable 'nope'", 6]]);
+  assert.deepEqual(diagnostics().map(d => [d.code, d.message, d.range.start.line]), [['unknown-variable', 'Unknown variable nope', 6]]);
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN.replace('== 6', '== true') }] });
   assert.equal(diagnostics().length, 1, "the tests' build is checked too");
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
@@ -178,7 +178,7 @@ try {
   await fs.writeFile(path.join(dir, '_shapes.utu'), SHAPES.replace('self.x + self.y', 'self.x + nope'));
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
   const onImport = sent.filter(m => m.method === 'textDocument/publishDiagnostics' && m.params.uri === shapes).at(-1);
-  assert.deepEqual(onImport.params.diagnostics.map(d => [d.message, d.range.start.line]), [["Unknown variable 'nope'", 12]]);
+  assert.deepEqual(onImport.params.diagnostics.map(d => [d.message, d.range.start.line]), [['Unknown variable nope', 12]]);
   await fs.writeFile(path.join(dir, '_shapes.utu'), SHAPES);
   await tell('textDocument/didChange', { textDocument: { uri: main, version: ++version }, contentChanges: [{ text: MAIN }] });
   assert.deepEqual(sent.filter(m => m.method === 'textDocument/publishDiagnostics' && m.params.uri === shapes).at(-1).params.diagnostics, [], 'and cleared when fixed');

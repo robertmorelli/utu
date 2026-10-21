@@ -33,19 +33,21 @@ export main() I32 {
   // place, and the code, marked (a rule under it, without color).
   r = utu('check', 'bad.utu');
   assert.equal(r.status, 1);
-  assert.equal(r.stderr.trim(), `ERROR  Type mismatch: expected I32, got Str
+  assert.equal(r.stderr.trim(), `ERROR  Expected I32, got Str
         type-mismatch · bad.utu:3:25
 
  2 │ export main() I32 {
  3 │     let x: I32 = add(1, "two");
    │                         ━━━━━
+   │                         ╰─ Str
 
- ERROR  Unknown variable 'missing'
+ ERROR  Unknown variable missing
         unknown-variable · bad.utu:4:9
 
  3 │     let x: I32 = add(1, "two");
  4 │     x + missing;
-   │         ━━━━━━━`);
+   │         ━━━━━━━
+   │         ╰─ not defined`);
   // On a terminal, colored as the compiler reads it: \`add\` a function, \`I32\` a type, the string a string.
   const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', COLORTERM: 'truecolor', UTU_THEME: 'dark' } }).stderr;
   assert.match(colored, /\x1b\[38;2;130;170;255madd/);
@@ -64,7 +66,7 @@ export main() I32 {
   assert.match(utu('check', 'wide.utu').stderr, /^ {3}│ {26}━{4}$/m);
   // A file that ends early says so.
   await fs.writeFile(path.join(dir, 'short.utu'), 'export main() I32 {\n');
-  assert.match(utu('check', 'short.utu').stderr, /Syntax error: unexpected end of the file/);
+  assert.match(utu('check', 'short.utu').stderr, /Unexpected end of file/);
 
   r = utu('run', 'good.utu');
   assert.equal(r.status, 0, r.stderr);
@@ -85,7 +87,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   for (const mode of [[], ['-O', 'fast']]) {
     r = utu('run', 'past.utu', ...mode);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /TRAP  The program stopped/);
+    assert.match(r.stderr, /TRAP  fatal, failed assert, or failed check/);
   }
   for (const mode of ['smallUnsafe', 'fastUnsafe']) {
     r = utu('run', 'past.utu', '-O', mode);
@@ -93,9 +95,9 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.equal(r.stdout.trim(), '7');
   }
   // One mode at a time, by name.
-  assert.match(utu('run', 'past.utu', '-O', 'fast', '-O', 'small').stderr, /choose one build mode/);
+  assert.match(utu('run', 'past.utu', '-O', 'fast', '-O', 'small').stderr, /Two build modes/);
   assert.match(utu('run', 'past.utu', '-O', 'fastUnsfe').stderr, /did you mean fastUnsafe/);
-  assert.match(utu('run', 'past.utu', '-O3').stderr, /-O3 is not an option/);
+  assert.match(utu('run', 'past.utu', '-O3').stderr, /Unknown option -O3/);
 
   // A module and the least JavaScript that loads it.
   r = utu('build', 'good.utu', '-o', 'out');

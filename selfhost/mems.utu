@@ -297,7 +297,8 @@ fn finish_mems() void {
 
 /// The `@comptime` mems, in order.
 vec comptime_mem: I32;
-/// Their values, from the host: bytes in `comptime_bytes`, or -1 until given.
+/// Their values, from the host: bytes in `comptime_bytes`, or -1 until given,
+/// or -2 when the evaluation trapped (its count then the reason's code).
 vec comptime_start: I32;
 vec comptime_count: I32;
 export mem comptime_bytes: U8;
@@ -347,6 +348,9 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
         };
     } else {
         let k = comptime_index(decl);
+        // A number, or @es: not what fills a mem.
+        if k < 0 { report2(Diag.MemInitializer, init, decl_name[decl], 1, -1); };
+        if k >= 0 and comptime_start[k] == -2 { report2(Diag.ComptimeTrap, init, decl_name[decl], comptime_count[k], -1); };
         if k >= 0 and comptime_start[k] >= 0 {
             let value_size = if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
             count = comptime_count[k];

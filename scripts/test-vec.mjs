@@ -115,10 +115,9 @@ try {
   for (const compiler of ['stage0', 'selfhost']) assert.equal(lots[compiler].exports?.total(), 149, `${compiler}: 150 vecs`);
 
   const over = await both(path.join(dir, 'over.utu'), tooMany);
-  const message = 'mem m100 is one mem too many: a module has at most 100 memories; declare the others as vec';
-  assert.equal(over.stage0.error, message);
-  assert.equal(over.selfhost.error, message);
-  console.log(`vec: ${KINDS.length} storage kinds behave as mems in both compilers; growth, 150 vecs, and the 101st mem as stage 0`);
+  assert.equal(over.stage0.error, 'mem m100 is one mem too many: a module has at most 100 memories; declare the others as vec');
+  assert.equal(over.selfhost.error, 'Too many mems (max 100): make m100 a vec');
+  console.log(`vec: ${KINDS.length} storage kinds behave as mems in both compilers; growth, 150 vecs, and the 101st mem reported by both`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

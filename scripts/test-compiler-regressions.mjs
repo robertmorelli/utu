@@ -94,18 +94,18 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
-  // Mistakes the self-hosted compiler reports (stage 0's words, where it has them).
+  // Mistakes the self-hosted compiler reports, in its words.
   const mistakes = [
-    ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'entry surface: multiple export lib declarations'],
-    ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'entry surface: multiple export main declarations'],
-    ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'entry surface: export lib and export main are mutually exclusive'],
+    ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
+    ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'Two export main'],
+    ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'export lib and export main together'],
     // A function of a type without self, called on a value of it.
-    ['struct P:\n    | x : I32\nfn P.make() I32 { 1; }\nexport lib { fn run() I32 { P { x: 1 }.make(); } }\n', 'Wrong arity: expected 0, got 1'],
+    ['struct P:\n    | x : I32\nfn P.make() I32 { 1; }\nexport lib { fn run() I32 { P { x: 1 }.make(); } }\n', 'Takes 0, given 1'],
     // An implementation of a protocol for a type that is not there (this trapped).
     ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { 0.0; }\nfn sum(l: Array[P]) F32 { l[0].perimeter(); }\nexport lib { fn run() I32 { 0; } }\n',
-      "Unknown type 'Nope'"],
+      'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
-    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Syntax error: expected ';', got 'x'"],
+    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Expected ';', got 'x'"],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

@@ -288,6 +288,12 @@ fn type_path(node: I32, inst: I32) I32 {
         return named(member_decl, at);
     };
     let n = if kind == Node.Promoted_type.to_i32() { node; } else { name_node(node); };
+    // U8, I8, U16, I16 are how a mem, a vec, or an int enum stores its
+    // values, which read as I32: not the type of a value.
+    if node_decl[n] < 0 and builtin_type(word_of(n)) {
+        report(Diag.StorageType, n, word_of(n));
+        return ty_error();
+    };
     decl_type(node_decl[n], inst);
 }
 

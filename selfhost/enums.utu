@@ -263,8 +263,9 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     if is_foreign_or_nullable(st) { return check_host_alt(node, st, m, expect, cx); };
     if not decl_is(enum_decl, Decl.Enum) {
         report2(Diag.AltNotEnum, scrutinee, -1, st, -1);
-        diag_label("this is " + article(type_text(st)));
-        diag_note(alt_hint(st));
+        diag_label(type_text(st));
+        let hint = alt_hint(st);
+        if hint.len() > 0 { diag_note(hint); };
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };

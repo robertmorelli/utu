@@ -25,8 +25,7 @@ const roots = inputs.length ? inputs : ['examples', 'benchmarks', 'std', 'hand_w
 function files(entry) {
   if (fs.statSync(entry).isFile()) return [entry];
   return fs.readdirSync(entry, { withFileTypes: true }).flatMap(item => {
-    // The error catalog (examples/error_demo/<category>/) has its own test, test-error-messages.mjs.
-    if (item.isDirectory()) return ['node_modules', 'dist'].includes(item.name) || path.basename(entry) === 'error_demo' ? [] : files(path.join(entry, item.name));
+    if (item.isDirectory()) return ['node_modules', 'dist'].includes(item.name) ? [] : files(path.join(entry, item.name));
     return item.name.endsWith('.utu') ? [path.join(entry, item.name)] : [];
   });
 }

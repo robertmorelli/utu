@@ -384,13 +384,31 @@ export async function compileProgram(utu, target, host = {}) {
     const { exports } = await instantiate(wasm, spec, host);
     for (let k = 0; k < count; k++) {
       const name = utu.comptime_name(k);
-      const n = exports[`__comptime_run_${name}`]();
+      let n;
+      try { n = exports[`__comptime_run_${name}`](); } catch (error) {
+        // Reported at the mem, as a diagnostic.
+        utu.comptime_fail(k, comptimeTrapCode(error));
+        continue;
+      }
       const bytes = new Uint8Array(exports[`__comptime_${name}`].buffer, 0, n * utu.comptime_value_size(k)).slice();
       const at = utu.comptime_set(k, n);
       new Uint8Array(utu.comptime_bytes.buffer).set(bytes, at);
     }
   }
   return utu.compile_program(target);
+}
+
+/** Why a `@comptime` evaluation threw, as the compiler's code for it (comptime_trap_text). */
+function comptimeTrapCode(error) {
+  const text = String(error?.message ?? error);
+  if (!(error instanceof WebAssembly.RuntimeError) && !/call stack|recursion/i.test(text)) return 7;
+  if (/out of bounds/i.test(text)) return 1;
+  if (/unreachable/i.test(text)) return 2;
+  if (/divi.*zero|by zero/i.test(text)) return 3;
+  if (/overflow/i.test(text) && !/stack/i.test(text)) return 4;
+  if (/null/i.test(text)) return 5;
+  if (/call stack|recursion|stack/i.test(text)) return 6;
+  return 0;
 }
 
 /**
@@ -440,6 +458,8 @@ export function readDiagnostics(utu, files) {
         }
       }
     }
+    // Every mark has its tag: the report's label, or the kind's own.
+    if (utu.diagnostic_default_label && diagnostic.label == null && diagnostic.file) diagnostic.label = utu.diagnostic_default_label(i);
     out.push(diagnostic);
   }
   return out;

@@ -462,7 +462,6 @@ fn module_member_missing(module: I32, name: I32) I32 {
 fn report_module_member_missing(module: I32, name: I32) void {
     if reported_within(name) { return; };
     report3(Diag.UnknownMember, name, word_of(name), -1, -1, decl_name[module]);
-    diag_label("not in " + word_text(decl_name[module]));
 }
 
 /// A string literal @decode_string refused: a bad escape, or a lone
@@ -471,6 +470,11 @@ fn bad_literal(at: I32) I32 {
     // A lone surrogate: half of a pair, which a string cannot hold alone.
     if bad_escape[0] < 0 {
         report2(Diag.InvalidEscape, at, -1, 1, -1);
+        return error_value();
+    };
+    if bad_escape[1] == 1 {
+        // `\d`: the escape's two bytes, as a word, for the message.
+        report2(Diag.InvalidEscape, at, src.intern(bad_escape[0], bad_escape[0] + 2), 2, -1);
         return error_value();
     };
     report(Diag.InvalidEscape, at, -1);
@@ -1078,7 +1082,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
         let name = last_child(target);
         if node_decl[name] < 0 { return unsupported(node); };
         report(Diag.AssignmentToImmutable, name, word_of(name));
-        diag_label(pick(decl_is(node_decl[name], Decl.Variant), "a variant is a constant", "a function cannot be reassigned"));
+        diag_label(pick(decl_is(node_decl[name], Decl.Variant), "constant", "function"));
         return error_value();
     };
     if not is_kind(target, Node.Identifier) { return unsupported(node); };
@@ -1203,7 +1207,6 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
 /// its type and apply the operator `word` of that type.
 fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     if ty_is(t, Ty.Error) {
-        if is_kind(at, Node.Binary_expr) and unresolved(first_child(at)) { report2(Diag.UnknownOperator, at, -1, -1, -1); };
         check_expr(right, -1, cx);
         return error_since(m);
     };
@@ -1291,7 +1294,6 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
         if is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true); };
     };
     let m = w_mark();
-    if unresolved(operand) { report2(Diag.UnknownOperator, node, -1, -1, -1); };
     if tok_word[node_first[node]] == Kw.Not.to_i32() {
         let bool_t = prelude(Prelude.Bool);
         coerce(check_expr(operand, bool_t, cx), bool_t, operand);
@@ -1623,13 +1625,10 @@ fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
     let params = fi_params[fi];
     let sig = "(";
     for (0 ..< vl_len[params]) |i| {
-        let t = vl_item(params, i);
-        if not crosses_chunk(t) { report2(Diag.LazyValue, decl_node[decl], decl_name[decl], t, -1); };
         if i > 0 { sig = sig + ", "; };
-        sig = sig + "a" + i.to_str() + ": " + type_text(t);
+        sig = sig + "a" + i.to_str() + ": " + type_text(vl_item(params, i));
     };
     let r = fi_result[fi];
-    if not is_foreign(r) { report2(Diag.LazyValue, decl_node[decl], decl_name[decl], r, 1); };
     sig = sig + ") " + type_text(r);
     let body = "(...a)=>globalThis.__utuWutu.lazyCall(" + word_text(lazy_path[lazy]) + ",\"" + word_text(decl_name[decl]) + "\",a)";
     let imp = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), func_type_of[f]);
@@ -1640,6 +1639,18 @@ fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
     lazy_call_fn.push(decl);
     lazy_call_sig.push(intern_text(sig));
     lazy_call_path.push(lazy);
+}
+
+/// What crosses into lazy module function `fi`'s chunk and back: numbers,
+/// Bool, Str, and host values in, a host element out.
+fn check_lazy_signature(fi: I32) void {
+    let decl = fi_decl[fi];
+    let params = fi_params[fi];
+    for (0 ..< vl_len[params]) |i| {
+        let t = vl_item(params, i);
+        if not crosses_chunk(t) { report2(Diag.LazyValue, decl_node[decl], decl_name[decl], t, -1); };
+    };
+    if not is_foreign(fi_result[fi]) { report2(Diag.LazyValue, decl_node[decl], decl_name[decl], fi_result[fi], 1); };
 }
 
 /// Whether a value of type t can cross into a chunk: a number, a Bool, a Str, or a host value.
@@ -1661,7 +1672,11 @@ fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     // From outside a lazy module, its function is its stub (see lazy_stub).
     let lazy = lazy_index(module_of(fi_decl[fi]));
     let caller = if cx.fi >= 0 { module_of(fi_decl[cx.fi]); } else { -1; };
-    let target = if lazy >= 0 and caller != module_of(fi_decl[fi]) { lazy_stub_func(fi, lazy); } else { fi_func[fi]; };
+    let stubbed = lazy >= 0 and caller != module_of(fi_decl[fi]);
+    // Checked at every call: a stub is made once, perhaps while only a type is
+    // wanted, whose diagnostics are dropped.
+    if stubbed { check_lazy_signature(fi); };
+    let target = if stubbed { lazy_stub_func(fi, lazy); } else { fi_func[fi]; };
     w_node(Op.Call, repr(result), target, 0, m);
     result;
 }
@@ -1994,7 +2009,13 @@ fn check_return(node: I32, cx: Cx) I32 {
     let value = first_child(node);
     let m = w_mark();
     if value >= 0 {
-        coerce(check_expr(value, cx.result, cx), cx.result, value);
+        let t = check_expr(value, cx.result, cx);
+        if ty_is(cx.result, Ty.Void) and not ty_is(t, Ty.Void) and not ty_is(t, Ty.Never) and not ty_is(t, Ty.Error) {
+            // The function's name, unless the return is a closure's.
+            let name = if cx.fi >= 0 and not in_closure(node) { decl_name[fi_decl[cx.fi]]; } else { -1; };
+            report(Diag.ReturnValueFromVoid, value, name);
+        };
+        coerce(t, cx.result, value);
     } else if not ty_is(cx.result, Ty.Void) {
         mismatch(node, cx.result, ty_void());
     };

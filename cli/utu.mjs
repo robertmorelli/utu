@@ -41,30 +41,36 @@ async function main() {
   if (!commands[command]) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
     // A file given without a command: it was meant for one.
-    if (command.endsWith('.utu')) fail(`${command} is a file; say what to do with it`, 'unknown-command', [], `utu check ${command}`);
-    fail(`${command} is not a utu command${near ? `; did you mean ${near}?` : ''}`, 'unknown-command',
-      ['utu --help lists the commands.'], near && fileArg ? `utu ${near} ${[fileArg, ...rest].join(' ')}` : null);
+    if (command.endsWith('.utu')) fail(`No command for ${command}`, 'unknown-command', [], `utu check ${command}`);
+    fail(`Unknown command ${command}${near ? `; did you mean ${near}?` : ''}`, 'unknown-command',
+      [], near && fileArg ? `utu ${near} ${[fileArg, ...rest].join(' ')}` : null);
   }
-  if (!fileArg) fail(`utu ${command} needs a file`, 'missing-file', [], `utu ${command} <file.utu>`);
+  if (!fileArg) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
   const file = path.resolve(fileArg);
   let stat = null;
   try { stat = await fs.stat(file); } catch {}
-  if (!stat) fail(`${fileArg} does not exist`, 'file-not-found');
-  if (stat.isDirectory()) fail(`${fileArg} is a directory, not a .utu file`, 'not-a-file');
+  if (!stat) fail(`No file ${fileArg}`, 'file-not-found');
+  if (stat.isDirectory()) fail(`${fileArg} is a directory`, 'not-a-file');
   // The build mode: -O small (the default), fast, smallUnsafe, fastUnsafe, or debug.
   const given = rest.flatMap((arg, i) => arg === '-O' ? [rest[i + 1] ?? ''] : []);
-  if (given.length > 1) fail(`choose one build mode, not ${given.join(' and ')}`, 'build-mode');
+  if (given.length > 1) fail(`Two build modes: ${given.join(', ')}`, 'build-mode');
   const mode = given[0] ?? 'small';
   if (!MODES[mode]) {
     const near = closest(mode, Object.keys(MODES));
-    fail(mode ? `${mode} is not a build mode${near ? `; did you mean ${near}?` : ''}` : '-O needs a build mode', 'build-mode',
-      ['The modes are small (the default), fast, smallUnsafe, fastUnsafe, and debug.']);
+    fail(mode ? `Unknown build mode ${mode}${near ? `; did you mean ${near}?` : ''}` : '-O needs a build mode', 'build-mode',
+      ['small, fast, smallUnsafe, fastUnsafe, debug']);
   }
   const flags = rest.filter((arg, i) => arg.startsWith('-') && arg !== '-O' && rest[i - 1] !== '-O' && !['-o', '--out'].includes(arg) && !['-o', '--out'].includes(rest[i - 1]));
-  if (flags.length) fail(`${flags[0]} is not an option`, 'unknown-option', ['The build mode is -O small, fast, smallUnsafe, fastUnsafe, or debug; -o names where build writes.']);
+  if (flags.length) fail(`Unknown option ${flags[0]}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir']);
   const { optimize, safe } = MODES[mode];
   const out = option(rest, '-o') ?? option(rest, '--out');
-  await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
+  try {
+    await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
+  } catch (error) {
+    // A place build cannot write (-o somewhere read-only, or under a file).
+    if (!FS_REASONS[error?.code] || !error.path) throw error;
+    fail(`cannot write ${displayPath(error.path)}: ${FS_REASONS[error.code]}`, 'write-failed', ['-o names the directory build writes into.']);
+  }
 }
 
 /** A file as the user would write it: relative to here, unless that is longer. */
@@ -109,7 +115,7 @@ async function run(file, { utu, optimize, safe }) {
   // Named functions, so a trap says which.
   const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe, debugNames: true });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
-  if (typeof exports.main !== 'function') fail(`${displayPath(file)} has no export main to run`, 'no-main', ['utu run calls export main; utu test runs the tests.']);
+  if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   let result;
   try {
     result = await exports.main();
@@ -136,7 +142,7 @@ async function test(file, { utu, optimize, safe }) {
       console.log(`${paint('31', 'FAIL')} ${title}: ${what}${where}`);
     }
   }
-  console.log(tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'no tests: a test is test "name" { … }');
+  console.log(tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'No tests');
   if (failed) process.exitCode = 1;
 }
 
@@ -387,6 +393,13 @@ function usage(code) {
  * Report a problem with how utu was run, in the shape of every other problem
  * it reports, with the corrected command when there is one; then exit 1.
  */
+/** What a file-system error code means, for a command that could not write. */
+const FS_REASONS = {
+  EACCES: 'permission denied', EPERM: 'permission denied', EROFS: 'the file system is read-only',
+  ENOTDIR: 'a part of the path is a file, not a directory', EISDIR: 'it is a directory',
+  ENOSPC: 'the disk is full', EEXIST: 'a file is in the way', ENOENT: 'a part of the path does not exist',
+};
+
 function fail(title, code, list = [], command = null) {
   const ink = pen({ color: colored(process.stderr) });
   const lines = [...heading(ink, 'error', title, code)];
@@ -414,15 +427,15 @@ function closest(word, names) {
 
 // What the engine says when Wasm traps, in utu's terms.
 const TRAPS = [
-  [/^unreachable/, 'The program stopped: a fatal, a failed assert, or a failed check'],
-  [/null (pointer|reference)|dereferencing a null/, 'A null value was used where a value was needed (orelse fatal, or a null reference)'],
+  [/^unreachable/, 'fatal, failed assert, or failed check'],
+  [/null (pointer|reference)|dereferencing a null/, 'Null'],
   [/divide by zero|division by zero/, 'Integer division by zero'],
   [/remainder by zero/, 'Integer remainder by zero'],
-  [/integer overflow|divide result unrepresentable/, 'Integer overflow: the result does not fit its type'],
-  [/out of bounds/, 'An index is outside the array'],
-  [/illegal cast|type incompatibility/, 'A value had the wrong type where it crossed into utu'],
-  [/array (is )?too large|requested new array is too large/, 'An array of that size cannot be made'],
-  [/Maximum call stack|stack overflow/i, 'The call stack ran out: recursion went too deep'],
+  [/integer overflow|divide result unrepresentable/, 'Integer overflow'],
+  [/out of bounds/, 'Index out of bounds'],
+  [/illegal cast|type incompatibility/, 'Wrong type from JavaScript'],
+  [/array (is )?too large|requested new array is too large/, 'Array too large'],
+  [/Maximum call stack|stack overflow/i, 'Stack overflow'],
 ];
 
 /** A trap, or a JavaScript error from the host, as what happened and the utu functions it was in. */

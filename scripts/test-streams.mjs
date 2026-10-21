@@ -52,20 +52,21 @@ for (const compiler of ['stage0', 'selfhost']) {
 
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-streams-'));
 try {
+  // Each case: the body, then stage 0's message and the self-hosted compiler's.
   const cases = [
-    ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; t; }', "Unknown method 'I32.iterator'"],
-    ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`'],
-    ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'a stream loop binds one value: await for (s) |value| { … }'],
-    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', "Cannot access field 'iterator' on nullable ?Stream[I32]"],
-    ['fn f(s: Stream[I32]) I32 { let g = cl() I32 { let t = 0; await for (s) |v| { t += v; }; t; }; g(); }', 'a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)'],
+    ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; t; }', "Unknown method 'I32.iterator'", 'No method I32.iterator'],
+    ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`', 'await for needs a generator call or a stream'],
+    ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'a stream loop binds one value: await for (s) |value| { … }', 'A stream loop binds one value'],
+    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', "Cannot access field 'iterator' on nullable ?Stream[I32]", '?Stream[I32] may be null'],
+    ['fn f(s: Stream[I32]) I32 { let g = cl() I32 { let t = 0; await for (s) |v| { t += v; }; t; }; g(); }', 'a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)', 'A closure cannot await'],
   ];
-  for (const [i, [body, message]] of cases.entries()) {
+  for (const [i, [body, stage0, selfhost]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);
     await fs.writeFile(file, `export lib { ${body} }\n`);
     const built = await both(file);
     // Stage 0 counts the calls the first one's failure causes (`(+4 caused by this)`), and names Stream[I32] Stream__I32.
-    assert.equal(built.stage0.errors?.[0].replace(/ \(\+\d+ caused by this\)$/, '').replace(/(\w)__(\w+)/g, '$1[$2]'), message, `stage 0: ${body}`);
-    assert.deepEqual(built.selfhost.errors, [message], `self-hosted: ${body}`);
+    assert.equal(built.stage0.errors?.[0].replace(/ \(\+\d+ caused by this\)$/, '').replace(/(\w)__(\w+)/g, '$1[$2]'), stage0, `stage 0: ${body}`);
+    assert.deepEqual(built.selfhost.errors, [selfhost], `self-hosted: ${body}`);
   }
   // Nested loops; a type of its own with the stream's methods (not
   // externrefs); and the source's `return()`, called when the loop is left
@@ -110,7 +111,7 @@ export lib {
     assert.equal(await exports.finished(), 61, `${compiler}: a stream run out`);
     assert.equal(await exports.passed(), 101, `${compiler}: a function that awaits, called as a fun value`);
   }
-  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, nested loops, types with the methods, closing on break and return, awaiting through a fun value, and ${cases.length} mistakes reported alike`);
+  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, nested loops, types with the methods, closing on break and return, awaiting through a fun value, and ${cases.length} mistakes reported by both`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

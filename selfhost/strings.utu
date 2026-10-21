@@ -126,14 +126,17 @@ fn string_global(word: I32) I32 {
     g;
 }
 
-/// Where @decode_string last found a `\u` without four hexadecimal digits (a
-/// byte in `src`), or -1.
-vec bad_escape: I32 = [-1];
+/// Where @decode_string last found a bad escape (a byte in `src`), or -1 for
+/// a lone surrogate; `[1]` is 1 when the escape is not one utu has, 0 when it
+/// is a `\u` without four hexadecimal digits.
+vec bad_escape: I32 = [-1, 0];
 
-/// JSON's escapes, and `\c` as `c` for any other `c`, from `src[start ..< end_]`
-/// into `lit_bytes` as UTF-8. False at a bad escape, or a lone surrogate.
+/// JSON's escapes, and `` \` `` `\$` `\'` for template strings, from
+/// `src[start ..< end_]` into `lit_bytes` as UTF-8. False at a bad escape, or
+/// a lone surrogate.
 fn decode_string(start: I32, end_: I32) Bool {
     bad_escape[0] = -1;
+    bad_escape[1] = 0;
     let i = start;
     while (i < end_) {
         let c = src[i];
@@ -174,7 +177,12 @@ fn decode_string(start: I32, end_: I32) Bool {
                     utf8_push(unit);
                 };
             }
-            else { lit_bytes.push(e); };
+            else if e == 34 or e == 92 or e == 47 or e == 96 or e == 36 or e == 39 { lit_bytes.push(e); }
+            else {
+                bad_escape[0] = i - 2;
+                bad_escape[1] = 1;
+                return false;
+            };
         };
     };
     true;

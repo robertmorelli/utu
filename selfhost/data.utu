@@ -39,7 +39,6 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
     let decl = if t >= 0 { ty_decl(t); } else { -1; };
     if not decl_is(decl, Decl.Struct) {
         report2(Diag.ImplicitStructInit, node, -1, t, -1);
-        diag_note("Name the struct, as in Point { x: 1.0 }, or give the place a struct type: let p: Point = &{ x: 1.0 }.");
         return error_value();
     };
     build_struct(t, decl, next_sibling(first_child(node)), node, cx);
@@ -196,11 +195,23 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         if first_elem < 0 { elem = prelude(Prelude.I32); };
         let c = first_elem;
         let has_null = false;
+        let from = -1;
         while (c >= 0) {
-            if is_null_literal(c) { has_null = true; } else if elem < 0 { elem = type_only(c, -1, cx); };
+            if is_null_literal(c) { has_null = true; } else if elem < 0 {
+                elem = type_only(c, -1, cx);
+                from = c;
+            };
             c = next_sibling(c);
         };
         if elem < 0 { elem = prelude(Prelude.I32); };
+        if ty_is(elem, Ty.Error) {
+            // The element it was read from is a mistake (`&{…}`, with no
+            // struct to make), whose diagnostic type_only dropped: report it.
+            let me = w_mark();
+            discard(check_expr(from, -1, cx));
+            w_stack.resize(me);
+            return error_value();
+        };
         if has_null { elem = nullable(elem); };
         // A fun cannot be stored; inferred, the elements are closures of it.
         if ty_is(elem, Ty.Fun) { elem = ty(Ty.Closure, ty_a[elem], ty_b[elem]); };

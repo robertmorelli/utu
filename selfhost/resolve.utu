@@ -193,6 +193,9 @@ enum(U8) Diag:
     | LazyValue
     | UnknownMember
     | DslPlace
+    | StorageType
+    | ReturnValueFromVoid
+    | ComptimeTrap
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -1060,7 +1063,11 @@ fn register_method(item: I32, w: Walk) void {
             if n >= 0 and node_decl[n] >= 0 { add_member(node_decl[n], word_of(method), Space.Method, decl); };
         };
     };
-    if owner >= 0 { add_member(owner, word_of(method), Space.Method, decl); };
+    if owner >= 0 {
+        let prior = add_member(owner, word_of(method), Space.Method, decl);
+        // A protocol's `fn P[T].m` is one method per T, all members of P.
+        if prior >= 0 and prior != decl and not decl_is(owner, Decl.Proto) { report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1); };
+    };
 }
 
 /// `fn T:add |a, b|`: an operator of T.

@@ -690,7 +690,9 @@ class Parser {
     const children = [this.token('using'), this.moduleName()];
     if (this.isPunct('[')) children.push(this.moduleTypeArgList());
     if (this.isPunct('|')) children.push(this.node('captured_module_name', [this.token('|'), this.moduleName(), this.expectPunct('|')]));
-    if (this.isWord('lazy')) children.push(this.token('lazy'));
+    // tree-sitter labels `lazy` as a field.
+    let lazyAt = -1;
+    if (this.isWord('lazy')) { lazyAt = children.length; children.push(this.token('lazy')); }
     if (this.isWord('from')) {
       children.push(this.token('from'));
       if (this.source[this.pos] === '"') {
@@ -705,7 +707,9 @@ class Parser {
         this.skip();
       }
     }
-    return this.node('using_decl', children);
+    const node = this.node('using_decl', children);
+    if (lazyAt >= 0) node.fieldNames = children.map((_, i) => i === lazyAt ? 'lazy' : null);
+    return node;
   }
 
   exportLibDecl() {

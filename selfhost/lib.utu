@@ -193,6 +193,12 @@ export lib {
         if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
     }
 
+    /// Mem k's evaluation trapped, for the reason `code` names (see ComptimeTrap's message).
+    fn comptime_fail(k: I32, code: I32) void {
+        comptime_start[k] = -2;
+        comptime_count[k] = code;
+    }
+
     /// Room for `count` values of mem k; the host writes them at the offset returned, in `comptime_bytes`.
     fn comptime_set(k: I32, count: I32) I32 {
         let at = comptime_bytes.len();
@@ -225,6 +231,9 @@ export lib {
     fn diagnostic_code(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
 
     fn diagnostic_extras(i: I32) I32 { diag_extra_n[i]; }
+
+    /// What hangs off a diagnostic's span when its report gave no label.
+    fn diagnostic_default_label(i: I32) Str { diag_default_label(i); }
 
     fn diagnostic_extra_kind(i: I32, k: I32) I32 { extra_kind[diag_extra[i] + k]; }
 

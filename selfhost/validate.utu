@@ -190,6 +190,10 @@ fn validate_node(node: I32) void {
         Node.Field_list => { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(parent_of(node))]); },
         Node.Enum_decl => { duplicate_names(node, Diag.DuplicateDeclaration, 2); },
         Node.Block => { duplicate_lets(node); },
+        Node.Closure_param_list => { duplicate_words(node, 1); },
+        Node.Tuple_pattern => { duplicate_words(node, 3); },
+        Node.Capture => { duplicate_words(node, 6); },
+        Node.Alt_expr => { duplicate_alt_arms(node); },
         Node.Nullable_type => { validate_nullable(node); },
         Node.Tuple_type => { validate_tuple_type(node); },
         Node.Field => { validate_field_type(node); },
@@ -215,6 +219,56 @@ fn duplicate_names(node: I32, kind: Diag, what: I32) void {
             while (other != c) {
                 if node_kind[other] == k and word_of(first_child(other)) == word {
                     report2(kind, c, word, what, -1);
+                    other = c;
+                } else {
+                    other = next_sibling(other);
+                };
+            };
+        };
+        c = next_sibling(c);
+    };
+}
+
+/// Names a node lists (closure parameters, a tuple's parts, a capture's
+/// names), each once; `_` may repeat. `what` is DuplicateDeclaration's
+/// argument: 1 parameters, 3 local bindings, 6 captures.
+fn duplicate_words(node: I32, what: I32) void {
+    let c = first_child(node);
+    while (c >= 0) {
+        let word = list_word(c);
+        if word >= 0 and node_text(name_of_listed(c)) != "_" {
+            let other = first_child(node);
+            while (other != c) {
+                if list_word(other) == word {
+                    report2(Diag.DuplicateDeclaration, name_of_listed(c), word, what, -1);
+                    other = c;
+                } else {
+                    other = next_sibling(other);
+                };
+            };
+        };
+        c = next_sibling(c);
+    };
+}
+
+/// The name a listed child declares: itself, or a closure parameter's first child.
+fn name_of_listed(c: I32) I32 { if is_kind(c, Node.Closure_param) { first_child(c); } else { c; }; }
+
+fn list_word(c: I32) I32 {
+    let n = name_of_listed(c);
+    if is_kind(n, Node.Identifier) { word_of(n); } else { -1; };
+}
+
+/// An alt's arms, each variant once: a second arm for one can never run.
+fn duplicate_alt_arms(node: I32) void {
+    let c = first_child(node);
+    while (c >= 0) {
+        if is_kind(c, Node.Alt_arm) {
+            let text = node_text(first_child(c));
+            let other = first_child(node);
+            while (other != c) {
+                if is_kind(other, Node.Alt_arm) and node_text(first_child(other)) == text {
+                    report2(Diag.DuplicatePattern, c, -1, 1, -1);
                     other = c;
                 } else {
                     other = next_sibling(other);
