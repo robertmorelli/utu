@@ -49,17 +49,23 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
 /// missing field is reported (a missing one's value is `unreachable`).
 fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     // Each initializer names a field once, and each field has one.
+    let unknown = false;
     let f = first_init;
     while (f >= 0) {
         let name = first_child(f);
         let field = member(decl, word_of(name), Space.Member);
-        if not decl_is(field, Decl.Field) { report2(Diag.UnknownField, f, word_of(name), decl, -1); }
+        if not decl_is(field, Decl.Field) {
+            report2(Diag.UnknownField, f, word_of(name), decl, -1);
+            suggest_field(decl, name);
+            unknown = true;
+        }
         else {
             node_decl[name] = field;
             let other = first_init;
             while (other != f) {
                 if word_of(first_child(other)) == word_of(name) {
                     report(Diag.DuplicateField, f, word_of(name));
+                    diag_place(Extra.Related, first_child(other), "first here");
                     other = f;
                 } else { other = next_sibling(other); };
             };
@@ -76,11 +82,17 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
             let init = init_for(first_init, decl_name[field]);
             let ft = field_type(field, ty_inst(t));
             if init < 0 {
-                if not missing { report2(Diag.MissingField, at, decl_name[field], decl, -1); };
+                // A misnamed field (reported) is the mistake, not the one it meant.
+                if not missing and not unknown {
+                    report2(Diag.MissingField, at, decl_name[field], decl, -1);
+                    if same_file(at, c) { diag_place(Extra.Related, first_child(c), "declared here"); };
+                };
                 missing = true;
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
             } else {
+                want(last_child(init), ft, Why.Field, field, -1);
                 coerce(check_expr(last_child(init), ft, cx), ft, last_child(init));
+                unwant();
             };
         };
         c = next_sibling(c);
@@ -112,7 +124,8 @@ fn field_of(t: I32, name: I32) I32 {
     };
     let field = member(decl, word_of(name), Space.Member);
     if not decl_is(field, Decl.Field) or not (decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Variant)) {
-        report(Diag.UnknownField, parent_of(name), word_of(name));
+        report2(Diag.UnknownField, parent_of(name), word_of(name), decl, -1);
+        suggest_field(decl, name);
         return -1;
     };
     node_decl[name] = field;
@@ -161,7 +174,9 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let heap = vt_heap(repr(t));
     let index = decl_a[field];
     if op == Tok.Eq.to_i32() {
+        want(value, ft, Why.Field, field, -1);
         coerce(check_expr(value, ft, cx), ft, value);
+        unwant();
     } else {
         // Read the struct once: x.f = x.f op v.
         let obj = w_pop();
@@ -231,7 +246,9 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let c = first_elem;
     while (c >= 0) {
+        want(c, elem, Why.Elements, first_elem, -1);
         coerce(check_expr(c, elem, cx), elem, c);
+        unwant();
         c = next_sibling(c);
     };
     let vt = repr(t);
@@ -391,7 +408,9 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let index = last_child(target);
     if op == Tok.Eq.to_i32() {
         coerce(check_expr(index, it, cx), it, index);
+        want(value, vt_, Why.Elements, -1, -1);
         coerce(check_expr(value, vt_, cx), vt_, value);
+        unwant();
         return finish_call(fi, m, cx);
     };
     // a[i] op= v: the array and index once each.

@@ -105,7 +105,15 @@ export lib {
     ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { 0.0; }\nfn sum(l: Array[P]) F32 { l[0].perimeter(); }\nexport lib { fn run() I32 { 0; } }\n',
       'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
-    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Expected ';', got 'x'"],
+    ['fn f() I32 {\n    let x = 1 2;\n    x;\n}\n', "Expected ';', got '2'"],
+    // A token missing at the end of a line: after the token before it.
+    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', 'Missing ; after 1'],
+    // Other languages' habits, and names that are nearly right.
+    ['fn f(a: Bool, b: Bool) Bool { a && b; }\n', 'Write and, not &&'],
+    ['fn f() I32 {\n    let total = 1;\n    totl;\n}\n', 'Unknown variable totl; did you mean total?'],
+    // Where an expected type came from: a parameter, a result.
+    ['fn g(n: I32) I32 { n; }\nfn f() I32 { g("x"); }\n', 'g takes I32, got Str'],
+    ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

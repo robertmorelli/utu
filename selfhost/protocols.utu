@@ -91,7 +91,7 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownField, parent_of(name), word_of(name));
+        report2(Diag.UnknownField, parent_of(name), word_of(name), proto, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -108,7 +108,7 @@ fn proto_field_set(t: I32, name: I32, value: I32, m: I32, cx: Cx) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownField, parent_of(name), word_of(name));
+        report2(Diag.UnknownField, parent_of(name), word_of(name), proto, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };

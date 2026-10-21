@@ -39,6 +39,27 @@ change made on purpose.
 | wrong kind | 5 |
 | duplicate | 2 |
 
+After the first round of the redesign (did-you-mean, where an expected
+type came from, other places a mistake is about, other languages' habits in
+the parser, fewer follow-on errors), the messages read:
+
+| verdict | messages |
+|---|---:|
+| good | 352 |
+| unclear | 138 |
+| misleading | 53 |
+| wrong location | 9 |
+| wrong | 7 |
+| wrong kind | 5 |
+| duplicate | 2 |
+
+Counted by hand: each of the 157 programs whose errors, fixes, notes, or
+marks changed was judged again against its redesign; the rest keep the
+audit's verdict (accepted, missing, and crash cases are left out: other
+work fixed many of them). 93 programs now mark a second place (3 before),
+45 carry a fix (none before; 44 of them the redesign's), and 19 print more
+than one error for one mistake (38 before).
+
 Types are in the best shape (76 of 99 good); runtime errors in the worst (10
 of 70): no trap says where in the utu source it happened, and `assert`,
 `fatal`, and `--safe` bounds checks all print `unreachable`.
@@ -118,7 +139,10 @@ equally good edits.
 
 ## What the compiler needs
 
-In order of how many messages each change improves:
+In order of how many messages each change improves (`selfhost/hints.utu`
+now holds the first round of 1 to 5 and 8: the did-you-mean helper and its
+table of other languages' names, the reasons a type is expected (`want`),
+the parser's habits, and finer codes):
 
 1. **Diagnostics with more than one place.** The record in `report3`
    (`selfhost/resolve.utu`) holds one node and three numbers. Related spans

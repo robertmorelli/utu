@@ -298,14 +298,14 @@ fn diag_text(i: I32) Str {
     let b = diag_b[i];
     let node = diag_node[i];
     match k {
-        Diag.UnknownVariable => "Unknown variable " + w,
-        Diag.UnknownType => "Unknown type " + w,
+        Diag.UnknownVariable => pick(is_callee(node), "Unknown function ", "Unknown variable ") + w + did_you_mean(i),
+        Diag.UnknownType => "Unknown type " + w + did_you_mean(i),
         Diag.UnknownImport => {
             let path = import_path[missing_import[0]];
             let spelled = bytes_text(tok_start[node_first[path]] + 1, tok_end[node_last[path] - 1] - 1);
             "No file " + spelled + " (" + bytes_text(missing_start[0], missing_end[0]) + ")";
         },
-        Diag.UnknownModule => "Unknown module " + w,
+        Diag.UnknownModule => "Unknown module " + w + did_you_mean(i),
         Diag.DuplicateDeclaration => {
             if a == 4 { return "Duplicate " + hoisted_name(b, node); };
             if a == 5 { return "Duplicate method " + node_text(node); };
@@ -324,18 +324,14 @@ fn diag_text(i: I32) Str {
             "Tuple " + type_text(a) + " has " + int_text(vl_len[ty_a[a]]) + " values";
         },
         Diag.NotNullable => "Expected nullable, got " + type_text(a),
-        Diag.TypeMismatch => {
-            let caused = if diag_c[i] > 0 { " (+" + int_text(diag_c[i]) + " caused by this)"; } else { ""; };
-            if a >= 0 and b >= 0 { return "Expected " + type_text(a) + ", got " + type_text(b) + caused; };
-            "Type mismatch";
-        },
+        Diag.TypeMismatch => mismatch_text(i),
         Diag.UnknownMethod => {
             if a >= 0 and ty_is(a, Ty.Nullable) { return "No method " + type_text(ty_a[a]) + "." + w; };
             if a >= 0 and b == 1 {
                 let t = type_text(a);
                 return t + "." + w + " is a function, not a method: " + t + "." + w + "(value)";
             };
-            if a >= 0 { return "No method " + type_text(a) + "." + w; };
+            if a >= 0 { return "No method " + type_text(a) + "." + w + did_you_mean(i); };
             if diag_c[i] >= 0 { return "No method " + word_text(diag_c[i]) + "." + w; };
             "No method " + w;
         },
@@ -343,7 +339,10 @@ fn diag_text(i: I32) Str {
             if a < 0 { return "No operator for an unknown type"; };
             "No " + operator_symbol(diag_word[i]) + " for " + type_text(a);
         },
-        Diag.WrongArity => "Takes " + int_text(a) + ", given " + int_text(b),
+        Diag.WrongArity => {
+            if named_word(word) { return w + " takes " + int_text(a) + ", given " + int_text(b); };
+            "Takes " + int_text(a) + ", given " + int_text(b);
+        },
         Diag.AssignmentToImmutable => w + " is immutable",
         Diag.InvalidBreak => break_rule_text(a),
         Diag.InvalidDefer => break_rule_text(a),
@@ -367,10 +366,10 @@ fn diag_text(i: I32) Str {
         Diag.EnumValueRange => int_text(b) + " does not fit " + word_text(diag_c[i]),
         Diag.EnumValueTwice => word_text(a) + "." + w + " and ." + word_text(b) + " are both " + int_text(diag_c[i]),
         Diag.UnknownField => {
-            if a >= 0 { return decl_text(a) + " has no field " + w; };
-            "No field " + w;
+            if a >= 0 { return decl_text(a) + " has no field " + w + did_you_mean(i); };
+            "No field " + w + did_you_mean(i);
         },
-        Diag.MissingField => "Missing field " + w,
+        Diag.MissingField => if a >= 0 { decl_text(a) + " needs a value for " + w; } else { "Missing field " + w; },
         Diag.NullableAccess => {
             // A name the compiler calls for you (a template's to_str, a loop's iterator, indexing): just the type.
             if w == "to_str" or w == "iterator" or w == "get_index" or w == "set_index" { return type_text(a) + " may be null"; };
@@ -385,7 +384,7 @@ fn diag_text(i: I32) Str {
         Diag.MemKind => mem_word(word) + " " + w + " cannot store " + node_text(next_sibling(first_child(node))),
         Diag.NonDefaultable => type_text(a) + " has no default: Array[" + type_text(a) + "].new(n, fill)",
         Diag.InvalidModuleArity => w + " takes " + int_text(a) + " type arguments, given " + int_text(b),
-        Diag.NotCallable => type_text(a) + " is not callable",
+        Diag.NotCallable => if named_word(word) { w + " is " + article(type_text(a)) + ", not a function"; } else { type_text(a) + " is not callable"; },
         Diag.NonExhaustive => {
             // a: 0 integer match, 1 Bool match, 2 integer enum match, 3 alt
             if a == 1 { return "match misses " + pick(b == 1, "true", "false"); };
@@ -399,7 +398,7 @@ fn diag_text(i: I32) Str {
             if a == 2 or a == 3 { return p + " cannot match " + type_text(b); };
             p + " is out of range for " + type_text(b);
         },
-        Diag.UnknownVariant => type_text(a) + " has no variant " + w,
+        Diag.UnknownVariant => type_text(a) + " has no variant " + w + did_you_mean(i),
         Diag.InvalidForSource => {
             if a == 1 { return "A generator loop binds one value"; };
             "for needs an array or range, not " + type_text(b);
@@ -474,7 +473,8 @@ fn diag_text(i: I32) Str {
         Diag.VecHost => "The host cannot see vec " + node_text(first_child(node)) + ": make it a mem",
         Diag.InvalidDslUsage => "@es needs a typed let",
         Diag.ParseError => {
-            // What the parser wanted, and what it found.
+            // What the parser wanted, and what it found; or what @parse_hint saw.
+            if diag_c[i] >= 0 { return word_text(diag_c[i]); };
             // The lexer stops at a quote or backtick it finds no end for.
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 34 { return "Unclosed string"; };
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 96 { return "Unclosed template string"; };
@@ -561,7 +561,7 @@ fn diag_default_label(i: I32) Str {
         Diag.UnknownField => "no such field",
         Diag.UnknownVariant => "no such variant",
         Diag.UnknownOperator => if a >= 0 { type_text(a); } else { "here"; },
-        Diag.WrongArity => "takes " + int_text(a) + ", given " + int_text(b),
+        Diag.WrongArity => if named_word(diag_word[i]) { "given " + int_text(b); } else { "takes " + int_text(a) + ", given " + int_text(b); },
         Diag.MissingField => w + "?",
         Diag.DuplicateDeclaration => "already declared",
         Diag.DuplicateField => "already given",
