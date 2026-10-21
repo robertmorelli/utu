@@ -196,6 +196,11 @@ enum(U8) Diag:
     | StorageType
     | ReturnValueFromVoid
     | ComptimeTrap
+    | ProtoGeneric
+    | SelfUntyped
+    | ProtoAccess
+    | MemberClash
+    | VariantNotValue
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -1067,6 +1072,15 @@ fn register_method(item: I32, w: Walk) void {
         let prior = add_member(owner, word_of(method), Space.Method, decl);
         // A protocol's `fn P[T].m` is one method per T, all members of P.
         if prior >= 0 and prior != decl and not decl_is(owner, Decl.Proto) { report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1); };
+        // `p.f()` cannot mean both: a field holding a closure, and a method.
+        let field = member(owner, word_of(method), Space.Member);
+        if decl_is(field, Decl.Field) and is_kind(next_sibling(first_child(decl_node[field])), Node.Closure_type) {
+            report2(Diag.MemberClash, method, word_of(method), owner, 0);
+        };
+        // `fn P.m` beside a member m of protocol P: `p.m()` is the member.
+        if decl_is(field, Decl.ProtoMember) and not is_kind(args, Node.Module_type_arg_list) {
+            report2(Diag.MemberClash, method, word_of(method), owner, 1);
+        };
     };
 }
 
@@ -1179,6 +1193,8 @@ fn walk_module_name(node: I32) I32 {
     let word = word_of(n);
     let decl = lookup(word);
     if decl_is(decl, Decl.Alias) { decl = decl_a[decl]; };
+    // Inside `mod G[T]`, G is its type `&`: in `G[T]`, the module.
+    if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl = decl_owner[decl]; };
     if not decl_is(decl, Decl.Module) and not decl_is(decl, Decl.Foreign) {
         report(Diag.UnknownModule, n, word);
         return -1;
@@ -1523,12 +1539,19 @@ fn walk_alt_arm(arm: I32, w: Walk) void {
     };
     let c = next_sibling(pattern);
     let mark = scope_mark();
-    if is_kind(c, Node.Identifier) {
+    if arm_binding(arm) >= 0 {
         declare_in_scope(Decl.ArmBinding, c, arm, -1);
         c = next_sibling(c);
     };
     walk_expr(c, w);
     scope_pop(mark);
+}
+
+/// An alt arm's `|x|` binding, or -1. The arm `V => x` has no binding: the
+/// binding is the identifier between the pattern and the arm's expression.
+fn arm_binding(arm: I32) I32 {
+    let c = next_sibling(first_child(arm));
+    if is_kind(c, Node.Identifier) and next_sibling(c) >= 0 { c; } else { -1; };
 }
 
 /// `Tag.Leaf` in a match: the integer enum and its variant.

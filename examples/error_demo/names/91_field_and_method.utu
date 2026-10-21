@@ -1,0 +1,11 @@
+// What: a closure field and a method of the same name; p.f() would call one silently
+// Expect: P.f is both a field and a method
+struct P:
+    | f: cl() I32
+
+fn P.f |p| () I32 { 2; }
+
+export main() I32 {
+    let p = P { f: cl() I32 { 1; } };
+    p.f();
+}

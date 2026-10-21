@@ -354,8 +354,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     w_node(Op.Plain, vt_i32, 69, 0, mc);
     let mt = w_mark();
     let d = node_decl[binding];
-    decl_local[d] = s;
-    decl_ty[d] = inner;
+    bind_local(d, inner, s);
     let t = -1;
     if default_ < 0 {
         discard(check_expr(arm, ty_void(), cx));
@@ -450,9 +449,8 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     if binding >= 0 {
         let d = node_decl[binding];
         let local = new_local(vt_externref);
-        decl_local[d] = local;
-        decl_ty[d] = prelude(Prelude.Externref);
         w_leaf(Op.LocalSet, vt_none, local, 0);
+        bind_local(d, prelude(Prelude.Externref), local);
     } else {
         w_leaf(Op.Drop, vt_none, 0, 0);
     };
@@ -518,9 +516,8 @@ fn check_let_tuple(node: I32, cx: Cx) I32 {
         let d = node_decl[names[k]];
         let et = vl_item(ty_a[t], k);
         let local = new_local(repr(et));
-        decl_local[d] = local;
-        decl_ty[d] = et;
         w_leaf(Op.LocalSet, vt_none, local, 0);
+        bind_local(d, et, local);
         k -= 1;
     };
     w_node(Op.Seq, vt_none, 0, 0, m);
@@ -686,8 +683,10 @@ fn check_for(node: I32, cx: Cx) I32 {
             let heap = vt_heap(cur_locals[arrays[k]]);
             w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
             w_node(Op.LocalSet, vt_none, local, 0, mg);
+            bind_local(d, types[k], local);
         } else {
-            decl_local[d] = counters[k];
+            // A boxed counter: a box per round, read back before the step.
+            bind_local(d, types[k], counters[k]);
         };
         k += 1;
         c = next_sibling(c);
@@ -697,6 +696,17 @@ fn check_for(node: I32, cx: Cx) I32 {
     discard(check_block(block, ty_void(), cx));
     leave_loop();
     w_node(Op.Block, vt_none, next, 0, mn);
+    k = 0;
+    c = if capture >= 0 { first_child(capture); } else { -1; };
+    while (c >= 0) {
+        if kinds[k] != 2 and decl_boxed[node_decl[c]] == 1 {
+            let mr = w_mark();
+            read_value(node_decl[c], types[k]);
+            w_node(Op.LocalSet, vt_none, counters[k], 0, mr);
+        };
+        k += 1;
+        c = next_sibling(c);
+    };
     for (0 ..< n) |j| { step_counter(counters[j], if kinds[j] == 2 { vt_i32; } else { repr(types[j]); }); };
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);

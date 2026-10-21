@@ -822,10 +822,20 @@ fn mem_push_helper(decl: I32, reserve: I32) void {
     func_body[push] = w_pop();
 }
 
-/// `resize(n)`: `reserve(n); len = n`.
+/// `resize(n)`: `reserve(n); len = n` (a safe build traps on a negative n).
 fn mem_resize_helper(decl: I32, reserve: I32) void {
     let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize");
     let r = w_mark();
+    if safe_checks[0] == 1 {
+        let mif = w_mark();
+        w_get(vt_i32, 0);
+        w_i32(0);
+        w_i32_op(i32_lt_s, mif);
+        let trap = w_mark();
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        w_node(Op.Seq, vt_none, 0, 0, trap);
+        w_node(Op.If, vt_none, 1, 0, mif);
+    };
     let rr = w_mark();
     w_get(vt_i32, 0);
     w_node(Op.Call, vt_none, reserve, 0, rr);
