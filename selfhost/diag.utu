@@ -81,10 +81,29 @@ fn type_text(t: I32) Str {
     let name = decl_name[decl];
     if decl_is(decl, Decl.TypeDecl) or (module >= 0 and decl_a[module] == decl) { name = decl_name[module]; };
     let text = word_text(name);
+    if qualify_types[0] == 1 and module >= 0 and decl_a[module] != decl and not decl_is(decl, Decl.TypeDecl) { text = word_text(decl_name[module]) + "." + text; };
     if inst > 0 and module >= 0 and (decl_a[module] == decl) {
         text = text + "[" + type_list_text(inst_args[inst]) + "]";
     };
     text;
+}
+
+/// Whether @type_text names a module's type with its module (`a.S`).
+vec qualify_types: U8 = [0];
+
+/// "Expected A, got B": two types of one name told apart by their modules,
+/// or said to be two.
+fn expected_got(a: I32, b: I32) Str {
+    let ta = type_text(a);
+    let tb = type_text(b);
+    if ta == tb and a != b {
+        qualify_types[0] = 1;
+        ta = type_text(a);
+        tb = type_text(b);
+        qualify_types[0] = 0;
+        if ta == tb { return "Expected " + ta + ", got " + tb + " (another type of that name)"; };
+    };
+    "Expected " + ta + ", got " + tb;
 }
 
 fn type_list_text(list: I32) Str {
@@ -219,6 +238,12 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.StorageType { return "storage-type"; };
     if k == Diag.ReturnValueFromVoid { return "type-mismatch"; };
     if k == Diag.ComptimeTrap { return "comptime-trap"; };
+    if k == Diag.AmbiguousName { return "ambiguous-name"; };
+    if k == Diag.StandardName { return "duplicate-declaration"; };
+    if k == Diag.InstanceDepth { return "instantiation-depth"; };
+    if k == Diag.MainParams { return "entry-surface-conflict"; };
+    if k == Diag.TestName { return "duplicate-declaration"; };
+    if k == Diag.TooManyParams { return "too-many-parameters"; };
     "type-mismatch";
 }
 
@@ -326,7 +351,7 @@ fn diag_text(i: I32) Str {
         Diag.NotNullable => "Expected nullable, got " + type_text(a),
         Diag.TypeMismatch => {
             let caused = if diag_c[i] > 0 { " (+" + int_text(diag_c[i]) + " caused by this)"; } else { ""; };
-            if a >= 0 and b >= 0 { return "Expected " + type_text(a) + ", got " + type_text(b) + caused; };
+            if a >= 0 and b >= 0 { return expected_got(a, b) + caused; };
             "Type mismatch";
         },
         Diag.UnknownMethod => {
@@ -362,7 +387,7 @@ fn diag_text(i: I32) Str {
         },
         Diag.InvalidGlobalInitializer => "Global " + w + " needs a literal",
         Diag.RecursiveType => w + " contains itself; make the field nullable",
-        Diag.IntegerOutOfRange => pick(b == 1, "-", "") + node_text(node) + " does not fit " + type_text(a),
+        Diag.IntegerOutOfRange => node_text(node) + " does not fit " + type_text(a),
         Diag.InvalidDistinct => "distinct wraps I32, U32, I64, U64, F32, or F64",
         Diag.EnumValueRange => int_text(b) + " does not fit " + word_text(diag_c[i]),
         Diag.EnumValueTwice => word_text(a) + "." + w + " and ." + word_text(b) + " are both " + int_text(diag_c[i]),
@@ -427,6 +452,12 @@ fn diag_text(i: I32) Str {
             w + " returns void";
         },
         Diag.ComptimeTrap => "@comptime " + w + " trapped: " + comptime_trap_text(a),
+        Diag.AmbiguousName => w + " is ambiguous: " + decl_text(module_of(a)) + "." + w + " or " + decl_text(module_of(b)) + "." + w,
+        Diag.StandardName => w + " is a standard type",
+        Diag.InstanceDepth => w + "'s instances nest more than " + int_text(a) + " deep",
+        Diag.MainParams => "main takes no parameters",
+        Diag.TestName => pick(a == 1, "Empty test name", "Duplicate test " + node_text(node)),
+        Diag.TooManyParams => pick(word < 0, "main", w) + " has " + int_text(a) + " parameters (max 1000)",
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -564,6 +595,9 @@ fn diag_default_label(i: I32) Str {
         Diag.WrongArity => "takes " + int_text(a) + ", given " + int_text(b),
         Diag.MissingField => w + "?",
         Diag.DuplicateDeclaration => "already declared",
+        Diag.AmbiguousName => "ambiguous",
+        Diag.StandardName => "a prelude name",
+        Diag.InstanceDepth => "one more level",
         Diag.DuplicateField => "already given",
         Diag.DuplicatePattern => "already matched",
         Diag.AssignmentToImmutable => "cannot be assigned",

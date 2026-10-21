@@ -45,14 +45,33 @@ async function main() {
     fail(`Unknown command ${command}${near ? `; did you mean ${near}?` : ''}`, 'unknown-command',
       [], near && fileArg ? `utu ${near} ${[fileArg, ...rest].join(' ')}` : null);
   }
-  if (!fileArg) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
-  const file = path.resolve(fileArg);
+  // Options anywhere: the build mode (-O small, the default; fast,
+  // smallUnsafe, fastUnsafe, or debug), where build writes (-o), and one file.
+  const args = [fileArg, ...rest].filter(arg => arg !== undefined);
+  const given = [];
+  const files = [];
+  let out;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '-O') given.push(args[++i] ?? '');
+    else if (arg === '-o' || arg === '--out') {
+      const value = args[++i];
+      const what = command === 'build-exe' ? 'file' : 'directory';
+      if (!WRITES.has(command)) fail(`${arg} is only for build and build-exe`, 'unknown-option', [`utu ${command} writes nothing.`]);
+      if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
+      if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
+      out = value;
+    } else if (arg.startsWith('-') && arg !== '-') {
+      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir']);
+    } else files.push(arg);
+  }
+  if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
+  if (files.length > 1) fail(`Extra argument ${files[1]}`, 'extra-argument', [`utu ${command} takes one file.`]);
+  const file = path.resolve(files[0]);
   let stat = null;
   try { stat = await fs.stat(file); } catch {}
-  if (!stat) fail(`No file ${fileArg}`, 'file-not-found');
-  if (stat.isDirectory()) fail(`${fileArg} is a directory`, 'not-a-file');
-  // The build mode: -O small (the default), fast, smallUnsafe, fastUnsafe, or debug.
-  const given = rest.flatMap((arg, i) => arg === '-O' ? [rest[i + 1] ?? ''] : []);
+  if (!stat) fail(`No file ${files[0]}`, 'file-not-found');
+  if (stat.isDirectory()) fail(`${files[0]} is a directory`, 'not-a-file');
   if (given.length > 1) fail(`Two build modes: ${given.join(', ')}`, 'build-mode');
   const mode = given[0] ?? 'small';
   if (!MODES[mode]) {
@@ -60,10 +79,7 @@ async function main() {
     fail(mode ? `Unknown build mode ${mode}${near ? `; did you mean ${near}?` : ''}` : '-O needs a build mode', 'build-mode',
       ['small, fast, smallUnsafe, fastUnsafe, debug']);
   }
-  const flags = rest.filter((arg, i) => arg.startsWith('-') && arg !== '-O' && rest[i - 1] !== '-O' && !['-o', '--out'].includes(arg) && !['-o', '--out'].includes(rest[i - 1]));
-  if (flags.length) fail(`Unknown option ${flags[0]}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir']);
   const { optimize, safe } = MODES[mode];
-  const out = option(rest, '-o') ?? option(rest, '--out');
   try {
     await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
   } catch (error) {
@@ -80,10 +96,8 @@ function displayPath(key) {
   return relative.length < key.length ? relative : key;
 }
 
-function option(args, name) {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
-}
+/** The commands that write files (where -o says). */
+const WRITES = new Set(['build', 'build-exe']);
 
 /** Build, printing the diagnostics; exits on errors. */
 async function buildOrExit(utu, file, options) {
@@ -95,13 +109,19 @@ async function buildOrExit(utu, file, options) {
     const sorted = result.diagnostics.toSorted((a, b) => (order.get(a.file) ?? -1) - (order.get(b.file) ?? -1) || (a.start ?? 0) - (b.start ?? 0));
     // Colored as the compiler reads it: it still holds this build's program.
     const { highlighter } = await import('../src/selfhost/highlight.js');
-    console.error(formatDiagnostics(sorted, files, {
+    // All of it written before exiting: a pipe takes it in pieces.
+    await written(process.stderr, `${formatDiagnostics(sorted, files, {
       color: colored(process.stderr), relative: displayPath,
       highlight: highlighter(utu, result.files),
-    }));
+    })}\n`);
   }
   if (!result.wasm) process.exit(1);
   return result;
+}
+
+/** Write `text` to `stream`, resolving once the stream has taken it all. */
+function written(stream, text) {
+  return new Promise(resolve => stream.write(text, () => resolve()));
 }
 
 async function check(file, { utu }) {
@@ -116,6 +136,12 @@ async function run(file, { utu, optimize, safe }) {
   const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe, debugNames: true });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
+  // A main with parameters is for a host that passes them; run passes none.
+  if (exports.main.length > 0) {
+    const params = /export\s+main\s*\(([^)]*)\)/.exec(await fs.readFile(file, 'utf8'))?.[1].trim();
+    fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu run calls it with none`, 'main-arguments',
+      ['Give main no parameters to run it, or call it from JavaScript (utu build).']);
+  }
   let result;
   try {
     result = await exports.main();
@@ -290,7 +316,12 @@ async function grepCommand(args) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--where') {
       const [name, ...type] = (args[++i] ?? '').split(':');
-      where[name.trim().replace(/^\$/, '')] = type.join(':').trim();
+      const hole = name.trim().replace(/^\$/, '');
+      if (!hole || !type.join(':').trim()) {
+        console.error(`utu grep: --where needs a name and a type: --where '${hole || 'x'}: I32'`);
+        process.exit(2);
+      }
+      where[hole] = type.join(':').trim();
     } else if (args[i] === '--refs') references = args[++i];
     else if (args[i] === '--json') json = true;
     else rest.push(args[i]);
@@ -324,12 +355,16 @@ async function grepCommand(args) {
     if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
     return hosts.get(root);
   };
-  const { matches, texts, error, skipped = [] } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
+  const { matches, texts, error, skipped = [], unmatched = [] } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
   if (error) {
     console.error(error);
     process.exit(2);
   }
   for (const file of skipped) console.error(`${displayPath(file)}: skipped: it does not parse (utu check ${displayPath(file)})`);
+  // A type no candidate had: likely misspelled, or not a type at all.
+  for (const { hole, type, seen } of unmatched) {
+    console.error(`utu grep: no $${hole} has type ${type}${seen.length ? ` (they have ${seen.slice(0, 6).join(', ')}${seen.length > 6 ? ', …' : ''})` : ''}`);
+  }
   const color = colored(process.stdout);
   const paint = (code, text) => (color ? `\x1b[${code}m${text}\x1b[0m` : text);
   const located = matches.map(match => {
@@ -426,22 +461,25 @@ function closest(word, names) {
 }
 
 // What the engine says when Wasm traps, in utu's terms.
+// V8's words and JavaScriptCore's (Bun's), in either case.
 const TRAPS = [
-  [/^unreachable/, 'fatal, failed assert, or failed check'],
-  [/null (pointer|reference)|dereferencing a null/, 'Null'],
-  [/divide by zero|division by zero/, 'Integer division by zero'],
-  [/remainder by zero/, 'Integer remainder by zero'],
-  [/integer overflow|divide result unrepresentable/, 'Integer overflow'],
-  [/out of bounds/, 'Index out of bounds'],
-  [/illegal cast|type incompatibility/, 'Wrong type from JavaScript'],
-  [/array (is )?too large|requested new array is too large/, 'Array too large'],
+  [/^unreachable/i, 'fatal, failed assert, or failed check'],
+  [/null (pointer|reference)|dereferencing a null/i, 'Null'],
+  [/remainder by zero/i, 'Integer remainder by zero'],
+  [/divide by zero|division by zero/i, 'Integer division by zero'],
+  [/integer overflow|divide result unrepresentable|unrepresentable in integer|out of bounds trunc/i, 'Integer overflow'],
+  [/out of bounds/i, 'Index out of bounds'],
+  [/illegal cast|type incompatibility|failed to cast/i, 'Wrong type from JavaScript'],
+  [/array (is )?too large|requested new array is too large|failed to allocate new array/i, 'Array too large'],
   [/Maximum call stack|stack overflow/i, 'Stack overflow'],
 ];
 
 /** A trap, or a JavaScript error from the host, as what happened and the utu functions it was in. */
 function trapText(error) {
-  const message = String(error?.message ?? error).split('\n')[0];
-  const wasm = error instanceof WebAssembly.RuntimeError || /Maximum call stack/.test(message);
+  let message = String(error?.message ?? error).split('\n')[0];
+  const wasm = error instanceof WebAssembly.RuntimeError || /Maximum call stack/i.test(message);
+  // JavaScriptCore says what it was evaluating: not part of the trap.
+  if (wasm) message = message.replace(/ \(evaluating '[^']*'\)$/, '');
   const title = wasm ? (TRAPS.find(([pattern]) => pattern.test(message))?.[1] ?? message) : message;
   const frames = [];
   for (const line of String(error?.stack ?? '').split('\n')) {

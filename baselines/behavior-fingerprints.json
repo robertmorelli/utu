@@ -716,9 +716,9 @@
  "examples/modules/console.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "42f57a4d2a4e2793",
-  "queries": "54759e1f4afc8ce2",
-  "graphs": "72d9f1a83a07501d"
+  "entries": "8e151039a07a0860",
+  "queries": "24472ed1de56364f",
+  "graphs": "1cb552f14fc67d4c"
  },
  "examples/modules/console.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -738,9 +738,9 @@
  "examples/modules/main_and_bench.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "7771edb23bdc7c63",
-  "queries": "99cc6bd28205cb11",
-  "graphs": "c52caa01bfa0eabd"
+  "entries": "e4d11fed74b38934",
+  "queries": "a6bdc7d7c0c81d03",
+  "graphs": "d2564e33301e15e9"
  },
  "examples/modules/main_and_bench.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -848,9 +848,9 @@
  "examples/multi_file/main.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "d77480729f0cfc2f",
-  "queries": "467773e43361ac74",
-  "graphs": "db0b2ae67d007b69"
+  "entries": "e8dd073fc67c3dc7",
+  "queries": "1c7e39dfb98dc0c1",
+  "graphs": "9e482c7795343727"
  },
  "examples/multi_file/main.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",

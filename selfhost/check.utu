@@ -582,7 +582,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
     if decl < 0 { return error_value(); };
     let k = decl_kind[decl];
     if k == Decl.Global.to_i32() and is_es(last_child(decl_node[decl])) {
-        let t = global_type(decl);
+        let t = global_type_in(decl, cx.inst);
         es_import(decl, last_child(decl_node[decl]), t);
         return es_read(decl, t);
     };
@@ -619,7 +619,7 @@ fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
         w_leaf(Op.RefNull, vt_externref, vt_externref, 0);
         return ty_error();
     };
-    if is_kind(c, Node.Int_lit) { return int_literal(c, expect, false); };
+    if is_kind(c, Node.Int_lit) { return int_literal(c, c, expect, false); };
     if is_kind(c, Node.Float_lit) { return float_literal(c, expect, false); };
     if is_kind(c, Node.String_lit) or is_kind(c, Node.Multiline_string_lit) {
         if not string_literal(c) { return bad_literal(node); };
@@ -870,12 +870,13 @@ fn int_value(node: I32) I64 {
 }
 
 /// The type an integer literal takes: the one expected, when integers
-/// adopt it, else I32.
-fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
+/// adopt it, else I32. `at` is the literal as written: with its minus,
+/// when `negate`.
+fn int_literal(node: I32, at: I32, expect: I32, negate: Bool) I32 {
     let v = int_value(node);
     if negate { v = 0 - v; };
     let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
-    if not fits(v, t, negate) { report2(Diag.IntegerOutOfRange, node, -1, t, if negate { 1; } else { 0; }); };
+    if not fits(v, t, negate) { report2(Diag.IntegerOutOfRange, at, -1, t, if negate { 1; } else { 0; }); };
     push_number(t, v, false);
     t;
 }
@@ -984,8 +985,12 @@ fn check_let(node: I32, cx: Cx) I32 {
 /// By declaration: its wasm global, or -1.
 vec decl_global: I32;
 
-fn global_type(decl: I32) I32 {
-    let t = type_of(next_sibling(first_child(decl_node[decl])), 0);
+fn global_type(decl: I32) I32 { global_type_in(decl, 0); }
+
+/// A global's type, seen from instance `inst` (an `@es` binding of a
+/// generic module has a type in each).
+fn global_type_in(decl: I32, inst: I32) I32 {
+    let t = type_of(next_sibling(first_child(decl_node[decl])), inst);
     if is_es(last_child(decl_node[decl])) { t = es_binding_type(t); };
     decl_ty[decl] = t;
     t;
@@ -1062,7 +1067,7 @@ fn constant(node: I32, expect: I32, cx: Cx) I32 {
     };
     if is_kind(node, Node.Unary_expr) and tok_kind[node_first[node]] == Tok.Minus.to_i32() {
         let lit = first_child(last_child(node));
-        if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Int_lit) { return int_literal(lit, expect, true); };
+        if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Int_lit) { return int_literal(lit, node, expect, true); };
         if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true); };
     };
     -1;
@@ -1290,7 +1295,7 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
     let op = tok_kind[node_first[node]];
     if op == Tok.Minus.to_i32() and is_kind(operand, Node.Literal) {
         let lit = first_child(operand);
-        if is_kind(lit, Node.Int_lit) { return int_literal(lit, expect, true); };
+        if is_kind(lit, Node.Int_lit) { return int_literal(lit, node, expect, true); };
         if is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true); };
     };
     let m = w_mark();
@@ -1338,7 +1343,7 @@ fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
         return finish_error(args, m, cx);
     };
     if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
-        es_import(decl, last_child(decl_node[decl]), global_type(decl));
+        es_import(decl, last_child(decl_node[decl]), global_type_in(decl, cx.inst));
     };
     if decl_es[decl] >= 0 { return call_es(decl, args, m, node, cx); };
     if not decl_is(decl, Decl.Fn) {
@@ -1366,10 +1371,13 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
             report(Diag.UnknownMethod, name, word_of(name));
             return finish_error(args, m, cx);
         };
-        return call_with(fn_instance(target, alias_instance(module)), args, 0, m, node, cx);
+        let inst = module_instance(decl_a[module], module, callee, cx);
+        if inst < 0 { return finish_error(args, m, cx); };
+        return call_with(fn_instance(target, inst), args, 0, m, node, cx);
     };
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
-        let decl = node_decl[name];
+        // A function, or a method of its promoted type (`sm.new(…)`).
+        let decl = static_member(module, word_of(name));
         if not decl_is(decl, Decl.Fn) {
             if decl < 0 {
                 report_module_member_missing(module, name);
@@ -1377,7 +1385,10 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
             };
             return unsupported(node);
         };
-        return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
+        node_decl[name] = decl;
+        let inst = module_instance(module, -1, callee, cx);
+        if inst < 0 { return finish_error(args, m, cx); };
+        return call_with(fn_instance(decl, inst), args, 0, m, node, cx);
     };
     // `m.T.f(…)`: a static function of a module's (or alias's) type.
     let st = static_type_path(base, cx);
@@ -1481,11 +1492,25 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
         return call_es(decl, args, m, node, cx);
     };
     if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
-    let owner_t = type_path(first_child(callee), cx.inst);
-    let inst = if is_kind(first_child(callee), Node.Type_ident) and decl_is(node_decl[first_child(callee)], Decl.Module) {
-        instance_for(node_decl[first_child(callee)], cx.inst);
-    } else { ty_inst(owner_t); };
+    let base = first_child(callee);
+    let inst = if is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module) {
+        module_instance(node_decl[base], node_alias[base], callee, cx);
+    } else { ty_inst(type_path(base, cx.inst)); };
+    if inst < 0 { return finish_error(args, m, cx); };
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
+}
+
+/// The instance of `module` that `M.f` or `alias.f` (`alias` the alias, or
+/// -1) calls in: the alias's, the calling code's own, or one `using M[A];`
+/// opened. A generic module named with none of those is reported (it takes
+/// type arguments): -1.
+fn module_instance(module: I32, alias: I32, at: I32, cx: Cx) I32 {
+    let inst = if alias >= 0 { alias_instance(alias); } else { instance_for(module, cx.inst); };
+    if inst == 0 and is_generic(module) {
+        report2(Diag.InvalidModuleArity, first_child(at), decl_name[module], module_arity(module), 0);
+        return -1;
+    };
+    inst;
 }
 
 /// A call of any other expression: a `fun` or `cl` value.
@@ -1790,7 +1815,7 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
         let tn = x_attr(x, known_word(Known.TypeName));
         let v = x_attr(x, known_word(Known.Value));
         if tn < 0 or v < 0 { return false; };
-        let t = decl_type(promoted(lookup(attr_word(tn))), 0);
+        let t = decl_type(promoted(prelude_lookup(attr_word(tn))), 0);
         let neg = src[attr_start[v]] == 45;
         let value: I64 = 0;
         for ((attr_start[v] + if neg { 1; } else { 0; }) ..< attr_end[v]) |i| { value = value * 10 + (src[i] - 48).to_i64(); };
@@ -1888,6 +1913,7 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
         return error_value();
     };
     let inst = instance(owner, targs);
+    if too_deep(inst, node) { return error_value(); };
     let m = w_mark();
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
@@ -2235,6 +2261,14 @@ fn check_item(item: I32) void {
 /// target leaves out (tests in a normal build, exports in a test build), as
 /// those are not part of the program built.
 fn keep_target_diagnostics(target: Target) void {
+    // The entry file's own items, in place order, for @in_target to search.
+    target_items.clear();
+    let entry = entry_file();
+    let item = if entry >= 0 and file_root[entry] >= 0 { first_child(file_root[entry]); } else { -1; };
+    while (item >= 0) {
+        if node_last[item] > node_first[item] and file_of_token(node_first[item]) == entry { target_items.push(item); };
+        item = next_sibling(item);
+    };
     let kept = 0;
     for (0 ..< diag_kind.len()) |i| {
         if in_target(diag_node[i], target) {
@@ -2254,22 +2288,29 @@ fn in_target(node: I32, target: Target) Bool {
     let t = node_first[node];
     let file = file_of_token(t);
     if file_role[file] != FileRole.Entry.to_i32() { return true; };
-    // By place in the file (a DSL's splices are re-read tokens, after the file's).
+    // By place in the file (a DSL's splices are re-read tokens, after the
+    // file's): the last item starting at or before it.
     let at = tok_start[t];
-    let item = first_child(file_root[file]);
-    while (item >= 0) {
-        if node_last[item] > node_first[item] and tok_start[node_first[item]] <= at and at < tok_end[node_last[item] - 1] {
-            let kind = node_kind[item];
-            if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
-            if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };
-            if kind == Node.Mem_decl.to_i32() and target == Target.Comptime { return true; };
-            if kind == Node.Bench_decl.to_i32() { return false; };
-            return true;
-        };
-        item = next_sibling(item);
+    let lo = 0;
+    let hi = target_items.len() - 1;
+    while (lo < hi) {
+        let mid = (lo + hi + 1) / 2;
+        if tok_start[node_first[target_items[mid]]] <= at { lo = mid; } else { hi = mid - 1; };
+    };
+    if hi < 0 { return true; };
+    let item = target_items[lo];
+    if tok_start[node_first[item]] <= at and at < tok_end[node_last[item] - 1] {
+        let kind = node_kind[item];
+        if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
+        if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };
+        if kind == Node.Mem_decl.to_i32() and target == Target.Comptime { return true; };
+        if kind == Node.Bench_decl.to_i32() { return false; };
     };
     true;
 }
+
+/// The entry file's items, in place order (see @keep_target_diagnostics).
+vec target_items: I32;
 
 /// `export main(…)` and tests: functions of their own, exported.
 fn entry_function(item: I32, name: I32, test_index: I32) void {

@@ -52,8 +52,11 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
         if is_kind(first, Node.Instantiated_module_ref) { inst = ty_inst(type_path(first, cx.inst)); }
         else {
             let owner = node_decl[first];
-            if decl_is(owner, Decl.Alias) { inst = alias_instance(owner); }
+            let alias = if decl_is(owner, Decl.Alias) { owner; } else { node_alias[first]; };
+            if alias >= 0 { inst = module_instance(decl_a[alias], alias, target, cx); }
+            else if decl_is(owner, Decl.Module) and nnames > 0 { inst = module_instance(owner, -1, target, cx); }
             else { inst = instance_for(module_of(decl), cx.inst); };
+            if inst < 0 { return finish_error(-1, m, cx); };
             if nnames > 0 and not decl_is(owner, Decl.Module) and not is_type_decl(owner) and owner >= 0 {
                 // `x -o value.method(…)`: a method of a value.
                 return pipe_method(node, first, names, nnames, args, count, value, m, cx);

@@ -13,8 +13,10 @@
 // One difference is on purpose: a program that does not parse. Stage 0
 // reports where tree-sitter's error recovery put its error nodes; the
 // self-hosted parser reports one error, at the furthest token it reached.
-// Both must reject the program with parse errors alone. The others are
-// listed in INTENDED, each with what the self-hosted compiler does.
+// Both must reject the program with parse errors alone. So is a program
+// declaring a prelude module's name: one "X is a standard type" where stage
+// 0 reports each member its hoisting duplicates. The others are listed in
+// INTENDED, each with what the self-hosted compiler does.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -110,6 +112,11 @@ async function main() {
   const onlyParseErrors = list => list.length > 0 && list.every(d => d[0] === 'parse-error');
   // Wutu templates are the self-hosted compiler's alone: stage 0 refuses them.
   const refusesWutu = list => list.some(d => String(d[1]).startsWith('Wutu templates are compiled by the self-hosted compiler'));
+  // A file declaring a prelude module's name (a standard module's source,
+  // compiled as a program) is told so, once, where stage 0 reports each
+  // member its hoisting duplicates (or, for a generic one, nothing).
+  const standardName = (want, got) => want.every(d => d[0] === 'duplicate-declaration')
+    && got.length > 0 && got.every(d => / is a standard type$/.test(d[1]));
   const lines = [];
   for (const key of Object.keys(results).sort()) {
     const got = results[key];
@@ -124,6 +131,7 @@ async function main() {
     const where = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => [kind, file, start, end]));
     if (where(want) === where(got)) { count.same++; continue; }
     if (refusesWutu(want)) { count.intended++; continue; }
+    if (standardName(want, got)) { count.intended++; continue; }
     if (onlyParseErrors(want) && onlyParseErrors(got)) { count.intended++; continue; }
     count.differ++;
     if (lines.length < show) lines.push(`DIFFERS ${key}\n  stage 0: ${JSON.stringify(want).slice(0, 300)}\n  now:     ${JSON.stringify(got).slice(0, 300)}`);

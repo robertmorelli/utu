@@ -282,7 +282,7 @@ fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
 
 /// `Array[elem]`, the type.
 fn array_of(elem: I32) I32 {
-    let module = lookup(known_word(Known.WordArray));
+    let module = prelude_lookup(known_word(Known.WordArray));
     if not decl_is(module, Decl.Module) { return ty_error(); };
     let m = vl_begin();
     vl_add(elem);

@@ -79,6 +79,9 @@ export lib {
 
     fn file_first_token(file: I32) I32 { file_tok[file]; }
 
+    /// Where the last parse was most deeply nested: a byte in `src`, or -1.
+    fn parse_deepest_at() I32 { if parse_deepest[1] >= 0 { tok_start[parse_deepest[1]]; } else { -1; }; }
+
     fn file_end_token(file: I32) I32 { file_tok_end[file]; }
 
     fn import_count() I32 { import_file.len(); }

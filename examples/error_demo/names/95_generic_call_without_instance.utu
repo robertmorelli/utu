@@ -1,0 +1,9 @@
+// What: a generic module's function called with no type arguments, alias, or open instance
+// Expect: box takes 1 type argument, given 0: box[F64].id(1.5)
+mod box[T] {
+    fn id(v: T) T { v; }
+}
+
+export main() F64 {
+    box.id(1.5);
+}
