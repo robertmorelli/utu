@@ -9,6 +9,9 @@
 /// `type N = distinct B;`: B is one of the numeric scalars.
 fn validate_distinct(node: I32) void {
     let base = last_child(node);
+    // An unknown base is the mistake (reported).
+    let n = name_node(base);
+    if n >= 0 and node_decl[n] < 0 and not builtin_type(word_of(n)) { return; };
     let t = decl_type(node_decl[base], 0);
     if not (t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64)
         or t == prelude(Prelude.U64) or t == prelude(Prelude.F32) or t == prelude(Prelude.F64)) {
@@ -114,6 +117,7 @@ fn validate_program() void {
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
             report2(Diag.ParseError, -1, file, file_error[file], file_wanted[file]);
+            parse_hint(file, file_error[file], file_wanted[file]);
         } else if is_own_file(file) {
             validate_tree(file_root[file]);
         };
@@ -249,6 +253,7 @@ fn duplicate_names(node: I32, kind: Diag, what: I32) void {
             while (other != c) {
                 if node_kind[other] == k and word_of(first_child(other)) == word {
                     report2(kind, c, word, what, -1);
+                    diag_place(Extra.Related, first_child(other), "first here");
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -271,6 +276,7 @@ fn duplicate_words(node: I32, what: I32) void {
             while (other != c) {
                 if list_word(other) == word {
                     report2(Diag.DuplicateDeclaration, name_of_listed(c), word, what, -1);
+                    diag_place(Extra.Related, name_of_listed(other), "first here");
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -299,6 +305,7 @@ fn duplicate_alt_arms(node: I32) void {
             while (other != c) {
                 if is_kind(other, Node.Alt_arm) and node_text(first_child(other)) == text {
                     report2(Diag.DuplicatePattern, c, -1, 1, -1);
+                    diag_place(Extra.Related, first_child(other), "first here");
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -339,7 +346,19 @@ fn duplicate_lets(block: I32) void {
     while (c >= 0) {
         if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
             let word = word_of(first_child(c));
-            if word_seen(word, stamp) { report2(Diag.DuplicateDeclaration, c, word, 3, -1); };
+            if word_seen(word, stamp) {
+                report2(Diag.DuplicateDeclaration, c, word, 3, -1);
+                // The first: looked for only once there is a mistake.
+                let other = first_child(block);
+                while (other != c) {
+                    if is_kind(other, Node.Bind_expr) and is_kind(first_child(other), Node.Identifier) and word_of(first_child(other)) == word {
+                        diag_place(Extra.Related, first_child(other), "first here");
+                        other = c;
+                    } else {
+                        other = next_sibling(other);
+                    };
+                };
+            };
         };
         c = next_sibling(c);
     };

@@ -82,6 +82,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let first_arm = arm_nodes.len();
     let default_ = -1;
     let faulted = false;
+    let unknown_arm = false;
     let c = next_sibling(scrutinee);
     pattern_fault.resize(1);
     while (c >= 0) {
@@ -94,11 +95,16 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
             if fault == 4 {
                 let p = first_child(first_child(c));
                 report2(Diag.UnknownVariant, c, word_of(next_sibling(p)), st, -1);
+                suggest_member(ty_decl(st), next_sibling(p), Space.Member);
+                unknown_arm = true;
             } else if fault >= 0 {
                 report2(Diag.MatchPattern, c, -1, fault, st);
             } else {
                 for (first_arm ..< arm_nodes.len()) |k| {
-                    if arm_values[k] == v { report(Diag.DuplicatePattern, c, -1); };
+                    if arm_values[k] == v {
+                        report(Diag.DuplicatePattern, c, -1);
+                        diag_place(Extra.Related, first_child(arm_nodes[k]), "first here");
+                    };
                 };
                 arm_nodes.push(c);
                 arm_values.push(v);
@@ -107,8 +113,8 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
         c = next_sibling(c);
     };
     let last_arm = arm_nodes.len();
-    // (A pattern already reported counts for nothing; what it misses is no news.)
-    if default_ < 0 and not faulted { match_exhaustive(node, st, first_arm, last_arm); };
+    // A pattern already reported, or an arm naming no variant, is the mistake: what it misses is no news.
+    if default_ < 0 and not faulted and not unknown_arm { match_exhaustive(node, st, first_arm, last_arm); };
     let t = -1;
     if looping {
         t = loop_match(s, st, first_arm, last_arm, default_, cx);

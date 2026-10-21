@@ -472,6 +472,8 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     };
     let end_op = st_op[first_stage + n - 1];
     let t = -1;
+    let m0 = w_mark();
+    let before = diag_kind.len();
     if not is_terminal(end_op) {
         report(Diag.IteratorUnfinished, node, end_op);
         t = error_value();
@@ -480,6 +482,8 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     } else {
         t = check_pipeline(input, first_stage, n, cx);
     };
+    // A mistaken pipeline (reported) has no value to check further.
+    if not ty_is(t, Ty.Error) and pipeline_mistake_since(before) { t = error_since(m0); };
     st_node.resize(first_stage);
     st_op.resize(first_stage);
     st_counter.resize(first_stage);
@@ -2949,4 +2953,13 @@ fn past_splices(node: I32) I32 {
     let n = node;
     while (n >= 0 and is_kind(n, Node.Splice)) { n = first_child(n); };
     n;
+}
+
+/// Whether a pipeline's own mistake was reported since diagnostic `from`.
+fn pipeline_mistake_since(from: I32) Bool {
+    for (from ..< diag_kind.len()) |i| {
+        let k = Diag.from_i32(diag_kind[i]);
+        if k == Diag.IteratorTerminalInside or k == Diag.IteratorCaptures or k == Diag.IteratorSource or k == Diag.GeneratorCall { return true; };
+    };
+    false;
 }

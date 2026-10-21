@@ -1103,7 +1103,12 @@ fn declare_entry_item(item: I32, first_entry: I32) void {
         if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name); }
         else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); }
         else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); }
-        else { report(Diag.DuplicateDeclaration, decl_node[decl], name); };
+        else {
+            report(Diag.DuplicateDeclaration, decl_node[decl], name);
+            let again = decl_name_at(decl);
+            if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again"); };
+            diag_place(Extra.Related, decl_name_at(hidden), "first here");
+        };
     };
     bind(name, decl);
     bind_variants(decl);
@@ -1312,7 +1317,7 @@ fn walk_using(item: I32, w: Walk) void {
     let module = if using_path(item) >= 0 { node_decl[n]; } else { lookup(word_of(n)); };
     if decl_is(module, Decl.Alias) { module = decl_a[module]; };
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
-        report(Diag.UnknownModule, n, word_of(n));
+        report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
         return;
     };
     node_decl[n] = module;
@@ -1350,7 +1355,10 @@ fn register_method(item: I32, w: Walk) void {
     if owner >= 0 {
         let prior = add_member(owner, word_of(method), Space.Method, decl);
         // A protocol's `fn P[T].m` is one method per T, all members of P.
-        if prior >= 0 and prior != decl and not decl_is(owner, Decl.Proto) { report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1); };
+        if prior >= 0 and prior != decl and not decl_is(owner, Decl.Proto) {
+            report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1);
+            diag_place(Extra.Related, decl_name_at(prior), "first here");
+        };
         // `p.f()` cannot mean both: a field holding a closure, and a method.
         let field = member(owner, word_of(method), Space.Member);
         if decl_is(field, Decl.Field) and is_kind(next_sibling(first_child(decl_node[field])), Node.Closure_type) {
@@ -1386,7 +1394,7 @@ fn walk_type_name(node: I32, w: Walk) I32 {
     let decl = lookup(word);
     if ambiguous(decl, n) { return -1; };
     if decl < 0 or not is_type_decl(decl) {
-        if not builtin_type(word) { report(Diag.UnknownType, n, word); };
+        if not builtin_type(word) { report_unknown(Diag.UnknownType, n, word, Seek.Type); };
         return -1;
     };
     let t = promoted(decl);
@@ -1480,7 +1488,7 @@ fn walk_module_name(node: I32) I32 {
     // Inside `mod G[T]`, G is its type `&`: in `G[T]`, the module.
     if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl = decl_owner[decl]; };
     if not decl_is(decl, Decl.Module) and not decl_is(decl, Decl.Foreign) {
-        report(Diag.UnknownModule, n, word);
+        report_unknown(Diag.UnknownModule, n, word, Seek.Module);
         return -1;
     };
     node_decl[n] = decl;
@@ -1607,7 +1615,7 @@ fn walk_expr(node: I32, w: Walk) void {
         let word = word_of(node);
         let decl = lookup(word);
         if ambiguous(decl, node) { return; };
-        if decl < 0 { report(Diag.UnknownVariable, node, word); } else { node_decl[node] = decl; };
+        if decl < 0 { report_unknown(Diag.UnknownVariable, node, word, Seek.Value); } else { node_decl[node] = decl; };
     } else {
         walk_compound(node, kind, w);
     };
@@ -1875,7 +1883,7 @@ fn walk_pipe_target(target: I32, w: Walk) void {
         owner = walk_type_path(c, w);
     } else if is_kind(c, Node.Identifier) {
         let decl = lookup(word_of(c));
-        if ambiguous(decl, c) { decl = -1; } else if decl < 0 { report(Diag.UnknownVariable, c, word_of(c)); } else { node_decl[c] = decl; };
+        if ambiguous(decl, c) { decl = -1; } else if decl < 0 { report_unknown(Diag.UnknownVariable, c, word_of(c), Seek.Value); } else { node_decl[c] = decl; };
         owner = decl;
     } else {
         owner = walk_owner_name(c);
@@ -1905,7 +1913,7 @@ fn walk_owner_name(node: I32) I32 {
     let decl = lookup(word);
     if ambiguous(decl, node) { return -1; };
     if decl < 0 or not is_type_decl(decl) {
-        if not builtin_type(word) { report(Diag.UnknownType, node, word); };
+        if not builtin_type(word) { report_unknown(Diag.UnknownType, node, word, Seek.Type); };
         return -1;
     };
     if decl_is(decl, Decl.Alias) {

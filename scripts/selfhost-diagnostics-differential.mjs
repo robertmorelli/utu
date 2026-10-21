@@ -48,6 +48,9 @@ const INTENDED = {
   ...both('baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu', 'an array of a protocol has no default'),
   ...both('baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu', 'an array of a protocol has no default'),
   ...both('baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu', 'an array of a protocol has no default'),
+  // `@stored/\ S "k" S { n: missing } \/`: the expansion reads the default
+  // twice, and stage 0 reports the unknown name for each reading.
+  ...both('baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu', 'one name unknown twice on a line is one mistake'),
 };
 
 if (isMainThread) await main();
@@ -133,7 +136,9 @@ async function main() {
     // Nor the follow-on "Cannot resolve operator for unknown", which the
     // self-hosted compiler leaves out: the unknown operand is reported already.
     const followOn = d => d[0] === 'unknown-operator' && d[1] === 'Cannot resolve operator for unknown';
-    const where = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => [kind, file, start, end]));
+    // (Sorted by place: the lists come sorted by their words.)
+    const where = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => [kind, file, start, end])
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
     if (where(want) === where(got)) { count.same++; continue; }
     // A struct that contains itself: stage 0 marks the struct, the
     // self-hosted compiler the field the cycle goes through.

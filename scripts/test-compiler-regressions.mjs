@@ -394,7 +394,6 @@ export lib {
     ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { 0.0; }\nfn sum(l: Array[P]) F32 { l[0].perimeter(); }\nexport lib { fn run() I32 { 0; } }\n',
       'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
-    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Expected ';', got 'x'"],
     // Literals past their type, once wrapped as they were read.
     ['export lib { fn run() I32 { let a = 18446744073709551615; a; } }\n', '18446744073709551615 does not fit I32'],
     ['export lib { fn run() I32 { let a: I32 = -18446744073709551615; a; } }\n', '-18446744073709551615 does not fit I32'],
@@ -458,6 +457,15 @@ export lib {
     [`fn f(${Array.from({ length: 1001 }, (_, i) => `a${i}: I32`).join(', ')}) I32 { a0; }\nexport main() I32 { 1; }\n`, 'f has 1001 parameters (max 1000)'],
     // Nesting past the compiler's stack: a diagnostic, not a JavaScript stack.
     [`export main() I32 {\n    ${'('.repeat(30000)}1${')'.repeat(30000)};\n}\n`, 'Program nested too deeply (at about line 2)'],
+    ['fn f() I32 {\n    let x = 1 2;\n    x;\n}\n', "Expected ';', got '2'"],
+    // A token missing at the end of a line: after the token before it.
+    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', 'Missing ; after 1'],
+    // Other languages' habits, and names that are nearly right.
+    ['fn f(a: Bool, b: Bool) Bool { a && b; }\n', 'Write and, not &&'],
+    ['fn f() I32 {\n    let total = 1;\n    totl;\n}\n', 'Unknown variable totl; did you mean total?'],
+    // Where an expected type came from: a parameter, a result.
+    ['fn g(n: I32) I32 { n; }\nfn f() I32 { g("x"); }\n', 'g takes I32, got Str'],
+    ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

@@ -231,7 +231,7 @@ export lib {
     /// a place (a file and byte offsets: another node's, or its own span's
     /// for a label, or the bytes a fix replaces), a text (a label, a note,
     /// or a fix's new text), and a fix's label.
-    fn diagnostic_code(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
+    fn diagnostic_code(i: I32) Str { diag_code(i); }
 
     fn diagnostic_extras(i: I32) I32 { diag_extra_n[i]; }
 

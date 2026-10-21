@@ -239,6 +239,7 @@ fn new_label() I32 {
 
 /// A function's checking starts: no locals, labels, loops, or defers yet.
 fn begin_function() void {
+    want_reset();
     cur_locals.clear();
     next_label.resize(1);
     next_label[0] = 0;
@@ -263,7 +264,9 @@ fn check_function(fi: I32) void {
     cur_params[0] = cur_locals.len();
     mark_boxes(fn_body(decl));
     let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] };
+    want(fn_body(decl), cx.result, Why.Returns, decl, -1);
     finish_function(fi_func[fi], fn_body(decl), cx, box_params(decls, params));
+    unwant();
 }
 
 /// A body checked against the result type, as function `f`'s (after
@@ -400,6 +403,11 @@ fn mismatch(at: I32, expected: I32, actual: I32) void {
         fold_into(decl_cause[node_decl[site]]);
         return;
     };
+    let k = want_for(site, expected);
+    if k >= 0 {
+        report_wanted(k, site, expected, actual);
+        return;
+    };
     report2(Diag.TypeMismatch, site, -1, expected, actual);
 }
 
@@ -415,6 +423,7 @@ vec decl_cause: I32;
 
 fn fold_into(i: I32) void {
     if i < 0 or i >= diag_kind.len() { return; };
+    // (A TypeMismatch's diag_c holds its reason above the count: see @want.)
     diag_c[i] = if diag_c[i] < 0 { 1; } else { diag_c[i] + 1; };
 }
 
@@ -1082,8 +1091,12 @@ fn check_let(node: I32, cx: Cx) I32 {
         return ty_void();
     };
     let before = diag_kind.len();
+    if annotated { want(init, t, Why.Annotation, next_sibling(name), decl_name[decl]); };
     let actual = check_expr(init, t, cx);
-    if annotated { coerce(actual, t, init); } else { t = actual; };
+    if annotated {
+        coerce(actual, t, init);
+        unwant();
+    } else { t = actual; };
     decl_cause[decl] = any_mismatch_since(before);
     if ty_is(t, Ty.Null) {
         report(Diag.TypeMismatch, init, -1);
@@ -1175,7 +1188,9 @@ fn global_of(decl: I32) I32 {
         };
         return -2;
     };
+    want(init, t, Why.Annotation, next_sibling(first_child(node)), decl_name[decl]);
     coerce(actual, t, init);
+    unwant();
     let g = add_global(repr(t), false, w_pop());
     decl_global[decl] = g;
     g;
@@ -1233,7 +1248,9 @@ fn check_assign(node: I32, cx: Cx) I32 {
     let m = w_mark();
     write_begin(decl, t);
     if op == Tok.Eq.to_i32() {
+        want(value, t, Why.Variable, decl, -1);
         coerce(check_expr(value, t, cx), t, value);
+        unwant();
     } else {
         // `x op= e` is `x = x op e`.
         let word = compound_word(op, node_last[target]);
@@ -1311,8 +1328,12 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
     let bool_t = prelude(Prelude.Bool);
     if word == Kw.Xor.to_i32() {
         let m = w_mark();
+        want(left, bool_t, Why.Operand, node, word);
         coerce(check_expr(left, bool_t, cx), bool_t, left);
+        unwant();
+        want(right, bool_t, Why.Operand, node, word);
         coerce(check_expr(right, bool_t, cx), bool_t, right);
+        unwant();
         w_node(Op.Plain, vt_i32, 115, 0, m);
         return bool_t;
     };
@@ -1361,7 +1382,12 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     // An operator declared on the type, else (a distinct or int enum) its comparisons.
     let op = member(decl, word, Space.Operator);
     if is_scalar_kind(decl) and op < 0 {
+        let before = diag_kind.len();
+        want(right, t, Why.Operand, at, word);
         coerce(check_expr(right, t, cx), t, right);
+        unwant();
+        // Operands that do not meet have no result to check further.
+        if any_mismatch_since(before) >= 0 { return error_since(m); };
         if scalar_compare(decl, word, m) { return prelude(Prelude.Bool); };
         report2(Diag.UnknownOperator, at, word, t, -1);
         return error_since(m);
@@ -1372,7 +1398,12 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
         return error_since(m);
     };
     let fi = fn_instance(op, ty_inst(t));
+    let before = diag_kind.len();
+    want(right, vl_item(fi_params[fi], 1), Why.Operand, at, word);
     coerce(check_expr(right, vl_item(fi_params[fi], 1), cx), vl_item(fi_params[fi], 1), right);
+    unwant();
+    // Operands that do not meet have no result to check further.
+    if any_mismatch_since(before) >= 0 { return error_since(m); };
     finish_call(fi, m, cx);
 }
 
@@ -1397,7 +1428,10 @@ fn type_only(node: I32, expect: I32, cx: Cx) I32 {
 fn check_logical(node: I32, word: I32, cx: Cx) I32 {
     let bool_t = prelude(Prelude.Bool);
     let m = w_mark();
+    want(first_child(node), bool_t, Why.Operand, node, word);
     coerce(check_expr(first_child(node), bool_t, cx), bool_t, first_child(node));
+    unwant();
+    want(last_child(node), bool_t, Why.Operand, node, word);
     let m1 = w_mark();
     if word == Kw.And.to_i32() {
         coerce(check_expr(last_child(node), bool_t, cx), bool_t, last_child(node));
@@ -1412,6 +1446,7 @@ fn check_logical(node: I32, word: I32, cx: Cx) I32 {
         coerce(check_expr(last_child(node), bool_t, cx), bool_t, last_child(node));
         w_node(Op.Seq, vt_i32, 0, 0, m2);
     };
+    unwant();
     w_node(Op.If, vt_i32, new_label(), 0, m);
     bool_t;
 }
@@ -1427,7 +1462,9 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     if tok_word[node_first[node]] == Kw.Not.to_i32() {
         let bool_t = prelude(Prelude.Bool);
+        want(operand, bool_t, Why.Operand, node, Kw.Not.to_i32());
         coerce(check_expr(operand, bool_t, cx), bool_t, operand);
+        unwant();
         w_node(Op.Plain, vt_i32, 69, 0, m);
         return bool_t;
     };
@@ -1490,6 +1527,8 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
     let name = last_child(callee);
     let module = node_decl[base];
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Mem) { return check_mem_method(module, name, args, node, cx); };
+    // An alias of a module that is not there (reported): nothing more to say.
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_a[module] < 0 { return finish_error(args, m, cx); };
     // `ints.make(…)` with `using M[A] |ints|`: M's function in M[A].
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Module) {
         let target = static_member(decl_a[module], word_of(name));
@@ -1578,6 +1617,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         if host >= 0 { return check_foreign_primitive_method(node, rt, host, word_of(name), args, m, expect, cx); };
         // `x.sqrt()` with `fn sqrt(x: &)` in the type's module: b says so.
         report2(Diag.UnknownMethod, node, word_of(name), rt, if module_fn_of(rt, word_of(name)) >= 0 { 1; } else { -1; });
+        suggest_member(ty_decl(rt), name, Space.Method);
         return finish_error(args, m, cx);
     };
     // What the name means, for an editor (as a field's is recorded).
@@ -1660,7 +1700,9 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
     while (a >= 0) {
         if i < vl_len[params] {
             let pt = vl_item(params, i);
+            want(a, pt, Why.Param, fi_decl[fi], i);
             coerce(check_expr(a, pt, cx), pt, a);
+            unwant();
         } else {
             drop_value(check_expr(a, -1, cx));
         };
@@ -1668,7 +1710,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
         a = next_sibling(a);
     };
     if i != vl_len[params] {
-        report2(Diag.WrongArity, at, -1, vl_len[params] - first_param, i - first_param);
+        report3(Diag.WrongArity, at, if fi_decl[fi] >= 0 { decl_name[fi_decl[fi]]; } else { -1; }, vl_len[params] - first_param, i - first_param, -1);
         return error_since(m);
     };
     finish_call(fi, m, cx);
@@ -2054,6 +2096,7 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let name = last_child(node);
     if decl < 0 and (decl_is(owner, Decl.IntEnum) or decl_is(owner, Decl.Enum)) and not reported_within(name) {
         report2(Diag.UnknownVariant, name, word_of(name), named(owner, -1), -1);
+        suggest_member(owner, name, Space.Member);
         return error_value();
     };
     if decl < 0 and decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };
@@ -2078,7 +2121,9 @@ fn check_if(node: I32, expect: I32, cx: Cx) I32 {
     let else_ = next_sibling(then_);
     let bool_t = prelude(Prelude.Bool);
     let m = w_mark();
+    want(cond, bool_t, Why.Condition, -1, -1);
     coerce(check_expr(cond, bool_t, cx), bool_t, cond);
+    unwant();
     let label = new_label();
     if else_ < 0 {
         let m1 = w_mark();
@@ -2090,8 +2135,11 @@ fn check_if(node: I32, expect: I32, cx: Cx) I32 {
     // The result: what is expected, else the then branch's type, else
     // (when it does not complete) the else branch's.
     let t = first_branch(check_block(then_, expect, cx), expect, then_);
+    // With nothing expected, the then branch sets the type.
+    if expect < 0 and t >= 0 { want(else_, t, Why.Branches, then_, -1); };
     let t2 = if is_kind(else_, Node.If_expr) { check_if(else_, t, cx); } else { check_block(else_, t, cx); };
     t = other_branch(t, t2, else_);
+    if expect < 0 and t >= 0 { unwant(); };
     w_node(Op.If, repr(t), label, 0, m);
     t;
 }
@@ -2128,7 +2176,9 @@ fn check_while(node: I32, cx: Cx) I32 {
     if cond != block {
         let bool_t = prelude(Prelude.Bool);
         let mc = w_mark();
+        want(cond, bool_t, Why.Condition, -1, -1);
         coerce(check_expr(cond, bool_t, cx), bool_t, cond);
+        unwant();
         w_node(Op.Plain, vt_i32, 69, 0, mc);
         w_node(Op.BrIf, vt_none, brk, 0, mc);
     };
@@ -2172,7 +2222,9 @@ fn check_return(node: I32, cx: Cx) I32 {
             let name = if cx.fi >= 0 and not in_closure(node) { decl_name[fi_decl[cx.fi]]; } else { -1; };
             report(Diag.ReturnValueFromVoid, value, name);
         };
+        want(value, cx.result, Why.Returns, if cx.fi >= 0 and not in_closure(node) { fi_decl[cx.fi]; } else { -1; }, -1);
         coerce(t, cx.result, value);
+        unwant();
     } else if not ty_is(cx.result, Ty.Void) {
         mismatch(node, cx.result, ty_void());
     };
@@ -2188,7 +2240,9 @@ fn check_return(node: I32, cx: Cx) I32 {
 fn check_assert(node: I32, cx: Cx) I32 {
     let bool_t = prelude(Prelude.Bool);
     let m = w_mark();
+    want(first_child(node), bool_t, Why.Assert, -1, -1);
     coerce(check_expr(first_child(node), bool_t, cx), bool_t, first_child(node));
+    unwant();
     w_node(Op.Plain, vt_i32, 69, 0, m);
     let mt = w_mark();
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
