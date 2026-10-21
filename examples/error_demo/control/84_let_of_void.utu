@@ -1,0 +1,8 @@
+// What: binds the result of a void function to a name.
+// Expect: x would hold no value
+fn log_nothing() void {}
+
+export main() I32 {
+    let x = log_nothing();
+    0;
+}

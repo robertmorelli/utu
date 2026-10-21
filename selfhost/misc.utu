@@ -167,7 +167,7 @@ fn run_defers(from: I32, cx: Cx) void {
     let i = defer_node.len() - 1;
     while (i >= from) {
         if defer_node[i] < 0 { close_stream(-defer_node[i] - 1, cx); }
-        else { discard(check_expr(defer_node[i], ty_void(), cx)); };
+        else { discard(check_statement(defer_node[i], ty_void(), cx)); };
         i -= 1;
     };
 }
@@ -202,9 +202,13 @@ fn optional_override(node: I32) I32 {
 }
 
 /// The leftmost `?.` of a statement not yet being checked as present: one
-/// whose base has none. A block's statements are guarded on their own.
+/// whose base has none. A block's statements are guarded on their own; one
+/// in a nested branch, loop, or `orelse` is a value, not looked for.
 fn leftmost_optional(node: I32) I32 {
-    if is_kind(node, Node.Closure_expr) or is_kind(node, Node.Block) { return -1; };
+    let k = Node.from_i32(node_kind[node]);
+    if k == Node.Closure_expr or k == Node.Block or k == Node.Block_expr or k == Node.If_expr or k == Node.Match_expr
+        or k == Node.Loop_match_expr or k == Node.Alt_expr or k == Node.Promote_expr or k == Node.Else_expr
+        or k == Node.While_expr or k == Node.For_expr or k == Node.Try_expr { return -1; };
     let c = first_child(node);
     while (c >= 0) {
         let found = leftmost_optional(c);
@@ -263,13 +267,12 @@ fn has_optionals() Bool {
     optionals_seen[1] == 1;
 }
 
-/// Whether a statement can run only when its `?.` is present. A `let` cannot
-/// (its name would be bound to nothing after it), nor a statement that picks
-/// what runs (skipping all of an `if`, its `else` too): their `?.` is a value.
+/// Whether a statement can run only when its `?.` is present: a call, an
+/// assignment, or a plain chain. Any other (a `let`, `return`, `assert`, a
+/// jump, a branch) would skip more than the chain: its `?.` is a value.
 fn guardable(stmt: I32) Bool {
     let k = Node.from_i32(node_kind[stmt]);
-    k != Node.Bind_expr and k != Node.If_expr and k != Node.While_expr and k != Node.For_expr and k != Node.Match_expr
-        and k != Node.Loop_match_expr and k != Node.Alt_expr and k != Node.Promote_expr and k != Node.Block_expr;
+    k == Node.Call_expr or k == Node.Assign_expr or k == Node.Field_expr or k == Node.Optional_field_expr or k == Node.Index_expr;
 }
 
 /// A statement: an optional chain's guard, or the expression.
@@ -278,6 +281,7 @@ fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
     if opt >= 0 and expect >= 0 and not ty_is(expect, Ty.Void) {
         // A statement whose value is used (a block's last) is not guarded.
         report(Diag.OptionalOutsideStatement, opt, -1);
+        diag_note("for a value, use promote");
         return error_value();
     };
     if opt >= 0 and guardable(stmt) { return check_optional_statement(stmt, opt, cx); };
@@ -291,6 +295,7 @@ fn check_base(field_node: I32, cx: Cx) I32 {
         let i = optional_override(field_node);
         if i < 0 {
             report(Diag.OptionalOutsideStatement, field_node, -1);
+            diag_note("for a value, use promote");
             return error_value();
         };
         let t = optional_type[i];
