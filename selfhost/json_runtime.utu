@@ -93,8 +93,19 @@ fn json_runtime() Str {
     \\fn __json_open(r: JsonReader__, c: I32, why: Str) void {
     \\    if __json_peek(r) == c {
     \\        r.at += 1;
+    \\        if c != 58 {
+    \\            __json_enter(r);
+    \\        };
     \\    } else {
     \\        __json_fail(r, why);
+    \\    };
+    \\}
+    \\
+    \\// Into an object or array: one level deeper (out again at its close).
+    \\fn __json_enter(r: JsonReader__) void {
+    \\    r.depth += 1;
+    \\    if r.depth > 512 {
+    \\        __json_fail(r, "nested too deeply");
     \\    };
     \\}
     \\
@@ -106,6 +117,7 @@ fn json_runtime() Str {
     \\fn __json_first(r: JsonReader__, close: I32) Bool {
     \\    if __json_peek(r) == close {
     \\        r.at += 1;
+    \\        r.depth -= 1;
     \\        false;
     \\    } else {
     \\        r.failed == 0;
@@ -121,6 +133,7 @@ fn json_runtime() Str {
     \\    } else {
     \\        if c == close {
     \\            r.at += 1;
+    \\            r.depth -= 1;
     \\        } else {
     \\            __json_fail(r, if close == 125 { "expected ',' or '}'"; } else { "expected ',' or ']'"; });
     \\        };
@@ -357,7 +370,7 @@ fn json_runtime() Str {
     \\        for (whole..<end) |k| {
     \\            v = v * 10.0 + (r.text[k] - 48).to_f64();
     \\        };
-    \\        if negative { 0.0 - v; } else { v; };
+    \\        if negative { v * -1.0; } else { v; };
     \\    } else {
     \\        __json_number(r.text.slice(start, end));
     \\    };
@@ -398,10 +411,13 @@ fn json_runtime() Str {
     \\}
     \\
     \\fn __json_i32(r: JsonReader__) I32 {
+    \\    __json_ws(r);
+    \\    let start = r.at;
     \\    let v = __json_i64(r);
     \\    let low: I64 = -2147483648;
     \\    let high: I64 = 2147483647;
     \\    if v < low or v > high {
+    \\        r.at = start;
     \\        __json_fail(r, "integer out of range");
     \\        0;
     \\    } else {
@@ -410,9 +426,12 @@ fn json_runtime() Str {
     \\}
     \\
     \\fn __json_u32(r: JsonReader__) U32 {
+    \\    __json_ws(r);
+    \\    let start = r.at;
     \\    let v = __json_i64(r);
     \\    let high: I64 = 4294967295;
     \\    if v < 0 or v > high {
+    \\        r.at = start;
     \\        __json_fail(r, "integer out of range");
     \\    };
     \\    v.to_u32();
@@ -421,12 +440,9 @@ fn json_runtime() Str {
     \\// Skip one value of any shape (unknown fields).
     \\fn __json_skip(r: JsonReader__) void {
     \\    let c = __json_peek(r);
-    \\    r.depth += 1;
-    \\    if r.depth > 512 {
-    \\        __json_fail(r, "nested too deeply");
-    \\    };
     \\    if c == 123 {
     \\        r.at += 1;
+    \\        __json_enter(r);
     \\        let more = __json_first(r, 125);
     \\        while (more) {
     \\            __json_span(r);
@@ -437,6 +453,7 @@ fn json_runtime() Str {
     \\    } else {
     \\        if c == 91 {
     \\            r.at += 1;
+    \\            __json_enter(r);
     \\            let more = __json_first(r, 93);
     \\            while (more) {
     \\                __json_skip(r);
@@ -461,7 +478,6 @@ fn json_runtime() Str {
     \\            };
     \\        };
     \\    };
-    \\    r.depth -= 1;
     \\}
     \\
     \\// Skip the remaining fields of an object whose first field was already read.
@@ -558,20 +574,34 @@ fn json_runtime() Str {
     \\    // Plain characters copy straight into reserved space.
     \\    while (i < n) {
     \\        let c = s[i];
-    \\        if c == 34 or c == 92 or c < 32 {
+    \\        if c == 34 or c == 92 or c < 32 or (c >= 55296 and c <= 57343) {
     \\            break;
     \\        };
     \\        w.buf[w.n] = c;
     \\        w.n += 1;
     \\        i += 1;
     \\    };
-    \\    for (i..<n) |k| {
-    \\        let c = s[k];
+    \\    while (i < n) {
+    \\        let c = s[i];
+    \\        i += 1;
     \\        if c == 34 or c == 92 {
     \\            __json_put(w, 92);
     \\            __json_put(w, c);
     \\        } else {
-    \\            if c >= 32 {
+    \\            if c >= 55296 and c <= 57343 {
+    \\                // A surrogate pair as it is; a lone surrogate escaped, as JSON.stringify does.
+    \\                if c <= 56319 and i < n and s[i] >= 56320 and s[i] <= 57343 {
+    \\                    __json_put(w, c);
+    \\                    __json_put(w, s[i]);
+    \\                    i += 1;
+    \\                } else {
+    \\                    __json_raw(w, "\\u");
+    \\                    __json_put(w, __json_hex_digit(c >> 12));
+    \\                    __json_put(w, __json_hex_digit((c >> 8) & 15));
+    \\                    __json_put(w, __json_hex_digit((c >> 4) & 15));
+    \\                    __json_put(w, __json_hex_digit(c & 15));
+    \\                };
+    \\            } else if c >= 32 {
     \\                __json_put(w, c);
     \\            } else {
     \\                match c {

@@ -472,6 +472,10 @@ fn bad_literal(at: I32) I32 {
         report2(Diag.InvalidEscape, at, -1, 1, -1);
         return error_value();
     };
+    if bad_escape[1] == 2 {
+        report2(Diag.InvalidEscape, at, -1, 3, -1);
+        return error_value();
+    };
     if bad_escape[1] == 1 {
         // `\d`: the escape's two bytes, as a word, for the message.
         report2(Diag.InvalidEscape, at, src.intern(bad_escape[0], bad_escape[0] + 2), 2, -1);
@@ -2052,6 +2056,8 @@ enum(U8) Target:
 fn reset_check() void {
     memo_state.clear();
     lazy_call_fn.clear();
+    export_func.clear();
+    export_result.clear();
     lazy_call_sig.clear();
     lazy_call_path.clear();
     lazy_stub_of.clear();
@@ -2110,6 +2116,7 @@ fn compile(target: Target) I32 {
     validate_program();
     count_memories();
     report_wat();
+    report_bare_openers();
     keep_target_diagnostics(target);
     // A DSL that does not expand ends the build, as in stage 0: the first
     // the target has is its one diagnostic.
@@ -2199,7 +2206,14 @@ fn compile(target: Target) I32 {
 fn export_fn(decl: I32) void {
     let fi = fn_instance(decl, 0);
     func_field_name[function_of(fi)] = fn_debug_name(decl);
+    export_func.push(function_of(fi));
+    export_result.push(fi_result[fi]);
 }
+
+/// The exported functions and their result types, for the host to give
+/// results as JS has them (see write_exports_json).
+vec export_func: I32;
+vec export_result: I32;
 
 fn has_prefix(word: I32, prefix: Str) Bool {
     if src.interned_size(word) < prefix.len() { return false; };
@@ -2289,6 +2303,8 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
         else { name_add("__test_" + test_index.to_str()); };
     func_field_name[f] = export_name;
     func_debug_name[f] = export_name;
+    export_func.push(f);
+    export_result.push(result);
     // `export main() I32 { @wat/\ … \/; }`: its code, which the host assembled.
     let wat = wat_of(last_child(item));
     if wat >= 0 {

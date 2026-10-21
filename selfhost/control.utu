@@ -340,6 +340,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let et = check_expr(e, -1, cx);
     if ty_is(et, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_dynamic(et) { et = dynamic_nullable(et); };
     if not ty_is(et, Ty.Nullable) {
         report2(Diag.NotNullable, e, -1, et, -1);
         return error_since(m);
@@ -356,6 +357,17 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     let d = node_decl[binding];
     decl_local[d] = s;
     decl_ty[d] = inner;
+    // A nullable number or Bool from the host: the binding is the primitive.
+    let boxed = boxed_primitive(inner);
+    if boxed >= 0 {
+        let mu = w_mark();
+        w_leaf(Op.LocalGet, repr(et), s, 0);
+        foreign_unbox(inner, boxed, false);
+        let u = new_local(repr(boxed));
+        w_node(Op.LocalSet, vt_none, u, 0, mu);
+        decl_local[d] = u;
+        decl_ty[d] = boxed;
+    };
     let t = -1;
     if default_ < 0 {
         discard(check_expr(arm, ty_void(), cx));
@@ -381,15 +393,39 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let at = check_expr(a, if expect >= 0 { nullable(expect); } else { -1; }, cx);
     if ty_is(at, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_dynamic(at) { at = dynamic_nullable(at); };
     if not ty_is(at, Ty.Nullable) {
         report2(Diag.NotNullable, a, -1, at, -1);
         return error_since(m);
     };
     let t = ty_a[at];
+    // A nullable number or Bool from the host: the value is the primitive.
+    let boxed = boxed_primitive(t);
     // `x orelse fatal`: wasm's own null check, with no branch.
     if is_kind(b, Node.Fatal_expr) {
         w_node(Op.RefAsNonNull, repr(t), 0, 0, m);
+        if boxed >= 0 {
+            foreign_unbox(t, boxed, false);
+            return boxed;
+        };
         return t;
+    };
+    if boxed >= 0 {
+        let s = new_local(repr(at));
+        w_node(Op.LocalSet, vt_none, s, 0, m);
+        let mi = w_mark();
+        w_leaf(Op.LocalGet, repr(at), s, 0);
+        w_node(Op.RefIsNull, vt_i32, 0, 0, mi);
+        let mt = w_mark();
+        coerce(check_expr(b, boxed, cx), boxed, b);
+        w_node(Op.Seq, repr(boxed), 0, 0, mt);
+        let me = w_mark();
+        w_leaf(Op.LocalGet, repr(at), s, 0);
+        foreign_unbox(t, boxed, false);
+        w_node(Op.Seq, repr(boxed), 0, 0, me);
+        w_node(Op.If, repr(boxed), new_label(), 0, mi);
+        w_node(Op.Seq, repr(boxed), 0, 0, m);
+        return boxed;
     };
     let s = new_local(repr(at));
     w_node(Op.LocalSet, vt_none, s, 0, m);
