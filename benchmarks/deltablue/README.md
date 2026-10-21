@@ -36,7 +36,7 @@ page of the docs site shows the results.
 `bun run bench:deltablue` builds the four ports and times each in a d8
 process of its own (V8's shell; `D8_BIN` chooses which), with 5 warmups and
 the median of 20 samples, each containing 20 solver iterations. utu is built
-as `utu build -O3` builds it. d8 15.6 on arm64 macOS; all returned zero
+as `utu build -O fastUnsafe` builds it. d8 15.6 on arm64 macOS; all returned zero
 failures.
 
 | workload | utu Wasm | safe Rust Wasm | unsafe Rust Wasm | JavaScript |

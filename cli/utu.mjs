@@ -2,17 +2,19 @@
 // cli/utu.mjs — the utu command line, on the self-hosted compiler.
 //
 //   utu check <file.utu>                 report what is wrong
-//   utu run <file.utu> [-O…]             build, then call main
-//   utu test <file.utu> [-O…]            build the tests, then run each
-//   utu build <file.utu> [-o dir] [-O…]  NAME.wasm and NAME.mjs (its loader)
+//   utu run <file.utu> [-O mode]             build, then call main
+//   utu test <file.utu> [-O mode]            build the tests, then run each
+//   utu build <file.utu> [-o dir] [-O mode]  NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
 //   utu lsp                              a language server, on stdin and stdout
 //   utu grep <pattern> <paths…>          utu code by syntax, names, and types
 //
-// -Oz (the default) builds the smallest module, -O3 the fastest (it inlines,
-// selfhost/inline.utu), -O0 the module as code generation leaves it. --safe
-// keeps the checks wasm makes anyway. `display` and `graph` show stage 0's
-// IR and graphs, so they use stage 0.
+// The build mode, `-O mode` (named as Zig names its own): small (the default)
+// builds the smallest module, fast the fastest (it inlines,
+// selfhost/inline.utu), both keeping the checks Wasm does not make itself (a
+// Buffer's length, a last alt arm); smallUnsafe and fastUnsafe leave them
+// out; debug is the module as code generation leaves it. `display` and
+// `graph` show stage 0's IR and graphs, so they use stage 0.
 
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -20,6 +22,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { MODES } from '../src/selfhost/compiler.js';
 import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
 import { glueSource, loaderSource } from '../src/selfhost/loader.js';
 
@@ -48,8 +51,18 @@ async function main() {
   try { stat = await fs.stat(file); } catch {}
   if (!stat) fail(`${fileArg} does not exist`, 'file-not-found');
   if (stat.isDirectory()) fail(`${fileArg} is a directory, not a .utu file`, 'not-a-file');
-  const optimize = rest.includes('-O3') ? 'speed' : rest.includes('-O0') ? 'none' : 'size';
-  const safe = rest.includes('--safe');
+  // The build mode: -O small (the default), fast, smallUnsafe, fastUnsafe, or debug.
+  const given = rest.flatMap((arg, i) => arg === '-O' ? [rest[i + 1] ?? ''] : []);
+  if (given.length > 1) fail(`choose one build mode, not ${given.join(' and ')}`, 'build-mode');
+  const mode = given[0] ?? 'small';
+  if (!MODES[mode]) {
+    const near = closest(mode, Object.keys(MODES));
+    fail(mode ? `${mode} is not a build mode${near ? `; did you mean ${near}?` : ''}` : '-O needs a build mode', 'build-mode',
+      ['The modes are small (the default), fast, smallUnsafe, fastUnsafe, and debug.']);
+  }
+  const flags = rest.filter((arg, i) => arg.startsWith('-') && arg !== '-O' && rest[i - 1] !== '-O' && !['-o', '--out'].includes(arg) && !['-o', '--out'].includes(rest[i - 1]));
+  if (flags.length) fail(`${flags[0]} is not an option`, 'unknown-option', ['The build mode is -O small, fast, smallUnsafe, fastUnsafe, or debug; -o names where build writes.']);
+  const { optimize, safe } = MODES[mode];
   const out = option(rest, '-o') ?? option(rest, '--out');
   await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
 }
@@ -351,18 +364,19 @@ function usage(code) {
   console.log(`usage: utu <command> <file.utu> [options]
 
   check <file>                 report what is wrong with the program
-  run <file> [-O…]             build it, then call its main
-  test <file> [-O…]            build its tests, then run each
-  build <file> [-o dir] [-O…]  NAME.wasm, and NAME.mjs that loads it
+  run <file> [-O mode]            build it, then call its main
+  test <file> [-O mode]           build its tests, then run each
+  build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
   grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']
   grep --refs <name> <paths…>  a name's declaration and every use, by what it resolves to
 
-  -Oz  the smallest module (the default)
-  -O3  the fastest module
-  -O0  the module as code generation leaves it
-  --safe  keep the checks wasm makes anyway (Buffer indexing, a last alt arm, …)
+  -O small        the smallest module (the default)
+  -O fast         the fastest module: it inlines
+  -O smallUnsafe  small, without the checks Wasm does not make itself
+  -O fastUnsafe   fast, without them (Buffer indexing, a last alt arm, …)
+  -O debug        the module as code generation leaves it, checked
 
   display[:tests|:benches|:modules|:exports|:debug] <file>, graph <file> [-o out.html]
                                stage 0's IR and graphs`);

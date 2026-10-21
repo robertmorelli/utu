@@ -15,19 +15,23 @@ mod benchmarks {
                 "A build time is from clean, the median of 3, as each toolchain's command line runs it; utu's is a warm compile in a running process (the whole utu build command takes about 90 ms, most of it starting Node), and Kotlin's has Gradle's daemon already running. A size is everything that must ship to run it: the Wasm and the JavaScript it needs, all minified alike, with gzip per file summed. For utu that JavaScript is the loader utu build writes; for Rust, MoonBit, and AssemblyScript a loader of the same kind; for Dart and Kotlin what their compilers emit; for Go, Swift, and Haskell a WASI shim; JavaScript is just its source.";
             }
             p {
-                "utu is built at ";
+                "utu is built ";
                 code {
-                    "-O3";
+                    "-O fastUnsafe";
                 }
-                " and at ";
+                " and ";
                 code {
-                    "-Oz";
+                    "-O smallUnsafe";
                 }
-                " (and DeltaBlue also with ";
+                ", and DeltaBlue also ";
                 code {
-                    "--safe";
+                    "-O fast";
                 }
-                " as well, which puts back the bounds checks Wasm does not make itself). Dart, Kotlin, and MoonBit compile to WasmGC, as utu does. Rust, AssemblyScript, Go, Swift, and Haskell (GHC's WebAssembly backend) compile to linear memory: Rust frees memory itself, while the others carry their own collector or runtime in the module, which is much of their size. Every language keeps its normal checks.";
+                " and ";
+                code {
+                    "-O small";
+                }
+                " (the default), which keep the checks Wasm does not make itself, such as a Buffer's length. Dart, Kotlin, and MoonBit compile to WasmGC, as utu does. Rust, AssemblyScript, Go, Swift, and Haskell (GHC's WebAssembly backend) compile to linear memory: Rust frees memory itself, while the others carry their own collector or runtime in the module, which is much of their size. Every language keeps its normal checks.";
             }
             p {
                 "Run them again with ";
@@ -71,30 +75,7 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "utu -O3";
-                        }
-                        td {
-                            "7.91";
-                        }
-                        td {
-                            "10.0";
-                        }
-                        td {
-                            "8.13";
-                        }
-                        td {
-                            "6.47";
-                        }
-                        td {
-                            "9.08";
-                        }
-                        td {
-                            "8.25";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu -O3 --safe";
+                            "utu fast";
                         }
                         td {
                             "7.96";
@@ -117,30 +98,30 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz";
+                            "utu fastUnsafe";
                         }
                         td {
-                            "12.9";
+                            "7.91";
                         }
                         td {
-                            "15.9";
+                            "10.0";
                         }
                         td {
-                            "17.4";
+                            "8.13";
                         }
                         td {
-                            "10.6";
+                            "6.47";
                         }
                         td {
-                            "18.3";
+                            "9.08";
                         }
                         td {
-                            "11.0";
+                            "8.25";
                         }
                     }
                     tr {
                         th {
-                            "utu -Oz --safe";
+                            "utu small";
                         }
                         td {
                             "13.5";
@@ -159,6 +140,29 @@ mod benchmarks {
                         }
                         td {
                             "11.6";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu smallUnsafe";
+                        }
+                        td {
+                            "12.9";
+                        }
+                        td {
+                            "15.9";
+                        }
+                        td {
+                            "17.4";
+                        }
+                        td {
+                            "10.6";
+                        }
+                        td {
+                            "18.3";
+                        }
+                        td {
+                            "11.0";
                         }
                     }
                     tr {
@@ -413,21 +417,7 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "utu -O3";
-                        }
-                        td {
-                            "11.0";
-                        }
-                        td {
-                            "28.3";
-                        }
-                        td {
-                            "8.9";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu -O3 --safe";
+                            "utu fast";
                         }
                         td {
                             "11.3";
@@ -441,13 +431,27 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz";
+                            "utu fastUnsafe";
                         }
                         td {
-                            "2.33";
+                            "11.0";
                         }
                         td {
-                            "5.3";
+                            "28.3";
+                        }
+                        td {
+                            "8.9";
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu small";
+                        }
+                        td {
+                            "2.27";
+                        }
+                        td {
+                            "5.4";
                         }
                         td {
                             "2.4";
@@ -455,13 +459,13 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz --safe";
+                            "utu smallUnsafe";
                         }
                         td {
-                            "2.27";
+                            "2.33";
                         }
                         td {
-                            "5.4";
+                            "5.3";
                         }
                         td {
                             "2.4";
@@ -644,7 +648,7 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "utu -O3";
+                            "utu fastUnsafe";
                         }
                         td {
                             "5.59";
@@ -667,7 +671,7 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz";
+                            "utu smallUnsafe";
                         }
                         td {
                             "7.18";
@@ -886,7 +890,7 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "utu -O3";
+                            "utu fastUnsafe";
                         }
                         td {
                             "6.49";
@@ -909,7 +913,7 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz";
+                            "utu smallUnsafe";
                         }
                         td {
                             "6.74";
@@ -1128,7 +1132,7 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "utu -O3";
+                            "utu fastUnsafe";
                         }
                         td {
                             "13.8";
@@ -1151,7 +1155,7 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz";
+                            "utu smallUnsafe";
                         }
                         td {
                             "14.2";
@@ -1370,7 +1374,7 @@ mod benchmarks {
                 tbody {
                     tr {
                         th {
-                            "utu -O3";
+                            "utu fastUnsafe";
                         }
                         td {
                             "17.5";
@@ -1393,7 +1397,7 @@ mod benchmarks {
                     }
                     tr {
                         th {
-                            "utu -Oz";
+                            "utu smallUnsafe";
                         }
                         td {
                             "18.9";

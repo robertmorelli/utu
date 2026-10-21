@@ -57,7 +57,7 @@ mod compiler {
             p {
                 "The invariant is behavior, not bytes: every program does what the reference compiler's build of it did, and every program that does not build is diagnosed with the same kinds, messages, and spans. Of the programs both compilers build at ";
                 code {
-                    "-Oz";
+                    "-O smallUnsafe";
                 }
                 ", 262 of 284 are smaller from the self-hosted compiler and 16.8% smaller in all. Compiling DeltaBlue warm takes 0.9 ms against 56 ms before.";
             }
@@ -82,21 +82,13 @@ mod compiler {
                 code {
                     "wasm:js-string";
                 }
-                " builtins and string constants are imported globals, so there is no shipped UTF-8 transcoder. At ";
-                code {
-                    "-Oz";
-                }
-                " and ";
-                code {
-                    "-O3";
-                }
-                " a local cleanup removes the copies and temporaries lowerings leave, which is what makes a consumed iterator compile to the loop you would have written by hand.";
+                " builtins and string constants are imported globals, so there is no shipped UTF-8 transcoder. In every build mode a local cleanup removes the copies and temporaries lowerings leave, which is what makes a consumed iterator compile to the loop you would have written by hand.";
             }
             = ui.further("docs/wasm-backend.md", "The wasm backend");
             p {
-                "At ";
+                "With ";
                 code {
-                    "-O3";
+                    "-O fast";
                 }
                 " the backend also inlines, folds type tests it can decide, and keeps structs that never escape in locals. How that compares with Rust, JavaScript, Dart, Go, and Swift is on ";
                 a {

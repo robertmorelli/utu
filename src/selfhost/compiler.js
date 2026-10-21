@@ -30,6 +30,22 @@ export const TARGET = { normal: 0, test: 1, comptime: 2 };
 /** How builds are optimized; size (-Oz) is the default, as in stage 0. */
 export const OPTIMIZE = { none: 0, size: 1, speed: 2 };
 
+/**
+ * The build modes people choose (`-O mode`, named as Zig names its own):
+ * small (the default for people: the smallest module, with the checks Wasm
+ * does not make itself), fast (the fastest, inlined, with those checks),
+ * each without the checks, and debug (the module as code generation leaves
+ * it, checked). `optimize` and `safe` remain for tools that want one
+ * without the other.
+ */
+export const MODES = {
+  small: { optimize: 'size', safe: true },
+  fast: { optimize: 'speed', safe: true },
+  smallUnsafe: { optimize: 'size', safe: false },
+  fastUnsafe: { optimize: 'speed', safe: false },
+  debug: { optimize: 'none', safe: true },
+};
+
 // The engine provides the JS string builtins, and string constants as
 // imports from module `'`.
 const COMPILE_OPTIONS = Object.freeze({ builtins: ['js-string'], importedStringConstants: "'" });
@@ -50,7 +66,9 @@ export async function loadCompiler(wasm, spec = {}) {
  * a Map from `std:Name` to text or to an async thunk of a host ABI).
  */
 export async function compile(utu, entry, host) {
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false } = host;
+  const chosen = host.mode ? MODES[host.mode] : null;
+  if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);

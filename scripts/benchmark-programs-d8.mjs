@@ -10,7 +10,7 @@
 // The first engine is the one the sizes and builds are reported with.
 //
 // Ports, where a program has them (benchmarks/NAME/<dir>):
-//   utu        -O3 and -Oz (DeltaBlue also with --safe), the shipped
+//   utu        fastUnsafe and smallUnsafe (DeltaBlue also fast and small, with the checks), the shipped
 //              self-hosted compiler, warm: the median of 20 builds after 5
 //   Rust       rust/ (safe; Rc Rust for DeltaBlue) and rust-unsafe/,
 //              `cargo build --release`
@@ -123,8 +123,8 @@ for (const name of names) {
   const dir = path.join(ROOT, 'benchmarks', name);
   const has = sub => existsSync(path.join(dir, sub));
   const utuPorts = name === 'deltablue'
-    ? [['-O3', 'speed', false], ['-O3 --safe', 'speed', true], ['-Oz', 'size', false], ['-Oz --safe', 'size', true]]
-    : [['-O3', 'speed', false], ['-Oz', 'size', false]];
+    ? [['fast', 'speed', true], ['fastUnsafe', 'speed', false], ['small', 'size', true], ['smallUnsafe', 'size', false]]
+    : [['fastUnsafe', 'speed', false], ['smallUnsafe', 'size', false]];
   const ports = [];
   for (const [label, optimize, safe] of utuPorts) ports.push({ port: `utu ${label}`, kind: 'utu', ...await compileUtu(path.join(dir, `${name}.utu`), optimize, safe), js: utuLoader(dir, name, optimize, safe) });
   ports.push({ port: name === 'deltablue' ? 'Rc Rust' : 'safe Rust', kind: 'wasm', ...buildRust(dir, 'rust', `rust_${name}`), js: await plainLoader(name, '{}') });
@@ -210,8 +210,9 @@ async function compileUtu(file, optimize, safe) {
 // The loader `utu build` writes for the program (already minified).
 function utuLoader(dir, name, optimize, safe) {
   const out = path.join(TMP, `${name}-utu-${optimize}${safe ? '-safe' : ''}`);
+  const mode = `${optimize === 'speed' ? 'fast' : 'small'}${safe ? '' : 'Unsafe'}`;
   const result = spawnSync(process.execPath, [
-    path.join(ROOT, 'cli', 'utu.mjs'), 'build', path.join(dir, `${name}.utu`), optimize === 'speed' ? '-O3' : '-Oz', ...(safe ? ['--safe'] : []), '-o', out,
+    path.join(ROOT, 'cli', 'utu.mjs'), 'build', path.join(dir, `${name}.utu`), '-O', mode, '-o', out,
   ], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`utu build ${name}: ${result.stderr}`);
   return readFileSync(path.join(out, `${name}.mjs`));

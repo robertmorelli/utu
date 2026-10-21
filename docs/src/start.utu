@@ -83,15 +83,23 @@ mod start {
             = code.block(hello_sample());
             = code.shell(run_sample());
             p {
-                "Pass ";
+                "Builds are ";
                 code {
-                    "-O3";
+                    "-O small";
                 }
-                " for the fastest module, or ";
+                " by default, the smallest module; pass ";
                 code {
-                    "-Oz";
+                    "-O fast";
                 }
-                " (the default) for the smallest one. ";
+                " for the fastest. Both keep the checks Wasm does not make itself, such as a Buffer's length; ";
+                code {
+                    "-O smallUnsafe";
+                }
+                " and ";
+                code {
+                    "-O fastUnsafe";
+                }
+                " leave them out. ";
                 code {
                     "build-exe";
                 }

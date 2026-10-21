@@ -106,12 +106,19 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     const doc = docs.get(key);
     if (!doc) return;
     const lines = lineStarts(doc.text);
+    // The diagnostic's own kind, its notes after its message, the other
+    // places it is about, and its fix (kept for a quick fix: codeAction).
     const diagnostic = (d, lines, here) => ({
-      range: here ? range(lines, d.start, d.end) : range(lines, 0, 0),
+      range: here ? range(lines, d.focus?.start ?? d.start, d.focus?.end ?? d.end) : range(lines, 0, 0),
       severity: d.severity === 'warning' ? 2 : 1,
       source: 'utu',
-      code: d.kind,
-      message: d.message,
+      code: d.code ?? d.kind,
+      message: [d.message, ...(d.notes ?? []).map(note => `note: ${note}`)].join('\n'),
+      relatedInformation: (d.related ?? []).flatMap(r => {
+        const place = location(program, r);
+        return place ? [{ location: place, message: r.label || 'related' }] : [];
+      }),
+      data: d.fix && toUri(d.fix.file ?? d.file) ? { fix: { ...d.fix, uri: toUri(d.fix.file ?? d.file) } } : undefined,
     });
     const diagnostics = program.diagnostics.filter(d => d.file === key || d.file == null).map(d => diagnostic(d, lines, d.file === key));
     if (diagnostics.length) published.add(key);
@@ -215,11 +222,29 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
         documentSymbolProvider: true,
         completionProvider: { triggerCharacters: ['.'] },
         semanticTokensProvider: { legend: { tokenTypes: SEMANTIC_TYPES, tokenModifiers: SEMANTIC_MODIFIERS }, full: true },
+        codeActionProvider: { codeActionKinds: ['quickfix'] },
       },
       serverInfo: { name: 'utu' },
     }),
 
     shutdown: () => { shutdown = true; return null; },
+
+    // Quick fixes: each diagnostic's fix, as one edit (sent with the diagnostic, in its data).
+    'textDocument/codeAction': params => {
+      const actions = [];
+      for (const d of params.context?.diagnostics ?? []) {
+        const fix = d.data?.fix;
+        if (!fix) continue;
+        const text = docs.get(toKey(fix.uri))?.text ?? current?.files.find(f => toUri(f.key) === fix.uri)?.text;
+        if (text == null) continue;
+        const lines = lineStarts(text);
+        actions.push({
+          title: fix.label || 'Apply the fix', kind: 'quickfix', diagnostics: [d], isPreferred: true,
+          edit: { changes: { [fix.uri]: [{ range: range(lines, fix.start, fix.end), newText: fix.text }] } },
+        });
+      }
+      return actions;
+    },
 
     'textDocument/definition': async params => {
       const q = await at(params);

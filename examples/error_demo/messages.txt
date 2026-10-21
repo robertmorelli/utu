@@ -3434,11 +3434,15 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/06_buffer_past_length.utu
-10
---- exit 0
+ TRAP  The program stopped: a fatal, a failed assert, or a failed check
+       trap · examples/error_demo/runtime/06_buffer_past_length.utu
+
+  in &.get_index
+  in main
+--- exit 1
 
 === utu run examples/error_demo/runtime/07_buffer_past_capacity.utu
- TRAP  An index is outside the array
+ TRAP  The program stopped: a fatal, a failed assert, or a failed check
        trap · examples/error_demo/runtime/07_buffer_past_capacity.utu
 
   in &.get_index
@@ -3446,7 +3450,7 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/08_buffer_pop_empty.utu
- TRAP  An index is outside the array
+ TRAP  The program stopped: a fatal, a failed assert, or a failed check
        trap · examples/error_demo/runtime/08_buffer_pop_empty.utu
 
   in &.pop
@@ -3696,9 +3700,9 @@ FAIL fetches: offline
 --- exit 1
 
 === utu test examples/error_demo/runtime/48_test_buffer_safe.utu
-pass third item (… ms)
-1 passed, 0 failed
---- exit 0
+FAIL third item: The program stopped: a fatal, a failed assert, or a failed check  in &.get_index
+0 passed, 1 failed
+--- exit 1
 
 === utu run examples/error_demo/runtime/50_no_main.utu
  ERROR  examples/error_demo/runtime/50_no_main.utu has no export main to run

@@ -109,7 +109,7 @@ compile as one. `filter` followed by `sum` adds a select instead of branching.
 
 Leading `skip`/`take` stages and a first-stage `zip` narrow the source loop's
 bounds instead of counting elements. Pipelines that cannot stop early compile
-to counted loops, which `-O3` unrolls four ways when the body is small.
+to counted loops, which `-O fast` unrolls four ways when the body is small.
 Measurements against Rust are in `benchmarks/loops/README.md`.
 
 An unfinished `map`/`filter` pipeline is an error. Bind a collected array to

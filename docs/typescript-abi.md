@@ -257,17 +257,17 @@ replacing the former 1,490 expanded source modules. Standard `DecompressionStrea
 shared; demand, type identities, and inference state are private to a compilation.
 The catalog is not decompressed when the program does not import the browser.
 
-Builds optimize for size (`-Oz`, the default) or speed (`-O3`); pass
-`createCompiler({ optimize: 'speed' })`, `-O3` to the CLI's `build-exe`, or
-`optimize: 'speed'` to `tools/dts/build-app.mjs`. Under `-Oz`, plain property
+Builds optimize for size (`-O small`, the default) or speed (`-O fast`); pass
+`createCompiler({ optimize: 'speed' })`, `-O fast` to the CLI's `build-exe`, or
+`optimize: 'speed'` to `tools/dts/build-app.mjs`. Under `-O small`, plain property
 reads and writes, method calls, and global reads share one import per shape,
 such as `(self,k) => self[k]`, with the name passed from Wasm as a string
-constant; JS string builtins make those constants free. Under `-O3`, each name
+constant; JS string builtins make those constants free. Under `-O fast`, each name
 keeps its own import, so every JavaScript access site stays monomorphic.
 Named package imports are never shared,
 because bundlers need them for tree shaking.
 
-| App | `-Oz` total gzip | `-O3` total gzip |
+| App | `-O small` total gzip | `-O fast` total gzip |
 |---|---:|---:|
 | browser task board | 2,572 B | 2,640 B |
 | Pantry dashboard | 4,867 B | 5,198 B |

@@ -368,9 +368,9 @@ mod javascript {
                 "What it costs";
             }
             p {
-                "At the default ";
+                "Built ";
                 code {
-                    "-Oz";
+                    "-O smallUnsafe";
                 }
                 ", the browser task board is 2,572 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard 4,867. A thousand unused declarations add zero bytes. Each boundary crossing still costs time, so call once per operation, not once per element.";
             }

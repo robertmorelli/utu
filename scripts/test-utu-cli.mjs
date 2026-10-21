@@ -76,19 +76,26 @@ export main() I32 {
   assert.match(r.stdout, /^FAIL fails: /m);
   assert.match(r.stdout, /1 passed, 1 failed/);
 
-  // --safe keeps the checks wasm makes anyway: past a Buffer's length is a
-  // trap, where otherwise it reaches the capacity beyond (at -Oz and -O3).
+  // The build modes: small (the default) and fast keep the checks Wasm does
+  // not make itself, so past a Buffer's length is a trap; the unsafe ones
+  // leave them out, and it reaches the capacity beyond.
   await write('past.utu', `using Buffer from std:Buffer;
 export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
 `);
-  for (const level of [[], ['-O3']]) {
-    r = utu('run', 'past.utu', ...level);
-    assert.equal(r.status, 0, r.stderr);
-    assert.equal(r.stdout.trim(), '7');
-    r = utu('run', 'past.utu', '--safe', ...level);
+  for (const mode of [[], ['-O', 'fast']]) {
+    r = utu('run', 'past.utu', ...mode);
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /TRAP  The program stopped/);
   }
+  for (const mode of ['smallUnsafe', 'fastUnsafe']) {
+    r = utu('run', 'past.utu', '-O', mode);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.trim(), '7');
+  }
+  // One mode at a time, by name.
+  assert.match(utu('run', 'past.utu', '-O', 'fast', '-O', 'small').stderr, /choose one build mode/);
+  assert.match(utu('run', 'past.utu', '-O', 'fastUnsfe').stderr, /did you mean fastUnsafe/);
+  assert.match(utu('run', 'past.utu', '-O3').stderr, /-O3 is not an option/);
 
   // A module and the least JavaScript that loads it.
   r = utu('build', 'good.utu', '-o', 'out');
