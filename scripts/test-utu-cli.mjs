@@ -29,34 +29,42 @@ export main() I32 {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), 'ok');
 
-  // Each problem where it is, in source order, underlined.
+  // Each problem where it is, in source order: the problem, its kind and
+  // place, and the code, marked (a rule under it, without color).
   r = utu('check', 'bad.utu');
   assert.equal(r.status, 1);
-  assert.equal(r.stderr.trim(), `bad.utu:3:25: error: Type mismatch: expected I32, got Str
- 2 | export main() I32 {
- 3 |     let x: I32 = add(1, "two");
-   |                         ^^^^^
+  assert.equal(r.stderr.trim(), `ERROR  Type mismatch: expected I32, got Str
+        type-mismatch · bad.utu:3:25
 
-bad.utu:4:9: error: Unknown variable 'missing'
- 3 |     let x: I32 = add(1, "two");
- 4 |     x + missing;
-   |         ^^^^^^^`);
+ 2 │ export main() I32 {
+ 3 │     let x: I32 = add(1, "two");
+   │                         ━━━━━
+
+ ERROR  Unknown variable 'missing'
+        unknown-variable · bad.utu:4:9
+
+ 3 │     let x: I32 = add(1, "two");
+ 4 │     x + missing;
+   │         ━━━━━━━`);
   // On a terminal, colored as the compiler reads it: \`add\` a function, \`I32\` a type, the string a string.
-  const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1' } }).stderr;
-  assert.match(colored, /\x1b\[34madd\x1b\[0m/);
-  assert.match(colored, /\x1b\[36mI32\x1b\[0m/);
-  assert.match(colored, /\x1b\[32m"two"\x1b\[0m/);
+  const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', COLORTERM: 'truecolor', UTU_THEME: 'dark' } }).stderr;
+  assert.match(colored, /\x1b\[38;2;130;170;255madd/);
+  assert.match(colored, /\x1b\[38;2;125;207;255mI32/);
+  assert.match(colored, /\x1b\[38;2;158;206;106m"two"/);
+  // Without 24-bit color, the nearest of the 256.
+  const fewer = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', COLORTERM: '', TERM_PROGRAM: '', UTU_THEME: 'dark' } }).stderr;
+  assert.match(fewer, /\x1b\[38;5;\d+madd/);
   // NO_COLOR wins; FORCE_COLOR=0 is no.
   for (const env of [{ NO_COLOR: '1', FORCE_COLOR: '1' }, { FORCE_COLOR: '0' }]) {
     const plain = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...env } }).stderr;
     assert.ok(!plain.includes('\x1b['), JSON.stringify(env));
   }
-  // The underline is under the code, past wide characters.
+  // The mark is under the code, past wide characters.
   await fs.writeFile(path.join(dir, 'wide.utu'), 'export main() I32 {\n    let s: Str = "漢字"; nope;\n}\n');
-  assert.match(utu('check', 'wide.utu').stderr, /^ {3}\| {26}\^{4}$/m);
+  assert.match(utu('check', 'wide.utu').stderr, /^ {3}│ {26}━{4}$/m);
   // A file that ends early says so.
   await fs.writeFile(path.join(dir, 'short.utu'), 'export main() I32 {\n');
-  assert.match(utu('check', 'short.utu').stderr, /error: Syntax error: unexpected end of the file/);
+  assert.match(utu('check', 'short.utu').stderr, /Syntax error: unexpected end of the file/);
 
   r = utu('run', 'good.utu');
   assert.equal(r.status, 0, r.stderr);
@@ -79,7 +87,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.equal(r.stdout.trim(), '7');
     r = utu('run', 'past.utu', '--safe', ...level);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /unreachable/);
+    assert.match(r.stderr, /TRAP  The program stopped/);
   }
 
   // A module and the least JavaScript that loads it.

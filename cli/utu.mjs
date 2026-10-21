@@ -20,7 +20,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
-import { formatDiagnostics } from '../src/selfhost/format.js';
+import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
 import { glueSource, loaderSource } from '../src/selfhost/loader.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -36,20 +36,18 @@ async function main() {
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, build, 'build-exe': buildExe };
   if (!commands[command]) {
-    console.error(`unknown command: ${command}`);
-    usage(1);
+    const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
+    // A file given without a command: it was meant for one.
+    if (command.endsWith('.utu')) fail(`${command} is a file; say what to do with it`, 'unknown-command', [], `utu check ${command}`);
+    fail(`${command} is not a utu command${near ? `; did you mean ${near}?` : ''}`, 'unknown-command',
+      ['utu --help lists the commands.'], near && fileArg ? `utu ${near} ${[fileArg, ...rest].join(' ')}` : null);
   }
-  if (!fileArg) {
-    console.error('missing file');
-    usage(1);
-  }
+  if (!fileArg) fail(`utu ${command} needs a file`, 'missing-file', [], `utu ${command} <file.utu>`);
   const file = path.resolve(fileArg);
-  try {
-    await fs.access(file);
-  } catch {
-    console.error(`${fileArg}: file not found`);
-    process.exit(1);
-  }
+  let stat = null;
+  try { stat = await fs.stat(file); } catch {}
+  if (!stat) fail(`${fileArg} does not exist`, 'file-not-found');
+  if (stat.isDirectory()) fail(`${fileArg} is a directory, not a .utu file`, 'not-a-file');
   const optimize = rest.includes('-O3') ? 'speed' : rest.includes('-O0') ? 'none' : 'size';
   const safe = rest.includes('--safe');
   const out = option(rest, '-o') ?? option(rest, '--out');
@@ -95,18 +93,21 @@ async function check(file, { utu }) {
 }
 
 async function run(file, { utu, optimize, safe }) {
-  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
+  // Named functions, so a trap says which.
+  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe, debugNames: true });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
-  if (typeof exports.main !== 'function') {
-    console.error(`${displayPath(file)}: no \`export main\``);
-    process.exit(1);
+  if (typeof exports.main !== 'function') fail(`${displayPath(file)} has no export main to run`, 'no-main', ['utu run calls export main; utu test runs the tests.']);
+  let result;
+  try {
+    result = await exports.main();
+  } catch (error) {
+    trap(error, file);
   }
-  const result = await exports.main();
   if (result !== undefined) console.log(result);
 }
 
 async function test(file, { utu, optimize, safe }) {
-  const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize, safe });
+  const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   let failed = 0;
@@ -117,10 +118,12 @@ async function test(file, { utu, optimize, safe }) {
       console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${(performance.now() - started).toFixed(1)} ms)`)}`);
     } catch (error) {
       failed++;
-      console.log(`${paint('31', 'FAIL')} ${title}: ${String(error?.message ?? error).split('\n')[0]}`);
+      const { title: what, frames } = trapText(error);
+      const where = frames.length ? paint('2', `  in ${frames.map(f => f.fn).join(' ← ')}`) : '';
+      console.log(`${paint('31', 'FAIL')} ${title}: ${what}${where}`);
     }
   }
-  console.log(`${tests.length - failed} passed, ${failed} failed`);
+  console.log(tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'no tests: a test is test "name" { … }');
   if (failed) process.exitCode = 1;
 }
 
@@ -364,6 +367,74 @@ function usage(code) {
   display[:tests|:benches|:modules|:exports|:debug] <file>, graph <file> [-o out.html]
                                stage 0's IR and graphs`);
   process.exit(code);
+}
+
+/**
+ * Report a problem with how utu was run, in the shape of every other problem
+ * it reports, with the corrected command when there is one; then exit 1.
+ */
+function fail(title, code, list = [], command = null) {
+  const ink = pen({ color: colored(process.stderr) });
+  const lines = [...heading(ink, 'error', title, code)];
+  if (list.length) lines.push('', ...notes(ink, list));
+  if (command) lines.push('', `  ${ink.paint(ink.palette.add, `${ink.bold}try`)}   ${ink.paint(ink.palette.add, `$ ${command}`)}`);
+  console.error(lines.join('\n'));
+  process.exit(1);
+}
+
+/** The closest of `names` to a mistyped `word` (at most two edits away), or null. */
+function closest(word, names) {
+  const distance = (a, b) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+    return d[a.length][b.length];
+  };
+  const ranked = names.map(n => [n, distance(word.toLowerCase(), n)]).sort((a, b) => a[1] - b[1]);
+  const [best, second] = ranked;
+  return best && best[1] <= 2 && (!second || second[1] > best[1]) ? best[0] : null;
+}
+
+// What the engine says when Wasm traps, in utu's terms.
+const TRAPS = [
+  [/^unreachable/, 'The program stopped: a fatal, a failed assert, or a failed check'],
+  [/null (pointer|reference)|dereferencing a null/, 'A null value was used where a value was needed (orelse fatal, or a null reference)'],
+  [/divide by zero|division by zero/, 'Integer division by zero'],
+  [/remainder by zero/, 'Integer remainder by zero'],
+  [/integer overflow|divide result unrepresentable/, 'Integer overflow: the result does not fit its type'],
+  [/out of bounds/, 'An index is outside the array'],
+  [/illegal cast|type incompatibility/, 'A value had the wrong type where it crossed into utu'],
+  [/array (is )?too large|requested new array is too large/, 'An array of that size cannot be made'],
+  [/Maximum call stack|stack overflow/i, 'The call stack ran out: recursion went too deep'],
+];
+
+/** A trap, or a JavaScript error from the host, as what happened and the utu functions it was in. */
+function trapText(error) {
+  const message = String(error?.message ?? error).split('\n')[0];
+  const wasm = error instanceof WebAssembly.RuntimeError || /Maximum call stack/.test(message);
+  const title = wasm ? (TRAPS.find(([pattern]) => pattern.test(message))?.[1] ?? message) : message;
+  const frames = [];
+  for (const line of String(error?.stack ?? '').split('\n')) {
+    const at = line.match(/^\s*at (?:async )?(\S+) \(wasm:/) ?? line.match(/^\s*at (?:async )?(\S+) .*wasm-function/);
+    // Not the engine's numbers, nor the test runner's own exports.
+    if (at && !/^wasm-function|^__test_/.test(at[1])) frames.push({ fn: at[1].replace(/^[$]/, '') });
+  }
+  // Endless recursion: one frame, many times; say it once.
+  const folded = frames.filter((f, i) => i === 0 || f.fn !== frames[i - 1].fn);
+  return { title, frames: folded.slice(0, 12), wasm };
+}
+
+/** A trap in `utu run`: in the shape of every other problem, with the utu functions it was in. */
+function trap(error, file) {
+  const ink = pen({ color: colored(process.stderr) });
+  const { title, frames, wasm } = trapText(error);
+  const lines = [...heading(ink, wasm ? 'trap' : 'error', title, `${wasm ? 'trap' : 'uncaught-exception'} · ${displayPath(file)}`)];
+  if (frames.length) lines.push('', ...frames.map(f => `  ${ink.paint(ink.palette.dim, 'in')} ${ink.bold}${f.fn}${ink.reset}`));
+  console.error(lines.join('\n'));
+  process.exit(1);
 }
 
 main().catch(error => {

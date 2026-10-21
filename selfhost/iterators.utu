@@ -376,7 +376,11 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         let ms = w_mark();
         let at = check_expr(input, -1, cx);
         if not is_array_type(at) {
-            if not ty_is(at, Ty.Error) { report(Diag.IteratorSource, input, -1); };
+            if not ty_is(at, Ty.Error) {
+                report2(Diag.IteratorSource, input, -1, at, 0);
+                diag_label("this is " + article(type_text(at)));
+                diag_note(source_hint(at));
+            };
             w_stack.resize(m);
             return error_value();
         };
@@ -672,6 +676,10 @@ fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         or op == Kw.Min_by.to_i32() or op == Kw.Max_by.to_i32() or op == Kw.Sort.to_i32() { 2; } else { 1; };
     if k < p.count - 1 and is_terminal(op) {
         report(Diag.IteratorTerminalInside, stage_node(p, k), op);
+        let here = stage_node(p, k);
+        let next = stage_node(p, k + 1);
+        diag_focus(node_last[first_child(here)], node_last[here] - 1, "ends the pipeline");
+        diag_place_tokens(Extra.Related, node_last[first_child(next)], node_last[next] - 1, "so this has nothing to read");
         seq_void(m);
         return;
     };
@@ -911,7 +919,10 @@ fn other_array(p: Pipe, k: I32, cx: Cx) I32 {
     let param = stage_param(stage_node(p, k));
     let ot = type_only(param, -1, cx);
     if not is_array_type(ot) {
-        if not ty_is(ot, Ty.Error) { report(Diag.IteratorSource, param, -1); };
+        if not ty_is(ot, Ty.Error) {
+            report2(Diag.IteratorSource, param, stage_op(p, k), ot, 1);
+            diag_label("this is " + article(type_text(ot)));
+        };
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return -1;
     };
@@ -985,7 +996,10 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let mn = w_mark();
     let nt = stage_body(p, k, one(value), one(vt), 1, -1, cx);
     if not is_array_type(nt) {
-        if not ty_is(nt, Ty.Error) { report(Diag.IteratorSource, block, -1); };
+        if not ty_is(nt, Ty.Error) {
+            report2(Diag.IteratorSource, block, -1, nt, 2);
+            diag_label("gives " + article(type_text(nt)));
+        };
         w_stack.resize(mn);
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return;
@@ -1533,7 +1547,7 @@ fn check_sort(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let et = type_of(type_node, cx.inst);
     let capture = stage_capture(node);
     if child_count(capture) != 2 {
-        report(Diag.IteratorCaptures, node, -1);
+        report2(Diag.IteratorCaptures, node, stage_op(p, k), 2, 1);
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return;
     };
@@ -2580,7 +2594,7 @@ fn slice_at(data: I32, base: I32, s: I32, width: I32, count: I32, heap: I32) voi
 /// the test runs about `log2(n) + 1` times.
 fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     if n != 1 {
-        report(Diag.IteratorSource, node, -1);
+        report2(Diag.IteratorSource, node, -1, -1, 3);
         return error_value();
     };
     let i32_t = prelude(Prelude.I32);
@@ -2607,7 +2621,11 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
         let ms = w_mark();
         let at = check_expr(input, -1, cx);
         if not is_array_type(at) {
-            if not ty_is(at, Ty.Error) { report(Diag.IteratorSource, input, -1); };
+            if not ty_is(at, Ty.Error) {
+                report2(Diag.IteratorSource, input, -1, at, 0);
+                diag_label("this is " + article(type_text(at)));
+                diag_note(source_hint(at));
+            };
             w_stack.resize(m);
             return error_value();
         };

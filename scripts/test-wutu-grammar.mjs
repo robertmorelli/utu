@@ -9,7 +9,8 @@ const utu = await Language.load('./tree-sitter-utu.wasm');
 const wutu = await Language.load('./editors/tree-sitter-wutu/tree-sitter-wutu.wasm');
 const pu = new Parser(); pu.setLanguage(utu);
 const pw = new Parser(); pw.setLanguage(wutu);
-const files = execSync('git ls-files "*.utu" "editors/**/*.utu"', { encoding: 'utf8' }).split('\n').filter(f => f && !f.startsWith('baselines/') && !f.startsWith('selfhost/'));
+// (Not the error catalog, examples/error_demo/<category>/: its templates are wrong on purpose.)
+const files = execSync('git ls-files "*.utu" "editors/**/*.utu"', { encoding: 'utf8' }).split('\n').filter(f => f && !f.startsWith('baselines/') && !f.startsWith('selfhost/') && !/^examples\/error_demo\/[^/]+\//.test(f));
 let total = 0, bad = 0; const shown = [];
 const check = (f, text) => {
   total++; const t = pw.parse(text);

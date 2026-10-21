@@ -23,7 +23,11 @@ fn field_type(field: I32, inst: I32) I32 { type_of(next_sibling(first_child(decl
 fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     let t = type_path(first_child(node), cx.inst);
     let decl = ty_decl(t);
-    if not decl_is(decl, Decl.Struct) and not decl_is(decl, Decl.Variant) { return unsupported(node); };
+    if not decl_is(decl, Decl.Struct) and not decl_is(decl, Decl.Variant) {
+        // An unknown name was already reported; otherwise it names something that is not a struct.
+        if ty_is(t, Ty.Error) { return error_value(); };
+        return unsupported(node);
+    };
     let inits = next_sibling(first_child(node));
     return build_struct(t, decl, inits, node, cx);
 }
@@ -34,7 +38,8 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
     if is_foreign(t) { return check_foreign_record(node, t, cx); };
     let decl = if t >= 0 { ty_decl(t); } else { -1; };
     if not decl_is(decl, Decl.Struct) {
-        report(Diag.ImplicitStructInit, node, -1);
+        report2(Diag.ImplicitStructInit, node, -1, t, -1);
+        diag_note("Name the struct, as in Point { x: 1.0 }, or give the place a struct type: let p: Point = &{ x: 1.0 }.");
         return error_value();
     };
     build_struct(t, decl, next_sibling(first_child(node)), node, cx);

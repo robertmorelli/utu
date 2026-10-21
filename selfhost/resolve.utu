@@ -191,6 +191,8 @@ enum(U8) Diag:
     | InvalidEscape
     | AwaitInClosure
     | LazyValue
+    | UnknownMember
+    | DslPlace
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -202,6 +204,79 @@ vec diag_a: I32;
 vec diag_b: I32;
 vec diag_c: I32;
 
+/// What a diagnostic says beyond its message and span, for the host to draw
+/// (see `diagnostic_extra_*` in lib.utu): a label on its own span, other
+/// places it is about (each with a role and a label), notes, and a fix, one
+/// edit of the source. A diagnostic owns a run of extra rows, `diag_extra_n`
+/// of them from `diag_extra`; rows are added right after the report, so the
+/// run is unbroken.
+vec diag_extra: I32;
+vec diag_extra_n: I32;
+/// A row: its @Extra kind; for a place, its node (-1: the diagnostic's own
+/// span), or bytes `extra_node ..< extra_end` when `extra_end` is not -1 (for
+/// a label, the part of its own span to show: its focus); for a fix, the
+/// bytes it replaces; and its text (a label, a note, or a fix's new text)
+/// and a fix's label, both interned (-1 for none).
+vec extra_kind: U8;
+vec extra_node: I32;
+vec extra_end: I32;
+vec extra_text: I32;
+vec extra_label: I32;
+/// Whether the last report made a diagnostic (a repeat makes none, and its extras go nowhere).
+vec diag_fresh: U8 = [0];
+
+/// What an extra row is. A place's kind is the role it plays: where the
+/// requirement came from, where the value came from, or other context.
+enum(U8) Extra:
+    | Here
+    | Expected
+    | Found
+    | Related
+    | Note
+    | Fix
+
+fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) void {
+    if diag_fresh[0] == 0 { return; };
+    let i = diag_kind.len() - 1;
+    if diag_extra_n[i] == 0 { diag_extra[i] = extra_kind.len(); };
+    extra_kind.push(kind.to_i32());
+    extra_node.push(node);
+    extra_end.push(end_);
+    extra_text.push(text);
+    extra_label.push(label);
+    diag_extra_n[i] += 1;
+}
+
+/// A label on the last diagnostic's own span.
+fn diag_label(label: Str) void {
+    if diag_fresh[0] == 1 { add_extra(Extra.Here, -1, -1, intern_text(label), -1); };
+}
+
+/// The part of the last diagnostic's span to show (tokens `first` to `last`), with a label.
+fn diag_focus(first: I32, last: I32, label: Str) void {
+    if diag_fresh[0] == 1 { add_extra(Extra.Here, tok_start[first], tok_end[last], intern_text(label), -1); };
+}
+
+/// Another place the last diagnostic is about, by tokens `first` to `last`.
+fn diag_place_tokens(role: Extra, first: I32, last: I32, label: Str) void {
+    if first >= 0 and diag_fresh[0] == 1 { add_extra(role, tok_start[first], tok_end[last], intern_text(label), -1); };
+}
+
+/// Another place the last diagnostic is about: node, its role, and a label.
+fn diag_place(role: Extra, node: I32, label: Str) void {
+    if node >= 0 and diag_fresh[0] == 1 { add_extra(role, node, -1, intern_text(label), -1); };
+}
+
+/// A note on the last diagnostic: one sentence that teaches the rule.
+fn diag_note(text: Str) void {
+    if diag_fresh[0] == 1 { add_extra(Extra.Note, -1, -1, intern_text(text), -1); };
+}
+
+/// A fix for the last diagnostic: source bytes `start ..< end_` become `text`.
+fn diag_fix(start: I32, end_: I32, text: Str, label: Str) void {
+    if diag_fresh[0] == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)); };
+}
+
 fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1, -1, -1); }
 
 fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind, node, word, a, b, -1); }
@@ -209,11 +284,15 @@ fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind
 /// Report a mistake (once per node, kind, and word).
 fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
     // Once for a node: a name resolved, or a type read, twice is still one mistake.
+    diag_fresh[0] = 0;
     if node >= 0 {
         for (0 ..< diag_kind.len()) |i| {
             if diag_node[i] == node and diag_kind[i] == kind.to_i32() and diag_word[i] == word { return; };
         };
     };
+    diag_fresh[0] = 1;
+    diag_extra.push(-1);
+    diag_extra_n.push(0);
     diag_kind.push(kind.to_i32());
     diag_node.push(node);
     diag_word.push(word);
@@ -230,6 +309,19 @@ fn diag_truncate(n: I32) void {
     diag_a.resize(n);
     diag_b.resize(n);
     diag_c.resize(n);
+    diag_extra.resize(n);
+    diag_extra_n.resize(n);
+    diag_fresh[0] = 0;
+}
+
+/// No diagnostics, and no extra rows: a build starting over.
+fn diag_reset() void {
+    diag_truncate(0);
+    extra_kind.clear();
+    extra_node.clear();
+    extra_end.clear();
+    extra_text.clear();
+    extra_label.clear();
 }
 
 fn diag_move(from: I32, to: I32) void {
@@ -239,6 +331,8 @@ fn diag_move(from: I32, to: I32) void {
     diag_a[to] = diag_a[from];
     diag_b[to] = diag_b[from];
     diag_c[to] = diag_c[from];
+    diag_extra[to] = diag_extra[from];
+    diag_extra_n[to] = diag_extra_n[from];
 }
 
 //! = Members
@@ -365,7 +459,7 @@ fn reset_resolve() void {
     decl_owner.clear();
     decl_a.clear();
     node_decl.clear();
-    diag_truncate(0);
+    diag_reset();
     bind_word.clear();
     bind_decl.clear();
     bind_prev.clear();
@@ -764,7 +858,7 @@ struct Walk:
 /// Resolution, after parsing: `@`-DSLs expanded, every declaration declared,
 /// method headers then bodies walked. Returns the number of diagnostics.
 fn resolve_names() I32 {
-    diag_truncate(0);
+    diag_reset();
     if missing_import[0] >= 0 {
         report(Diag.UnknownImport, import_node[missing_import[0]], -1);
         save_diagnostics();
@@ -794,6 +888,8 @@ vec saved_word: I32;
 vec saved_a: I32;
 vec saved_b: I32;
 vec saved_c: I32;
+vec saved_extra: I32;
+vec saved_extra_n: I32;
 
 fn save_diagnostics() void {
     let n = diag_kind.len();
@@ -803,6 +899,8 @@ fn save_diagnostics() void {
     saved_a.resize(n);
     saved_b.resize(n);
     saved_c.resize(n);
+    saved_extra.resize(n);
+    saved_extra_n.resize(n);
     for (0 ..< n) |i| {
         saved_kind[i] = diag_kind[i];
         saved_node[i] = diag_node[i];
@@ -810,6 +908,8 @@ fn save_diagnostics() void {
         saved_a[i] = diag_a[i];
         saved_b[i] = diag_b[i];
         saved_c[i] = diag_c[i];
+        saved_extra[i] = diag_extra[i];
+        saved_extra_n[i] = diag_extra_n[i];
     };
 }
 
@@ -823,6 +923,8 @@ fn restore_diagnostics() void {
         diag_a[i] = saved_a[i];
         diag_b[i] = saved_b[i];
         diag_c[i] = saved_c[i];
+        diag_extra[i] = saved_extra[i];
+        diag_extra_n[i] = saved_extra_n[i];
     };
 }
 

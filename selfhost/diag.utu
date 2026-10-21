@@ -184,6 +184,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.UnknownType or k == Diag.NotAModule or k == Diag.UnknownModule or k == Diag.UnknownVariant or k == Diag.MemKind or k == Diag.InvalidDistinct or k == Diag.MemView { return "unknown-type"; };
     if k == Diag.UnknownImport { return "unknown-import"; };
     if k == Diag.DuplicateDeclaration or k == Diag.DuplicatePattern or k == Diag.MemTwice or k == Diag.MemClash or k == Diag.EnumValueTwice { return "duplicate-declaration"; };
+    if k == Diag.UnknownMember { return "unknown-method"; };
+    if k == Diag.DslPlace { return "invalid-dsl-usage"; };
     if k == Diag.UnknownMethod or k == Diag.ProtoMissing or k == Diag.InternNotBytes or k == Diag.MemNoMethod or k == Diag.VecHost { return "unknown-method"; };
     if k == Diag.UnknownOperator { return "unknown-operator"; };
     if k == Diag.WrongArity { return "wrong-arity"; };
@@ -215,6 +217,37 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.InvalidDslUsage or k == Diag.DslError or k == Diag.WatPlace or k == Diag.WatHost { return "invalid-dsl-usage"; };
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     "type-mismatch";
+}
+
+/// Whether `t` names a number or Bool type: what match takes.
+fn is_scalar_name(t: Str) Bool {
+    t == "I32" or t == "U32" or t == "I64" or t == "U64" or t == "F32" or t == "F64" or t == "U8" or t == "I8"
+        or t == "U16" or t == "I16" or t == "Bool";
+}
+
+/// What to do instead of an alt over a value of type `t`.
+fn alt_hint(t: I32) Str {
+    if t >= 0 and ty_is(t, Ty.Nullable) { return "Unwrap it first: promote value { |v| => alt v { … }, ~> … }."; };
+    let name = type_text(t);
+    if is_scalar_name(name) { return "alt picks among a tag enum's variants; to branch on a number or Bool, use match."; };
+    if name == "Str" { return "alt picks among a tag enum's variants; compare strings with if and ==."; };
+    "alt picks among a tag enum's variants, and " + name + " has none.";
+}
+
+/// What a pipeline could read instead of a value of type `t`.
+fn source_hint(t: I32) Str {
+    if t >= 0 and ty_is(t, Ty.Nullable) { return "Unwrap it first, with promote or orelse."; };
+    let name = type_text(t);
+    if is_scalar_name(name) and name != "Bool" and name != "F32" and name != "F64" { return "To count, read a range: 0 ..< n."; };
+    "Pipelines read arrays, ranges (a ..< b), and generator calls.";
+}
+
+/// A type's name after "a" or "an".
+fn article(t: Str) Str {
+    if t.len() == 0 { return t; };
+    let c = t.slice(0, 1);
+    let vowel = c == "A" or c == "E" or c == "I" or c == "O" or c == "U" or c == "a" or c == "e" or c == "i" or c == "o" or c == "u";
+    pick(vowel, "an ", "a ") + t;
 }
 
 /// What InvalidBreak or InvalidDefer says, by the @BreakRule broken.
@@ -364,7 +397,10 @@ fn diag_text(i: I32) Str {
         Diag.DslError => w,
         Diag.WatPlace => "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }",
         Diag.AwaitInClosure => "a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)",
-        Diag.InvalidEscape => "Invalid escape: \\u takes four hexadecimal digits",
+        Diag.InvalidEscape => {
+            if a == 1 { return "Invalid escape: a \\u escape here is half of a surrogate pair, which a string cannot hold alone"; };
+            "Invalid escape: \\u takes four hexadecimal digits";
+        },
         Diag.EntrySurface => {
             if a == 0 { return "entry surface: multiple export lib declarations"; };
             if a == 1 { return "entry surface: multiple export main declarations"; };
@@ -387,7 +423,11 @@ fn diag_text(i: I32) Str {
         Diag.AwaitForSource => "await for reads a generator call or a stream: `await for (ticks()) |t| { … }`",
         Diag.AwaitForCapture => "a stream loop binds one value: await for (s) |value| { … }",
         Diag.IteratorUnfinished => "Iterator pipeline must end with fold, each, collect(Type), or a scalar terminal; found " + w,
-        Diag.IteratorCaptures => w + " expects " + int_text(a) + " value binding(s) and an optional index",
+        Diag.IteratorCaptures => {
+            // b == 1: exactly that many (sort's two values to compare), no index
+            if b == 1 { return w + " compares two values, so it takes exactly " + int_text(a) + " names: |a, b|"; };
+            w + " expects " + int_text(a) + " value binding(s) and an optional index";
+        },
         Diag.OptionalOutsideStatement => "'?.' is only allowed in statements; use promote or orelse for a value",
         Diag.AwaitNotPromise => "Cannot await non-promise " + type_text(a),
         Diag.ProtoMissing => decl_text(a) + " does not implement protocol " + pick(b == 1, "getter", "method") + " '" + word_text(diag_c[i]) + "." + w + "'",
@@ -422,6 +462,30 @@ fn diag_text(i: I32) Str {
             "Syntax error: unexpected " + found;
         },
         Diag.Unsupported => "not supported yet",
+        Diag.UnknownMember => word_text(diag_c[i]) + " has no member " + w,
+        Diag.DslPlace => {
+            if w == "embed" or w == "comptime" { return "@" + w + " fills a mem: mem name: U8 = @" + w + "/\\ … \\/;"; };
+            "There is no @" + w + " DSL; the DSLs are @es, @json, @stored, @css, @wutu, @ir, @wat, @comptime, and @embed";
+        },
+        Diag.AltNotEnum => {
+            if a >= 0 and ty_is(a, Ty.Nullable) { return "alt needs an enum value, but this is a nullable " + type_text(ty_a[a]); };
+            if a >= 0 { return "alt needs an enum value, but this is " + article(type_text(a)); };
+            "alt needs an enum value";
+        },
+        Diag.IteratorSource => {
+            // b: 0 a pipeline's source, 1 a stage's other array, 2 a flat_map body, 3 bisect with other stages
+            if b == 3 { return "bisect is a whole pipeline of its own: xs bisect |v| { test }"; };
+            if b == 2 { return "flat_map's body must give an array, but it gives " + article(type_text(a)); };
+            if b == 1 { return word_text(word) + " takes an array, but this is " + article(type_text(a)); };
+            if a >= 0 { return "A pipeline reads an array or a range, but this is " + article(type_text(a)); };
+            "A pipeline reads an array or a range";
+        },
+        Diag.IteratorTerminalInside => w + " ends a pipeline, so nothing can come after it",
+        Diag.ClosureParamType => "The closure parameter " + w + " needs a type: nothing here says what it is",
+        Diag.ImplicitStructInit => {
+            if a >= 0 { return "&{…} makes the struct this place expects, but it expects " + article(type_text(a)); };
+            "&{…} makes the struct this place expects, but nothing here expects a struct";
+        },
         Diag.LazyValue => {
             if b == 1 { return "A lazy module's function returns its element to the page: " + w + " returns " + type_text(a) + ", not a host element"; };
             "A lazy module's function takes numbers, Bool, Str, and host values (they cross into its chunk): " + w + " takes " + type_text(a);
@@ -446,6 +510,13 @@ fn found_text(t: I32) Str {
     let text = bytes_text(tok_start[t], tok_end[t]);
     if text.len() > 24 { return "'" + text.slice(0, 24) + "…'"; };
     "'" + text + "'";
+}
+
+/// Whether extra row k of diagnostic i is a place (a label on its own span,
+/// or another node), not a note or a fix.
+fn is_place(i: I32, k: I32) Bool {
+    let kind = extra_kind[diag_extra[i] + k];
+    kind != Extra.Note.to_i32() and kind != Extra.Fix.to_i32();
 }
 
 /// The span a diagnostic points at: its node's, as byte offsets.

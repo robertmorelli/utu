@@ -438,14 +438,41 @@ fn unresolved(node: I32) Bool {
 
 /// Something the compiler cannot do yet: reported, and checking goes on.
 fn unsupported(at: I32) I32 {
-    report(Diag.Unsupported, at, -1);
+    // A mistake already reported inside this code made it unreadable: say nothing more.
+    if not reported_within(at) { report(Diag.Unsupported, at, -1); };
     error_value();
+}
+
+/// Whether a diagnostic is about a node within `at` (its tokens).
+fn reported_within(at: I32) Bool {
+    if at < 0 { return false; };
+    for (0 ..< diag_kind.len()) |i| {
+        let n = diag_node[i];
+        if n >= 0 and node_first[n] >= node_first[at] and node_first[n] < node_last[at] { return true; };
+    };
+    false;
+}
+
+/// `module.name` where the module has no such member: reported, and its value an error.
+fn module_member_missing(module: I32, name: I32) I32 {
+    report_module_member_missing(module, name);
+    error_value();
+}
+
+fn report_module_member_missing(module: I32, name: I32) void {
+    if reported_within(name) { return; };
+    report3(Diag.UnknownMember, name, word_of(name), -1, -1, decl_name[module]);
+    diag_label("not in " + word_text(decl_name[module]));
 }
 
 /// A string literal @decode_string refused: a bad escape, or a lone
 /// surrogate (which no constant's name can hold).
 fn bad_literal(at: I32) I32 {
-    if bad_escape[0] < 0 { return unsupported(at); };
+    // A lone surrogate: half of a pair, which a string cannot hold alone.
+    if bad_escape[0] < 0 {
+        report2(Diag.InvalidEscape, at, -1, 1, -1);
+        return error_value();
+    };
     report(Diag.InvalidEscape, at, -1);
     error_value();
 }
@@ -536,7 +563,11 @@ fn check_node(node: I32, expect: I32, cx: Cx) I32 {
             } else if is_wat(node) {
                 report(Diag.WatPlace, node, -1);
                 error_value();
-            } else { unsupported(node); };
+            } else {
+                // Any other DSL in a value's place: one that is not there, or one that fills a mem.
+                report(Diag.DslPlace, node, word_of(first_child(node)));
+                error_value();
+            };
         },
         ~> unsupported(node),
     };
@@ -1042,6 +1073,14 @@ fn check_assign(node: I32, cx: Cx) I32 {
     while (is_kind(target, Node.Splice)) { target = first_child(target); };
     if (is_kind(target, Node.Field_expr) and not is_module_path(target)) or is_kind(target, Node.Optional_field_expr) { return check_field_set(target, value, op, node, cx); };
     if is_kind(target, Node.Index_expr) { return check_index_set(target, value, op, node, cx); };
+    // `T.Variant = …` or `module.f = …`: a constant, not a variable.
+    if is_kind(target, Node.Type_member_expr) or (is_kind(target, Node.Field_expr) and is_module_path(target)) {
+        let name = last_child(target);
+        if node_decl[name] < 0 { return unsupported(node); };
+        report(Diag.AssignmentToImmutable, name, word_of(name));
+        diag_label(pick(decl_is(node_decl[name], Decl.Variant), "a variant is a constant", "a function cannot be reassigned"));
+        return error_value();
+    };
     if not is_kind(target, Node.Identifier) { return unsupported(node); };
     let decl = node_decl[target];
     if decl < 0 { return error_value(); };
@@ -1329,7 +1368,13 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
     };
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
         let decl = node_decl[name];
-        if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+        if not decl_is(decl, Decl.Fn) {
+            if decl < 0 {
+                report_module_member_missing(module, name);
+                return finish_error(args, m, cx);
+            };
+            return unsupported(node);
+        };
         return call_with(fn_instance(decl, instance_for(module, cx.inst)), args, 0, m, node, cx);
     };
     // `m.T.f(…)`: a static function of a module's (or alias's) type.
@@ -1805,6 +1850,7 @@ fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     if is_module_path(node) {
         let name = last_child(node);
         if decl_is(node_decl[name], Decl.Global) { return global_get(node_decl[name]); };
+        if node_decl[name] < 0 { return module_member_missing(node_decl[first_child(node)], name); };
         return unsupported(node);
     };
     check_field_get(node, expect, cx);
@@ -1838,6 +1884,12 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let decl = node_decl[last_child(node)];
     if decl_is(decl, Decl.Global) { return global_get(decl); };
     if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl); };
+    let name = last_child(node);
+    if decl < 0 and (decl_is(owner, Decl.IntEnum) or decl_is(owner, Decl.Enum)) and not reported_within(name) {
+        report2(Diag.UnknownVariant, name, word_of(name), named(owner, -1), -1);
+        return error_value();
+    };
+    if decl < 0 and decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };
     unsupported(node);
 }
 

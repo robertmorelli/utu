@@ -397,12 +397,30 @@ export function readDiagnostics(utu, files) {
     const f = utu.diagnostic_file(i);
     const file = f >= 0 ? files[f] : null;
     const diagnostic = { kind: utu.diagnostic_kind(i), message: utu.diagnostic_message(i), severity: 'error', file: file?.key ?? null };
-    if (file) {
-      const start = units(file, utu.diagnostic_start(i));
-      const end = units(file, utu.diagnostic_end(i));
-      const before = file.text.slice(0, start);
-      const line = before.split('\n').length;
-      Object.assign(diagnostic, { start, end, line, column: start - before.lastIndexOf('\n') });
+    if (file) Object.assign(diagnostic, place(file, utu.diagnostic_start(i), utu.diagnostic_end(i)));
+    // Its own kind's name (`kind` is stage 0's, which several share), and
+    // what it says beyond its message: a label on its span, other places,
+    // notes, and a fix.
+    if (utu.diagnostic_code) {
+      diagnostic.code = utu.diagnostic_code(i).replace(/(?<=[a-z0-9])(?=[A-Z])/g, '-').toLowerCase();
+      for (let k = 0; k < utu.diagnostic_extras(i); k++) {
+        const kind = EXTRA[utu.diagnostic_extra_kind(i, k)];
+        const text = utu.diagnostic_extra_text(i, k);
+        if (kind === 'note') (diagnostic.notes ??= []).push(text);
+        else if (kind === 'label') {
+          diagnostic.label = text;
+          // A label may narrow the span to show (its focus).
+          const start = utu.diagnostic_extra_start(i, k), end = utu.diagnostic_extra_end(i, k);
+          if (file && (start !== utu.diagnostic_start(i) || end !== utu.diagnostic_end(i))) diagnostic.focus = place(file, start, end);
+        }
+        else {
+          const at = files[utu.diagnostic_extra_file(i, k)];
+          if (!at) continue;
+          const where = { file: at.key, ...place(at, utu.diagnostic_extra_start(i, k), utu.diagnostic_extra_end(i, k)) };
+          if (kind === 'fix') diagnostic.fix = { ...where, text, label: utu.diagnostic_extra_label(i, k) };
+          else (diagnostic.related ??= []).push({ ...where, role: kind, label: text });
+        }
+      }
     }
     out.push(diagnostic);
   }
@@ -426,6 +444,17 @@ function sourceWarnings(files) {
 }
 
 /** A byte offset in `src` as a UTF-16 offset in the file's text. */
+/** A diagnostic's extra rows, by kind (`Extra` in selfhost/resolve.utu). */
+const EXTRA = ['label', 'expected', 'found', 'related', 'note', 'fix'];
+
+/** Byte offsets into a file, as UTF-16 offsets and a 1-based line and column. */
+function place(file, startByte, endByte) {
+  const start = units(file, startByte);
+  const end = units(file, endByte);
+  const before = file.text.slice(0, start);
+  return { start, end, line: before.split('\n').length, column: start - before.lastIndexOf('\n') };
+}
+
 function units(file, byte) {
   return decoder.decode(file.bytes.subarray(0, Math.max(0, byte - file.offset))).length;
 }

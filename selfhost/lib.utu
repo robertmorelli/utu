@@ -216,6 +216,44 @@ export lib {
 
     fn diagnostic_node(i: I32) I32 { diag_node[i]; }
 
+    /// A diagnostic's own kind (its @Diag name; `diagnostic_kind` is stage
+    /// 0's, which several share), and what it says beyond its message (see
+    /// `diag_extra` in resolve.utu): its extra rows, each an @Extra kind,
+    /// a place (a file and byte offsets: another node's, or its own span's
+    /// for a label, or the bytes a fix replaces), a text (a label, a note,
+    /// or a fix's new text), and a fix's label.
+    fn diagnostic_code(i: I32) Str { Diag.name(Diag.from_i32(diag_kind[i])); }
+
+    fn diagnostic_extras(i: I32) I32 { diag_extra_n[i]; }
+
+    fn diagnostic_extra_kind(i: I32, k: I32) I32 { extra_kind[diag_extra[i] + k]; }
+
+    fn diagnostic_extra_file(i: I32, k: I32) I32 {
+        let r = diag_extra[i] + k;
+        let node = extra_node[r];
+        if is_place(i, k) and node >= 0 and extra_end[r] < 0 { file_of_token(node_first[node]); } else { diag_file(i); };
+    }
+
+    fn diagnostic_extra_start(i: I32, k: I32) I32 {
+        let r = diag_extra[i] + k;
+        if extra_kind[r] == Extra.Fix.to_i32() { return extra_node[r]; };
+        if not is_place(i, k) { return -1; };
+        if extra_end[r] >= 0 { return extra_node[r]; };
+        if extra_node[r] < 0 { diag_start(i); } else { tok_start[node_first[extra_node[r]]]; };
+    }
+
+    fn diagnostic_extra_end(i: I32, k: I32) I32 {
+        let r = diag_extra[i] + k;
+        if extra_kind[r] == Extra.Fix.to_i32() { return extra_end[r]; };
+        if not is_place(i, k) { return -1; };
+        if extra_end[r] >= 0 { return extra_end[r]; };
+        if extra_node[r] < 0 { diag_end(i); } else { tok_end[node_last[extra_node[r]] - 1]; };
+    }
+
+    fn diagnostic_extra_text(i: I32, k: I32) Str { word_text(extra_text[diag_extra[i] + k]); }
+
+    fn diagnostic_extra_label(i: I32, k: I32) Str { word_text(extra_label[diag_extra[i] + k]); }
+
     /// `@wat` functions (`host.utu`): how many the loaded program has; site k's
     /// function (its node: name, parameters, result) and text (between `/\`
     /// and `\/`, in src). The host gives back k's code (`n` bytes it writes
