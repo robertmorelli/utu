@@ -200,6 +200,7 @@ fn validate_node(node: I32) void {
         Node.Global_decl => { validate_global(node); },
         Node.Distinct_decl => { validate_distinct(node); },
         Node.Yield_expr => { validate_yield(node); },
+        Node.Yield_type => { validate_yield_type(node); },
         Node.Defer_expr => { validate_defer(node); },
         Node.Await_expr => { validate_await(node); },
         ~> {},
@@ -376,6 +377,18 @@ fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
     false;
 }
 
+/// A method declared `yield T` (`fn &.each |s| () yield T`): generators
+/// are functions, expanded where a `for` names them.
+fn is_method_generator(fn_node: I32) Bool {
+    let ret = child_of_kind(fn_node, Node.Return_type);
+    ret >= 0 and is_kind(first_child(ret), Node.Yield_type) and next_sibling(first_child(first_child(fn_node))) >= 0;
+}
+
+fn validate_yield_type(node: I32) void {
+    let f = parent_of(parent_of(node));
+    if f >= 0 and is_kind(f, Node.Fn_decl) and is_method_generator(f) { report(Diag.GeneratorMethod, node, -1); };
+}
+
 /// `yield` belongs in a generator, and not in a closure inside one (the
 /// generator expands into its consumer).
 fn validate_yield(node: I32) void {
@@ -386,7 +399,8 @@ fn validate_yield(node: I32) void {
             return;
         };
         if is_kind(p, Node.Fn_decl) {
-            if not is_generator(node_decl[last_child(first_child(p))]) { report(Diag.YieldOutside, node, -1); };
+            // (A method's `yield T` is reported.)
+            if not is_generator(node_decl[last_child(first_child(p))]) and not is_method_generator(p) { report(Diag.YieldOutside, node, -1); };
             return;
         };
         p = parent_of(p);

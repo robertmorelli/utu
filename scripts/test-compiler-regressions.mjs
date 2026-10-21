@@ -94,8 +94,72 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
+  // Programs only the self-hosted compiler builds right, in every mode.
+  const tree = `struct Node:
+    | v: I32
+    | kids: Array[Node]
+fn walk(n: Node) yield Node { yield n; for (n.kids) |k| { for (walk(k)) |d| { yield d; }; }; }
+fn tree() Node { Node { v: 1, kids: [Node { v: 2, kids: [] }] }; }
+fn show(xs: Array[I32]) Str { xs fold("") |acc, v, i| { if i == 0 { \`\${v}\`; } else { \`\${acc},\${v}\`; }; }; }
+mod Box {
+    struct &:
+        | v: I32
+    fn &.new(v: I32) & { &{ v: v }; }
+    fn &.len |self| () I32 { self.v += 100; self.v; }
+}
+`;
+  const selfhostPrograms = [
+    // A recursive generator's loop, run again, starts over (it yielded nothing).
+    [`${tree}export lib {
+    fn again() Str { let out = ""; for (0 ..< 3) |r| { for (walk(tree())) |n| { out = \`\${out}\${n.v}\`; }; out = \`\${out}|\`; }; out; }
+    fn nested() Str { let out = ""; for (walk(tree())) |a| { for (walk(tree())) |b| { out = \`\${out}\${a.v}\${b.v} \`; }; }; out; }
+}`, { again: '12|12|12|', nested: '11 12 21 22 ' }],
+    // (… collect(T)) … is one loop only when no one can tell.
+    [`${tree}export lib {
+    fn writes() Str { let xs = [1, 2, 3, 4]; let k = 10; show((xs map |n| { n * k; } collect(I32)) map |v| { k += 1; v; } collect(I32)); }
+    fn source() Str { let ys = [1, 2, 3, 4]; show((ys map |n| { ys[0] + n; } collect(I32)) map |v| { ys[0] = 100; v; } collect(I32)); }
+    fn own_len() I32 { let bs = [Box.new(1), Box.new(2), Box.new(3)]; let r = (bs map |b| { b.len(); } collect(I32)) take(1) sum; r * 1000 + bs[2].v; }
+    fn fused_bisect() I32 { ([1, 2, 3, 4] map |n| { n * 2; } collect(I32)) bisect |n| { n < 5; }; }
+}`, { writes: '10,20,30,40', source: '2,3,4,5', own_len: 101103, fused_bisect: 2 }],
+    // Ranges as sources: to the type's greatest, wider than 2^31, of I64, U32 and U64.
+    [`export lib {
+    fn to_max() I32 { let hi = 2147483647; (hi - 2 ... hi) count; }
+    fn wide_take() I32 { (-2000000000 ..< 2000000000) take(3) count; }
+    fn wide_skip() I32 { (-2147483648 ..< 2147483647) skip(2147483647) take(2) sum; }
+    fn longs() I64 { let big: I64 = 5000000000; (big ..< big + 4) sum; }
+    fn unsigned() I32 { let u: U32 = 4294967294; (u ... 4294967295) count; }
+    fn u64_max() I32 { let u: U64 = 18446744073709551614; (u ... 18446744073709551615) count; }
+    fn to_max_bisect() I32 { let hi = 2147483647; (hi - 3 ... hi) bisect |v| { v < hi; }; }
+}`, { to_max: 3, wide_take: 3, wide_skip: -1, longs: 20000000006n, unsigned: 2, u64_max: 2, to_max_bisect: 3 }],
+  ];
+  for (const [source, expected] of selfhostPrograms) {
+    const file = await write(source);
+    for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+      const built = await compileFile(utu, file, { mode });
+      assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+      const { exports } = await instantiateNode(built.wasm, built.spec);
+      for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, `${mode} ${name}`);
+      checked++;
+    }
+  }
+  // A trap in a collected pipeline stays when the consumer takes less.
+  const trapping = await compileFile(utu, await write(`export lib {
+    fn run() I32 { let xs = [1, 0]; let ys = [5]; (xs map |v, i| { ys[i.to_i32()] / v; } collect(I32)) take(1) sum; }
+}`));
+  await assert.rejects(async () => (await instantiateNode(trapping.wasm, trapping.spec)).exports.run());
+  checked++;
+
   // Mistakes the self-hosted compiler reports, in its words.
   const mistakes = [
+    // A generator's body cannot leave its consumer's loop.
+    ['fn g() yield I32 { yield 1; break; }\nexport lib { fn run() I32 { let t = 0; for (0 ..< 2) |i| { for (g()) |v| { t += v; }; }; t; } }\n', 'break outside a loop'],
+    // Element types the pipeline's values are not (these built invalid Wasm).
+    ['export lib { fn run() I32 { [1, 2, 3] chain(["a"]) count; } }\n', 'Expected I32, got Str'],
+    ['export lib { fn run() I32 { let w = [1, 2] windows(Str, 1); w.len(); } }\n', 'Expected Str, got I32'],
+    ['export lib { fn run() Str { ["a", "b"] sum; } }\n', 'sum needs numbers, not Str'],
+    ['export lib { fn run() I32 { [1, 2] bisect |v, i, j| { true; }; } }\n', 'bisect takes 1 name and an optional index'],
+    ['mod B {\n    struct &:\n        | x: I32\n    fn &.each |b| () yield I32 { yield b.x; }\n}\nexport lib { fn run() I32 { 0; } }\n', 'A method cannot be a generator'],
+    ['export lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F64'],
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
     ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'Two export main'],
     ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'export lib and export main together'],
