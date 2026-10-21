@@ -196,6 +196,9 @@ enum(U8) Diag:
     | StorageType
     | ReturnValueFromVoid
     | ComptimeTrap
+    | FloatOutOfRange
+    | EnumBase
+    | TagEnumValue
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from

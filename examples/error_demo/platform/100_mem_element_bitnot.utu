@@ -1,0 +1,7 @@
+// What: `~5` in a mem's initializer, which takes numbers and negated numbers
+// Expect: mem table: numbers only (`~5` once stored -5)
+const mem table: I32 = [~5, 3];
+
+export main() I32 {
+    table[0];
+}

@@ -845,7 +845,8 @@ fn to_str_of(rt: I32, e: I32, m: I32, cx: Cx) void {
     if not ty_is(t, Ty.Error) { coerce(t, prelude(Prelude.Str), e); };
 }
 
-/// An integer literal's value, as 64 bits.
+/// An integer literal's magnitude, as 64 unsigned bits (one past them
+/// wraps as it is read; see @past_64_bits).
 fn int_value(node: I32) I64 {
     let t = node_first[node];
     let i = tok_start[t];
@@ -872,11 +873,9 @@ fn int_value(node: I32) I64 {
 /// The type an integer literal takes: the one expected, when integers
 /// adopt it, else I32.
 fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
-    let v = int_value(node);
-    if negate { v = 0 - v; };
     let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
-    if past_64_bits(node) or not fits(v, t, negate) { report2(Diag.IntegerOutOfRange, node, -1, t, if negate { 1; } else { 0; }); };
-    push_number(t, v, false);
+    if not literal_fits(node, t, negate) { report2(Diag.IntegerOutOfRange, node, -1, t, if negate { 1; } else { 0; }); };
+    push_number(t, literal_bits(node, t, negate), true);
     t;
 }
 
@@ -905,29 +904,87 @@ fn past_64_bits(node: I32) Bool {
     false;
 }
 
-/// Whether an integer literal's value fits its type. A literal past the
-/// 64-bit range wraps when it is read, so U64's top half reads negative.
-fn fits(v: I64, t: I32, negate: Bool) Bool {
-    if t == prelude(Prelude.I32) { return v >= -2147483648 and v <= 2147483647; };
-    if t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { return v >= 0 and v <= 4294967295; };
-    if t == prelude(Prelude.I64) { return negate or v >= 0; };
-    true;
+/// Whether integer literal `node`, negated or not, is in -neg ..= pos: its
+/// magnitude, read as 64 unsigned bits, against `neg` or `pos`.
+fn int_in(node: I32, negate: Bool, neg: U64, pos: U64) Bool {
+    if past_64_bits(node) { return false; };
+    int_value(node).to_u64() <= if negate { neg; } else { pos; };
 }
 
-/// Push a constant of numeric type `t`: the integer `v`, or (when `is_float`)
-/// the float whose bits are `v`.
-fn push_number(t: I32, v: I64, is_float: Bool) void {
+/// Whether a literal (integer or float), negated or not, fits numeric type
+/// `t`. An integer fits I32 and I64 by their signed ranges; U32, U64 and
+/// the masks take no negative value; a float takes any 64-bit magnitude.
+/// A float literal fits a float type when it is finite there.
+fn literal_fits(node: I32, t: I32, negate: Bool) Bool {
+    if is_kind(node, Node.Float_lit) {
+        if not is_float(t) { return true; };
+        let bits = literal_bits(node, t, negate);
+        if t == prelude(Prelude.F32) { return (bits & 2147483647) != 2139095040; };
+        return (bits & 9223372036854775807) != 9218868437227405312;
+    };
+    if t == prelude(Prelude.I32) { return int_fits(node, negate, 32, true); };
+    if t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { return int_fits(node, negate, 32, false); };
+    if t == prelude(Prelude.I64) { return int_fits(node, negate, 64, true); };
+    if t == prelude(Prelude.U64) or t == prelude(Prelude.M64) { return int_fits(node, negate, 64, false); };
+    int_in(node, negate, 18446744073709551615, 18446744073709551615);
+}
+
+/// Whether integer literal `node`, negated or not, fits an integer of
+/// `bits` bits, signed or not.
+fn int_fits(node: I32, negate: Bool, bits: I32, signed: Bool) Bool {
+    let one: U64 = 1;
+    let top = one << (bits - 1).to_u64();
+    if signed { return int_in(node, negate, top, top - one); };
+    int_in(node, negate, 0, top - one + top);
+}
+
+/// The bits a literal (integer or float), negated or not, makes as numeric
+/// type `t` (an F32's in the low 32). An integer's magnitude goes to a float
+/// unsigned and is rounded once; a float is negated by its sign, so `-0.0`
+/// is negative zero.
+fn literal_bits(node: I32, t: I32, negate: Bool) I64 {
+    let f32 = t == prelude(Prelude.F32);
+    if is_kind(node, Node.Float_lit) {
+        let text = token_text(node_first[node]);
+        if f32 {
+            let f = parse_f32(text).to_f32();
+            return (if negate { -f; } else { f; }).bits().to_i64() & 4294967295;
+        };
+        let d = parse_number(text);
+        return (if negate { -d; } else { d; }).bits();
+    };
+    let v = int_value(node);
+    if f32 {
+        let f = v.to_u64().to_f32();
+        return (if negate { -f; } else { f; }).bits().to_i64() & 4294967295;
+    };
+    if t == prelude(Prelude.F64) {
+        let d = v.to_u64().to_f64();
+        return (if negate { -d; } else { d; }).bits();
+    };
+    if negate { 0 - v; } else { v; };
+}
+
+/// A token's source text.
+fn token_text(t: I32) Str {
+    let text = "";
+    for (tok_start[t] ..< tok_end[t]) |i| { text = text + Str.from_code_point(src[i]); };
+    text;
+}
+
+/// Push a constant of numeric type `t`: the integer `v`, or (when `is_bits`)
+/// the constant whose bits are `v` (an F32's in the low 32).
+fn push_number(t: I32, v: I64, is_bits: Bool) void {
     let vt = repr(t);
     if vt == vt_i32 {
         w_i32(v.to_i32());
     } else if vt == vt_i64 {
         w_leaf(Op.I64Const, vt_i64, (v & 4294967295).to_i32(), (v >> 32).to_i32());
     } else if vt == vt_f64 {
-        let bits = if is_float { v; } else { v.to_f64().bits(); };
+        let bits = if is_bits { v; } else { v.to_f64().bits(); };
         w_leaf(Op.F64Const, vt_f64, (bits & 4294967295).to_i32(), (bits >> 32).to_i32());
     } else if vt == vt_f32 {
-        let f = if is_float { F64.from_bits(v); } else { v.to_f64(); };
-        w_leaf(Op.F32Const, vt_f32, f.to_f32().bits(), 0);
+        w_leaf(Op.F32Const, vt_f32, if is_bits { v.to_i32(); } else { v.to_f32().bits(); }, 0);
     } else {
         w_i32(v.to_i32());
     };
@@ -935,15 +992,30 @@ fn push_number(t: I32, v: I64, is_float: Bool) void {
 
 let parse_number: fun(Str) F64 = @es/\ (s) => Number(s) \/;
 
+/// A float literal's value as F32, rounded once (as an F64, exactly): the
+/// F64 nearest it is rounded again unless that lies halfway between two
+/// F32s; then the literal's digits pick the side.
+let parse_f32: fun(Str) F64 = @es/\ (s) => {
+    const d = Number(s), f = Math.fround(d);
+    if (f === d || !Number.isFinite(f)) return f;
+    const b = new Float32Array([f]), u = new Uint32Array(b.buffer);
+    u[0] += f < d ? 1 : -1;
+    const g = b[0];
+    if ((f + g) / 2 !== d) return f;
+    let m = d, e = 0n;
+    while (!Number.isInteger(m)) { m *= 2; e += 1n; }
+    const t = s.toLowerCase(), k = t.indexOf("e"), mant = k < 0 ? t : t.slice(0, k), dot = mant.indexOf(".");
+    const x = BigInt(k < 0 ? 0 : Number(t.slice(k + 1))) - BigInt(dot < 0 ? 0 : mant.length - dot - 1);
+    let l = BigInt(mant.replace(".", "")) * 2n ** e, r = BigInt(m);
+    if (x >= 0n) l *= 10n ** x; else r *= 10n ** -x;
+    if (l === r) return f;
+    return (l > r) === (g > f) ? g : f;
+} \/;
+
 fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
-    let t = node_first[node];
-    let text = "";
-    for (tok_start[t] ..< tok_end[t]) |i| { text = text + Str.from_code_point(src[i]); };
-    let f = parse_number(text);
-    // Negated, not subtracted from 0.0: `-0.0` is negative zero.
-    if negate { f = -f; };
     let ft = if expect >= 0 and is_float(expect) { expect; } else { prelude(Prelude.F64); };
-    push_number(ft, f.bits(), true);
+    if not literal_fits(node, ft, negate) { report2(Diag.FloatOutOfRange, node, -1, ft, if negate { 1; } else { 0; }); };
+    push_number(ft, literal_bits(node, ft, negate), true);
     ft;
 }
 
@@ -1496,7 +1568,7 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
         let named = method_of_unknown(word_of(first_child(callee)), word_of(last_child(callee)));
         if named >= 0 { return call_with(fn_instance(named, 0), args, 0, m, node, cx); };
     };
-    if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module)) and not has_foreign() {
+    if decl < 0 and (decl_is(owner_decl, Decl.Struct) or decl_is(owner_decl, Decl.Enum) or decl_is(owner_decl, Decl.Module) or is_scalar_kind(owner_decl)) and not has_foreign() {
         report3(Diag.UnknownMethod, node, word_of(last_child(callee)), -1, -1, decl_name[owner_decl]);
         return finish_error(args, m, cx);
     };

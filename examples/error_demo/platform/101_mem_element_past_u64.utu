@@ -1,0 +1,7 @@
+// What: a U32 mem element past 64 bits
+// Expect: 18446744073709551616 does not fit U32
+const mem table: U32 = [3, 18446744073709551616];
+
+export main() I32 {
+    0;
+}

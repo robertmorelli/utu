@@ -30,21 +30,46 @@ fn int_enum_values() void {
     variant_value.resize(decl_kind.len());
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.IntEnum) { enum_values(d); };
+        if decl_is(d, Decl.Enum) and is_own_file(file_of_token(node_first[decl_node[d]])) { tag_enum_values(d); };
     };
 }
 
+/// A tag enum's variants take no `= n`.
+fn tag_enum_values(decl: I32) void {
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) and is_kind(last_child(c), Node.Int_lit) {
+            report2(Diag.TagEnumValue, last_child(c), decl_name[node_decl[first_child(c)]], decl_name[decl], -1);
+        };
+        c = next_sibling(c);
+    };
+}
+
+/// An integer enum's values, counted in 64 bits and each checked against
+/// its representation: U8, I8, U16, I16, I32, or U32 (any other is reported,
+/// and counted as I32).
 fn enum_values(decl: I32) void {
     let node = decl_node[decl];
     let repr_word = word_of(after_qualifier(node));
-    let lo = 0;
-    let hi = 2147483647;
-    if repr_word == narrow_word(Narrow.U8) { hi = 255; };
-    if repr_word == narrow_word(Narrow.I8) { lo = -128; hi = 127; };
-    if repr_word == narrow_word(Narrow.U16) { hi = 65535; };
-    if repr_word == narrow_word(Narrow.I16) { lo = -32768; hi = 32767; };
-    if repr_word == known_word(Known.WordI32) { lo = -2147483648; };
     let own = is_own_file(file_of_token(node_first[node]));
-    let next = 0;
+    let bits = 32;
+    let signed = repr_word != known_word(Known.WordU32);
+    if repr_word == narrow_word(Narrow.U8) or repr_word == narrow_word(Narrow.I8) { bits = 8; };
+    if repr_word == narrow_word(Narrow.U16) or repr_word == narrow_word(Narrow.I16) { bits = 16; };
+    if repr_word == narrow_word(Narrow.U8) or repr_word == narrow_word(Narrow.U16) { signed = false; };
+    if own and bits == 32 and repr_word != known_word(Known.WordI32) and repr_word != known_word(Known.WordU32) {
+        report(Diag.EnumBase, after_qualifier(node), repr_word);
+        own = false;
+    };
+    let one: I64 = 1;
+    let half = one << (bits - 1).to_i64();
+    let lo: I64 = 0;
+    let hi: I64 = half + half - one;
+    if signed {
+        lo = 0 - half;
+        hi = half - one;
+    };
+    let next: I64 = 0;
     let first = -1;
     let c = first_child(node);
     while (c >= 0) {
@@ -52,17 +77,20 @@ fn enum_values(decl: I32) void {
             let v = node_decl[first_child(c)];
             let lit = last_child(c);
             if is_kind(lit, Node.Int_lit) {
-                let value = int_value(lit).to_i32();
-                if tok_kind[node_last[lit] - 2] == Tok.Minus.to_i32() or tok_kind[node_first[lit] - 1] == Tok.Minus.to_i32() { value = 0 - value; };
-                next = value;
+                let negate = tok_kind[node_last[lit] - 2] == Tok.Minus.to_i32() or tok_kind[node_first[lit] - 1] == Tok.Minus.to_i32();
+                if own and not int_fits(lit, negate, bits, signed) {
+                    let text = pick(negate, "-", "") + token_text(node_first[lit]);
+                    report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], intern_text(text), repr_word);
+                };
+                next = literal_bits(lit, prelude(Prelude.I64), negate);
             };
-            variant_value[v] = next;
-            if own and (next < lo or next > hi) { report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], next, repr_word); };
+            variant_value[v] = next.to_i32();
+            if own and (next < lo or next > hi) { report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], intern_text(next.to_str()), repr_word); };
             if own {
                 let other = first;
                 while (other >= 0 and other != v) {
-                    if variant_value[other] == next {
-                        report3(Diag.EnumValueTwice, c, decl_name[v], decl_name[decl], decl_name[other], next);
+                    if variant_value[other] == variant_value[v] {
+                        report3(Diag.EnumValueTwice, c, decl_name[v], decl_name[decl], decl_name[other], intern_text(next.to_str()));
                         other = v;
                     } else {
                         other = other + 1;

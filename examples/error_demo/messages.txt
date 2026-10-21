@@ -3558,6 +3558,69 @@ ok
 19 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/91_enum_implicit_past_i32.utu
+ ERROR  2147483648 does not fit I32
+        enum-value-range · examples/error_demo/names/91_enum_implicit_past_i32.utu:5:7
+
+ 3 │ enum(I32) Wide:
+ 4 │     | Top = 2147483647
+ 5 │     | Next
+   │       ━━━━
+   │       ╰─ here
+ 6 │
+ 7 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/92_enum_base_i64.utu
+ ERROR  enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+        enum-base · examples/error_demo/names/92_enum_base_i64.utu:3:6
+
+ 1 │ // What: an integer enum over I64, which enums do not support
+ 2 │ // Expect: enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+ 3 │ enum(I64) Big:
+   │      ━━━
+   │      ╰─ not U8, I8, U16, I16, I32, or U32
+ 4 │     | Huge = 5000000000
+--- exit 1
+
+=== utu check examples/error_demo/names/93_enum_base_f64.utu
+ ERROR  enum(F64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+        enum-base · examples/error_demo/names/93_enum_base_f64.utu:3:6
+
+ 1 │ // What: an enum over F64
+ 2 │ // Expect: enum(F64) is not an integer enum
+ 3 │ enum(F64) Ratio:
+   │      ━━━
+   │      ╰─ not U8, I8, U16, I16, I32, or U32
+ 4 │     | Half
+ 5 │     | Whole
+--- exit 1
+
+=== utu check examples/error_demo/names/94_tag_enum_value.utu
+ ERROR  Level.Low has a value; only an integer enum's variants do
+        tag-enum-value · examples/error_demo/names/94_tag_enum_value.utu:4:13
+
+ 2 │ // Expect: Level.Low has a value; only an integer enum's variants do
+ 3 │ enum Level:
+ 4 │     | Low = 3
+   │             ━
+   │             ╰─ no value here
+ 5 │     | High {}
+--- exit 1
+
+=== utu check examples/error_demo/names/95_distinct_wrong_conversion.utu
+ ERROR  No method Id.from_i32
+        unknown-method · examples/error_demo/names/95_distinct_wrong_conversion.utu:6:14
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let id = Id.from_i32(5);
+   │              ━━━━━━━━━━━━━━
+   │              ╰─ no such method
+ 7 │     0;
+ 8 │ }
+--- exit 1
+
 === utu check examples/error_demo/names/lazy_parts/widgets.utu
 ok
 --- exit 0
@@ -3699,8 +3762,34 @@ ok
  5 │ export main() I32 {
 --- exit 1
 
+=== utu check examples/error_demo/platform/100_mem_element_bitnot.utu
+ ERROR  mem table: numbers only
+        mem-initializer · examples/error_demo/platform/100_mem_element_bitnot.utu:3:24
+
+ 1 │ // What: `~5` in a mem's initializer, which takes numbers and negated numbers
+ 2 │ // Expect: mem table: numbers only (`~5` once stored -5)
+ 3 │ const mem table: I32 = [~5, 3];
+   │                        ━━━━━━━
+   │                        ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/101_mem_element_past_u64.utu
+ ERROR  18446744073709551616 does not fit U32
+        mem-element-range · examples/error_demo/platform/101_mem_element_past_u64.utu:3:24
+
+ 1 │ // What: a U32 mem element past 64 bits
+ 2 │ // Expect: 18446744073709551616 does not fit U32
+ 3 │ const mem table: U32 = [3, 18446744073709551616];
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                        ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
 === utu check examples/error_demo/platform/10_mem_element_out_of_range.utu
- ERROR  2 does not fit U8
+ ERROR  300 does not fit U8
         mem-element-range · examples/error_demo/platform/10_mem_element_out_of_range.utu:3:18
 
  1 │ // What: a U8 mem initialized with a value above 255
@@ -3713,7 +3802,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/11_mem_float_in_int.utu
- ERROR  1 does not fit I32
+ ERROR  0.5 does not fit I32
         mem-element-range · examples/error_demo/platform/11_mem_float_in_int.utu:3:20
 
  1 │ // What: a float literal in an I32 mem initializer
@@ -6457,6 +6546,71 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/95_int_u64_max_default_i32.utu
+ ERROR  18446744073709551615 does not fit I32
+        integer-out-of-range · examples/error_demo/syntax/95_int_u64_max_default_i32.utu:4:20
+
+ 2 │ // Expect: 18446744073709551615 does not fit I32 (it once wrapped to -1)
+ 3 │ export main() I32 {
+ 4 │     let all_ones = 18446744073709551615;
+   │                    ━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ I32
+ 5 │     all_ones;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/96_int_negative_u64.utu
+ ERROR  -5 does not fit U64
+        integer-out-of-range · examples/error_demo/syntax/96_int_negative_u64.utu:4:23
+
+ 2 │ // Expect: -5 does not fit U64
+ 3 │ export main() I32 {
+ 4 │     let count: U64 = -5;
+   │                       ━
+   │                       ╰─ U64
+ 5 │     count.to_i32();
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/97_int_below_i64_min.utu
+ ERROR  -9223372036854775809 does not fit I64
+        integer-out-of-range · examples/error_demo/syntax/97_int_below_i64_min.utu:4:23
+
+ 2 │ // Expect: -9223372036854775809 does not fit I64 (it once wrapped to I64's largest)
+ 3 │ export main() I64 {
+ 4 │     let least: I64 = -9223372036854775809;
+   │                       ━━━━━━━━━━━━━━━━━━━
+   │                       ╰─ I64
+ 5 │     least;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/98_float_out_of_range_f32.utu
+ ERROR  1.0e39 does not fit F32
+        float-out-of-range · examples/error_demo/syntax/98_float_out_of_range_f32.utu:4:20
+
+ 2 │ // Expect: 1.0e39 does not fit F32 (it once became Infinity)
+ 3 │ export main() F32 {
+ 4 │     let big: F32 = 1.0e39;
+   │                    ━━━━━━
+   │                    ╰─ F32
+ 5 │     big;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/99_mask_negative_m64.utu
+ ERROR  -1 does not fit M64
+        integer-out-of-range · examples/error_demo/syntax/99_mask_negative_m64.utu:4:21
+
+ 2 │ // Expect: -1 does not fit M64, as with M32
+ 3 │ export main() I32 {
+ 4 │     let all: M64 = -1;
+   │                     ━
+   │                     ╰─ M64
+ 5 │     0;
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu
  ERROR  Expected ';', got 'y'
         parse-error · examples/error_demo/syntax/lib/broken_shapes.utu:5:9
@@ -6592,6 +6746,19 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
    │              ╰─ F64
  6 │     total;
  7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/100_match_pattern_past_i64.utu
+ ERROR  18446744073709551615 is out of range for I64
+        match-pattern · examples/error_demo/types/100_match_pattern_past_i64.utu:5:9
+
+ 3 │ fn status(code: I64) I32 {
+ 4 │     match code {
+ 5 │         18446744073709551615 => 1,
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │         ╰─ here
+ 6 │         ~> 2,
+ 7 │     };
 --- exit 1
 
 === utu check examples/error_demo/types/10_reassign_local.utu

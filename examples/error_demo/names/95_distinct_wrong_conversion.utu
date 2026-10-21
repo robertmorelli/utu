@@ -1,0 +1,8 @@
+// What: from_i32 on a distinct U32, whose conversion is from_u32
+// Expect: No method Id.from_i32 (it once said "Not supported yet")
+type Id = distinct U32;
+
+export main() I32 {
+    let id = Id.from_i32(5);
+    0;
+}

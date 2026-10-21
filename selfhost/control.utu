@@ -27,26 +27,15 @@ fn pattern_value(lit: I32, t: I32) I64 {
     };
     let negate = tok_kind[node_first[lit]] == Tok.Minus.to_i32();
     if is_kind(c, Node.Float_lit) {
-        if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; };
-        let text = "";
-        for (tok_start[node_first[c]] ..< tok_end[node_first[c]]) |i| { text = text + Str.from_code_point(src[i]); };
-        let f = parse_number(text);
-        if negate { f = 0.0 - f; };
-        return float_bits(f, t);
+        if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; return 0; };
+        if not literal_fits(c, t, negate) { pattern_fault[0] = 0; };
+        return literal_bits(c, t, negate);
     };
-    let v = int_value(c);
-    if negate { v = 0 - v; };
-    if is_float(t) { return float_bits(v.to_f64(), t); };
+    let v = literal_bits(c, t, negate);
     if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v; };
     if not is_numeric(t) and not decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };
-    if not fits(v, t, negate) { pattern_fault[0] = 0; };
+    if not literal_fits(c, t, negate) { pattern_fault[0] = 0; };
     v;
-}
-
-/// The bits of `f` as float type `t` (F32 or F64).
-fn float_bits(f: F64, t: I32) I64 {
-    if t == prelude(Prelude.F32) { return f.to_f32().bits().to_i64(); };
-    f.bits();
 }
 
 /// Push the comparison of local `s` (of type `t`) with a pattern's value.

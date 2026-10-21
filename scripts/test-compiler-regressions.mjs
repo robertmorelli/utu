@@ -94,6 +94,36 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
+  // Literals read as 64 unsigned bits and rounded once, in every mode: into
+  // a float, an F32 (once rounded through F64), a mem, an enum, a @comptime
+  // U32 mem (once sign-extended). Stage 0 reads several of these wrong.
+  const literalSource = `const mem zero: F64 = [-0.0];
+const mem ones: U32 = @comptime/\\ ones_list() \\/;
+fn ones_list() Array[U32] { let a: U32 = 4294967295; [a]; }
+enum(U32) Big:
+    | A = 3000000000
+export lib {
+    fn big() F64 { let a: F64 = 10000000000000000000; a; }
+    fn below() F64 { let a: F64 = -18446744073709551615; a; }
+    fn near() F64 { let a: F32 = 1.000000059604644775390625001; a.to_f64(); }
+    fn wide() F64 { let a: F32 = 1152921573326323713; a.to_f64(); }
+    fn tie() F64 { let a: F32 = 1.000000178813934326171875; a.to_f64(); }
+    fn negzero() F64 { 1.0 / zero[0]; }
+    fn all_ones() F64 { ones[0].to_f64(); }
+    fn variant() I32 { Big.A.to_i32(); }
+}
+`;
+  const literalFile = await write(literalSource);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, literalFile, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    const want = { big: 1e19, below: -18446744073709551615, near: 1.0000001192092896, wide: 2 ** 60 + 2 ** 37,
+      tie: 1 + 2 ** -22, negzero: -Infinity, all_ones: 4294967295, variant: 3000000000 | 0 };
+    for (const [name, value] of Object.entries(want)) assert.equal(exports[name](), value, `${mode}: ${name}`);
+    checked++;
+  }
+
   // Mistakes the self-hosted compiler reports, in its words.
   const mistakes = [
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
@@ -106,6 +136,26 @@ export lib {
       'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
     ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Expected ';', got 'x'"],
+    // Literals past their type, once wrapped as they were read.
+    ['export lib { fn run() I32 { let a = 18446744073709551615; a; } }\n', '18446744073709551615 does not fit I32'],
+    ['export lib { fn run() I32 { let a: I32 = -18446744073709551615; a; } }\n', '-18446744073709551615 does not fit I32'],
+    ['export lib { fn run() I64 { let a: I64 = -9223372036854775809; a; } }\n', '-9223372036854775809 does not fit I64'],
+    ['export lib { fn run() U64 { let a: U64 = -5; a; } }\n', '-5 does not fit U64'],
+    ['export lib { fn run() I32 { let m: M64 = -1; 0; } }\n', '-1 does not fit M64'],
+    ['export lib { fn run() F32 { let a: F32 = 1.0e39; a; } }\n', '1.0e39 does not fit F32'],
+    ['let g: I32 = 0xffffffffffffffff;\nexport lib { fn run() I32 { g; } }\n', '0xffffffffffffffff does not fit I32'],
+    ['fn s(x: I64) I32 { match x { 18446744073709551615 => 1, ~> 2, }; }\nexport lib { fn run() I32 { s(0); } }\n', '18446744073709551615 is out of range for I64'],
+    ['const mem t: I32 = [~5, 3];\nexport lib { fn run() I32 { t[0]; } }\n', 'mem t: numbers only'],
+    ['const mem t: I32 = [not 5];\nexport lib { fn run() I32 { t[0]; } }\n', 'mem t: numbers only'],
+    ['const mem t: I32 = [4294967296];\nexport lib { fn run() I32 { t[0]; } }\n', '4294967296 does not fit I32'],
+    // Integer enums: counted in 64 bits, over an integer of at most 32.
+    ['enum(I32) E:\n    | A = 2147483647\n    | B\nexport lib { fn run() I32 { E.A.to_i32(); } }\n', '2147483648 does not fit I32'],
+    ['enum(I32) E:\n    | A = 4294967296\nexport lib { fn run() I32 { E.A.to_i32(); } }\n', '4294967296 does not fit I32'],
+    ['enum(U32) E:\n    | A = 4294967295\n    | B\nexport lib { fn run() I32 { E.A.to_i32(); } }\n', '4294967296 does not fit U32'],
+    ['enum(I64) E:\n    | A = 5000000000\nexport lib { fn run() I32 { 0; } }\n', 'enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32'],
+    ['enum(Str) E:\n    | A\nexport lib { fn run() I32 { 0; } }\n', 'enum(Str) is not an integer enum; use U8, I8, U16, I16, I32, or U32'],
+    ['enum L:\n    | A = 3\n    | B {}\nexport lib { fn run() I32 { 0; } }\n', "L.A has a value; only an integer enum's variants do"],
+    ['type Id = distinct U32;\nexport lib { fn run() I32 { let i = Id.from_i32(5); 0; } }\n', 'No method Id.from_i32'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

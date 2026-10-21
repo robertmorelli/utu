@@ -219,6 +219,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.StorageType { return "storage-type"; };
     if k == Diag.ReturnValueFromVoid { return "type-mismatch"; };
     if k == Diag.ComptimeTrap { return "comptime-trap"; };
+    if k == Diag.FloatOutOfRange { return "float-literal-out-of-range"; };
+    if k == Diag.EnumBase or k == Diag.TagEnumValue { return "invalid-enum"; };
     "type-mismatch";
 }
 
@@ -364,8 +366,8 @@ fn diag_text(i: I32) Str {
         Diag.RecursiveType => w + " contains itself; make the field nullable",
         Diag.IntegerOutOfRange => pick(b == 1, "-", "") + node_text(node) + " does not fit " + type_text(a),
         Diag.InvalidDistinct => "distinct wraps I32, U32, I64, U64, F32, or F64",
-        Diag.EnumValueRange => int_text(b) + " does not fit " + word_text(diag_c[i]),
-        Diag.EnumValueTwice => word_text(a) + "." + w + " and ." + word_text(b) + " are both " + int_text(diag_c[i]),
+        Diag.EnumValueRange => word_text(b) + " does not fit " + word_text(diag_c[i]),
+        Diag.EnumValueTwice => word_text(a) + "." + w + " and ." + word_text(b) + " are both " + word_text(diag_c[i]),
         Diag.UnknownField => {
             if a >= 0 { return decl_text(a) + " has no field " + w; };
             "No field " + w;
@@ -427,6 +429,9 @@ fn diag_text(i: I32) Str {
             w + " returns void";
         },
         Diag.ComptimeTrap => "@comptime " + w + " trapped: " + comptime_trap_text(a),
+        Diag.FloatOutOfRange => pick(b == 1, "-", "") + node_text(node) + " does not fit " + type_text(a),
+        Diag.EnumBase => "enum(" + w + ") is not an integer enum; use U8, I8, U16, I16, I32, or U32",
+        Diag.TagEnumValue => word_text(a) + "." + w + " has a value; only an integer enum's variants do",
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -453,7 +458,7 @@ fn diag_text(i: I32) Str {
         Diag.AwaitNotPromise => "Cannot await " + type_text(a),
         Diag.ProtoMissing => decl_text(a) + " lacks " + word_text(diag_c[i]) + "." + w,
         Diag.ProtoSignature => word_text(a) + "[" + word_text(b) + "]." + w + " does not match the protocol",
-        Diag.MemElementRange => int_text(b) + " does not fit " + Storage.name(mem_storage(a)),
+        Diag.MemElementRange => word_text(diag_c[i]) + " does not fit " + Storage.name(mem_storage(a)),
         Diag.MemInitializer => {
             if a == 1 {
                 let head = mem_word(word) + " " + w + " takes a list, @embed, or @comptime";
@@ -569,6 +574,9 @@ fn diag_default_label(i: I32) Str {
         Diag.AssignmentToImmutable => "cannot be assigned",
         Diag.NonExhaustive => if a == 2 or a == 3 { "no " + w; } else { "no ~>"; },
         Diag.IntegerOutOfRange => if a >= 0 { type_text(a); } else { "out of range"; },
+        Diag.FloatOutOfRange => type_text(a),
+        Diag.EnumBase => "not U8, I8, U16, I16, I32, or U32",
+        Diag.TagEnumValue => "no value here",
         Diag.BareNull => "no type",
         Diag.NotCallable => "not a function",
         Diag.ParseError => if b >= 0 { word_text(b) + "?"; } else { "unexpected"; },
