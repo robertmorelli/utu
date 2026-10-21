@@ -53,13 +53,14 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
     runtimeNames.push('exceptionImports');
     body.push('imports.utu = exceptionImports(imports.utu);');
   }
+  if (spec.exports) runtimeNames.push('convertExports');
   if (runtimeNames.length) lines.unshift(`import { ${runtimeNames.join(', ')} } from ${JSON.stringify(runtime)};`);
   const compile = streaming ? 'compileStreaming' : 'compile';
   body.push(`const module = await WebAssembly.${compile}(${wasm}, ${JSON.stringify(COMPILE_OPTIONS)});`);
   body.push('export const instance = await WebAssembly.instantiate(module, imports);');
-  body.push(spec.promises
-    ? `export const exports = promisifyExports(instance, ${JSON.stringify(spec.promises)});`
-    : 'export const exports = instance.exports;');
+  let exports = spec.promises ? `promisifyExports(instance, ${JSON.stringify(spec.promises)})` : 'instance.exports';
+  if (spec.exports) exports = `convertExports(${exports}, ${JSON.stringify(spec.exports)})`;
+  body.push(`export const exports = ${exports};`);
   return [...lines, ...body].join('\n') + '\n';
 }
 

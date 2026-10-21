@@ -192,6 +192,30 @@ export function promisifyExports(instance, promiseSpec) {
   return exports;
 }
 
+/**
+ * Give exports' results as JavaScript has them. Wasm returns a Bool as 1 or
+ * 0, and a U32 or U64 as signed; the compiler records which exports return
+ * one (`{ main: 'U32' }`). Arguments need nothing: wasm wraps a JS number
+ * or BigInt to its bits, and `true` to 1. A promised result converts when
+ * it settles.
+ *
+ * @returns {Record<string, Function>} exports, with those results converted
+ */
+export function convertExports(exports, exportSpec) {
+  if (!exportSpec) return exports;
+  const out = { ...exports };
+  for (const [name, kind] of Object.entries(exportSpec)) {
+    const f = exports[name];
+    if (typeof f !== 'function') continue;
+    const convert = kind === 'Bool' ? v => v !== 0 : kind === 'U32' ? v => v >>> 0 : v => BigInt.asUintN(64, v);
+    out[name] = (...args) => {
+      const result = f(...args);
+      return result instanceof Promise ? result.then(convert) : convert(result);
+    };
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // `@es` glue
 //

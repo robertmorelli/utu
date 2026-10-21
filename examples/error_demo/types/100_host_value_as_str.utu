@@ -1,0 +1,8 @@
+// What: a host value that is not a string, where a Str is wanted.
+// Expect: expected Str, got the host type (only Externref holds any host value).
+using JS from std:JS;
+
+export main() I32 {
+    let s: Str = new JS.Map();
+    s.len();
+}

@@ -1581,14 +1581,44 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/30_source_range_float.utu
- ERROR  Cannot pipe a range of F64
-        iterator-source · examples/error_demo/iterators/30_source_range_float.utu:4:5
+ ERROR  Expected F64, got I32
+        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:5
 
  2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
  3 │ export main() F64 {
  4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │     ━━━━━━━━━━━━━
-   │     ╰─ here
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ I32
+ 5 │ }
+
+ ERROR  Expected I32, got F64
+        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:6
+
+ 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
+ 3 │ export main() F64 {
+ 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
+   │      ━━━
+   │      ╰─ F64
+ 5 │ }
+
+ ERROR  Expected I32, got F64
+        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:14
+
+ 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
+ 3 │ export main() F64 {
+ 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
+   │              ━━━
+   │              ╰─ F64
+ 5 │ }
+
+ ERROR  Expected I32, got F64
+        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:33
+
+ 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
+ 3 │ export main() F64 {
+ 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
+   │                                 ━━━
+   │                                 ╰─ F64
  5 │ }
 --- exit 1
 
@@ -2261,92 +2291,6 @@ ok
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │     ╰─ here
  5 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/80_break_in_generator_body.utu
- ERROR  break outside a loop
-        invalid-break · examples/error_demo/iterators/80_break_in_generator_body.utu:5:5
-
- 3 │ fn ones() yield I32 {
- 4 │     yield 1;
- 5 │     break;
-   │     ━━━━━
-   │     ╰─ here
- 6 │     yield 2;
- 7 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/81_chain_other_element_type.utu
- ERROR  Expected I32, got Str
-        type-mismatch · examples/error_demo/iterators/81_chain_other_element_type.utu:4:22
-
- 2 │ // Expect: Expected I32, got Str (the chained array's elements continue the pipeline)
- 3 │ export main() I32 {
- 4 │     [1, 2, 3] chain(["a"]) count;
-   │                      ━━━
-   │                      ╰─ Str
- 5 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/82_windows_wrong_element_type.utu
- ERROR  Expected Str, got I32
-        type-mismatch · examples/error_demo/iterators/82_windows_wrong_element_type.utu:5:13
-
- 3 │ export main() I32 {
- 4 │     let xs = [1, 2, 3];
- 5 │     let w = xs windows(Str, 2);
-   │             ━━━━━━━━━━━━━━━━━━
-   │             ╰─ I32
- 6 │     w.len();
- 7 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/83_sum_of_strings.utu
- ERROR  sum needs numbers, not Str
-        iterator-source · examples/error_demo/iterators/83_sum_of_strings.utu:4:5
-
- 2 │ // Expect: sum needs numbers, not Str (use fold("") to join)
- 3 │ export main() Str {
- 4 │     ["a", "b"] sum;
-   │     ━━━━━━━━━━━━━━
-   │     ╰─ here
- 5 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/84_bisect_extra_names.utu
- ERROR  bisect takes 1 name and an optional index
-        iterator-captures · examples/error_demo/iterators/84_bisect_extra_names.utu:4:5
-
- 2 │ // Expect: bisect takes 1 name and an optional index
- 3 │ export main() I32 {
- 4 │     [1, 2, 3] bisect |v, i, j| { v < 2; };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 5 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/85_generator_method.utu
- ERROR  A method cannot be a generator
-        generator-method · examples/error_demo/iterators/85_generator_method.utu:7:27
-
- 5 │         | items: Array[I32]
- 6 │     fn &.new(xs: Array[I32]) & { &{ items: xs }; }
- 7 │     fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
-   │                           ━━━━━━━━━
-   │                           ╰─ here
- 8 │ }
---- exit 1
-
-=== utu check examples/error_demo/iterators/86_bisect_over_i64_range.utu
- ERROR  bisect takes a range of I32, not I64
-        iterator-source · examples/error_demo/iterators/86_bisect_over_i64_range.utu:5:5
-
- 3 │ export main() I32 {
- 4 │     let n: I64 = 10;
- 5 │     (0 ..< n) bisect |v| { v < 4; };
-   │     ━━━━━━━━━
-   │     ╰─ here
- 6 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/01_unknown_variable_typo.utu
@@ -5842,7 +5786,7 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 --- exit 1
 
 === utu check examples/error_demo/syntax/45_dsl_block_not_closed.utu
- ERROR  Unexpected character '/'
+ ERROR  No \/ ends this body
         parse-error · examples/error_demo/syntax/45_dsl_block_not_closed.utu:3:25
 
  1 │ // What: an @es DSL block is never closed with `\/`.
@@ -6504,6 +6448,19 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/95_es_regex_nests.utu
+ ERROR  This /\ opens a nested body, so the body ends at a later \/
+        dsl-error · examples/error_demo/syntax/95_es_regex_nests.utu:3:48
+
+ 1 │ // What: a JavaScript regex in an @es body holds `/\`, which opens a nested body.
+ 2 │ // Expect: the `/\` in the regex is named: the body ends at a later `\/` than meant.
+ 3 │ let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
+   │                                                ━━
+   │                                                ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu
  ERROR  Expected ';', got 'y'
         parse-error · examples/error_demo/syntax/lib/broken_shapes.utu:5:9
@@ -6639,6 +6596,19 @@ ok
    │              ╰─ F64
  6 │     total;
  7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/100_host_value_as_str.utu
+ ERROR  Expected Str, got JS.Map<any, any>
+        type-mismatch · examples/error_demo/types/100_host_value_as_str.utu:6:18
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let s: Str = new JS.Map();
+   │                  ━━━━━━━━━━━━
+   │                  ╰─ JS.Map<any, any>
+ 7 │     s.len();
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/10_reassign_local.utu

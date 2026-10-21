@@ -17,7 +17,7 @@
 
 import {
   awaitImports, closureImports, exceptionImports, glueModuleSource, importObjectFromEval, importObjectFromGlue,
-  memoryImports, promiseImports, promisifyExports,
+  convertExports, memoryImports, promiseImports, promisifyExports,
 } from '../runtime/host-imports.js';
 import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
 
@@ -83,9 +83,16 @@ export async function compile(utu, entry, host) {
 function readTests(utu) {
   const tests = [];
   for (let k = 0; k < utu.test_count(); k++) {
-    tests.push({ export: `__test_${k}`, name: JSON.parse(textAt(utu.src, utu.test_name_start(k), utu.test_name_end(k))) });
+    tests.push({ export: `__test_${k}`, name: stringValue(textAt(utu.src, utu.test_name_start(k), utu.test_name_end(k))) });
   }
   return tests;
+}
+
+const ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' };
+
+/** A utu string literal's text (quotes included), its escapes read as utu reads them. */
+function stringValue(literal) {
+  return literal.slice(1, -1).replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_, e) => e.length > 1 ? String.fromCharCode(parseInt(e.slice(1), 16)) : ESCAPES[e] ?? e);
 }
 
 /**
@@ -98,7 +105,8 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   const { resolvePath = defaultResolvePath, stdlib } = host;
   // Each file read once, though a program may be started twice.
   const readFile = async file => {
-    if (!texts.has(file)) texts.set(file, await host.readFile(file));
+    // Bytes as they are, when the host's readFile can give them: the compiler reports text that is not UTF-8.
+    if (!texts.has(file)) texts.set(file, await (host.readFile.bytes ?? host.readFile)(file));
     return texts.get(file);
   };
   const prelude = startProgram(utu, stdlib);
@@ -191,9 +199,10 @@ async function assembleWat(utu) {
 
 const PLATFORM_PATH = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;
 
-/** Add a file to the program, and parse it. Returns its index. */
-function addFile(utu, files, byKey, key, text, role) {
-  const bytes = encoder.encode(text);
+/** Add a file (its text, or its bytes) to the program, and parse it. Returns its index. */
+function addFile(utu, files, byKey, key, source, role) {
+  const bytes = typeof source === 'string' ? encoder.encode(source) : new Uint8Array(source);
+  const text = typeof source === 'string' ? source : new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
   const file = utu.file_add(bytes.length, role);
   if (key.startsWith('std:')) utu.file_mark_std?.(file);
   new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
@@ -519,7 +528,7 @@ export async function instantiate(wasm, spec = {}, { loadGlue = null } = {}) {
     imports.utu = exceptionImports(imports.utu ?? {});
   }
   const instance = await WebAssembly.instantiate(module, imports);
-  return { module, instance, exports: promisifyExports(instance, spec.promises) };
+  return { module, instance, exports: convertExports(promisifyExports(instance, spec.promises), spec.exports) };
 }
 
 /** `../b.utu` from `/a/c.utu`: POSIX paths and URLs alike. */

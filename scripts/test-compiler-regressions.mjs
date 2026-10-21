@@ -283,6 +283,90 @@ mod Box {
   await assert.rejects(async () => (await instantiateNode(trapping.wasm, trapping.spec)).exports.run());
   checked++;
 
+  // Values at the JavaScript boundary, and @json, in the self-hosted compiler,
+  // in every build mode: what each export returns.
+  const boundary = [
+    // Results as JS has them: Bool true/false, U32 and U64 unsigned.
+    ['export lib { fn u() U32 { 4000000000; } fn w() U64 { 18446744073709551615; } fn yes() Bool { true; } }',
+      { u: 4000000000, w: 18446744073709551615n, yes: true }],
+    // @es arguments and results convert; undefined is absent.
+    [`let none: fun() ?Str = @es/\\ () => undefined \\/;
+let two: fun() Bool = @es/\\ () => 2 \\/;
+let show: fun(Bool, U32, U64) Str = @es/\\ (b, u, w) => typeof b + " " + u + " " + w \\/;
+export lib {
+    fn absent() Bool { promote none() { |v| => false, ~> true, }; }
+    fn bool() Bool { two() == true; }
+    fn shown() Str { show(true, 4000000000, 18446744073709551615); }
+}`, { absent: true, bool: true, shown: 'boolean 4000000000 18446744073709551615' }],
+    // A dynamic value into ?Str: undefined is absent, a number a TypeError; orelse and promote take it.
+    [`using JS from std:JS;
+export lib {
+    fn missing() Bool { let m = new JS.Map(); let h: ?Str = m.get("nope"); h == null; }
+    fn wrong() Str { try { let x: ?Str = JS.JSON.parse("5"); "accepted"; } catch |e| { "caught"; }; }
+    fn fallback() Str { let m = new JS.Map(); let s: Str = m.get("nope") orelse "d"; s; }
+    fn code() F64 { "x".codePointAt(5.0) orelse -1.0; }
+    fn chars() Str { JS.Array.from("abc").join("-"); }
+}`, { missing: true, wrong: 'caught', fallback: 'd', code: -1, chars: 'a-b-c' }],
+    // @json: depth, -0, escaped and exponent literals, required objects, int enums, lone surrogates, error places.
+    [`enum(U8) Level:
+    | Low
+    | High
+struct L:
+    | l: Level
+struct N:
+    | next: ?N
+struct Z:
+    | x: F64
+fn deep() Str { let a = ""; let b = ""; for (0 ..< 20000) |i| { a = a + "{\\"next\\":"; b = b + "}"; }; a + b; }
+export lib {
+    fn depth() Str { @json/\\ error N deep() \\/; }
+    fn negzero() F64 { let z = @json/\\ decode Z "{\\"x\\":-0}" \\/ orelse fatal; 1.0 / z.x; }
+    fn literal(text: Str) Str {
+        @json/\\ match text {
+            { a: "q\\"t" } => "quote",
+            { "q\\"k": |v| I32 } => "key",
+            { b: 1e5 } => "exp",
+            { plan: { tier: |t| ?Str } } => "plan",
+            { d: |d| Str = \`x,y\` } => d,
+            ~> |e| e,
+        }\\/;
+    }
+    fn level() Str { @json/\\ encode L L { l: Level.High } \\/; }
+    fn lone() Str { @json/\\ encode Array[Str] [Str.from_code_point(55296)] \\/; }
+    fn range() Str { @json/\\ error L "{\\"l\\":\\"Mid\\"}" \\/; }
+}`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant at line 1, column 6' },
+      { literal: [['{"a":"q\\"t"}', 'quote'], ['{"q\\"k":1}', 'key'], ['{"b":100000}', 'exp'], ['{"plan":{}}', 'plan'], ['{}', 'x,y']] }],
+  ];
+  for (const [source, expected, calls = {}] of boundary) {
+    const file = await write(source);
+    for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+      const built = await compileFile(utu, file, { mode });
+      assert.ok(built.wasm, `${mode}: ${built.diagnostics.map(d => d.message).join('\n')}`);
+      const { exports } = await instantiateNode(built.wasm, built.spec);
+      for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, `${mode} ${name}: ${source.slice(0, 60)}`);
+      for (const [name, pairs] of Object.entries(calls)) {
+        for (const [arg, value] of pairs) assert.equal(exports[name](arg), value, `${mode} ${name}(${arg})`);
+      }
+      checked++;
+    }
+  }
+
+  // Test names with utu escapes that JSON lacks.
+  const named = await compileFile(utu, await write('export main() void {}\ntest "it\\\'s \\$5\tok" { assert 1 == 1; }\n'), { target: 'test' });
+  assert.deepEqual(named.tests.map(t => t.name), ["it's $5\tok"]);
+  checked++;
+
+  // Text that is not UTF-8 (a byte no text can hold), and CRLF line ends,
+  // which are LF in multiline and template strings.
+  const bad = path.join(dir, 'not_utf8.utu');
+  await fs.writeFile(bad, Buffer.concat([Buffer.from('export main() I32 {\n    let s = \\\\a'), Buffer.from([0xc0, 0xaf]), Buffer.from('b\n    ;\n    s.len();\n}\n')]));
+  assert.deepEqual((await selfhost(bad)).errors, ['Not UTF-8']);
+  checked++;
+  const crlf = await selfhost(await write('export lib {\r\n    fn m() Str { let m = \\\\a\r\n        \\\\b\r\n    ; m; }\r\n    fn t() Str { `a\r\nb`; }\r\n}\r\n'));
+  assert.equal(crlf.exports?.m(), 'a\nb', crlf.errors?.join('\n'));
+  assert.equal(crlf.exports.t(), 'a\nb');
+  checked++;
+
   // Mistakes the self-hosted compiler reports, in its words.
   const mistakes = [
     // A generator's body cannot leave its consumer's loop.
@@ -294,6 +378,13 @@ mod Box {
     ['export lib { fn run() I32 { [1, 2] bisect |v, i, j| { true; }; } }\n', 'bisect takes 1 name and an optional index'],
     ['mod B {\n    struct &:\n        | x: I32\n    fn &.each |b| () yield I32 { yield b.x; }\n}\nexport lib { fn run() I32 { 0; } }\n', 'A method cannot be a generator'],
     ['export lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F64'],
+    // Only Externref holds any host value: not Str.
+    ['using JS from std:JS;\nexport main() I32 { let s: Str = new JS.Map(); s.len(); }\n', 'Expected Str, got JS.Map<any, any>'],
+    ['fn take(s: Str) I32 { s.len(); }\nexport main() I32 { take(cl() void {}); }\n', 'Expected Str, got cl() void'],
+    ['using JS from std:JS;\nexport main() Str { "hello".replace("l", cl(m) Str { m; }); }\n', 'Expected Str, got cl(unknown) Str'],
+    // A bare /\\ in a body nests.
+    ['let f: fun(Str) I32 = @es/\\ (s) => s.split(/\\s\\//).length \\/;\nexport main() I32 { f("a"); }\n', 'This /\\ opens a nested body, so the body ends at a later \\/'],
+    ['let f: fun(Str) Str = @es/\\ (s) => s.replace(/\\//g, "-") \\/;\nexport main() I32 { 0; }\n', 'No \\/ ends this body: the /\\ at line 1 opens another'],
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
     ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'Two export main'],
     ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'export lib and export main together'],

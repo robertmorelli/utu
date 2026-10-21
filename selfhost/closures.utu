@@ -456,6 +456,19 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
             else if expected >= 0 and i < vl_len[ty_a[expected]] { vl_item(ty_a[expected], i); }
             else { -1; };
         if t < 0 {
+            // A closure where something else is wanted (as `Str`): that mismatch.
+            if exp >= 0 and not is_foreign(exp) and not ty_is(exp, Ty.Error) {
+                let mt = vl_begin();
+                let q = first_child(list);
+                while (q >= 0) {
+                    let q_type = next_sibling(first_child(q));
+                    vl_add(if q_type >= 0 { type_of(q_type, cx.inst); } else { ty_error(); });
+                    q = next_sibling(q);
+                };
+                let r_node = child_of_kind(node, Node.Return_type);
+                mismatch(node, expect, ty(Ty.Closure, vl_end(mt), if r_node >= 0 { type_of(r_node, cx.inst); } else { ty_error(); }));
+                return error_value();
+            };
             // Host declarations type the closures handed to them.
             if has_foreign() { return unsupported(node); };
             report(Diag.ClosureParamType, p, word_of(first_child(p)));
