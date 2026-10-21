@@ -875,9 +875,34 @@ fn int_literal(node: I32, expect: I32, negate: Bool) I32 {
     let v = int_value(node);
     if negate { v = 0 - v; };
     let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
-    if not fits(v, t, negate) { report2(Diag.IntegerOutOfRange, node, -1, t, if negate { 1; } else { 0; }); };
+    if past_64_bits(node) or not fits(v, t, negate) { report2(Diag.IntegerOutOfRange, node, -1, t, if negate { 1; } else { 0; }); };
     push_number(t, v, false);
     t;
+}
+
+/// Whether an integer literal is past what 64 bits hold (it would wrap as
+/// it is read): more significant digits than 2^64 - 1 has, or as many and
+/// greater.
+fn past_64_bits(node: I32) Bool {
+    let t = node_first[node];
+    let i = tok_start[t];
+    let end_ = tok_end[t];
+    let max = "18446744073709551615";
+    let per = 0;
+    if end_ - i > 2 and src[i] == 48 and (src[i + 1] == 120 or src[i + 1] == 98) {
+        per = if src[i + 1] == 120 { 16; } else { 64; };
+        i += 2;
+    };
+    while (i < end_ - 1 and src[i] == 48) { i += 1; };
+    let n = end_ - i;
+    if per > 0 { return n > per; };
+    if n != max.len() { return n > max.len(); };
+    for (0 ..< n) |k| {
+        let d = src[i + k];
+        let m = max[k];
+        if d != m { return d > m; };
+    };
+    false;
 }
 
 /// Whether an integer literal's value fits its type. A literal past the
