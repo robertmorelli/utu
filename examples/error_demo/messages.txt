@@ -1181,6 +1181,54 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/control/84_let_of_void.utu
+ ERROR  x would hold no value
+        void-let · examples/error_demo/control/84_let_of_void.utu:6:9
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let x = log_nothing();
+   │         ━
+   │         ╰─ here
+ 7 │     0;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/85_closure_captures_tuple.utu
+ ERROR  A closure cannot capture tuple pair
+        tuple-let · examples/error_demo/control/85_closure_captures_tuple.utu:7:17
+
+ 5 │ export main() I32 {
+ 6 │     let pair = swap(3, 4);
+ 7 │     let first = cl() I32 { let .{a, b} = pair; a; };
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                 ╰─ here
+ 8 │     first();
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/86_int_pattern_on_int_enum.utu
+ ERROR  0 cannot match Level
+        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:15
+
+ 6 │
+ 7 │ fn label(l: Level) I32 {
+ 8 │     match l { 0 => 10, 1 => 20, };
+   │               ━━━━━━━━
+   │               ╰─ here
+ 9 │ }
+
+ ERROR  1 cannot match Level
+        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:24
+
+ 6 │
+ 7 │ fn label(l: Level) I32 {
+ 8 │     match l { 0 => 10, 1 => 20, };
+   │                        ━━━━━━━━
+   │                        ╰─ here
+ 9 │ }
+--- exit 1
+
 === utu check examples/error_demo/iterators/01_unfinished_map.utu
  ERROR  Unfinished pipeline: map
         iterator-unfinished · examples/error_demo/iterators/01_unfinished_map.utu:5:19
@@ -1550,35 +1598,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/30_source_range_float.utu
- ERROR  Expected I32, got F64
-        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:6
+ ERROR  Cannot pipe a range of F64
+        iterator-source · examples/error_demo/iterators/30_source_range_float.utu:4:5
 
  2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
  3 │ export main() F64 {
  4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │      ━━━
-   │      ╰─ F64
- 5 │ }
-
- ERROR  Expected I32, got F64
-        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:14
-
- 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
- 3 │ export main() F64 {
- 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │              ━━━
-   │              ╰─ F64
- 5 │ }
-
- ERROR  No * for I32 and F64
-        operand-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:33
-
- 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
- 3 │ export main() F64 {
- 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │                             ─   ━━━
-   │                             │   ╰─ F64
-   │                             ╰─ I32
+   │     ━━━━━━━━━━━━━
+   │     ╰─ here
  5 │ }
 --- exit 1
 
@@ -2244,6 +2271,92 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/80_break_in_generator_body.utu
+ ERROR  break outside a loop
+        invalid-break · examples/error_demo/iterators/80_break_in_generator_body.utu:5:5
+
+ 3 │ fn ones() yield I32 {
+ 4 │     yield 1;
+ 5 │     break;
+   │     ━━━━━
+   │     ╰─ here
+ 6 │     yield 2;
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/81_chain_other_element_type.utu
+ ERROR  Elements are I32, got Str
+        type-mismatch · examples/error_demo/iterators/81_chain_other_element_type.utu:4:22
+
+ 2 │ // Expect: Expected I32, got Str (the chained array's elements continue the pipeline)
+ 3 │ export main() I32 {
+ 4 │     [1, 2, 3] chain(["a"]) count;
+   │                      ━━━
+   │                      ╰─ Str
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/82_windows_wrong_element_type.utu
+ ERROR  Expected Str, got I32
+        type-mismatch · examples/error_demo/iterators/82_windows_wrong_element_type.utu:5:13
+
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3];
+ 5 │     let w = xs windows(Str, 2);
+   │             ━━━━━━━━━━━━━━━━━━
+   │             ╰─ I32
+ 6 │     w.len();
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/83_sum_of_strings.utu
+ ERROR  sum needs numbers, not Str
+        iterator-source · examples/error_demo/iterators/83_sum_of_strings.utu:4:5
+
+ 2 │ // Expect: sum needs numbers, not Str (use fold("") to join)
+ 3 │ export main() Str {
+ 4 │     ["a", "b"] sum;
+   │     ━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/84_bisect_extra_names.utu
+ ERROR  bisect takes 1 name and an optional index
+        iterator-captures · examples/error_demo/iterators/84_bisect_extra_names.utu:4:5
+
+ 2 │ // Expect: bisect takes 1 name and an optional index
+ 3 │ export main() I32 {
+ 4 │     [1, 2, 3] bisect |v, i, j| { v < 2; };
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/85_generator_method.utu
+ ERROR  A method cannot be a generator
+        generator-method · examples/error_demo/iterators/85_generator_method.utu:7:27
+
+ 5 │         | items: Array[I32]
+ 6 │     fn &.new(xs: Array[I32]) & { &{ items: xs }; }
+ 7 │     fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
+   │                           ━━━━━━━━━
+   │                           ╰─ here
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/86_bisect_over_i64_range.utu
+ ERROR  bisect takes a range of I32, not I64
+        iterator-source · examples/error_demo/iterators/86_bisect_over_i64_range.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let n: I64 = 10;
+ 5 │     (0 ..< n) bisect |v| { v < 4; };
+   │     ━━━━━━━━━
+   │     ╰─ here
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/names/01_unknown_variable_typo.utu
  ERROR  Unknown variable lengh; did you mean length?
         unknown-variable · examples/error_demo/names/01_unknown_variable_typo.utu:6:5
@@ -2377,6 +2490,80 @@ ok
 
   fix   Use true
  4 │     let ready = true;
+--- exit 1
+
+=== utu check examples/error_demo/names/100_protocol_method_shadow.utu
+ ERROR  Sh.area is already a protocol member
+        member-clash · examples/error_demo/names/100_protocol_method_shadow.utu:10:7
+
+ 8 │
+ 9 │ fn Sh[Sq].area |q| () I32 { q.s * q.s; }
+10 │ fn Sh.area |x| () I32 { 0; }
+   │       ━━━━
+   │       ╰─ also in the protocol
+11 │
+12 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/101_standard_name_struct.utu
+ ERROR  Found is a standard type
+        standard-name · examples/error_demo/names/101_standard_name_struct.utu:3:8
+
+ 1 │ // What: a struct named like a prelude module (Found, which iterators return)
+ 2 │ // Expect: Found is a standard type: name it something else
+ 3 │ struct Found:
+   │        ━━━━━
+   │        ╰─ a prelude name
+ 4 │     | x: I32
+--- exit 1
+
+=== utu check examples/error_demo/names/102_imported_file_helper_private.utu
+ ERROR  Unknown function helper
+        unknown-function · examples/error_demo/names/102_imported_file_helper_private.utu:6:22
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     shapes.area(2) + helper();
+   │                      ━━━━━━
+   │                      ╰─ not defined
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/103_variant_as_value.utu
+ ERROR  Color.R is a type, not a value
+        variant-not-value · examples/error_demo/names/103_variant_as_value.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let c = Color.R;
+   │             ━━━━━━━
+   │             ╰─ make one: R {…}
+ 9 │     0;
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/104_tag_enum_value.utu
+ ERROR  Level.Low has a value; only an integer enum's variants do
+        tag-enum-value · examples/error_demo/names/104_tag_enum_value.utu:4:13
+
+ 2 │ // Expect: Level.Low has a value; only an integer enum's variants do
+ 3 │ enum Level:
+ 4 │     | Low = 3
+   │             ━
+   │             ╰─ no value here
+ 5 │     | High {}
+--- exit 1
+
+=== utu check examples/error_demo/names/105_generic_call_without_instance.utu
+ ERROR  box takes 1 type arguments, given 0
+        invalid-module-arity · examples/error_demo/names/105_generic_call_without_instance.utu:8:5
+
+ 6 │
+ 7 │ export main() F64 {
+ 8 │     box.id(1.5);
+   │     ━━━
+   │     ╰─ here
+ 9 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/10_unknown_type_Strng.utu
@@ -3070,25 +3257,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/55_duplicate_hoisted_std_name.utu
- ERROR  Duplicate Str__len
-        duplicate-declaration · examples/error_demo/names/55_duplicate_hoisted_std_name.utu:4:5
+ ERROR  Str is a standard type
+        standard-name · examples/error_demo/names/55_duplicate_hoisted_std_name.utu:3:5
 
+ 1 │ // What: an own module named like a std module (Str) redeclares one of its functions
  2 │ // Expect: Duplicate top-level declaration 'Str.len' (std's Str already declares it)
  3 │ mod Str {
+   │     ━━━
+   │     ╰─ a prelude name
  4 │     fn len |s| () I32 { 0; }
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ already declared
  5 │ }
-
- ERROR  No method Str.len
-        unknown-method · examples/error_demo/names/55_duplicate_hoisted_std_name.utu:8:5
-
- 6 │
- 7 │ export main() I32 {
- 8 │     "abc".len();
-   │     ━━━━━━━━━━━
-   │     ╰─ no such method
- 9 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/56_duplicate_methods.utu
@@ -3342,41 +3520,37 @@ ok
 
 === utu check examples/error_demo/names/74_recursive_struct.utu
  ERROR  Node contains itself; make the field nullable
-        recursive-type · examples/error_demo/names/74_recursive_struct.utu:3:1
+        recursive-type · examples/error_demo/names/74_recursive_struct.utu:5:7
 
- 1 │ // What: a struct contains itself directly (a linked list node without ?)
- 2 │ // Expect: Recursive type 'Node' must use a nullable or indirect field (write next: ?Node)
  3 │ struct Node:
  4 │     | value: I32
  5 │     | next: Node
-   │     ━━━━━━━━━━━━
-   │     ╰─ here
+   │       ━━━━━━━━━━
+   │       ╰─ here
  6 │
  7 │ export main() I32 {
 --- exit 1
 
 === utu check examples/error_demo/names/75_recursive_mutual.utu
  ERROR  Parent contains itself; make the field nullable
-        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:3:1
+        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:4:7
 
- 1 │ // What: two structs contain each other directly
  2 │ // Expect: Recursive type 'Parent' must use a nullable or indirect field (Parent -> Child -> Parent)
  3 │ struct Parent:
  4 │     | child: Child
-   │     ━━━━━━━━━━━━━━
-   │     ╰─ here
+   │       ━━━━━━━━━━━━
+   │       ╰─ here
  5 │
  6 │ struct Child:
 
  ERROR  Child contains itself; make the field nullable
-        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:6:1
+        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:7:7
 
- 4 │     | child: Child
  5 │
  6 │ struct Child:
  7 │     | parent: Parent
-   │     ━━━━━━━━━━━━━━━━
-   │     ╰─ here
+   │       ━━━━━━━━━━━━━━
+   │       ╰─ here
  8 │
  9 │ export main() I32 {
 --- exit 1
@@ -3558,6 +3732,124 @@ ok
 19 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/91_ambiguous_opened_name.utu
+ ERROR  v is ambiguous: a.v or b.v
+        ambiguous-name · examples/error_demo/names/91_ambiguous_opened_name.utu:9:5
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     v();
+   │     ━
+   │     ╰─ ambiguous
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/92_enum_base_i64.utu
+ ERROR  enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+        enum-base · examples/error_demo/names/92_enum_base_i64.utu:3:6
+
+ 1 │ // What: an integer enum over I64, which enums do not support
+ 2 │ // Expect: enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+ 3 │ enum(I64) Big:
+   │      ━━━
+   │      ╰─ not U8, I8, U16, I16, I32, or U32
+ 4 │     | Huge = 5000000000
+--- exit 1
+
+=== utu check examples/error_demo/names/93_enum_base_f64.utu
+ ERROR  enum(F64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+        enum-base · examples/error_demo/names/93_enum_base_f64.utu:3:6
+
+ 1 │ // What: an enum over F64
+ 2 │ // Expect: enum(F64) is not an integer enum
+ 3 │ enum(F64) Ratio:
+   │      ━━━
+   │      ╰─ not U8, I8, U16, I16, I32, or U32
+ 4 │     | Half
+ 5 │     | Whole
+--- exit 1
+
+=== utu check examples/error_demo/names/94_imported_alias_stays_in_its_file.utu
+ ERROR  Unknown variable ops
+        unknown-variable · examples/error_demo/names/94_imported_alias_stays_in_its_file.utu:6:5
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     ops.double(21);
+   │     ━━━
+   │     ╰─ not defined
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/95_distinct_wrong_conversion.utu
+ ERROR  No method Id.from_i32
+        unknown-method · examples/error_demo/names/95_distinct_wrong_conversion.utu:6:14
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let id = Id.from_i32(5);
+   │              ━━━━━━━━━━━━━━
+   │              ╰─ no such method
+ 7 │     0;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/96_duplicate_test_name.utu
+ ERROR  Duplicate test "adds"
+        test-name · examples/error_demo/names/96_duplicate_test_name.utu:6:6
+
+ 4 │
+ 5 │ test "adds" { assert add(1, 2) == 3; }
+ 6 │ test "adds" { assert add(2, 2) == 4; }
+   │      ━━━━━━
+   │      ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/97_empty_test_name.utu
+ ERROR  Empty test name
+        test-name · examples/error_demo/names/97_empty_test_name.utu:3:6
+
+ 1 │ // What: a test with an empty name
+ 2 │ // Expect: Empty test name
+ 3 │ test "" { assert 1 + 1 == 2; }
+   │      ━━
+   │      ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/98_enum_implicit_past_i32.utu
+ ERROR  2147483648 does not fit I32
+        enum-value-range · examples/error_demo/names/98_enum_implicit_past_i32.utu:5:7
+
+ 3 │ enum(I32) Wide:
+ 4 │     | Top = 2147483647
+ 5 │     | Next
+   │       ━━━━
+   │       ╰─ here
+ 6 │
+ 7 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/99_field_and_method.utu
+ ERROR  P.f is both a field and a method
+        member-clash · examples/error_demo/names/99_field_and_method.utu:6:6
+
+ 4 │     | f: cl() I32
+ 5 │
+ 6 │ fn P.f |p| () I32 { 2; }
+   │      ━
+   │      ╰─ also a field
+ 7 │
+ 8 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/import_parts/mathops.utu
+ok
+--- exit 0
+
+=== utu check examples/error_demo/names/import_parts/shapes.utu
+ok
+--- exit 0
+
 === utu check examples/error_demo/names/lazy_parts/widgets.utu
 ok
 --- exit 0
@@ -3699,8 +3991,34 @@ ok
  5 │ export main() I32 {
 --- exit 1
 
+=== utu check examples/error_demo/platform/100_mem_element_bitnot.utu
+ ERROR  mem table: numbers only
+        mem-initializer · examples/error_demo/platform/100_mem_element_bitnot.utu:3:24
+
+ 1 │ // What: `~5` in a mem's initializer, which takes numbers and negated numbers
+ 2 │ // Expect: mem table: numbers only (`~5` once stored -5)
+ 3 │ const mem table: I32 = [~5, 3];
+   │                        ━━━━━━━
+   │                        ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/101_mem_element_past_u64.utu
+ ERROR  18446744073709551616 does not fit U32
+        mem-element-range · examples/error_demo/platform/101_mem_element_past_u64.utu:3:24
+
+ 1 │ // What: a U32 mem element past 64 bits
+ 2 │ // Expect: 18446744073709551616 does not fit U32
+ 3 │ const mem table: U32 = [3, 18446744073709551616];
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                        ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
 === utu check examples/error_demo/platform/10_mem_element_out_of_range.utu
- ERROR  2 does not fit U8
+ ERROR  300 does not fit U8
         mem-element-range · examples/error_demo/platform/10_mem_element_out_of_range.utu:3:18
 
  1 │ // What: a U8 mem initialized with a value above 255
@@ -3713,7 +4031,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/11_mem_float_in_int.utu
- ERROR  1 does not fit I32
+ ERROR  0.5 does not fit I32
         mem-element-range · examples/error_demo/platform/11_mem_float_in_int.utu:3:20
 
  1 │ // What: a float literal in an I32 mem initializer
@@ -5228,10 +5546,10 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 --- exit 1
 
 === utu run examples/error_demo/runtime/54_main_takes_args.utu
- TRAP  Wrong type from JavaScript
-       trap · examples/error_demo/runtime/54_main_takes_args.utu
+ ERROR  main takes (name: Str), but utu run calls it with none
+        main-arguments
 
-  in main
+  note  Give main no parameters to run it, or call it from JavaScript (utu build).
 --- exit 1
 
 === utu run examples/error_demo/runtime/55_main_returns_struct.utu
@@ -5364,6 +5682,62 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
    │                            ━
    │                            ╰─ unexpected
  8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/100_int_u64_max_default_i32.utu
+ ERROR  18446744073709551615 does not fit I32
+        integer-out-of-range · examples/error_demo/syntax/100_int_u64_max_default_i32.utu:4:20
+
+ 2 │ // Expect: 18446744073709551615 does not fit I32 (it once wrapped to -1)
+ 3 │ export main() I32 {
+ 4 │     let all_ones = 18446744073709551615;
+   │                    ━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ I32
+ 5 │     all_ones;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/101_optional_in_assert.utu
+ ERROR  ?. only in a statement
+        optional-outside-statement · examples/error_demo/syntax/101_optional_in_assert.utu:9:12
+
+ 7 │ export main() I32 {
+ 8 │     let head = Node { count: 1, next: null };
+ 9 │     assert head.next?.count == 1;
+   │            ━━━━━━━━━━━━━━━━
+   │            ╰─ here
+10 │     0;
+11 │ }
+
+  note  for a value, use promote
+--- exit 1
+
+=== utu check examples/error_demo/syntax/102_too_many_parameters.utu
+ ERROR  f has 1001 parameters (max 1000)
+        too-many-params · examples/error_demo/syntax/102_too_many_parameters.utu:3:4
+
+ 1 │ // What: a function with more parameters than a Wasm function takes (1000)
+ 2 │ // Expect: f has 1001 parameters (max 1000)
+ 3 │ fn f(
+   │    ━
+   │    ╰─ here
+ 4 │     a0: I32,
+ 5 │     a1: I32,
+--- exit 1
+
+=== utu check examples/error_demo/syntax/103_optional_before_orelse.utu
+ ERROR  ?. only in a statement
+        optional-outside-statement · examples/error_demo/syntax/103_optional_before_orelse.utu:10:14
+
+ 8 │     let head = Node { name: "a", next: null };
+ 9 │     let second = "none";
+10 │     second = head.next?.name orelse "default";
+   │              ━━━━━━━━━━━━━━━
+   │              ╰─ here
+11 │     second;
+12 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/10_smart_quotes.utu
@@ -5849,7 +6223,7 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 --- exit 1
 
 === utu check examples/error_demo/syntax/45_dsl_block_not_closed.utu
- ERROR  Unexpected character '/'
+ ERROR  No \/ ends this body
         parse-error · examples/error_demo/syntax/45_dsl_block_not_closed.utu:3:25
 
  1 │ // What: an @es DSL block is never closed with `\/`.
@@ -6095,13 +6469,13 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 
 === utu check examples/error_demo/syntax/64_int_negative_unsigned.utu
  ERROR  -1 does not fit U32
-        integer-out-of-range · examples/error_demo/syntax/64_int_negative_unsigned.utu:4:22
+        integer-out-of-range · examples/error_demo/syntax/64_int_negative_unsigned.utu:4:21
 
  2 │ // Expect: Integer literal -1 is out of range for U32.
  3 │ export main() I32 {
  4 │     let none: U32 = -1;
-   │                      ━
-   │                      ╰─ U32
+   │                     ━━
+   │                     ╰─ U32
  5 │     none.to_i32();
  6 │ }
 --- exit 1
@@ -6144,8 +6518,17 @@ FAIL third item: fatal, failed assert, or failed check  in &.get_index
 --- exit 1
 
 === utu check examples/error_demo/syntax/68_int_out_of_range_i64.utu
-ok
---- exit 0
+ ERROR  99999999999999999999 does not fit I64
+        integer-out-of-range · examples/error_demo/syntax/68_int_out_of_range_i64.utu:4:21
+
+ 2 │ // Expect: Integer literal 99999999999999999999 is out of range for I64.
+ 3 │ export main() I64 {
+ 4 │     let huge: I64 = 99999999999999999999;
+   │                     ━━━━━━━━━━━━━━━━━━━━
+   │                     ╰─ I64
+ 5 │     huge;
+ 6 │ }
+--- exit 1
 
 === utu check examples/error_demo/syntax/69_tuple_param_type.utu
  ERROR  A tuple is only a function result
@@ -6298,6 +6681,8 @@ ok
    │                  ╰─ here
 10 │     second;
 11 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/80_optional_as_block_value.utu
@@ -6310,6 +6695,8 @@ ok
    │     ━━━━━━━━━━━━━━━
    │     ╰─ here
  9 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/81_optional_in_condition.utu
@@ -6323,6 +6710,8 @@ ok
    │        ╰─ here
  9 │     false;
 10 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/82_optional_return.utu
@@ -6335,6 +6724,8 @@ ok
    │            ━━━━━━━━━━━━━━━
    │            ╰─ here
  9 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/83_two_export_libs.utu
@@ -6520,6 +6911,71 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/95_es_regex_nests.utu
+ ERROR  This /\ opens a nested body, so the body ends at a later \/
+        dsl-error · examples/error_demo/syntax/95_es_regex_nests.utu:3:48
+
+ 1 │ // What: a JavaScript regex in an @es body holds `/\`, which opens a nested body.
+ 2 │ // Expect: the `/\` in the regex is named: the body ends at a later `\/` than meant.
+ 3 │ let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
+   │                                                ━━
+   │                                                ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/syntax/96_int_negative_u64.utu
+ ERROR  -5 does not fit U64
+        integer-out-of-range · examples/error_demo/syntax/96_int_negative_u64.utu:4:22
+
+ 2 │ // Expect: -5 does not fit U64
+ 3 │ export main() I32 {
+ 4 │     let count: U64 = -5;
+   │                      ━━
+   │                      ╰─ U64
+ 5 │     count.to_i32();
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/97_int_below_i64_min.utu
+ ERROR  -9223372036854775809 does not fit I64
+        integer-out-of-range · examples/error_demo/syntax/97_int_below_i64_min.utu:4:22
+
+ 2 │ // Expect: -9223372036854775809 does not fit I64 (it once wrapped to I64's largest)
+ 3 │ export main() I64 {
+ 4 │     let least: I64 = -9223372036854775809;
+   │                      ━━━━━━━━━━━━━━━━━━━━
+   │                      ╰─ I64
+ 5 │     least;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/98_float_out_of_range_f32.utu
+ ERROR  1.0e39 does not fit F32
+        float-out-of-range · examples/error_demo/syntax/98_float_out_of_range_f32.utu:4:20
+
+ 2 │ // Expect: 1.0e39 does not fit F32 (it once became Infinity)
+ 3 │ export main() F32 {
+ 4 │     let big: F32 = 1.0e39;
+   │                    ━━━━━━
+   │                    ╰─ F32
+ 5 │     big;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/99_mask_negative_m64.utu
+ ERROR  -1 does not fit M64
+        integer-out-of-range · examples/error_demo/syntax/99_mask_negative_m64.utu:4:20
+
+ 2 │ // Expect: -1 does not fit M64, as with M32
+ 3 │ export main() I32 {
+ 4 │     let all: M64 = -1;
+   │                    ━━
+   │                    ╰─ M64
+ 5 │     0;
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu
  ERROR  Missing ; after x
         missing-semicolon · examples/error_demo/syntax/lib/broken_shapes.utu:4:21
@@ -6671,6 +7127,137 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/100_host_value_as_str.utu
+ ERROR  s is Str, got JS.Map<any, any>
+        type-mismatch · examples/error_demo/types/100_host_value_as_str.utu:6:18
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let s: Str = new JS.Map();
+   │            ───   ━━━━━━━━━━━━
+   │            │     ╰─ JS.Map<any, any>
+   │            ╰─ Str
+ 7 │     s.len();
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/101_instances_without_end.utu
+ ERROR  m's instances nest more than 64 deep
+        instance-depth · examples/error_demo/types/101_instances_without_end.utu:5:33
+
+ 3 │ mod m[T] {
+ 4 │     fn f(n: I32) I32 {
+ 5 │         if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
+   │                                 ━━━━━━━━━━━━━━━━━━━━
+   │                                 ╰─ one more level
+ 6 │     }
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/102_nullable_generic_scalar.utu
+ ERROR  I32 cannot be nullable
+        invalid-nullable-type · examples/error_demo/types/102_nullable_generic_scalar.utu:5:14
+
+ 3 │ mod Box[T] {
+ 4 │     struct &:
+ 5 │         | v: ?T
+   │              ━━
+   │              ╰─ here
+ 6 │     fn &.empty() & { &{ v: null }; }
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/103_generic_lists_protocol.utu
+ ERROR  A generic type cannot list protocol Sh
+        proto-generic · examples/error_demo/types/103_generic_lists_protocol.utu:7:14
+
+ 5 │
+ 6 │ mod Box[T] {
+ 7 │     struct &[Sh]:
+   │              ━━
+   │              ╰─ on a generic type
+ 8 │         | v: T
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/104_proto_get_only_write.utu
+ ERROR  Sh.size is get-only
+        proto-access · examples/error_demo/types/104_proto_get_only_write.utu:11:5
+
+ 9 │ export main() I32 {
+10 │     let s: Sh = Sq { size: 2 };
+11 │     s.size = 5;
+   │     ━━━━━━
+   │     ╰─ get-only
+12 │     0;
+13 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/105_proto_set_only_read.utu
+ ERROR  Sh.size is set-only
+        proto-access · examples/error_demo/types/105_proto_set_only_read.utu:11:5
+
+ 9 │ export main() I32 {
+10 │     let s: Sh = Sq { size: 2 };
+11 │     s.size;
+   │     ━━━━━━
+   │     ╰─ set-only
+12 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/106_closure_self_untyped.utu
+ ERROR  f needs a type annotation to call itself
+        self-untyped · examples/error_demo/types/106_closure_self_untyped.utu:4:20
+
+ 2 │ // Expect: f needs a type annotation to call itself
+ 3 │ export main() I32 {
+ 4 │     let f = cl() { f(); };
+   │                    ━
+   │                    ╰─ type not known yet
+ 5 │     f();
+ 6 │     1;
+--- exit 1
+
+=== utu check examples/error_demo/types/107_match_pattern_past_i64.utu
+ ERROR  18446744073709551615 is out of range for I64
+        match-pattern · examples/error_demo/types/107_match_pattern_past_i64.utu:5:9
+
+ 3 │ fn status(code: I64) I32 {
+ 4 │     match code {
+ 5 │         18446744073709551615 => 1,
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │         ╰─ here
+ 6 │         ~> 2,
+ 7 │     };
+--- exit 1
+
+=== utu check examples/error_demo/types/108_new_default_str.utu
+ ERROR  Str has no default: Array[Str].new(n, fill)
+        non-defaultable · examples/error_demo/types/108_new_default_str.utu:4:17
+
+ 2 │ // Expect: Str has no default: Array[Str].new(n, fill)
+ 3 │ export main() I32 {
+ 4 │     let names = Array[Str].new_default(3);
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                 ╰─ here
+ 5 │     names.len();
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/109_same_name_types.utu
+ ERROR  s is S, got a.S
+        type-mismatch · examples/error_demo/types/109_same_name_types.utu:13:16
+
+11 │
+12 │ export main() I32 {
+13 │     let s: S = a.mk();
+   │            ─   ━━━━━━
+   │            │   ╰─ S
+   │            ╰─ S
+14 │     s.x;
+15 │ }
+--- exit 1
+
 === utu check examples/error_demo/types/10_reassign_local.utu
  ERROR  n is I32, got Str
         type-mismatch · examples/error_demo/types/10_reassign_local.utu:5:9
@@ -6684,6 +7271,19 @@ ok
    │         ╰─ Str
  6 │     n;
  7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/110_nullable_distinct.utu
+ ERROR  Id cannot be nullable
+        invalid-nullable-type · examples/error_demo/types/110_nullable_distinct.utu:6:12
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let x: ?Id = null;
+   │            ━━━
+   │            ╰─ here
+ 7 │     0;
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/11_global_annotation.utu

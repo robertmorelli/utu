@@ -110,7 +110,8 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
                 missing = true;
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
             } else if temps[decl_a[field]] >= 0 {
-                w_get(repr(ft), temps[decl_a[field]]);
+                // (A let: every branch is void, as stage -1 wants.)
+                let got = w_get(repr(ft), temps[decl_a[field]]);
             } else {
                 want(last_child(init), ft, Why.Field, field, -1);
                 coerce(check_expr(last_child(init), ft, cx), ft, last_child(init));

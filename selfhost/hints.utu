@@ -435,7 +435,16 @@ fn mismatch_text(i: I32) Str {
     let n = if c > 0 { c % 65536; } else { 0; };
     let caused = if n > 0 { " (+" + int_text(n) + " caused by this)"; } else { ""; };
     let e = type_text(diag_a[i]);
-    let got = ", got " + type_text(diag_b[i]) + caused;
+    let g = type_text(diag_b[i]);
+    // Two types of one name: said with their modules (or, when that is the same too, as two).
+    if e == g and diag_a[i] != diag_b[i] {
+        qualify_types[0] = 1;
+        e = type_text(diag_a[i]);
+        g = type_text(diag_b[i]);
+        qualify_types[0] = 0;
+        if e == g { g = g + " (another type of that name)"; };
+    };
+    let got = ", got " + g + caused;
     let w = word_text(diag_word[i]);
     // A name the compiler made says nothing to the user.
     if w.len() > 1 and w.slice(0, 2) == "__" { w = ""; };
