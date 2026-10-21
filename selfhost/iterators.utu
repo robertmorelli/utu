@@ -66,6 +66,7 @@ struct Pipe:
 
 fn reset_iterators() void {
     pure_words.clear();
+    pure_flags.clear();
     st_node.clear();
     st_op.clear();
     st_counter.clear();
@@ -108,12 +109,45 @@ fn copy_local(to: I32, from: I32) void {
     ls(to, m);
 }
 
-/// Push `hi - lo`: how many values the source has.
+/// Push `hi - lo`: how many values the source has, as an I32 (a range's,
+/// past I32's greatest, is 2^31, the least I32 read unsigned).
 fn span(p: Pipe) void {
     let m = w_mark();
     lg(p.hi);
     lg(p.lo);
-    w_i32_op(i32_sub, m);
+    if not p.range {
+        w_i32_op(i32_sub, m);
+        return;
+    };
+    plain(i64_sub, vt_i64, m);
+    let d = new_local(vt_i64);
+    ls(d, m);
+    let mi = w_mark();
+    lg(d);
+    w_leaf(Op.I64Const, vt_i64, -2147483648, 0);
+    plain(i64_gt_u, vt_i32, mi);
+    let mt = w_mark();
+    w_i32(-2147483648);
+    w_node(Op.Seq, vt_i32, 0, 0, mt);
+    let me = w_mark();
+    lg(d);
+    plain(i32_wrap_i64, vt_i32, me);
+    w_node(Op.Seq, vt_i32, 0, 0, me);
+    w_node(Op.If, vt_i32, new_label(), 0, mi);
+    w_node(Op.Seq, vt_i32, 0, 0, m);
+}
+
+/// Push `lo + n`, n an I32 local at least 0, as a position of the source.
+fn lo_plus(p: Pipe, n: I32) void {
+    let m = w_mark();
+    lg(p.lo);
+    lg(n);
+    if p.range {
+        plain(i64_extend_i32_u, vt_i64, m + 1);
+        plain(i64_add, vt_i64, m);
+    } else {
+        w_i32_op(i32_add, m);
+    };
 }
 
 /// Ends `if cond { … } [else { … }]`: the condition on the stack since
@@ -232,23 +266,31 @@ fn is_bounded_stage(op: I32) Bool {
 
 /// `(… collect(T))` as a pipeline's source, when its stages cannot observe
 /// being interleaved with the stages that consume it (stage 0's
-/// `fusableCollect`): its collect stage, or -1.
-fn fusable_collect(input: I32) I32 {
+/// `fusableCollect`): its collect stage, or -1. With `strict` (the consumer
+/// can stop early or trap), its stages must not trap or loop either: fused,
+/// the values the consumer never takes would not be made.
+fn fusable_collect(input: I32, strict: Bool) I32 {
     if not is_kind(input, Node.Paren_expr) { return -1; };
     let inner = past_splices(first_child(input));
     if not is_kind(inner, Node.Iterator_expr) or next_sibling(first_child(input)) >= 0 { return -1; };
     if iterator_op(inner) != Kw.Collect.to_i32() { return -1; };
     let s = past_splices(first_child(inner));
     while (is_kind(s, Node.Iterator_expr)) {
-        if is_terminal(iterator_op(s)) or not pure_stage(s) { return -1; };
+        if is_terminal(iterator_op(s)) or not pure_stage(s) or (strict and stage_may_trap(s)) { return -1; };
         s = past_splices(first_child(s));
     };
     inner;
 }
 
+/// Stages that can end the pipeline before its source does.
+fn stops_early(op: I32) Bool {
+    op == Kw.Take.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
+        or op == Kw.First_where.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Zip.to_i32();
+}
+
 /// A stage whose parts (all but its source) assign only their own locals,
-/// call only conversions and reads, and neither await, nest a pipeline, use
-/// a DSL, nor leave (return, break, continue, yield).
+/// call only std's conversions and reads, and neither await, nest a
+/// pipeline, use a DSL, nor leave (return, break, continue, yield).
 fn pure_stage(stage: I32) Bool {
     let lo = tok_start[node_first[stage]];
     let hi = tok_end[node_last[stage] - 1];
@@ -264,12 +306,20 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
     let kind = node_kind[node];
     if kind == Node.Await_expr.to_i32() or kind == Node.Dsl_expr.to_i32() or kind == Node.Iterator_expr.to_i32()
         or kind == Node.Yield_expr.to_i32() or kind == Node.Return_expr.to_i32() or kind == Node.Break_expr.to_i32()
-        or kind == Node.Continue_expr.to_i32() or kind == Node.Promoted_module_call_expr.to_i32() {
+        or kind == Node.Continue_expr.to_i32() or kind == Node.Promoted_module_call_expr.to_i32() or kind == Node.Prune_expr.to_i32()
+        or kind == Node.Defer_expr.to_i32() or kind == Node.Bind_expr.to_i32() or kind == Node.Pipe_expr.to_i32() {
         return false;
     };
+    // An operator may be the program's own method.
+    if (kind == Node.Binary_expr.to_i32() or kind == Node.Unary_expr.to_i32() or kind == Node.Index_expr.to_i32()
+        or kind == Node.Slice_expr.to_i32()) and user_operators() {
+        return false;
+    };
+    // A hole's text is its value's `to_str`.
+    if kind == Node.Template_string.to_i32() and user_to_str() { return false; };
     if kind == Node.Assign_expr.to_i32() {
         let target = first_child(node);
-        if not is_kind(target, Node.Identifier) { return false; };
+        if not is_kind(target, Node.Identifier) or (tok_kind[token_after(target)] != Tok.Eq.to_i32() and user_operators()) { return false; };
         let d = node_decl[target];
         if d < 0 or decl_node[d] < 0 { return false; };
         let at = tok_start[node_first[decl_node[d]]];
@@ -278,6 +328,9 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
     if kind == Node.Call_expr.to_i32() {
         let callee = first_child(node);
         if not (is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Type_member_expr)) or not pure_method(word_of(last_child(callee))) { return false; };
+        // A host module's function is the host's.
+        let r = first_child(callee);
+        if is_kind(r, Node.Identifier) and decl_is(node_decl[r], Decl.Foreign) { return false; };
     };
     let c = first_child(node);
     while (c >= 0) {
@@ -287,14 +340,92 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
     true;
 }
 
-/// The methods pure_method allows, interned once per program.
+/// The methods pure_method allows, interned once per program, and then
+/// `to_str` (a template's holes).
 vec pure_words: I32;
+/// By entry of @pure_words: 1 when the program declares a function or field
+/// of that name of its own (which may do anything), else 0; last, 1 when it
+/// declares an operator.
+vec pure_flags: I32;
 
-fn pure_method(word: I32) Bool {
+/// Whether the program's own code declares a function, field, or protocol
+/// member named `word`, or (`word` -1) an operator.
+fn user_declares(word: I32) Bool {
+    for (0 ..< decl_kind.len()) |d| {
+        let node = decl_node[d];
+        if node >= 0 and file_std[file_of_token(node_first[node])] == 0
+            and (decl_is(d, Decl.Fn) or decl_is(d, Decl.Field) or decl_is(d, Decl.ProtoMember)) {
+            if word < 0 { if is_kind(node, Node.Op_decl) { return true; }; }
+            else if decl_name[d] == word { return true; };
+        };
+    };
+    false;
+}
+
+/// @pure_flags's entry `i`.
+fn pure_flag(i: I32) Bool {
     if pure_words.len() == 0 {
         for (["to_i32", "to_u32", "to_i64", "to_u64", "to_f32", "to_f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)); };
+        pure_words.push(known_word(Known.ToStr));
+        for (0 ..< pure_words.len()) |j| { pure_flags.push(if user_declares(pure_words[j]) { 1; } else { 0; }); };
+        pure_flags.push(if user_declares(-1) { 1; } else { 0; });
     };
-    for (0 ..< pure_words.len()) |i| { if pure_words[i] == word { return true; }; };
+    pure_flags[i] == 1;
+}
+
+/// Whether the program declares an operator of its own.
+fn user_operators() Bool {
+    pure_flag(0);
+    pure_flag(pure_flags.len() - 1);
+}
+
+/// Whether a template's holes may call the program's own `to_str`.
+fn user_to_str() Bool {
+    pure_flag(0);
+    pure_flag(pure_words.len() - 1);
+}
+
+/// A method that only reads: std's conversions and reads, when the program
+/// declares nothing of the same name.
+fn pure_method(word: I32) Bool {
+    pure_flag(0);
+    for (0 ..< pure_words.len() - 1) |i| { if pure_words[i] == word { return not pure_flag(i); }; };
+    false;
+}
+
+/// Whether a stage's parts may trap or run without end: an index, a
+/// division, a call, an unwrap, an assertion, a loop, a match.
+fn stage_may_trap(stage: I32) Bool {
+    let part = next_sibling(first_child(stage));
+    while (part >= 0) {
+        if may_trap(part) { return true; };
+        part = next_sibling(part);
+    };
+    false;
+}
+
+fn may_trap(node: I32) Bool {
+    let kind = node_kind[node];
+    if kind == Node.Index_expr.to_i32() or kind == Node.Slice_expr.to_i32() or kind == Node.Call_expr.to_i32()
+        or kind == Node.Promote_expr.to_i32() or kind == Node.Assert_expr.to_i32() or kind == Node.Fatal_expr.to_i32()
+        or kind == Node.While_expr.to_i32() or kind == Node.For_expr.to_i32() or kind == Node.Loop_match_expr.to_i32()
+        or kind == Node.Match_expr.to_i32() or kind == Node.Alt_expr.to_i32() or kind == Node.Try_expr.to_i32()
+        or kind == Node.Template_string.to_i32() {
+        return true;
+    };
+    if kind == Node.Binary_expr.to_i32() {
+        let w = operator_word(token_after(first_child(node)));
+        if w == known_word(Known.Div) or w == known_word(Known.Rem) { return true; };
+    };
+    if kind == Node.Assign_expr.to_i32() {
+        let op = tok_kind[token_after(first_child(node))];
+        if op == Tok.SlashEq.to_i32() or op == Tok.PercentEq.to_i32() { return true; };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        if may_trap(c) { return true; };
+        c = next_sibling(c);
+    };
     false;
 }
 
@@ -305,14 +436,20 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     // (A DSL's splice may hold the stages before: `xs filter … ` then `each`.)
     // `(xs … collect(T)) …` whose inner stages cannot tell is one pipeline,
     // as in stage 0: the array is never made.
+    // Only when the consuming stages are pure too, and bisect, which reads
+    // its source at random, never.
     let n = 0;
     let input = node;
+    let pure = iterator_op(node) != Kw.Bisect.to_i32();
+    let strict = false;
     while (true) {
         while (is_kind(input, Node.Iterator_expr)) {
             n += 1;
+            if not pure_stage(input) { pure = false; };
+            if stops_early(iterator_op(input)) or stage_may_trap(input) { strict = true; };
             input = past_splices(first_child(input));
         };
-        let inner = fusable_collect(input);
+        let inner = if pure { fusable_collect(input, strict); } else { -1; };
         if inner < 0 { break; };
         input = past_splices(first_child(inner));
     };
@@ -327,7 +464,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     let s = node;
     let k = n - 1;
     while (k >= 0) {
-        if not is_kind(s, Node.Iterator_expr) { s = past_splices(first_child(fusable_collect(s))); };
+        if not is_kind(s, Node.Iterator_expr) { s = past_splices(first_child(fusable_collect(s, false))); };
         st_node[first_stage + k] = s;
         st_op[first_stage + k] = iterator_op(s);
         s = past_splices(first_child(s));
@@ -357,22 +494,20 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let m = w_mark();
     let p = Pipe {
         first_stage: first_stage, count: n, first: 0, range: is_kind(input, Node.Range_expr), source: -1,
-        lo: new_local(vt_i32), lo_zero: false, hi: new_local(vt_i32), stop: -1, stop_at: -1, result: -1, result_type: ty_void(),
+        lo: -1, lo_zero: false, hi: -1, stop: -1, stop_at: -1, result: -1, result_type: ty_void(),
         finish: -1, setup_start: iter_setup.len(), cleanup_start: iter_cleanup.len(), replay: false,
         skip_loop: false, bounded: false, elem: prelude(Prelude.I32),
     };
     let i32_t = prelude(Prelude.I32);
-    // The source: lo = a; hi = b (+ 1); if hi < lo { hi = lo }, or the array and its length.
+    // The source: a range's bounds, or the array and its length.
     if p.range {
-        ls(p.hi, range_bounds(input, p.lo, cx));
-        let mi = w_mark();
-        lg(p.hi);
-        lg(p.lo);
-        w_i32_op(i32_lt_s, mi);
-        let mt = w_mark();
-        copy_local(p.hi, p.lo);
-        end_if(mi, mt);
+        if not range_source(p, input, cx) {
+            w_stack.resize(m);
+            return error_value();
+        };
     } else {
+        p.lo = new_local(vt_i32);
+        p.hi = new_local(vt_i32);
         let ms = w_mark();
         let at = check_expr(input, -1, cx);
         if not is_array_type(at) {
@@ -422,9 +557,9 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         iter_setup.push(w_pop());
     };
     // The loop body, from the first stage on; the stages add their setup and cleanup.
-    let value = new_local(if p.range { vt_i32; } else { repr(p.elem); });
-    let vtype = if p.range { i32_t; } else { p.elem; };
-    let index = new_local(vt_i32);
+    let value = new_local(repr(p.elem));
+    let vtype = p.elem;
+    let index = new_local(cur_locals[p.lo]);
     // In a stage's body, break leaves the loop and continue goes on to the next value.
     let brk = new_label();
     let next = new_label();
@@ -447,22 +582,53 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     rt;
 }
 
-/// A range's bounds, as I32s: `lo = a`, then `b` (plus one, for `a ... b`)
-/// on the stack since the mark returned.
-fn range_bounds(range: I32, lo: I32, cx: Cx) I32 {
-    let i32_t = prelude(Prelude.I32);
-    let a = first_child(range);
-    let b = last_child(range);
-    let ma = w_mark();
-    coerce(check_expr(a, i32_t, cx), i32_t, a);
-    ls(lo, ma);
-    let mb = w_mark();
-    coerce(check_expr(b, i32_t, cx), i32_t, b);
-    if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
-        w_i32(1);
-        w_i32_op(i32_add, mb);
+/// A range `(a ..< b)` or `(a ... b)` of I32, U32, I64, or U64 as a
+/// pipeline's source: `lo = a; hi = b`, as I64s; `hi = lo` when it is empty,
+/// else (for `...`) `hi += 1`, which past I64's (or U64's) greatest wraps:
+/// the loop runs until `index == hi`. Its values' type is the range's.
+/// False after reporting another type.
+fn range_source(p: Pipe, input: I32, cx: Cx) Bool {
+    let a = first_child(input);
+    let b = last_child(input);
+    // Its type as `for` finds it: a's, unless a is a literal.
+    let t = if is_number_literal(a) and not is_number_literal(b) { type_only(b, -1, cx); } else { type_only(a, -1, cx); };
+    if not (t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)) {
+        if not ty_is(t, Ty.Error) { report2(Diag.IteratorSource, input, -1, t, 4); };
+        return false;
     };
-    mb;
+    p.elem = t;
+    p.lo = new_local(vt_i64);
+    p.hi = new_local(vt_i64);
+    let to_wide = if t == prelude(Prelude.I32) { i64_extend_i32_s; } else { i64_extend_i32_u; };
+    let ma = w_mark();
+    coerce(check_expr(a, t, cx), t, a);
+    if repr(t) == vt_i32 { plain(to_wide, vt_i64, ma); };
+    ls(p.lo, ma);
+    let mb = w_mark();
+    coerce(check_expr(b, t, cx), t, b);
+    if repr(t) == vt_i32 { plain(to_wide, vt_i64, mb); };
+    ls(p.hi, mb);
+    let inclusive = tok_kind[token_after(a)] == Tok.DotDotDot.to_i32();
+    // if hi < lo (hi <= lo for ..<) { hi = lo } [else { hi += 1 }]
+    let mi = w_mark();
+    lg(p.hi);
+    lg(p.lo);
+    let unsigned = t == prelude(Prelude.U64);
+    plain(if inclusive { if unsigned { i64_lt_u; } else { i64_lt_s; }; } else { if unsigned { i64_le_u; } else { i64_le_s; }; }, vt_i32, mi);
+    let mt = w_mark();
+    copy_local(p.hi, p.lo);
+    if inclusive {
+        let me = else_begin(mt);
+        let m1 = w_mark();
+        lg(p.hi);
+        w_leaf(Op.I64Const, vt_i64, 1, 0);
+        plain(i64_add, vt_i64, m1);
+        ls(p.hi, m1);
+        end_if(mi, me);
+    } else {
+        end_if(mi, mt);
+    };
+    true;
 }
 
 /// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
@@ -472,14 +638,31 @@ fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     if p.lo_zero { set_i32(index, 0); } else { copy_local(index, p.lo); };
     let mb = w_mark();
     let lp = WLoop { brk: brk, top: top, mb: mb, ml: mb };
-    // while (i < hi and not stop)
+    // while (i < hi and not stop) (a range's: i != hi)
     lg(index);
     lg(p.hi);
-    exit_at_end(p, lp, mb);
+    if p.range {
+        plain(i64_eq, vt_i32, mb);
+        br_if(lp.brk, mb);
+        exit_if_stopped(p, lp.brk);
+    } else {
+        exit_at_end(p, lp, mb);
+    };
     let mv = w_mark();
-    if p.range { lg(index); } else { array_get(p.source, index); };
-    ls(value, mv);
-    incr(index);
+    if p.range {
+        lg(index);
+        if repr(p.elem) == vt_i32 { plain(i32_wrap_i64, vt_i32, mv); };
+        ls(value, mv);
+        let mi = w_mark();
+        lg(index);
+        w_leaf(Op.I64Const, vt_i64, 1, 0);
+        plain(i64_add, vt_i64, mi);
+        ls(index, mi);
+    } else {
+        array_get(p.source, index);
+        ls(value, mv);
+        incr(index);
+    };
     w_push(body);
     loop_close(lp);
 }
@@ -490,6 +673,8 @@ fn narrow(p: Pipe, k: I32, cx: Cx) void {
     let limit = stage_local(p.first_stage + k, 0, vt_i32);
     let m = w_mark();
     param_i32(stage_node(p, k), limit, cx);
+    // (hi - lo compared unsigned: a range's may pass I32's greatest.)
+    let pos = cur_locals[p.lo];
     if stage_op(p, k) == Kw.Skip.to_i32() {
         // if limit > 0 { lo = if limit > hi - lo { hi } else { lo + limit } }
         let mi = w_mark();
@@ -498,18 +683,15 @@ fn narrow(p: Pipe, k: I32, cx: Cx) void {
         w_i32_op(i32_gt_s, mi);
         let mt = w_mark();
         lg(limit);
-        let md = w_mark();
         span(p);
-        w_i32_op(i32_gt_s, mt);
+        w_i32_op(i32_gt_u, mt);
         let a = w_mark();
         lg(p.hi);
-        w_node(Op.Seq, vt_i32, 0, 0, a);
+        w_node(Op.Seq, pos, 0, 0, a);
         let b = w_mark();
-        lg(p.lo);
-        lg(limit);
-        w_i32_op(i32_add, b);
-        w_node(Op.Seq, vt_i32, 0, 0, b);
-        w_node(Op.If, vt_i32, new_label(), 0, mt);
+        lo_plus(p, limit);
+        w_node(Op.Seq, pos, 0, 0, b);
+        w_node(Op.If, pos, new_label(), 0, mt);
         ls(p.lo, mt);
         end_if(mi, mt);
     } else {
@@ -524,11 +706,9 @@ fn narrow(p: Pipe, k: I32, cx: Cx) void {
         let me = else_begin(mt);
         lg(limit);
         span(p);
-        w_i32_op(i32_lt_s, me);
+        w_i32_op(i32_lt_u, me);
         let mt2 = w_mark();
-        lg(p.lo);
-        lg(limit);
-        w_i32_op(i32_add, mt2);
+        lo_plus(p, limit);
         ls(p.hi, mt2);
         end_if(me, mt2);
         end_if(mi, me);
@@ -878,8 +1058,13 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
 /// values go through the rest of the pipeline. A stop upstream of the chain
 /// does not stop the appended array.
 fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
-    let ot = other_array(p, k, cx);
+    let ot = other_array(p, k, array_of(vt), cx);
     if ot < 0 { return; };
+    // Its values go on as the pipeline's own.
+    if inst_arg(ty_inst(ot), 0) != vt {
+        mismatch(stage_param(stage_node(p, k)), array_of(vt), ot);
+        return;
+    };
     let other = stage_local(p.first_stage + k, 0, repr(ot));
     let item = new_local(repr(vt));
     copy_local(item, value);
@@ -916,9 +1101,9 @@ fn check_chain(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
 
 /// A stage's `(other)` array, in its stage local 0 (set in the setup):
 /// its type, or -1 when it is not an array (reported).
-fn other_array(p: Pipe, k: I32, cx: Cx) I32 {
+fn other_array(p: Pipe, k: I32, expect: I32, cx: Cx) I32 {
     let param = stage_param(stage_node(p, k));
-    let ot = type_only(param, -1, cx);
+    let ot = type_only(param, expect, cx);
     if not is_array_type(ot) {
         if not ty_is(ot, Ty.Error) {
             report2(Diag.IteratorSource, param, stage_op(p, k), ot, 1);
@@ -930,7 +1115,7 @@ fn other_array(p: Pipe, k: I32, cx: Cx) I32 {
     let other = stage_local(p.first_stage + k, 0, repr(ot));
     if not p.replay {
         let m = w_mark();
-        check_expr(param, -1, cx);
+        check_expr(param, expect, cx);
         ls(other, m);
         to_setup(p);
     };
@@ -1014,7 +1199,7 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
 /// shorter. As the first stage it narrows the loop; later, it stops it.
 fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let slot = p.first_stage + k;
-    let ot = other_array(p, k, cx);
+    let ot = other_array(p, k, -1, cx);
     if ot < 0 { return; };
     let other = stage_local(slot, 0, repr(ot));
     let et = inst_arg(ty_inst(ot), 0);
@@ -1023,14 +1208,16 @@ fn check_zip(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
         let ms = w_mark();
         if first {
             // if other.len() < hi - lo { hi = lo + other.len() }
+            let n = new_local(vt_i32);
+            let mn = w_mark();
+            len_of(other);
+            ls(n, mn);
             let mi = w_mark();
-            len_of(other);
+            lg(n);
             span(p);
-            w_i32_op(i32_lt_s, mi);
+            w_i32_op(i32_lt_u, mi);
             let mt = w_mark();
-            lg(p.lo);
-            len_of(other);
-            w_i32_op(i32_add, mt);
+            lo_plus(p, n);
             ls(p.hi, mt);
             end_if(mi, mt);
         } else {
@@ -1119,6 +1306,12 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     if op == Kw.Each.to_i32() {
         p.result_type = ty_void();
         discard(stage_body(p, k, one(value), one(vt), 1, ty_void(), cx));
+        return;
+    };
+    if (op == Kw.Sum.to_i32() or op == Kw.Product.to_i32() or op == Kw.Fast_sum.to_i32()) and not is_numeric(vt) {
+        // Only a number has a 0 and a 1 to start from.
+        if not ty_is(vt, Ty.Error) { report2(Diag.IteratorSource, node, op, vt, 5); };
+        p.result_type = error_value();
         return;
     };
     if op == Kw.Sum.to_i32() or op == Kw.Product.to_i32() {
@@ -2480,7 +2673,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         seq_void(mw);
         to_setup(p);
     };
-    let direct = k == p.first and not p.range;
+    // (The source's own array, when its elements are of the type written.)
+    let direct = k == p.first and not p.range and et == vt;
     let data = -1;
     let count = new_local(vt_i32);
     let base = -1;
@@ -2603,6 +2797,12 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
         report2(Diag.IteratorSource, node, -1, -1, 3);
         return error_value();
     };
+    // Its value, and optionally its index.
+    let names = child_count(stage_capture(node));
+    if names < 1 or names > 2 {
+        report2(Diag.IteratorCaptures, node, Kw.Bisect.to_i32(), 1, -1);
+        return error_value();
+    };
     let i32_t = prelude(Prelude.I32);
     let m = w_mark();
     let range = is_kind(input, Node.Range_expr);
@@ -2611,18 +2811,54 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     let count = new_local(vt_i32);
     let et = i32_t;
     if range {
-        // count = b - a, at least 0
-        let mb = range_bounds(input, start, cx);
+        // count = b - a (+ 1), as I64s: at least 0, at most I32's greatest
+        let a = first_child(input);
+        let b = last_child(input);
+        let t = if is_number_literal(a) and not is_number_literal(b) { type_only(b, -1, cx); } else { type_only(a, -1, cx); };
+        if t != i32_t {
+            if not ty_is(t, Ty.Error) { report2(Diag.IteratorSource, input, -1, t, 6); };
+            w_stack.resize(m);
+            return error_value();
+        };
+        let ma = w_mark();
+        coerce(check_expr(a, i32_t, cx), i32_t, a);
+        ls(start, ma);
+        let wide = new_local(vt_i64);
+        let mb = w_mark();
+        coerce(check_expr(b, i32_t, cx), i32_t, b);
+        plain(i64_extend_i32_s, vt_i64, mb);
         lg(start);
-        w_i32_op(i32_sub, mb);
-        ls(count, mb);
+        plain(i64_extend_i32_s, vt_i64, w_mark() - 1);
+        plain(i64_sub, vt_i64, mb);
+        if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
+            w_leaf(Op.I64Const, vt_i64, 1, 0);
+            plain(i64_add, vt_i64, mb);
+        };
+        ls(wide, mb);
+        let mc = w_mark();
         let mi = w_mark();
-        lg(count);
-        w_i32(0);
-        w_i32_op(i32_lt_s, mi);
+        lg(wide);
+        w_leaf(Op.I64Const, vt_i64, 0, 0);
+        plain(i64_lt_s, vt_i32, mi);
         let mt = w_mark();
-        set_i32(count, 0);
-        end_if(mi, mt);
+        w_i32(0);
+        w_node(Op.Seq, vt_i32, 0, 0, mt);
+        let me = w_mark();
+        let mj = w_mark();
+        lg(wide);
+        w_leaf(Op.I64Const, vt_i64, 2147483647, 0);
+        plain(i64_gt_s, vt_i32, mj);
+        let mt2 = w_mark();
+        w_i32(2147483647);
+        w_node(Op.Seq, vt_i32, 0, 0, mt2);
+        let me2 = w_mark();
+        lg(wide);
+        plain(i32_wrap_i64, vt_i32, me2);
+        w_node(Op.Seq, vt_i32, 0, 0, me2);
+        w_node(Op.If, vt_i32, new_label(), 0, mj);
+        w_node(Op.Seq, vt_i32, 0, 0, me);
+        w_node(Op.If, vt_i32, new_label(), 0, mi);
+        ls(count, mc);
     } else {
         let ms = w_mark();
         let at = check_expr(input, -1, cx);

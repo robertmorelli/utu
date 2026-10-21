@@ -359,7 +359,15 @@ fn save_function() void {
     for (0 ..< cur_locals.len()) |i| { saved_locals.push(cur_locals[i]); };
     saved_marks.push(cur_params[0]);
     saved_marks.push(next_label[0]);
-    saved_marks.push(saved_loops.len());
+    saved_marks.push(hide_loops());
+    cur_locals.clear();
+    next_label[0] = 0;
+}
+
+/// Set the loops aside, so that none is in reach; where they went in
+/// @saved_loops, for @show_loops.
+fn hide_loops() I32 {
+    let at = saved_loops.len();
     for (0 ..< loop_break.len()) |i| {
         saved_loops.push(loop_break[i]);
         saved_loops.push(loop_continue[i]);
@@ -368,9 +376,24 @@ fn save_function() void {
         saved_loops.push(loop_defers[i]);
         saved_loops.push(loop_break_defers[i]);
     };
-    cur_locals.clear();
     clear_loops();
-    next_label[0] = 0;
+    at;
+}
+
+/// Bring back the loops @hide_loops set aside at `at`.
+fn show_loops(at: I32) void {
+    clear_loops();
+    let i = at;
+    while (i < saved_loops.len()) {
+        loop_break.push(saved_loops[i]);
+        loop_continue.push(saved_loops[i + 1]);
+        loop_state.push(saved_loops[i + 2]);
+        loop_state_type.push(saved_loops[i + 3]);
+        loop_defers.push(saved_loops[i + 4]);
+        loop_break_defers.push(saved_loops[i + 5]);
+        i += 6;
+    };
+    saved_loops.resize(at);
 }
 
 /// Bring back what @save_function set aside.
@@ -387,18 +410,7 @@ fn restore_function() void {
     saved_locals.resize(locals_at);
     cur_params[0] = params;
     next_label[0] = label;
-    clear_loops();
-    let i = loops_at;
-    while (i < saved_loops.len()) {
-        loop_break.push(saved_loops[i]);
-        loop_continue.push(saved_loops[i + 1]);
-        loop_state.push(saved_loops[i + 2]);
-        loop_state_type.push(saved_loops[i + 3]);
-        loop_defers.push(saved_loops[i + 4]);
-        loop_break_defers.push(saved_loops[i + 5]);
-        i += 6;
-    };
-    saved_loops.resize(loops_at);
+    show_loops(loops_at);
 }
 
 //! = Closure literals

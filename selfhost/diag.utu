@@ -208,7 +208,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.NonExhaustive { return "non-exhaustive-match"; };
     if k == Diag.InvalidForSource or k == Diag.GeneratorRecursion or k == Diag.YieldOutside or k == Diag.GeneratorReturnValue
         or k == Diag.GeneratorCall or k == Diag.YieldInClosure or k == Diag.AwaitForSource or k == Diag.AwaitForCapture or k == Diag.GeneratorPassThrough
-        or k == Diag.GeneratorArity or k == Diag.PruneOutside or k == Diag.PruneInClosure { return "invalid-for-source"; };
+        or k == Diag.GeneratorArity or k == Diag.PruneOutside or k == Diag.PruneInClosure
+        or k == Diag.GeneratorMethod { return "invalid-for-source"; };
     if k == Diag.IteratorUnfinished or k == Diag.IteratorCaptures or k == Diag.IteratorTerminalInside or k == Diag.IteratorSource { return "invalid-iterator-usage"; };
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
     if k == Diag.EntrySurface { return "entry-surface-conflict"; };
@@ -448,6 +449,7 @@ fn diag_text(i: I32) Str {
         Diag.ForeignNotArray => type_text(a) + " is not an array",
         Diag.ForeignOverload => "No overload takes " + int_text(a),
         Diag.PruneInClosure => "prune in a closure",
+        Diag.GeneratorMethod => "A method cannot be a generator",
         Diag.PruneOutside => "prune outside a recursive generator loop",
         Diag.GeneratorPassThrough => w + " passes its values straight through",
         Diag.GeneratorArity => w + " takes " + int_text(a) + ", given " + int_text(b),
@@ -511,7 +513,11 @@ fn diag_text(i: I32) Str {
             "alt needs an enum";
         },
         Diag.IteratorSource => {
-            // b: 0 a pipeline's source, 1 a stage's other array, 2 a flat_map body, 3 bisect with other stages
+            // b: 0 a pipeline's source, 1 a stage's other array, 2 a flat_map body, 3 bisect with other stages,
+            // 4 a range of a type that cannot be counted, 5 sum of non-numbers, 6 bisect over a range not of I32
+            if b == 6 { return "bisect takes a range of I32, not " + type_text(a); };
+            if b == 5 { return word_text(word) + " needs numbers, not " + type_text(a); };
+            if b == 4 { return "Cannot pipe a range of " + type_text(a); };
             if b == 3 { return "bisect must be the whole pipeline"; };
             if b == 2 { return "flat_map body gives " + type_text(a) + ", not an array"; };
             if b == 1 { return word_text(word) + " takes an array, not " + type_text(a); };

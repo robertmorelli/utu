@@ -1132,54 +1132,6 @@ ok
  7 │ }
 --- exit 1
 
-=== utu check examples/error_demo/control/84_let_of_void.utu
- ERROR  x would hold no value
-        void-let · examples/error_demo/control/84_let_of_void.utu:6:9
-
- 4 │
- 5 │ export main() I32 {
- 6 │     let x = log_nothing();
-   │         ━
-   │         ╰─ here
- 7 │     0;
- 8 │ }
---- exit 1
-
-=== utu check examples/error_demo/control/85_closure_captures_tuple.utu
- ERROR  A closure cannot capture tuple pair
-        tuple-let · examples/error_demo/control/85_closure_captures_tuple.utu:7:17
-
- 5 │ export main() I32 {
- 6 │     let pair = swap(3, 4);
- 7 │     let first = cl() I32 { let .{a, b} = pair; a; };
-   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │                 ╰─ here
- 8 │     first();
- 9 │ }
---- exit 1
-
-=== utu check examples/error_demo/control/86_int_pattern_on_int_enum.utu
- ERROR  0 cannot match Level
-        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:15
-
- 6 │
- 7 │ fn label(l: Level) I32 {
- 8 │     match l { 0 => 10, 1 => 20, };
-   │               ━━━━━━━━
-   │               ╰─ here
- 9 │ }
-
- ERROR  1 cannot match Level
-        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:24
-
- 6 │
- 7 │ fn label(l: Level) I32 {
- 8 │     match l { 0 => 10, 1 => 20, };
-   │                        ━━━━━━━━
-   │                        ╰─ here
- 9 │ }
---- exit 1
-
 === utu check examples/error_demo/iterators/01_unfinished_map.utu
  ERROR  Unfinished pipeline: map
         iterator-unfinished · examples/error_demo/iterators/01_unfinished_map.utu:5:19
@@ -1304,6 +1256,16 @@ ok
    │                                         ╰─ ends here
  6 │     sorted[0];
  7 │ }
+
+ ERROR  No [] for void
+        unknown-operator · examples/error_demo/iterators/09_terminal_collect_then_sort.utu:6:5
+
+ 4 │     let xs = [3, 1, 2];
+ 5 │     let sorted = xs map |n| { n * 10; } collect(I32) sort(I32) |a, b| { a < b; };
+ 6 │     sorted[0];
+   │     ━━━━━━━━━
+   │     ╰─ void
+ 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/10_terminal_each_then_sum.utu
@@ -1376,6 +1338,16 @@ ok
    │                  ╰─ here
  5 │     sorted[0];
  6 │ }
+
+ ERROR  No [] for void
+        unknown-operator · examples/error_demo/iterators/14_captures_sort_one.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let sorted = [3, 1, 2] sort(I32) |a| { a; };
+ 5 │     sorted[0];
+   │     ━━━━━━━━━
+   │     ╰─ void
+ 6 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/15_captures_sort_three.utu
@@ -1388,6 +1360,16 @@ ok
    │                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                  ╰─ here
  5 │     sorted[0];
+ 6 │ }
+
+ ERROR  No [] for void
+        unknown-operator · examples/error_demo/iterators/15_captures_sort_three.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let sorted = [3, 1, 2] sort(I32) |a, b, i| { a < b; };
+ 5 │     sorted[0];
+   │     ━━━━━━━━━
+   │     ╰─ void
  6 │ }
 --- exit 1
 
@@ -1599,44 +1581,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/30_source_range_float.utu
- ERROR  Expected F64, got I32
-        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:5
+ ERROR  Cannot pipe a range of F64
+        iterator-source · examples/error_demo/iterators/30_source_range_float.utu:4:5
 
  2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
  3 │ export main() F64 {
  4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ I32
- 5 │ }
-
- ERROR  Expected I32, got F64
-        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:6
-
- 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
- 3 │ export main() F64 {
- 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │      ━━━
-   │      ╰─ F64
- 5 │ }
-
- ERROR  Expected I32, got F64
-        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:14
-
- 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
- 3 │ export main() F64 {
- 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │              ━━━
-   │              ╰─ F64
- 5 │ }
-
- ERROR  Expected I32, got F64
-        type-mismatch · examples/error_demo/iterators/30_source_range_float.utu:4:33
-
- 2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
- 3 │ export main() F64 {
- 4 │     (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
-   │                                 ━━━
-   │                                 ╰─ F64
+   │     ━━━━━━━━━━━━━
+   │     ╰─ here
  5 │ }
 --- exit 1
 
@@ -2311,6 +2263,92 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/80_break_in_generator_body.utu
+ ERROR  break outside a loop
+        invalid-break · examples/error_demo/iterators/80_break_in_generator_body.utu:5:5
+
+ 3 │ fn ones() yield I32 {
+ 4 │     yield 1;
+ 5 │     break;
+   │     ━━━━━
+   │     ╰─ here
+ 6 │     yield 2;
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/81_chain_other_element_type.utu
+ ERROR  Expected I32, got Str
+        type-mismatch · examples/error_demo/iterators/81_chain_other_element_type.utu:4:22
+
+ 2 │ // Expect: Expected I32, got Str (the chained array's elements continue the pipeline)
+ 3 │ export main() I32 {
+ 4 │     [1, 2, 3] chain(["a"]) count;
+   │                      ━━━
+   │                      ╰─ Str
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/82_windows_wrong_element_type.utu
+ ERROR  Expected Str, got I32
+        type-mismatch · examples/error_demo/iterators/82_windows_wrong_element_type.utu:5:13
+
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3];
+ 5 │     let w = xs windows(Str, 2);
+   │             ━━━━━━━━━━━━━━━━━━
+   │             ╰─ I32
+ 6 │     w.len();
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/83_sum_of_strings.utu
+ ERROR  sum needs numbers, not Str
+        iterator-source · examples/error_demo/iterators/83_sum_of_strings.utu:4:5
+
+ 2 │ // Expect: sum needs numbers, not Str (use fold("") to join)
+ 3 │ export main() Str {
+ 4 │     ["a", "b"] sum;
+   │     ━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/84_bisect_extra_names.utu
+ ERROR  bisect takes 1 name and an optional index
+        iterator-captures · examples/error_demo/iterators/84_bisect_extra_names.utu:4:5
+
+ 2 │ // Expect: bisect takes 1 name and an optional index
+ 3 │ export main() I32 {
+ 4 │     [1, 2, 3] bisect |v, i, j| { v < 2; };
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/85_generator_method.utu
+ ERROR  A method cannot be a generator
+        generator-method · examples/error_demo/iterators/85_generator_method.utu:7:27
+
+ 5 │         | items: Array[I32]
+ 6 │     fn &.new(xs: Array[I32]) & { &{ items: xs }; }
+ 7 │     fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
+   │                           ━━━━━━━━━
+   │                           ╰─ here
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/86_bisect_over_i64_range.utu
+ ERROR  bisect takes a range of I32, not I64
+        iterator-source · examples/error_demo/iterators/86_bisect_over_i64_range.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let n: I64 = 10;
+ 5 │     (0 ..< n) bisect |v| { v < 4; };
+   │     ━━━━━━━━━
+   │     ╰─ here
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/names/01_unknown_variable_typo.utu
  ERROR  Unknown variable lengh
         unknown-variable · examples/error_demo/names/01_unknown_variable_typo.utu:6:5
@@ -2696,6 +2734,20 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/26_unknown_variant_match.utu
+ ERROR  match misses Level.High
+        non-exhaustive · examples/error_demo/names/26_unknown_variant_match.utu:9:5
+
+ 7 │
+ 8 │ fn label(l: Level) Str {
+ 9 │     match l {
+10 │         Level.Low => "calm",
+11 │         Level.Mid => "busy",
+12 │         Level.Hgh => "on fire",
+13 │     };
+   │     ━
+   │     ╰─ no High
+14 │ }
+
  ERROR  Level has no variant Hgh
         unknown-variant · examples/error_demo/names/26_unknown_variant_match.utu:12:9
 
@@ -6233,8 +6285,6 @@ ok
    │                  ╰─ here
 10 │     second;
 11 │ }
-
-  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/80_optional_as_block_value.utu
@@ -6247,8 +6297,6 @@ ok
    │     ━━━━━━━━━━━━━━━
    │     ╰─ here
  9 │ }
-
-  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/81_optional_in_condition.utu
@@ -6262,8 +6310,6 @@ ok
    │        ╰─ here
  9 │     false;
 10 │ }
-
-  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/82_optional_return.utu
@@ -6276,8 +6322,6 @@ ok
    │            ━━━━━━━━━━━━━━━
    │            ╰─ here
  9 │ }
-
-  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/83_two_export_libs.utu
@@ -6458,36 +6502,6 @@ ok
    │       ╰─ unexpected
  4 │     n * 2;
  5 │ }
---- exit 1
-
-=== utu check examples/error_demo/syntax/95_optional_in_assert.utu
- ERROR  ?. only in a statement
-        optional-outside-statement · examples/error_demo/syntax/95_optional_in_assert.utu:9:12
-
- 7 │ export main() I32 {
- 8 │     let head = Node { count: 1, next: null };
- 9 │     assert head.next?.count == 1;
-   │            ━━━━━━━━━━━━━━━━
-   │            ╰─ here
-10 │     0;
-11 │ }
-
-  note  for a value, use promote
---- exit 1
-
-=== utu check examples/error_demo/syntax/96_optional_before_orelse.utu
- ERROR  ?. only in a statement
-        optional-outside-statement · examples/error_demo/syntax/96_optional_before_orelse.utu:10:14
-
- 8 │     let head = Node { name: "a", next: null };
- 9 │     let second = "none";
-10 │     second = head.next?.name orelse "default";
-   │              ━━━━━━━━━━━━━━━
-   │              ╰─ here
-11 │     second;
-12 │ }
-
-  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu

@@ -236,7 +236,9 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     let mb = w_mark();
     // The generator's own loops are its; the consumer's loops are not in reach.
     let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
+    let loops = hide_loops();
     discard(check_block(fn_body(gen), ty_void(), gcx));
+    show_loops(loops);
     w_node(Op.Block, vt_none, whole, 0, mb);
     end_expansion();
     bring_back(decls, saved);
@@ -266,7 +268,10 @@ fn expansion_of(node: I32) I32 {
 fn check_yield(node: I32, cx: Cx) I32 {
     let k = expansion_of(node);
     if k < 0 {
-        report(Diag.YieldOutside, node, -1);
+        // (A method's `yield T` is reported.)
+        let f = parent_of(node);
+        while (f >= 0 and not is_kind(f, Node.Fn_decl)) { f = parent_of(f); };
+        if f < 0 or not is_method_generator(f) { report(Diag.YieldOutside, node, -1); };
         return error_value();
     };
     let t = gen_type[k];
@@ -610,6 +615,16 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     let end_ = new_local(vt_i32);
     let fsp = new_local(vt_i32);
     let l = RecLoop { kind: kind, val: val, top: top, cur: cur, end_: end_, fsp: fsp, fcur: rec_new_array(vt_i32), fend: rec_new_array(vt_i32) };
+    // The loop may run again: each run starts from nothing.
+    let m0 = w_mark();
+    w_i32(0);
+    ls(top, m0);
+    let m0c = w_mark();
+    w_i32(0);
+    ls(cur, m0c);
+    let m0f = w_mark();
+    w_i32(0);
+    ls(fsp, m0f);
     let mk = w_mark();
     w_i32(1);
     rec_set(kind, top, mk);
@@ -713,7 +728,10 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     begin_expansion(frame, -1, -1, elem, cx, gen, r);
     let mb = w_mark();
     let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
+    // The generator's own loops are its; the consumer's loops are not in reach.
+    let loops = hide_loops();
     discard(check_block(fn_body(gen), ty_void(), gcx));
+    show_loops(loops);
     w_node(Op.Block, vt_none, frame, 0, mb);
     end_expansion();
     rec_kind.resize(r);

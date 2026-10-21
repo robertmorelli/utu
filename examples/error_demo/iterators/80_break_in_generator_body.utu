@@ -1,0 +1,13 @@
+// What: break at the top of a generator's body, outside any loop of its own
+// Expect: break outside a loop (a generator's body cannot leave its consumer's loop)
+fn ones() yield I32 {
+    yield 1;
+    break;
+    yield 2;
+}
+
+export main() I32 {
+    let total = 0;
+    for (0 ..< 3) |i| { for (ones()) |v| { total += v; }; };
+    total;
+}

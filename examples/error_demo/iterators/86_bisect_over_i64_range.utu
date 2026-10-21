@@ -1,0 +1,6 @@
+// What: bisect over a range of I64, whose position would not fit its I32 result
+// Expect: bisect takes a range of I32, not I64
+export main() I32 {
+    let n: I64 = 10;
+    (0 ..< n) bisect |v| { v < 4; };
+}
