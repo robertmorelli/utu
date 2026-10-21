@@ -325,6 +325,8 @@ fn diag_text(i: I32) Str {
         },
         Diag.TupleLet => {
             if not ty_is(a, Ty.Tuple) { return "let .{…} needs a tuple, got " + type_text(a); };
+            // b == 2: a closure captures a tuple
+            if b == 2 { return "A closure cannot capture tuple " + w; };
             "Tuple " + type_text(a) + " has " + int_text(vl_len[ty_a[a]]) + " values";
         },
         Diag.NotNullable => "Expected nullable, got " + type_text(a),
@@ -430,6 +432,7 @@ fn diag_text(i: I32) Str {
             if word < 0 { return "This closure returns void"; };
             w + " returns void";
         },
+        Diag.VoidLet => w + " would hold no value",
         Diag.ComptimeTrap => "@comptime " + w + " trapped: " + comptime_trap_text(a),
         Diag.FloatOutOfRange => pick(b == 1, "-", "") + node_text(node) + " does not fit " + type_text(a),
         Diag.EnumBase => "enum(" + w + ") is not an integer enum; use U8, I8, U16, I16, I32, or U32",

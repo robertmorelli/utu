@@ -170,6 +170,65 @@ export lib {
     checked++;
   }
 
+  // Control flow the self-hosted compiler once got wrong, the same in every build mode.
+  const control = await write(`struct N:
+    | next: ?N
+    | v: I32
+fn pair() .{I32, Str} { let k = 0; defer k = 1; .{2, "bb"}; }
+fn triple(c: Bool) .{F64, Str, I32} { let k = 0; defer k = 1; if c { return .{1.5, "x", 3}; }; .{2.5, "yy", 4}; }
+export lib {
+    // \`continue <state>\` runs the defers it leaves, as break does.
+    fn state_defers() I32 {
+        let log = 0;
+        loop match 0 { 0 => { defer log = log * 10 + 1; continue 1; }, 1 => { defer log = log * 10 + 2; break; }, ~> { break; }, };
+        loop match 0 { 0 => { for (0 ..< 3) |i| { defer log = log * 10 + 3; if i == 1 { continue 1; }; }; }, ~> { break; }, };
+        log;
+    }
+    // \`defer a?.b = v;\` runs only when a is there, as in a block.
+    fn optional_defer() I32 {
+        let b = N { next: null, v: 1 };
+        let a = N { next: b, v: 1 };
+        { defer a.next?.v = 9; defer b.next?.v = 5; };
+        b.v;
+    }
+    // A name bound to a value that never arrives.
+    fn never_let(c: I32) I32 { if c > 0 { let z = return 3; z; } else { 4; }; }
+    // Tuples past a defer, dropped whole, and held by one name.
+    fn tuples() I32 {
+        pair();
+        triple(true);
+        let .{a, b} = pair();
+        let held = triple(false);
+        held = if a > 0 { held; } else { triple(true); };
+        let .{x, y, z} = held;
+        a * 1000 + b.len() * 100 + y.len() * 10 + z + (x * 2.0).to_i32();
+    }
+    // An inclusive range through the type's largest value ends.
+    fn inclusive_max() I32 {
+        let c = 0;
+        for (2147483645 ... 2147483647) |i| { c += 1; if c > 9 { break; }; };
+        let d = 0;
+        let hi: I64 = 9223372036854775807;
+        for (hi - 1.to_i64() ... hi) |v| { d += 1; if d > 9 { break; }; };
+        let e = 0;
+        for ((-2).to_u32() ... (-1).to_u32()) |u| { e += 1; if e > 9 { break; }; };
+        c * 100 + d * 10 + e;
+    }
+    // A body that moves its count is not unrolled.
+    fn capture_write() I32 { let t = 0; for (0 ..< 8) |i| { t += i; i += 2; }; t; }
+}
+`);
+  const controlWant = { state_defers: 1233, optional_defer: 9, tuples: 2000 + 200 + 20 + 4 + 5, inclusive_max: 322, capture_write: 9 };
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, control, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    for (const [name, value] of Object.entries(controlWant)) assert.equal(exports[name](), value, `${mode}: ${name}`);
+    assert.equal(exports.never_let(1), 3, `${mode}: never_let`);
+    assert.equal(exports.never_let(0), 4, `${mode}: never_let`);
+    checked++;
+  }
+
   // Mistakes the self-hosted compiler reports, in its words.
   const mistakes = [
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
@@ -221,6 +280,16 @@ export lib {
     ['struct P:\n    | f: cl() I32\nfn P.f |p| () I32 { 2; }\nexport lib { fn run() I32 { 0; } }\n', 'P.f is both a field and a method'],
     ['proto Sh:\n    | area() I32\nfn Sh.area |x| () I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'Sh.area is already a protocol member'],
     ['enum Color:\n    | R\n    | G\nexport lib { fn run() I32 { let c = Color.R; 0; } }\n', 'Color.R is a type, not a value'],
+    // `?.` guards a call or an assignment, not a return, an assert, a jump, or a value inside one.
+    ...['if c { return a.next?.v; }; -1;', 'assert a.next?.v == 1; 0;', 'let x = 0; x = if a.next?.v == 1 { 5; } else { 6; }; x;',
+      'let s = "i"; s = a.next?.s orelse "d"; 0;', 'loop match 0 { 0 => { continue a.next?.v; }, ~> { break; }, }; 0;'].map(body =>
+      [`struct N:\n    | next: ?N\n    | v: I32\n    | s: ?Str\nfn f(a: N, c: Bool) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }\n`, '?. only in a statement']),
+    // A let of no value (it crashed the compiler).
+    ['fn nothing() void {}\nexport main() I32 { let x = nothing(); x; 0; }\n', 'x would hold no value'],
+    // A tuple bound to one name is its values, which a closure cannot hold.
+    ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 'A closure cannot capture tuple t'],
+    // An integer is no variant of an integer enum.
+    ['enum(U8) A:\n    | X\n    | Y\nexport main() I32 { match A.X { 0 => 10, 1 => 20, }; }\n', '0 cannot match A'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

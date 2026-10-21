@@ -1132,6 +1132,54 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/control/84_let_of_void.utu
+ ERROR  x would hold no value
+        void-let · examples/error_demo/control/84_let_of_void.utu:6:9
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let x = log_nothing();
+   │         ━
+   │         ╰─ here
+ 7 │     0;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/85_closure_captures_tuple.utu
+ ERROR  A closure cannot capture tuple pair
+        tuple-let · examples/error_demo/control/85_closure_captures_tuple.utu:7:17
+
+ 5 │ export main() I32 {
+ 6 │     let pair = swap(3, 4);
+ 7 │     let first = cl() I32 { let .{a, b} = pair; a; };
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                 ╰─ here
+ 8 │     first();
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/86_int_pattern_on_int_enum.utu
+ ERROR  0 cannot match Level
+        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:15
+
+ 6 │
+ 7 │ fn label(l: Level) I32 {
+ 8 │     match l { 0 => 10, 1 => 20, };
+   │               ━━━━━━━━
+   │               ╰─ here
+ 9 │ }
+
+ ERROR  1 cannot match Level
+        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:24
+
+ 6 │
+ 7 │ fn label(l: Level) I32 {
+ 8 │     match l { 0 => 10, 1 => 20, };
+   │                        ━━━━━━━━
+   │                        ╰─ here
+ 9 │ }
+--- exit 1
+
 === utu check examples/error_demo/iterators/01_unfinished_map.utu
  ERROR  Unfinished pipeline: map
         iterator-unfinished · examples/error_demo/iterators/01_unfinished_map.utu:5:19
@@ -1256,16 +1304,6 @@ ok
    │                                         ╰─ ends here
  6 │     sorted[0];
  7 │ }
-
- ERROR  No [] for void
-        unknown-operator · examples/error_demo/iterators/09_terminal_collect_then_sort.utu:6:5
-
- 4 │     let xs = [3, 1, 2];
- 5 │     let sorted = xs map |n| { n * 10; } collect(I32) sort(I32) |a, b| { a < b; };
- 6 │     sorted[0];
-   │     ━━━━━━━━━
-   │     ╰─ void
- 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/10_terminal_each_then_sum.utu
@@ -1338,16 +1376,6 @@ ok
    │                  ╰─ here
  5 │     sorted[0];
  6 │ }
-
- ERROR  No [] for void
-        unknown-operator · examples/error_demo/iterators/14_captures_sort_one.utu:5:5
-
- 3 │ export main() I32 {
- 4 │     let sorted = [3, 1, 2] sort(I32) |a| { a; };
- 5 │     sorted[0];
-   │     ━━━━━━━━━
-   │     ╰─ void
- 6 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/15_captures_sort_three.utu
@@ -1360,16 +1388,6 @@ ok
    │                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                  ╰─ here
  5 │     sorted[0];
- 6 │ }
-
- ERROR  No [] for void
-        unknown-operator · examples/error_demo/iterators/15_captures_sort_three.utu:5:5
-
- 3 │ export main() I32 {
- 4 │     let sorted = [3, 1, 2] sort(I32) |a, b, i| { a < b; };
- 5 │     sorted[0];
-   │     ━━━━━━━━━
-   │     ╰─ void
  6 │ }
 --- exit 1
 
@@ -2678,20 +2696,6 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/26_unknown_variant_match.utu
- ERROR  match misses Level.High
-        non-exhaustive · examples/error_demo/names/26_unknown_variant_match.utu:9:5
-
- 7 │
- 8 │ fn label(l: Level) Str {
- 9 │     match l {
-10 │         Level.Low => "calm",
-11 │         Level.Mid => "busy",
-12 │         Level.Hgh => "on fire",
-13 │     };
-   │     ━
-   │     ╰─ no High
-14 │ }
-
  ERROR  Level has no variant Hgh
         unknown-variant · examples/error_demo/names/26_unknown_variant_match.utu:12:9
 
@@ -3334,37 +3338,41 @@ ok
 
 === utu check examples/error_demo/names/74_recursive_struct.utu
  ERROR  Node contains itself; make the field nullable
-        recursive-type · examples/error_demo/names/74_recursive_struct.utu:5:7
+        recursive-type · examples/error_demo/names/74_recursive_struct.utu:3:1
 
+ 1 │ // What: a struct contains itself directly (a linked list node without ?)
+ 2 │ // Expect: Recursive type 'Node' must use a nullable or indirect field (write next: ?Node)
  3 │ struct Node:
  4 │     | value: I32
  5 │     | next: Node
-   │       ━━━━━━━━━━
-   │       ╰─ here
+   │     ━━━━━━━━━━━━
+   │     ╰─ here
  6 │
  7 │ export main() I32 {
 --- exit 1
 
 === utu check examples/error_demo/names/75_recursive_mutual.utu
  ERROR  Parent contains itself; make the field nullable
-        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:4:7
+        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:3:1
 
+ 1 │ // What: two structs contain each other directly
  2 │ // Expect: Recursive type 'Parent' must use a nullable or indirect field (Parent -> Child -> Parent)
  3 │ struct Parent:
  4 │     | child: Child
-   │       ━━━━━━━━━━━━
-   │       ╰─ here
+   │     ━━━━━━━━━━━━━━
+   │     ╰─ here
  5 │
  6 │ struct Child:
 
  ERROR  Child contains itself; make the field nullable
-        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:7:7
+        recursive-type · examples/error_demo/names/75_recursive_mutual.utu:6:1
 
+ 4 │     | child: Child
  5 │
  6 │ struct Child:
  7 │     | parent: Parent
-   │       ━━━━━━━━━━━━━━
-   │       ╰─ here
+   │     ━━━━━━━━━━━━━━━━
+   │     ╰─ here
  8 │
  9 │ export main() I32 {
 --- exit 1
@@ -3552,45 +3560,6 @@ ok
    │     ╰─ here
 18 │     fn total(n: I32) I32 { n * 2; }
 19 │ }
---- exit 1
-
-=== utu check examples/error_demo/names/91_field_and_method.utu
- ERROR  P.f is both a field and a method
-        member-clash · examples/error_demo/names/91_field_and_method.utu:6:6
-
- 4 │     | f: cl() I32
- 5 │
- 6 │ fn P.f |p| () I32 { 2; }
-   │      ━
-   │      ╰─ also a field
- 7 │
- 8 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/names/92_protocol_method_shadow.utu
- ERROR  Sh.area is already a protocol member
-        member-clash · examples/error_demo/names/92_protocol_method_shadow.utu:10:7
-
- 8 │
- 9 │ fn Sh[Sq].area |q| () I32 { q.s * q.s; }
-10 │ fn Sh.area |x| () I32 { 0; }
-   │       ━━━━
-   │       ╰─ also in the protocol
-11 │
-12 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/names/93_variant_as_value.utu
- ERROR  Color.R is a type, not a value
-        variant-not-value · examples/error_demo/names/93_variant_as_value.utu:8:13
-
- 6 │
- 7 │ export main() I32 {
- 8 │     let c = Color.R;
-   │             ━━━━━━━
-   │             ╰─ make one: R {…}
- 9 │     0;
-10 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/lazy_parts/widgets.utu
@@ -6264,6 +6233,8 @@ ok
    │                  ╰─ here
 10 │     second;
 11 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/80_optional_as_block_value.utu
@@ -6276,6 +6247,8 @@ ok
    │     ━━━━━━━━━━━━━━━
    │     ╰─ here
  9 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/81_optional_in_condition.utu
@@ -6289,6 +6262,8 @@ ok
    │        ╰─ here
  9 │     false;
 10 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/82_optional_return.utu
@@ -6301,6 +6276,8 @@ ok
    │            ━━━━━━━━━━━━━━━
    │            ╰─ here
  9 │ }
+
+  note  for a value, use promote
 --- exit 1
 
 === utu check examples/error_demo/syntax/83_two_export_libs.utu
@@ -6483,6 +6460,36 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/95_optional_in_assert.utu
+ ERROR  ?. only in a statement
+        optional-outside-statement · examples/error_demo/syntax/95_optional_in_assert.utu:9:12
+
+ 7 │ export main() I32 {
+ 8 │     let head = Node { count: 1, next: null };
+ 9 │     assert head.next?.count == 1;
+   │            ━━━━━━━━━━━━━━━━
+   │            ╰─ here
+10 │     0;
+11 │ }
+
+  note  for a value, use promote
+--- exit 1
+
+=== utu check examples/error_demo/syntax/96_optional_before_orelse.utu
+ ERROR  ?. only in a statement
+        optional-outside-statement · examples/error_demo/syntax/96_optional_before_orelse.utu:10:14
+
+ 8 │     let head = Node { name: "a", next: null };
+ 9 │     let second = "none";
+10 │     second = head.next?.name orelse "default";
+   │              ━━━━━━━━━━━━━━━
+   │              ╰─ here
+11 │     second;
+12 │ }
+
+  note  for a value, use promote
+--- exit 1
+
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu
  ERROR  Expected ';', got 'y'
         parse-error · examples/error_demo/syntax/lib/broken_shapes.utu:5:9
@@ -6618,96 +6625,6 @@ ok
    │              ╰─ F64
  6 │     total;
  7 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/100_new_default_str.utu
- ERROR  Str has no default: Array[Str].new(n, fill)
-        non-defaultable · examples/error_demo/types/100_new_default_str.utu:4:17
-
- 2 │ // Expect: Str has no default: Array[Str].new(n, fill)
- 3 │ export main() I32 {
- 4 │     let names = Array[Str].new_default(3);
-   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━
-   │                 ╰─ here
- 5 │     names.len();
- 6 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/101_nullable_distinct.utu
- ERROR  Id cannot be nullable
-        invalid-nullable-type · examples/error_demo/types/101_nullable_distinct.utu:6:12
-
- 4 │
- 5 │ export main() I32 {
- 6 │     let x: ?Id = null;
-   │            ━━━
-   │            ╰─ here
- 7 │     0;
- 8 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/102_nullable_generic_scalar.utu
- ERROR  I32 cannot be nullable
-        invalid-nullable-type · examples/error_demo/types/102_nullable_generic_scalar.utu:5:14
-
- 3 │ mod Box[T] {
- 4 │     struct &:
- 5 │         | v: ?T
-   │              ━━
-   │              ╰─ here
- 6 │     fn &.empty() & { &{ v: null }; }
- 7 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/103_generic_lists_protocol.utu
- ERROR  A generic type cannot list protocol Sh
-        proto-generic · examples/error_demo/types/103_generic_lists_protocol.utu:7:14
-
- 5 │
- 6 │ mod Box[T] {
- 7 │     struct &[Sh]:
-   │              ━━
-   │              ╰─ on a generic type
- 8 │         | v: T
- 9 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/104_proto_get_only_write.utu
- ERROR  Sh.size is get-only
-        proto-access · examples/error_demo/types/104_proto_get_only_write.utu:11:5
-
- 9 │ export main() I32 {
-10 │     let s: Sh = Sq { size: 2 };
-11 │     s.size = 5;
-   │     ━━━━━━
-   │     ╰─ get-only
-12 │     0;
-13 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/105_proto_set_only_read.utu
- ERROR  Sh.size is set-only
-        proto-access · examples/error_demo/types/105_proto_set_only_read.utu:11:5
-
- 9 │ export main() I32 {
-10 │     let s: Sh = Sq { size: 2 };
-11 │     s.size;
-   │     ━━━━━━
-   │     ╰─ set-only
-12 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/106_closure_self_untyped.utu
- ERROR  f needs a type annotation to call itself
-        self-untyped · examples/error_demo/types/106_closure_self_untyped.utu:4:20
-
- 2 │ // Expect: f needs a type annotation to call itself
- 3 │ export main() I32 {
- 4 │     let f = cl() { f(); };
-   │                    ━
-   │                    ╰─ type not known yet
- 5 │     f();
- 6 │     1;
 --- exit 1
 
 === utu check examples/error_demo/types/10_reassign_local.utu

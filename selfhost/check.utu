@@ -322,6 +322,16 @@ fn defers_after_value(vt: I32, m: I32, from: I32, cx: Cx) void {
         run_defers(from, cx);
         return;
     };
+    if vt >= vt_tuple {
+        // Each value of a tuple waits in its own local (the last on top).
+        let list = vt - vt_tuple;
+        let first = new_local(vl_item(list, 0));
+        for (1 ..< vl_len[list]) |i| { new_local(vl_item(list, i)); };
+        set_tuple(first, list, m);
+        run_defers(from, cx);
+        for (0 ..< vl_len[list]) |i| { w_leaf(Op.LocalGet, vl_item(list, i), first + i, 0); };
+        return;
+    };
     let local = new_local(vt);
     w_node(Op.LocalSet, vt_none, local, 0, m);
     run_defers(from, cx);
@@ -336,6 +346,12 @@ fn drop_value(t: I32) void {
     let vt = repr(t);
     if vt == vt_none or vt == vt_unreachable or ty_is(t, Ty.Error) { return; };
     let m = w_mark() - 1;
+    if vt >= vt_tuple {
+        // A tuple is several values: a drop each.
+        for (0 ..< vl_len[vt - vt_tuple]) |_i| { w_leaf(Op.Drop, vt_none, 0, 0); };
+        w_node(Op.Seq, vt_none, 0, 0, m);
+        return;
+    };
     w_node(Op.Drop, vt_none, 0, 0, m);
 }
 
@@ -1069,8 +1085,16 @@ fn check_let(node: I32, cx: Cx) I32 {
         t = ty_error();
     };
     decl_ty[decl] = t;
-    if ty_is(t, Ty.Void) or ty_is(t, Ty.Never) {
-        // Nothing to hold: the expression runs, and the name has no value.
+    if ty_is(t, Ty.Void) {
+        // (After a mistake in the value, its being void is no news; a
+        // defer as a value is validation's to report.)
+        if diag_kind.len() == before and not is_kind(init, Node.Defer_expr) { report(Diag.VoidLet, name, word_of(name)); };
+        decl_ty[decl] = ty_error();
+        return error_since(m);
+    };
+    if ty_is(t, Ty.Never) {
+        // Nothing to hold: the expression does not finish, and a read of
+        // the name never runs (see @read_value).
         w_node(Op.Seq, repr(t), 0, 0, m);
         return ty_void();
     };

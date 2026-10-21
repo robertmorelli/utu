@@ -232,6 +232,15 @@ fn box_type(vt: I32) I32 {
 /// local, or in a new box its local holds.
 fn bind_value(d: I32, t: I32, m: I32) void {
     let vt = repr(t);
+    if vt >= vt_tuple {
+        // A tuple: a local each, in a row from decl_local.
+        let list = vt - vt_tuple;
+        let first = new_local(vl_item(list, 0));
+        for (1 ..< vl_len[list]) |i| { new_local(vl_item(list, i)); };
+        decl_local[d] = first;
+        set_tuple(first, list, m);
+        return;
+    };
     if decl_boxed[d] == 1 {
         let h = box_type(vt);
         w_node(Op.StructNew, vt_ref(h, false), h, 0, m);
@@ -260,9 +269,30 @@ fn bind_local(d: I32, t: I32, local: I32) void {
     bind_value(d, t, m);
 }
 
+/// The tuple on the stack (since `m`, of value types `list`) into the locals
+/// from `first` on (the last on top).
+fn set_tuple(first: I32, list: I32, m: I32) void {
+    let k = vl_len[list] - 1;
+    while (k >= 0) {
+        w_leaf(Op.LocalSet, vt_none, first + k, 0);
+        k -= 1;
+    };
+    w_node(Op.Seq, vt_none, 0, 0, m);
+}
+
 /// Push the value of declaration `d` (of type `t`).
 fn read_value(d: I32, t: I32) void {
     let vt = repr(t);
+    // A name bound to a value that never arrives (`let z = fatal;`).
+    if vt == vt_unreachable {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    if vt >= vt_tuple {
+        let list = vt - vt_tuple;
+        for (0 ..< vl_len[list]) |i| { w_leaf(Op.LocalGet, vl_item(list, i), decl_local[d] + i, 0); };
+        return;
+    };
     if decl_boxed[d] == 1 {
         let h = box_type(vt);
         let m = w_mark();
@@ -276,13 +306,15 @@ fn read_value(d: I32, t: I32) void {
 /// A write to `d` begins: a box is pushed first, its value to follow (see
 /// @write_end).
 fn write_begin(d: I32, t: I32) void {
-    if decl_boxed[d] == 1 { w_leaf(Op.LocalGet, vt_ref(box_type(repr(t)), true), decl_local[d], 0); };
+    if decl_boxed[d] == 1 and repr(t) < vt_tuple { w_leaf(Op.LocalGet, vt_ref(box_type(repr(t)), true), decl_local[d], 0); };
 }
 
 /// A write to `d` ends: the value on the stack since `m` goes into its box
 /// (pushed by @write_begin) or its local.
 fn write_end(d: I32, t: I32, m: I32) void {
-    if decl_boxed[d] == 1 {
+    if repr(t) >= vt_tuple {
+        set_tuple(decl_local[d], repr(t) - vt_tuple, m);
+    } else if decl_boxed[d] == 1 {
         w_node(Op.StructSet, vt_none, box_type(repr(t)), 0, m);
     } else {
         w_node(Op.LocalSet, vt_none, decl_local[d], 0, m);
@@ -434,6 +466,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     for (0 ..< ncap) |k| {
         cap_types[k] = decl_ty[vl_item(caps, k)];
         cap_locals[k] = decl_local[vl_item(caps, k)];
+        if ty_is(cap_types[k], Ty.Tuple) {
+            report2(Diag.TupleLet, node, decl_name[vl_item(caps, k)], cap_types[k], 2);
+            return error_value();
+        };
     };
     // The environment: the captured values (boxes for boxed variables).
     let env_vts = Array[I32].new(ncap, 0);
