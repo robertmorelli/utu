@@ -1325,13 +1325,14 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
         return check_foreign_equal(t, right, word == known_word(Known.Eq), m, cx);
     };
     let decl = ty_decl(t);
-    if is_scalar_kind(decl) {
+    // An operator declared on the type, else (a distinct or int enum) its comparisons.
+    let op = member(decl, word, Space.Operator);
+    if is_scalar_kind(decl) and op < 0 {
         coerce(check_expr(right, t, cx), t, right);
         if scalar_compare(decl, word, m) { return prelude(Prelude.Bool); };
         report2(Diag.UnknownOperator, at, word, t, -1);
         return error_since(m);
     };
-    let op = member(decl, word, Space.Operator);
     if op < 0 {
         check_expr(right, t, cx);
         report2(Diag.UnknownOperator, at, word, t, -1);
@@ -2002,6 +2003,11 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
         return error_value();
     };
     if decl < 0 and decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };
+    // `Color.R` of an enum whose variants are structs: a type, made by `R {…}`.
+    if decl_is(decl, Decl.Variant) {
+        report2(Diag.VariantNotValue, node, word_of(name), decl_owner[decl], -1);
+        return error_value();
+    };
     unsupported(node);
 }
 

@@ -319,15 +319,13 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     // The arm: bind, then its expression.
     let mt = w_mark();
     let c = next_sibling(pattern);
-    if is_kind(c, Node.Identifier) {
+    if arm_binding(a) >= 0 {
         let d = node_decl[c];
-        let local = new_local(vrepr);
-        decl_local[d] = local;
         decl_ty[d] = vt_;
         let mb = w_mark();
         w_get(repr(st), s);
         w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb);
-        w_node(Op.LocalSet, vt_none, local, 0, mb);
+        bind_value(d, vt_, mb);
         c = next_sibling(c);
     };
     let t1 = check_expr(c, expect, cx);

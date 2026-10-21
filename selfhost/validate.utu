@@ -379,29 +379,30 @@ fn invalid_global_initializer(node: I32) Bool {
 /// nullable, not arrays) can never be built.
 fn validate_recursive_structs() void {
     for (0 ..< decl_kind.len()) |d| {
-        if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]]))
-            and not is_generic(module_of(d)) and reaches_struct(d, d, 0) {
-            report(Diag.RecursiveType, decl_node[d], decl_name[d]);
+        if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]])) and not is_generic(module_of(d)) {
+            // The field the cycle goes through is marked.
+            let field = reaching_field(d, d, 0);
+            if field >= 0 { report(Diag.RecursiveType, field, decl_name[d]); };
         };
     };
 }
 
-/// Whether `target` is a struct field's type in `from`, or in one it holds
-/// (through at most 64 struct types).
-fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
-    if depth > 64 { return false; };
+/// The field of `from` whose struct type is `target` or holds it (through
+/// at most 64 struct types), or -1.
+fn reaching_field(from: I32, target: I32, depth: I32) I32 {
+    if depth > 64 { return -1; };
     let c = first_child(decl_node[from]);
     while (c >= 0) {
         if is_kind(c, Node.Field) {
             let t = next_sibling(first_child(c));
             if is_kind(t, Node.Ref_type) and is_kind(first_child(t), Node.Type_ident) {
                 let d = node_decl[first_child(t)];
-                if decl_is(d, Decl.Struct) and (d == target or reaches_struct(d, target, depth + 1)) { return true; };
+                if decl_is(d, Decl.Struct) and (d == target or reaching_field(d, target, depth + 1) >= 0) { return c; };
             };
         };
         c = next_sibling(c);
     };
-    false;
+    -1;
 }
 
 /// `yield` belongs in a generator, and not in a closure inside one (the

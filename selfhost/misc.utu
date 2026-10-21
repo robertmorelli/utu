@@ -431,12 +431,8 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     let mv = w_mark();
     let t = stream_call(value_fi, s, st, r, rt, node, cx);
     let v = new_local(repr(t));
-    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 {
-        let d = node_decl[first_child(capture)];
-        decl_ty[d] = t;
-        decl_local[d] = v;
-    };
     w_node(Op.LocalSet, vt_none, v, 0, mv);
+    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 { bind_local(node_decl[first_child(capture)], t, v); };
     enter_loop(brk, top, -1, -1);
     discard(check_block(block, ty_void(), cx));
     leave_loop();

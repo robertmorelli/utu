@@ -221,6 +221,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.ComptimeTrap { return "comptime-trap"; };
     if k == Diag.FloatOutOfRange { return "float-literal-out-of-range"; };
     if k == Diag.EnumBase or k == Diag.TagEnumValue { return "invalid-enum"; };
+    if k == Diag.ProtoGeneric { return "unsupported"; };
+    if k == Diag.MemberClash { return "duplicate-declaration"; };
     "type-mismatch";
 }
 
@@ -432,6 +434,11 @@ fn diag_text(i: I32) Str {
         Diag.FloatOutOfRange => pick(b == 1, "-", "") + node_text(node) + " does not fit " + type_text(a),
         Diag.EnumBase => "enum(" + w + ") is not an integer enum; use U8, I8, U16, I16, I32, or U32",
         Diag.TagEnumValue => word_text(a) + "." + w + " has a value; only an integer enum's variants do",
+        Diag.ProtoGeneric => "A generic type cannot list protocol " + w,
+        Diag.SelfUntyped => w + " needs a type annotation to call itself",
+        Diag.MemberClash => word_text(decl_name[a]) + "." + w + pick(b == 1, " is already a protocol member", " is both a field and a method"),
+        Diag.VariantNotValue => word_text(decl_name[a]) + "." + w + " is a type, not a value",
+        Diag.ProtoAccess => word_text(decl_name[b]) + "." + w + pick(a == 1, " is set-only", " is get-only"),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -580,6 +587,11 @@ fn diag_default_label(i: I32) Str {
         Diag.BareNull => "no type",
         Diag.NotCallable => "not a function",
         Diag.ParseError => if b >= 0 { word_text(b) + "?"; } else { "unexpected"; },
+        Diag.ProtoGeneric => "on a generic type",
+        Diag.SelfUntyped => "type not known yet",
+        Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),
+        Diag.MemberClash => pick(b == 1, "also in the protocol", "also a field"),
+        Diag.VariantNotValue => "make one: " + w + " {…}",
         ~> "here",
     };
 }

@@ -216,7 +216,16 @@ fn type_of(node: I32, inst: I32) I32 {
     let kind = node_kind[node];
     if kind == Node.Ref_type.to_i32() { return type_path(first_child(node), inst); };
     if kind == Node.Type_ident.to_i32() or kind == Node.Promoted_type.to_i32() { return type_path(node, inst); };
-    if kind == Node.Nullable_type.to_i32() { return nullable(type_of(first_child(node), inst)); };
+    if kind == Node.Nullable_type.to_i32() {
+        // A scalar has no null: `?Id`, `?L` for an int enum, `?T` as `I32`.
+        let t = type_of(first_child(node), inst);
+        let d = ty_decl(t);
+        if is_scalar_kind(d) or (decl_is(d, Decl.TypeDecl) and is_scalar_decl(d)) {
+            report(Diag.InvalidNullableType, node, decl_name[d]);
+            return ty_error();
+        };
+        return nullable(t);
+    };
     if kind == Node.Paren_type.to_i32() { return type_of(first_child(node), inst); };
     if kind == Node.Void_type.to_i32() { return ty_void(); };
     if kind == Node.Return_type.to_i32() { return type_of(first_child(node), inst); };

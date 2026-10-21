@@ -41,6 +41,11 @@ const INTENDED = {
   // `await for ([1, 2])`: an array is no stream. Stage 0 names its type
   // as it mangles it, `Array__I32`.
   ...both('baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu', 'a type is named as it is written'),
+  // `Array[P].new_default(n)` of a protocol P: stage 0 fills it with null,
+  // which a P is never.
+  ...both('baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu', 'an array of a protocol has no default'),
+  ...both('baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu', 'an array of a protocol has no default'),
+  ...both('baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu', 'an array of a protocol has no default'),
 };
 
 if (isMainThread) await main();
@@ -123,6 +128,10 @@ async function main() {
     const followOn = d => d[0] === 'unknown-operator' && d[1] === 'Cannot resolve operator for unknown';
     const where = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => [kind, file, start, end]));
     if (where(want) === where(got)) { count.same++; continue; }
+    // A struct that contains itself: stage 0 marks the struct, the
+    // self-hosted compiler the field the cycle goes through.
+    const unplaced = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => kind === 'recursive-type' ? [kind, file] : [kind, file, start, end]));
+    if (unplaced(want) === unplaced(got)) { count.intended++; continue; }
     if (refusesWutu(want)) { count.intended++; continue; }
     if (onlyParseErrors(want) && onlyParseErrors(got)) { count.intended++; continue; }
     count.differ++;
