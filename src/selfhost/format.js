@@ -3,9 +3,11 @@
 //    ERROR  Unknown variable 'nope'
 //           unknown-variable · main.utu:7:13
 //
+//    5 │ fn main() I32 {
 //    6 │     let total = p.sum();
 //    7 │     total * nope;
-//      │             ╰─ a label, when the compiler gives one
+//      │             ╰─ its label
+//    8 │ }
 //
 //     note  one sentence on the rule, when the compiler gives one
 //
@@ -22,6 +24,8 @@
 // reads it. Without color, marks are thin rules under the code.
 
 const LONG = 6;
+// Lines shown before and after the primary mark.
+const CONTEXT = 2;
 
 /**
  * How many columns a terminal gives `text`: a tab four, a wide (East
@@ -190,9 +194,13 @@ function view(text, file, marks, primaryFile) {
     m.last = Math.max(m.first, lineOf(Math.max(m.start, m.end - 1)));
     for (let i = m.first; i <= m.last; i++) if (m.last - m.first + 1 <= LONG || i < m.first + 2 || i > m.last - 2) shown.add(i);
   }
+  // A window of about five lines: two before the primary mark and two after.
   const primary = marks.find(m => m.role === 'primary');
-  const context = primary && primaryFile && primary.first > 0 && !shown.has(primary.first - 1) && lineText(primary.first - 1).trim() ? primary.first - 1 : -1;
-  if (context >= 0) shown.add(context);
+  if (primary && primaryFile) {
+    for (let i = Math.max(0, primary.first - CONTEXT); i <= Math.min(starts.length - 1, primary.last + CONTEXT); i++) shown.add(i);
+    // Not a trailing empty line at the end of the file.
+    while (shown.size > 1 && !lineText(Math.max(...shown)).trim() && Math.max(...shown) > primary.last) shown.delete(Math.max(...shown));
+  }
   const rows = [];
   let previous = null;
   for (const line of [...shown].sort((a, b) => a - b)) {
@@ -204,7 +212,7 @@ function view(text, file, marks, primaryFile) {
       const to = line === m.last ? Math.min(raw.length, Math.max(from + 1, m.end - starts[line])) : raw.length;
       return { mark: m, from, to: Math.max(to, from + (raw.length > from ? 1 : 0)), ends: line === m.last };
     });
-    rows.push({ line, raw, offset: starts[line], marks: on, context: line === context });
+    rows.push({ line, raw, offset: starts[line], marks: on });
   }
   return { file, rows };
 }
@@ -214,7 +222,6 @@ function codeLine(row, v, ink, sev, highlight) {
   const raw = row.raw;
   const tabs = s => s.replace(/\t/g, '    ');
   if (!ink.on) return tabs(raw);
-  if (row.context) return ink.paint(ink.palette.dim, tabs(raw));
   const pieces = highlight ? highlight(v.file, row.offset, row.offset + raw.length) : [];
   // Where each character's tint comes from: the innermost (latest) mark over it.
   const tintAt = new Array(raw.length).fill(null);

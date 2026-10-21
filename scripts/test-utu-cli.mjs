@@ -30,24 +30,30 @@ export main() I32 {
   assert.equal(r.stdout.trim(), 'ok');
 
   // Each problem where it is, in source order: the problem, its kind and
-  // place, and the code, marked (a rule under it, without color).
+  // place, and about five lines of the code, the mistake marked (a rule
+  // under it, without color).
   r = utu('check', 'bad.utu');
   assert.equal(r.status, 1);
   assert.equal(r.stderr.trim(), `ERROR  Expected I32, got Str
         type-mismatch · bad.utu:3:25
 
+ 1 │ fn add(a: I32, b: I32) I32 { a + b; }
  2 │ export main() I32 {
  3 │     let x: I32 = add(1, "two");
    │                         ━━━━━
    │                         ╰─ Str
+ 4 │     x + missing;
+ 5 │ }
 
  ERROR  Unknown variable missing
         unknown-variable · bad.utu:4:9
 
+ 2 │ export main() I32 {
  3 │     let x: I32 = add(1, "two");
  4 │     x + missing;
    │         ━━━━━━━
-   │         ╰─ not defined`);
+   │         ╰─ not defined
+ 5 │ }`);
   // On a terminal, colored as the compiler reads it: \`add\` a function, \`I32\` a type, the string a string.
   const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', COLORTERM: 'truecolor', UTU_THEME: 'dark' } }).stderr;
   assert.match(colored, /\x1b\[38;2;130;170;255madd/);
