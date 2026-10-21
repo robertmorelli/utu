@@ -1,0 +1,10 @@
+// What: a mem named the same as a helper function that reads it
+// Expect: mem scores clashes with fn scores (line 5); rename one of them
+mem scores: I32;
+
+fn scores() I32 { scores.len(); }
+
+export main() I32 {
+    scores.push(10);
+    scores();
+}

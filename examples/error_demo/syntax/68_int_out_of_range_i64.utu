@@ -1,0 +1,6 @@
+// What: a literal beyond even I64's range.
+// Expect: Integer literal 99999999999999999999 is out of range for I64.
+export main() I64 {
+    let huge: I64 = 99999999999999999999;
+    huge;
+}

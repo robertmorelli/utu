@@ -1,0 +1,12 @@
+// What: yield from a closure inside a generator
+// Expect: yield cannot appear inside a closure; the generator expands into its consumer
+fn doubled(xs: Array[I32]) yield I32 {
+    let emit = cl(v: I32) { yield v * 2; };
+    for (xs) |x| { emit(x); };
+}
+
+export main() I32 {
+    let total = 0;
+    for (doubled([1, 2])) |v| { total += v; };
+    total;
+}

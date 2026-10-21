@@ -1,0 +1,9 @@
+// What: calling a non-function struct field as a method
+// Expect: Cannot call field 'name' of type Str (or: Unknown method 'User.name')
+struct User:
+    | name: Str
+
+export main() I32 {
+    let u = User { name: "ada" };
+    u.name().len();
+}

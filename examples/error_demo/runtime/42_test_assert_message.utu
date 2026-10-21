@@ -1,0 +1,9 @@
+// What: a test using an assert with a message (assert cond, "msg") — the grammar may not allow it
+// Expect: either FAIL ...: expected two words or a clear syntax error naming assert's form
+fn words(s: Str) I32 {
+    s.split(" ").len();
+}
+
+test "split counts words" {
+    assert words("hello  world") == 2, "expected two words";
+}

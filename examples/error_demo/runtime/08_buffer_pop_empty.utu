@@ -1,0 +1,8 @@
+// What: popping an empty Buffer
+// Expect: trap: pop from an empty Buffer
+using Buffer from std:Buffer;
+
+export main() I32 {
+    let b = Buffer[I32].new();
+    b.pop();
+}

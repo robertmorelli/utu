@@ -1,0 +1,9 @@
+// What: writes a default with orelse on a plain I32.
+// Expect: orelse needs a nullable value on its left; count is I32, which is never null
+fn shown(count: I32) I32 {
+    count orelse 0;
+}
+
+export main() I32 {
+    shown(3);
+}

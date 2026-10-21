@@ -1,0 +1,7 @@
+// What: a using declaration that forgets the word `from`.
+// Expect: expected 'from' (or ';') after `using console`, got 'std'.
+using console std:Console;
+
+export main() void {
+    console.log("hi");
+}

@@ -1,0 +1,11 @@
+// What: a C-style three-part for loop.
+// Expect: utu's for is `for (0 ..< n) |i| { ... }`; a `let` cannot start a for header.
+fn sum_to(n: I32) I32 {
+    let total = 0;
+    for (let i = 0; i < n; i += 1) {
+        total += i;
+    };
+    total;
+}
+
+export main() I32 { sum_to(10); }

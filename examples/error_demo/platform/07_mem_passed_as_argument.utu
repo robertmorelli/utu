@@ -1,0 +1,12 @@
+// What: passing a mem to a function as if it were an array value
+// Expect: mem samples is not a value; use samples[i], samples[i] = v, or samples.len()
+mem samples: F64;
+
+fn total(xs: Array[F64]) F64 {
+    xs fold(0.0) |s, x| { s + x; };
+}
+
+export main() F64 {
+    samples.push(1.5);
+    total(samples);
+}

@@ -1,0 +1,15 @@
+// What: a struct with a U8 field (not a JSON type)
+// Expect: @json cannot use U8: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64 (naming the field Pixel.r)
+
+struct Pixel:
+    | r: U8
+    | g: U8
+    | b: U8
+
+fn load(text: Str) ?Pixel {
+    @json/\ decode Pixel text \/;
+}
+
+export main() I32 {
+    promote load("{}") { |p| => p.r.to_i32(), ~> 0, };
+}

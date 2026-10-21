@@ -1,0 +1,8 @@
+// What: for over a Stream, forgetting await
+// Expect: Stream[I32] is read with await for: await for (s) |v| { … }
+export main() I32 {
+    let s = Stream[I32].of([1, 2, 3]);
+    let total = 0;
+    for (s) |v| { total += v; };
+    total;
+}

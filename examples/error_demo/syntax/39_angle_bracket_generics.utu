@@ -1,0 +1,7 @@
+// What: generic arguments written with angle brackets `Array<I32>`.
+// Expect: type arguments use square brackets: `Array[I32]`.
+fn first(xs: Array<I32>) I32 {
+    xs[0];
+}
+
+export main() I32 { first([1, 2, 3]); }

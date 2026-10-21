@@ -1,0 +1,9 @@
+// What: checks an I32 against null, as if 0 meant "missing".
+// Expect: count is I32, which is never null; comparing it with null is always false
+fn missing(count: I32) Bool {
+    count == null;
+}
+
+export main() I32 {
+    if missing(3) { 1; } else { 0; };
+}

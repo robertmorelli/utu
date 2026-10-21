@@ -1,0 +1,17 @@
+// What: a CSS declaration without its semicolon before the next one
+// Expect: CSS declarations require a semicolon (after padding: 1rem)
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        padding: 1rem
+        gap: 2rem;
+        h2 { = title; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

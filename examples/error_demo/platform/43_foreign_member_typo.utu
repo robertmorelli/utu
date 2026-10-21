@@ -1,0 +1,9 @@
+// What: wrong case on a DOM property (innerHtml for innerHTML)
+// Expect: Unknown foreign member 'HTMLDivElement.innerHtml'; did you mean innerHTML?
+using Browser from std:Browser;
+
+export main() void {
+    let div = Browser.document.createElement("div");
+    div.innerHtml = "<b>hi</b>";
+    Browser.document.body.appendChild(div);
+}

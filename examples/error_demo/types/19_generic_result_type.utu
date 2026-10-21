@@ -1,0 +1,12 @@
+// What: assigning a Stack[Str] to a variable annotated Stack[I32]
+// Expect: Type mismatch: expected Stack[I32], got Stack[Str]
+mod Stack[T] {
+    struct &:
+        | items: Array[T]
+    fn &.new(fill: T) & { &{ items: Array[T].new(4, fill) }; }
+}
+
+export main() I32 {
+    let s: Stack[I32] = Stack[Str].new("");
+    s.items.len();
+}

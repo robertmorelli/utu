@@ -1,0 +1,8 @@
+// What: a lazily loaded module's function takes an Array[I32] (a Wasm array cannot cross into the chunk)
+// Expect: A lazy module's function takes numbers, Bool, Str, and host values: tally takes Array[I32]
+using Browser from std:Browser;
+using widgets lazy from "./lazy_parts/widgets.utu";
+
+export main() void {
+    Browser.document.body.append(widgets.tally([1, 2, 3]));
+}

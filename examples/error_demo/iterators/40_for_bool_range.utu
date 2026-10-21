@@ -1,0 +1,8 @@
+// What: a range with a Bool bound
+// Expect: a range counts integers, got Bool
+export main() I32 {
+    let done = false;
+    let n = 0;
+    for (0 ..< done) |i| { n += i; };
+    n;
+}

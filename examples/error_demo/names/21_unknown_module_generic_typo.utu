@@ -1,0 +1,13 @@
+// What: a generic module is misspelled where it is instantiated (Stak[I32])
+// Expect: Module 'Stak' not found; did you mean 'Stack'?
+mod Stack[T] {
+    struct &:
+        | items: Array[T]
+        | size: I32
+    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
+}
+
+export main() I32 {
+    let s = Stak[I32].new(0);
+    s.size;
+}

@@ -1,0 +1,6 @@
+// What: a boolean literal written in another language's spelling (True)
+// Expect: Unknown variable 'True'; Bool literals are true and false
+export main() I32 {
+    let ready = True;
+    if ready { 1; } else { 0; };
+}

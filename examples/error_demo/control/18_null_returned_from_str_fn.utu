@@ -1,0 +1,10 @@
+// What: returns null from a function declared to return Str.
+// Expect: Cannot return null from find_user: its result Str is not nullable (use ?Str)
+fn find_user(id: I32) Str {
+    if id == 0 { return "root"; };
+    null;
+}
+
+export main() Str {
+    find_user(1);
+}

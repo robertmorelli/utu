@@ -1,0 +1,14 @@
+// What: continues a loop match over I32 states with a Bool state.
+// Expect: Type mismatch: expected I32 (the loop match's state), got Bool
+fn run() I32 {
+    let n = 0;
+    loop match 0 {
+        0 => { n += 1; continue true; },
+        ~> { break; },
+    };
+    n;
+}
+
+export main() I32 {
+    run();
+}

@@ -1,0 +1,15 @@
+// What: a text statement without its semicolon
+// Expect: expected ; after Wutu statement (after "Hello")
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        p { "Hello" }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

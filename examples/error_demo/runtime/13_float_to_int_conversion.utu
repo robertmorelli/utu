@@ -1,0 +1,7 @@
+// What: converting a huge / NaN float to an integer
+// Expect: either a trap (integer overflow in conversion) or the documented saturation; record which
+export main() I32 {
+    let big = 1.0e12.to_i32();
+    let nan = (0.0 / 0.0).to_i32();
+    big + nan;
+}

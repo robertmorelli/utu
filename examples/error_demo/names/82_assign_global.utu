@@ -1,0 +1,12 @@
+// What: assigns to a top-level let (globals are immutable)
+// Expect: Cannot assign to immutable 'count': top-level lets are constants
+let count: I32 = 0;
+
+fn bump() void {
+    count += 1;
+}
+
+export main() I32 {
+    bump();
+    count;
+}

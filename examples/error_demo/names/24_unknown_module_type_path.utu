@@ -1,0 +1,15 @@
+// What: a type path's module part is misspelled (geom.Point for geometry.Point)
+// Expect: Module 'geom' not found; did you mean 'geometry'?
+mod geometry {
+    struct Point:
+        | x: F64
+        | y: F64
+}
+
+fn norm(p: geom.Point) F64 {
+    p.x + p.y;
+}
+
+export main() I32 {
+    0;
+}

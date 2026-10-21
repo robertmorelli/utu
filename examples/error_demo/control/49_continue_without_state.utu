@@ -1,0 +1,19 @@
+// What: uses a plain continue in a loop match, which needs the next state.
+// Expect: continue in a loop match needs the next state: continue <value>
+fn count_words(text: Str) I32 {
+    let i = 0;
+    let words = 0;
+    loop match 0 {
+        0 => {
+            if i >= text.len() { break; };
+            i += 1;
+            continue;
+        },
+        ~> { break; },
+    };
+    words;
+}
+
+export main() I32 {
+    count_words("a b");
+}

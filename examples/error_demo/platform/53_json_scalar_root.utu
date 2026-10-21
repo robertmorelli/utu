@@ -1,0 +1,6 @@
+// What: decoding a bare I32 at the root
+// Expect: @json decode works on a struct, enum, or Array; wrap I32 in a struct field
+
+export main() I32 {
+    promote @json/\ decode I32 "42" \/ { |n| => n, ~> 0, };
+}

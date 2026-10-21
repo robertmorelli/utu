@@ -1,0 +1,12 @@
+// What: a @wat body on a method (self parameter)
+// Expect: a @wat function is a plain function (no self): fn f(x: I32) I32 { @wat/\ … \/; }
+struct Counter:
+    | n: I32
+
+fn Counter.bumped |self| () I32 {
+    @wat/\ local.get $self drop i32.const 1 \/;
+}
+
+export main() I32 {
+    Counter { n: 1 }.bumped();
+}

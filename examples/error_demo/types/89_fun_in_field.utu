@@ -1,0 +1,6 @@
+// What: a struct field typed fun(...) instead of cl(...)
+// Expect: fun(I32) I32 cannot be stored in a struct field yet; use cl(I32) I32 instead
+struct Handler:
+    | on_click: fun(I32) I32
+
+export main() I32 { 0; }

@@ -1,0 +1,7 @@
+// What: the function's final expression has no semicolon (Rust habit).
+// Expect: expected ';' after `a + b` (the last expression of a block also ends with ';').
+fn add(a: I32, b: I32) I32 {
+    a + b
+}
+
+export main() I32 { add(1, 2); }

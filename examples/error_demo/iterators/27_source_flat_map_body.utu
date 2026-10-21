@@ -1,0 +1,5 @@
+// What: flat_map body returns a scalar instead of an array
+// Expect: flat_map's body must give an array, got I32; use map for one value each
+export main() I32 {
+    [1, 2, 3] flat_map |n| { n * 2; } sum;
+}

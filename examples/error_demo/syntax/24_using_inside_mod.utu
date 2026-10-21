@@ -1,0 +1,8 @@
+// What: a `using` placed inside a module body.
+// Expect: `using` is only allowed at the top level of a file; move it above `mod report`.
+mod report {
+    using console from std:Console;
+    fn show(n: I32) void { console.log(n.to_str()); }
+}
+
+export main() void { report.show(3); }

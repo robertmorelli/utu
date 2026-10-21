@@ -1,0 +1,15 @@
+// What: calls a user-defined method on a value that might be null.
+// Expect: Cannot call method 'area' on ?Rect: it may be null
+struct Rect:
+    | w: F64
+    | h: F64
+
+fn Rect.area(r: Rect) F64 { r.w * r.h; }
+
+fn biggest(found: ?Rect) F64 {
+    found.area();
+}
+
+export main() F64 {
+    biggest(Rect { w: 2.0, h: 3.0 });
+}

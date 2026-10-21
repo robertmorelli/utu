@@ -1,0 +1,11 @@
+// What: decoding into a host (Browser) type
+// Expect: @json cannot use Browser.Element: use a local struct or enum ...
+using Browser from std:Browser;
+
+fn load(text: Str) ?Browser.Element {
+    @json/\ decode Browser.Element text \/;
+}
+
+export main() void {
+    let e = load("{}");
+}

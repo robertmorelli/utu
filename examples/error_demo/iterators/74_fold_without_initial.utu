@@ -1,0 +1,5 @@
+// What: fold written without its initial value
+// Expect: fold needs an initial value: fold(0) |acc, value| { … }
+export main() I32 {
+    [1, 2, 3] fold |acc, n| { acc + n; };
+}

@@ -1,0 +1,13 @@
+// What: a text string missing its closing quote
+// Expect: unterminated string
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    p { "Hello; }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

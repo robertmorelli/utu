@@ -1,0 +1,17 @@
+// What: a for loop over items without |item|
+// Expect: expected |item| or |item, index| after iterable
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    ul {
+        for items {
+            li { "item"; }
+        }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

@@ -1,0 +1,12 @@
+// What: returns ?F64 to signal "no answer".
+// Expect: Scalar type 'F64' cannot be nullable
+fn average(xs: Array[F64]) ?F64 {
+    if xs.len() == 0 { return null; };
+    let total = 0.0;
+    for (xs) |x| { total += x; };
+    total / xs.len().to_f64();
+}
+
+export main() F64 {
+    average([1.0, 2.0]) orelse 0.0;
+}

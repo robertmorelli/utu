@@ -1,0 +1,9 @@
+// What: an enum variant's field list repeats a field
+// Expect: Duplicate field 'w' in Rect
+enum Shape:
+    | Rect { w: F64, w: F64 }
+    | Dot {}
+
+export main() I32 {
+    0;
+}

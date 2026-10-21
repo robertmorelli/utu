@@ -1,0 +1,11 @@
+// What: a .then callback divides by zero after main has returned
+// Expect: the trap is reported (and the exit code is nonzero)
+using console from std:Console;
+
+let delay: fun(I32, I32) Promise[I32] =
+    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+
+export main() void {
+    delay(0, 5).then(cl(v) { console.log(`${10 / v}`); });
+    console.log("scheduled");
+}

@@ -1,0 +1,15 @@
+// What: tests a nullable field's field inside an if condition, forgetting the null check.
+// Expect: Cannot read field 'active' of ?Session: it may be null
+struct Session:
+    | active: Bool
+
+struct User:
+    | session: ?Session
+
+fn online(u: User) Bool {
+    if u.session.active { true; } else { false; };
+}
+
+export main() I32 {
+    if online(User { session: null }) { 1; } else { 0; };
+}

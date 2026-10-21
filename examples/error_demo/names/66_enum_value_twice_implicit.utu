@@ -1,0 +1,10 @@
+// What: an explicit value collides with the value an earlier variant got implicitly
+// Expect: Level.Low and Level.Max are both 0 (Low is 0 by position)
+enum(U8) Level:
+    | Low
+    | Mid
+    | Max = 0
+
+export main() I32 {
+    Level.Max.to_i32();
+}

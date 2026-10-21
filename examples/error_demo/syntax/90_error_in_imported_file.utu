@@ -1,0 +1,7 @@
+// What: an imported file has a syntax error (missing ';' in lib/broken_shapes.utu).
+// Expect: the error is reported in lib/broken_shapes.utu at line 4, not in this file.
+using shapes from "./lib/broken_shapes.utu";
+
+export main() F64 {
+    shapes.square(3.0);
+}

@@ -1,0 +1,9 @@
+// What: matches a U8 (b % 2) against 0 and 1 only, without a default; 2..255 are unhandled.
+// Expect: Match over U8 requires a default arm
+fn parity(b: U8) Str {
+    match b % 2 { 0 => "even", 1 => "odd", };
+}
+
+export main() Str {
+    parity(3);
+}

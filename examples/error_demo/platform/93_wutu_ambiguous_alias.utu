@@ -1,0 +1,17 @@
+// What: two nodes given the same alias, then referenced
+// Expect: Ambiguous element alias 'label'; reference it inside its own subtree
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        p as label { "a"; }
+        p as label { "b"; }
+        button { "Go"; on click { label.textContent = "x"; } }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

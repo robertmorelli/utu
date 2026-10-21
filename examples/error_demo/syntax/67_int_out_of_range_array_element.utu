@@ -1,0 +1,6 @@
+// What: one element of a byte array literal does not fit in U8.
+// Expect: Integer literal 256 is out of range for U8, pointing at that element.
+export main() I32 {
+    let bytes: Array[U8] = [0, 128, 255, 256];
+    bytes.len();
+}

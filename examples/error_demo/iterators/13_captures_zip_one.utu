@@ -1,0 +1,7 @@
+// What: zip body binds only one value
+// Expect: zip binds |left, right| (and an optional index); got 1 name
+export main() I32 {
+    let a = [1, 2, 3];
+    let b = [10, 20, 30];
+    a zip(b) |x| { x; } sum;
+}

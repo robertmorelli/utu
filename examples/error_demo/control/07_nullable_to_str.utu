@@ -1,0 +1,14 @@
+// What: calls .to_str() on a nullable struct-held number field container.
+// Expect: Cannot call method 'to_str' on ?Box: it may be null
+struct Box:
+    | n: I32
+
+fn Box.to_str(b: Box) Str { b.n.to_str(); }
+
+fn show(b: ?Box) Str {
+    b.to_str();
+}
+
+export main() Str {
+    show(Box { n: 4 });
+}

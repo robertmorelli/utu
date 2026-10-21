@@ -1,0 +1,7 @@
+// What: await for over a range (a sync source)
+// Expect: await for reads a generator call or a stream; a range is synchronous, so drop await
+export main() I32 {
+    let total = 0;
+    await for (0 ..< 3) |i| { total += i; };
+    total;
+}

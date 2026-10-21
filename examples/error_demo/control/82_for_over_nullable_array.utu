@@ -1,0 +1,11 @@
+// What: iterates a ?Array[Str] with for, without checking for null.
+// Expect: for cannot iterate ?Array[Str]: it may be null; promote it first
+fn count(xs: ?Array[Str]) I32 {
+    let n = 0;
+    for (xs) |x| { n += 1; };
+    n;
+}
+
+export main() I32 {
+    count(["a"]);
+}

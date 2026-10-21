@@ -1,0 +1,15 @@
+// What: children inside a void element (img)
+// Expect: img cannot have children
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        img { src = "/fern.png"; "A fern"; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

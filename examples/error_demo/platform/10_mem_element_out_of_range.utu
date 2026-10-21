@@ -1,0 +1,7 @@
+// What: a U8 mem initialized with a value above 255
+// Expect: mem levels: element 2 (300) does not fit in U8
+mem levels: U8 = [0, 128, 300];
+
+export main() I32 {
+    levels[2];
+}

@@ -1,0 +1,14 @@
+// What: an enum variant with a field named kind (@json uses kind as the tag)
+// Expect: Event.Click has a field named kind, which @json uses to name the variant
+
+enum Event:
+    | Click { kind: Str }
+    | Key { code: I32 }
+
+fn load(text: Str) ?Event {
+    @json/\ decode Event text \/;
+}
+
+export main() I32 {
+    promote load("{}") { |e| => 1, ~> 0, };
+}

@@ -1,0 +1,17 @@
+// What: a :hover selector block whose last declaration has no semicolon
+// Expect: CSS declarations require a semicolon (after color: red)
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    a {
+        href = "/plants";
+        :hover { color: red }
+        "Plants";
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

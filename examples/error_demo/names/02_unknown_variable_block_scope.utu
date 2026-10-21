@@ -1,0 +1,10 @@
+// What: a let declared inside an if block is used after the block
+// Expect: Unknown variable 'bonus': it is declared in the if block above and is not visible here
+export main() I32 {
+    let score = 40;
+    if score > 30 {
+        let bonus = 5;
+        score += bonus;
+    };
+    score + bonus;
+}

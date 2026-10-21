@@ -1,0 +1,7 @@
+// What: imports a real file from the wrong relative directory (benchmarks lives two levels up)
+// Expect: Cannot import "../benchmarks/richards/richards.utu": file not found
+using richards from "../benchmarks/richards/richards.utu";
+
+export main() I32 {
+    0;
+}

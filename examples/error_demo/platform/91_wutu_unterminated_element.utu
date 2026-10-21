@@ -1,0 +1,14 @@
+// What: an element whose closing brace is missing
+// Expect: unterminated element 'section' (opened at line 7)
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        h2 { = title; }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

@@ -1,0 +1,7 @@
+// What: a mem initializer list containing a computed value
+// Expect: mem table: an initializer list holds number literals; compute other values with @comptime (at 2 * 3)
+mem table: I32 = [1, 2, 2 * 3];
+
+export main() I32 {
+    table[2];
+}

@@ -1,0 +1,11 @@
+// What: calling copy_in on a vec (only mems are visible to the host)
+// Expect: vec input has no method 'copy_in': the host cannot see a vec; declare it as a mem
+using JS from std:JS;
+
+vec input: U8;
+
+export lib {
+    fn load(bytes: JS.Uint8Array) I32 {
+        input.copy_in(bytes);
+    }
+}

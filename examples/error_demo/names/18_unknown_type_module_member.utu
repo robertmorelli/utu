@@ -1,0 +1,15 @@
+// What: a type path names a type the module does not declare (geometry.Pt)
+// Expect: Module 'geometry' has no type 'Pt'
+mod geometry {
+    struct Point:
+        | x: F64
+        | y: F64
+}
+
+fn norm(p: geometry.Pt) F64 {
+    p.x + p.y;
+}
+
+export main() I32 {
+    0;
+}

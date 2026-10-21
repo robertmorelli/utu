@@ -1,0 +1,12 @@
+// What: a while condition written without parentheses (unlike `if`, while needs them).
+// Expect: expected '(' after `while`: write `while (n > 0) { ... }`.
+fn countdown(n: I32) I32 {
+    let steps = 0;
+    while n > 0 {
+        n -= 1;
+        steps += 1;
+    };
+    steps;
+}
+
+export main() I32 { countdown(3); }

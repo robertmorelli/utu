@@ -1,0 +1,7 @@
+// What: `and` between I32 values
+// Expect: Type mismatch: expected Bool, got I32
+export main() I32 {
+    let a = 1;
+    let b = 2;
+    if a and b { 1; } else { 0; };
+}

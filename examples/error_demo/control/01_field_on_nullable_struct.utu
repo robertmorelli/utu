@@ -1,0 +1,14 @@
+// What: reads a field straight off a ?Node without checking for null first.
+// Expect: Cannot read field 'name' of ?Node: it may be null; use promote, orelse, or ?.
+struct Node:
+    | name: Str
+    | next: ?Node
+
+fn second_name(head: Node) Str {
+    let n = head.next;
+    n.name;
+}
+
+export main() Str {
+    second_name(Node { name: "a", next: Node { name: "b", next: null } });
+}

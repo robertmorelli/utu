@@ -1,0 +1,11 @@
+// What: an enum lists the same variant twice
+// Expect: Duplicate variant 'Mid'
+enum(U8) Level:
+    | Low
+    | Mid
+    | High
+    | Mid
+
+export main() I32 {
+    Level.Low.to_i32();
+}

@@ -1,0 +1,11 @@
+// What: an int enum's value is spelled with a variant it does not have (Color.Purple)
+// Expect: Color has no variant Purple
+enum(U8) Color:
+    | Red
+    | Green
+    | Blue
+
+export main() I32 {
+    let c = Color.Purple;
+    c.to_i32();
+}

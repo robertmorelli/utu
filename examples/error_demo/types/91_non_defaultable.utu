@@ -1,0 +1,10 @@
+// What: Array.new_default for a struct element type, which has no zero value
+// Expect: Array element type 'Point' has no default value; use Array[Point].new(length, fill)
+struct Point:
+    | x: F64
+    | y: F64
+
+export main() I32 {
+    let ps = Array[Point].new_default(4);
+    ps.len();
+}

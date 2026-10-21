@@ -1,0 +1,9 @@
+// What: indexes into an ?Array[I32] without checking for null.
+// Expect: Cannot index ?Array[I32]: it may be null; use promote or orelse first
+fn first(xs: ?Array[I32]) I32 {
+    xs[0];
+}
+
+export main() I32 {
+    first([1, 2, 3]);
+}

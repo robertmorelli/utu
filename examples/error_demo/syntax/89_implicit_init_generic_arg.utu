@@ -1,0 +1,10 @@
+// What: `&{ ... }` passed to a generic-typed parameter (a struct type cannot be inferred from T).
+// Expect: `&{ ... }` needs a known struct type; write `Point { ... }`.
+struct Point:
+    | x: F64
+    | y: F64
+
+export main() I32 {
+    let xs = [&{ x: 1.0, y: 2.0 }];
+    xs.len();
+}

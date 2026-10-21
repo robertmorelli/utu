@@ -1,0 +1,7 @@
+// What: collect followed by another pipeline stage without parentheses
+// Expect: collect(I32) ends a pipeline; parenthesize it to start another
+export main() I32 {
+    let xs = [3, 1, 2];
+    let sorted = xs map |n| { n * 10; } collect(I32) sort(I32) |a, b| { a < b; };
+    sorted[0];
+}

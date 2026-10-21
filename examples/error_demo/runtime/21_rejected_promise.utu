@@ -1,0 +1,9 @@
+// What: async main awaits a promise that rejects
+// Expect: uncaught rejection: Error: connection refused (awaited at 21_rejected_promise.utu:7)
+let fetch_count: fun(I32) Promise[I32] =
+    @es/\ (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("connection refused")), ms)) \/;
+
+export main() I32 {
+    let n = await fetch_count(5);
+    n + 1;
+}

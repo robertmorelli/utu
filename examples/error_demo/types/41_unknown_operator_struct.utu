@@ -1,0 +1,12 @@
+// What: using + on a struct that defines no add operator
+// Expect: Vec2 has no '+' operator (define fn Vec2:add |a, b| Vec2 { ... })
+struct Vec2:
+    | x: F64
+    | y: F64
+
+export main() I32 {
+    let a = Vec2 { x: 1.0, y: 2.0 };
+    let b = Vec2 { x: 3.0, y: 4.0 };
+    let c = a + b;
+    c.x.to_i32();
+}

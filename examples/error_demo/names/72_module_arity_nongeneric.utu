@@ -1,0 +1,12 @@
+// What: a type argument given to a module that takes none
+// Expect: Module 'Money' takes no type arguments, got 1
+mod Money {
+    struct &:
+        | cents: I64
+    fn &.zero() & { &{ cents: 0.to_i64() }; }
+}
+
+export main() I32 {
+    let m = Money[I64].zero();
+    0;
+}

@@ -1,0 +1,15 @@
+// What: an off-by-one loop reads one past the end of an array
+// Expect: trap: index 3 out of bounds for array of length 3 at 04_array_index_oob.utu:7
+fn sum(xs: Array[I32]) I32 {
+    let total = 0;
+    let i = 0;
+    while (i <= xs.len()) {
+        total += xs[i];
+        i += 1;
+    };
+    total;
+}
+
+export main() I32 {
+    sum([1, 2, 3]);
+}

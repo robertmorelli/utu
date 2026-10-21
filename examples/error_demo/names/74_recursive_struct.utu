@@ -1,0 +1,9 @@
+// What: a struct contains itself directly (a linked list node without ?)
+// Expect: Recursive type 'Node' must use a nullable or indirect field (write next: ?Node)
+struct Node:
+    | value: I32
+    | next: Node
+
+export main() I32 {
+    0;
+}

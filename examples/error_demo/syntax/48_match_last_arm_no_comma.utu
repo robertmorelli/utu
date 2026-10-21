@@ -1,0 +1,11 @@
+// What: the last match arm has no trailing comma.
+// Expect: accepted (a trailing comma should be optional), or: expected ',' after the last arm `~> "many"`.
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        ~> "many"
+    };
+}
+
+export main() Str { describe(4); }

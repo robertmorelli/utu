@@ -1,0 +1,13 @@
+// What: reading a field through a protocol value that the protocol does not declare
+// Expect: Unknown field 'r' for Shape
+proto Shape:
+    | get name : Str
+
+struct Circle[Shape]:
+    | name: Str
+    | r: F64
+
+export main() I32 {
+    let s: Shape = Circle { name: "c", r: 1.0 };
+    s.r.to_i32();
+}

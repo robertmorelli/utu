@@ -1,0 +1,5 @@
+// What: a stage in the middle of a pipeline has too many bindings
+// Expect: map (the first stage) binds one value and an optional index; got 3 names
+export main() I32 {
+    [1, 2, 3] map |a, b, c| { a * 2; } filter |n| { n > 2; } sum;
+}

@@ -1,0 +1,8 @@
+// What: destructuring a value that is not a tuple.
+// Expect: let .{…} takes apart a tuple, but this value is I32.
+fn total(a: I32, b: I32) I32 { a + b; }
+
+export main() I32 {
+    let .{sum, count} = total(3, 4);
+    sum + count;
+}

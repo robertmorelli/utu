@@ -1,0 +1,7 @@
+// What: an @es binding throws a non-Error value (a string)
+// Expect: uncaught exception: "negative" (from `risky` at 20_es_throws_string.utu:6)
+let risky: fun(I32) I32 = @es/\ (n) => { if (n < 0) throw "negative"; return n * 2; } \/;
+
+export main() I32 {
+    risky(-5);
+}

@@ -1,0 +1,11 @@
+// What: two match arms are not separated by a comma.
+// Expect: expected ',' after the arm `0 => "zero"`.
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero"
+        1 => "one",
+        ~> "many",
+    };
+}
+
+export main() Str { describe(1); }

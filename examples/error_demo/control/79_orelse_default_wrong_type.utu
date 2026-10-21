@@ -1,0 +1,9 @@
+// What: an orelse default whose type does not match the nullable's inner type.
+// Expect: Type mismatch: orelse default must be Str (from ?Str), got I32
+fn shown(nickname: ?Str) Str {
+    nickname orelse 0;
+}
+
+export main() Str {
+    shown(null);
+}

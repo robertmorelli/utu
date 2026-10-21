@@ -1,0 +1,7 @@
+// What: a float literal in an I32 mem initializer
+// Expect: mem weights: element 1 (0.5) is not an integer; I32 holds integers
+mem weights: I32 = [1, 0.5];
+
+export main() I32 {
+    weights[0];
+}

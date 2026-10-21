@@ -1,0 +1,18 @@
+// What: an alt over an enum misses two variants; only the first is named.
+// Expect: Missing variants 'Minus' and 'Times' in alt over enum Token (ideally all of them)
+enum Token:
+    | Num { value: I32 }
+    | Plus {}
+    | Minus {}
+    | Times {}
+
+fn weight(t: Token) I32 {
+    alt t {
+        Num |n| => n.value,
+        Plus => 1,
+    };
+}
+
+export main() I32 {
+    weight(Plus {});
+}

@@ -1,0 +1,7 @@
+// What: passing a Str where a Node is expected (appendChild("text"))
+// Expect: Type mismatch: expected Browser.Node, got Str
+using Browser from std:Browser;
+
+export main() void {
+    Browser.document.body.appendChild("hello");
+}

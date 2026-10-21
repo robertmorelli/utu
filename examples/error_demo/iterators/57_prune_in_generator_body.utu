@@ -1,0 +1,20 @@
+// What: prune inside the recursive generator itself rather than its consumer
+// Expect: prune belongs in the consumer's loop body; in the generator, skip the delegation instead
+struct Node:
+    | name: Str
+    | kids: Array[Node]
+
+fn walk(n: Node) yield Node {
+    for (n.kids) |k| {
+        yield k;
+        if k.name == "tmp" { prune; };
+        for (walk(k)) |d| { yield d; };
+    };
+}
+
+export main() I32 {
+    let root = Node { name: "/", kids: [] };
+    let count = 0;
+    for (walk(root)) |n| { count += 1; };
+    count;
+}

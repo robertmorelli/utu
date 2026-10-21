@@ -1,0 +1,10 @@
+// What: a variant is constructed under a misspelled name (Squar)
+// Expect: Unknown type 'Squar'; did you mean the variant Shape.Square?
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+export main() I32 {
+    let s: Shape = Squar { side: 2.0 };
+    0;
+}

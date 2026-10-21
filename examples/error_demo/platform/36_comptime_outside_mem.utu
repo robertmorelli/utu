@@ -1,0 +1,8 @@
+// What: @comptime used for an ordinary local instead of a mem initializer
+// Expect: @comptime initializes a mem: const mem t: I32 = @comptime/\ … \/;
+fn fib(n: I32) I32 { if n < 2 { n; } else { fib(n - 1) + fib(n - 2); }; }
+
+export main() I32 {
+    let f20: I32 = @comptime/\ fib(20) \/;
+    f20;
+}

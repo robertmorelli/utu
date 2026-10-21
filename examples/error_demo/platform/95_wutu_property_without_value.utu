@@ -1,0 +1,15 @@
+// What: a DOM property assignment without a value
+// Expect: a property takes a value: .name = value;
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    input {
+        .value;
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

@@ -1,0 +1,5 @@
+// What: a pipeline over a float range
+// Expect: a range pipeline counts integers; F64 bounds are not allowed
+export main() F64 {
+    (0.0 ..< 1.0) map |x| { x * 2.0; } sum;
+}

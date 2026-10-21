@@ -1,0 +1,7 @@
+// What: an array type whose element is a tuple.
+// Expect: A tuple type is only a function result (or: Tuples cannot be stored in arrays).
+fn pairs() Array[.{I32, I32}] {
+    Array[.{I32, I32}].new(0, .{0, 0});
+}
+
+export main() I32 { 0; }

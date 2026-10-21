@@ -1,0 +1,7 @@
+// What: I64 division by zero
+// Expect: trap: integer division by zero
+export main() I64 {
+    let a: I64 = 100;
+    let b: I64 = 0;
+    a / b;
+}

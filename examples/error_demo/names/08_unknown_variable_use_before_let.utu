@@ -1,0 +1,8 @@
+// What: a local is used one line before it is declared
+// Expect: Unknown variable 'rate': it is declared later, on line 6
+export main() I32 {
+    let price = 100;
+    let tax = price * rate / 100;
+    let rate = 8;
+    price + tax;
+}

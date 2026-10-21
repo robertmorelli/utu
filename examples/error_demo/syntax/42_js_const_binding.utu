@@ -1,0 +1,8 @@
+// What: a JS-style `const` local binding inside a function.
+// Expect: local bindings use `let`; `const` declares a constant memory at the top level.
+fn area(r: F64) F64 {
+    const pi = 3.14159;
+    pi * r * r;
+}
+
+export main() F64 { area(2.0); }

@@ -1,0 +1,12 @@
+// What: initializing a non-nullable struct field with null
+// Expect: Type mismatch: expected User, got null (field 'owner' is not nullable; declare it ?User)
+struct User:
+    | name: Str
+
+struct Account:
+    | owner: User
+
+export main() I32 {
+    let a = Account { owner: null };
+    0;
+}

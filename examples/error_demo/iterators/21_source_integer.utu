@@ -1,0 +1,6 @@
+// What: a pipeline over a count instead of a range
+// Expect: map needs an array or a range, got I32; count with a range like 0..<n
+export main() I32 {
+    let n = 10;
+    n map |i| { i * i; } sum;
+}

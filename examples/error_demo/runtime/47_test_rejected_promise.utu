@@ -1,0 +1,8 @@
+// What: a test that awaits a rejected promise
+// Expect: FAIL fetches: Error: offline
+let fetch_it: fun() Promise[I32] = @es/\ () => Promise.reject(new Error("offline")) \/;
+
+test "fetches" {
+    let v = await fetch_it();
+    assert v == 1;
+}

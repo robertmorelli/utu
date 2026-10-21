@@ -1,0 +1,11 @@
+// What: a function body's closing brace is missing; the file ends inside it.
+// Expect: unexpected end of file: the `{` of `fn main` on line 5 is never closed.
+fn double(x: I32) I32 { x * 2; }
+
+export main() I32 {
+    let n = double(4);
+    if n > 4 {
+        n;
+    } else {
+        0;
+    };

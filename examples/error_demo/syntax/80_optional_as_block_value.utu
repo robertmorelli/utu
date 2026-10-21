@@ -1,0 +1,11 @@
+// What: an optional chain `?.` as a function's final (result) expression.
+// Expect: '?.' is only allowed in statements; use `promote` or `orelse` to give the result a value when absent.
+struct Node:
+    | name: Str
+    | next: ?Node
+
+fn second_name(head: Node) Str {
+    head.next?.name;
+}
+
+export main() Str { second_name(Node { name: "a", next: null }); }

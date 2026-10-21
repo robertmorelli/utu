@@ -1,0 +1,12 @@
+// What: calling a module function that takes the type as a parameter with method syntax
+// Expect: Unknown method 'Money.doubled': doubled is a function of Money; call Money.doubled(m)
+mod Money {
+    struct &:
+        | cents: I32
+    fn &.of(c: I32) & { &{ cents: c }; }
+    fn doubled(m: &) & { &{ cents: m.cents * 2 }; }
+}
+export main() I32 {
+    let m = Money.of(5);
+    m.doubled().cents;
+}

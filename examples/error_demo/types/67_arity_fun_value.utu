@@ -1,0 +1,6 @@
+// What: calling a fun(I32) I32 value with no arguments
+// Expect: Wrong arity: expected 1, got 0
+fn twice(f: fun(I32) I32) I32 { f(); }
+fn double(x: I32) I32 { x * 2; }
+
+export main() I32 { twice(double); }

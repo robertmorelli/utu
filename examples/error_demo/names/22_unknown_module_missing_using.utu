@@ -1,0 +1,7 @@
+// What: a std module (StrMap) used without the `using StrMap from std:StrMap;` line
+// Expect: Module 'StrMap' not found; add `using StrMap from std:StrMap;`
+export main() I32 {
+    let counts = StrMap[I32].new();
+    counts.set("a", 1);
+    counts.get("a", 0);
+}

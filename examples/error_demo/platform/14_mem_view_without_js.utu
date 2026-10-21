@@ -1,0 +1,10 @@
+// What: calling .view() on a mem without importing std:JS
+// Expect: pixels.view() returns a JS.Uint8Array; add `using JS from std:JS;`
+export mem pixels: U8;
+
+export lib {
+    fn frame() void {
+        pixels.push(0);
+        let v = pixels.view(0, 1);
+    }
+}

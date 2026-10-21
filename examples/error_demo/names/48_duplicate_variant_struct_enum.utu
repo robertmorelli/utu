@@ -1,0 +1,10 @@
+// What: a struct-carrying enum lists the same variant twice
+// Expect: Duplicate variant 'Circle'
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+    | Circle { d: F64 }
+
+export main() I32 {
+    0;
+}

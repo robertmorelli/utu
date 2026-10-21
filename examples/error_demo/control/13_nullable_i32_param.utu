@@ -1,0 +1,9 @@
+// What: declares a parameter as ?I32, but scalars have no null.
+// Expect: Scalar type 'I32' cannot be nullable
+fn lookup(key: ?I32) I32 {
+    key orelse -1;
+}
+
+export main() I32 {
+    lookup(4);
+}

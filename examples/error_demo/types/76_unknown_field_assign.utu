@@ -1,0 +1,10 @@
+// What: assigning to a field the struct does not have
+// Expect: Unknown field 'count' for Counter
+struct Counter:
+    | n: I32
+
+export main() I32 {
+    let c = Counter { n: 0 };
+    c.count = 1;
+    c.n;
+}

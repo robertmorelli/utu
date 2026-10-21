@@ -1,0 +1,12 @@
+// What: breaks out of a loop from inside a defer.
+// Expect: break cannot appear inside deferred code
+using console from std:Console;
+
+export main() I32 {
+    let n = 0;
+    while (true) {
+        defer { n += 1; if n > 3 { break; }; };
+        console.log("tick");
+    };
+    n;
+}

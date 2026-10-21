@@ -1,0 +1,15 @@
+// What: a @stored default of the wrong struct type
+// Expect: Type mismatch: expected Prefs, got Other (at the default)
+using Browser from std:Browser;
+
+struct Prefs:
+    | name: Str
+    | enabled: Bool
+
+struct Other:
+    | x: I32
+
+export main() void {
+    let prefs = @stored/\ Prefs "prefs-v1" Other { x: 1 } \/;
+    Browser.console.log(prefs.name);
+}

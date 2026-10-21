@@ -1,0 +1,6 @@
+// What: Array misspelled in a local's annotation (Arary)
+// Expect: Unknown type 'Arary'; did you mean 'Array'?
+export main() I32 {
+    let xs: Arary[I32] = [1, 2, 3];
+    xs[0] + xs[2];
+}

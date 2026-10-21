@@ -1,0 +1,11 @@
+// What: a test where an @es call throws
+// Expect: FAIL parses numbers: Error: not a number: x (and the remaining tests still run)
+let parse: fun(Str) F64 = @es/\ (s) => { const n = Number(s); if (Number.isNaN(n)) throw new Error("not a number: " + s); return n; } \/;
+
+test "parses numbers" {
+    assert parse("x") == 1.0;
+}
+
+test "still runs" {
+    assert parse("2") == 2.0;
+}

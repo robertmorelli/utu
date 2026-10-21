@@ -1,0 +1,7 @@
+// What: C-style `&&` used for a logical and.
+// Expect: utu writes logical and as `and` (and `||` as `or`, `!` as `not`).
+fn in_range(x: I32, lo: I32, hi: I32) Bool {
+    x >= lo && x <= hi;
+}
+
+export main() I32 { if in_range(3, 0, 10) { 1; } else { 0; }; }

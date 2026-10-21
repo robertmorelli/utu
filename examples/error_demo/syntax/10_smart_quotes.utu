@@ -1,0 +1,7 @@
+// What: curly quotes pasted from a word processor around a string.
+// Expect: unexpected character '“': strings use straight double quotes.
+fn greeting() Str {
+    “hello”;
+}
+
+export main() Str { greeting(); }

@@ -1,0 +1,10 @@
+// What: match over a Str with string patterns (like a switch in JS)
+// Expect: match needs an integer, float, or Bool value, got Str; use if/else (not a bare syntax error)
+fn code(cmd: Str) I32 {
+    match cmd {
+        "start" => 1,
+        ~> 0,
+    };
+}
+
+export main() I32 { code("start"); }

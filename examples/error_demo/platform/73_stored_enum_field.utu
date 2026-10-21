@@ -1,0 +1,16 @@
+// What: a @stored struct with an enum field
+// Expect: Unsupported stored type Theme (field Prefs.theme); use local structs, Array, Str, Bool, I32, or F64
+using Browser from std:Browser;
+
+enum Theme:
+    | Light {}
+    | Dark {}
+
+struct Prefs:
+    | name: Str
+    | theme: Theme
+
+export main() void {
+    let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", theme: Light {} } \/;
+    Browser.console.log(prefs.name);
+}

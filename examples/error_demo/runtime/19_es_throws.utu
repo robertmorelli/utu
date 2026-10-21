@@ -1,0 +1,11 @@
+// What: an @es binding throws and nothing catches it
+// Expect: uncaught exception from @es binding `parse`: Error: not a number: twelve (with utu call site)
+let parse: fun(Str) F64 = @es/\ (s) => {
+    const n = Number(s);
+    if (Number.isNaN(n)) throw new Error("not a number: " + s);
+    return n;
+} \/;
+
+export main() F64 {
+    parse("twelve");
+}

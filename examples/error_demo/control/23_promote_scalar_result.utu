@@ -1,0 +1,13 @@
+// What: promotes a function result that is a plain struct, not nullable.
+// Expect: promote needs a nullable value; make_user() returns User, which is never null
+struct User:
+    | name: Str
+
+fn make_user() User { User { name: "x" }; }
+
+export main() Str {
+    promote make_user() {
+        |u| => u.name,
+        ~> "nobody",
+    };
+}

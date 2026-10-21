@@ -1,0 +1,11 @@
+// What: a reserved word (`match`) used as a local variable name.
+// Expect: 'match' is a keyword and cannot name a variable, pointing at the `let match`.
+fn first_match(xs: Array[I32], target: I32) I32 {
+    let match = -1;
+    for (xs, 0 ..< xs.len()) |x, i| {
+        if x == target and match < 0 { match = i; };
+    };
+    match;
+}
+
+export main() I32 { first_match([4, 5, 6], 5); }

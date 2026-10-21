@@ -1,0 +1,8 @@
+// What: awaiting a synchronous host call that returns Str
+// Expect: Cannot await non-promise Str
+let read_name: fun() Str = @es/\ () => "ada" \/;
+
+export main() I32 {
+    let name = await read_name();
+    name.len();
+}

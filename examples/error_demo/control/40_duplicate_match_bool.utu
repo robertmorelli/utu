@@ -1,0 +1,9 @@
+// What: writes the true arm twice in a Bool match.
+// Expect: Duplicate match pattern 'true'
+fn bit(b: Bool) I32 {
+    match b { true => 1, true => 2, false => 0, };
+}
+
+export main() I32 {
+    bit(true);
+}

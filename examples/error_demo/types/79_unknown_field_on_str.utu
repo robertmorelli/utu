@@ -1,0 +1,6 @@
+// What: reading .length on a Str (it is a method, len())
+// Expect: Unknown field 'length' for Str (did you mean len()?)
+export main() I32 {
+    let s = "hello";
+    s.length;
+}

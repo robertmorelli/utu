@@ -1,0 +1,6 @@
+// What: a big literal with no annotation defaults to I32 and overflows.
+// Expect: Integer literal 3000000000 is out of range for I32; annotate the binding (e.g. `: I64`).
+export main() I64 {
+    let big = 3000000000;
+    big.to_i64();
+}

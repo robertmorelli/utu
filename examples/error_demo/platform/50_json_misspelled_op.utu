@@ -1,0 +1,13 @@
+// What: a @json site that says parse instead of decode
+// Expect: @json expects `decode Type text`, ... (pointing at parse)
+struct User:
+    | name: Str
+    | age: I32
+
+fn load(text: Str) ?User {
+    @json/\ parse User text \/;
+}
+
+export main() I32 {
+    promote load("{}") { |u| => u.age, ~> 0, };
+}

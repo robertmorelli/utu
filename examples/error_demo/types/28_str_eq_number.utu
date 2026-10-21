@@ -1,0 +1,6 @@
+// What: comparing a Str to an I32 with ==
+// Expect: Type mismatch: expected Str, got I32
+export main() I32 {
+    let input = "5";
+    if input == 5 { 1; } else { 0; };
+}

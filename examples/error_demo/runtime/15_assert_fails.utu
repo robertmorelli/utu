@@ -1,0 +1,10 @@
+// What: an assert on a precondition fails
+// Expect: assertion failed: `b != 0` at 15_assert_fails.utu:4
+fn checked_div(a: I32, b: I32) I32 {
+    assert b != 0;
+    a / b;
+}
+
+export main() I32 {
+    checked_div(10, 0);
+}

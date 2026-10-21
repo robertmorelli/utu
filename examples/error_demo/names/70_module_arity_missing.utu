@@ -1,0 +1,14 @@
+// What: a generic module used with no type arguments (Stack instead of Stack[I32])
+// Expect: Module 'Stack' expects 1 type argument(s), got 0
+mod Stack[T] {
+    struct &:
+        | items: Array[T]
+        | size: I32
+    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
+}
+
+fn depth(s: Stack) I32 { s.size; }
+
+export main() I32 {
+    depth(Stack[I32].new(0));
+}

@@ -1,0 +1,11 @@
+// What: a vec of a struct type (vecs hold only scalars; use Array[T])
+// Expect: vec points stores Point; a vec holds scalars only (use Array[Point])
+struct Point:
+    | x: I32
+    | y: I32
+
+vec points: Point;
+
+export main() I32 {
+    points.len();
+}

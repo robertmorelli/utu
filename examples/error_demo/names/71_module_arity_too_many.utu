@@ -1,0 +1,8 @@
+// What: a std generic module given two type arguments (StrMap[Str, I32], as in a two-parameter Map)
+// Expect: Module 'StrMap' expects 1 type argument(s), got 2 (its keys are always Str)
+using StrMap from std:StrMap;
+
+export main() I32 {
+    let counts = StrMap[Str, I32].new();
+    counts.get("a", 0);
+}

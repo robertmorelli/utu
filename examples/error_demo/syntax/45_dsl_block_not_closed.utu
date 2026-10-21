@@ -1,0 +1,7 @@
+// What: an @es DSL block is never closed with `\/`.
+// Expect: the @es block opened with `/\` on line 3 is not closed with `\/`.
+let now: fun() F64 = @es/\ () => Date.now();
+
+export main() F64 {
+    now();
+}

@@ -1,0 +1,16 @@
+// What: an enum variant holds the enum itself, non-nullably (an expression tree)
+// Expect: either accept it (variants are references) or Recursive type 'Expr'
+enum Expr:
+    | Num { value: I32 }
+    | Add { left: Expr, right: Expr }
+
+fn eval(e: Expr) I32 {
+    alt e {
+        Num |n| => n.value,
+        Add |a| => eval(a.left) + eval(a.right),
+    };
+}
+
+export main() I32 {
+    eval(Add { left: Num { value: 2 }, right: Num { value: 3 } });
+}

@@ -1,0 +1,13 @@
+// What: one module is opened twice in a file and both copies declare the same function
+// Expect: Duplicate top-level declaration 'geometry.square'
+mod geometry {
+    fn square(x: F64) F64 { x * x; }
+}
+
+mod geometry {
+    fn square(x: F64) F64 { x * x * 1.0; }
+}
+
+export main() F64 {
+    geometry.square(3.0);
+}

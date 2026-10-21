@@ -1,0 +1,7 @@
+// What: a function's last expression is a Str but the result type is Bool
+// Expect: Type mismatch: expected Bool, got Str at the tail expression
+fn is_empty(s: Str) Bool {
+    if s.len() == 0 { "yes"; } else { "no"; };
+}
+
+export main() I32 { if is_empty("") { 1; } else { 0; }; }

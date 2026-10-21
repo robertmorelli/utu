@@ -1,0 +1,13 @@
+// What: consuming a generator declared in a module, called through the module name
+// Expect: accepted (a module's generator is consumed like any other), or a clear message if not
+mod seq {
+    fn squares(n: I32) yield I32 {
+        for (0 ..< n) |i| { yield i * i; };
+    }
+}
+
+export main() I32 {
+    let total = 0;
+    for (seq.squares(4)) |s| { total += s; };
+    total;
+}

@@ -1,0 +1,21 @@
+// What: an alt arm names a variant that belongs to a different enum.
+// Expect: Shape has no variant Leaf (Leaf is a variant of Tree)
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+enum Tree:
+    | Leaf {}
+    | Branch { size: I32 }
+
+fn area(shape: Shape) F64 {
+    alt shape {
+        Circle |c| => c.r,
+        Leaf => 0.0,
+        ~> 1.0,
+    };
+}
+
+export main() F64 {
+    area(Dot {});
+}

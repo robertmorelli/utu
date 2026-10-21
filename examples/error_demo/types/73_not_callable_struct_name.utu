@@ -1,0 +1,10 @@
+// What: calling a struct's name like a constructor function (Point(1.0, 2.0))
+// Expect: Point is a type, not a function; write Point { x: 1.0, y: 2.0 }
+struct Point:
+    | x: F64
+    | y: F64
+
+export main() I32 {
+    let p = Point(1.0, 2.0);
+    p.x.to_i32();
+}

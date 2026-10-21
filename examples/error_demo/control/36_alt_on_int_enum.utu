@@ -1,0 +1,16 @@
+// What: uses alt on an integer enum (which match handles).
+// Expect: alt needs an enum with variants; Level is an integer enum, use match
+enum(U8) Level:
+    | Low
+    | High
+
+fn label(l: Level) Str {
+    alt l {
+        Low => "low",
+        High => "high",
+    };
+}
+
+export main() Str {
+    label(Level.Low);
+}

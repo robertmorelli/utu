@@ -1,0 +1,9 @@
+// What: compares a Str that can never be null against null.
+// Expect: name is Str, which is never null; this comparison is always false
+fn has_name(name: Str) Bool {
+    name != null;
+}
+
+export main() I32 {
+    if has_name("x") { 1; } else { 0; };
+}

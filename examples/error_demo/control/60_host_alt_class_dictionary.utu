@@ -1,0 +1,13 @@
+// What: narrows a host value to an options dictionary type, which has no class to test against.
+// Expect: Browser.AddEventListenerOptions is only a type; narrowing needs a declared runtime class
+using Browser from std:Browser;
+
+export main() void {
+    let doc = Browser.document;
+    doc.addEventListener("click", cl(e) void {
+        alt e.target {
+            Browser.AddEventListenerOptions |o| => Browser.console.log("options"),
+            ~> {},
+        };
+    });
+}

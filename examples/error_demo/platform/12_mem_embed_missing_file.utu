@@ -1,0 +1,7 @@
+// What: @embed of a file that does not exist (typo in the name)
+// Expect: mem font: @embed cannot read font.binn: file not found
+mem font: U8 = @embed/\ font.binn \/;
+
+export main() I32 {
+    font.len();
+}

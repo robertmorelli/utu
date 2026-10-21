@@ -1,0 +1,12 @@
+// What: a @json match with only a fallback arm
+// Expect: @json match needs at least one pattern arm
+
+fn status(text: Str) I32 {
+    @json/\ match text {
+        ~> 0,
+    }\/;
+}
+
+export main() I32 {
+    status("{}");
+}

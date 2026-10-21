@@ -1,0 +1,13 @@
+// What: an interpolated expression with a syntax error
+// Expect: Invalid Utu interpolation: title + (pointing at it)
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    h2 { = title + ; }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

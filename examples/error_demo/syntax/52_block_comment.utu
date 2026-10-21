@@ -1,0 +1,8 @@
+// What: a C-style `/* ... */` block comment.
+// Expect: utu has only `//` line comments; `/*` is not a comment.
+fn answer() I32 {
+    /* the answer to everything */
+    42;
+}
+
+export main() I32 { answer(); }

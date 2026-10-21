@@ -1,0 +1,12 @@
+// What: matches an I32 against a few literals with no default arm.
+// Expect: Match over I32 requires a default arm (~> ...)
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero",
+        1 => "one",
+    };
+}
+
+export main() Str {
+    describe(2);
+}

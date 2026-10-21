@@ -1,0 +1,7 @@
+// What: @embed of a 5-byte file into an I32 mem (not a whole number of elements)
+// Expect: mem words: odd_size.bin is 5 bytes, not a whole number of 4-byte I32 elements
+mem words: I32 = @embed/\ odd_size.bin \/;
+
+export main() I32 {
+    words.len();
+}

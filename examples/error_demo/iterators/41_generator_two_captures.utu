@@ -1,0 +1,11 @@
+// What: a generator loop binding a value and an index
+// Expect: a generator loop binds one value: for (gen()) |value| { … }
+fn squares(n: I32) yield I32 {
+    for (0 ..< n) |i| { yield i * i; };
+}
+
+export main() I32 {
+    let total = 0;
+    for (squares(4)) |s, i| { total += s; };
+    total;
+}

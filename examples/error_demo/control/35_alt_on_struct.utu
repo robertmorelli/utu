@@ -1,0 +1,16 @@
+// What: uses alt on a struct value as if it were an enum.
+// Expect: alt needs an enum value, got Point (a struct)
+struct Point:
+    | x: F64
+    | y: F64
+
+fn kind(p: Point) Str {
+    alt p {
+        Point |q| => "point",
+        ~> "other",
+    };
+}
+
+export main() Str {
+    kind(Point { x: 0.0, y: 0.0 });
+}

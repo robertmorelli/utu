@@ -1,0 +1,9 @@
+// What: await for over a single promise
+// Expect: await for reads a stream, got Promise[I32]; await a promise with `await p`
+let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+
+export main() I32 {
+    let total = 0;
+    await for (later(3)) |v| { total += v; };
+    total;
+}

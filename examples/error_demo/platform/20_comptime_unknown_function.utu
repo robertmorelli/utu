@@ -1,0 +1,13 @@
+// What: a @comptime mem initializer that calls a misspelled function
+// Expect: @comptime: Unknown variable 'make_tabel' (pointing at the call inside the @comptime body)
+fn make_table(n: I32) Array[I32] {
+    let out = Array[I32].new(n, 0);
+    for (0 ..< n) |i| { out[i] = i * i; };
+    out;
+}
+
+const mem squares: I32 = @comptime/\ make_tabel(16) \/;
+
+export main() I32 {
+    squares[3];
+}

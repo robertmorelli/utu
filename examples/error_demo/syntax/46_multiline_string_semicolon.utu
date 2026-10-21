@@ -1,0 +1,8 @@
+// What: a `\\` multiline string's terminating ';' written on the same line as its text.
+// Expect: the ';' is part of the string text; end the string with ';' on a line of its own.
+fn usage() Str {
+    \\usage: utu check <file.utu>
+    \\       utu run <file.utu>;
+}
+
+export main() Str { usage(); }

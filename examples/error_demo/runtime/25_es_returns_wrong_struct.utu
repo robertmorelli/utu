@@ -1,0 +1,14 @@
+// What: an @es binding declared to return an enum gives back a plain JS object
+// Expect: TypeError at the boundary: `load_shape` returned a value that is not a Shape
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+let load_shape: fun() Shape = @es/\ () => ({ r: 2 }) \/;
+
+export main() F64 {
+    alt load_shape() {
+        Circle |c| => c.r,
+        Square |s| => s.side,
+    };
+}

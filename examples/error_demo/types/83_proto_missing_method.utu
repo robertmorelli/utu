@@ -1,0 +1,11 @@
+// What: a struct declares a protocol but never implements its method
+// Expect: Square does not implement protocol method 'Shape.area'
+proto Shape:
+    | area() F64
+
+struct Square[Shape]:
+    | side: F64
+
+fn total(s: Shape) F64 { s.area(); }
+
+export main() I32 { total(Square { side: 2.0 }).to_i32(); }

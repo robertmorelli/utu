@@ -1,0 +1,10 @@
+// What: assigning through [] on a struct with no set_index
+// Expect: Grid has no '[]=' operator
+struct Grid:
+    | cells: Array[I32]
+
+export main() I32 {
+    let g = Grid { cells: [1, 2, 3] };
+    g[0] = 5;
+    0;
+}

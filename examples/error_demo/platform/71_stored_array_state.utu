@@ -1,0 +1,8 @@
+// What: @stored of an Array type
+// Expect: @stored state must be a struct ...; but Array[Str] is not even accepted by the type scanner
+using Browser from std:Browser;
+
+export main() void {
+    let tags = @stored/\ Array[Str] "tags" ["a"] \/;
+    Browser.console.log(tags.len());
+}

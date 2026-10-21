@@ -1,0 +1,7 @@
+// What: awaiting a stream instead of reading it with await for
+// Expect: Cannot await Stream[I32]: read a stream with await for (s) |v| { … }
+export main() I32 {
+    let s = Stream[I32].of([1, 2, 3]);
+    let v = await s;
+    0;
+}

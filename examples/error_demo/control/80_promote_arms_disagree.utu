@@ -1,0 +1,12 @@
+// What: promote's present arm and default arm give different types.
+// Expect: promote arms disagree: |n| arm is Str, default is I32
+fn initial(name: ?Str) Str {
+    promote name {
+        |n| => n.slice(0, 1),
+        ~> 0,
+    };
+}
+
+export main() Str {
+    initial(null);
+}

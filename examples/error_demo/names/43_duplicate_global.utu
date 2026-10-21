@@ -1,0 +1,8 @@
+// What: two top-level lets of the same name
+// Expect: Duplicate top-level declaration 'limit'
+let limit: I32 = 3;
+let limit: I32 = 5;
+
+export main() I32 {
+    limit;
+}

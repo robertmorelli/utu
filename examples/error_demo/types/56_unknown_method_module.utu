@@ -1,0 +1,7 @@
+// What: calling a function a plain module does not define
+// Expect: Unknown method 'geometry.cube' (or: geometry has no function cube)
+mod geometry {
+    fn square(x: F64) F64 { x * x; }
+}
+
+export main() I32 { geometry.cube(2.0).to_i32(); }

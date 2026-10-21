@@ -1,0 +1,9 @@
+// What: two export main declarations (an old one left behind)
+// Expect: entry surface: multiple export main declarations (second at line 7, first at line 3)
+export main() I32 {
+    1;
+}
+
+export main() I32 {
+    2;
+}

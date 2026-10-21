@@ -1,0 +1,11 @@
+// What: two structs contain each other directly
+// Expect: Recursive type 'Parent' must use a nullable or indirect field (Parent -> Child -> Parent)
+struct Parent:
+    | child: Child
+
+struct Child:
+    | parent: Parent
+
+export main() I32 {
+    0;
+}

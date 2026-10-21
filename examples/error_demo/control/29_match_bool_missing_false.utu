@@ -1,0 +1,9 @@
+// What: matches a Bool but only handles true.
+// Expect: Missing Bool case 'false' in match
+fn bit(b: Bool) I32 {
+    match b { true => 1, };
+}
+
+export main() I32 {
+    bit(false);
+}

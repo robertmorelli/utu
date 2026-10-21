@@ -1,0 +1,7 @@
+// What: dividing the most negative I32 by -1
+// Expect: trap: integer overflow in division (-2147483648 / -1)
+export main() I32 {
+    let min = -2147483647 - 1;
+    let d = 0 - 1;
+    min / d;
+}

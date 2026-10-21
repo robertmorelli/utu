@@ -1,0 +1,10 @@
+// What: prune used in an ordinary for over an array, as a "skip"
+// Expect: prune skips a subtree of a recursive generator; in a plain loop use continue
+export main() I32 {
+    let total = 0;
+    for ([1, -2, 3]) |x| {
+        if x < 0 { prune; };
+        total += x;
+    };
+    total;
+}

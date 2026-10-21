@@ -1,0 +1,21 @@
+// What: an alt arm names a variant of a different enum
+// Expect: Shape has no variant Ok (Ok is a variant of Outcome)
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+enum Outcome:
+    | Ok {}
+    | Failed {}
+
+fn area(s: Shape) F64 {
+    alt s {
+        Circle |c| => c.r,
+        Ok => 0.0,
+        ~> 1.0,
+    };
+}
+
+export main() F64 {
+    area(Circle { r: 1.0 });
+}

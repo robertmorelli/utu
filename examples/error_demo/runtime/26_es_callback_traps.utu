@@ -1,0 +1,8 @@
+// What: a utu closure passed to JS traps when JS calls it (here, inside Array.map)
+// Expect: the trap message, ideally with the utu location of the closure
+let map_all: fun(Array[I32], cl(I32) I32) I32 = @es/\ (xs, f) => { let s = 0; for (let i = 0; i < 3; i++) s += f(i); return s; } \/;
+
+export main() I32 {
+    let xs = [10, 20, 30];
+    map_all(xs, cl(i) { 100 / (i - 1); });
+}

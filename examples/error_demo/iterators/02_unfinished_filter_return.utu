@@ -1,0 +1,9 @@
+// What: a function returns a filter pipeline without collecting it
+// Expect: filter pipeline is unfinished: the function returns Array[I32], so end it with collect(I32)
+fn evens(xs: Array[I32]) Array[I32] {
+    xs filter |n| { n % 2 == 0; };
+}
+
+export main() I32 {
+    evens([1, 2, 3, 4]).len();
+}

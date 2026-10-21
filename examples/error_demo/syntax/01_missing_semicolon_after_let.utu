@@ -1,0 +1,8 @@
+// What: a let statement is missing its trailing semicolon.
+// Expect: expected ';' after `let total = price * qty`, pointing at the end of line 4.
+fn cost(price: I32, qty: I32) I32 {
+    let total = price * qty
+    total + 5;
+}
+
+export main() I32 { cost(3, 4); }

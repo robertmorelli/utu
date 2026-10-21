@@ -1,0 +1,19 @@
+// What: a test file where one assert fails among passing tests
+// Expect: FAIL clamp keeps values in range: assertion failed `clamp(15, 0, 10) == 15` at 40_test_one_failing.utu:14
+fn clamp(x: I32, low: I32, high: I32) I32 {
+    if x < low { return low; };
+    if x > high { return high; };
+    x;
+}
+
+test "clamp passes through values in range" {
+    assert clamp(5, 0, 10) == 5;
+}
+
+test "clamp keeps values in range" {
+    assert clamp(15, 0, 10) == 15;
+}
+
+test "clamp lifts low values" {
+    assert clamp(-3, 0, 10) == 0;
+}

@@ -1,0 +1,6 @@
+// What: a pipeline straight over a Str, as if it were an array of chars
+// Expect: a pipeline reads an array or a range, got Str; split it first (text.split(""))
+export main() I32 {
+    let text = "hello";
+    text filter |c| { c == "l"; } count;
+}

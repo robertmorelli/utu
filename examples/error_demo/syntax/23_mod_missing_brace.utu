@@ -1,0 +1,8 @@
+// What: a module's closing brace is missing; the export main lands inside it.
+// Expect: `export main` cannot appear inside `mod geometry`; the `{` on line 3 is not closed.
+mod geometry {
+    fn square(x: F64) F64 { x * x; }
+
+export main() F64 {
+    geometry.square(3.0);
+}

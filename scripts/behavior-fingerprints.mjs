@@ -89,6 +89,8 @@ async function utuFiles(directory) {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       if (['node_modules', 'dist', '.utu'].includes(entry.name)) continue;
+      // The error catalog (examples/error_demo/<category>/) has its own test, test-error-messages.mjs.
+      if (path.basename(directory) === 'error_demo') continue;
       out.push(...await utuFiles(file));
     } else if (entry.name.endsWith('.utu')) {
       out.push(file);

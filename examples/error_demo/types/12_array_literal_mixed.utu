@@ -1,0 +1,6 @@
+// What: an array literal mixing I32 and Str elements
+// Expect: Type mismatch: expected I32, got Str at the "three" element
+export main() I32 {
+    let xs = [1, 2, "three"];
+    xs.len();
+}

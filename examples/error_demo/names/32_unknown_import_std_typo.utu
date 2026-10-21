@@ -1,0 +1,7 @@
+// What: a std module name misspelled (std:Consle)
+// Expect: Unknown std module 'std:Consle'; did you mean std:Console?
+using console from std:Consle;
+
+export main() void {
+    console.log("hi");
+}

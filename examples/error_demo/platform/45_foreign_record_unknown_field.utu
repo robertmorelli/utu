@@ -1,0 +1,8 @@
+// What: a typo in an options record (onse for once)
+// Expect: Unknown foreign property 'onse' in AddEventListenerOptions; did you mean once?
+using Browser from std:Browser;
+
+export main() void {
+    let button = Browser.document.createElement("button");
+    button.addEventListener("click", cl() void { Browser.console.log("hi"); }, &{ onse: true });
+}

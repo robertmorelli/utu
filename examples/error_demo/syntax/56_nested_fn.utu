@@ -1,0 +1,8 @@
+// What: a helper function declared inside another function's body.
+// Expect: functions cannot be nested; declare `square` at the top level or use `cl(x) { ... }`.
+fn sum_of_squares(a: I32, b: I32) I32 {
+    fn square(x: I32) I32 { x * x; }
+    square(a) + square(b);
+}
+
+export main() I32 { sum_of_squares(3, 4); }

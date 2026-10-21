@@ -1,0 +1,15 @@
+// What: assigning an I32 to an input element value (a Str)
+// Expect: Type mismatch: expected Str, got I32 (at .value)
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    input {
+        .value = items.len();
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

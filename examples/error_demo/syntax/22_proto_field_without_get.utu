@@ -1,0 +1,7 @@
+// What: a protocol field declared like a struct field, without `get` / `set`.
+// Expect: a protocol field is `| get name : Str`; a method is `| area() F64`.
+proto Shape:
+    | name: Str
+    | area() F64
+
+export main() I32 { 0; }

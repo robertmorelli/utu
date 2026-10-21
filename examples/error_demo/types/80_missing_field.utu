@@ -1,0 +1,10 @@
+// What: a struct literal that leaves out a field
+// Expect: Missing field 'h' for Rect
+struct Rect:
+    | w: F64
+    | h: F64
+
+export main() I32 {
+    let r = Rect { w: 2.0 };
+    r.w.to_i32();
+}

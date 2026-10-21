@@ -1,0 +1,8 @@
+// What: @stored of a bare I32 counter
+// Expect: @stored state must be a struct so updates can apply in place; wrap I32 in a struct field
+using Browser from std:Browser;
+
+export main() void {
+    let visits = @stored/\ I32 "visits" 0 \/;
+    Browser.console.log(visits);
+}

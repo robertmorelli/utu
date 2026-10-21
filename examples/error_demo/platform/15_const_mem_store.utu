@@ -1,0 +1,8 @@
+// What: writing into a const mem's element
+// Expect: mem primes is const; it cannot be written
+const mem primes: I32 = [2, 3, 5, 7];
+
+export main() I32 {
+    primes[0] = 1;
+    primes[0];
+}

@@ -1,0 +1,8 @@
+// What: an integer enum value given as a name instead of an integer literal.
+// Expect: expected an integer after `=` in `| High = MAX`.
+enum(U8) Level:
+    | Low
+    | Mid
+    | High = MAX
+
+export main() I32 { Level.High.to_i32(); }

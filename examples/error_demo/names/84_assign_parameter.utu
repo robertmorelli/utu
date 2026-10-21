@@ -1,0 +1,11 @@
+// What: assigns to a parameter (is this allowed?)
+// Expect: either allowed, or Cannot assign to parameter 'n'
+fn countdown(n: I32) I32 {
+    let steps = 0;
+    while (n > 0) { n -= 1; steps += 1; };
+    steps;
+}
+
+export main() I32 {
+    countdown(5);
+}

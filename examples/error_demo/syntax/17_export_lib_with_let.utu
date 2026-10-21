@@ -1,0 +1,8 @@
+// What: a global `let` placed inside `export lib { ... }`.
+// Expect: `export lib` holds functions only; declare the global outside it.
+fn area(w: F64, h: F64) F64 { w * h; }
+
+export lib {
+    let unit: F64 = 1.0;
+    fn rect_area(w: F64, h: F64) F64 { area(w, h) * unit; }
+}

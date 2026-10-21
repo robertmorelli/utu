@@ -1,0 +1,9 @@
+// What: a parameter type misspelled (Strng for Str)
+// Expect: Unknown type 'Strng'; did you mean 'Str'?
+fn greet(name: Strng) Str {
+    "hello " + name;
+}
+
+export main() I32 {
+    greet("ada").len();
+}

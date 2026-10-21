@@ -1,0 +1,11 @@
+// What: a method receiver written as an untyped first parameter (Python/Rust habit).
+// Expect: a method names its receiver in bars: `fn Rect.area |self| () F64`.
+struct Rect:
+    | w: F64
+    | h: F64
+
+fn Rect.area(self) F64 {
+    self.w * self.h;
+}
+
+export main() F64 { Rect { w: 2.0, h: 3.0 }.area(); }

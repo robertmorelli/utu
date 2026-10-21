@@ -1,0 +1,8 @@
+// What: a misspelled browser global (documnet)
+// Expect: Unknown foreign member 'Browser.documnet'; did you mean document?
+using Browser from std:Browser;
+
+export main() void {
+    let doc = Browser.documnet;
+    doc.title = "hi";
+}

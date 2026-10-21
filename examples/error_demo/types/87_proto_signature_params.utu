@@ -1,0 +1,11 @@
+// What: implementing a protocol method with an extra parameter
+// Expect: Implementation 'Shape[Square].area' does not match: protocol takes (), implementation takes (F64)
+proto Shape:
+    | area() F64
+
+struct Square[Shape]:
+    | side: F64
+
+fn Shape[Square].area |s| (scale: F64) F64 { s.side * s.side * scale; }
+
+export main() I32 { 0; }

@@ -1,0 +1,12 @@
+// What: a generator stored in a variable to be consumed later
+// Expect: squares is a generator, not a function value: consume it directly with for (squares(…)) |v|
+fn squares(n: I32) yield I32 {
+    for (0 ..< n) |i| { yield i * i; };
+}
+
+export main() I32 {
+    let gen = squares;
+    let total = 0;
+    for (gen(4)) |s| { total += s; };
+    total;
+}

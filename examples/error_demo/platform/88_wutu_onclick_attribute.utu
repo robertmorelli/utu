@@ -1,0 +1,16 @@
+// What: an HTML-style onclick string attribute
+// Expect: events are written on click { … }, not as an attribute
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    button {
+        onclick = "go()";
+        "Go";
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

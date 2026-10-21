@@ -1,0 +1,10 @@
+// What: two variants of an int enum are given the same explicit value
+// Expect: Status.Done and Status.Closed are both 2
+enum(U8) Status:
+    | Open = 1
+    | Done = 2
+    | Closed = 2
+
+export main() I32 {
+    Status.Done.to_i32();
+}

@@ -1,0 +1,9 @@
+// What: await for zipping two streams, as plain for zips arrays
+// Expect: await for reads one stream: await for (s) |value| { … }
+export main() I32 {
+    let a = Stream[I32].of([1, 2]);
+    let b = Stream[I32].of([3, 4]);
+    let total = 0;
+    await for (a, b) |x, y| { total += x * y; };
+    total;
+}

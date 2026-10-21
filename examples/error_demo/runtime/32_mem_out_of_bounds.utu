@@ -1,0 +1,8 @@
+// What: reading a `mem` past what was pushed
+// Expect: trap: index 1000000 out of bounds for mem `bytes` (length 1)
+mem bytes: U8;
+
+export main() I32 {
+    bytes.push(1);
+    bytes[1000000];
+}

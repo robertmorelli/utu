@@ -1,0 +1,9 @@
+// What: interpolates a ?Str directly into a template string.
+// Expect: Cannot turn ?Str into text: it may be null; use orelse "..." in the template
+fn greet(nickname: ?Str) Str {
+    `hello ${nickname}`;
+}
+
+export main() Str {
+    greet("ace");
+}

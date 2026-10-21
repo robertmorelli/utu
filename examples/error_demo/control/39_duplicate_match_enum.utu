@@ -1,0 +1,19 @@
+// What: handles the same integer-enum value twice in a match.
+// Expect: Duplicate match pattern 'Level.Mid'
+enum(U8) Level:
+    | Low
+    | Mid
+    | High
+
+fn label(l: Level) Str {
+    match l {
+        Level.Low => "calm",
+        Level.Mid => "busy",
+        Level.Mid => "busier",
+        Level.High => "on fire",
+    };
+}
+
+export main() Str {
+    label(Level.Mid);
+}

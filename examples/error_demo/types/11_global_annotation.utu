@@ -1,0 +1,5 @@
+// What: a global annotated I32 initialized with a Str literal
+// Expect: Type mismatch: expected I32, got Str
+let limit: I32 = "ten";
+
+export main() I32 { limit; }

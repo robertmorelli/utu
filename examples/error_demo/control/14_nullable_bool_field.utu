@@ -1,0 +1,10 @@
+// What: declares a struct field as ?Bool.
+// Expect: Scalar type 'Bool' cannot be nullable
+struct Flag:
+    | name: Str
+    | value: ?Bool
+
+export main() I32 {
+    let f = Flag { name: "debug", value: null };
+    0;
+}

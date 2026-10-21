@@ -1,0 +1,19 @@
+// What: a recursive generator filters values from its self-call
+// Expect: a recursive generator passes its own values straight through; filter at the consumer instead
+struct Tree:
+    | value: I32
+    | kids: Array[Tree]
+
+fn positives(t: Tree) yield I32 {
+    if t.value > 0 { yield t.value; };
+    for (t.kids) |k| {
+        for (positives(k)) |v| { if v > 0 { yield v; }; };
+    };
+}
+
+export main() I32 {
+    let t = Tree { value: 1, kids: [Tree { value: -2, kids: [] }] };
+    let total = 0;
+    for (positives(t)) |v| { total += v; };
+    total;
+}

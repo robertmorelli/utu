@@ -1,0 +1,13 @@
+// What: an &{ } literal (type from context) repeats a field
+// Expect: Duplicate field 'y'
+struct Point:
+    | x: I32
+    | y: I32
+
+fn origin() Point {
+    &{ x: 0, y: 0, y: 1 };
+}
+
+export main() I32 {
+    origin().y;
+}

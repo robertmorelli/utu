@@ -1,0 +1,13 @@
+// What: returns a value from a function declared void.
+// Expect: log_twice returns void; return takes no value here
+using console from std:Console;
+
+fn log_twice(s: Str) void {
+    console.log(s);
+    console.log(s);
+    return 1;
+}
+
+export main() void {
+    log_twice("hi");
+}

@@ -1,0 +1,7 @@
+// What: reassigning an inferred I32 local with a Str
+// Expect: Type mismatch: expected I32, got Str
+export main() I32 {
+    let n = 1;
+    n = "two";
+    n;
+}

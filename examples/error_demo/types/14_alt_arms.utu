@@ -1,0 +1,14 @@
+// What: alt arms producing different types
+// Expect: Type mismatch: expected F64, got Str at the second arm
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+fn area(s: Shape) F64 {
+    alt s {
+        Circle |c| => 3.14 * c.r * c.r,
+        Square => "unknown",
+    };
+}
+
+export main() I32 { area(Circle { r: 1.0 }).to_i32(); }

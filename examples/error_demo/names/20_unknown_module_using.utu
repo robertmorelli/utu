@@ -1,0 +1,11 @@
+// What: `using` names a module that does not exist in this file (geometri)
+// Expect: Module 'geometri' not found; did you mean 'geometry'?
+mod geometry {
+    fn square(x: F64) F64 { x * x; }
+}
+
+using geometri |geo|;
+
+export main() F64 {
+    geo.square(3.0);
+}

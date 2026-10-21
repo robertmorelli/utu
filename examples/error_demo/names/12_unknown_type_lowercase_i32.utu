@@ -1,0 +1,9 @@
+// What: a numeric type written in lowercase (i32), as in Rust
+// Expect: Unknown type 'i32'; did you mean 'I32'?
+fn add(a: i32, b: i32) i32 {
+    a + b;
+}
+
+export main() I32 {
+    add(2, 3);
+}

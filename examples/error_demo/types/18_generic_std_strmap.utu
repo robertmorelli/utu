@@ -1,0 +1,9 @@
+// What: storing a Str in a StrMap[I32]
+// Expect: Type mismatch: expected I32, got Str at the value argument
+using StrMap from std:StrMap;
+
+export main() I32 {
+    let ages = StrMap[I32].new();
+    ages.set("ada", "36");
+    ages.get("ada", 0);
+}

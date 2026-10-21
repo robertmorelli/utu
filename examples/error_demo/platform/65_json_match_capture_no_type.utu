@@ -1,0 +1,13 @@
+// What: a capture in a @json pattern without its type
+// Expect: Expected a type for capture name
+
+fn name_of(text: Str) Str {
+    @json/\ match text {
+        { user: { name: |name| } } => name,
+        ~> "",
+    }\/;
+}
+
+export main() I32 {
+    name_of("{}").len();
+}

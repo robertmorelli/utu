@@ -1,0 +1,7 @@
+// What: imports a sibling file that does not exist
+// Expect: Cannot import "./helpers.utu": file not found
+using helpers from "./helpers.utu";
+
+export main() I32 {
+    helpers.double(21);
+}

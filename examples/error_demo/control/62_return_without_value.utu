@@ -1,0 +1,12 @@
+// What: a bare `return;` in a function that must return an I32.
+// Expect: return needs a value: find returns I32
+fn find(xs: Array[I32], target: I32) I32 {
+    for (xs, 0 ..< xs.len()) |x, i| {
+        if x == target { return; };
+    };
+    -1;
+}
+
+export main() I32 {
+    find([1, 2], 2);
+}

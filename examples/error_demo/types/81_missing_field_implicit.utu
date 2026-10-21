@@ -1,0 +1,9 @@
+// What: an &{ } literal (type from context) that leaves out a field
+// Expect: Missing field 'y' for Point
+struct Point:
+    | x: F64
+    | y: F64
+
+fn origin() Point { &{ x: 0.0 }; }
+
+export main() I32 { origin().x.to_i32(); }

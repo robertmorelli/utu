@@ -1,0 +1,9 @@
+// What: the for-loop's |x| capture is used after the loop ends
+// Expect: Unknown variable 'x': the loop variable is only visible inside the loop body
+export main() I32 {
+    let total = 0;
+    for ([3, 1, 4]) |x| {
+        total += x;
+    };
+    total + x;
+}

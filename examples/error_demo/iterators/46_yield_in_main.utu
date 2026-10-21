@@ -1,0 +1,6 @@
+// What: yield written in main, as if printing values
+// Expect: yield can only appear in a generator: declare the function with `yield T` as its return type
+export main() I32 {
+    for (0 ..< 3) |i| { yield i; };
+    0;
+}

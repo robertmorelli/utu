@@ -1,0 +1,10 @@
+// What: a struct field has no type.
+// Expect: expected ':' and a type after field `y`.
+struct Point:
+    | x: F64
+    | y
+
+export main() F64 {
+    let p = Point { x: 1.0, y: 2.0 };
+    p.x;
+}

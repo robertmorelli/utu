@@ -1,0 +1,17 @@
+// What: an Array[Shape] literal containing a non-implementor
+// Expect: Type mismatch: expected Shape, got Label at the element
+proto Shape:
+    | area() F64
+
+struct Circle[Shape]:
+    | r: F64
+
+struct Label:
+    | text: Str
+
+fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+
+export main() I32 {
+    let shapes: Array[Shape] = [Circle { r: 1.0 }, Label { text: "x" }];
+    shapes.len();
+}

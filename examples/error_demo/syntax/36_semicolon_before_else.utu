@@ -1,0 +1,12 @@
+// What: a semicolon after the if branch splits it from its else.
+// Expect: unexpected 'else': the `;` on line 6 ends the if; remove it to attach the else.
+fn sign(n: I32) I32 {
+    if n < 0 {
+        -1;
+    };
+    else {
+        1;
+    };
+}
+
+export main() I32 { sign(5); }

@@ -1,0 +1,6 @@
+// What: a negative literal assigned to an unsigned type.
+// Expect: Integer literal -1 is out of range for U32.
+export main() I32 {
+    let none: U32 = -1;
+    none.to_i32();
+}

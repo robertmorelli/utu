@@ -1,0 +1,17 @@
+// What: an alt over a DOM event target names a utu struct as an arm.
+// Expect: Every arm of an alt over a host value must name a declared class (Note is a utu struct, not a Browser class)
+using Browser from std:Browser;
+
+struct Note:
+    | text: Str
+
+export main() void {
+    let doc = Browser.document;
+    doc.addEventListener("input", cl(e) void {
+        let text = alt e.target {
+            Note |n| => n.text,
+            ~> "",
+        };
+        Browser.console.log(text);
+    });
+}

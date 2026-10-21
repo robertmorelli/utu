@@ -1,0 +1,11 @@
+// What: a match over an I32 with a Bool pattern
+// Expect: Pattern true cannot match values of type I32
+fn bucket(n: I32) I32 {
+    match n {
+        0 => 10,
+        true => 20,
+        ~> 0,
+    };
+}
+
+export main() I32 { bucket(1); }

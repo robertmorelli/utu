@@ -1,0 +1,10 @@
+// What: a struct literal sets the same field twice
+// Expect: Duplicate field 'x' (already set in this literal)
+struct Point:
+    | x: I32
+    | y: I32
+
+export main() I32 {
+    let p = Point { x: 1, y: 2, x: 3 };
+    p.x;
+}

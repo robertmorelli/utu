@@ -1,0 +1,11 @@
+// What: uses alt (variant dispatch) on an I32, where match is meant.
+// Expect: alt needs an enum value, got I32; use match for numbers
+fn describe(n: I32) Str {
+    alt n {
+        ~> "number",
+    };
+}
+
+export main() Str {
+    describe(3);
+}

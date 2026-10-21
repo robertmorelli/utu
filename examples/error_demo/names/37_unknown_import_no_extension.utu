@@ -1,0 +1,7 @@
+// What: imports a sibling utu file without the .utu extension
+// Expect: Cannot import "./01_unknown_variable_typo": file not found (did you mean "./01_unknown_variable_typo.utu"?)
+using other from "./01_unknown_variable_typo";
+
+export main() I32 {
+    0;
+}

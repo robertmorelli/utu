@@ -1,0 +1,7 @@
+// What: storing an F64 into an Array[I32] element
+// Expect: Type mismatch: expected I32, got F64
+export main() I32 {
+    let xs = Array[I32].new(3, 0);
+    xs[0] = 1.5;
+    xs[0];
+}

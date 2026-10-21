@@ -1,0 +1,9 @@
+// What: an own module named like a std module (Str) redeclares one of its functions
+// Expect: Duplicate top-level declaration 'Str.len' (std's Str already declares it)
+mod Str {
+    fn len |s| () I32 { 0; }
+}
+
+export main() I32 {
+    "abc".len();
+}

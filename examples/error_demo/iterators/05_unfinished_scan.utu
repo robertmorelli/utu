@@ -1,0 +1,6 @@
+// What: scan used as if it returned the running totals
+// Expect: scan is a stage, not a terminal: add collect(I32) to get the running totals
+export main() I32 {
+    let totals = [1, 2, 3] scan(0) |acc, v| { acc + v; };
+    totals[2];
+}

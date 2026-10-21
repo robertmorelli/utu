@@ -1,0 +1,10 @@
+// What: integer division where the divisor comes out zero
+// Expect: trap: integer division by zero at 09_div_by_zero.utu:4
+fn average(total: I32, count: I32) I32 {
+    total / count;
+}
+
+export main() I32 {
+    let items: Array[I32] = [];
+    average(0, items.len());
+}

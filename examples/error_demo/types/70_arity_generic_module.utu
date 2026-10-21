@@ -1,0 +1,12 @@
+// What: instantiating a one-parameter generic module with two type arguments
+// Expect: Module 'Box' expects 1 type argument(s), got 2
+mod Box[T] {
+    struct &:
+        | value: T
+    fn &.new(v: T) & { &{ value: v }; }
+}
+
+export main() I32 {
+    let b = Box[I32, Str].new(1);
+    b.value;
+}

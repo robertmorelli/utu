@@ -1,0 +1,16 @@
+// What: passing a struct that does not implement the protocol where the protocol is expected
+// Expect: Type mismatch: expected Shape, got Label (Label does not implement Shape)
+proto Shape:
+    | area() F64
+
+struct Circle[Shape]:
+    | r: F64
+
+struct Label:
+    | text: Str
+
+fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+
+fn total(s: Shape) F64 { s.area(); }
+
+export main() I32 { total(Label { text: "x" }).to_i32(); }

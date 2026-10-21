@@ -1,0 +1,10 @@
+// What: constructing an enum variant without one of its fields
+// Expect: Missing field 'h' for Rect
+enum Shape:
+    | Rect { w: F64, h: F64 }
+    | Dot {}
+
+export main() I32 {
+    let s: Shape = Rect { w: 1.0 };
+    0;
+}

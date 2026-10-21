@@ -1,0 +1,8 @@
+// What: using the result of a void function as an I32
+// Expect: Type mismatch: expected I32, got void
+fn log_it(n: I32) void { }
+
+export main() I32 {
+    let r: I32 = log_it(3);
+    r;
+}

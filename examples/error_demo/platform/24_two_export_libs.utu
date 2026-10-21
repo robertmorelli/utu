@@ -1,0 +1,9 @@
+// What: two export lib blocks in one file
+// Expect: entry surface: multiple export lib declarations; merge them into one export lib { … } (pointing at the second)
+export lib {
+    fn add(a: I32, b: I32) I32 { a + b; }
+}
+
+export lib {
+    fn sub(a: I32, b: I32) I32 { a - b; }
+}

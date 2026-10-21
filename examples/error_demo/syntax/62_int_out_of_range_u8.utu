@@ -1,0 +1,6 @@
+// What: an integer literal too large for a U8 binding.
+// Expect: Integer literal 300 is out of range for U8 (0 to 255).
+export main() I32 {
+    let level: U8 = 300;
+    level.to_i32();
+}

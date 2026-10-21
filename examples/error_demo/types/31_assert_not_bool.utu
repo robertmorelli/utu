@@ -1,0 +1,7 @@
+// What: assert on an I32 value
+// Expect: Type mismatch: expected Bool, got I32
+fn count() I32 { 3; }
+
+test "counts something" {
+    assert count();
+}

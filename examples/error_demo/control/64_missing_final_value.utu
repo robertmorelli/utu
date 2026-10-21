@@ -1,0 +1,9 @@
+// What: the function body ends with a let, so it produces no I32.
+// Expect: double must end with an I32 value; its last statement is a let (add `d;`)
+fn double(x: I32) I32 {
+    let d = x * 2;
+}
+
+export main() I32 {
+    double(4);
+}

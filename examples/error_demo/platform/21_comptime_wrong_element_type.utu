@@ -1,0 +1,13 @@
+// What: a @comptime initializer that builds Array[F64] for an I32 mem
+// Expect: @comptime: Type mismatch: expected Array[I32], got Array[F64]
+fn halves(n: I32) Array[F64] {
+    let out = Array[F64].new(n, 0.0);
+    for (0 ..< n) |i| { out[i] = i.to_f64() / 2.0; };
+    out;
+}
+
+const mem table: I32 = @comptime/\ halves(8) \/;
+
+export main() I32 {
+    table[2];
+}

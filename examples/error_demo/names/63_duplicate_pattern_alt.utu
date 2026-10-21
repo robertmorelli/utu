@@ -1,0 +1,17 @@
+// What: an alt lists one variant twice
+// Expect: Duplicate alt arm 'Circle'
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+fn area(s: Shape) F64 {
+    alt s {
+        Circle |c| => 3.0 * c.r * c.r,
+        Circle |c| => c.r,
+        Square |q| => q.side * q.side,
+    };
+}
+
+export main() F64 {
+    area(Circle { r: 1.0 });
+}

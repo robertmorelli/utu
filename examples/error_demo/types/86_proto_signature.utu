@@ -1,0 +1,11 @@
+// What: implementing a protocol method with the wrong return type
+// Expect: Implementation 'Shape[Square].area' does not match the protocol signature: expected () F64, got () I32
+proto Shape:
+    | area() F64
+
+struct Square[Shape]:
+    | side: F64
+
+fn Shape[Square].area |s| () I32 { s.side.to_i32() * s.side.to_i32(); }
+
+export main() I32 { 0; }

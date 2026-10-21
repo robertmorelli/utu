@@ -1,0 +1,6 @@
+// What: binds null with no type annotation.
+// Expect: Bare null requires a nullable type context: write let current: ?T = null
+export main() I32 {
+    let current = null;
+    0;
+}

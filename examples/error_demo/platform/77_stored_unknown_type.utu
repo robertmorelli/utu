@@ -1,0 +1,12 @@
+// What: @stored naming a struct that does not exist (typo)
+// Expect: Unknown type Prefz
+using Browser from std:Browser;
+
+struct Prefs:
+    | name: Str
+    | enabled: Bool
+
+export main() void {
+    let prefs = @stored/\ Prefz "prefs-v1" Prefs { name: "", enabled: true } \/;
+    Browser.console.log(prefs.name);
+}

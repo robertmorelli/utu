@@ -1,0 +1,8 @@
+// What: a `${` hole inside a template string is never closed with `}`.
+// Expect: a `${` in a template string is not closed: expected '}'.
+using console from std:Console;
+
+export main() void {
+    let n = 3;
+    console.log(`items: ${n`);
+}

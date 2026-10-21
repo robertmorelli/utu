@@ -1,0 +1,11 @@
+// What: a Python/JS-style `for x in xs` loop.
+// Expect: utu's for is `for (xs) |x| { ... }`; got 'x' where '(' was expected.
+fn sum(xs: Array[I32]) I32 {
+    let total = 0;
+    for x in xs {
+        total += x;
+    };
+    total;
+}
+
+export main() I32 { sum([1, 2, 3]); }

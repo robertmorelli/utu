@@ -1,0 +1,9 @@
+// What: the same function is declared twice at the top level
+// Expect: Duplicate top-level declaration 'area' (first declared on line 3)
+fn area(w: I32, h: I32) I32 { w * h; }
+
+fn area(r: I32) I32 { 3 * r * r; }
+
+export main() I32 {
+    area(2, 3);
+}

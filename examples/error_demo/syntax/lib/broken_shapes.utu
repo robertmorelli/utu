@@ -1,0 +1,7 @@
+// Helper for 90_error_in_imported_file.utu: it has a syntax error on purpose (missing ';' after the let).
+mod shapes {
+    fn square(x: F64) F64 {
+        let y = x * x
+        y;
+    }
+}

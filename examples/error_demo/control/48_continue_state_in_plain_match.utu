@@ -1,0 +1,14 @@
+// What: writes continue <state> in a plain match (forgot the 'loop' keyword).
+// Expect: continue with a state only works inside loop match (this is a plain match; write loop match)
+fn steps(n: I32) I32 {
+    let count = 0;
+    match n {
+        0 => { count += 1; continue 1; },
+        ~> {},
+    };
+    count;
+}
+
+export main() I32 {
+    steps(0);
+}

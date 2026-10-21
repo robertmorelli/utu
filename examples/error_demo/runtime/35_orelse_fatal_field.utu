@@ -1,0 +1,11 @@
+// What: unwrapping a struct's null `next` field with `orelse fatal`
+// Expect: trap: `orelse fatal` on null `tail.next` at 35_orelse_fatal_field.utu:9
+struct Node:
+    | name: Str
+    | next: ?Node
+
+export main() Str {
+    let tail = Node { name: "b", next: null };
+    let n = tail.next orelse fatal;
+    n.name;
+}

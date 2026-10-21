@@ -1,0 +1,6 @@
+// What: a pipeline stage applied to a Stream (streams have methods, not stages)
+// Expect: a pipeline reads an array or a range, got Stream[I32]; use s.map(cl(v) { … }) and await for
+export main() I32 {
+    let s = Stream[I32].of([1, 2, 3]);
+    s map |v| { v * 2; } sum;
+}

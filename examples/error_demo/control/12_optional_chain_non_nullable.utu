@@ -1,0 +1,12 @@
+// What: uses ?. on a struct value that cannot be null.
+// Expect: '?.' needs a nullable value; p is Point, which is never null; use '.'
+using console from std:Console;
+
+struct Point:
+    | x: F64
+    | y: F64
+
+export main() void {
+    let p = Point { x: 1.0, y: 2.0 };
+    console.log(p?.x.to_str());
+}

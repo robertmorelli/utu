@@ -1,0 +1,8 @@
+// What: an @es binding declared to return Str returns null (a missing DOM attribute, say)
+// Expect: TypeError at the boundary: `read_setting` returned null, but its type says Str (declared at 02_es_returns_null_for_str.utu:4)
+let read_setting: fun(Str) Str = @es/\ (key) => ({ theme: "dark" })[key] ?? null \/;
+
+export main() I32 {
+    let lang = read_setting("lang");
+    lang.len();
+}

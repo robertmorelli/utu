@@ -1,0 +1,10 @@
+// What: awaiting inside the closure given to Stream.map
+// Expect: a closure cannot await: a closure is called through the host, where JSPI cannot suspend
+let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+
+export main() I32 {
+    let s = Stream[I32].of([1, 2]).map(cl(v) { let w: I32 = await later(v); w; });
+    let total = 0;
+    await for (s) |v| { total += v; };
+    total;
+}

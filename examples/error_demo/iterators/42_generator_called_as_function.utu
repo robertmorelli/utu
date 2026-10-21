@@ -1,0 +1,10 @@
+// What: a generator called like a function returning an array
+// Expect: squares is a generator: consume it with `for (squares(…)) |value| { … }`
+fn squares(n: I32) yield I32 {
+    for (0 ..< n) |i| { yield i * i; };
+}
+
+export main() I32 {
+    let xs = squares(4);
+    xs.len();
+}

@@ -1,0 +1,13 @@
+// What: a @json match without the text to match
+// Expect: @json match needs the text to match: `match text { … }`
+
+fn status(text: Str) I32 {
+    @json/\ match {
+        { status: "ok" } => 1,
+        ~> 0,
+    }\/;
+}
+
+export main() I32 {
+    status("{}");
+}

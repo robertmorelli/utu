@@ -1,0 +1,13 @@
+// What: the ~> arm of a @json match is not last
+// Expect: The ~> arm must be last in @json match
+
+fn status(text: Str) I32 {
+    @json/\ match text {
+        ~> 0,
+        { status: "ok" } => 1,
+    }\/;
+}
+
+export main() I32 {
+    status("{}");
+}

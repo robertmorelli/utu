@@ -1,0 +1,7 @@
+// What: an empty `${}` hole in a template string.
+// Expect: expected an expression inside `${}`.
+fn label(n: I32) Str {
+    `count: ${} items`;
+}
+
+export main() Str { label(3); }

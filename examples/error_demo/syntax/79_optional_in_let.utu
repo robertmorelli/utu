@@ -1,0 +1,11 @@
+// What: an optional chain `?.` used as the value of a let.
+// Expect: '?.' is only allowed in statements; use promote or orelse for a value.
+struct Node:
+    | name: Str
+    | next: ?Node
+
+export main() Str {
+    let head = Node { name: "a", next: null };
+    let second = head.next?.name;
+    second;
+}

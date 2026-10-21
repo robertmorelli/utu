@@ -1,0 +1,10 @@
+// What: yield in a function declared with a normal return type
+// Expect: yield can only appear in a generator: declare the function with `yield I32` as its return type
+fn evens(n: I32) I32 {
+    for (0 ..< n) |i| { if i % 2 == 0 { yield i; }; };
+    0;
+}
+
+export main() I32 {
+    evens(10);
+}

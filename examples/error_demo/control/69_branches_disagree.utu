@@ -1,0 +1,9 @@
+// What: if/else used as a value where one branch is I32 and the other Str.
+// Expect: if branches disagree: then is I32, else is Str
+fn label(n: I32) I32 {
+    if n > 0 { n; } else { "none"; };
+}
+
+export main() I32 {
+    label(1);
+}

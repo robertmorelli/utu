@@ -1,0 +1,12 @@
+// What: an enum variant and a top-level struct share a name (variants are types too)
+// Expect: Duplicate top-level declaration 'Circle': it is a variant of Shape and a struct
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+struct Circle:
+    | radius: F64
+
+export main() I32 {
+    0;
+}

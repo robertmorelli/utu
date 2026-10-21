@@ -1,0 +1,20 @@
+// What: prune from a closure inside the consumer of a recursive generator
+// Expect: prune cannot appear inside a closure
+struct Node:
+    | name: Str
+    | kids: Array[Node]
+
+fn walk(n: Node) yield Node {
+    for (n.kids) |k| { yield k; for (walk(k)) |d| { yield d; }; };
+}
+
+export main() I32 {
+    let root = Node { name: "/", kids: [Node { name: "tmp", kids: [] }] };
+    let count = 0;
+    for (walk(root)) |n| {
+        let skip = cl() { if n.name == "tmp" { prune; }; };
+        skip();
+        count += 1;
+    };
+    count;
+}

@@ -1,0 +1,16 @@
+// What: two generators that consume each other
+// Expect: generator evens consumes itself (through odds); generators expand inline, so they cannot recurse
+fn evens(n: I32) yield I32 {
+    if n > 0 { for (odds(n - 1)) |v| { yield v; }; };
+    yield n;
+}
+
+fn odds(n: I32) yield I32 {
+    if n > 0 { for (evens(n - 1)) |v| { yield v; }; };
+}
+
+export main() I32 {
+    let total = 0;
+    for (evens(4)) |v| { total += v; };
+    total;
+}

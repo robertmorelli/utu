@@ -207,6 +207,7 @@
   "devDependencies": {
     "@floating-ui/dom": "1.8.0",
     "@types/node": "26.6.2",
+    "errors:show": "node ./scripts/show-diagnostics.mjs",
     "@vscode/test-web": "^0.0.80",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.4",

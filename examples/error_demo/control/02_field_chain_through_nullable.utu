@@ -1,0 +1,10 @@
+// What: chains two field reads where the middle link is nullable.
+// Expect: Cannot read field 'name' of head.next (?Node): it may be null
+struct Node:
+    | name: Str
+    | next: ?Node
+
+export main() Str {
+    let head = Node { name: "a", next: Node { name: "b", next: null } };
+    head.next.name;
+}

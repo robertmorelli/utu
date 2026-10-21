@@ -1,0 +1,14 @@
+// What: reading a field from an alt-bound variant that it does not have
+// Expect: Unknown field 'radius' for Circle
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+fn size(s: Shape) F64 {
+    alt s {
+        Circle |c| => c.radius,
+        Dot => 0.0,
+    };
+}
+
+export main() I32 { size(Dot {}).to_i32(); }

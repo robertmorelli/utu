@@ -1,0 +1,9 @@
+// What: an explicit enum value too large for its U8 representation
+// Expect: Code.Huge = 300 does not fit in U8 (0..255)
+enum(U8) Code:
+    | Small = 1
+    | Huge = 300
+
+export main() I32 {
+    Code.Small.to_i32();
+}

@@ -1,0 +1,8 @@
+// What: calling .length() on a mem (JS habit) instead of .len()
+// Expect: mem bytes has no method 'length'; did you mean len?
+mem bytes: U8;
+
+export main() I32 {
+    bytes.push(1);
+    bytes.length();
+}

@@ -1,0 +1,9 @@
+// What: `utu run` on a main that returns a struct
+// Expect: something readable printed (its to_str, or the fields), not an opaque object
+struct Point:
+    | x: I32
+    | y: I32
+
+export main() Point {
+    Point { x: 1, y: 2 };
+}

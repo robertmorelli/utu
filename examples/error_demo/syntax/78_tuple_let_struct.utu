@@ -1,0 +1,10 @@
+// What: destructuring a struct as if it were a tuple (JS object destructuring habit).
+// Expect: let .{…} takes apart a tuple, but this value is Point; read its fields as p.x, p.y.
+struct Point:
+    | x: I32
+    | y: I32
+
+export main() I32 {
+    let .{x, y} = Point { x: 1, y: 2 };
+    x + y;
+}

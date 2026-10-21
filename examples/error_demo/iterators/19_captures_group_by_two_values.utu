@@ -1,0 +1,6 @@
+// What: group_by key body binds a key and a value
+// Expect: group_by binds one value and an optional index; got 3 names
+export main() I32 {
+    let groups = [1, 2, 3, 4] group_by(I32, I32) |k, v, i| { v % 2; };
+    groups.len();
+}

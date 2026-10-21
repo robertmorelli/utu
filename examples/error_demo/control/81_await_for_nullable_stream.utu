@@ -1,0 +1,11 @@
+// What: reads a ?Stream[I32] with await for, without checking for null.
+// Expect: Cannot read a stream that may be null: s is ?Stream[I32]; promote it first
+fn sum(s: ?Stream[I32]) I32 {
+    let acc = 0;
+    await for (s) |v| { acc += v; };
+    acc;
+}
+
+export main() I32 {
+    sum(Stream[I32].of([1, 2, 3]));
+}

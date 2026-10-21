@@ -1,0 +1,13 @@
+// What: `elif` used instead of `else if`.
+// Expect: 'elif' is not a keyword: write `else if`.
+fn sign(n: I32) I32 {
+    if n < 0 {
+        -1;
+    } elif n == 0 {
+        0;
+    } else {
+        1;
+    };
+}
+
+export main() I32 { sign(5); }

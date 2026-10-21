@@ -1,0 +1,7 @@
+// What: a local is misspelled where it is used (lengh for length)
+// Expect: Unknown variable 'lengh'; did you mean 'length'?
+export main() I32 {
+    let length = 12;
+    let width = 3;
+    lengh * width;
+}

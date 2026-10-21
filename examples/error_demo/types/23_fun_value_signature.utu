@@ -1,0 +1,7 @@
+// What: passing a function with the wrong signature as a fun value
+// Expect: Type mismatch: expected fun(I32) I32, got fun(F64) F64
+fn halve(x: F64) F64 { x / 2.0; }
+
+fn twice(f: fun(I32) I32, x: I32) I32 { f(f(x)); }
+
+export main() I32 { twice(halve, 8); }

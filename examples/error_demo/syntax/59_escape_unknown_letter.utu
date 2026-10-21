@@ -1,0 +1,6 @@
+// What: an unknown escape `\d` (regex habit) in a string literal.
+// Expect: Invalid escape '\d' (known escapes: \n \t \r \b \f \" \\ \uXXXX).
+export main() Bool {
+    let pattern = "\d+";
+    pattern.len() == 3;
+}

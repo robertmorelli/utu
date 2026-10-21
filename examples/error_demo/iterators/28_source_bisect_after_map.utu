@@ -1,0 +1,6 @@
+// What: bisect after a map stage, which it does not allow
+// Expect: bisect searches a materialized array: collect(I32) first, then bisect
+export main() I32 {
+    let xs = [1, 2, 3, 4];
+    xs map |n| { n * 2; } bisect |v| { v < 5; };
+}

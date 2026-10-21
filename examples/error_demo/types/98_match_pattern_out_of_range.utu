@@ -1,0 +1,11 @@
+// What: a negative pattern in a match over a U32
+// Expect: Pattern -1 is out of range for U32 and can never match
+fn status(code: U32) I32 {
+    match code {
+        0 => 0,
+        -1 => 1,
+        ~> 2,
+    };
+}
+
+export main() I32 { status(0); }

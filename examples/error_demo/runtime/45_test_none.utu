@@ -1,0 +1,5 @@
+// What: running `utu test` on a file that has no tests
+// Expect: "no tests in 45_test_none.utu" (and probably exit 0 or a distinct code)
+export main() I32 {
+    0;
+}

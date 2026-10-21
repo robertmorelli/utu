@@ -1,0 +1,13 @@
+// What: calling a method the protocol does not declare
+// Expect: Unknown method 'Shape.perimeter'
+proto Shape:
+    | area() F64
+
+struct Circle[Shape]:
+    | r: F64
+
+fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+
+fn edge(s: Shape) F64 { s.perimeter(); }
+
+export main() I32 { edge(Circle { r: 1.0 }).to_i32(); }

@@ -1,0 +1,14 @@
+// What: an alt over a host value writes a bare class name, forgetting the Browser. prefix.
+// Expect: Every arm of an alt over a host value must name a declared class: write Browser.HTMLInputElement
+using Browser from std:Browser;
+
+export main() void {
+    let doc = Browser.document;
+    doc.addEventListener("input", cl(e) void {
+        let text = alt e.target {
+            HTMLInputElement |t| => t.value,
+            ~> "",
+        };
+        Browser.console.log(text);
+    });
+}

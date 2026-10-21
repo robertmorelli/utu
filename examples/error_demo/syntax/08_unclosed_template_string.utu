@@ -1,0 +1,8 @@
+// What: a template string's closing backtick is missing.
+// Expect: a template string not closed, pointing at the opening backtick.
+using console from std:Console;
+
+export main() void {
+    let name = "Ada";
+    console.log(`hello, ${name});
+}

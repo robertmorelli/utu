@@ -52,7 +52,11 @@ async function programs() {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const file = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!['node_modules', 'dist', '.utu'].includes(entry.name)) walk(file);
+        // The error catalog's folders (examples/error_demo/<category>/) say what
+        // the self-hosted compiler says, on purpose: test-error-messages.mjs
+        // keeps them, not stage 0.
+        const catalog = path.basename(dir) === 'error_demo';
+        if (!['node_modules', 'dist', '.utu'].includes(entry.name) && !catalog) walk(file);
       } else if (entry.name.endsWith('.utu')) {
         out.push({ name: path.relative(ROOT, file), file });
       }

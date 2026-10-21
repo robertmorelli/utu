@@ -1,0 +1,7 @@
+// What: multiplying an F32 by an F64
+// Expect: Type mismatch: expected F32, got F64
+fn scale(x: F32, k: F64) F32 {
+    x * k;
+}
+
+export main() I32 { scale(1.0, 2.0).to_i32(); }

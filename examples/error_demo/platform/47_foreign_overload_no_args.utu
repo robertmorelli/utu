@@ -1,0 +1,7 @@
+// What: calling createElement with no arguments
+// Expect: createElement expects 1–2 arguments, got 0
+using Browser from std:Browser;
+
+export main() void {
+    let el = Browser.document.createElement();
+}

@@ -1,0 +1,16 @@
+// What: loops while a nullable cursor is "truthy", as in JavaScript.
+// Expect: while condition must be Bool, got ?Node (write cur != null)
+struct Node:
+    | value: I32
+    | next: ?Node
+
+fn length(head: ?Node) I32 {
+    let n = 0;
+    let cur = head;
+    while (cur) { n += 1; cur = null; };
+    n;
+}
+
+export main() I32 {
+    length(null);
+}

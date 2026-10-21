@@ -1,0 +1,8 @@
+// What: awaiting a Promise[Str] into an I32 binding
+// Expect: Type mismatch: expected I32, got Str (the awaited value of Promise[Str])
+let fetch_name: fun() Promise[Str] = @es/\ () => Promise.resolve("ada") \/;
+
+export main() I32 {
+    let n: I32 = await fetch_name();
+    n;
+}

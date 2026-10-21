@@ -1,0 +1,11 @@
+// What: both `export lib` and `export main` in one entry file.
+// Expect: entry surface: export lib and export main are mutually exclusive.
+fn area(w: F64, h: F64) F64 { w * h; }
+
+export lib {
+    fn rect_area(w: F64, h: F64) F64 { area(w, h); }
+}
+
+export main() F64 {
+    area(2.0, 3.0);
+}

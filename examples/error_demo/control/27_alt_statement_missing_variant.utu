@@ -1,0 +1,17 @@
+// What: an alt used as a statement (void arms) still misses a variant.
+// Expect: Missing variant 'Quit' in alt over enum Command (or accepted, since a void alt may skip variants)
+using console from std:Console;
+
+enum Command:
+    | Say { text: Str }
+    | Quit {}
+
+fn run(c: Command) void {
+    alt c {
+        Say |s| => console.log(s.text),
+    };
+}
+
+export main() void {
+    run(Quit {});
+}

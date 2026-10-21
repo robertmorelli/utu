@@ -1,0 +1,19 @@
+// What: a match over an int enum with a pattern from another enum
+// Expect: Pattern Size.Small cannot match values of type Color
+enum(U8) Color:
+    | Red
+    | Green
+
+enum(U8) Size:
+    | Small
+    | Large
+
+fn f(c: Color) I32 {
+    match c {
+        Color.Red => 0,
+        Size.Small => 1,
+        ~> 2,
+    };
+}
+
+export main() I32 { f(Color.Red); }

@@ -1,0 +1,7 @@
+// What: for over the characters of a Str
+// Expect: for can only iterate an array, got Str; split it first
+export main() I32 {
+    let vowels = 0;
+    for ("banana") |c| { if c == "a" { vowels += 1; }; };
+    vowels;
+}

@@ -1,0 +1,9 @@
+// What: two sources but only one capture
+// Expect: for over 2 sources binds 2 values, got 1
+export main() I32 {
+    let a = [1, 2, 3];
+    let b = [4, 5, 6];
+    let total = 0;
+    for (a, b) |x| { total += x; };
+    total;
+}

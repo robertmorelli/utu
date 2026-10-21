@@ -1,0 +1,16 @@
+// What: a recursive generator transforms its own values instead of passing them through
+// Expect: a recursive generator passes its own values straight through: `for (depths(…)) |v| { yield v; }`
+struct Node:
+    | kids: Array[Node]
+
+fn depths(n: Node, d: I32) yield I32 {
+    yield d;
+    for (n.kids) |k| { for (depths(k, d)) |x| { yield x + 1; }; };
+}
+
+export main() I32 {
+    let root = Node { kids: [Node { kids: [] }] };
+    let total = 0;
+    for (depths(root, 0)) |d| { total += d; };
+    total;
+}

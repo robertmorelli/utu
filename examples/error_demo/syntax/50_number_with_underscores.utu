@@ -1,0 +1,7 @@
+// What: digit-group underscores in an integer literal (`1_000_000`).
+// Expect: either accept digit separators, or: invalid number literal '1_000_000' (underscores are not allowed).
+fn million() I32 {
+    1_000_000;
+}
+
+export main() I32 { million(); }

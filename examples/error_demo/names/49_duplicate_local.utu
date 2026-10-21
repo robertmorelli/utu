@@ -1,0 +1,7 @@
+// What: the same name is declared with let twice in one block
+// Expect: Duplicate local binding 'total' (or: shadowing is not allowed; assign with total = ...)
+export main() I32 {
+    let total = 1;
+    let total = total + 2;
+    total;
+}

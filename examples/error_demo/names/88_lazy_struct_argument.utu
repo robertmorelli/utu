@@ -1,0 +1,8 @@
+// What: a lazily loaded module's function takes a struct (it cannot cross into the chunk)
+// Expect: A lazy module's function takes numbers, Bool, Str, and host values: badge takes Options
+using Browser from std:Browser;
+using widgets lazy from "./lazy_parts/widgets.utu";
+
+export main() void {
+    Browser.document.body.append(widgets.badge(&{ title: "new", count: 3 }));
+}

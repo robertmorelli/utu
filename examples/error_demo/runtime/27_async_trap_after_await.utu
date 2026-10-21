@@ -1,0 +1,10 @@
+// What: a trap happens after an await inside main
+// Expect: the trap message (index out of bounds) with the utu location, not a host stack
+let delay: fun(I32, I32) Promise[I32] =
+    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+
+export main() I32 {
+    let xs = [1, 2, 3];
+    let i = await delay(7, 5);
+    xs[i];
+}

@@ -1,0 +1,6 @@
+// What: sort comparator given an index binding, which it does not take
+// Expect: sort compares exactly two values: |left, right|; got 3 names
+export main() I32 {
+    let sorted = [3, 1, 2] sort(I32) |a, b, i| { a < b; };
+    sorted[0];
+}

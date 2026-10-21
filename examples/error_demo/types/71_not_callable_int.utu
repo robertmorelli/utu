@@ -1,0 +1,6 @@
+// What: calling an I32 local as if it were a function
+// Expect: Cannot call value of type I32 ('count' is a local I32, not a function)
+export main() I32 {
+    let count = 3;
+    count(1);
+}

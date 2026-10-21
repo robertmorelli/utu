@@ -1,0 +1,6 @@
+// What: indexing a Str past its end
+// Expect: trap: index 10 out of range for a Str of length 3
+export main() I32 {
+    let s = "abc";
+    s[10];
+}

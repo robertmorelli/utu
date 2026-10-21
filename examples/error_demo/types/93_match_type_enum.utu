@@ -1,0 +1,14 @@
+// What: match over a struct-carrying enum (alt is the right tool)
+// Expect: match needs an integer, float, or Bool value, got Shape; use alt for enums
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+fn kind(s: Shape) I32 {
+    match s {
+        Shape.Dot => 0,
+        ~> 1,
+    };
+}
+
+export main() I32 { kind(Dot {}); }

@@ -1,0 +1,8 @@
+// What: a mem that stores Str (mems hold only scalars)
+// Expect: mem names stores Str; a mem holds an integer enum, a distinct type, or a number type
+mem names: Str;
+
+export main() I32 {
+    names.push("ada");
+    names.len();
+}

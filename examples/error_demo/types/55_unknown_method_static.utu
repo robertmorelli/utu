@@ -1,0 +1,9 @@
+// What: calling a static function that a module does not define
+// Expect: Unknown method 'Rect.unit'
+struct Rect:
+    | w: F64
+
+export main() I32 {
+    let r = Rect.unit();
+    r.w.to_i32();
+}

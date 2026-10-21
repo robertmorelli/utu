@@ -1,0 +1,14 @@
+// What: a test that traps (array index out of bounds) rather than failing an assert
+// Expect: FAIL last element: trap: array index 3 out of bounds (length 3) at 41_test_traps.utu:4
+fn last(xs: Array[I32]) I32 {
+    xs[xs.len()];
+}
+
+test "first element" {
+    let xs = [4, 5, 6];
+    assert xs[0] == 4;
+}
+
+test "last element" {
+    assert last([4, 5, 6]) == 6;
+}

@@ -1,0 +1,11 @@
+// What: `&{ ... }` where the expected type is an enum (which variant is ambiguous).
+// Expect: `&{ ... }` cannot build an enum Shape; name the variant: `Circle { r: 1.0 }`.
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+fn unit() Shape {
+    &{ r: 1.0 };
+}
+
+export main() I32 { 0; }

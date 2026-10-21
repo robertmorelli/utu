@@ -1,0 +1,8 @@
+// What: for over one array binding a value and an index (other languages' enumerate)
+// Expect: for over 1 source binds 1 value, got 2; for an index add a range: for (xs, 0 ..< xs.len()) |x, i|
+export main() I32 {
+    let xs = [10, 20, 30];
+    let total = 0;
+    for (xs) |x, i| { total += x * i; };
+    total;
+}

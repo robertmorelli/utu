@@ -1,0 +1,12 @@
+// What: a generator consumed with the wrong number of arguments
+// Expect: range_step expects 3 argument(s), got 2
+fn range_step(lo: I32, hi: I32, step: I32) yield I32 {
+    let i = lo;
+    while (i < hi) { yield i; i += step; };
+}
+
+export main() I32 {
+    let total = 0;
+    for (range_step(0, 10)) |v| { total += v; };
+    total;
+}

@@ -1,0 +1,8 @@
+// What: a zipped for loop names its element and index captures the same
+// Expect: Duplicate capture 'x'
+export main() I32 {
+    let xs = [4, 5, 6];
+    let total = 0;
+    for (xs, 0 ..< xs.len()) |x, x| { total += x; };
+    total;
+}

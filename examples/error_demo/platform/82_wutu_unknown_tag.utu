@@ -1,0 +1,15 @@
+// What: a made-up element name without a hyphen
+// Expect: expected an HTML tag, found unknown element 'card' (custom element names need a hyphen)
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        card { h2 { = title; } }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

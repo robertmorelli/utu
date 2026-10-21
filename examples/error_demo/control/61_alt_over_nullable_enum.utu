@@ -1,0 +1,16 @@
+// What: alts over a ?Shape (nullable enum) instead of promoting it first.
+// Expect: alt needs a non-null enum; shape is ?Shape: promote it first (or add a null arm)
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+fn area(shape: ?Shape) F64 {
+    alt shape {
+        Circle |c| => 3.0 * c.r * c.r,
+        Dot => 0.0,
+    };
+}
+
+export main() F64 {
+    area(Dot {});
+}

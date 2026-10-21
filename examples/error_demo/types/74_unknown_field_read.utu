@@ -1,0 +1,10 @@
+// What: reading a field the struct does not have
+// Expect: Unknown field 'z' for Point
+struct Point:
+    | x: F64
+    | y: F64
+
+export main() I32 {
+    let p = Point { x: 1.0, y: 2.0 };
+    p.z.to_i32();
+}

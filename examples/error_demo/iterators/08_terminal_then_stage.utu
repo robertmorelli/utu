@@ -1,0 +1,6 @@
+// What: a stage chained after a terminal without parentheses
+// Expect: count ends the pipeline, so map cannot follow it; parenthesize or reorder
+export main() I32 {
+    let xs = [1, 2, 3, 4];
+    xs filter |n| { n > 1; } count map |c| { c * 2; } sum;
+}

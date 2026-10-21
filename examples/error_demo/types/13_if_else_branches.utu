@@ -1,0 +1,7 @@
+// What: if/else used as a value whose branches have different types
+// Expect: Type mismatch: expected I32, got Str (the else branch)
+export main() I32 {
+    let n = 3;
+    let label = if n > 2 { 10; } else { "small"; };
+    label;
+}

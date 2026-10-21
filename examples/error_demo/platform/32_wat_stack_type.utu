@@ -1,0 +1,9 @@
+// What: a @wat body that leaves an i64 where the function returns I32
+// Expect: the function's result needs an i32, not an i64
+fn widen(x: I32) I32 {
+    @wat/\ local.get $x i64.extend_i32_s \/;
+}
+
+export main() I32 {
+    widen(4);
+}

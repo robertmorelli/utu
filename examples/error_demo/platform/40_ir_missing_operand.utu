@@ -1,0 +1,9 @@
+// What: an @ir body whose binary op has one operand (and is unclosed)
+// Expect: @ir: <ir-i32-mul> needs two operands / is not closed
+fn square(a: I32) I32 {
+    @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
+}
+
+export main() I32 {
+    square(7);
+}

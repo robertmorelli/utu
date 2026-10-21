@@ -1,0 +1,10 @@
+// What: passing a raw I32 where a distinct UserId is required
+// Expect: Type mismatch: expected UserId, got I32
+type UserId = distinct I32;
+
+fn lookup(id: UserId) I32 { id.to_i32(); }
+
+export main() I32 {
+    let raw = 7;
+    lookup(raw);
+}

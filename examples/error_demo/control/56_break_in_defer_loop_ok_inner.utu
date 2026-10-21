@@ -1,0 +1,13 @@
+// What: a defer whose own inner loop breaks (allowed), plus a return inside it (not allowed).
+// Expect: return cannot appear inside deferred code (and no complaint about the inner break)
+fn work() I32 {
+    defer {
+        for (0 ..< 3) |i| { if i == 1 { break; }; };
+        return 0;
+    };
+    1;
+}
+
+export main() I32 {
+    work();
+}

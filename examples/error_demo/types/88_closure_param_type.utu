@@ -1,0 +1,6 @@
+// What: an untyped closure parameter with no expected type to infer it from
+// Expect: Closure parameter 'x' needs a type: cl(x: I32) ...
+export main() I32 {
+    let inc = cl(x) { x + 1; };
+    inc(1);
+}

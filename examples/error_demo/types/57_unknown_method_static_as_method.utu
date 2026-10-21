@@ -1,0 +1,12 @@
+// What: calling a static function (no receiver) as a method
+// Expect: Unknown method 'Rect.square': it is a function of Rect; call Rect.square(value)
+struct Rect:
+    | w: F64
+
+fn Rect.square(side: F64) Rect { Rect { w: side }; }
+
+export main() I32 {
+    let r = Rect { w: 1.0 };
+    let s = r.square(2.0);
+    s.w.to_i32();
+}

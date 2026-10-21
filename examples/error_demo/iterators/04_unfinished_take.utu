@@ -1,0 +1,7 @@
+// What: take(n) is the last stage, expecting it to produce an array
+// Expect: take pipeline is unfinished: end it with collect(I32) to keep the first values
+export main() I32 {
+    let scores = [90, 85, 70, 60];
+    let top = scores take(2);
+    top.len();
+}

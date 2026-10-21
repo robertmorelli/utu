@@ -1,0 +1,7 @@
+// What: a non-ASCII character in an identifier.
+// Expect: unexpected character 'é' in a name: names are ASCII letters, digits, and '_'.
+fn café_total(n: I32) I32 {
+    n * 2;
+}
+
+export main() I32 { café_total(3); }

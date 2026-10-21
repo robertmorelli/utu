@@ -1,0 +1,12 @@
+// What: calling a static constructor function with too few arguments
+// Expect: Wrong arity: Point.new expects 2 arguments, got 1
+struct Point:
+    | x: F64
+    | y: F64
+
+fn Point.new(x: F64, y: F64) Point { Point { x: x, y: y }; }
+
+export main() I32 {
+    let p = Point.new(1.0);
+    p.x.to_i32();
+}

@@ -1,0 +1,13 @@
+// What: a two-parameter generic module given one argument in an expression
+// Expect: Module 'Pair' expects 2 type argument(s), got 1
+mod Pair[A, B] {
+    struct &:
+        | first: A
+        | second: B
+    fn &.of(a: A, b: B) & { &{ first: a, second: b }; }
+}
+
+export main() I32 {
+    let p = Pair[I32].of(1, 2);
+    p.first;
+}

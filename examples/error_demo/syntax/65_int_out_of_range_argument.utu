@@ -1,0 +1,7 @@
+// What: a literal argument too big for an I32 parameter.
+// Expect: Integer literal 5000000000 is out of range for I32 (the parameter `ms` of `wait`).
+fn wait(ms: I32) I32 { ms; }
+
+export main() I32 {
+    wait(5000000000);
+}

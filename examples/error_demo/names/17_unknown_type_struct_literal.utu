@@ -1,0 +1,10 @@
+// What: a struct literal names a misspelled struct (Pointt)
+// Expect: Unknown type 'Pointt'; did you mean 'Point'?
+struct Point:
+    | x: I32
+    | y: I32
+
+export main() I32 {
+    let p = Pointt { x: 1, y: 2 };
+    p.x + p.y;
+}

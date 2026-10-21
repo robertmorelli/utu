@@ -1,0 +1,7 @@
+// What: a std module written as a quoted path ("std:Console")
+// Expect: either accept it or say std modules are written unquoted: std:Console
+using console from "std:Console";
+
+export main() void {
+    console.log("hi");
+}

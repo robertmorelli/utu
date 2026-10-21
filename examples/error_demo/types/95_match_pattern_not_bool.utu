@@ -1,0 +1,10 @@
+// What: a match over a Bool with an integer pattern
+// Expect: Pattern 1 is not a Bool; use true or false
+fn bit(b: Bool) I32 {
+    match b {
+        1 => 1,
+        ~> 0,
+    };
+}
+
+export main() I32 { bit(true); }

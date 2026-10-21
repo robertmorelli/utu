@@ -1,0 +1,6 @@
+// What: a doc-comment written as a bare string at the top level (Python docstring habit).
+// Expect: unexpected string at top level: a file holds declarations; use `///` for doc comments.
+"Computes the area of a rectangle."
+fn area(w: F64, h: F64) F64 { w * h; }
+
+export main() F64 { area(2.0, 3.0); }

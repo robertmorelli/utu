@@ -1,0 +1,12 @@
+// What: an optional chain `?.` used inside an if condition.
+// Expect: '?.' is only allowed in statements; use promote or orelse for a value.
+struct Node:
+    | count: I32
+    | next: ?Node
+
+fn has_big_next(head: Node) Bool {
+    if head.next?.count > 10 { return true; };
+    false;
+}
+
+export main() I32 { if has_big_next(Node { count: 1, next: null }) { 1; } else { 0; }; }

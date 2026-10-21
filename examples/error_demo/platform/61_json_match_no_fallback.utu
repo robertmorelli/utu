@@ -1,0 +1,13 @@
+// What: a @json match without the required ~> arm
+// Expect: @json match needs a ~> arm for text that matches no pattern
+
+fn status(text: Str) I32 {
+    @json/\ match text {
+        { status: "ok" } => 1,
+        { status: "error" } => 2,
+    }\/;
+}
+
+export main() I32 {
+    status("{}");
+}

@@ -1,0 +1,5 @@
+// What: a JS/Rust-style `\u{1F600}` code-point escape.
+// Expect: Invalid escape: \u takes four hexadecimal digits (pointing at the `\u`, ideally suggesting a surrogate pair).
+export main() Str {
+    "smile: \u{1F600}";
+}

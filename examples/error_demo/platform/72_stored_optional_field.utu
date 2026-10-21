@@ -1,0 +1,12 @@
+// What: a @stored struct with a ?Str field
+// Expect: Unsupported stored type ?Str (field Prefs.note); use local structs, Array, Str, Bool, I32, or F64
+using Browser from std:Browser;
+
+struct Prefs:
+    | name: Str
+    | note: ?Str
+
+export main() void {
+    let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", note: null } \/;
+    Browser.console.log(prefs.name);
+}

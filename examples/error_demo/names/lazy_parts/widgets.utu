@@ -1,0 +1,19 @@
+// Helper for 88/89 (not an error demo on its own): a module meant to be loaded lazily.
+using Browser from std:Browser;
+
+mod widgets {
+    struct Options:
+        | title: Str
+        | count: I32
+    fn badge(o: Options) Browser.HTMLElement {
+        let el = Browser.document.createElement("span");
+        el.textContent = o.title;
+        el;
+    }
+    fn tally(counts: Array[I32]) Browser.HTMLElement {
+        let el = Browser.document.createElement("span");
+        el.textContent = counts.len().to_str();
+        el;
+    }
+    fn total(n: I32) I32 { n * 2; }
+}

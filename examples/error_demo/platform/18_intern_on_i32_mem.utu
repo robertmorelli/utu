@@ -1,0 +1,9 @@
+// What: calling intern on an I32 vec (interning works on bytes)
+// Expect: vec codes.intern: only byte vecs (U8, I8) intern spans
+vec codes: I32;
+
+export main() I32 {
+    codes.push(65);
+    codes.push(66);
+    codes.intern(0, 2);
+}

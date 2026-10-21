@@ -1,0 +1,7 @@
+// What: an @es binding declared to return I32 returns a string
+// Expect: TypeError: `count` returned "12" (a string), but its type says I32
+let count: fun() I32 = @es/\ () => "12" \/;
+
+export main() I32 {
+    count() + 1;
+}

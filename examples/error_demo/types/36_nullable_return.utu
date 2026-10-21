@@ -1,0 +1,10 @@
+// What: returning a ?Str from a function declared to return Str
+// Expect: Type mismatch: expected Str, got ?Str
+struct User:
+    | nickname: ?Str
+
+fn shown(u: User) Str {
+    u.nickname;
+}
+
+export main() I32 { shown(User { nickname: "x" }).len(); }

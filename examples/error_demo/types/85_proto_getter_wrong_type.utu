@@ -1,0 +1,9 @@
+// What: the implementor's field has a different type than the protocol getter
+// Expect: Square's field 'name' is I32, but protocol Shape declares it Str
+proto Shape:
+    | get name : Str
+
+struct Square[Shape]:
+    | name: I32
+
+export main() I32 { 0; }

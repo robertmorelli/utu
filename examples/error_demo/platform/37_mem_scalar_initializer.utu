@@ -1,0 +1,7 @@
+// What: a mem initialized with a single number instead of a list
+// Expect: mem counts: an initializer is a list of number literals: mem counts: U8 = [5];
+mem counts: U8 = 5;
+
+export main() I32 {
+    counts.len();
+}

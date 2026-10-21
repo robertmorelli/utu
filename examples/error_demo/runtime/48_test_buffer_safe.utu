@@ -1,0 +1,10 @@
+// What: a test reads a Buffer past its length; passes silently without --safe, fails with it
+// Expect: under --safe, FAIL ...: Buffer index 3 out of range (length 2); without --safe, the same (not a silent pass)
+using Buffer from std:Buffer;
+
+test "third item" {
+    let b = Buffer[I32].new();
+    b.push(1);
+    b.push(2);
+    assert b[3] == 1;
+}

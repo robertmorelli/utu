@@ -1,0 +1,10 @@
+// What: an early return gives a Str in a function returning I32.
+// Expect: Type mismatch: expected I32 (parse's result), got Str
+fn parse(s: Str) I32 {
+    if s.len() == 0 { return "empty"; };
+    s.len();
+}
+
+export main() I32 {
+    parse("abc");
+}

@@ -1,0 +1,6 @@
+// What: an operator whose left operand is an unknown variable
+// Expect: Unknown variable 'totl' only (no follow-on operator error)
+export main() I32 {
+    let total = 3;
+    totl + 1;
+}

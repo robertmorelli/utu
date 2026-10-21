@@ -1,0 +1,9 @@
+// What: a function with no return type (void must be written).
+// Expect: expected a return type (e.g. `void`) after the parameter list, got '{'.
+using console from std:Console;
+
+fn greet(name: Str) {
+    console.log(name);
+}
+
+export main() void { greet("Ada"); }

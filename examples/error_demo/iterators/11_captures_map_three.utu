@@ -1,0 +1,5 @@
+// What: map body binds three names (value, index, and an extra)
+// Expect: map binds one value and an optional index: |value| or |value, index|; got 3 names
+export main() I32 {
+    [1, 2, 3] map |n, i, extra| { n; } sum;
+}

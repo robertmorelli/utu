@@ -1,0 +1,9 @@
+// What: String used for the string type, as in Java/Rust/Swift
+// Expect: Unknown type 'String'; utu's string type is Str
+fn shout(s: String) String {
+    s.to_upper();
+}
+
+export main() I32 {
+    shout("hi").len();
+}

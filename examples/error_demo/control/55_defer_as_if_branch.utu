@@ -1,0 +1,14 @@
+// What: uses defer as the bare body of a match arm instead of inside a block.
+// Expect: defer must be a statement in a block: 1 => { defer ...; }
+using console from std:Console;
+
+fn open(mode: I32) void {
+    match mode {
+        1 => defer console.log("closed"),
+        ~> {},
+    };
+}
+
+export main() void {
+    open(1);
+}

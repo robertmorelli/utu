@@ -1,0 +1,9 @@
+// What: a recursive function with no base case
+// Expect: stack overflow in `count_down` (recursion too deep) at 17_stack_overflow.utu:4
+fn count_down(n: I32) I32 {
+    count_down(n - 1) + 1;
+}
+
+export main() I32 {
+    count_down(10);
+}

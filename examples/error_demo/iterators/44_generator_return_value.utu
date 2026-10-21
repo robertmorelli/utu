@@ -1,0 +1,14 @@
+// What: a generator returns a value to stop early
+// Expect: a generator ends with `return;`, without a value
+fn upto(limit: I32) yield I32 {
+    for (0 ..< 100) |i| {
+        if i == limit { return i; };
+        yield i;
+    };
+}
+
+export main() I32 {
+    let total = 0;
+    for (upto(3)) |v| { total += v; };
+    total;
+}

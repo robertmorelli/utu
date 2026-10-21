@@ -1,0 +1,14 @@
+// What: breaks out of a for loop from inside a closure called in its body.
+// Expect: break cannot leave a closure: it is inside cl(...), not directly in the loop
+fn first_big(xs: Array[I32]) I32 {
+    let found = -1;
+    for (xs) |x| {
+        let test = cl(v: I32) void { if v > 10 { break; }; };
+        test(x);
+    };
+    found;
+}
+
+export main() I32 {
+    first_big([1, 20]);
+}

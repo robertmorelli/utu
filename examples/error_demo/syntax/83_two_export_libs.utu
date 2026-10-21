@@ -1,0 +1,11 @@
+// What: two `export lib` blocks in one entry file.
+// Expect: entry surface: multiple export lib declarations; merge them into one export lib.
+fn area(w: F64, h: F64) F64 { w * h; }
+
+export lib {
+    fn rect_area(w: F64, h: F64) F64 { area(w, h); }
+}
+
+export lib {
+    fn square_area(s: F64) F64 { area(s, s); }
+}

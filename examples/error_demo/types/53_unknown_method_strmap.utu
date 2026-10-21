@@ -1,0 +1,9 @@
+// What: calling a method StrMap does not have (put instead of set)
+// Expect: Unknown method 'StrMap[I32].put'
+using StrMap from std:StrMap;
+
+export main() I32 {
+    let m = StrMap[I32].new();
+    m.put("a", 1);
+    m.get("a", 0);
+}

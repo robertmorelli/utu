@@ -1,0 +1,9 @@
+// What: a state machine hits its `~> fatal` default arm
+// Expect: trap: fatal at 14_fatal_in_match.utu:4 (in `step`)
+fn step(state: I32) I32 {
+    match state { 0 => 1, 1 => 2, ~> fatal, };
+}
+
+export main() I32 {
+    step(step(step(0)));
+}

@@ -1,0 +1,5 @@
+// What: filter body with no capture bars at all
+// Expect: filter binds one value: |value| { predicate; }
+export main() I32 {
+    [1, 2, 3] filter { true; } count;
+}

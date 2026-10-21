@@ -1,0 +1,8 @@
+// What: passing a ?Str where a Str is required
+// Expect: Type mismatch: expected Str, got ?Str (hint: promote or orelse)
+fn shout(s: Str) Str { s.to_upper(); }
+
+export main() I32 {
+    let name: ?Str = null;
+    shout(name).len();
+}

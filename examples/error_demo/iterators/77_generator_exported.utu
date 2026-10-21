@@ -1,0 +1,7 @@
+// What: a generator exported from a library, for JS to iterate
+// Expect: a generator cannot be exported: it expands inline at a for loop; export a function returning Array[I32]
+export lib {
+    fn squares(n: I32) yield I32 {
+        for (0 ..< n) |i| { yield i * i; };
+    }
+}

@@ -1,0 +1,10 @@
+// What: decoding malformed JSON and unwrapping with `orelse fatal`
+// Expect: trap: `orelse fatal` on null (json decode of Point failed) at 23_json_decode_fatal.utu:8
+struct Point:
+    | x: I32
+    | y: I32
+
+export main() I32 {
+    let p = @json/\ decode Point "{\"x\": 1}" \/ orelse fatal;
+    p.x;
+}

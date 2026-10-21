@@ -1,0 +1,7 @@
+// What: two string literals side by side with no `+` between them (C-style concatenation).
+// Expect: expected ',' or ')' between the strings; join strings with `+`.
+using console from std:Console;
+
+export main() void {
+    console.log("hello, " "world");
+}

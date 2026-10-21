@@ -1,0 +1,14 @@
+// What: assigns to a field through a nullable reference.
+// Expect: Cannot write field 'count' of ?Counter: it may be null
+struct Counter:
+    | count: I32
+
+fn reset(c: ?Counter) void {
+    c.count = 0;
+}
+
+export main() I32 {
+    let c = Counter { count: 5 };
+    reset(c);
+    c.count;
+}

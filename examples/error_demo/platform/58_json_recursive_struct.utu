@@ -1,0 +1,14 @@
+// What: a struct that contains itself directly
+// Expect: Node contains itself; make the recursive field ?Node or an Array
+
+struct Node:
+    | value: I32
+    | next: Node
+
+fn load(text: Str) ?Node {
+    @json/\ decode Node text \/;
+}
+
+export main() I32 {
+    promote load("{}") { |n| => n.value, ~> 0, };
+}

@@ -1,0 +1,9 @@
+// What: the same mem declared twice (copy-pasted declaration)
+// Expect: mem pixels is declared twice; first declaration at line 3
+mem pixels: U8;
+mem pixels: U8;
+
+export main() I32 {
+    pixels.push(255);
+    pixels.len();
+}

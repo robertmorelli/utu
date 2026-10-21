@@ -1,0 +1,13 @@
+// What: code after an unconditional return, which can never run.
+// Expect: warning: unreachable code after return (or accepted silently)
+using console from std:Console;
+
+fn answer() I32 {
+    return 42;
+    console.log("never printed");
+    0;
+}
+
+export main() I32 {
+    answer();
+}

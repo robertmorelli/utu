@@ -1,0 +1,8 @@
+// What: each body treated like a fold with two value bindings plus an index
+// Expect: each binds one value and an optional index; got 3 names
+let log: fun(I32) void = @es/\ (n) => console.log(n) \/;
+
+export main() I32 {
+    [1, 2, 3] each |a, b, i| { log(a); };
+    0;
+}

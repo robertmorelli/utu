@@ -1,0 +1,12 @@
+// What: a @stored struct that contains an array of itself
+// Expect: Stored schemas must be acyclic (Folder.children contains Folder)
+using Browser from std:Browser;
+
+struct Folder:
+    | name: Str
+    | children: Array[Folder]
+
+export main() void {
+    let tree = @stored/\ Folder "tree" Folder { name: "root", children: [] } \/;
+    Browser.console.log(tree.name);
+}

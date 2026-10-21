@@ -1,0 +1,5 @@
+// What: a DSL block written without its DSL name (`@/\ ... \/` instead of `@es/\ ... \/`).
+// Expect: expected a DSL name after '@' (e.g. @es, @wat, @json), got '/\'.
+let now: fun() F64 = @/\ () => Date.now() \/;
+
+export main() F64 { now(); }

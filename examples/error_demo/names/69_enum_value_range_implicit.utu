@@ -1,0 +1,9 @@
+// What: implicit numbering after 255 overflows U8
+// Expect: Byte.Over = 256 does not fit in U8 (it follows Byte.Last = 255)
+enum(U8) Byte:
+    | Last = 255
+    | Over
+
+export main() I32 {
+    Byte.Last.to_i32();
+}

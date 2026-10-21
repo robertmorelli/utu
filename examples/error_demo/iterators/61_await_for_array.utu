@@ -1,0 +1,8 @@
+// What: await for over a plain array
+// Expect: await for reads a stream, got Array[I32]; use a plain for, or Stream[I32].of(xs)
+export main() I32 {
+    let xs = [1, 2, 3];
+    let total = 0;
+    await for (xs) |v| { total += v; };
+    total;
+}

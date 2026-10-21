@@ -1,0 +1,10 @@
+// What: assigns to an int enum's variant
+// Expect: Cannot assign to Level.Low: enum variants are constants
+enum(U8) Level:
+    | Low
+    | High
+
+export main() I32 {
+    Level.Low = Level.High;
+    0;
+}

@@ -1,0 +1,12 @@
+// What: returns a value from inside a defer.
+// Expect: return cannot appear inside deferred code
+using console from std:Console;
+
+fn work() I32 {
+    defer { console.log("done"); return 1; };
+    42;
+}
+
+export main() I32 {
+    work();
+}

@@ -1,0 +1,8 @@
+// What: a closure body names a variable that does not exist (offest)
+// Expect: Unknown variable 'offest'; did you mean 'offset'?
+fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+
+export main() I32 {
+    let offset = 10;
+    apply(cl(n) { n + offest; }, 5);
+}

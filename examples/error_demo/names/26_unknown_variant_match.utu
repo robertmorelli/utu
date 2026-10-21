@@ -1,0 +1,18 @@
+// What: a match arm on an int enum names a missing variant (Level.Hgh)
+// Expect: Level has no variant Hgh; did you mean High?
+enum(U8) Level:
+    | Low
+    | Mid
+    | High
+
+fn label(l: Level) Str {
+    match l {
+        Level.Low => "calm",
+        Level.Mid => "busy",
+        Level.Hgh => "on fire",
+    };
+}
+
+export main() I32 {
+    label(Level.Mid).len();
+}

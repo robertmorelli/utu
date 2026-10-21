@@ -1,0 +1,7 @@
+// What: a string literal is not closed before the end of its line.
+// Expect: a string not closed on its line, pointing at the opening quote.
+using console from std:Console;
+
+export main() void {
+    console.log("hello, world);
+}

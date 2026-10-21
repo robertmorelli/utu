@@ -1,0 +1,7 @@
+// What: binds a while loop's result as if it were a value.
+// Expect: a while loop has no value; it cannot initialize n
+export main() I32 {
+    let i = 0;
+    let n: I32 = while (i < 10) { i += 1; };
+    n;
+}

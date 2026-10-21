@@ -1,0 +1,15 @@
+// What: pushing a Str onto a Stack[I32]
+// Expect: Type mismatch: expected I32, got Str at the argument
+mod Stack[T] {
+    struct &:
+        | items: Array[T]
+        | size: I32
+    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
+    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }
+}
+
+export main() I32 {
+    let s = Stack[I32].new(0);
+    s.push("four");
+    s.size;
+}

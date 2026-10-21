@@ -1,0 +1,6 @@
+// What: @embed used to initialize an ordinary let instead of a mem
+// Expect: @embed fills a mem: mem logo: U8 = @embed/\ logo.png \/;
+export main() I32 {
+    let logo: Array[U8] = @embed/\ odd_size.bin \/;
+    logo.len();
+}

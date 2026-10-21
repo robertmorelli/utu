@@ -1,0 +1,9 @@
+// What: integer remainder by zero
+// Expect: trap: integer remainder by zero at 10_rem_by_zero.utu:4
+fn bucket(hash: I32, buckets: I32) I32 {
+    hash % buckets;
+}
+
+export main() I32 {
+    bucket(12345, 0);
+}

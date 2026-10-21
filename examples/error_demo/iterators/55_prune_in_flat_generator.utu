@@ -1,0 +1,14 @@
+// What: prune in the consumer of a generator that is not recursive
+// Expect: prune needs a recursive generator; squares does not delegate to itself, so use continue
+fn squares(n: I32) yield I32 {
+    for (0 ..< n) |i| { yield i * i; };
+}
+
+export main() I32 {
+    let total = 0;
+    for (squares(5)) |s| {
+        if s > 4 { prune; };
+        total += s;
+    };
+    total;
+}

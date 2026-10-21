@@ -1,0 +1,17 @@
+// What: a recursive generator delegates to itself with the wrong number of arguments
+// Expect: walk expects 2 argument(s), got 1
+struct Node:
+    | name: Str
+    | kids: Array[Node]
+
+fn walk(n: Node, depth: I32) yield Node {
+    yield n;
+    for (n.kids) |k| { for (walk(k)) |d| { yield d; }; };
+}
+
+export main() I32 {
+    let root = Node { name: "/", kids: [] };
+    let count = 0;
+    for (walk(root, 0)) |n| { count += 1; };
+    count;
+}

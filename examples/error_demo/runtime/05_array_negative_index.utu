@@ -1,0 +1,8 @@
+// What: writing an array element at index -1
+// Expect: trap: index -1 out of bounds for array of length 4 at 05_array_negative_index.utu:6
+export main() I32 {
+    let xs = Array[I32].new(4, 0);
+    let last = xs.len() - 5;
+    xs[last] = 7;
+    xs[0];
+}

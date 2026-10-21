@@ -1,0 +1,13 @@
+// What: passing a value of one enum where another enum is expected
+// Expect: Type mismatch: expected Color, got Size
+enum(U8) Color:
+    | Red
+    | Green
+
+enum(U8) Size:
+    | Small
+    | Large
+
+fn paint(c: Color) I32 { c.to_i32(); }
+
+export main() I32 { paint(Size.Small); }

@@ -1,0 +1,10 @@
+// What: a @wat block after another statement in a function body
+// Expect: @wat is a function's whole body: fn f(x: I32) I32 { @wat/\ … \/; }
+fn rotl(x: I32, k: I32) I32 {
+    let y = x;
+    @wat/\ local.get $x local.get $k i32.rotl \/;
+}
+
+export main() I32 {
+    rotl(1, 4);
+}

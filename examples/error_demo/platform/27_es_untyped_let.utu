@@ -1,0 +1,7 @@
+// What: @es bound to a let with no type annotation
+// Expect: @es needs a type: let now: fun() F64 = @es/\ … \/
+let now = @es/\ () => Date.now() \/;
+
+export main() F64 {
+    now();
+}

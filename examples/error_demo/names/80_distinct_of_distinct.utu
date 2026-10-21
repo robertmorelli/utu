@@ -1,0 +1,8 @@
+// What: a distinct type over another distinct type
+// Expect: either allowed, or: type AdminId = distinct UserId: a distinct type wraps one of I32, ...
+type UserId = distinct I32;
+type AdminId = distinct UserId;
+
+export main() I32 {
+    0;
+}

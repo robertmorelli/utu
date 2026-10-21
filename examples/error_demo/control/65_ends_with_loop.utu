@@ -1,0 +1,10 @@
+// What: the function ends with a for loop, whose value is void, but it must return Str.
+// Expect: join must end with a Str value; a for loop has no value
+fn join(xs: Array[Str]) Str {
+    let out = "";
+    for (xs) |x| { out = out + x; };
+}
+
+export main() Str {
+    join(["a", "b"]);
+}

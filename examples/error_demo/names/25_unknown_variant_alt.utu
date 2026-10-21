@@ -1,0 +1,16 @@
+// What: an alt arm names a variant the enum does not have (Circel)
+// Expect: Shape has no variant Circel; did you mean Circle?
+enum Shape:
+    | Circle { r: F64 }
+    | Square { side: F64 }
+
+fn area(s: Shape) F64 {
+    alt s {
+        Circel |c| => 3.0 * c.r * c.r,
+        Square |q| => q.side * q.side,
+    };
+}
+
+export main() F64 {
+    area(Square { side: 2.0 });
+}

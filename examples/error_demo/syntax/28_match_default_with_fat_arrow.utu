@@ -1,0 +1,10 @@
+// What: a default arm written `~> => value`, mixing the two arrows.
+// Expect: the default arm is `~> "many"` (no `=>` after `~>`).
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero",
+        ~> => "many",
+    };
+}
+
+export main() Str { describe(7); }

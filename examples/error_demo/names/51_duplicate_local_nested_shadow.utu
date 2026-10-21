@@ -1,0 +1,10 @@
+// What: an inner block redeclares an outer local's name
+// Expect: either allowed shadowing, or Duplicate local binding 'x'
+export main() I32 {
+    let x = 1;
+    if true {
+        let x = 2;
+        x;
+    };
+    x;
+}

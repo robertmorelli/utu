@@ -1,0 +1,10 @@
+// What: a promote arm has no `|name|` capture before `=>`.
+// Expect: a promote's present arm binds the value: `|n| => ...`; got '=>'.
+fn initial(name: ?Str) Str {
+    promote name {
+        => name.slice(0, 1),
+        ~> "?",
+    };
+}
+
+export main() Str { initial("Ada"); }

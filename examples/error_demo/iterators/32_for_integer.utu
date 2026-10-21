@@ -1,0 +1,7 @@
+// What: for over a count, as in Python's range(n) habit
+// Expect: for can only iterate an array, got I32; count with a range like 0..<n
+export main() I32 {
+    let total = 0;
+    for (10) |i| { total += i; };
+    total;
+}

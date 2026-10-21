@@ -1,0 +1,10 @@
+// What: binding a generator function to a local as a value
+// Expect: count is a generator: consume it with `for (count(…)) |value| { … }` (at line 8, not at the generator)
+fn count(n: I32) yield I32 {
+    for (0 ..< n) |i| { yield i; };
+}
+
+export main() I32 {
+    let g = count;
+    0;
+}

@@ -1,0 +1,7 @@
+// What: a test block named with a bare word instead of a string.
+// Expect: a test's name is a string: `test "addition" { ... }`.
+fn add(a: I32, b: I32) I32 { a + b; }
+
+test addition {
+    assert add(2, 3) == 5;
+}

@@ -1,0 +1,13 @@
+// What: calling a protocol method with an argument it does not take
+// Expect: Wrong arity: Shape.area expects 0 arguments, got 1
+proto Shape:
+    | area() F64
+
+struct Circle[Shape]:
+    | r: F64
+
+fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+
+fn big(s: Shape) F64 { s.area(2.0); }
+
+export main() I32 { big(Circle { r: 1.0 }).to_i32(); }

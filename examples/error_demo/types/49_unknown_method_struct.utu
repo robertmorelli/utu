@@ -1,0 +1,12 @@
+// What: calling a method a struct does not define
+// Expect: Unknown method 'Rect.perimeter'
+struct Rect:
+    | w: F64
+    | h: F64
+
+fn Rect.area |r| () F64 { r.w * r.h; }
+
+export main() I32 {
+    let r = Rect { w: 2.0, h: 3.0 };
+    r.perimeter().to_i32();
+}

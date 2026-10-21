@@ -1,0 +1,9 @@
+// What: matches an F64 against literals with no default.
+// Expect: Match over F64 requires a default arm
+fn name(x: F64) Str {
+    match x { 0.0 => "zero", 1.0 => "one", };
+}
+
+export main() Str {
+    name(0.5);
+}

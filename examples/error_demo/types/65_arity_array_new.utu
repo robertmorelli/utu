@@ -1,0 +1,6 @@
+// What: Array[I32].new with only a length (fill missing)
+// Expect: Wrong arity: Array.new expects 2 arguments (length, fill), got 1
+export main() I32 {
+    let xs = Array[I32].new(5);
+    xs.len();
+}

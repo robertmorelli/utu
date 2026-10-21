@@ -1,0 +1,7 @@
+// What: concatenating a Str with an I32 using +
+// Expect: Type mismatch: expected Str, got I32 (hint: use .to_str() or a template)
+export main() I32 {
+    let n = 7;
+    let msg = "count: " + n;
+    msg.len();
+}

@@ -1,0 +1,11 @@
+// What: a match default arm written `_ =>` (Rust habit) instead of `~>`.
+// Expect: the default arm is `~> value`; `_` is not a pattern.
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        _ => "many",
+    };
+}
+
+export main() Str { describe(7); }

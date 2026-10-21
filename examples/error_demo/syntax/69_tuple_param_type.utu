@@ -1,0 +1,8 @@
+// What: a tuple type used as a function parameter.
+// Expect: A tuple type is only a function result; pass the values separately.
+fn sum_pair(p: .{I32, I32}) I32 {
+    let .{a, b} = p;
+    a + b;
+}
+
+export main() I32 { 0; }

@@ -1,0 +1,6 @@
+// What: a closure parameter's type misspelled (F46 for F64)
+// Expect: Unknown type 'F46'; did you mean 'F64'?
+export main() F64 {
+    let half = cl(x: F46) F64 { x / 2.0; };
+    half(9.0);
+}

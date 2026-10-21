@@ -1,0 +1,14 @@
+// What: an alt arm binds its variant with Rust-style `Circle(c)` instead of `Circle |c|`.
+// Expect: bind the variant with bars: `Circle |c| => ...`; got '('.
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+fn area(s: Shape) F64 {
+    alt s {
+        Circle(c) => 3.0 * c.r * c.r,
+        Dot => 0.0,
+    };
+}
+
+export main() F64 { area(Dot {}); }

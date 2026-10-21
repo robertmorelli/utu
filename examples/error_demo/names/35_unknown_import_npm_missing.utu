@@ -1,0 +1,7 @@
+// What: imports an npm package that is not installed, and calls it
+// Expect: Cannot import "npm:left-pad-xyz": package not found in node_modules
+using pad from "npm:left-pad-xyz";
+
+export main() Str {
+    pad.leftPad("7", 3);
+}

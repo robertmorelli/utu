@@ -1,0 +1,9 @@
+// What: matches a Bool but only handles false.
+// Expect: Missing Bool case 'true' in match
+fn negate(b: Bool) Bool {
+    match b { false => true, };
+}
+
+export main() I32 {
+    if negate(true) { 1; } else { 0; };
+}

@@ -1,0 +1,6 @@
+// What: two array literal elements are not separated by a comma.
+// Expect: expected ',' or ']' between `2` and `3`.
+export main() I32 {
+    let xs = [1, 2 3];
+    xs[0];
+}

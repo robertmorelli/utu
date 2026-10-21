@@ -1,0 +1,10 @@
+// What: statements after an unconditional break inside a loop body.
+// Expect: warning: unreachable code after break (or accepted silently)
+export main() I32 {
+    let n = 0;
+    for (0 ..< 10) |i| {
+        break;
+        n += i;
+    };
+    n;
+}

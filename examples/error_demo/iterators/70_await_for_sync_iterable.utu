@@ -1,0 +1,18 @@
+// What: a hand-written iterable whose next returns its result directly, not a promise
+// Expect: await for needs next to return a Promise, but Counter.next returns I32
+mod Counter {
+    struct &:
+        | n: I32
+    fn &.new(n: I32) & { &{ n: n }; }
+    fn &.iterator |self| () I32 { 0; }
+    fn &.next |self| (it: I32) I32 { it + 1; }
+    fn &.done |self| (r: I32) Bool { r > self.n; }
+    fn &.value |self| (r: I32) I32 { r; }
+    fn &.close |self| (it: I32) void { }
+}
+
+export main() I32 {
+    let total = 0;
+    await for (Counter.new(3)) |v| { total += v; };
+    total;
+}

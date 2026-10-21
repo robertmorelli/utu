@@ -1,0 +1,9 @@
+// What: puts null into an array of non-nullable structs.
+// Expect: Array[User] holds User, which is not nullable; use Array[?User]
+struct User:
+    | name: Str
+
+export main() I32 {
+    let users: Array[User] = [User { name: "a" }, null];
+    users.len();
+}

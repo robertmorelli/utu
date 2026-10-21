@@ -1,0 +1,9 @@
+// What: a lazily loaded module's function returns a number, not an element
+// Expect: A lazy module's function returns its element to the page: total returns I32, not a host element
+using Browser from std:Browser;
+using widgets lazy from "./lazy_parts/widgets.utu";
+
+export main() void {
+    let n = widgets.total(4);
+    Browser.document.title = n.to_str();
+}

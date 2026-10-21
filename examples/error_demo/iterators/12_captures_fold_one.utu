@@ -1,0 +1,5 @@
+// What: fold body forgets the accumulator binding
+// Expect: fold binds |acc, value| (and an optional index); got 1 name
+export main() I32 {
+    [1, 2, 3] fold(0) |n| { n * 2; };
+}

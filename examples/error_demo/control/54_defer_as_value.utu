@@ -1,0 +1,8 @@
+// What: binds a defer to a let, as if it were an expression.
+// Expect: defer must be a statement in a block
+using console from std:Console;
+
+export main() I32 {
+    let cleanup = defer console.log("bye");
+    0;
+}

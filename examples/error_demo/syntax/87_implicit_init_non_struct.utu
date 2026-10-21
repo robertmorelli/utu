@@ -1,0 +1,6 @@
+// What: `&{ ... }` where the expected type is a number, not a struct.
+// Expect: `&{ ... }` builds a struct, but the expected type here is F64.
+export main() F64 {
+    let total: F64 = &{ value: 1.0 };
+    total;
+}

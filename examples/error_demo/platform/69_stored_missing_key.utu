@@ -1,0 +1,12 @@
+// What: @stored without its storage key string
+// Expect: @stored expects Type "storage-key" default-expression (pointing after the type: missing key)
+using Browser from std:Browser;
+
+struct Prefs:
+    | name: Str
+    | enabled: Bool
+
+export main() void {
+    let prefs = @stored/\ Prefs Prefs { name: "", enabled: true } \/;
+    Browser.console.log(prefs.name);
+}

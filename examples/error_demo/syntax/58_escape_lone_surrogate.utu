@@ -1,0 +1,5 @@
+// What: a high surrogate escape with no low surrogate after it.
+// Expect: Invalid escape: \uD83D is a high surrogate and must be followed by a low surrogate \uDC00-\uDFFF.
+export main() Str {
+    "face: \uD83D";
+}

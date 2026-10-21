@@ -1,0 +1,7 @@
+// What: passes null for a parameter whose type is not nullable.
+// Expect: Argument 'name' of greet is Str, not nullable; null cannot be passed
+fn greet(name: Str) Str { "hi " + name; }
+
+export main() Str {
+    greet(null);
+}

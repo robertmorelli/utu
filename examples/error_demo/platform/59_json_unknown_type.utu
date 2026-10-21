@@ -1,0 +1,13 @@
+// What: decoding a type name that is not declared (typo)
+// Expect: @json cannot use Usr: ... (Unknown type Usr)
+struct User:
+    | name: Str
+    | age: I32
+
+fn load(text: Str) ?User {
+    @json/\ decode Usr text \/;
+}
+
+export main() I32 {
+    promote load("{}") { |u| => u.age, ~> 0, };
+}

@@ -1,0 +1,16 @@
+// What: a misspelled CSS property (colr)
+// Expect: invalid CSS property colr; did you mean color?
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        colr: red;
+        h2 { = title; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

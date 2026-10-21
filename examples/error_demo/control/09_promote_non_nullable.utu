@@ -1,0 +1,12 @@
+// What: uses promote on a value that is never null.
+// Expect: promote needs a nullable value; name is Str, which is never null
+fn initial(name: Str) Str {
+    promote name {
+        |n| => n.slice(0, 1),
+        ~> "?",
+    };
+}
+
+export main() Str {
+    initial("Ada");
+}

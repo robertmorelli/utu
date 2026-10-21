@@ -1,0 +1,6 @@
+// What: calling a closure value with a Str argument where it takes I32
+// Expect: Type mismatch: expected I32, got Str at the argument
+export main() I32 {
+    let double: cl(I32) I32 = cl(x) { x * 2; };
+    double("4");
+}

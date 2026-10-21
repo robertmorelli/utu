@@ -1,0 +1,12 @@
+// What: a struct declares a protocol whose getter field it lacks
+// Expect: Square does not implement protocol getter 'Shape.name'
+proto Shape:
+    | get name : Str
+    | area() F64
+
+struct Square[Shape]:
+    | side: F64
+
+fn Shape[Square].area |s| () F64 { s.side * s.side; }
+
+export main() I32 { 0; }

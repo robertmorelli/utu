@@ -1,0 +1,6 @@
+// What: assigns null to a let annotated with a non-nullable Str.
+// Expect: Type mismatch: expected Str, got null (Str is not nullable; use ?Str)
+export main() I32 {
+    let name: Str = null;
+    0;
+}

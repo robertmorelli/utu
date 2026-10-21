@@ -1,0 +1,9 @@
+// What: calling a two-parameter function with one argument
+// Expect: Wrong arity: clamp expects 3 arguments, got 2
+fn clamp(x: I32, low: I32, high: I32) I32 {
+    if x < low { return low; };
+    if x > high { return high; };
+    x;
+}
+
+export main() I32 { clamp(5, 0); }

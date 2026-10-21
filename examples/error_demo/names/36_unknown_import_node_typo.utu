@@ -1,0 +1,7 @@
+// What: imports a Node builtin with a misspelled name (node:fss), and calls it
+// Expect: Cannot import "node:fss": no such Node module; did you mean "node:fs"?
+using Fs from "node:fss";
+
+export main() Bool {
+    Fs.existsSync("README.md");
+}

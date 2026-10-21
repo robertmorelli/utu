@@ -1,0 +1,7 @@
+// What: adding an I32 and an I64 without converting
+// Expect: Type mismatch: expected I32, got I64 (or: I32 + I64 needs a conversion, use .to_i64())
+fn total(count: I32, bytes: I64) I64 {
+    count + bytes;
+}
+
+export main() I32 { total(1, 2.to_i64()).to_i32(); }

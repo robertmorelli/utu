@@ -1,0 +1,11 @@
+// What: takes .len() of a nullable array inside a for range.
+// Expect: Cannot call method 'len' on ?Array[I32]: it may be null
+fn total(xs: ?Array[I32]) I32 {
+    let t = 0;
+    for (0 ..< xs.len()) |i| { t += i; };
+    t;
+}
+
+export main() I32 {
+    total([1, 2]);
+}

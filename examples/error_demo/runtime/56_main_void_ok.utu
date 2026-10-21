@@ -1,0 +1,5 @@
+// What: a well-formed program used as the target of the CLI-misuse commands (bad -O flag, unwritable -o dir)
+// Expect: it runs and prints 42
+export main() I32 {
+    42;
+}

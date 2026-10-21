@@ -1,0 +1,5 @@
+// What: a range pipeline with only a filter, returned as I32
+// Expect: filter pipeline is unfinished: end it with count, sum, or collect(I32)
+export main() I32 {
+    (0 ..< 100) filter |n| { n % 7 == 0; };
+}

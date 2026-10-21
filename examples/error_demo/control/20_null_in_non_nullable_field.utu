@@ -1,0 +1,13 @@
+// What: fills a non-nullable struct field with null.
+// Expect: Field 'owner' of Pet is User, not ?User; null cannot be stored there
+struct User:
+    | name: Str
+
+struct Pet:
+    | name: Str
+    | owner: User
+
+export main() I32 {
+    let p = Pet { name: "Rex", owner: null };
+    0;
+}

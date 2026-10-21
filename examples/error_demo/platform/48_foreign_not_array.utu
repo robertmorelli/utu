@@ -1,0 +1,9 @@
+// What: passing an array literal where a single DOM node is expected
+// Expect: Type mismatch: expected Browser.Node, got an array literal
+using Browser from std:Browser;
+
+export main() void {
+    let a = Browser.document.createElement("p");
+    let b = Browser.document.createElement("p");
+    Browser.document.body.appendChild([a, b]);
+}

@@ -1,0 +1,12 @@
+// What: a struct field's type is a struct that was never declared
+// Expect: Unknown type 'Adress'; did you mean 'Address'?
+struct Address:
+    | city: Str
+
+struct Person:
+    | name: Str
+    | home: Adress
+
+export main() I32 {
+    0;
+}

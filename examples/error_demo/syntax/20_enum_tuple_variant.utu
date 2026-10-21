@@ -1,0 +1,9 @@
+// What: an enum variant with Rust-style tuple payload `Circle(F64)`.
+// Expect: a variant's fields are named in braces: `| Circle { r: F64 }`; got '('.
+enum Shape:
+    | Circle(F64)
+    | Square(F64)
+
+export main() F64 {
+    0.0;
+}

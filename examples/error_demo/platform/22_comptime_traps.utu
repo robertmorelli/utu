@@ -1,0 +1,15 @@
+// What: a @comptime initializer that traps while it runs (index out of bounds)
+// Expect: @comptime squares: the evaluation trapped (array index out of bounds) at line 6
+fn build(n: I32) Array[I32] {
+    let out = Array[I32].new(n, 0);
+    for (0 ..< n + 1) |i| {
+        out[i] = i;
+    };
+    out;
+}
+
+const mem squares: I32 = @comptime/\ build(4) \/;
+
+export main() I32 {
+    squares[0];
+}

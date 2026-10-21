@@ -1,0 +1,11 @@
+// What: reading a Buffer at an index past its length (but inside its capacity)
+// Expect: trap: Buffer index 5 out of range (length 3) — or at least the same with and without --safe
+using Buffer from std:Buffer;
+
+export main() I32 {
+    let b = Buffer[I32].new();
+    b.push(10);
+    b.push(20);
+    b.push(30);
+    b[5];
+}

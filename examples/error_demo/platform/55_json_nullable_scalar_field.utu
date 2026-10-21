@@ -1,0 +1,14 @@
+// What: a struct with a ?I32 field decoded by @json
+// Expect: ?I32 is not supported: only reference types (Str, structs, enums, arrays) can be null
+
+struct Profile:
+    | name: Str
+    | age: ?I32
+
+fn load(text: Str) ?Profile {
+    @json/\ decode Profile text \/;
+}
+
+export main() I32 {
+    promote load("{}") { |p| => p.name.len(), ~> 0, };
+}

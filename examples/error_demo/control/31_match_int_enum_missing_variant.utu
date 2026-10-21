@@ -1,0 +1,14 @@
+// What: matches an integer enum and forgets one level.
+// Expect: Missing variant 'High' in match over Level
+enum(U8) Level:
+    | Low
+    | Mid
+    | High
+
+fn label(l: Level) Str {
+    match l { Level.Low => "calm", Level.Mid => "busy", };
+}
+
+export main() Str {
+    label(Level.High);
+}

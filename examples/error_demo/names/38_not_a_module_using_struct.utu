@@ -1,0 +1,11 @@
+// What: `using` names a struct, not a module
+// Expect: 'Point' is a struct, not a module
+struct Point:
+    | x: I32
+    | y: I32
+
+using Point |P|;
+
+export main() I32 {
+    0;
+}

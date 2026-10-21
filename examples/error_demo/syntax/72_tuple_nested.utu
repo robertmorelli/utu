@@ -1,0 +1,7 @@
+// What: a function returning a tuple that contains another tuple.
+// Expect: A tuple cannot hold another tuple.
+fn split(a: I32) .{I32, .{I32, I32}} {
+    .{a, .{a / 2, a % 2}};
+}
+
+export main() I32 { 0; }

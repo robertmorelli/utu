@@ -1,0 +1,14 @@
+// What: two sibling root elements in one template
+// Expect: expected exactly one root element; use a component for siblings
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    h2 { = title; }
+    p { "Some text"; }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

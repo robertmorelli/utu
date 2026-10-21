@@ -1,0 +1,5 @@
+// What: main is written as a plain fn, without `export`
+// Expect: no `export main`: `fn main` at 51_main_not_exported.utu:4 is not exported (write `export main() I32`)
+fn main() I32 {
+    42;
+}

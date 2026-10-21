@@ -1,0 +1,9 @@
+// What: correct-looking recursion that is simply too deep (summing a list recursively)
+// Expect: stack overflow in `sum_to` at 29_deep_recursion_with_base.utu:4; a short trace, not 10,000 frames
+fn sum_to(n: I32) I64 {
+    if n == 0 { 0.to_i64(); } else { n.to_i64() + sum_to(n - 1); };
+}
+
+export main() I64 {
+    sum_to(1000000);
+}

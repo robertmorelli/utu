@@ -1,0 +1,6 @@
+// What: calling Str.slice with one argument
+// Expect: Wrong arity: Str.slice expects 2 arguments, got 1
+export main() I32 {
+    let s = "hello";
+    s.slice(1).len();
+}

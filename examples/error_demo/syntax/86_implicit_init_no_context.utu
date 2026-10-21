@@ -1,0 +1,10 @@
+// What: `&{ ... }` with no type annotation, so its struct type is unknown.
+// Expect: `&{ ... }` needs a struct type from context: annotate `let p: Point = &{ ... }` or write `Point { ... }`.
+struct Point:
+    | x: F64
+    | y: F64
+
+export main() F64 {
+    let p = &{ x: 1.0, y: 2.0 };
+    p.x;
+}

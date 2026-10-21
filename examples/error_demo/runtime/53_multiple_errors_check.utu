@@ -1,0 +1,9 @@
+// What: `utu check` on a file with three independent errors
+// Expect: all three, in file order, with a count at the end
+fn add(a: I32, b: I32) I32 { a + b; }
+
+export main() I32 {
+    let s: Str = 5;
+    let n = add(1, "two");
+    missing_function(n);
+}

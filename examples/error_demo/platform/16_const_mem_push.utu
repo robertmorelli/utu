@@ -1,0 +1,8 @@
+// What: pushing onto a const mem
+// Expect: mem primes is const; it has no push
+const mem primes: I32 = [2, 3, 5];
+
+export main() I32 {
+    primes.push(7);
+    primes.len();
+}

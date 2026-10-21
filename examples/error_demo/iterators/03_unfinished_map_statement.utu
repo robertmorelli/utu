@@ -1,0 +1,9 @@
+// What: a map used for its side effects as a statement (each was meant)
+// Expect: map pipeline is unfinished; to run a body for its effects use each
+let log: fun(I32) void = @es/\ (n) => console.log(n) \/;
+
+export main() I32 {
+    let xs = [1, 2, 3];
+    xs map |n| { log(n); };
+    0;
+}

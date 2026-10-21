@@ -1,0 +1,8 @@
+// What: an array literal built from tuple-returning calls.
+// Expect: Tuples cannot be stored in arrays; take them apart with `let .{a, b} = …` first.
+fn divmod(a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }
+
+export main() I32 {
+    let results = [divmod(7, 2), divmod(9, 4)];
+    results.len();
+}

@@ -1,0 +1,14 @@
+// What: lists the same integer pattern twice in a match.
+// Expect: Duplicate match pattern '1'
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero",
+        1 => "one",
+        1 => "uno",
+        ~> "many",
+    };
+}
+
+export main() Str {
+    describe(1);
+}

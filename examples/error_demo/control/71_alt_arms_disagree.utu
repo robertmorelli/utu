@@ -1,0 +1,16 @@
+// What: alt arms produce different types.
+// Expect: alt arms disagree: Circle's arm is F64, Dot's arm is Str
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+fn area(shape: Shape) F64 {
+    alt shape {
+        Circle |c| => c.r * c.r,
+        Dot => "none",
+    };
+}
+
+export main() F64 {
+    area(Dot {});
+}

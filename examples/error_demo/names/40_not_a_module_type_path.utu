@@ -1,0 +1,10 @@
+// What: a type path goes through a struct as if it were a module (Point.Inner)
+// Expect: 'Point' is a struct, not a module, so Point.Inner names nothing
+struct Point:
+    | x: I32
+
+fn f(p: Point.Inner) I32 { 0; }
+
+export main() I32 {
+    0;
+}

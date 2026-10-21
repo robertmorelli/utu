@@ -1,0 +1,6 @@
+// What: a file with a missing semicolon passed to `utu run`
+// Expect: the syntax error at 52_syntax_error_run.utu:5, and nothing run
+export main() I32 {
+    let x = 40
+    x + 2;
+}

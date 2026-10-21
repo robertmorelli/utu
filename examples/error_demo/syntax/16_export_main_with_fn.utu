@@ -1,0 +1,5 @@
+// What: the entry point written as `export fn main()`.
+// Expect: the entry point is `export main() T { ... }`, without `fn`.
+export fn main() I32 {
+    42;
+}

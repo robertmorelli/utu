@@ -1,0 +1,13 @@
+// What: match arms produce different types.
+// Expect: match arms disagree: the first arm is Str, this one is I32
+fn describe(n: I32) Str {
+    match n {
+        0 => "zero",
+        1 => 1,
+        ~> "many",
+    };
+}
+
+export main() Str {
+    describe(1);
+}

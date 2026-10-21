@@ -1,0 +1,12 @@
+// What: tries to break out of a loop with a value (break 5).
+// Expect: break takes no value; set a variable before breaking
+fn first_even(xs: Array[I32]) I32 {
+    for (xs) |x| {
+        if x % 2 == 0 { break x; };
+    };
+    -1;
+}
+
+export main() I32 {
+    first_even([1, 4]);
+}

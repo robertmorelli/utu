@@ -1,0 +1,14 @@
+// What: a struct and an int enum share a name
+// Expect: Duplicate top-level declaration 'Color' (a struct Color is declared on line 3)
+struct Color:
+    | r: U32
+    | g: U32
+    | b: U32
+
+enum(U8) Color:
+    | Red
+    | Green
+
+export main() I32 {
+    0;
+}

@@ -1,0 +1,7 @@
+// What: bitwise & on F64 values
+// Expect: F64 has no '&' operator
+export main() I32 {
+    let x = 3.0;
+    let masked = x & 1.0;
+    masked.to_i32();
+}

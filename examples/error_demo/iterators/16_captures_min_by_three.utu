@@ -1,0 +1,10 @@
+// What: min_by comparator binds an index
+// Expect: min_by compares exactly two values: |a, b|; got 3 names
+struct Item:
+    | price: I32
+
+export main() I32 {
+    let items = [Item { price: 3 }, Item { price: 1 }];
+    let cheapest = items min_by(Item) |a, b, i| { a.price < b.price; };
+    (cheapest orelse fatal).value.price;
+}

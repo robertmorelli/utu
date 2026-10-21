@@ -1,0 +1,13 @@
+// What: a method uses `self` but its receiver was named |r|
+// Expect: Unknown variable 'self'; this method's receiver is named 'r'
+struct Rect:
+    | w: I32
+    | h: I32
+
+fn Rect.area |r| () I32 {
+    self.w * self.h;
+}
+
+export main() I32 {
+    Rect { w: 2, h: 3 }.area();
+}

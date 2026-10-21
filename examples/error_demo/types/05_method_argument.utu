@@ -1,0 +1,12 @@
+// What: passing a Str to a method that takes an F64
+// Expect: Type mismatch: expected F64, got Str at the argument
+struct Account:
+    | balance: F64
+
+fn Account.deposit |a| (amount: F64) void { a.balance += amount; }
+
+export main() I32 {
+    let acct = Account { balance: 0.0 };
+    acct.deposit("100");
+    0;
+}

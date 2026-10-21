@@ -1,0 +1,16 @@
+// What: a CSS property written with a space instead of a hyphen
+// Expect: invalid CSS property "background color"; did you mean background-color?
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        background color: #eee;
+        h2 { = title; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}

@@ -1,0 +1,7 @@
+// What: a std module written in lowercase (std:console)
+// Expect: Unknown std module 'std:console'; did you mean std:Console?
+using console from std:console;
+
+export main() void {
+    console.log("hi");
+}

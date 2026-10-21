@@ -1,0 +1,5 @@
+// What: a Windows path with single backslashes, so `\n` and `\p` are escapes.
+// Expect: Invalid escape '\p' (write `\\` for a backslash).
+export main() Str {
+    "C:\projects\new";
+}

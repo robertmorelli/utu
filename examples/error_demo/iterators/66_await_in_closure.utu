@@ -1,0 +1,12 @@
+// What: awaiting inside a promise callback closure
+// Expect: a closure cannot await: a closure is called through the host, where JSPI cannot suspend
+let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+let record: fun(I32) void = @es/\ (v) => { globalThis.__v = v; } \/;
+
+export main() I32 {
+    later(1).then(cl(v) {
+        let w: I32 = await later(v + 1);
+        record(w);
+    });
+    0;
+}

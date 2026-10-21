@@ -1,0 +1,6 @@
+// What: calling a JS-style method name that Str does not have
+// Expect: Unknown method 'Str.toUpperCase' (maybe to_upper)
+export main() I32 {
+    let s = "hi";
+    s.toUpperCase().len();
+}

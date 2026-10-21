@@ -1,0 +1,16 @@
+// What: an attribute that the tag does not have (href on div)
+// Expect: unknown attribute href on div
+using Browser from std:Browser;
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    div {
+        href = "/plants";
+        = title;
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]));
+}
