@@ -1,7 +1,0 @@
-// What: a global initialized with a function call
-// Expect: Global 'limit' requires a literal constant initializer
-fn compute() I32 { 3 * 7; }
-
-let limit: I32 = compute();
-
-export main() I32 { limit; }

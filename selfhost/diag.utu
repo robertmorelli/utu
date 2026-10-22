@@ -252,6 +252,14 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.BoundMissing { return "unsatisfied-bound"; };
     if k == Diag.UnboundedCall { return "unknown-method"; };
     if k == Diag.BoundNotProto or k == Diag.ProtoSelfDynamic { return "invalid-bound"; };
+    if k == Diag.UnknownLabel { return "invalid-break"; };
+    if k == Diag.GlobalCycle { return "invalid-global-initializer"; };
+    if k == Diag.NotValue or k == Diag.NotStruct { return "type-mismatch"; };
+    if k == Diag.NotAssignable { return "assignment-to-immutable"; };
+    if k == Diag.IrUnknown { return "invalid-dsl-usage"; };
+    if k == Diag.YieldPlace or k == Diag.GeneratorExport { return "invalid-for-source"; };
+    if k == Diag.NewNotHost { return "not-callable"; };
+    if k == Diag.HostMissing { return "unknown-import"; };
     "type-mismatch";
 }
 
@@ -484,6 +492,17 @@ fn diag_text(i: I32) Str {
         Diag.ForeignOverload => "No overload takes " + int_text(a),
         Diag.PruneInClosure => "prune in a closure",
         Diag.GeneratorMethod => "A method cannot be a generator",
+        Diag.UnknownLabel => "No block labeled " + w + " around this break",
+        Diag.GlobalCycle => if a < 0 { "Global " + w + " is read while it is being set"; }
+            else { "Globals " + w + " and " + word_text(decl_name[a]) + " each need the other set first"; },
+        Diag.NotValue => if a == 2 { w + " is a field: read it from a value"; } else { w + " is a " + pick(a == 1, "module", "type") + ", not a value"; },
+        Diag.NotAssignable => "Only a variable, field, or index can be assigned",
+        Diag.IrUnknown => if a == 1 { "@ir names no parameter " + w; } else { "No @ir element <" + w + ">"; },
+        Diag.YieldPlace => "yield T is only a generator's result type",
+        Diag.NotStruct => type_text(a) + " is not a struct: it has no fields to set",
+        Diag.NewNotHost => "new makes host objects; " + w + " is not a host class",
+        Diag.GeneratorExport => w + " is a generator: it expands into each for that reads it, so it cannot be exported",
+        Diag.HostMissing => "No declarations for " + w + "; is it installed?",
         Diag.PruneOutside => "prune outside a recursive generator loop",
         Diag.GeneratorPassThrough => w + " passes its values straight through",
         Diag.GeneratorArity => w + " takes " + int_text(a) + ", given " + int_text(b),
@@ -656,6 +675,16 @@ fn diag_default_label(i: I32) Str {
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),
         Diag.MemberClash => pick(b == 1, "also in the protocol", "also a field"),
         Diag.VariantNotValue => "make one: " + w + " {…}",
+        Diag.UnknownLabel => "no such label",
+        Diag.GlobalCycle => if a < 0 { "reads " + w; } else { "needs " + word_text(decl_name[a]); },
+        Diag.NotValue => "not a value",
+        Diag.NotAssignable => "not a variable",
+        Diag.IrUnknown => "unknown",
+        Diag.YieldPlace => "not a type here",
+        Diag.NotStruct => "no fields",
+        Diag.NewNotHost => "not a host class",
+        Diag.GeneratorExport => "a generator",
+        Diag.HostMissing => "not found",
         ~> "here",
     };
 }

@@ -79,7 +79,7 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
         };
         return ty_b[t];
     };
-    if ty_is(t, Ty.Error) { return unsupported(node); };
+    if ty_is(t, Ty.Error) { return follow_on(first, -1, m, node, cx); };
     report2(Diag.NotCallable, first, -1, t, -1);
     error_value();
 }
@@ -88,6 +88,7 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
 fn pipe_method(node: I32, first: I32, names: Array[I32], nnames: I32, args: Array[I32], count: I32, value: I32, m: I32, cx: Cx) I32 {
     // The receiver: the path but its last name, read as fields.
     let rt = check_expr(first, -1, cx);
+    if ty_is(rt, Ty.Error) { return finish_error(-1, m, cx); };
     for (0 ..< nnames - 1) |i| {
         let field = field_of(rt, names[i]);
         if field < 0 { return finish_error(-1, m, cx); };
@@ -99,7 +100,8 @@ fn pipe_method(node: I32, first: I32, names: Array[I32], nnames: I32, args: Arra
     let name = names[nnames - 1];
     let decl = member(ty_decl(rt), word_of(name), Space.Method);
     if decl < 0 {
-        if has_foreign() { return unsupported(node); };
+        // (Piping into a host value's method is not done yet.)
+        if is_foreign(rt) or primitive_host_type(rt, word_of(name)) >= 0 { return unsupported(node); };
         report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
         return finish_error(-1, m, cx);
     };
@@ -342,7 +344,7 @@ fn check_await(node: I32, cx: Cx) I32 {
     let e = first_child(node);
     if is_kind(e, Node.For_expr) {
         // `await for (gen()) |x| { … }`: the generator's body may await.
-        if generator_call(e) >= 0 { return check_expr(e, ty_void(), cx); };
+        if generator_source(e, cx) >= 0 { return check_expr(e, ty_void(), cx); };
         return check_stream_for(e, cx);
     };
     let m = w_mark();

@@ -176,6 +176,29 @@ export lib {
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
     ['mod m[T] {\n    struct &:\n        | v: T\n        | next: ?m[T]\n    fn &.mk(v: T) m[T] { &{ v: v, next: null }; }\n}\nexport lib { fn run() I32 { let a = m[I32].mk(3); a.next = m[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    // Labeled blocks: `break name v` leaves nested loops with a value; the
+    // block's defers run; the type comes from the tail, else the breaks.
+    ['fn find(xs: Array[I32], want: I32) I32 {\n    found: {\n        for (0 ..< xs.len()) |i| { for (0 ..< 3) |j| { if xs[i] + j == want { break found i * 10 + j; }; }; };\n        -1;\n    };\n}\n'
+      + 'fn early() I32 { let n = 0; out_: { defer n += 100; n += 1; if n > 0 { break out_; }; n += 1000; }; n; }\n'
+      + 'export lib { fn run() I32 {\n    let a = blk: { 3; };\n    let b: I64 = big: { break big 7; };\n    let c = word: { if a > 2 { break word "yes"; }; "no"; };\n    let d = done: { for ([3, 5, 8]) |x| { if x % 2 == 0 { break done x; }; }; break done 0; };\n'
+      + '    find([5, 9, 12], 13) + a * 100 + b.to_i32() * 1000 + c.len() * 10000 + d * 100000 + early() * 1000000;\n} }\n', 21 + 300 + 7000 + 30000 + 800000 + 101000000],
+    // A module's and a type's functions as values (`m.f`, `T.f`, an alias's).
+    ['mod m { fn twice(x: I32) I32 { x * 2; } }\nmod Box[T] {\n    struct &:\n        | v: T\n    fn &.make(v: T) & { &{ v: v }; }\n    fn &.get |b| () T { b.v; }\n    fn wrap(v: T) & { &{ v: v }; }\n}\nusing Box[I32] |ints|;\n'
+      + 'struct P:\n    | x: I32\nfn P.make(x: I32) P { P { x: x }; }\nfn P.get |self| () I32 { self.x; }\nfn apply(f: fun(I32) I32, x: I32) I32 { f(x); }\nfn apply_cl(f: cl(I32) I32, x: I32) I32 { f(x); }\n'
+      + 'export lib { fn run() I32 { let g = m.twice; let mk = P.make; let get = P.get; let w = ints.wrap; let bm = ints.make;\n    g(1) + apply(m.twice, 10) + apply_cl(m.twice, 100) + get(mk(1000)) + w(10000).get() + bm(100000).get(); } }\n', 111222],
+    // Compound assignment on host fields and indexes: the object and index once each.
+    ['using JS from std:JS;\nexport lib { fn run() I32 {\n    let a = new JS.Int32Array(4);\n    a[1] = 5;\n    a[1] += 3;\n    a[1] *= 2;\n    let b = new JS.Array();\n    b.length += 2;\n    b.length *= 3;\n    a[1].to_i32() * 100 + b.length.to_i32();\n} }\n', 1606],
+    // Computed globals: each set after the globals it reads (directly or
+    // through a function); structs, arrays, strings, nullables, and funs.
+    ['struct Pt:\n    | x: I32\n    | y: I32\nfn compute() I32 { 3 * 7; }\nfn twice_base() I32 { base * 2; }\nfn twice(x: I32) I32 { x * 2; }\n'
+      + 'let doubled: I32 = twice_base();\nlet base: I32 = compute();\nlet origin: Pt = Pt { x: base, y: 2 };\nlet squares: Array[I32] = [1, 4, 9, 16];\nlet name: Str = "utu " + base.to_str();\nlet maybe: ?Pt = null;\nlet total: I64 = squares.len().to_i64() * 1000.to_i64();\nlet pick: fun(I32) I32 = twice;\n'
+      + 'export lib { fn run() I32 { let n = if maybe == null { 1; } else { 0; }; doubled + origin.x * 100 + squares[3] * 10000 + total.to_i32() * 1000 + n * 100000000 + pick(name.len()) * 1000000; } }\n', 42 + 2100 + 160000 + 4000000 + 100000000 + 12000000],
+    // Generators through a module, an alias, a type, and a method (`x.each()`).
+    ['mod seq { fn squares(n: I32) yield I32 { for (0 ..< n) |i| { yield i * i; }; } }\nmod Stack[T] {\n    struct &:\n        | items: Array[T]\n        | size: I32\n    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }\n    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }\n'
+      + '    fn &.each |s| () yield T { let i = s.size - 1; while (i >= 0) { yield s.items[i]; i -= 1; }; }\n    fn &.upto(n: I32) yield I32 { for (0 ..< n) |i| { yield i; }; }\n}\nusing seq |s|;\nstruct Range:\n    | lo: I32\n    | hi: I32\n'
+      + 'fn Range.each |r| () yield I32 { for (r.lo ..< r.hi) |i| { yield i; }; }\nfn Range.below(n: I32) yield I32 { for (0 ..< n) |i| { yield i; }; }\n'
+      + 'export lib { fn run() I32 {\n    let total = 0;\n    for (seq.squares(4)) |v| { total += v; };\n    for (s.squares(3)) |v| { total += v * 100; };\n    let st = Stack[I32].new(0);\n    st.push(1);\n    st.push(2);\n    st.push(3);\n    let order = 0;\n    for (st.each()) |v| { order = order * 10 + v; };\n'
+      + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    total + order * 1000000;\n} }\n', 321393514],
   ];
   for (const [source, value] of everyMode) {
     const file = await write(source);
@@ -377,6 +400,22 @@ export lib {
     }
   }
 
+  // Benches: a bench build exports `__bench_k(n)`, its setup once and its
+  // measured block n times; a test build checks them.
+  const benchFile = await write('let calls: Array[I32] = [0];\nexport lib { fn count() I32 { calls[0]; } }\nbench "adds" {\n    let k = 2;\n    measure { calls[0] += k; }\n}\nbench "nothing" {\n    measure {}\n}\n');
+  for (const mode of modes) {
+    const benched = await compileFile(utu, benchFile, { target: 'bench', mode });
+    assert.deepEqual(benched.benches, [{ export: '__bench_0', name: 'adds' }, { export: '__bench_1', name: 'nothing' }], `${mode}: ${benched.diagnostics?.map(d => d.message)}`);
+    const { exports } = await instantiateNode(benched.wasm, benched.spec);
+    exports.__bench_0(5);
+    exports.__bench_0(0);
+    exports.__bench_1(3);
+    checked++;
+  }
+  const badBench = await compileFile(utu, await write('export main() I32 { 0; }\nbench "sum" {\n    measure { let s: I32 = "x"; }\n}\n'), { target: 'test' });
+  assert.deepEqual(badBench.diagnostics.map(d => d.message), ['s is I32, got Str']);
+  checked++;
+
   // Test names with utu escapes that JSON lacks.
   const named = await compileFile(utu, await write('export main() void {}\ntest "it\\\'s \\$5\tok" { assert 1 == 1; }\n'), { target: 'test' });
   assert.deepEqual(named.tests.map(t => t.name), ["it's $5\tok"]);
@@ -408,7 +447,28 @@ export lib {
     ['export lib { fn run() I32 { let w = [1, 2] windows(Str, 1); w.len(); } }\n', 'Expected Str, got I32'],
     ['export lib { fn run() Str { ["a", "b"] sum; } }\n', 'sum needs numbers, not Str'],
     ['export lib { fn run() I32 { [1, 2] bisect |v, i, j| { true; }; } }\n', 'bisect takes 1 name and an optional index'],
-    ['mod B {\n    struct &:\n        | x: I32\n    fn &.each |b| () yield I32 { yield b.x; }\n}\nexport lib { fn run() I32 { 0; } }\n', 'A method cannot be a generator'],
+    ['mod B {\n    struct &:\n        | x: I32\n    fn &.new() & { &{ x: 1 }; }\n    fn &.each |b| () yield I32 { yield b.x; }\n}\nexport lib { fn run() I32 { B.new().each(); 0; } }\n', 'each is a generator: for (each(…)) |v| { … }'],
+    ['mod seq { fn squares(n: I32) yield I32 { yield n; } }\nexport lib { fn run() I32 { let f = seq.squares; 0; } }\n', 'squares is a generator: for (squares(…)) |v| { … }'],
+    ['export lib {\n    fn squares(n: I32) yield I32 { yield n; }\n}\n', 'squares is a generator: it expands into each for that reads it, so it cannot be exported'],
+    // Labeled blocks.
+    ['export lib { fn run() I32 { outer: { break nowhere 1; 2; }; } }\n', 'No block labeled nowhere around this break'],
+    ['export lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'No block labeled outer around this break'],
+    ['export lib { fn run() I32 { let b: I32 = outer: { break outer "x"; }; b; } }\n', 'Expected I32, got Str'],
+    ['export lib { fn run() I32 { outer: { defer { break outer; }; }; 0; } }\n', 'break in defer'],
+    // Computed globals that need each other.
+    ['fn get_b() I32 { b + 1; }\nlet a: I32 = get_b();\nlet b: I32 = a * 2;\nexport lib { fn run() I32 { a; } }\n', 'Globals b and a each need the other set first'],
+    ['let c: I32 = c + 1;\nexport lib { fn run() I32 { c; } }\n', 'Global c is read while it is being set'],
+    ['let d: cl() I32 = cl() I32 { e; };\nlet e: I32 = d();\nexport lib { fn run() I32 { e; } }\n', 'Globals e and d each need the other set first'],
+    // Names that are not values, and other plain mistakes (once "Not supported yet").
+    ['mod m { fn f() I32 { 1; } }\nexport lib { fn run() I32 { let x = m; 0; } }\n', 'm is a module, not a value'],
+    ['mod m {\n    struct P:\n        | x: I32\n}\nexport lib { fn run() I32 { m.P(1); 0; } }\n', 'P is a type, not a value'],
+    ['struct P:\n    | x: I32\nexport lib { fn run() I32 { let v = P.x; 0; } }\n', 'x is a field: read it from a value'],
+    ['mod m { let k: I32 = 3; }\nexport lib { fn run() I32 { m.k(1); } }\n', 'I32 is not callable'],
+    ['enum(U8) E:\n    | A\n    | B\nexport lib { fn run() I32 { let e = E { x: 1 }; 0; } }\n', 'E is not a struct: it has no fields to set'],
+    ['struct P:\n    | x: I32\nfn mk() P { P { x: 1 }; }\nexport lib { fn run() I32 { let p = new mk(); 0; } }\n', 'new makes host objects; mk is not a host class'],
+    ['fn sq(a: I32) I32 {\n    @ir/\\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \\/;\n}\nexport lib { fn run() I32 { sq(7); } }\n', 'No @ir element <ir-i32-mull>'],
+    ['fn sq(a: I32) I32 {\n    @ir/\\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \\/;\n}\nexport lib { fn run() I32 { sq(7); } }\n', '@ir names no parameter b'],
+    ['using JS from std:JS;\nexport lib { fn run() I32 { let f = cl(x) { x; }; 0; } }\n', 'x needs a type'],
     ['export lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F64'],
     // Only Externref holds any host value: not Str.
     ['using JS from std:JS;\nexport main() I32 { let s: Str = new JS.Map(); s.len(); }\n', 's is Str, got JS.Map<any, any>'],
@@ -535,6 +595,9 @@ export lib {
     [{ 'main.utu': 'mod sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nexport main() I32 { sm.get(sm.new(3)); }\n' }, 3],
     // An @es binding of a generic module, typed in each instance.
     [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nexport main() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).to_f64(); }\n' }, 10.5],
+    // A computed global of an imported file, read by the entry's: set first.
+    [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; a; }\n    let squares: Array[I32] = build();\n}\n',
+      'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nexport main() I32 { last; }\n' }, 10],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];

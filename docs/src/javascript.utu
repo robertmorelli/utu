@@ -29,6 +29,10 @@ mod javascript {
         \\    let words = JS.Array.of("b", "c", "a");
         \\    words.sort();
         \\    console.log(words.join("-"));                         // a-b-c
+        \\    let counts = new JS.Int32Array(3);
+        \\    counts[1] += 5;                                       // op= reads, operates, writes back
+        \\    words.length -= 1;
+        \\    console.log(`${counts[1]} ${words.join("-")}`);       // 5 a-b
         \\}
         ;
     }

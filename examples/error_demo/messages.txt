@@ -609,6 +609,64 @@ ok
 14 │     };
 --- exit 1
 
+=== utu check examples/error_demo/control/400_break_unknown_label.utu
+ ERROR  No block labeled nowhere around this break
+        unknown-label · examples/error_demo/control/400_break_unknown_label.utu:5:15
+
+ 3 │ export main() I32 {
+ 4 │     let a = outer: {
+ 5 │         break nowhere 1;
+   │               ━━━━━━━
+   │               ╰─ no such label
+ 6 │         2;
+ 7 │     };
+--- exit 1
+
+=== utu check examples/error_demo/control/401_break_label_in_closure.utu
+ ERROR  No block labeled outer around this break
+        unknown-label · examples/error_demo/control/401_break_label_in_closure.utu:5:34
+
+ 3 │ export main() I32 {
+ 4 │     outer: {
+   │     ─────
+   │     ╰─ outside the closure
+ 5 │         let f = cl() I32 { break outer 1; };
+   │                                  ━━━━━
+   │                                  ╰─ no such label
+ 6 │         f();
+ 7 │     };
+
+  note  a closure cannot leave the block it is in
+--- exit 1
+
+=== utu check examples/error_demo/control/402_break_label_wrong_type.utu
+ ERROR  Expected I32, got Str
+        type-mismatch · examples/error_demo/control/402_break_label_wrong_type.utu:5:21
+
+ 3 │ export main() I32 {
+ 4 │     let n: I32 = found: {
+ 5 │         break found "seven";
+   │                     ━━━━━━━
+   │                     ╰─ Str
+ 6 │     };
+ 7 │     n;
+--- exit 1
+
+=== utu check examples/error_demo/control/403_break_label_no_value.utu
+ ERROR  n is I32, got void
+        type-mismatch · examples/error_demo/control/403_break_label_no_value.utu:5:9
+
+ 3 │ export main() I32 {
+ 4 │     let n: I32 = found: {
+   │            ───
+   │            ╰─ I32
+ 5 │         break found;
+   │         ━━━━━━━━━━━
+   │         ╰─ void
+ 6 │     };
+ 7 │     n;
+--- exit 1
+
 === utu check examples/error_demo/control/40_duplicate_match_bool.utu
  ERROR  Duplicate pattern true
         duplicate-pattern · examples/error_demo/control/40_duplicate_match_bool.utu:4:26
@@ -1091,16 +1149,18 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/77_break_with_value.utu
- ERROR  Expected ';', got 'x'
-        parse-error · examples/error_demo/control/77_break_with_value.utu:5:31
+ ERROR  No block labeled x around this break
+        unknown-label · examples/error_demo/control/77_break_with_value.utu:5:31
 
  3 │ fn first_even(xs: Array[I32]) I32 {
  4 │     for (xs) |x| {
  5 │         if x % 2 == 0 { break x; };
    │                               ━
-   │                               ╰─ ';'?
+   │                               ╰─ no such label
  6 │     };
  7 │     -1;
+
+  note  a loop's break takes no value; break name v leaves a block name: { … } with v
 --- exit 1
 
 === utu check examples/error_demo/control/78_missing_return_in_one_branch.utu
@@ -1725,6 +1785,19 @@ ok
  8 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/400_generator_method_called.utu
+ ERROR  each is a generator: for (each(…)) |v| { … }
+        generator-call · examples/error_demo/iterators/400_generator_method_called.utu:14:5
+
+12 │ export main() I32 {
+13 │     let bag = Bag.new();
+14 │     bag.each();
+   │     ━━━━━━━━━━
+   │     ╰─ here
+15 │     0;
+16 │ }
+--- exit 1
+
 === utu check examples/error_demo/iterators/40_for_bool_range.utu
  ERROR  for needs an array or range, not Bool
         invalid-for-source · examples/error_demo/iterators/40_for_bool_range.utu:6:10
@@ -2126,50 +2199,20 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/71_generator_from_module.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/iterators/71_generator_from_module.utu:4:24
-
- 2 │ // Expect: accepted (a module's generator is consumed like any other), or a clear message if not
- 3 │ mod seq {
- 4 │     fn squares(n: I32) yield I32 {
-   │                        ━━━━━━━━━
-   │                        ╰─ here
- 5 │         for (0 ..< n) |i| { yield i * i; };
- 6 │     }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/iterators/71_generator_from_module.utu:5:29
-
- 3 │ mod seq {
- 4 │     fn squares(n: I32) yield I32 {
- 5 │         for (0 ..< n) |i| { yield i * i; };
-   │                             ━━━━━━━━━━━
-   │                             ╰─ here
- 6 │     }
- 7 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/iterators/72_generator_as_value.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/iterators/72_generator_as_value.utu:3:20
+ ERROR  squares is a generator: for (squares(…)) |v| { … }
+        generator-call · examples/error_demo/iterators/72_generator_as_value.utu:8:15
 
- 1 │ // What: a generator stored in a variable to be consumed later
- 2 │ // Expect: squares is a generator, not a function value: consume it directly with for (squares(…)) |v|
- 3 │ fn squares(n: I32) yield I32 {
-   │                    ━━━━━━━━━
-   │                    ╰─ here
- 4 │     for (0 ..< n) |i| { yield i * i; };
- 5 │ }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/iterators/72_generator_as_value.utu:4:25
-
- 2 │ // Expect: squares is a generator, not a function value: consume it directly with for (squares(…)) |v|
- 3 │ fn squares(n: I32) yield I32 {
- 4 │     for (0 ..< n) |i| { yield i * i; };
-   │                         ━━━━━━━━━━━
-   │                         ╰─ here
- 5 │ }
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let gen = squares;
+   │               ━━━━━━━
+   │               ╰─ here
+ 9 │     let total = 0;
+10 │     for (gen(4)) |s| { total += s; };
 --- exit 1
 
 === utu check examples/error_demo/iterators/73_collect_without_type.utu
@@ -2224,27 +2267,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/77_generator_exported.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/iterators/77_generator_exported.utu:4:24
+ ERROR  squares is a generator: it expands into each for that reads it, so it cannot be exported
+        generator-export · examples/error_demo/iterators/77_generator_exported.utu:4:8
 
  2 │ // Expect: a generator cannot be exported: it expands inline at a for loop; export a function returning Array[I32]
  3 │ export lib {
  4 │     fn squares(n: I32) yield I32 {
-   │                        ━━━━━━━━━
-   │                        ╰─ here
+   │        ━━━━━━━
+   │        ╰─ a generator
  5 │         for (0 ..< n) |i| { yield i * i; };
  6 │     }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/iterators/77_generator_exported.utu:5:29
-
- 3 │ export lib {
- 4 │     fn squares(n: I32) yield I32 {
- 5 │         for (0 ..< n) |i| { yield i * i; };
-   │                             ━━━━━━━━━━━
-   │                             ╰─ here
- 6 │     }
- 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/78_generator_in_pipeline_body.utu
@@ -2334,16 +2366,8 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/85_generator_method.utu
- ERROR  A method cannot be a generator
-        generator-method · examples/error_demo/iterators/85_generator_method.utu:7:27
-
- 5 │         | items: Array[I32]
- 6 │     fn &.new(xs: Array[I32]) & { &{ items: xs }; }
- 7 │     fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
-   │                           ━━━━━━━━━
-   │                           ╰─ here
- 8 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/iterators/86_bisect_over_i64_range.utu
  ERROR  bisect takes a range of I32, not I64
@@ -2989,15 +3013,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/35_unknown_import_npm_missing.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/names/35_unknown_import_npm_missing.utu:6:5
+ ERROR  No declarations for npm:left-pad-xyz; is it installed?
+        host-missing · examples/error_demo/names/35_unknown_import_npm_missing.utu:3:16
 
+ 1 │ // What: imports an npm package that is not installed, and calls it
+ 2 │ // Expect: Cannot import "npm:left-pad-xyz": package not found in node_modules
+ 3 │ using pad from "npm:left-pad-xyz";
+   │                ━━━━━━━━━━━━━━━━━━
+   │                ╰─ not found
  4 │
  5 │ export main() Str {
- 6 │     pad.leftPad("7", 3);
-   │     ━━━
-   │     ╰─ here
- 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/36_unknown_import_node_typo.utu
@@ -3048,6 +3073,44 @@ ok
    │               ━
    │               ╰─ unexpected
  7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/400_module_as_value.utu
+ ERROR  shapes is a module, not a value
+        not-value · examples/error_demo/names/400_module_as_value.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let s = shapes;
+   │             ━━━━━━
+   │             ╰─ not a value
+ 9 │     0;
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/401_module_type_called.utu
+ ERROR  P is a type, not a value
+        not-value · examples/error_demo/names/401_module_type_called.utu:9:5
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     m.P(1);
+   │     ━━━
+   │     ╰─ not a value
+10 │     0;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/402_field_read_from_type.utu
+ ERROR  x is a field: read it from a value
+        not-value · examples/error_demo/names/402_field_read_from_type.utu:7:5
+
+ 5 │
+ 6 │ export main() I32 {
+ 7 │     P.x;
+   │     ━━━
+   │     ╰─ not a value
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/40_not_a_module_type_path.utu
@@ -4399,18 +4462,40 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/39_ir_unknown_op.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/platform/39_ir_unknown_op.utu:3:1
+ ERROR  No @ir element <ir-i32-mull>
+        ir-unknown · examples/error_demo/platform/39_ir_unknown_op.utu:4:5
 
- 1 │ // What: an @ir body with a misspelled intrinsic tag
  2 │ // Expect: @ir: unknown intrinsic <ir-i32-mull> (pointing at the tag)
  3 │ fn square(a: I32) I32 {
  4 │     @ir/\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ unknown
  5 │ }
-   │ ━
-   │ ╰─ here
- 6 │
- 7 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/400_new_of_utu_function.utu
+ ERROR  new makes host objects; mk is not a host class
+        new-not-host · examples/error_demo/platform/400_new_of_utu_function.utu:9:17
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     let p = new mk();
+   │                 ━━
+   │                 ╰─ not a host class
+10 │     p.x;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/401_ir_unknown_parameter.utu
+ ERROR  @ir names no parameter b
+        ir-unknown · examples/error_demo/platform/401_ir_unknown_parameter.utu:4:5
+
+ 2 │ // Expect: @ir names no parameter b
+ 3 │ fn square(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ unknown
+ 5 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/40_ir_missing_operand.utu
@@ -4418,26 +4503,16 @@ ok
 --- exit 0
 
 === utu check examples/error_demo/platform/41_generator_as_value.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/platform/41_generator_as_value.utu:3:18
+ ERROR  count is a generator: for (count(…)) |v| { … }
+        generator-call · examples/error_demo/platform/41_generator_as_value.utu:8:13
 
- 1 │ // What: binding a generator function to a local as a value
- 2 │ // Expect: count is a generator: consume it with `for (count(…)) |value| { … }` (at line 8, not at the generator)
- 3 │ fn count(n: I32) yield I32 {
-   │                  ━━━━━━━━━
-   │                  ╰─ here
- 4 │     for (0 ..< n) |i| { yield i; };
- 5 │ }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/platform/41_generator_as_value.utu:4:25
-
- 2 │ // Expect: count is a generator: consume it with `for (count(…)) |value| { … }` (at line 8, not at the generator)
- 3 │ fn count(n: I32) yield I32 {
- 4 │     for (0 ..< n) |i| { yield i; };
-   │                         ━━━━━━━
-   │                         ╰─ here
- 5 │ }
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let g = count;
+   │             ━━━━━
+   │             ╰─ here
+ 9 │     0;
+10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/42_foreign_root_typo.utu
@@ -8042,6 +8117,47 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 10 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/400_global_cycle.utu
+ ERROR  Globals b and a each need the other set first
+        global-cycle · examples/error_demo/types/400_global_cycle.utu:6:14
+
+ 4 │
+ 5 │ let a: I32 = get_b();
+   │     ─
+   │     ╰─ needs b
+ 6 │ let b: I32 = a * 2;
+   │              ━━━━━
+   │              ╰─ needs a
+ 7 │
+ 8 │ export main() I32 { a + b; }
+--- exit 1
+
+=== utu check examples/error_demo/types/401_global_reads_itself.utu
+ ERROR  Global count is read while it is being set
+        global-cycle · examples/error_demo/types/401_global_reads_itself.utu:3:18
+
+ 1 │ // What: a computed global whose initializer reads the global itself
+ 2 │ // Expect: Global count is read while it is being set
+ 3 │ let count: I32 = count + 1;
+   │                  ━━━━━━━━━
+   │                  ╰─ reads count
+ 4 │
+ 5 │ export main() I32 { count; }
+--- exit 1
+
+=== utu check examples/error_demo/types/402_struct_init_of_enum.utu
+ ERROR  E is not a struct: it has no fields to set
+        not-struct · examples/error_demo/types/402_struct_init_of_enum.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let e = E { x: 1 };
+   │             ━
+   │             ╰─ no fields
+ 9 │     0;
+10 │ }
+--- exit 1
+
 === utu check examples/error_demo/types/40_enum_variant_wrong_enum.utu
  ERROR  paint takes Color, got Size
         type-mismatch · examples/error_demo/types/40_enum_variant_wrong_enum.utu:13:27
@@ -8740,19 +8856,6 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │              ╰─ here
  9 │     ps.len();
 10 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/92_invalid_global_init_call.utu
- ERROR  Global limit needs a literal
-        invalid-global-initializer · examples/error_demo/types/92_invalid_global_init_call.utu:5:18
-
- 3 │ fn compute() I32 { 3 * 7; }
- 4 │
- 5 │ let limit: I32 = compute();
-   │                  ━━━━━━━━━
-   │                  ╰─ here
- 6 │
- 7 │ export main() I32 { limit; }
 --- exit 1
 
 === utu check examples/error_demo/types/93_match_type_enum.utu

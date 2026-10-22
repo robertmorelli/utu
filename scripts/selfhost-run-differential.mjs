@@ -39,6 +39,9 @@ const INTENDED = {
   // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
   'examples/bounds.utu normal': 'bounded module parameters',
   'examples/bounds.utu test': 'bounded module parameters',
+  // `let value: … = f();`: stage 0 wants a literal; a global may be computed.
+  'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu normal': 'a global may be computed',
+  'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu test': 'a global may be computed',
 };
 
 if (isMainThread) await main();

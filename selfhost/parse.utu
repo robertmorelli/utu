@@ -1526,7 +1526,15 @@ fn keyword_expression(p: Parser) I32 {
         expr(p, 0, true);
         return node(p, if w == Kw.Yield.to_i32() { Node.Yield_expr; } else { Node.Defer_expr; }, at, first);
     };
-    if w == Kw.Break.to_i32() { return leaf(p, Node.Break_expr); };
+    if w == Kw.Break.to_i32() {
+        // `break label value`: a label is a name, but not a word that may follow an expression.
+        advance(p);
+        if shaped(p) and starts_expression(p) {
+            identifier(p);
+            if starts_expression(p) { expr(p, 0, true); };
+        };
+        return node(p, Node.Break_expr, at, first);
+    };
     if w == Kw.Fatal.to_i32() { return leaf(p, Node.Fatal_expr); };
     if w == Kw.Prune.to_i32() { return leaf(p, Node.Prune_expr); };
     if w == Kw.Let.to_i32() { return bind_expr(p); };

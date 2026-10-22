@@ -1,0 +1,9 @@
+// What: breaks out of a labeled block by a name no block around it has
+// Expect: No block labeled nowhere around this break
+export main() I32 {
+    let a = outer: {
+        break nowhere 1;
+        2;
+    };
+    a;
+}
