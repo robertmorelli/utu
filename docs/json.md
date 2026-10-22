@@ -49,7 +49,7 @@ fn store(save: Save) Str {
 | `?T` (reference types) | `null` or a missing field |
 | `Array[T]` | arrays |
 | local structs | objects; unknown fields are skipped, field order is free |
-| enums with no fields | strings: `"Red"` |
+| enums with no fields, `enum(U8)` ones included | strings: `"Red"` |
 | other enums | objects whose first field is `"kind"`: `{"kind": "Circle", "r": 2}` |
 
 Types may be recursive through `?T` or `Array[T]`. Non-optional fields must be

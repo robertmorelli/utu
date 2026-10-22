@@ -32,9 +32,6 @@ fn narrow_word(n: Narrow) I32 { Kw.count() + n.to_i32(); }
 /// The program's own files: checked whole, reached or not.
 fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Import.to_i32(); }
 
-/// Files whose top-level declarations are the program's (not only modules).
-fn declares_items(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Generated.to_i32(); }
-
 /// By file: 1 for the standard library's (the host says which).
 vec file_std: I32;
 /// A file's first byte in `src`. The `file_*` vecs are rows by file id.

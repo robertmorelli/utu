@@ -1,0 +1,10 @@
+// What: a struct variant named as if it were a value
+// Expect: Color.R is a type, not a value (make one: R {})
+enum Color:
+    | R
+    | G
+
+export main() I32 {
+    let c = Color.R;
+    0;
+}

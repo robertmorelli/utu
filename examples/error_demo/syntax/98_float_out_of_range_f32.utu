@@ -1,0 +1,6 @@
+// What: a float literal past F32's largest value
+// Expect: 1.0e39 does not fit F32 (it once became Infinity)
+export main() F32 {
+    let big: F32 = 1.0e39;
+    big;
+}

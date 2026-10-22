@@ -1,0 +1,9 @@
+// What: an enum over F64
+// Expect: enum(F64) is not an integer enum
+enum(F64) Ratio:
+    | Half
+    | Whole
+
+export main() I32 {
+    0;
+}

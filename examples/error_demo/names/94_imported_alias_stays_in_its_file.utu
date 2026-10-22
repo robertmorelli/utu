@@ -1,0 +1,7 @@
+// What: an alias an imported file makes (`using … |ops|` there), used here
+// Expect: Unknown variable ops: an alias is its file's own
+using shapes from "./import_parts/shapes.utu";
+
+export main() I32 {
+    ops.double(21);
+}

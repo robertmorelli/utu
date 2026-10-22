@@ -214,8 +214,9 @@ fn inl_assigns(n: I32, local: I32) Bool {
 //! Equality calls `output()`, whose copy asks Stay? Edit? Equality? of the
 //! same local. Inside `if (ref.test T x)`, with x assigned at most once (as
 //! every local is set before it is read, the one assignment came before the
-//! test), a test of x against U is known: true when T is U or below it,
-//! false when T is final and is not. A local whose one assignment copies
+//! test) and x not a parameter assigned at all (it starts with a value), a
+//! test of x against U is known: true when T is U or below it, false when T
+//! is final and is not. A local whose one assignment copies
 //! another (`alt` keeps its scrutinee in one) is that other. An `if` on a
 //! known condition is the branch it takes.
 
@@ -228,7 +229,8 @@ vec fold_local: I32;
 vec fold_heap: I32;
 
 fn fold_known_tests(f: I32) void {
-    let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f];
+    let params = vl_len[ht_a[func_type_of[f]]];
+    let total = params + func_local_count[f];
     fold_assigned.resize(total);
     fold_copy_of.resize(total);
     for (0 ..< total) |i| {
@@ -236,6 +238,8 @@ fn fold_known_tests(f: I32) void {
         fold_copy_of[i] = -1;
     };
     note_assigned(func_body[f]);
+    // A parameter starts with a value, so any assignment may follow a test.
+    for (0 ..< params) |i| { if fold_assigned[i] > 0 { fold_assigned[i] = 2; }; };
     fold_local.clear();
     fold_heap.clear();
     fold(func_body[f]);
