@@ -688,6 +688,7 @@ fn host_assignable(actual: I32, expected: I32) Bool {
         if (name == "Object" or name == "object" or name == "{}") and (is_foreign(a) or ty_is(a, Ty.Closure)) { return true; };
         if is_foreign(a) and same_template_any(a, e) { return true; };
         if is_foreign(a) and structurally(a, e) { return true; };
+        if a == prelude(Prelude.Str) and string_like(e) { return true; };
         let union = desc_get(describe(ref_of(e)), "union");
         if union >= 0 {
             let m = jfirst(union);
@@ -699,9 +700,22 @@ fn host_assignable(actual: I32, expected: I32) Bool {
             };
         };
     };
-    // Externref (std) holds any host value.
-    if decl_is(ty_decl(e), Decl.TypeDecl) and repr(e) == vt_externref and is_host_value(a) { return true; };
+    // Externref (std) holds any host value; Str and the other externref types do not.
+    if e == prelude(Prelude.Externref) and is_host_value(a) { return true; };
     false;
+}
+
+/// Whether a string is one: an `ArrayLike` or `Iterable` of strings.
+fn string_like(e: I32) Bool {
+    let lib = jget(describe(ref_of(e)).at, "lib");
+    if lib < 0 or not (jstring_is_text(lib, "ArrayLike") or jstring_is_text(lib, "Iterable")) { return false; };
+    // `Iterable<T, …>`: T, its first argument.
+    let env = ref_of(e).env;
+    if jstring_is_text(lib, "Iterable") {
+        return env >= 0 and vl_len[env] >= 3 and foreign_type(Ref { doc: fty_doc[e], at: vl_item(env, 1), env: vl_item(env, 2) }, fty_view[e]) == prelude(Prelude.Str);
+    };
+    let el = element_of(ref_of(e), 0);
+    el >= 0 and foreign_type(Ref { doc: fty_doc[e], at: el, env: element_env[0] }, fty_view[e]) == prelude(Prelude.Str);
 }
 
 /// Whether host type `t` has base `b` (through its bases' bases).
@@ -767,6 +781,20 @@ fn has_member_named(t: I32, key: I32, depth: I32) Bool {
 /// read as a primitive, and a boxed number or Bool read as one.
 fn host_coerce(actual: I32, expected: I32) Bool {
     if not (is_host_value(actual) or is_host_value(expected) or ty_is(actual, Ty.Nullable) and is_foreign(ty_a[actual])) { return false; };
+    // A dynamic value made nullable: undefined is absent, and a primitive is checked.
+    if is_dynamic(actual) and ty_is(expected, Ty.Nullable) and is_host_value(ty_a[expected]) {
+        let inner = ty_a[expected];
+        if typeof_name(inner).len() > 0 or host_assignable(actual, inner) {
+            let v = w_pop();
+            let m = w_mark();
+            w_push(v);
+            let mt = vl_begin();
+            vl_add(nullable(foreign_any(fty_view[actual])));
+            let present = if typeof_name(inner).len() > 0 { js_output("value", inner, true); } else { "value"; };
+            foreign_call_op(vl_end(mt), expected, "(value) => value == null ? null : " + present, m);
+            return true;
+        };
+    };
     if host_assignable(actual, expected) { return true; };
     let a = actual;
     if is_dynamic(a) and typeof_name(expected).len() > 0 {
@@ -779,6 +807,17 @@ fn host_coerce(actual: I32, expected: I32) Bool {
         return true;
     };
     false;
+}
+
+/// A dynamic value (on the stack) as the subject of `promote` or `orelse`:
+/// nullable, undefined as null.
+fn dynamic_nullable(t: I32) I32 {
+    let v = w_pop();
+    let m = w_mark();
+    w_push(v);
+    let mt = vl_begin();
+    vl_add(t);
+    foreign_call_op(vl_end(mt), nullable(t), "(value) => value ?? null", m);
 }
 
 fn foreign_unbox(from: I32, to: I32, checked: Bool) void {
@@ -1337,6 +1376,16 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 };
             };
         };
+        // A string where an array-like or iterable of `T` is wanted: `T` is Str.
+        if p < 0 and not is_untyped_array(args[k]) and closure_node(args[k]) < 0 and type_only(args[k], -1, cx) == prelude(Prelude.Str) {
+            let el = element_of(slot, 0);
+            let ep = if el >= 0 { jget(el, "parameter"); } else { -1; };
+            if ep >= 0 and not bound_in_pending(m, jstring_word(ep)) {
+                vl_add(jstring_word(ep));
+                vl_add(prim_ref(prelude(Prelude.Str)));
+                vl_add(-1);
+            };
+        };
         // A callback's result parameter (`map<U>(f: (x: T) => U)`) takes the closure's result.
         let c = closure_node(args[k]);
         let call = jfirst(desc_get(describe(slot), "calls"));
@@ -1883,7 +1932,7 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
     w_node(Op.Plain, vt_i32, 69, 0, mc);
     let mthen = w_mark();
     let c = next_sibling(pattern);
-    if is_kind(c, Node.Identifier) {
+    if arm_binding(a) >= 0 {
         let d = node_decl[c];
         decl_ty[d] = narrowed;
         let mb = w_mark();

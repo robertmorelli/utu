@@ -8,22 +8,36 @@ export function compressedSourceWarnings(source, file) {
   const warnings = [];
   let offset = 0;
   let inBlockComment = false;
+  // Open template strings: 'text' inside one's text, or the brace depth
+  // inside one's `${…}`. A template, interpolations and all, is not code.
+  const templates = [];
   for (const [index, line] of source.split('\n').entries()) {
     let code = '';
     let quoted = false;
     if (!line.trimStart().startsWith('\\\\')) {
       for (let i = 0; i < line.length; i++) {
         const pair = line.slice(i, i + 2);
+        const top = templates.length - 1;
         if (inBlockComment) {
           if (pair === '*/') { inBlockComment = false; i++; }
         } else if (quoted) {
-          if (line[i] === '"') quoted = false;
+          if (line[i] === '\\') i++;
+          else if (line[i] === '"') quoted = false;
+        } else if (templates[top] === 'text') {
+          if (line[i] === '\\') i++;
+          else if (line[i] === '`') templates.pop();
+          else if (pair === '${') { templates.push(0); i++; }
         } else if (pair === '//') {
           break;
         } else if (pair === '/*') {
           inBlockComment = true; i++;
         } else if (line[i] === '"') {
           quoted = true;
+        } else if (line[i] === '`') {
+          templates.push('text');
+        } else if (top >= 0) {
+          if (line[i] === '{') templates[top]++;
+          else if (line[i] === '}' && templates[top]-- === 0) templates.pop();
         } else {
           code += line[i];
         }

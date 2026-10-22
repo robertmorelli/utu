@@ -1,0 +1,7 @@
+// What: a closure names itself before its type is known
+// Expect: f needs a type annotation to call itself
+export main() I32 {
+    let f = cl() { f(); };
+    f();
+    1;
+}

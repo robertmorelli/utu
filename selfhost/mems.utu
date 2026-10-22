@@ -320,16 +320,12 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
     if is_kind(init, Node.Array_expr) {
         let c = first_child(init);
         while (c >= 0) {
-            let lit = if is_kind(c, Node.Unary_expr) { first_child(last_child(c)); } else { first_child(c); };
-            let negate = is_kind(c, Node.Unary_expr);
-            if is_kind(lit, Node.Int_lit) {
-                let v = int_value(lit);
-                store_value(decl, if negate { 0 - v; } else { v; }, false, init, count);
-            } else if is_kind(lit, Node.Float_lit) {
-                let text = "";
-                for (tok_start[node_first[lit]] ..< tok_end[node_first[lit]]) |i| { text = text + Str.from_code_point(src[i]); };
-                let f = parse_number(text);
-                store_value(decl, (if negate { 0.0 - f; } else { f; }).bits(), true, init, count);
+            // A number, or `-` and one.
+            let negate = is_kind(c, Node.Unary_expr) and tok_kind[node_first[c]] == Tok.Minus.to_i32();
+            let e = if negate { last_child(c); } else { c; };
+            let lit = if is_kind(e, Node.Literal) { first_child(e); } else { -1; };
+            if lit >= 0 and (is_kind(lit, Node.Int_lit) or is_kind(lit, Node.Float_lit)) {
+                store_literal(decl, lit, negate, init, count);
             } else {
                 report(Diag.MemInitializer, init, decl_name[decl]);
             };
@@ -361,7 +357,10 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
             for (0 ..< count) |i| {
                 let at = comptime_start[k] + i * value_size;
                 let lo = read_u32(at);
-                let v = if value_size == 8 { (read_u32(at + 4).to_i64() << 32) | (lo.to_i64() & 4294967295); } else { lo.to_i64(); };
+                // Unsigned kinds' values are zero-extended; an F32's bits stay as they are.
+                let unsigned = s == Storage.U8 or s == Storage.U16 or s == Storage.U32 or s == Storage.F32;
+                let v = if value_size == 8 { (read_u32(at + 4).to_i64() << 32) | lo.to_u32().to_i64(); }
+                    else if unsigned { lo.to_u32().to_i64(); } else { lo.to_i64(); };
                 store_value(decl, v, s == Storage.F32 or s == Storage.F64, init, i);
             };
         };
@@ -378,15 +377,38 @@ fn read_u32(at: I32) I32 {
     comptime_bytes[at] | (comptime_bytes[at + 1] << 8) | (comptime_bytes[at + 2] << 16) | (comptime_bytes[at + 3] << 24);
 }
 
+/// Append element `i` of mem `decl`'s initializer `at`: literal `lit`,
+/// negated or not, read as the mem's element type.
+fn store_literal(decl: I32, lit: I32, negate: Bool, at: I32, i: I32) void {
+    let s = mem_storage(decl);
+    let fits = true;
+    let bits: I64 = 0;
+    if s == Storage.F32 or s == Storage.F64 {
+        let t = prelude(if s == Storage.F32 { Prelude.F32; } else { Prelude.F64; });
+        fits = literal_fits(lit, t, negate);
+        bits = literal_bits(lit, t, negate);
+    } else if is_kind(lit, Node.Int_lit) {
+        let signed = s == Storage.I8 or s == Storage.I16 or s == Storage.I32 or s == Storage.I64;
+        fits = int_fits(lit, negate, 8 << storage_shift(s), signed);
+        bits = literal_bits(lit, prelude(Prelude.I64), negate);
+    } else {
+        fits = false;
+    };
+    if not fits {
+        let text = pick(negate, "-", "") + token_text(node_first[lit]);
+        report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(text));
+    };
+    let size = 1 << storage_shift(s);
+    for (0 ..< size) |k| { data_bytes.push((bits >> (k * 8).to_i64()).to_i32() & 255); };
+}
+
 /// Append element `i` of mem `decl`'s initializer `at`: `v`, an integer or
-/// a float's 64 bits.
+/// (when `is_float`) the element type's bits, as @comptime gives them.
 fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
     let s = mem_storage(decl);
     let size = 1 << storage_shift(s);
-    if s == Storage.F32 or s == Storage.F64 {
-        let f = if is_float { F64.from_bits(v); } else { v.to_f64(); };
-        let bits = if s == Storage.F32 { f.to_f32().bits().to_i64(); } else { f.bits(); };
-        for (0 ..< size) |k| { data_bytes.push((bits >> (k * 8).to_i64()).to_i32() & 255); };
+    if is_float {
+        for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
         return;
     };
     let lo: I64 = 0;
@@ -398,10 +420,7 @@ fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
     else if s == Storage.I32 { lo = -2147483648; hi = 2147483647; }
     else if s == Storage.U32 { hi = 4294967295; }
     else { lo = 0 - 9223372036854775807 - 1; hi = 9223372036854775807; };
-    if is_float or v < lo or v > hi {
-        let text = if is_float { F64.from_bits(v).to_str(); } else { v.to_str(); };
-        report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(text));
-    };
+    if v < lo or v > hi { report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(v.to_str())); };
     for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
 }
 
@@ -832,10 +851,20 @@ fn mem_push_helper(decl: I32, reserve: I32) void {
     func_body[push] = w_pop();
 }
 
-/// `resize(n)`: `reserve(n); len = n`.
+/// `resize(n)`: `reserve(n); len = n` (a safe build traps on a negative n).
 fn mem_resize_helper(decl: I32, reserve: I32) void {
     let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize");
     let r = w_mark();
+    if safe_checks[0] == 1 {
+        let mif = w_mark();
+        w_get(vt_i32, 0);
+        w_i32(0);
+        w_i32_op(i32_lt_s, mif);
+        let trap = w_mark();
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        w_node(Op.Seq, vt_none, 0, 0, trap);
+        w_node(Op.If, vt_none, 1, 0, mif);
+    };
     let rr = w_mark();
     w_get(vt_i32, 0);
     w_node(Op.Call, vt_none, reserve, 0, rr);

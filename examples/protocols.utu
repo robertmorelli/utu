@@ -45,16 +45,10 @@ fn perimeter_sum(l: Array[P]) F32 {
 }
 
 export main() F32 {
-    let my_ps: Array[P] = Array[P].new_default(3);
-
-
-
-
-
-
-
-    my_ps[0] = Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 };
-    my_ps[1] = Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 };
-    my_ps[2] = Circle { x: 0.0, y: 0.0, r: 0.0 };
+    let my_ps: Array[P] = [
+        Line { x: 0.0, y: 0.0, x2: 3.0, y2: 4.0 },
+        Oval { x: 0.0, y: 0.0, r: 0.0, r2: 0.0 },
+        Circle { x: 0.0, y: 0.0, r: 0.0 },
+    ];
     perimeter_sum(my_ps);
 }

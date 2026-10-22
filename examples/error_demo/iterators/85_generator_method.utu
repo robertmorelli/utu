@@ -1,0 +1,15 @@
+// What: a method declared as a generator
+// Expect: A method cannot be a generator (declare it as a function: fn each_item(b: Bag) yield I32)
+mod Bag {
+    struct &:
+        | items: Array[I32]
+    fn &.new(xs: Array[I32]) & { &{ items: xs }; }
+    fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
+}
+
+export main() I32 {
+    let b = Bag.new([1, 2, 3]);
+    let total = 0;
+    for (b.each_item()) |v| { total += v; };
+    total;
+}

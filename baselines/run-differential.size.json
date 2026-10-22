@@ -4601,6 +4601,17 @@
  "examples/json/json.utu test": {
   "calls": {}
  },
+ "examples/modules/console.utu normal": {
+  "calls": {
+   "main": {
+    "result": 5,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/console.utu test": {
+  "calls": {}
+ },
  "examples/modules/inline_paths.utu normal": {
   "calls": {}
  },
@@ -4623,6 +4634,17 @@
     "printed": []
    }
   }
+ },
+ "examples/modules/main_and_bench.utu normal": {
+  "calls": {
+   "main": {
+    "result": 22,
+    "printed": []
+   }
+  }
+ },
+ "examples/modules/main_and_bench.utu test": {
+  "calls": {}
  },
  "examples/modules/method_promotion.utu normal": {
   "calls": {}
@@ -4784,6 +4806,17 @@
     "printed": []
    }
   }
+ },
+ "examples/multi_file/main.utu normal": {
+  "calls": {
+   "main": {
+    "result": 43,
+    "printed": []
+   }
+  }
+ },
+ "examples/multi_file/main.utu test": {
+  "calls": {}
  },
  "examples/multi_file/tests.utu normal": {
   "calls": {}

@@ -1,0 +1,9 @@
+// What: the value after I32's largest, counted for an implicit variant
+// Expect: Wide.Next = 2147483648 does not fit I32 (it once wrapped to -2147483648)
+enum(I32) Wide:
+    | Top = 2147483647
+    | Next
+
+export main() I32 {
+    Wide.Top.to_i32();
+}

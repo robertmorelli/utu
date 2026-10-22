@@ -521,9 +521,19 @@ let i32_and: I32 = 113;
 let i32_xor: I32 = 115;
 let i32_shl: I32 = 116;
 let i32_shr_u: I32 = 118;
+let i64_eq: I32 = 81;
+let i64_lt_s: I32 = 83;
+let i64_lt_u: I32 = 84;
+let i64_gt_s: I32 = 85;
+let i64_gt_u: I32 = 86;
+let i64_le_s: I32 = 87;
+let i64_le_u: I32 = 88;
+let i64_add: I32 = 124;
+let i64_sub: I32 = 125;
 let i64_xor: I32 = 133;
 let i64_shr_u: I32 = 136;
 let i32_wrap_i64: I32 = 167;
+let i64_extend_i32_s: I32 = 172;
 let i64_extend_i32_u: I32 = 173;
 
 /// By IR node: its instruction. The other `w_*` vecs are its other columns.

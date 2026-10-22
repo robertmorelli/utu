@@ -1,0 +1,13 @@
+// What: a generic struct lists a protocol (dispatch tests one type per declaration)
+// Expect: A generic type cannot list protocol Sh
+proto Sh:
+    | name() I32
+
+mod Box[T] {
+    struct &[Sh]:
+        | v: T
+}
+
+fn Sh[Box[I32]].name |b| () I32 { 1; }
+
+export main() I32 { 0; }

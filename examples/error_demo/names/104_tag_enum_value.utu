@@ -1,0 +1,9 @@
+// What: a value on a tag enum's variant, which only integer enums have
+// Expect: Level.Low has a value; only an integer enum's variants do
+enum Level:
+    | Low = 3
+    | High {}
+
+export main() I32 {
+    0;
+}
