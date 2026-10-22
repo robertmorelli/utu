@@ -249,7 +249,20 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.MainParams { return "entry-surface-conflict"; };
     if k == Diag.TestName { return "duplicate-declaration"; };
     if k == Diag.TooManyParams { return "too-many-parameters"; };
+    if k == Diag.ImportNotModule { return "unknown-type"; };
+    if k == Diag.HostUnresolved { return "unknown-import"; };
     "type-mismatch";
+}
+
+/// A top-level item, by its node kind, after "is".
+fn item_kind_text(kind: I32) Str {
+    let k = Node.from_i32(kind);
+    if k == Node.Fn_decl { return "a function"; };
+    if k == Node.Struct_decl { return "a struct"; };
+    if k == Node.Enum_decl { return "an enum"; };
+    if k == Node.Proto_decl { return "a protocol"; };
+    if k == Node.Global_decl { return "a global"; };
+    "not a mod";
 }
 
 /// Whether `t` names a number or Bool type: what match takes.
@@ -391,7 +404,7 @@ fn diag_text(i: I32) Str {
             let t = type_text(a);
             t + " cannot be stored; use cl" + t.slice(3, t.len());
         },
-        Diag.InvalidGlobalInitializer => "Global " + w + " needs a literal",
+        Diag.InvalidGlobalInitializer => "Global " + w + " needs a literal: a number, string, Bool, or null",
         Diag.RecursiveType => w + " contains itself; make the field nullable",
         Diag.IntegerOutOfRange => node_text(node) + " does not fit " + type_text(a),
         Diag.InvalidDistinct => "distinct wraps I32, U32, I64, U64, F32, or F64",
@@ -474,6 +487,8 @@ fn diag_text(i: I32) Str {
         Diag.MainParams => "main takes no parameters",
         Diag.TestName => pick(a == 1, "Empty test name", "Duplicate test " + node_text(node)),
         Diag.TooManyParams => pick(word < 0, "main", w) + " has " + int_text(a) + " parameters (max 1000)",
+        Diag.ImportNotModule => w + " is " + item_kind_text(a) + "; using imports a mod",
+        Diag.HostUnresolved => "No host declarations for " + node_text(node),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -556,7 +571,9 @@ fn diag_text(i: I32) Str {
         },
         Diag.IteratorSource => {
             // b: 0 a pipeline's source, 1 a stage's other array, 2 a flat_map body, 3 bisect with other stages,
-            // 4 a range of a type that cannot be counted, 5 sum of non-numbers, 6 bisect over a range not of I32
+            // 4 a range of a type that cannot be counted, 5 sum of non-numbers, 6 bisect over a range not of I32,
+            // 7 a source an operator took (word: the operator)
+            if b == 7 { return "A pipeline binds looser than " + w + ": its source is all of this"; };
             if b == 6 { return "bisect takes a range of I32, not " + type_text(a); };
             if b == 5 { return word_text(word) + " needs numbers, not " + type_text(a); };
             if b == 4 { return "Cannot pipe a range of " + type_text(a); };
@@ -646,6 +663,8 @@ fn diag_default_label(i: I32) Str {
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),
         Diag.MemberClash => pick(b == 1, "also in the protocol", "also a field"),
         Diag.VariantNotValue => "make one: " + w + " {…}",
+        Diag.ImportNotModule => "not a mod",
+        Diag.HostUnresolved => "not found",
         ~> "here",
     };
 }

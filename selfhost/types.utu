@@ -35,6 +35,10 @@ vec inst_module: I32;
 /// A list of types.
 vec inst_args: I32;
 vec inst_table: I32;
+/// By instance: the type node that first named it (`Vec[I32]`), or -1; from
+/// @inst_at, which a caller of @instance sets.
+vec inst_site: I32;
+vec inst_at: I32 = [-1];
 
 fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 40503; }
 
@@ -98,6 +102,8 @@ fn inst_hash(module: I32, args: I32) I32 { (module * -1640531535) ^ (args * 4050
 /// The instance of `module` with type arguments `args` (a list of types),
 /// interned.
 fn instance(module: I32, args: I32) I32 {
+    let site = inst_at[0];
+    inst_at[0] = -1;
     if (inst_module.len() + 1) * 2 > inst_table.len() { inst_grow(); };
     let mask = inst_table.len() - 1;
     let h = inst_hash(module, args) & mask;
@@ -109,6 +115,7 @@ fn instance(module: I32, args: I32) I32 {
     let id = inst_module.len();
     inst_module.push(module);
     inst_args.push(args);
+    inst_site.push(site);
     inst_table[h] = id;
     let depth = 0;
     for (0 ..< vl_len[args]) |i| { depth = max_i32(depth, type_depth(vl_item(args, i))); };
@@ -243,6 +250,12 @@ fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64
 
 //! = Types from syntax
 
+/// On the last diagnostic, a mistake in instance `inst` of a generic
+/// module: where the instance is named.
+fn instance_site(inst: I32) void {
+    if inst > 0 and inst < inst_site.len() and inst_site[inst] >= 0 { diag_place(Extra.Related, inst_site[inst], "instantiated here"); };
+}
+
 /// The type a type node names, in instance `inst`.
 fn type_of(node: I32, inst: I32) I32 {
     if node < 0 { return ty_error(); };
@@ -255,6 +268,7 @@ fn type_of(node: I32, inst: I32) I32 {
         let d = ty_decl(t);
         if is_scalar_kind(d) or (decl_is(d, Decl.TypeDecl) and is_scalar_decl(d)) {
             report(Diag.InvalidNullableType, node, decl_name[d]);
+            instance_site(inst);
             return ty_error();
         };
         return nullable(t);
@@ -300,6 +314,7 @@ fn type_path(node: I32, inst: I32) I32 {
             report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[args]);
             return ty_error();
         };
+        inst_at[0] = node;
         let at = instance(owner, args);
         if too_deep(at, node) { return ty_error(); };
         return named(decl, at);
@@ -320,6 +335,7 @@ fn type_path(node: I32, inst: I32) I32 {
         if member_decl < 0 { return ty_error(); };
         let owner = module_of(member_decl);
         let at = 0;
+        inst_at[0] = node;
         if is_kind(c, Node.Instantiated_module_ref) {
             at = instance(owner, type_args(next_sibling(first_child(c)), inst));
         } else if is_kind(next_sibling(c), Node.Module_type_arg_list) {
@@ -546,6 +562,7 @@ fn reset_types() void {
     inst_module.clear();
     inst_args.clear();
     inst_depth.clear();
+    inst_site.clear();
     inst_table.clear();
     struct_inst.clear();
     struct_heap.clear();

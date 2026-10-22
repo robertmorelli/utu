@@ -401,7 +401,10 @@ fn validate_field_type(node: I32) void {
 
 /// A global's initializer is a literal (maybe negated).
 fn validate_global(node: I32) void {
-    if invalid_global_initializer(node) { report(Diag.InvalidGlobalInitializer, last_child(node), word_of(first_child(node))); };
+    if invalid_global_initializer(node) {
+        report(Diag.InvalidGlobalInitializer, last_child(node), word_of(first_child(node)));
+        diag_note("Make other values in a function: fn " + word_text(word_of(first_child(node))) + "() … { … }");
+    };
 }
 
 /// Whether a global's initializer is other than a literal, a negated

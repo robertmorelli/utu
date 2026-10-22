@@ -76,6 +76,15 @@ mod Str {
         </ir-string-slice-wtf16> \/;
     }
 
+    // Stop the program, saying why: a trap named `reason` (std's checks use it).
+    fn trap(reason: &) void {
+        let f: fun(&) void = @es/\ (r) => { throw new WebAssembly.RuntimeError(r); } \/;
+        f(reason);
+    }
+
+    // Whether the build keeps its checks (all but -O smallUnsafe and fastUnsafe).
+    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
+
     // The string itself: what `${s}` in a template string calls.
     fn &.to_str |self| () & { @ir/\ <ir-ident name="self"/> \/; }
 
