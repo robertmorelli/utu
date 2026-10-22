@@ -258,6 +258,9 @@ vec func_module_name: I32;
 vec func_field_name: I32;
 /// For the name section, or -1.
 vec func_debug_name: I32;
+/// Its syntax node (a declaration, a closure), or -1: where a source map
+/// places what has no nearer one.
+vec func_src: I32;
 /// Its index in the module, once encoding assigns them.
 vec func_index: I32;
 /// A @wat function: its site (host.utu), whose code is its body; else -1.
@@ -348,6 +351,7 @@ fn new_func(kind: FuncKind, t: I32) I32 {
     func_module_name.push(-1);
     func_field_name.push(-1);
     func_debug_name.push(-1);
+    func_src.push(cur_src[0]);
     func_index.push(-1);
     func_code.push(-1);
     f;
@@ -398,6 +402,7 @@ fn reset_wasm() void {
     func_module_name.clear();
     func_field_name.clear();
     func_debug_name.clear();
+    func_src.clear();
     func_index.clear();
     func_code.clear();
     local_types.clear();
@@ -551,6 +556,12 @@ vec w_kids: I32;
 vec w_aux: I32;
 /// Nodes built and not yet taken.
 vec w_stack: I32;
+/// The syntax node each was made for (@cur_src then), or -1: a source map's spans.
+vec w_src: I32;
+/// For a copy inlining made: the syntax of the call it replaced, or -1.
+vec w_site: I32;
+/// The syntax node being checked, whose code nodes made now are (-1: none).
+vec cur_src: I32 = [-1];
 
 fn reset_ir() void {
     w_op.clear();
@@ -562,6 +573,9 @@ fn reset_ir() void {
     w_kids.clear();
     w_aux.clear();
     w_stack.clear();
+    w_src.clear();
+    w_site.clear();
+    cur_src[0] = -1;
 }
 
 fn w_mark() I32 { w_stack.len(); }
@@ -574,6 +588,8 @@ fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
     if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple); };
     w_op.push(op.to_i32());
     w_type.push(vt);
+    w_src.push(cur_src[0]);
+    w_site.push(-1);
     w_a.push(a);
     w_b.push(b);
     w_first.push(w_kids.len());
@@ -1444,17 +1460,29 @@ fn encode_code() void {
             // Assembled already: locals, instructions, and end.
             let k = func_code[f];
             leb_u(false, wat_len[k]);
+            // One entry, its function's place: its code is the host's.
+            if source_map[0] == 1 {
+                map_at.push(sec.len());
+                map_node.push(func_src[f]);
+                map_site.push(-1);
+            };
             for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]); };
         } else {
             code_bytes.clear();
             encode_locals(f);
             mark_targets(func_body[f]);
+            let first = map_at.len();
+            if source_map[0] == 1 { map_function(f); };
             emit(func_body[f], f);
             code_bytes.push(11);
             leb_u(false, code_bytes.len());
+            // The map's offsets, from the body's to the section's.
+            for (first ..< map_at.len()) |i| { map_at[i] += sec.len(); };
             for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]); };
         };
     };
+    map_code_size[0] = sec.len();
+    map_func[0] = -1;
     flush_section(10);
 }
 
@@ -1557,6 +1585,8 @@ fn encode_names() void {
 /// (@optimize_module) when optimizing, numbered (@assign_indices), and
 /// encoded section by section. Returns their number.
 fn encode_module() I32 {
+    // Nodes made from here (inlining, cleaning up) have no syntax of their own.
+    cur_src[0] = -1;
     sweep();
     // -O3 inlines (inline.utu); what is no longer called is then swept out,
     // before the mems' late functions are made (and marked live).
@@ -1571,6 +1601,11 @@ fn encode_module() I32 {
     out.clear();
     sec.clear();
     labels.clear();
+    map_at.clear();
+    map_node.clear();
+    map_site.clear();
+    w_near.clear();
+    map_func[0] = -1;
     declared.clear();
     func_declared.resize(func_kind.len());
     for (0 ..< func_kind.len()) |f| { func_declared[f] = 0; };
@@ -1592,6 +1627,9 @@ fn encode_module() I32 {
     out.resize(code_start);
     encode_elements();
     encode_data_count();
+    // The map's offsets, from the section's contents to the module's.
+    let moved = out.len() + code.len() - map_code_size[0];
+    for (0 ..< map_at.len()) |i| { map_at[i] += moved; };
     for (0 ..< code.len()) |i| { out.push(code[i]); };
     encode_data();
     if debug_names[0] == 1 { encode_names(); };
@@ -1607,6 +1645,73 @@ export mem host_json: U8;
 /// Whether the module carries a name section (function names for stack
 /// traces): off unless asked for, as stage 0 has none.
 vec debug_names: I32 = [0];
+
+//! = Source maps
+//!
+//! Each IR node keeps the syntax node it was made for (@w_src), and a copy
+//! inlining made, the call it replaced (@w_site). Encoding notes, at each
+//! instruction whose syntax differs from the one before, its offset in the
+//! module and that syntax; the host reads the table (a trap's offset to a
+//! line) and writes a standard source map from it. A node with none (made
+//! by cleaning up) takes the nearest around it, else its function's: a
+//! coarser place, never another one.
+
+/// Whether builds keep a source map (1), or not (0, the default).
+vec source_map: I32 = [0];
+/// By entry: an instruction's byte offset in the module, its syntax node,
+/// and the call it was inlined at (-1: none).
+vec map_at: I32;
+vec map_node: I32;
+vec map_site: I32;
+/// The code section's size, before its header.
+vec map_code_size: I32 = [0];
+/// While a body is encoded: by IR node, the nearest node with syntax (it, or
+/// one around it), or -1.
+vec w_near: I32;
+/// The function being encoded.
+vec map_func: I32 = [-1];
+
+/// Function `f`'s body is next: @w_near for its nodes, and an entry at its
+/// start (its locals), for what precedes its first instruction.
+fn map_function(f: I32) void {
+    map_func[0] = f;
+    if w_near.len() < w_op.len() {
+        let old = w_near.len();
+        w_near.resize(w_op.len());
+        for (old ..< w_op.len()) |n| { w_near[n] = -1; };
+    };
+    let body = func_body[f];
+    w_near[body] = if w_src[body] >= 0 { body; } else { -1; };
+    live_work.clear();
+    live_work.push(body);
+    while (live_work.len() > 0) {
+        let n = live_work[live_work.len() - 1];
+        live_work.resize(live_work.len() - 1);
+        for (0 ..< w_count[n]) |i| {
+            let k = w_kid(n, i);
+            w_near[k] = if w_src[k] >= 0 { k; } else { w_near[n]; };
+            live_work.push(k);
+        };
+    };
+    // From the body's first byte (its locals): a stack overflow is there.
+    map_at.push(0);
+    map_node.push(func_src[f]);
+    map_site.push(-1);
+}
+
+/// An entry for node's instruction, next in @code_bytes, unless its syntax is the last entry's.
+fn map_note(node: I32) void {
+    if map_func[0] < 0 { return; };
+    // A global's folded initializer is no body's node: its own syntax, or its function's.
+    let near = if w_src[node] >= 0 { node; } else if node < w_near.len() { w_near[node]; } else { -1; };
+    let s = if near >= 0 { w_src[near]; } else { func_src[map_func[0]]; };
+    let site = if near >= 0 { w_site[near]; } else { -1; };
+    let last = map_node.len() - 1;
+    if map_node[last] == s and map_site[last] == site { return; };
+    map_at.push(code_bytes.len());
+    map_node.push(s);
+    map_site.push(site);
+}
 
 //! = Instructions
 
@@ -1901,6 +2006,7 @@ fn emit_while_deep(block: I32) void {
 }
 
 fn emit_own(node: I32) void {
+    if source_map[0] == 1 { map_note(node); };
     let op = w_op[node];
     let a = w_a[node];
     let b = w_b[node];

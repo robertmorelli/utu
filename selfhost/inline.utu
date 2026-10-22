@@ -20,6 +20,8 @@ vec inl_local_map: I32;
 /// While copying: how far its labels move, and where a `return` goes.
 vec inl_label_offset: I32 = [0];
 vec inl_return_label: I32 = [0];
+/// The call's syntax (see w_site).
+vec inl_site: I32 = [-1];
 /// The calls found in a body.
 vec inl_calls: I32;
 
@@ -99,6 +101,7 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
     inl_label_offset[0] = label;
     let block = label + max_label(func_body[g]) + 1;
     inl_return_label[0] = block;
+    inl_site[0] = w_src[c];
     // The arguments set the parameters, in order; then the body.
     let m = w_mark();
     for (0 ..< np) |i| {
@@ -156,7 +159,10 @@ fn inl_copy(n: I32) I32 {
         op = Op.Br.to_i32();
         a = inl_return_label[0];
     };
-    w_node(Op.from_i32(op), w_type[n], a, w_b[n], m);
+    let copy = w_node(Op.from_i32(op), w_type[n], a, w_b[n], m);
+    // Its syntax, the callee's, and the call it is inlined at: a source map places it so.
+    w_src[copy] = w_src[n];
+    w_site[copy] = inl_site[0];
     w_pop();
 }
 
