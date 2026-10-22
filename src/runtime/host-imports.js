@@ -186,7 +186,8 @@ export function promisifyExports(instance, promiseSpec) {
   const exports = { ...instance.exports };
   for (const name of names) {
     if (typeof exports[name] === 'function') {
-      exports[name] = WebAssembly.promising(exports[name]);
+      // Its length stays the function's arity (Bun's promising() gives 1).
+      exports[name] = Object.defineProperty(WebAssembly.promising(exports[name]), 'length', { value: exports[name].length });
     }
   }
   return exports;
@@ -208,10 +209,10 @@ export function convertExports(exports, exportSpec) {
     const f = exports[name];
     if (typeof f !== 'function') continue;
     const convert = kind === 'Bool' ? v => v !== 0 : kind === 'U32' ? v => v >>> 0 : v => BigInt.asUintN(64, v);
-    out[name] = (...args) => {
+    out[name] = Object.defineProperty((...args) => {
       const result = f(...args);
       return result instanceof Promise ? result.then(convert) : convert(result);
-    };
+    }, 'length', { value: f.length });
   }
   return out;
 }

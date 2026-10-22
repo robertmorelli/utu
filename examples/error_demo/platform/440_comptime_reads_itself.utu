@@ -1,0 +1,8 @@
+// What: a @comptime expression that reads its own mem
+// Expect: @comptime t reads itself
+fn tab() Array[I32] { [t.len()]; }
+const mem t: I32 = @comptime/\ tab() \/;
+
+export main() I32 {
+    t[0];
+}

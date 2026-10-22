@@ -61,7 +61,7 @@ fn generated_file(start: I32) I32 {
 vec gen_owner: I32;
 
 /// The imported file whose scope a file's declarations are in, or -1.
-fn owner_of(file: I32) I32 { if file < gen_owner.len() { gen_owner[file]; } else { -1; }; }
+fn gen_owner_of(file: I32) I32 { if file < gen_owner.len() { gen_owner[file]; } else { -1; }; }
 
 /// Writes the generated sources for each own file's mems, and parses them
 /// as one more file per file. Called before names are resolved.

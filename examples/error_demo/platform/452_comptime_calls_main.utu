@@ -1,0 +1,8 @@
+// What: a @comptime helper calling main
+// Expect: main is the entry point, not a function: move its body into a fn
+fn tab() Array[I32] { [main()]; }
+const mem t: I32 = @comptime/\ tab() \/;
+
+export main() I32 {
+    5;
+}

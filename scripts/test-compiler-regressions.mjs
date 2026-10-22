@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { compileFile, instantiateNode, loadNodeCompiler, nodeStdlib } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
@@ -60,18 +60,22 @@ try {
 
   // An @ir function named as a value, in the middle of another function's
   // locals, which its making once overwrote (stage 0 cannot build this).
-  const valued = await selfhost(await write(`fn plus(a: I32, b: I32) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }
-fn apply(f: fun(I32, I32) I32, a: I32, b: I32) I32 { f(a, b); }
-export lib {
+  // @ir is the standard library's only: the function is in a std: module here.
+  const plusStd = `mod plus {
+    fn add(a: I32, b: I32) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }
+    fn apply(f: fun(I32, I32) I32, a: I32, b: I32) I32 { f(a, b); }
     fn run() F64 {
         let s = "text";
         let x: F64 = 1.5;
-        let r = apply(plus, 1, 2);
+        let r = apply(add, 1, 2);
         let z: F64 = 10.0;
         r.to_f64() * 1000.0 + x * 100.0 + z + s.len().to_f64();
     }
 }
-`));
+`;
+  const valuedBuild = await compileFile(utu, await write('using plus from std:Plus;\nexport lib { fn run() F64 { plus.run(); } }\n'),
+    { optimize: 'size', stdlib: new Map([...nodeStdlib(), ['std:Plus', plusStd]]) });
+  const valued = valuedBuild.wasm ? { exports: (await instantiateNode(valuedBuild.wasm, valuedBuild.spec)).exports } : { errors: valuedBuild.diagnostics.map(d => d.message) };
   assert.equal(valued.exports?.run(), 3164, valued.errors?.join('\n'));
   checked++;
 
@@ -466,12 +470,33 @@ export lib {
     // Where an expected type came from: a parameter, a result.
     ['fn g(n: I32) I32 { n; }\nfn f() I32 { g("x"); }\n', 'g takes I32, got Str'],
     ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
+    // @comptime and the other DSLs (each crashed, hung, or passed silently).
+    ['fn tab() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads itself'],
+    ['fn f() Array[I32] { [u.len()]; }\nfn g() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nconst mem u: I32 = @comptime/\\ g() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads u, which waits on it'],
+    ['fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nexport main() I32 { t.len(); }\n', '@comptime t trapped: it ran too long (a hundred million loop rounds)'],
+    ['const mem t: I32 = @comptime/\\ [1, 2] ; __comptime_t.push(99) \\/;\nexport main() I32 { t.len(); }\n', "@comptime takes one expression: Expected ')', got ';'"],
+    ['const mem a: U8 = @comptime/\\  \\/;\nexport main() I32 { a.len(); }\n', '@comptime needs an expression'],
+    ['const mem a: U8 = @embed/\\ \\/;\nexport main() I32 { a.len(); }\n', '@embed needs a file path'],
+    ['enum(U8) Color: | Red | Green | Blue\nconst mem cs: Color = [2, 7, 1];\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    ['enum(U8) Color: | Red | Green | Blue\nfn cs_() Array[I32] { [2, 7]; }\nconst mem cs: Color = @comptime/\\ cs_() \\/;\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-array-len><ir-ident name="a"/></ir-array-len> \\/; }\nexport main() I32 { f(1); }\n', '@ir is for the standard library: use @wat'],
+    ['fn f(c: I32, a: I32) I32 { @wat/\\ local.get $a local.get $a local.get $c select (param i32) \\/; }\nexport main() I32 { f(1, 2); }\n', 'select takes only (result t)'],
+    [`export main() I32 { ${'@utu/\\ '.repeat(17)}1${' \\/'.repeat(17)}; }\n`, 'DSLs nested too deeply (max 16)'],
+    ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nexport main() I32 { 1; }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
+    ['struct P:\n    | name: Str\nexport main() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; a.name; }\n', '@stored needs using Browser from std:Browser'],
+    ['fn tab() Array[I32] { [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { 5; }\n', 'main is the entry point, not a function: move its body into a fn'],
+    ['export lib {\n    fn f(x: ?I32) I32 { promote x { |v| => v, ~> 0 }; }\n}\n', 'Missing , after 0'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
+
+  // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
+  const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));
+  assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);
+  checked++;
 
   // Test names: each test has one, its own.
   const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
@@ -503,6 +528,16 @@ export lib {
     [{ 'main.utu': 'mod sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nexport main() I32 { sm.get(sm.new(3)); }\n' }, 3],
     // An @es binding of a generic module, typed in each instance.
     [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nexport main() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).to_f64(); }\n' }, 10.5],
+    // An imported file's own mems, read by its functions and modules; a
+    // @comptime mem there; an @embed path relative to that file (each was "Unknown variable").
+    [{ 'lib.utu': 'mem m: I32 = [5, 6];\nfn top() I32 { m[1]; }\nfn sq() Array[I32] { [0, 1, 4, 9]; }\nconst mem tab: I32 = @comptime/\\ sq() \\/;\nconst mem raw: U8 = @embed/\\ data.bin \\/;\nmod t { fn n() I32 { top() + m[0] + tab[3] * 10 + raw.len() * 100; } }\n',
+      'data.bin': 'abc', 'main.utu': 'using t from "./lib.utu";\nexport main() I32 { t.n(); }\n' }, 401],
+    // A @comptime mem read by another's expression is evaluated first (the second read it empty).
+    [{ 'main.utu': 'fn sq() Array[I32] { [0, 1, 4, 9, 16]; }\nfn plus() Array[I32] { let a = Array[I32].new(first.len(), 0); for (0 ..< first.len()) |i| { a[i] = first[i] + 1; }; a; }\nconst mem second: I32 = @comptime/\\ plus() \\/;\nconst mem first: I32 = @comptime/\\ sq() \\/;\nexport main() I32 { second.len() * 100 + second[4]; }\n' }, 517],
+    // A @comptime expression that awaits (its run gave a promise, read as nothing).
+    [{ 'main.utu': 'let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn tab() Array[I32] { [await later(5)]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t.len() * 100 + t[0]; }\n' }, 105],
+    // A @wat Bool is 0 or 1, returned or left (6 read as true, and == true was false).
+    [{ 'main.utu': 'fn six() Bool { @wat/\\ i32.const 6 \\/; }\nfn nine() Bool { @wat/\\ i32.const 9 return \\/; }\nexport main() I32 { if six() == true and nine() == true { 1; } else { 0; }; }\n' }, 1],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
@@ -520,6 +555,10 @@ export lib {
     [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { 1; } }\n', 'main.utu': 'using hm from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'Unknown function helper'],
     [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n', 'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f() I32 { 1; } }\n',
       'main.utu': 'using boxes from "./boxes.utu";\nexport main() I32 { ops.double(21); }\n' }, 'Unknown variable ops'],
+    // An imported file's mem is its own too.
+    [{ 'mf.utu': 'mem m: I32 = [1];\nmod mm { fn f() I32 { m[0]; } }\n', 'main.utu': 'using mm from "./mf.utu";\nexport main() I32 { m[0]; }\n' }, 'Unknown variable m'],
+    // A parse error in an imported file is the mistake (it showed as "Unknown module t8").
+    [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nexport main() I32 { t8.n(); }\n' }, "Unexpected ';'"],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

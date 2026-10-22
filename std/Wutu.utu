@@ -732,9 +732,10 @@ mod wutu {
     }
   };
 
-  addEventListener('pagehide', flush);
-  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
-  addEventListener('storage', event => {
+  // (Where there is a window: Node and a DOM without one have none.)
+  globalThis.addEventListener?.('pagehide', flush);
+  globalThis.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  globalThis.addEventListener?.('storage', event => {
     const store = stores.get(event.key);
     if (!store) return;
     if (store.dirty) {

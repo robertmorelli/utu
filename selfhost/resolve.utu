@@ -543,7 +543,7 @@ vec file_scope_end: I32;
 fn scope_file(file: I32) I32 {
     if file_role[file] != FileRole.Generated.to_i32() { return file; };
     // What is generated for an imported file's mems is in its scope.
-    if owner_of(file) >= 0 { return owner_of(file); };
+    if gen_owner_of(file) >= 0 { return gen_owner_of(file); };
     for (0 ..< file_role.len()) |f| { if file_role[f] == FileRole.Entry.to_i32() { return f; }; };
     file;
 }
@@ -1009,7 +1009,7 @@ fn declare_file_scope(file: I32) void {
     let entry = file_role[file] == FileRole.Entry.to_i32();
     for (file ..< file_root.len()) |f| {
         let owner = if entry { -1; } else { file; };
-        let generated = file_role[f] == FileRole.Generated.to_i32() and owner_of(f) == owner;
+        let generated = file_role[f] == FileRole.Generated.to_i32() and gen_owner_of(f) == owner;
         if (f == file or generated) and file_root[f] >= 0 {
             let first_entry = decl_kind.len();
             item = first_child(file_root[f]);

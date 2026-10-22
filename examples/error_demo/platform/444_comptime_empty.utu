@@ -1,0 +1,7 @@
+// What: an empty @comptime body
+// Expect: @comptime needs an expression
+const mem t: I32 = @comptime/\  \/;
+
+export main() I32 {
+    t.len();
+}

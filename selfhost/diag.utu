@@ -175,7 +175,8 @@ fn comptime_site(i: I32) I32 {
     if node < 0 { return -1; };
     let b = tok_start[node_first[node]];
     for (0 ..< comptime_text_start.len()) |k| {
-        if b >= comptime_text_start[k] and b < comptime_text_end[k] { return k; };
+        // (From the `(` written before the expression.)
+        if b >= comptime_text_start[k] - 1 and b < comptime_text_end[k] { return k; };
     };
     -1;
 }
@@ -678,7 +679,7 @@ fn diag_default_label(i: I32) Str {
         Diag.NotCallable => "not a function",
         Diag.ParseError => if b >= 0 and comptime_parse_site(i) < 0 { word_text(b) + "?"; } else { "unexpected"; },
         Diag.DslEmpty => "empty",
-        Diag.ComptimeCycle => "waits on itself",
+        Diag.ComptimeCycle => if a >= 0 and decl_name[a] != diag_word[i] { "waits on " + word_text(decl_name[a]); } else { "waits on itself"; },
         Diag.IrOutsideStd => "not the standard library",
         Diag.DslTooDeep => "too deep",
         Diag.ProtoGeneric => "on a generic type",

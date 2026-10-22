@@ -1,0 +1,11 @@
+// What: a @comptime expression whose loop never ends
+// Expect: @comptime t trapped: it ran too long (a hundred million loop rounds)
+fn f() Array[I32] {
+    while (true) { };
+    [1];
+}
+const mem t: I32 = @comptime/\ f() \/;
+
+export main() I32 {
+    t.len();
+}

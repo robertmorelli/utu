@@ -443,7 +443,7 @@ mod I32 {
 
 Rules:
 - A `mod` body may contain `type` declarations, structs, protocols, enums, functions, globals, tests, and benches.
-- A `mod` body may **not** contain another `mod`.
+- A `mod` body may **not** contain another `mod`, or a `mem` (a mem is one memory of the program, declared at a file's top level).
 
 ---
 
@@ -460,6 +460,8 @@ type & = @ir/\ <ir-wasm-I31/> \/
 
 After instantiation, type parameters in the `@ir` body are substituted with concrete types.  
 The codegen backend reads the `ir-wasm-*` node and emits the appropriate wasm type definition.
+
+A function body written in `@ir` is unchecked compiler IR, and the standard library's only: in a program, one is an error that says to write `@wat` (which is checked) instead.
 
 ---
 
@@ -794,9 +796,15 @@ mem props: U16 = @embed/\ tables/props.bin \/;    // a file's bytes, beside the 
 const mem dfa: U8 = @comptime/\ build_dfa() \/;   // runs during compilation
 ```
 
-`@comptime` compiles a copy of the entry file (without its exports, tests, and
-other `@comptime` mems), evaluates the expression to an `Array` of the element's
-value type (`Array[I32]` for the narrow kinds), and embeds the result. A
+`@comptime` compiles a copy of the program (without its exports and tests),
+evaluates the expression (one expression; it may `await`) to an `Array` of the
+element's value type (`Array[I32]` for the narrow kinds), and embeds the result.
+An expression may read another `@comptime` mem, which is evaluated first; one
+that reads itself, or a mem that reads it back, is an error, and so is one that
+runs over a hundred million loop rounds. An integer enum mem's values must be
+its variants'. A `@embed` path is relative to the file that declares the mem.
+A mem is declared at the top level of a file, and an imported file's mems are
+its own (its functions and modules see them; the importer does not). A
 `const mem` rejects writes, `push`, `reserve`, `resize`, `clear`, and `copy_in`.
 
 The host reaches a mem through two methods; a mem that uses either is created by
