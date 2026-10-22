@@ -661,6 +661,7 @@ fn struct_returns() Bool {
             func_locals[twin] = func_locals[f];
             func_local_count[twin] = func_local_count[f];
             func_debug_name[twin] = func_debug_name[f];
+            func_src[twin] = func_src[f];
             sr_twin[f] = twin;
         };
     };
@@ -671,6 +672,9 @@ fn struct_returns() Bool {
     sr_type.resize(all);
     sr_twin.resize(all);
     sr_changed.resize(all);
+    // (Nodes made here are placed by what holds them; see w_src.)
+    let src = cur_src[0];
+    cur_src[0] = -1;
     for (n ..< all) |g| {
         func_live[g] = 1;
         func_uses[g] = 0;
@@ -684,6 +688,7 @@ fn struct_returns() Bool {
     for (0 ..< all) |f| {
         if sr_changed[f] == 1 and sr_unshared(func_body[f]) { locals_for_structs(f); };
     };
+    cur_src[0] = src;
     true;
 }
 
@@ -941,6 +946,8 @@ fn sr_rewrite_calls(f: I32, n: I32, parent: I32) void {
     for (0 ..< w_count[n]) |i| { w_push(w_kid(n, i)); };
     let call = w_node(Op.Call, sr_vt(t), sr_twin[g], 0, m);
     w_pop();
+    w_src[call] = w_src[n];
+    w_site[call] = w_site[n];
     sr_changed[f] = 1;
     if parent >= 0 and w_op[parent] == Op.Drop.to_i32() {
         let md = w_mark();
