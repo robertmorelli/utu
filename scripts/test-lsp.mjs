@@ -189,6 +189,94 @@ try {
   const published = sent.filter(m => m.method === 'textDocument/publishDiagnostics' && m.params.uri === main).at(-1);
   assert.match(published.params.diagnostics[0]?.message ?? '', /sum/);
 
+  // A fresh server, for what follows: its own documents.
+  {
+    const out = [];
+    const fresh = createLanguageServer({
+      utu: await loadNodeCompiler(), hostFor: () => host, send: message => out.push(message),
+      toKey: uri => uri.startsWith('file:') ? fileURLToPath(uri) : uri, toUri: key => key.startsWith('std:') ? null : pathToFileURL(key).href,
+    });
+    const call = async (method, params) => {
+      const n = out.length;
+      await fresh.handle({ jsonrpc: '2.0', id: ++id, method, params });
+      const answer = out.slice(n).find(m => m.id === id);
+      return answer.error ? { error: answer.error.message } : answer.result;
+    };
+    const note = async (method, params) => { await fresh.handle({ jsonrpc: '2.0', method, params }); await fresh.idle(); };
+    const shown = uri => out.filter(m => m.method === 'textDocument/publishDiagnostics' && m.params.uri === uri).at(-1)?.params.diagnostics;
+    const file = async (name, text) => { await fs.writeFile(path.join(dir, name), text); return pathToFileURL(path.join(dir, name)).href; };
+    await call('initialize', { capabilities: {} });
+
+    // While a file does not parse, answers come from its last text that did.
+    const S = 'fn g() I32 { 2; }\nfn f() I32 { let count = g(); count; }\nexport lib { fn h() I32 { f(); } }\n';
+    const s = await file('s.utu', S);
+    await note('textDocument/didOpen', { textDocument: { uri: s, version: 1, text: S } });
+    const broken = '// above\n' + S.replace('count; }', 'count }');
+    await note('textDocument/didChange', { textDocument: { uri: s, version: 2 }, contentChanges: [{ text: broken }] });
+    assert.match((await call('textDocument/hover', at(broken, 'f();', 0, s))).contents.value, /fn f\(\) I32/);
+    assert.deepEqual((await call('textDocument/definition', at(broken, 'g()', 0, s))).range.start, { line: 1, character: 3 });
+    assert.deepEqual((await call('textDocument/documentSymbol', { textDocument: { uri: s } })).map(x => x.name), ['g', 'h'], "f's line changed");
+    assert.ok((await call('textDocument/semanticTokens/full', { textDocument: { uri: s } })).data.length >= 15);
+    assert.match((await call('textDocument/rename', { ...at(broken, 'g()', 0, s), newName: 'k' })).error, /does not parse/);
+    await note('textDocument/didChange', { textDocument: { uri: s, version: 3 }, contentChanges: [{ text: S }] });
+
+    // A rename to a name that would mean something else is refused.
+    for (const name of ['new', 'I32', 'Str']) assert.ok((await call('textDocument/rename', { ...at(S, 'count', 1, s), newName: name })).error, name);
+
+    // References and rename from an imported file reach the open files importing it.
+    const SH = 'mod shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n    fn &.sum |self| () I32 { self.x; }\n}\n';
+    const M = 'using shapes |Point| from "./sh.utu";\nexport lib { fn run() I32 { let p = Point.new(1); p.sum(); } }\n';
+    const sh = await file('sh.utu', SH), m = await file('m.utu', M);
+    await note('textDocument/didOpen', { textDocument: { uri: m, version: 1, text: M } });
+    await note('textDocument/didOpen', { textDocument: { uri: sh, version: 1, text: SH } });
+    const across = await call('textDocument/rename', { ...at(SH, 'sum', 0, sh), newName: 'total' });
+    assert.deepEqual(Object.keys(across.changes).sort(), [m, sh].sort());
+    assert.deepEqual((await call('textDocument/references', { ...at(SH, 'shapes', 0, sh), context: { includeDeclaration: true } })).map(r => r.uri).filter((u, i, all) => all.indexOf(u) === i).sort(), [m, sh].sort());
+
+    // Closing a file: the others are built again (on its text on disk), and
+    // what only its builds showed on files not open is cleared.
+    await note('textDocument/didChange', { textDocument: { uri: sh, version: 2 }, contentChanges: [{ text: SH.replace('fn &.sum', 'fn &.add') }] });
+    assert.equal(shown(m).length, 1);
+    await note('textDocument/didClose', { textDocument: { uri: sh } });
+    assert.deepEqual(shown(m), [], 'the discarded text no longer counts');
+    const lib = await file('util.utu', 'mod util { fn helper() I32 { nope; } }\n');
+    const U = 'using util from "./util.utu";\nexport lib { fn run() I32 { util.helper(); } }\n';
+    const user = await file('user.utu', U);
+    await note('textDocument/didOpen', { textDocument: { uri: user, version: 1, text: U } });
+    assert.equal(shown(lib)?.length, 1, 'an import not open shows its mistake');
+    await note('textDocument/didClose', { textDocument: { uri: user } });
+    assert.deepEqual(shown(lib), [], 'and not after its importer closes');
+
+    // An unsaved buffer keeps its own URI.
+    const T = 'fn f() I32 {\n    let total = 1;\n    totl;\n}\nexport lib { fn h() I32 { f(); } }\n';
+    await note('textDocument/didOpen', { textDocument: { uri: 'untitled:Untitled-1', version: 1, text: T } });
+    assert.equal(shown('untitled:Untitled-1')[0].data.fix.uri, 'untitled:Untitled-1');
+    assert.equal((await call('textDocument/definition', at(T, 'f();', 0, 'untitled:Untitled-1'))).uri, 'untitled:Untitled-1');
+
+    // Completion after a type, a field, a call, an index; `?.` on a nullable.
+    const C = 'struct Inner:\n    | v: I32\nstruct Rect:\n    | w: F64\n    | inner: Inner\nfn Rect.square(s: F64) Rect { Rect { w: s, inner: Inner { v: 1 } }; }\nfn Rect.area |r| () F64 { r.w; }\nenum Shape:\n    | Circle\n    | Square\nfn mk() Rect { Rect.square(2.0); }\nexport lib {\n    fn f(r: Rect, opt: ?Rect, arr: Array[Rect]) F64 {\n        CURSOR\n        r.w;\n    }\n}\n';
+    const c = await file('c.utu', C.replace('CURSOR', ''));
+    await note('textDocument/didOpen', { textDocument: { uri: c, version: 1, text: C.replace('CURSOR', '') } });
+    let v = 1;
+    const offered = async typed => {
+      const text = C.replace('CURSOR', `${typed}¦`);
+      await note('textDocument/didChange', { textDocument: { uri: c, version: ++v }, contentChanges: [{ text: text.replace('¦', '') }] });
+      return (await call('textDocument/completion', at(text, '¦', 0, c))).map(item => item.label);
+    };
+    assert.deepEqual(await offered('Rect.'), ['square']);
+    assert.deepEqual(await offered('Shape.'), ['Circle', 'Square']);
+    assert.deepEqual(await offered('r.inner.'), ['v']);
+    for (const typed of ['mk().', 'arr[0].', 'Rect.square(1.0).', 'opt?.', 'r. ']) assert.deepEqual(await offered(typed), ['w', 'inner', 'area'], typed);
+    assert.deepEqual(await offered('opt.'), [], 'not without ?.');
+
+    // Hover: a built-in type without its representation, a module's type by the module's name.
+    const H = 'using shapes |Point| from "./sh.utu";\nfn f(a: Array[I32], p: Point) I32 { a.len() + p.x; }\nexport lib { fn run() I32 { f([1], Point.new(1)); } }\n';
+    const h = await file('h.utu', H);
+    await note('textDocument/didOpen', { textDocument: { uri: h, version: 1, text: H } });
+    assert.match((await call('textDocument/hover', at(H, 'Array', 0, h))).contents.value, /^```utu\ntype Array\n```/);
+    assert.match((await call('textDocument/hover', at(H, 'new(1)', 0, h))).contents.value, /fn shapes\.new\(x: I32\) shapes/);
+  }
+
   // `utu lsp`: the same server, framed on stdin and stdout.
   const child = spawn(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'lsp'], { stdio: ['pipe', 'pipe', 'ignore'] });
   let buffer = Buffer.alloc(0);
@@ -216,6 +304,11 @@ try {
   child.stdin.write('Content-Length: 5\r\n\r\n{bad}');
   write({ method: 'textDocument/didOpen', params: {} });
   write({ id: 3, method: 'textDocument/hover', params: at(MAIN, 'total * 2') });
+  // A standard library file (where a definition leads) is its std: module, with no mistakes of its own.
+  const strFile = path.join(ROOT, 'std', 'Str.utu');
+  const strUri = pathToFileURL(strFile).href;
+  write({ method: 'textDocument/didOpen', params: { textDocument: { uri: strUri, languageId: 'utu', version: 1, text: await fs.readFile(strFile, 'utf8') } } });
+  write({ id: 6, method: 'textDocument/documentSymbol', params: { textDocument: { uri: strUri } } });
   write({ id: 4, method: 'shutdown' });
   write({ id: 5, method: 'textDocument/hover', params: at(MAIN, 'total * 2') });
   write({ method: 'exit' });
@@ -224,8 +317,10 @@ try {
   assert.equal(answers.find(a => a.id === null).error.code, -32700);
   assert.match(answers.find(a => a.id === 3).result.contents.value, /total: I32/);
   assert.equal(answers.find(a => a.id === 5).error.code, -32600, 'nothing is answered after shutdown');
+  assert.ok(answers.find(a => a.id === 6).result.length > 0);
+  assert.ok(!answers.some(a => a.method === 'textDocument/publishDiagnostics' && a.params.uri === strUri && a.params.diagnostics.length));
 
-  console.log('lsp: hover, definitions, references, rename (aliases, refusals), symbols, tokens, completion (not in comments or strings), diagnostics as text changes and in unopened imports; `utu lsp` on stdio, past bad messages');
+  console.log('lsp: hover, definitions, references, rename (aliases, refusals, importers), symbols, tokens, completion (members of any expression, statics, ?.; not in comments or strings), answers while a file does not parse, diagnostics as text changes, on close, and in unopened imports, unsaved buffers; `utu lsp` on stdio, std files, past bad messages');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }
